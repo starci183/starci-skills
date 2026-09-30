@@ -1,219 +1,134 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
-import {
-    SepayClient 
-} from "./sepay.client"
-import {
-    mock 
-} from "@starci/jest-preset/mock"
+import { mock } from "@starci/jest-preset/mock"
+import { Secret } from "@modules/platform/config"
+import { HttpError, HttpErrorCode } from "@modules/platform/http"
+import type { HttpClient } from "@modules/platform/http"
+import { SepayErrorCode } from "./errors/sepay.error"
+import { SepayClient } from "./sepay.client"
+import type { SepayOptions } from "./sepay.options"
 
-function gatewayResponse(status: number, body: string): Response {
-    return mock<Response>({
-        ok: status >= 200 && status < 300, status, text: async () => body 
+const options: SepayOptions = {
+    baseUrl: "http://sepay.test",
+    apiKey: new Secret("api-key"),
+    webhookSecret: new Secret("hook-secret"),
+    timeoutMs: 250,
+}
+
+const answering = (body: unknown, status = 200): HttpClient =>
+    mock<HttpClient>({ request: jest.fn().mockResolvedValue({ status, body }) })
+
+const clientFor = (http: HttpClient): SepayClient => new SepayClient(http, options)
+
+const failing = async (call: Promise<unknown>): Promise<Record<string, unknown>> => {
+    const error: unknown = await call.then(
+        () => undefined,
+        (rejected: unknown) => rejected,
+    )
+    expect(error).toMatchObject({ code: SepayErrorCode.RequestFailed })
+    return error instanceof Error && "params" in error && typeof error.params === "object" && error.params !== null
+        ? { ...error.params }
+        : {}
+}
+
+describe("SepayClient", () => {
+    describe("createIntent", () => {
+        it("posts the reference, amount and currency with the credential and the deadline, and carries the gateway ids through", async () => {
+            const http = answering({ id: "g1", qrCodeUrl: "https://pay.test/g1" })
+            const result = await clientFor(http).createIntent({ subscriptionId: "s1", amount: 99000, currency: "VND" })
+            expect(result).toEqual({ gatewayIntentId: "g1", checkoutUrl: "https://pay.test/g1" })
+            expect(http.request).toHaveBeenCalledWith({
+                method: "POST",
+                url: "http://sepay.test/userapi/transactions/qr",
+                headers: { accept: "application/json", authorization: "Bearer api-key" },
+                body: { reference: "s1", amount: 99000, currency: "VND" },
+                timeoutMs: 250,
+            })
+        })
+
+        it("refuses a success answer that names no transaction or an empty one", async () => {
+            const params = { subscriptionId: "s1", amount: 1, currency: "VND" }
+            await expect(failing(clientFor(answering({})).createIntent(params))).resolves.toMatchObject({ reason: "missing-intent" })
+            await expect(
+                failing(clientFor(answering({ id: "", qrCodeUrl: "https://pay.test" })).createIntent(params)),
+            ).resolves.toMatchObject({ reason: "missing-intent" })
+        })
+
+        it("reports the gateway status of a failed call and never the credential", async () => {
+            const params = await failing(
+                clientFor(answering({ message: "bad" }, 401)).createIntent({ subscriptionId: "s1", amount: 1, currency: "VND" }),
+            )
+            expect(params).toEqual({ operation: "create-intent", reason: "http-401", status: 401 })
+            expect(JSON.stringify(params)).not.toContain("api-key")
+        })
+
+        it("refuses an answer that is JSON but not an object", async () => {
+            await expect(
+                failing(clientFor(answering("plain")).createIntent({ subscriptionId: "s1", amount: 1, currency: "VND" })),
+            ).resolves.toMatchObject({ reason: "not-an-object" })
+        })
     })
-}
 
-const modules: Array<TestingModule> = []
+    describe("getTransaction", () => {
+        it("reads the status and the period end and keeps the id inside its own path segment", async () => {
+            const http = answering({ status: "paid", periodEnd: "2026-10-30T00:00:00.000Z" })
+            const result = await clientFor(http).getTransaction("a/b c")
+            expect(result).toEqual({ status: "paid", periodEnd: new Date("2026-10-30T00:00:00.000Z") })
+            expect(http.request).toHaveBeenCalledWith(
+                expect.objectContaining({ method: "GET", url: "http://sepay.test/userapi/transactions/details/a%2Fb%20c" }),
+            )
+        })
 
-async function clientWith(config: Partial<AppConfigService>): Promise<SepayClient> {
-    const moduleRef = await Test.createTestingModule({
-        providers: [SepayClient,
-            {
-                provide: AppConfigService, useValue: config 
-            }],
-    }).compile()
-    modules.push(moduleRef)
-    return moduleRef.get(SepayClient)
-}
+        it("carries a failed status through and has no period end when the gateway names none", async () => {
+            await expect(clientFor(answering({ status: "failed" })).getTransaction("g1")).resolves.toEqual({
+                status: "failed",
+                periodEnd: undefined,
+            })
+        })
 
-function gatewayClient(apiKey: string): Promise<SepayClient> {
-    return clientWith({
-        getSepayBaseUrl: () => "https://my.sepay.vn",
-        getSepayApiKey: () => apiKey,
+        it("accepts an epoch-milliseconds period end", async () => {
+            const epoch = Date.parse("2026-10-30T00:00:00.000Z")
+            const result = await clientFor(answering({ status: "paid", periodEnd: epoch })).getTransaction("g1")
+            expect(result.periodEnd).toEqual(new Date(epoch))
+        })
+
+        it("refuses a status outside the closed vocabulary rather than coercing it", async () => {
+            await expect(failing(clientFor(answering({ status: "refunded" })).getTransaction("g1"))).resolves.toMatchObject({
+                reason: "unknown-status",
+            })
+            await expect(failing(clientFor(answering({ status: 7 })).getTransaction("g1"))).resolves.toMatchObject({
+                reason: "unknown-status",
+            })
+        })
+
+        it("refuses a period end that is not a date", async () => {
+            await expect(
+                failing(clientFor(answering({ status: "paid", periodEnd: "soon" })).getTransaction("g1")),
+            ).resolves.toMatchObject({ reason: "bad-period-end" })
+            await expect(
+                failing(clientFor(answering({ status: "paid", periodEnd: { at: 1 } })).getTransaction("g1")),
+            ).resolves.toMatchObject({ reason: "bad-period-end" })
+        })
     })
-}
 
-afterEach(async () => {
-    jest.restoreAllMocks()
-    while (modules.length) await modules.pop()?.close()
+    describe("transport failures", () => {
+        const rejecting = (code: HttpErrorCode): HttpClient =>
+            mock<HttpClient>({ request: jest.fn().mockRejectedValue(new HttpError({ code })) })
+
+        it("reports a gateway that never answers as a timeout", async () => {
+            await expect(failing(clientFor(rejecting(HttpErrorCode.Timeout)).getTransaction("g1"))).resolves.toEqual({
+                operation: "get-transaction",
+                reason: "timeout",
+            })
+        })
+
+        it("reports an unreachable gateway and an unreadable body, keeping the cause", async () => {
+            await expect(failing(clientFor(rejecting(HttpErrorCode.Network)).getTransaction("g1"))).resolves.toMatchObject({
+                reason: "unreachable",
+            })
+            await expect(failing(clientFor(rejecting(HttpErrorCode.BodyUnreadable)).getTransaction("g1"))).resolves.toMatchObject({
+                reason: "not-json",
+            })
+            const call = clientFor(rejecting(HttpErrorCode.Network)).getTransaction("g1")
+            await expect(call).rejects.toMatchObject({ cause: expect.any(HttpError) })
+        })
+    })
 })
-
-describe("SepayClient.assertWebhookAuthorized",
-    () => {
-        it("fr.plan.upgrade's invalid-signature exception flow: a missing or wrong Authorization header is refused",
-            async () => {
-                const client = await clientWith({
-                    getSepayWebhookSecret: () => "" 
-                })
-                expect(() => client.assertWebhookAuthorized(undefined)).toThrow(expect.objectContaining({
-                    code: "PLAN_WEBHOOK_UNAUTHORIZED_EXCEPTION" 
-                }))
-                expect(() => client.assertWebhookAuthorized("Bearer wrong-secret")).toThrow(
-                    expect.objectContaining({
-                        code: "PLAN_WEBHOOK_UNAUTHORIZED_EXCEPTION" 
-                    }),
-                )
-            })
-
-        it("a matching Authorization header is accepted",
-            async () => {
-                const client = await clientWith({
-                    getSepayWebhookSecret: () => "the-real-secret" 
-                })
-                expect(() => client.assertWebhookAuthorized("Bearer the-real-secret")).not.toThrow()
-            })
-    })
-
-describe("SepayClient.createIntent (integration.plan.sepay)",
-    () => {
-        it("reports the gateway status of a failed call instead of a JSON parse error",
-            async () => {
-                // Measured on the real host 2026-09-18: the create-intent path answers 404 with an empty body, and
-                // parsing that body before reading the status threw SyntaxError, hiding the one fact that mattered.
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(gatewayResponse(404,
-                    ""))
-                await expect((await gatewayClient("a-key")).createIntent({
-                    subscriptionId: "sub-1", amount: 99000, currency: "VND" 
-                }))
-                    .rejects.toThrow(/empty body \(HTTP 404/)
-            })
-
-        it("names whether a credential went out at all, never its value",
-            async () => {
-                const fetchMock = jest.spyOn(global,
-                    "fetch").mockResolvedValue(gatewayResponse(401,
-                    ""))
-                await expect((await gatewayClient("")).createIntent({
-                    subscriptionId: "sub-1", amount: 99000, currency: "VND" 
-                }))
-                    .rejects.toThrow(/no credential is configured/)
-                expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({
-                    authorization: "Bearer " 
-                })
-
-                await expect((await gatewayClient("a-real-key")).createIntent({
-                    subscriptionId: "sub-1", amount: 99000, currency: "VND" 
-                }))
-                    .rejects.toThrow(/a credential was sent/)
-            })
-
-        it("carries the gateway's own transaction id and checkout url through unchanged",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(gatewayResponse(200,
-                    JSON.stringify({
-                        id: "TN9", qrCodeUrl: "https://pay.example/qr/TN9" 
-                    })))
-                await expect((await gatewayClient("a-key")).createIntent({
-                    subscriptionId: "sub-1", amount: 99000, currency: "VND" 
-                }))
-                    .resolves.toEqual({
-                        gatewayIntentId: "TN9", checkoutUrl: "https://pay.example/qr/TN9" 
-                    })
-            })
-
-        it("refuses a success response that names no transaction",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(gatewayResponse(200,
-                    JSON.stringify({
-                        message: "ok" 
-                    })))
-                await expect((await gatewayClient("a-key")).createIntent({
-                    subscriptionId: "sub-1", amount: 99000, currency: "VND" 
-                }))
-                    .rejects.toThrow(/no transaction id and checkout url/)
-            })
-
-        it("refuses a gateway answer that is not JSON at all",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(gatewayResponse(200,
-                    "<html>gateway said no</html>"))
-                await expect((await gatewayClient("a-key")).createIntent({
-                    subscriptionId: "sub-1", amount: 99000, currency: "VND" 
-                }))
-                    .rejects.toThrow(/body that is not JSON \(<html>gateway said no<\/html>\)/)
-            })
-    })
-
-describe("SepayClient.getTransaction (sds.plan.reconciliation)",
-    () => {
-        it("refuses a status outside the closed vocabulary rather than casting it into one",
-            async () => {
-                // Any status that is not 'pending' or 'failed' reaches ConfirmPaymentHandler as a paid activation,
-                // so a value this product does not know must never become one by a cast.
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(gatewayResponse(200,
-                    JSON.stringify({
-                        status: "refunded" 
-                    })))
-                await expect((await gatewayClient("a-key")).getTransaction("TN9")).rejects.toThrow(/unrecognised status "refunded"/)
-            })
-
-        it("reads the gateway's paid status and its period end",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(gatewayResponse(200,
-                    JSON.stringify({
-                        status: "paid", periodEnd: "2027-01-01T00:00:00.000Z" 
-                    })))
-                await expect((await gatewayClient("a-key")).getTransaction("TN9")).resolves.toEqual({
-                    status: "paid",
-                    periodEnd: new Date("2027-01-01T00:00:00.000Z"),
-                })
-            })
-
-        it("refuses a period end it cannot read as a date",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(gatewayResponse(200,
-                    JSON.stringify({
-                        status: "paid", periodEnd: "next tuesday" 
-                    })))
-                await expect((await gatewayClient("a-key")).getTransaction("TN9")).rejects.toThrow(/unreadable periodEnd \("next tuesday"\)/)
-            })
-
-        it("keeps a gateway intent id inside its own path segment",
-            async () => {
-                const fetchMock = jest.spyOn(global,
-                    "fetch").mockResolvedValue(gatewayResponse(200,
-                    JSON.stringify({
-                        status: "pending" 
-                    })))
-                await (await gatewayClient("a-key")).getTransaction("TN9/../admin")
-                expect(String(fetchMock.mock.calls[0][0])).toBe("https://my.sepay.vn/userapi/transactions/details/TN9%2F..%2Fadmin")
-            })
-
-        it("reports a gateway that never answers as a timeout",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockRejectedValue(
-                    Object.assign(new Error("This operation was aborted"),
-                        {
-                            name: "TimeoutError" 
-                        }),
-                )
-                await expect((await gatewayClient("a-key")).getTransaction("TN9")).rejects.toThrow(/timed out after 15000ms/)
-            })
-
-        it("reports the real cause of a request that could not be made",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockRejectedValue(
-                    Object.assign(new TypeError("fetch failed"),
-                        {
-                            cause: Object.assign(new Error("no route"),
-                                {
-                                    code: "ENOTFOUND" 
-                                }) 
-                        }),
-                )
-                await expect((await gatewayClient("a-key")).getTransaction("TN9")).rejects.toThrow(/did not complete \(ENOTFOUND\).*HTTP no response/s)
-            })
-    })

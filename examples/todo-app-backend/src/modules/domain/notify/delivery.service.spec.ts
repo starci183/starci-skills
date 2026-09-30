@@ -1,284 +1,159 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    NotifySmtpPort,
-} from "@modules/integrations/notify-smtp/index"
-import {
-    createFakeNotifyEntityManager 
-} from "./testing/fake-notify-entity-manager"
-import {
-    FakeNotifySmtpClient,
-} from "@modules/integrations/notify-smtp/index"
-import {
-    DeliveryService, RETRY_BUDGET 
-} from "./delivery.service"
+import { mock } from "@starci/jest-preset/mock"
+import { NotifySmtpError, NotifySmtpErrorCode } from "@modules/integrations/notify-smtp"
+import type { NotifySmtpClient } from "@modules/integrations/notify-smtp"
+import type { Logger } from "@modules/platform/logging"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { DeliveryService } from "./delivery.service"
+import { RETRY_BUDGET } from "./notify.policy"
+import { NotifyDeliveryAttemptEntity } from "./persistence/entities/delivery-attempt.entity"
 
-describe("DeliveryService",
-    () => {
-        let moduleRef: TestingModule
-        let smtp: FakeNotifySmtpClient
-        let service: DeliveryService
+const AT = new Date("2026-09-30T10:00:00.000Z")
+const ISO = AT.toISOString()
+const MESSAGE = { to: "p1", subject: "s", body: "b" }
 
-        beforeEach(async () => {
-            smtp = new FakeNotifySmtpClient()
-            moduleRef = await Test.createTestingModule({
-                providers: [
-                    DeliveryService,
-                    {
-                        provide: NotifySmtpPort, useValue: smtp 
-                    },
-                    {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: createFakeNotifyEntityManager() 
-                    },
-                ],
-            }).compile()
-            service = moduleRef.get(DeliveryService)
-        })
-
-        afterEach(async () => {
-            await moduleRef.close()
-        })
-
-        it("ac.notify.failure.classified.suppresses-unsubscribed: reaches suppressed before any dispatch attempt, and no attempt is ever made",
-            async () => {
-                const now = new Date("2026-09-18T06:00:00.000Z")
-                const attempt = await service.admit("notif-1",
-                    now,
-                    true)
-
-                expect(attempt.state).toBe("suppressed")
-                expect(attempt.failureClass).toBe("unsubscribed")
-                expect(attempt.endedAt).toEqual(now)
-                expect(smtp.sent).toHaveLength(0)
-            })
-
-        it("sds.notify.delivery-lifecycle t-dispatch/t-deliver: a queued attempt that the transport accepts reaches delivered",
-            async () => {
-                const now = new Date("2026-09-18T06:10:00.000Z")
-                await service.admit("notif-1",
-                    new Date("2026-09-18T06:00:00.000Z"),
-                    false)
-
-                const result = await service.dispatchBatch(["notif-1"],
-                    now,
-                    {
-                        to: "owner@todo.dev", subject: "x", body: "y" 
-                    })
-
-                expect(result.delivered).toEqual(["notif-1"])
-                expect(smtp.sent).toHaveLength(1)
-                const attempt = await service.findById("notif-1")
-                expect(attempt?.state).toBe("delivered")
-                expect(attempt?.endedAt).toEqual(now)
-                expect(attempt?.attempt).toBe(1)
-            })
-
-        it("reads the whole batch in one query and dispatches only the queued members, skipping suppressed and unknown ids",
-            async () => {
-                await service.admit("notif-1",
-                    new Date("2026-09-18T06:00:00.000Z"),
-                    false)
-                await service.admit("notif-2",
-                    new Date("2026-09-18T06:00:00.000Z"),
-                    true)
-                await service.admit("notif-3",
-                    new Date("2026-09-18T06:00:00.000Z"),
-                    false)
-
-                const result = await service.dispatchBatch(["notif-3",
-                    "notif-2",
-                    "notif-1",
-                    "notif-missing"],
-                new Date("2026-09-18T06:10:00.000Z"),
-                {
-                    to: "owner@todo.dev", subject: "x", body: "y"
-                })
-
-                expect(result.delivered).toEqual(["notif-3",
-                    "notif-1"])
-                expect(smtp.sent).toHaveLength(1)
-            })
-
-        it("ac.notify.failure.classified.suppresses-bounced-address: a permanent rejection reaches bounced and does not retry",
-            async () => {
-                smtp.failPermanentFor("rejected@todo.dev")
-                await service.admit("notif-1",
-                    new Date("2026-09-18T06:00:00.000Z"),
-                    false)
-
-                const result = await service.dispatchBatch(["notif-1"],
-                    new Date("2026-09-18T06:10:00.000Z"),
-                    {
-                        to: "rejected@todo.dev",
-                        subject: "x",
-                        body: "y",
-                    })
-
-                expect(result.bounced).toEqual(["notif-1"])
-                expect(result.retried).toEqual([])
-                const attempt = await service.findById("notif-1")
-                expect(attempt?.state).toBe("bounced")
-                expect(attempt?.failureClass).toBe("permanent-bounce")
-                expect(attempt?.endedAt).not.toBeNull()
-            })
-
-        it("ac.notify.failure.classified.retries-transient: a transient failure returns to queued with failureClass transient, and a later dispatch can still reach delivered",
-            async () => {
-                smtp.failTransientFor("flaky@todo.dev")
-                await service.admit("notif-1",
-                    new Date("2026-09-18T06:00:00.000Z"),
-                    false)
-
-                const first = await service.dispatchBatch(["notif-1"],
-                    new Date("2026-09-18T06:10:00.000Z"),
-                    {
-                        to: "flaky@todo.dev",
-                        subject: "x",
-                        body: "y",
-                    })
-                expect(first.retried).toEqual(["notif-1"])
-                let attempt = await service.findById("notif-1")
-                expect(attempt?.state).toBe("queued")
-                expect(attempt?.failureClass).toBe("transient")
-
-                // The host recovers; the next dispatch of the same attempt reaches delivered.
-                smtp.clearFailuresFor("flaky@todo.dev")
-                const second = await service.dispatchBatch(["notif-1"],
-                    new Date("2026-09-18T06:20:00.000Z"),
-                    {
-                        to: "flaky@todo.dev",
-                        subject: "x",
-                        body: "y",
-                    })
-                expect(second.delivered).toEqual(["notif-1"])
-                attempt = await service.findById("notif-1")
-                expect(attempt?.state).toBe("delivered")
-                expect(attempt?.attempt).toBe(2)
-            })
-
-        it("ac.notify.failure.classified.retries-transient: exhausting the retry budget lands on bounced with failureClass retries-exhausted, distinct from a real bounce",
-            async () => {
-                smtp.failTransientFor("always-flaky@todo.dev")
-                await service.admit("notif-1",
-                    new Date("2026-09-18T06:00:00.000Z"),
-                    false)
-
-                let now = new Date("2026-09-18T06:10:00.000Z")
-                for (let i = 0; i < RETRY_BUDGET; i += 1) {
-                    const result = await service.dispatchBatch(["notif-1"],
-                        now,
-                        {
-                            to: "always-flaky@todo.dev", subject: "x", body: "y" 
-                        })
-                    if (i < RETRY_BUDGET - 1) {
-                        expect(result.retried).toEqual(["notif-1"])
-                    } else {
-                        expect(result.bounced).toEqual(["notif-1"])
-                    }
-                    now = new Date(now.getTime() + 60_000)
-                }
-
-                const attempt = await service.findById("notif-1")
-                expect(attempt?.state).toBe("bounced")
-                expect(attempt?.failureClass).toBe("retries-exhausted")
-                expect(attempt?.attempt).toBe(RETRY_BUDGET)
-            })
-
-        it("dispatching a batch renders one message covering every member (br.notify.digest.window)",
-            async () => {
-                await service.admit("notif-1",
-                    new Date("2026-09-18T06:00:00.000Z"),
-                    false)
-                await service.admit("notif-2",
-                    new Date("2026-09-18T06:01:00.000Z"),
-                    false)
-
-                const result = await service.dispatchBatch(["notif-1",
-                    "notif-2"],
-                new Date("2026-09-18T06:10:00.000Z"),
-                {
-                    to: "owner@todo.dev",
-                    subject: "Two things happened",
-                    body: "one, two",
-                })
-
-                expect(result.delivered.sort()).toEqual(["notif-1",
-                    "notif-2"])
-                expect(smtp.sent).toHaveLength(1)
-            })
-
-        describe("batch membership arms (w8 branch depth)",
-            () => {
-                it("a suppressed attempt inside the batch is skipped, not failed - only queued members dispatch",
-                    async () => {
-                        const now = new Date("2026-09-18T06:10:00.000Z")
-                        await service.admit("notif-suppressed",
-                            new Date("2026-09-18T06:00:00.000Z"),
-                            true)
-                        await service.admit("notif-queued",
-                            new Date("2026-09-18T06:00:01.000Z"),
-                            false)
-
-                        const result = await service.dispatchBatch(["notif-suppressed",
-                            "notif-queued"],
-                        now,
-                        {
-                            to: "owner@todo.dev", subject: "x", body: "y" 
-                        })
-
-                        expect(result.delivered).toEqual(["notif-queued"])
-                        const suppressed = await service.findById("notif-suppressed")
-                        expect(suppressed?.state).toBe("suppressed")
-                        expect(suppressed?.attempt).toBe(0)
-                    })
-
-                it("a batch of only unknown or non-queued ids sends nothing and reports empty buckets",
-                    async () => {
-                        const result = await service.dispatchBatch(["never-existed"],
-                            new Date("2026-09-18T06:10:00.000Z"),
-                            {
-                                to: "owner@todo.dev", subject: "x", body: "y" 
-                            })
-
-                        expect(result).toEqual({
-                            delivered: [], retried: [], bounced: [] 
-                        })
-                        expect(smtp.sent).toHaveLength(0)
-                    })
-
-                it("a retry keeps the original startedAt instead of resetting it",
-                    async () => {
-                        smtp.failTransientFor("owner@todo.dev")
-                        const t0 = new Date("2026-09-18T06:00:00.000Z")
-                        const t1 = new Date("2026-09-18T06:10:00.000Z")
-                        await service.admit("notif-1",
-                            t0,
-                            false)
-                        await service.dispatchBatch(["notif-1"],
-                            t1,
-                            {
-                                to: "owner@todo.dev", subject: "x", body: "y" 
-                            })
-                        const afterFirst = await service.findById("notif-1")
-                        expect(afterFirst?.state).toBe("queued")
-
-                        smtp.clearFailuresFor("owner@todo.dev")
-                        await service.dispatchBatch(["notif-1"],
-                            new Date("2026-09-18T06:10:31.000Z"),
-                            {
-                                to: "owner@todo.dev", subject: "x", body: "y" 
-                            })
-                        const retried = await service.findById("notif-1")
-                        expect(retried?.state).toBe("delivered")
-                        expect(retried?.startedAt).toEqual(afterFirst?.startedAt)
-                        expect(retried?.attempt).toBe(2)
-                    })
-            })
+const attemptRow = (overrides: Partial<NotifyDeliveryAttemptEntity> = {}): NotifyDeliveryAttemptEntity =>
+    Object.assign(new NotifyDeliveryAttemptEntity(), {
+        notificationId: "n1",
+        state: "queued" as const,
+        attempt: 0,
+        failureClass: null,
+        startedAt: null,
+        endedAt: null,
+        history: [{ state: "queued" as const, at: ISO }],
+        ...overrides,
     })
+
+const echoSave = jest.fn().mockImplementation((_target: unknown, entity: object) => Promise.resolve(entity))
+
+const build = (smtp: Partial<NotifySmtpClient> = {}) => {
+    const logger = mock<Logger>()
+    const service = new DeliveryService(mockEntityManager(), mock<NotifySmtpClient>(smtp), logger)
+    return { service, logger }
+}
+
+describe("DeliveryService", () => {
+    it("creates a queued attempt with a one-step history", async () => {
+        const manager = mockEntityManager({ save: echoSave })
+        const { service } = build()
+        const view = await service.admit({ manager, notificationId: "n1", at: AT, unsubscribed: false })
+        expect(view).toMatchObject({ state: "queued", attempt: 0, failureClass: null, endedAt: null })
+        expect(view.history).toEqual([{ state: "queued", at: ISO }])
+    })
+
+    it("creates the attempt of an unsubscribed recipient already suppressed and ended", async () => {
+        const manager = mockEntityManager({ save: echoSave })
+        const { service } = build()
+        const view = await service.admit({ manager, notificationId: "n1", at: AT, unsubscribed: true })
+        expect(view).toMatchObject({ state: "suppressed", failureClass: "unsubscribed", endedAt: AT })
+        expect(view.history.map((step) => step.state)).toEqual(["queued", "suppressed"])
+    })
+
+    it("moves only queued attempts to sending and counts the dispatch", async () => {
+        const manager = mockEntityManager({
+            find: jest.fn().mockResolvedValue([attemptRow(), attemptRow({ notificationId: "n2", state: "delivered" })]),
+            save: echoSave,
+        })
+        const { service } = build()
+        const sending = await service.markSending({ manager, notificationIds: ["n1", "n2"], at: AT })
+        expect(sending).toHaveLength(1)
+        expect(sending[0]).toMatchObject({ notificationId: "n1", state: "sending", attempt: 1, startedAt: AT })
+        expect(sending[0]?.history.map((step) => step.state)).toEqual(["queued", "sending"])
+    })
+
+    it("writes nothing when the batch is empty or has no queued attempt", async () => {
+        const manager = mockEntityManager({
+            find: jest.fn().mockResolvedValue([attemptRow({ state: "delivered" })]),
+            save: jest.fn(),
+        })
+        const { service } = build()
+        await expect(service.markSending({ manager, notificationIds: [], at: AT })).resolves.toEqual([])
+        await expect(service.markSending({ manager, notificationIds: ["n1"], at: AT })).resolves.toEqual([])
+        expect(manager.save).not.toHaveBeenCalled()
+    })
+
+    it("answers delivered when the mail host accepts the message", async () => {
+        const send = jest.fn().mockResolvedValue(undefined)
+        const { service } = build({ send })
+        await expect(service.transmit(MESSAGE)).resolves.toBe("delivered")
+        expect(send).toHaveBeenCalledWith(MESSAGE)
+    })
+
+    it("classifies a permanent rejection, a transient failure and an unexpected error", async () => {
+        const rejected = new NotifySmtpError({ code: NotifySmtpErrorCode.PermanentRejection, params: { reason: "550" } })
+        const busy = new NotifySmtpError({ code: NotifySmtpErrorCode.TransientFailure, params: { reason: "450" } })
+        await expect(build({ send: jest.fn().mockRejectedValue(rejected) }).service.transmit(MESSAGE)).resolves.toBe("permanent-bounce")
+        await expect(build({ send: jest.fn().mockRejectedValue(busy) }).service.transmit(MESSAGE)).resolves.toBe("transient")
+        const unexpected = build({ send: jest.fn().mockRejectedValue(new TypeError("boom")) })
+        await expect(unexpected.service.transmit(MESSAGE)).resolves.toBe("transient")
+        expect(unexpected.logger.error).toHaveBeenCalled()
+    })
+
+    it("marks a sending attempt delivered and ends it", async () => {
+        const manager = mockEntityManager({
+            find: jest.fn().mockResolvedValue([attemptRow({ state: "sending", attempt: 1 })]),
+            save: echoSave,
+        })
+        const { service } = build()
+        const recorded = await service.record({ manager, notificationIds: ["n1"], verdict: "delivered", at: AT })
+        expect(recorded).toEqual({ delivered: ["n1"], retried: [], bounced: [], attempt: 1 })
+        expect(manager.save).toHaveBeenCalledWith(
+            NotifyDeliveryAttemptEntity,
+            [expect.objectContaining({ state: "delivered", endedAt: AT })],
+        )
+    })
+
+    it("bounces a permanent rejection with its failure class", async () => {
+        const manager = mockEntityManager({
+            find: jest.fn().mockResolvedValue([attemptRow({ state: "sending", attempt: 1 })]),
+            save: echoSave,
+        })
+        const recorded = await build().service.record({ manager, notificationIds: ["n1"], verdict: "permanent-bounce", at: AT })
+        expect(recorded.bounced).toEqual(["n1"])
+        expect(manager.save).toHaveBeenCalledWith(
+            NotifyDeliveryAttemptEntity,
+            [expect.objectContaining({ state: "bounced", failureClass: "permanent-bounce", endedAt: AT })],
+        )
+    })
+
+    it("re-queues a transient failure while the budget lasts and bounces it once the budget is spent", async () => {
+        const retry = mockEntityManager({
+            find: jest.fn().mockResolvedValue([attemptRow({ state: "sending", attempt: 1 })]),
+            save: echoSave,
+        })
+        const first = await build().service.record({ manager: retry, notificationIds: ["n1"], verdict: "transient", at: AT })
+        expect(first).toMatchObject({ retried: ["n1"], bounced: [], attempt: 1 })
+        expect(retry.save).toHaveBeenCalledWith(
+            NotifyDeliveryAttemptEntity,
+            [expect.objectContaining({ state: "queued", failureClass: "transient", endedAt: null })],
+        )
+
+        const spent = mockEntityManager({
+            find: jest.fn().mockResolvedValue([attemptRow({ state: "sending", attempt: RETRY_BUDGET })]),
+            save: echoSave,
+        })
+        const last = await build().service.record({ manager: spent, notificationIds: ["n1"], verdict: "transient", at: AT })
+        expect(last).toMatchObject({ retried: [], bounced: ["n1"] })
+        expect(spent.save).toHaveBeenCalledWith(
+            NotifyDeliveryAttemptEntity,
+            [expect.objectContaining({ state: "bounced", failureClass: "retries-exhausted", endedAt: AT })],
+        )
+    })
+
+    it("leaves attempts that are not sending untouched", async () => {
+        const manager = mockEntityManager({
+            find: jest.fn().mockResolvedValue([attemptRow({ state: "suppressed" })]),
+            save: jest.fn(),
+        })
+        const recorded = await build().service.record({ manager, notificationIds: ["n1"], verdict: "delivered", at: AT })
+        expect(recorded).toEqual({ delivered: [], retried: [], bounced: [], attempt: 0 })
+        expect(manager.save).not.toHaveBeenCalled()
+    })
+
+    it("reads one attempt by notification id and answers null for an unknown one", async () => {
+        const own = mockEntityManager({ findOneBy: jest.fn().mockResolvedValueOnce(attemptRow()).mockResolvedValueOnce(null) })
+        const service = new DeliveryService(own, mock<NotifySmtpClient>(), mock<Logger>())
+        await expect(service.find({ notificationId: "n1" })).resolves.toMatchObject({ notificationId: "n1" })
+        await expect(service.find({ notificationId: "nope" })).resolves.toBeNull()
+        expect(own.findOneBy).toHaveBeenCalledWith(NotifyDeliveryAttemptEntity, { notificationId: "n1" })
+    })
+})

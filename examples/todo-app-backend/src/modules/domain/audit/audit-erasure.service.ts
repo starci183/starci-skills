@@ -1,214 +1,121 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    randomUUID 
-} from "node:crypto"
-import type {
-    EntityManager 
-} from "typeorm"
-import {
-    InjectPrimaryEntityManager,
-} from "@modules/platform/databases/index"
-import {
-    AuditErasureRequestEntity,
-} from "@modules/platform/databases/index"
-import {
-    ErasureNotConfirmedException,
-} from "./errors/erasure-not-confirmed"
-import {
-    ErasureRequestForbiddenException,
-} from "./errors/erasure-request-forbidden"
-import {
-    ErasureRequestInvalidStateException,
-} from "./errors/erasure-request-invalid-state"
-import {
-    ErasureRequestNotFoundException,
-} from "./errors/erasure-request-not-found"
+import { randomUUID } from "node:crypto"
+import { Injectable } from "@nestjs/common"
+import { ok, refused } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
+import type { EntityManager } from "typeorm"
+import { AuditKeystoreService } from "./audit-keystore.service"
+import { ErasureState } from "./audit.contracts"
+import type { ErasureRequestView, ErasureStepParams, RequestErasureParams } from "./audit.contracts"
+import { AuditErrorCode } from "./errors/audit.error"
+import { toErasureRequestView } from "./persistence/audit.rows"
+import { AuditErasureRequestEntity } from "./persistence/entities/audit-erasure-request.entity"
 
-import {
-    AuditLogService 
-} from "./audit-log.service"
-import {
-    AuditKeystoreService, SYSTEM_ACTOR_ID 
-} from "./audit-keystore.service"
-import {
-    AuditErasureRequestRecord 
-} from "./types/audit-erasure-request-record"
-import {
-    Clock
-} from "@modules/platform/clock/index"
+/** The refusals of the verification step. */
+type ConfirmRefusal =
+    | AuditErrorCode.ErasureRequestNotFound
+    | AuditErrorCode.ErasureRequestInvalidState
+    | AuditErrorCode.ErasureRequestForbidden
 
-const ACTION_ERASURE_REQUESTED = "audit.erasure.requested"
-const ACTION_ERASURE_COMPLETED = "audit.erasure.completed"
+/** The refusals of the execution step. */
+type ExecuteRefusal = ConfirmRefusal | AuditErrorCode.ErasureNotConfirmed
 
-/**
- * sds.audit.erasure-request: the lifecycle of one request to be forgotten, implemented against
- * decision.audit.erasure-method (crypto-shred). Every transition id below (`tRequest`, `tVerify`,
- * `tRefuse`, `tExecute`, `tComplete`) mirrors the record's own transition ids exactly, matching
- * TaskService's `tComplete`/`tReopen` convention for the same reason: a reader can hold the record
- * beside the code.
- *
- * Only `request` (tRequest + tVerify) and `execute` (tExecute + confirm + tComplete) are exposed through
- * GraphQL (requestErasure/completeErasure - see the brief's naming). The re-authentication challenge
- * sds.audit.erasure-request's sequence names between them is already satisfied at this layer: the only
- * caller who can ever reach `request` is the signed-in session belonging to the subject itself (there is
- * no operator-initiated erasure - see gap.audit.operator-role), so identity is proven by the same
- * `x-session-token` that authenticated the GraphQL call, and t-verify runs immediately rather than
- * waiting on a second round-trip this example has no separate channel for.
- */
 @Injectable()
-/** Injectable service owning the audit erasure logic the audit capability exposes; wired by the capability's own module. */
+/**
+ * The lifecycle of one request to be forgotten, by crypto-shredding: requested, verified (or refused), executing,
+ * complete. The subject is always the caller, so `request` opens and verifies in one step. Execution destroys the
+ * subject key, confirms nothing about the subject stays readable, and drops the person id from the request row. The log
+ * lines about the erasure are written by the handler through the audit queue, never here.
+ */
 export class AuditErasureService {
-    constructor(
-    @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-    private readonly logService: AuditLogService,
-    private readonly keystore: AuditKeystoreService,
-        private readonly clock: Clock
-    ) {}
+    constructor(private readonly keystore: AuditKeystoreService) {}
 
-    /** fr.audit.erasure.request: tRequest then tVerify, chained because the caller is always the subject. */
-    async request(personId: string): Promise<AuditErasureRequestRecord> {
-        const requested = await this.tRequest(personId)
-        return this.confirm(requested.requestId,
-            personId)
+    /** Opens a request for the caller and verifies it at once, since the caller is the subject. */
+    async request(params: RequestErasureParams): Promise<Outcome<ErasureRequestView, ConfirmRefusal>> {
+        const saved = await params.manager.save(AuditErasureRequestEntity, {
+            requestId: randomUUID(),
+            personId: params.personId,
+            state: ErasureState.Requested,
+            requestedAt: params.at,
+            verifiedAt: null,
+            refusedAt: null,
+            executingAt: null,
+            completedAt: null,
+        })
+        return this.confirm({ manager: params.manager, requestId: saved.requestId, callerId: params.personId, at: params.at })
     }
 
     /**
-   * sds.audit.erasure-request's t-verify as a second round of its own: the challenge its sequence
-   * names - "the subject re-authenticates and the request moves to verified" - runs on this caller,
-   * proven by the live session token behind it (the same SessionService seam that authenticated the
-   * first round). requestErasure always chains request+confirm, so a second confirm of the same
-   * pending request hits t-refuse, never a repeat of t-verify.
-   */
-    confirm(requestId: string, callerId: string): Promise<AuditErasureRequestRecord> {
-        return this.tVerify(requestId,
-            callerId)
-    }
-
-    /** fr.audit.erasure.complete: tExecute, confirm every line is unreadable, then tComplete. */
-    async execute(requestId: string, callerId: string): Promise<AuditErasureRequestRecord> {
-        const row = await this.findRow(requestId)
-        if (row.personId !== null && row.personId !== callerId) {
-            throw new ErasureRequestForbiddenException({
+     * Verifies that the caller is the subject of a still requested request. A stranger refuses the request (state
+     * refused) and gets a forbidden refusal; the subject key is never touched.
+     */
+    async confirm(params: ErasureStepParams): Promise<Outcome<ErasureRequestView, ConfirmRefusal>> {
+        const row = await this.find(params.manager, params.requestId)
+        if (!row) return refused(AuditErrorCode.ErasureRequestNotFound, { requestId: params.requestId })
+        if (row.state !== ErasureState.Requested) {
+            return refused(AuditErrorCode.ErasureRequestInvalidState, {
+                requestId: row.requestId,
+                state: row.state,
+                expected: ErasureState.Requested,
             })
         }
-        if (row.state !== "verified") {
-            throw new ErasureRequestInvalidStateException({
-                requestId, state: row.state, expected: "verified" 
+        if (row.personId !== params.callerId) {
+            await params.manager.save(AuditErasureRequestEntity, {
+                ...row,
+                refusedAt: params.at,
+                state: ErasureState.Refused,
+            })
+            return refused(AuditErrorCode.ErasureRequestForbidden, { requestId: row.requestId })
+        }
+        const saved = await params.manager.save(AuditErasureRequestEntity, {
+            ...row,
+            verifiedAt: params.at,
+            state: ErasureState.Verified,
+        })
+        return ok(toErasureRequestView(saved))
+    }
+
+    /**
+     * Destroys the subject key of a verified request, confirms that no line of the subject resolves any more, then
+     * completes the request and drops the person id from it. Only the subject may complete their own request.
+     */
+    async execute(params: ErasureStepParams): Promise<Outcome<ErasureRequestView, ExecuteRefusal>> {
+        const row = await this.find(params.manager, params.requestId)
+        if (!row) return refused(AuditErrorCode.ErasureRequestNotFound, { requestId: params.requestId })
+        if (row.personId !== null && row.personId !== params.callerId) {
+            return refused(AuditErrorCode.ErasureRequestForbidden, { requestId: row.requestId })
+        }
+        if (row.state !== ErasureState.Verified) {
+            return refused(AuditErrorCode.ErasureRequestInvalidState, {
+                requestId: row.requestId,
+                state: row.state,
+                expected: ErasureState.Verified,
             })
         }
-        const subjectId = row.personId ?? callerId
-        const keyIdBeforeDestruction = await this.keystore.getKeyIdForPerson(subjectId)
-        await this.tExecute(row)
-        const stillReadable = keyIdBeforeDestruction !== null && (await this.keystore.getKeyMaterial(keyIdBeforeDestruction)) !== null
-        if (stillReadable) {
-            throw new ErasureNotConfirmedException({
-                requestId 
-            })
+        const subjectId = row.personId ?? params.callerId
+        const keyId = await this.keystore.getKeyIdForPerson({ personId: subjectId, manager: params.manager })
+        await params.manager.save(AuditErasureRequestEntity, {
+            ...row,
+            executingAt: params.at,
+            state: ErasureState.Executing,
+        })
+        await this.keystore.destroyKey({ manager: params.manager, personId: subjectId })
+        if (keyId !== null) {
+            const remaining = await this.keystore.getKeyMaterials({ keyIds: [keyId], manager: params.manager })
+            if (remaining.size > 0) {
+                return refused(AuditErrorCode.ErasureNotConfirmed, { requestId: row.requestId })
+            }
         }
-        return this.tComplete(row)
+        const saved = await params.manager.save(AuditErasureRequestEntity, {
+            ...row,
+            executingAt: params.at,
+            completedAt: params.at,
+            state: ErasureState.Complete,
+            personId: null,
+        })
+        return ok(toErasureRequestView(saved))
     }
 
-    /** sds.audit.erasure-request's t-request: the row and its state machine instance come into existence
-   * together, directly in `requested` - there is no prior state to transition from. */
-    private async tRequest(personId: string): Promise<AuditErasureRequestRecord> {
-        const requestId = randomUUID()
-        const requestedAt = this.clock.now()
-        const saved = await this.entityManager.save(AuditErasureRequestEntity,
-            {
-                requestId,
-                personId,
-                state: "requested",
-                requestedAt,
-                verifiedAt: null,
-                refusedAt: null,
-                executingAt: null,
-                completedAt: null,
-            })
-        await this.logService.append(SYSTEM_ACTOR_ID,
-            ACTION_ERASURE_REQUESTED,
-            requestId)
-        return toRecord(saved)
+    private find(manager: EntityManager, requestId: string): Promise<AuditErasureRequestEntity | null> {
+        return manager.findOne(AuditErasureRequestEntity, { where: { requestId }, lock: { mode: "pessimistic_write" } })
     }
-
-    /** t-verify: the requester is proven to be the subject; a mismatch runs t-refuse instead. */
-    private async tVerify(requestId: string, callerId: string): Promise<AuditErasureRequestRecord> {
-        const row = await this.findRow(requestId)
-        if (row.state !== "requested") {
-            throw new ErasureRequestInvalidStateException({
-                requestId, state: row.state, expected: "requested" 
-            })
-        }
-        if (row.personId !== callerId) {
-            await this.tRefuse(row)
-            throw new ErasureRequestForbiddenException({
-            })
-        }
-        row.verifiedAt = this.clock.now()
-        row.state = "verified"
-        const saved = await this.entityManager.save(AuditErasureRequestEntity,
-            row)
-        return toRecord(saved)
-    }
-
-    /** t-refuse: nothing about the subject's keys is touched. */
-    private async tRefuse(row: AuditErasureRequestEntity): Promise<AuditErasureRequestRecord> {
-        row.refusedAt = this.clock.now()
-        row.state = "refused"
-        const saved = await this.entityManager.save(AuditErasureRequestEntity,
-            row)
-        return toRecord(saved)
-    }
-
-    /** t-execute: destroys the subject's key and the keystore's personId-to-keyId mapping. No log line is
-   * read, rewritten or deleted. */
-    private async tExecute(row: AuditErasureRequestEntity): Promise<void> {
-        row.executingAt = this.clock.now()
-        row.state = "executing"
-        await this.entityManager.save(AuditErasureRequestEntity,
-            row)
-        await this.keystore.destroyKey(row.personId ?? "")
-    }
-
-    /** t-complete: appends the erasure-completed line naming the requestId, then drops personId - the
-   * data.audit.erasure-request invariant that keeps this table from becoming a second permanent record
-   * of who the subject was. */
-    private async tComplete(row: AuditErasureRequestEntity): Promise<AuditErasureRequestRecord> {
-        row.completedAt = this.clock.now()
-        row.state = "complete"
-        row.personId = null
-        const saved = await this.entityManager.save(AuditErasureRequestEntity,
-            row)
-        await this.logService.append(SYSTEM_ACTOR_ID,
-            ACTION_ERASURE_COMPLETED,
-            row.requestId)
-        return toRecord(saved)
-    }
-
-    private async findRow(requestId: string): Promise<AuditErasureRequestEntity> {
-        const row = await this.entityManager.findOneBy(AuditErasureRequestEntity,
-            {
-                requestId 
-            })
-        if (!row) {
-            throw new ErasureRequestNotFoundException({
-                requestId 
-            })
-        }
-        return row
-    }
-}
-
-function toRecord(row: AuditErasureRequestEntity): AuditErasureRequestRecord {
-    return new AuditErasureRequestRecord(
-        row.requestId,
-        row.personId,
-    row.state as AuditErasureRequestRecord["state"],
-    row.requestedAt,
-    row.verifiedAt,
-    row.refusedAt,
-    row.executingAt,
-    row.completedAt,
-    )
 }

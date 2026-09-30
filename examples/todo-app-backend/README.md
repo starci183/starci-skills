@@ -16,11 +16,14 @@ under `.starcistacks/dev`.
 
 ## Repository layout
 
-- `apps/todo/src`: the api process (startup and Nest module composition).
-- `apps/migrate/src`: the only process that applies migrations; run `npm run migrate` (or `migrate:dev`) before the api starts.
-- `src/features` and `src/modules/{domain,platform,integrations}`: shared backend source.
-- `.starcistacks`: development stack declarations; `docs/`: human verification guidance.
-- `.starciwork`: product records shared with the paired frontend.
+- `apps/todo/src`: the api (`main.ts` parses the environment once, `app.module.ts` is `AppModule.register(options)`: every capability registered once with `isGlobal: true`, the three app guards in order rate limit, origin, auth).
+- `apps/worker/src`: the worker (no listener): the scheduled jobs and the queue consumers of `src/features/todo/transport/{schedule,message}`.
+- `apps/migrate/src`: the only process that applies migrations; run `npm run migrate` (or `migrate:dev`) before the api and the worker start.
+- `src/features/{todo,health}`: `application/` (command/query + handler + contracts) and `transport/{graphql,http,schedule,message}/`.
+- `src/modules/domain`: session (auth guard), task, share, plan, recur, notify, audit, upload; each owns its entities, migrations, `.sql.ts` constants and errors under `persistence/` and `errors/`.
+- `src/modules/platform`: composition (injectors), config (EnvSource), cqrs, database, errors, graphql, http, http-security, i18n, logging, clock, primitives (Outcome), probes, observability, lease, scheduling, inbox, outbox, messaging.
+- `src/modules/integrations`: keycloak, notify-smtp, sepay, upload (byte storage).
+- `.starcistacks`: development stack declarations; `docs/`: human verification guidance; `.starciwork`: product records shared with the paired frontend.
 
 ## Development
 
@@ -32,12 +35,11 @@ source (`npm run test:unit`) and e2e `*.e2e-spec.ts` under `src/tests/e2e/` (`np
 
 ## Configuration and migrations
 
-`DATABASE_URL`, `REDIS_URL`, `KEYCLOAK_TOKEN_URL` and `SEPAY_BASE_URL` have no default: a missing value stops with an error that names the key.
-A secret comes from a decrypted file named by a `*_FILE` variable (`UPLOAD_SIGNING_SECRET_FILE`, `SEPAY_API_KEY_FILE`,
-`SEPAY_WEBHOOK_SECRET_FILE`); a variable that is set but names an unreadable file also stops with its name. Schema changes only by
-migration under `src/modules/platform/databases/persistence/migrations`, listed explicitly from `persistence/index.ts`.
-Business code reads time through the injected `Clock` (`src/modules/platform/clock`; specs use `FakeClock`) and user-facing
-copy through the messages catalog (`src/modules/platform/i18n` and `src/features/todo/messages`).
+Every runtime value comes from the process environment through `EnvSource` (`.starcistacks/dev/runtime/env/KEYS.md` lists the keys). The database is the `primary`
+connection: `PRIMARY_DB_URL`. Secrets and hosts have no default: a missing value stops the boot with an error that names the key. A secret may come from a
+file named by `<KEY>_FILE`. Schema changes only by migration, owned by the capability whose table it is (`src/modules/{domain,platform}/<c>/persistence/migrations`),
+listed by each owner index and concatenated by `apps/migrate` and the apps. Business code reads time through the injected `Clock` (specs use `FakeClock`),
+side effects that must survive a crash go through the outbox in the same transaction (`outbox.enqueue(manager, message)`) and are consumed by the worker.
 
 ## Work
 
@@ -71,8 +73,5 @@ only, and this identity must never protect a real credential (see `scripts/with-
 
 ## Probes and metrics
 
-`GET /health` and `GET /ready` answer the dependency-checked Postgres probe (200 ok / 503), and
-`GET /metrics` serves Prometheus text exposition of per-route request counters and durations. Every
-request carries an `x-request-id` correlation id echoed on the response and written on one structured
-`http.request.completed` log line. See `docs/guides/testing.md` for the exact commands and how the dev stack's
-Prometheus service scrapes the api.
+`GET /health` answers the dependency-checked probe (200 ok / 503) and `GET /metrics` serves Prometheus text exposition of per-route request counters and durations.
+Every request carries an `x-request-id` correlation id echoed on the response and written on one structured `http.request.completed` log line.

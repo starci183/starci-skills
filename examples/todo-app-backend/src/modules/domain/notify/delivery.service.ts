@@ -1,216 +1,149 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    In
-} from "typeorm"
+import { Injectable } from "@nestjs/common"
+import { InjectNotifySmtp, NotifySmtpError, NotifySmtpErrorCode } from "@modules/integrations/notify-smtp"
+import type { NotifySmtpClient, NotifySmtpMessageParams } from "@modules/integrations/notify-smtp"
+import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { InjectLogger } from "@modules/platform/logging"
+import type { Logger } from "@modules/platform/logging"
+import { In } from "typeorm"
+import type { EntityManager } from "typeorm"
+import { NotifyLogEvent } from "./notify.log-events"
 import type {
-    EntityManager 
-} from "typeorm"
-import {
-    InjectPrimaryEntityManager,
-} from "@modules/platform/databases/index"
-import {
-    NotifyDeliveryAttemptEntity,
-} from "@modules/platform/databases/index"
-import {
-    NotifySmtpMessageParams,
-    NotifySmtpPort,
-} from "@modules/integrations/notify-smtp/index"
-import {
-    NotifySmtpPermanentRejectionException,
-} from "@modules/integrations/notify-smtp/index"
-import {
-    NotifySmtpTransientFailureException,
-} from "@modules/integrations/notify-smtp/index"
+    AdmitDeliveryParams,
+    DeliveryAttemptView,
+    DeliveryHistoryEntry,
+    DeliveryVerdict,
+    FindDeliveryParams,
+    MarkSendingParams,
+    RecordDeliveryParams,
+    RecordedDelivery,
+} from "./notify.contracts"
+import { settleAttempt } from "./notify.policy"
+import { NotifyDeliveryAttemptEntity } from "./persistence/entities/delivery-attempt.entity"
+import { toDeliveryAttemptView } from "./persistence/notify.rows"
 
-import {
-    DeliveryAttemptRecord, DeliveryHistoryEntry 
-} from "./types/delivery-attempt-record"
-
-/** br.notify.failure.classified's "bounded number of attempts": a transient failure retries up to this
- * many dispatch attempts before it is recorded as retries-exhausted rather than retried forever. */
-export const RETRY_BUDGET = 3
-
-/** Contract naming the dispatch batch result shape domain/notify code and its consumers share; a second site never retypes it inline. */
-export interface DispatchBatchResult {
-  readonly delivered: Array<string>;
-  readonly retried: Array<string>;
-  readonly bounced: Array<string>;
-}
-
-/**
- * sds.notify.delivery-lifecycle: carries one delivery attempt from admission to a terminal outcome. The
- * pipeline (notify.service.ts) is the only caller - nothing else reads or writes
- * NotifyDeliveryAttemptEntity. Method names mirror the record's transition ids (t-suppress, t-dispatch,
- * t-deliver, t-bounce, t-retry, t-give-up) so the record and the code read together, the same convention
- * `TaskService`'s tComplete/tReopen and `SessionService`'s tBegin/tAccept already use in this codebase.
- */
 @Injectable()
-/** Injectable service owning the delivery logic the notify capability exposes; wired by the capability's own module. */
+/**
+ * The delivery attempts and the one send to the mail host. An attempt goes queued, sending, then delivered, bounced or
+ * back to queued for a retry; an unsubscribed recipient's attempt is created suppressed and is never sent. The send
+ * itself holds no transaction: the caller marks the attempts sending, sends, then records the outcome.
+ */
 export class DeliveryService {
     constructor(
-    @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-    private readonly smtp: NotifySmtpPort,
+        @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        @InjectNotifySmtp() private readonly smtp: NotifySmtpClient,
+        @InjectLogger() private readonly logger: Logger,
     ) {}
 
-    /** The delivery attempt's initial state (implicit `queued` in the state machine), immediately followed
-   * by t-suppress when the recipient is already unsubscribed - br.notify.failure.classified's
-   * suppresses-unsubscribed acceptance criterion: suppressed is reached before any dispatch attempt, and
-   * no attempt is ever made against the transport. */
-    async admit(notificationId: string, now: Date, unsubscribed: boolean): Promise<DeliveryAttemptRecord> {
-        const history: Array<DeliveryHistoryEntry> = [{
-            state: "queued", at: now.toISOString() 
-        }]
-        if (unsubscribed) {
-            history.push({
-                state: "suppressed", at: now.toISOString(), failureClass: "unsubscribed" 
-            })
-            const saved = await this.entityManager.save(NotifyDeliveryAttemptEntity,
-                {
-                    notificationId,
-                    state: "suppressed",
-                    attempt: 0,
-                    failureClass: "unsubscribed",
-                    startedAt: null,
-                    endedAt: now,
-                    history,
-                })
-            return toRecord(saved)
-        }
-        const saved = await this.entityManager.save(NotifyDeliveryAttemptEntity,
-            {
-                notificationId,
-                state: "queued",
+    /** Creates the attempt of a notification: queued, or suppressed at once when the recipient opted out. */
+    async admit(params: AdmitDeliveryParams): Promise<DeliveryAttemptView> {
+        const queued: DeliveryHistoryEntry = { state: "queued", at: params.at.toISOString() }
+        if (params.unsubscribed) {
+            const saved = await params.manager.save(NotifyDeliveryAttemptEntity, {
+                notificationId: params.notificationId,
+                state: "suppressed",
                 attempt: 0,
-                failureClass: null,
+                failureClass: "unsubscribed",
                 startedAt: null,
-                endedAt: null,
-                history,
+                endedAt: params.at,
+                history: [queued, { state: "suppressed", at: params.at.toISOString(), failureClass: "unsubscribed" }],
             })
-        return toRecord(saved)
+            return toDeliveryAttemptView(saved)
+        }
+        const saved = await params.manager.save(NotifyDeliveryAttemptEntity, {
+            notificationId: params.notificationId,
+            state: "queued",
+            attempt: 0,
+            failureClass: null,
+            startedAt: null,
+            endedAt: null,
+            history: [queued],
+        })
+        return toDeliveryAttemptView(saved)
     }
 
-    async findById(notificationId: string): Promise<DeliveryAttemptRecord | null> {
-        const row = await this.entityManager.findOneBy(NotifyDeliveryAttemptEntity,
-            {
-                notificationId 
-            })
-        return row ? toRecord(row) : null
+    /** The attempt of a notification, or null. */
+    async find(params: FindDeliveryParams): Promise<DeliveryAttemptView | null> {
+        const row = await this.entityManager.findOneBy(NotifyDeliveryAttemptEntity, {
+            notificationId: params.notificationId,
+        })
+        return row ? toDeliveryAttemptView(row) : null
     }
 
-    /**
-   * t-dispatch for every queued attempt in the batch, one SMTP `send` covering all of them (br.notify.digest.window:
-   * a flushed group is rendered as one message), then t-deliver/t-bounce/t-retry/t-give-up applied to
-   * each attempt from that single outcome. Attempts not currently `queued` are skipped rather than
-   * failed, so a batch that included an already-suppressed member is a no-op for that member.
-   */
-    async dispatchBatch(notificationIds: Array<string>, now: Date, message: NotifySmtpMessageParams): Promise<DispatchBatchResult> {
-        const found = notificationIds.length === 0
-            ? []
-            : await this.entityManager.find(NotifyDeliveryAttemptEntity,
-                {
-                    where: {
-                        notificationId: In(notificationIds)
-                    },
-                    take: notificationIds.length,
-                })
-        const rows = notificationIds.flatMap(notificationId => found.filter(row => row.notificationId === notificationId && row.state === "queued"))
-        if (rows.length === 0) {
-            return {
-                delivered: [], retried: [], bounced: [] 
-            }
-        }
+    /** Moves every queued attempt of the batch to sending and counts the dispatch; attempts in any other state are left alone. */
+    async markSending(params: MarkSendingParams): Promise<Array<DeliveryAttemptView>> {
+        if (params.notificationIds.length === 0) return []
+        const found = await params.manager.find(NotifyDeliveryAttemptEntity, {
+            where: { notificationId: In([...params.notificationIds]) },
+            take: LIST_ROWS_MAX,
+        })
+        const sending = found
+            .filter((row) => row.state === "queued")
+            .map((row) => ({
+                ...row,
+                state: "sending" as const,
+                attempt: row.attempt + 1,
+                startedAt: row.startedAt ?? params.at,
+                history: [...row.history, { state: "sending" as const, at: params.at.toISOString() }],
+            }))
+        if (sending.length === 0) return []
+        const saved = await params.manager.save(NotifyDeliveryAttemptEntity, sending)
+        return saved.map(toDeliveryAttemptView)
+    }
 
-        for (const row of rows) {
-            row.state = "sending"
-            row.attempt += 1
-            row.startedAt = row.startedAt ?? now
-            row.history = [...row.history,
-                {
-                    state: "sending", at: now.toISOString() 
-                }]
-            await this.entityManager.save(NotifyDeliveryAttemptEntity,
-                row)
-        }
-
+    /** Sends one message. It holds no transaction and never throws for a mail-host failure: the answer is the verdict. */
+    async transmit(message: NotifySmtpMessageParams): Promise<DeliveryVerdict> {
         try {
             await this.smtp.send(message)
-            for (const row of rows) {
-                row.state = "delivered"
-                row.endedAt = now
-                row.history = [...row.history,
-                    {
-                        state: "delivered", at: now.toISOString() 
-                    }]
-                await this.entityManager.save(NotifyDeliveryAttemptEntity,
-                    row)
-            }
-            return {
-                delivered: rows.map(row => row.notificationId), retried: [], bounced: [] 
-            }
+            return "delivered"
         } catch (error) {
-            if (error instanceof NotifySmtpPermanentRejectionException) {
-                for (const row of rows) {
-                    row.state = "bounced"
-                    row.failureClass = "permanent-bounce"
-                    row.endedAt = now
-                    row.history = [...row.history,
-                        {
-                            state: "bounced", at: now.toISOString(), failureClass: "permanent-bounce" 
-                        }]
-                    await this.entityManager.save(NotifyDeliveryAttemptEntity,
-                        row)
-                }
-                return {
-                    delivered: [], retried: [], bounced: rows.map(row => row.notificationId) 
-                }
+            if (error instanceof NotifySmtpError && error.code === NotifySmtpErrorCode.PermanentRejection) {
+                this.logger.warn(NotifyLogEvent.SendRejected, { reason: error.params.reason ?? "" })
+                return "permanent-bounce"
             }
-            if (error instanceof NotifySmtpTransientFailureException) {
-                const retried: Array<string> = []
-                const bounced: Array<string> = []
-                for (const row of rows) {
-                    if (row.attempt < RETRY_BUDGET) {
-                        row.state = "queued"
-                        row.failureClass = "transient"
-                        row.history = [...row.history,
-                            {
-                                state: "queued", at: now.toISOString(), failureClass: "transient" 
-                            }]
-                        retried.push(row.notificationId)
-                    } else {
-                        row.state = "bounced"
-                        row.failureClass = "retries-exhausted"
-                        row.endedAt = now
-                        row.history = [...row.history,
-                            {
-                                state: "bounced", at: now.toISOString(), failureClass: "retries-exhausted" 
-                            }]
-                        bounced.push(row.notificationId)
-                    }
-                    await this.entityManager.save(NotifyDeliveryAttemptEntity,
-                        row)
-                }
-                return {
-                    delivered: [], retried, bounced 
-                }
+            if (error instanceof NotifySmtpError) {
+                this.logger.warn(NotifyLogEvent.SendFailed, { reason: error.params.reason ?? "" })
+            } else {
+                this.logger.error(NotifyLogEvent.SendFailed, error)
             }
-            throw error
+            return "transient"
         }
     }
-}
 
-function toRecord(row: NotifyDeliveryAttemptEntity): DeliveryAttemptRecord {
-    // The entity's `history` column is typed loosely (plain `string` fields) since the platform database
-    // module never depends on a capability's own types; every element this service ever writes is
-    // actually a DeliveryHistoryEntry, so the cast is honest rather than a widening escape.
-    return new DeliveryAttemptRecord(
-        row.notificationId,
-        row.state,
-        row.attempt,
-        row.failureClass,
-        row.startedAt,
-        row.endedAt,
-    row.history as Array<DeliveryHistoryEntry>,
-    )
+    /** Applies the outcome of one send to every attempt that is still sending: delivered, bounced, or back to queued while the budget lasts. */
+    async record(params: RecordDeliveryParams): Promise<RecordedDelivery> {
+        if (params.notificationIds.length === 0) return { delivered: [], retried: [], bounced: [], attempt: 0 }
+        const found = await params.manager.find(NotifyDeliveryAttemptEntity, {
+            where: { notificationId: In([...params.notificationIds]) },
+            take: LIST_ROWS_MAX,
+        })
+        const delivered: Array<string> = []
+        const retried: Array<string> = []
+        const bounced: Array<string> = []
+        let attempt = 0
+        const settled = found
+            .filter((row) => row.state === "sending")
+            .map((row) => {
+                const settlement = settleAttempt(params.verdict, row.attempt)
+                attempt = Math.max(attempt, row.attempt)
+                if (settlement.state === "delivered") delivered.push(row.notificationId)
+                else if (settlement.state === "queued") retried.push(row.notificationId)
+                else bounced.push(row.notificationId)
+                return {
+                    ...row,
+                    state: settlement.state,
+                    failureClass: settlement.failureClass ?? row.failureClass,
+                    endedAt: settlement.ends ? params.at : row.endedAt,
+                    history: [
+                        ...row.history,
+                        {
+                            state: settlement.state,
+                            at: params.at.toISOString(),
+                            ...(settlement.failureClass ? { failureClass: settlement.failureClass } : {}),
+                        },
+                    ],
+                }
+            })
+        if (settled.length > 0) await params.manager.save(NotifyDeliveryAttemptEntity, settled)
+        return { delivered, retried, bounced, attempt }
+    }
 }

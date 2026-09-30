@@ -1,82 +1,19 @@
-import {
-    DynamicModule, Module 
-} from "@nestjs/common"
-import {
-    CqrsModule 
-} from "@nestjs/cqrs"
-import {
-    TaskModule,
-} from "@modules/domain/task/index"
-import {
-    ConfigurableModuleClass, OPTIONS_TYPE 
-} from "./share.module-definition"
-import {
-    InvitationService 
-} from "./invitation.service"
-import {
-    AccessService 
-} from "./access.service"
-import {
-    CollaboratorCache 
-} from "./collaborator-cache"
-import {
-    ShareCompletionAuthoritySetup 
-} from "./completion-authority"
-import {
-    InviteHandler 
-} from "./invite.handler"
-import {
-    AcceptInvitationHandler 
-} from "./accept-invitation.handler"
-import {
-    RevokeCollaboratorHandler 
-} from "./revoke-collaborator.handler"
-import {
-    ListCollaboratorsHandler 
-} from "./list-collaborators.handler"
+import { Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import { AccessService } from "./access.service"
+import { InvitationService } from "./invitation.service"
+import { ConfigurableModuleClass, OPTIONS_TYPE } from "./share.module-definition"
 
-/**
- * The `share` capability module, under nivo's `modules/domain/<capability>` shape - see task.module.ts
- * and session.module.ts for the same pattern. Owns InvitationService/AccessService/CollaboratorCache and
- * every share CQRS command/query handler.
- *
- * Imports `TaskModule.register()` with the same (empty) options `app.module.ts` already registers it
- * with, so `ConfigurableModuleBuilder`'s own module-token hashing resolves both imports to the one shared
- * module instance instead of constructing a second, independent copy of TaskService/
- * CompletionAuthorityRegistry - this is the sanctioned seam (CompletionAuthorityRegistry.register), never
- * a direct import of task's TaskService or its command handlers. `ShareCompletionAuthoritySetup` performs
- * that registration from its own `onModuleInit`.
- *
- * No `TypeOrmModule.forFeature(...)` here, for the same reason as task/session: `InvitationService`
- * reaches `ShareInvitationEntity` through `@InjectPrimaryEntityManager()`, and `PostgresqlPrimaryModule`'s
- * `TypeOrmCoreModule` is already app-wide by the vendor's own design.
- */
-@Module({
-    providers: [
-        InviteHandler,
-        AcceptInvitationHandler,
-        RevokeCollaboratorHandler,
-        ListCollaboratorsHandler,
-    ],
-})
-/** Nest module wiring the share capability's providers; the app composition root registers it - other modules never import it. */
+@Module({})
+/** The share capability: the invitation rows, their lifecycle and the access rule for completing a shared task. The handlers live in the todo feature. */
 export class ShareModule extends ConfigurableModuleClass {
-    static register(options: typeof OPTIONS_TYPE = {
-    }): DynamicModule {
+    /** Registers the capability once per app. */
+    static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
         return {
             ...base,
-            imports: [CqrsModule,
-                TaskModule.register()],
-            providers: [
-                ...(base.providers ?? []),
-                InvitationService,
-                AccessService,
-                CollaboratorCache,
-                ShareCompletionAuthoritySetup,
-            ],
-            exports: [InvitationService,
-                AccessService],
+            providers: [...(base.providers ?? []), InvitationService, AccessService],
+            exports: [InvitationService, AccessService],
         }
     }
 }

@@ -1,166 +1,36 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    CompletionAuthorityRegistry,
-} from "@modules/domain/task/index"
-import {
-    TaskCreationPolicyRegistry,
-} from "@modules/domain/task/index"
-import {
-    TaskService,
-} from "@modules/domain/task/index"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    createFakePlanEntityManager 
-} from "./testing/fake-plan-entity-manager"
-import {
-    SubscriptionService 
-} from "./subscription.service"
-import {
-    PlanCapGuardPolicy 
-} from "./cap-guard.policy"
-import {
-    Clock 
-} from "@modules/platform/clock/index"
-import {
-    FakeClock 
-} from "@starci/jest-preset/clock"
-import {
-    OwnershipGuard 
-} from "@modules/domain/task/index"
+import { mock } from "@starci/jest-preset/mock"
+import { CapGuardPolicy } from "./cap-guard.policy"
+import { FREE_PLAN, FREE_PLAN_TASK_CAP, PAID_PLAN } from "./plan.policy"
+import type { SubscriptionService } from "./subscription.service"
 
-describe("PlanCapGuardPolicy (sds.plan.cap-guard)",
-    () => {
-        let moduleRef: TestingModule
-        let taskService: TaskService
-        let subscriptionService: SubscriptionService
-        let policy: PlanCapGuardPolicy
+const guardOn = (plan: typeof FREE_PLAN): { policy: CapGuardPolicy; subscriptions: SubscriptionService } => {
+    const subscriptions = mock<SubscriptionService>({ readEffectivePlan: jest.fn().mockResolvedValue(plan) })
+    return { policy: new CapGuardPolicy(subscriptions), subscriptions }
+}
 
-        beforeEach(async () => {
-            moduleRef = await Test.createTestingModule({
-                providers: [
-                    OwnershipGuard,
-                    {
-                        provide: Clock, useValue: new FakeClock() 
-                    },
-                    PlanCapGuardPolicy,
-                    TaskService,
-                    CompletionAuthorityRegistry,
-                    TaskCreationPolicyRegistry,
-                    SubscriptionService,
-                    {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: createFakePlanEntityManager() 
-                    },
-                ],
-            }).compile()
-            taskService = moduleRef.get(TaskService)
-            subscriptionService = moduleRef.get(SubscriptionService)
-            policy = moduleRef.get(PlanCapGuardPolicy)
-        })
-
-        afterEach(async () => {
-            await moduleRef.close()
-        })
-
-        it("t-under-cap: a free person under 20 active tasks may create",
-            async () => {
-                for (let i = 0; i < 19; i += 1) {
-                    await taskService.create("owner-1",
-                        `task-${i}`)
-                }
-                await expect(policy.assertMayCreate({
-                    actorId: "owner-1" 
-                })).resolves.toBeUndefined()
-            })
-
-        it("ac.plan.caps.limit.refuses-over-cap / t-at-cap: a free person at 20 active tasks is refused, naming the cap and the upgrade path",
-            async () => {
-                for (let i = 0; i < 20; i += 1) {
-                    await taskService.create("owner-1",
-                        `task-${i}`)
-                }
-                await expect(policy.assertMayCreate({
-                    actorId: "owner-1" 
-                })).rejects.toMatchObject({
-                    code: "PLAN_CAP_EXCEEDED_EXCEPTION",
-                    metadata: expect.objectContaining({
-                        cap: 20 
-                    }),
-                })
-            })
-
-        it("ac.plan.active-scope.excludes-complete: a completed task does not count toward the cap",
-            async () => {
-                for (let i = 0; i < 19; i += 1) {
-                    await taskService.create("owner-1",
-                        `task-${i}`)
-                }
-                const completedOne = await taskService.create("owner-1",
-                    "the 20th, soon completed")
-                await taskService.complete(completedOne.id,
-                    "owner-1")
-
-                await expect(policy.assertMayCreate({
-                    actorId: "owner-1" 
-                })).resolves.toBeUndefined()
-            })
-
-        it("a paid person is never refused, however many active tasks they hold",
-            async () => {
-                for (let i = 0; i < 40; i += 1) {
-                    await taskService.create("owner-1",
-                        `task-${i}`)
-                }
-                await subscriptionService.tCheckoutStarted("owner-1")
-                const subscription = await subscriptionService.getOrCreate("owner-1")
-                await subscriptionService.tGatewayConfirmed(subscription.id,
-                    new Date("2027-01-01T00:00:00.000Z"))
-
-                await expect(policy.assertMayCreate({
-                    actorId: "owner-1" 
-                })).resolves.toBeUndefined()
-            })
-
-        it("br.plan.downgrade.freeze / ac.plan.downgrade.freeze.over-cap-blocks-create: a downgraded-to-free person over the cap is refused the same way an at-cap create is",
-            async () => {
-                for (let i = 0; i < 40; i += 1) {
-                    await taskService.create("owner-1",
-                        `task-${i}`)
-                }
-                await subscriptionService.tCheckoutStarted("owner-1")
-                const subscription = await subscriptionService.getOrCreate("owner-1")
-                await subscriptionService.tGatewayConfirmed(subscription.id,
-                    new Date())
-                await subscriptionService.tDowngrade("owner-1")
-
-                await expect(policy.assertMayCreate({
-                    actorId: "owner-1" 
-                })).rejects.toMatchObject({
-                    code: "PLAN_CAP_EXCEEDED_EXCEPTION" 
-                })
-            })
-
-        it("contract.plan.create-precondition / gap.plan.cap-guard-not-wired: registered into TaskCreationPolicyRegistry, the registry itself refuses the over-cap create",
-            async () => {
-                const registry = moduleRef.get(TaskCreationPolicyRegistry)
-                registry.register(policy)
-                for (let i = 0; i < 20; i += 1) {
-                    await taskService.create("owner-1",
-                        `task-${i}`)
-                }
-                await expect(registry.assertMayCreate({
-                    actorId: "owner-1" 
-                },
-                {
-                    title: "one too many" 
-                })).rejects.toMatchObject({
-                    code: "PLAN_CAP_EXCEEDED_EXCEPTION",
-                })
-            })
+describe("CapGuardPolicy", () => {
+    it("allows a free person under the cap", async () => {
+        const { policy, subscriptions } = guardOn(FREE_PLAN)
+        await expect(policy.check({ personId: "p1", activeTaskCount: FREE_PLAN_TASK_CAP - 1 })).resolves.toEqual({ allowed: true })
+        expect(subscriptions.readEffectivePlan).toHaveBeenCalledWith({ personId: "p1" })
     })
+
+    it("refuses a free person at the cap, naming the cap and the upgrade path", async () => {
+        const { policy } = guardOn(FREE_PLAN)
+        await expect(policy.check({ personId: "p1", activeTaskCount: FREE_PLAN_TASK_CAP })).resolves.toEqual({
+            allowed: false,
+            cap: 20,
+            upgradePath: "/plan/usage",
+        })
+    })
+
+    it("refuses a downgraded person who is over the cap the same way", async () => {
+        const { policy } = guardOn(FREE_PLAN)
+        await expect(policy.check({ personId: "p1", activeTaskCount: 35 })).resolves.toMatchObject({ allowed: false, cap: 20 })
+    })
+
+    it("never refuses a paid person, however many active tasks they hold", async () => {
+        const { policy } = guardOn(PAID_PLAN)
+        await expect(policy.check({ personId: "p1", activeTaskCount: 10_000 })).resolves.toEqual({ allowed: true })
+    })
+})

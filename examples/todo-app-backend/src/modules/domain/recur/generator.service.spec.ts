@@ -1,255 +1,108 @@
-import {
-    randomUUID 
-} from "node:crypto"
-import {
-    Test 
-} from "@nestjs/testing"
-import {
-    CommandBus 
-} from "@nestjs/cqrs"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    CreateTaskCommand,
-} from "@modules/domain/task/index"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    TaskEntity,
-} from "@modules/platform/databases/index"
-import {
-    createFakeRecurEntityManager 
-} from "./testing/fake-recur-entity-manager"
-import {
-    RuleService 
-} from "./rule.service"
-import {
-    OccurrenceService 
-} from "./occurrence.service"
-import {
-    GeneratorService 
-} from "./generator.service"
-import {
-    Clock 
-} from "@modules/platform/clock/index"
-import {
-    FakeClock 
-} from "@starci/jest-preset/clock"
+import { mock } from "@starci/jest-preset/mock"
+import { LIST_ROWS_MAX } from "@modules/platform/database"
+import { GeneratorService } from "./generator.service"
+import type { OccurrenceService } from "./occurrence.service"
+import { RuleFrequency } from "./recur.contracts"
+import type { RuleView } from "./recur.contracts"
+import type { RuleService } from "./rule.service"
 
-/** A minimal CommandBus stand-in that only knows CreateTaskCommand, writing directly into the same fake
- * entity manager GeneratorService's own services use - close enough to the real seam (dispatch onto a
- * bus, land in the tasks table) without standing up the whole CqrsModule wiring for a unit test. */
-function fakeCommandBusOverTasks(entityManager: ReturnType<typeof createFakeRecurEntityManager>) {
-    return {
-        async execute(command: CreateTaskCommand) {
-            const id = randomUUID()
-            await entityManager.save(TaskEntity,
-                {
-                    id,
-                    owner: command.params.ownerId,
-                    title: command.params.title,
-                    complete: false,
-                    completedAt: null,
-                })
-            return {
-                taskId: id, title: command.params.title 
-            }
-        },
-    }
+const weekday: RuleView = {
+    id: "r1",
+    owner: "o1",
+    title: "Stand-up",
+    frequency: RuleFrequency.EveryWeekday,
+    n: null,
+    dayOfMonth: null,
+    timeZone: "Asia/Ho_Chi_Minh",
+    time: "09:00",
+    startDate: "2026-09-14",
+    endedAt: null,
 }
 
-describe("GeneratorService (sds.recur.generation-engine)",
-    () => {
-        const build = async () => {
-            const entityManager = createFakeRecurEntityManager()
-            const moduleRef = await Test.createTestingModule({
-                providers: [
-                    {
-                        provide: Clock, useValue: new FakeClock() 
-                    },
-                    RuleService,
-                    OccurrenceService,
-                    GeneratorService,
-                    {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
-                    },
-                    {
-                        provide: CommandBus, useValue: fakeCommandBusOverTasks(entityManager) 
-                    },
-                ],
-            }).compile()
-            return {
-                moduleRef,
-                ruleService: moduleRef.get(RuleService),
-                occurrenceService: moduleRef.get(OccurrenceService),
-                generator: moduleRef.get(GeneratorService),
-            }
-        }
+// 2026-09-18 is a Friday; 12:00Z is 19:00 in Ho Chi Minh, the same calendar day.
+const FRIDAY = new Date("2026-09-18T12:00:00.000Z")
 
-        it("materialises one occurrence per weekday date between startDate and now, skipping weekends",
-            async () => {
-                const { moduleRef, ruleService, occurrenceService, generator } = await build()
-                try {
-                    const rule = await ruleService.create({
-                        owner: "owner-1",
-                        title: "Morning routine",
-                        frequency: "every-weekday",
-                        timeZone: "UTC",
-                        time: "09:00",
-                        startDate: "2026-09-14", // Monday
-                    })
-
-                    const summary = await generator.runOnce(new Date("2026-09-18T12:00:00.000Z")) // Friday, after 09:00 UTC
-
-                    expect(summary.materialised).toHaveLength(5)
-                    const occurrences = await occurrenceService.listByRule(rule.id)
-                    expect(occurrences.map(o => o.localDate)).toEqual(["2026-09-14",
-                        "2026-09-15",
-                        "2026-09-16",
-                        "2026-09-17",
-                        "2026-09-18"])
-                    expect(occurrences.every(o => o.status === "materialised")).toBe(true)
-                } finally {
-                    await moduleRef.close()
-                }
-            })
-
-        it("br.recur.generation.once / ac.is-idempotent-on-rerun: running twice for an overlapping window creates no second occurrence",
-            async () => {
-                const { moduleRef, ruleService, occurrenceService, generator } = await build()
-                try {
-                    const rule = await ruleService.create({
-                        owner: "owner-1",
-                        title: "Daily",
-                        frequency: "every-n-days",
-                        n: 1,
-                        timeZone: "Europe/Berlin",
-                        time: "09:00",
-                        startDate: "2026-09-14",
-                    })
-
-                    await generator.runOnce(new Date("2026-09-14T12:00:00.000Z"))
-                    const firstRun = await occurrenceService.listByRule(rule.id)
-                    expect(firstRun).toHaveLength(1)
-                    const firstId = firstRun[0].id
-                    const firstDueAtUtc = firstRun[0].dueAtUtc.toISOString()
-
-                    await generator.runOnce(new Date("2026-09-14T12:00:00.000Z"))
-                    const secondRun = await occurrenceService.listByRule(rule.id)
-
-                    expect(secondRun).toHaveLength(1)
-                    expect(secondRun[0].id).toBe(firstId)
-                    expect(secondRun[0].dueAtUtc.toISOString()).toBe(firstDueAtUtc)
-                    expect(secondRun[0].status).toBe(firstRun[0].status)
-                } finally {
-                    await moduleRef.close()
-                }
-            })
-
-        it("decision.recur.generation.backfill: a generator that has never run walks and materialises every missed date, one occurrence per date",
-            async () => {
-                const { moduleRef, ruleService, occurrenceService, generator } = await build()
-                try {
-                    const rule = await ruleService.create({
-                        owner: "owner-1",
-                        title: "Daily",
-                        frequency: "every-n-days",
-                        n: 1,
-                        timeZone: "UTC",
-                        time: "09:00",
-                        startDate: "2026-09-14",
-                    })
-
-                    // Simulates the generator having been down for three days: the first tick after the outage runs at
-                    // 2026-09-17, and every day since startDate must be backfilled, not only the latest.
-                    await generator.runOnce(new Date("2026-09-17T12:00:00.000Z"))
-                    const occurrences = await occurrenceService.listByRule(rule.id)
-
-                    expect(occurrences.map(o => o.localDate)).toEqual(["2026-09-14",
-                        "2026-09-15",
-                        "2026-09-16",
-                        "2026-09-17"])
-                } finally {
-                    await moduleRef.close()
-                }
-            })
-
-        it("ac.recur.impossible-date.skips.skips-nonexistent-day: a monthly-day-31 rule materialises January and March 2026 but nothing for February",
-            async () => {
-                const { moduleRef, ruleService, occurrenceService, generator } = await build()
-                try {
-                    const rule = await ruleService.create({
-                        owner: "owner-1",
-                        title: "End-of-month bill",
-                        frequency: "monthly-day",
-                        dayOfMonth: 31,
-                        timeZone: "UTC",
-                        time: "09:00",
-                        startDate: "2026-01-01",
-                    })
-
-                    await generator.runOnce(new Date("2026-03-31T10:00:00.000Z"))
-                    const occurrences = await occurrenceService.listByRule(rule.id)
-
-                    expect(occurrences.map(o => o.localDate)).toEqual(["2026-01-31",
-                        "2026-03-31"])
-                    expect(occurrences.some(o => o.localDate.startsWith("2026-02"))).toBe(false)
-                } finally {
-                    await moduleRef.close()
-                }
-            })
-
-        it("br.recur.ending.preserves-history: an ended rule never has a generated occurrence dated after the day it ended",
-            async () => {
-                const { moduleRef, ruleService, occurrenceService, generator } = await build()
-                try {
-                    const rule = await ruleService.create({
-                        owner: "owner-1",
-                        title: "Daily",
-                        frequency: "every-n-days",
-                        n: 1,
-                        timeZone: "UTC",
-                        time: "09:00",
-                        startDate: "2026-09-14",
-                    })
-                    await ruleService.end(rule.id,
-                        "owner-1",
-                        "2026-09-15")
-
-                    await generator.runOnce(new Date("2026-09-20T12:00:00.000Z"))
-                    const occurrences = await occurrenceService.listByRule(rule.id)
-
-                    expect(occurrences.map(o => o.localDate)).toEqual(["2026-09-14",
-                        "2026-09-15"])
-                    expect(occurrences.every(o => o.localDate <= "2026-09-15")).toBe(true)
-                } finally {
-                    await moduleRef.close()
-                }
-            })
-
-        it("br.recur.timezone.owner-local-time: the materialised occurrence's dueAtUtc is resolved from the rule's own zone, not the host clock",
-            async () => {
-                const { moduleRef, ruleService, occurrenceService, generator } = await build()
-                try {
-                    const rule = await ruleService.create({
-                        owner: "owner-1",
-                        title: "Daily",
-                        frequency: "every-n-days",
-                        n: 1,
-                        timeZone: "Europe/Berlin",
-                        time: "02:30",
-                        startDate: "2026-03-29",
-                    })
-
-                    await generator.runOnce(new Date("2026-03-29T12:00:00.000Z"))
-                    const occurrences = await occurrenceService.listByRule(rule.id)
-
-                    expect(occurrences).toHaveLength(1)
-                    expect(occurrences[0].dueAtUtc.toISOString()).toBe("2026-03-29T01:30:00.000Z")
-                } finally {
-                    await moduleRef.close()
-                }
-            })
+const build = (
+    batches: ReadonlyArray<Array<RuleView>>,
+    existing: ReadonlyArray<string> = [],
+): { generator: GeneratorService; rules: RuleService; occurrences: OccurrenceService } => {
+    const listBatch = jest.fn()
+    for (const batch of batches) listBatch.mockResolvedValueOnce(batch)
+    const rules = mock<RuleService>({ listBatch })
+    const occurrences = mock<OccurrenceService>({
+        existingWindowKeys: jest.fn().mockResolvedValue(new Set(existing)),
     })
+    return { generator: new GeneratorService(rules, occurrences), rules, occurrences }
+}
+
+describe("GeneratorService", () => {
+    it("owes one occurrence per weekday between the start date and today, skipping weekends, resolved in the zone of the rule", async () => {
+        const { generator } = build([[weekday]])
+        const due = await generator.collectDue({ now: FRIDAY, limit: 100 })
+        expect(due.map((entry) => entry.localDate)).toEqual(["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"])
+        expect(due[0]).toEqual({
+            ruleId: "r1",
+            ownerId: "o1",
+            title: "Stand-up",
+            windowKey: "r1:2026-09-14",
+            localDate: "2026-09-14",
+            dueAtUtc: new Date("2026-09-14T02:00:00.000Z"),
+        })
+    })
+
+    it("does not owe a window that already has an occurrence, so running twice creates no second one", async () => {
+        const { generator, occurrences } = build([[weekday]], ["r1:2026-09-14", "r1:2026-09-15", "r1:2026-09-16"])
+        const due = await generator.collectDue({ now: FRIDAY, limit: 100 })
+        expect(due.map((entry) => entry.localDate)).toEqual(["2026-09-17", "2026-09-18"])
+        expect(occurrences.existingWindowKeys).toHaveBeenCalledWith({
+            windowKeys: ["r1:2026-09-14", "r1:2026-09-15", "r1:2026-09-16", "r1:2026-09-17", "r1:2026-09-18"],
+        })
+    })
+
+    it("backfills every missed date on the first run", async () => {
+        const { generator } = build([[{ ...weekday, startDate: "2026-09-01" }]])
+        const due = await generator.collectDue({ now: FRIDAY, limit: 100 })
+        expect(due).toHaveLength(14)
+    })
+
+    it("skips the months that lack the day of a monthly-day-31 rule", async () => {
+        const monthly: RuleView = { ...weekday, frequency: RuleFrequency.MonthlyDay, dayOfMonth: 31, startDate: "2026-01-01" }
+        const { generator } = build([[monthly]])
+        const due = await generator.collectDue({ now: new Date("2026-03-31T12:00:00.000Z"), limit: 100 })
+        expect(due.map((entry) => entry.localDate)).toEqual(["2026-01-31", "2026-03-31"])
+    })
+
+    it("never owes an occurrence dated after the day an ended rule ended", async () => {
+        const { generator } = build([[{ ...weekday, endedAt: "2026-09-16" }]])
+        const due = await generator.collectDue({ now: FRIDAY, limit: 100 })
+        expect(due.map((entry) => entry.localDate)).toEqual(["2026-09-14", "2026-09-15", "2026-09-16"])
+    })
+
+    it("reads today from the zone of the rule: 23:30Z on Sunday is already Monday in Ho Chi Minh", async () => {
+        const { generator } = build([[weekday]])
+        const due = await generator.collectDue({ now: new Date("2026-09-20T23:30:00.000Z"), limit: 100 })
+        expect(due.map((entry) => entry.localDate)).toContain("2026-09-21")
+    })
+
+    it("stops at the limit and leaves the rest for the next tick", async () => {
+        const { generator, rules } = build([[weekday, { ...weekday, id: "r2" }]])
+        const due = await generator.collectDue({ now: FRIDAY, limit: 6 })
+        expect(due).toHaveLength(6)
+        expect(due.filter((entry) => entry.ruleId === "r2")).toHaveLength(1)
+        expect(rules.listBatch).toHaveBeenCalledTimes(1)
+    })
+
+    it("walks the batches of rules until a short batch", async () => {
+        const full = Array.from({ length: LIST_ROWS_MAX }, (_unused, index) => ({ ...weekday, id: `a${index}`, startDate: "2026-09-18" }))
+        const { generator, rules } = build([full, [{ ...weekday, id: "z1", startDate: "2026-09-18" }]])
+        const due = await generator.collectDue({ now: FRIDAY, limit: LIST_ROWS_MAX + 10 })
+        expect(due).toHaveLength(LIST_ROWS_MAX + 1)
+        expect(rules.listBatch).toHaveBeenNthCalledWith(1, { after: null })
+        expect(rules.listBatch).toHaveBeenNthCalledWith(2, { after: `a${LIST_ROWS_MAX - 1}` })
+    })
+
+    it("owes nothing when there are no rules", async () => {
+        const { generator } = build([[]])
+        await expect(generator.collectDue({ now: FRIDAY, limit: 100 })).resolves.toEqual([])
+    })
+})

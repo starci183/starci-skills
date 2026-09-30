@@ -1,15 +1,8 @@
-import {
-    ConfigurableModuleBuilder 
-} from "@nestjs/common"
+import { ConfigurableModuleBuilder } from "@nestjs/common"
+import type { UploadStorageOptions } from "./upload.options"
 
-/** Upload takes no options beyond the isGlobal extra. */
-export type UploadOptions = Record<never, never>
-
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<UploadOptions>().setExtras(
-    {
-        isGlobal: false 
-    },
-    (definition, extras) => ({
-        ...definition, global: extras.isGlobal 
-    }),
-).build()
+/** The configurable-module base of the upload storage integration; `isGlobal` is decided by the app root. */
+export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } =
+    new ConfigurableModuleBuilder<UploadStorageOptions>()
+        .setExtras({ isGlobal: false }, (definition, extras) => ({ ...definition, global: extras.isGlobal }))
+        .build()

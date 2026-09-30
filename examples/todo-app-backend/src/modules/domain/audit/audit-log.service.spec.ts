@@ -1,365 +1,189 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    AuditLogLineEntity,
-} from "@modules/platform/databases/index"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    createFakeAuditEntityManager 
-} from "./testing/fake-audit-entity-manager"
-import {
-    AuditKeystoreService 
-} from "./audit-keystore.service"
-import {
-    AuditLogService
-} from "./audit-log.service"
-import {
-    Clock,
-} from "@modules/platform/clock/index"
-import {
-    FakeClock
-} from "@starci/jest-preset/clock"
+import { randomBytes } from "node:crypto"
+import { LIST_ROWS_MAX } from "@modules/platform/database"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { GENESIS_HASH, hashLine } from "./audit-chain.policy"
+import { AuditKeystoreService } from "./audit-keystore.service"
+import { AuditLogService } from "./audit-log.service"
+import { AuditAction } from "./audit.contracts"
+import type { VerifyChainResult } from "./audit.contracts"
+import { LOCK_AUDIT_CHAIN } from "./persistence/audit.sql"
+import { AuditLogLineEntity } from "./persistence/entities/audit-log-line.entity"
 
-const build = async (clock: FakeClock = new FakeClock()) => {
-    const manager = createFakeAuditEntityManager()
-    const moduleRef = await Test.createTestingModule({
-        providers: [
-            AuditKeystoreService,
-            AuditLogService,
-            {
-                provide: Clock, useValue: clock
-            },
-            {
-                provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: manager
-            },
-        ],
-    }).compile()
-    return {
-        moduleRef, manager, keystore: moduleRef.get(AuditKeystoreService), log: moduleRef.get(AuditLogService)
+const AT = new Date("2026-09-30T10:00:00.000Z")
+
+const chainOf = (count: number, from = 1, start = GENESIS_HASH): Array<AuditLogLineEntity> => {
+    const rows: Array<AuditLogLineEntity> = []
+    let prevHash = start
+    for (let position = 0; position < count; position += 1) {
+        const line = { prevHash, at: AT, action: "task.created", target: `t${from + position}`, keyId: "k1", actor: "sealed" }
+        const hash = hashLine(line)
+        rows.push({ id: String(from + position), ...line, hash })
+        prevHash = hash
     }
+    return rows
 }
 
-describe("AuditLogService",
-    () => {
-        let moduleRef: TestingModule | undefined
+const walk = (rows: Array<AuditLogLineEntity>): Promise<VerifyChainResult> =>
+    new AuditLogService(
+        mockEntityManager({ find: jest.fn().mockResolvedValueOnce(rows).mockResolvedValue([]) }),
+        new AuditKeystoreService(mockEntityManager()),
+    ).verifyChain()
 
-        afterEach(async () => {
-            await moduleRef?.close()
-            moduleRef = undefined
+describe("AuditLogService.append", () => {
+    const setup = (existing: Array<AuditLogLineEntity>): {
+        store: AuditKeystoreService
+        manager: ReturnType<typeof mockEntityManager>
+        saved: Array<AuditLogLineEntity>
+        key: Buffer
+    } => {
+        const key = randomBytes(32)
+        const store = new AuditKeystoreService(mockEntityManager())
+        jest.spyOn(store, "getOrCreateKey").mockResolvedValue({ keyId: "k1", key })
+        const saved: Array<AuditLogLineEntity> = []
+        const manager = mockEntityManager({
+            query: jest.fn().mockResolvedValue([]),
+            find: jest.fn().mockResolvedValue(existing.slice(-1)),
+            save: jest.fn().mockImplementation((_target: unknown, entity: AuditLogLineEntity) => {
+                saved.push(entity)
+                return Promise.resolve({ ...entity, id: "9" })
+            }),
         })
+        return { store, manager, saved, key }
+    }
 
-        it("fr.audit.log.append: appending increases the line count by exactly one and the chain stays valid",
-            async () => {
-                const built = await build()
-                moduleRef = built.moduleRef
-
-                await built.log.append("person-1",
-                    "sign-in",
-                    null)
-                const result = await built.log.verifyChain()
-
-                expect(result.totalLines).toBe(1)
-                expect(result.valid).toBe(true)
-            })
-
-        it("sds.audit.log-chain's t-append: the acting person's id is sealed, never stored in the clear",
-            async () => {
-                const built = await build()
-                moduleRef = built.moduleRef
-
-                await built.log.append("person-1",
-                    "task.created",
-                    "task-1")
-
-                const [row] = await built.manager.find(AuditLogLineEntity)
-                expect(String(row.actor)).not.toContain("person-1")
-                expect(row.keyId).not.toBe("person-1")
-            })
-
-        describe("ac.audit.append-only.chain-detects-tamper",
-            () => {
-                it("an untouched log of several lines recomputes as fully valid",
-                    async () => {
-                        const built = await build()
-                        moduleRef = built.moduleRef
-                        await built.log.append("person-1",
-                            "sign-in",
-                            null)
-                        await built.log.append("person-1",
-                            "task.created",
-                            "task-1")
-                        await built.log.append("person-2",
-                            "sign-in",
-                            null)
-                        await built.log.append("person-1",
-                            "task.completed",
-                            "task-1")
-
-                        const result = await built.log.verifyChain()
-
-                        expect(result.valid).toBe(true)
-                        expect(result.totalLines).toBe(4)
-                    })
-
-                it("mutating one stored field on an already-appended line surfaces a content mismatch at that line's index",
-                    async () => {
-                        const built = await build()
-                        moduleRef = built.moduleRef
-                        await built.log.append("person-1",
-                            "sign-in",
-                            null)
-                        await built.log.append("person-1",
-                            "task.created",
-                            "task-1")
-                        await built.log.append("person-2",
-                            "sign-in",
-                            null)
-                        await built.log.append("person-1",
-                            "task.completed",
-                            "task-1")
-
-                        // Out-of-band mutation: bypasses AuditLogService's own append path entirely, the way a rogue
-                        // admin or a compromised disk would.
-                        const rows = built.manager._rowsFor(AuditLogLineEntity)
-                        rows[2].action = "task.deleted"
-
-                        const result = await built.log.verifyChain()
-
-                        expect(result.valid).toBe(false)
-                        expect(result.break).toEqual({
-                            index: 2, reason: "content-mismatch" 
-                        })
-                    })
-
-                it("removing a line from the middle of the store surfaces a broken prevHash link at the line that followed it",
-                    async () => {
-                        const built = await build()
-                        moduleRef = built.moduleRef
-                        await built.log.append("person-1",
-                            "sign-in",
-                            null)
-                        await built.log.append("person-1",
-                            "task.created",
-                            "task-1")
-                        await built.log.append("person-2",
-                            "sign-in",
-                            null)
-                        await built.log.append("person-1",
-                            "task.completed",
-                            "task-1")
-
-                        const rows = built.manager._rowsFor(AuditLogLineEntity)
-                        rows.splice(2,
-                            1) // remove the third appended line out-of-band
-
-                        const result = await built.log.verifyChain()
-
-                        expect(result.valid).toBe(false)
-                        // The removed line's successor is now at index 2 (it shifted down by one).
-                        expect(result.break).toEqual({
-                            index: 2, reason: "broken-prev-hash" 
-                        })
-                    })
-
-                it("fuzzes every line and every mutable field: each single out-of-band mutation is detected, and each is undone before the next",
-                    async () => {
-                        const mutableFields = ["at",
-                            "action",
-                            "target",
-                            "keyId",
-                            "actor",
-                            "prevHash",
-                            "hash"] as const
-                        let attempted = 0
-
-                        for (let lineIndex = 0; lineIndex < 4; lineIndex++) {
-                            for (const field of mutableFields) {
-                                const built = await build()
-                                await built.log.append("person-1",
-                                    "sign-in",
-                                    "target-a")
-                                await built.log.append("person-1",
-                                    "task.created",
-                                    "task-1")
-                                await built.log.append("person-2",
-                                    "sign-in",
-                                    "target-b")
-                                await built.log.append("person-1",
-                                    "task.completed",
-                                    "task-1")
-
-                                const rows = built.manager._rowsFor(AuditLogLineEntity)
-                                const original = rows[lineIndex][field]
-                                rows[lineIndex][field] = field === "at" ? new Date(Date.now() + 1) : `${String(original)}-tampered`
-
-                                const result = await built.log.verifyChain()
-                                attempted++
-
-                                expect(result.valid).toBe(false)
-                                expect((result.break as { index: number }).index).toBe(lineIndex)
-                                await built.moduleRef.close()
-                            }
-                        }
-
-                        expect(attempted).toBeGreaterThan(0)
-                    })
-
-                it("a fuzz over every middle line-removal index is detected, with zero false positives on the untouched baseline",
-                    async () => {
-                        // Only indices with a successor line are fuzzed here: removing the very last line truncates the
-                        // chain without breaking any prevHash link (there is no "line that followed it" to surface the
-                        // break at), which is a known, inherent limit of hash-chaining alone - not a gap in this
-                        // acceptance criterion, whose own wording ("removed from the middle of the store") only commits
-                        // to detecting a removal that a later line's prevHash can still witness.
-                        for (let removeIndex = 0; removeIndex < 3; removeIndex++) {
-                            const built = await build()
-                            await built.log.append("person-1",
-                                "sign-in",
-                                null)
-                            await built.log.append("person-1",
-                                "task.created",
-                                "task-1")
-                            await built.log.append("person-2",
-                                "sign-in",
-                                null)
-                            await built.log.append("person-1",
-                                "task.completed",
-                                "task-1")
-
-                            expect((await built.log.verifyChain()).valid).toBe(true) // baseline: no false positive before mutation
-
-                            built.manager._rowsFor(AuditLogLineEntity).splice(removeIndex,
-                                1)
-
-                            expect((await built.log.verifyChain()).valid).toBe(false)
-                            await built.moduleRef.close()
-                        }
-                    })
-            })
-
-        describe("nfr.audit.retention",
-            () => {
-                it("a line survives its full 400-day retention window untouched, proven with a fake clock, never real elapsed time",
-                    async () => {
-                        const clock = new FakeClock("2026-01-01T00:00:00.000Z")
-                        const built = await build(clock)
-                        moduleRef = built.moduleRef
-
-                        await built.log.append("person-1",
-                            "sign-in",
-                            null)
-                        clock.advance(400 * 24 * 60 * 60 * 1000 + 1000)
-
-                        const swept = await built.log.sweepRetention()
-
-                        expect(swept.lineCount).toBe(1)
-                        expect(swept.valid).toBe(true)
-                    })
-
-                it("retention and erasure are independent axes: past the window, an erased line still exists but no longer decrypts",
-                    async () => {
-                        const clock = new FakeClock("2026-01-01T00:00:00.000Z")
-                        const built = await build(clock)
-                        moduleRef = built.moduleRef
-
-                        const line = await built.log.append("person-1",
-                            "sign-in",
-                            null)
-                        await built.keystore.destroyKey("person-1")
-                        clock.advance(400 * 24 * 60 * 60 * 1000 + 1000)
-
-                        const swept = await built.log.sweepRetention()
-                        expect(swept.lineCount).toBe(1) // still exists
-                        expect(swept.valid).toBe(true) // chain untouched by the erasure
-
-                        const rows = await built.log.findLinesForPerson("person-1")
-                        expect(rows).toHaveLength(0) // no longer decrypts through the person's own read
-
-                        void line
-                    })
-            })
-
-        describe("findLinesForPerson / exportForPerson",
-            () => {
-                it("returns only the lines that person produced, oldest first, never another person's lines",
-                    async () => {
-                        const built = await build()
-                        moduleRef = built.moduleRef
-                        await built.log.append("person-1",
-                            "sign-in",
-                            null)
-                        await built.log.append("person-2",
-                            "sign-in",
-                            null)
-                        await built.log.append("person-1",
-                            "task.created",
-                            "task-1")
-
-                        const lines = await built.log.findLinesForPerson("person-1")
-
-                        expect(lines.map(line => line.action)).toEqual(["sign-in",
-                            "task.created"])
-                        expect(lines.every(line => line.actor === "person-1")).toBe(true)
-                    })
-
-                it("returns an empty list for a person who never produced a line",
-                    async () => {
-                        const built = await build()
-                        moduleRef = built.moduleRef
-
-                        expect(await built.log.findLinesForPerson("nobody")).toEqual([])
-                        expect(await built.log.exportForPerson("nobody")).toEqual([])
-                    })
-            })
-
-        describe("readLine resolution arms (w8 branch depth)",
-            () => {
-                it("a line whose keyId never existed in the keystore resolves tombstoned, never throws",
-                    async () => {
-                        const built = await build()
-                        moduleRef = built.moduleRef
-                        // A row naming a keyId no person owns: getKeyMaterial misses, so the read must
-                        // degrade to tombstoned rather than crash the operator read path.
-                        const orphanRow = new AuditLogLineEntity()
-                        orphanRow.at = new Date("2026-09-18T10:00:00.000Z")
-                        orphanRow.action = "task.created"
-                        orphanRow.target = "task-1"
-                        orphanRow.keyId = "key-that-never-existed"
-                        orphanRow.actor = "sealed-blob"
-                        orphanRow.prevHash = "GENESIS"
-                        orphanRow.hash = "0".repeat(64)
-
-                        const resolved = await built.log.readLine(orphanRow)
-
-                        expect(resolved.tombstoned).toBe(true)
-                        expect(resolved.actor).toBeNull()
-                        expect(resolved.action).toBe("task.created")
-                    })
-
-                it("a line whose sealed actor no longer unseals under the live key resolves tombstoned",
-                    async () => {
-                        const built = await build()
-                        moduleRef = built.moduleRef
-                        const { keyId } = await built.keystore.getOrCreateKey("person-1")
-                        const row = new AuditLogLineEntity()
-                        row.at = new Date("2026-09-18T10:00:00.000Z")
-                        row.action = "sign-in"
-                        row.target = null
-                        row.keyId = keyId
-                        row.actor = "not-a-valid-sealed-blob"
-                        row.prevHash = "GENESIS"
-                        row.hash = "0".repeat(64)
-
-                        const resolved = await built.log.readLine(row)
-
-                        expect(resolved.tombstoned).toBe(true)
-                        expect(resolved.actor).toBeNull()
-                    })
-            })
+    it("takes the chain lock, seals the actor under the person key and chains onto the last hash", async () => {
+        const existing = chainOf(2)
+        const { store, manager, saved, key } = setup(existing)
+        const result = await new AuditLogService(mockEntityManager(), store).append({
+            manager,
+            actorId: "p1",
+            action: AuditAction.TaskCompleted,
+            target: "t1",
+            at: AT,
+        })
+        expect(result).toEqual({ lineId: "9" })
+        expect(manager.query).toHaveBeenCalledWith(LOCK_AUDIT_CHAIN, [])
+        expect(manager.find).toHaveBeenCalledWith(AuditLogLineEntity, { order: { id: "DESC" }, take: 1 })
+        const line = saved[0]
+        expect(line).toMatchObject({ at: AT, action: "task.completed", target: "t1", keyId: "k1", prevHash: existing[1]?.hash })
+        expect(line?.actor).not.toContain("p1")
+        expect(store.unseal(key, line?.actor ?? "")).toEqual({ opened: true, plaintext: "p1" })
+        expect(line?.hash).toBe(line ? hashLine(line) : "")
     })
+
+    it("starts the chain from the genesis marker when the log is empty", async () => {
+        const { store, manager, saved } = setup([])
+        await new AuditLogService(mockEntityManager(), store).append({
+            manager,
+            actorId: "p1",
+            action: AuditAction.SignedIn,
+            target: null,
+            at: AT,
+        })
+        expect(saved[0]).toMatchObject({ prevHash: GENESIS_HASH, target: null })
+    })
+})
+
+describe("AuditLogService.verifyChain", () => {
+    it("reads an untouched chain as valid", async () => {
+        await expect(walk(chainOf(4))).resolves.toEqual({ valid: true, totalLines: 4, break: null })
+    })
+
+    it("reads an empty log as valid", async () => {
+        await expect(walk([])).resolves.toEqual({ valid: true, totalLines: 0, break: null })
+    })
+
+    it("reports a content mismatch at the position of a changed field", async () => {
+        const rows = chainOf(4)
+        const changed = rows.map((row, index) => (index === 2 ? { ...row, action: "task.deleted" } : row))
+        await expect(walk(changed)).resolves.toMatchObject({ valid: false, break: { index: 2, reason: "content-mismatch" } })
+    })
+
+    it("reports a broken link at the line that followed a removed one", async () => {
+        const rows = chainOf(4)
+        const removed = rows.filter((_row, index) => index !== 1)
+        await expect(walk(removed)).resolves.toMatchObject({ valid: false, break: { index: 1, reason: "broken-prev-hash" } })
+    })
+
+    it("walks the chain in bounded batches, carrying the link across a batch", async () => {
+        const first = chainOf(LIST_ROWS_MAX)
+        const tail = first.at(-1)?.hash ?? GENESIS_HASH
+        const second = chainOf(3, LIST_ROWS_MAX + 1, tail)
+        const find = jest.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second)
+        const result = await new AuditLogService(mockEntityManager({ find }), new AuditKeystoreService(mockEntityManager())).verifyChain()
+        expect(result).toEqual({ valid: true, totalLines: LIST_ROWS_MAX + 3, break: null })
+        expect(find).toHaveBeenCalledTimes(2)
+        expect(find).toHaveBeenNthCalledWith(1, AuditLogLineEntity, expect.objectContaining({ take: LIST_ROWS_MAX }))
+    })
+})
+
+describe("AuditLogService reads", () => {
+    const sealedRows = (store: AuditKeystoreService, key: Buffer, actors: ReadonlyArray<string>): Array<AuditLogLineEntity> =>
+        actors.map((actor, index) => ({
+            id: String(index + 1),
+            at: AT,
+            action: "task.created",
+            target: `t${index}`,
+            keyId: "k1",
+            actor: store.seal(key, actor),
+            prevHash: GENESIS_HASH,
+            hash: "h",
+        }))
+
+    it("reads a person own lines oldest first through their key id, resolved and without the key id", async () => {
+        const key = randomBytes(32)
+        const store = new AuditKeystoreService(mockEntityManager())
+        jest.spyOn(store, "getKeyIdForPerson").mockResolvedValue("k1")
+        jest.spyOn(store, "getKeyMaterials").mockResolvedValue(new Map([["k1", key]]))
+        const entityManager = mockEntityManager({ find: jest.fn().mockResolvedValue(sealedRows(store, key, ["p1", "p1"])) })
+        const lines = await new AuditLogService(entityManager, store).findLinesForPerson("p1")
+        expect(entityManager.find).toHaveBeenCalledWith(AuditLogLineEntity, {
+            where: { keyId: "k1" },
+            order: { id: "ASC" },
+            take: LIST_ROWS_MAX,
+        })
+        expect(lines).toEqual([
+            { at: AT, action: "task.created", target: "t0", actor: "p1", tombstoned: false },
+            { at: AT, action: "task.created", target: "t1", actor: "p1", tombstoned: false },
+        ])
+    })
+
+    it("reads nothing for a person without a key, and never touches the log", async () => {
+        const store = new AuditKeystoreService(mockEntityManager())
+        jest.spyOn(store, "getKeyIdForPerson").mockResolvedValue(null)
+        const entityManager = mockEntityManager()
+        await expect(new AuditLogService(entityManager, store).findLinesForPerson("p1")).resolves.toEqual([])
+        expect(entityManager.find).not.toHaveBeenCalled()
+    })
+
+    it("tombstones a line whose key is gone and a line the live key no longer opens", async () => {
+        const key = randomBytes(32)
+        const store = new AuditKeystoreService(mockEntityManager())
+        const rows = sealedRows(store, key, ["p1", "p2"])
+        const entityManager = mockEntityManager({ find: jest.fn().mockResolvedValue(rows) })
+        const service = new AuditLogService(entityManager, store)
+        jest.spyOn(store, "getKeyMaterials").mockResolvedValueOnce(new Map())
+        const gone = await service.readChain({ action: null, target: null })
+        expect(gone.map((line) => [line.actor, line.tombstoned])).toEqual([[null, true], [null, true]])
+        jest.spyOn(store, "getKeyMaterials").mockResolvedValueOnce(new Map([["k1", randomBytes(32)]]))
+        const wrongKey = await service.readChain({ action: null, target: null })
+        expect(wrongKey.every((line) => line.tombstoned)).toBe(true)
+    })
+
+    it("reads the whole chain with one key lookup, narrowed by action and target in the query", async () => {
+        const key = randomBytes(32)
+        const store = new AuditKeystoreService(mockEntityManager())
+        const materials = jest.spyOn(store, "getKeyMaterials").mockResolvedValue(new Map([["k1", key]]))
+        const entityManager = mockEntityManager({ find: jest.fn().mockResolvedValue(sealedRows(store, key, ["p1", "p2"])) })
+        const service = new AuditLogService(entityManager, store)
+        const lines = await service.readChain({ action: "task.created", target: "t1" })
+        expect(entityManager.find).toHaveBeenCalledWith(AuditLogLineEntity, {
+            where: { action: "task.created", target: "t1" },
+            order: { id: "ASC" },
+            take: LIST_ROWS_MAX,
+        })
+        expect(lines.map((line) => line.actor)).toEqual(["p1", "p2"])
+        expect(materials).toHaveBeenCalledTimes(1)
+        expect(materials).toHaveBeenCalledWith({ keyIds: ["k1"] })
+    })
+})

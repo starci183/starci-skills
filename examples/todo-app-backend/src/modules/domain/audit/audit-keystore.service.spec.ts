@@ -1,102 +1,79 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    createFakeAuditEntityManager 
-} from "./testing/fake-audit-entity-manager"
-import {
-    AuditKeystoreService 
-} from "./audit-keystore.service"
-import {
-    Clock 
-} from "@modules/platform/clock/index"
-import {
-    FakeClock 
-} from "@starci/jest-preset/clock"
+import { randomBytes } from "node:crypto"
+import { LIST_ROWS_MAX } from "@modules/platform/database"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { AuditKeystoreService } from "./audit-keystore.service"
+import { AuditKeyEntity } from "./persistence/entities/audit-key.entity"
 
-describe("AuditKeystoreService",
-    () => {
-        let moduleRef: TestingModule
-        let keystore: AuditKeystoreService
+const AT = new Date("2026-09-30T10:00:00.000Z")
 
-        beforeEach(async () => {
-            moduleRef = await Test.createTestingModule({
-                providers: [
-                    {
-                        provide: Clock, useValue: new FakeClock() 
-                    },
-                    AuditKeystoreService,
-                    {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: createFakeAuditEntityManager() 
-                    },
-                ],
-            }).compile()
-            keystore = moduleRef.get(AuditKeystoreService)
+describe("AuditKeystoreService", () => {
+    it("mints and stores a key in the caller transaction on first use", async () => {
+        const own = mockEntityManager()
+        const manager = mockEntityManager({
+            findOneBy: jest.fn().mockResolvedValue(null),
+            save: jest.fn().mockImplementation((_target: unknown, entity: object) => Promise.resolve(entity)),
         })
-
-        afterEach(async () => {
-            await moduleRef.close()
-        })
-
-        it("getOrCreateKey mints a key on first use and returns the same key on later calls",
-            async () => {
-                const first = await keystore.getOrCreateKey("person-1")
-                const second = await keystore.getOrCreateKey("person-1")
-
-                expect(second.keyId).toBe(first.keyId)
-                expect(second.key.equals(first.key)).toBe(true)
-            })
-
-        it("seal/unseal round-trips a plaintext under the same key",
-            async () => {
-                const { key } = await keystore.getOrCreateKey("person-1")
-
-                const sealed = keystore.seal(key,
-                    "person-1")
-
-                expect(sealed).not.toContain("person-1")
-                expect(keystore.unseal(key,
-                    sealed)).toEqual({
-                    opened: true, plaintext: "person-1"
-                })
-            })
-
-        it("unseal reports opened: false with the cause, never throws, for a tampered or wrongly-keyed blob",
-            async () => {
-                const { key } = await keystore.getOrCreateKey("person-1")
-                const { key: otherKey } = await keystore.getOrCreateKey("person-2")
-                const sealed = keystore.seal(key,
-                    "person-1")
-
-                expect(keystore.unseal(otherKey,
-                    sealed)).toMatchObject({
-                    opened: false, cause: expect.any(Error)
-                })
-                expect(keystore.unseal(key,
-                    "not-a-sealed-value")).toMatchObject({
-                    opened: false, cause: expect.any(RangeError)
-                })
-            })
-
-        it("br.audit.erasure.right / decision.audit.erasure-method: destroyKey removes the key and the personId-to-keyId mapping together",
-            async () => {
-                const { keyId } = await keystore.getOrCreateKey("person-1")
-
-                await keystore.destroyKey("person-1")
-
-                expect(await keystore.getKeyIdForPerson("person-1")).toBeNull()
-                expect(await keystore.getKeyMaterial(keyId)).toBeNull()
-            })
-
-        it("getKeyIdForPerson never creates a key as a side effect of a read",
-            async () => {
-                expect(await keystore.getKeyIdForPerson("never-seen")).toBeNull()
-                expect(await keystore.getKeyIdForPerson("never-seen")).toBeNull()
-            })
+        const minted = await new AuditKeystoreService(own).getOrCreateKey({ manager, personId: "p1", at: AT })
+        expect(minted.key).toHaveLength(32)
+        expect(manager.save).toHaveBeenCalledWith(
+            AuditKeyEntity,
+            expect.objectContaining({ personId: "p1", keyId: minted.keyId, createdAt: AT, key: minted.key.toString("base64") }),
+        )
+        expect(own.save).not.toHaveBeenCalled()
     })
+
+    it("returns the stored key on later calls without writing", async () => {
+        const key = randomBytes(32)
+        const manager = mockEntityManager({
+            findOneBy: jest.fn().mockResolvedValue({ personId: "p1", keyId: "k1", key: key.toString("base64"), createdAt: AT }),
+        })
+        const found = await new AuditKeystoreService(mockEntityManager()).getOrCreateKey({ manager, personId: "p1", at: AT })
+        expect(found).toEqual({ keyId: "k1", key })
+        expect(manager.save).not.toHaveBeenCalled()
+    })
+
+    it("looks a key id up without ever creating a key, through the manager it is handed when there is one", async () => {
+        const own = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue({ keyId: "k1" }) })
+        const inner = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null) })
+        const service = new AuditKeystoreService(own)
+        await expect(service.getKeyIdForPerson({ personId: "p1" })).resolves.toBe("k1")
+        await expect(service.getKeyIdForPerson({ personId: "p1", manager: inner })).resolves.toBeNull()
+        expect(own.save).not.toHaveBeenCalled()
+        expect(inner.findOneBy).toHaveBeenCalledWith(AuditKeyEntity, { personId: "p1" })
+    })
+
+    it("loads the material of the key ids that still exist in one bounded read, and nothing for no ids", async () => {
+        const key = randomBytes(32)
+        const own = mockEntityManager({ find: jest.fn().mockResolvedValue([{ keyId: "k1", key: key.toString("base64") }]) })
+        const service = new AuditKeystoreService(own)
+        const materials = await service.getKeyMaterials({ keyIds: ["k1", "gone"] })
+        expect([...materials.entries()]).toEqual([["k1", key]])
+        expect(own.find).toHaveBeenCalledWith(AuditKeyEntity, expect.objectContaining({ take: LIST_ROWS_MAX }))
+        const none = await service.getKeyMaterials({ keyIds: [] })
+        expect(none.size).toBe(0)
+        expect(own.find).toHaveBeenCalledTimes(1)
+    })
+
+    it("destroys the key row of the person through the given manager", async () => {
+        const manager = mockEntityManager()
+        await new AuditKeystoreService(mockEntityManager()).destroyKey({ manager, personId: "p1" })
+        expect(manager.delete).toHaveBeenCalledWith(AuditKeyEntity, { personId: "p1" })
+    })
+
+    it("round-trips a plaintext under the same key", () => {
+        const service = new AuditKeystoreService(mockEntityManager())
+        const key = randomBytes(32)
+        const sealed = service.seal(key, "person-1")
+        expect(sealed).not.toContain("person-1")
+        expect(service.unseal(key, sealed)).toEqual({ opened: true, plaintext: "person-1" })
+    })
+
+    it("reports opened false with the cause, never throwing, for a wrong key, a tampered blob and a bad shape", () => {
+        const service = new AuditKeystoreService(mockEntityManager())
+        const sealed = service.seal(randomBytes(32), "person-1")
+        expect(service.unseal(randomBytes(32), sealed)).toMatchObject({ opened: false })
+        const [iv, tag] = sealed.split(".")
+        expect(service.unseal(randomBytes(32), `${iv}.${tag}.AAAA`)).toMatchObject({ opened: false })
+        expect(service.unseal(randomBytes(32), "not-a-sealed-blob")).toMatchObject({ opened: false })
+    })
+})

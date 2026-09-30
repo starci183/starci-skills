@@ -1,16 +1,7 @@
-import {
-    ConfigurableModuleBuilder 
-} from "@nestjs/common"
+import { ConfigurableModuleBuilder } from "@nestjs/common"
+import type { ShareOptions } from "./share.options"
 
-/** Share takes no options beyond the isGlobal extra. */
-export type ShareOptions = Record<never, never>
-
-/** See databases/primary.module-definition.ts's comment: same isGlobal knob, every module. */
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<ShareOptions>().setExtras(
-    {
-        isGlobal: false 
-    },
-    (definition, extras) => ({
-        ...definition, global: extras.isGlobal 
-    }),
-).build()
+/** The configurable-module base of the share capability; `isGlobal` is decided by the app root. */
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<ShareOptions>()
+    .setExtras({ isGlobal: false }, (definition, extras) => ({ ...definition, global: extras.isGlobal }))
+    .build()

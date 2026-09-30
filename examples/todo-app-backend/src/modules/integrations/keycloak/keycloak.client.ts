@@ -1,125 +1,66 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
-import {
-    keycloakConfig,
-} from "./keycloak.config"
-import {
-    KeycloakInvalidCredentialsException,
-} from "./errors/keycloak-invalid-credentials"
-import {
-    KeycloakUnavailableException,
-} from "./errors/keycloak-unavailable"
+import { Injectable } from "@nestjs/common"
+import { HttpError, InjectHttpClient } from "@modules/platform/http"
+import type { HttpClient } from "@modules/platform/http"
+import { KeycloakError, KeycloakErrorCode } from "./errors/keycloak.error"
+import type { KeycloakSignIn, KeycloakSignInParams, KeycloakSignOutParams } from "./keycloak.contracts"
+import { InjectKeycloakOptions } from "./keycloak.decorators"
+import type { KeycloakOptions } from "./keycloak.options"
+import { readSubject } from "./keycloak-token.policy"
 
+type Call = Parameters<HttpClient["request"]>[0]
+type Answer = Awaited<ReturnType<HttpClient["request"]>>
 
-/** How long a round-trip to the realm may take: a provider that accepts the connection and then goes quiet must not hold a sign-in open. */
-const REQUEST_TIMEOUT_MS = 10_000
-
-/** Contract naming the keycloak sign in result shape integrations/keycloak code and its consumers share; a second site never retypes it inline. */
-export interface KeycloakSignInResult {
-  readonly subject: string;
-}
-
-/**
- * Keycloak is the identity provider named by integration.login.keycloak: this product never stores a
- * password on the provider's behalf. signIn() makes exactly one round-trip to the realm's token endpoint
- * (grant_type=password) whichever half of the pair is wrong - Keycloak's own direct access grant already
- * answers an unknown username and a wrong password with the same invalid_grant refusal, so this client
- * does not need a second call, a local hash or a decoy to keep that refusal uniform (br.login.password.sign-in,
- * nfr.login.sign-in-timing). The subject is read out of the access token it already received, so a
- * successful sign-in costs no further network round-trip either.
- *
- * Sign-out best-effort notifies Keycloak so a revoked local session does not leave a stale provider-side
- * grant; a failure here never blocks the local revoke.
- */
 @Injectable()
-/** Outbound client for the keycloak integration surface; transport failures surface as house exceptions, never raw HTTP noise. */
+/**
+ * The identity provider: this product never stores a password. Sign-in is one round-trip to the token endpoint of the
+ * realm (direct access grant); the provider answers an unknown email and a wrong password with the same refusal, so
+ * the refusal is uniform without a second call, and the subject is read from the token it already returned.
+ */
 export class KeycloakClient {
-    constructor(private readonly config: AppConfigService) {}
+    constructor(
+        @InjectHttpClient() private readonly http: HttpClient,
+        @InjectKeycloakOptions() private readonly options: KeycloakOptions,
+    ) {}
 
-    async signIn(email: string, password: string): Promise<KeycloakSignInResult> {
-        const body = new URLSearchParams({
-            grant_type: "password",
-            client_id: keycloakConfig(this.config).clientId,
-            username: email,
-            password,
+    /** The subject of the person the provider accepts, or a KeycloakError: refused credentials or an unreachable provider. */
+    async signIn(params: KeycloakSignInParams): Promise<KeycloakSignIn> {
+        const response = await this.send({
+            method: "POST",
+            url: this.options.tokenUrl,
+            form: {
+                grant_type: "password",
+                client_id: this.options.clientId,
+                username: params.email,
+                password: params.password,
+            },
+            timeoutMs: this.options.timeoutMs,
         })
-        let response: Response
+        const subject = response.status >= 200 && response.status < 300 ? readSubject(response.body) : null
+        if (subject === null) throw new KeycloakError({ code: KeycloakErrorCode.InvalidCredentials })
+        return { subject }
+    }
+
+    /**
+     * Tells the provider a session ended, so a revoked local session leaves no stale provider-side grant. An error
+     * answer of the provider is ignored; only a call that cannot complete fails, with a KeycloakError.
+     */
+    async notifySignOut(params: KeycloakSignOutParams): Promise<void> {
+        await this.send({
+            method: "POST",
+            url: this.options.tokenUrl,
+            body: { action: "sign-out", personId: params.personId },
+            timeoutMs: this.options.timeoutMs,
+        })
+    }
+
+    private async send(call: Call): Promise<Answer> {
         try {
-            response = await fetch(keycloakConfig(this.config).tokenUrl,
-                {
-                    method: "POST",
-                    headers: {
-                        "content-type": "application/x-www-form-urlencoded" 
-                    },
-                    body: body.toString(),
-                    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-                })
-        } catch (error) {
-            throw new KeycloakUnavailableException({
-                detail: String(error) 
-            })
+            return await this.http.request(call)
+        } catch (cause) {
+            if (cause instanceof HttpError) {
+                throw new KeycloakError({ code: KeycloakErrorCode.ProviderUnavailable, cause })
+            }
+            throw cause
         }
-        if (!response.ok) {
-            // Keycloak's direct access grant answers an unknown username and a wrong password with the same
-            // {error: "invalid_grant"} shape, so this refusal is already uniform without inspecting the body.
-            throw new KeycloakInvalidCredentialsException({
-            })
-        }
-        const payload = (await response.json()) as { access_token?: string }
-        if (!payload.access_token) {
-            throw new KeycloakInvalidCredentialsException({
-            })
-        }
-        return {
-            subject: readSubject(payload.access_token) 
-        }
-    }
-
-    async notifySignOut(personId: string): Promise<void> {
-        const targetUrl = keycloakConfig(this.config).tokenUrl
-        try {
-            await fetch(targetUrl,
-                {
-                    method: "POST",
-                    headers: {
-                        "content-type": "application/json" 
-                    },
-                    body: JSON.stringify({
-                        action: "sign-out", personId 
-                    }),
-                    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-                })
-        } catch (error) {
-            throw new KeycloakUnavailableException({
-                detail: String(error) 
-            })
-        }
-    }
-}
-
-/** Reads `sub` out of the access token's payload segment. No signature check: this client trusts the
- * transport-local Keycloak it just received the token from over TLS/loopback, not a bearer presented by
- * a third party. A resource server verifying a caller-presented token is a different, unwritten concern. */
-function readSubject(accessToken: string): string {
-    const segments = accessToken.split(".")
-    if (segments.length < 2) {
-        throw new KeycloakInvalidCredentialsException({
-        })
-    }
-    try {
-        const payload = JSON.parse(Buffer.from(segments[1],
-            "base64url").toString("utf8")) as { sub?: string }
-        if (!payload.sub) {
-            throw new KeycloakInvalidCredentialsException({
-            })
-        }
-        return payload.sub
-    } catch {
-        throw new KeycloakInvalidCredentialsException({
-        })
     }
 }

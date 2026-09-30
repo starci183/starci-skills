@@ -1,216 +1,113 @@
-import {
-    Injectable 
-} from "@nestjs/common"
+import { Injectable } from "@nestjs/common"
+import { TaskService } from "@modules/domain/task"
+import type { TaskView } from "@modules/domain/task"
+import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { ok, refused } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
+import { In } from "typeorm"
+import type { EntityManager } from "typeorm"
+import { RecurErrorCode } from "./errors/recur.error"
+import { OccurrenceEntity } from "./persistence/entities/occurrence.entity"
+import { toAffectedCount, toOccurrenceView } from "./persistence/occurrence.rows"
+import { ORPHAN_ENDED_OCCURRENCES } from "./persistence/occurrence.sql"
 import type {
-    EntityManager 
-} from "typeorm"
-import {
-    InjectPrimaryEntityManager,
-} from "@modules/platform/databases/index"
-import {
-    OccurrenceEntity,
-} from "@modules/platform/databases/index"
-import {
-    TaskEntity,
-} from "@modules/platform/databases/index"
-import {
-    RecurOccurrenceForbiddenException,
-} from "./errors/occurrence-forbidden"
-import {
-    RecurOccurrenceNotFoundException,
-} from "./errors/occurrence-not-found"
+    ExistingWindowKeysParams,
+    ListOccurrencesParams,
+    MaterialiseParams,
+    OccurrenceView,
+    OrphanOccurrencesParams,
+    TransitionOccurrenceParams,
+} from "./recur.contracts"
 
-import {
-    OccurrenceRecord, OccurrenceStatus 
-} from "./types/occurrence-record"
-import {
-    Clock
-} from "@modules/platform/clock/index"
-
-/** The most occurrences one rule keeps materialised at a time. */
-const MAX_OCCURRENCES_PER_RULE = 1_000
-
-/** Contract naming the materialise occurrence input shape domain/recur code and its consumers share; a second site never retypes it inline. */
-export interface MaterialiseOccurrenceInput {
-  /** The id of the task row already created (through CreateTaskCommand) for this occurrence. */
-  readonly id: string;
-  readonly ruleId: string;
-  readonly windowKey: string;
-  readonly localDate: string;
-  readonly dueAtUtc: Date;
-}
-
-/**
- * sds.recur.occurrence-lifecycle: holds one row per materialised occurrence, joined to the `tasks` row
- * `CreateTaskCommand` wrote for it (data.recur.occurrence `extends data.task.task`). This is the only
- * writer of an occurrence row (that record's own interfaces statement). Persistence only through
- * `@InjectPrimaryEntityManager()`.
- */
 @Injectable()
-/** Injectable service owning the occurrence logic the recur capability exposes; wired by the capability's own module. */
+/**
+ * The occurrence rows, joined by id to the task each one spawned. Only the owner of the task may complete or skip an
+ * occurrence, and materialising the same window twice changes nothing.
+ */
 export class OccurrenceService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-        private readonly clock: Clock
+    constructor(
+        @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        private readonly tasks: TaskService,
     ) {}
 
-    /** br.recur.generation.once: a second call for a windowKey that already has a row changes nothing and
-   * returns that same row untouched - the caller (GeneratorService) is expected to check
-   * `existsByWindowKey` before even creating the underlying task, but this method is idempotent on its
-   * own terms too so a race between two generator runs can never produce a second row for one window. */
-    async materialise(input: MaterialiseOccurrenceInput): Promise<OccurrenceRecord> {
-        const existing = await this.entityManager.findOneBy(OccurrenceEntity,
-            {
-                windowKey: input.windowKey 
-            })
-        if (existing) {
-            return this.toRecord(existing)
-        }
-        const saved = await this.entityManager.save(OccurrenceEntity,
-            {
-                id: input.id,
-                ruleId: input.ruleId,
-                windowKey: input.windowKey,
-                localDate: input.localDate,
-                dueAtUtc: input.dueAtUtc,
-                status: "materialised" satisfies OccurrenceStatus,
-            })
-        return this.toRecord(saved)
+    /** Writes the occurrence row of a window keyed by its window key; a window that already has a row is returned untouched. */
+    async materialise(params: MaterialiseParams): Promise<OccurrenceView> {
+        const existing = await params.manager.findOneBy(OccurrenceEntity, { windowKey: params.windowKey })
+        if (existing) return toOccurrenceView(existing)
+        const saved = await params.manager.save(OccurrenceEntity, {
+            id: params.id,
+            ruleId: params.ruleId,
+            windowKey: params.windowKey,
+            localDate: params.localDate,
+            dueAtUtc: params.dueAtUtc,
+            status: "materialised",
+        })
+        return toOccurrenceView(saved)
     }
 
-    async existsByWindowKey(windowKey: string): Promise<boolean> {
-        const row = await this.entityManager.findOneBy(OccurrenceEntity,
-            {
-                windowKey 
+    /** Which of the window keys already have an occurrence row; the keys are read in bounded chunks. */
+    async existingWindowKeys(params: ExistingWindowKeysParams): Promise<Set<string>> {
+        const found = new Set<string>()
+        for (let from = 0; from < params.windowKeys.length; from += LIST_ROWS_MAX) {
+            const rows = await this.entityManager.find(OccurrenceEntity, {
+                where: { windowKey: In(params.windowKeys.slice(from, from + LIST_ROWS_MAX)) },
+                take: LIST_ROWS_MAX,
             })
-        return row !== null
+            for (const row of rows) found.add(row.windowKey)
+        }
+        return found
     }
 
-    async findById(id: string): Promise<OccurrenceRecord> {
-        const row = await this.entityManager.findOneBy(OccurrenceEntity,
-            {
-                id 
-            })
-        if (!row) {
-            throw new RecurOccurrenceNotFoundException({
-                occurrenceId: id 
-            })
-        }
-        return this.toRecord(row)
+    /** The occurrences of one rule, oldest local date first, at most LIST_ROWS_MAX. */
+    async listByRule(params: ListOccurrencesParams): Promise<Array<OccurrenceView>> {
+        const rows = await this.entityManager.find(OccurrenceEntity, {
+            where: { ruleId: params.ruleId },
+            order: { localDate: "ASC" },
+            take: LIST_ROWS_MAX,
+        })
+        return rows.map(toOccurrenceView)
     }
 
-    async listByRule(ruleId: string): Promise<Array<OccurrenceRecord>> {
-        const rows = await this.entityManager.find(OccurrenceEntity,
-            {
-                where: {
-                    ruleId 
-                }, take: MAX_OCCURRENCES_PER_RULE 
-            })
-        const records = await Promise.all(rows.map(row => this.toRecord(row)))
-        return records.sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
+    /** Completes the occurrence of the owner and the task it spawned; completing again changes nothing. */
+    async complete(params: TransitionOccurrenceParams): Promise<Outcome<OccurrenceView, RecurErrorCode.OccurrenceNotFound | RecurErrorCode.OccurrenceForbidden>> {
+        const found = await this.findForOwner(params)
+        if (found.kind === "refused") return found
+        const { row, task } = found.value
+        if (row.status === "completed") return ok(toOccurrenceView(row))
+        await this.tasks.complete({ manager: params.manager, task, at: params.at })
+        const saved = await params.manager.save(OccurrenceEntity, { ...row, status: "completed" })
+        return ok(toOccurrenceView(saved))
     }
 
-    /** br.recur.occurrence.owned-by-rule-owner / sds.recur.occurrence-lifecycle's t-complete: materialised
-   * -> completed, owner-only. Completing an already-completed occurrence again is a no-op, matching
-   * task's own idempotent-complete convention. */
-    async complete(id: string, actorId: string): Promise<OccurrenceRecord> {
-        const { occurrenceRow, taskRow } = await this.findRowsForOwner(id,
-            actorId)
-        if (occurrenceRow.status === "completed") {
-            return this.toRecord(occurrenceRow)
-        }
-        taskRow.complete = true
-        taskRow.completedAt = this.clock.now()
-        await this.entityManager.save(TaskEntity,
-            taskRow)
-        occurrenceRow.status = "completed"
-        const saved = await this.entityManager.save(OccurrenceEntity,
-            occurrenceRow)
-        return this.toRecord(saved)
+    /** Skips the occurrence of the owner without completing its task; skipping again changes nothing. */
+    async skip(params: TransitionOccurrenceParams): Promise<Outcome<OccurrenceView, RecurErrorCode.OccurrenceNotFound | RecurErrorCode.OccurrenceForbidden>> {
+        const found = await this.findForOwner(params)
+        if (found.kind === "refused") return found
+        const { row } = found.value
+        if (row.status === "skipped") return ok(toOccurrenceView(row))
+        const saved = await params.manager.save(OccurrenceEntity, { ...row, status: "skipped" })
+        return ok(toOccurrenceView(saved))
     }
 
-    /** sds.recur.occurrence-lifecycle's t-skip: materialised -> skipped, owner-only, without marking the
-   * underlying task complete. */
-    async skip(id: string, actorId: string): Promise<OccurrenceRecord> {
-        const { occurrenceRow } = await this.findRowsForOwner(id,
-            actorId)
-        if (occurrenceRow.status === "skipped") {
-            return this.toRecord(occurrenceRow)
-        }
-        occurrenceRow.status = "skipped"
-        const saved = await this.entityManager.save(OccurrenceEntity,
-            occurrenceRow)
-        return this.toRecord(saved)
+    /** Orphans the occurrences of an ended rule dated on or after the end that are still materialised; returns how many. Nothing is deleted. */
+    async orphanEnded(params: OrphanOccurrencesParams): Promise<number> {
+        const result: unknown = await params.manager.query(ORPHAN_ENDED_OCCURRENCES, [params.ruleId, params.endedAt])
+        return toAffectedCount(result)
     }
 
-    /** br.recur.ending.preserves-history / sds.recur.occurrence-lifecycle's t-orphan: every occurrence of
-   * `ruleId` dated on or after `endedAtLocalDate` that is still `materialised` becomes `orphaned`.
-   * Already-completed or already-skipped occurrences are left exactly as they are; nothing is deleted. */
-    async orphanEndedOccurrences(ruleId: string, endedAtLocalDate: string): Promise<number> {
-        const rows = await this.entityManager.find(OccurrenceEntity,
-            {
-                where: {
-                    ruleId 
-                }, take: MAX_OCCURRENCES_PER_RULE 
-            })
-        const toOrphan = rows.filter(row => row.status === "materialised" && row.localDate >= endedAtLocalDate)
-        for (const row of toOrphan) {
-            row.status = "orphaned"
-            await this.entityManager.save(OccurrenceEntity,
-                row)
-        }
-        return toOrphan.length
-    }
-
-    private async findRowsForOwner(id: string, actorId: string): Promise<{ occurrenceRow: OccurrenceEntity; taskRow: TaskEntity }> {
-        const occurrenceRow = await this.entityManager.findOneBy(OccurrenceEntity,
-            {
-                id 
-            })
-        if (!occurrenceRow) {
-            throw new RecurOccurrenceNotFoundException({
-                occurrenceId: id 
-            })
-        }
-        const taskRow = await this.entityManager.findOneBy(TaskEntity,
-            {
-                id 
-            })
-        if (!taskRow) {
-            throw new RecurOccurrenceNotFoundException({
-                occurrenceId: id 
-            })
-        }
-        if (taskRow.owner !== actorId) {
-            throw new RecurOccurrenceForbiddenException({
-                occurrenceId: id, actorId 
-            })
-        }
-        return {
-            occurrenceRow, taskRow 
-        }
-    }
-
-    private async toRecord(row: OccurrenceEntity): Promise<OccurrenceRecord> {
-        const taskRow = await this.entityManager.findOneBy(TaskEntity,
-            {
-                id: row.id 
-            })
-        if (!taskRow) {
-            throw new RecurOccurrenceNotFoundException({
-                occurrenceId: row.id 
-            })
-        }
-        return new OccurrenceRecord(
-            row.id,
-            taskRow.owner,
-            taskRow.title,
-            taskRow.complete,
-            taskRow.completedAt,
-            row.ruleId,
-            row.windowKey,
-            row.localDate,
-            row.dueAtUtc,
-      row.status as OccurrenceStatus,
-        )
+    private async findForOwner(
+        params: TransitionOccurrenceParams,
+    ): Promise<
+        Outcome<
+            { readonly row: OccurrenceEntity; readonly task: TaskView },
+            RecurErrorCode.OccurrenceNotFound | RecurErrorCode.OccurrenceForbidden
+        >
+    > {
+        const row = await params.manager.findOneBy(OccurrenceEntity, { id: params.id })
+        if (!row) return refused(RecurErrorCode.OccurrenceNotFound)
+        const task = await this.tasks.find({ id: params.id })
+        if (!task) return refused(RecurErrorCode.OccurrenceNotFound)
+        if (task.owner !== params.actorId) return refused(RecurErrorCode.OccurrenceForbidden)
+        return ok({ row, task })
     }
 }

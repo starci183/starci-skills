@@ -1,120 +1,56 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    randomUUID 
-} from "node:crypto"
-import {
-    IsNull 
-} from "typeorm"
+import { randomUUID } from "node:crypto"
+import { Injectable } from "@nestjs/common"
+import { IsNull } from "typeorm"
 import type {
-    EntityManager 
-} from "typeorm"
-import {
-    InjectPrimaryEntityManager,
-} from "@modules/platform/databases/index"
-import {
-    NotifyDigestWindowEntity,
-} from "@modules/platform/databases/index"
-import {
-    DigestWindowRecord 
-} from "./types/digest-window-record"
+    AdmitIntoWindowParams,
+    AdmittedIntoWindow,
+    FlushedWindow,
+    FlushWindowParams,
+} from "./notify.contracts"
+import { NotifyDigestWindowEntity } from "./persistence/entities/digest-window.entity"
 
-/** decision.notify.digest-window's chosen default: one rolling window per person per channel, 10 minutes
- * unless a preference overrides it. */
-export const DEFAULT_DIGEST_WINDOW_MINUTES = 10
+const MS_PER_MINUTE = 60_000
 
-/** Contract naming the admit into window result shape domain/notify code and its consumers share; a second site never retypes it inline. */
-export interface AdmitIntoWindowResult {
-  readonly windowId: string;
-  /** True only when this call opened a brand-new window; false when the notification joined one that
-   * was already open. Callers use this to decide whether to schedule the one flush timer for the
-   * window - a join must never schedule a second one. */
-  readonly opened: boolean;
-  readonly closesAt: Date;
-}
-
-/** Contract naming the flushed window shape domain/notify code and its consumers share; a second site never retypes it inline. */
-export interface FlushedWindow {
-  readonly windowId: string;
-  readonly personId: string;
-  readonly channel: string;
-}
-
-/**
- * br.notify.digest.window / decision.notify.digest-window ("one-rolling-window-per-channel"): every
- * notification admitted for one person and one channel before their window closes joins the same group;
- * the group's content is read at close, never at open. This service owns only the window's own
- * bookkeeping (open/close/flushed); which notifications belong to a window is data.notify.notification's
- * own `digestGroupId` field, assigned by whoever calls this service (see notify.service.ts), so this
- * class never needs to know about NotifyNotificationEntity.
- */
 @Injectable()
-/** Injectable service owning the digest logic the notify capability exposes; wired by the capability's own module. */
+/**
+ * The digest windows: one rolling window per person and channel. Every notification admitted before the window closes
+ * joins it, and its content is read at close, never at open. Which notifications belong to a window is the
+ * notification's own digest group id.
+ */
 export class DigestService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
-
-    /** Joins the person+channel's currently open window, or opens a fresh one if none is open or the one
-   * that was open has already closed (fr.notify.digest's exception flow: a closed window is never
-   * joined, even if nothing has flushed it yet). */
-    async admit(personId: string, channel: string, now: Date, windowMinutes: number = DEFAULT_DIGEST_WINDOW_MINUTES): Promise<AdmitIntoWindowResult> {
-    // A literal `flushedAt: null` is silently dropped by TypeORM's real `findOneBy` (verified against
-    // the real dev Postgres: it returned an already-flushed row) rather than translated to `IS NULL`, so
-    // `IsNull()` is required here, not a style preference. `fake-entity-manager.ts`'s `matches()`
-    // duck-types this exact operator so a unit spec sees the same "not yet flushed" semantics.
-        const open = await this.entityManager.findOneBy(NotifyDigestWindowEntity,
-            {
-                personId, channel, flushedAt: IsNull() 
-            })
-        if (open && open.closesAt.getTime() > now.getTime()) {
-            return {
-                windowId: open.id, opened: false, closesAt: open.closesAt 
-            }
+    /** Joins the open window of the person and the channel, or opens a new one when none is open or the open one has closed. */
+    async admit(params: AdmitIntoWindowParams): Promise<AdmittedIntoWindow> {
+        // IsNull() is required: a literal null in `where` is dropped by TypeORM instead of becoming IS NULL.
+        const open = await params.manager.findOneBy(NotifyDigestWindowEntity, {
+            personId: params.personId,
+            channel: params.channel,
+            flushedAt: IsNull(),
+        })
+        if (open && open.closesAt.getTime() > params.at.getTime()) {
+            return { windowId: open.id, opened: false, closesAt: open.closesAt }
         }
-        const closesAt = new Date(now.getTime() + windowMinutes * 60_000)
-        const saved = await this.entityManager.save(NotifyDigestWindowEntity,
-            {
-                id: randomUUID(),
-                personId,
-                channel,
-                opensAt: now,
-                closesAt,
-                flushedAt: null,
-            })
-        return {
-            windowId: saved.id, opened: true, closesAt: saved.closesAt 
-        }
+        const closesAt = new Date(params.at.getTime() + params.windowMinutes * MS_PER_MINUTE)
+        const saved = await params.manager.save(NotifyDigestWindowEntity, {
+            id: randomUUID(),
+            personId: params.personId,
+            channel: params.channel,
+            opensAt: params.at,
+            closesAt,
+            flushedAt: null,
+        })
+        return { windowId: saved.id, opened: true, closesAt: saved.closesAt }
     }
 
-    /** Reads the window's content at close. Returns null (and writes nothing) when the window does not
-   * exist, has already been flushed, or has not closed yet (ac.notify.digest.window.collapses-into-one-message:
-   * "Flushing before the window closes returns nothing."). */
-    async flush(windowId: string, now: Date): Promise<FlushedWindow | null> {
-        const row = await this.entityManager.findOneBy(NotifyDigestWindowEntity,
-            {
-                id: windowId 
-            })
-        if (!row || row.flushedAt || row.closesAt.getTime() > now.getTime()) {
-            return null
-        }
-        row.flushedAt = now
-        await this.entityManager.save(NotifyDigestWindowEntity,
-            row)
-        return {
-            windowId: row.id, personId: row.personId, channel: row.channel 
-        }
-    }
-
-    async findById(windowId: string): Promise<DigestWindowRecord | null> {
-        const row = await this.entityManager.findOneBy(NotifyDigestWindowEntity,
-            {
-                id: windowId 
-            })
-        return row ? new DigestWindowRecord(row.id,
-            row.personId,
-            row.channel,
-            row.opensAt,
-            row.closesAt,
-            row.flushedAt) : null
+    /** Marks the window flushed; answers null and writes nothing when it does not exist, is flushed already, or has not closed yet. */
+    async flush(params: FlushWindowParams): Promise<FlushedWindow | null> {
+        const row = await params.manager.findOneBy(NotifyDigestWindowEntity, { id: params.windowId })
+        if (!row || row.flushedAt || row.closesAt.getTime() > params.at.getTime()) return null
+        const result = await params.manager.update(
+            NotifyDigestWindowEntity,
+            { id: row.id, flushedAt: IsNull() },
+            { flushedAt: params.at },
+        )
+        if (result.affected !== 1) return null
+        return { windowId: row.id, personId: row.personId, channel: row.channel }
     }
 }

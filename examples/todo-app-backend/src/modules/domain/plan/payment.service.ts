@@ -1,125 +1,83 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    randomUUID 
-} from "node:crypto"
+import { randomUUID } from "node:crypto"
+import { Injectable } from "@nestjs/common"
+import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { ok, refused } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
+import type { EntityManager } from "typeorm"
+import { PlanErrorCode } from "./errors/plan.error"
+import { PaymentIntentEntity } from "./persistence/entities/payment-intent.entity"
+import { toPaymentIntentView } from "./persistence/payment-intent.rows"
 import type {
-    EntityManager 
-} from "typeorm"
-import {
-    InjectPrimaryEntityManager,
-} from "@modules/platform/databases/index"
-import {
-    PaymentIntentEntity,
-} from "@modules/platform/databases/index"
-import {
-    PlanPaymentIntentNotFoundException,
-} from "./errors/plan-payment-intent-not-found"
+    AppliedIntent,
+    CreatePaymentIntentParams,
+    FindPaymentIntentByGatewayParams,
+    FindPaymentIntentParams,
+    PaymentIntentView,
+    SettleIntentParams,
+} from "./plan.contracts"
 
-import {
-    PaymentIntentRecord, PaymentIntentStatus 
-} from "./types/payment-intent-record"
-import {
-    Clock
-} from "@modules/platform/clock/index"
-
-/**
- * data.plan.payment-intent: the idempotent ledger br.plan.payment.idempotent depends on. `id` is this
- * product's own opaque id and idempotency key; `gatewayIntentId` is SePay's own id for the same
- * transaction. `markPaidIfNotApplied` is the one write that ever sets `appliedAt`, and it sets it at most
- * once per id - a webhook (fr.plan.upgrade's t-gateway-confirmed) and a reconciliation poll
- * (fr.plan.reconcile) both call it, and whichever gets there first wins; the other's call is a no-op that
- * reports `alreadyApplied: true` instead of writing a second time.
- */
 @Injectable()
-/** Injectable service owning the payment logic the plan capability exposes; wired by the capability's own module. */
+/**
+ * The idempotent ledger of the gateway: `id` is this product id and idempotency key, `gatewayIntentId` is the id the
+ * gateway knows the transaction under. markPaidIfNotApplied is the one write that sets appliedAt, at most once per id,
+ * under a row lock, so a webhook and a reconciliation poll converge: whichever comes first wins and the other is a no-op.
+ */
 export class PaymentService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-        private readonly clock: Clock
-    ) {}
+    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
 
-    async create(subscriptionId: string, gatewayIntentId: string, amount: number, currency: string): Promise<PaymentIntentRecord> {
-        const saved = await this.entityManager.save(PaymentIntentEntity,
-            {
-                id: randomUUID(),
-                subscriptionId,
-                gateway: "sepay",
-                gatewayIntentId,
-                amount,
-                currency,
-                status: "pending" as PaymentIntentStatus,
-                appliedAt: null,
-            })
-        return toRecord(saved)
+    /** Records a new pending intent for the subscription. */
+    async create(params: CreatePaymentIntentParams): Promise<PaymentIntentView> {
+        const saved = await params.manager.save(PaymentIntentEntity, {
+            id: randomUUID(),
+            subscriptionId: params.subscriptionId,
+            gateway: "sepay",
+            gatewayIntentId: params.gatewayIntentId,
+            amount: params.amount,
+            currency: params.currency,
+            status: "pending",
+            appliedAt: null,
+        })
+        return toPaymentIntentView(saved)
     }
 
-    async findById(id: string): Promise<PaymentIntentRecord> {
-        return toRecord(await this.mustFindRow(id))
+    /** The intent with this id, or null. */
+    async findById(params: FindPaymentIntentParams): Promise<PaymentIntentView | null> {
+        const row = await (params.manager ?? this.entityManager).findOneBy(PaymentIntentEntity, { id: params.id })
+        return row ? toPaymentIntentView(row) : null
     }
 
-    async findByGatewayIntentId(gatewayIntentId: string): Promise<PaymentIntentRecord | null> {
-        const row = await this.entityManager.findOneBy(PaymentIntentEntity,
-            {
-                gatewayIntentId 
-            })
-        return row ? toRecord(row) : null
+    /** The intent the gateway names by its own id, or null. */
+    async findByGatewayIntentId(params: FindPaymentIntentByGatewayParams): Promise<PaymentIntentView | null> {
+        const row = await (params.manager ?? this.entityManager).findOneBy(PaymentIntentEntity, {
+            gatewayIntentId: params.gatewayIntentId,
+        })
+        return row ? toPaymentIntentView(row) : null
     }
 
-    /** br.plan.payment.idempotent / ac.plan.payment.idempotent.replay-is-noop: the first call to apply an
-   * intent activates it; every later call for the same id changes nothing and reports so. */
-    async markPaidIfNotApplied(id: string): Promise<{ record: PaymentIntentRecord; alreadyApplied: boolean }> {
-        const row = await this.mustFindRow(id)
-        if (row.appliedAt) {
-            return {
-                record: toRecord(row), alreadyApplied: true 
-            }
-        }
-        row.status = "paid"
-        row.appliedAt = this.clock.now()
-        const saved = await this.entityManager.save(PaymentIntentEntity,
-            row)
-        return {
-            record: toRecord(saved), alreadyApplied: false 
-        }
+    /** The first call for an intent applies it; every later call changes nothing and says so. */
+    async markPaidIfNotApplied(
+        params: SettleIntentParams,
+    ): Promise<Outcome<AppliedIntent, PlanErrorCode.PaymentIntentNotFound>> {
+        const row = await this.lock(params)
+        if (!row) return refused(PlanErrorCode.PaymentIntentNotFound)
+        if (row.appliedAt) return ok({ intent: toPaymentIntentView(row), alreadyApplied: true })
+        const saved = await params.manager.save(PaymentIntentEntity, { ...row, status: "paid", appliedAt: params.at })
+        return ok({ intent: toPaymentIntentView(saved), alreadyApplied: false })
     }
 
-    /** fr.plan.reconcile: the gateway shows the intent failed or expired. Never overturns an intent already
-   * applied - an idempotent ledger entry is never revoked once written. */
-    async markFailed(id: string): Promise<PaymentIntentRecord> {
-        const row = await this.mustFindRow(id)
-        if (row.appliedAt) {
-            return toRecord(row)
-        }
-        row.status = "failed"
-        const saved = await this.entityManager.save(PaymentIntentEntity,
-            row)
-        return toRecord(saved)
+    /** The gateway shows the intent failed or expired; an intent already applied is never overturned. */
+    async markFailed(params: SettleIntentParams): Promise<Outcome<PaymentIntentView, PlanErrorCode.PaymentIntentNotFound>> {
+        const row = await this.lock(params)
+        if (!row) return refused(PlanErrorCode.PaymentIntentNotFound)
+        if (row.appliedAt) return ok(toPaymentIntentView(row))
+        const saved = await params.manager.save(PaymentIntentEntity, { ...row, status: "failed" })
+        return ok(toPaymentIntentView(saved))
     }
 
-    private async mustFindRow(id: string): Promise<PaymentIntentEntity> {
-        const row = await this.entityManager.findOneBy(PaymentIntentEntity,
-            {
-                id 
-            })
-        if (!row) {
-            throw new PlanPaymentIntentNotFoundException({
-                intentId: id 
-            })
-        }
-        return row
+    private lock(params: SettleIntentParams): Promise<PaymentIntentEntity | null> {
+        return params.manager.findOne(PaymentIntentEntity, {
+            where: { id: params.id },
+            lock: { mode: "pessimistic_write" },
+        })
     }
-}
-
-function toRecord(row: PaymentIntentEntity): PaymentIntentRecord {
-    return new PaymentIntentRecord(
-        row.id,
-        row.subscriptionId,
-        row.gateway,
-        row.gatewayIntentId,
-        row.amount,
-        row.currency,
-    row.status as PaymentIntentStatus,
-    row.appliedAt,
-    )
 }

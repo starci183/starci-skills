@@ -1,264 +1,84 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
-import {
-    KeycloakClient 
-} from "./keycloak.client"
-import {
-    mock 
-} from "@starci/jest-preset/mock"
+import { mock } from "@starci/jest-preset/mock"
+import { HttpError, HttpErrorCode } from "@modules/platform/http"
+import type { HttpClient } from "@modules/platform/http"
+import { KeycloakError, KeycloakErrorCode } from "./errors/keycloak.error"
+import { KeycloakClient } from "./keycloak.client"
 
-/** A syntactically-valid JWT whose payload segment carries the given claims - readSubject only ever
- * decodes that middle segment, so header and signature stay placeholders. */
-function tokenWith(payload: object): string {
-    return `e30.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.sig`
-}
+const OPTIONS = { tokenUrl: "http://keycloak.test/realms/todo/protocol/openid-connect/token", clientId: "todo-api", timeoutMs: 250 }
 
-function tokenEndpointResponse(status: number, body: unknown): Response {
-    return mock<Response>({
-        ok: status >= 200 && status < 300, status, json: async () => body 
-    })
-}
+const tokenWith = (claims: object): string => `e30.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.sig`
 
-const config = {
-    getKeycloakTokenUrl: () => "http://keycloak.test/realms/todo/protocol/openid-connect/token",
-    getKeycloakClientId: () => "todo-api",
-}
+const answering = (status: number, body: unknown): HttpClient =>
+    mock<HttpClient>({ request: jest.fn().mockResolvedValue({ status, body }) })
 
-async function boot(): Promise<{ moduleRef: TestingModule; client: KeycloakClient }> {
-    const moduleRef = await Test.createTestingModule({
-        providers: [KeycloakClient,
-            {
-                provide: AppConfigService, useValue: config 
-            }],
-    }).compile()
-    return {
-        moduleRef, client: moduleRef.get(KeycloakClient) 
-    }
-}
+const failing = (cause: unknown): HttpClient => mock<HttpClient>({ request: jest.fn().mockRejectedValue(cause) })
 
-describe("KeycloakClient.signIn (integration.login.keycloak)",
-    () => {
-        afterEach(() => jest.restoreAllMocks())
+const CREDENTIALS = { email: "person@example.com", password: "s3cret" }
 
-        it("posts the direct access grant to the realm token endpoint with the configured client id",
-            async () => {
-                const fetchMock = jest
-                    .spyOn(global,
-                        "fetch")
-                    .mockResolvedValue(tokenEndpointResponse(200,
-                        {
-                            access_token: tokenWith({
-                                sub: "person-1" 
-                            }) 
-                        }))
-                const { moduleRef, client } = await boot()
-                try {
-                    await expect(client.signIn("person@example.com",
-                        "s3cret")).resolves.toEqual({
-                        subject: "person-1" 
-                    })
-                    const [url,
-                        init] = fetchMock.mock.calls[0]
-                    expect(url).toBe("http://keycloak.test/realms/todo/protocol/openid-connect/token")
-                    expect(init?.method).toBe("POST")
-                    expect(init?.signal).toBeInstanceOf(AbortSignal)
-                    expect(init?.headers).toMatchObject({
-                        "content-type": "application/x-www-form-urlencoded" 
-                    })
-                    const params = new URLSearchParams(String(init?.body))
-                    expect(params.get("grant_type")).toBe("password")
-                    expect(params.get("client_id")).toBe("todo-api")
-                    expect(params.get("username")).toBe("person@example.com")
-                    expect(params.get("password")).toBe("s3cret")
-                } finally {
-                    await moduleRef.close()
-                }
+describe("KeycloakClient", () => {
+    describe("signIn", () => {
+        it("posts the direct access grant as form fields with the client id and the deadline and answers the subject", async () => {
+            const http = answering(200, { access_token: tokenWith({ sub: "person-1" }) })
+            await expect(new KeycloakClient(http, OPTIONS).signIn(CREDENTIALS)).resolves.toEqual({ subject: "person-1" })
+            expect(http.request).toHaveBeenCalledTimes(1)
+            expect(http.request).toHaveBeenCalledWith({
+                method: "POST",
+                url: OPTIONS.tokenUrl,
+                form: { grant_type: "password", client_id: "todo-api", username: "person@example.com", password: "s3cret" },
+                timeoutMs: 250,
             })
+        })
 
-        it("maps any refusal of the token endpoint to the same invalid-credentials exception",
-            async () => {
-                // br.login.password.sign-in: an unknown email and a wrong password must be indistinguishable, and
-                // Keycloak already answers both with the same invalid_grant - the client must not fork on the body.
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(tokenEndpointResponse(401,
-                    {
-                        error: "invalid_grant" 
-                    }))
-                const { moduleRef, client } = await boot()
-                try {
-                    await expect(client.signIn("person@example.com",
-                        "wrong")).rejects.toThrow(
-                        expect.objectContaining({
-                            code: "KEYCLOAK_INVALID_CREDENTIALS_EXCEPTION" 
-                        }),
-                    )
-                } finally {
-                    await moduleRef.close()
-                }
-            })
+        it("refuses every error answer of the token endpoint with the same invalid-credentials error", async () => {
+            for (const status of [400, 401, 403]) {
+                const call = new KeycloakClient(answering(status, { error: "invalid_grant" }), OPTIONS).signIn(CREDENTIALS)
+                await expect(call).rejects.toBeInstanceOf(KeycloakError)
+                await expect(call).rejects.toMatchObject({ code: KeycloakErrorCode.InvalidCredentials })
+            }
+        })
 
-        it("refuses a 200 answer that carries no access token",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(tokenEndpointResponse(200,
-                    {
-                        token_type: "bearer" 
-                    }))
-                const { moduleRef, client } = await boot()
-                try {
-                    await expect(client.signIn("person@example.com",
-                        "s3cret")).rejects.toThrow(
-                        expect.objectContaining({
-                            code: "KEYCLOAK_INVALID_CREDENTIALS_EXCEPTION" 
-                        }),
-                    )
-                } finally {
-                    await moduleRef.close()
-                }
-            })
+        it("refuses a 200 answer that carries no readable subject", async () => {
+            for (const body of [{ token_type: "bearer" }, { access_token: "no-segments" }, { access_token: tokenWith({ name: "x" }) }]) {
+                await expect(new KeycloakClient(answering(200, body), OPTIONS).signIn(CREDENTIALS)).rejects.toMatchObject({
+                    code: KeycloakErrorCode.InvalidCredentials,
+                })
+            }
+        })
 
-        it("refuses an access token whose payload segment cannot be read",
-            async () => {
-                jest
-                    .spyOn(global,
-                        "fetch")
-                    .mockResolvedValue(tokenEndpointResponse(200,
-                        {
-                            access_token: "no-segments" 
-                        }))
-                const { moduleRef, client } = await boot()
-                try {
-                    await expect(client.signIn("person@example.com",
-                        "s3cret")).rejects.toThrow(
-                        expect.objectContaining({
-                            code: "KEYCLOAK_INVALID_CREDENTIALS_EXCEPTION" 
-                        }),
-                    )
-                } finally {
-                    await moduleRef.close()
-                }
-            })
+        it("reports an unreachable provider as unavailable, keeping the cause, and not as bad credentials", async () => {
+            const cause = new HttpError({ code: HttpErrorCode.Network })
+            const call = new KeycloakClient(failing(cause), OPTIONS).signIn(CREDENTIALS)
+            await expect(call).rejects.toMatchObject({ code: KeycloakErrorCode.ProviderUnavailable, cause })
+        })
 
-        it("refuses an access token whose payload is not JSON",
-            async () => {
-                const access_token = `e30.${Buffer.from("not json").toString("base64url")}.sig`
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(tokenEndpointResponse(200,
-                    {
-                        access_token 
-                    }))
-                const { moduleRef, client } = await boot()
-                try {
-                    await expect(client.signIn("person@example.com",
-                        "s3cret")).rejects.toThrow(
-                        expect.objectContaining({
-                            code: "KEYCLOAK_INVALID_CREDENTIALS_EXCEPTION" 
-                        }),
-                    )
-                } finally {
-                    await moduleRef.close()
-                }
-            })
-
-        it("refuses an access token that carries no subject",
-            async () => {
-                jest
-                    .spyOn(global,
-                        "fetch")
-                    .mockResolvedValue(tokenEndpointResponse(200,
-                        {
-                            access_token: tokenWith({
-                                name: "x" 
-                            }) 
-                        }))
-                const { moduleRef, client } = await boot()
-                try {
-                    await expect(client.signIn("person@example.com",
-                        "s3cret")).rejects.toThrow(
-                        expect.objectContaining({
-                            code: "KEYCLOAK_INVALID_CREDENTIALS_EXCEPTION" 
-                        }),
-                    )
-                } finally {
-                    await moduleRef.close()
-                }
-            })
-
-        it("reports an unreachable provider as unavailable rather than as bad credentials",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockRejectedValue(new Error("connect ECONNREFUSED"))
-                const { moduleRef, client } = await boot()
-                try {
-                    await expect(client.signIn("person@example.com",
-                        "s3cret")).rejects.toThrow(
-                        expect.objectContaining({
-                            code: "KEYCLOAK_UNAVAILABLE_EXCEPTION" 
-                        }),
-                    )
-                } finally {
-                    await moduleRef.close()
-                }
-            })
+        it("lets a failure that is not an HTTP failure through untouched", async () => {
+            const cause = new TypeError("bug")
+            await expect(new KeycloakClient(failing(cause), OPTIONS).signIn(CREDENTIALS)).rejects.toBe(cause)
+        })
     })
 
-describe("KeycloakClient.notifySignOut",
-    () => {
-        afterEach(() => jest.restoreAllMocks())
-
-        it("posts the sign-out notice for the revoked session’s person",
-            async () => {
-                const fetchMock = jest.spyOn(global,
-                    "fetch").mockResolvedValue(tokenEndpointResponse(200,
-                    {
-                    }))
-                const { moduleRef, client } = await boot()
-                try {
-                    await expect(client.notifySignOut("person-1")).resolves.toBeUndefined()
-                    const [url,
-                        init] = fetchMock.mock.calls[0]
-                    expect(url).toBe("http://keycloak.test/realms/todo/protocol/openid-connect/token")
-                    expect(init?.method).toBe("POST")
-                    expect(JSON.parse(String(init?.body))).toEqual({
-                        action: "sign-out", personId: "person-1" 
-                    })
-                } finally {
-                    await moduleRef.close()
-                }
+    describe("notifySignOut", () => {
+        it("posts the sign-out notice for the person with the deadline", async () => {
+            const http = answering(200, undefined)
+            await expect(new KeycloakClient(http, OPTIONS).notifySignOut({ personId: "person-1" })).resolves.toBeUndefined()
+            expect(http.request).toHaveBeenCalledWith({
+                method: "POST",
+                url: OPTIONS.tokenUrl,
+                body: { action: "sign-out", personId: "person-1" },
+                timeoutMs: 250,
             })
+        })
 
-        it("is best-effort: a provider-side error answer does not block the local revoke",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockResolvedValue(tokenEndpointResponse(500,
-                    {
-                        error: "server_error" 
-                    }))
-                const { moduleRef, client } = await boot()
-                try {
-                    await expect(client.notifySignOut("person-1")).resolves.toBeUndefined()
-                } finally {
-                    await moduleRef.close()
-                }
-            })
+        it("is best-effort on an error answer: the provider refusing the notice does not fail the call", async () => {
+            const http = answering(500, { error: "server_error" })
+            await expect(new KeycloakClient(http, OPTIONS).notifySignOut({ personId: "person-1" })).resolves.toBeUndefined()
+        })
 
-        it("still surfaces a transport failure as KEYCLOAK_UNAVAILABLE",
-            async () => {
-                jest.spyOn(global,
-                    "fetch").mockRejectedValue(new Error("socket hangup"))
-                const { moduleRef, client } = await boot()
-                try {
-                    await expect(client.notifySignOut("person-1")).rejects.toThrow(
-                        expect.objectContaining({
-                            code: "KEYCLOAK_UNAVAILABLE_EXCEPTION" 
-                        }),
-                    )
-                } finally {
-                    await moduleRef.close()
-                }
+        it("still fails as unavailable when the call itself cannot complete", async () => {
+            const http = failing(new HttpError({ code: HttpErrorCode.Timeout }))
+            await expect(new KeycloakClient(http, OPTIONS).notifySignOut({ personId: "person-1" })).rejects.toMatchObject({
+                code: KeycloakErrorCode.ProviderUnavailable,
             })
+        })
     })
+})

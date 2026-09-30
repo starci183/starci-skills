@@ -1,312 +1,160 @@
-import {
-    Injectable, OnModuleInit 
-} from "@nestjs/common"
-import {
-    randomUUID 
-} from "node:crypto"
+import { randomUUID } from "node:crypto"
+import { Injectable } from "@nestjs/common"
+import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { ok, refused } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
+import type { EntityManager } from "typeorm"
+import { ShareErrorCode } from "./errors/share.error"
+import { isShareRole, isWellFormedEmail, liveStatusOf, normalizeEmail } from "./invitation.policy"
+import { InvitationEntity } from "./persistence/entities/invitation.entity"
+import { toInvitationView } from "./persistence/invitation.rows"
+import { InvitationStatus } from "./share.contracts"
 import type {
-    EntityManager 
-} from "typeorm"
-import {
-    InjectPrimaryEntityManager,
-} from "@modules/platform/databases/index"
-import {
-    ShareInvitationEntity,
-} from "@modules/platform/databases/index"
-import {
-    CollaboratorCache 
-} from "./collaborator-cache"
-import {
-    InvitationRecord, ShareInvitationStatus, ShareRole 
-} from "./types/invitation-record"
-import {
-    ShareEmailMismatchException,
-} from "./errors/email-mismatch"
-import {
-    ShareForbiddenException,
-} from "./errors/forbidden"
-import {
-    ShareInvalidEmailException,
-} from "./errors/invalid-email"
-import {
-    ShareInvalidRoleException,
-} from "./errors/invalid-role"
-import {
-    ShareInvitationAlreadyClosedException,
-} from "./errors/invitation-already-closed"
-import {
-    ShareInvitationAlreadyExistsException,
-} from "./errors/invitation-already-exists"
-import {
-    ShareInvitationExpiredException,
-} from "./errors/invitation-expired"
-import {
-    ShareInvitationNotFoundException,
-} from "./errors/invitation-not-found"
-import {
-    ShareInvitationRevokedException,
-} from "./errors/invitation-revoked"
-import {
-    Clock
-} from "@modules/platform/clock/index"
+    AcceptParams,
+    InvitationView,
+    InviteParams,
+    ListInvitationsParams,
+    RevokeParams,
+} from "./share.contracts"
 
-/** The most accepted invitations the boot-time cache warm-up loads. */
-const MAX_ACCEPTED_INVITATIONS = 100_000
-/** The most invitations one task lists. */
-const MAX_INVITATIONS_PER_TASK = 500
-
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const EXPIRY_DAYS = 14
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
-const ROLES: Array<ShareRole> = ["viewer",
-    "editor"]
-
-/**
- * sds.share.invitation-lifecycle: one row per invited email per task, its role and its status. Method
- * names mirror the record's five transitions (t-invite, t-accept, t-expire, t-revoke-pending,
- * t-revoke-accepted) so the record and the code read together, the same convention TaskService and
- * SessionService already use for their own transitions.
- *
- * Expiry and revocation are both enforced on read, never by a sweep (br.share.invite.expiry,
- * br.share.revoke.on-read): `liveStatusOf` recomputes a pending row's real status against the injected clock
- * every time this service reads it, and `reconcileLiveStatus` persists that recomputation the moment it
- * changes anything - the same "expire while reading" shape SessionService.findActive already uses for
- * session rows.
- */
 @Injectable()
-/** Injectable service owning the invitation logic the share capability exposes; wired by the capability's own module. */
-export class InvitationService implements OnModuleInit {
-    constructor(
-    @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-    private readonly cache: CollaboratorCache,
-        private readonly clock: Clock
-    ) {}
+/**
+ * The invitation lifecycle: one row per invited email per task. Expiry is enforced on read, never by a sweep: a pending
+ * row past its window reads as expired, so it cannot be accepted and inviting the same address again re-opens it.
+ * Who may invite on a task is decided by the handler that knows the task.
+ */
+export class InvitationService {
+    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
 
-    /** Hydrates the synchronous CollaboratorCache from Postgres at boot, so a process restart does not
-   * lose what accept/revoke already wrote to disk (see collaborator-cache.ts's comment). */
-    async onModuleInit(): Promise<void> {
-        const accepted = await this.entityManager.find(ShareInvitationEntity,
-            {
-                where: {
-                    status: "accepted" 
-                }, take: MAX_ACCEPTED_INVITATIONS 
-            })
-        for (const row of accepted) {
-            if (row.personId) {
-                this.cache.set(row.taskId,
-                    row.personId,
-row.role as ShareRole)
-            }
-        }
-    }
-
-    /** t-invite: fr.share.invite. Reuses an existing expired/revoked row for the same (taskId, email) pair
-   * instead of inserting a second one, honouring data.share.invitation's "exactly one row at a time"
-   * invariant; a still-pending or still-accepted row for the same pair is refused instead. */
-    async invite(ownerId: string, taskId: string, email: string, role: string): Promise<InvitationRecord> {
-        const normalizedEmail = normalizeEmail(email)
-        if (!EMAIL_PATTERN.test(normalizedEmail)) {
-            throw new ShareInvalidEmailException({
-                email 
-            })
-        }
-        if (!ROLES.includes(role as ShareRole)) {
-            throw new ShareInvalidRoleException({
-                role 
-            })
-        }
-
-        const existing = await this.entityManager.findOneBy(ShareInvitationEntity,
-            {
-                taskId, email: normalizedEmail 
-            })
-        if (existing) {
-            const liveStatus = this.liveStatusOf(existing)
-            if (liveStatus === "pending" || liveStatus === "accepted") {
-                throw new ShareInvitationAlreadyExistsException({
-                    taskId, email: normalizedEmail 
-                })
-            }
-            existing.role = role
-            existing.status = "pending"
-            existing.sentAt = this.clock.now()
-            existing.acceptedAt = null
-            existing.revokedAt = null
-            if (existing.personId) {
-                this.cache.delete(existing.taskId,
-                    existing.personId)
-            }
-            existing.personId = null
-            const saved = await this.entityManager.save(ShareInvitationEntity,
-                existing)
-            return toRecord(saved)
-        }
-
-        const saved = await this.entityManager.save(ShareInvitationEntity,
-            {
+    /**
+     * Creates a pending invitation, or re-opens an expired or revoked row of the same (task, email) pair so exactly one
+     * row exists per pair; a pending or accepted row for the pair is refused.
+     */
+    async invite(
+        params: InviteParams,
+    ): Promise<
+        Outcome<
+            InvitationView,
+            ShareErrorCode.InvalidEmail | ShareErrorCode.InvalidRole | ShareErrorCode.InvitationAlreadyExists
+        >
+    > {
+        const email = normalizeEmail(params.email)
+        if (!isWellFormedEmail(email)) return refused(ShareErrorCode.InvalidEmail, { email: params.email })
+        if (!isShareRole(params.role)) return refused(ShareErrorCode.InvalidRole, { role: params.role })
+        const existing = await params.manager.findOne(InvitationEntity, {
+            where: { taskId: params.taskId, email },
+            lock: { mode: "pessimistic_write" },
+        })
+        if (!existing) {
+            const created = await params.manager.save(InvitationEntity, {
                 id: randomUUID(),
-                taskId,
-                ownerId,
-                email: normalizedEmail,
-                role,
-                status: "pending",
-                sentAt: this.clock.now(),
+                taskId: params.taskId,
+                ownerId: params.ownerId,
+                email,
+                role: params.role,
+                status: InvitationStatus.Pending,
+                sentAt: params.at,
                 acceptedAt: null,
                 revokedAt: null,
                 personId: null,
             })
-        return toRecord(saved)
+            return ok(toInvitationView(created, params.at))
+        }
+        const live = liveStatusOf(existing, params.at)
+        if (live === InvitationStatus.Pending || live === InvitationStatus.Accepted) {
+            return refused(ShareErrorCode.InvitationAlreadyExists, { taskId: params.taskId, email })
+        }
+        const reopened = await params.manager.save(InvitationEntity, {
+            ...existing,
+            ownerId: params.ownerId,
+            role: params.role,
+            status: InvitationStatus.Pending,
+            sentAt: params.at,
+            acceptedAt: null,
+            revokedAt: null,
+            personId: null,
+        })
+        return ok(toInvitationView(reopened, params.at))
     }
 
-    /** t-accept / t-expire (read-after-ttl): fr.share.accept. `email` is the accepting actor's own address,
-   * self-declared the same way sign-in's own email input is (see sign-in.command.ts) - the session
-   * contract (contract.login.identity-for-task) resolves only {personId}, never an email, so this is the
-   * one piece InvitationService cannot learn from the session seam alone; matching it against the
-   * invitation's own recorded email is what actually authorizes binding personId to this row. */
-    async accept(actorId: string, invitationId: string, email: string): Promise<InvitationRecord> {
-        const row = await this.findRow(invitationId)
-        const normalizedEmail = normalizeEmail(email)
-        if (normalizedEmail !== row.email) {
-            throw new ShareEmailMismatchException({
-                invitationId 
-            })
+    /**
+     * Binds the accepting person to a pending invitation addressed to their own email. Accepting again by the same
+     * person changes nothing; a closed, expired, revoked or foreign invitation is refused.
+     */
+    async accept(
+        params: AcceptParams,
+    ): Promise<
+        Outcome<
+            InvitationView,
+            | ShareErrorCode.InvitationNotFound
+            | ShareErrorCode.EmailMismatch
+            | ShareErrorCode.InvitationExpired
+            | ShareErrorCode.InvitationRevoked
+            | ShareErrorCode.InvitationAlreadyClosed
+        >
+    > {
+        const row = await params.manager.findOne(InvitationEntity, {
+            where: { id: params.invitationId },
+            lock: { mode: "pessimistic_write" },
+        })
+        if (!row) return refused(ShareErrorCode.InvitationNotFound, { invitationId: params.invitationId })
+        if (normalizeEmail(params.email) !== row.email) {
+            return refused(ShareErrorCode.EmailMismatch, { invitationId: row.id })
         }
-
-        const liveStatus = await this.reconcileLiveStatus(row)
-        if (liveStatus === "expired") {
-            throw new ShareInvitationExpiredException({
-                invitationId 
-            })
+        const live = liveStatusOf(row, params.at)
+        if (live === InvitationStatus.Expired) return refused(ShareErrorCode.InvitationExpired, { invitationId: row.id })
+        if (live === InvitationStatus.Revoked) return refused(ShareErrorCode.InvitationRevoked, { invitationId: row.id })
+        if (live === InvitationStatus.Accepted) {
+            if (row.personId === params.actorId) return ok(toInvitationView(row, params.at))
+            return refused(ShareErrorCode.InvitationAlreadyClosed, { invitationId: row.id })
         }
-        if (liveStatus === "revoked") {
-            throw new ShareInvitationRevokedException({
-                invitationId 
-            })
-        }
-        if (liveStatus === "accepted") {
-            if (row.personId === actorId) {
-                return toRecord(row)
-            }
-            throw new ShareInvitationAlreadyClosedException({
-                invitationId 
-            })
-        }
-
-        row.status = "accepted"
-        row.acceptedAt = this.clock.now()
-        row.personId = actorId
-        const saved = await this.entityManager.save(ShareInvitationEntity,
-            row)
-        this.cache.set(saved.taskId,
-            actorId,
-saved.role as ShareRole)
-        return toRecord(saved)
+        const saved = await params.manager.save(InvitationEntity, {
+            ...row,
+            status: InvitationStatus.Accepted,
+            acceptedAt: params.at,
+            personId: params.actorId,
+        })
+        return ok(toInvitationView(saved, params.at))
     }
 
-    /** t-revoke-pending / t-revoke-accepted: fr.share.revoke. Only the invitation's own owner may revoke
-   * it; an already expired or already revoked row refuses a second revoke. */
-    async revoke(ownerId: string, invitationId: string): Promise<InvitationRecord> {
-        const row = await this.findRow(invitationId)
-        if (row.ownerId !== ownerId) {
-            throw new ShareForbiddenException({
-                invitationId, actorId: ownerId 
-            })
+    /** Revokes an invitation for its owner, pending or accepted; an expired or revoked one is refused as closed. */
+    async revoke(
+        params: RevokeParams,
+    ): Promise<
+        Outcome<
+            InvitationView,
+            ShareErrorCode.InvitationNotFound | ShareErrorCode.Forbidden | ShareErrorCode.InvitationAlreadyClosed
+        >
+    > {
+        const row = await params.manager.findOne(InvitationEntity, {
+            where: { id: params.invitationId },
+            lock: { mode: "pessimistic_write" },
+        })
+        if (!row) return refused(ShareErrorCode.InvitationNotFound, { invitationId: params.invitationId })
+        if (row.ownerId !== params.ownerId) return refused(ShareErrorCode.Forbidden, { invitationId: row.id })
+        const live = liveStatusOf(row, params.at)
+        if (live === InvitationStatus.Expired || live === InvitationStatus.Revoked) {
+            return refused(ShareErrorCode.InvitationAlreadyClosed, { invitationId: row.id })
         }
-
-        const liveStatus = await this.reconcileLiveStatus(row)
-        if (liveStatus === "expired" || liveStatus === "revoked") {
-            throw new ShareInvitationAlreadyClosedException({
-                invitationId 
-            })
-        }
-
-        row.status = "revoked"
-        row.revokedAt = this.clock.now()
-        const saved = await this.entityManager.save(ShareInvitationEntity,
-            row)
-        if (saved.personId) {
-            this.cache.delete(saved.taskId,
-                saved.personId)
-        }
-        return toRecord(saved)
+        const saved = await params.manager.save(InvitationEntity, {
+            ...row,
+            status: InvitationStatus.Revoked,
+            revokedAt: params.at,
+        })
+        return ok(toInvitationView(saved, params.at))
     }
 
-    /** fr.share.list: the owner of the task's invitations, or a bound collaborator, sees every row with a
-   * live status; anyone else - including a stranger asking about a task with no rows at all - sees
-   * nothing, per that record's own exceptionFlow. */
-    async listFor(actorId: string, taskId: string): Promise<Array<InvitationRecord>> {
-        const rows = await this.entityManager.find(ShareInvitationEntity,
-            {
-                where: {
-                    taskId 
-                }, take: MAX_INVITATIONS_PER_TASK 
-            })
-        if (rows.length === 0) {
-            return []
-        }
-        const isOwner = rows.some(row => row.ownerId === actorId)
-        const isCollaborator = rows.some(row => row.personId === actorId)
-        if (!isOwner && !isCollaborator) {
-            return []
-        }
-
-        const results: Array<InvitationRecord> = []
-        for (const row of rows) {
-            await this.reconcileLiveStatus(row)
-            results.push(toRecord(row))
-        }
-        return results
+    /**
+     * The invitations of a task with their live statuses, at most LIST_ROWS_MAX: the owner of the task and a bound
+     * collaborator see every row, anyone else sees nothing.
+     */
+    async listFor(params: ListInvitationsParams): Promise<Array<InvitationView>> {
+        const rows = await this.entityManager.find(InvitationEntity, {
+            where: { taskId: params.taskId },
+            take: LIST_ROWS_MAX,
+        })
+        const involved = rows.some((row) => row.ownerId === params.actorId || row.personId === params.actorId)
+        if (!involved) return []
+        return rows.map((row) => toInvitationView(row, params.at))
     }
-
-    /** The read-time half of br.share.invite.expiry: a pending row past its fourteen-day window reads
-   * (and, from `reconcileLiveStatus`, is persisted) as expired without any sweep ever running. */
-    private liveStatusOf(row: ShareInvitationEntity): ShareInvitationStatus {
-        if (row.status === "pending" && this.clock.now().getTime() > row.sentAt.getTime() + EXPIRY_DAYS * MILLISECONDS_PER_DAY) {
-            return "expired"
-        }
-        return row.status as ShareInvitationStatus
-    }
-
-    private async reconcileLiveStatus(row: ShareInvitationEntity): Promise<ShareInvitationStatus> {
-        const live = this.liveStatusOf(row)
-        if (live !== row.status) {
-            row.status = live
-            await this.entityManager.save(ShareInvitationEntity,
-                row)
-        }
-        return live
-    }
-
-    private async findRow(id: string): Promise<ShareInvitationEntity> {
-        const row = await this.entityManager.findOneBy(ShareInvitationEntity,
-            {
-                id 
-            })
-        if (!row) {
-            throw new ShareInvitationNotFoundException({
-                invitationId: id 
-            })
-        }
-        return row
-    }
-}
-
-function normalizeEmail(email: string): string {
-    return email.trim().toLowerCase()
-}
-
-function toRecord(row: ShareInvitationEntity): InvitationRecord {
-    return new InvitationRecord(
-        row.id,
-        row.taskId,
-        row.ownerId,
-        row.email,
-    row.role as ShareRole,
-    row.status as ShareInvitationStatus,
-    row.sentAt,
-    row.acceptedAt,
-    row.revokedAt,
-    row.personId,
-    )
 }

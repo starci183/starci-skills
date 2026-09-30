@@ -1,369 +1,187 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    ShareInvitationEntity,
-} from "@modules/platform/databases/index"
-import {
-    createFakeEntityManager,
-} from "@modules/platform/databases/index"
-import {
-    CollaboratorCache 
-} from "./collaborator-cache"
-import {
-    InvitationService 
-} from "./invitation.service"
-import {
-    Clock 
-} from "@modules/platform/clock/index"
-import {
-    FakeClock 
-} from "@starci/jest-preset/clock"
+import { LIST_ROWS_MAX } from "@modules/platform/database"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { ShareErrorCode } from "./errors/share.error"
+import { InvitationService } from "./invitation.service"
+import { InvitationEntity } from "./persistence/entities/invitation.entity"
 
-const DAY_MS = 24 * 60 * 60 * 1000
-const PRIMARY_ENTITY_MANAGER = getEntityManagerToken(POSTGRESQL_PRIMARY)
+const DAY = 24 * 60 * 60 * 1000
+const SENT = new Date("2026-09-01T10:00:00.000Z")
+const SOON = new Date(SENT.getTime() + 13 * DAY)
+const LATE = new Date(SENT.getTime() + 15 * DAY)
 
-describe("InvitationService",
-    () => {
-        let moduleRef: TestingModule
-        let entityManager: ReturnType<typeof createFakeEntityManager<ShareInvitationEntity>>
-        let cache: CollaboratorCache
-        let service: InvitationService
+const pending: InvitationEntity = {
+    id: "i1",
+    taskId: "t1",
+    ownerId: "owner-1",
+    email: "ann@example.com",
+    role: "editor",
+    status: "pending",
+    sentAt: SENT,
+    acceptedAt: null,
+    revokedAt: null,
+    personId: null,
+}
+const accepted: InvitationEntity = { ...pending, status: "accepted", acceptedAt: SOON, personId: "ann" }
+const revoked: InvitationEntity = { ...pending, status: "revoked", revokedAt: SOON }
 
-        beforeEach(async () => {
-            entityManager = createFakeEntityManager<ShareInvitationEntity>("id")
-            moduleRef = await Test.createTestingModule({
-                providers: [
-                    {
-                        provide: Clock, useValue: new FakeClock() 
-                    },
-                    InvitationService,
-                    CollaboratorCache,
-                    {
-                        provide: PRIMARY_ENTITY_MANAGER, useValue: entityManager 
-                    },
-                ],
-            }).compile()
-            cache = moduleRef.get(CollaboratorCache)
-            service = moduleRef.get(InvitationService)
+const echoSave = (): jest.Mock =>
+    jest.fn().mockImplementation((_target: unknown, entity: object) => Promise.resolve(entity))
+
+const withRow = (row: InvitationEntity | null): ReturnType<typeof mockEntityManager> =>
+    mockEntityManager({ findOne: jest.fn().mockResolvedValue(row), save: echoSave() })
+
+const service = (): InvitationService => new InvitationService(mockEntityManager())
+
+describe("InvitationService.invite", () => {
+    it("creates a pending invitation bound to the task, the normalized email and the role", async () => {
+        const manager = withRow(null)
+        const outcome = await service().invite({
+            manager,
+            ownerId: "owner-1",
+            taskId: "t1",
+            email: "  Ann@Example.com ",
+            role: "editor",
+            at: SENT,
         })
-
-        afterEach(async () => {
-            await moduleRef.close()
+        expect(outcome).toMatchObject({
+            kind: "ok",
+            value: { taskId: "t1", ownerId: "owner-1", email: "ann@example.com", role: "editor", status: "pending" },
         })
+        expect(manager.findOne).toHaveBeenCalledWith(
+            InvitationEntity,
+            expect.objectContaining({ where: { taskId: "t1", email: "ann@example.com" } }),
+        )
+        expect(manager.save).toHaveBeenCalledWith(
+            InvitationEntity,
+            expect.objectContaining({ sentAt: SENT, acceptedAt: null, personId: null }),
+        )
+    })
 
-        it("fr.share.invite: creates a pending invitation bound to the task, email and role",
-            async () => {
-                const record = await service.invite("owner-1",
-                    "task-1",
-                    "Editor@Example.com",
-                    "editor")
-                expect(record.status).toBe("pending")
-                expect(record.email).toBe("editor@example.com")
-                expect(record.role).toBe("editor")
-                expect(record.taskId).toBe("task-1")
-            })
+    it("refuses an email that is not well formed and writes nothing", async () => {
+        const manager = withRow(null)
+        const outcome = await service().invite({ manager, ownerId: "o", taskId: "t1", email: "nope", role: "viewer", at: SENT })
+        expect(outcome).toMatchObject({ kind: "refused", code: ShareErrorCode.InvalidEmail, params: { email: "nope" } })
+        expect(manager.save).not.toHaveBeenCalled()
+    })
 
-        it("fr.share.invite exceptionFlows: an invalid email is refused and nothing is created",
-            async () => {
-                await expect(service.invite("owner-1",
-                    "task-1",
-                    "not-an-email",
-                    "editor")).rejects.toMatchObject({
-                    code: "SHARE_INVALID_EMAIL_EXCEPTION",
-                })
-            })
+    it("refuses a role other than viewer or editor and writes nothing", async () => {
+        const manager = withRow(null)
+        const outcome = await service().invite({ manager, ownerId: "o", taskId: "t1", email: "a@b.co", role: "boss", at: SENT })
+        expect(outcome).toMatchObject({ kind: "refused", code: ShareErrorCode.InvalidRole, params: { role: "boss" } })
+        expect(manager.save).not.toHaveBeenCalled()
+    })
 
-        it("fr.share.invite exceptionFlows: a role other than viewer or editor is refused",
-            async () => {
-                await expect(service.invite("owner-1",
-                    "task-1",
-                    "someone@example.com",
-                    "admin")).rejects.toMatchObject({
-                    code: "SHARE_INVALID_ROLE_EXCEPTION",
-                })
-            })
-
-        it("data.share.invitation invariant: a second invite to the same pending pair is refused",
-            async () => {
-                await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "viewer")
-                await expect(service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "editor")).rejects.toMatchObject({
-                    code: "SHARE_INVITATION_ALREADY_EXISTS_EXCEPTION",
-                })
-            })
-
-        it("ac.share.invite.expiry.accept-before-expiry-succeeds: accepting thirteen days in still succeeds",
-            async () => {
-                const invited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "editor")
-                await backdateSentAt(invited.id,
-                    13)
-
-                const accepted = await service.accept("person-1",
-                    invited.id,
-                    "collab@example.com")
-                expect(accepted.status).toBe("accepted")
-                expect(accepted.role).toBe("editor")
-            })
-
-        it("ac.share.invite.expiry.expires-after-14-days: reading fifteen days later reports expired and refuses acceptance",
-            async () => {
-                const invited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "editor")
-                await backdateSentAt(invited.id,
-                    15)
-
-                await expect(service.accept("person-1",
-                    invited.id,
-                    "collab@example.com")).rejects.toMatchObject({
-                    code: "SHARE_INVITATION_EXPIRED_EXCEPTION",
-                })
-                const stored = await entityManager.findOneBy(ShareInvitationEntity,
-                    {
-                        id: invited.id 
-                    })
-                expect(stored?.status).toBe("expired")
-            })
-
-        it("fr.share.accept exceptionFlows: accepting with a different email is refused",
-            async () => {
-                const invited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "viewer")
-                await expect(service.accept("person-1",
-                    invited.id,
-                    "somebody-else@example.com")).rejects.toMatchObject({
-                    code: "SHARE_EMAIL_MISMATCH_EXCEPTION",
-                })
-            })
-
-        it("fr.share.accept exceptionFlows: accepting a revoked invitation is refused",
-            async () => {
-                const invited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "viewer")
-                await service.revoke("owner-1",
-                    invited.id)
-                await expect(service.accept("person-1",
-                    invited.id,
-                    "collab@example.com")).rejects.toMatchObject({
-                    code: "SHARE_INVITATION_REVOKED_EXCEPTION",
-                })
-            })
-
-        it("ac.share.revoke.on-read.removed-loses-access-next-read: revoke clears the collaborator cache immediately",
-            async () => {
-                const invited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "editor")
-                await service.accept("person-1",
-                    invited.id,
-                    "collab@example.com")
-                expect(cache.roleOf("task-1",
-                    "person-1").role).toBe("editor")
-
-                await service.revoke("owner-1",
-                    invited.id)
-                expect(cache.roleOf("task-1",
-                    "person-1").role).toBeNull()
-            })
-
-        it("fr.share.revoke exceptionFlows: revoking an already revoked invitation is refused",
-            async () => {
-                const invited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "viewer")
-                await service.revoke("owner-1",
-                    invited.id)
-                await expect(service.revoke("owner-1",
-                    invited.id)).rejects.toMatchObject({
-                    code: "SHARE_INVITATION_ALREADY_CLOSED_EXCEPTION",
-                })
-            })
-
-        it("fr.share.revoke: only the owner may revoke",
-            async () => {
-                const invited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "viewer")
-                await expect(service.revoke("someone-else",
-                    invited.id)).rejects.toMatchObject({
-                    code: "SHARE_FORBIDDEN_EXCEPTION" 
-                })
-            })
-
-        it("fr.share.list exceptionFlows: a stranger sees nothing",
-            async () => {
-                await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "viewer")
-                const list = await service.listFor("a-stranger",
-                    "task-1")
-                expect(list).toEqual([])
-            })
-
-        it("fr.share.list: the owner sees every row with a live status",
-            async () => {
-                await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "viewer")
-                const list = await service.listFor("owner-1",
-                    "task-1")
-                expect(list).toHaveLength(1)
-                expect(list[0].status).toBe("pending")
-            })
-
-        it("fr.share.list: a bound collaborator sees the list too",
-            async () => {
-                const invited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "editor")
-                await service.accept("person-1",
-                    invited.id,
-                    "collab@example.com")
-                const list = await service.listFor("person-1",
-                    "task-1")
-                expect(list).toHaveLength(1)
-                expect(list[0].status).toBe("accepted")
-            })
-
-        it("fr.share.list postconditions: an expired row reads expired at read time, never cached",
-            async () => {
-                const invited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "viewer")
-                await backdateSentAt(invited.id,
-                    20)
-                const list = await service.listFor("owner-1",
-                    "task-1")
-                expect(list[0].status).toBe("expired")
-            })
-
-        it("re-inviting an expired address re-opens a fresh pending row instead of a second one",
-            async () => {
-                const invited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "viewer")
-                await backdateSentAt(invited.id,
-                    20)
-                await service.listFor("owner-1",
-                    "task-1") // reconciles to expired
-                const reinvited = await service.invite("owner-1",
-                    "task-1",
-                    "collab@example.com",
-                    "editor")
-                expect(reinvited.id).toBe(invited.id)
-                expect(reinvited.status).toBe("pending")
-                expect(reinvited.role).toBe("editor")
-            })
-
-        describe("guard arms (w8 branch depth)",
-            () => {
-                it("data.share.invitation invariant: a second invite over an accepted pair is refused too",
-                    async () => {
-                        const invited = await service.invite("owner-1",
-                            "task-1",
-                            "collab@example.com",
-                            "viewer")
-                        await service.accept("person-1",
-                            invited.id,
-                            "collab@example.com")
-                        await expect(service.invite("owner-1",
-                            "task-1",
-                            "collab@example.com",
-                            "editor")).rejects.toMatchObject({
-                            code: "SHARE_INVITATION_ALREADY_EXISTS_EXCEPTION",
-                        })
-                    })
-
-                it("re-inviting a revoked row re-opens it pending and clears the stale person binding",
-                    async () => {
-                        const invited = await service.invite("owner-1",
-                            "task-1",
-                            "collab@example.com",
-                            "editor")
-                        await service.accept("person-1",
-                            invited.id,
-                            "collab@example.com")
-                        await service.revoke("owner-1",
-                            invited.id)
-                        // t-revoke-accepted leaves personId bound on the row while the cache is cleared;
-                        // the re-invite must scrub that stale binding before the row goes pending again.
-                        const reinvited = await service.invite("owner-1",
-                            "task-1",
-                            "collab@example.com",
-                            "viewer")
-                        expect(reinvited.id).toBe(invited.id)
-                        expect(reinvited.status).toBe("pending")
-                        expect(reinvited.personId).toBeNull()
-                        expect(reinvited.acceptedAt).toBeNull()
-                        expect(reinvited.revokedAt).toBeNull()
-                        expect(cache.roleOf("task-1",
-                            "person-1").role).toBeNull()
-                    })
-
-                it("revoking an already-expired invitation is refused as already closed",
-                    async () => {
-                        const invited = await service.invite("owner-1",
-                            "task-1",
-                            "collab@example.com",
-                            "viewer")
-                        await backdateSentAt(invited.id,
-                            20)
-                        await expect(service.revoke("owner-1",
-                            invited.id)).rejects.toMatchObject({
-                            code: "SHARE_INVITATION_ALREADY_CLOSED_EXCEPTION",
-                        })
-                    })
-
-                it("accept and revoke both refuse an unknown invitation id",
-                    async () => {
-                        await expect(service.accept("person-1",
-                            "missing",
-                            "collab@example.com")).rejects.toMatchObject({
-                            code: "SHARE_INVITATION_NOT_FOUND_EXCEPTION",
-                        })
-                        await expect(service.revoke("owner-1",
-                            "missing")).rejects.toMatchObject({
-                            code: "SHARE_INVITATION_NOT_FOUND_EXCEPTION",
-                        })
-                    })
-            })
-
-        async function backdateSentAt(invitationId: string, days: number): Promise<void> {
-            const row = await entityManager.findOneBy(ShareInvitationEntity,
-                {
-                    id: invitationId 
-                })
-            if (!row) throw new Error("row not found")
-            row.sentAt = new Date(Date.now() - days * DAY_MS)
-            await entityManager.save(ShareInvitationEntity,
-                row)
+    it("refuses a second invite over a pending pair and over an accepted pair", async () => {
+        for (const row of [pending, accepted]) {
+            const manager = withRow(row)
+            const outcome = await service().invite({ manager, ownerId: "owner-1", taskId: "t1", email: row.email, role: "viewer", at: SOON })
+            expect(outcome).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationAlreadyExists })
+            expect(manager.save).not.toHaveBeenCalled()
         }
     })
+
+    it("re-opens an expired row as one pending row and clears the stale person binding", async () => {
+        const manager = withRow({ ...accepted, status: "pending", personId: "ann" })
+        const outcome = await service().invite({ manager, ownerId: "owner-1", taskId: "t1", email: "ann@example.com", role: "viewer", at: LATE })
+        expect(outcome).toMatchObject({ kind: "ok", value: { id: "i1", role: "viewer", status: "pending", personId: null } })
+        expect(manager.save).toHaveBeenCalledWith(InvitationEntity, expect.objectContaining({ id: "i1", sentAt: LATE, personId: null }))
+    })
+
+    it("re-opens a revoked row pending", async () => {
+        const manager = withRow(revoked)
+        const outcome = await service().invite({ manager, ownerId: "owner-1", taskId: "t1", email: "ann@example.com", role: "editor", at: SOON })
+        expect(outcome).toMatchObject({ kind: "ok", value: { id: "i1", status: "pending", revokedAt: null } })
+    })
+})
+
+describe("InvitationService.accept", () => {
+    it("binds the accepting person and activates the role at once", async () => {
+        const manager = withRow(pending)
+        const outcome = await service().accept({ manager, actorId: "ann", invitationId: "i1", email: "ANN@example.com", at: SOON })
+        expect(outcome).toMatchObject({ kind: "ok", value: { status: "accepted", personId: "ann", role: "editor", acceptedAt: SOON } })
+        expect(manager.save).toHaveBeenCalledWith(
+            InvitationEntity,
+            expect.objectContaining({ status: "accepted", personId: "ann", acceptedAt: SOON }),
+        )
+    })
+
+    it("accepts thirteen days in but refuses fifteen days in as expired", async () => {
+        const early = await service().accept({ manager: withRow(pending), actorId: "ann", invitationId: "i1", email: "ann@example.com", at: SOON })
+        expect(early.kind).toBe("ok")
+        const manager = withRow(pending)
+        const late = await service().accept({ manager, actorId: "ann", invitationId: "i1", email: "ann@example.com", at: LATE })
+        expect(late).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationExpired })
+        expect(manager.save).not.toHaveBeenCalled()
+    })
+
+    it("refuses another email, a revoked invitation and an unknown id", async () => {
+        const mismatch = await service().accept({ manager: withRow(pending), actorId: "bob", invitationId: "i1", email: "bob@example.com", at: SOON })
+        expect(mismatch).toMatchObject({ kind: "refused", code: ShareErrorCode.EmailMismatch })
+        const gone = await service().accept({ manager: withRow(revoked), actorId: "ann", invitationId: "i1", email: "ann@example.com", at: SOON })
+        expect(gone).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationRevoked })
+        const unknown = await service().accept({ manager: withRow(null), actorId: "ann", invitationId: "nope", email: "ann@example.com", at: SOON })
+        expect(unknown).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationNotFound, params: { invitationId: "nope" } })
+    })
+
+    it("answers the same person accepting twice with the row untouched, and refuses a different person as closed", async () => {
+        const manager = withRow(accepted)
+        const again = await service().accept({ manager, actorId: "ann", invitationId: "i1", email: "ann@example.com", at: LATE })
+        expect(again).toMatchObject({ kind: "ok", value: { status: "accepted", personId: "ann" } })
+        expect(manager.save).not.toHaveBeenCalled()
+        const other = await service().accept({ manager: withRow(accepted), actorId: "bob", invitationId: "i1", email: "ann@example.com", at: LATE })
+        expect(other).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationAlreadyClosed })
+    })
+})
+
+describe("InvitationService.revoke", () => {
+    it("lets the owner revoke a pending or an accepted invitation", async () => {
+        for (const row of [pending, accepted]) {
+            const manager = withRow(row)
+            const outcome = await service().revoke({ manager, ownerId: "owner-1", invitationId: "i1", at: SOON })
+            expect(outcome).toMatchObject({ kind: "ok", value: { status: "revoked", revokedAt: SOON } })
+            expect(manager.save).toHaveBeenCalledWith(InvitationEntity, expect.objectContaining({ status: "revoked" }))
+        }
+    })
+
+    it("refuses anyone but the owner and writes nothing", async () => {
+        const manager = withRow(pending)
+        const outcome = await service().revoke({ manager, ownerId: "mallory", invitationId: "i1", at: SOON })
+        expect(outcome).toMatchObject({ kind: "refused", code: ShareErrorCode.Forbidden })
+        expect(manager.save).not.toHaveBeenCalled()
+    })
+
+    it("refuses an already revoked, an already expired and an unknown invitation", async () => {
+        const closedRevoked = await service().revoke({ manager: withRow(revoked), ownerId: "owner-1", invitationId: "i1", at: SOON })
+        expect(closedRevoked).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationAlreadyClosed })
+        const closedExpired = await service().revoke({ manager: withRow(pending), ownerId: "owner-1", invitationId: "i1", at: LATE })
+        expect(closedExpired).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationAlreadyClosed })
+        const unknown = await service().revoke({ manager: withRow(null), ownerId: "owner-1", invitationId: "nope", at: SOON })
+        expect(unknown).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationNotFound })
+    })
+})
+
+describe("InvitationService.listFor", () => {
+    const listing = (rows: Array<InvitationEntity>): { svc: InvitationService; manager: ReturnType<typeof mockEntityManager> } => {
+        const manager = mockEntityManager({ find: jest.fn().mockResolvedValue(rows) })
+        return { svc: new InvitationService(manager), manager }
+    }
+
+    it("shows the owner every row with its live status, bounded", async () => {
+        const { svc, manager } = listing([pending, accepted])
+        const views = await svc.listFor({ actorId: "owner-1", taskId: "t1", at: LATE })
+        expect(views.map((view) => view.status)).toEqual(["expired", "accepted"])
+        expect(manager.find).toHaveBeenCalledWith(InvitationEntity, { where: { taskId: "t1" }, take: LIST_ROWS_MAX })
+    })
+
+    it("shows a bound collaborator the list too", async () => {
+        const { svc } = listing([pending, accepted])
+        await expect(svc.listFor({ actorId: "ann", taskId: "t1", at: SOON })).resolves.toHaveLength(2)
+    })
+
+    it("shows a stranger, and a task with no rows, nothing", async () => {
+        const { svc } = listing([pending, accepted])
+        await expect(svc.listFor({ actorId: "stranger", taskId: "t1", at: SOON })).resolves.toEqual([])
+        const empty = listing([])
+        await expect(empty.svc.listFor({ actorId: "owner-1", taskId: "t9", at: SOON })).resolves.toEqual([])
+    })
+})

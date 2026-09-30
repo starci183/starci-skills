@@ -1,118 +1,117 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    createFakePlanEntityManager 
-} from "./testing/fake-plan-entity-manager"
-import {
-    PaymentService 
-} from "./payment.service"
-import {
-    Clock 
-} from "@modules/platform/clock/index"
-import {
-    FakeClock 
-} from "@starci/jest-preset/clock"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { PlanErrorCode } from "./errors/plan.error"
+import { PaymentService } from "./payment.service"
+import { PaymentIntentEntity } from "./persistence/entities/payment-intent.entity"
+import type { PaymentIntentView } from "./plan.contracts"
 
-describe("PaymentService",
-    () => {
-        let moduleRef: TestingModule
-        let service: PaymentService
+const AT = new Date("2026-09-30T10:00:00.000Z")
 
-        beforeEach(async () => {
-            moduleRef = await Test.createTestingModule({
-                providers: [
-                    {
-                        provide: Clock, useValue: new FakeClock() 
-                    },
-                    PaymentService,
-                    {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: createFakePlanEntityManager() 
-                    },
-                ],
-            }).compile()
-            service = moduleRef.get(PaymentService)
+const pending: PaymentIntentView = {
+    id: "i1",
+    subscriptionId: "s1",
+    gateway: "sepay",
+    gatewayIntentId: "g1",
+    amount: 99000,
+    currency: "VND",
+    status: "pending",
+    appliedAt: null,
+}
+
+const echoSave = (): jest.Mock =>
+    jest.fn().mockImplementation((_target: unknown, entity: object) => Promise.resolve(entity))
+
+describe("PaymentService", () => {
+    it("records a pending intent with no appliedAt through the manager it was handed", async () => {
+        const inTransaction = mockEntityManager({ save: echoSave() })
+        const created = await new PaymentService(mockEntityManager()).create({
+            manager: inTransaction,
+            subscriptionId: "s1",
+            gatewayIntentId: "g1",
+            amount: 99000,
+            currency: "VND",
         })
-
-        afterEach(async () => {
-            await moduleRef.close()
+        expect(created).toMatchObject({
+            subscriptionId: "s1",
+            gateway: "sepay",
+            gatewayIntentId: "g1",
+            amount: 99000,
+            currency: "VND",
+            status: "pending",
+            appliedAt: null,
         })
-
-        it("data.plan.payment-intent: create writes a pending row with no appliedAt",
-            async () => {
-                const record = await service.create("sub-1",
-                    "sepay-gw-1",
-                    99000,
-                    "VND")
-                expect(record.status).toBe("pending")
-                expect(record.appliedAt).toBeNull()
-                expect(record.gatewayIntentId).toBe("sepay-gw-1")
-            })
-
-        it("ac.plan.payment.idempotent.replay-is-noop: the first apply activates, a replay changes nothing",
-            async () => {
-                const created = await service.create("sub-1",
-                    "sepay-gw-1",
-                    99000,
-                    "VND")
-
-                const first = await service.markPaidIfNotApplied(created.id)
-                expect(first.alreadyApplied).toBe(false)
-                expect(first.record.status).toBe("paid")
-                const firstAppliedAt = first.record.appliedAt
-                expect(firstAppliedAt).not.toBeNull()
-
-                const replay = await service.markPaidIfNotApplied(created.id)
-                expect(replay.alreadyApplied).toBe(true)
-                expect(replay.record.appliedAt).toEqual(firstAppliedAt)
-            })
-
-        it("br.plan.payment.idempotent: applying twice never records a second ledger entry for the same intent",
-            async () => {
-                const created = await service.create("sub-1",
-                    "sepay-gw-1",
-                    99000,
-                    "VND")
-                await service.markPaidIfNotApplied(created.id)
-                await service.markPaidIfNotApplied(created.id)
-                const stored = await service.findById(created.id)
-                expect(stored.status).toBe("paid")
-            })
-
-        it("fr.plan.reconcile: markFailed never overturns an already-applied intent",
-            async () => {
-                const created = await service.create("sub-1",
-                    "sepay-gw-1",
-                    99000,
-                    "VND")
-                await service.markPaidIfNotApplied(created.id)
-                const afterFailAttempt = await service.markFailed(created.id)
-                expect(afterFailAttempt.status).toBe("paid")
-            })
-
-        it("markFailed on a never-applied intent sets it failed",
-            async () => {
-                const created = await service.create("sub-1",
-                    "sepay-gw-1",
-                    99000,
-                    "VND")
-                const failed = await service.markFailed(created.id)
-                expect(failed.status).toBe("failed")
-            })
-
-        it("findByGatewayIntentId resolves the intent SePay named in a webhook",
-            async () => {
-                const created = await service.create("sub-1",
-                    "sepay-gw-1",
-                    99000,
-                    "VND")
-                const found = await service.findByGatewayIntentId("sepay-gw-1")
-                expect(found?.id).toBe(created.id)
-            })
+        expect(inTransaction.save).toHaveBeenCalledWith(PaymentIntentEntity, expect.objectContaining({ status: "pending" }))
     })
+
+    it("finds an intent by its id and by the id the gateway named, and answers null for an unknown one", async () => {
+        const own = mockEntityManager({
+            findOneBy: jest.fn().mockResolvedValueOnce({ ...pending }).mockResolvedValueOnce({ ...pending }).mockResolvedValueOnce(null),
+        })
+        const service = new PaymentService(own)
+        await expect(service.findById({ id: "i1" })).resolves.toEqual(pending)
+        await expect(service.findByGatewayIntentId({ gatewayIntentId: "g1" })).resolves.toEqual(pending)
+        await expect(service.findByGatewayIntentId({ gatewayIntentId: "nope" })).resolves.toBeNull()
+        expect(own.findOneBy).toHaveBeenNthCalledWith(1, PaymentIntentEntity, { id: "i1" })
+        expect(own.findOneBy).toHaveBeenNthCalledWith(2, PaymentIntentEntity, { gatewayIntentId: "g1" })
+    })
+
+    describe("markPaidIfNotApplied", () => {
+        it("applies an unapplied intent once, under a row lock", async () => {
+            const inTransaction = mockEntityManager({ findOne: jest.fn().mockResolvedValue({ ...pending }), save: echoSave() })
+            const outcome = await new PaymentService(mockEntityManager()).markPaidIfNotApplied({
+                manager: inTransaction,
+                id: "i1",
+                at: AT,
+            })
+            expect(outcome).toMatchObject({ kind: "ok", value: { alreadyApplied: false, intent: { status: "paid", appliedAt: AT } } })
+            expect(inTransaction.findOne).toHaveBeenCalledWith(PaymentIntentEntity, {
+                where: { id: "i1" },
+                lock: { mode: "pessimistic_write" },
+            })
+        })
+
+        it("changes nothing for an intent that was applied before and says so", async () => {
+            const applied = { ...pending, status: "paid", appliedAt: AT }
+            const inTransaction = mockEntityManager({ findOne: jest.fn().mockResolvedValue(applied), save: jest.fn() })
+            const outcome = await new PaymentService(mockEntityManager()).markPaidIfNotApplied({
+                manager: inTransaction,
+                id: "i1",
+                at: new Date("2026-10-01T00:00:00.000Z"),
+            })
+            expect(outcome).toMatchObject({ kind: "ok", value: { alreadyApplied: true, intent: { appliedAt: AT } } })
+            expect(inTransaction.save).not.toHaveBeenCalled()
+        })
+
+        it("refuses an unknown intent", async () => {
+            const inTransaction = mockEntityManager({ findOne: jest.fn().mockResolvedValue(null), save: jest.fn() })
+            const outcome = await new PaymentService(mockEntityManager()).markPaidIfNotApplied({
+                manager: inTransaction,
+                id: "nope",
+                at: AT,
+            })
+            expect(outcome).toMatchObject({ kind: "refused", code: PlanErrorCode.PaymentIntentNotFound })
+            expect(inTransaction.save).not.toHaveBeenCalled()
+        })
+    })
+
+    describe("markFailed", () => {
+        it("sets a never-applied intent failed", async () => {
+            const inTransaction = mockEntityManager({ findOne: jest.fn().mockResolvedValue({ ...pending }), save: echoSave() })
+            const outcome = await new PaymentService(mockEntityManager()).markFailed({ manager: inTransaction, id: "i1", at: AT })
+            expect(outcome).toMatchObject({ kind: "ok", value: { status: "failed", appliedAt: null } })
+        })
+
+        it("never overturns an intent that was applied", async () => {
+            const applied = { ...pending, status: "paid", appliedAt: AT }
+            const inTransaction = mockEntityManager({ findOne: jest.fn().mockResolvedValue(applied), save: jest.fn() })
+            const outcome = await new PaymentService(mockEntityManager()).markFailed({ manager: inTransaction, id: "i1", at: AT })
+            expect(outcome).toMatchObject({ kind: "ok", value: { status: "paid", appliedAt: AT } })
+            expect(inTransaction.save).not.toHaveBeenCalled()
+        })
+
+        it("refuses an unknown intent", async () => {
+            const inTransaction = mockEntityManager({ findOne: jest.fn().mockResolvedValue(null) })
+            const outcome = await new PaymentService(mockEntityManager()).markFailed({ manager: inTransaction, id: "nope", at: AT })
+            expect(outcome).toMatchObject({ kind: "refused", code: PlanErrorCode.PaymentIntentNotFound })
+        })
+    })
+})

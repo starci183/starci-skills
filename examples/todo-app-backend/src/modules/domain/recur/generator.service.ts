@@ -1,111 +1,60 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    CommandBus 
-} from "@nestjs/cqrs"
-import {
-    CreateTaskCommand,
-    CreateTaskCommandResult,
-} from "@modules/domain/task/index"
-import {
-    datesForRule 
-} from "./calendar.util"
-import {
-    localDateInZone, resolveRuleInstant 
-} from "./zone.util"
-import {
-    RuleService 
-} from "./rule.service"
-import {
-    OccurrenceService 
-} from "./occurrence.service"
-import {
-    RuleRecord 
-} from "./types/rule-record"
-import {
-    OccurrenceRecord 
-} from "./types/occurrence-record"
-import {
-    Clock
-} from "@modules/platform/clock/index"
+import { Injectable } from "@nestjs/common"
+import { LIST_ROWS_MAX } from "@modules/platform/database"
+import { datesForRule } from "./calendar.policy"
+import { OccurrenceService } from "./occurrence.service"
+import type { CollectDueParams, DueOccurrence, RuleView } from "./recur.contracts"
+import { RuleService } from "./rule.service"
+import { localDateInZone, resolveRuleInstant } from "./zone.policy"
 
-/** Contract naming the generation summary shape domain/recur code and its consumers share; a second site never retypes it inline. */
-export interface GenerationSummary {
-  readonly materialised: Array<OccurrenceRecord>;
-}
-
-/**
- * sds.recur.generation-engine's own responsibility statement made real: walks a rule's dates between its
- * `startDate` and "today" (in the rule's own zone, at tick time), resolving each to a UTC instant and
- * materialising the ones not yet written. Walking from `startDate` every run rather than tracking a
- * separate "last generated" cursor is decision.recur.generation.backfill made structural instead of
- * conditional: a missed window is not detected and specially replayed, it is simply part of the range
- * this run always covers, and `OccurrenceService.existsByWindowKey` is what makes covering it twice free
- * (br.recur.generation.once). Ending a rule (data.recur.rule.endedAt) caps the walk so "no occurrence
- * dated after the day it ended" is a property of the range itself, not a filter applied afterward.
- *
- * Materialising a date always goes through `CommandBus.execute(new CreateTaskCommand(...))` - the same
- * command the task capability's own create-task flow dispatches - so `TaskCreationPolicyRegistry` sees
- * every occurrence exactly like any other task and `event.task.created` still fires for it.
- */
 @Injectable()
-/** Injectable service owning the generator logic the recur capability exposes; wired by the capability's own module. */
+/**
+ * Works out which occurrences the rules owe and have not materialised yet. It walks the dates of a rule from its start
+ * date up to today in the zone of the rule, every time, instead of tracking a cursor: a missed window is simply part of
+ * the range every run covers, and the unique window key makes covering it twice free. Ending a rule caps the walk at the
+ * day it ended. The generator writes nothing: the handler that owns the tick creates each task and then materialises it.
+ */
 export class GeneratorService {
     constructor(
-    private readonly ruleService: RuleService,
-    private readonly occurrenceService: OccurrenceService,
-    private readonly commandBus: CommandBus,
-        private readonly clock: Clock
+        private readonly rules: RuleService,
+        private readonly occurrences: OccurrenceService,
     ) {}
 
-    async runOnce(now: Date = this.clock.now()): Promise<GenerationSummary> {
-        const rules = await this.ruleService.listActive()
-        const materialised: Array<OccurrenceRecord> = []
-        for (const rule of rules) {
-            materialised.push(...(await this.runForRule(rule,
-                now)))
-        }
-        return {
-            materialised 
+    /** The occurrences that are due at the tick instant across all rules, at most `limit`; the rest wait for the next tick. */
+    async collectDue(params: CollectDueParams): Promise<Array<DueOccurrence>> {
+        const due: Array<DueOccurrence> = []
+        let after: string | null = null
+        for (;;) {
+            const batch: Array<RuleView> = await this.rules.listBatch({ after })
+            for (const rule of batch) {
+                if (due.length >= params.limit) return due
+                due.push(...(await this.dueOf(rule, params.now, params.limit - due.length)))
+            }
+            const last = batch[batch.length - 1]
+            if (last === undefined || batch.length < LIST_ROWS_MAX) return due
+            after = last.id
         }
     }
 
-    async runForRule(rule: RuleRecord, now: Date): Promise<Array<OccurrenceRecord>> {
-        const todayLocalDate = localDateInZone(rule.timeZone,
-            now)
-        const horizon = rule.endedAt !== null && rule.endedAt < todayLocalDate ? rule.endedAt : todayLocalDate
+    private async dueOf(rule: RuleView, now: Date, room: number): Promise<Array<DueOccurrence>> {
+        const today = localDateInZone(rule.timeZone, now)
+        const horizon = rule.endedAt !== null && rule.endedAt < today ? rule.endedAt : today
         const dates = datesForRule(
-            {
-                frequency: rule.frequency, n: rule.n, dayOfMonth: rule.dayOfMonth, startDate: rule.startDate 
-            },
+            { frequency: rule.frequency, n: rule.n, dayOfMonth: rule.dayOfMonth, startDate: rule.startDate },
             rule.startDate,
             horizon,
         )
-
-        const materialised: Array<OccurrenceRecord> = []
-        for (const localDate of dates) {
-            const windowKey = `${rule.id}:${localDate}`
-            if (await this.occurrenceService.existsByWindowKey(windowKey)) {
-                continue
-            }
-            const resolution = resolveRuleInstant(rule.timeZone,
-                localDate,
-                rule.time)
-            const createdTask = await this.commandBus.execute<CreateTaskCommand, CreateTaskCommandResult>(
-                new CreateTaskCommand({
-                    ownerId: rule.owner, title: rule.title 
-                }),
-            )
-            const occurrence = await this.occurrenceService.materialise({
-                id: createdTask.taskId,
+        const windowKeys = dates.map((localDate) => `${rule.id}:${localDate}`)
+        const existing = await this.occurrences.existingWindowKeys({ windowKeys })
+        return dates
+            .filter((_localDate, index) => !existing.has(windowKeys[index] ?? ""))
+            .slice(0, room)
+            .map((localDate) => ({
                 ruleId: rule.id,
-                windowKey,
+                ownerId: rule.owner,
+                title: rule.title,
+                windowKey: `${rule.id}:${localDate}`,
                 localDate,
-                dueAtUtc: resolution.instant,
-            })
-            materialised.push(occurrence)
-        }
-        return materialised
+                dueAtUtc: resolveRuleInstant(rule.timeZone, localDate, rule.time).instant,
+            }))
     }
 }

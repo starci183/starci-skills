@@ -1,16 +1,8 @@
-import {
-    ConfigurableModuleBuilder 
-} from "@nestjs/common"
+import { ConfigurableModuleBuilder } from "@nestjs/common"
+import type { NotifySmtpOptions } from "./notify-smtp.options"
 
-/** NotifySmtp takes no options beyond the isGlobal extra. */
-export type NotifySmtpOptions = Record<never, never>
-
-/** See databases/primary.module-definition.ts's comment: same isGlobal knob, every module. */
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<NotifySmtpOptions>().setExtras(
-    {
-        isGlobal: false 
-    },
-    (definition, extras) => ({
-        ...definition, global: extras.isGlobal 
-    }),
-).build()
+/** The configurable-module base of the notify-smtp integration; `isGlobal` is decided by the app root. */
+export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } =
+    new ConfigurableModuleBuilder<NotifySmtpOptions>()
+        .setExtras({ isGlobal: false }, (definition, extras) => ({ ...definition, global: extras.isGlobal }))
+        .build()

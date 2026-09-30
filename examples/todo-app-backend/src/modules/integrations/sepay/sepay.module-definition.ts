@@ -1,16 +1,7 @@
-import {
-    ConfigurableModuleBuilder 
-} from "@nestjs/common"
+import { ConfigurableModuleBuilder } from "@nestjs/common"
+import type { SepayOptions } from "./sepay.options"
 
-/** Sepay takes no options beyond the isGlobal extra. */
-export type SepayOptions = Record<never, never>
-
-/** See primary.module-definition.ts's comment: nivo gives every owned module this same isGlobal knob. */
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<SepayOptions>().setExtras(
-    {
-        isGlobal: false 
-    },
-    (definition, extras) => ({
-        ...definition, global: extras.isGlobal 
-    }),
-).build()
+/** The configurable-module base of the SePay integration; `isGlobal` is decided by the app root. */
+export const { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } = new ConfigurableModuleBuilder<SepayOptions>()
+    .setExtras({ isGlobal: false }, (definition, extras) => ({ ...definition, global: extras.isGlobal }))
+    .build()

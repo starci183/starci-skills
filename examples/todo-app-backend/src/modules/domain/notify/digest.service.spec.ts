@@ -1,115 +1,92 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    createFakeNotifyEntityManager 
-} from "./testing/fake-notify-entity-manager"
-import {
-    DigestService, AdmitIntoWindowResult 
-} from "./digest.service"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { IsNull } from "typeorm"
+import { DigestService } from "./digest.service"
+import { NotifyDigestWindowEntity } from "./persistence/entities/digest-window.entity"
 
-describe("DigestService",
-    () => {
-        let moduleRef: TestingModule
-        let service: DigestService
+const AT = new Date("2026-09-30T10:00:00.000Z")
+const MINUTE = 60_000
 
-        beforeEach(async () => {
-            moduleRef = await Test.createTestingModule({
-                providers: [
-                    DigestService,
-                    {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: createFakeNotifyEntityManager() 
-                    },
-                ],
-            }).compile()
-            service = moduleRef.get(DigestService)
-        })
-
-        afterEach(async () => {
-            await moduleRef.close()
-        })
-
-        it("ac.notify.digest.window.collapses-into-one-message: a second event before close joins the same group",
-            async () => {
-                const t0 = new Date("2026-09-18T06:00:00.000Z")
-                const t1 = new Date("2026-09-18T06:05:00.000Z") // 5 minutes later, still inside the 10-minute default window
-
-                const first = await service.admit("person-1",
-                    "email",
-                    t0)
-                const second = await service.admit("person-1",
-                    "email",
-                    t1)
-
-                expect(first.opened).toBe(true)
-                expect(second.opened).toBe(false)
-                expect(second.windowId).toBe(first.windowId)
-            })
-
-        it("ac.notify.digest.window.collapses-into-one-message: flushing before close returns nothing",
-            async () => {
-                const t0 = new Date("2026-09-18T06:00:00.000Z")
-                const beforeClose = new Date("2026-09-18T06:05:00.000Z")
-
-                const opened = await service.admit("person-1",
-                    "email",
-                    t0)
-                const flushed = await service.flush(opened.windowId,
-                    beforeClose)
-
-                expect(flushed).toBeNull()
-            })
-
-        it("ac.notify.digest.window.collapses-into-one-message: flushing at close returns the group once, in order",
-            async () => {
-                const t0 = new Date("2026-09-18T06:00:00.000Z")
-                const atClose = (opened: AdmitIntoWindowResult) => new Date(opened.closesAt.getTime())
-
-                const opened = await service.admit("person-1",
-                    "email",
-                    t0)
-                const closeTime = atClose(opened)
-
-                const flushed = await service.flush(opened.windowId,
-                    closeTime)
-                expect(flushed).toEqual({
-                    windowId: opened.windowId, personId: "person-1", channel: "email" 
-                })
-
-                const flushedAgain = await service.flush(opened.windowId,
-                    closeTime)
-                expect(flushedAgain).toBeNull()
-            })
-
-        it("fr.notify.digest's exception flow: a window that has already closed is not joined by a later admission",
-            async () => {
-                const t0 = new Date("2026-09-18T06:00:00.000Z")
-                const afterClose = new Date("2026-09-18T06:11:00.000Z") // past the 10-minute default window
-
-                const opened = await service.admit("person-1",
-                    "email",
-                    t0)
-                const later = await service.admit("person-1",
-                    "email",
-                    afterClose)
-
-                expect(later.opened).toBe(true)
-                expect(later.windowId).not.toBe(opened.windowId)
-            })
-
-        it("a preference override changes the window length",
-            async () => {
-                const t0 = new Date("2026-09-18T06:00:00.000Z")
-                const opened = await service.admit("person-1",
-                    "email",
-                    t0,
-                    1)
-                expect(opened.closesAt.getTime() - t0.getTime()).toBe(60_000)
-            })
+const windowRow = (overrides: Partial<NotifyDigestWindowEntity> = {}): NotifyDigestWindowEntity =>
+    Object.assign(new NotifyDigestWindowEntity(), {
+        id: "w1",
+        personId: "p1",
+        channel: "email",
+        opensAt: new Date(AT.getTime() - MINUTE),
+        closesAt: new Date(AT.getTime() + 9 * MINUTE),
+        flushedAt: null,
+        ...overrides,
     })
+
+const echoSave = jest.fn().mockImplementation((_target: unknown, entity: object) => Promise.resolve(entity))
+const updated = (affected: number) => jest.fn().mockResolvedValue({ affected, raw: [], generatedMaps: [] })
+
+describe("DigestService", () => {
+    it("joins the open window without opening a second one", async () => {
+        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(windowRow()), save: jest.fn() })
+        const joined = await new DigestService().admit({ manager, personId: "p1", channel: "email", at: AT, windowMinutes: 10 })
+        expect(joined).toEqual({ windowId: "w1", opened: false, closesAt: new Date(AT.getTime() + 9 * MINUTE) })
+        expect(manager.findOneBy).toHaveBeenCalledWith(NotifyDigestWindowEntity, {
+            personId: "p1",
+            channel: "email",
+            flushedAt: IsNull(),
+        })
+        expect(manager.save).not.toHaveBeenCalled()
+    })
+
+    it("opens a new window of the asked length when none is open", async () => {
+        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null), save: echoSave })
+        const opened = await new DigestService().admit({ manager, personId: "p1", channel: "email", at: AT, windowMinutes: 5 })
+        expect(opened.opened).toBe(true)
+        expect(opened.closesAt).toEqual(new Date(AT.getTime() + 5 * MINUTE))
+        expect(manager.save).toHaveBeenCalledWith(
+            NotifyDigestWindowEntity,
+            expect.objectContaining({ personId: "p1", channel: "email", opensAt: AT, flushedAt: null }),
+        )
+    })
+
+    it("never joins a window that has already closed", async () => {
+        const closed = windowRow({ closesAt: new Date(AT.getTime() - 1) })
+        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(closed), save: echoSave })
+        const result = await new DigestService().admit({ manager, personId: "p1", channel: "email", at: AT, windowMinutes: 10 })
+        expect(result.opened).toBe(true)
+        expect(result.windowId).not.toBe("w1")
+    })
+
+    it("flushes a closed window once", async () => {
+        const closed = windowRow({ closesAt: new Date(AT.getTime() - 1) })
+        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(closed), update: updated(1) })
+        await expect(new DigestService().flush({ manager, windowId: "w1", at: AT })).resolves.toEqual({
+            windowId: "w1",
+            personId: "p1",
+            channel: "email",
+        })
+        expect(manager.update).toHaveBeenCalledWith(
+            NotifyDigestWindowEntity,
+            { id: "w1", flushedAt: IsNull() },
+            { flushedAt: AT },
+        )
+    })
+
+    it("answers null and writes nothing before the window closes", async () => {
+        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(windowRow()), update: updated(1) })
+        await expect(new DigestService().flush({ manager, windowId: "w1", at: AT })).resolves.toBeNull()
+        expect(manager.update).not.toHaveBeenCalled()
+    })
+
+    it("answers null for an unknown window and for one that was flushed already", async () => {
+        const unknown = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null), update: updated(1) })
+        await expect(new DigestService().flush({ manager: unknown, windowId: "nope", at: AT })).resolves.toBeNull()
+        const flushed = mockEntityManager({
+            findOneBy: jest.fn().mockResolvedValue(windowRow({ closesAt: AT, flushedAt: AT })),
+            update: updated(1),
+        })
+        await expect(new DigestService().flush({ manager: flushed, windowId: "w1", at: AT })).resolves.toBeNull()
+        expect(unknown.update).not.toHaveBeenCalled()
+        expect(flushed.update).not.toHaveBeenCalled()
+    })
+
+    it("answers null when a concurrent flush won the row", async () => {
+        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(windowRow({ closesAt: AT })), update: updated(0) })
+        await expect(new DigestService().flush({ manager, windowId: "w1", at: AT })).resolves.toBeNull()
+    })
+})

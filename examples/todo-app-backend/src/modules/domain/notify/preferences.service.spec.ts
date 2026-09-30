@@ -1,87 +1,105 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    createFakeNotifyEntityManager 
-} from "./testing/fake-notify-entity-manager"
-import {
-    PreferencesService 
-} from "./preferences.service"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { NotifyErrorCode } from "./errors/notify.error"
+import { NotifyPreferenceEntity } from "./persistence/entities/preference.entity"
+import { PreferencesService } from "./preferences.service"
 
-describe("PreferencesService",
-    () => {
-        let moduleRef: TestingModule
-        let service: PreferencesService
+const echoSave = jest.fn().mockImplementation((_target: unknown, entity: object) => Promise.resolve(entity))
 
-        beforeEach(async () => {
-            moduleRef = await Test.createTestingModule({
-                providers: [
-                    PreferencesService,
-                    {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: createFakeNotifyEntityManager() 
-                    },
-                ],
-            }).compile()
-            service = moduleRef.get(PreferencesService)
+const stored = Object.assign(new NotifyPreferenceEntity(), {
+    personId: "p1",
+    channel: "email",
+    unsubscribed: true,
+    digestWindowMinutes: 5,
+})
+
+describe("PreferencesService", () => {
+    it("reads the default when no preference was ever written", async () => {
+        const own = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null) })
+        await expect(new PreferencesService(own).get({ personId: "p1", channel: "email" })).resolves.toEqual({
+            personId: "p1",
+            channel: "email",
+            unsubscribed: false,
+            digestWindowMinutes: null,
         })
-
-        afterEach(async () => {
-            await moduleRef.close()
-        })
-
-        it("data.notify.preference: no row reads as the default (not unsubscribed, no override)",
-            async () => {
-                const pref = await service.get("person-1",
-                    "email")
-                expect(pref.unsubscribed).toBe(false)
-                expect(pref.digestWindowMinutes).toBeNull()
-            })
-
-        it("ac.notify.unsubscribe.honored.suppresses-future-sends: unsubscribing is per person and per channel",
-            async () => {
-                await service.setUnsubscribed("person-1",
-                    "email",
-                    true)
-
-                expect(await service.isUnsubscribed("person-1",
-                    "email")).toBe(true)
-                expect(await service.isUnsubscribed("person-1",
-                    "sms")).toBe(false)
-                expect(await service.isUnsubscribed("person-2",
-                    "email")).toBe(false)
-            })
-
-        it("re-subscribing (unsubscribed: false) reverses the suppression",
-            async () => {
-                await service.setUnsubscribed("person-1",
-                    "email",
-                    true)
-                await service.setUnsubscribed("person-1",
-                    "email",
-                    false)
-
-                expect(await service.isUnsubscribed("person-1",
-                    "email")).toBe(false)
-            })
-
-        it("data.notify.preference invariant: at most one row per (personId, channel) - setting unsubscribed preserves an existing digestWindowMinutes",
-            async () => {
-                await service.setDigestWindowMinutes("person-1",
-                    "email",
-                    15)
-                await service.setUnsubscribed("person-1",
-                    "email",
-                    true)
-
-                const pref = await service.get("person-1",
-                    "email")
-                expect(pref.unsubscribed).toBe(true)
-                expect(pref.digestWindowMinutes).toBe(15)
-            })
+        expect(own.findOneBy).toHaveBeenCalledWith(NotifyPreferenceEntity, { personId: "p1", channel: "email" })
     })
+
+    it("reads a stored preference", async () => {
+        const own = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(stored) })
+        await expect(new PreferencesService(own).get({ personId: "p1", channel: "email" })).resolves.toEqual({
+            personId: "p1",
+            channel: "email",
+            unsubscribed: true,
+            digestWindowMinutes: 5,
+        })
+    })
+
+    it("writes a first preference on top of the defaults through the manager it was given", async () => {
+        const inTransaction = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null), save: echoSave })
+        const outcome = await new PreferencesService(mockEntityManager()).update({
+            manager: inTransaction,
+            personId: "p1",
+            channel: "email",
+            patch: { unsubscribed: true },
+        })
+        expect(outcome).toEqual({
+            kind: "ok",
+            value: { personId: "p1", channel: "email", unsubscribed: true, digestWindowMinutes: null },
+        })
+        expect(inTransaction.save).toHaveBeenCalledWith(NotifyPreferenceEntity, {
+            personId: "p1",
+            channel: "email",
+            unsubscribed: true,
+            digestWindowMinutes: null,
+        })
+    })
+
+    it("keeps the omitted fields of the stored preference", async () => {
+        const inTransaction = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(stored), save: echoSave })
+        const outcome = await new PreferencesService(mockEntityManager()).update({
+            manager: inTransaction,
+            personId: "p1",
+            channel: "email",
+            patch: { digestWindowMinutes: 20 },
+        })
+        expect(outcome).toMatchObject({ kind: "ok", value: { unsubscribed: true, digestWindowMinutes: 20 } })
+    })
+
+    it("clears the window override when the patch says null", async () => {
+        const inTransaction = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(stored), save: echoSave })
+        const outcome = await new PreferencesService(mockEntityManager()).update({
+            manager: inTransaction,
+            personId: "p1",
+            channel: "email",
+            patch: { digestWindowMinutes: null },
+        })
+        expect(outcome).toMatchObject({ kind: "ok", value: { unsubscribed: true, digestWindowMinutes: null } })
+    })
+
+    it("refuses a blank channel and writes nothing", async () => {
+        const inTransaction = mockEntityManager({ save: jest.fn() })
+        const outcome = await new PreferencesService(mockEntityManager()).update({
+            manager: inTransaction,
+            personId: "p1",
+            channel: "  ",
+            patch: { unsubscribed: true },
+        })
+        expect(outcome).toMatchObject({ kind: "refused", code: NotifyErrorCode.ChannelRequired })
+        expect(inTransaction.save).not.toHaveBeenCalled()
+    })
+
+    it("refuses a window below one minute or a fractional one and writes nothing", async () => {
+        const inTransaction = mockEntityManager({ save: jest.fn() })
+        const service = new PreferencesService(mockEntityManager())
+        for (const minutes of [0, -5, 1.5]) {
+            const outcome = await service.update({
+                manager: inTransaction,
+                personId: "p1",
+                channel: "email",
+                patch: { digestWindowMinutes: minutes },
+            })
+            expect(outcome).toMatchObject({ kind: "refused", code: NotifyErrorCode.DigestWindowInvalid })
+        }
+        expect(inTransaction.save).not.toHaveBeenCalled()
+    })
+})

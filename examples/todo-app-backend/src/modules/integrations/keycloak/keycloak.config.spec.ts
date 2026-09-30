@@ -1,26 +1,27 @@
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
-import {
-    keycloakConfig,
-} from "./keycloak.config"
-import {
-    mock 
-} from "@starci/jest-preset/mock"
+import { EnvSource } from "@modules/platform/config"
+import { parseKeycloakConfig } from "./keycloak.config"
 
-describe("keycloak config",
-    () => {
-        it("reads every setting through the platform config reader at access time",
-            () => {
-                const source = mock<AppConfigService>({
-                    getKeycloakTokenUrl: jest.fn().mockReturnValue("http://idp.test/token"),
-                    getKeycloakClientId: jest.fn().mockReturnValue("todo-api"),
-                })
-                const config = keycloakConfig(source)
+const REQUIRED = { KEYCLOAK_TOKEN_URL: "http://idp.test/token", KEYCLOAK_CLIENT_ID: "todo-api" }
 
-                expect(config.tokenUrl).toEqual("http://idp.test/token")
-                expect(config.clientId).toEqual("todo-api")
-                expect(source.getKeycloakTokenUrl).toHaveBeenCalledTimes(1)
-                expect(source.getKeycloakClientId).toHaveBeenCalledTimes(1)
-            })
+describe("parseKeycloakConfig", () => {
+    it("reads the endpoint and the client id and defaults the timeout to ten seconds", () => {
+        expect(parseKeycloakConfig(new EnvSource(REQUIRED))).toEqual({
+            tokenUrl: "http://idp.test/token",
+            clientId: "todo-api",
+            timeoutMs: 10_000,
+        })
     })
+
+    it("reads the timeout as a duration", () => {
+        expect(parseKeycloakConfig(new EnvSource({ ...REQUIRED, KEYCLOAK_TIMEOUT: "3s" })).timeoutMs).toBe(3000)
+    })
+
+    it("has no default endpoint and no default client id", () => {
+        expect(() => parseKeycloakConfig(new EnvSource({ KEYCLOAK_CLIENT_ID: "todo-api" }))).toThrow()
+        expect(() => parseKeycloakConfig(new EnvSource({ KEYCLOAK_TOKEN_URL: "http://idp.test/token" }))).toThrow()
+    })
+
+    it("refuses an endpoint that is not a URL", () => {
+        expect(() => parseKeycloakConfig(new EnvSource({ ...REQUIRED, KEYCLOAK_TOKEN_URL: "not a url" }))).toThrow()
+    })
+})

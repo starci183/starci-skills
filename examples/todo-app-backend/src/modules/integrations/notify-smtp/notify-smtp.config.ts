@@ -1,23 +1,11 @@
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
+import type { EnvSource } from "@modules/platform/config"
+import type { NotifySmtpOptions } from "./notify-smtp.options"
 
-/** The SMTP submission settings: host, port and the from address. */
-export interface NotifySmtpConfig {
-    readonly host: string
-    readonly port: number
-    readonly fromAddress: string
-}
-
-/** Reads the notify-smtp settings through the platform config reader on every access, so a value changed in the environment is never cached here. */
-export const notifySmtpConfig = (source: AppConfigService): NotifySmtpConfig => ({
-    get host(): string {
-        return source.getSmtpHost()
-    },
-    get port(): number {
-        return source.getSmtpPort()
-    },
-    get fromAddress(): string {
-        return source.getSmtpFromAddress()
-    },
+/** Reads the notify-smtp options: the host, the port and the sender have no default; the two silences are tunables. */
+export const parseNotifySmtpConfig = (env: EnvSource): NotifySmtpOptions => ({
+    host: env.string("SMTP_HOST"),
+    port: env.int("SMTP_PORT"),
+    from: env.string("SMTP_FROM"),
+    connectTimeoutMs: env.duration("SMTP_CONNECT_TIMEOUT", 5_000),
+    commandTimeoutMs: env.duration("SMTP_COMMAND_TIMEOUT", 10_000),
 })

@@ -1,111 +1,77 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    createFakeNotifyEntityManager 
-} from "./testing/fake-notify-entity-manager"
-import {
-    DedupeService 
-} from "./dedupe.service"
-import {
-    Clock 
-} from "@modules/platform/clock/index"
-import {
-    FakeClock 
-} from "@starci/jest-preset/clock"
+import { LIST_ROWS_MAX } from "@modules/platform/database"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { IsNull } from "typeorm"
+import { DedupeService } from "./dedupe.service"
+import { computeDedupeKey } from "./notify.policy"
+import { NotifyNotificationEntity } from "./persistence/entities/notification.entity"
+import { INSERT_NOTIFICATION_IF_ABSENT } from "./persistence/notify.sql"
 
-describe("DedupeService",
-    () => {
-        let moduleRef: TestingModule
-        let service: DedupeService
+const AT = new Date("2026-09-30T10:00:00.000Z")
+const KEY = computeDedupeKey("task-complete", "evt-1", "p1")
+const params = { kind: "task-complete", sourceEventId: "evt-1", recipientId: "p1", payload: { taskId: "t1" }, at: AT }
 
-        beforeEach(async () => {
-            moduleRef = await Test.createTestingModule({
-                providers: [
-                    {
-                        provide: Clock, useValue: new FakeClock() 
-                    },
-                    DedupeService,
-                    {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: createFakeNotifyEntityManager() 
-                    },
-                ],
-            }).compile()
-            service = moduleRef.get(DedupeService)
+const stored = Object.assign(new NotifyNotificationEntity(), {
+    id: KEY,
+    kind: "task-complete",
+    recipientId: "p1",
+    payload: { taskId: "t1" },
+    digestGroupId: "w1",
+    createdAt: new Date("2026-09-30T09:00:00.000Z"),
+})
+
+describe("DedupeService", () => {
+    it("inserts a first admission under its dedupe key through the manager it was given", async () => {
+        const inTransaction = mockEntityManager({ query: jest.fn().mockResolvedValue([{ id: KEY }]) })
+        const own = mockEntityManager()
+        const result = await new DedupeService(own).admit({ manager: inTransaction, ...params })
+        expect(result.isNew).toBe(true)
+        expect(result.notification).toEqual({
+            id: KEY,
+            kind: "task-complete",
+            recipientId: "p1",
+            payload: { taskId: "t1" },
+            digestGroupId: null,
+            createdAt: AT,
         })
-
-        afterEach(async () => {
-            await moduleRef.close()
-        })
-
-        it("ac.notify.delivery.once.dedupe-collapses-retry: a second admission for the same triple returns the same notification, not a new one",
-            async () => {
-                const first = await service.admit({
-                    kind: "task-complete",
-                    sourceEventId: "evt-1",
-                    recipientId: "owner-1",
-                    payload: {
-                        taskId: "task-1" 
-                    },
-                })
-                expect(first.isNew).toBe(true)
-
-                const second = await service.admit({
-                    kind: "task-complete",
-                    sourceEventId: "evt-1",
-                    recipientId: "owner-1",
-                    payload: {
-                        taskId: "task-1" 
-                    },
-                })
-
-                expect(second.isNew).toBe(false)
-                expect(second.record.id).toBe(first.record.id)
-                expect(second.record).toStrictEqual(first.record)
-            })
-
-        it("a different sourceEventId, kind or recipient produces a distinct notification",
-            async () => {
-                const base = await service.admit({
-                    kind: "task-complete", sourceEventId: "evt-1", recipientId: "owner-1", payload: {
-                    } 
-                })
-                const differentEvent = await service.admit({
-                    kind: "task-complete", sourceEventId: "evt-2", recipientId: "owner-1", payload: {
-                    } 
-                })
-                const differentRecipient = await service.admit({
-                    kind: "task-complete", sourceEventId: "evt-1", recipientId: "owner-2", payload: {
-                    } 
-                })
-
-                expect(differentEvent.record.id).not.toBe(base.record.id)
-                expect(differentRecipient.record.id).not.toBe(base.record.id)
-            })
-
-        it("assignDigestGroup sets digestGroupId exactly once and a second call is a no-op",
-            async () => {
-                const admitted = await service.admit({
-                    kind: "task-complete", sourceEventId: "evt-1", recipientId: "owner-1", payload: {
-                    } 
-                })
-                await service.assignDigestGroup(admitted.record.id,
-                    "group-1")
-                await service.assignDigestGroup(admitted.record.id,
-                    "group-2")
-
-                const found = await service.findById(admitted.record.id)
-                expect(found?.digestGroupId).toBe("group-1")
-            })
-
-        it("findById returns null for an unknown notification id (w8 branch depth)",
-            async () => {
-                expect(await service.findById("missing")).toBeNull()
-            })
+        expect(inTransaction.query).toHaveBeenCalledWith(INSERT_NOTIFICATION_IF_ABSENT, [
+            KEY,
+            "task-complete",
+            "p1",
+            JSON.stringify({ taskId: "t1" }),
+            AT,
+        ])
+        expect(own.query).not.toHaveBeenCalled()
     })
+
+    it("answers the stored row and isNew false when the same event was admitted before", async () => {
+        const inTransaction = mockEntityManager({
+            query: jest.fn().mockResolvedValue([]),
+            findOneBy: jest.fn().mockResolvedValue(stored),
+        })
+        const result = await new DedupeService(mockEntityManager()).admit({ manager: inTransaction, ...params })
+        expect(result.isNew).toBe(false)
+        expect(result.notification).toMatchObject({ id: KEY, digestGroupId: "w1" })
+        expect(inTransaction.findOneBy).toHaveBeenCalledWith(NotifyNotificationEntity, { id: KEY })
+    })
+
+    it("lists one digest group in admission order, bounded", async () => {
+        const own = mockEntityManager({ find: jest.fn().mockResolvedValue([stored]) })
+        const group = await new DedupeService(own).findByDigestGroup({ groupId: "w1" })
+        expect(group).toHaveLength(1)
+        expect(own.find).toHaveBeenCalledWith(NotifyNotificationEntity, {
+            where: { digestGroupId: "w1" },
+            order: { createdAt: "ASC" },
+            take: LIST_ROWS_MAX,
+        })
+    })
+
+    it("assigns the group only to a notification that has none yet", async () => {
+        const inTransaction = mockEntityManager({ update: jest.fn().mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] }) })
+        await new DedupeService(mockEntityManager()).assignDigestGroup({ manager: inTransaction, id: KEY, digestGroupId: "w1" })
+        expect(inTransaction.update).toHaveBeenCalledWith(
+            NotifyNotificationEntity,
+            { id: KEY, digestGroupId: IsNull() },
+            { digestGroupId: "w1" },
+        )
+    })
+})

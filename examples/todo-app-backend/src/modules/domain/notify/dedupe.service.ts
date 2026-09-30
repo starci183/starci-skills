@@ -1,133 +1,67 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    sha256Hex,
-} from "@modules/platform/primitives/index"
+import { Injectable } from "@nestjs/common"
+import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { IsNull } from "typeorm"
+import type { EntityManager } from "typeorm"
 import type {
-    EntityManager 
-} from "typeorm"
-import {
-    InjectPrimaryEntityManager,
-} from "@modules/platform/databases/index"
-import {
-    NotifyNotificationEntity,
-} from "@modules/platform/databases/index"
-import {
-    NotificationRecord 
-} from "./types/notification-record"
-import {
-    Clock
-} from "@modules/platform/clock/index"
+    AssignDigestGroupParams,
+    DedupeAdmitParams,
+    DedupeAdmitResult,
+    FindDigestGroupParams,
+    NotificationView,
+} from "./notify.contracts"
+import { computeDedupeKey } from "./notify.policy"
+import { NotifyNotificationEntity } from "./persistence/entities/notification.entity"
+import { INSERT_NOTIFICATION_IF_ABSENT } from "./persistence/notify.sql"
+import { toNotificationView } from "./persistence/notify.rows"
 
-/** The most notifications one digest group can hold. */
-const MAX_DIGEST_GROUP_MEMBERS = 500
-
-/** Contract naming the admit notification params shape domain/notify code and its consumers share; a second site never retypes it inline. */
-export interface AdmitNotificationParams {
-  readonly kind: string;
-  readonly sourceEventId: string;
-  readonly recipientId: string;
-  readonly payload: Record<string, unknown>;
-}
-
-/** Contract naming the admit notification result shape domain/notify code and its consumers share; a second site never retypes it inline. */
-export interface AdmitNotificationResult {
-  readonly record: NotificationRecord;
-  /** True only when this call actually inserted a new row; false when an earlier admission for the same
-   * dedupe key already exists and this call returned that same row instead of creating a second one. */
-  readonly isNew: boolean;
-}
-
-/**
- * br.notify.delivery.once / decision.notify.dedupe-key: the dedupe key is sha256 of kind + sourceEventId +
- * recipientId - never the payload (decision.notify.dedupe-key's payload-hash option was refused: two
- * distinct real events with the same payload must not collapse into one). The notification's id equals
- * its dedupeKey (data.notify.notification), so admitting the same triple twice reads back the same row by
- * primary key - there is no read-then-write race to reason about beyond what a unique primary key already
- * gives a duplicate insert.
- */
 @Injectable()
-/** Injectable service owning the dedupe logic the notify capability exposes; wired by the capability's own module. */
+/**
+ * The notification table and its dedupe rule: the id of a notification is the sha256 of its kind, its source event id
+ * and its recipient, so admitting the same event twice reads back the first row and writes nothing.
+ */
 export class DedupeService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-        private readonly clock: Clock
-    ) {}
+    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
 
-    async admit(params: AdmitNotificationParams): Promise<AdmitNotificationResult> {
-        const dedupeKey = computeDedupeKey(params.kind,
-            params.sourceEventId,
-            params.recipientId)
-        const existing = await this.entityManager.findOneBy(NotifyNotificationEntity,
-            {
-                id: dedupeKey 
-            })
-        if (existing) {
-            return {
-                record: toRecord(existing), isNew: false 
-            }
+    /** Admits the notification once; a repeated admission answers the stored row with isNew false. */
+    async admit(params: DedupeAdmitParams): Promise<DedupeAdmitResult> {
+        const id = computeDedupeKey(params.kind, params.sourceEventId, params.recipientId)
+        // An INSERT answers the rows it inserted: none when the key was already admitted.
+        const inserted: Array<{ id: string }> = await params.manager.query(INSERT_NOTIFICATION_IF_ABSENT, [
+            id,
+            params.kind,
+            params.recipientId,
+            JSON.stringify(params.payload),
+            params.at,
+        ])
+        const fresh: NotificationView = {
+            id,
+            kind: params.kind,
+            recipientId: params.recipientId,
+            payload: params.payload,
+            digestGroupId: null,
+            createdAt: params.at,
         }
-        const saved = await this.entityManager.save(NotifyNotificationEntity,
-            {
-                id: dedupeKey,
-                kind: params.kind,
-                recipientId: params.recipientId,
-                payload: params.payload,
-                digestGroupId: null,
-                createdAt: this.clock.now(),
-            })
-        return {
-            record: toRecord(saved), isNew: true 
-        }
+        if (inserted.length > 0) return { notification: fresh, isNew: true }
+        const existing = await params.manager.findOneBy(NotifyNotificationEntity, { id })
+        return { notification: existing ? toNotificationView(existing) : fresh, isNew: false }
     }
 
-    async findById(id: string): Promise<NotificationRecord | null> {
-        const row = await this.entityManager.findOneBy(NotifyNotificationEntity,
-            {
-                id 
-            })
-        return row ? toRecord(row) : null
+    /** The notifications of one digest group in admission order, at most LIST_ROWS_MAX. */
+    async findByDigestGroup(params: FindDigestGroupParams): Promise<Array<NotificationView>> {
+        const rows = await this.entityManager.find(NotifyNotificationEntity, {
+            where: { digestGroupId: params.groupId },
+            order: { createdAt: "ASC" },
+            take: LIST_ROWS_MAX,
+        })
+        return rows.map(toNotificationView)
     }
 
-    /** Every notification currently assigned to `digestGroupId`, in admission order - the order
-   * fr.notify.digest's flush must read the group's content in (ac.notify.digest.window.collapses-into-one-message:
-   * "in admission order"). */
-    async findByDigestGroup(digestGroupId: string): Promise<Array<NotificationRecord>> {
-        const rows = await this.entityManager.find(NotifyNotificationEntity,
-            {
-                where: {
-                    digestGroupId 
-                }, take: MAX_DIGEST_GROUP_MEMBERS 
-            })
-        return rows.map(toRecord).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    /** Assigns the notification to its digest group; a notification that already has one keeps it. */
+    async assignDigestGroup(params: AssignDigestGroupParams): Promise<void> {
+        await params.manager.update(
+            NotifyNotificationEntity,
+            { id: params.id, digestGroupId: IsNull() },
+            { digestGroupId: params.digestGroupId },
+        )
     }
-
-    async assignDigestGroup(id: string, digestGroupId: string): Promise<void> {
-        const row = await this.entityManager.findOneBy(NotifyNotificationEntity,
-            {
-                id 
-            })
-        if (!row || row.digestGroupId) {
-            // Already assigned: data.notify.notification's invariant is "set exactly once", so a second call
-            // (a retried admission) is a no-op rather than an overwrite.
-            return
-        }
-        row.digestGroupId = digestGroupId
-        await this.entityManager.save(NotifyNotificationEntity,
-            row)
-    }
-}
-
-/** Compute dedupe key for the dedupe.service flow - one named step of the notify capability's behaviour. */
-export function computeDedupeKey(kind: string, sourceEventId: string, recipientId: string): string {
-    return sha256Hex(`${kind}:${sourceEventId}:${recipientId}`)
-}
-
-function toRecord(row: NotifyNotificationEntity): NotificationRecord {
-    return new NotificationRecord(row.id,
-        row.kind,
-        row.recipientId,
-        row.payload,
-        row.digestGroupId,
-        row.createdAt)
 }

@@ -1,10 +1,19 @@
-export { AuditLogQuery, AuditLogQueryResult } from "./audit-log.query"
+import { AuditErasureRequestEntity } from "./persistence/entities/audit-erasure-request.entity"
+import { AuditKeyEntity } from "./persistence/entities/audit-key.entity"
+import { AuditLogLineEntity } from "./persistence/entities/audit-log-line.entity"
+import { CreateAuditTables1758246000000 } from "./persistence/migrations/1758246000000-create-audit-tables"
+
+/** The entities of the audit capability, for the connection that holds them. */
+export const auditEntities = [AuditLogLineEntity, AuditKeyEntity, AuditErasureRequestEntity]
+
+/** The migrations of the audit capability, in the order they run. */
+export const auditMigrations = [CreateAuditTables1758246000000]
+
+export { AUDIT_APPEND_QUEUE, toAuditAppendMessage } from "./audit-append.policy"
+export { AuditErasureService } from "./audit-erasure.service"
+export { AuditLogService } from "./audit-log.service"
+export { AuditAction, SYSTEM_ACTOR_ID } from "./audit.contracts"
+export type { AuditAppendPayload, ErasureRequestView, ResolvedAuditLine } from "./audit.contracts"
 export { AuditModule } from "./audit.module"
-export { CompleteErasureCommand, CompleteErasureCommandResult } from "./complete-erasure.command"
-export { AuditOperatorRoleNotAuthorizedException } from "./errors/audit-operator-role-not-authorized"
-export { ErasureNotConfirmedException } from "./errors/erasure-not-confirmed"
-export { ErasureRequestForbiddenException } from "./errors/erasure-request-forbidden"
-export { ErasureRequestInvalidStateException } from "./errors/erasure-request-invalid-state"
-export { ErasureRequestNotFoundException } from "./errors/erasure-request-not-found"
-export { ExportMyDataQuery, ExportMyDataQueryResult } from "./export-my-data.query"
-export { RequestErasureCommand, RequestErasureCommandResult } from "./request-erasure.command"
+export { AUDIT_ERROR_KINDS, AuditError, AuditErrorCode } from "./errors/audit.error"
+export { AUDIT_MESSAGES } from "./messages/audit.messages"

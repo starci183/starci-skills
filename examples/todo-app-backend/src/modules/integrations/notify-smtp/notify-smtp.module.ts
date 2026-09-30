@@ -1,35 +1,19 @@
-import {
-    DynamicModule, Module 
-} from "@nestjs/common"
-import {
-    ConfigurableModuleClass, OPTIONS_TYPE 
-} from "./notify-smtp.module-definition"
-import {
-    NotifySmtpClient 
-} from "./notify-smtp.client"
-import {
-    NotifySmtpPort 
-} from "./notify-smtp.contracts"
+import { Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import { NotifySmtpClient } from "./notify-smtp.client"
+import { NOTIFY_SMTP_CLIENT } from "./notify-smtp.decorators"
+import { ConfigurableModuleClass, OPTIONS_TYPE } from "./notify-smtp.module-definition"
 
-/**
- * integration.notify.smtp: the one real SMTP client, registered against its own port (`NotifySmtpPort`)
- * the way `KeycloakModule` registers `KeycloakClient` - `NotifyModule` depends on the port, never on
- * this concrete class, so a spec can substitute `FakeNotifySmtpClient` without touching this module.
- */
-@Module({
-})
-/** Nest module wiring the notify-smtp capability's providers; the app composition root registers it - other modules never import it. */
+@Module({})
+/** The notify-smtp integration: the one client that speaks SMTP to the mail host. */
 export class NotifySmtpModule extends ConfigurableModuleClass {
-    static register(options: typeof OPTIONS_TYPE = {
-    }): DynamicModule {
+    /** Registers the integration once per app. */
+    static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []),
-                {
-                    provide: NotifySmtpPort, useClass: NotifySmtpClient 
-                }],
-            exports: [NotifySmtpPort],
+            providers: [...(base.providers ?? []), { provide: NOTIFY_SMTP_CLIENT, useClass: NotifySmtpClient }],
+            exports: [NOTIFY_SMTP_CLIENT],
         }
     }
 }

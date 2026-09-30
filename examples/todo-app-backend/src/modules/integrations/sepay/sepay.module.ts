@@ -1,30 +1,18 @@
-import {
-    DynamicModule, Module 
-} from "@nestjs/common"
-import {
-    ConfigurableModuleClass, OPTIONS_TYPE 
-} from "./sepay.module-definition"
-import {
-    SepayClient 
-} from "./sepay.client"
+import { Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import { SepayClient } from "./sepay.client"
+import { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } from "./sepay.module-definition"
 
-/**
- * integration.plan.sepay: the one SePay client, registered the way nivo registers every capability -
- * matches keycloak.module.ts's shape exactly. No `imports: [ConfigModule]`: `ConfigModule` is registered
- * globally from `app.module.ts`, so `AppConfigService` is already visible to `SepayClient`.
- */
-@Module({
-})
-/** Nest module wiring the sepay capability's providers; the app composition root registers it - other modules never import it. */
+@Module({})
+/** Provides the SePay client, and the options the webhook door needs to verify a delivery. */
 export class SepayModule extends ConfigurableModuleClass {
-    static register(options: typeof OPTIONS_TYPE = {
-    }): DynamicModule {
+    /** Registers the integration once per app. */
+    static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []),
-                SepayClient],
-            exports: [SepayClient],
+            providers: [...(base.providers ?? []), SepayClient],
+            exports: [MODULE_OPTIONS_TOKEN, SepayClient],
         }
     }
 }

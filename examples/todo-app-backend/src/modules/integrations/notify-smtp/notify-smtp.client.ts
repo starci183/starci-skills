@@ -1,196 +1,193 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    Socket 
-} from "node:net"
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
-import {
-    notifySmtpConfig,
-} from "./notify-smtp.config"
-import {
-    NotifySmtpPermanentRejectionException,
-} from "./errors/notify-smtp-permanent-rejection"
-import {
-    NotifySmtpTransientFailureException,
-} from "./errors/notify-smtp-transient-failure"
+import { connect } from "node:net"
+import type { Socket } from "node:net"
+import { Injectable } from "@nestjs/common"
+import { NotifySmtpError, NotifySmtpErrorCode } from "./errors/notify-smtp.error"
+import type { NotifySmtpMessageParams, SmtpReply } from "./notify-smtp.contracts"
+import { InjectNotifySmtpOptions } from "./notify-smtp.decorators"
+import type { NotifySmtpOptions } from "./notify-smtp.options"
 
-import {
-    NotifySmtpMessageParams, NotifySmtpPort
-} from "./notify-smtp.contracts"
+const REPLY_LINE = /^(\d{3})([ -])/
+const BASE64_LINE_LENGTH = 76
 
-const CONNECT_TIMEOUT_MS = 5_000
-const COMMAND_TIMEOUT_MS = 10_000
+const transient = (reason: string): NotifySmtpError =>
+    new NotifySmtpError({ code: NotifySmtpErrorCode.TransientFailure, params: { reason } })
 
-/**
- * integration.notify.smtp: a plain SMTP client speaking the submission protocol directly over a TCP
- * socket (EHLO, MAIL FROM, RCPT TO, DATA, QUIT), chosen over adding `nodemailer` for the same reason
- * `PlatformEventBus` chose RxJS over `@nestjs/event-emitter` (see that file's comment): this host cannot
- * reliably reach npm to add a fresh dependency, and the protocol this integration needs is a handful of
- * line-based commands, not a library's worth of surface. No dev SMTP host is declared in
- * application-stacks.yaml at this commit (see integration.notify.smtp's own `sandbox` note), so this
- * client's live path only proves anything once `SMTP_HOST` actually names a reachable one.
- *
- * Classification matches br.notify.failure.classified exactly: a connection failure or a 4xx answer at
- * any step is transient (the host might accept a retry); a 5xx answer to RCPT TO is a permanent
- * rejection of the address, thrown as its own exception so `DeliveryService` never has to parse an SMTP
- * status code itself.
- */
-@Injectable()
-/** Outbound client for the notify smtp integration surface; transport failures surface as house exceptions, never raw HTTP noise. */
-export class NotifySmtpClient extends NotifySmtpPort {
-    constructor(private readonly config: AppConfigService) {
-        super()
+const singleLine = (value: string): string => value.replace(/[\r\n]+/g, " ").trim()
+
+const encodeHeader = (value: string): string => `=?UTF-8?B?${Buffer.from(singleLine(value), "utf8").toString("base64")}?=`
+
+const encodeBody = (value: string): string =>
+    (Buffer.from(value, "utf8").toString("base64").match(new RegExp(`.{1,${BASE64_LINE_LENGTH}}`, "g")) ?? []).join("\r\n")
+
+/** Takes the first complete reply (every line up to the one whose code is followed by a space) off the buffered text. */
+const takeReply = (buffered: string): { readonly reply: SmtpReply; readonly rest: string } | null => {
+    const lines = buffered.split("\r\n")
+    const complete = lines.slice(0, -1)
+    for (let index = 0; index < complete.length; index += 1) {
+        const match = REPLY_LINE.exec(complete[index] ?? "")
+        if (match?.[2] === " ") {
+            return {
+                reply: { code: Number(match[1]), text: complete.slice(0, index + 1).join("\n") },
+                rest: lines.slice(index + 1).join("\r\n"),
+            }
+        }
+    }
+    return null
+}
+
+/** One SMTP conversation over one socket: commands out, replies in, silences bounded by the socket idle timeout. */
+class SmtpChannel {
+    private buffer = ""
+    private failure: Error | null = null
+
+    constructor(private readonly socket: Socket) {
+        socket.on("error", (error: Error) => {
+            this.failure = error
+        })
     }
 
-    async send(message: NotifySmtpMessageParams): Promise<void> {
-        const host = notifySmtpConfig(this.config).host
-        const port = notifySmtpConfig(this.config).port
-        const from = notifySmtpConfig(this.config).fromAddress
-
-        const socket = await connect(host,
-            port).catch(error => {
-            throw new NotifySmtpTransientFailureException({
-                reason: String(error) 
-            })
+    /** Opens the connection; a refusal, an error or a silence longer than `timeoutMs` is a transient failure. */
+    static open(options: NotifySmtpOptions): Promise<SmtpChannel> {
+        return new Promise((resolve, reject) => {
+            const socket = connect({ host: options.host, port: options.port })
+            socket.setTimeout(options.connectTimeoutMs)
+            const cleanup = (): void => {
+                socket.off("connect", onConnect)
+                socket.off("error", onError)
+                socket.off("timeout", onTimeout)
+            }
+            const onConnect = (): void => {
+                cleanup()
+                socket.setTimeout(options.commandTimeoutMs)
+                resolve(new SmtpChannel(socket))
+            }
+            const onError = (error: Error): void => {
+                cleanup()
+                socket.destroy()
+                reject(transient(error.message))
+            }
+            const onTimeout = (): void => {
+                cleanup()
+                socket.destroy()
+                reject(transient("connection timed out"))
+            }
+            socket.once("connect", onConnect)
+            socket.once("error", onError)
+            socket.once("timeout", onTimeout)
         })
+    }
 
+    /** Reads one complete reply. */
+    read(): Promise<SmtpReply> {
+        return new Promise((resolve, reject) => {
+            const cleanup = (): void => {
+                this.socket.off("data", onData)
+                this.socket.off("error", onError)
+                this.socket.off("timeout", onTimeout)
+                this.socket.off("close", onClose)
+            }
+            const tryTake = (): boolean => {
+                const taken = takeReply(this.buffer)
+                if (!taken) return false
+                this.buffer = taken.rest
+                cleanup()
+                resolve(taken.reply)
+                return true
+            }
+            const onData = (chunk: Buffer): void => {
+                this.buffer += chunk.toString("utf8")
+                tryTake()
+            }
+            const onError = (error: Error): void => {
+                cleanup()
+                reject(transient(error.message))
+            }
+            const onTimeout = (): void => {
+                cleanup()
+                reject(transient("no answer from the mail host"))
+            }
+            const onClose = (): void => {
+                cleanup()
+                reject(transient("connection closed by the mail host"))
+            }
+            if (tryTake()) return
+            if (this.failure) {
+                reject(transient(this.failure.message))
+                return
+            }
+            this.socket.on("data", onData)
+            this.socket.on("error", onError)
+            this.socket.on("timeout", onTimeout)
+            this.socket.on("close", onClose)
+        })
+    }
+
+    /** Writes one command line and reads its reply. */
+    command(line: string): Promise<SmtpReply> {
+        this.socket.write(`${line}\r\n`)
+        return this.read()
+    }
+
+    /** Says goodbye without waiting for the answer: the message was already accepted. */
+    quit(): void {
+        this.socket.end("QUIT\r\n")
+    }
+
+    /** Drops the connection after a failure. */
+    abort(): void {
+        this.socket.destroy()
+    }
+}
+
+/** A step that must be answered with `code`; anything else is a transient refusal carrying the host's text. */
+const expectCode = (reply: SmtpReply, code: number): void => {
+    if (reply.code !== code) throw transient(reply.text)
+}
+
+/** RCPT TO is the one step whose 5xx answer permanently rejects the address; every other refusal is transient. */
+const expectRecipient = (reply: SmtpReply): void => {
+    if (reply.code === 250) return
+    if (reply.code >= 500 && reply.code < 600) {
+        throw new NotifySmtpError({ code: NotifySmtpErrorCode.PermanentRejection, params: { reason: reply.text } })
+    }
+    throw transient(reply.text)
+}
+
+@Injectable()
+/**
+ * The only file that speaks SMTP: EHLO, MAIL FROM, RCPT TO, DATA and QUIT over a plain socket. The subject and the body
+ * travel UTF-8 encoded (RFC 2047 subject, base64 body), so Vietnamese text is safe. A connection failure, a silence or
+ * a 4xx answer is a transient failure; a 5xx answer to RCPT TO is a permanent rejection of the address.
+ */
+export class NotifySmtpClient {
+    constructor(@InjectNotifySmtpOptions() private readonly options: NotifySmtpOptions) {}
+
+    /** Hands one message to the mail host; resolves when the host accepted it, throws a NotifySmtpError otherwise. */
+    async send(message: NotifySmtpMessageParams): Promise<void> {
+        const { from, host } = this.options
+        const channel = await SmtpChannel.open(this.options)
         try {
-            await expect(socket,
-                /^220/)
-            await command(socket,
-                `EHLO ${host}`,
-                /^250/)
-            await command(socket,
-                `MAIL FROM:<${from}>`,
-                /^250/)
-            await rcptTo(socket,
-                message.to)
-            await command(socket,
-                "DATA",
-                /^354/)
-            const body = [
-                `From: ${from}`,
-                `To: ${message.to}`,
-                `Subject: ${message.subject}`,
+            expectCode(await channel.read(), 220)
+            expectCode(await channel.command(`EHLO ${host}`), 250)
+            expectCode(await channel.command(`MAIL FROM:<${singleLine(from)}>`), 250)
+            expectRecipient(await channel.command(`RCPT TO:<${singleLine(message.to)}>`))
+            expectCode(await channel.command("DATA"), 354)
+            const data = [
+                `From: ${singleLine(from)}`,
+                `To: ${singleLine(message.to)}`,
+                `Subject: ${encodeHeader(message.subject)}`,
+                "MIME-Version: 1.0",
+                "Content-Type: text/plain; charset=utf-8",
+                "Content-Transfer-Encoding: base64",
                 "",
-                message.body,
+                encodeBody(message.body),
                 ".",
             ].join("\r\n")
-            await command(socket,
-                body,
-                /^250/)
-            await quit(socket)
-        } finally {
-            socket.destroy()
+            expectCode(await channel.command(data), 250)
+            channel.quit()
+        } catch (error) {
+            channel.abort()
+            throw error
         }
     }
-}
-
-/** The courtesy QUIT after the message was accepted: a failure changes nothing about delivery, so it comes back as an outcome carrying the cause rather than as an error. */
-type QuitOutcome =
-    | { readonly quit: true }
-    | { readonly quit: false; readonly cause: unknown }
-
-async function quit(socket: Socket): Promise<QuitOutcome> {
-    try {
-        await command(socket,
-            "QUIT",
-            /^221/)
-        return {
-            quit: true
-        }
-    } catch (error) {
-        return {
-            quit: false, cause: error
-        }
-    }
-}
-
-function connect(host: string, port: number): Promise<Socket> {
-    return new Promise((resolve, reject) => {
-        const socket = new Socket()
-        const timer = setTimeout(() => {
-            socket.destroy()
-            reject(new Error(`connection to ${host}:${port} timed out`))
-        },
-        CONNECT_TIMEOUT_MS)
-        socket.once("connect",
-            () => {
-                clearTimeout(timer)
-                resolve(socket)
-            })
-        socket.once("error",
-            error => {
-                clearTimeout(timer)
-                reject(error)
-            })
-        socket.connect(port,
-            host)
-    })
-}
-
-function readLine(socket: Socket): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("SMTP response timed out")),
-            COMMAND_TIMEOUT_MS)
-        const onData = (chunk: Buffer) => {
-            clearTimeout(timer)
-            socket.off("error",
-                onError)
-            resolve(chunk.toString("utf8"))
-        }
-        const onError = (error: Error) => {
-            clearTimeout(timer)
-            socket.off("data",
-                onData)
-            reject(error)
-        }
-        socket.once("data",
-            onData)
-        socket.once("error",
-            onError)
-    })
-}
-
-async function expect(socket: Socket, okPattern: RegExp): Promise<string> {
-    const line = await readLine(socket).catch(error => {
-        throw new NotifySmtpTransientFailureException({
-            reason: String(error) 
-        })
-    })
-    if (!okPattern.test(line)) {
-        throw new NotifySmtpTransientFailureException({
-            reason: line.trim() 
-        })
-    }
-    return line
-}
-
-function command(socket: Socket, line: string, okPattern: RegExp): Promise<string> {
-    socket.write(`${line}\r\n`)
-    return expect(socket,
-        okPattern)
-}
-
-/** RCPT TO is the one step whose 5xx means a permanent rejection of the address rather than a transient
- * transport problem - every other non-2xx/3xx answer in this client is treated as transient. */
-async function rcptTo(socket: Socket, to: string): Promise<string> {
-    socket.write(`RCPT TO:<${to}>\r\n`)
-    const line = await readLine(socket).catch(error => {
-        throw new NotifySmtpTransientFailureException({
-            reason: String(error) 
-        })
-    })
-    if (/^250/.test(line)) return line
-    if (/^5\d\d/.test(line)) {
-        throw new NotifySmtpPermanentRejectionException({
-            reason: line.trim() 
-        })
-    }
-    throw new NotifySmtpTransientFailureException({
-        reason: line.trim() 
-    })
 }

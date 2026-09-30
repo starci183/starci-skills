@@ -41,18 +41,20 @@ export class ObservabilityInterceptor implements NestInterceptor {
                   ? `${request.baseUrl}${request.route.path}`
                   : UNMATCHED_ROUTE
         const startedAt = this.clock.now().getTime()
-        response?.setHeader(REQUEST_ID_HEADER, requestId)
-        response?.on("finish", () => {
-            const durationMs = this.clock.now().getTime() - startedAt
-            this.metrics.recordRequest(request.method, route, response.statusCode, durationMs)
-            this.logger.info(ObservabilityLogEvent.RequestCompleted, {
-                requestId,
-                method: request.method,
-                route,
-                status: response.statusCode,
-                durationMs,
+        if (response) {
+            response.setHeader(REQUEST_ID_HEADER, requestId)
+            response.on("finish", () => {
+                const durationMs = this.clock.now().getTime() - startedAt
+                this.metrics.recordRequest(request.method, route, response.statusCode, durationMs)
+                this.logger.info(ObservabilityLogEvent.RequestCompleted, {
+                    requestId,
+                    method: request.method,
+                    route,
+                    status: response.statusCode,
+                    durationMs,
+                })
             })
-        })
+        }
         return next.handle()
     }
 }

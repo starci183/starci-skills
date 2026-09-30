@@ -1,184 +1,173 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    NotifySmtpMessageParams,
-} from "@modules/integrations/notify-smtp/index"
-import {
-    NotifyQueuePort,
-} from "@modules/integrations/notify-queue/index"
-import {
-    DedupeService 
-} from "./dedupe.service"
-import {
-    DigestService, DEFAULT_DIGEST_WINDOW_MINUTES 
-} from "./digest.service"
-import {
-    PreferencesService 
-} from "./preferences.service"
-import {
-    DeliveryService 
-} from "./delivery.service"
-import {
-    DeliveryState 
-} from "./types/delivery-attempt-record"
-import {
-    NotificationRecord 
-} from "./types/notification-record"
-import {
-    Clock
-} from "@modules/platform/clock/index"
+import { Injectable } from "@nestjs/common"
+import type { NotifySmtpMessageParams } from "@modules/integrations/notify-smtp"
+import { InjectMessageCatalog } from "@modules/platform/i18n"
+import type { MessageCatalog } from "@modules/platform/i18n"
+import { InjectOutbox } from "@modules/platform/outbox"
+import type { Outbox } from "@modules/platform/outbox"
+import { ok, refused } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
+import { DedupeService } from "./dedupe.service"
+import { DeliveryService } from "./delivery.service"
+import { DigestService } from "./digest.service"
+import { NotifyErrorCode } from "./errors/notify.error"
+import { NOTIFY_KIND_TASK_COMPLETE } from "./notify.contracts"
+import type {
+    AdmitParams,
+    AdmittedNotification,
+    DeliveryVerdict,
+    DispatchedGroup,
+    DispatchPlan,
+    NotificationView,
+    PrepareDispatchParams,
+    SettleDispatchParams,
+} from "./notify.contracts"
+import { toNotifyDispatchMessage } from "./notify.mapper"
+import { DEFAULT_DIGEST_WINDOW_MINUTES, EMAIL_LOCALE, RETRY_BACKOFF_MS, isBlankChannel } from "./notify.policy"
+import { PreferencesService } from "./preferences.service"
 
-const FLUSH_PREFIX = "flush:"
-const RETRY_PREFIX = "retry:"
-/** A fixed backoff between a transient failure and the next dispatch attempt of the same group.
- * sds.notify.delivery-lifecycle names only that a retry re-enters `queued` for another t-dispatch, not a
- * particular backoff curve, so a correct change to this constant is not a protocol change (see that
- * record's `sequence.note`). */
-const RETRY_BACKOFF_MS = 30_000
-
-/** Contract naming the admit event input shape domain/notify code and its consumers share; a second site never retypes it inline. */
-export interface AdmitEventInput {
-  readonly kind: string;
-  readonly sourceEventId: string;
-  readonly recipientId: string;
-  readonly channel: string;
-  readonly payload: Record<string, unknown>;
-}
-
-/** Contract naming the admit event result shape domain/notify code and its consumers share; a second site never retypes it inline. */
-export interface AdmitEventResult {
-  readonly notificationId: string;
-  readonly isNew: boolean;
-  readonly deliveryState: DeliveryState;
-}
-
-/**
- * The notify pipeline: ties DedupeService, PreferencesService, DigestService and DeliveryService
- * together into the one sequence fr.notify.on-completion, fr.notify.on-new-device, fr.notify.digest and
- * fr.notify.unsubscribe all describe. `admit` is what every event subscriber (notify-event.subscriber.ts)
- * and every retried transport call into; `runDueJobs` is what the real timer (notify.scheduler.ts) and
- * every test that wants to move time forward call - the queue (integration.notify.queue) is the only
- * thing that knows when a window has closed or a retry's backoff has elapsed, so this class never reads
- * a wall clock itself except for the `now` a caller passes in.
- */
 @Injectable()
-/** Injectable service owning the notify logic the notify capability exposes; wired by the capability's own module. */
+/**
+ * The notify pipeline over the dedupe table, the preferences, the digest windows and the deliveries. Admission dedupes
+ * by source event, suppresses an unsubscribed recipient before any window or send, and joins the digest window, whose
+ * one delayed flush is a dispatch message written with the admission. A dispatch has three steps the caller runs in
+ * order: prepare (in a transaction), transmit (in none), settle (in a transaction).
+ */
 export class NotifyService {
     constructor(
-    private readonly dedupe: DedupeService,
-    private readonly digest: DigestService,
-    private readonly preferences: PreferencesService,
-    private readonly delivery: DeliveryService,
-    private readonly queue: NotifyQueuePort,
-        private readonly clock: Clock
+        @InjectMessageCatalog() private readonly catalog: MessageCatalog,
+        @InjectOutbox() private readonly outbox: Outbox,
+        private readonly dedupe: DedupeService,
+        private readonly digest: DigestService,
+        private readonly preferences: PreferencesService,
+        private readonly delivery: DeliveryService,
     ) {}
 
     /**
-   * br.notify.delivery.once: a retried admission (isNew: false) never re-runs preference checks, never
-   * touches the digest window and never creates a second delivery attempt - it just reads back what the
-   * first admission already decided. br.notify.failure.classified.suppresses-unsubscribed: an
-   * unsubscribed recipient's attempt is created already suppressed and never joins a digest window at
-   * all, so it can never be batched into a message that would have gone out anyway.
-   */
-    async admit(input: AdmitEventInput, now: Date = this.clock.now()): Promise<AdmitEventResult> {
-        const { record, isNew } = await this.dedupe.admit(input)
+     * Admits one event. A repeated admission of the same event only reads back the first decision: it never checks
+     * the preference again, never touches a window and never creates a second attempt. Refuses a blank channel.
+     */
+    async admit(params: AdmitParams): Promise<Outcome<AdmittedNotification, NotifyErrorCode.ChannelRequired>> {
+        const { manager, at } = params
+        if (isBlankChannel(params.channel)) return refused(NotifyErrorCode.ChannelRequired)
+        const { notification, isNew } = await this.dedupe.admit(params)
         if (!isNew) {
-            const attempt = await this.delivery.findById(record.id)
-            return {
-                notificationId: record.id, isNew: false, deliveryState: attempt?.state ?? "queued" 
-            }
+            const attempt = await this.delivery.find({ notificationId: notification.id })
+            return ok({ notificationId: notification.id, isNew: false, deliveryState: attempt?.state ?? "queued" })
         }
-
-        const preference = await this.preferences.get(input.recipientId,
-            input.channel)
-        const attempt = await this.delivery.admit(record.id,
-            now,
-            preference.unsubscribed)
-
+        const preference = await this.preferences.get({ personId: params.recipientId, channel: params.channel })
+        const attempt = await this.delivery.admit({
+            manager,
+            notificationId: notification.id,
+            at,
+            unsubscribed: preference.unsubscribed,
+        })
         if (!preference.unsubscribed) {
-            const windowMinutes = preference.digestWindowMinutes ?? DEFAULT_DIGEST_WINDOW_MINUTES
-            const window = await this.digest.admit(input.recipientId,
-                input.channel,
-                now,
-                windowMinutes)
-            await this.dedupe.assignDigestGroup(record.id,
-                window.windowId)
+            const window = await this.digest.admit({
+                manager,
+                personId: params.recipientId,
+                channel: params.channel,
+                at,
+                windowMinutes: preference.digestWindowMinutes ?? DEFAULT_DIGEST_WINDOW_MINUTES,
+            })
+            await this.dedupe.assignDigestGroup({ manager, id: notification.id, digestGroupId: window.windowId })
             if (window.opened) {
-                await this.queue.enqueue(`${FLUSH_PREFIX}${window.windowId}`,
-                    window.closesAt.getTime())
+                await this.outbox.enqueue(
+                    manager,
+                    toNotifyDispatchMessage({
+                        eventId: `notify-flush:${window.windowId}`,
+                        kind: "flush",
+                        groupId: window.windowId,
+                        dueAt: window.closesAt,
+                    }),
+                )
             }
         }
+        return ok({ notificationId: notification.id, isNew: true, deliveryState: attempt.state })
+    }
 
+    /**
+     * Step one of a dispatch: for a flush, closes the window (nothing to do when it is unknown, flushed already or not
+     * closed yet); then marks the queued attempts of the group sending and renders the one message they share. Answers
+     * null when there is nothing to send.
+     */
+    async prepareDispatch(params: PrepareDispatchParams): Promise<DispatchPlan | null> {
+        const { manager, groupId, at } = params
+        if (params.kind === "flush") {
+            const flushed = await this.digest.flush({ manager, windowId: groupId, at })
+            if (!flushed) return null
+        }
+        const notifications = await this.dedupe.findByDigestGroup({ groupId })
+        const [first] = notifications
+        if (!first) return null
+        const sending = await this.delivery.markSending({
+            manager,
+            notificationIds: notifications.map((notification) => notification.id),
+            at,
+        })
+        if (sending.length === 0) return null
         return {
-            notificationId: record.id, isNew: true, deliveryState: attempt.state 
+            notificationIds: sending.map((attempt) => attempt.notificationId),
+            groupId,
+            message: this.render(first, notifications),
         }
     }
 
-    /** Drains every job the queue currently reports as due - a window whose close time has passed, or a
-   * retry whose backoff has elapsed - and dispatches it. Called on a real wall-clock tick in production
-   * (notify.scheduler.ts) and directly, with an advanced `now`, by specs. */
-    async runDueJobs(now: Date = this.clock.now()): Promise<void> {
-        const jobIds = await this.queue.dequeueDue(now.getTime())
-        for (const jobId of jobIds) {
-            if (jobId.startsWith(FLUSH_PREFIX)) {
-                await this.flushWindow(jobId.slice(FLUSH_PREFIX.length),
-                    now)
-            } else if (jobId.startsWith(RETRY_PREFIX)) {
-                await this.dispatchGroup(jobId.slice(RETRY_PREFIX.length),
-                    now)
-            }
+    /** Step two of a dispatch: the send. It runs outside any transaction. */
+    transmit(plan: DispatchPlan): Promise<DeliveryVerdict> {
+        return this.delivery.transmit(plan.message)
+    }
+
+    /** Step three of a dispatch: records what the send came to, and writes the retry message when some attempts go back to queued. */
+    async settle(params: SettleDispatchParams): Promise<DispatchedGroup> {
+        const { manager, plan, at } = params
+        const recorded = await this.delivery.record({
+            manager,
+            notificationIds: plan.notificationIds,
+            verdict: params.verdict,
+            at,
+        })
+        if (recorded.retried.length > 0) {
+            await this.outbox.enqueue(
+                manager,
+                toNotifyDispatchMessage({
+                    eventId: `notify-retry:${plan.groupId}:${recorded.attempt}`,
+                    kind: "retry",
+                    groupId: plan.groupId,
+                    dueAt: new Date(at.getTime() + RETRY_BACKOFF_MS),
+                }),
+            )
         }
-    }
-
-    private async flushWindow(windowId: string, now: Date): Promise<void> {
-        const flushed = await this.digest.flush(windowId,
-            now)
-        if (!flushed) return // already flushed, or not actually closed yet - nothing to dispatch
-        await this.dispatchGroup(windowId,
-            now)
-    }
-
-    /** t-dispatch (or a retry's immediate redispatch) for every still-queued member of one digest group,
-   * as one rendered message. */
-    private async dispatchGroup(groupId: string, now: Date): Promise<void> {
-        const notifications = await this.dedupe.findByDigestGroup(groupId)
-        if (notifications.length === 0) return
-        const message = renderMessage(notifications)
-        const result = await this.delivery.dispatchBatch(notifications.map(notification => notification.id),
-            now,
-            message)
-        if (result.retried.length > 0) {
-            await this.queue.enqueue(`${RETRY_PREFIX}${groupId}`,
-                now.getTime() + RETRY_BACKOFF_MS)
-        }
-    }
-}
-
-/** fr.notify.on-completion's postcondition: "one message names the task". No contract exposes a way to
- * resolve a personId to an email address today, so this demo addresses the message to the recipientId
- * itself - a real product would resolve that through a person-directory port this feature does not have. */
-function renderMessage(notifications: Array<NotificationRecord>): NotifySmtpMessageParams {
-    const to = notifications[0].recipientId
-    if (notifications.length === 1) {
         return {
-            to, subject: subjectFor(notifications[0]), body: lineFor(notifications[0]) 
+            delivered: recorded.delivered.length,
+            retried: recorded.retried.length,
+            bounced: recorded.bounced.length,
         }
     }
-    return {
-        to,
-        subject: `${notifications.length} updates`,
-        body: notifications.map(lineFor).join("\n"),
-    }
-}
 
-function subjectFor(notification: NotificationRecord): string {
-    if (notification.kind === "task-complete") {
-        return `Task completed: ${String(notification.payload.taskId ?? "")}`
+    /**
+     * One message for the group. Nothing resolves a person id to an email address today, so the message is addressed
+     * to the recipient id itself; a real product would resolve it through a person directory.
+     */
+    private render(first: NotificationView, notifications: ReadonlyArray<NotificationView>): NotifySmtpMessageParams {
+        const lines = notifications.map((notification) =>
+            this.catalog.get(
+                "notify.email.line",
+                { kind: notification.kind, payload: JSON.stringify(notification.payload) },
+                EMAIL_LOCALE,
+            ),
+        )
+        return { to: first.recipientId, subject: this.subjectOf(first, notifications.length), body: lines.join("\n") }
     }
-    return `Notification: ${notification.kind}`
-}
 
-function lineFor(notification: NotificationRecord): string {
-    return `- ${notification.kind}: ${JSON.stringify(notification.payload)}`
+    private subjectOf(first: NotificationView, count: number): string {
+        if (count > 1) return this.catalog.get("notify.email.digest.subject", { count }, EMAIL_LOCALE)
+        if (first.kind === NOTIFY_KIND_TASK_COMPLETE) {
+            return this.catalog.get(
+                "notify.email.task-complete.subject",
+                { taskId: String(first.payload.taskId ?? "") },
+                EMAIL_LOCALE,
+            )
+        }
+        return this.catalog.get("notify.email.generic.subject", { kind: first.kind }, EMAIL_LOCALE)
+    }
 }

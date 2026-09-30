@@ -1,23 +1,10 @@
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
+import type { EnvSource } from "@modules/platform/config"
+import type { SepayOptions } from "./sepay.options"
 
-/** The SePay gateway settings: base URL, API key and webhook secret (the last two are empty when no decrypted file is named). */
-export interface SepayConfig {
-    readonly baseUrl: string
-    readonly apiKey: string
-    readonly webhookSecret: string
-}
-
-/** Reads the sepay settings through the platform config reader on every access, so a value changed in the environment is never cached here. */
-export const sepayConfig = (source: AppConfigService): SepayConfig => ({
-    get baseUrl(): string {
-        return source.getSepayBaseUrl()
-    },
-    get apiKey(): string {
-        return source.getSepayApiKey()
-    },
-    get webhookSecret(): string {
-        return source.getSepayWebhookSecret()
-    },
+/** Reads the SePay options: the URL and both secrets are required with no default, the timeout is a tunable with a literal default. */
+export const parseSepayConfig = (env: EnvSource): SepayOptions => ({
+    baseUrl: env.url("SEPAY_BASE_URL"),
+    apiKey: env.secret("SEPAY_API_KEY"),
+    webhookSecret: env.secret("SEPAY_WEBHOOK_SECRET"),
+    timeoutMs: env.duration("SEPAY_TIMEOUT", 15_000),
 })

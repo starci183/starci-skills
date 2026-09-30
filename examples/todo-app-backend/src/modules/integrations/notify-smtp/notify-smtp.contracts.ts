@@ -1,18 +1,17 @@
-/** Contract naming the notify smtp message shape integrations/notify-smtp code and its consumers share; a second site never retypes it inline. */
+/** One rendered message handed to the mail host. */
 export interface NotifySmtpMessageParams {
-  readonly to: string;
-  readonly subject: string;
-  readonly body: string;
+    /** The recipient address. */
+    readonly to: string
+    /** The subject line, plain text. */
+    readonly subject: string
+    /** The body, plain text. */
+    readonly body: string
 }
 
-/**
- * integration.notify.smtp's boundary: notify hands a rendered message to this port and afterward owns
- * only the outcome of that handoff. `send` resolves on acceptance, and rejects with
- * `NotifySmtpPermanentRejectionException` (a permanent bounce) or `NotifySmtpTransientFailureException`
- * (the host is unreachable or answers transiently) - never a bare `Error` - so `DeliveryService` can
- * classify the outcome without inspecting transport internals. An abstract class, not an interface,
- * matching this codebase's own convention for ports (`KeycloakClient`'s shape, `CompletionAuthority`).
- */
-export abstract class NotifySmtpPort {
-  abstract send(message: NotifySmtpMessageParams): Promise<void>;
+/** One answer of the mail host: its three-digit code and the text of every line of the reply. */
+export interface SmtpReply {
+    /** The reply code. */
+    readonly code: number
+    /** The text of the reply, one line per line of the reply. */
+    readonly text: string
 }

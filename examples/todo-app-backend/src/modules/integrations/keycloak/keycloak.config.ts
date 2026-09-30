@@ -1,19 +1,9 @@
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
+import type { EnvSource } from "@modules/platform/config"
+import type { KeycloakOptions } from "./keycloak.options"
 
-/** The Keycloak realm settings the client needs: the token endpoint and the client id. */
-export interface KeycloakConfig {
-    readonly tokenUrl: string
-    readonly clientId: string
-}
-
-/** Reads the keycloak settings through the platform config reader on every access, so a value changed in the environment is never cached here. */
-export const keycloakConfig = (source: AppConfigService): KeycloakConfig => ({
-    get tokenUrl(): string {
-        return source.getKeycloakTokenUrl()
-    },
-    get clientId(): string {
-        return source.getKeycloakClientId()
-    },
+/** Reads the keycloak options: the endpoint and the client id are required, the timeout is a tunable with a literal default. */
+export const parseKeycloakConfig = (env: EnvSource): KeycloakOptions => ({
+    tokenUrl: env.url("KEYCLOAK_TOKEN_URL"),
+    clientId: env.string("KEYCLOAK_CLIENT_ID"),
+    timeoutMs: env.duration("KEYCLOAK_TIMEOUT", 10_000),
 })

@@ -1,29 +1,23 @@
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
-import {
-    sepayConfig,
-} from "./sepay.config"
-import {
-    mock 
-} from "@starci/jest-preset/mock"
+import { EnvSource } from "@modules/platform/config"
+import { parseSepayConfig } from "./sepay.config"
 
-describe("sepay config",
-    () => {
-        it("reads every setting through the platform config reader at access time",
-            () => {
-                const source = mock<AppConfigService>({
-                    getSepayBaseUrl: jest.fn().mockReturnValue("https://pay.test"),
-                    getSepayApiKey: jest.fn().mockReturnValue("key"),
-                    getSepayWebhookSecret: jest.fn().mockReturnValue("hook"),
-                })
-                const config = sepayConfig(source)
+const declared = { SEPAY_BASE_URL: "https://my.sepay.test", SEPAY_API_KEY: "k", SEPAY_WEBHOOK_SECRET: "w" }
 
-                expect(config.baseUrl).toEqual("https://pay.test")
-                expect(config.apiKey).toEqual("key")
-                expect(config.webhookSecret).toEqual("hook")
-                expect(source.getSepayBaseUrl).toHaveBeenCalledTimes(1)
-                expect(source.getSepayApiKey).toHaveBeenCalledTimes(1)
-                expect(source.getSepayWebhookSecret).toHaveBeenCalledTimes(1)
-            })
+describe("parseSepayConfig", () => {
+    it("reads the URL and both secrets, and defaults only the timeout", () => {
+        const options = parseSepayConfig(new EnvSource(declared))
+        expect(options.baseUrl).toBe("https://my.sepay.test")
+        expect(options.apiKey.reveal()).toBe("k")
+        expect(options.webhookSecret.reveal()).toBe("w")
+        expect(options.timeoutMs).toBe(15_000)
     })
+
+    it("reads the timeout tunable", () => {
+        expect(parseSepayConfig(new EnvSource({ ...declared, SEPAY_TIMEOUT: "5s" })).timeoutMs).toBe(5000)
+    })
+
+    it("names the missing key instead of defaulting a URL or a secret", () => {
+        expect(() => parseSepayConfig(new EnvSource({ ...declared, SEPAY_API_KEY: "" }))).toThrow()
+        expect(() => parseSepayConfig(new EnvSource({ SEPAY_API_KEY: "k", SEPAY_WEBHOOK_SECRET: "w" }))).toThrow()
+    })
+})
