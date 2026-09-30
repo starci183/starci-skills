@@ -16,9 +16,7 @@ export class TaskCountsHandler extends ICQRSHandler<TaskCountsQuery, TaskCountsR
         super(logger)
     }
 
-    protected override async process(query: TaskCountsQuery): Promise<TaskCountsResult> {
-        const owned = await this.tasks.listOwnedBy({ ownerId: query.params.principal.id })
-        const complete = owned.filter((task) => task.complete).length
-        return { open: owned.length - complete, complete }
+    protected override process(query: TaskCountsQuery): Promise<TaskCountsResult> {
+        return this.tasks.countsOf({ ownerId: query.params.principal.id })
     }
 }

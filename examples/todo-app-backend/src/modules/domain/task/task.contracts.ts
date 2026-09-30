@@ -1,4 +1,6 @@
+import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
+import type { TaskErrorCode } from "./errors/task.error"
 
 /** A task as callers see it; completedAt is set if and only if complete is true. */
 export interface TaskView {
@@ -56,3 +58,44 @@ export interface DeleteTaskParams {
 
 /** The answer of a task lookup: the task, or null when there is none with that id. */
 export type TaskLookupResult = TaskView | null
+
+/** What deleting a task of the owner needs. */
+export interface DeleteOwnedTaskParams {
+    /** The person who asks; only the owner deletes. */
+    readonly ownerId: string
+    /** The task id. */
+    readonly taskId: string
+}
+
+/** What a successful delete answers. */
+export interface DeletedTaskResult {
+    /** Always true: a refused delete answers a refusal instead. */
+    readonly deleted: boolean
+}
+
+/** The confirmation of a delete, or the refusal that names why the task stays. */
+export type DeleteOwnedTaskResult = Outcome<DeletedTaskResult, TaskErrorCode>
+
+/** One task in the list of an owner. */
+export interface TaskListEntry {
+    /** The task id. */
+    readonly taskId: string
+    /** The title. */
+    readonly title: string
+    /** Whether the task is complete. */
+    readonly complete: boolean
+}
+
+/** The tasks an owner holds, at most the list bound. */
+export interface TaskList {
+    /** One entry per task. */
+    readonly tasks: ReadonlyArray<TaskListEntry>
+}
+
+/** How many tasks an owner holds open and complete. */
+export interface TaskCounts {
+    /** Tasks not yet complete. */
+    readonly open: number
+    /** Tasks complete. */
+    readonly complete: number
+}

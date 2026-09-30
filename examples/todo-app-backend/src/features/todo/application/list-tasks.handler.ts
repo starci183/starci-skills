@@ -16,8 +16,7 @@ export class ListTasksHandler extends ICQRSHandler<ListTasksQuery, ListTasksResu
         super(logger)
     }
 
-    protected override async process(query: ListTasksQuery): Promise<ListTasksResult> {
-        const owned = await this.tasks.listOwnedBy({ ownerId: query.params.principal.id })
-        return { tasks: owned.map((task) => ({ taskId: task.id, title: task.title, complete: task.complete })) }
+    protected override process(query: ListTasksQuery): Promise<ListTasksResult> {
+        return this.tasks.listSummaries({ ownerId: query.params.principal.id })
     }
 }
