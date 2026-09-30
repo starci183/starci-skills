@@ -17,6 +17,7 @@ import { checkDeadExports, DEAD_EXPORT_RULE_IDS } from './dead-exports.mjs';
 import { checkRequiredFiles, REQUIRED_FILE_RULE_IDS } from './required-files.mjs';
 import { checkSizeGrowth, SIZE_GROWTH_RULE_IDS } from './size-growth.mjs';
 import { checkClones, CLONE_RULE_IDS } from './clones.mjs';
+import { checkSymbols, SYMBOL_RULE_IDS } from './symbols.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -135,12 +136,12 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   }
   // HFS machine: the slot-driven graph checks read the whole program, also when the caller asked for one path.
   const hfsContext = paths.length ? buildTypeScriptContext(config, injectedTypeScript) : context;
-  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, sizeGrowth: null, clones: null };
+  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, sizeGrowth: null, clones: null, symbols: null };
   if (hfsContext.program) {
     const graph = buildHfsGraph(config, hfsContext);
     const input = { config, context: hfsContext, graph, base };
     const runs = { tiers: () => checkTiers(graph), reachability: () => checkReachability(input), deadExports: () => checkDeadExports(input),
-      requiredFiles: () => checkRequiredFiles(input), sizeGrowth: () => checkSizeGrowth(input), clones: () => checkClones(input) };
+      requiredFiles: () => checkRequiredFiles(input), sizeGrowth: () => checkSizeGrowth(input), clones: () => checkClones(input), symbols: () => checkSymbols(input) };
     for (const [name, run] of Object.entries(runs)) {
       const result = run();
       violations.push(...result.violations);
@@ -182,6 +183,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     ...(hfsChecks.requiredFiles?.status === 'checked' ? REQUIRED_FILE_RULE_IDS : []),
     ...(hfsChecks.sizeGrowth?.status === 'checked' ? SIZE_GROWTH_RULE_IDS : []),
     ...(hfsChecks.clones?.status === 'checked' ? CLONE_RULE_IDS : []),
+    ...(hfsChecks.symbols?.status === 'checked' ? SYMBOL_RULE_IDS : []),
     ...(frontendChecked ? FRONTEND_RULE_IDS : []),
     ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
     ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),

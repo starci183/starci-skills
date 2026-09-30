@@ -14,6 +14,7 @@ import { DEAD_EXPORT_RULE_IDS } from '../scripts/checks/architecture/dead-export
 import { REQUIRED_FILE_RULE_IDS } from '../scripts/checks/architecture/required-files.mjs';
 import { SIZE_GROWTH_RULE_IDS } from '../scripts/checks/architecture/size-growth.mjs';
 import { CLONE_RULE_IDS } from '../scripts/checks/architecture/clones.mjs';
+import { SYMBOL_RULE_IDS } from '../scripts/checks/architecture/symbols.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -23,7 +24,7 @@ const ts = require('typescript');
 // The HFS machine (tier direction, reachability, dead exports, required files, size growth, duplicate blocks) runs on every
 // fixture too and has its own specs; check() below drops its findings so this spec judges the rules it is about.
 const HFS_MACHINE_RULE_IDS = new Set([...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS, ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS,
-  ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS]);
+  ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...SYMBOL_RULE_IDS]);
 
 function scoped(report) {
   const violations = report.violations.filter(item => !HFS_MACHINE_RULE_IDS.has(item.ruleId));
