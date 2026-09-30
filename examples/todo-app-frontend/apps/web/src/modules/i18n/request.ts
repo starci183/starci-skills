@@ -1,5 +1,5 @@
 import { createRequestConfig } from "@fe-kit/i18n/request"
-import { PRODUCT_TIME_ZONE } from "./config"
+import { i18n } from "./config"
 import { routing } from "./routing"
 
 /**
@@ -20,7 +20,7 @@ import { routing } from "./routing"
  */
 export default createRequestConfig({
     routing,
-    timeZone: PRODUCT_TIME_ZONE,
+    timeZone: i18n.PRODUCT_TIME_ZONE,
     messages: {
         en: () => import("./messages/en.json"),
         vi: () => import("./messages/vi.json"),

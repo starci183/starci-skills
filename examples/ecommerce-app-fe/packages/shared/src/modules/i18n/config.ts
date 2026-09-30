@@ -13,6 +13,3 @@ export const i18n = defineI18nConfig({
     localeCookie: "northwind-locale",
     timeZone: "Asia/Ho_Chi_Minh",
 })
-
-/** Stable product timezone shared by server formatting and the hydrated client provider. */
-export const PRODUCT_TIME_ZONE = i18n.PRODUCT_TIME_ZONE

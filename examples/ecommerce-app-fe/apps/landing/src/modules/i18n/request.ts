@@ -1,6 +1,5 @@
 import { createRequestConfig } from "@starci-examples/fe-kit/i18n/request"
-import { withCommonMessages } from "@ecommerce/shared"
-import { PRODUCT_TIME_ZONE } from "./config"
+import { i18n, withCommonMessages } from "@ecommerce/shared"
 import { routing } from "./routing"
 
 /**
@@ -12,7 +11,7 @@ import { routing } from "./routing"
  */
 export default createRequestConfig({
     routing,
-    timeZone: PRODUCT_TIME_ZONE,
+    timeZone: i18n.PRODUCT_TIME_ZONE,
     messages: withCommonMessages({
         en: () => import("./messages/en.json"),
         vi: () => import("./messages/vi.json"),

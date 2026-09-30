@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from "next-intl"
 import type { ReactNode } from "react"
 import { FeKitI18nProvider } from "@fe-kit/i18n/i18n-context"
 import { ThemeProvider } from "@fe-kit/theme/theme-context"
-import { i18n, Link, PRODUCT_TIME_ZONE, usePathname, useRouter } from "@/modules/i18n"
+import { i18n, Link, usePathname, useRouter } from "@/modules/i18n"
 
 /**
  * The three contexts that sit above every route, and nothing else.
@@ -53,7 +53,7 @@ export interface AppProvidersProps {
  * @param props - {@link AppProvidersProps}
  */
 export const AppProviders = (props: AppProvidersProps) => (
-    <NextIntlClientProvider locale={props.locale} messages={props.messages} timeZone={PRODUCT_TIME_ZONE}>
+    <NextIntlClientProvider locale={props.locale} messages={props.messages} timeZone={i18n.PRODUCT_TIME_ZONE}>
         <I18nProvider locale={props.locale}>
             <ThemeProvider>
                 <FeKitI18nProvider locales={i18n.LOCALES} navigation={FE_KIT_NAVIGATION}>

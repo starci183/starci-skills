@@ -1,3 +1,3 @@
-export { i18n, PRODUCT_TIME_ZONE } from "./config"
+export { i18n } from "./config"
 export { routing } from "./routing"
 export { Link, usePathname, useRouter } from "./navigation"

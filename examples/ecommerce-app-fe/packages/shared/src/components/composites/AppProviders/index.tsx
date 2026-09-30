@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from "next-intl"
 import type { ReactNode } from "react"
 import { FeKitI18nProvider } from "@starci-examples/fe-kit/i18n/i18n-context"
 import { ThemeProvider } from "@starci-examples/fe-kit/theme/theme-context"
-import { i18n, PRODUCT_TIME_ZONE } from "../../../modules/i18n/config"
+import { i18n } from "../../../modules/i18n/config"
 import { Link, usePathname, useRouter } from "../../../modules/i18n/navigation"
 
 /**
@@ -43,7 +43,7 @@ export const AppProviders = (props: AppProvidersProps) => (
     <NextIntlClientProvider
         locale={props.locale}
         messages={props.messages}
-        timeZone={PRODUCT_TIME_ZONE}
+        timeZone={i18n.PRODUCT_TIME_ZONE}
     >
         <I18nProvider locale={props.locale}>
             <ThemeProvider>
