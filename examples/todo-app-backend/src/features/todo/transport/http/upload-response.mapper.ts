@@ -14,7 +14,7 @@ export const toUploadResponse = (upload: UploadSummary): UploadResponse => ({
 })
 
 /** The headers of a download: the stored media type, the file name (without quotes or line breaks) and the length. */
-export const toDownloadHeaders = (upload: UploadContent): ReadonlyMap<string, string> =>
+export const toDownloadHeaders = (upload: UploadContent): Map<string, string> =>
     new Map([
         ["content-type", upload.mime],
         ["content-disposition", `attachment; filename="${upload.filename.replace(/["\r\n]/g, "")}"`],
