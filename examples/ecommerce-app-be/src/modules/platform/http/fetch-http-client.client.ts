@@ -1,0 +1,38 @@
+import { Injectable } from "@nestjs/common"
+import { HttpError, HttpErrorCode } from "./errors/http.error"
+import type { HttpClient, HttpRequest, HttpResponse } from "./http.port"
+
+@Injectable()
+/** The HttpClient adapter over the global `fetch`; the only place outside a spec that calls it. */
+export class FetchHttpClient implements HttpClient {
+    /** Sends `request` with its deadline and parses the JSON body. */
+    async request(request: HttpRequest): Promise<HttpResponse> {
+        const deadline = AbortSignal.timeout(request.timeoutMs)
+        const signal = request.signal ? AbortSignal.any([deadline, request.signal]) : deadline
+        const response = await this.send(request, signal)
+        const text = await response.text()
+        return { status: response.status, body: text === "" ? undefined : this.parse(text) }
+    }
+
+    private async send(request: HttpRequest, signal: AbortSignal): Promise<Response> {
+        try {
+            return await fetch(request.url, {
+                method: request.method,
+                headers: request.body === undefined ? request.headers : { "content-type": "application/json", ...request.headers },
+                body: request.body === undefined ? undefined : JSON.stringify(request.body),
+                signal,
+            })
+        } catch (cause) {
+            const timedOut = cause instanceof Error && cause.name === "TimeoutError"
+            throw new HttpError({ code: timedOut ? HttpErrorCode.Timeout : HttpErrorCode.Network, cause })
+        }
+    }
+
+    private parse(text: string): unknown {
+        try {
+            return JSON.parse(text)
+        } catch (cause) {
+            throw new HttpError({ code: HttpErrorCode.BodyUnreadable, cause })
+        }
+    }
+}

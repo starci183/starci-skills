@@ -1,5 +1,0 @@
-export { PostgresPrimaryClient } from "./primary.client"
-export { InjectPrimaryEntityManager } from "./primary.decorators"
-export { runOrderMigrations } from "./migrate.runner"
-export { PostgresqlPrimaryModule } from "./primary.module"
-export { CartItemEntity, CONNECTION, entities, migrations, OrderEntity, OrderLineEntity, PaymentEntity, ProductEntity } from "./persistence"

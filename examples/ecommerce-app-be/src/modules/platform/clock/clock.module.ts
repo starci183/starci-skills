@@ -1,31 +1,19 @@
-import {
-    DynamicModule, Module 
-} from "@nestjs/common"
-import {
-    Clock 
-} from "./clock.port"
-import {
-    ConfigurableModuleClass, OPTIONS_TYPE 
-} from "./clock.module-definition"
-import {
-    SystemClock 
-} from "./system-clock"
+import { Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import { CLOCK } from "./clock.decorators"
+import { ConfigurableModuleClass, OPTIONS_TYPE } from "./clock.module-definition"
+import { SystemClock } from "./system-clock.service"
 
-@Module({
-})
-/** Provides the `Clock` port backed by the system clock; the app composition root registers it once, globally. */
+@Module({})
+/** Provides the Clock port backed by the system clock. */
 export class ClockModule extends ConfigurableModuleClass {
-    /** Builds the dynamic module; `isGlobal` decides whether every capability sees the clock without importing it. */
-    static register(options: typeof OPTIONS_TYPE = {
-    }): DynamicModule {
+    /** Registers the capability once per app. */
+    static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []),
-                {
-                    provide: Clock, useClass: SystemClock 
-                }],
-            exports: [Clock],
+            providers: [...(base.providers ?? []), { provide: CLOCK, useClass: SystemClock }],
+            exports: [CLOCK],
         }
     }
 }
