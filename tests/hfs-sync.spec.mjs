@@ -21,7 +21,7 @@ const require = createRequire(import.meta.url);
 const jestPreset = require('../packages/jest-preset/index.cjs');
 
 const BE = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] };
-const FE = { hfs: 1, profile: 'fe', project: 'nivo', apps: [{ name: 'app', kind: 'web' }, { name: 'admin', kind: 'web' }] };
+const FE = { hfs: 1, profile: 'fe', project: 'nivo', apps: [{ name: 'app', kind: 'next' }, { name: 'admin', kind: 'next' }] };
 const PRESETS = {
   be: { sonarExclusions: jestPreset.sonarExclusions() },
   fe: null,   // a front end has no test runner, so no preset
@@ -64,6 +64,11 @@ describe('hfs.json validation', () => {
       assert.throws(() => validateHfs(bad), /HFS_SYNC_HFS_INVALID/);
     }
     assert.doesNotThrow(() => validateHfs({ ...FE, stacks: '../nivo-backend' }));
+  });
+  it('refuses a declaration the canons would refuse, so a pin bump never leaves eslint unable to start', () => {
+    // the pre-2.0 connections shape (names only) is what broke eslint in a product repo after a pin bump
+    assert.throws(() => validateHfs({ ...BE, connections: ['primary', 'agentos'] }), /HFS_SYNC_HFS_INVALID: .*connections must be a list/);
+    assert.doesNotThrow(() => validateHfs({ ...BE, connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] }));
   });
 });
 
@@ -341,7 +346,7 @@ describe('the drift check', () => {
   it('an app or profile change in hfs.json is drift until --write', async t => {
     const dir = repo(t, FE);
     await run(['--write'], dir);
-    fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ ...FE, apps: [...FE.apps, { name: 'docs', kind: 'web' }] }));
+    fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ ...FE, apps: [...FE.apps, { name: 'docs', kind: 'next' }] }));
     const failed = await run(['--check'], dir);
     assert.ok(failed.lines.some(line => /^HFS_SYNC_DRIFT sonar-project\.properties/.test(line)), 'the sonar tsconfig paths name the new app');
     assert.ok(failed.lines.some(line => /^HFS_SYNC_DRIFT package\.json/.test(line)), 'the scripts gain dev and start for the new app');
@@ -471,7 +476,7 @@ describe('the package.json scripts of a front end', () => {
       assert.equal(fe['sonar.sources'], 'apps,packages', slots.join());
       assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json,packages/*/tsconfig.json');
     }
-    for (const slots of [undefined, [], ['fe.route']]) {
+    for (const slots of [undefined, [], ['repo.docs']]) {
       const fe = properties({ ...FE, ...(slots ? { optionalSlots: slots } : {}) });
       assert.equal(fe['sonar.sources'], 'apps', String(slots));
       assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json');
@@ -606,7 +611,7 @@ describe('hfs sync --init', () => {
     'src/app/[locale]/layout.tsx', 'src/app/[locale]/page.tsx', 'src/app/[locale]/error.tsx', 'src/app/[locale]/not-found.tsx',
     'src/modules/i18n/index.ts', 'src/modules/i18n/request.ts', 'src/modules/i18n/messages/vi.json', 'src/modules/api/index.ts'];
   it('a one-app front end keeps the next-intl stack and the one API client in the app: vi default, as-needed prefix, proxy.ts, error boundaries and the health route', async t => {
-    const one = { ...FE, apps: [{ name: 'app', kind: 'web' }] };
+    const one = { ...FE, apps: [{ name: 'app', kind: 'next' }] };
     const { dir } = await skeleton(t, one);
     const files = filesUnder(dir);
     for (const file of [...APP_SHELL, 'src/modules/i18n/config.ts', 'src/modules/i18n/routing.ts', 'src/modules/i18n/navigation.ts', 'src/modules/api/client.ts', 'src/modules/api/outcome.ts']) {
@@ -645,7 +650,7 @@ describe('hfs sync --init', () => {
     for (const file of ['package.json', 'tsconfig.json', 'src/index.ts', 'src/client.ts', 'src/outcome.ts']) assert.ok(files.includes(`packages/nivo-api/${file}`), `packages/nivo-api/${file}`);
     assert.equal(JSON.parse(read(dir, 'packages/nivo-i18n/package.json')).name, '@nivo/i18n');
     assert.equal(JSON.parse(read(dir, 'packages/nivo-api/package.json')).name, '@nivo/api');
-    const single = await skeleton(t, { ...FE, apps: [{ name: 'app', kind: 'web' }] });
+    const single = await skeleton(t, { ...FE, apps: [{ name: 'app', kind: 'next' }] });
     assert.equal(read(dir, 'packages/nivo-api/src/client.ts'), read(single.dir, 'apps/app/src/modules/api/client.ts'), 'one client text, whichever tree holds it');
     assert.ok(!files.some(file => file.startsWith('apps/') && /\/modules\/api\/(client|outcome)\.ts$/.test(file)), 'no app keeps a client of its own');
     assert.doesNotMatch(files.map(file => read(dir, file)).join('\n'), /\{\{[a-zA-Z]/, 'no template placeholder is left');

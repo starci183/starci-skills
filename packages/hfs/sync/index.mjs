@@ -15,7 +15,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { braceVariants } from '../runtime/scripts/lib/glob.mjs';
-import { loadSlotManifest } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
 import { readDeclaredSonarKey } from './sonar-key.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
@@ -86,6 +86,13 @@ export function validateHfs(hfs, manifest = loadSlotManifest()) {
     if (seen.has(app.name)) bad(`app ${app.name} is listed twice`);
     if (hfs.profile === 'be' && !manifest.appKinds.be.includes(app.kind)) bad(`app ${app.name} needs a kind, one of ${manifest.appKinds.be.join(', ')}`);
     seen.add(app.name);
+  }
+  // The whole declaration must be valid for the manifest it pins (connections, optional slots, ...): sync never renders
+  // configs for a declaration the eslint canons and hfs check would refuse, so a pin bump cannot leave lint unable to start.
+  try {
+    resolveRepoDeclaration(manifest, hfs);
+  } catch (error) {
+    bad(`hfs.json is not a valid declaration for manifest ${manifest.version}: ${error.message}`);
   }
   return hfs;
 }
