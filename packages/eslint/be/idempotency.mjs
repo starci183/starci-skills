@@ -6,13 +6,14 @@
  * delivery can repeat through, so a repeat is a no-op instead of a second charge, a second email or a second state
  * transition.
  *
- *   - `inbox-dedupe-required` judges every delivery handler: each public method of a consumer (a `*.consumer.ts` file
- *     of slot `be.transport.message`) and each method under `@Public({ reason: PublicReason.SignedWebhook })` (the
- *     decorator on the method or on its class; the reason is read by its TYPE, the enum member `SignedWebhook` of
- *     `PublicReason`). The FIRST awaited expression of the handler must be `claim(source, eventId)` on a receiver whose
- *     type is the `Inbox` port of `platform/inbox`, and the handler must return early when the claim answers `false`.
- *     A lookalike `Inbox` declared by another owner, a renamed receiver and a property injection are all judged by the
- *     receiver's type, so only the real port satisfies the rule; a keyword or a class name never does.
+ *   - `inbox-dedupe-required` judges every DELIVERY method of a service. Doors (consumers, `SignedWebhook` controllers) are
+ *     thin (R88): they map the delivery and dispatch one message, so the claim lives in the `*.service.ts` the handler calls,
+ *     inside its transaction. A delivery method is a public method of a `<name>.service.ts` whose FIRST parameter has an
+ *     `eventId` property, read by the parameter's TYPE. The FIRST awaited expression of such a method must be
+ *     `claim(source, eventId)` on a receiver whose type is the `Inbox` port of `platform/inbox`, and the method must return
+ *     early when the claim answers `false`. A lookalike `Inbox` declared by another owner, a renamed receiver and a
+ *     property injection are all judged by the receiver's type, so only the real port satisfies the rule; a keyword or a
+ *     class name never does.
  *
  * Accepted shapes of "claim, then return on false":
  *   if (!(await this.inbox.claim(source, id))) return
@@ -23,22 +24,11 @@
  */
 import { hfsOf } from "./lib/hfs.mjs"
 import { walk } from "./lib/ast.mjs"
-import { baseName, enumMemberOf, isOwnedType } from "./lib/ports.mjs"
+import { baseName, isOwnedType } from "./lib/ports.mjs"
+import { typed } from "./lib/types.mjs"
 
 /** The `Inbox` port of `platform/inbox`. */
 const isInboxType = (context, node) => isOwnedType(context, node, { name: "Inbox", capability: "inbox", tier: "platform" })
-
-/** Whether a decorator is `@<anything>({ reason: <PublicReason.SignedWebhook> })`, judged by the type of the reason value. */
-const isSignedWebhookDecorator = (context, decorator) => {
-    const expression = decorator.expression
-    if (expression.type !== "CallExpression") return false
-    const options = expression.arguments[0]
-    if (options?.type !== "ObjectExpression") return false
-    const reason = options.properties.find((property) => property.type === "Property" && !property.computed && property.key.type === "Identifier" && property.key.name === "reason")
-    if (!reason) return false
-    const member = enumMemberOf(context, reason.value)
-    return member?.enumName === "PublicReason" && member.member === "SignedWebhook"
-}
 
 /** A `return` statement, or a block that ends in one. */
 const returns = (statement) =>
@@ -83,32 +73,38 @@ const firstAwait = (body) => {
     return first
 }
 
-/** A delivery handler claims the event through the shared inbox before it acts. */
+/** Whether a parameter's type has an `eventId` property: the shape of a delivery. */
+const isDeliveryParam = (context, param) => {
+    const target = param.type === "TSParameterProperty" ? param.parameter : param.type === "AssignmentPattern" ? param.left : param
+    const { checker, toTs } = typed(context)
+    const tsNode = toTs(target)
+    if (!tsNode) return false
+    const type = checker.getTypeAtLocation(tsNode)
+    return (type.isUnion() ? type.types : [type]).some((part) => checker.getPropertyOfType(part, "eventId") !== undefined)
+}
+
+/** A service method that takes a delivery claims the event through the shared inbox before it acts. */
 export const inboxDedupeRequired = {
     meta: {
         type: "problem",
-        docs: { description: "A consumer and a `SignedWebhook` handler claim `(source, eventId)` on the `Inbox` port first and return early when it answers `false`." },
+        docs: { description: "A public service method whose first parameter carries an `eventId` claims `(source, eventId)` on the `Inbox` port first and returns early when it answers `false`." },
         schema: [],
         messages: {
-            noClaim: "This {{kind}} handler's first awaited expression is not `claim(source, eventId)` on the `Inbox` port of `platform/inbox` (`@InjectInbox() private readonly inbox: Inbox`). A sender that gets no timely reply resends the same event: claim it before anything else so a repeat delivery is a no-op.",
-            noEarlyReturn: "This {{kind}} handler claims the event but does not return when the claim answers `false`. Write `if (!(await this.inbox.claim(source, eventId))) return` (or store the answer and return on `!fresh` straight after), so a repeat does none of the work again.",
+            noClaim: "This delivery method's first awaited expression is not `claim(source, eventId)` on the `Inbox` port of `platform/inbox` (`@InjectInbox() private readonly inbox: Inbox`). A sender that gets no timely reply resends the same event: claim it before anything else so a repeat delivery is a no-op.",
+            noEarlyReturn: "This delivery method claims the event but does not return when the claim answers `false`. Write `if (!(await this.inbox.claim(source, eventId))) return` (or store the answer and return on `!fresh` straight after), so a repeat does none of the work again.",
         },
     },
     create(context) {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
-        const consumerFile = hfs.slotOf(filename) === "be.transport.message" && baseName(filename).endsWith(".consumer.ts")
-        const judged = new Set()
+        const slot = hfs.slotOf(filename)
+        if (!baseName(filename).endsWith(".service.ts") || !slot || slot.startsWith("be.tests.")) return {}
         return {
             MethodDefinition(node) {
                 if (node.kind !== "method" || node.static || node.key.type === "PrivateIdentifier" || !node.value.body) return
                 if (node.accessibility === "private" || node.accessibility === "protected") return
-                const klass = node.parent.parent
-                const webhook = [...(node.decorators ?? []), ...(klass.decorators ?? [])].some((decorator) => isSignedWebhookDecorator(context, decorator))
-                if (!consumerFile && !webhook) return
-                if (judged.has(node)) return
-                judged.add(node)
-                const kind = webhook ? "SignedWebhook" : "consumer"
+                const first = node.value.params[0]
+                if (!first || !isDeliveryParam(context, first)) return
                 const awaited = firstAwait(node.value.body)
                 const call = awaited?.argument
                 const claims = call?.type === "CallExpression"
@@ -116,10 +112,10 @@ export const inboxDedupeRequired = {
                     && !call.callee.computed
                     && call.callee.property.type === "Identifier"
                     && call.callee.property.name === "claim"
-                    && call.arguments.length === 2
+                    && call.arguments.length >= 2
                     && isInboxType(context, call.callee.object)
-                if (!claims) context.report({ node: node.key, messageId: "noClaim", data: { kind } })
-                else if (!returnsOnFalse(awaited)) context.report({ node: node.key, messageId: "noEarlyReturn", data: { kind } })
+                if (!claims) context.report({ node: node.key, messageId: "noClaim" })
+                else if (!returnsOnFalse(awaited)) context.report({ node: node.key, messageId: "noEarlyReturn" })
             },
         }
     },

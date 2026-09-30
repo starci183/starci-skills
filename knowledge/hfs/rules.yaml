@@ -897,7 +897,7 @@ rules:
   - id: R80
     code: "BE_INBOX_DEDUPE_MISSING"
     title_vi: "Thiếu chống trùng lặp qua inbox"
-    law: "Every consumer and every `SignedWebhook` handler makes `claim(source, eventId)` on the `Inbox` port its first awaited expression and returns early when the claim answers `false`."
+    law: "Every service method that takes a delivery (a public method of a `*.service.ts` whose first parameter has an `eventId`) makes `claim(source, eventId)` on the `Inbox` port its first awaited expression and returns early when the claim answers `false`; consumers and `SignedWebhook` controllers stay thin doors (R88) and dispatch to the handler whose service claims."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_INBOX_DEDUPE_MISSING"]
@@ -989,7 +989,7 @@ rules:
   - id: R88
     code: "BE_TRANSPORT_SHAPE"
     title_vi: "Tầng giao tiếp làm nhiều hơn chuyển lệnh"
-    law: "A transport handler maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager), holds no branch, loop or other call besides pure mapper functions, returns no envelope and takes no `GraphQLJSON`."
+    law: "A transport handler maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else (no EntityManager, no Inbox), holds no branch, loop or other call besides pure mapper functions and `unwrapOutcome` of `platform/primitives`, returns no envelope and takes no `GraphQLJSON`."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_TRANSPORT_SHAPE"]

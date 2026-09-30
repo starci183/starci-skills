@@ -248,11 +248,11 @@ test("infra-needs-injector: class injection only for domain services and the sam
             { filename: HANDLER, code: `class Local { ping(): boolean { return true } }\nexport class H { constructor(private readonly name: string, private readonly ids: Array<number>, private readonly at: Date, private readonly local: Local) {} }` },
             // a class of the same owner, even a platform one
             { filename: at("src/modules/platform/cache/cache.warmer.ts"), code: `import { CacheService } from "./cache.service"\nexport class Warmer { constructor(private readonly cache: CacheService) {} }` },
-            // not a constructor
+            // a CQRS message carries its params as data; it is built with new, never injected\n            { filename: at("src/features/plan/application/place-order.command.ts"), code: `import { Command } from "@nestjs/cqrs"\nimport type { ExecuteParams } from "@modules/platform/cqrs"\nexport class PlaceOrderCommand extends Command<string> { constructor(readonly params: ExecuteParams<{ id: string }>) { super() } }` },\n            // not a constructor
             { filename: HANDLER, code: `${EM}export class H { run(em: EntityManager): EntityManager { return em } }` },
         ],
         invalid: [
-            // renamed receivers do not matter: the TYPE is infrastructure
+            // the same parameter on a class that is not a message is a dependency\n            { filename: HANDLER, code: `import type { ExecuteParams } from "@modules/platform/cqrs"\nexport class H { constructor(readonly params: ExecuteParams<{ id: string }>) {} }`, errors: [{ messageId: "missing" }] },\n            // renamed receivers do not matter: the TYPE is infrastructure
             { filename: HANDLER, code: `${EM}export class H { constructor(private readonly em: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
             { filename: HANDLER, code: `${EM}export class H { constructor(manager: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
             { filename: HANDLER, code: `${EM}export class H { constructor(private readonly repo: EntityManager) {} }`, errors: [{ messageId: "missing" }] },

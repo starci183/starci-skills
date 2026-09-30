@@ -39,7 +39,8 @@ import { Mutation, Query as GqlQuery, Resolver } from "@nestjs/graphql"
 import { SubscribeMessage } from "@nestjs/websockets"
 import { InjectCommandBus, InjectQueryBus } from "@modules/platform/cqrs/cqrs.decorators"
 import type { RequestLocale } from "@modules/platform/i18n"
-import type { Inbox } from "@modules/platform/inbox"
+import { unwrapOutcome } from "@modules/platform/primitives"
+import { unwrapOutcome as lookalike } from "./local"
 class Place extends Command<string> {}
 class Ask extends Query<string> {}
 interface OrderService { place(): number }
@@ -57,17 +58,12 @@ test("transport-is-thin: a door injects only the bus, dispatches exactly once an
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(@InjectQueryBus() private readonly q: QueryBus, @InjectCommandBus() readonly c: CommandBus) {} @GqlQuery(() => String) async ask() { return this.q.execute(new Ask()) } }` },
             // REST content negotiation
             { filename: CONTROLLER, code: `${BUS}@Controller() export class C { constructor(@InjectCommandBus() private readonly bus: CommandBus, private readonly locale: RequestLocale) {} @Post() async pay() { return this.bus.execute(new Place()) } }` },
-            // a consumer claims through the inbox, then dispatches
-            { filename: CONSUMER, code: `${BUS}export class C { constructor(private readonly inbox: Inbox, private readonly bus: CommandBus) {} async handle(id: string) { if (!(await this.inbox.claim("s", id))) return; await this.bus.execute(new Place()) } private helper() { return 1 } }` },
             { filename: JOB, code: `${BUS}export class J { readonly name = "sweep"; constructor(private readonly bus: CommandBus) {} async run(at: Date) { await this.bus.execute(new Place()) } }` },
             { filename: GATEWAY, code: `${BUS}export class G { constructor(private readonly bus: CommandBus) {} @SubscribeMessage("say") say() { return this.bus.execute(new Place()) } handleConnection() { return 1 } }` },
             { filename: CLI, code: `${BUS}export class S { constructor(private readonly bus: CommandBus) {} async run() { await this.bus.execute(new Place()) } }` },
             // mapping the input and the result with pure mapper functions is mapping
             { filename: RESOLVER, code: `${BUS}import { toCommand, toView } from "./place.mapper"\n@Resolver() export class R { constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {} @Mutation(() => String) async place(input: string) { const command = toCommand(input); return toView(await this.commandBus.execute(command)) } }` },
-            // the inbox guard R80 demands is the one `if` a door may hold, in either accepted shape
-            { filename: CONSUMER, code: `${BUS}export class C { constructor(private readonly inbox: Inbox, private readonly bus: CommandBus) {} async handle(id: string) { const fresh = await this.inbox.claim("s", id); if (!fresh) { return } await this.bus.execute(new Place()) } }` },
-            { filename: CONSUMER, code: `${BUS}export class C { constructor(private readonly inbox: Inbox, private readonly bus: CommandBus) {} async handle(id: string) { if ((await this.inbox.claim("s", id)) === false) return; await this.bus.execute(new Place()) } }` },
-            // a class with no handler method is not a door (a guard, an interceptor, a plain provider)
+            // unwrapOutcome of platform/primitives, resolved by its symbol, sits between the bus and the mapper\n            { filename: RESOLVER, code: `${BUS}import { toView } from "./place.mapper"\n@Resolver() export class R { constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {} @Mutation(() => String) async place() { return toView(unwrapOutcome(await this.commandBus.execute(new Place()), Error)) } }` },\n            // a class with no handler method is not a door (a guard, an interceptor, a plain provider)
             { filename: at(`${T}/http/session.guard.ts`), code: `${BUS}export class G { canActivate(x: number) { if (x > 1) { return true } return x ? Date.now() > 1 : false } }` },
             // a DTO class carries decorated fields and no injection
             { filename: DTO, code: `import { Field } from "@nestjs/graphql"\nexport class PlaceInput { @Field() name!: string }` },
@@ -81,9 +77,8 @@ test("transport-is-thin: a door injects only the bus, dispatches exactly once an
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { @Inject("X") private readonly orders!: OrderService; constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place() { return this.bus.execute(new Place()) } }`, errors: [{ messageId: "injects" }] },
             // a lookalike bus declared in the file is not the cqrs one
             { filename: RESOLVER, code: `${BUS}class Fake { execute(x: unknown) { return x } }\n@Resolver() export class R { constructor(private readonly bus: Fake) {} @Mutation(() => String) place() { return this.bus.execute(1) } }`, errors: [{ messageId: "injects" }, { messageId: "none" }, { messageId: "call" }] },
-            // the locale is allowed only in a REST door; the inbox only where events arrive
+            // the locale is allowed only in a REST door; an inbox is a service concern, never a door dependency
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly locale: RequestLocale, private readonly bus: CommandBus) {} @Mutation(() => String) place() { return this.bus.execute(new Place()) } }`, errors: [{ messageId: "injects" }] },
-            { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly inbox: Inbox, private readonly bus: CommandBus) {} @Mutation(() => String) place() { return this.bus.execute(new Place()) } }`, errors: [{ messageId: "injects" }] },
             // an untyped parameter cannot be judged
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus) {} @Mutation(() => String) place() { return this.bus.execute(new Place()) } }`, errors: [{ messageId: "injects" }, { messageId: "none" }, { messageId: "call" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place() { return 1 } }`, errors: [{ messageId: "none" }] },
@@ -100,9 +95,7 @@ test("transport-is-thin: a door injects only the bus, dispatches exactly once an
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) async place() { try { return await this.bus.execute(new Place()) } catch { throw new Error("x") } } }`, errors: [{ messageId: "branch" }, { messageId: "branch" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place(ids: string[]) { for (const id of ids) { void id } return this.bus.execute(new Place()) } }`, errors: [{ messageId: "branch" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place(kind: string) { switch (kind) { default: break } return this.bus.execute(new Place()) } }`, errors: [{ messageId: "branch" }] },
-            // an inbox guard that does more than return early is a branch
-            { filename: CONSUMER, code: `${BUS}export class C { constructor(private readonly inbox: Inbox, private readonly bus: CommandBus) {} async handle(id: string) { if (!(await this.inbox.claim("s", id))) { await this.bus.execute(new Place()) } else { return } } }`, errors: [{ messageId: "branch" }] },
-            // a call a door does not make: a global, a helper on the class, a function that is not a mapper
+            // a lookalike unwrapOutcome from another module is a foreign call\n            { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {} @Mutation(() => String) async place() { return lookalike(await this.commandBus.execute(new Place())) } }`, errors: [{ messageId: "call" }] },\n            // an inbox is not a door dependency\n            { filename: CONSUMER, code: `${BUS}interface Inbox { claim(s: string, id: string): Promise<boolean> }\nexport class C { constructor(private readonly inbox: Inbox, private readonly bus: CommandBus) {} async handle(id: string) { if (!(await this.inbox.claim("s", id))) return; await this.bus.execute(new Place()) } }`, errors: [{ messageId: "injects" }, { messageId: "branch" }, { messageId: "call" }] },\n            // a call a door does not make: a global, a helper on the class, a function that is not a mapper
             { filename: RESOLVER, code: `${BUS}import { normalise } from "./normalise.helper"\n@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place(raw: string) { return this.bus.execute(new Place(normalise(raw))) } }`, errors: [{ messageId: "call" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place(raw: string) { return this.bus.execute(new Place(JSON.parse(raw))) } }`, errors: [{ messageId: "call" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly bus: CommandBus) {} @Mutation(() => String) place(raw: string[]) { return this.bus.execute(new Place(raw.map((x) => x))) } }`, errors: [{ messageId: "call" }] },

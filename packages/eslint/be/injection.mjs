@@ -26,6 +26,7 @@ import { posix } from "node:path"
 import ts from "typescript"
 import { staticText } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
+import { isImportedFrom } from "./lib/import-source.mjs"
 import { normalizePath } from "./lib/path.mjs"
 import { typed, typeOrigins } from "./lib/types.mjs"
 
@@ -426,6 +427,9 @@ export const infraNeedsInjector = {
         const own = hfs.ownerOf(filename)
         return {
             MethodDefinition(node) {
+                // a CQRS message (`extends Command<R>` / `Query<R>` of @nestjs/cqrs) carries its own `params` as data: it is constructed by `new`, never injected
+                const klass = node.parent.parent
+                if (node.kind === "constructor" && klass.superClass && isImportedFrom(context, klass.superClass, "@nestjs/cqrs", ["Command", "Query"])) return
                 for (const param of constructorParams(node)) {
                     const { target, decorators } = decoratorsOfParam(param)
                     const annotation = target.typeAnnotation?.typeAnnotation
