@@ -145,7 +145,7 @@ test('a planned eslint enforcer the plugin already ships is stale', () => {
   // mark a shipped eslint enforcer planned again: the plugin still ships it, so the status is stale
   const catalog = { ...base, rules: base.rules.map((r) => (r.id === 'R38' ? { ...r, enforcers: r.enforcers.map((e) => (e.kind === 'eslint-be' && e.id === 'error-home' ? { ...e, planned: true } : e)) } : r)) };
   const findings = run(catalog, { plugins });
-  assert.deepEqual(findings.map((f) => [f.code, f.rule, f.enforcer]), [['HFS_RULE_ENFORCER_STALE', 'R38', 'eslint-be:error-home']]);
+  assert.deepEqual(findings.map((f) => [f.code, f.rule, f.enforcer]), [['HFS_RULE_ENFORCER_PLANNED', 'R38', 'eslint-be:error-home'], ['HFS_RULE_ENFORCER_STALE', 'R38', 'eslint-be:error-home']]);
 });
 
 test('an existing machine enforcer needs its file to exist and to emit the rule code', () => {
@@ -289,7 +289,7 @@ test('a stylelint enforcer must be a rule of packages/stylelint, a shipped one m
   plugins.stylelint.ids.delete('token-only');
   assert.deepEqual(run(catalog, { plugins }).map((f) => [f.code, f.rule, f.enforcer]), [['HFS_RULE_ENFORCER_MISSING', 'R61', 'stylelint:token-only']]);
   const planned = { ...catalog, rules: catalog.rules.map((r) => (r.id === 'R61' ? { ...r, enforcers: r.enforcers.map((e) => (e.id === 'token-only' && e.kind === 'stylelint' ? { ...e, planned: true } : e)) } : r)) };
-  assert.deepEqual(run(planned).map((f) => [f.code, f.enforcer]), [['HFS_RULE_ENFORCER_STALE', 'stylelint:token-only']]);
+  assert.deepEqual(run(planned, { plugins: pluginsOf(catalog) }).map((f) => [f.code, f.enforcer]), [['HFS_RULE_ENFORCER_PLANNED', 'stylelint:token-only'], ['HFS_RULE_ENFORCER_STALE', 'stylelint:token-only']]);
   const extra = pluginsOf(catalog);
   extra.stylelint.ids.add('rule-nobody-owns');
   assert.deepEqual(run(catalog, { plugins: extra }).map((f) => [f.code, f.enforcer]), [['HFS_RULE_UNCATALOGUED', 'stylelint:rule-nobody-owns']]);

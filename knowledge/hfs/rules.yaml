@@ -509,8 +509,9 @@ rules:
       - {kind: hfs, id: test-topology, at: scripts/lib/hfs-rules/test-topology.mjs}
       - {kind: machine, id: test-kind-retired, at: scripts/checks/architecture/hfs.mjs}
       - {kind: eslint-be, id: unit-test-colocated}
-      - {kind: eslint-be, id: e2e-no-schema-work}
-      - {kind: eslint-be, id: e2e-fakes-external-only}
+      - {kind: eslint-be, id: tests-infra-only-in-world}
+      - {kind: eslint-be, id: tests-no-override}
+      - {kind: eslint-be, id: test-world-shape}
   - id: R48
     code: "BE_SPEC_QUALITY"
     title_vi: "Spec đọc mã nguồn hoặc ép kiểu mock"
@@ -529,6 +530,7 @@ rules:
       - {kind: eslint-be, id: no-call-only-spec}
       - {kind: eslint-be, id: no-marker-model-stub}
       - {kind: eslint-be, id: no-model-call-in-e2e}
+      - {kind: eslint-be, id: spec-typed-entity-manager}
   - id: R49
     code: "FE_ENV_OWNER"
     title_vi: "Đọc biến môi trường ngoài modules/config"

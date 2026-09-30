@@ -73,3 +73,4 @@ retired:
   - {path: skills/restart/SKILL.md, retiredAt: 2026-09-29, removedIn: start-set-profile, replacedBy: 'skills/start (start --set-profile); the restart skill is removed'}
   - {path: scripts/checks/blob-output.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: no caller besides its test (RED18); checks store output with scripts/checks/output.mjs emitCheckOutput'}
   - {path: scripts/kernel/usage-backfill.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: the one-shot backfill ran; the Host controller sweeps usage (scripts/kernel/usage-record.mjs sweepUsage)'}
+  - {path: packages/eslint/be/e2e-schema.test.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'packages/eslint/be/test-world.test.mjs (the test-world law: tests-infra-only-in-world, tests-no-override, test-world-shape)'}

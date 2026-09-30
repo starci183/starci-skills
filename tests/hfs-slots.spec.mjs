@@ -154,7 +154,7 @@ test('BE fixture: which slot owns a path', () => {
   assert.equal(owner('src/modules/platform/database/persistence/migrations/20260101000000-init.ts'), 'owned:be.persistence');
   assert.equal(owner('src/modules/platform/config/index.ts'), 'owned:be.platform');
   assert.equal(owner('src/tests/e2e/orders/place.e2e-spec.ts'), 'owned:be.tests.e2e');
-  assert.equal(owner('src/tests/e2e/world/world.ts'), 'owned:be.tests.e2e-world');
+  assert.equal(owner('src/tests/world/use-test-world.ts'), 'owned:be.tests.world');
   assert.equal(owner('contracts/core/schema.graphql'), 'owned:be.contract.graphql');
   assert.equal(owner('contracts/core/openapi.json'), 'not-enabled:be.contract.openapi');
   assert.equal(owner('.starciwork/features/index.yaml'), 'owned:be.starciwork');

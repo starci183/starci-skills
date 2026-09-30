@@ -1,0 +1,34 @@
+id: hfs-test-layout
+effectiveAt: '2026-10-01T00:30:00+07:00'
+summary: >-
+  Owner test layout 2026-09-30 (supersedes the e2e-world shape of hfs-e2e-world and hfs-e2e-fakes): unit specs beside the
+  subject; src/tests/world/ (slot be.tests.world) is the only test infrastructure (global-setup, use-test-world.ts with
+  useTestWorld({ apps } | { modules }), fakes/<provider>/ network-edge fakes); src/tests/fixtures/ typed doubles;
+  src/tests/integration/<capability>/*.integration-spec.ts ({ modules }); src/tests/e2e/<area>/*.e2e-spec.ts ({ apps });
+  src/tests/contract/<provider>/*.contract-spec.ts (provider sandboxes, run only by test:contract). live/, e2e/world,
+  be.tests.e2e-modules and useE2eWorld are gone. New law test-world (R47): tests-infra-only-in-world, tests-no-override
+  (nothing under src/tests overrides a provider; external services are network fakes), test-world-shape (and the retired
+  name useE2eWorld is refused); the earlier e2e-no-schema-work and e2e-fakes-external-only are deleted. New R48 rule
+  spec-typed-entity-manager (unit specs take mockEntityManager()/fakeTransaction(), never an ad-hoc jest.fn EntityManager).
+  @starci/jest-preset projects: unit, integration, e2e, contract. check-hfs-rules refuses any planned enforcer
+  (HFS_RULE_ENFORCER_PLANNED): the catalog has 0 owed enforcers.
+reach: new-legs
+adds:
+  codes: [HFS_RULE_ENFORCER_PLANNED]
+paths:
+  - modules/kernel/contract-changes/hfs-test-layout.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/retired-paths.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/rules.yaml
+  - scripts/checks/check-hfs-rules.mjs
+  - packages/jest-preset/index.cjs
+  - packages/jest-preset/preset.test.mjs
+  - packages/eslint/be/test-world.mjs
+  - packages/eslint/be/test-world.test.mjs
+  - packages/eslint/be/spec-quality.mjs
+  - packages/eslint/be/spec-typed-entity-manager.test.mjs
+  - packages/eslint/be/e2e-flow.mjs
+  - packages/eslint/be/index.mjs
+  - tests/hfs-rules.spec.mjs
+  - tests/hfs-slots.spec.mjs

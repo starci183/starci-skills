@@ -32,8 +32,7 @@
 //     rule lists in failureCodes; a code no rule owns has no R-id, no gate and no parity proof. The only exempt codes are the
 //     infrastructure refusals ("cannot judge"), which their owners export as one list each (ERROR_RULE_IDS of the machine's
 //     index, REFUSAL_CODES of scripts/lib/hfs-check.mjs)                                     HFS_RULE_CODE_UNOWNED
-// A planned enforcer is not a finding: it is the owed work, listed by --unbuilt (the rules with no existing enforcer at
-// all) and counted in the summary.
+//   - a `status: planned` enforcer: the catalog carries no owed work (owner acceptance 2026-09-30)  HFS_RULE_ENFORCER_PLANNED
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -180,6 +179,8 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
   const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
   for (const rule of catalog.rules) {
     if (!rule.enforcers.length) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) has no enforcer`);
+    // Owner acceptance 2026-09-30: every rule ships at error on the day the canon ships; an owed enforcer is a gap, not a plan.
+    for (const e of rule.enforcers) if (e.planned) add('HFS_RULE_ENFORCER_PLANNED', rule.id, `${rule.id} lists ${e.kind}:${e.id} as planned: build it (with a violating and a passing test) or delete it; the catalog carries no owed enforcer`, `${e.kind}:${e.id}`);
     for (const [kind, family, what] of [['lint', LINT_FAMILY, 'an eslint or stylelint rule'], ['check', CHECK_FAMILY, 'a machine, hfs or work-validate check']]) {
       if (rule.kinds.includes(kind) && !rule.enforcers.some((e) => family.includes(e.kind))) add('HFS_RULE_NO_ENFORCER', rule.id, `${rule.id} (${rule.code}) is kind ${kind} but names no ${what}`);
     }

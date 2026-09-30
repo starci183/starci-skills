@@ -11957,6 +11957,7 @@ HFS_SLOT_UNDECLARED:
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển tệp vào ô gần nhất được báo hoặc xoá nó; nếu thực sự cần một loại nội dung mới thì đó là việc thêm ô vào bảng kê, do người giám sát làm, không phải kho tự thêm."
   owner: op-retry
   kind: check-finding
+
 HFS_SLOT_REQUIRED_MISSING:
   title: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`)"
   title_vi: "Ô thiếu tệp bắt buộc"
@@ -11968,6 +11969,7 @@ HFS_SLOT_REQUIRED_MISSING:
   nextStep_vi: "Tạo tệp hoặc thư mục theo mẫu của ô rồi commit; tệp chưa git add vẫn tính là thiếu. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
+
 HFS_UNTRACKED_ROOT_ENTRY:
   title: "No untracked or ignored entry outside an `ignored` slot"
   title_vi: "Mục lạ ở gốc kho"
@@ -12805,6 +12807,17 @@ HFS_RULE_ENFORCER_MISSING:
     - "Khai một enforcer chưa được viết mà quên status: planned"
     - "Tệp kiểm tra bị di chuyển"
   nextStep_vi: "Người giám sát sửa rules.yaml cho khớp với plugin và tệp thật, hoặc đánh dấu status: planned cho phần còn nợ, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+HFS_RULE_ENFORCER_PLANNED:
+  title: "Rule enforcer still planned"
+  title_vi: "Enforcer của luật vẫn còn nợ"
+  meaning_vi: "Danh mục knowledge/hfs/rules.yaml còn một enforcer đánh dấu status: planned. Theo tiêu chí nghiệm thu của chủ dự án, mọi luật đều có bộ kiểm tra ở mức error ngay khi bộ chuẩn phát hành; một enforcer còn nợ là một lỗ hổng."
+  causes_vi:
+    - "Thêm luật mới vào danh mục trước khi viết bộ kiểm tra"
+    - "Gỡ một bộ kiểm tra nhưng quên xóa mục enforcer"
+  nextStep_vi: "Người giám sát viết enforcer (kèm ca vi phạm và ca hợp lệ) hoặc xóa mục đó khỏi danh mục, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
