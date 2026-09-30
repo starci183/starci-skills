@@ -25,7 +25,7 @@ rules:
   claim: one live claimer per DI for 15 minutes; an expired claim reads open again (event decision-expired on the next claim)
   supervisorClaim: a --by supervisor claim of a decider-kernel DI needs the DI escalated, or its kind cross-workflow|deadlock
   decisionsFirst: an open, unclaimed decider-kernel DI older than 2 minutes (never a supervisor-ruling; a job DI only while its job still waits on the Kernel) makes api route, dispatch, enqueue and dispatch-ready refuse decisions-first with the oldest item and its copy-paste commands (scripts/reconciler/decisions.mjs refuseDecisionsFirst); a command carrying --resolves <that DI id>, and the children of graph-edit and redesign, pass. --next prints that item alone
-  autoClose: every list closes a supervisor-ruling opened before the Kernel's latest runtime-rev ack and a job DI whose job no longer waits on the Kernel (resolution by runtime)
+  autoClose: every list closes a supervisor-ruling opened before the Kernel's latest runtime-rev ack and a job DI whose job no longer waits on the Kernel (resolution by runtime); api archive and api finish resolve every live DI of their workflow in the same transaction before the phase flips (resolution by runtime, verb workflow-archived | workflow-finished, event decision-resolved auto:true), and a DI of an archived or finished workflow is never listed, escalated, rung or digested
   allowedVerbs: a DI that lists allowedVerbs is resolved only by --verb whose first word is one of theirs
 refusals:
   decision-kind-invalid: --kind is not a starci/decision-item@1 kind

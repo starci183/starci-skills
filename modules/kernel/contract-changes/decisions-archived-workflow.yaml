@@ -1,0 +1,21 @@
+id: decisions-archived-workflow
+effectiveAt: '2026-09-30T17:00:00+07:00'
+summary: >-
+  WORKFLOW-END CLOSES ITS DECISION ITEMS (cluster decisions-archived-workflow; evidence 2026-09-30 nivo-backend:
+  7 Decision Items open|claimed on workflows archived by owner ruling, unresolvable under
+  events_refuse_archived yet still counted, escalated and digested). api archive and api finish resolve every
+  live DI of the workflow (open|claimed|escalated) inside their own transaction BEFORE the phase flips -
+  resolution by 'runtime', verb workflow-archived | workflow-finished, event decision-resolved auto:true, and
+  the receipt and workflow-archived|workflow-finished event carry decisionsClosed. Read side:
+  scripts/reconciler/decisions.mjs listDecisions ignores the DIs of an archived or finished workflow, so
+  blockingDecisions, escalateDue, ringDoorbell, sweepDecisions, `api decisions` and every reader built on them
+  never list, escalate, ring or digest a leftover. Adds no check or finding code.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/decisions-archived-workflow.yaml
+  - modules/kernel/api-commands/archive.yaml
+  - modules/kernel/api-commands/decisions.yaml
+  - modules/kernel/api-commands/finish.yaml
+  - scripts/kernel/api-verbs/archive.mjs
+  - scripts/kernel/api-verbs/finish.mjs
+  - scripts/reconciler/decisions.mjs

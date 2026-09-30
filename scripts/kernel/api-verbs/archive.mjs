@@ -7,6 +7,7 @@ import { kernelCustodyOf } from '../api-lib/kernel-seat.mjs';
 import { openAskDispatchesOf, retireAsk } from '../api-lib/asks.mjs';
 import { closeHeldTasks, closeKernelTerminal, releaseDroppedWorker, releaseKernelSeat, retainAfterEnd } from '../api-lib/workflow-end.mjs';
 import { reportedJobs } from '../../reconcile/job-settle.mjs';
+import { closeWorkflowDecisions } from '../../reconciler/decisions.mjs';
 
 const WORKFLOW_ARCHIVED = 'workflow-archived';
 // How an open job leaves at archive (job_transitions): straight to cancelled where the table allows it, an answering
@@ -51,7 +52,7 @@ export default {
   const now = Date.now(), archived = { at: now, reason, by };
   const seat = kernelCustodyOf(db, workflowId), kernelTerminal = seat.terminal;
   const dropped = [];
-  let inboxClosed = 0, incidentsClosed = 0, kernelSignalsReleased = 0, kernelJobsSettled = 0, racedAt = null;
+  let inboxClosed = 0, incidentsClosed = 0, kernelSignalsReleased = 0, kernelJobsSettled = 0, racedAt = null, decisionsClosed = [];
   ledger.transaction(() => {
     const phase = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(workflowId);
     if (phase?.phase === 'archived') { racedAt = phase.archived_at ?? now; return; }
@@ -85,10 +86,14 @@ export default {
       updateIncident(db, { incidentId: row.incident_id, lastProgress: `${row.last_progress ?? ''} [resolved: ${WORKFLOW_ARCHIVED}]`, at: now });
       if (resolveIncident(db, { incidentId: row.incident_id, reason: 'workflow-ended', at: now })) incidentsClosed++;
     }
+    // An archived workflow keeps no live Decision Item: each resolves by runtime (verb workflow-archived) BEFORE
+    // the phase flips — after it no decision write is possible (events_refuse_archived) and the item would keep
+    // being counted, escalated and digested forever.
+    decisionsClosed = closeWorkflowDecisions(ledger, workflowId, { verb: WORKFLOW_ARCHIVED, now });
     ({ kernelSignalsReleased, kernelJobsSettled } = releaseKernelSeat(db, workflowId, seat,
       { status: 'cancelled', result: { reason: WORKFLOW_ARCHIVED, at: now }, stamp: { archivedAt: now }, now }));
     ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: WORKFLOW_ARCHIVED,
-      payload: { archived, inboxClosed, incidentsClosed, jobsDropped: dropped.map((d) => d.job.job_id), asksRetired, kernelSignalsReleased, kernelJobsSettled, kernelTerminal } });
+      payload: { archived, inboxClosed, incidentsClosed, decisionsClosed, jobsDropped: dropped.map((d) => d.job.job_id), asksRetired, kernelSignalsReleased, kernelJobsSettled, kernelTerminal } });
     if (STOP_FIRST.has(phase.phase)) changeWorkflowPhase(db, { workflowId, to: 'stopped', by, reason, at: now });
     changeWorkflowPhase(db, { workflowId, to: 'archived', by, reason, at: now });
   });
@@ -106,9 +111,9 @@ export default {
   });
   const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now, internals);
   const retention = retainAfterEnd(db, now);
-  const out = { ok: true, workflowId, archived: true, archivedAt: now, reason, by, inboxClosed, incidentsClosed, jobsDropped, asksRetired,
+  const out = { ok: true, workflowId, archived: true, archivedAt: now, reason, by, inboxClosed, incidentsClosed, decisionsClosed, jobsDropped, asksRetired,
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal), tasksClosed, retention };
-  emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; jobs dropped: ${jobsDropped.length}${asksRetired.length ? `; asks retired: ${asksRetired.length}` : ''}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
+  emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; decisions closed: ${decisionsClosed.length}; jobs dropped: ${jobsDropped.length}${asksRetired.length ? `; asks retired: ${asksRetired.length}` : ''}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:archive` });
 
   },

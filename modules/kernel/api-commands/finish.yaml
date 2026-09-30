@@ -4,7 +4,10 @@ finish:
   writes: >-
     workflows.phase='finished' + finished_json {at, verdict}; the inbox
     goal row closed (status 'done'); every open incident resolved with reason
-    workflow-finished (H12); the kernel singleton signal deleted;
+    workflow-finished (H12); every live Decision Item resolved by the runtime
+    (status resolved, resolution_verb workflow-finished, event decision-resolved
+    auto:true - a leftover could never be decided and would keep being counted);
+    the kernel singleton signal deleted;
     the Kernel job settled with worker_id and terminalHandle cleared; the
     exact Kernel terminal receives a best-effort close request after the
     durable receipt is emitted; every Task the Run still holds open is closed
@@ -29,7 +32,7 @@ finish:
     only by api archive); no flag bypasses the gate. finished_json and the workflow-finished event
     carry handover {via: handover-approved|archived, approvedSeq, answeredBy}. A workflow already
     finished finishes again idempotently without the gate.
-  returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed:[{jobId,taskId,status,ok}], handover?:{via, approvedSeq, answeredBy}, retention?:{retained:true, debugLogsDeleted, vacuumed}|{retained:false, reason}}'
+  returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, incidentsClosed:<n>, decisionsClosed:[diId], alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed:[{jobId,taskId,status,ok}], handover?:{via, approvedSeq, answeredBy}, retention?:{retained:true, debugLogsDeleted, vacuumed}|{retained:false, reason}}'
   refuses:
     - workflow-unknown
     - 'workflow-not-accepting-work: the workflow is not running (running -> finished only, DBTREE workflow_transitions); a paused or stopped workflow is resumed first'

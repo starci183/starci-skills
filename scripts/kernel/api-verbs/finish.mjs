@@ -5,6 +5,7 @@ import { requirePhase } from '../api-lib/lifecycle.mjs';
 import { kernelCustodyOf } from '../api-lib/kernel-seat.mjs';
 import { closeHeldTasks, closeKernelTerminal, releaseKernelSeat, retainAfterEnd } from '../api-lib/workflow-end.mjs';
 import { handoverGateOf } from '../handover.mjs';
+import { closeWorkflowDecisions } from '../../reconciler/decisions.mjs';
 
 export default {
   verb: 'finish',
@@ -43,7 +44,7 @@ export default {
   // not: release the singleton signal and settle its job before asking Orca
   // to close the exact terminal.
   const seat = kernelCustodyOf(db, workflowId), kernelTerminal = seat.terminal;
-  let closed = 0, incidentsClosed = 0, kernelSignalsReleased = 0, kernelJobsSettled = 0;
+  let closed = 0, incidentsClosed = 0, kernelSignalsReleased = 0, kernelJobsSettled = 0, decisionsClosed = [];
   ledger.transaction(() => {
     for (const row of db.prepare("SELECT inbox_id FROM inbox WHERE workflow_id=? AND status NOT IN ('done','applied') ORDER BY inbox_id").all(workflowId)) {
       if (setInboxStatus(db, { inboxId: row.inbox_id, status: 'done', at: now })) closed++;
@@ -54,6 +55,9 @@ export default {
       updateIncident(db, { incidentId: row.incident_id, lastProgress: `${row.last_progress ?? ''} [resolved: workflow-finished]`, at: now });
       if (resolveIncident(db, { incidentId: row.incident_id, reason: 'workflow-ended', at: now })) incidentsClosed++;
     }
+    // H12 for decisions: a finished workflow keeps no live Decision Item — each resolves by runtime (verb
+    // workflow-finished); a leftover could never be decided and would keep being counted, escalated and digested.
+    decisionsClosed = closeWorkflowDecisions(ledger, workflowId, { verb: 'workflow-finished', now });
     // running -> finished (workflow_transitions) with its lifecycle_changes row; already finished stays as it is.
     if (!already) changeWorkflowPhase(db, { workflowId, to: 'finished', by: `kernel:${workflowId}`, reason: 'workflow-finished', at: now,
       finished: { finishedAt: now, by: 'kernel-api', ...(handoverFinish ? { handover: handoverFinish } : {}) } });
@@ -61,16 +65,16 @@ export default {
       { status: 'succeeded', result: { verdict: 'pass', reason: 'workflow-finished', at: now }, stamp: { finishedAt: now }, now }));
     ledger.appendEvent({
       workflowId, entityType: 'workflow', entityId: workflowId,
-      kind: 'workflow-finished', payload: { inboxClosed: closed, incidentsClosed, alreadyFinished: already, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, ...(handoverFinish ? { handover: handoverFinish } : {}) },
+      kind: 'workflow-finished', payload: { inboxClosed: closed, incidentsClosed, decisionsClosed, alreadyFinished: already, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, ...(handoverFinish ? { handover: handoverFinish } : {}) },
     });
   });
   const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now, internals);
   const retention = retainAfterEnd(db, now);
 
-  const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, incidentsClosed, alreadyFinished: already,
+  const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, incidentsClosed, decisionsClosed, alreadyFinished: already,
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal),
     tasksClosed, retention, ...(handoverFinish ? { handover: handoverFinish } : {}) };
-  emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
+  emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; decisions closed: ${decisionsClosed.length}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:finish` });
 
   },

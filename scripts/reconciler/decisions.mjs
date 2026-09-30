@@ -98,11 +98,16 @@ export function effective(di, now = Date.now()) {
 
 const byUrgency = (a, b) => (b.severity === 'critical') - (a.severity === 'critical') || (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity) || String(a.id).localeCompare(String(b.id));
 
+// A workflow in an ended phase holds no decidable work: a DI left open on an archived workflow can never be
+// resolved (events_refuse_archived refuses every further write), and an ended workflow's leftovers are never
+// listed, escalated, rung or digested — they are the rows archive/finish close before the phase flips.
+const ENDED = "(w.phase IS NULL OR w.phase NOT IN ('archived','finished'))";
+
 /** A product ledger's DIs (`workflowId` narrows; live ones unless `all`), critical first, then by dueAt. */
 export function listDecisions(db, { workflowId, all = false, decider = null, now = Date.now() } = {}) {
   const rows = workflowId
-    ? db.prepare('SELECT * FROM decision_items WHERE workflow_id=? ORDER BY opened_at, di_id').all(workflowId)
-    : db.prepare('SELECT * FROM decision_items ORDER BY opened_at, di_id').all();
+    ? db.prepare(`SELECT d.* FROM decision_items d LEFT JOIN workflows w ON w.workflow_id=d.workflow_id WHERE d.workflow_id=? AND ${ENDED} ORDER BY d.opened_at, d.di_id`).all(workflowId)
+    : db.prepare(`SELECT d.* FROM decision_items d LEFT JOIN workflows w ON w.workflow_id=d.workflow_id WHERE ${ENDED} ORDER BY d.opened_at, d.di_id`).all();
   return rows.map(rowToDi).map((d) => effective(d, now))
     .filter((d) => (all || LIVE.includes(d.status)) && (!decider || d.decider === decider)).sort(byUrgency);
 }
@@ -435,6 +440,27 @@ export function sweepDecisions(ledger, workflowId, { now = Date.now(), prefix = 
       closed.push(d.id);
     }
   });
+  return closed;
+}
+
+/**
+ * api archive / api finish close the workflow's live DIs (open|claimed|escalated) inside their own transaction,
+ * BEFORE the phase flips: an archived workflow takes no further writes (events_refuse_archived), so a DI left
+ * live there could never be resolved and would keep counting, escalating and digesting forever. Each resolves
+ * by 'runtime' (verb workflow-archived | workflow-finished, event decision-resolved auto:true). Rows are read
+ * raw, not through listDecisions — that reader already hides an ended workflow's leftovers, and a finished
+ * workflow being archived still owes them a close. Returns the closed ids.
+ */
+export function closeWorkflowDecisions(ledger, workflowId, { verb, now = Date.now(), prefix = 'decision' } = {}) {
+  const closed = [];
+  const rows = ledger.db.prepare("SELECT * FROM decision_items WHERE workflow_id=? AND status IN ('open','claimed','escalated') ORDER BY opened_at, di_id").all(workflowId);
+  for (const r of rows) {
+    const d = effective(rowToDi(r), now);
+    const next = { ...d, status: 'resolved', claim: null, resolution: { by: 'runtime', verb: one(verb, 400), decisionId: null, at: now } };
+    write(ledger, next, now);
+    event(ledger, prefix, next, 'resolved', { ...next.resolution, auto: true }, now);
+    closed.push(d.id);
+  }
   return closed;
 }
 
