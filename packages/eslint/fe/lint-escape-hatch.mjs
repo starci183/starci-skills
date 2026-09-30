@@ -8,6 +8,10 @@
  *   eslint-disable / -next-line / -line / -enable / -env, and `/* eslint rule: "off" *\/`
  *   @ts-ignore, @ts-expect-error, @ts-nocheck
  *   vn-ok: <reason>   - the retired second-language pragma; it excuses nothing any more
+ *   NOSONAR, @sonar-ignore                        - Sonar's own switches
+ *   istanbul ignore, c8 ignore, v8 ignore         - a line taken out of the coverage the gate reads
+ *   prettier-ignore                               - a region taken out of the formatter
+ *   stylelint-disable / -enable                   - a stylelint switch that reached a TS file
  *
  * TWO LAYERS, BECAUSE ONE IS NOT ENOUGH. The flat-config fence (`noInlineConfig`) makes an ESLint
  * directive INEFFECTIVE; this rule makes it a FINDING, so the attempt is named in the log instead of
@@ -39,6 +43,13 @@ const ESLINT_DIRECTIVE = /^\s*eslint-(?:disable(?:-next-line|-line)?|enable|env)
 /** A TypeScript directive that turns the compiler's check off for the next line or the file. */
 const TS_DIRECTIVE = /^\s*(?:\/\s*)?@ts-(?:ignore|expect-error|nocheck)\b/
 
+/**
+ * A quality-tool switch other than ESLint's: Sonar honours `NOSONAR` anywhere in a comment (case-insensitively), so it is
+ * matched anywhere; the others are read by their tool from the start of the comment, so they are anchored there too.
+ */
+const TOOL_DIRECTIVE =
+  /\bNOSONAR\b|^\s*@sonar-ignore\b|^\s*(?:istanbul|c8|v8)\s+ignore\b|^\s*prettier-ignore(?:-start|-end)?\b|^\s*stylelint-(?:disable(?:-next-line|-line)?|enable)\b/i
+
 /** The retired second-language pragma. Present anywhere in a comment, it is a finding. */
 const RETIRED_PRAGMA = /\bvn-ok:/
 
@@ -53,6 +64,8 @@ export const noInlineLintConfig = {
         "Inline ESLint configuration makes this file the author of whether repository law applies. Remove the directive and fix the code or the shared rule; there is no local exception path.",
       typescript:
         "A TypeScript suppression directive. It turns the compiler off for code that is failing the check for a reason. Fix the type, or change the shared contract that produced it; there is no local exception path.",
+      tool:
+        "A Sonar, coverage, formatter or stylelint suppression (`NOSONAR`, `@sonar-ignore`, `istanbul ignore`, `c8 ignore`, `prettier-ignore`, `stylelint-disable`). It removes this code from a gate that is failing it for a reason, and the next reader cannot tell a measured exception from an avoided fix. Fix the code, or change the shared rule or the coverage threshold; there is no local exception path.",
       pragma:
         "`vn-ok:` was the second-language escape hatch and it is retired: user-facing text comes from a `next-intl` catalogue through `t()`, and there is no comment that excuses a literal. Remove the pragma and move the string.",
     },
@@ -65,6 +78,7 @@ export const noInlineLintConfig = {
         for (const comment of source.getAllComments()) {
           if (ESLINT_DIRECTIVE.test(comment.value)) context.report({ node: comment, messageId: "directive" })
           else if (TS_DIRECTIVE.test(comment.value)) context.report({ node: comment, messageId: "typescript" })
+          else if (TOOL_DIRECTIVE.test(comment.value)) context.report({ node: comment, messageId: "tool" })
           else if (RETIRED_PRAGMA.test(comment.value)) context.report({ node: comment, messageId: "pragma" })
         }
       },

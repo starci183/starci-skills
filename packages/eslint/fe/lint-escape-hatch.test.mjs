@@ -27,6 +27,10 @@ test("LINT-ESCAPE-1: product source cannot change its own lint policy", () => {
     valid: [
       { filename: SOURCE, code: "// the rule is fixed centrally\nconst value = 1" },
       { filename: "D:/repo/plugins/eslint/rule.test.mjs", code: "const fixture = 'eslint-disable'" },
+      // a comment that merely mentions a tool without being its directive
+      { filename: SOURCE, code: "// coverage is measured by the runner, not by a marker\nconst value = 1" },
+      { filename: SOURCE, code: "// the formatter is not asked to ignore anything here\nconst value = 1" },
+      { filename: SOURCE, code: "// stylelint runs on the css files only\nconst value = 1" },
       /*
        * PROSE ABOUT A DIRECTIVE IS NOT A DIRECTIVE. A comment that explains why a file carries no
        * `eslint-disable` is the most useful comment on the subject a file can hold, and the earlier
@@ -50,6 +54,18 @@ test("LINT-ESCAPE-1: product source cannot change its own lint policy", () => {
       { filename: SOURCE, code: "// @ts-nocheck\nconst value = 1", errors: [{ messageId: "typescript" }] },
       { filename: SOURCE, code: "// vn-ok: the server sends this verbatim\nconst value = 1", errors: [{ messageId: "pragma" }] },
       { filename: SOURCE, code: "const value = 'x' // vn-ok: one academy's own name", errors: [{ messageId: "pragma" }] },
+      // the other tools' switches
+      { filename: SOURCE, code: "const value = 1 // NOSONAR\n", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "// NOSONAR: legacy\nconst value = 1", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "// @sonar-ignore\nconst value = 1", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "/* istanbul ignore next */\nconst value = 1", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "/* istanbul ignore if */\nconst value = 1", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "/* c8 ignore next 3 */\nconst value = 1", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "/* c8 ignore start */\nconst value = 1", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "/* v8 ignore next */\nconst value = 1", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "// prettier-ignore\nconst value = [1,2]", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "/* stylelint-disable color-no-hex */\nconst value = 1", errors: [{ messageId: "tool" }] },
+      { filename: SOURCE, code: "// stylelint-disable-next-line\nconst value = 1", errors: [{ messageId: "tool" }] },
       // the e2e tree and specs are governed too
       { filename: "D:/repo/e2e/course/play.e2e-spec.ts", code: "// @ts-ignore\nconst value = 1", errors: [{ messageId: "typescript" }] },
       { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: "// @ts-ignore\nconst value = 1", errors: [{ messageId: "typescript" }] },
