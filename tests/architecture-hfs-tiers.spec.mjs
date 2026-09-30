@@ -6,8 +6,9 @@ import { stronglyConnected } from '../scripts/checks/architecture/tiers.mjs';
 // HFS checks 1 and 2: the tier direction matrix of knowledge/hfs/slots.yaml and owner cycles.
 
 const beDirection = report => findings(report, 'BE_TIER_DIRECTION');
+const featureImports = report => findings(report, 'BE_FEATURE_IMPORTS_FEATURE');
 
-test('BE: a feature importing another feature breaks the direction matrix', t => {
+test('BE: a feature importing another feature is BE_FEATURE_IMPORTS_FEATURE, never BE_TIER_DIRECTION (R28)', t => {
   const root = archFixture(t, {
     files: {
       'src/features/a/index.ts': "import { b } from '../b';\nexport const a = b + 1;\n",
@@ -15,7 +16,8 @@ test('BE: a feature importing another feature breaks the direction matrix', t =>
     },
   });
   const report = runArch(root);
-  const hits = beDirection(report);
+  assert.deepEqual(beDirection(report), []);
+  const hits = featureImports(report);
   assert.equal(hits.length, 1, JSON.stringify(hits));
   assert.equal(hits[0].path, 'src/features/a/index.ts');
   assert.equal(hits[0].resolvedPath, 'src/features/b/index.ts');
@@ -24,6 +26,7 @@ test('BE: a feature importing another feature breaks the direction matrix', t =>
   assert.equal(hits[0].typeOnly, false);
   assert.equal(report.coverage.hfsMachine.tiers.status, 'checked');
   assert.ok(report.coverage.checkedRuleIds.includes('BE_TIER_DIRECTION'));
+  assert.ok(report.coverage.checkedRuleIds.includes('BE_FEATURE_IMPORTS_FEATURE'));
 });
 
 test('BE: a feature may import domain, platform and integrations; an import inside one owner is always fine', t => {
@@ -36,7 +39,9 @@ test('BE: a feature may import domain, platform and integrations; an import insi
       'src/modules/integrations/mail/index.ts': 'export const i = 1;\n',
     },
   });
-  assert.deepEqual(beDirection(runArch(root)), []);
+  const report = runArch(root);
+  assert.deepEqual(beDirection(report), []);
+  assert.deepEqual(featureImports(report), []);
 });
 
 test('BE: domain, platform and integrations never import a feature or an app; platform never imports domain', t => {
@@ -63,7 +68,7 @@ test('BE: a type-only import counts and says so', t => {
       'src/features/b/index.ts': 'export type B = string;\n',
     },
   });
-  const hits = beDirection(runArch(root));
+  const hits = featureImports(runArch(root));
   assert.equal(hits.length, 1);
   assert.equal(hits[0].typeOnly, true);
   assert.match(hits[0].message, /type-only imports count/);
