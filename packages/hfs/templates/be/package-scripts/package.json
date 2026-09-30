@@ -13,6 +13,7 @@
     "test:integration": "npm run typecheck:tests && jest --selectProjects integration",
     "test:e2e": "npm run typecheck:tests && jest --selectProjects e2e",
     "test:contract": "npm run typecheck:tests && jest --selectProjects contract",
+    "test:stack": "hfs test-stack",
     "contract:emit": "hfs emit-contracts",
     "hfs:check": "hfs check",
     "hfs:report": "hfs check --sonar reports/hfs.sonar.json"

@@ -8,8 +8,8 @@ import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 /**
  * session/sign-out end to end: a session that answers calls ends by its own token through the public signOut door (the
  * session row is deleted, so the next bearer read is SESSION_NOT_FOUND and a second signOut refuses the same way), and
- * the same identity recovers with a fresh sign-in. The identity provider is told the session ended (the fake records the
- * notice); the row counts are read through the shared entity manager, every step of the journey itself travels /graphql.
+ * the same identity recovers with a fresh sign-in at the real Keycloak of the stack; the row counts are read through the
+ * shared entity manager, every step of the journey itself travels /graphql.
  */
 describe("session sign-out (e2e)", () => {
     const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
@@ -31,11 +31,6 @@ describe("session sign-out (e2e)", () => {
         const signedOut = await api.graphql<SignOutData>("signOut", { input: { sessionToken: person.sessionToken } })
         expect(signedOut.errors).toBeNull()
         expect(signedOut.data?.signOut.signedOut).toBe(true)
-
-        // The provider was told the session ended: the notice names the person (contract check on what the app sent).
-        const notices = (await world.fake.keycloak.requests()).filter((request) => request.body.includes(person.personId))
-        expect(notices).toHaveLength(1)
-        expect(notices[0]?.body).toContain("sign-out")
 
         const refused = await person.caller.graphql<TasksData>("tasks")
         expect(refused.errorCode).toBe(IdentityErrorCode.NotFound)

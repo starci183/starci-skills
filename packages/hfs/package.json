@@ -18,6 +18,7 @@
     "report/**",
     "runtime/**",
     "sync/**",
+    "test-stack/**",
     "templates/**",
     "README.md",
     "CHANGELOG.md"

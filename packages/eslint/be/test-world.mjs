@@ -2,11 +2,13 @@
  * The rules that hold the test layout (catalog R47 `BE_TEST_TOPOLOGY`, owner test layout 2026-09-30).
  *
  * Unit specs sit beside their subject. Everything else lives under `src/tests/`, one folder per kind:
- *   - `world/`        the ONLY test infrastructure (slot `be.tests.world`): `global-setup.ts` starts the containers and runs
- *                     `apps/migrate`'s exported bootstrap once; `use-test-world.ts` exports
+ *   - `world/`        the ONLY test infrastructure (slot `be.tests.world`): `global-setup.ts` starts (or attaches to) the stack
+ *                     the repository declares in `.starcistacks/<env>` through `hfs test-stack` - every service of it runs
+ *                     REAL behind toxiproxy - and runs `apps/migrate`'s exported bootstrap once; `use-test-world.ts` exports
  *                     `useTestWorld({ apps } | { modules })` -> `world.apps.<name>.api`, `world.db.<connection>`,
- *                     `world.fake.<provider>` (network-edge fakes with failNext/replayWebhook/delay), `world.waitFor`;
- *                     `fakes/<provider>/` holds the fake servers and payload fixtures.
+ *                     `world.infra.<service>` (`latency(ms)`, `cut()`, `restore()` on the real service),
+ *                     `world.fake.<provider>` (network-edge fakes of external SaaS with failNext/replayWebhook/delay),
+ *                     `world.waitFor`; `fakes/<provider>/` holds the fake servers and payload fixtures.
  *   - `fixtures/`     typed doubles and builders.
  *   - `integration/`  `<capability>/*.integration-spec.ts`, `useTestWorld({ modules })`, real database, no HTTP.
  *   - `e2e/`          `<area>/*.e2e-spec.ts`, `useTestWorld({ apps })`.
@@ -103,8 +105,8 @@ export const testsInfraOnlyInWorld = {
 const OVERRIDES = new Set(["overrideProvider", "overrideModule", "overrideGuard", "overrideInterceptor", "overrideFilter", "overridePipe"])
 
 /**
- * Nothing under `src/tests/` overrides the DI container: external services are network-edge fakes of the world
- * (`world.fake.<provider>`), so our integrations' signing, parsing and retry code runs. Refused: `.override*(`, a provider
+ * Nothing under `src/tests/` overrides the DI container: the repository's own services run real (`world.infra.<service>`) and
+ * external SaaS are network-edge fakes of the world (`world.fake.<provider>`), so our integrations' signing, parsing and retry code runs. Refused: `.override*(`, a provider
  * object with `useValue`, and `jest.mock(`.
  */
 export const testsNoOverride = {
@@ -113,7 +115,7 @@ export const testsNoOverride = {
         docs: { description: "Nothing under src/tests overrides a provider: external services are the world's network fakes." },
         schema: [],
         messages: {
-            override: "`{{what}}` replaces a provider under `src/tests`. Nothing is overridden: an external service is a network fake of the world (`world.fake.<provider>`, fixtures under `src/tests/world/fakes/`), so the integration's own signing, parsing and retry code runs.",
+            override: "`{{what}}` replaces a provider under `src/tests`. Nothing is overridden: a service of the repository's stack runs real (`world.infra.<service>` fails it on purpose) and an external SaaS is a network fake of the world (`world.fake.<provider>`, fixtures under `src/tests/world/fakes/`), so the integration's own signing, parsing and retry code runs.",
         },
     },
     create(context) {

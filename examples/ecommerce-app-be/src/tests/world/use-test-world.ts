@@ -2,12 +2,13 @@
  * The ONE test world. `useTestWorld({ apps } | { modules })` registers `beforeAll`/`afterAll` and boots either the REAL apps
  * (`AppModule.register(testOptions)` of `apps/identity` and `apps/order`, each listening on an OS-allocated loopback port and
  * wired to the other through typed options) or only the named capability modules over the platform database, in this
- * process, against the shared infrastructure the jest globalSetup started once (one migrated Postgres container per
+ * process, against the shared infrastructure the jest globalSetup started once (the stack, one migrated database per
  * connection). Both modes share this implementation: same options, same boot, same shutdown.
  *
- * Nothing first-party is ever replaced: no provider, guard, filter or module is overridden. The only double is the Redis
- * provider, a network fake the cache integration reaches over a real socket. No sleeps: an asynchronous effect is awaited
- * with `waitFor` against persisted state or a fake.
+ * Nothing first-party is ever replaced: no provider, guard, filter or module is overridden, and nothing is faked: Postgres
+ * and Redis are the real services of the repository's own stack (`.starcistacks/dev`), each behind a toxiproxy proxy, a
+ * dependency is failed on purpose through `world.infra.<service>` (latency, cut, restore), never by killing it. No sleeps: an
+ * asynchronous effect is awaited with `waitFor` against persisted state.
  */
 import "reflect-metadata"
 import { strict as assert } from "node:assert"
@@ -18,7 +19,6 @@ import { NestFactory } from "@nestjs/core"
 import { DataSource } from "typeorm"
 import { freePorts } from "@tests/world/kit/free-ports"
 import { pollUntil } from "@tests/world/kit/poll"
-import { retryUntil } from "@tests/world/kit/readiness"
 import { accountEntities } from "@modules/domain/account"
 import { cartEntities } from "@modules/domain/cart"
 import { catalogEntities } from "@modules/domain/catalog"
@@ -30,17 +30,17 @@ import { DatabaseModule, IDENTITY_CONNECTION, ORDER_CONNECTION } from "@modules/
 import type { DatabaseConnectionOptions } from "@modules/platform/database"
 import { LoggingModule } from "@modules/platform/logging"
 import type { RegisterData, SignInData } from "../fixtures/e2e-views.contracts"
-import { killContainer, postgresAccepts, startContainer } from "./docker.client"
-import { RedisFakeService } from "./fakes/redis/redis-fake.service"
+import { cacheSize } from "./cache.client"
+import { createInfraControl, resetInfra } from "./infra.client"
 import { createTestApi } from "./test-api.client"
 import type { TestApi } from "./test-api.client"
 import type {
     AppsWorldSpec,
     ModulesWorldSpec,
     TestApps,
-    TestConnection,
+    TestCache,
     TestDb,
-    TestFakes,
+    TestInfra,
     TestSession,
     TestWiring,
     TestWorldSpec,
@@ -48,14 +48,13 @@ import type {
 } from "./test-world.contracts"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 import { readWorldState } from "./test-world-state.service"
-import type { TestDatabaseState, TestWorldState } from "./test-world-state.service"
+import type { TestWorldState } from "./test-world-state.service"
 
 const BOOT_TIMEOUT_MS = 240_000
 const STOP_TIMEOUT_MS = 60_000
 const DEFAULT_TEST_TIMEOUT_MS = 120_000
 const DEFAULT_WAIT_MS = 30_000
 const DEFAULT_POLL_MS = 250
-const DATABASE_RETURN_DEADLINE_MS = 120_000
 const RATE_LIMIT_HIGH = 100_000
 const CALL_DEADLINE_MS = 5000
 const NEST_LOGGER = ["error", "warn"] as const
@@ -73,7 +72,7 @@ interface Runtime {
     readonly contexts: ReadonlyArray<INestApplicationContext>
     readonly dataSources: ReadonlyArray<DataSource>
     readonly db: TestDb
-    readonly fake: TestFakes
+    readonly infra: TestInfra
     readonly apis: { readonly identity: TestApi; readonly order: TestApi } | null
     readonly root: INestApplicationContext | null
 }
@@ -103,9 +102,6 @@ const openDatabase = async (
     return dataSource
 }
 
-const databaseOf = (state: TestWorldState, connection: TestConnection): TestDatabaseState =>
-    connection === "identity" ? state.identity : state.order
-
 /** The handle a spec holds: infrastructure coordinates hidden, every door and reader typed. */
 export class TestWorld {
     private runtime: Runtime | null = null
@@ -115,27 +111,30 @@ export class TestWorld {
     /** Boots the world; called by the `beforeAll` that `useTestWorld` registers. */
     async start(): Promise<void> {
         const state = readWorldState()
-        const redis = await RedisFakeService.start()
-        const identityDb = await openDatabase(IDENTITY_CONNECTION, state.identity.url, IDENTITY_ENTITIES)
-        const orderDb = await openDatabase(ORDER_CONNECTION, state.order.url, ORDER_ENTITIES)
+        await resetInfra(state.stack)
+        const identityDb = await openDatabase(IDENTITY_CONNECTION, state.identity.directUrl, IDENTITY_ENTITIES)
+        const orderDb = await openDatabase(ORDER_CONNECTION, state.order.directUrl, ORDER_ENTITIES)
         const base = {
             state,
             dataSources: [identityDb, orderDb],
             db: { identity: identityDb.manager, order: orderDb.manager },
-            fake: { redis },
+            infra: {
+                postgres: createInfraControl(state.stack, "postgres"),
+                redis: createInfraControl(state.stack, "redis"),
+            },
         }
         this.runtime =
             "apps" in this.spec ? await this.startApps(this.spec, base) : await this.startModules(this.spec, base)
     }
 
-    /** Closes every booted app, last booted first, then the readers and the fake; called by the `afterAll` of `useTestWorld`. */
+    /** Closes every booted app, last booted first, then the readers, and puts every proxy back to normal; called by the `afterAll` of `useTestWorld`. */
     async stop(): Promise<void> {
         const runtime = this.runtime
         this.runtime = null
         if (runtime === null) return
         const closed = await Promise.allSettled([...runtime.contexts].reverse().map((context) => context.close()))
         await Promise.all(runtime.dataSources.map((dataSource) => dataSource.destroy()))
-        await runtime.fake.redis.stop()
+        await resetInfra(runtime.state.stack)
         const failed = closed.find((result) => result.status === "rejected")
         if (failed?.status === "rejected") {
             throw new TestWorldError({
@@ -166,9 +165,15 @@ export class TestWorld {
         return this.booted().db
     }
 
-    /** The network fakes of the external services. */
-    get fake(): TestFakes {
-        return this.booted().fake
+    /** The real services of the stack, each with `latency(ms)`, `cut()` and `restore()`. */
+    get infra(): TestInfra {
+        return this.booted().infra
+    }
+
+    /** What the world reads from the real Redis of the stack. */
+    get cache(): TestCache {
+        const { state } = this.booted()
+        return { size: () => cacheSize(state.stack, state.runId) }
     }
 
     /** Resolves a provider of a modules world by its class. */
@@ -188,29 +193,6 @@ export class TestWorld {
         options: WaitForOptions = {},
     ): Promise<TValue> {
         return pollUntil(label, check, options.timeoutMs ?? DEFAULT_WAIT_MS, options.intervalMs ?? DEFAULT_POLL_MS)
-    }
-
-    /**
-     * Kills the database container of `connection` (both when it is absent), runs `during` while it is down, then starts the
-     * same container again and waits until it accepts connections: the outage a deployment sees when its database host
-     * crashes and comes back.
-     */
-    async interruptDatabase(during: () => Promise<void>, connection?: TestConnection): Promise<void> {
-        const { state } = this.booted()
-        const databases = connection === undefined ? [state.identity, state.order] : [databaseOf(state, connection)]
-        databases.forEach((database) => killContainer(database.container))
-        try {
-            await during()
-        } finally {
-            for (const database of databases) {
-                startContainer(database.container)
-                await retryUntil(
-                    `the ${database.database} database accepts connections again`,
-                    DATABASE_RETURN_DEADLINE_MS,
-                    () => Promise.resolve(postgresAccepts(database.container, database.user, database.database)),
-                )
-            }
-        }
     }
 
     /** Registers a new person through the public door of the identity app and signs them in. */
@@ -249,7 +231,7 @@ export class TestWorld {
     }
 
     private async startApps(spec: AppsWorldSpec, base: Omit<Runtime, "contexts" | "apis" | "root">): Promise<Runtime> {
-        const { state, fake } = base
+        const { state } = base
         const [identityPort = 0, orderPort = 0] = await freePorts(2)
         const identityUrl = `http://127.0.0.1:${identityPort}`
         const orderUrl = `http://127.0.0.1:${orderPort}`
@@ -259,7 +241,7 @@ export class TestWorld {
             spec.apps.identity.module.register({
                 port: identityPort,
                 database: { name: IDENTITY_CONNECTION, url: new Secret(state.identity.url) },
-                cache: { url: new Secret(fake.redis.url) },
+                cache: { url: new Secret(state.cacheUrl) },
                 orderApi: { url: orderUrl, timeoutMs: CALL_DEADLINE_MS },
                 httpSecurity: { allowedOrigins, rateLimit },
             }),

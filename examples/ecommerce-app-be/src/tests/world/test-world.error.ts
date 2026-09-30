@@ -2,7 +2,7 @@ import { DomainError } from "@modules/platform/errors"
 
 /** Codes of the test world: what can go wrong while it stands infrastructure up, boots an app, or reads a fake. */
 export enum TestWorldErrorCode {
-    /** The shared infrastructure (docker, the database, the fakes host) could not be started or removed. */
+    /** The shared infrastructure (the stack, a database, a proxy) could not be started, reached or removed. */
     InfrastructureFailed = "TEST_WORLD_INFRASTRUCTURE_FAILED",
     /** The world state file of the run is absent or malformed: the jest globalSetup did not run. */
     StateMissing = "TEST_WORLD_STATE_MISSING",

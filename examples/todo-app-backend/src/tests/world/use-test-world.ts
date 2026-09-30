@@ -1,21 +1,23 @@
 /**
  * The ONE test world. `useTestWorld({ apps })` registers `beforeAll`/`afterAll` and boots the REAL apps
  * (`AppModule.register(testOptions)` of `apps/todo`, listening on an OS-allocated loopback port, and `apps/worker`, no
- * listener) in this process, against the shared infrastructure the jest globalSetup started once (one migrated Postgres
- * container and the network-edge fakes of every third party).
+ * listener) in this process, against the shared infrastructure the jest globalSetup started once: every service of the
+ * repository's own stack (`.starcistacks/dev`: Postgres with a migrated database per run, Keycloak with its realm imported)
+ * running for real behind toxiproxy, and the network-edge fakes of the external SaaS the team does not operate.
  *
  * Nothing first-party is ever replaced: no provider, guard, filter or module is overridden, so signing, parsing, retries and
  * the whole request pipeline of the app run for real; the only doubles are the servers in `fakes/`, reached over the wire.
+ * A dependency is failed on purpose through `world.infra.<service>` (latency, cut, restore), never by killing it.
  * No sleeps: an asynchronous effect is awaited with `waitFor` against persisted state or a fake.
  */
 import "reflect-metadata"
 import { pollUntil } from "@tests/world/kit/poll"
-import { retryUntil } from "@tests/world/kit/readiness"
 import type { INestApplicationContext } from "@nestjs/common"
 import { NestFactory } from "@nestjs/core"
 import { randomUUID } from "node:crypto"
 import { DataSource } from "typeorm"
-import { killContainer, postgresAccepts, startContainer } from "./docker.client"
+import { registerPerson } from "./identity-provider.client"
+import { createInfraControl, resetInfra } from "./infra.client"
 import { createTestApi } from "./test-api.client"
 import type { TestApi } from "./test-api.client"
 import { testOptions } from "./test-apps.options"
@@ -26,6 +28,8 @@ import type {
     SignedInPerson,
     TestApps,
     TestDb,
+    TestIdentity,
+    TestInfra,
     TestOptions,
     WaitForOptions,
 } from "./test-world.contracts"
@@ -38,7 +42,6 @@ const STOP_TIMEOUT_MS = 60_000
 const DEFAULT_TEST_TIMEOUT_MS = 120_000
 const DEFAULT_WAIT_MS = 30_000
 const DEFAULT_POLL_MS = 250
-const DATABASE_RETURN_DEADLINE_MS = 120_000
 const NEST_LOGGER = ["error", "warn"] as const
 
 interface BootedApp {
@@ -52,6 +55,7 @@ interface Runtime {
     readonly dataSource: DataSource
     readonly db: TestDb
     readonly fake: TestFakes
+    readonly infra: TestInfra
     readonly api: TestApi | null
     readonly workerBooted: boolean
 }
@@ -69,7 +73,7 @@ const boot = async (module: DynamicModule, options: TestOptions, listen: boolean
 }
 
 /** The world's own handle on the migrated database: the shared entity manager a spec reads persisted state through. */
-const openDatabase = (state: TestWorldState): Promise<DataSource> => new DataSource({ type: "postgres", url: state.databaseUrl, synchronize: false }).initialize()
+const openDatabase = (state: TestWorldState): Promise<DataSource> => new DataSource({ type: "postgres", url: state.databaseDirectUrl, synchronize: false }).initialize()
 
 /** Closes one context; answers the failure instead of throwing, so every context gets its turn. */
 const closeContext = async (context: INestApplicationContext): Promise<unknown> => {
@@ -90,6 +94,7 @@ export class TestWorld {
     /** Boots the world; called by the `beforeAll` that `useTestWorld` registers. */
     async start(): Promise<void> {
         const state = readWorldState()
+        await resetInfra(state.stack)
         const options = testOptions(state)
         this.runtime = await this.startApps(this.spec, state, options)
     }
@@ -98,6 +103,7 @@ export class TestWorld {
     async stop(): Promise<void> {
         const contexts = this.runtime?.contexts ?? []
         const dataSource = this.runtime?.dataSource
+        if (this.runtime !== null) await resetInfra(this.runtime.state.stack)
         this.runtime = null
         const failures: Array<unknown> = []
         for (const context of [...contexts].reverse()) {
@@ -131,9 +137,20 @@ export class TestWorld {
         return this.booted().db
     }
 
-    /** The fakes of the third parties, reached over the control channel. */
+    /** The fakes of the external SaaS, reached over the control channel. */
     get fake(): TestFakes {
         return this.booted().fake
+    }
+
+    /** The real services of the stack, each with `latency(ms)`, `cut()` and `restore()`. */
+    get infra(): TestInfra {
+        return this.booted().infra
+    }
+
+    /** The real identity provider's admin door. */
+    get identity(): TestIdentity {
+        const { state } = this.booted()
+        return { register: (email, password) => registerPerson(state.stack, state.keycloakRealm, email, password) }
     }
 
     /**
@@ -160,28 +177,11 @@ export class TestWorld {
         return seen.observed
     }
 
-    /**
-     * Kills the database container, runs `during` while it is down, then starts the same container again and waits until it
-     * accepts connections: the outage a deployment sees when its database host crashes and comes back.
-     */
-    async interruptDatabase(during: () => Promise<void>): Promise<void> {
-        const { databaseContainer, databaseUser, databaseName } = this.booted().state
-        killContainer(databaseContainer)
-        try {
-            await during()
-        } finally {
-            startContainer(databaseContainer)
-            await retryUntil("the database accepts connections again", DATABASE_RETURN_DEADLINE_MS, () =>
-                Promise.resolve(postgresAccepts(databaseContainer, databaseUser, databaseName)),
-            )
-        }
-    }
-
-    /** Registers a new person at the identity provider fake and signs them in through the public door. */
+    /** Registers a new person at the real identity provider and signs them in through the public door. */
     async signedInPerson(label: string): Promise<SignedInPerson> {
         const email = `${label}-${randomUUID()}@todo.dev`
         const password = `pw-${randomUUID()}`
-        const personId = await this.fake.keycloak.person(email, password)
+        const personId = await this.identity.register(email, password)
         const api = this.apps.todo.api
         const session = await api.signIn(email, password)
         return { email, password, personId, sessionToken: session.sessionToken, caller: api.as(session.sessionToken) }
@@ -212,6 +212,12 @@ export class TestWorld {
             contexts,
             dataSource,
             db: { primary: dataSource.manager },
+            infra: {
+                postgres: createInfraControl(state.stack, "postgres"),
+                keycloak: createInfraControl(state.stack, "keycloak"),
+                redis: createInfraControl(state.stack, "redis"),
+                minio: createInfraControl(state.stack, "minio"),
+            },
             fake: createTestFakes(state.controlUrl, () => {
                 if (baseUrl === null) throw notDeclared("apps.todo (the webhook target)")
                 return baseUrl

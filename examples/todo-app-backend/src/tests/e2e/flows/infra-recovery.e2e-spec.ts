@@ -6,11 +6,12 @@ import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 import { AppModule as WorkerApp } from "../../../../apps/worker/src/app.module"
 
 /**
- * Infra-down recovery. The world kills the database container mid-run (the one dependency the api /health probe checks; the
- * worker polls the same database), the spec asserts the api stays alive and answers /health with a clean 503 instead of
- * hanging or crashing, the world starts the same container back (identical port and data), and the spec asserts the api
- * recovers to 200, the persisted world is intact, and the worker recovered too: a sign-in made after the outage gets its
- * audit line appended through the outbox and the worker consumer.
+ * Infra-down recovery on the REAL Postgres of the stack. The spec cuts the database at its toxiproxy proxy mid-run
+ * (`world.infra.postgres.cut()`: the one dependency the api /health probe checks; the worker polls the same database),
+ * asserts the api stays alive and answers /health with a clean 503 instead of hanging or crashing, restores the database
+ * (`world.infra.postgres.restore()`: same instance, same data), and asserts the api recovers to 200, the persisted world is
+ * intact, and the worker recovered too: a sign-in made after the outage gets its audit line appended through the outbox and
+ * the worker consumer.
  */
 describe("resilience: infra recovery", () => {
     const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } }, testTimeoutMs: 900_000 })
@@ -27,10 +28,10 @@ describe("resilience: infra recovery", () => {
         // Baseline: the data channel answers and the persisted world holds its migrated tables.
         expect(await tables()).toEqual(expect.arrayContaining(["sessions", "tasks", "outbox_messages", "inbox_claims"]))
 
-        await world.interruptDatabase(async () => {
-            // The api tolerates the outage: still answering HTTP, with a declared dependency error.
-            await world.waitFor("api /health answers 503", async () => (await api.get("/health")).status === 503, { timeoutMs: 90_000, intervalMs: 1_000 })
-        })
+        await world.infra.postgres.cut()
+        // The api tolerates the outage: still answering HTTP, with a declared dependency error.
+        await world.waitFor("api /health answers 503", async () => (await api.get("/health")).status === 503, { timeoutMs: 90_000, intervalMs: 1_000 })
+        await world.infra.postgres.restore()
 
         await world.waitFor("api /health recovers to 200", async () => (await api.get("/health")).status === 200, { timeoutMs: 180_000, intervalMs: 1_000 })
 

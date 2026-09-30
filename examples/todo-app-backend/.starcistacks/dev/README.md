@@ -30,6 +30,7 @@ this brings up.
 | keycloak | 8089 |
 | minio | 9000 |
 | prometheus | 9090 |
+| toxiproxy | 8474 |
 
 The four stateful ports (postgres 5432, redis 6379, minio 9000, prometheus 9090) run on their declared
 host ports, by owner ruling: this machine also runs other Docker Desktop containers on those same ports
@@ -48,6 +49,13 @@ docker start starci-postgres starci-redis starci-minio starci-prometheus
 ```
 
 `starci-sonarqube` and anything else not sitting on one of this example's declared ports is left running.
+
+## Test world
+
+`toxiproxy` is the failure-injection proxy of the test world. `npm run test:stack -- up` (`hfs test-stack up`) starts the real
+services of this stack (postgres, keycloak with `realm-todo.json` imported, redis, minio) behind it under the project
+`todo-app-backend-test-stack`, on OS-allocated loopback ports and with test-only credentials, so it never collides with the
+ports above; `npm run test:stack -- down` removes it. The e2e world attaches to it when it answers.
 
 ## Secrets
 

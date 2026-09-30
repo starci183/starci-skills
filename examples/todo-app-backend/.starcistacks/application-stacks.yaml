@@ -22,6 +22,11 @@ components:
     image: prom/prometheus:latest
     role: observability
     compose: infra/compose/prometheus.yaml
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    role: failure-injection
+    purpose: The test world routes every real service through a proxy here to cut or slow it on purpose (hfs test-stack).
+    compose: infra/compose/toxiproxy.yaml
   api:
     image: todo-app/api
     role: service
@@ -43,6 +48,8 @@ environments:
         port: 8089
       redis:
         port: 6379
+      toxiproxy:
+        port: 8474
       minio:
         port: 9000
       prometheus:

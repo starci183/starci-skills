@@ -11,8 +11,8 @@ const NAME_KEY = defineCacheKey<string>({
 })
 
 /**
- * Contract of the Redis provider: the REAL cache integration (ioredis) against a Redis SANDBOX, the behaviour the RESP fake
- * of the e2e world imitates: a stored value reads back through the declared key, a missing entry reads as a miss, a deleted
+ * Contract of the Redis provider: the REAL cache integration (ioredis) against a Redis SANDBOX, the behaviour the real Redis
+ * of the e2e world serves: a stored value reads back through the declared key, a missing entry reads as a miss, a deleted
  * entry is gone, and a value the key cannot narrow is a miss. Runs only when the sandbox is declared in the environment
  * (`CACHE_REDIS_URL` of a disposable Redis); otherwise skipped. No secret is read from or written to the repository.
  */

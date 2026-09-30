@@ -24,6 +24,11 @@
 //   hfs emit-contracts [--repo <dir>]      write contracts/<app>/schema.graphql of every api app that serves GraphQL (emit/contracts.mjs):
 //                                            printSchema(lexicographicSortSchema) of the resolvers the app root composes; no env, no database, no network.
 //   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar, codecov); sync/cli.mjs
+//   hfs test-stack (up | down) [--repo <dir>] [--env <name>] [--project <name>]
+//                                            the warm stack of the test world (test-stack/test-stack.mjs): `up` starts every service of the repository's own
+//                                            stack definition (.starcistacks/<env>, default dev) for real behind toxiproxy under the stable project name
+//                                            `<package>-test-stack` (or attaches when it already answers) and prints the state document as JSON; `down`
+//                                            removes exactly that project. The npm script is `test:stack`.
 //   hfs work-hygiene                              the pre-commit guard for staged .starciwork and .starcistacks paths; sync/cli.mjs
 // Every finding names a why code and carries its Vietnamese text. The command reads the repository, never writes to it
 // (init writes hfs.json only, and only when none exists). Exit codes: 0 clean, 1 error findings, 2 a refusal or bad usage.
@@ -37,6 +42,7 @@ import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
+import { TestStackError, main as testStackMain } from '../test-stack/test-stack.mjs';
 import { contractEmitFindings } from '../runtime/scripts/lib/hfs-rules/contract.mjs';
 import { LINTER_KINDS, convertReportFile, sonarReport, sourceRootsOf, writeReport } from '../report/sonar.mjs';
 
@@ -46,10 +52,11 @@ hfs init [--repo <dir>] [--stdout]
 hfs emit-contracts [--repo <dir>]
 hfs explain <path> [--repo <dir>] [--json]
 hfs sync (--check | --write) [--root <dir>]
+hfs test-stack (up | down) [--repo <dir>] [--env <name>] [--project <name>]
 hfs work-hygiene
 `;
 const PER_CODE_LIMIT = 25;
-const VALUE_FLAGS = new Set(['--repo', '--base', '--sonar']);
+const VALUE_FLAGS = new Set(['--repo', '--base', '--sonar', '--env', '--project']);
 const BOOL_FLAGS = new Set(['--json', '--stdout', '--fast']);
 
 function parse(argv) {
@@ -109,7 +116,7 @@ function printExplain(e, out) {
 /** `presets` and `prettier` are test seams: the coverage denominators sync would load from the repository's installed preset, and the repository's own prettier. */
 export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
   const [verb, ...rest] = argv;
-  if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report', 'emit-contracts'].includes(verb)) { stderr(USAGE); return 2; }
+  if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report', 'emit-contracts', 'test-stack'].includes(verb)) { stderr(USAGE); return 2; }
   try {
     if (verb === 'sync' || verb === 'work-hygiene') return await syncMain(argv);
     const opts = parse(rest);
@@ -147,6 +154,10 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
       stdout(`hfs report ${kind}: ${issues} issue${issues === 1 ? '' : 's'} written to ${output}\n`);
       return 0;
     }
+    if (verb === 'test-stack') {
+      if (opts.positional.length !== 1 || !['up', 'down'].includes(opts.positional[0])) throw new Error('hfs test-stack takes up or down');
+      return await testStackMain({ action: opts.positional[0], root: repoRoot, environment: opts.env, project: opts.project, stdout });
+    }
     if (verb === 'emit-contracts') {
       if (opts.positional.length) throw new Error('hfs emit-contracts takes no path');
       const declaration = JSON.parse(fs.readFileSync(path.join(repoRoot, 'hfs.json'), 'utf8'));
@@ -172,7 +183,7 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     if (opts.json) stdout(`${JSON.stringify(explained, null, 2)}\n`); else printExplain(explained, stdout);
     return explained.status === 'no-slot' || explained.status === 'ambiguous' ? 1 : 0;
   } catch (error) {
-    stderr(error instanceof HfsSlotsError || error instanceof SyncError ? `${error.message}\n` : `hfs: ${error.message}\n${USAGE}`);
+    stderr(error instanceof HfsSlotsError || error instanceof SyncError || error instanceof TestStackError ? `${error.message}\n` : `hfs: ${error.message}\n${USAGE}`);
     return 2;
   }
 }

@@ -84,7 +84,7 @@ describe("identity sign-up and sign-in journey", () => {
         expect(await readRows<PersonRow>(world.db.identity, PERSON_BY_ID, [personId])).toEqual([
             { id: personId, email },
         ])
-        expect(world.fake.redis.size()).toBeGreaterThan(0)
+        expect(await world.cache.size()).toBeGreaterThan(0)
         const identityTables = await readRows<TableRow>(world.db.identity, PUBLIC_TABLES, [])
         const orderTables = await readRows<TableRow>(world.db.order, PUBLIC_TABLES, [])
         expect([...identityTables, ...orderTables].map((row) => row.table_name)).toEqual(

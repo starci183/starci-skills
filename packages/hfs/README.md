@@ -10,6 +10,7 @@ npx hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]
 npx hfs report <eslint|stylelint> <in> <out> [--repo <dir>]   # a linter's json -> Sonar Generic Issue Import (see Sonar)
 npx hfs init    [--repo <dir>] [--stdout]     # write a starter hfs.json (never overwrites); --stdout only prints
 npx hfs emit-contracts [--repo <dir>]         # write contracts/<app>/schema.graphql of every api app that serves GraphQL (the managed script contract:emit)
+npx hfs test-stack (up | down) [--repo <dir>] [--env <name>] [--project <name>]   # the warm stack of the test world: every service of .starcistacks/<env> for real behind toxiproxy (the managed script test:stack)
 npx hfs explain <path> [--repo <dir>] [--json]
 npx hfs sync (--check | --write) [--root <dir>]   # generated files: the managedBy slots of slots.yaml, the .gitignore block (sync/, templates/)
 npx hfs work-hygiene                              # pre-commit guard for staged .starciwork / .starcistacks paths

@@ -2,6 +2,7 @@ include:
   - postgres.yaml
   - keycloak.yaml
   - redis.yaml
+  - toxiproxy.yaml
   - minio.yaml
   - prometheus.yaml
   - api.yaml
