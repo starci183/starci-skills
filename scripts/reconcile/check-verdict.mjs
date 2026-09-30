@@ -3,7 +3,7 @@
 // A checker that could not run (its tool missing, its inputs unresolvable, a timeout, a crash before it measured) is
 // an INFRASTRUCTURE problem: `unavailable`, never red, so it never rolls an integration back, never opens a
 // continuation and never fails an attempt. The checker's own status word decides that when it writes one
-// (check-scoped-lint exits 2 with status unavailable; canon-scan answers status unresolved); a bare exit code reads
+// (gate.mjs exits 2 when a tool could not run; canon-scan answers status unresolved); a bare exit code reads
 // 0 -> pass, 124 (timeout) / 127 (spawn failure) -> unavailable, anything else -> red. A run is `pass` only with raw
 // exit 0 (DBTREE check_runs: no pass with a raw exit != 0) - a status word never lifts a red exit to green.
 export const CHECK_VERDICTS = Object.freeze(['pass', 'red', 'unavailable']);

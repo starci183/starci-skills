@@ -90,7 +90,7 @@ test('IMPORTS_BROKEN_AFTER_MOVE: after the move lands, the unrepointed importers
 test('RCA: a checker failing on an unresolved import is broken-import (not checker-unavailable), and the repoint unit is ranked first', async () => {
   const { causesOf, actionsOf, CAUSES } = await import('../scripts/kernel/progress-rca.mjs');
   assert.equal(CAUSES['broken-import'].authority, 'kernel');
-  const report = { outcome: 'blocked', blocker: { kind: 'environment', detail: 'check-scoped-lint status=unavailable: TS2307 Cannot find module "@/i18n/request"' } };
+  const report = { outcome: 'blocked', blocker: { kind: 'environment', detail: 'gate.mjs exit 2: TS2307 Cannot find module "@/i18n/request"' } };
   assert.deepEqual(causesOf({ status: 'failed', report }), ['broken-import']);
   assert.equal(causesOf({ status: 'failed', report: { outcome: 'blocked', blocker: { kind: 'environment', detail: 'checker is unavailable (exit 3)' } } })[0], 'checker-unavailable');
   const importsBroken = { count: 26, files: 3, repointQueued: false, brokenFiles: ['nivo-fe/apps/app/src/a.ts', 'nivo-fe/apps/app/src/b.ts', 'nivo-fe/apps/app/src/c.ts'] };

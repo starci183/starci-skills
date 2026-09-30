@@ -46,6 +46,22 @@ export function isLinkLike(p, { parentReal = null, stat = null } = {}) {
 }
 
 /** Remove a link itself, never its target. True when nothing is left at `p`. */
+/** Every link (symlink, junction, other reparse point) under root, found with lstat; the walk never enters one. */
+export function linksUnder(root) {
+  const found = [];
+  const visit = (p, parentReal) => {
+    let stat;
+    try { stat = fs.lstatSync(p); } catch { return; }
+    if (isLinkLike(p, { parentReal, stat })) { found.push(p); return; }
+    if (!stat.isDirectory()) return;
+    let real, names;
+    try { real = fs.realpathSync.native(p); names = fs.readdirSync(p); } catch { return; }
+    for (const name of names) visit(path.join(p, name), real);
+  };
+  visit(path.resolve(root), null);
+  return found;
+}
+
 export function unlinkOnly(p) {
   try { fs.lstatSync(p); } catch (error) { return error?.code === 'ENOENT'; }
   try { fs.unlinkSync(p); } catch { try { fs.rmdirSync(p); } catch { /* verified below */ } }

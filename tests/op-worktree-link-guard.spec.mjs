@@ -7,8 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { classifyGit } from '../scripts/guards/git-policy.mjs';
 import { BASH_ENV_FILE, bashEnvBody, bindGuardTerminal, ensureGuardBin, ensureHistoryHook, guardLaunch, msysPath, writeJobGuard } from '../scripts/guards/install.mjs';
 import { scanFootprint } from '../scripts/guards/footprint-scan.mjs';
-import { linksUnder } from '../scripts/checks/scoped-lint-baseline.mjs';
-import { safeRemoveTree } from '../scripts/lib/safe-remove.mjs';
+import { linksUnder, safeRemoveTree } from '../scripts/lib/safe-remove.mjs';
 
 // nivo-fe inc-c8fbf76aa499 (2026-09-25 05:47): Devin op worker op-interface.implement-2a43f63c6c ran, through Git Bash,
 // `git worktree add --detach D:/Repositories/nivo-fe-wt-r4`, junctioned six node_modules of live nivo-fe into it

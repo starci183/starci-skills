@@ -675,8 +675,7 @@ policy:
     sonarGate: slice-new-code-pass-for-tested-revision
     sonarProjectGate: note-never-block
     sonarEnforcement: settle-refuses-done-without-pass-unavailable-is-explicit
-    scopedLintGate: slice-verdict-clean-for-tested-revision
-    repositoryObligationOwed: note-owed-by-repo-owner-never-block
+    opGate: gate-exit-0-for-tested-revision
     missingRunner: blocked
     canDelegateResponsibility: false
   deliveryPolicy:

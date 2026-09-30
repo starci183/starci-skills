@@ -3301,7 +3301,7 @@ function widenCanonWire(ledger, job, payload, paths, after = []) {
     repair: { records: payload.records ?? [], ownedPaths: paths, repository: payload.repository ?? null, params: { ...(payload.params ?? {}), canonWire: true, resumeFrom: '', admissionBase: '' } } });
   return created?.jobId ? { jobId: created.jobId, created: true } : wire;
 }
-// The admission commit a slice's scoped lint measured against (`check-scoped-lint.mjs ... --base <sha>` in its report's checks).
+// The admission commit a slice's gate measured against (`gate.mjs ... --base <sha>` in its report's checks).
 const admissionBaseOfReport = (envelope) => (Array.isArray(envelope?.checks) ? envelope.checks : [])
   .map((check) => /--base\s+([0-9a-f]{7,40})/i.exec(String(check?.command ?? ''))?.[1]).find(Boolean) ?? null;
 function canonSettleFollowUp(ledger, job, payload, envelope) {

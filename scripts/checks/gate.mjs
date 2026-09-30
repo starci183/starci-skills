@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // gate.mjs - THE gate of a code-writing op and of the Kernel landing (schema starci/gate@1).
 //
-//   node scripts/checks/gate.mjs --root <app> [--base <commit>] [--changed <file>...] [--tests <pattern>] [--out <file>]
+//   node scripts/checks/gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>]
 //
 // An op forces it every round of its READ-CODE-CHECK-FIX-REPORT loop (knowledge/op-gate.yaml) and attaches the JSON it prints;
 // `api settle` re-reads that JSON (scripts/kernel/gate-settle.mjs), and the Kernel's landing re-runs this script on the op branch
@@ -12,7 +12,10 @@
 //      (each skipped while its inputs are unchanged since its last run in this worktree);
 //   3. tsc, one incremental program per tsconfig that owns a changed file (be/, each fe app or package), through the compiler
 //      API, its buildinfo in this worktree's git dir; the worktree's own stale *.tsbuildinfo files are deleted first;
-//   4. with --tests, the slice's unit/integration specs (jest --maxWorkers=2).
+//   4. with --tests, the slice's unit/integration specs (jest --maxWorkers=2);
+//   0. first, the MERGE GUARD: every merge commit in base..HEAD with one parent on the main line (--main, default main|master) is
+//      recomputed with `git merge-tree`; a path main changed whose merged blob is the lane's (main's change dropped, merge
+//      9958cce38) is a finding `merge/dropped-main-change`, never preexisting.
 // Only NEW findings block: lint per (file, engine/rule) count and tsc per normalised message are compared with the base commit
 // (--base, else the merge-base of HEAD with its upstream, else with main). The base is measured READ-ONLY from git objects: an
 // ESLint lintText of the base blob, the repository checks over the base listing, and a TypeScript program whose host reads the
@@ -39,17 +42,17 @@ const ESLINT_CONFIGS = ['eslint.config.mjs', 'eslint.config.js', 'eslint.config.
 const JEST_CONFIGS = ['jest.config.js', 'jest.config.ts', 'jest.config.mjs', 'jest.config.cjs', 'jest.config.json'];
 const LINT_CHUNK = 150;
 const LISTED_MAX = 500;
-const USAGE = 'usage: gate.mjs --root <app> [--base <commit>] [--changed <file>...] [--tests <pattern>] [--out <file>]';
+const USAGE = 'usage: gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>]';
 
 /** The flags; `--changed` takes every argument up to the next flag (an empty list is an empty slice). */
 export function parseGateArgs(argv) {
-  const opts = { root: null, base: null, changed: null, tests: null, out: null };
+  const opts = { root: null, base: null, main: null, changed: null, tests: null, out: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--changed') {
       opts.changed = [];
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(argv[++i]);
-    } else if (['--root', '--base', '--tests', '--out'].includes(arg)) {
+    } else if (['--root', '--base', '--main', '--tests', '--out'].includes(arg)) {
       if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`${arg} needs a value; ${USAGE}`);
       opts[arg.slice(2)] = argv[++i];
     } else throw new Error(`unknown argument ${arg}; ${USAGE}`);
@@ -76,21 +79,25 @@ export function resolveGateBase(root, base = null) {
 }
 
 /**
- * The delta between the base and the working tree, relative to --root: {changed[] (existing files), added Set, deleted Set}.
- * Renames are split into a deletion and an addition, and untracked files are additions.
+ * The delta between the base and the working tree, relative to --root: {changed[] (existing files), added Set, deleted Set,
+ * renamed Map(new -> old)}. A rename's old path counts as deleted and its new path is measured against the old path's base
+ * blob, so the findings a move carries stay preexisting; untracked files are additions.
  */
 export function gateDelta(root, base) {
-  const status = lines(gitText(root, ['diff', '--name-status', '--no-renames', '--relative', base]));
-  const added = new Set(), deleted = new Set(), changed = new Set();
+  const status = lines(gitText(root, ['diff', '--name-status', '--find-renames', '--relative', base]));
+  const added = new Set(), deleted = new Set(), changed = new Set(), renamed = new Map();
   for (const row of status) {
-    const [kind, file] = row.split('\t');
+    const [kind, file, to] = row.split('\t');
     const rel = posixPath(file);
-    if (kind === 'D') deleted.add(rel);
+    if (kind.startsWith('R')) { deleted.add(rel); changed.add(posixPath(to)); renamed.set(posixPath(to), rel); }
+    else if (kind === 'D') deleted.add(rel);
     else { changed.add(rel); if (kind === 'A') added.add(rel); }
   }
   for (const file of lines(gitText(root, ['ls-files', '--others', '--exclude-standard']))) { const rel = posixPath(file); changed.add(rel); added.add(rel); }
-  return { changed: [...changed].filter((file) => fs.existsSync(path.join(root, file))).sort(), added, deleted };
+  return { changed: [...changed].filter((file) => fs.existsSync(path.join(root, file))).sort(), added, deleted, renamed };
 }
+/** The base path a head path is measured against: its rename source, itself, or null when the base has no such file. */
+const basePathOf = (delta, rel) => (delta.added.has(rel) ? null : delta.renamed.get(rel) ?? rel);
 
 /** The base blob of a root-relative path, or null when the base has no such file. */
 function baseBlobReader(root, base) {
@@ -174,21 +181,19 @@ const nearestWith = (root, file, names) => {
 };
 
 /**
- * The base counts of the lint keys the head reports: ESLint over the base blob of each file (lintText through the app's
- * own install and the nearest flat config), the repository checks over the base listing. Nothing is written to the tree.
+ * ESLint over base blobs, read-only: (basePath, headPath) -> the rule ids of the base blob of basePath linted as headPath through
+ * the app's own install and the nearest flat config (null when the base has no such file). Cached per (base, paths, config).
  */
-async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache }) {
-  const counts = new Map();
-  const add = (key, n = 1) => counts.set(key, (counts.get(key) ?? 0) + n);
-  const eslintFiles = [...new Set(head.filter((f) => f.engine === 'eslint' && f.path && !delta.added.has(f.path)).map((f) => f.path))];
+function baseEslint({ root, base, readBase, cache }) {
   const linters = new Map();
-  for (const file of eslintFiles) {
-    const cacheFile = path.join(cache.shared, 'eslint', sha256(`${base}\0${file}`) + '.json');
+  return async (basePath, file) => {
+    const cwd = nearestWith(root, file, ESLINT_CONFIGS) ?? root;
+    const config = ESLINT_CONFIGS.map((name) => path.join(cwd, name)).find((p) => fs.existsSync(p));
+    const cacheFile = path.join(cache.shared, 'eslint', sha256(`${base}\0${basePath}\0${file}\0${config ? fs.readFileSync(config, 'utf8') : ''}`) + '.json');
     let messages = readCache(cacheFile);
     if (!messages) {
-      const text = readBase(file);
-      if (text === null) continue;
-      const cwd = nearestWith(root, file, ESLINT_CONFIGS) ?? root;
+      const text = readBase(basePath);
+      if (text === null) return null;
       if (!linters.has(cwd)) {
         const require = createRequire(path.join(cwd, 'package.json'));
         const { ESLint } = await import(pathToFileURL(require.resolve('eslint')).href);
@@ -198,16 +203,46 @@ async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache })
       messages = (result?.messages ?? []).map((m) => m.ruleId ?? 'eslint-error');
       writeCache(cacheFile, messages);
     }
-    for (const rule of messages) add(`${file}|eslint/${rule}`);
-  }
-  const hfsFiles = [...new Set(head.filter((f) => f.engine === 'hfs' && f.path && !delta.added.has(f.path)).map((f) => f.path))];
-  if (hfsFiles.length) {
+    return messages;
+  };
+}
+
+/**
+ * The ESLint findings of `files` (root-relative) at `base`, read-only from git objects (no tree, no worktree, no link):
+ * [{file, ruleId}] - what scripts/reconcile/canon-parity.mjs compares a slice's remaining canon findings with.
+ */
+export async function baseEslintFindings({ root, base, files }) {
+  root = path.resolve(root);
+  const sha = resolveGateBase(root, base);
+  const atBase = baseEslint({ root, base: sha, readBase: baseBlobReader(root, sha), cache: cacheDirs(root) });
+  const out = [];
+  for (const file of [...new Set(files.map(posixPath))]) for (const ruleId of (await atBase(file, file)) ?? []) out.push({ file, ruleId });
+  return out;
+}
+
+/**
+ * The base counts of the lint keys the head reports:ESLint over the base blob of each file (lintText through the app's
+ * own install and the nearest flat config), the repository checks over the base listing. Nothing is written to the tree.
+ */
+async function lintBaseCounts({ root, base, head, delta, hfs, readBase, cache }) {
+  const counts = new Map();
+  const add = (key, n = 1) => counts.set(key, (counts.get(key) ?? 0) + n);
+  const eslintFiles = [...new Set(head.filter((f) => f.engine === 'eslint' && f.path && basePathOf(delta, f.path)).map((f) => f.path))];
+  const atBase = baseEslint({ root, base, readBase, cache });
+  for (const file of eslintFiles) for (const rule of (await atBase(basePathOf(delta, file), file)) ?? []) add(`${file}|eslint/${rule}`);
+  // The repository checks judge paths: over the base listing (the declaration and file contents are the head's) a finding
+  // on a file's base path, or on no file, is the base's. A content finding on a changed file does not reproduce there.
+  const headPathOf = new Map(head.filter((f) => f.engine === 'hfs' && f.path && basePathOf(delta, f.path)).map((f) => [basePathOf(delta, f.path), f.path]));
+  if (headPathOf.size || head.some((f) => f.engine === 'hfs' && !f.path)) {
     const listing = lines(gitText(root, ['ls-tree', '-r', '--name-only', '--full-tree', base])).map(posixPath);
     const prefix = (gitText(root, ['rev-parse', '--show-prefix']) ?? '').trim();
     const files = listing.filter((f) => f.startsWith(prefix)).map((f) => f.slice(prefix.length));
     const { checkRepo } = await import(pathToFileURL(path.join(hfs.dir, 'runtime', 'scripts', 'lib', 'hfs-check.mjs')).href);
-    const result = checkRepo({ repoRoot: root, files, only: hfsFiles, tree: false });
-    for (const finding of result.findings.filter((f) => f.level === 'error' && f.path)) add(`${posixPath(finding.path)}|hfs/${finding.code}`);
+    const result = checkRepo({ repoRoot: root, files, only: [...headPathOf.keys()], tree: false });
+    for (const finding of result.findings.filter((f) => f.level === 'error')) {
+      if (!finding.path) add(`|hfs/${finding.code}`);
+      else if (headPathOf.has(posixPath(finding.path))) add(`${headPathOf.get(posixPath(finding.path))}|hfs/${finding.code}`);
+    }
   }
   return counts;
 }
@@ -313,21 +348,23 @@ function headTsc(ts, root, project, cache) {
 
 /**
  * The base program of one project, read-only: a host whose files are the working tree's except every path the delta changed,
- * which reads its base blob (an added file does not exist, a deleted one comes back). Cached per (base, project).
+ * which reads its base blob (an added or renamed-to file does not exist, a deleted or renamed-from one comes back). A base
+ * finding on a rename source is keyed at its new path. Cached per (base, project, renames).
  */
 function baseTsc(ts, root, project, { base, delta, readBase, cache }) {
-  const cacheFile = path.join(cache.shared, 'tsc', `${sha256(`${base}\0${project}\0${ts.version}`)}.json`);
+  const cacheFile = path.join(cache.shared, 'tsc', `${sha256(`${base}\0${project}\0${ts.version}\0${JSON.stringify([...delta.renamed])}`)}.json`);
   const cached = readCache(cacheFile);
   if (cached) return cached;
   const abs = (rel) => posixPath(path.resolve(root, rel));
   const overlay = new Map([...delta.changed, ...delta.deleted].map((rel) => [abs(rel), rel]));
   for (const rel of delta.added) overlay.set(abs(rel), rel);
+  const absent = (rel) => delta.added.has(rel) || delta.renamed.has(rel);
   const read = (fileName) => {
     const rel = overlay.get(posixPath(path.resolve(fileName)));
     if (rel === undefined) return ts.sys.readFile(fileName);
-    return delta.added.has(rel) ? undefined : readBase(rel) ?? undefined;
+    return absent(rel) ? undefined : readBase(rel) ?? undefined;
   };
-  const exists = (fileName) => { const rel = overlay.get(posixPath(path.resolve(fileName))); return rel === undefined ? ts.sys.fileExists(fileName) : !delta.added.has(rel) && readBase(rel) !== null; };
+  const exists = (fileName) => { const rel = overlay.get(posixPath(path.resolve(fileName))); return rel === undefined ? ts.sys.fileExists(fileName) : !absent(rel) && readBase(rel) !== null; };
   const deletedSources = [...delta.deleted].filter((rel) => TS_SOURCE.test(rel)).map((rel) => path.resolve(root, rel));
   const sys = { ...ts.sys, readFile: read, fileExists: exists, onUnRecoverableConfigFileDiagnostic: () => {},
     readDirectory: (dir, ext, exclude, include, depth) => [...ts.sys.readDirectory(dir, ext, exclude, include, depth).filter((f) => exists(f)),
@@ -341,7 +378,10 @@ function baseTsc(ts, root, project, { base, delta, readBase, cache }) {
     getSourceFile: (fileName, languageVersion) => { const text = read(fileName); return text === undefined ? undefined : ts.createSourceFile(fileName, text, languageVersion); },
   });
   const program = ts.createProgram({ rootNames: [...new Set(parsed.fileNames)], options, projectReferences: parsed.projectReferences, host });
-  return writeBack(cacheFile, errorsOf(ts, programDiagnostics(program), root));
+  const movedTo = new Map([...delta.renamed].map(([to, from]) => [from, to]));
+  const moved = (finding) => (finding.path && movedTo.has(finding.path)
+    ? { ...finding, path: movedTo.get(finding.path), key: `${movedTo.get(finding.path)}${finding.key.slice(finding.path.length)}` } : finding);
+  return writeBack(cacheFile, errorsOf(ts, programDiagnostics(program), root).map(moved));
 }
 const writeBack = (file, value) => { writeCache(file, value); return value; };
 
@@ -377,16 +417,111 @@ function runTests(root, pattern, cache) {
   return { step: { pattern, cwd: posixPath(path.relative(root, cwd)) || '.', exit: run.status, total: result.numTotalTests ?? 0, failed: result.numFailedTests ?? 0, ms: Date.now() - started }, findings, error: null };
 }
 
+/** The lint half: `hfs lint --changed` over the files, judged against the base. {step, fresh[], preexisting, errors[]} */
+async function lintAgainstBase({ root, base, files, delta, hfs, readBase, cache }) {
+  const lint = runHfsLint(root, files, hfs);
+  const errors = [...lint.errors];
+  let baseCounts = new Map();
+  if (!errors.length && lint.findings.length) {
+    try { baseCounts = await lintBaseCounts({ root, base, head: lint.findings, delta, hfs, readBase, cache }); }
+    catch (error) { errors.push(`lint base could not be measured: ${String(error?.message ?? error).split('\n')[0]}`); }
+  }
+  const judged = newLintFindings(lint.findings, baseCounts);
+  return { step: { files: files.length, findings: lint.findings.length, new: judged.fresh.length, preexisting: judged.preexisting },
+    fresh: judged.fresh.map(({ engine, rule, path: file, line, message }) => ({ engine, rule, path: file, line, message })), preexisting: judged.preexisting, errors };
+}
+
+/**
+ * The gate's lint half alone, for a caller that measures TypeScript itself (scripts/reconcile/canon-parity.mjs):
+ * {exit, step, findings[] (new), preexisting, errors[]} over `files` against `base`, with the gate's exit codes.
+ */
+export async function runLintGate({ root, base, files, hfs = null }) {
+  try {
+    root = path.resolve(root);
+    const sha = resolveGateBase(root, base);
+    const lint = await lintAgainstBase({ root, base: sha, files, delta: gateDelta(root, sha), hfs: hfs ?? hfsEntry(root), readBase: baseBlobReader(root, sha), cache: cacheDirs(root) });
+    return { exit: lint.errors.length ? GATE_EXIT.toolFailed : lint.fresh.length ? GATE_EXIT.findings : GATE_EXIT.clean, step: lint.step, findings: lint.fresh, preexisting: lint.preexisting, errors: lint.errors };
+  } catch (error) {
+    return { exit: GATE_EXIT.toolFailed, step: null, findings: [], preexisting: 0, errors: [String(error?.message ?? error)] };
+  }
+}
+
+/* ------------------------------------------------------------------------------------------ merge guard */
+
+const GUARD_CHUNK = 200;
+/** {path -> blob} of `commit` over `paths` (ls-tree -z, chunked; a missing path has no entry). Full-tree, repository-relative. */
+function blobsAt(root, commit, paths) {
+  const out = new Map();
+  for (let i = 0; i < paths.length; i += GUARD_CHUNK) {
+    const text = gitText(root, ['ls-tree', '-r', '-z', '--full-tree', commit, '--', ...paths.slice(i, i + GUARD_CHUNK)]) ?? '';
+    for (const row of text.split('\0').filter(Boolean)) { const [meta, file] = row.split('\t'); out.set(posixPath(file), meta.split(' ')[2]); }
+  }
+  return out;
+}
+
+/**
+ * The main-side changes one merge commit dropped (owner 2026-10-01, merge 9958cce38 "merge main into lane/ut-int"): the merge
+ * is recomputed with `git merge-tree --write-tree` from its lane parent and its main parent, and every path the main parent
+ * changed since their merge-base (main's blob differs from the lane's) whose recorded blob in the merge is the LANE's - the
+ * lane side taken over main, a clean hunk of main or a conflict resolved as "ours" alike - is a dropped main change. A path
+ * where the merge kept main's blob, or wrote a third blob (a real resolution), is not. {merge, lane, main, conflicted[],
+ * dropped: [{path, conflicted, main: blob|null, lane: blob|null}]}; throws when the commits cannot be read.
+ */
+export function droppedMainChanges(root, { merge, mainParent, laneParent }) {
+  const mergeBase = gitText(root, ['merge-base', laneParent, mainParent])?.trim();
+  if (!mergeBase) throw Object.assign(new Error(`merge ${merge}: its parents ${laneParent} and ${mainParent} have no merge-base`), { code: 'GATE_MERGE_UNREADABLE' });
+  const remerge = git(root, ['merge-tree', '--write-tree', '--name-only', '--no-messages', laneParent, mainParent]);
+  if (remerge.error || ![0, 1].includes(remerge.status)) throw Object.assign(new Error(`merge ${merge}: git merge-tree could not recompute it: ${String(remerge.stderr ?? remerge.error?.message ?? '').trim().split('\n')[0]}`), { code: 'GATE_MERGE_UNREADABLE' });
+  const conflicted = lines(remerge.stdout).slice(1).map(posixPath);
+  const touched = lines(gitText(root, ['diff', '--no-renames', '--name-only', mergeBase, mainParent])).map(posixPath);
+  const main = blobsAt(root, mainParent, touched), lane = blobsAt(root, laneParent, touched), recorded = blobsAt(root, merge, touched);
+  const conflicts = new Set(conflicted);
+  const dropped = touched.filter((file) => (main.get(file) ?? null) !== (lane.get(file) ?? null) && (recorded.get(file) ?? null) === (lane.get(file) ?? null))
+    .map((file) => ({ path: file, conflicted: conflicts.has(file), main: main.get(file) ?? null, lane: lane.get(file) ?? null }));
+  return { merge, lane: laneParent, main: mainParent, mergeBase, conflicted, dropped };
+}
+
+/** The main line a merge is judged against: `main`, else `master`, else null (then no merge has a main side). */
+export function mainTipOf(root, ref = null) {
+  for (const name of ref ? [ref] : ['main', 'master']) { const sha = gitText(root, ['rev-parse', '--verify', '--quiet', `${name}^{commit}`])?.trim(); if (sha) return sha; }
+  return null;
+}
+
+/**
+ * THE merge guard: every merge commit in base..head whose parents split into exactly one main-side parent (an ancestor of the
+ * main tip) and a lane parent is recomputed (droppedMainChanges); a merge with dropped main changes is a finding (engine
+ * `merge`, rule `dropped-main-change`, one per path), never preexisting. A merge of two lane parents, or of two main parents,
+ * has no main side and is not judged. {checked: [sha], findings[], errors[]}
+ */
+export function mergeGuard(root, { base, head = 'HEAD', mainTip = mainTipOf(root) }) {
+  const out = { checked: [], findings: [], errors: [] };
+  if (!mainTip) return out;
+  const merges = lines(gitText(root, ['rev-list', '--merges', '--parents', head, `^${base}`]));
+  for (const row of merges) {
+    const [merge, ...parents] = row.split(' ');
+    const onMain = parents.filter((p) => git(root, ['merge-base', '--is-ancestor', p, mainTip]).status === 0);
+    if (onMain.length !== 1 || parents.length !== 2) continue;
+    const mainParent = onMain[0], laneParent = parents.find((p) => p !== mainParent);
+    try {
+      const judged = droppedMainChanges(root, { merge, mainParent, laneParent });
+      out.checked.push(merge);
+      for (const d of judged.dropped) out.findings.push({ engine: 'merge', rule: 'dropped-main-change', path: d.path, line: null,
+        message: `merge ${merge.slice(0, 12)} keeps the lane side of ${d.path} over main's change (${d.conflicted ? 'a conflict resolved as the lane' : 'a clean main hunk dropped'}; main parent ${mainParent.slice(0, 12)}, recomputed with git merge-tree)` });
+    } catch (error) { out.errors.push(String(error?.message ?? error)); }
+  }
+  return out;
+}
+
 /* ----------------------------------------------------------------------------------------------- gate */
 
 /**
  * Run the gate; resolves the starci/gate@1 report. Never throws for a tool failure: it lands in errors[] with exit 2.
  * `hfs` ({dir, bin}) is a spec seam: the hfs install to lint with, default hfsEntry(root).
  */
-export async function runGate({ root, base = null, changed = null, tests = null, hfs = null }) {
+export async function runGate({ root, base = null, changed = null, tests = null, main = null, hfs = null }) {
   const at = new Date().toISOString();
   const report = { schema: GATE_SCHEMA, at, root: posixPath(path.resolve(root)), base: null, head: null, dirty: null, changed: [], exit: GATE_EXIT.toolFailed, ok: false,
-    steps: { lint: null, codegen: null, build: [], tsc: [], tests: null, staleBuildInfo: [] }, counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
+    steps: { merges: null, lint: null, codegen: null, build: [], tsc: [], tests: null, staleBuildInfo: [] }, counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
   const fail = (error) => { report.errors.push(String(error?.message ?? error)); return finish(report); };
   let cache, delta;
   try {
@@ -403,19 +538,18 @@ export async function runGate({ root, base = null, changed = null, tests = null,
   const fresh = [];
   let preexisting = 0;
 
+  // The merge guard first: a merge in base..HEAD that took the lane side over a main-side change is never a clean branch.
+  const guard = mergeGuard(root, { base: report.base, mainTip: mainTipOf(root, main) });
+  report.steps.merges = { checked: guard.checked, dropped: guard.findings.length };
+  report.errors.push(...guard.errors);
+  fresh.push(...guard.findings);
+
   if (report.changed.length) {
-    hfs ??= hfsEntry(root);
-    const lint = runHfsLint(root, report.changed, hfs);
+    const lint = await lintAgainstBase({ root, base: report.base, files: report.changed, delta, hfs: hfs ?? hfsEntry(root), readBase, cache });
     report.errors.push(...lint.errors);
-    let baseCounts = new Map();
-    if (!lint.errors.length && lint.findings.length) {
-      try { baseCounts = await lintBaseCounts({ root, base: report.base, head: lint.findings, delta, hfs, readBase, cache }); }
-      catch (error) { report.errors.push(`lint base could not be measured: ${String(error?.message ?? error).split('\n')[0]}`); }
-    }
-    const judged = newLintFindings(lint.findings, baseCounts);
-    report.steps.lint = { files: report.changed.length, findings: lint.findings.length, new: judged.fresh.length, preexisting: judged.preexisting };
-    fresh.push(...judged.fresh.map(({ engine, rule, path: file, line, message }) => ({ engine, rule, path: file, line, message })));
-    preexisting += judged.preexisting;
+    report.steps.lint = lint.step;
+    fresh.push(...lint.fresh);
+    preexisting += lint.preexisting;
   }
 
   const projects = tsProjectsOf(root, report.changed);
@@ -460,7 +594,7 @@ function finish(report) {
 export async function gateMain(argv, { stdout = (s) => process.stdout.write(s) } = {}) {
   let opts;
   try { opts = parseGateArgs(argv); } catch (error) { stdout(`${JSON.stringify({ schema: GATE_SCHEMA, ok: false, exit: GATE_EXIT.toolFailed, errors: [error.message] })}\n`); return GATE_EXIT.toolFailed; }
-  const report = await runGate({ root: opts.root ?? process.cwd(), base: opts.base, changed: opts.changed, tests: opts.tests });
+  const report = await runGate({ root: opts.root ?? process.cwd(), base: opts.base, main: opts.main, changed: opts.changed, tests: opts.tests });
   const text = `${JSON.stringify(report, null, 2)}\n`;
   if (opts.out) { fs.mkdirSync(path.dirname(path.resolve(opts.out)), { recursive: true }); fs.writeFileSync(path.resolve(opts.out), text); }
   stdout(text);

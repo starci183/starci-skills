@@ -6,7 +6,7 @@
 //   <repo>/.starciwork/worktrees/<wf>/<op>    one op job's worktree, branch op/<op> (a sibling of _wf, never inside it)
 // <wf> and <op> are short ids (8 chars). The directory is git-excluded (.git/info/exclude), so `git status`,
 // `git ls-files --others --exclude-standard` and sonar never see it; every scanner that walks the filesystem
-// (canon-scan's eslint, check-scoped-lint, the architecture walkers, input digests, proof-integrity, Work readers)
+// (canon-scan's eslint, hfs lint, the architecture walkers, input digests, proof-integrity, Work readers)
 // skips it with isWorktreesPath / WORKTREES_IGNORE_GLOBS, or it would lint and hash every sibling worktree.
 import path from 'node:path';
 import { posixPath } from './path-key.mjs';

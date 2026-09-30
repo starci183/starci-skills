@@ -99,7 +99,7 @@ reads:
       en: The adopted naming, error-identity, structure and typing conventions, and the FE or BE pattern
         topics for the selected repository.
   - id: machines
-    path: scripts/checks/gate.mjs + scripts/checks/slice-typecheck.mjs + scripts/checks/code-patterns/*.mjs +
+    path: scripts/checks/gate.mjs + scripts/checks/code-patterns/*.mjs +
       scripts/checks/architecture/*.mjs + modules/models/code-patterns.yaml +
       docs/architecture-check.md
     purpose:
@@ -216,11 +216,10 @@ steps:
         BEFORE the first edit. It gates only the slice's new findings. Without context.cut,
         run the whole-repository hfs lint --format json at ROOT
         BEFORE the first edit. Keep the machine report, exact command and exit code in either mode.
-        For a cut slice in a TypeScript repository, also run node scripts/checks/slice-typecheck.mjs
-        --root ROOT --base <slice admission commit> [--project <tsconfig used by the declared typecheck> ...]
-        -- <owned paths> BEFORE editing and retain its JSON report. Its comparison restores only
-        the owned files to the admission base, so other in-flight files are identical on both
-        sides of the measurement. A repository-wide typecheck may be recorded as context, but
+        For a cut slice in a TypeScript repository, the gate's tsc step (node scripts/checks/gate.mjs
+        --root ROOT --base <slice admission commit> --changed <owned files>) is the typecheck: one program per
+        tsconfig that owns a changed file, its base read from the admission commit's blobs, so other in-flight
+        files are identical on both sides of the measurement. A repository-wide typecheck may be recorded as context, but
         its pre-existing errors outside the slice do not block this ordinal.
         When params.canonFamilies is set, run node scripts/checks/canon-scan.mjs
         --root ROOT --paths <owned paths> --families <params.canonFamilies> --json BEFORE the first
@@ -238,7 +237,7 @@ steps:
         your owned paths), that is a tool error, never the slice's blocker: record the raw result as
         a check with `toolError: true`, keep the same command for the after run, prove the slice
         with the machines that did run (canon-scan's lint families, the gate's new and preexisting counts,
-        the slice-typecheck result) and continue. No existing, covering, runnable check is reported `blocked` with blocker kind
+        the gate's tsc step) and continue. No existing, covering, runnable check is reported `blocked` with blocker kind
         `test-gap` and this op stops; it never authors the missing tests itself, and it runs only the specs of the code it moved or changed and the specs that import it - never the whole repository suite (owner 2026-09-29). Resolve the
         execution profile and actual tool availability before selecting instruments; this does not
         switch the model/runtime or spawn workers. Never create the target or invent its
@@ -289,10 +288,9 @@ steps:
         or the same whole-repository hfs lint for an uncut refactor. The gate measures a moved file
         against its old base path, so carried findings stay preexisting and only new findings gate;
         retain its report beside the before report.
-        For a cut TypeScript slice, run the SAME slice-typecheck.mjs command AFTER the edit with
-        the admission base and paths, and retain the JSON beside the before report. Its
-        newErrors are gating whether they appear in an owned file or an untouched importer;
-        SLICE_PREEXISTING notes are advisory. An unavailable comparison is not a pass.
+        For a cut TypeScript slice, the gate.json's tsc findings are gating whether they appear in an owned
+        file or an untouched importer; its preexisting count is advisory. A gate that could not run tsc
+        (exit 2) is not a pass.
         The ordinal whose pass closes the cut set runs
         the whole-repository hfs lint --format json at ROOT ONCE
         after its gate run and records the whole-repository report and exit code with
@@ -363,10 +361,9 @@ proofs:
         verbatim on both sides with its reports retained. For context.cut this is the
         --base <slice admission commit> --changed <owned paths> command: its after run follows
         renamed destinations from the base diff and gates only new findings.
-        A cut TypeScript slice also has typecheck-before.json and typecheck-after.json from
-        slice-typecheck.mjs with the same base and owned paths; the after report must be clean
-        with no newErrors anywhere in its checked projects. SLICE_PREEXISTING notes do not
-        change this verdict, including when repository-wide typecheck is red on untouched debt.
+        A cut TypeScript slice's gate.json (same admission base, owned files) carries no new tsc finding
+        anywhere in its checked projects; its preexisting count does not change this verdict, including
+        when repository-wide typecheck is red on untouched debt.
         The closing ordinal records one whole-repository hfs lint measurement with
         `full-regression-final`; an uncut refactor uses it on both sides. A new architecture or
         pattern violation after the change is a failure. A missing, different or narrowed check on

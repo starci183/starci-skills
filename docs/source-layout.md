@@ -174,11 +174,10 @@ lifecycle evidence assess deployment completeness separately.
 
 ## Validation
 
-Source-layout conformance is a machine obligation of the aggregate scoped-lint
-gate (a `repository-audit` kind in the profile), not a separate command:
+Source-layout conformance is part of `hfs lint` (its `hfs check` half), not a separate command:
 
 ```sh
-node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root <repo-root> --all
+hfs lint --repo <repo-root> --format json
 ```
 
 The HFS tree law itself is reported by the slot check and the architecture machine

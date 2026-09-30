@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import {
-  canonParityVerdict, checkFamilyOf, sliceBaseOf, parityEligible, tscParity, baseBlobsOf, declaredProjectsOf, isForeignNote, lintParity,
+  canonParityVerdict, checkFamilyOf, sliceBaseOf, parityEligible, tscParity, baseBlobsOf, declaredProjectsOf, lintParity,
 } from '../scripts/reconcile/canon-parity.mjs';
 import { verifyReported, classifyCheck, isBaselineCheck, settlerSettings, parityCacheFile, EVENTS } from '../scripts/reconcile/job-settle.mjs';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
@@ -33,7 +33,7 @@ const sliceItem = (base, checks, extra = {}) => ({
   jobId: 'op-code.refactor-aaa', workflowId: 'wf-x', op: 'code.refactor', attempt: 1, outcome: 'done', dispatchId: 'ctx_1',
   payload: { cut: { id: 'fe-canon', ordinal: 3, total: 9 }, params: { canonFamilies: 'all' }, owned_paths: ['src/slice'], ...(extra.payload ?? {}) },
   report: { checks: [
-    { name: 'check-scoped-lint-before', command: `node .claude/scripts/checks/check-scoped-lint.mjs --profile next --root R --base ${base} -- a.ts`, exitCode: 2 },
+    { name: 'gate-before', command: `node .claude/scripts/checks/gate.mjs --root R --base ${base} --changed a.ts`, exitCode: 2 },
     ...checks,
   ] },
 });
@@ -44,19 +44,20 @@ const seams = (root, over = {}) => ({
   rerun: () => ({ exitCode: 0, ms: 10, tail: '' }),
   canon: async () => ({ exitCode: 0, status: 'ok', findings: 0, root, paths: 1 }),
   tsc: async () => ({ ok: true, projects: [{ project: 'tsconfig.json', errors: 5, baseErrors: 5, newKeys: 0 }], newErrors: [] }),
-  lint: async () => ({ ok: true, status: 'clean', counts: { new: 0, preexisting: 3, runLevel: 0 }, outside: 40, gating: [], attempts: 1, baseline: { method: 'base-tree', status: 'measured' } }),
+  lint: async () => ({ ok: true, status: 'clean', counts: { new: 0, preexisting: 3 }, gating: [], baseline: { method: 'gate', status: 'measured' } }),
   ...over,
 });
 const RED = [
   { name: 'canon-scan-repo-wide', command: 'node .claude/scripts/checks/canon-scan.mjs --root R --json', exitCode: 2 },
-  { name: 'check-scoped-lint-after', command: 'node .claude/scripts/checks/check-scoped-lint.mjs --profile next --root R --base B -- a.ts', exitCode: 2 },
+  { name: 'gate-after', command: 'node .claude/scripts/checks/gate.mjs --root R --base B --changed a.ts', exitCode: 2 },
   { name: 'tsc-app', command: 'cd R/apps/app && npx tsc --noEmit', exitCode: 2 },
   { name: 'git-scoped-commit', command: 'git commit -m x', exitCode: 0 },
 ];
 
 test('families, base and eligibility', () => {
   assert.equal(checkFamilyOf({ name: 'canon-scan-fix', command: 'node x/canon-scan.mjs --fix' }), 'canon');
-  assert.equal(checkFamilyOf({ name: 'code-patterns-all-after', command: 'node x/check-scoped-lint.mjs --all' }), 'lint');
+  assert.equal(checkFamilyOf({ name: 'lint-gate-after', command: 'node x/gate.mjs --root R --base B' }), 'lint');
+  assert.equal(checkFamilyOf({ name: 'hfs-lint', command: 'npx hfs lint --format json' }), 'lint');
   assert.equal(checkFamilyOf({ name: 'eslint-owned', command: 'cd R && npx eslint src' }), 'lint');
   assert.equal(checkFamilyOf({ name: 'app-typecheck-after', command: 'npm run typecheck' }), 'tsc');
   assert.equal(checkFamilyOf({ name: 'tsc-landing-draft', command: 'cd R/apps/landing-draft && npx tsc --noEmit' }), 'tsc');
@@ -70,8 +71,6 @@ test('families, base and eligibility', () => {
   assert.equal(parityEligible({ ...sliceItem('a', []), payload: { params: { canonFamilies: 'all' } } }), false, 'a wire leg (no cut) is not a slice');
   assert.equal(parityEligible({ ...sliceItem('a', []), outcome: 'blocked' }), false);
   assert.equal(parityEligible({ ...sliceItem('a', []), op: 'review.verify' }), false);
-  assert.equal(isForeignNote({ code: 'FOREIGN_RESIDUE' }), true);
-  assert.equal(isForeignNote({ code: 'LINT_MESSAGE', file: 'a.ts' }), false);
 });
 
 test('parity settles a slice whose only reds are foreign residue, with the cut checks settle demands', async () => {
@@ -80,20 +79,20 @@ test('parity settles a slice whose only reds are foreign residue, with the cut c
   assert.equal(v.green, true, JSON.stringify(v));
   assert.equal(v.via, 'canon-parity');
   const names = v.checks.checks.map((c) => c.name);
-  for (const n of ['cut-slice-postcondition', 'cut-regression-inventory', 'canon-parity-scoped-lint', 'canon-parity-typecheck']) assert.ok(names.includes(n), n);
+  for (const n of ['cut-slice-postcondition', 'cut-regression-inventory', 'canon-parity-lint', 'canon-parity-typecheck']) assert.ok(names.includes(n), n);
   assert.ok(v.checks.checks.every((c) => c.exitCode === 0));
-  assert.deepEqual(v.parity.superseded, ['canon-scan-repo-wide:2', 'check-scoped-lint-after:2', 'tsc-app:2']);
+  assert.deepEqual(v.parity.superseded, ['canon-scan-repo-wide:2', 'gate-after:2', 'tsc-app:2']);
 });
 
 test('any new finding in the owned files goes to the Kernel', async () => {
   const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' });
   const item = sliceItem(base, RED);
-  const lintNew = await canonParityVerdict(item, seams(root, { lint: async () => ({ ok: false, status: 'findings', counts: { new: 1, runLevel: 0 }, outside: 3,
-    gating: [{ code: 'LINT_MESSAGE', file: 'src/slice/a.ts', line: 1, newBecause: 'changed-line' }], attempts: 1 }) }));
+  const lintNew = await canonParityVerdict(item, seams(root, { lint: async () => ({ ok: false, status: 'findings', counts: { new: 1, preexisting: 0 },
+    gating: [{ code: 'eslint/no-unused-vars', file: 'src/slice/a.ts', line: 1 }] }) }));
   assert.equal(lintNew.green, false); assert.equal(lintNew.reason, 'parity-lint-new');
-  const unproven = await canonParityVerdict(item, seams(root, { lint: async () => ({ ok: false, status: 'unavailable', counts: { new: 0, runLevel: 1 }, outside: 3,
-    gating: [{ code: 'SCRIPT_INPUT_UNAVAILABLE', message: 'unlocated' }], attempts: 1 }) }));
-  // H7: a scoped lint that answered unavailable could not measure the slice - tooling, never the slice's red.
+  const unproven = await canonParityVerdict(item, seams(root, { lint: async () => ({ ok: false, status: 'unavailable', counts: { new: 0, preexisting: 0 },
+    gating: [{ code: 'GATE_TOOL_FAILED', message: 'hfs lint produced no report' }] }) }));
+  // H7: a lint gate that could not run a tool could not measure the slice - tooling, never the slice's red.
   assert.equal(unproven.reason, 'parity-checker-unavailable'); assert.equal(unproven.unavailable, true);
   const tscNew = await canonParityVerdict(item, seams(root, { tsc: async () => ({ ok: false, projects: [], newErrors: [{ file: 'src/other/b.ts', code: 'TS2305', message: 'no export', owned: false, count: 1, baseCount: 0 }] }) }));
   assert.equal(tscNew.reason, 'parity-tsc-new');
@@ -116,15 +115,14 @@ test('an uncovered red, a red re-run or a missing base never settles', async () 
   assert.equal((await canonParityVerdict(sliceItem('0'.repeat(40), RED), seams(root))).reason, 'parity-base-unknown');
 });
 
-test('lint parity re-measures a run a sibling edit voided, and only that', async () => {
-  let n = 0;
-  const flaky = async () => { n += 1; return { slice: n < 2 ? { status: 'unavailable', issues: [{ code: 'INPUTS_CHANGED_DURING_CHECK' }], counts: { new: 0 }, outside: 1 } : { status: 'clean', issues: [], counts: { new: 0 }, outside: 1 } }; };
-  const r = await lintParity({ root: '.', files: ['a.ts'], base: 'b', profile: 'next', checker: flaky });
-  assert.equal(r.ok, true); assert.equal(r.attempts, 2);
-  let m = 0;
-  const real = async () => { m += 1; return { slice: { status: 'findings', issues: [{ code: 'LINT_MESSAGE', file: 'a.ts', line: 1 }], counts: { new: 1 } } }; };
-  const r2 = await lintParity({ root: '.', files: ['a.ts'], base: 'b', profile: 'next', checker: real });
-  assert.equal(r2.ok, false); assert.equal(m, 1);
+test('lint parity maps the gate: exit 0 clean, 1 findings, 2 unavailable', async () => {
+  const gate = (exit, extra = {}) => async (root, files, { base }) => { assert.equal(base, 'b'); return { exit, findings: [], preexisting: 0, errors: [], ...extra }; };
+  assert.equal((await lintParity({ root: '.', files: ['a.ts'], base: 'b', checker: gate(0, { preexisting: 2 }) })).status, 'clean');
+  const red = await lintParity({ root: '.', files: ['a.ts'], base: 'b', checker: gate(1, { findings: [{ engine: 'eslint', rule: 'no-var', path: 'a.ts', line: 1, message: 'x' }] }) });
+  assert.equal(red.ok, false); assert.equal(red.status, 'findings'); assert.equal(red.gating[0].code, 'eslint/no-var');
+  const down = await lintParity({ root: '.', files: ['a.ts'], base: 'b', checker: gate(2, { errors: ['hfs lint produced no report'] }) });
+  assert.equal(down.status, 'unavailable'); assert.equal(down.gating[0].code, 'GATE_TOOL_FAILED');
+  assert.equal((await lintParity({ root: '.', files: [], base: 'b', checker: gate(2) })).ok, true, 'no owned file: nothing to lint');
 });
 
 test('base blobs and declared projects', () => {

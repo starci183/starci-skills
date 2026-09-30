@@ -102,12 +102,7 @@ schemaToSchema:
      source: "modules/schemas/knowledge-source.schema.yaml; modules/schemas/knowledge-rule.schema.yaml"}
 
   # --- code-pattern pipeline --------------------------------------------------
-  - {from: code-pattern-check, to: code-pattern-profile, type: consumes,
-     note: "aggregate report names its profile; statuses implemented|missing|conflict read against the profile's rule set",
-     source: "scripts/checks/check-scoped-lint.mjs:12-13"}
-  - {from: code-pattern-check, to: "starci/code-pattern-script@1 (no file)", type: consumes,
-     note: "check-scoped-lint aggregates per-script results emitted as code-pattern-script@1 by scripts/checks/code-patterns/*.mjs — an unschematized sibling id",
-     source: "scripts/checks/code-patterns/*.mjs result.schema; check-scoped-lint.mjs:176"}
+  # (the aggregate starci/code-pattern-check@1 report retired with check-scoped-lint.mjs, op-gate-loop)
 
 # ----------------------------------------------------------------------------
 # Schema -> subsystem binding: which engine part each schema constrains.

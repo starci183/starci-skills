@@ -45,7 +45,7 @@
 //     is the Kernel's.
 //   - CANON PARITY (contract change canon-parity-settle): a done code.refactor canon cut slice whose declared checks are
 //     red or not re-verifiable is measured by the settler itself over its owned paths against its admission base
-//     (scripts/reconcile/canon-parity.mjs): canon-scan 0 findings, check-scoped-lint no new finding, typecheck no new
+//     (scripts/reconcile/canon-parity.mjs): canon-scan 0 findings, the gate's lint no new finding, typecheck no new
 //     error, every declared red superseded by those owned-scope measurements (foreign residue). Any new finding -> Kernel.
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
@@ -57,7 +57,7 @@ import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor, updateAttempt, releaseLeases, setCondition } from '../../engine/ledger-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { claimManager, lockHolder } from '../connectors/lib.mjs';
-import { canonParityVerdict, parityEligible, parityFingerprint, parityTransient, PARITY_REASONS, resolveOwnedRoot } from './canon-parity.mjs';
+import { canonParityVerdict, parityEligible, parityFingerprint, PARITY_REASONS, resolveOwnedRoot } from './canon-parity.mjs';
 import { checkRunStatusOf, checkVerdictOf } from './check-verdict.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
@@ -321,19 +321,19 @@ export async function verifyReported(db, item, { repo, settings = settlerSetting
   // itself over its owned paths; it settles only when nothing is new there, else the Kernel gets the parity reason.
   if (plain.green || !parity || !parityEligible(item) || !PARITY_REASONS.includes(plain.reason)) return plain;
   // A measurement takes minutes and the settler passes every minute: a handed-over verdict is reused while the slice's
-  // base and owned files are unchanged (PARITY_RECHECK_MS; a sibling's mid-run edit only PARITY_TRANSIENT_MS).
+  // base and owned files are unchanged (PARITY_RECHECK_MS).
   const resolveRoot = parityDeps.resolveRoot ?? resolveOwnedRoot;
   let fingerprint = null;
   try { fingerprint = await parityFingerprint(item, { repo, resolveRoot }); } catch { fingerprint = null; }
   const cached = fingerprint ? readParityCache(repo, item) : null;
   const now = Date.now();
   if (cached && cached.dispatchId === item.dispatchId && cached.fingerprint === fingerprint
-    && now - cached.at < (cached.transient ? PARITY_TRANSIENT_MS : PARITY_RECHECK_MS)) return { ...cached.verdict, cached: true };
+    && now - cached.at < PARITY_RECHECK_MS) return { ...cached.verdict, cached: true };
   const measured = await parity(item, { repo, settings, env, rerun, canon, classify: (c) => classifyCheck(c), baseline: isBaselineCheck,
     wireLegs: () => canonWireLegsOf(db, item), record, ...parityDeps, resolveRoot });
   const verdict = measured.green ? measured
     : { ...measured, detail: [`declared: ${plain.reason}${plain.detail ? ` ${plain.detail.slice(0, 4).join(', ')}` : ''}`, ...(measured.detail ?? [])].slice(0, 8) };
-  if (!verdict.green && fingerprint) writeParityCache(repo, item, { fingerprint, at: now, transient: parityTransient(measured), verdict: { green: false, reason: verdict.reason, detail: verdict.detail } });
+  if (!verdict.green && fingerprint) writeParityCache(repo, item, { fingerprint, at: now, verdict: { green: false, reason: verdict.reason, detail: verdict.detail } });
   return verdict;
 }
 /** The workflow's canon-wire legs of the slice's op, queued or running: [{jobId, status, ownedPaths}]. */
@@ -345,7 +345,6 @@ export function canonWireLegsOf(db, item) {
   } catch { return []; }
 }
 export const PARITY_RECHECK_MS = 30 * 60_000;
-export const PARITY_TRANSIENT_MS = 5 * 60_000;
 /** <ledger dir>/settle-parity/<jobId>.json: the last non-green parity verdict of a dispatch. */
 export const parityCacheFile = (repo, jobId) => path.join(path.dirname(ledgerFileFor(path.resolve(repo))), 'settle-parity', `${slug(jobId)}.json`);
 function readParityCache(repo, item) { try { return JSON.parse(fs.readFileSync(parityCacheFile(repo, item.jobId), 'utf8')); } catch { return null; } }
@@ -354,7 +353,7 @@ function writeParityCache(repo, item, rec) {
 }
 /** STARCI_SETTLER_PARITY=0 turns the canon parity verifier off (the rollback of canon-parity-settle). */
 export const parityEnabled = (env = process.env) => String(env.STARCI_SETTLER_PARITY ?? '1') !== '0';
-/** A baseline measured BEFORE the change (canon-scan-before, scoped-lint-before ...): evidence, never a verdict. */
+/** A baseline measured BEFORE the change (canon-scan-before, gate-before ...): evidence, never a verdict. */
 export const isBaselineCheck = (c) => BASELINE_NAME.test(String(c?.name ?? ''));
 
 /**
@@ -369,7 +368,7 @@ async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, rec
   if (KERNEL_ONLY_OPS.includes(item.op)) return { green: false, reason: 'owner-act' };
   const declared = Array.isArray(item.report.checks) ? item.report.checks : [];
   if (!declared.length) return { green: false, reason: 'no-declared-checks' };
-  // A baseline measured BEFORE the change (canon-scan-before, scoped-lint-before ...) is the refactor's starting point,
+  // A baseline measured BEFORE the change (canon-scan-before, gate-before ...) is the refactor's starting point,
   // not its verdict: its exit code is evidence, never a red, and it is not re-run (the tree has moved on).
   const classed = declared.filter((c) => !isBaselineCheck(c)).map((c) => ({ check: c, ...classifyCheck(c) }));
   const foreign = classed.filter((c) => c.kind === 'foreign');
@@ -577,9 +576,9 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
         catch (error) { verdict = { green: false, reason: 'verify-error', detail: [String(error?.message ?? error).slice(0, 300)] }; }
         let settleAs = 'pass';
         if (!verdict.green) {
-          const mechanical = verdict.unavailable || parityTransient(verdict) ? null : mechanicalSettleOf(fresh, verdict);
+          const mechanical = verdict.unavailable ? null : mechanicalSettleOf(fresh, verdict);
           if (dryRun) { out[mechanical ? 'settled' : 'kernel'].push({ jobId: item.jobId, reason: verdict.reason, ...(mechanical ? { verdict: mechanical.verdict } : {}), unavailable: Boolean(verdict.unavailable), dryRun: true }); continue; }
-          if (verdict.unavailable || parityTransient(verdict)) { out.skipped.push(await checkerUnavailable(ledger, fresh, verdict, { now: now(), settings })); continue; }
+          if (verdict.unavailable) { out.skipped.push(await checkerUnavailable(ledger, fresh, verdict, { now: now(), settings })); continue; }
           if (!mechanical) { out.kernel.push({ ...handToKernel(ledger, fresh, verdict, { now: now() }), ...(verdict.detail ? { detail: verdict.detail } : {}) }); continue; }
           settleAs = mechanical.verdict;
           verdict = { ...verdict, checks: mechanical.checks ?? null, via: `report-${fresh.outcome}${mechanical.checks ? `+${verdict.reason}` : ''}` };

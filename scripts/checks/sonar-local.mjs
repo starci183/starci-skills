@@ -759,7 +759,7 @@ async function readAll(cfg,tokens,pathname,listKey){
 }
 
 // SonarQube path patterns (sonar.test.inclusions) are the scripts/lib/glob.mjs subset
-// check-scoped-lint.mjs matches globs with: ** spans directories, * and ? stay inside
+// ESLint and the runtime's own path globs match with: ** spans directories, * and ? stay inside
 // one segment, {a,b} alternates.
 
 /**

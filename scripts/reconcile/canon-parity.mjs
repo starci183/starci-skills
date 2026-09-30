@@ -7,8 +7,8 @@
 // the slice itself, over its OWNED paths, against its admission base, and settles it only when ALL hold:
 //
 //   (a) canon-scan over the owned paths returns 0 findings              - the slice's own goal is met;
-//   (b) check-scoped-lint over the owned source files, --base <admission base>, has NO gating issue: no new located
-//       finding and no unlocated (run-level) issue inside the slice      - nothing new, nothing unproven;
+//   (b) the gate's lint half (scripts/checks/gate.mjs: hfs lint --changed over the owned files, per (file, rule) against the
+//       admission base, read-only) reports no new finding and every tool ran  - nothing new, nothing unproven;
 //   (c) every declared red / unavailable check is superseded by one of these owned-scope measurements (canon, lint,
 //       typecheck, git diff --check) or re-runs exit 0 as a runtime check - so what stays red is FOREIGN residue,
 //       located outside the owned paths (the checker's `outside` count, FOREIGN_RESIDUE notes);
@@ -27,15 +27,13 @@ import { checkVerdictOf } from './check-verdict.mjs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { runGit } from '../lib/git.mjs';
 import { sameOrUnder } from '../lib/path-key.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const PARITY_OPS = Object.freeze(['code.refactor']);
 export const PARITY_REASONS = Object.freeze(['declared-check-red', 'check-not-reverifiable', 'nothing-reverifiable', 'rerun-red', 'cut-postcondition-red']);
-export const PARITY_CHECKS = Object.freeze({ lint: 'canon-parity-scoped-lint', tsc: 'canon-parity-typecheck', diff: 'canon-parity-diff-check' });
-const LINT_ATTEMPTS = 3;
+export const PARITY_CHECKS = Object.freeze({ lint: 'canon-parity-lint', tsc: 'canon-parity-typecheck', diff: 'canon-parity-diff-check' });
 const norm = (p) => String(p ?? '').replace(/\\/g, '/');
 const keyOf = (p) => { const k = norm(path.resolve(p)).replace(/\/+$/, ''); return process.platform === 'win32' ? k.toLowerCase() : k; };
 const trimOwned = (p) => norm(p).replace(/\/\*\*(?:\/\*)?$/, '').replace(/\/+$/, '');
@@ -44,7 +42,7 @@ const trimOwned = (p) => norm(p).replace(/\/\*\*(?:\/\*)?$/, '').replace(/\/+$/,
 export const parityEligible = (item) => item?.outcome === 'done' && PARITY_OPS.includes(item.op)
   && Boolean(item.payload?.cut) && Boolean(item.payload?.params?.canonFamilies);
 
-/** The slice's admission base: params.admissionBase, else the --base its scoped-lint checks measured against. */
+/** The slice's admission base: params.admissionBase, else the --base its checks (gate.mjs, canon-scan) measured against. */
 export function sliceBaseOf(item) {
   const param = String(item?.payload?.params?.admissionBase ?? '').trim();
   if (/^[0-9a-f]{7,40}$/i.test(param)) return param;
@@ -52,21 +50,6 @@ export function sliceBaseOf(item) {
     const m = /--base\s+([0-9a-f]{7,40})\b/i.exec(String(c?.command ?? ''));
     if (m) return m[1];
   }
-  return null;
-}
-
-/** The code-pattern profile the slice's checks used (--profile), else what the repository's package.json holds. */
-export function profileOf(item, root) {
-  for (const c of Array.isArray(item?.report?.checks) ? item.report.checks : []) {
-    const m = /--profile\s+(next|nest)\b/.exec(String(c?.command ?? ''));
-    if (m) return m[1];
-  }
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
-    if (deps['@nestjs/core']) return 'nest';
-    if (deps.next) return 'next';
-  } catch { /* none */ }
   return null;
 }
 
@@ -86,7 +69,7 @@ export const withoutNodePath = (command) => String(command ?? '')
 export function checkFamilyOf(check) {
   const name = String(check?.name ?? ''), command = String(check?.command ?? '');
   if (/canon-scan\.mjs/.test(command) || /(?:^|[-_.\s])canon(?:$|[-_.\s])/i.test(name)) return 'canon';
-  if (/check-scoped-lint\.mjs|\beslint\b/.test(command) || /scoped-lint|code-patterns|(?:^|[-_.])lint(?:$|[-_.])|eslint/i.test(name)) return 'lint';
+  if (/gate\.mjs|\bhfs\s+lint\b|\beslint\b/.test(command) || /code-patterns|(?:^|[-_.])lint(?:$|[-_.])|eslint/i.test(name)) return 'lint';
   if (/(?:^|[\s/\\])tsc(?:\.cmd)?(?:\s|$)/.test(command) || /(?:^|[-_.])tsc(?:$|[-_.])|type-?check/i.test(name)) return 'tsc';
   if (/^git\s+diff\b[^&|;]*--check\b/.test(command.trim())) return 'diff';
   // Exactly one file operand, never a flag (a preload flag would run code).
@@ -259,54 +242,37 @@ export function tscParity({ root, ownedRels, baseBlobs, extraProjects = [], ts: 
   return { ok: newErrors.length === 0, projects: measured, newErrors };
 }
 
-/* ------------------------------------------------------------ (b) scoped-lint parity */
-
-/** Owned files the profile lints (its sourceGlobs). */
-export async function lintFilesOf(root, ownedRels, profile) {
-  const { readModuleJson } = await import('../../engine/runtime-root.mjs');
-  const globs = (readModuleJson('modules', 'models', 'code-patterns.yaml')?.profiles?.[profile]?.sourceGlobs ?? []).flatMap(braceVariants).map(globExpression);
-  return ownedFilesOf(root, ownedRels).filter((rel) => globs.some((re) => re.test(rel)));
-}
-
-/** An issue the checker itself marks as another owner's residue: never the slice's. */
-export const isForeignNote = (issue) => issue?.code === 'FOREIGN_RESIDUE' || issue?.severity === 'note' || issue?.owner === 'repository';
+/* ------------------------------------------------------------ (b) lint parity through the gate */
 
 /**
- * (b)+(c) for lint: check-scoped-lint --base over the owned source files, in-process. A run whose only gating issue is
- * INPUTS_CHANGED_DURING_CHECK (a sibling editing the shared checkout mid-run) is measured again, up to LINT_ATTEMPTS.
- * {ok, status, counts, outside, gating: [...], baseline, attempts}
+ * (b)+(c) for lint: the gate's lint half (scripts/checks/gate.mjs runLintGate: `hfs lint --changed` over the owned files,
+ * judged per (file, rule) against the admission base read-only from git objects) in a child process. {ok, status, counts,
+ * gating: [...], baseline}. status clean | findings | unavailable (a tool could not run: never green).
  */
-export async function lintParity({ root, files, base, profile, attempts = LINT_ATTEMPTS, checker = null, timeoutMs = 1_200_000 }) {
-  if (!files.length) return { ok: true, status: 'clean', counts: { new: 0, preexisting: 0, runLevel: 0 }, outside: 0, gating: [], attempts: 0, note: 'no owned source file' };
-  const check = checker ?? ((r, f, o) => lintInChild(r, f, { ...o, timeoutMs }));
-  let last = null;
-  for (let i = 1; i <= attempts; i += 1) {
-    const report = await check(root, files, { profile, base });
-    const slice = report?.slice ?? null;
-    if (!slice) return { ok: false, status: report?.status ?? 'invalid', gating: (report?.issues ?? []).slice(0, 5), attempts: i };
-    const gating = (slice.issues ?? []).filter((issue) => !isForeignNote(issue));
-    last = { ok: gating.length === 0, status: slice.status, counts: slice.counts ?? null, outside: slice.outside ?? 0, owed: slice.owed?.length ?? 0,
-      gating, baseline: slice.baseline ? { method: slice.baseline.method, status: slice.baseline.status, base: slice.baseline.base ?? base } : null, attempts: i };
-    if (last.ok || !gating.every((issue) => issue.code === 'INPUTS_CHANGED_DURING_CHECK')) return last;
-  }
-  return last;
+export async function lintParity({ root, files, base, checker = null, timeoutMs = 1_200_000 }) {
+  if (!files.length) return { ok: true, status: 'clean', counts: { new: 0, preexisting: 0 }, gating: [], note: 'no owned file' };
+  const gated = await (checker ?? ((r, f, o) => lintInChild(r, f, { ...o, timeoutMs })))(root, files, { base });
+  const status = gated?.exit === 0 ? 'clean' : gated?.exit === 1 ? 'findings' : 'unavailable';
+  const gating = [...(gated?.errors ?? []).map((message) => ({ code: 'GATE_TOOL_FAILED', message: String(message) })),
+    ...(gated?.findings ?? []).map((f) => ({ code: `${f.engine}/${f.rule}`, file: f.path ?? null, line: f.line ?? null, message: f.message }))];
+  return { ok: status === 'clean', status, counts: { new: (gated?.findings ?? []).length, preexisting: gated?.preexisting ?? 0 }, gating,
+    baseline: { method: 'gate', status: status === 'unavailable' ? 'unavailable' : 'measured', base } };
 }
 
 /**
- * check-scoped-lint in a child process of its own. In-process it would share the ESM cache with the settler's
- * canon-scan: the target's eslint.config then holds the canon plugin module canon-scan imported, never the one
- * check-scoped-lint pins, and every required rule reads REQUIRED_RULE_IMPLEMENTATION_UNAVAILABLE. The file list goes
- * through a temp file (never a command line). Resolves to {status, slice}.
+ * The gate's lint half in a child process of its own. In-process it would share the ESM cache with the settler's canon-scan:
+ * the target's eslint.config would then hold the canon plugin module canon-scan imported. The file list goes through a temp
+ * file (never a command line). Resolves to runLintGate's {exit, findings, preexisting, errors}.
  */
-export function lintInChild(root, files, { profile, base, timeoutMs = 1_200_000, env = process.env } = {}) {
+export function lintInChild(root, files, { base, timeoutMs = 1_200_000, env = process.env } = {}) {
   const dir = path.join(os.tmpdir(), 'starci-settler');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `parity-lint-${process.pid}-${Date.now()}.json`);
-  fs.writeFileSync(file, JSON.stringify({ root, files, profile, base }));
+  fs.writeFileSync(file, JSON.stringify({ root, files, base }));
   try {
     const r = spawnSync(process.execPath, [selfFile, '--lint-child', file], { encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env, maxBuffer: 256 * 1024 * 1024 });
     const line = String(r.stdout ?? '').trim().split(/\r?\n/).pop() ?? '';
-    try { return JSON.parse(line); } catch { return { status: 'invalid', issues: [{ code: 'PARITY_LINT_CHILD_FAILED', message: String(r.stderr || r.error?.message || `exit ${r.status}`).slice(0, 300) }] }; }
+    try { return JSON.parse(line); } catch { return { exit: 2, findings: [], errors: [`the parity lint child printed no result: ${String(r.stderr || r.error?.message || `exit ${r.status}`).slice(0, 300)}`] }; }
   } finally { try { fs.rmSync(file, { force: true }); } catch { /* temp */ } }
 }
 
@@ -326,7 +292,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   // H7: a measurement that could not run is tooling, never the slice's red (scripts/reconcile/check-verdict.mjs).
   const unavailable = (reason, detail) => ({ ...hand(reason, detail), unavailable: true });
   const base = sliceBaseOf(item);
-  if (!base) return hand('parity-no-base', 'no params.admissionBase and no scoped-lint --base in the report');
+  if (!base) return hand('parity-no-base', 'no params.admissionBase and no --base in the report checks');
   const where = await resolveRoot(item, { repo });
   if (!where.ok) return hand('parity-unresolved', where.why);
   const { root, ownedRels } = where;
@@ -400,17 +366,15 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   if (typed.unavailable) return unavailable('parity-tsc-unavailable', typed.unavailable);
   if (!typed.ok) return hand('parity-tsc-new', typed.newErrors.slice(0, 8).map((e) => `${e.owned ? 'owned' : 'importer'} ${e.file} ${e.code} x${e.count - e.baseCount}: ${e.message}`), { tsc: typed });
 
-  // (b) scoped lint: no new finding, nothing unproven, inside the owned files.
-  const profile = profileOf(item, root);
-  if (!profile) return hand('parity-profile-unknown', 'no --profile in the report and no next/@nestjs/core dependency');
-  const files = await lintFilesOf(root, ownedRels, profile);
-  if (now() - started > settings.itemBudgetMs) return hand('verify-budget-exceeded', 'before scoped lint');
-  const linted = await lint({ root, files, base, profile });
-  await record({ name: PARITY_CHECKS.lint, command: `check-scoped-lint --profile ${profile} --root ${root} --base ${base}`, cwd: root,
-    phase: 'parity', runner: 'parity', exitCode: linted.ok ? 0 : 1, output: linted,
-    summary: { status: linted.status, counts: linted.counts, outside: linted.outside } });
-  if (!linted.ok && checkVerdictOf({ exitCode: 1, status: linted.status }).verdict === 'unavailable') return unavailable('parity-checker-unavailable', `scoped lint ${linted.status}: ${(linted.gating ?? []).slice(0, 3).map(brief).join('; ')}`);
-  if (!linted.ok) return hand('parity-lint-new', [`slice ${linted.status} new=${linted.counts?.new ?? '?'} runLevel=${linted.counts?.runLevel ?? '?'} baseline=${linted.baseline?.method ?? '?'}/${linted.baseline?.status ?? '?'}`, ...(linted.gating ?? []).slice(0, 6).map(brief)], { lint: { ...linted, gating: (linted.gating ?? []).slice(0, 20) } });
+  // (b) lint through the gate: no new finding over the owned files, and every tool ran.
+  const files = ownedFilesOf(root, ownedRels);
+  if (now() - started > settings.itemBudgetMs) return hand('verify-budget-exceeded', 'before the lint gate');
+  const linted = await lint({ root, files, base });
+  await record({ name: PARITY_CHECKS.lint, command: `gate.mjs lint --root ${root} --base ${base} --changed <${files.length} owned file(s)>`, cwd: root,
+    phase: 'parity', runner: 'parity', exitCode: linted.ok ? 0 : linted.status === 'unavailable' ? 2 : 1, output: linted,
+    summary: { status: linted.status, counts: linted.counts } });
+  if (linted.status === 'unavailable') return unavailable('parity-checker-unavailable', `lint gate: ${(linted.gating ?? []).slice(0, 3).map(brief).join('; ')}`);
+  if (!linted.ok) return hand('parity-lint-new', [`lint gate new=${linted.counts?.new ?? '?'} preexisting=${linted.counts?.preexisting ?? '?'} against ${base}`, ...(linted.gating ?? []).slice(0, 6).map(brief)], { lint: { ...linted, gating: (linted.gating ?? []).slice(0, 20) } });
 
   // git diff --check over the slice's diff (only when the worker declared one).
   let diffed = null;
@@ -424,18 +388,18 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
 
   const superseded = [...covered.canon, ...covered.lint, ...covered.tsc, ...covered.diff, ...covered.syntax].filter((c) => c?.exitCode !== 0).map((c) => `${c.name}:${c.exitCode}`);
   const tscLine = typed.projects.map((p) => `${p.project} ${p.errors} error(s) now / ${p.baseErrors} at base, 0 new`).join('; ') || typed.note;
-  const lintLine = `slice ${linted.status}, new=${linted.counts?.new ?? 0} preexisting=${linted.counts?.preexisting ?? 0}, ${linted.outside} finding(s) located outside the owned paths (foreign), baseline ${linted.baseline?.method ?? 'n/a'}/${linted.baseline?.status ?? 'n/a'}${linted.attempts > 1 ? `, measured ${linted.attempts}x (sibling edits mid-run)` : ''}`;
+  const lintLine = `lint gate ${linted.status}, new=${linted.counts?.new ?? 0} preexisting=${linted.counts?.preexisting ?? 0} against ${base}`;
   checks.push({ name: 'cut-slice-postcondition', exitCode: 0, command: `canon-scan (in-process) --root ${slice.root} over the slice's ${slice.paths} owned path(s)`,
     evidence: owedAccepted
       ? `runtime settler (canon parity): canon-scan ${slice.findings} finding(s) on the owned paths, every one declared owedToWire, held by canon-wire leg(s) ${owedAccepted.wires.join(', ')} and present at base ${base} (not introduced by the slice)`
       : `runtime settler (canon parity): canon-scan status ok, 0 findings on the slice's owned paths (families ${item.payload.params.canonFamilies})` });
-  checks.push({ name: PARITY_CHECKS.lint, exitCode: 0, command: `check-scoped-lint (in-process) --profile ${profile} --root ${root} --base ${base} -- <${files.length} owned source file(s)>`,
+  checks.push({ name: PARITY_CHECKS.lint, exitCode: 0, command: `gate.mjs lint (child) --root ${root} --base ${base} --changed <${files.length} owned file(s)>`,
     evidence: `runtime settler (canon parity): ${lintLine}` });
   checks.push({ name: PARITY_CHECKS.tsc, exitCode: 0, command: `typescript (in-process) owned files at ${base} vs working tree`, evidence: `runtime settler (canon parity): ${tscLine}` });
   if (diffed) checks.push({ name: PARITY_CHECKS.diff, exitCode: 0, command: `git diff --check ${base} -- <owned paths>`, evidence: 'runtime settler (canon parity): no whitespace/conflict error in the slice diff' });
-  checks.push({ name: 'cut-regression-inventory', exitCode: 0, command: `canon parity: canon-scan + scoped lint + typecheck over the owned paths vs ${base}`,
+  checks.push({ name: 'cut-regression-inventory', exitCode: 0, command: `canon parity: canon-scan + lint gate + typecheck over the owned paths vs ${base}`,
     evidence: `runtime settler (canon parity, contract change canon-parity-settle): no new finding and no new type error against the admission base; ${superseded.length ? `the worker's red declared check(s) ${superseded.join(', ')} are foreign residue outside the owned paths (superseded by the owned-scope measurements)` : 'no declared check was red'}${reruns.length ? `; ${reruns.length} runtime check(s) re-ran exit 0` : ''}` });
-  return { green: true, via: 'canon-parity', checks: { checks }, parity: { base, profile, ...(owedAccepted ? { owedToWire: { findings: slice.findings, wires: owedAccepted.wires } } : {}), lint: { status: linted.status, counts: linted.counts, outside: linted.outside, attempts: linted.attempts }, tsc: typed.projects, superseded } };
+  return { green: true, via: 'canon-parity', checks: { checks }, parity: { base, ...(owedAccepted ? { owedToWire: { findings: slice.findings, wires: owedAccepted.wires } } : {}), lint: { status: linted.status, counts: linted.counts }, tsc: typed.projects, superseded } };
 }
 
 /** A path of a report or payload (maybe prefixed with the repository folder, e.g. nivo-fe/apps/...) relative to root. */
@@ -474,30 +438,17 @@ export async function owedToWireAccept(item, slice, { root, base, ownedRels, wir
 }
 
 /**
- * Canon-scan over the owned paths AT BASE: a link-free base tree (scoped-lint-baseline.mjs materializeBaseTree, the
- * owned files at their base blobs) scanned by canon-scan.mjs in a child with the base view (the live node_modules
- * read-only). {ok, findings: [{file, ruleId}]} or {ok: false, reason}.
+ * The canon findings of the owned paths AT BASE, read-only from git objects: ESLint over each owned file's base blob through
+ * the checkout's own install and flat config (scripts/checks/gate.mjs baseEslintFindings) - no base tree, no worktree, no
+ * link. {ok, findings: [{file, ruleId}]} or {ok: false, reason}.
  */
-export async function canonBaseFindings({ root, base, ownedRels, families = 'all', timeoutMs = 600_000 }) {
-  const bl = await import('../checks/scoped-lint-baseline.mjs');
-  const resolved = bl.resolveSliceBase(root, base);
-  if (!resolved.ok) return { ok: false, reason: resolved.reason };
-  const current = ownedFilesOf(root, ownedRels);
-  const blobs = baseBlobsOf(root, base, ownedRels);
-  if (!blobs.ok) return { ok: false, reason: blobs.reason };
-  let tree = null;
+export async function canonBaseFindings({ root, base, ownedRels }) {
   try {
-    tree = bl.materializeBaseTree(root, resolved, { files: [...new Set([...current, ...blobs.blobs.keys()])], atBase: [...blobs.blobs.keys()] });
-    const script = path.join(path.dirname(selfFile), '..', 'checks', 'canon-scan.mjs');
-    const r = spawnSync(process.execPath, [script, '--root', tree.root, '--families', families, '--paths', ownedRels.join(','), '--json'],
-      { cwd: tree.root, env: bl.baseViewEnv(tree), encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
-    let report = null;
-    const text = String(r.stdout ?? '').trim();
-    try { report = JSON.parse(text); } catch { try { report = JSON.parse(text.split(/\r?\n/).pop()); } catch { report = null; } }
-    if (!report || !['ok', 'findings'].includes(report.status)) return { ok: false, reason: `canon-scan at base: ${report?.status ?? `exit ${r.status}`} ${String(r.stderr ?? '').trim().split(/\r?\n/)[0] ?? ''}`.trim() };
-    return { ok: true, findings: (report.findings ?? []).map((f) => ({ file: norm(f.file ?? ''), ruleId: f.ruleId ?? null })) };
+    const blobs = baseBlobsOf(root, base, ownedRels);
+    if (!blobs.ok) return { ok: false, reason: blobs.reason };
+    const { baseEslintFindings } = await import('../checks/gate.mjs');
+    return { ok: true, findings: (await baseEslintFindings({ root, base, files: [...blobs.blobs.keys()] })).map((f) => ({ file: norm(f.file), ruleId: f.ruleId })) };
   } catch (error) { return { ok: false, reason: String(error?.message ?? error).slice(0, 200) }; }
-  finally { try { tree?.dispose(); } catch { /* a temp tree */ } }
 }
 
 /** The one checkout the slice's owned paths resolve into, and the owned paths relative to it. */
@@ -523,20 +474,10 @@ export async function parityFingerprint(item, { repo, resolveRoot = resolveOwned
   }
   return h.digest('hex').slice(0, 16);
 }
-/** A verdict whose only failure was a sibling's edit mid-run is retried sooner. */
-export const parityTransient = (verdict) => verdict?.reason === 'parity-lint-new'
-  && (verdict.parity?.lint?.gating ?? []).length > 0 && verdict.parity.lint.gating.every((i) => i.code === 'INPUTS_CHANGED_DURING_CHECK');
-
-// The lint child: node canon-parity.mjs --lint-child <job.json> -> one JSON line {status, slice}.
+// The lint child: node canon-parity.mjs --lint-child <job.json> -> one JSON line, runLintGate's result.
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile && process.argv[2] === '--lint-child') {
   const job = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
-  const { checkScopedLint } = await import('../checks/check-scoped-lint.mjs');
-  let out;
-  try {
-    const report = await checkScopedLint(job.root, job.files, { profile: job.profile, base: job.base });
-    const s = report?.slice;
-    out = { status: report?.status ?? null, ...(s ? { slice: { status: s.status, ok: s.ok, counts: s.counts ?? null, outside: s.outside ?? 0, owed: s.owed ?? [],
-      issues: (s.issues ?? []).slice(0, 500), issueCount: (s.issues ?? []).length, baseline: s.baseline ? { method: s.baseline.method, status: s.baseline.status, base: s.baseline.base ?? null } : null } } : { issues: (report?.issues ?? []).slice(0, 20) }) };
-  } catch (error) { out = { status: 'invalid', issues: [{ code: 'PARITY_LINT_CHILD_FAILED', message: String(error?.stack ?? error).slice(0, 600) }] }; }
-  process.stdout.write(`${JSON.stringify(out)}\n`);
+  const { runLintGate } = await import('../checks/gate.mjs');
+  const out = await runLintGate({ root: job.root, base: job.base, files: job.files });
+  process.stdout.write(`${JSON.stringify({ exit: out.exit, findings: out.findings.slice(0, 500), preexisting: out.preexisting, errors: out.errors })}\n`);
 }

@@ -32,7 +32,7 @@ const KINDS=parseYaml(fs.readFileSync(path.join(ROOT,'modules','models','kinds.y
 // The fe-canon attempt-4 checks the kernel recorded, verbatim in shape.
 const CANON_CHECKS=[
   {name:'canon-scan',command:'node .claude/scripts/checks/canon-scan.mjs --root ../nivo-fe --exclude design-plans --json',exitCode:1,evidence:'status=findings; 574 findings, 185 files, 34 slices'},
-  {name:'check-scoped-lint',command:'node .claude/scripts/checks/check-scoped-lint.mjs --profile next --root ../nivo-fe --all',exitCode:2,evidence:'status=unavailable, exit 2'},
+  {name:'hfs-lint',command:'npx hfs lint --repo ../nivo-fe --format json',exitCode:1,evidence:'exit 1 - 67 findings'},
   {name:'lint-check',command:'npm run lint:check (root ../nivo-fe)',exitCode:1,evidence:'exit 1 - 4 @typescript-eslint findings'},
 ];
 const UAT_ROOT_CAUSE={node:'impl.login.nivo-backend.session-custody',self:false,category:'contract-gap',
@@ -115,7 +115,9 @@ test('failure classes: measurement findings, tool errors, environment, product o
   assert.equal(classifyFailure({op:'review.verify',report:{outcome:'failed',checks:CANON_CHECKS},measurement:true}).class,'findings');
   assert.equal(measurementCheckClass(CANON_CHECKS[0]),'findings','canon-scan exit 1 is findings');
   assert.equal(measurementCheckClass({...CANON_CHECKS[0],exitCode:3}),'error','canon-scan exit 3: a machine could not run');
-  assert.equal(measurementCheckClass(CANON_CHECKS[1]),'findings','scoped-lint --all unavailable (undeclared repo obligations) is measured, owed by the repo owner');
+  assert.equal(measurementCheckClass(CANON_CHECKS[1]),'findings','a whole-repository hfs lint with findings is measured');
+  assert.equal(measurementCheckClass({name:'gate',command:'node .claude/scripts/checks/gate.mjs --root ../nivo-fe',exitCode:1}),'findings','gate exit 1: new findings');
+  assert.equal(measurementCheckClass({name:'gate',command:'node .claude/scripts/checks/gate.mjs --root ../nivo-fe',exitCode:2}),'error','gate exit 2: a tool could not run');
   assert.equal(classifyFailure({op:'review.verify',report:{outcome:'failed',checks:[{...CANON_CHECKS[0],exitCode:3}]},measurement:true}).class,'tool');
   // app-auth a1: the UAT names its owner as a Work record.
   assert.equal(classifyFailure({op:'uat.verify',report:{outcome:'failed',rootCause:UAT_ROOT_CAUSE,checks:[{name:'uat-spec-run',command:'node --test x',exitCode:1}]}}).class,'product');

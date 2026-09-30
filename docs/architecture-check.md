@@ -7,12 +7,11 @@ packages, declared exports, re-export barrels, static `import()` calls, and
 string-literal `require()` calls. It reports architectural evidence; it does
 not promote current code into the standard.
 
-It runs inside the aggregate scoped-lint gate as the `architecture` machine
-kind:
+It runs inside `hfs lint` (the ESLint canon's project-graph rules and `hfs check`), which the op gate runs over a
+slice's changed files:
 
 ```sh
-node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root <repo-root> \
-  (--all | -- <files...>)
+node scripts/checks/gate.mjs --root <repo-root> --changed <files...>
 ```
 
 on its own:

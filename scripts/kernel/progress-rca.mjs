@@ -460,7 +460,7 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
     } else if (c.cause === 'tool-timeout') {
       add({ key: actionKey('params', 'commandTimeoutMs'), tier: 'light', cause: c.cause, unblocks: c.open,
         title: 'give the op a longer command window and the background-run rule for long validators',
-        command: `${api} op-override ${base} --op ${us[0]?.op ?? 'code.refactor'} --set '${JSON.stringify({ commandTimeoutMs: settings.commandTimeoutMs, notes: ['Long validators (canon-scan, scoped lint, typecheck) may exceed your tool window: start them in the background writing to a file, then poll that file until it is complete; never report blocked on a tool timeout.'] })}' --decision <id>`,
+        command: `${api} op-override ${base} --op ${us[0]?.op ?? 'code.refactor'} --set '${JSON.stringify({ commandTimeoutMs: settings.commandTimeoutMs, notes: ['Long validators (canon-scan, gate.mjs, hfs lint) may exceed your tool window: start them in the background writing to a file, then poll that file until it is complete; never report blocked on a tool timeout.'] })}' --decision <id>`,
         expected: 'no unit blocks on a 30 s tool window; applies to every later dispatch of the op in this workflow' });
     } else if (c.cause === 'test-gap' && unitSpecsOff()) {
       add({ key: actionKey('params', 'specs-unit-off'), tier: 'light', cause: c.cause, unblocks: c.open,

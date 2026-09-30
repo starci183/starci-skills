@@ -98,7 +98,7 @@ export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = 
 export function kernelOverrideLines(o) {
   if (!o || typeof o !== 'object') return [];
   const out = [`kernel_override: your Kernel adapted this op for its workflow (additive; your brief and every gate still hold):`];
-  if (Number.isInteger(o.commandTimeoutMs)) out.push(`  commandTimeoutMs=${o.commandTimeoutMs} - a command may run this long. When your tool window is shorter, start a long validator (canon-scan, scoped lint, typecheck) in the background writing to a file and poll that file until it is complete; a tool timeout is never a blocker by itself.`);
+  if (Number.isInteger(o.commandTimeoutMs)) out.push(`  commandTimeoutMs=${o.commandTimeoutMs} - a command may run this long. When your tool window is shorter, start a long validator (canon-scan, gate.mjs, hfs lint) in the background writing to a file and poll that file until it is complete; a tool timeout is never a blocker by itself.`);
   for (const n of o.notes ?? []) out.push(`  - ${n}`);
   if (o.redesign?.brief) out.push(`  redesign brief (RCA ${o.redesign.brief.id ?? '-'}): ${JSON.stringify(o.redesign.brief).slice(0, 6000)}`);
   return out.length > 1 ? out : [];

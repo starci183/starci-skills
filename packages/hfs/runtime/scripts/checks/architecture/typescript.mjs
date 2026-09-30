@@ -19,8 +19,8 @@ export function isGeneratedPath(root, fileName) {
 // A `<tool>.config.*` or `<tool>.setup.*` module beside a package manifest (next.config.ts,
 // postcss.config.mjs) is build tooling a broad `**/*.ts` include pulls in; a `*.config.ts` inside a source tree
 // (src/config/database.config.ts) has no manifest beside it and stays source. The architecture program still
-// reads tooling modules (a profile may declare one as source); check-scoped-lint does not make one a canon
-// lint subject unless the profile's sourceGlobs name it.
+// reads tooling modules (a profile may declare one as source); the lint (hfs lint) judges one only through the
+// repository's own eslint.config.
 const TOOLING_MODULE = /^[^/]+\.(?:config|setup)\.[cm]?[jt]sx?$/i;
 export function isToolingModule(fileName) {
   return TOOLING_MODULE.test(path.basename(fileName)) && fs.existsSync(path.join(path.dirname(fileName), 'package.json'));

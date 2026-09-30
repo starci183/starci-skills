@@ -8,7 +8,7 @@ import { loadContractChanges, changeById } from '../scripts/kernel/contract-vers
 const ROOT = new URL('..', import.meta.url);
 
 // nivo Collab inc-00026c808d40: backend.implement and interface.implement workers filed `partial`
-// for a Sonar 401, a repo-wide check-scoped-lint `status: unavailable`, and backend E2E they said a
+// for a Sonar 401, a whole-repository lint that could not run, and backend E2E they said a
 // later e2e.verify leg owns; each cost a procedural fail and a retry, since partial never settles
 // pass. The shared op contract now says what an open item is and what is only a note.
 test('the shared op contract separates open items from environment and later-leg notes', () => {
@@ -16,7 +16,7 @@ test('the shared op contract separates open items from environment and later-leg
   const text = JSON.stringify(common);
   assert.match(text, /Open items are unfinished work/);
   assert.match(text, /inc-00026c808d40/);
-  assert.match(text, /check-scoped-lint repo-wide\s+`status: unavailable`/, 'a repo-wide unavailable lint beside a green scoped run is a note');
+  assert.match(text, /whole-repository hfs lint\s+that cannot run beside a gate\.json with exit 0/, 'a whole-repository lint that cannot run beside a green gate is a note');
   assert.match(text, /e2e\.verify/, 'a proof another leg owns is cited with its op');
   assert.match(text, /sonar-local\.mjs[\s\S]*401 means run it\s+again/, 'Sonar 401 is a rerun, never an open item');
   assert.match(text, /backend\.implement's scoped unit gate for its selected operations/, "the op's own required proofs stay its own");

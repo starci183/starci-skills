@@ -14,7 +14,7 @@
 #   records.yaml       — starci/records@1 record catalog (contract data, read directly)
 #   agents/            — starci/agent-card@1 agent cards
 #   profiles/          — per-runtime launch facts
-#   code-patterns.yaml — starci/code-pattern-profile@1 (scripts/checks/check-scoped-lint.mjs)
+#   code-patterns.yaml — starci/code-pattern-profile@1 (scripts/checks/canon-scan.mjs, scripts/checks/check-hfs-rules.mjs)
 #   canon-conformance.yaml — starci/canon-conformance@1 (scripts/checks/canon-scan.mjs)
 
 schema: starci/module-models-index@1

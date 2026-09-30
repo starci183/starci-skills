@@ -695,25 +695,12 @@ schemas:
     subsystem: gate
     governs: "The profile registry for pattern checks — required profiles nest + next, each declaring its rule set (per #/$defs/profile)."
     binds: code-pattern profile declarations
-    usedBy: [scripts/checks/check-scoped-lint.mjs (PROFILE_SCHEMA const; status enum implemented|missing|conflict)]
+    usedBy: [scripts/checks/canon-scan.mjs (profiles.<profile>.canon), scripts/checks/check-hfs-rules.mjs (expectedSourceRuleIds parity)]
     business:
       question: "Which mechanical rules apply to THIS repository's framework?"
       whenNeeded: Before a pattern check runs — the profile picks the nest/next rule set.
       whenNot: Framework substitution is not licensed by a profile existing; mono/single-source mappings keep Nest/Next roles.
-      selectedBy: check-scoped-lint / code-pattern enforcement lanes.
-
-  - id: starci/code-pattern-check@1
-    file: modules/schemas/code-pattern-check.schema.yaml
-    dialect: json-schema
-    subsystem: gate
-    governs: "The aggregated pattern-check REPORT — profile, repository, ok, status(clean|findings|unavailable|invalid), inventoryDigest, canon{name,version,digest,files}, tooling, inputs, machineResults, coverage, obligations, files, issues, limitations, reportDigest."
-    binds: the report a scoped-lint/pattern run emits
-    usedBy: [scripts/checks/check-scoped-lint.mjs (CODE_PATTERN_REPORT const); checker scripts emit the sibling starci/code-pattern-script@1 per-file results it aggregates]
-    business:
-      question: "Did mechanical code-pattern conformance run clean, with what coverage and what limits?"
-      whenNeeded: review.verify lint mode; enforcement needs executable coverage, not agent approval.
-      whenNot: status unavailable/invalid is not clean; a missing checker can never be replaced by agent sign-off (per CONTEXT.md).
-      selectedBy: pattern-check orchestration; auditors read reportDigest-bound output.
+      selectedBy: canon-scan --profile and the check-hfs-rules parity gate.
 
   - id: starci/canon-pins@1
     file: modules/schemas/canon-pins.schema.yaml
@@ -995,7 +982,7 @@ moduleLocalDocumentKinds:
 
 gaps:
   - "starci/goal@1 (kernel goal.json) has no dedicated schema file — the workflow goal is a sqlite row written by `api enqueue`/define-goal; its contract lives in modules/goal/define-goal.yaml."
-  - "starci/code-pattern-script@1 is emitted by every scripts/checks/code-patterns/*.mjs script and consumed by check-scoped-lint.mjs, but has no schema file — only the aggregate starci/code-pattern-check@1 is schematized."
+  - "starci/code-pattern-script@1 is emitted by every scripts/checks/code-patterns/*.mjs script and has no schema file; since check-scoped-lint.mjs was retired (op-gate-loop) no runner aggregates it."
   - "starci/evidence-packet@1 is named in modules/models/kinds.yaml but has no schema file;"
 
 coverage:

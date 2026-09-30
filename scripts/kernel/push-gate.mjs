@@ -1,5 +1,4 @@
-// settle's push-gate half. A job's scoped lint (check-scoped-lint.mjs) proves its files under the
-// runtime's code-pattern profile, but the repository's OWN push gate - the lint its husky pre-push
+// settle's push-gate half. A job's gate (scripts/checks/gate.mjs) proves its changed files against its base, but the repository's OWN push gate - the lint its husky pre-push
 // hook runs when it has one, else its package `lint:check` script, which the ci.yml that `hfs sync` generates
 // also runs - runs later, over the whole configured glob, and one landed file it rejects blocks every
 // push of that repository (nivo-backend 2026-09-24: 63 errors in nine landed files). So a pass whose
