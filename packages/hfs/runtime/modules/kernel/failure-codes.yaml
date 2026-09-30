@@ -248,7 +248,18 @@ BE_APP_COMPOSITION_ONLY:
   meaning_vi: "Mã trong ứng dụng gốc không phải entry, module gốc hay bootstrap được cho phép."
   causes_vi:
     - "Thêm tệp không đúng tên vào thư mục ứng dụng gốc"
+    - "Composition spec của app tự khai AppModule, import AppModule từ tệp khác app.module, hoặc không gọi AppModule.register( — module thật không bao giờ được khởi chạy"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_BACKGROUND_UNOWNED:
+  title: "Every sweep, outbox or retry has a job or consumer run by a worker app"
+  title_vi: "Việc nền không có ai chạy"
+  meaning_vi: "`<method>` là việc nền nhưng không có job/consumer nào chạy nó — 'khôi phục bền' này không bao giờ chạy."
+  causes_vi:
+    - "Vi phạm luật R46: Công việc nền (outbox, sweep, reconcile, retry) là `transport/schedule/*.job.ts` hoặc `transport/message/*.consumer.ts`, được app `worker` compose; job/consumer không app `worker` nào compose, hoặc `@Cron`/`@Interval`/`setInterval` ngoài `platform/scheduling`, hoặc method `sweep*\\|deliver*\\|reconcile*\\|retry*` không có job/consumer đã compose chạm tới = đỏ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -351,6 +362,16 @@ BE_FEATURE_NOT_COMPOSED:
   owner: op-retry
   kind: check-finding
 
+BE_FEATURE_SHAPE:
+  title: "Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`"
+  title_vi: "Feature sai hình dạng"
+  meaning_vi: "Feature `<f>` có `<dir>` ngoài hình dạng chuẩn (application/ + transport/<protocol>/)."
+  causes_vi:
+    - "Vi phạm luật R29: Feature gốc chỉ có `index.ts`, `<feature>.module.ts`, `application/`, `transport/<protocol>/` với protocol có slot; không `application/graphql\\|http`, không `infrastructure/`, `composition/`, cây transport-first."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 BE_MODULE_HANDLER_REGISTRATION:
   title: "Handler not registered exactly once"
   title_vi: "Handler chưa đăng ký đúng một lần"
@@ -395,6 +416,7 @@ BE_MODULE_SHAPE:
     - "new ConfigurableModuleBuilder() không có kiểu options"
     - "register không static, hoặc có forRoot, forFeature, registerAsync"
     - "new XService() hoặc let ở cấp module tạo trạng thái toàn cục"
+    - "Feature có hai module trong một thư mục transport (một module cho mỗi thao tác), có module-definition, hoặc @Module ngoài `<f>.module.ts` và `<f>-<protocol>.module.ts`; app import module ứng dụng của feature hoặc module transport không thuộc loại app cho phép (api: graphql/http/websocket; worker: schedule/message; cli: cli)"
     - "Bộ máy đồ thị module: module đại diện của capability được đăng ký hai lần trong một app, thiếu isGlobal: true ở gốc app, hoặc bị module khác import"
     - "Module con có hơn một nơi import, hoặc vừa nằm ở gốc app vừa được module khác import"
     - "isGlobal: true xuất hiện ngoài gốc app apps/<app>/src/app.module.ts"
@@ -409,6 +431,19 @@ BE_PUBLIC_CONTRACT_FORM:
   causes_vi:
     - "Viết kiểu ngay tại tham số thay vì khai báo tên riêng"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_PUBLIC_SURFACE:
+  title: "Owner public surface violated"
+  title_vi: "Bề mặt công khai của owner bị vi phạm"
+  meaning_vi: "Một import chui vào tệp bên trong owner khác thay vì đi qua index.ts của owner, hoặc index.ts export * , export cả thư mục types, export token kho (*_STORE), hoặc export quá nhiều tên."
+  causes_vi:
+    - "Import theo đường dẫn sâu như @modules/domain/plan/plan.service"
+    - "index.ts dùng export * hoặc export cả thư mục"
+    - "index.ts export token kho hoặc vượt số export cho phép"
+    - "Có index.ts lồng bên trong owner (persistence/index.ts, errors/index.ts), hoặc index.ts chứa import, khai báo, export default thay vì chỉ các dòng export { } / export type { }"
+  nextStep_vi: "Import qua index.ts của owner và liệt kê tường minh những gì owner cung cấp; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -432,6 +467,16 @@ BE_REQUIRED_MODULE_MISSING:
     - "Module nền tảng bắt buộc (config, logging, errors, primitives) chưa được tạo hoặc đặt tên khác"
     - "Ứng dụng thiếu bài kiểm thử ghép <app>.composition.spec.ts"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tạo tệp hoặc thư mục còn thiếu đúng theo bảng kê; nếu tên hiện có là do thiết kế khác thì đó là việc đổi bảng kê, do người giám sát quyết định."
+  owner: op-retry
+  kind: check-finding
+
+BE_SCHEMA_OWNER:
+  title: "Entities and migrations live in the owning capability's `persistence/`"
+  title_vi: "Entity hoặc migration sai chủ"
+  meaning_vi: "Entity/migration `<file>` không nằm dưới `persistence/` của capability sở hữu (hoặc sai tên)."
+  causes_vi:
+    - "Vi phạm luật R35: Entity + migration nằm trong `<capability>/persistence/` của capability sở hữu bảng, có `connection.ts`; `connection.ts` trỏ tới một connection khai trong `hfs.json`; tên migration `<epochMs13>-<kebab>.ts`, class `<Pascal><epochMs13>`, thuộc tính `name` bằng tên class; `index.ts` của owner export `<c>Entities` và `<c>Migrations`, app compose."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
@@ -560,6 +605,16 @@ FE_FETCH_OUTSIDE_TRANSPORT:
   owner: other-op:interface.implement
   kind: check-finding
 
+FE_HOOKS_ARE_HOOKS:
+  title: "`hooks/` hold hooks and one shared file per domain"
+  title_vi: "hooks/ chứa thứ không phải hook"
+  meaning_vi: "`<file>` trong `hooks/` không phải React hook, hoặc một domain có nhiều hơn một tệp `.shared.ts` (hay tệp shared không mang tên domain), hoặc một helper được khai báo ở nhiều tệp của domain. Reader server về `modules/api`, helper về `<domain>.shared.ts`."
+  causes_vi:
+    - "Vi phạm luật R56: `hooks/<domain>/` chỉ chứa `use*.ts` và một `<domain>.shared.ts` cho helper dùng chung; reader server nằm ở `modules/api/<domain>/read-*.ts` (bọc `cache()`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 FE_HREF_RESOLVES:
   title: "Link points to a route that does not exist"
   title_vi: "Liên kết trỏ tới đường dẫn không tồn tại"
@@ -581,6 +636,16 @@ FE_OWNER_REACHABLE:
     - "Route chỉ import kiểu của feature chứ không render nó"
     - "Feature đã bị thay thế nhưng thư mục cũ vẫn còn"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để gắn feature vào route đúng hoặc xoá feature không dùng; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_PACKAGE_SHAPE:
+  title: "Packages build to `dist` with explicit exports and no dead unit"
+  title_vi: "Gói dùng chung sai hình dạng"
+  meaning_vi: "Package `<p>` export source chưa build (hoặc `export *`, hoặc unit không ai dùng)."
+  causes_vi:
+    - "Vi phạm luật R63: `packages/*` build ra `dist`, `exports` tường minh, không `export *`, không unit chết; package UI chỉ chứa composites/branches/leaves + CSS token của family."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -661,6 +726,16 @@ FE_ROUTE_DRAWING_DECISION:
   owner: other-op:interface.implement
   kind: check-finding
 
+FE_ROUTE_FILES_THIN:
+  title: "Route files mount one owner; Next conventions (`proxy.ts`, metadata)"
+  title_vi: "Tệp route không mỏng"
+  meaning_vi: "Tệp route `<file>` `<what>`. Route chỉ nhận input framework rồi mount một owner."
+  causes_vi:
+    - "Vi phạm luật R54: Luật route áp cho mọi tệp route (`page/layout/template/loading/not-found`): không component inline, không vẽ, không hook; `force-dynamic` cấm trên page client; redirect cũ nằm ở `next.config` `redirects()`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 FE_ROUTE_ONE_PAGE:
   title: "Route must mount exactly one page"
   title_vi: "Route phải mount đúng một thành phần trang"
@@ -717,6 +792,16 @@ FE_TIER_DIRECTION:
   owner: op-retry
   kind: check-finding
 
+FE_TRANSPORT_OWNER:
+  title: "One `fetch` in `modules/api/client.ts`, with timeout and abort"
+  title_vi: "fetch ngoài client duy nhất"
+  meaning_vi: "`fetch` ở `<file>` ngoài `modules/api/client.ts` (gọi, gán lại hoặc truyền như giá trị), app import thư viện HTTP khác, reader `read-*.ts` không đi qua client, hoặc state dùng chung dạng `let`."
+  causes_vi:
+    - "Vi phạm luật R50: Mỗi app đúng một `fetch` ở `modules/api/client.ts`, có timeout + `AbortSignal`; không singleton `let` giữ token/locale; credential truyền bằng tham số/context."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
 FE_WORLD_OWNER_RENDER_BOUNDARY:
   title: "World-state owner renders inline"
   title_vi: "Nơi giữ trạng thái sản phẩm tự render trực tiếp"
@@ -759,6 +844,16 @@ HFS_APP_LAYOUT_INVALID:
     - "Ứng dụng thiếu tệp bắt buộc"
   nextStep_vi: "Op dựng khung sửa bố cục ứng dụng theo HFS rồi kiểm tra lại."
   owner: other-op:backend.scaffold
+  kind: check-finding
+
+HFS_ARCH_CONFIG_UNREAD:
+  title: "The machine reads `hfs.json`; zero files analysed is red"
+  title_vi: "Máy kiến trúc không đọc được hfs.json"
+  meaning_vi: "Kiểm tra kiến trúc không đọc được `hfs.json` phân tích 0 tệp, hoặc repo còn một tệp cấu hình mà máy không đọc nữa (`architecture.json`) — đây là đỏ, không phải 'chưa có dữ liệu'."
+  causes_vi:
+    - "Vi phạm luật R24: Máy kiến trúc tự đọc `hfs.json`; phân tích 0 tệp hay `unavailable` cho một profile đã khai = thất bại."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
   kind: check-finding
 
 HFS_CANON_PIN_DRIFT:

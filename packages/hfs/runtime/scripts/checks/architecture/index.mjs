@@ -25,6 +25,17 @@ import { checkErrorMasked, ERROR_MASKED_RULE_IDS } from './error-masked.mjs';
 import { checkDefaultDeny, DEFAULT_DENY_RULE_IDS } from './default-deny.mjs';
 import { checkEntrypoints, ENTRYPOINT_RULE_IDS } from './entrypoint.mjs';
 import { checkErrorCodes, ERROR_CODE_RULE_IDS } from './error-codes.mjs';
+import { checkConfigUnread, CONFIG_UNREAD_RULE_IDS } from './config-unread.mjs';
+import { checkFeatureShape, FEATURE_SHAPE_RULE_IDS } from './feature-shape.mjs';
+import { checkPublicSurface, PUBLIC_SURFACE_RULE_IDS } from './public-surface.mjs';
+import { checkCompositionSpec, COMPOSITION_SPEC_RULE_IDS } from './composition-spec.mjs';
+import { checkSchemaOwner, SCHEMA_OWNER_RULE_IDS } from './schema-owner.mjs';
+import { checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS } from './module-per-transport.mjs';
+import { checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS } from './background-unowned.mjs';
+import { checkTransportOwner, TRANSPORT_OWNER_RULE_IDS } from './transport-owner.mjs';
+import { checkRouteFilesThin, ROUTE_FILES_THIN_RULE_IDS } from './route-files-thin.mjs';
+import { checkHooksAreHooks, HOOKS_ARE_HOOKS_RULE_IDS } from './hooks-are-hooks.mjs';
+import { checkPackageShape, PACKAGE_SHAPE_RULE_IDS } from './package-shape.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -37,7 +48,7 @@ const LIMITATIONS = [
   'Frontend SWR lifecycle rules prove declared key bindings and installed SWR identity only; domain identity completeness, stale-result behavior and mutation effects require target behavior evidence.',
 ];
 
-// The backend composition and data machine (R33, R38, R39, R41, R45, R84, R86): name -> [check, the rule ids it makes truthful].
+// The backend composition and data machine (R29, R30, R32, R33, R35, R38, R39, R41, R45, R46, R84, R86): name -> [check, the rule ids it makes truthful].
 const BACKEND_MACHINE = {
   connectionMap: [checkConnectionMap, CONNECTION_RULE_IDS],
   sqlOwner: [checkSqlOwner, SQL_OWNER_RULE_IDS],
@@ -46,6 +57,20 @@ const BACKEND_MACHINE = {
   defaultDeny: [checkDefaultDeny, DEFAULT_DENY_RULE_IDS],
   entrypoints: [checkEntrypoints, ENTRYPOINT_RULE_IDS],
   errorCodes: [checkErrorCodes, ERROR_CODE_RULE_IDS],
+  featureShape: [checkFeatureShape, FEATURE_SHAPE_RULE_IDS],
+  publicSurface: [checkPublicSurface, PUBLIC_SURFACE_RULE_IDS],
+  compositionSpec: [checkCompositionSpec, COMPOSITION_SPEC_RULE_IDS],
+  schemaOwner: [checkSchemaOwner, SCHEMA_OWNER_RULE_IDS],
+  modulePerTransport: [checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS],
+  backgroundUnowned: [checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS],
+};
+
+// The frontend repository machine (R50, R54, R56, R63): same shape, run for a front-end repository only.
+const FRONTEND_MACHINE = {
+  transportOwner: [checkTransportOwner, TRANSPORT_OWNER_RULE_IDS],
+  routeFilesThin: [checkRouteFilesThin, ROUTE_FILES_THIN_RULE_IDS],
+  hooksAreHooks: [checkHooksAreHooks, HOOKS_ARE_HOOKS_RULE_IDS],
+  packageShape: [checkPackageShape, PACKAGE_SHAPE_RULE_IDS],
 };
 
 const COMMON_RULE_IDS = [
@@ -95,7 +120,7 @@ export const ARCHITECTURE_RULE_IDS = Object.freeze([...new Set([
   ...COMMON_RULE_IDS, ...BACKEND_RULE_IDS, ...FRONTEND_RULE_IDS, ...HFS_RULE_IDS, ...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS,
   ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS,
   ...REGISTRATION_RULE_IDS, ...SWR_DATA_RULE_IDS, ...SYMBOL_RULE_IDS, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID, PUBLIC_CONTRACT_RULE_ID,
-  READONLY_BOUNDARY_RULE_ID, ...ERROR_RULE_IDS, ...Object.values(BACKEND_MACHINE).flatMap(([, ids]) => ids),
+  READONLY_BOUNDARY_RULE_ID, ...ERROR_RULE_IDS, ...CONFIG_UNREAD_RULE_IDS, ...Object.values(BACKEND_MACHINE).flatMap(([, ids]) => ids), ...Object.values(FRONTEND_MACHINE).flatMap(([, ids]) => ids),
 ])].sort());
 
 function stable(items) {
@@ -128,6 +153,8 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
       errors: [{ ruleId: match?.[1] ?? 'ARCH_COMPILER_FAILURE', message: message.replace(/^(ARCH_[A-Z_]+):\s*/, '') }], limitations: LIMITATIONS };
   }
   const violations = [...hfs.violations];
+  const configUnread = checkConfigUnread({ config, context });
+  violations.push(...configUnread.violations);
   let moduleRegistration = { status: 'not-applicable' };
   let backendSourceShape = { status: 'not-applicable' };
   let backendContractTypeForm = { publicContracts: { status: 'not-applicable' }, readonlyBoundaries: { status: 'not-applicable' } };
@@ -175,6 +202,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     const runs = { tiers: () => checkTiers(graph), reachability: () => checkReachability(input), deadExports: () => checkDeadExports(input),
       requiredFiles: () => checkRequiredFiles(input), sizeGrowth: () => checkSizeGrowth(input), clones: () => checkClones(input), symbols: () => checkSymbols(input) };
     if (graph.profile === 'be') for (const [name, [check]] of Object.entries(BACKEND_MACHINE)) runs[name] = () => check(input);
+    if (graph.profile === 'fe') for (const [name, [check]] of Object.entries(FRONTEND_MACHINE)) runs[name] = () => check(input);
     if (fast) { delete runs.deadExports; delete runs.clones; delete runs.symbols; }
     for (const [name, run] of Object.entries(runs)) {
       const result = run();
@@ -190,6 +218,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   const coverage = {
     sourceFiles: context.files.map(file => relativePath(config.root, canonical(file.fileName))).sort(),
     hfs: hfs.coverage,
+    configUnread: configUnread.coverage,
     backendContractTypeForm,
     backendSourceShape,
     frontendDataLifecycle,
@@ -218,7 +247,8 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     ...(hfsChecks.sizeGrowth?.status === 'checked' ? SIZE_GROWTH_RULE_IDS : []),
     ...(hfsChecks.clones?.status === 'checked' ? CLONE_RULE_IDS : []),
     ...(hfsChecks.symbols?.status === 'checked' ? SYMBOL_RULE_IDS : []),
-    ...Object.entries(BACKEND_MACHINE).flatMap(([name, [, ids]]) => (hfsChecks[name]?.status === 'checked' ? ids : [])),
+    ...CONFIG_UNREAD_RULE_IDS,
+    ...Object.entries({ ...BACKEND_MACHINE, ...FRONTEND_MACHINE }).flatMap(([name, [, ids]]) => (hfsChecks[name]?.status === 'checked' ? ids : [])),
     ...(frontendChecked ? FRONTEND_RULE_IDS : []),
     ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
     ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),

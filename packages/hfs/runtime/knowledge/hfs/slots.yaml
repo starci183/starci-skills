@@ -42,6 +42,7 @@ versioning:
 #   requiredWhen       connections: required only when hfs.json declares a database connection.
 #   allows / forbids   names inside the instance; the loader exposes them, slot-check enforces them.
 #   tests       unit-beside | e2e | none.
+#   composedBy  the app kinds allowed to compose a transport slot (an app of another kind imports none of its modules).
 #   budget      size budgets (lines per file, files per slot, exports).
 #   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
 #   managedBy   the template directory hfs sync renders this slot's files from. The slot path then lists literal files
@@ -522,6 +523,7 @@ slots:
     requires: ["<feature>-http.module.ts"]
     allows: ["<action>.controller.ts", "dto/<action>.{request,response}.ts", "<action>.mapper.ts", "*.spec.ts"]
     tests: unit-beside
+    composedBy: [api]
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.graphql
     profiles: [be]
@@ -532,6 +534,7 @@ slots:
     requires: ["<feature>-graphql.module.ts"]
     allows: ["<action>.resolver.ts", "dto/<action>.{input,type,args}.ts", "<action>.mapper.ts", "*.spec.ts"]
     tests: unit-beside
+    composedBy: [api]
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.message
     profiles: [be]
@@ -542,6 +545,7 @@ slots:
     requires: ["<feature>-message.module.ts"]
     allows: ["<event>.consumer.ts", "<event>.message.ts", "*.spec.ts"]
     tests: unit-beside
+    composedBy: [worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.transport.schedule
     profiles: [be]
@@ -552,6 +556,7 @@ slots:
     requires: ["<feature>-schedule.module.ts"]
     allows: ["<job>.job.ts", "*.spec.ts"]
     tests: unit-beside
+    composedBy: [worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.transport.websocket
     profiles: [be]
@@ -562,6 +567,7 @@ slots:
     requires: ["<feature>-websocket.module.ts"]
     allows: ["<channel>.gateway.ts", "dto/*.ts", "*.spec.ts"]
     tests: unit-beside
+    composedBy: [api]
     since: 1.0.0
   - id: be.feature.transport.cli
     profiles: [be]
@@ -572,6 +578,7 @@ slots:
     requires: ["<feature>-cli.module.ts"]
     allows: ["<name>.cli.ts", "dto/*.ts", "*.spec.ts"]     # .cli.ts: .command.ts is a CQRS message (HFS delta 3)
     tests: unit-beside
+    composedBy: [cli]
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_FEATURE_NOT_COMPOSED, BE_ENTRYPOINT_ONLY_IN_APPS]
     since: 1.0.0
 
@@ -647,6 +654,7 @@ slots:
     requires: [index.ts]
     forbids: [common/, utils/, shared/, testing/]   # primitives live in platform/primitives
     tests: unit-beside
+    budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE]
   - id: be.integrations
     profiles: [be]
@@ -657,6 +665,7 @@ slots:
     owner: true
     requires: [index.ts, "<provider>.config.ts"]
     tests: unit-beside
+    budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT]
   - id: be.integrations.model
     profiles: [be]
