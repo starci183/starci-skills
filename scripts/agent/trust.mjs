@@ -436,7 +436,8 @@ export function assertJsonToolGuard({ file, command, matcher = null, edit = null
     const list = Array.isArray(d?.hooks?.PreToolUse) ? d.hooks.PreToolUse.filter(isGuardGroup) : [];
     return list.length === 1 && JSON.stringify(list[0]) === JSON.stringify(group);
   };
-  const updated = atomicUpdate(file, (text) => {
+  let updated;
+  try { updated = atomicUpdate(file, (text) => {
     const d = text == null ? {} : jsonOf(text);
     if (d === undefined || !d || typeof d !== 'object' || Array.isArray(d)) throw new Error(`${file} is not a JSON object`);
     if (d.hooks != null && (typeof d.hooks !== 'object' || Array.isArray(d.hooks))) throw new Error(`${file} hooks is not an object`);
@@ -448,7 +449,8 @@ export function assertJsonToolGuard({ file, command, matcher = null, edit = null
     const next = JSON.stringify(d, null, 2) + (text?.endsWith('\n') ? '\n' : '');
     if (text && !numbersSurvive(text, next)) throw new Error(`${file} holds a number JSON cannot round-trip; refusing to rewrite it`);
     return { text: next, result: null };
-  }, (text) => { const d = jsonOf(text ?? ''); return !!d && holds(d) && (!edit || !edit(structuredClone(d))); }, { hooks });
+  }, (text) => { const d = jsonOf(text ?? ''); return !!d && holds(d) && (!edit || !edit(structuredClone(d))); }, { hooks }); }
+  catch (e) { return { file, ok: false, state: 'failed', error: String(e?.message ?? e) }; }
   return updated.ok ? { file, ok: true, state: updated.changed ? 'written' : 'already' } : { file, ok: false, state: 'failed', error: updated.error };
 }
 

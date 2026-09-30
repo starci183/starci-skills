@@ -51,7 +51,7 @@ test('the contract-changes directory is never leased: jobs naming it do not conf
   assert.deepEqual(leaseConflicts(m, [CONTRACT_CHANGES_DIR]), []);
   assert.deepEqual(leaseConflicts(m, [`${CONTRACT_CHANGES_DIR}/new-entry.yaml`]), []);
   // The guard still owns the directory in each staging checkout: the worker writes its new entry file there
-  // (an owned directory covers its subtree - scripts/guards/shim.mjs foreignPathsOf).
+  // (an owned directory covers its subtree - scripts/guards/verify-commit.mjs foreignPathsOf).
   for (const g of into.guards) {
     const owned = g.owned.map((o) => path.relative(into.stagingRoot, o).replaceAll('\\', '/'));
     assert.ok(owned.some((p) => p.endsWith(`/${CONTRACT_CHANGES_DIR}`)), JSON.stringify(owned));

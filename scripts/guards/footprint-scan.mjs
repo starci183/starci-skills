@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// footprint-scan.mjs — the worktree/link footprint watch, independent of every shim (nivo-fe inc-c8fbf76aa499).
+// footprint-scan.mjs — the worktree/link footprint watch, independent of every guard hook (nivo-fe inc-c8fbf76aa499).
 //
-// A worker's shell may bypass the git shim (Git Bash's own git came first on its PATH), `git worktree remove` cannot be
+// A worker's command may slip past the command guard (a script, a tool that is not a shell), `git worktree remove` cannot be
 // hooked, and a link can be made by any tool. So the runtime also LOOKS: under the repositories root (the parent of
 // the source host repository, D:/Repositories on this host) it lists
 //   - every linked git worktree of a repository there that lives under the root (kernel and supervisor scratch lives

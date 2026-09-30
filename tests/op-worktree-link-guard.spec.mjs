@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyGit } from '../scripts/guards/git-policy.mjs';
-import { BASH_ENV_FILE, bashEnvBody, bindGuardTerminal, ensureGuardBin, ensureHistoryHook, guardLaunch, msysPath, writeJobGuard } from '../scripts/guards/install.mjs';
+import { bindGuardTerminal, ensureHistoryHook, writeJobGuard } from '../scripts/guards/install.mjs';
 import { scanFootprint } from '../scripts/guards/footprint-scan.mjs';
 import { linksUnder } from '../scripts/checks/scoped-lint-baseline.mjs';
 import { safeRemoveTree } from '../scripts/lib/safe-remove.mjs';
@@ -13,8 +13,9 @@ import { safeRemoveTree } from '../scripts/lib/safe-remove.mjs';
 // nivo-fe inc-c8fbf76aa499 (2026-09-25 05:47): Devin op worker op-interface.implement-2a43f63c6c ran, through Git Bash,
 // `git worktree add --detach D:/Repositories/nivo-fe-wt-r4`, junctioned six node_modules of live nivo-fe into it
 // (New-Item -ItemType Junction from a -File script, after `cmd //c mklink /J` failed on quoting), and removed it with
-// `git worktree remove --force`, which followed the junctions and deleted 674 live files. The shim never saw a
-// command: Git Bash puts /mingw64/bin before the launch PATH. This spec proves every layer WITHOUT creating a link:
+// `git worktree remove --force`, which followed the junctions and deleted 674 live files. A guard on the worker's PATH
+// never saw it: Git Bash puts /mingw64/bin first. The guard now sees the agent's command itself (a PreToolUse hook)
+// and the history hook backs it for any git binary. This spec proves every layer WITHOUT creating a link:
 // each link command aims at a directory that does not exist, so even an unguarded run could not make one.
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -49,10 +50,13 @@ test('the history hook refuses a worktree an op creates with ANY git binary, and
   assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
   const guardRoot = tempDir(t, 'guard-wt-root-');
   const file = writeJobGuard({ skillRoot: guardRoot, jobId: 'op-interface.implement-2a43f63c6c', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src')] });
-  const op = { STARCI_GUARD_FILE: file };
+  const handle = `term_spec-any-git-${process.pid}`;
+  const bound = bindGuardTerminal({ skillRoot: ROOT, handle, jobFile: file });
+  t.after(() => fs.rmSync(bound, { force: true }));
+  const op = { ORCA_TERMINAL_HANDLE: handle };
   const beside = path.join(path.dirname(repo), `${path.basename(repo)}-wt-r4`);
   t.after(() => safeRemoveTree(beside));
-  // `git` here is the real binary, not the shim: exactly the Git Bash case.
+  // `git` here is the real binary, run by nothing that checks it first: exactly the Git Bash case.
   for (const args of [['worktree', 'add', '--detach', beside, 'HEAD'], ['worktree', 'add', '-b', 'op-side', beside]]) {
     const added = sh(repo, args, op);
     assert.notEqual(added.status, 0, `git ${args.join(' ')} from an op is refused`);
@@ -68,13 +72,13 @@ test('the history hook refuses a worktree an op creates with ANY git binary, and
   assert.equal(commit.status, 0, commit.stderr);
   // No environment flag overrides the hook; a caller that is no op (the owner, the kernel) adds a worktree freely.
   assert.notEqual(sh(repo, ['worktree', 'add', '--detach', beside, 'HEAD'], { ...op, STARCI_HISTORY_GUARD: 'owner-override' }).status, 0);
-  const owner = sh(repo, ['worktree', 'add', '--detach', beside, 'HEAD'], { STARCI_GUARD_FILE: '' });
+  const owner = sh(repo, ['worktree', 'add', '--detach', beside, 'HEAD'], { ORCA_TERMINAL_HANDLE: '' });
   assert.equal(owner.status, 0, owner.stderr);
   assert.deepEqual(linksUnder(beside), [], 'a plain worktree, no link');
 });
 
-// A managed worker-start agent runs with Orca's environment, never STARCI_GUARD_FILE: the dispatch binds its
-// guard to the Orca terminal (runtime/guards/terminals/<handle>.json) and the hook finds it by ORCA_TERMINAL_HANDLE.
+// A worker-start agent runs with Orca's environment: the dispatch binds its guard to the Orca terminal
+// (runtime/guards/terminals/<handle>.json) and the hook finds it by ORCA_TERMINAL_HANDLE.
 test('the history hook applies an op\'s rules to a managed agent found by its bound Orca terminal', (t) => {
   const repo = initRepo(t);
   assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
@@ -84,7 +88,7 @@ test('the history hook applies an op\'s rules to a managed agent found by its bo
   t.after(() => fs.rmSync(bound, { force: true }));
   assert.equal(path.basename(bound), 'term_spec_managed-' + process.pid + '.json');
   assert.equal(JSON.parse(fs.readFileSync(bound, 'utf8')).jobId, 'op-docs.author-managed');
-  const managed = { STARCI_GUARD_FILE: '', ORCA_TERMINAL_HANDLE: handle };
+  const managed = { ORCA_TERMINAL_HANDLE: handle };
   const beside = path.join(path.dirname(repo), path.basename(repo) + '-wt-managed');
   t.after(() => safeRemoveTree(beside));
   const added = sh(repo, ['worktree', 'add', '--detach', beside, 'HEAD'], managed);
@@ -99,65 +103,54 @@ test('the history hook applies an op\'s rules to a managed agent found by its bo
   assert.match(swept.stderr, /COMMIT_FOREIGN_PATHS[\s\S]*peer\/b\.txt/);
   assert.equal(sh(repo, ['commit', '-q', '-m', 'managed', '--', 'src'], managed).status, 0, 'its own paths land');
   // A terminal no op is bound to (the Kernel's, the owner's) is no op.
-  const kernel = sh(repo, ['commit', '-q', '-m', 'kernel', '--', 'peer'], { STARCI_GUARD_FILE: '', ORCA_TERMINAL_HANDLE: 'term_kernel' });
+  const kernel = sh(repo, ['commit', '-q', '-m', 'kernel', '--', 'peer'], { ORCA_TERMINAL_HANDLE: 'term_kernel' });
   assert.equal(kernel.status, 0, kernel.stderr);
 });
 
-test('the op launch names a bash env that puts the guard first again and refuses link commands', (t) => {
-  const skillRoot = tempDir(t, 'guard-wt-skill-');
-  const repo = initRepo(t);
-  const launched = guardLaunch({ skillRoot: ROOT, jobId: 'op-bash-env', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src')], repos: [], config: { guards: { historyHook: false } } });
-  if (launched.receipt.shims?.dir) {
-    assert.equal(launched.env.BASH_ENV, path.join(launched.receipt.shims.dir, BASH_ENV_FILE).replace(/\\/g, '/'));
-    assert.ok(fs.existsSync(launched.env.BASH_ENV));
-  }
-  const off = guardLaunch({ skillRoot, jobId: 'op-off', workflowId: 'wf-x', ledgerRepo: null, owned: [], repos: [], config: { guards: { shims: false, historyHook: false } } });
-  assert.equal(off.env.BASH_ENV, undefined, 'no shims, no bash env');
-  const body = bashEnvBody({ dir: 'D:\\R\\.claude\\runtime\\guards\\bin', shim: 'D:\\R\\.claude\\scripts\\guards\\shim.mjs', nodePath: 'C:\\Program Files\\nodejs\\node.exe', platform: 'win32' });
-  assert.match(body, /^starci_guard_bin='\/d\/R\/\.claude\/runtime\/guards\/bin'$/m);
-  assert.match(body, /'C:\/Program Files\/nodejs\/node\.exe' 'D:\/R\/\.claude\/scripts\/guards\/shim\.mjs' refuse-link/);
-  assert.equal(msysPath('C:\\Users\\x'), '/c/Users/x');
-});
+// The command guard runs the way an agent's host runs it: a PreToolUse hook process, the tool input on stdin, the
+// agent's Orca terminal in ORCA_TERMINAL_HANDLE. Exit 2 blocks the command before it runs (Claude Code, Codex, Devin).
+const HOOK = path.join(ROOT, 'scripts', 'guards', 'command-guard.mjs');
+const hook = (input, handle) => spawnSync(process.execPath, [HOOK], { input: JSON.stringify(input), encoding: 'utf8', env: { ...process.env, ORCA_TERMINAL_HANDLE: handle } });
 
-// Git Bash itself: only on a Windows host with Git for Windows.
-const gitRoot = (() => { const r = spawnSync('git', ['--exec-path'], { encoding: 'utf8' }); return r.status === 0 ? path.resolve(r.stdout.trim(), '..', '..', '..') : null; })();
-const gitBash = process.platform === 'win32' && gitRoot && fs.existsSync(path.join(gitRoot, 'bin', 'bash.exe')) ? path.join(gitRoot, 'bin', 'bash.exe') : null;
-test('in Git Bash the op git is the guard again, and ln / mklink / New-Item links are refused before they run', { skip: gitBash ? false : 'needs Git for Windows bin/bash.exe' }, (t) => {
+test('the command guard hook refuses the incident\'s worktree and link commands before they run, and passes ordinary ones', (t) => {
   const repo = initRepo(t);
-  const bin = tempDir(t, 'guard-wt-bin-');
-  const built = ensureGuardBin({ skillRoot: ROOT, binDir: bin });
-  assert.equal(built.ok, true, JSON.stringify(built));
-  const file = writeJobGuard({ skillRoot: bin, jobId: 'op-git-bash', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src')] });
-  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, STARCI_GUARD_FILE: file, STARCI_GUARD_BIN: bin, BASH_ENV: path.join(bin, BASH_ENV_FILE).replace(/\\/g, '/') };
-  const bash = (script) => spawnSync(gitBash, ['-c', script], { cwd: repo, encoding: 'utf8', env });
-  // Without BASH_ENV, Git Bash's own git comes first: the bypass of inc-c8fbf76aa499.
-  const bare = spawnSync(gitBash, ['-c', 'command -v git'], { cwd: repo, encoding: 'utf8', env: { ...env, BASH_ENV: '' } });
-  assert.match(bare.stdout.trim(), /\/mingw64\/bin\/git$/);
-  assert.equal(bash('command -v git').stdout.trim(), `${msysPath(bin)}/git`, 'the guard is first on PATH again');
-  const login = spawnSync(gitBash, ['-l', '-c', 'command -v git'], { cwd: repo, encoding: 'utf8', env });
-  assert.equal(login.stdout.trim(), `${msysPath(bin)}/git`, 'a login shell too');
-  const add = bash(`git worktree add --detach '${msysPath(path.join(path.dirname(repo), 'never-made'))}' HEAD`);
-  assert.equal(add.status, 3, add.stderr);
-  assert.match(add.stderr, /starci guard: refused `git worktree add .*\[WORKTREE_NOT_OPS\]/);
-  const nowhere = path.join(bin, 'no-such-dir');
-  const script = path.join(bin, 'junctions.ps1');
+  const scratch = tempDir(t, 'guard-hook-');
+  const jobFile = writeJobGuard({ skillRoot: scratch, jobId: 'op-interface.implement-2a43f63c6c', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src')] });
+  const handle = `term_spec-link-hook-${process.pid}`;
+  const bound = bindGuardTerminal({ skillRoot: ROOT, handle, jobFile });
+  t.after(() => fs.rmSync(bound, { force: true }));
+  const nowhere = path.join(scratch, 'no-such-dir');
+  const script = path.join(scratch, 'junctions.ps1');
   fs.writeFileSync(script, `New-Item -ItemType Junction -Path '${path.join(nowhere, 'a')}' -Target '${path.join(nowhere, 'b')}'\n`);
-  for (const [command, tool] of [
-    [`ln -s '${msysPath(path.join(nowhere, 'b'))}' '${msysPath(path.join(nowhere, 'a'))}'`, 'ln'],
-    [`cmd //c mklink /J "${path.join(nowhere, 'a')}" "${path.join(nowhere, 'b')}"`, 'cmd'],
-    [`powershell -NoProfile -Command "New-Item -ItemType Junction -Path '${path.join(nowhere, 'a')}' -Target '${path.join(nowhere, 'b')}'"`, 'powershell'],
-    [`powershell -NoProfile -ExecutionPolicy Bypass -File '${script}'`, 'powershell'],
-    [`powershell.exe -NoProfile -Command "ni -ItemType SymbolicLink -Path x -Value y"`, 'powershell.exe'],
-  ]) {
-    const refused = bash(command);
-    assert.equal(refused.status, 3, `${command}: ${refused.stderr}`);
-    assert.match(refused.stderr, new RegExp(`starci guard: refused \`${tool.replace('.', '\\.')} .*\\[LINK_CREATE\\]`));
+  const refusedCases = [
+    ['Bash', `git worktree add --detach '${path.join(path.dirname(repo), 'never-made').replace(/\\/g, '/')}' HEAD`, 'WORKTREE_NOT_OPS'],
+    ['Bash', `ln -s '${path.join(nowhere, 'b')}' '${path.join(nowhere, 'a')}'`, 'LINK_CREATE'],
+    ['Bash', `cmd //c mklink /J "${path.join(nowhere, 'a')}" "${path.join(nowhere, 'b')}"`, 'LINK_CREATE'],
+    ['Bash', `powershell -NoProfile -Command "New-Item -ItemType Junction -Path '${path.join(nowhere, 'a')}' -Target '${path.join(nowhere, 'b')}'"`, 'LINK_CREATE'],
+    ['Bash', `powershell -NoProfile -ExecutionPolicy Bypass -File '${script}'`, 'LINK_CREATE'],
+    ['Bash', 'powershell.exe -NoProfile -Command "ni -ItemType SymbolicLink -Path x -Value y"', 'LINK_CREATE'],
+    ['PowerShell', `New-Item -Path '${path.join(nowhere, 'a')}' -ItemType Junction -Target '${path.join(nowhere, 'b')}'`, 'LINK_CREATE'],
+    ['PowerShell', `[System.IO.Directory]::CreateSymbolicLink('${path.join(nowhere, 'a')}', '${path.join(nowhere, 'b')}')`, 'LINK_CREATE'],
+    ['Bash', 'git reset --hard HEAD~1', 'HISTORY_REWRITE'],
+  ];
+  for (const [tool, command, code] of refusedCases) {
+    const r = hook({ tool_name: tool, tool_input: { command }, cwd: repo }, handle);
+    assert.equal(r.status, 2, `${command}: ${r.stderr}`);
+    assert.match(r.stderr, new RegExp(`starci guard: refused .*\\[${code}\\]`), command);
   }
+  // Devin's exec tool carries its own workdir.
+  assert.equal(hook({ tool_name: 'exec', tool_input: { command: 'git clean -fd', workdir: repo }, cwd: scratch }, handle).status, 2);
   assert.equal(fs.existsSync(nowhere), false, 'nothing was made');
-  assert.equal(bash('powershell -NoProfile -Command "Write-Output guarded-ok"').stdout.trim(), 'guarded-ok', 'an ordinary PowerShell command passes');
-  assert.equal(bash('git rev-parse --abbrev-ref HEAD').stdout.trim(), 'main', 'ordinary git passes through the guard');
-  assert.deepEqual(linksUnder(bin), []);
-  assert.deepEqual(linksUnder(repo), []);
+  for (const [tool, command] of [['Bash', 'git status --short'], ['Bash', 'echo "never ln -s or git reset --hard"'], ['PowerShell', 'Write-Output guarded-ok'],
+    ['PowerShell', `New-Item -ItemType Directory -Path '${path.join(scratch, 'plain')}'`], ['Bash', 'grep -rn mklink docs'], ['Bash', 'git commit -q -m "a; b" -- src/a.txt']]) {
+    const r = hook({ tool_name: tool, tool_input: { command }, cwd: repo }, handle);
+    assert.equal(r.status, 0, `${command}: ${r.stderr}`);
+  }
+  // A terminal with no guard bound (the Kernel, the owner) is never refused; neither is a tool that runs no command.
+  assert.equal(hook({ tool_name: 'Bash', tool_input: { command: 'git reset --hard HEAD~1' }, cwd: repo }, 'term_kernel-unbound').status, 0);
+  assert.equal(hook({ tool_name: 'Read', tool_input: { file_path: 'x' }, cwd: repo }, handle).status, 0);
+  const logged = fs.readFileSync(path.join(ROOT, 'runtime', 'guards', 'refusals.jsonl'), 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l)).filter((e) => e.jobId === 'op-interface.implement-2a43f63c6c' && e.via === 'pre-tool-use');
+  assert.ok(logged.some((e) => e.code === 'LINK_CREATE') && logged.some((e) => e.code === 'WORKTREE_NOT_OPS'), 'every refusal is logged');
 });
 
 test('the footprint watch flags a new worktree or cross-repository link under the root, never a workspace link', (t) => {

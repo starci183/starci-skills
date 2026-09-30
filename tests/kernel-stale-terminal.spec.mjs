@@ -63,7 +63,7 @@ function controller(over = {}) {
   const c = createHostController({
     settings: () => S, registry: () => [], store: () => memoryStore(),
     probeSeat: async () => ({ ok: true, action: 'active', terminal: LIVE }),
-    listProcesses: async () => [], hostVerdict: async () => ({ stop: [], alert: false }), orcaTerminals: async () => null,
+    listProcesses: async () => [], hostVerdict: async () => ({ alert: false }), orcaTerminals: async () => null,
     supervisorMode: async () => 'kernel', quickCheck: () => ({ ok: true, result: ['ok'] }), backupDue: () => false,
     probeTurn: async () => ({ ok: true, busy: false, state: 'turn-idle' }),
     turnNumbers: () => ({ kernelBudgetMs: 20 * 60_000, supervisorBudgetMs: 30 * 60_000, graceMs: 5 * 60_000 }),

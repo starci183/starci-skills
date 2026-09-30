@@ -1,7 +1,7 @@
 // git-index-lock: a stale shared .git/index.lock (starci-next sn-subscription backend.implement a20: a 403 KB lock
 // from 01:01:34, no git process alive, every commit in the checkout refused) is recovered by the runtime, only when
 // it is older than allocation.housekeeping.gitIndexLockStaleMs and no git process may be working on that repository;
-// each removal is a Supervisor audit event (machine.sqlite sup_events). The op worker's git shim and the housekeeping area gitlocks run it.
+// each removal is a Supervisor audit event (machine.sqlite sup_events). The op command guard (before an op's git command) and the housekeeping area gitlocks run it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,6 +14,7 @@ import { sweepGitLocks } from '../scripts/lib/hk-git-locks.mjs';
 import { AREAS } from '../scripts/supervisor/housekeeping.mjs';
 import { allocationSettings } from '../engine/config.mjs';
 import { readMachine } from '../engine/machine-db.mjs';
+import { writeJobGuard, bindGuardTerminal } from '../scripts/guards/install.mjs';
 
 const MIN = 60_000;
 const STALE = 5 * MIN;
@@ -97,7 +98,7 @@ test('a linked worktree resolves its gitdir; the checkout of a nested cwd is fou
   assert.equal(checkoutOf(path.join(dir, 'w', 'a')), path.join(dir, 'w'));
 });
 
-test('the shim pre-flight removes a stale lock and records git-index-lock-removed in machine.sqlite', async (t) => {
+test('the command guard pre-flight removes a stale lock and records git-index-lock-removed in machine.sqlite', async (t) => {
   const { repo, lock } = repoWithLock(t, 9);
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(tmp(t), 'machine.sqlite') };
   const said = [];
@@ -108,15 +109,21 @@ test('the shim pre-flight removes a stale lock and records git-index-lock-remove
   const rows = readMachine((m) => m.supEvents({ kind: LOCK_EVENT }), [], { env });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].payload.jobId, 'op-backend.implement-aaaaaaaaaa');
-  assert.equal(rows[0].payload.by, 'git-shim');
+  assert.equal(rows[0].payload.by, 'command-guard');
   assert.equal(await preflightIndexLock({ cwd: repo, env, list: () => [] }), null, 'no lock: one stat, nothing else');
 });
 
-test('the op worker\'s git shim runs the pre-flight before git and says why a lock stays', (t) => {
+test('the command guard runs the pre-flight before an op\'s git command and says why a lock stays', (t) => {
   const { repo, lock } = repoWithLock(t, 9);
   spawnSync('git', ['init', '-q'], { cwd: repo, windowsHide: true });
-  const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'guards', 'shim.mjs'), 'git', 'status', '--porcelain'], { cwd: repo, encoding: 'utf8', windowsHide: true,
-    env: { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(tmp(t), 'machine.sqlite'), STARCI_GUARD_FILE: '' } });
+  const jobFile = writeJobGuard({ skillRoot: tmp(t), jobId: 'op-backend.implement-bbbbbbbbbb', workflowId: 'wf-x', ledgerRepo: null, owned: [repo] });
+  const handle = `term_spec-index-lock-${process.pid}`;
+  const bound = bindGuardTerminal({ skillRoot: root, handle, jobFile });
+  t.after(() => fs.rmSync(bound, { force: true }));
+  const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'guards', 'command-guard.mjs')], { encoding: 'utf8', windowsHide: true,
+    input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git status --porcelain' }, cwd: repo }),
+    env: { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(tmp(t), 'machine.sqlite'), ORCA_TERMINAL_HANDLE: handle } });
+  assert.equal(r.status, 0, 'the command itself is allowed');
   assert.match(r.stderr, /index\.lock is \d+ min old and was left in place \(probe-failed/, 'a spec child never reads the host table, and says so');
   assert.ok(fs.existsSync(lock));
 });

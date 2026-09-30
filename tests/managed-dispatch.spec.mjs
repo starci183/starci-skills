@@ -217,13 +217,13 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.equal(payload?.hierarchy?.runtime?.dispatchId,'dispatch-fake-1');
   assert.equal(payload?.hierarchy?.runtime?.terminalHandle,'fake-terminal-1');
   // worker-start owns the agent's env, so the op's guard is bound to the Orca terminal the history hook reads
-  // (ORCA_TERMINAL_HANDLE), and the guard receipt rides on op-dispatched like a command-terminal launch's.
+  // and command guard (ORCA_TERMINAL_HANDLE), and the guard receipt rides on op-dispatched.
   const dispatched=ledgerRead(fx.repo,db=>db.prepare("SELECT payload_json FROM events WHERE kind='op-dispatched' AND entity_id=?").get(jobId));
   const guard=json(dispatched?.payload_json)?.guard;
   assert.equal(typeof guard?.jobFile,'string',JSON.stringify(guard));
   assert.equal(path.basename(guard?.terminal??''),'fake-terminal-1.json',JSON.stringify(guard));
   assert.equal(json(fs.readFileSync(guard.terminal,'utf8'))?.jobId,jobId);
-  assert.deepEqual(guard?.shims,{disabled:true},'no shim reaches a managed agent');
+  assert.equal('shims' in (guard??{}),false,'the guard reaches the agent through its terminal binding only');
 
   // A pass is earned from the worker's filed done claim plus an independent
   // green Kernel check. Settle then closes the managed worker through the

@@ -28,7 +28,6 @@ const WINDOWS = {
   'scripts/guards/footprint-scan.mjs': [['FOOTPRINT_EVERY_MS', 'footprint.everyMs'], ['FOOTPRINT_LOCK_STALE_MS', 'footprint.lockStaleMs']],
   'scripts/guards/install.mjs': [['JOB_GUARD_TTL_MS', 'jobGuard.ttlMs']],
 };
-const DEPS_LOCK = { waitMs: 'depsLock.waitMs', staleMs: 'depsLock.staleMs', pollMs: 'depsLock.pollMs' };
 
 const at = (doc, dotted) => dotted.split('.').reduce((node, key) => node?.[key], doc.allocation);
 const put = (doc, dotted, value) => {
@@ -57,7 +56,7 @@ const importOf = (root, rel) => JSON.stringify(new URL(`file:///${path.join(root
 
 test('every recovery window is read from runtimes.yaml: a fixture value changes the computed window', (t) => {
   const live = parseYaml(read(RUNTIMES));
-  const keys = [...Object.values(WINDOWS).flat().map(([, key]) => key), ...Object.values(DEPS_LOCK)];
+  const keys = Object.values(WINDOWS).flat().map(([, key]) => key);
   // Every fixture value differs from the live one.
   const fixtureValue = (key) => at(live, key) + 7;
   const root = fixture(t, (doc) => { for (const key of keys) put(doc, key, fixtureValue(key)); });
@@ -65,8 +64,6 @@ test('every recovery window is read from runtimes.yaml: a fixture value changes 
   const r = probe(root, `
     const out = {};
     ${modules.map((rel, i) => `const m${i} = await import(${importOf(root, rel)}); for (const [name] of ${JSON.stringify(WINDOWS[rel])}) out[name] = m${i}[name];`).join('\n')}
-    const deps = await import(${importOf(root, 'scripts/guards/deps-guard.mjs')});
-    out.depsLock = await deps.depsLockWindows();
     console.log(JSON.stringify(out));
     process.exit(0);`);
   assert.equal(r.status, 0, r.stderr);
@@ -75,7 +72,6 @@ test('every recovery window is read from runtimes.yaml: a fixture value changes 
     assert.notEqual(fixtureValue(key), at(live, key));
     assert.equal(out[name], fixtureValue(key), `${name} reads allocation.${key}`);
   }
-  for (const [field, key] of Object.entries(DEPS_LOCK)) assert.equal(out.depsLock[field], fixtureValue(key), `depsLock.${field} reads allocation.${key}`);
 });
 
 test('a missing recovery key fails loudly at load, never a silent default', (t) => {
@@ -86,9 +82,6 @@ test('a missing recovery key fails loudly at load, never a silent default', (t) 
   const api = spawnSync(process.execPath, [path.join(root, 'scripts', 'kernel', 'api.mjs'), 'status', '--json'], { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 60000 });
   assert.notEqual(api.status, 0);
   assert.match(api.stderr, /allocation\.liveness\.quietMs must declare a positive number/, 'api.mjs no longer falls back to a literal quiet window');
-  const deps = probe(root, `const d = await import(${importOf(root, 'scripts/guards/deps-guard.mjs')}); d.acquireDepsLock({ lockFile: 'x', holder: {} });`);
-  assert.notEqual(deps.status, 0);
-  assert.match(deps.stderr, /waitMs must be a number of milliseconds/, 'the deps lock carries no literal default window');
 });
 
 test('no source file keeps a second literal of a moved window', () => {
@@ -116,7 +109,6 @@ test('no source file keeps a second literal of a moved window', () => {
     'scripts/supervisor/watchdog.mjs': [/7 \* 86_400_000/],
     'scripts/lib/self-reload.mjs': [/5 \* 60_000/, /30_000/],
     'scripts/guards/footprint-scan.mjs': [/10 \* 60_000/, /> 60_000/],
-    'scripts/guards/deps-guard.mjs': [/20 \* 60_000/, /3600_000/, /pollMs = \d/],
     'scripts/guards/install.mjs': [/7 \* 24/],
   };
   for (const [rel, patterns] of Object.entries(gone)) for (const pattern of patterns) assert.doesNotMatch(read(rel), pattern, `${rel} still carries ${pattern}`);

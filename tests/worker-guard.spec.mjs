@@ -1,5 +1,5 @@
 // The [Worker] guard (scripts/supervisor/workers.mjs workerGuard): a worker owns its leased files as ABSOLUTE
-// paths inside its staging checkout, so the git shim lets it stage and commit them (worker-guard-owned-empty:
+// paths inside its staging checkout, so the command guard lets it stage and commit them (worker-guard-owned-empty:
 // fix-autopilot-nested-tx-4a241a and fix-worker-spawn-quota-avoid-4d1388 had "owned": [] and could not commit).
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,13 +16,13 @@ after(() => { for (const dir of TEMP_DIRS) { try { fs.rmSync(dir, { recursive: t
 const tmp = (prefix) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); TEMP_DIRS.push(dir); return dir; };
 const envOf = () => { const root = tmp('worker-guard-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel', STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') }; };
 const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
-const fakeLaunch = (into) => (args) => { into.push(args); return { env: {}, pathPrefix: 'bin', receipt: {} }; };
+const fakeLaunch = (into) => (args) => { into.push(args); return { receipt: { jobFile: 'job.json' } }; };
 
 test('workerGuard: owned = the leased files resolved absolute in the staging checkout, repos = [] (no history hook)', () => {
   const staging = path.join(tmp('wg-stage-'), 'fix-x');
   const launched = [];
   const guard = workerGuard('fix-x', { root: 'R', staging, files: ['scripts/supervisor/workers.mjs', 'tests/worker-guard.spec.mjs', 'modules/ops/**'], launch: fakeLaunch(launched) });
-  assert.equal(guard.pathPrefix, 'bin');
+  assert.equal(guard.receipt.jobFile, 'job.json');
   assert.equal(launched.length, 1);
   const args = launched[0];
   assert.equal(args.jobId, 'fix-x');
@@ -41,15 +41,14 @@ test('workerGuard: the real guardLaunch never installs a history hook for a work
   const staging = tmp('wg-hook-');
   execFileSync('git', ['init', '-q', staging], { stdio: 'ignore' });
   const hooksDir = execFileSync('git', ['-C', staging, 'rev-parse', '--path-format=absolute', '--git-path', 'hooks'], { encoding: 'utf8' }).trim();
-  const guard = workerGuard('fix-hook', { root: tmp('wg-root-'), staging, files: ['a.mjs'], launch: (args) => guardLaunch({ ...args, config: { guards: { shims: false, historyHook: true } } }) });
+  const guard = workerGuard('fix-hook', { root: tmp('wg-root-'), staging, files: ['a.mjs'], launch: (args) => guardLaunch({ ...args, config: { guards: { historyHook: true } } }) });
   assert.deepEqual(guard.receipt.hooks, []);
   assert.ok(!fs.existsSync(path.join(hooksDir, 'reference-transaction')), hooksDir);
 });
 
-test('workerGuard: a failing launch returns no path prefix and the error on the receipt', () => {
+test('workerGuard: a failing launch returns the error on the receipt', () => {
   const guard = workerGuard('fix-y', { staging: tmp('wg-stage-'), files: ['a.mjs'], launch: () => { throw Error('boom'); } });
-  assert.equal(guard.pathPrefix, null);
-  assert.equal(guard.receipt.error, 'boom');
+  assert.deepEqual(guard, { receipt: { error: 'boom' } });
 });
 
 test('spawnWorkers: the default guard call passes the job\'s leased files and its staging checkout', async (t) => {
@@ -70,8 +69,8 @@ test('spawnWorkers: the default guard call passes the job\'s leased files and it
   };
   await spawnWorkers(m, { settings, deps, env });
   assert.equal(spawned.length, 1);
-  assert.equal(launched[0].shims, false, 'worker-start owns the worker environment: no PATH shims, the guard binds to its terminal');
-  assert.deepEqual(bound, [], 'a guard with no job file binds nothing');
+  assert.equal('shims' in launched[0], false, 'worker-start owns the worker environment: the guard binds to its terminal');
+  assert.deepEqual(bound.map((b) => [b.handle, b.jobFile]), [['term_g', 'job.json']], 'the job guard is bound to the worker terminal the command guard reads');
   assert.equal(launched[0].jobId, job.job.job_id);
   assert.deepEqual(launched[0].owned, [path.resolve(stagingPath, 'scripts/g1.mjs'), path.resolve(stagingPath, 'tests/g1.spec.mjs')]);
   assert.deepEqual(launched[0].repos, []);

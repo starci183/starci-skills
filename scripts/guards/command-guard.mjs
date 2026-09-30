@@ -11,7 +11,7 @@
 //
 // What it refuses, each from a real incident:
 //  - git: the shared-checkout policy (git-policy.mjs classifyGit - history rewrites, sweeping discards, foreign
-//    pathspecs, worktrees, hook bypasses); an App Router pathspec git would read as a glob (literalAppRouterArgv).
+//    pathspecs, worktrees, hook bypasses); an App Router pathspec whose glob reading reaches another path.
 //  - npm: an install-family command through a linked node_modules, which empties the live tree it links to
 //    (deps-guard.mjs linkedNodeModulesOf; node-modules-link-wipe), and a clean install while another workflow's job
 //    is leased on the ledger (peerLeasedJobs).
@@ -196,7 +196,8 @@ export function commandsOf(text, { cwd, env = process.env, dialect = 'bash', dep
       if (bare.length) { nestedOf(bare.join(' '), 'powershell'); continue; }
     }
     if (program === 'cmd') {
-      const at = args.findIndex((a) => /^\/[ck]$/i.test(a));
+      // Git Bash spells cmd's switch //c (MSYS would rewrite a single /c as a path).
+      const at = args.findIndex((a) => /^\/\/?[ck]$/i.test(a));
       if (at >= 0) { nestedOf(args.slice(at + 1).join(' '), 'cmd'); continue; }
     }
     out.push({ program, args, cwd: dir, env: cmdEnv, word: w[0] });
@@ -218,20 +219,53 @@ const linkVerdict = (program, args, word) => {
     remedy: 'work in your dispatched checkout with its own node_modules; a need for another tree or a linked dependency is reported (report blocked environment), never made' };
 };
 
+// git reads an App Router segment ([locale], [...slug]) in a pathspec as a character class. The policy scopes it as the
+// literal path admission granted, so the command is refused only when git's glob reading reaches a path the literal
+// reading does not (a sibling like src/app/l/ another workflow owns; nivo-fe inc-21f76abb6d10): the files each reading
+// names are compared with git ls-files. The remedy is the same command with :(literal) pathspecs.
+function appRouterGlob({ args, cwd, deps }) {
+  const { literalAppRouterArgv, parseGitArgv } = deps.policy;
+  const listFile = path.join(os.tmpdir(), `starci-pathspec-${process.pid}-${Date.now()}.nul`);
+  try {
+    const literal = literalAppRouterArgv(args, { cwd, stdin: null, listFile });
+    if (!literal.changed) return null;
+    const dir = parseGitArgv(args, cwd).cwd;
+    const files = (spec) => {
+      const r = deps.git.gitSpawn('git', ['ls-files', '-c', '-o', '--exclude-standard', '-z', ...spec], { cwd: dir });
+      return r.status === 0 ? new Set(r.stdout.split('\0').filter(Boolean)) : null;
+    };
+    let globbed, named, remedy;
+    if (literal.list == null) {
+      const pairs = args.map((a, i) => [a, literal.argv[i]]).filter(([a, l]) => a !== l);
+      globbed = files(['--', ...pairs.map((p) => p[0])]);
+      named = files(['--', ...pairs.map((p) => p[1])]);
+      remedy = `name the paths literally: git ${literal.argv.join(' ')}`;
+    } else {
+      // ls-files takes no pathspec list: the entries are read here and named after `--`.
+      const at = args.findIndex((a) => a === '--pathspec-from-file' || a.startsWith('--pathspec-from-file='));
+      const listPath = args[at] === '--pathspec-from-file' ? args[at + 1] : args[at].slice('--pathspec-from-file='.length);
+      const entries = deps.policy.parsePathspecList(fs.readFileSync(path.resolve(dir, listPath), 'utf8'), args.includes('--pathspec-file-nul'));
+      globbed = files(['--', ...entries]);
+      named = files(['--', ...literal.list.split('\0').filter(Boolean)]);
+      remedy = 'write each entry of the pathspec list as :(literal)<path>';
+    }
+    const reached = globbed && named ? [...globbed].filter((f) => !named.has(f)) : [];
+    if (!reached.length) return null;
+    return { code: 'APP_ROUTER_GLOB',
+      reason: `an App Router segment in a pathspec is a glob to git: it would also reach ${reached.slice(0, 5).join(', ')} (nivo-fe inc-21f76abb6d10)`,
+      remedy };
+  } finally { fs.rmSync(listFile, { force: true }); }
+}
+
 async function gitVerdict({ args, cwd, env, guard, deps }) {
-  const { classifyGit, literalAppRouterArgv, pathspecListOnStdin } = deps.policy;
+  const { classifyGit, pathspecListOnStdin } = deps.policy;
   const { gitSpawn } = deps.git;
   const top = () => { const r = gitSpawn('git', ['rev-parse', '--show-toplevel'], { cwd }); return r.status === 0 && r.stdout.trim() ? path.resolve(r.stdout.trim()) : null; };
   const currentConfig = (key) => { const r = gitSpawn('git', ['config', '--get', key], { cwd }); return r.status === 0 ? r.stdout.trim() : null; };
   const verdict = classifyGit(args, { cwd, owned: guard?.owned ?? null, top: guard?.owned?.length ? top() : null, env, stdin: null, currentConfig });
   const command = args.join(' ').slice(0, 200);
   if (!verdict.allow) return { tool: 'git', ...verdict, command };
-  if (!pathspecListOnStdin(args)) {
-    const literal = literalAppRouterArgv(args, { cwd, stdin: null, listFile: path.join(os.tmpdir(), 'starci-pathspec-list.nul') });
-    if (literal.changed && literal.list == null) return { tool: 'git', code: 'APP_ROUTER_GLOB', command,
-      reason: 'an App Router segment ([locale], (group)) in a pathspec is a glob to git: it would also reach a sibling path another workflow owns (nivo-fe inc-21f76abb6d10)',
-      remedy: `name the paths literally: git ${literal.argv.join(' ')}` };
-  }
+  if (!pathspecListOnStdin(args)) { const glob = appRouterGlob({ args, cwd, deps }); if (glob) return { tool: 'git', ...glob, command }; }
   const dashC = args.indexOf('-C');
   await deps.indexLock.preflightIndexLock({ cwd: dashC >= 0 && args[dashC + 1] ? path.resolve(cwd, args[dashC + 1]) : cwd, guard, env, say: deps.say });
   return null;

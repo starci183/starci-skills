@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyGit, pathspecsWithinOwned, literalPathspec, literalAppRouterArgv } from '../scripts/guards/git-policy.mjs';
-import { ensureGuardBin, ensureHistoryHook, writeJobGuard } from '../scripts/guards/install.mjs';
+import { ensureHistoryHook, writeJobGuard, bindGuardTerminal, unbindGuardTerminal } from '../scripts/guards/install.mjs';
+import { commandVerdict } from '../scripts/guards/command-guard.mjs';
 import { normalizeOwnedPath, ownedPathspec } from '../engine/admission.mjs';
 
 // nivo-fe inc-21f76abb6d10: the op git guard refused `git add` and `git commit` of the op's OWN paths under
@@ -49,7 +50,7 @@ test('App Router segments in owned paths are literal names to the guard, as to a
   }
 });
 
-test('the shim hands git the App Router pathspecs literally, and nothing else', (t) => {
+test('literalAppRouterArgv names the App Router pathspecs literally, and nothing else', (t) => {
   // git reads a plain [...slug] as a character class: the guard's literal reading holds only if git gets :(literal)
   assert.equal(literalPathspec('src/app/[locale]/(console)/x.tsx'), ':(literal)src/app/[locale]/(console)/x.tsx');
   assert.equal(literalPathspec('src/app/[[...opt]]'), ':(literal)src/app/[[...opt]]');
@@ -88,59 +89,76 @@ const sh = (cwd, args, env = {}) => spawnSync('git', args, { cwd, encoding: 'utf
 const write = (repo, rel, text) => { fs.mkdirSync(path.dirname(path.join(repo, rel)), { recursive: true }); fs.writeFileSync(path.join(repo, rel), text); };
 const committed = (repo) => sh(repo, ['diff-tree', '-r', '--name-only', '--no-commit-id', '-z', 'HEAD']).stdout.split('\0').filter(Boolean).sort();
 
-test('the real git shim stages and commits App Router owned paths as argv, a pathspec list and :(literal)', (t) => {
+test('through the command guard, real git stages and commits App Router owned paths as argv, a pathspec list and :(literal)', async (t) => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-approuter-'));
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-bin-'));
+  const guards = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-root-'));
   const lists = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-lists-'));
-  t.after(() => { for (const d of [repo, bin, lists]) fs.rmSync(d, { recursive: true, force: true }); });
+  const handle = `term_spec-approuter-${process.pid}`;
+  t.after(() => { unbindGuardTerminal({ skillRoot: ROOT, handle }); for (const d of [repo, guards, lists]) fs.rmSync(d, { recursive: true, force: true }); });
   for (const args of [['init', '-q', '-b', 'main'], ['config', 'user.email', 't@t'], ['config', 'user.name', 't'], ['config', 'commit.gpgsign', 'false'], ['config', 'core.quotePath', 'false']]) sh(repo, args);
   for (const rel of [...FILES, ...PEER]) write(repo, rel, 'base\n');
   sh(repo, ['add', '.']);
   assert.equal(sh(repo, ['commit', '-q', '-m', 'base']).status, 0);
   assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
-  assert.equal(ensureGuardBin({ skillRoot: ROOT, binDir: bin }).ok, true);
-  const file = writeJobGuard({ skillRoot: bin, jobId: 'op-test.author-approuter', workflowId: 'wf-x', ledgerRepo: null, owned: GRANTS.map((g) => path.join(repo, g)) });
-  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, STARCI_GUARD_FILE: file, STARCI_GUARD_BIN: bin };
-  const gitShim = path.join(bin, process.platform === 'win32' ? 'git.exe' : 'git');
-  const run = (args, input) => spawnSync(gitShim, args, { cwd: repo, encoding: 'utf8', env, ...(input == null ? {} : { input }) });
+  const file = writeJobGuard({ skillRoot: guards, jobId: 'op-test.author-approuter', workflowId: 'wf-x', ledgerRepo: null, owned: GRANTS.map((g) => path.join(repo, g)) });
+  // The history hook finds the op by the Orca terminal it runs in.
+  bindGuardTerminal({ skillRoot: ROOT, handle, jobFile: file });
+  const guard = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const env = { ...process.env, ORCA_TERMINAL_HANDLE: handle };
+  const quote = (a) => `'${a.replace(/'/g, `'\\''`)}'`;
+  // What an agent's shell call does: the hook decides first, and only an allowed command reaches git.
+  const run = async (args, input) => {
+    const refused = await commandVerdict({ command: `git ${args.map(quote).join(' ')}`, cwd: repo, guard, env });
+    if (refused) return { status: 2, stderr: `${refused.code}: ${refused.reason}`, refused };
+    return spawnSync('git', args, { cwd: repo, encoding: 'utf8', env, ...(input == null ? {} : { input }) });
+  };
   const edit = (round) => { for (const rel of FILES) write(repo, rel, `round ${round}\n`); for (const rel of PEER) write(repo, rel, `peer ${round}\n`); };
   const expected = [...FILES].sort();
   const ok = (r, what) => assert.equal(r.status, 0, `${what}: ${r.stderr}`);
 
-  // 1. named verbatim in argv
+  // 1. named verbatim in argv: `[...slug]` is a character class to git that also matches the peer's src/app/l, so
+  // that command is refused with its :(literal) form; the paths whose glob reading reaches nothing else pass as written.
   edit(1);
-  ok(run(['add', '--', ...FILES]), 'git add -- <App Router paths>');
-  ok(run(['commit', '-q', '-m', 'argv', '--', ...FILES]), 'git commit -- <App Router paths>');
+  const slug = FILES.filter((f) => f.startsWith('src/app/[...slug]'));
+  const plain = FILES.filter((f) => !slug.includes(f));
+  const globbed = await run(['add', '--', ...FILES]);
+  assert.equal(globbed.refused?.code, 'APP_ROUTER_GLOB', globbed.stderr);
+  assert.match(globbed.refused.reason, /src\/app\/l\/page\.tsx/);
+  assert.match(globbed.refused.remedy, /:\(literal\)src\/app\/\[\.\.\.slug\]\/page\.tsx/);
+  ok(await run(['add', '--', ...plain]), 'git add -- <App Router paths no glob reading reaches past>');
+  ok(await run(['add', '--', ...slug.map((f) => `:(literal)${f}`)]), 'git add -- :(literal)<[...slug] path>');
+  ok(await run(['commit', '-q', '-m', 'argv', '--', ...plain, ...slug.map((f) => `:(literal)${f}`)]), 'git commit -- <App Router paths>');
   assert.deepEqual(committed(repo), expected);
 
-  // 2. a --pathspec-from-file list (file, then stdin)
+  // 2. a --pathspec-from-file list; a stdin list is one the guard cannot read before the command runs
   edit(2);
   const list = path.join(lists, 'owned.txt');
   fs.writeFileSync(list, `${FILES.join('\n')}\n`);
-  ok(run(['add', `--pathspec-from-file=${list}`]), 'git add --pathspec-from-file');
-  ok(run(['commit', '-q', '-m', 'list', `--pathspec-from-file=${list}`]), 'git commit --pathspec-from-file');
+  assert.equal((await run(['add', `--pathspec-from-file=${list}`])).refused?.code, 'APP_ROUTER_GLOB', 'a list entry git would glob past its path');
+  fs.writeFileSync(list, `${[...plain, ...slug.map((f) => `:(literal)${f}`)].join('\n')}\n`);
+  ok(await run(['add', `--pathspec-from-file=${list}`]), 'git add --pathspec-from-file');
+  ok(await run(['commit', '-q', '-m', 'list', `--pathspec-from-file=${list}`]), 'git commit --pathspec-from-file');
   assert.deepEqual(committed(repo), expected);
   edit(3);
-  ok(run(['commit', '-q', '-m', 'stdin list', '--pathspec-from-file=-'], `${FILES.join('\n')}\n`), 'git commit --pathspec-from-file=-');
-  assert.deepEqual(committed(repo), expected);
+  assert.equal((await run(['commit', '-q', '-m', 'stdin list', '--pathspec-from-file=-'], `${FILES.join('\n')}\n`)).refused?.code, 'PATHSPEC_FILE_UNREADABLE');
 
   // 3. :(literal) pathspecs, and the grants themselves as directories
-  edit(4);
-  ok(run(['add', '--', ...FILES.map((f) => `:(literal)${f}`)]), 'git add -- :(literal)<paths>');
-  ok(run(['commit', '-q', '-m', 'literal', '--', ...GRANTS.map(ownedPathspec)]), 'git commit -- :(literal)<grants>');
+  ok(await run(['add', '--', ...FILES.map((f) => `:(literal)${f}`)]), 'git add -- :(literal)<paths>');
+  ok(await run(['commit', '-q', '-m', 'literal', '--', ...GRANTS.map(ownedPathspec)]), 'git commit -- :(literal)<grants>');
   assert.deepEqual(committed(repo), expected);
+  // A grant named verbatim: git's glob reading of the directory reaches no path the literal one does not, so it passes.
   edit(5);
-  ok(run(['commit', '-q', '-m', 'grants', '--', ...GRANTS]), 'git commit -- <grants verbatim>');
+  ok(await run(['commit', '-q', '-m', 'grants', '--', ...GRANTS]), 'git commit -- <grants verbatim>');
   assert.deepEqual(committed(repo), expected);
 
   // A peer's route is still refused, and its change stays uncommitted.
   const head = sh(repo, ['rev-parse', 'HEAD']).stdout.trim();
-  const foreign = run(['commit', '-q', '-m', 'x', '--', FILES[0], PEER[1]]);
-  assert.equal(foreign.status, 3);
+  const foreign = await run(['commit', '-q', '-m', 'x', '--', FILES[0], PEER[1]]);
+  assert.equal(foreign.status, 2);
   assert.match(foreign.stderr, /PATH_NOT_OWNED[\s\S]*\(auth\)\/sign-in/);
   const foreignList = path.join(lists, 'foreign.txt');
   fs.writeFileSync(foreignList, `${FILES[0]}\n${PEER[0]}\n`);
-  assert.equal(run(['add', `--pathspec-from-file=${foreignList}`]).status, 3);
+  assert.equal((await run(['add', `--pathspec-from-file=${foreignList}`])).status, 2);
   assert.equal(sh(repo, ['rev-parse', 'HEAD']).stdout.trim(), head);
   assert.deepEqual(sh(repo, ['status', '--porcelain', '-z', '--', 'src/app/l', 'src/app/(auth)']).stdout.split('\0').filter(Boolean).sort(),
     [' M src/app/(auth)/sign-in/page.tsx', ' M src/app/l/page.tsx'], 'the peer changes stay unstaged and uncommitted');
