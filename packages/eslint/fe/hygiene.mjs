@@ -44,7 +44,44 @@ const cleanupOf = (effect) => {
   return last?.argument ?? null
 }
 
-/** A timer belongs in an effect that clears it. */
+const CLEARERS = new Set(["clearTimeout", "clearInterval", "window.clearTimeout", "window.clearInterval", "globalThis.clearTimeout", "globalThis.clearInterval"])
+
+/** The identifier a timer call's handle is stored in (`const id = ...` or `id = ...`), or null. */
+const handleOf = (call) => {
+  const parent = call.parent
+  if (parent?.type === "VariableDeclarator" && parent.init === call && parent.id.type === "Identifier") return parent.id.name
+  if (parent?.type === "AssignmentExpression" && parent.right === call && parent.left.type === "Identifier") return parent.left.name
+  return null
+}
+
+/** The function a function directly returns (arrow expression body, or its last top-level `return`), or null. */
+const returnedFunction = (fn) => {
+  if (fn.body.type !== "BlockStatement") return isFunction(fn.body) ? fn.body : null
+  const last = [...fn.body.body].reverse().find((statement) => statement.type === "ReturnStatement")
+  return last?.argument && isFunction(last.argument) ? last.argument : null
+}
+
+/**
+ * True when a function enclosing the timer call returns a closure that clears the same handle: the
+ * `subscribe` of `useSyncExternalStore`, or any owner that hands back its own unsubscribe.
+ */
+const clearedByReturnedCleanup = (call, source) => {
+  const handle = handleOf(call)
+  if (!handle) return false
+  for (let current = call.parent; current; current = current.parent) {
+    if (current.type !== "FunctionExpression" && current.type !== "ArrowFunctionExpression" && current.type !== "FunctionDeclaration") continue
+    const cleanup = returnedFunction(current)
+    if (!cleanup) continue
+    let clears = false
+    walk(source, cleanup, (node) => {
+      if (node.type === "CallExpression" && CLEARERS.has(calleeName(node.callee)) && node.arguments[0]?.type === "Identifier" && node.arguments[0].name === handle) clears = true
+    })
+    if (clears) return true
+  }
+  return false
+}
+
+/** A timer belongs in an effect that clears it, or in a function whose returned cleanup clears it. */
 export const timerNeedsEffectCleanup = {
   meta: {
     type: "problem",
@@ -66,6 +103,7 @@ export const timerNeedsEffectCleanup = {
       CallExpression(node) {
         const name = calleeName(node.callee)
         if (!name || !TIMERS.has(name)) return
+        if (clearedByReturnedCleanup(node, source)) return
         const effect = enclosingEffect(node)
         if (!effect) return context.report({ node, messageId: "orphan", data: { timer: name } })
         const cleanup = cleanupOf(effect)

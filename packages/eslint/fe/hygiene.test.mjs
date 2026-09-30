@@ -40,6 +40,12 @@ test("HYGIENE-1: a timer lives in an effect that clears it", () => {
       // a module owns its timer and clears it in finally
       { filename: MODULE, code: "const id = setTimeout(() => controller.abort(), 5000); try { await run() } finally { clearTimeout(id) }" },
       { filename: SPEC, code: "setTimeout(done, 10)" },
+      // useSyncExternalStore subscribe: the timer starts in subscribe, the returned unsubscribe clears the same handle
+      {
+        filename: FILE,
+        code: "let timer; const subscribe = (listener) => { listeners.add(listener); if (timer === undefined) timer = setInterval(tick, 60000); return () => { listeners.delete(listener); if (listeners.size === 0 && timer !== undefined) { clearInterval(timer); timer = undefined } } }",
+      },
+      { filename: FILE, code: "function subscribe(cb) { const id = window.setTimeout(cb, 5); return () => window.clearTimeout(id) }" },
     ],
     invalid: [
       { filename: FILE, code: "const onClick = () => { setTimeout(() => set(false), 300) }", errors: [{ messageId: "orphan" }] },
@@ -55,6 +61,20 @@ test("HYGIENE-1: a timer lives in an effect that clears it", () => {
         code: "useLayoutEffect(() => { const id = setTimeout(a, 1); return undefined }, [])",
         errors: [{ messageId: "noCleanup" }],
       },
+      // subscribe returns an unsubscribe that never clears the timer
+      {
+        filename: FILE,
+        code: "let timer; const subscribe = (listener) => { listeners.add(listener); timer = setInterval(tick, 60000); return () => { listeners.delete(listener) } }",
+        errors: [{ messageId: "orphan" }],
+      },
+      // the returned cleanup clears a different handle
+      {
+        filename: FILE,
+        code: "const subscribe = (cb) => { const a = setTimeout(cb, 5); const b = 1; return () => clearTimeout(b) }",
+        errors: [{ messageId: "orphan" }],
+      },
+      // a timer with no handle cannot be cleared
+      { filename: FILE, code: "const subscribe = (cb) => { setTimeout(cb, 5); return () => clearTimeout(x) }", errors: [{ messageId: "orphan" }] },
     ],
   })
 })

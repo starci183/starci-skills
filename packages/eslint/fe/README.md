@@ -38,7 +38,7 @@ its Vietnamese why. New in 5.0: [env-owner](docs/env-owner.md), [transport](docs
 [next-conventions](docs/next-conventions.md), [translation](docs/translation.md) (no literal copy at any
 tier, no `vn-ok`), [brand-values](docs/brand-values.md), [native-controls](docs/native-controls.md),
 [size-and-state-budget](docs/size-and-state-budget.md), [e2e-shape](docs/e2e-shape.md),
-[spec-quality](docs/spec-quality.md) and [lint-escape-hatch](docs/lint-escape-hatch.md). New in 5.1: [lists](docs/lists.md), [hygiene](docs/hygiene.md), [formatting](docs/formatting.md) and [type-safety](docs/type-safety.md), plus rules added to next-conventions, client-boundary, native-controls and transport.
+[spec-quality](docs/spec-quality.md) and [lint-escape-hatch](docs/lint-escape-hatch.md). `timer-needs-effect-cleanup` also accepts a timer whose enclosing function returns a cleanup clearing the same handle (5.1.2). New in 5.1: [lists](docs/lists.md), [hygiene](docs/hygiene.md), [formatting](docs/formatting.md) and [type-safety](docs/type-safety.md), plus rules added to next-conventions, client-boundary, native-controls and transport.
 
 Older laws cover comments, file layout, icons and vendor ownership, landmarks, loading states,
 naming, props, served locales, component splits, design tokens, type safety, typography, and

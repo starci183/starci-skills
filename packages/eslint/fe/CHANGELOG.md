@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.1.2 - 2026-09-30
+
+- **Fix: `timer-needs-effect-cleanup` refused a correctly cleaned-up timer outside an effect.** nivo-fe `useNow` starts its `setInterval` inside the `subscribe` given to `useSyncExternalStore` and clears it in the unsubscribe that `subscribe` returns; the rule knew only `useEffect` cleanups and reported it. A timer is now also accepted when a function enclosing it directly returns a function (arrow expression body, or the last top-level `return`) that calls `clearTimeout`/`clearInterval` (bare, `window.` or `globalThis.`) on the same identifier the timer handle was stored in (`const id = ...` or `id = ...`). Detection is structural, not by name. A timer with no stored handle, a returned cleanup that clears another handle, or no returned cleanup at all is still refused.
+
 ## 5.1.1 - 2026-09-30
 
 - **Fix: `use-client-only-at-boundary` knew only the app layout.** A workspace package keeps its grammar tiers directly under `src/` (`packages/<pkg>/src/{composites,branches,leaves}`, the `fe.package.ui` slot), but the rule accepted the directive only under `/components/...`, so nivo-fe's `packages/nivo-ui` reported 13 false findings. The tier names come from `PACKAGE_TIERS` in `lib/scope.mjs` (the slot's layers, no repo name); a package branch or leaf is a boundary, a package composite is not, and the app layout is unchanged.

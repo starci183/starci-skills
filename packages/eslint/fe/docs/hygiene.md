@@ -25,6 +25,19 @@ useEffect(() => {
 }, [])
 ```
 
+**Valid** also: a function that starts the timer and directly returns a cleanup clearing the same handle (the `subscribe` of `useSyncExternalStore`)
+
+```tsx
+const subscribe = (listener: () => void) => {
+  listeners.add(listener)
+  if (timer === undefined) timer = setInterval(tick, 60_000)
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0) { clearInterval(timer); timer = undefined }
+  }
+}
+```
+
 **Finding code:** `FE_EFFECT_CLEANUP`
 
 **Vì sao (why):** `<timer>` ở `<file>` chạy ngoài effect hoặc trong effect không có cleanup gọi `clearTimeout`/`clearInterval`.
