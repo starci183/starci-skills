@@ -34,8 +34,8 @@
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@playwright/test": "1.63.0",
-    "@starci/eslint-canon-fe": "file:../../packages/eslint/fe",
-    "@starci/hfs": "file:../../packages/hfs",
+    "@starci/eslint-canon-fe": "5.1.2",
+    "@starci/hfs": "1.0.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
