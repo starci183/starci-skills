@@ -8,9 +8,10 @@ vi.mock("../../../modules/server-actions/clear-cart", () => ({
     clearCartAction: vi.fn(async () => ({ ok: true as const })),
 }))
 
-import { CartPageBase, type CartLineRow, type CartPageProps } from "./component"
+import { CartPageBase, type CartPageProps } from "./component"
+import type { LineItemRow } from "../../../modules/types"
 
-const lines: ReadonlyArray<CartLineRow> = [
+const lines: ReadonlyArray<LineItemRow> = [
     { productId: "sku-mug", name: "Enamel mug", quantityLabel: "× 2", lineTotal: "$25.98" },
     { productId: "sku-notebook", name: "Dot-grid notebook", quantityLabel: "× 1", lineTotal: "$8.99" },
 ]
@@ -38,7 +39,7 @@ const words = {
 }
 
 type CartScenario = "ready" | "empty" | "failed" | "signedOut"
-const surfaceFor = (scenario: CartScenario, rows: ReadonlyArray<CartLineRow> = lines): CartPageProps => ({
+const surfaceFor = (scenario: CartScenario, rows: ReadonlyArray<LineItemRow> = lines): CartPageProps => ({
     state: scenario === "signedOut" ? "signedOut" : "cart",
     props: {
         ...words,

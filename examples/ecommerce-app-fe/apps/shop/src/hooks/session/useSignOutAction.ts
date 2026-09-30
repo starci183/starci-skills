@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
+import { closeSession } from "../../modules/api"
 import { useRouter } from "../../modules/i18n"
-import { closeSession } from "../../modules/api/session"
 
 /** Owns the sign-out press and refreshes the server account view after the session door answers. */
 export const useSignOutAction = () => {

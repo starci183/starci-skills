@@ -6,7 +6,7 @@ vi.mock("../../../modules/server-actions/add-to-cart", () => ({
 }))
 
 import { addToCart } from "../../../modules/server-actions/add-to-cart"
-import type { Product } from "../../../modules/api/catalog"
+import type { Product } from "../../../modules/services"
 import { BrowsePageBase, type BrowsePageProps } from "./component"
 
 const rows: ReadonlyArray<Product> = [

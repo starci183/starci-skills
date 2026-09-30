@@ -1,6 +1,6 @@
 "use server"
 
-import { addCartItem } from "../api/cart"
+import { addCartItem } from "../services"
 import { readSessionToken } from "../session"
 
 /** What an add-to-cart press resolves to: the line's new quantity, or the refusal the service sent. */

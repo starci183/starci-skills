@@ -1,8 +1,8 @@
 "use client"
 
 import { Button, SurfaceCard, Text } from "@starci/grammar/common"
-import { formatPrice } from "../../../modules/money"
-import type { PlaceOrderOutcome } from "../../../modules/api/orders"
+import { formatPrice } from "@ecommerce/shared"
+import type { PlaceOrderOutcome } from "../../../modules/types"
 
 /** Resolved checkout copy and the answer of one confirmation attempt. */
 export type ConfirmOrderControlBaseProps = {

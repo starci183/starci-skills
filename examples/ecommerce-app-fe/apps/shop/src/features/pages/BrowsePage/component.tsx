@@ -1,14 +1,10 @@
 "use client"
 
 import { SectionHeader, Text } from "@starci/grammar/common"
-import { CatalogueTile } from "@ecommerce/shared/components/leaves/CatalogueTile"
-import { StateBlock } from "@ecommerce/shared/components/leaves/StateBlock"
-import type { Product } from "../../../modules/api/catalog"
-import { formatPrice } from "../../../modules/money"
+import { CatalogueTile, formatPrice, StateBlock, SlotView, type Slot } from "@ecommerce/shared"
+import type { Product } from "../../../modules/services"
 import { browsePageClassNames } from "./classNames"
 import { AddToCartControl } from "../../../components/blocks/AddToCart"
-import { SlotView } from "@ecommerce/shared/components/composites/SlotView"
-import type { Slot } from "@ecommerce/shared/modules/slot"
 
 /** The screen situations a catalogue read can settle. */
 export type BrowsePageState = "signedOut" | "browse"

@@ -2,6 +2,8 @@ import "server-only"
 import { cookies } from "next/headers"
 import { PERSON_COOKIE, SESSION_COOKIE } from "./shared"
 
+export { PERSON_COOKIE, SESSION_COOKIE }
+
 /**
  * The server half of the session seam: the cookies the browser presented on this request, read by
  * connected pages and server actions - never by a client component, which cannot see the request.
@@ -14,16 +16,12 @@ import { PERSON_COOKIE, SESSION_COOKIE } from "./shared"
 export const readSessionToken = async (): Promise<string | null> =>
     (await cookies()).get(SESSION_COOKIE)?.value ?? null
 
-/** The person id the sign-in flow recorded beside the token, or null for an anonymous visitor. */
-export const readSessionPerson = async (): Promise<string | null> =>
-    (await cookies()).get(PERSON_COOKIE)?.value ?? null
-
 /**
  * The cookie's lifetime: a mirror of the identity service's default TTL
  * (`IDENTITY_SESSION_TTL_SECONDS`, one hour). A cookie that outlives its session is harmless - the
  * verify door still refuses the dead token and the surface settles as anonymous.
  */
-export const SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60
+const SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60
 
 /**
  * The attributes the session door applies when it writes or clears the pair onto a response.

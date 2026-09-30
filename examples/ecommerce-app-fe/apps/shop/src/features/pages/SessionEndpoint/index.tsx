@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server"
-import {
-    registerAccount, revokeSession, signInWithPassword
-} from "../../../modules/api/identity"
-import {
-    readSessionToken, SESSION_COOKIE_OPTIONS
-} from "../../../modules/session"
-import {
-    PERSON_COOKIE, SESSION_COOKIE
-} from "../../../modules/session/shared"
+import { registerAccount, revokeSession, signInWithPassword } from "../../../modules/services"
+import { PERSON_COOKIE, readSessionToken, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "../../../modules/session"
 
 /** The body's honest floor: a mode this door serves plus the two credential halves. */
 type SessionRequestBody = {
@@ -33,7 +26,7 @@ type SessionRefusal = {
 /** Forward an upstream refusal: its status, its business code for the form's copy, and the reason it arrived with. */
 const refused = (result: SessionRefusal): Response =>
     NextResponse.json(
-        { ok: false, code: result.code ?? "IDENTITY_UNAVAILABLE", reason: result.reason },
+        { ok: false, code: result.code ?? "IDENTITY_UNAVAILABLE", message: result.reason },
         { status: refusalStatus(result.code) },
     )
 
@@ -56,7 +49,7 @@ export const SessionEndpointPost = async (request: Request): Promise<Response> =
     const password = typeof body.password === "string" ? body.password : ""
     if (mode === null || !email || !password) {
         return NextResponse.json(
-            { ok: false, code: "REQUEST_INVALID", reason: "A mode, an email and a password are required." },
+            { ok: false, code: "REQUEST_INVALID", message: "A mode, an email and a password are required." },
             { status: 400 },
         )
     }

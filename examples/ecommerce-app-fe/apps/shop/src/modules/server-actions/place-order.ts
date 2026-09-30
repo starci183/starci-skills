@@ -1,8 +1,8 @@
 "use server"
 
-import { placeOrder } from "../api/orders"
-import type { PlaceOrderOutcome } from "../api/orders"
+import { placeOrder } from "../services"
 import { readSessionToken } from "../session"
+import type { PlaceOrderOutcome } from "../types"
 
 /**
  * Send the rendered confirmation to the order service's `placeOrder` with its idempotency key.

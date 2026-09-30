@@ -1,6 +1,6 @@
 import "server-only"
 import { fetchCart } from "./cart"
-import type { GraphqlResult } from "./outcome"
+import type { GraphqlResult } from "../api"
 
 /**
  * A catalogue row as the shop renders it. The order service serves catalog data on the
@@ -23,7 +23,7 @@ export type Product = {
  * USD, which is the currency every row renders.
  */
 export const fetchProducts = async (
-    sessionToken: string,
+    sessionToken: string | null,
 ): Promise<GraphqlResult<ReadonlyArray<Product>>> => {
     const result = await fetchCart(sessionToken)
     if (!result.ok) return result

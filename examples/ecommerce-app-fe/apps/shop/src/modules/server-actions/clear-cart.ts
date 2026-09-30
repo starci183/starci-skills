@@ -1,6 +1,6 @@
 "use server"
 
-import { clearCart } from "../api/cart"
+import { clearCart } from "../services"
 import { readSessionToken } from "../session"
 
 /** What a clear-cart press resolves to: cleared, or the refusal the service sent. */

@@ -1,5 +1,5 @@
 import "server-only"
-import { readProjectedPorts } from "@ecommerce/shared/modules/config/projection"
+import { readProjectedPorts } from "@ecommerce/shared"
 
 /**
  * Backend endpoints the shop talks to, read once.
@@ -20,5 +20,3 @@ export const ORDER_API_URL =
 export const IDENTITY_API_URL =
   process.env.NEXT_PUBLIC_IDENTITY_API_URL ?? `http://localhost:${readProjectedPorts().identityApi}`
 
-/** How long a server-rendered read waits before the page falls back to its empty state. */
-export const REQUEST_TIMEOUT_MS = 2500

@@ -8,7 +8,7 @@ import { ROUTES } from "../../../modules/routes"
 import { ShopLayoutBase } from "./component"
 
 /** Framework-layout boundary input: the routed page body and nothing else. */
-export type ShopLayoutProps = { readonly content: ReactNode }
+type ShopLayoutProps = { readonly content: ReactNode }
 
 /** The primary sections, in bar order; the labels live in the dictionary, the paths in ROUTES. */
 const LINKS = [

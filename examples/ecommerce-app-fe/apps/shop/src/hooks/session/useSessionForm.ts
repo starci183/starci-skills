@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useLocale, useTranslations } from "next-intl"
+import { openSession } from "../../modules/api"
 import { useRouter } from "../../modules/i18n"
-import { openSession } from "../../modules/api/session"
 import { ROUTES } from "../../modules/routes"
 
 type Mode = "sign-in" | "register"

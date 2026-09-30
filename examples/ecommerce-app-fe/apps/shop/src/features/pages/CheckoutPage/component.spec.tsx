@@ -6,9 +6,10 @@ vi.mock("../../../modules/server-actions/place-order", () => ({
 }))
 
 import { placeOrderAction } from "../../../modules/server-actions/place-order"
-import { CheckoutPageBase, type CheckoutLineRow, type CheckoutPageProps } from "./component"
+import { CheckoutPageBase, type CheckoutPageProps } from "./component"
+import type { LineItemRow } from "../../../modules/types"
 
-const lines: ReadonlyArray<CheckoutLineRow> = [
+const lines: ReadonlyArray<LineItemRow> = [
     { productId: "sku-thermos", name: "Steel thermos", quantityLabel: "× 3", lineTotal: "$74.97" },
 ]
 
@@ -42,7 +43,7 @@ const words = {
 }
 
 type CheckoutScenario = "ready" | "empty" | "failed" | "signedOut"
-const surfaceFor = (scenario: CheckoutScenario, rows: ReadonlyArray<CheckoutLineRow> = lines): CheckoutPageProps => ({
+const surfaceFor = (scenario: CheckoutScenario, rows: ReadonlyArray<LineItemRow> = lines): CheckoutPageProps => ({
     state: scenario === "signedOut" ? "signedOut" : "checkout",
     props: {
         ...words,

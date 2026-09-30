@@ -1,15 +1,14 @@
 import { getTranslations } from "next-intl/server"
-import { fetchProducts } from "../../../modules/api/catalog"
+import { collectionSlot } from "@ecommerce/shared"
+import type { GraphqlResult } from "../../../modules/api"
 import { ORDER_API_URL } from "../../../modules/config"
+import { fetchProducts, type Product } from "../../../modules/services"
 import { readSessionToken } from "../../../modules/session"
 import { BrowsePageBase } from "./component"
 import type { BrowsePageState } from "./component"
-import type { Product } from "../../../modules/api/catalog"
-import type { GraphqlResult } from "../../../modules/api/outcome"
-import { collectionSlot } from "@ecommerce/shared/modules/slot"
 
 /** Props for the connected browse page: the route mounts it empty and it reads its own world. */
-export type BrowsePageProps = Record<never, never>
+type BrowsePageProps = Record<never, never>
 
 /**
  * The screen situation a catalogue read settles. The catalog rides the session-guarded `cart`
@@ -28,9 +27,7 @@ const browsePageStateOf = (result: GraphqlResult<ReadonlyArray<Product>>): Brows
 export const BrowsePage = async (props: BrowsePageProps) => {
     void props
     const [t, sessionToken] = await Promise.all([getTranslations("shop.browse"), readSessionToken()])
-    const result = sessionToken
-        ? await fetchProducts(sessionToken)
-        : { ok: false as const, reason: "no signed-in session", code: "SESSION_INVALID" }
+    const result = await fetchProducts(sessionToken)
     return (
         <BrowsePageBase
             state={browsePageStateOf(result)}

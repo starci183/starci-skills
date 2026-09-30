@@ -1,22 +1,14 @@
 "use client"
 
-import { Button, SectionHeader, SurfaceListCard, Text } from "@starci/grammar/common"
-import { StateBlock } from "@ecommerce/shared/components/leaves/StateBlock"
+import { Button, SectionHeader } from "@starci/grammar/common"
+import { StateBlock, SlotView, type Slot } from "@ecommerce/shared"
 import { checkoutPageClassNames } from "./classNames"
 import { ConfirmOrderControl } from "../../../components/blocks/ConfirmOrder"
-import { SlotView } from "@ecommerce/shared/components/composites/SlotView"
-import type { Slot } from "@ecommerce/shared/modules/slot"
+import { LineItemsCard } from "../../../components/composites/LineItemsCard"
+import type { LineItemRow } from "../../../modules/types"
 
 /** The screen situations a checkout read can settle. */
 export type CheckoutPageState = "signedOut" | "checkout"
-
-/** One checkout summary line with every rendered string already resolved. */
-export type CheckoutLineRow = {
-    readonly productId: string
-    readonly name: string
-    readonly quantityLabel: string
-    readonly lineTotal: string
-}
 
 /** The checkout page's resolved inputs: every string, the summary lines, the attempt key and the hrefs settled. */
 export type CheckoutPageProps = {
@@ -28,7 +20,7 @@ export type CheckoutPageProps = {
         readonly description: string
         readonly summaryTitle: string
         readonly orderTotal: string
-        readonly linesSlot: Slot<ReadonlyArray<CheckoutLineRow>>
+        readonly linesSlot: Slot<ReadonlyArray<LineItemRow>>
         /** The idempotency key this render's confirmation carries ("" when nobody could confirm). */
         readonly attemptKey: string
         readonly productNames: Readonly<Record<string, string>>
@@ -114,25 +106,7 @@ export const CheckoutPageBase = (props: CheckoutPageProps) => {
                 >
                     {(lines) => (
                         <>
-                            <SurfaceListCard label={props.props.summaryTitle} fact={props.props.orderTotal}>
-                                {lines.map((line) => (
-                                    <li className={checkoutPageClassNames.row} key={line.productId}>
-                                        <span>
-                                            <Text as="span" weight="semibold">
-                                                {line.name}
-                                            </Text>{" "}
-                                            <Text as="span" size="sm" tone="muted">
-                                                {line.quantityLabel}
-                                            </Text>
-                                        </span>
-                                        <span className={checkoutPageClassNames.rowAside}>
-                                            <Text as="span" weight="semibold">
-                                                {line.lineTotal}
-                                            </Text>
-                                        </span>
-                                    </li>
-                                ))}
-                            </SurfaceListCard>
+                            <LineItemsCard label={props.props.summaryTitle} total={props.props.orderTotal} lines={lines} />
                             <div className={checkoutPageClassNames.actions}>
                                 {confirm}
                             </div>

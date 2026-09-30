@@ -1,18 +1,16 @@
 import { getLocale, getTranslations } from "next-intl/server"
-import { fetchCart } from "../../../modules/api/cart"
+import { collectionSlot } from "@ecommerce/shared"
+import type { GraphqlResult } from "../../../modules/api"
 import { checkoutAttemptKey } from "../../../modules/checkout"
 import { ORDER_API_URL } from "../../../modules/config"
-import { formatPrice } from "../../../modules/money"
 import { ROUTES } from "../../../modules/routes"
+import { readCart, type CartView } from "../../../modules/services"
 import { readSessionToken } from "../../../modules/session"
 import { CheckoutPageBase } from "./component"
-import type { CheckoutLineRow, CheckoutPageState } from "./component"
-import type { CartView } from "../../../modules/api/cart"
-import type { GraphqlResult } from "../../../modules/api/outcome"
-import { collectionSlot } from "@ecommerce/shared/modules/slot"
+import type { CheckoutPageState } from "./component"
 
 /** Props for the connected checkout page: the route mounts it empty and it reads its own world. */
-export type CheckoutPageProps = Record<never, never>
+type CheckoutPageProps = Record<never, never>
 
 /** The screen situation a checkout read settles: gate, refusal, empty cart, or the summary. */
 const checkoutPageStateOf = (result: GraphqlResult<CartView>): CheckoutPageState => {
@@ -32,28 +30,7 @@ export const CheckoutPage = async (props: CheckoutPageProps) => {
         getLocale(),
         readSessionToken(),
     ])
-    const result = sessionToken
-        ? await fetchCart(sessionToken)
-        : { ok: false as const, reason: "no signed-in session", code: "SESSION_INVALID" }
-    const items = result.ok ? result.data.items : []
-    const catalog = result.ok ? result.data.catalog : []
-    const productNames: Record<string, string> = {}
-    for (const product of catalog) {
-        productNames[product.id] = product.name
-    }
-    const lines: ReadonlyArray<CheckoutLineRow> = items.map((item) => {
-        const product = catalog.find((entry) => entry.id === item.productId)
-        return {
-            productId: item.productId,
-            name: product?.name ?? item.productId,
-            quantityLabel: t("lineQuantity", { count: item.quantity }),
-            lineTotal: product ? formatPrice(product.priceMinorUnits * item.quantity, "USD") : "—",
-        }
-    })
-    const total = items.reduce((sum, item) => {
-        const product = catalog.find((entry) => entry.id === item.productId)
-        return sum + (product ? product.priceMinorUnits * item.quantity : 0)
-    }, 0)
+    const { result, summary } = await readCart(sessionToken, (count) => t("lineQuantity", { count }))
     const attemptKey = sessionToken ? checkoutAttemptKey() : ""
     return (
         <CheckoutPageBase
@@ -62,10 +39,10 @@ export const CheckoutPage = async (props: CheckoutPageProps) => {
                 title: t("title"),
                 description: t("description"),
                 summaryTitle: t("summaryTitle"),
-                orderTotal: formatPrice(total, "USD"),
-                linesSlot: collectionSlot(result.ok ? lines : null),
+                orderTotal: summary.total,
+                linesSlot: collectionSlot(result.ok ? summary.rows : null),
                 attemptKey,
-                productNames,
+                productNames: summary.productNames,
                 confirmLabel: t("confirmCta"),
                 confirmingLabel: t("confirmingCta"),
                 confirmedTitle: t("confirmed.title"),

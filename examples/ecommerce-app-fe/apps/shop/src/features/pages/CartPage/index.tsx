@@ -1,17 +1,15 @@
 import { getLocale, getTranslations } from "next-intl/server"
-import { fetchCart } from "../../../modules/api/cart"
+import { collectionSlot } from "@ecommerce/shared"
+import type { GraphqlResult } from "../../../modules/api"
 import { ORDER_API_URL } from "../../../modules/config"
-import { formatPrice } from "../../../modules/money"
 import { ROUTES } from "../../../modules/routes"
+import { readCart, type CartView } from "../../../modules/services"
 import { readSessionToken } from "../../../modules/session"
 import { CartPageBase } from "./component"
-import type { CartLineRow, CartPageState } from "./component"
-import type { CartView } from "../../../modules/api/cart"
-import type { GraphqlResult } from "../../../modules/api/outcome"
-import { collectionSlot } from "@ecommerce/shared/modules/slot"
+import type { CartPageState } from "./component"
 
 /** Props for the connected cart page: the route mounts it empty and it reads its own world. */
-export type CartPageProps = Record<never, never>
+type CartPageProps = Record<never, never>
 
 /** The screen situation a cart read settles: gate, refusal, genuine empty, or the lines. */
 const cartPageStateOf = (result: GraphqlResult<CartView>): CartPageState => {
@@ -31,27 +29,7 @@ export const CartPage = async (props: CartPageProps) => {
         getLocale(),
         readSessionToken(),
     ])
-    const result = sessionToken
-        ? await fetchCart(sessionToken)
-        : { ok: false as const, reason: "no signed-in session", code: "SESSION_INVALID" }
-    const catalog = result.ok ? result.data.catalog : []
-    const lines: ReadonlyArray<CartLineRow> = result.ok
-        ? result.data.items.map((item) => {
-            const product = catalog.find((entry) => entry.id === item.productId)
-            return {
-                productId: item.productId,
-                name: product?.name ?? item.productId,
-                quantityLabel: t("lineQuantity", { count: item.quantity }),
-                lineTotal: product ? formatPrice(product.priceMinorUnits * item.quantity, "USD") : "—",
-            }
-        })
-        : []
-    const total = result.ok
-        ? result.data.items.reduce((sum, item) => {
-            const product = catalog.find((entry) => entry.id === item.productId)
-            return sum + (product ? product.priceMinorUnits * item.quantity : 0)
-        }, 0)
-        : 0
+    const { result, summary } = await readCart(sessionToken, (count) => t("lineQuantity", { count }))
     return (
         <CartPageBase
             state={cartPageStateOf(result)}
@@ -59,8 +37,8 @@ export const CartPage = async (props: CartPageProps) => {
                 title: t("title"),
                 description: t("description"),
                 linesTitle: t("linesTitle"),
-                cartTotal: formatPrice(total, "USD"),
-                linesSlot: collectionSlot(result.ok ? lines : null),
+                cartTotal: summary.total,
+                linesSlot: collectionSlot(result.ok ? summary.rows : null),
                 clearLabel: t("clearLabel"),
                 clearingLabel: t("clearingLabel"),
                 clearRefused: t("clearRefused"),

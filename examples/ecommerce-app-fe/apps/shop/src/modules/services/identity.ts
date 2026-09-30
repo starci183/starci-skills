@@ -1,9 +1,7 @@
 import "server-only"
 import { IDENTITY_API_URL } from "../config"
 import { readSessionToken } from "../session"
-import { postGraphql } from "./client"
-import { postJson } from "./client"
-import type { Result } from "./outcome"
+import { postGraphql, postJson, type Result } from "../api"
 
 /**
  * The signed-in shopper as the identity service reports it: the person id, the email the account

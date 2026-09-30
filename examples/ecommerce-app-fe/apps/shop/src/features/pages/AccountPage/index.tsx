@@ -1,14 +1,13 @@
 import { getTranslations } from "next-intl/server"
-import { fetchCurrentUser } from "../../../modules/api/identity"
+import type { Slot } from "@ecommerce/shared"
+import type { Result } from "../../../modules/api"
 import { IDENTITY_API_URL } from "../../../modules/config"
+import { fetchCurrentUser, type CurrentUser } from "../../../modules/services"
 import { AccountPageBase } from "./component"
 import type { AccountPageState } from "./component"
-import type { CurrentUser } from "../../../modules/api/identity"
-import type { Result } from "../../../modules/api/outcome"
-import type { Slot } from "@ecommerce/shared/modules/slot"
 
 /** Props for the connected account page: the route mounts it empty and it reads its own world. */
-export type AccountPageProps = Record<never, never>
+type AccountPageProps = Record<never, never>
 
 /**
  * The screen situation an account read settles: the gate when no live session answers, the refusal

@@ -1,12 +1,9 @@
 "use client"
 
 import { Heading, SectionHeader, Text } from "@starci/grammar/common"
-import { DuckMascot } from "@ecommerce/shared/components/leaves/DuckMascot"
-import { StateBlock } from "@ecommerce/shared/components/leaves/StateBlock"
+import { DuckMascot, StateBlock, SlotView, type Slot } from "@ecommerce/shared"
 import { SessionForm } from "../../../components/blocks/SessionForm"
 import { SignOutAction } from "../../../components/blocks/SignOutAction"
-import { SlotView } from "@ecommerce/shared/components/composites/SlotView"
-import type { Slot } from "@ecommerce/shared/modules/slot"
 import { accountPageClassNames } from "./classNames"
 
 /**

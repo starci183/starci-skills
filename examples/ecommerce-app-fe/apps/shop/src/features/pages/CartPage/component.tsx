@@ -1,22 +1,14 @@
 "use client"
 
-import { Button, SectionHeader, SurfaceListCard, Text } from "@starci/grammar/common"
-import { StateBlock } from "@ecommerce/shared/components/leaves/StateBlock"
+import { Button, SectionHeader } from "@starci/grammar/common"
+import { StateBlock, SlotView, type Slot } from "@ecommerce/shared"
 import { cartPageClassNames } from "./classNames"
 import { ClearCartControl } from "../../../components/blocks/ClearCart"
-import { SlotView } from "@ecommerce/shared/components/composites/SlotView"
-import type { Slot } from "@ecommerce/shared/modules/slot"
+import { LineItemsCard } from "../../../components/composites/LineItemsCard"
+import type { LineItemRow } from "../../../modules/types"
 
 /** The screen situations a cart read can settle. */
 export type CartPageState = "signedOut" | "cart"
-
-/** One cart line with every rendered string already resolved (name, quantity, line total). */
-export type CartLineRow = {
-    readonly productId: string
-    readonly name: string
-    readonly quantityLabel: string
-    readonly lineTotal: string
-}
 
 /** The cart page's resolved inputs: every string, the line payloads and both hrefs settled. */
 export type CartPageProps = {
@@ -28,7 +20,7 @@ export type CartPageProps = {
         readonly description: string
         readonly linesTitle: string
         readonly cartTotal: string
-        readonly linesSlot: Slot<ReadonlyArray<CartLineRow>>
+        readonly linesSlot: Slot<ReadonlyArray<LineItemRow>>
         readonly clearLabel: string
         readonly clearingLabel: string
         readonly clearRefused: string
@@ -81,25 +73,7 @@ export const CartPageBase = (props: CartPageProps) => (
             >
                 {(lines) => (
                     <>
-                        <SurfaceListCard label={props.props.linesTitle} fact={props.props.cartTotal}>
-                            {lines.map((line) => (
-                                <li className={cartPageClassNames.row} key={line.productId}>
-                                    <span>
-                                        <Text as="span" weight="semibold">
-                                            {line.name}
-                                        </Text>{" "}
-                                        <Text as="span" size="sm" tone="muted">
-                                            {line.quantityLabel}
-                                        </Text>
-                                    </span>
-                                    <span className={cartPageClassNames.rowAside}>
-                                        <Text as="span" weight="semibold">
-                                            {line.lineTotal}
-                                        </Text>
-                                    </span>
-                                </li>
-                            ))}
-                        </SurfaceListCard>
+                        <LineItemsCard label={props.props.linesTitle} total={props.props.cartTotal} lines={lines} />
                         <div className={cartPageClassNames.actions}>
                             <ClearCartControl
                                 clearLabel={props.props.clearLabel}
