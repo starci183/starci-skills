@@ -107,6 +107,32 @@ function topLevel(ast) {
   return rows.map((r) => ({ ...r, exported: r.exported || exportedNames.has(r.name) }));
 }
 
+/**
+ * Names of the module's own mutable state: top-level `let`/`var` bindings and `const` bindings holding a fresh object
+ * (`new X()`, `{...}`, `[...]`). A helper that reads one is bound to its module's state (`() => cache.clear()` clears THIS
+ * module's cache), so an identical body elsewhere is a different function, not a copy to import.
+ */
+function moduleState(ast) {
+  const names = new Set();
+  for (const stmt of ast.body) {
+    const decl = stmt.type === 'ExportNamedDeclaration' && stmt.declaration ? stmt.declaration : stmt;
+    if (decl.type !== 'VariableDeclaration') continue;
+    for (const d of decl.declarations) {
+      const fresh = d.init && ['NewExpression', 'ObjectExpression', 'ArrayExpression'].includes(d.init.type);
+      if (decl.kind !== 'const' || fresh) bound(d.id, names);
+    }
+  }
+  return names;
+}
+
+/** True when `node` reads one of `state` as a free name (not as a property after `.`). */
+function readsState(source, node, state) {
+  if (!state.size) return false;
+  const tokens = [...acorn.tokenizer(source.slice(node.start, node.end), { ecmaVersion: 'latest', sourceType: 'module' })];
+  const local = declaredNames(node);
+  return tokens.some((t, i) => t.type.label === 'name' && state.has(t.value) && !local.has(t.value) && !['.', '?.'].includes(tokens[i - 1]?.type.label));
+}
+
 function rawGitSpawns(ast) {
   const found = [];
   const visit = (n) => {
@@ -136,7 +162,9 @@ export function helperOnceFindings({ tracked, read }) {
   const scripts = tracked.filter((rel) => rel.endsWith('.mjs') && SCRIPT_ROOTS.some((r) => rel.startsWith(`${r}/`)) && !isTest(rel) && !GENERATED.test(rel));
   const parsed = scripts.map((rel) => {
     const source = read(rel);
-    return { rel, source, rows: topLevel(parse(source)), ast: null };
+    const ast = parse(source);
+    const state = moduleState(ast);
+    return { rel, source, rows: topLevel(ast).filter((row) => !readsState(source, row.node, state)), ast: null };
   });
   const findings = [];
   // The table: exported helpers of the libs, keyed by normalised sequence.

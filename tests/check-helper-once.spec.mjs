@@ -65,3 +65,17 @@ test('tests and files outside the runtime roots are not scanned', () => {
     'packages/x/copy.mjs': "const s = (v) => String(v ?? '').replaceAll('-', '/');\n",
   }), []);
 });
+
+test("a helper bound to its own module's state is not a copy of another module's identical body", () => {
+  const files = {
+    'scripts/lib/pool.mjs': 'const cache = new Map();\nexport const resetPoolCache = () => { cache.clear(); cache.set("x", 1); cache.delete("y"); };\n',
+    'scripts/lib/graph.mjs': 'const cache = new Map();\nexport const resetGraphs = () => { cache.clear(); cache.set("x", 1); cache.delete("y"); };\n',
+  };
+  assert.deepEqual(run(files).filter((f) => f.code === 'RT_HELPER_REDEFINED'), []);
+  // the same body over a module-free value is still a copy
+  const copies = {
+    'scripts/lib/pool.mjs': 'export const clearAll = (cache) => { cache.clear(); cache.set("x", 1); cache.delete("y"); };\n',
+    'scripts/other.mjs': 'const clearAll = (cache) => { cache.clear(); cache.set("x", 1); cache.delete("y"); };\n',
+  };
+  assert.equal(run(copies).filter((f) => f.code === 'RT_HELPER_REDEFINED').length, 1);
+});
