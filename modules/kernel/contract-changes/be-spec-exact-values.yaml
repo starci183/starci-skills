@@ -1,0 +1,10 @@
+id: be-spec-exact-values
+effectiveAt: '2026-10-01T00:00:00+07:00'
+summary: "R48 BE_SPEC_QUALITY gains the eslint-be rule spec-exact-values (error): a *.service.spec.ts never asserts expect.any(String), expect.any(Number) or expect.any(Date), with `expect` resolved as the jest global or the @jest/globals import. A unit spec asserts exact values: the service takes its id generator and its clock from tokens, the spec provides fakeIds() and new FakeClock(...) from @starci/jest-preset. The example service specs that used expect.any for a generated value now assert the exact id and date. Adds no check or finding code (BE_SPEC_QUALITY causes_vi gains one line)"
+paths:
+  - packages/eslint/be/unit-spec.mjs
+  - packages/eslint/be/unit-spec.test.mjs
+  - knowledge/hfs/rules.yaml
+  - knowledge/patterns/be/test.yaml
+  - modules/kernel/failure-codes.yaml
+reach: new-legs

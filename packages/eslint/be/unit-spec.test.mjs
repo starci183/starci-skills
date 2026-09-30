@@ -13,6 +13,7 @@ import {
     noReturnOnlyGeneric,
     rules,
     specBuildsWithTestingModule,
+    specExactValues,
     specInfraDoubleFromKit,
     specModuleDefinitionOnlyProviders,
     specNoModuleMock,
@@ -212,4 +213,31 @@ test("the token table is the manifest's, not the rule's", () => {
     assert.equal(table.kit, "@starci/jest-preset")
     assert.deepEqual(table.doubles.map((entry) => entry.double).sort(), ["FakeClock", "builder", "fakeCache", "fakeIds", "fakeLock", "fakeTransaction", "mockEntityManager", "recordingOutbox"])
     assert.equal(table.fallback.double, "mock")
+})
+
+test("spec-exact-values: a unit spec asserts the exact id and the exact date, never expect.any(String|Number|Date)", () => {
+    const kit = 'import { FakeClock, fakeIds } from "@starci/jest-preset"\n'
+    tester.run("spec-exact-values", specExactValues, {
+        valid: [
+            // the exact id from fakeIds and the exact date from FakeClock
+            { filename: SPEC, code: `${kit}const ids = fakeIds("order")\nconst clock = new FakeClock("2026-01-01T00:00:00Z")\nexpect({ id: ids.next(), at: clock.now() }).toEqual({ id: "order-1", at: new Date("2026-01-01T00:00:00Z") })` },
+            // other asymmetric matchers are not a "some value of a kind"
+            { filename: SPEC, code: "expect({ a: 1 }).toEqual({ a: expect.anything() })\nexpect([1]).toEqual(expect.arrayContaining([1]))" },
+            // a locally declared `expect` or `Date` is not the jest global or the global constructor
+            { filename: SPEC, code: "const expect = { any: (kind: unknown) => kind }\nexpect.any(String)" },
+            { filename: SPEC, code: "class Date {}\nexpect({}).toEqual({ at: expect.any(Date) })" },
+            // only a service spec is judged
+            { filename: HANDLER_SPEC, code: "expect({}).toEqual({ id: expect.any(String) })" },
+            { filename: E2E, code: "expect({}).toEqual({ id: expect.any(String) })" },
+        ],
+        invalid: [
+            { filename: SPEC, code: "expect(saved).toEqual({ id: expect.any(String) })", errors: [{ messageId: "loose" }] },
+            { filename: SPEC, code: "expect(saved).toEqual({ total: expect.any(Number) })", errors: [{ messageId: "loose" }] },
+            { filename: SPEC, code: "expect(saved).toEqual({ createdAt: expect.any(Date) })", errors: [{ messageId: "loose" }] },
+            // through the @jest/globals import
+            { filename: SPEC, code: 'import { expect } from "@jest/globals"\nexpect(saved).toEqual({ id: expect.any(String) })', errors: [{ messageId: "loose" }] },
+            // nested in a matcher
+            { filename: SPEC, code: "expect(rows).toEqual([expect.objectContaining({ id: expect.any(String) })])", errors: [{ messageId: "loose" }] },
+        ],
+    })
 })

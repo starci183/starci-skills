@@ -194,6 +194,7 @@ rules:
     verification:
       automated:
         - spec-infra-double-from-kit
+        - spec-exact-values
         - spec-no-module-mock
         - BE_SPEC_QUALITY
         - BE_TYPE_ESCAPE

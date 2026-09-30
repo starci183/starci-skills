@@ -17,6 +17,9 @@
  *     `JSON.parse(JSON.stringify(x))`, or `Object.assign(new X(), y)` returned as another type.
  *   - `spec-infra-double-from-kit`: a provider `{ provide: TOKEN, useValue: X }` takes X from the kit double the token calls
  *     for. The table (token pattern -> double) is `ruleParams.be.specDoubles` of the slot manifest, not this file.
+ *   - `spec-exact-values`: no `expect.any(String)`, `expect.any(Number)` or `expect.any(Date)` (`expect` being the jest global
+ *     or the `@jest/globals` import): ids and clocks come from the kit's deterministic doubles (`fakeIds()`, `FakeClock`), so a
+ *     unit spec asserts the exact value.
  *
  * Paths are asked of the slot manifest (`lib/unit-spec.mjs`), a name is judged by the import that binds it, never by its spelling.
  */
@@ -164,13 +167,13 @@ export const specModuleDefinitionOnlyProviders = {
 /** The `jest` members that replace or fetch a module for the whole file. */
 const MODULE_MOCKS = new Set(["mock", "doMock", "unstable_mockModule", "requireMock", "setMock"])
 
-/** Whether `jest` here is the jest object: the ambient global, or the import from `@jest/globals`. */
-const isJestObject = (context, node) => {
-    if (node.type !== "Identifier" || node.name !== "jest") return false
+/** Whether the identifier `name` is the ambient global (or, when `source` is given, that import), not a local binding: `jest` and `expect` are the jest globals or `@jest/globals` imports. */
+const isAmbientOrImported = (context, node, name, source) => {
+    if (node.type !== "Identifier" || node.name !== name) return false
     const imported = importOf(context, node)
-    if (imported) return imported.source === "@jest/globals" && imported.imported === "jest"
+    if (imported) return source !== null && imported.source === source && imported.imported === name
     for (let scope = context.sourceCode.getScope(node); scope; scope = scope.upper) {
-        const variable = scope.set.get("jest")
+        const variable = scope.set.get(name)
         if (variable) return variable.defs.length === 0 || scope.type === "global" || variable.defs.every((definition) => definition.node?.parent?.declare === true)
     }
     return true
@@ -192,7 +195,7 @@ export const specNoModuleMock = {
             CallExpression(node) {
                 const callee = node.callee
                 if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier" || !MODULE_MOCKS.has(callee.property.name)) return
-                if (isJestObject(context, callee.object)) context.report({ node, messageId: "moduleMock", data: { method: callee.property.name } })
+                if (isAmbientOrImported(context, callee.object, "jest", "@jest/globals")) context.report({ node, messageId: "moduleMock", data: { method: callee.property.name } })
             },
         }
     },
@@ -431,6 +434,38 @@ export const specInfraDoubleFromKit = {
     },
 }
 
+// -- spec-exact-values -----------------------------------------------------------------------------------------
+
+/** The global constructors whose `expect.any(...)` accepts every value of a kind, so asserts nothing exact. */
+const LOOSE_KINDS = new Set(["String", "Number", "Date"])
+
+/** A unit spec asserts the exact id and the exact date, never "some string" or "some date". */
+export const specExactValues = {
+    meta: {
+        type: "problem",
+        docs: { description: "A service spec never asserts `expect.any(String)`, `expect.any(Number)` or `expect.any(Date)`: ids and clocks come from `fakeIds()` and `FakeClock`, so the exact value is asserted." },
+        schema: [],
+        messages: {
+            loose: "`expect.any({{kind}})` accepts every {{what}}, so the assertion proves nothing about the value the service generated. The service takes its ids and its clock from tokens and the spec provides the kit's deterministic doubles: `{ provide: ID_GENERATOR, useValue: fakeIds() }` and `{ provide: CLOCK, useValue: new FakeClock(...) }` from `@starci/jest-preset`. Assert the exact value ({{exact}}).",
+        },
+    },
+    create(context) {
+        if (!isServiceSpecFile(hfsOf(context), context.filename || context.getFilename())) return {}
+        return {
+            CallExpression(node) {
+                const callee = node.callee
+                if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier" || callee.property.name !== "any") return
+                if (!isAmbientOrImported(context, callee.object, "expect", "@jest/globals")) return
+                const kind = node.arguments[0]
+                if (kind?.type !== "Identifier" || !LOOSE_KINDS.has(kind.name) || !isAmbientOrImported(context, kind, kind.name, null)) return
+                const what = { String: "string", Number: "number", Date: "date" }[kind.name]
+                const exact = kind.name === "Date" ? "the clock's date, for example `clock.now()` of the `FakeClock` the spec provides" : "the id the `fakeIds()` double hands out"
+                context.report({ node, messageId: "loose", data: { kind: kind.name, what, exact } })
+            },
+        }
+    },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "spec-builds-with-testing-module": specBuildsWithTestingModule,
@@ -439,6 +474,7 @@ export const rules = {
     "spec-no-module-mock": specNoModuleMock,
     "no-return-only-generic": noReturnOnlyGeneric,
     "spec-infra-double-from-kit": specInfraDoubleFromKit,
+    "spec-exact-values": specExactValues,
 }
 
 /** Every rule of this law ships at `error`. */
@@ -449,4 +485,5 @@ export const recommended = {
     "starci-be/spec-no-module-mock": "error",
     "starci-be/no-return-only-generic": "error",
     "starci-be/spec-infra-double-from-kit": "error",
+    "starci-be/spec-exact-values": "error",
 }

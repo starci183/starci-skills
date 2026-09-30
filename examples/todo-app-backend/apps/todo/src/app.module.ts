@@ -29,6 +29,7 @@ import { NOTIFY_SMTP_ERROR_KINDS, NOTIFY_SMTP_MESSAGES, NotifySmtpModule } from 
 import { SEPAY_ERROR_KINDS, SEPAY_MESSAGES, SepayModule } from "@modules/integrations/sepay"
 import { UPLOAD_STORAGE_ERROR_KINDS, UPLOAD_STORAGE_MESSAGES, UploadStorageModule } from "@modules/integrations/upload"
 import { ClockModule } from "@modules/platform/clock"
+import { IdsModule } from "@modules/platform/ids"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
 import { DATABASE_ERROR_KINDS, DATABASE_PROBE, DatabaseModule } from "@modules/platform/database"
@@ -61,6 +62,7 @@ export class AppModule {
             module: AppModule,
             imports: [
                 ClockModule.register({ isGlobal: true }),
+                IdsModule.register({ isGlobal: true }),
                 LoggingModule.register({ isGlobal: true }),
                 I18nModule.register({
                     isGlobal: true,

@@ -14,6 +14,7 @@ import { NotifySmtpModule } from "@modules/integrations/notify-smtp"
 import { SepayModule } from "@modules/integrations/sepay"
 import { UploadStorageModule } from "@modules/integrations/upload"
 import { ClockModule } from "@modules/platform/clock"
+import { IdsModule } from "@modules/platform/ids"
 import { CqrsModule } from "@modules/platform/cqrs"
 import { DatabaseModule } from "@modules/platform/database"
 import { HttpModule } from "@modules/platform/http"
@@ -36,6 +37,7 @@ export class AppModule {
             module: AppModule,
             imports: [
                 ClockModule.register({ isGlobal: true }),
+                IdsModule.register({ isGlobal: true }),
                 LoggingModule.register({ isGlobal: true }),
                 I18nModule.register({ isGlobal: true, bundles: [NOTIFY_MESSAGES] }),
                 CqrsModule.register({ isGlobal: true }),
