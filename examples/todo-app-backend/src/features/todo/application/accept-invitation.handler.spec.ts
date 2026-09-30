@@ -1,12 +1,14 @@
 import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { ShareErrorCode } from "@modules/domain/share"
-import type { InvitationService, InvitationView } from "@modules/domain/share"
+import type { InvitationService } from "@modules/domain/share"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
 import { AcceptInvitationCommand } from "./accept-invitation.command"
 import { AcceptInvitationHandler } from "./accept-invitation.handler"
+
+type InvitationView = Awaited<ReturnType<InvitationService["listFor"]>>[number]
 
 const AT = new Date("2026-09-30T10:00:00.000Z")
 const principal: Principal = { id: "ann", roles: ["member"] }

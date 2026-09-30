@@ -2,7 +2,7 @@ import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { AuditAction } from "@modules/domain/audit"
 import { IdentityErrorCode } from "@modules/domain/identity"
-import type { SessionService, SessionView } from "@modules/domain/identity"
+import type { SessionService } from "@modules/domain/identity"
 import { KeycloakLogEvent } from "@modules/integrations/keycloak"
 import type { KeycloakClient } from "@modules/integrations/keycloak"
 import type { Logger } from "@modules/platform/logging"
@@ -10,6 +10,8 @@ import type { Outbox } from "@modules/platform/outbox"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
 import { SignOutCommand } from "./sign-out.command"
 import { SignOutHandler } from "./sign-out.handler"
+
+type SessionView = Awaited<ReturnType<SessionService["open"]>>
 
 const AT = new Date("2026-09-30T10:00:00.000Z")
 const session: SessionView = {

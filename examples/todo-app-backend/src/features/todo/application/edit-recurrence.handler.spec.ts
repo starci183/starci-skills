@@ -1,11 +1,13 @@
 import { mock } from "@starci/jest-preset/mock"
 import { RecurErrorCode, RuleFrequency } from "@modules/domain/recur"
-import type { RuleService, RuleView } from "@modules/domain/recur"
+import type { RuleService } from "@modules/domain/recur"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
 import { EditRecurrenceCommand } from "./edit-recurrence.command"
 import { EditRecurrenceHandler } from "./edit-recurrence.handler"
+
+type RuleView = Awaited<ReturnType<RuleService["listBatch"]>>[number]
 
 const principal: Principal = { id: "o1", roles: ["member"] }
 const edited: RuleView = {

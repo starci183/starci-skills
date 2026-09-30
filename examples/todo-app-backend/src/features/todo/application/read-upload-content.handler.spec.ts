@@ -1,10 +1,10 @@
 import { mock } from "@starci/jest-preset/mock"
 import { UploadErrorCode } from "@modules/domain/upload"
 import type { UploadService, UploadView } from "@modules/domain/upload"
-import { UploadStorageError, UploadStorageErrorCode } from "@modules/integrations/upload"
 import type { UploadStorage } from "@modules/integrations/upload"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
+import { storageFailure } from "@tests/fixtures/gateway-errors"
 import { ReadUploadContentHandler } from "./read-upload-content.handler"
 import { ReadUploadContentQuery } from "./read-upload-content.query"
 
@@ -72,7 +72,7 @@ describe("ReadUploadContentHandler", () => {
     })
 
     it("refuses as storage-unavailable when the storage fails, and rethrows any other failure", async () => {
-        const failing = build({ get: jest.fn().mockRejectedValue(new UploadStorageError({ code: UploadStorageErrorCode.Failed })) })
+        const failing = build({ get: jest.fn().mockRejectedValue(storageFailure()) })
         await expect(failing.handler.execute(query)).resolves.toMatchObject({
             kind: "refused",
             code: UploadErrorCode.StorageUnavailable,

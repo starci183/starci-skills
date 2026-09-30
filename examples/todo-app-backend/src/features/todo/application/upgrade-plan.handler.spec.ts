@@ -1,12 +1,15 @@
 import { mock } from "@starci/jest-preset/mock"
-import type { PaymentIntentView, PaymentService, PlanOptions, SubscriptionService, SubscriptionView } from "@modules/domain/plan"
-import { SepayError, SepayErrorCode } from "@modules/integrations/sepay"
+import type { PaymentService, PlanOptions, SubscriptionService } from "@modules/domain/plan"
 import type { SepayClient } from "@modules/integrations/sepay"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
+import { sepayRequestFailure } from "@tests/fixtures/gateway-errors"
 import { UpgradePlanCommand } from "./upgrade-plan.command"
 import { UpgradePlanHandler } from "./upgrade-plan.handler"
+
+type PaymentIntentView = Awaited<ReturnType<PaymentService["create"]>>
+type SubscriptionView = Awaited<ReturnType<SubscriptionService["getOrCreate"]>>
 
 const principal: Principal = { id: "p1", roles: ["member"] }
 const options: PlanOptions = { paidPriceMinorUnits: 99000, paidCurrency: "VND" }
@@ -68,7 +71,7 @@ describe("UpgradePlanHandler", () => {
     })
 
     it("writes no pending subscription and no intent when the gateway fails", async () => {
-        const failure = new SepayError({ code: SepayErrorCode.RequestFailed, params: { operation: "create-intent", reason: "timeout" } })
+        const failure = sepayRequestFailure({ operation: "create-intent", reason: "timeout" })
         const { handler, subscriptions, payments } = build(jest.fn().mockRejectedValue(failure))
         await expect(handler.execute(new UpgradePlanCommand({ request: {}, principal }))).rejects.toBe(failure)
         expect(subscriptions.startCheckout).not.toHaveBeenCalled()

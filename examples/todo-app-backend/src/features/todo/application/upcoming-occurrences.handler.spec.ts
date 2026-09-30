@@ -1,11 +1,14 @@
 import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { RecurErrorCode, RuleFrequency } from "@modules/domain/recur"
-import type { OccurrenceService, OccurrenceView, RuleService, RuleView } from "@modules/domain/recur"
+import type { OccurrenceService, RuleService } from "@modules/domain/recur"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import { UpcomingOccurrencesHandler } from "./upcoming-occurrences.handler"
 import { UpcomingOccurrencesQuery } from "./upcoming-occurrences.query"
+
+type OccurrenceView = Awaited<ReturnType<OccurrenceService["materialise"]>>
+type RuleView = Awaited<ReturnType<RuleService["listBatch"]>>[number]
 
 // 2026-09-18 is a Friday, 12:00Z is 19:00 in Ho Chi Minh, the same calendar day.
 const NOW = new Date("2026-09-18T12:00:00.000Z")

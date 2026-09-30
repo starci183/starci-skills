@@ -2,10 +2,10 @@ import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { UploadErrorCode } from "@modules/domain/upload"
 import type { UploadService, UploadView } from "@modules/domain/upload"
-import { UploadStorageError, UploadStorageErrorCode } from "@modules/integrations/upload"
 import type { UploadStorage } from "@modules/integrations/upload"
 import type { Logger } from "@modules/platform/logging"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
+import { storageFailure } from "@tests/fixtures/gateway-errors"
 import { AcceptUploadContentCommand } from "./accept-upload-content.command"
 import { AcceptUploadContentHandler } from "./accept-upload-content.handler"
 
@@ -91,7 +91,7 @@ describe("AcceptUploadContentHandler", () => {
     })
 
     it("refuses as storage-unavailable and keeps the row pending when the storage fails", async () => {
-        const store = jest.fn().mockRejectedValue(new UploadStorageError({ code: UploadStorageErrorCode.Failed }))
+        const store = jest.fn().mockRejectedValue(storageFailure())
         const { handler, uploads } = build({ store })
         const result = await handler.execute(command)
         expect(result).toMatchObject({ kind: "refused", code: UploadErrorCode.StorageUnavailable })

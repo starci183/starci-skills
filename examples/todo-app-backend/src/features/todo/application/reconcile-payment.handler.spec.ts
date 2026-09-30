@@ -1,13 +1,17 @@
 import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { PlanErrorCode } from "@modules/domain/plan"
-import type { PaymentIntentView, PaymentService, SettlementService, SubscriptionService, SubscriptionView } from "@modules/domain/plan"
-import type { SepayClient, SepayTransaction } from "@modules/integrations/sepay"
+import type { PaymentService, SettlementService, SubscriptionService } from "@modules/domain/plan"
+import type { SepayClient } from "@modules/integrations/sepay"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
 import { ReconcilePaymentCommand } from "./reconcile-payment.command"
 import { ReconcilePaymentHandler } from "./reconcile-payment.handler"
+
+type PaymentIntentView = Awaited<ReturnType<PaymentService["create"]>>
+type SubscriptionView = Awaited<ReturnType<SubscriptionService["getOrCreate"]>>
+type SepayTransaction = Awaited<ReturnType<SepayClient["getTransaction"]>>
 
 const AT = new Date("2026-09-30T10:00:00.000Z")
 const principal: Principal = { id: "p1", roles: ["member"] }

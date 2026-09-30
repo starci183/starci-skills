@@ -1,11 +1,11 @@
 import { mock } from "@starci/jest-preset/mock"
 import { UploadErrorCode } from "@modules/domain/upload"
 import type { UploadService, UploadView } from "@modules/domain/upload"
-import { UploadStorageError, UploadStorageErrorCode } from "@modules/integrations/upload"
 import type { UploadStorage } from "@modules/integrations/upload"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
+import { storageFailure } from "@tests/fixtures/gateway-errors"
 import { DeleteUploadCommand } from "./delete-upload.command"
 import { DeleteUploadHandler } from "./delete-upload.handler"
 
@@ -77,7 +77,7 @@ describe("DeleteUploadHandler", () => {
     })
 
     it("keeps the row and refuses as storage-unavailable when the bytes cannot be deleted", async () => {
-        const failing = jest.fn().mockRejectedValue(new UploadStorageError({ code: UploadStorageErrorCode.Failed }))
+        const failing = jest.fn().mockRejectedValue(storageFailure())
         const { handler, uploads } = build({ remove: failing })
         await expect(handler.execute(command)).resolves.toMatchObject({
             kind: "refused",

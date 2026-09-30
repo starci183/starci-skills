@@ -1,12 +1,14 @@
 import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { RecurErrorCode } from "@modules/domain/recur"
-import type { OccurrenceService, OccurrenceView } from "@modules/domain/recur"
+import type { OccurrenceService } from "@modules/domain/recur"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
 import { SkipOccurrenceCommand } from "./skip-occurrence.command"
 import { SkipOccurrenceHandler } from "./skip-occurrence.handler"
+
+type OccurrenceView = Awaited<ReturnType<OccurrenceService["materialise"]>>
 
 const AT = new Date("2026-09-30T10:00:00.000Z")
 const principal: Principal = { id: "o1", roles: ["member"] }

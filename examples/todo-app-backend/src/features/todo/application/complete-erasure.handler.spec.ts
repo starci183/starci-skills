@@ -1,13 +1,15 @@
 import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { AuditErrorCode } from "@modules/domain/audit"
-import type { AuditErasureService, ErasureRequestView } from "@modules/domain/audit"
+import type { AuditErasureService } from "@modules/domain/audit"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import type { Outbox } from "@modules/platform/outbox"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
 import { CompleteErasureCommand } from "./complete-erasure.command"
 import { CompleteErasureHandler } from "./complete-erasure.handler"
+
+type ErasureRequestView = Extract<Awaited<ReturnType<AuditErasureService["request"]>>, { readonly kind: "ok" }>["value"]
 
 const AT = new Date("2026-09-30T10:00:00.000Z")
 const principal: Principal = { id: "p1", roles: ["member"] }

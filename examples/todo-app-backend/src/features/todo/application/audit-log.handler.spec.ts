@@ -1,10 +1,12 @@
 import { mock } from "@starci/jest-preset/mock"
 import { AuditErrorCode } from "@modules/domain/audit"
-import type { AuditLogService, ResolvedAuditLine } from "@modules/domain/audit"
+import type { AuditLogService } from "@modules/domain/audit"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import { AuditLogHandler } from "./audit-log.handler"
 import { AuditLogQuery } from "./audit-log.query"
+
+type ResolvedAuditLine = Awaited<ReturnType<AuditLogService["readChain"]>>[number]
 
 const AT = new Date("2026-09-30T10:00:00.000Z")
 const member: Principal = { id: "p1", roles: ["member"] }

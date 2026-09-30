@@ -1,13 +1,15 @@
 import type { CommandBus } from "@nestjs/cqrs"
 import { mock } from "@starci/jest-preset/mock"
 import { RecurLogEvent } from "@modules/domain/recur"
-import type { DueOccurrence, GeneratorService, OccurrenceService } from "@modules/domain/recur"
+import type { GeneratorService, OccurrenceService } from "@modules/domain/recur"
 import { TaskErrorCode } from "@modules/domain/task"
 import type { Logger } from "@modules/platform/logging"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
 import { CreateTaskCommand } from "./create-task.command"
 import { GenerateRecurrencesCommand } from "./generate-recurrences.command"
 import { GenerateRecurrencesHandler } from "./generate-recurrences.handler"
+
+type DueOccurrence = Awaited<ReturnType<GeneratorService["collectDue"]>>[number]
 
 const AT = new Date("2026-09-18T12:00:00.000Z")
 const due = (localDate: string, ownerId = "o1"): DueOccurrence => ({

@@ -1,10 +1,10 @@
 import { UploadErrorCode } from "@modules/domain/upload"
-import { UploadStorageError, UploadStorageErrorCode } from "@modules/integrations/upload"
+import { storageFailure } from "@tests/fixtures/gateway-errors"
 import { toStorageRefusal } from "./upload-storage-refusal.mapper"
 
 describe("toStorageRefusal", () => {
     it("turns a failure of the storage integration into the storage-unavailable refusal of the upload", () => {
-        const failure = new UploadStorageError({ code: UploadStorageErrorCode.Failed })
+        const failure = storageFailure()
         expect(toStorageRefusal(failure, "u1")).toEqual({
             kind: "refused",
             code: UploadErrorCode.StorageUnavailable,

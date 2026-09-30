@@ -1,10 +1,12 @@
 import { mock } from "@starci/jest-preset/mock"
-import type { SubscriptionService, SubscriptionView } from "@modules/domain/plan"
+import type { SubscriptionService } from "@modules/domain/plan"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
 import { DowngradePlanCommand } from "./downgrade-plan.command"
 import { DowngradePlanHandler } from "./downgrade-plan.handler"
+
+type SubscriptionView = Awaited<ReturnType<SubscriptionService["getOrCreate"]>>
 
 const principal: Principal = { id: "p1", roles: ["member"] }
 const active: SubscriptionView = {

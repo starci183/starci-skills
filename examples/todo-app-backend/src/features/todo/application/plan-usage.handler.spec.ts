@@ -1,10 +1,12 @@
 import { mock } from "@starci/jest-preset/mock"
-import type { PlanDefinition, SubscriptionService } from "@modules/domain/plan"
+import type { SubscriptionService } from "@modules/domain/plan"
 import type { TaskService, TaskView } from "@modules/domain/task"
 import type { Principal } from "@modules/platform/cqrs"
 import type { Logger } from "@modules/platform/logging"
 import { PlanUsageHandler } from "./plan-usage.handler"
 import { PlanUsageQuery } from "./plan-usage.query"
+
+type PlanDefinition = Awaited<ReturnType<SubscriptionService["readEffectivePlan"]>>
 
 const principal: Principal = { id: "p1", roles: ["member"] }
 const AT = new Date("2026-09-30T10:00:00.000Z")

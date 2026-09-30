@@ -1,4 +1,4 @@
-export { UPLOAD_STORAGE_ERROR_KINDS, UploadStorageError, UploadStorageErrorCode } from "./errors/upload-storage.error"
+export { UPLOAD_STORAGE_ERROR_KINDS, UploadStorageError } from "./errors/upload-storage.error"
 export { UPLOAD_STORAGE_MESSAGES } from "./messages/upload-storage.messages"
 export { parseUploadStorageConfig } from "./upload.config"
 export type { ScanVerdict } from "./upload.contracts"
