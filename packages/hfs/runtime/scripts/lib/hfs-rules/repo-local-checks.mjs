@@ -1,4 +1,4 @@
-// repo-local-checks.mjs - HFS_REPO_LOCAL_CHECK (R99): a repository carries no check, lint rule or lint plugin of its own. Every check
+// repo-local-checks.mjs - HFS_REPO_LOCAL_CHECK (R103): a repository carries no check, lint rule or lint plugin of its own. Every check
 // lives in the .claude runtime or in a canon package (`@starci/eslint-canon-*`), so a repository has none to keep in step.
 //   - a file or folder named `eslint-local-rules*`, `eslint-plugin*` or `eslint-local-plugin*`, or one below an `eslint-rules/` or `lint-rules/` folder;
 //   - a `check-*` file in a `scripts/` or `tools/` folder (a check under another name is the reviewer's, not a name test's);
@@ -14,7 +14,7 @@ const LOCAL_RULE_FILE = /(?:^|\/)(?:eslint-local-rules|eslint-plugin|eslint-loca
 const CHECK_SCRIPT = /(?:^|\/)(?:scripts|tools)\/check-[^/]+$/;
 const RUNS_CHECK = /(?:^|[\s&|;(])(?:\.\/)?(?:scripts|tools)\/check-[^\s&|;)]+/;
 
-/** The findings of R99 over the tracked paths `files` of the repository at `repoRoot`. */
+/** The findings of R103 over the tracked paths `files` of the repository at `repoRoot`. */
 export function repoLocalCheckFindings({ repoRoot, files }) {
   const findings = [];
   for (const file of files) {

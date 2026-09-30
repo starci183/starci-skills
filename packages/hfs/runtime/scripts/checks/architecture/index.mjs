@@ -74,7 +74,7 @@ const BACKEND_MACHINE = {
   contractFixtureGuard: [checkContractFixtureGuard, CONTRACT_FIXTURE_GUARD_RULE_IDS],
 };
 
-// The frontend repository machine (R21, R50, R54, R55, R56, R63, R94, R102): same shape, run for a front-end repository only.
+// The frontend repository machine (R21, R50, R54, R55, R56, R63, R94, R106): same shape, run for a front-end repository only.
 const FRONTEND_MACHINE = {
   transportOwner: [checkTransportOwner, TRANSPORT_OWNER_RULE_IDS],
   routeFilesThin: [checkRouteFilesThin, ROUTE_FILES_THIN_RULE_IDS],

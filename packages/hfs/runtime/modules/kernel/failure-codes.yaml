@@ -502,7 +502,7 @@ BE_SPEC_PLACEMENT:
   title_vi: "Spec đặt ngoài bốn tầng test"
   meaning_vi: "Tệp spec hoặc test `<f>` nằm ngoài bốn tầng test của back end (kể cả trong `scripts/` hoặc `tools/`)."
   causes_vi:
-    - "Vi phạm luật R98: spec đơn vị là `<name>.service.spec.ts` cạnh service của nó; spec tích hợp, e2e và contract nằm dưới `src/tests/{integration,e2e,contract}`. Mọi `*.spec.*`, `*.test.*`, `*-spec.*` khác là vi phạm; script vận hành và công cụ không mang spec."
+    - "Vi phạm luật R102: spec đơn vị là `<name>.service.spec.ts` cạnh service của nó; spec tích hợp, e2e và contract nằm dưới `src/tests/{integration,e2e,contract}`. Mọi `*.spec.*`, `*.test.*`, `*-spec.*` khác là vi phạm; script vận hành và công cụ không mang spec."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chuyển spec vào tầng đúng hoặc xóa nó; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
@@ -692,7 +692,7 @@ FE_I18N_KEYS:
   title_vi: "Khóa catalog và mã nguồn đọc chúng không khớp"
   meaning_vi: "Mã nguồn đọc khóa `<key>` mà một locale không có, hoặc catalog `<f>` giữ khóa `<key>` mà không đoạn mã nào của app hay của package dùng chung đọc tới."
   causes_vi:
-    - "Vi phạm luật R102: khóa đọc bằng literal qua `next-intl` (`t`, `t.rich`, `t.raw`, `t.markup`) phải có trong mọi locale; khóa của catalog mà không chuỗi nào trong mã nguồn có thể đang đọc thì phải xóa."
+    - "Vi phạm luật R106: khóa đọc bằng literal qua `next-intl` (`t`, `t.rich`, `t.raw`, `t.markup`) phải có trong mọi locale; khóa của catalog mà không chuỗi nào trong mã nguồn có thể đang đọc thì phải xóa."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm khóa vào mọi catalog của app hoặc đọc khóa có thật; xóa khóa chết khỏi mọi catalog; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
@@ -1165,7 +1165,7 @@ HFS_LINT_SUPPRESSION_FILE:
   title_vi: "Kho có tệp hoặc script ghi nhận bỏ qua lỗi lint"
   meaning_vi: "Kho có tệp, script hoặc tùy chọn ghi nhận lỗi lint để bỏ qua ở `<f>`: `eslint.suppressions*`, script `lint:suppressions`, cờ `--suppress-all`/`--suppressions-location`, hoặc cấu hình eslint có `suppressions`."
   causes_vi:
-    - "Vi phạm luật R100: lỗi lint được sửa trong mã (hoặc luật được đổi trong canon); không ghi nhận để lỗi nằm lại trong tệp suppressions."
+    - "Vi phạm luật R104: lỗi lint được sửa trong mã (hoặc luật được đổi trong canon); không ghi nhận để lỗi nằm lại trong tệp suppressions."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xóa tệp, script hoặc cờ, và sửa các lỗi lint trong mã."
   owner: op-retry
   kind: check-finding
@@ -1251,7 +1251,7 @@ HFS_PROOF_COMMAND_FILE_MISSING:
   title_vi: "Lệnh chứng minh trỏ tới tệp không tồn tại"
   meaning_vi: "Lệnh `requiresProof.<kind>.command` của hồ sơ `.starciwork` `<f>` chạy tệp `<path>` mà kho không có, nên không thể chạy đúng như đã viết."
   causes_vi:
-    - "Vi phạm luật R101: lệnh chứng minh phải chạy được nguyên văn; tệp spec, script hay cấu hình mà nó nêu tên phải có trong kho (script đã xóa thì kế hoạch chứng minh phải được viết lại)."
+    - "Vi phạm luật R105: lệnh chứng minh phải chạy được nguyên văn; tệp spec, script hay cấu hình mà nó nêu tên phải có trong kho (script đã xóa thì kế hoạch chứng minh phải được viết lại)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: tạo tệp được nêu hoặc viết lại kế hoạch chứng minh (ví dụ thành một spec e2e trên world); không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
@@ -1349,7 +1349,7 @@ HFS_REPO_LOCAL_CHECK:
   title_vi: "Kho tự giữ bộ kiểm tra riêng"
   meaning_vi: "Kho có nguồn kiểm tra hoặc luật lint cục bộ ở `<f>`: tệp `check-*` trong `scripts/` hay `tools/`, tệp `eslint-local-rules*`, plugin eslint cục bộ, hoặc script npm chạy một tệp `check-*`."
   causes_vi:
-    - "Vi phạm luật R99: mọi bộ kiểm tra sống trong runtime `.claude` (hfs check, các canon eslint); kho sản phẩm không giữ bộ kiểm tra hay luật riêng. `scripts/` chỉ chứa script vận hành."
+    - "Vi phạm luật R103: mọi bộ kiểm tra sống trong runtime `.claude` (hfs check, các canon eslint); kho sản phẩm không giữ bộ kiểm tra hay luật riêng. `scripts/` chỉ chứa script vận hành."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xóa tệp và script trỏ tới nó; nếu luật còn cần thì đề xuất vào canon trong runtime `.claude`, không giữ bản sao trong kho."
   owner: op-retry
   kind: check-finding
