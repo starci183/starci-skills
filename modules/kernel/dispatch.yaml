@@ -352,23 +352,20 @@ spawnMechanics:
     reserved and nothing launches.
   sequence: >-
     Inside the api call: reserve (durable lease, intent-v1) -> create or reuse
-    the workflow Orca Run whose coordinator is the dedicated Kernel terminal
-    -> create one operation Task -> launch exactly one agent. Managed agents
-    use worker-start, which owns Task injection; the api reads dispatch-show
-    and worker-show for terminal/model attestation and never dispatches the
-    Task a second time. Command-terminal agents use terminal-create + readiness
-    -> orchestration dispatch --return-preamble to that exact handle ->
-    terminal-send of the returned preamble -> submission/death attestation.
-    Either path persists starci/agent-hierarchy@1 plus Run/Task/Dispatch and
+    the workflow Orca Run whose coordinator is the Kernel's own terminal
+    -> create one operation Task -> launch exactly one agent, the one way
+    (contract-changes/launch-through-worker-start.yaml; scripts/agent/lib.mjs
+    spawnAgent): worker-start --agent <provider> [--model --effort] on the op's
+    worktree, which owns Task injection; the api reads dispatch-show and
+    worker-show for terminal/model attestation and never dispatches the Task a
+    second time. It persists starci/agent-hierarchy@1 plus Run/Task/Dispatch and
     terminal metadata before job -> running. Failure = dispatch-rejected, job
-    not running, slot released, and the terminal or worker the attempt created
-    closed inside the same rejection, which records terminalClosed
-    (modules/kernel/start-workflow.yaml orcaTree).
-    Command flags and readiness patterns come from the agent card
-    modules/models/agents/<agent>.yaml.
-    The kernel's own launch shows the same primitive sequence
-    (scripts/kernel/start-workflow.mjs: terminal-create -> terminal-read ->
-    terminal-send -> bind the startup terminal).
+    not running, slot released, and the worker the attempt created stopped and
+    released inside the same rejection, which records terminalClosed
+    (modules/kernel/start-workflow.yaml orcaTree). Orca composes the agent
+    command with the owner's per-agent default args; no caller builds one.
+    The kernel's own launch is the same worker-start (scripts/kernel/start-workflow.mjs
+    via startAgent: entry Run -> Kernel Task -> worker-start -> attest).
   naming: >-
     Orca titles are the fleet's address book and are written at creation, not
     left to the provider's own summary; a terminal nobody reads is closed

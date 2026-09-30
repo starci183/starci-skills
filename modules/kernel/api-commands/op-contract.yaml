@@ -7,7 +7,7 @@ op-contract:
     dispatch used to commit the contract row only with status running, after the preamble was sent and
     the model attested; a worker whose first action is op-contract landed in that window and read
     contract-missing for a row the Kernel read seconds later (nivo Modules inc-e09140ad9c22, WSPV
-    inc-7f437d11edae). A command-terminal dispatch now commits the row as soon as Orca returns the
+    inc-7f437d11edae). A dispatch commits the row as soon as Orca returns the
     dispatch id, BEFORE the preamble reaches the terminal (re-filed with the delivered text when the job
     goes running; removed again when the launch is refused after that point). As belt-and-braces, with
     --job, while the job is still leased and its row is absent (a managed worker-start launch), op-contract

@@ -50,11 +50,10 @@ actor: >-
 host: orca
 executable: scripts/kernel/start-workflow.mjs
 
-usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>] [--launched-by watchdog|supervisor] [--adopt <terminal>]
+usage: start-workflow.mjs --repo <path> --goal <workflow_id> [--agent <name>] [--launched-by watchdog|supervisor]
 # --repo is the project repository that owns .starciwork/runtime.sqlite, not Source
 # without --goal: claims the oldest pending inbox goal
 # --agent pins an explicit Kernel agent override (routedBy: override)
-# --adopt binds a live kernel terminal back to its workflow (see claim.onLostSeat)
 # --launched-by names who ran the launch (default supervisor; watchdog --repair passes watchdog)
 
 launchAuthority: >-
@@ -70,28 +69,17 @@ claim:
     inside BEGIN IMMEDIATE — two starts never claim the same goal.
   onDeadKernel: >-
     inbox 'claimed' with no signal, an expired startup reservation, or a signal
-    whose Orca terminal is disconnected/unwritable → clear the stale binding and
-    spawn a replacement kernel for the same workflow (kernel attempt+1; workflow
-    generation is unchanged). Dead means a RESPONDING Orca says so
-    (scripts/kernel/host-outage.mjs): the handle is terminal_handle_stale or
-    missing from the listing, or listed disconnected/unwritable.
-  onAgentExited: >-
-    A kernel terminal that is connected but whose frame ENDS in a bare shell
-    prompt (scripts/kernel/terminal-liveness.mjs exitedAgentPromptRow: the
-    agent exited and left its PowerShell/cmd/POSIX shell) is a dead kernel on
-    a responding Orca, never a live signal and never adoptable. The watchdog
-    confirms it with a second read after the death settle and asks
-    start-workflow for a replacement; start-workflow re-proves it, clears the
-    seat (kernel-stale-cleared with agentExited, shellPrompt), launches the
-    replacement and only THEN closes the old shell with its tab on fresh proof
-    it is still a bare shell or disconnected
-    (close-op-terminal.mjs closeExitedTerminal), recorded as
-    kernel-exited-terminal-closed {liveTerminal, terminals[]} and returned as
-    exitedTerminalsClosed; a shell left open is an open
-    kernel-stale-terminal-unclosed incident, and a closed one resolves the
-    open incidents of that kind naming it. A kernel job terminal in that
-    state does not answer kernel-terminal-alive either. A failed launch
-    leaves the shell for the next start to close.
+    whose Dispatch worker-show reports ended (stopped, failed, exited, released,
+    abandoned) → the old Dispatch is stopped and released, the stale binding
+    cleared, and a replacement kernel starts for the same workflow (kernel
+    attempt+1; workflow generation is unchanged).
+  onTerminalLaunchedSeat: >-
+    A signal with a terminal and no Dispatch is a Kernel launched by terminal
+    create before every launch went through worker-start
+    (contract-changes/launch-through-worker-start.yaml). It is never live: the
+    next start retires it - its terminal closed (kernel-stale-cleared with
+    retiredTerminalLaunch; a refused close is a kernel-stale-terminal-unclosed
+    incident) - and a worker takes the seat.
   onHostOutage: >-
     Orca not answering - runtime_unavailable, orca.exe ENOENT while an update
     replaces it, a timed-out call - says nothing about any terminal. It is
@@ -101,18 +89,10 @@ claim:
     second probe before it asks for a replacement (2026-09-24 Orca
     auto-update: six kernel seats lost, one kernel duplicated).
   onLostSeat: >-
-    A kernel job whose terminal is alive while its signal is gone (a restart
-    that failed mid-outage) is never replaced: start-workflow refuses (step
-    kernel-terminal-alive, exit 3) and `--adopt <terminal>` binds it back - the
-    terminal must be named by the kernel job or a kernel event of the
-    workflow, live on a responding Orca, in the repo's worktree and showing an
-    agent session (a frame ending in a bare shell prompt refuses
-    adopt-terminal-agent-exited), and no other live kernel may hold the
-    signal; a signal terminal whose agent exited is closed after the adopt. Adopt writes
-    the signal, marks the job running with that worker, resolves the open
-    kernel-stale-terminal-unclosed incidents naming it, records
-    kernel-adopted and types nothing into the terminal. The watchdog adopts on
-    its own when start-workflow answers kernel-terminal-alive.
+    A kernel job whose own Dispatch (payload.managed.dispatchId) worker-show
+    reports live while its signal is gone (a restart that failed mid-outage) is
+    never replaced: start-workflow refuses (step kernel-worker-alive, exit 3)
+    and the watchdog reads that as already-live. No terminal is ever adopted.
   onFinished: >-
     workflows.phase='finished' or workflows.archived_at refuses a new kernel —
     a completed or archived goal is gone from the queue for good.
@@ -131,72 +111,33 @@ spawn:
   fallThrough:
     rule: >-
       A group boot (config kernel group or unpinned route) launches its members
-      in order within one boot and one startup reservation. A member whose
-      launch fails at a noEffectSteps step — before the model took any input:
-      the command could not be built, the terminal was not created, readiness
-      refused (an interactive gate such as the Claude first-run onboarding or
-      Codex directory trust, an auth death screen, a readiness timeout) or the
-      model did not attest — is recorded as one kernel-start-failed event
-      (fellThroughTo names the next member), its terminal is closed, and the
-      next member launches. A failure at any later step (send, submission,
-      attestation) has partial or unknown effect and never falls through; a
-      failed member whose terminal close is refused never falls through either,
-      so a boot never leaves an orphan terminal beside a new kernel. The last
-      member's refusal, a single pin and an --agent override end the boot as
-      before. Success records kernel-booted/kernel-restarted with fellThrough.
-    noEffectSteps: [command, create, readiness, model-attestation]
-  readiness:
-    rule: >-
-      scripts/agent/lib.mjs awaitReadiness, adaptive for the Kernel boot. The
-      window is wall-clock: the card's readiness.timeoutMs (default 120000) is
-      the base, stretched by host load (CPU busy share over the wait, Orca read
-      latency; up to maxLoadFactor, default x2), and past it the launch keeps
-      waiting while the terminal is alive and still printing (frame changed
-      within quietMs, default 30000) up to maxTimeoutMs (default 360000). It
-      fails early only on a real exit: Orca reports the terminal exited or
-      disconnected, or the frame ends in a bare shell prompt on two reads after
-      the agent drew its frame or its launch line was echoed. The Claude input
-      box's placeholder hint (❯ Try "…") is a ready prompt.
-    why: >-
-      wf-nivo-fe-debt-mug06w7h, 2026-09-24: three boots failed "terminal
-      readiness timeout after 120000ms" while Claude sat ready at a prompt
-      whose empty box showed a placeholder hint the pattern did not match; the
-      timeout path then closed each terminal (exitCause operator_close) and the
-      cause went with it.
-    reservation: >-
-      Every readiness and submission poll renews the startup reservation
-      (signals expires_at = now + 120000, at most every 15s), so a long wait
-      never frees the seat to another launcher or the restored-tab dedupe.
-  failure:
-    lastOutput: >-
-      Every failed launch carries lastOutput, the tail (30 rows, 3000 chars) of
-      the terminal's last frame, read before the terminal is closed, in the
-      kernel-start-retry / kernel-start-failed event and the stderr receipt.
-    failureKind: >-
-      agent-exited | readiness-stalled | prompt-delivery-stalled |
-      submission-not-consumed | prompt-stuck (transient) |
-      readiness-still-starting | terminal-incarnation-stale | interactive-gate | failure-signature |
-      model-attestation | attestation (never transient).
-    retry: >-
-      A transient failure whose terminal was closed is retried ONCE with a
-      fresh terminal in the same boot and reservation (event kernel-start-retry
-      with the attempt's facts); a boot that then succeeds returns and records
-      retriedAfter. Two transient failures end the boot with errorCode
-      kernel-launch-transient-retry-exhausted and attempts[]; a single one
-      that could not be retried is kernel-launch-transient.
-    stillStarting: >-
-      A terminal still printing at the hard cap is NOT closed
-      (keepStartingTerminal): the boot fails with errorCode
-      kernel-launch-still-starting and terminalLeftOpen, never retries beside
-      it and never falls through.
+      in order within one boot and one startup reservation. A member whose start
+      left no effect (effectState none: worker-start refused before a Dispatch
+      existed, or its Dispatch was proven ended and released) is recorded as one
+      kernel-start-failed event (fellThroughTo names the next member) and the next
+      member launches. A start with partial or unknown effect never falls through,
+      so a boot never leaves a worker beside a new kernel. The last member's
+      refusal, a single pin and an --agent override end the boot as before.
+      Success records kernel-booted/kernel-restarted with fellThrough.
+  launch: >-
+    Every Kernel is an Orca worker (contract-changes/launch-through-worker-start.yaml;
+    scripts/agent/lib.mjs startAgent). The launching terminal (ORCA_TERMINAL_HANDLE:
+    the owner's chat, the Supervisor, the watchdog run) creates the Kernel's entry
+    Run ("[Kernel] <Workflow> — <workflow_id>", that terminal its coordinator) and
+    files the Kernel Task whose spec is the kernel prompt (spilled to
+    <ledger dir>/kernel/<workflow>.a<attempt>.prompt.md past the host argv);
+    worker-start --agent <agent> [--model <id> --effort <level>] starts it on the
+    workflow's repository. A restart reuses the entry Run while Orca still knows it
+    and accepts the new Task, else creates a fresh one. worker-start blocks until
+    the agent is ready; the startup reservation is stretched past its timeout first.
+    The seat records {terminal, dispatch, runId} and the kernel job payload.managed
+    {runId, taskId, dispatchId, agentTerminalHandle}. The Kernel's own workflow Run
+    is created later from its own terminal (api.mjs ensureWorkflowRun).
   command: >-
-    Every Kernel boots as one dedicated Orca terminal, including Codex and
-    Claude agents that use managed workers for operation jobs. The command is
-    composed only from modules/models/agents/<agent>.yaml. The card owns the
-    executable plus modelArgs, effortArgs, bypassArgs and any credential/env
-    preparation; the launcher never improvises flags. Codex currently uses
-    --model <model>, -c model_reasoning_effort="<effort>",
-    --ask-for-approval never and --sandbox danger-full-access.
+    No caller composes a Kernel command: Orca launches the agent with the owner's
+    per-agent default args (agentDefaultArgs), and the runtime passes only
+    --agent, --model and --effort. A card with start.modelArgument false (devin)
+    takes no model flag and starts on its CLI default.
   prompt: >-
     kernel packet: rendered from modules/kernel/kernel-prompt.md (contract
     data — the template lives in modules/, not scripts/): resolved Source
@@ -207,18 +148,18 @@ spawn:
     mutation goes through node scripts/kernel/api.mjs <cmd>
     (the verb surface is modules/kernel/api.yaml `commands` — that file is the
     only list, and two of its verbs are worker-side op IPC) — never
-    direct sqlite writes, never self-spawned op terminals, never direct
+    direct sqlite writes, never self-spawned op workers, never direct
     orca/git/agent-CLI calls (report/contract/check truth is the ledger
     rows via the api verbs); `api route` persists the model decision before
     every dispatch; dispatch goes through api dispatch; findings/plans
     persist via api plan|incident before dispatch (driver-loop.yaml boundary).
   attestation: >-
-    terminal.create → terminal.read readiness → terminal.send prompt →
-    terminal.read activity. When a concrete model is requested, the ready
-    terminal must render that exact model id before the prompt is accepted.
-    A command-line model flag is request evidence, not attestation. Mismatch or
-    absence fails with step=model-attestation, closes the terminal, clears the
-    startup reservation and never records the Kernel job as running.
+    worker-start (ready) → dispatch-show (the exact assignee terminal) →
+    terminal rename "[Kernel] <Workflow>" → worker-show: the worker's EFFECTIVE
+    agent and model must equal the route (a card that takes no model flag is
+    attested on its agent alone). A mismatch fails with step=attestation, the
+    Dispatch is stopped and released, the startup reservation cleared, and the
+    Kernel job is never recorded as running.
 
 # ============================================================================
 # The Orca tree (Run -> Task -> terminal) beside the ledger hierarchy. The

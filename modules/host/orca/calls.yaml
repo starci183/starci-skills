@@ -344,14 +344,6 @@ calls:
     required: [url, page, worktree]
     receipt: [result]
     note: Rebind only the workflow's persisted input page after helper restart. Never navigate an unrelated owner tab.
-  terminal-create:
-    command: terminal create
-    kind: mutation
-    replay: none
-    flags: [worktree, title, command]
-    required: [title, command]
-    receipt: [result.terminal.handle]
-    note: Command-terminal launch only; the command is the declared target command prefixed with the credential refresh. Never used to attach a shell to a managed agent. Orca's CLI sends a command whose first word is codex or claude down the renderer-backed tab path (10s handle wait, "Timed out waiting for terminal handle after creation", tab spawns later), so those cards carry hostLaunchPrefix; any handle-less create whose effect is unknown is reconciled with terminal-list --include-visual-layouts by its tab title (scripts/agent/lib.mjs recoverCreatedTerminal).
   terminal-list:
     command: terminal list
     kind: read
@@ -402,14 +394,6 @@ calls:
       (the flags absent from agent-context, or incompatible_runtime): terminal-send.mjs sends through
       terminal-send instead. An ambiguous failure names orchestrationRequestId: the exact command is re-issued
       once with --retry-request <id>.
-  dispatch:
-    command: orchestration dispatch
-    kind: mutation
-    flags: [task, to, from, run, return-preamble]
-    required: [task, to, return-preamble]
-    forbidden: [inject, dry-run]
-    receipt: [result.dispatch.id, result.preamble]
-    creates: dispatch
   dispatch-show:
     command: orchestration dispatch-show
     kind: read

@@ -41,23 +41,31 @@ names:
   workflowKernel: "[Kernel] <Workflow>"
   operation: modules/kernel/start-workflow.yaml orcaTree.titles (operationTask, operationTerminal, managedOperationTerminal)
   rule: A worktree carries its workflow name; the one kernel process that owns the loop inside that worktree is its Kernel; every operation agent is an Op. There is no supervisor layer between a Kernel and an Op.
-launchTrust: "The runtime, never the owner, approves Claude/Codex launch prompts. Every launch (kernel start, command-terminal and managed op dispatch) first runs scripts/agent/trust.mjs for its cwd (Claude ~/.claude.json hasTrustDialogAccepted; Codex trust_level in ~/.codex and Orca's codex-runtime-home config.toml) and records trust in the launch event; a launch gate the agent card's gateAutoAnswer allowlists is answered once from the screen (gate-auto-approved), anything else is refused."
+launchTrust: "The runtime, never the owner, approves Claude/Codex launch prompts. Every launch (Kernel, Supervisor, [Worker] and op, all through worker-start) first runs scripts/agent/trust.mjs for its cwd (Claude ~/.claude.json hasTrustDialogAccepted; Codex trust_level in ~/.codex and Orca's codex-runtime-home config.toml) and records trust in the launch event; a launch gate the agent card's gateAutoAnswer allowlists is answered once from the screen (gate-auto-approved), anything else is refused."
 workflowKernel:
-  role: one-dedicated-agent-terminal-per-workflow
+  role: one-worker-per-workflow
   note: |-
-    The Kernel is not an Orca worker. start-workflow boots one dedicated attested agent terminal; its
-    first operation lazily binds a Run with that terminal as coordinator. Every operation Task/Dispatch
-    in the Run is a semantic child of the Kernel even when Orca renders its terminal as a peer tab.
+    The Kernel is an Orca worker (modules/kernel/contract-changes/launch-through-worker-start.yaml). start-workflow,
+    run from the launching terminal, creates the Kernel's entry Run (that terminal coordinates it), files the Kernel
+    Task and starts it with worker-start. The Kernel's first operation creates the workflow Run from the Kernel's own
+    terminal - Orca takes Run-scoped calls only from a Run's coordinator - and every operation Task/Dispatch of that
+    Run is a child of the Kernel.
   calls:
+    entryRun:
+      api: orchestration.run-create
+      cli: 'orca orchestration run-create --objective "[Kernel] <Workflow> — <workflow-id>" --json'
+    kernelTask:
+      api: orchestration.task-create
+      cli: 'orca orchestration task-create --run <entry-run-id> --task-title "[Kernel] <Workflow>" --display-name "[Kernel] <Workflow>" --spec "<kernel prompt>" --json'
+    boot:
+      api: orchestration.worker-start
+      cli: 'orca orchestration worker-start --task <kernel-task-id> --worktree <workflow-worktree> --agent <agent> --model <model> --effort <effort> --display-name "[Kernel] <Workflow>" --run <entry-run-id> --json'
     bindRun:
       api: orchestration.run-create
       cli: 'orca orchestration run-create --objective "<workflow goal>" --from <own-terminal> --json'
     useRun:
       api: orchestration.run-use
       cli: 'orca orchestration run-use --id <run-id> --from <own-terminal> --json'
-    boot:
-      api: terminal.create
-      cli: 'orca terminal create --worktree <exact-workflow-worktree-selector> --title "[Kernel] <Workflow>" --command "<kernel-agent-command>" --json'
     answerOperation:
       api: terminal.send
       cli: 'orca terminal send --terminal <operation-agent-terminal> --text "<answer or continue instruction>" --enter --json'
@@ -127,36 +135,18 @@ operationAgent:
   createTask:
     api: orchestration.task-create
     cli: 'orca orchestration task-create --run <run-id> --task-title "<concise-operation-title>" --display-name "[Op] <operation>" --spec "<one-operation-contract>" --json'
-  devin:
-    agent: devin
-    model: devin-agent
-    modelAuthority: configured-logical-runtime
-    launch: command-terminal
-    nestedAgents: forbidden
-    capacityAuthority: explicit-workflow-quota
-    quotaTelemetry: launch-status
-    calls:
-      createTerminal:
-        api: terminal.create
-        cli: 'orca terminal create --worktree <exact-workflow-worktree-selector> --title "[Op] <operation> a<attempt> · <Workflow>" --command "<read-only-auth-preflight><declared-devin-command>" --json'
-      awaitPrompt:
-        api: terminal.read
-        cli: 'orca terminal read --terminal <terminal-handle> --screen --json'
-      returnPreamble:
-        api: orchestration.dispatch
-        cli: 'orca orchestration dispatch --task <operation-task-id> --to <terminal-handle> --from <kernel-terminal> --run <workflow-run-id> --return-preamble --json'
-      submitPrompt:
-        api: terminal.send
-        cli: 'orca terminal send --terminal <terminal-handle> --text "<preamble>" --enter --json'
-      attestAssignee:
-        api: orchestration.dispatch-show
-        cli: 'orca orchestration dispatch-show --task <operation-task-id> --json'
-  managedFallback:
-    note: 'Unattended Codex ops never take this path: the codex profiles are command-terminal and launch with the codex card command incl. its bypassArgs (--ask-for-approval never --sandbox danger-full-access), because worker-start has no approval/sandbox flag.'
+  start:
+    note: >-
+      The one launch for every provider (claude, codex, devin): Orca composes the agent command with the owner's
+      per-agent default args (agentDefaultArgs); --model/--effort only for Claude, Codex and Cursor (a Devin worker
+      starts on its CLI default: agent card start.modelArgument false). There is no terminal-create launch.
     calls:
       startAgent:
         api: orchestration.worker-start
-        cli: 'orca orchestration worker-start --task <operation-task-id> --worktree current --agent <resolved-native-agent-id> --model <resolved-model-id> --effort <resolved-effort> --json'
+        cli: 'orca orchestration worker-start --task <operation-task-id> --worktree <op-worktree> --agent <resolved-agent> [--model <resolved-model-id> --effort <resolved-effort>] --run <workflow-run-id> --from <kernel-terminal> --json'
+      assignee:
+        api: orchestration.dispatch-show
+        cli: 'orca orchestration dispatch-show --task <operation-task-id> --from <kernel-terminal> --json'
       nameAgent:
         api: terminal.rename
         cli: 'orca terminal rename --terminal <worker.agent_terminal_handle> --title "[Op] <operation>" --json'
@@ -185,7 +175,8 @@ forbiddenCalls:
   - orchestration.dispatch-inject-for-operation
   - orchestration.dispatch-to-reused-terminal-for-operation
   - terminal-send-outside-canonical-launcher
-  - terminal-create-shell-only-kernel
+  - terminal-create-for-any-agent
+  - worker-start-terminal-adoption
   - operation-agent-tool-agent
   - orchestration-send-status-for-control-instruction
   - operation-agent-direct-control-of-another-operation

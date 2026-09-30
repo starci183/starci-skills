@@ -274,12 +274,10 @@ starciOrchestrationAllowlist:
     - orchestration gate-create
     - orchestration gate-resolve
     - orchestration gate-list
-    - orchestration dispatch
     - orchestration dispatch-show
     - worktree set
     - terminal rename
     - terminal close
-    - terminal create
     - terminal read
     - terminal send
   operationAgent:
@@ -287,6 +285,10 @@ starciOrchestrationAllowlist:
     - orchestration ask
     - orchestration check
 forbiddenForStarciOrchestration:
+  # Every agent launch is orchestration worker-start (contract-changes/launch-through-worker-start.yaml): the runtime
+  # never creates a terminal and never dispatches a Task into a terminal it made.
+  - terminal create
+  - orchestration dispatch
   - orchestration coordinator-start
   - orchestration coordinator-stop
   - orchestration reset

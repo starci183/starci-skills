@@ -1,22 +1,44 @@
 id: launch-through-worker-start
 effectiveAt: '2026-10-01T09:00:00+07:00'
 summary: >-
-  DESIGN (owner decision 2026-10-01, lane dv-c0-launch; implementation follows lead review). Every agent launch in the
-  runtime - Kernel, Supervisor, [Worker] and [Op] - goes through `orca orchestration worker-start --agent <provider>
-  [--model <id> --effort <level>]` (scripts/api/orca/worker-start.mjs); there is no terminal-create launch and no
-  worker-start --terminal adoption. Kernel bootstrap: `node scripts/kernel/start-workflow.mjs <wf>` (run by the owner's
-  chat, the [Supervisor] or a run-create caller) ensures the workflow Run (run-create from the invoking terminal: that
-  terminal is the Run coordinator), then starts the Kernel as a worker of that Run (worker-start --spec, task title
-  "[Kernel] <wf>", --worktree path:<repo>), attests agent/model with worker-show and records payload.managed
-  {runId, taskId, dispatchId, agentTerminalHandle}. The Kernel starts its ops from its own terminal (--from <kernel
-  handle>, Task parent = the Kernel Task) and is the coordinator of their Dispatches; their worker_done/escalations
-  are bridged by Run id and dispatch id through the non-consuming inbox, never by recipient. No run-use re-binding.
-  Restart: worker-show live/unverifiable -> no second Kernel; exited/failed -> worker-stop + worker-release, then
-  worker-start --task <kernel task> --retry-of <old dispatch>. An old-style terminal Kernel (seat launch 'terminal')
-  is retired once (quit + close, event kernel-retired-terminal-launch) and replaced, with a fresh Run (old id kept in
-  orca.previousRunIds). Requires Orca Settings -> Orchestration -> Nested worker depth >= 3 (Supervisor -> Kernel ->
-  Op); at the default 1 worker-start refuses nested_worker_depth_exceeded. Full design:
-  D:/starci-tmp/hfs/devin/c0/launch.report.md "Kernel bootstrap design".
+  EVERY AGENT LAUNCH GOES THROUGH ORCA WORKER-START (owner decision 2026-10-01, lane dv-c0-launch). The Kernel, the
+  [Supervisor], every [Worker] and every [Op] start through scripts/api/orca/worker-start.mjs (Orca's orchestration
+  worker-start --agent <provider> [--model <id> --effort <level>]) on an existing Task, via scripts/agent/lib.mjs
+  spawnAgent (pre-trust, worker-start, dispatch-show for the exact assignee, terminal rename, worker-show attestation of
+  the effective agent and model) or startAgent (entry Run + Task + spawnAgent). Orca composes the command with the
+  owner's per-agent default args (agentDefaultArgs: claude --dangerously-skip-permissions, codex
+  --dangerously-bypass-approvals-and-sandbox, devin --permission-mode bypass); --model is for Claude, Codex and Cursor
+  only, so a Devin worker starts on its CLI default (agent card start.modelArgument false). Removed with no alias: the
+  terminal-create wrapper and call, the orchestration dispatch (return-preamble) call, worker-start --terminal
+  adoption of a pre-made terminal, start-workflow --adopt and start-supervisor --adopt, the hand-built spawn command
+  (buildSpawnCommand, card terminalFallback/hostLaunchPrefix/commandPrefix/commandRequirements), screen readiness and
+  on-screen model attestation, the command-terminal op path and the profiles' launch.orca.kind (one shape: launch.orca
+  {agent}), and route/dispatch-op.mjs --spawn. Kernel bootstrap: start-workflow creates the Kernel's entry Run from the
+  launching terminal (its coordinator: the owner's chat, the Supervisor, the watchdog run), files the Kernel Task and
+  starts it as a worker; the Kernel creates its workflow Run from its own terminal (api.mjs ensureWorkflowRun: Orca
+  accepts Run-scoped calls only from a Run's coordinator) and coordinates its ops there - their worker_done,
+  questions and escalations reach the ledger through the non-consuming inbox bridge by Run id and dispatch id.
+  Restart: worker-show proves the old Dispatch ended (live -> kernel-worker-alive, exit 3, no second Kernel), the old
+  Dispatch is stopped and released, the entry Run is reused while Orca knows it and accepts the new Task. A seat
+  launched by terminal create (no Dispatch: Kernel, Supervisor or [Worker]) is retired once - its terminal closed, a
+  worker in its place. Liveness, stop and cleanup are worker-show / worker-stop / worker-release (the Kernel and
+  Supervisor watchdogs, the [Worker] sweep, close-verify.mjs releaseSelfSafe for a worker releasing itself). The
+  [Supervisor]'s Agent/Task denial, which worker-start cannot pass as argv, is a seat guard (guards/install.mjs
+  bindSeatGuard) enforced by the project PreToolUse hook (.claude/settings.json -> scripts/guards/seat-tools.mjs).
+  Enforcement: modules/host/orca/api.yaml forbids terminal create and orchestration dispatch for the runtime
+  (scripts/checks/providers.mjs refuses a call naming them), and scripts/checks/check-host-boundary.mjs rule
+  agent-launch fails on any terminalCreate, 'terminal-create' call, terminal create argv or command string in runtime
+  code (a non-agent shell needs a reviewed host-boundary.allow entry; there is none). Requires Orca Settings ->
+  Orchestration -> Nested worker depth >= 3 (Supervisor -> Kernel -> Op); at the default 1 a worker-start from a
+  worker is refused nested_worker_depth_exceeded. Adds no finding code.
 paths:
   - modules/kernel/contract-changes/launch-through-worker-start.yaml
+  - scripts/agent/lib.mjs
+  - scripts/kernel/start-workflow.mjs
+  - scripts/kernel/api-verbs/dispatch.mjs
+  - scripts/supervisor/start-supervisor.mjs
+  - scripts/supervisor/workers.mjs
+  - scripts/checks/check-host-boundary.mjs
+  - modules/host/orca/calls.yaml
+  - modules/host/orca/api.yaml
 reach: new-legs

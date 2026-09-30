@@ -10,7 +10,7 @@ hierarchy:
   identityRules:
     - 'titles such as [Kernel]/[Op], tab order and parentPaneKey never define ownership'
     - 'the workflow Run coordinator handle is the Kernel terminal; worker-start owns managed Task injection and is never followed by a second dispatch'
-    - 'command-terminal agents still receive an Orca Task/Dispatch; worker_id retains their terminal handle only for exact cleanup'
+    - 'every agent is a worker-start worker with an Orca Task/Dispatch; worker_id is its Dispatch id'
   refuses:
     - workflow-unknown
   usedBy: 'Orca/sidebar integrations and workflow monitors that need a semantic agent tree'

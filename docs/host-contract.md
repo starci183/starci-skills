@@ -22,79 +22,51 @@ agent-blind.
 | `envelopes.yaml` | The operation-input / report envelopes exchanged with agents |
 
 `calls.yaml` is an **enforced** contract, not documentation:
-`tests/provider-orca.spec.mjs` proves every `scripts/api/orca/terminal-*.mjs`
+`tests/provider-orca.spec.mjs` proves every `scripts/api/orca/*.mjs`
 wrapper's verb and `--flag` set is declared by a `calls:` entry, and every
 entry names a real, allowed command from `api.yaml`.
 
-## `modules/models/agents/` — per-agent spawn cards
+## `modules/models/agents/` — per-agent cards
 
-The contract an op or kernel is spawned through is the **agent card**:
+The contract an agent is started through is the **agent card**:
 `modules/models/agents/<agent>.yaml` (schema `starci/agent-card@1`) — the
 Orca adapter-card fields at top level plus an optional `capabilities:`
-key for agent-specific facts. Shipped cards: `devin`,
-`claude`, `codex`.
+key for agent-specific facts. Shipped cards: `devin`, `claude`, `codex`.
 
-The invariant: **no caller ever assembles an agent command by hand.**
-`--yolo`, `--dangerously-skip-permissions`, credential prefixes and env strips
-live only in the card, so they can never be forgotten.
+The invariant: **every agent launch is `orchestration worker-start`**
+(`modules/kernel/contract-changes/launch-through-worker-start.yaml`) and **no
+caller assembles an agent command**. Orca composes it with the owner's per-agent
+default args (Orca settings `agentDefaultArgs`: claude
+`--dangerously-skip-permissions`, codex `--dangerously-bypass-approvals-and-sandbox`,
+devin `--permission-mode bypass --respect-workspace-trust false`); the runtime
+passes only `--agent`, and `--model`/`--effort` where the card takes them.
+`terminal create` and `orchestration dispatch` are forbidden for the runtime
+(`api.yaml` `forbiddenForStarciOrchestration`), and `scripts/checks/check-host-boundary.mjs`
+rule `agent-launch` fails on any terminal-creating code.
 
 ## Card anatomy
 
 ```yaml
 schema: starci/agent-card@1
 agent: devin                     # binary/identity name
-kind: command-terminal-agent     # how the host drives it
-model: devin-agent               # logical model label (never inferred)
+kind: native-managed-agent       # every card: Orca starts and supervises the worker
 
-commandPrefix:                   # env prep + auth probe, per platform
-  win32: '…'
-  posix: 'command -v devin >/dev/null && env -u ACP_BACKEND devin models list … && '
-hostLaunchPrefix: {win32: '&', posix: 'command'}  # codex/claude: keep Orca's create on the runtime-owned PTY path
-environmentStrip:                # vars removed INSIDE the terminal command
-  - {name: ACP_BACKEND, reason: "…"}
+start:                           # the one launch
+  api: orchestration.worker-start
+  agentArgument: devin           # worker-start --agent <agentArgument>
+  modelArgument: false           # false: no --model/--effort (Orca takes them for Claude, Codex, Cursor only)
+release: {api: orchestration.worker-release}
 
-commandRequirements:             # op-agent flags — always injected; no interactive command gate
-  - '--permission-mode dangerous'
-kernelCommandRequirements: […]   # optional: kernel-terminal flags that differ (else commandRequirements)
-kernelPermissionReason: "…"      # why the kernel lane gets wider permissions
-
-readiness:                       # proof the TUI is at a prompt before send
-  screenPattern: '(?:Ask Devin|Message Devin|…)'
-  identityPattern: 'Devin'
-  timeoutMs: 120000
-  intervalMs: 5000
-
-delivery:                        # how the prompt reaches the agent
-  mode: file-reference-above-inline-limit
-  maxInlineChars: 3000           # longer prompts are written to a file and referenced
-  # fileDirectory unset → a fresh os.tmpdir staging dir; delivered, then removed
-  fileName: orca-dispatch-<dispatch>.md
-  prompt: 'Read <file> completely. …'
-
-submission:                      # proof the prompt was consumed
-  stagedPattern: 'Pasted Content|<file>|orca-dispatch-'
-  activityPattern: 'Thinking|Working|Running|esc to (?:cancel|interrupt)|tokens'
-  settleMs: 3000
-  timeoutMs: 45000
-  maxEnter: 2
-
-approvalMode:        {working: dangerous, reasoning: dangerous, reason: "approved contract + owned-path lease are the boundary"}
-kernelApprovalMode:  {working: dangerous, reasoning: "…"}
-
-start:                           # the ordered host-API sequence
-  - {api: terminal.create, binding: declared-target-command-after-auth-status}
-  - {api: terminal.read, phase: readiness}
-  - {api: orchestration.dispatch, binding: return-preamble}
-  - {api: terminal.send, phase: submit}
-  - {api: terminal.read, phase: submission}
-  - {api: orchestration.dispatch-show, phase: assignee-attestation}
-release: {api: orchestration.worker-stop, then: terminal.close}
+readiness: …                     # screen patterns the liveness classifier and follow-up sends read
+delivery: …                      # how a follow-up prompt reaches a live agent (inline or file reference)
+submission: …                    # proof a follow-up was consumed (agent/send.mjs, nudge)
+gateAutoAnswer: …                # the launch gates the runtime answers once (nudge)
 
 knownFailures:                   # observed signals → meaning → action, dated
-  - {signal: 'agent child exited: exit code: 0', meaning: …, action: …, seenAt: 2026-09-20}
+  - {signal: '…', meaning: …, action: …, seenAt: 2026-09-20}
 
-verifiedAt: 2026-09-20           # when this card was last proven live
-verifiedAgainst: 'devin CLI v3000.10.27'
+verifiedAt: 2026-09-24           # when this card was last proven live
+verifiedAgainst: 'devin CLI v3000.10.27, Orca 1.4.209'
 
 forbidden:                       # things this agent must never be asked for
   - provider-native-subagent
@@ -106,99 +78,81 @@ capabilities:                    # optional — agent-specific facts
   …
 ```
 
-## How `scripts/agent` consumes a card
+## How `scripts/agent` launches an agent
 
-`scripts/agent/lib.mjs` is the mechanism (`spawnAgent({provider, model, effort,
-worktree, title, prompt|promptFile, command, kernel, dispatchId, attest})`),
-called by `api dispatch`:
+`scripts/agent/lib.mjs` is the mechanism:
 
 ```text
-loadAdapter(provider)            → parse modules/models/agents/<agent>.yaml
-buildSpawnCommand(...)           → env + commandPrefix[plat] + hostLaunchPrefix[plat]
-                                   + command | commandRequirements
-                                   (kernel → kernelCommandRequirements;
-                                    native-managed → terminalFallback.command + bypassFlag)
-terminalCreate(worktree, title)  → [Op] <op> a<attempt> · <workflow_id> / [Kernel] <workflow_id>; a handle-less create
-                                   with effectUnknown is reconciled by tab title against a
-                                   before-snapshot: adopt one live match, close the rest
-                                   (createRecovery in the dispatch/kernel event)
-awaitReadiness(handle, card)     → screen must match readiness.screenPattern
-                                   (+ identityPattern) inside timeoutMs
-deliverPrompt(...)               → inline, or file-reference above maxInlineChars
-awaitSubmission(handle, card)    → screen must show submission.activityPattern;
-                                   re-enter while stagedPattern persists
+spawnAgent({provider, model, effort, worktree, title, task, run, from})
+  ensureLaunchTrust(agent, worktree)   → the owner never answers a trust prompt
+  worker-start(task, worktree, --agent, [--model, --effort], run, from)
+                                       → dispatchId (ready worker; Orca injected the Task)
+  dispatch-show(task, from)            → the exact assignee terminal (never a second dispatch)
+  terminal rename(assignee, title)     → [Op] … / [Kernel] … / [Supervisor] main / [Worker] …
+  worker-show(dispatch)                → attestation: effective agent (and model, when pinned) = the route
+startAgent({…, prompt, objective, entry, priorRunId})
+  run-create(objective, from = entry)  → the agent's own Run (Kernel, Supervisor, [Worker])
+  task-create(run, spec = prompt)      → spilled to a file past the host argv (task-spec.mjs)
+  spawnAgent(...)
 ```
 
-Auth or readiness/submission failure means the job is **not** running — the
-reservation is settled and the terminal closed (`dispatch-rejected`, per
-`modules/kernel/api.yaml`), never a ghost lease. `settle` closes the
-worker terminal via the card's `release` block.
+A failed start is reconciled before it returns: no effect → nothing; unknown →
+worker-show first, cleaned only when Orca shows the worker ended; partial →
+`worker-stop` + `worker-release`. The job is then **not** running
+(`dispatch-rejected`, per `modules/kernel/api.yaml`), never a ghost lease.
+`settle` releases the worker with `worker-stop` + `worker-release`.
 
 The host launch is only the delivery half of the op lifecycle; the durable
 record is the ledger's op IPC (docs/ledger-db.md §4a): `api dispatch` writes
-the `contracts` row — the contract is the dispatch authority, the terminal
-prompt or orchestration preamble only delivers it — the worker reads it via
-`api op-contract` and files its outcome with `api report`; the kernel marks it
-integrated with `api consume-report`, records its re-run via `api check`, and
-`api settle` releases the leases, closes the seat and consumes the job's
-report row (`reports.consumed_at`) as part of recording the verdict.
+the `contracts` row — the contract is the dispatch authority, the Task spec
+only delivers it — the worker reads it via `api op-contract` and files its
+outcome with `api report`; the kernel marks it integrated with `api consume-report`,
+records its re-run via `api check`, and `api settle` releases the leases, the
+worker and consumes the job's report row (`reports.consumed_at`) as part of
+recording the verdict.
 
-## Managed-agent dispatch (`kind: native-managed-agent`)
+## Operation dispatch
 
-Claude operations are **native managed agents**: the host starts a supervised
-worker — no terminal is created and no agent command is assembled. Codex
-operations are not: `worker-start` has no approval/sandbox flag, so the codex
-profiles are card-composed command terminals that launch with the codex card's
-`bypassArgs`, the same command the Kernel terminal boots with. The
-launch sequence (typed calls from `calls.yaml`, wrappers under
-`scripts/api/orca/`):
+Every operation - Claude, Codex, Devin - is a worker-start worker. The launch
+sequence (typed calls from `calls.yaml`, wrappers under `scripts/api/orca/`):
 
 ```text
 run-create(objective = workflow id + title,
-           from = Kernel terminal)              → runId
+           from = Kernel terminal)              → runId (once per workflow)
 task-create(run, spec = prompt/packet,
             displayName '[Op] <operation>')     → taskId
-worker-start(task, worktree, agent, model,
-             effort, run, from = Kernel)        → dispatchId + prompt delivery
-dispatch-show(task)                             → exact agent terminal
-worker-show(dispatch)                           → attestation: worker ready AND
-                                                  effective agent/model match
+spawnAgent(task, op worktree, agent, model,
+           effort, run, from = Kernel)          → dispatchId + assignee + attestation
 ```
 
-`worker-start` owns Task dispatch/injection. Calling `orchestration dispatch`
-again is a double-dispatch defect, not prompt-delivery verification.
-
+A product op worktree is a git worktree of the product repository, which Orca
+resolves under that repository's project, so the worker starts on it directly.
 Attestation is required before the seat is accepted — a worker whose
-`startOptions.launch.effective` mismatches the resolved agent/model is fenced:
-`worker-stop` then `worker-release` on the exact Dispatch, never a retry
-beside it. On success the job's `worker_id` is the **Dispatch id**, and
-`settle` releases it with `worker-stop` + `worker-release` (the
-`settle-dispatch` recovery in `calls.yaml`).
+effective agent/model mismatches the route is fenced: `worker-stop` then
+`worker-release` on the exact Dispatch, never a retry beside it. On success the
+job's `worker_id` is the **Dispatch id**.
 
-The Kernel seat is different: `start-workflow.mjs` always launches one
-dedicated attested Orca terminal and does not create a Run at boot. The first
-operation lazily creates the workflow Run with that terminal as coordinator.
-An explicit Kernel agent/model pin fails closed when unavailable; it is never
-silently substituted.
+The Kernel is a worker too: `start-workflow.mjs` creates the Kernel's entry Run
+from the launching terminal (its coordinator), files the Kernel Task and starts
+it with `startAgent`. The Kernel's first operation creates the workflow Run from
+the Kernel's own terminal (Orca takes Run-scoped calls only from a Run's
+coordinator). An explicit Kernel agent/model pin fails closed when unavailable;
+it is never silently substituted. `api hierarchy` projects `workflow → Kernel → Op`.
 
-Command-terminal operation agents still join the same semantic hierarchy:
-the api creates the Task, creates and attests the exact terminal, calls
-`dispatch --return-preamble` once, and sends that preamble. Their terminal
-handle remains `worker_id` for cleanup while the Orca Dispatch id keys
-contracts/reports. `api hierarchy` projects all launch kinds uniformly as
-`workflow → Kernel → Op`.
+Nested workers need Orca's Settings → Orchestration → Nested worker depth of at
+least 3 (Supervisor → Kernel → Op); at the default 1 a worker-start from a worker
+is refused `nested_worker_depth_exceeded`.
 
 ## Checklist for a new agent card
 
-1. Add `modules/models/agents/<name>.yaml` with every field above — a card
-   without `commandRequirements` (or `terminalFallback`) yields no command and
-   refuses.
+1. Add `modules/models/agents/<name>.yaml` with `start` (worker-start,
+   `agentArgument`, `modelArgument`) and `release`; Orca must know the agent
+   and carry its unattended default args.
 2. Prove `readiness` and `submission` patterns against the real TUI; record
    `verifiedAt`/`verifiedAgainst` and every observed failure in
    `knownFailures`.
-3. Put the permission-gate answers (dangerous/bypass flags) in
-   `commandRequirements`: Kernel and Op seats are both unattended. Add
-   `kernelCommandRequirements` only when the kernel needs different flags.
+3. Name it in a profile (`launch.orca.agent`) and the registry (`orcaLaunch.agent`);
+   `scripts/checks/providers.mjs` refuses an unknown card.
 4. Declare the `forbidden` list honestly; `spawnAgent` and the kernel packet
    enforce it.
 5. If the card drives Orca calls the wrappers do not cover yet, extend

@@ -19,6 +19,12 @@ description: >-
 
 For the owner's chat only. The `[Kernel]` and `[Op]` agents never run these commands; they call `scripts/kernel/api.mjs` or `scripts/api/orca/*.mjs`.
 
+Every agent is started with `orchestration worker-start --agent <provider> [--model <id> --effort <level>]` - the
+StarCi Kernel, Supervisor, [Worker]s and [Op]s included (runtime contract
+`.claude/modules/kernel/contract-changes/launch-through-worker-start.yaml`). Never launch an agent with
+`terminal create`, never hand a pre-made terminal to `worker-start --terminal`, and never `dispatch --inject` a Task
+into a terminal you made. Supervise with `worker-show`, `worker-read`, `worker-stop` and `worker-release`.
+
 The usage guide is served by the `orca` binary itself (see shared setup below). Routing to `orca-cli` and Computer
 Use is in the description above. Coordination requires real Orca runtime state; never substitute
 a non-Orca subagent tool.

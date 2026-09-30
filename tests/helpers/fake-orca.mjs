@@ -509,8 +509,11 @@ else if ((verb === 'orchestration task-create' || verb === 'orchestration task-u
   fail({ ok: false, error: { code: 'not_run_coordinator', message: 'Terminal ' + arg('from') + ' is not the coordinator of run ' + arg('run') + '.' } });
 else if (verb === 'orchestration task-create' && arg('parent') != null && !/^task[_-]/.test(arg('parent')))
   fail({ ok: false, error: { code: 'invalid_parent', message: '--parent takes a task id' } });
-else if (verb === 'orchestration task-create')
+else if (verb === 'orchestration task-create') {
+  // taskSpecs[id]: the spec a worker-start of that Task delivers (the prompt the worker receives).
+  state.taskSpecs = { ...(state.taskSpecs || {}), 'task-fake-1': arg('spec') }; save();
   out({ ok: true, result: { task: { id: 'task-fake-1', display_name: arg('display-name'), run: arg('run') } } });
+}
 else if (verb === 'orchestration task-update' && !['pending', 'ready', 'dispatched', 'completed', 'failed', 'blocked'].includes(arg('status')))
   fail({ ok: false, error: { code: 'invalid_argument', message: 'invalid status ' + arg('status') + ', expected one of: pending, ready, dispatched, completed, failed, blocked' } });
 else if (verb === 'orchestration task-update') {
@@ -545,6 +548,15 @@ else if (verb === 'orchestration worker-start') {
   // effectState none, so the candidate is reusable and nothing said why.
   if (mode === 'worker-start-refused')
     fail({ ok: false, error: { code: 'worker_start_failed', message: '' }, result: {} });
+  // Orca creates the worker's own agent terminal and injects the Task: the terminal record a real worker leaves.
+  state.counter = (state.counter || 0) + 1;
+  const handle = uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1';
+  const command = [arg('agent'), ...(arg('model') ? ['--model', arg('model')] : [])].join(' ');
+  state.terminals = { ...(state.terminals || {}), [handle]: { ...(state.terminals?.[handle] || {}), handle, connected: true, writable: true, sent: true,
+    prompt: state.taskSpecs?.[arg('task')] ?? null, command, model: arg('model') ?? null, title: arg('display-name'), tabTitle: arg('display-name'),
+    worktree: arg('worktree'), closed: false } };
+  state.workerStarts = [...(state.workerStarts || []), { agent: arg('agent'), model: arg('model') ?? null, effort: arg('effort') ?? null, task: arg('task'),
+    worktree: arg('worktree'), run: arg('run'), from: arg('from') ?? null, handle }];
   state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = 'dispatch-fake-1'; save();
   out({ ok: true, result: { runId: arg('run'), taskId: arg('task'), dispatchId: 'dispatch-fake-1',
     state: 'ready', stage: 'ready',

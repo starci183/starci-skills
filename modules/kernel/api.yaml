@@ -104,11 +104,10 @@ conventions:
     and the read projections (status, survey, hierarchy, estimate, op-contract). An op worker ran
     node:sqlite against .starciwork/runtime.sqlite (inc-360891316369), so this is enforced, not only
     instructed. ENFORCED: (1) the op packet and prompt name no ledger file - only the api verbs;
-    (2) a command-terminal op launches with STARCI_ROLE=op and STARCI_OP_JOB=<job> set in its own
-    shell (scripts/agent/lib.mjs envPrefix), and Orca exports ORCA_TERMINAL_HANDLE into every
-    terminal it owns, so a caller whose handle is the bound terminal of an op job (worker_id,
-    payload managed/orca agentTerminalHandle, hierarchy runtime terminalHandle) is that op even as a
-    managed worker-start agent whose env StarCi cannot set, and that job outranks STARCI_OP_JOB; (3) from an op caller every kernel verb
+    (2) Orca exports ORCA_TERMINAL_HANDLE into every terminal it owns, so a caller whose handle is the
+    bound terminal of an op job (worker_id, payload managed/orca agentTerminalHandle, hierarchy runtime
+    terminalHandle) is that op - every op is a worker-start agent whose env StarCi cannot set - and
+    that job outranks a STARCI_OP_JOB env marker; (3) from an op caller every kernel verb
     (plan, enqueue, route, dispatch, reconcile, nudge, observe, questions, messages, reply, peers, notify, inbox,
     settle, check, consume-report, serve-ask, retire-ask, incident, provider-health, finish, archive) refuses `op-context-refused` before it runs, and `report`
     refuses `report-identity-mismatch` for any job but the caller's own (whose dispatch/contract
@@ -124,7 +123,7 @@ conventions:
     Several workflows of one ledger build in ONE checkout on ONE branch; the shared branch is
     append-only and a worker touches only its owned paths. ENFORCED at every op dispatch
     (scripts/guards/, install.mjs guardLaunch; the receipt rides on op-dispatched `guard`, managed
-    dispatches included): (1) a command-terminal worker's git and npm are shims first on its PATH
+    dispatches included): (1) a worker whose env the launch sets has its git and npm as shims first on its PATH
     (runtime/guards/bin; a native exe built from scripts/guards/launcher.cs on Windows): git-policy.mjs
     refuses reset (except `reset -- <owned paths>`), rebase, pull --rebase, commit --amend/-a/--no-verify
     or without explicit pathspecs (a --pathspec-from-file list, stdin `-` and --pathspec-file-nul

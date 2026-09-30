@@ -46,6 +46,6 @@ rules:
   - Parent identity MUST NOT be inferred from terminal titles, tab order, paneKey or parentPaneKey.
   - The Kernel terminal is the Orca Run coordinator and is the explicit from-terminal for child Tasks and Dispatches.
   - A managed worker-start owns its Dispatch lifecycle; the runtime MUST NOT dispatch the same Task a second time.
-  - A command-terminal worker still receives a Run, Task and Dispatch; its terminal handle is retained for cleanup while its Dispatch id keys reports and contracts.
+  - Every worker is started by orchestration worker-start and receives a Run, Task and Dispatch; its Dispatch id keys reports, contracts, stop and release.
   - agent, provider, model, profile and runtimePool are separate fields and MUST NOT be used as aliases for one another.
   - The hierarchy command is read-only and may derive missing provider metadata for earlier jobs from their persisted profile.
