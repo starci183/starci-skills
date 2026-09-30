@@ -48,7 +48,7 @@ apps/.
 \`\`\`
 npm ci
 npm run typecheck
-npm run lint:check
+npm run lint
 npm run build
 npm test
 \`\`\`

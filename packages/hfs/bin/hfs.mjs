@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // hfs - the HFS command line of a StarCi product repository.
-//   hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]
+//   hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>]
 //                                            every tracked path has a slot; required files exist; nothing forbidden or
 //                                            tracked-that-must-be-ignored; pins match; every managed file equals its render
 //                                            (sync/managed.mjs, the .gitignore block and sonar-project.properties included); no empty or ghost
@@ -11,15 +11,14 @@
 //                                            architecture machine (tiers, owners, clones, dead exports, module registration, the
 //                                            front-end and back-end source rules), each violation a finding with its why.
 //                                            --fast: only what changed since the merge-base with origin/main (else main; --base
-//                                            overrides it, and without --fast is the base of the size-growth check); the machine
+//                                            overrides it); the machine
 //                                            runs on those owners without clones and dead exports. No merge-base is a refusal
 //                                            (exit 2), never a silent full pass. Exit 1 on any error-level finding.
-//                                            --sonar: also write the error findings as a Sonar Generic Issue Import file (report/sonar.mjs),
-//                                            before the verdict, so a failing check still leaves the report Sonar imports.
-//   hfs report <eslint|stylelint> <in> <out> [--repo <dir>]  convert a linter's json output into a Sonar Generic Issue Import file
-//                                            (one converter for both linters; a finding on a file Sonar does not index is filed on the first
-//                                            source file of sonar.sources, the real path in its message).
 //   hfs init    [--repo <dir>] [--stdout]   write a starter hfs.json by detecting the profile and the apps.
+//   hfs lint    [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>] [--stylelint <glob>]
+//                                            the ONE lint entry (npm run lint): ESLint (canon per-file rules and the project-graph rules)
+//                                            plus this check's repository findings plus stylelint, as one starci/lint@1 report; --sonar writes
+//                                            the one Sonar import file. Exit 0 clean, 1 findings, 2 a tool could not run (lint/run.mjs).
 //   hfs explain <path> [--repo <dir>] [--json]   which slot owns the path, its tier, allowed imports, required tests.
 //   hfs emit-contracts [--repo <dir>]      write contracts/<app>/schema.graphql of every api app that serves GraphQL (emit/contracts.mjs):
 //                                            printSchema(lexicographicSortSchema) of the resolvers the app root composes; no env, no database, no network.
@@ -45,10 +44,11 @@ import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
 import { ScaffoldError, newService, newSpec } from '../scaffold/service.mjs';
 import { contractEmitFindings } from '../runtime/scripts/lib/hfs-rules/contract.mjs';
-import { LINTER_KINDS, convertReportFile, sonarReport, sourceRootsOf, writeReport } from '../report/sonar.mjs';
+import { lintRepository, parseLintArgs, printLintText } from '../lint/run.mjs';
+import { writeReport } from '../report/sonar.mjs';
 
-const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]
-hfs report <eslint|stylelint> <in> <out> [--repo <dir>]
+const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>]
+hfs lint [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>] [--stylelint <glob>]
 hfs init [--repo <dir>] [--stdout]
 hfs emit-contracts [--repo <dir>]
 hfs explain <path> [--repo <dir>] [--json]
@@ -58,7 +58,7 @@ hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<mo
 hfs new spec <file>.service.ts [--repo <dir>]
 `;
 const PER_CODE_LIMIT = 25;
-const VALUE_FLAGS = new Set(['--repo', '--base', '--sonar', '--inject']);
+const VALUE_FLAGS = new Set(['--repo', '--base', '--inject']);
 /** Flags that may repeat: their values are collected in order. */
 const LIST_FLAGS = new Set(['--inject']);
 const BOOL_FLAGS = new Set(['--json', '--stdout', '--fast']);
@@ -97,13 +97,6 @@ function printCheck(result, out) {
   out(`\n${counts.error} error finding${counts.error === 1 ? '' : 's'}, ${counts.info} report-only\n`);
 }
 
-/** The check's error findings as the Sonar import file: findings outside `sonar.sources` are filed on the first source file. */
-function writeSonarReport({ repoRoot, file, result }) {
-  let properties = '';
-  try { properties = fs.readFileSync(path.join(repoRoot, 'sonar-project.properties'), 'utf8'); } catch { /* no properties: every finding keeps its own path */ }
-  writeReport(file, sonarReport(result.findings, { sourceRoots: sourceRootsOf(properties), tracked: trackedFiles(repoRoot) }));
-}
-
 function printExplain(e, out) {
   out(`${e.path}\n`);
   if (e.status === 'no-slot') {
@@ -121,46 +114,57 @@ function printExplain(e, out) {
   if (e.code) out(`  ${e.code}: ${e.titleVi}\n  ${e.whyVi}\n`);
 }
 
+/** The repository pass: slots, managed files, formatter, contract snapshots and the architecture machine's check surface. `only` limits the formatter to those files. */
+async function runCheck({ repoRoot, fast = false, base, only, presets, prettier }) {
+  const tracked = trackedFiles(repoRoot);
+  // Managed files, the .gitignore block and sonar against their render (R04, R05, R11, ...), and prettier through the repository's own install (R19, never under --fast).
+  const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...(fast ? [] : await formatFindings({ repoRoot, files: only ?? tracked, prettier }))];
+  // R23 against the app itself (full pass only): the committed snapshots equal what `emit-contracts` writes now.
+  let contracts = null;
+  let declared = null;
+  try { declared = JSON.parse(fs.readFileSync(path.join(repoRoot, 'hfs.json'), 'utf8')); } catch { /* checkRepository reports the unreadable declaration */ }
+  if (declared?.profile === 'be') {
+    if (fast) contracts = { status: 'skipped', reason: '--fast does not emit the apps' };
+    else {
+      const emitted = contractEmitFindings({ repoRoot, files: tracked, repo: declared, emit: emitContracts });
+      extraFindings.push(...emitted.findings);
+      contracts = { status: 'checked', apps: emitted.apps };
+    }
+  }
+  const result = checkRepository({ repoRoot, fast, base, extraFindings });
+  if (contracts) result.contracts = contracts;
+  return result;
+}
+
+/** `hfs lint`: ESLint, the repository checks and (front end) stylelint as one report; see lint/run.mjs. */
+async function lintMain(argv, { stdout, presets, prettier }) {
+  const opts = parseLintArgs(argv);
+  const repoRoot = path.resolve(opts.repo ?? process.cwd());
+  const { report, sonar, exit } = await lintRepository({
+    repoRoot, opts, trackedFiles,
+    hfsCheck: (root) => runCheck({ repoRoot: root, only: opts.changed ?? undefined, presets, prettier }),
+  });
+  if (opts.sonar !== undefined) writeReport(path.resolve(opts.sonar), sonar);
+  if (opts.format === 'json') stdout(`${JSON.stringify(report, null, 2)}
+`); else printLintText(report, stdout);
+  return exit;
+}
+
 /** `presets` and `prettier` are test seams: the Sonar exclusions sync would load from the repository's installed preset, and the repository's own prettier. */
 export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
   const [verb, ...rest] = argv;
-  if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report', 'emit-contracts', 'new'].includes(verb)) { stderr(USAGE); return 2; }
+  if (!['check', 'lint', 'init', 'explain', 'sync', 'work-hygiene', 'emit-contracts', 'new'].includes(verb)) { stderr(USAGE); return 2; }
   try {
     if (verb === 'sync' || verb === 'work-hygiene') return await syncMain(argv);
+    if (verb === 'lint') return await lintMain(rest, { stdout, presets, prettier });
     const opts = parse(rest);
     const repoRoot = path.resolve(opts.repo ?? process.cwd());
     if (verb === 'check') {
       if (opts.positional.length) throw new Error('hfs check takes no path');
-      const tracked = trackedFiles(repoRoot);
-      // Managed files, the .gitignore block and sonar against their render (R04, R05, R11, ...), and prettier through the repository's own install (R19, never under --fast).
-      const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...(opts.fast === true ? [] : await formatFindings({ repoRoot, files: tracked, prettier }))];
-      // R23 against the app itself (full pass only): the committed snapshots equal what `emit-contracts` writes now.
-      let contracts = null;
-      let declared = null;
-      try { declared = JSON.parse(fs.readFileSync(path.join(repoRoot, 'hfs.json'), 'utf8')); } catch { /* checkRepository reports the unreadable declaration */ }
-      if (declared?.profile === 'be') {
-        if (opts.fast === true) contracts = { status: 'skipped', reason: '--fast does not emit the apps' };
-        else {
-          const emitted = contractEmitFindings({ repoRoot, files: tracked, repo: declared, emit: emitContracts });
-          extraFindings.push(...emitted.findings);
-          contracts = { status: 'checked', apps: emitted.apps };
-        }
-      }
-      const result = checkRepository({ repoRoot, fast: opts.fast === true, base: opts.base, extraFindings });
-      if (contracts) result.contracts = contracts;
-      if (opts.sonar !== undefined) writeSonarReport({ repoRoot, file: path.resolve(opts.sonar), result });
+      if (opts.base !== undefined && opts.fast !== true) throw new Error('--base names the ref --fast compares with; it needs --fast');
+      const result = await runCheck({ repoRoot, fast: opts.fast === true, base: opts.base, presets, prettier });
       if (opts.json) stdout(`${JSON.stringify(result, null, 2)}\n`); else printCheck(result, stdout);
       return result.ok ? 0 : 1;
-    }
-    if (verb === 'report') {
-      if (opts.positional.length !== 3 || !LINTER_KINDS.includes(opts.positional[0])) throw new Error(`hfs report takes a linter (${LINTER_KINDS.join(' or ')}), an input and an output file`);
-      const [kind, input, output] = opts.positional;
-      let properties = '';
-      try { properties = fs.readFileSync(path.join(repoRoot, 'sonar-project.properties'), 'utf8'); } catch { /* no properties: every finding keeps its own path */ }
-      const sourceRoots = sourceRootsOf(properties);
-      const issues = convertReportFile({ kind, input: path.resolve(input), output: path.resolve(output), root: repoRoot, sourceRoots, tracked: sourceRoots.length ? trackedFiles(repoRoot) : [] });
-      stdout(`hfs report ${kind}: ${issues} issue${issues === 1 ? '' : 's'} written to ${output}\n`);
-      return 0;
     }
     if (verb === 'emit-contracts') {
       if (opts.positional.length) throw new Error('hfs emit-contracts takes no path');

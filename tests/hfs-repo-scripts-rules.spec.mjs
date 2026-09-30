@@ -114,7 +114,7 @@ test('HFS_LINT_SUPPRESSION_FILE: a suppressions file, the lint:suppressions scri
 
 test('HFS_LINT_SUPPRESSION_FILE: plain eslint scripts and the standard config are clean', () => {
   const result = checkRepo({ repoRoot: repoOf(BE, (dir) => {
-    put(dir, 'package.json', json({ name: 'demo', private: true, scripts: { lint: 'eslint --max-warnings=0 .', 'lint:check': 'eslint .' } }));
+    put(dir, 'package.json', json({ name: 'demo', private: true, scripts: { lint: 'eslint --max-warnings=0 .', 'lint:fix': 'hfs lint --fix' } }));
   }) });
   assert.deepEqual(only(result, 'HFS_LINT_SUPPRESSION_FILE'), []);
 });

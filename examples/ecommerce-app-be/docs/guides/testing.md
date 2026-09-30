@@ -8,7 +8,7 @@ them to test. The apps only compose; the e2e world proves they boot.
 | Check      | Command              |
 | ---------- | -------------------- |
 | Types      | `npm run typecheck`  |
-| Lint       | `npm run lint:check` |
+| Lint       | `npm run lint` |
 | Build      | `npm run build`      |
 | Unit suite | `npm test`           |
 | E2E suite  | `npm run test:e2e`   |

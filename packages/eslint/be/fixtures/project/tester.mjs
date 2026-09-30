@@ -8,6 +8,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { createRequire } from "node:module"
+import { execFileSync } from "node:child_process"
 import tsParser from "@typescript-eslint/parser"
 import { RuleTester } from "eslint"
 import { resetProjectGraphs } from "../../runtime/scripts/lib/project-graph.mjs"
@@ -42,6 +43,9 @@ export const projectFixture = ({ profile = "be", files = {}, declaration = {}, a
         fs.mkdirSync(path.dirname(target), { recursive: true })
         fs.writeFileSync(target, content)
     }
+    // the project graph reads the tracked tree: the fixture is a Git work tree with every file added
+    execFileSync("git", ["init", "-q"], { cwd: root })
+    execFileSync("git", ["add", "-A"], { cwd: root })
     resetProjectGraphs()
     const hfs = hfsFromDeclaration({ hfs: 1, profile, project: "fixture", apps, ...declaration }, fs.realpathSync(root))
     const tester = new RuleTester({

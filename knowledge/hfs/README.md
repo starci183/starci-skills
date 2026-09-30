@@ -434,7 +434,7 @@ packages/<pkg>/                       any other code two apps share (FE_CROSS_AP
   `.prettierignore`, and the `scripts` block of `package.json`. A front end's is the same mechanism: `tsconfig.json` (the
   `next.json` preset and nothing else), the one-line `eslint.config.mjs` (one ESLint run over the repository), the one-line `stylelint.config.mjs`
   (`appTokens` derived from the `globals.css` files by `loadAppTokens`), `.prettierrc`, `.prettierignore`, and the
-  `scripts` block: `lint:check` (ESLint with `--max-warnings=0` and stylelint over `{apps,packages}/*/src/**/*.css`) is the one lint gate, and a front end has no test script. The list of managed files is the `managedBy` slots of
+  `scripts` block: `lint` (`hfs lint`: ESLint, the repository check and, for a front end, stylelint over `{apps,packages}/*/src/**/*.css`) is the one lint gate, `lint:fix` its `--fix`, and a front end has no test script. The list of managed files is the `managedBy` slots of
   `slots.yaml`. A repository defines and disables no rule (R16, R17). `noInlineConfig: true`: no `eslint-disable`, no
   `@ts-ignore`, no `@ts-expect-error` (R18). `@starci/grammar` is installed from the npm registry at the pinned version; the other packages are consumed from the runtime checkout (`STARCI_HOME`) and are not published.
 - **Formatter.** Prettier only: `printWidth` 120, `tabWidth` 4, `semi` false, `singleQuote` false, `trailingComma`
@@ -456,7 +456,7 @@ packages/<pkg>/                       any other code two apps share (FE_CROSS_AP
 | Gate | Runs | Target | Rules |
 | --- | --- | --- | --- |
 | PC pre-commit | Prettier check, ESLint canon on staged files, stylelint, secrets guard | under 10 s | R06, R07, R18, R19, R34, R40, R41, R43 to R45, R49, R55, R58, R61, R62 |
-| PP pre-push | `typecheck`, `lint:check`, `format:check`, `hfs check --fast`, affected unit specs (back end) | under 2 min | PC plus R01, R03 to R05, R12 to R15, R22, R26, R27, R30 |
+| PP pre-push | `typecheck`, `lint` (`hfs lint`), `format:check`, affected unit specs (back end) | under 2 min | PC plus R01, R03 to R05, R12 to R15, R22, R26, R27, R30 |
 | OS op settle | `hfs check --paths <owned paths>` and ESLint on the op's paths; a red result does not settle | per op | every file-level and owner-level rule in scope |
 | LG land gate | full `hfs check` including reachability, composition, contract, size growth, duplicates; canon scan; unit; build | per repo | every rule |
 | CI GitHub | the same pinned `npx @starci/hfs check`, lint, typecheck, unit with coverage, build, `prettier --check` | | as LG except R23 on the frontend |
@@ -470,8 +470,8 @@ A rule's gates are data in `rules.yaml`; adding a rule to a gate edits the manif
 2. The e2e run boots the real `AppModule` of every app and is green when run by hand.
 3. No feature or owner is left uncomposed or unmounted; no dead export.
 4. The backend and frontend contracts match by hash.
-5. `typecheck`, `lint:check`, `build`, `test`, `prettier --check` and the Sonar gate are green.
-6. `typecheck:tests` (back end) is green and `lint:check` is green; integration, e2e and contract still run by hand. A front end has none of them.
+5. `typecheck`, `lint`, `build`, `test`, `prettier --check` and the Sonar gate are green.
+6. `typecheck:tests` (back end) is green and `lint` is green; integration, e2e and contract still run by hand. A front end has none of them.
 7. `git status` is clean, with no untracked entry outside a slot marked `ignored`.
 
 ## 12. Rule catalog

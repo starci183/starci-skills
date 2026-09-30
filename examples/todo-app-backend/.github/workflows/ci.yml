@@ -21,16 +21,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: hfs check
-        run: npm run hfs:report
       - name: lint
-        run: npm run lint:check
-      - name: lint report
-        if: ${{ !cancelled() }}
-        run: npm run lint:report
-      - name: eslint sonar import
-        if: ${{ !cancelled() }}
-        run: npx hfs report eslint reports/eslint.json reports/eslint.sonar.json
+        run: npm run lint -- --sonar reports/lint.sonar.json
       - name: format
         run: npm run format:check
       - name: typecheck

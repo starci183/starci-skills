@@ -13,7 +13,7 @@ const repo = t => {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   git(root, 'init', '-q');
   fs.mkdirSync(path.join(root, '.husky'), { recursive: true });
-  fs.writeFileSync(path.join(root, '.husky', 'pre-push'), 'npm run lint:check\n');
+  fs.writeFileSync(path.join(root, '.husky', 'pre-push'), 'npm run lint\n');
   return root;
 };
 const findings = root => checkHfs({ root, kinds: ['frontend'] }).violations.filter(item => item.ruleId === RULE);

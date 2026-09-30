@@ -45,7 +45,7 @@ const CLEAN_BACKEND = {
     scripts: { typecheck: 'tsc --noEmit', 'typecheck:tests': 'tsc -p src/tests/tsconfig.json', 'test:unit': 'jest --selectProjects unit', 'test:integration': 'jest --selectProjects integration', 'test:e2e': 'jest --selectProjects e2e', 'test:contract': 'jest --selectProjects contract', 'lint:check': 'eslint . --ignore-pattern "src/tests/e2e/**"' },
     'lint-staged': { '*.ts': "eslint --fix --ignore-pattern 'src/tests/e2e/**'" },
   }),
-  '.husky/pre-push': 'npm run lint:check && npm run test:unit\n',
+  '.husky/pre-push': 'npm run lint && npm run test:unit\n',
   '.github/workflows/ci.yml': 'on:\n  push:\n    branches: [main]\njobs:\n  unit:\n    steps:\n      - run: npm run test:unit\n',
   '.github/workflows/e2e.yml': 'on:\n  workflow_dispatch:\njobs:\n  e2e:\n    steps:\n      - run: npm run test:e2e\n',
 };

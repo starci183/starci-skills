@@ -23,17 +23,17 @@ const fakeGit = ({ branch = 'main', dirty = [], ahead = 2, heads = ['aaa111'] } 
 
 const greenStep = () => ({ ok: true, exit: 0, ms: 5, log: 'l.log', text: '' });
 
-test('planFor: runtime = npm test + npm run check; product = typecheck, lint:check, test:unit, build, canon-scan; a missing script is absent; never e2e', () => {
+test('planFor: runtime = npm test + npm run check; product = typecheck, lint, test:unit, build, canon-scan; a missing script is absent; never e2e', () => {
   const rt = planFor(RUNTIME, { runtimeRoot: RUNTIME });
   assert.equal(rt.kind, 'runtime');
   assert.deepEqual(rt.steps.map((s) => s.name), ['npm test', 'npm run check']);
-  const full = planFor(PRODUCT, { runtimeRoot: RUNTIME, skillRoot: RUNTIME, pkg: { scripts: { typecheck: 'tsc', 'lint:check': 'eslint .', 'test:unit': 'jest', 'test:e2e': 'jest --config e2e', build: 'nest build' } } });
+  const full = planFor(PRODUCT, { runtimeRoot: RUNTIME, skillRoot: RUNTIME, pkg: { scripts: { typecheck: 'tsc', 'lint': 'eslint .', 'test:unit': 'jest', 'test:e2e': 'jest --config e2e', build: 'nest build' } } });
   assert.equal(full.kind, 'product');
-  assert.deepEqual(full.steps.map((s) => s.name), ['npm run typecheck', 'npm run lint:check', 'npm run test:unit', 'npm run build', 'canon-scan']);
+  assert.deepEqual(full.steps.map((s) => s.name), ['npm run typecheck', 'npm run lint', 'npm run test:unit', 'npm run build', 'canon-scan']);
   assert.ok(!full.steps.some((s) => /e2e/.test(s.name) || (s.args ?? []).some((a) => /e2e/.test(a))), 'e2e is never a step');
   assert.deepEqual(full.steps.at(-1).args.slice(1), ['--root', PRODUCT]);
   const bare = planFor(PRODUCT, { runtimeRoot: RUNTIME, skillRoot: RUNTIME, pkg: { scripts: { 'test:unit': 'vitest run' } } });
-  assert.deepEqual(bare.steps.filter((s) => s.absent).map((s) => s.name), ['npm run typecheck', 'npm run lint:check', 'npm run build']);
+  assert.deepEqual(bare.steps.filter((s) => s.absent).map((s) => s.name), ['npm run typecheck', 'npm run lint', 'npm run build']);
 });
 
 test('failuresOf groups by file: node:test spec and tap, jest, tsc, eslint, canon-scan JSON, and an unparsed tail', () => {
@@ -49,7 +49,7 @@ test('failuresOf groups by file: node:test spec and tap, jest, tsc, eslint, cano
   assert.equal(tscGroups[0].file, 'src/a.ts');
   assert.equal(tscGroups[0].items.length, 2);
   const eslint = ['src/b.ts', '  3:5  error  Unexpected any  @typescript-eslint/no-explicit-any', ''].join('\n');
-  assert.deepEqual(failuresOf('npm run lint:check', eslint), [{ file: 'src/b.ts', items: ['@typescript-eslint/no-explicit-any @3 Unexpected any'] }]);
+  assert.deepEqual(failuresOf('npm run lint', eslint), [{ file: 'src/b.ts', items: ['@typescript-eslint/no-explicit-any @3 Unexpected any'] }]);
   const canon = JSON.stringify({ findings: [{ file: 'src/c.ts', family: 'naming', rule: 'canon/x', line: 2, message: 'bad' }] });
   assert.deepEqual(failuresOf('canon-scan', canon), [{ file: 'src/c.ts', items: ['naming:canon/x @2 bad'] }]);
   const other = failuresOf('npm run build', 'boom\nsecond line');
@@ -80,13 +80,13 @@ test('pushGitRepo: a red suite prints the grouped failures, runs every step, ski
   const seen = [];
   const deps = {
     git: fakeGit(),
-    plan: () => planFor(PRODUCT, { runtimeRoot: RUNTIME, skillRoot: RUNTIME, pkg: { scripts: { typecheck: 't', 'lint:check': 'l', 'test:unit': 'u', build: 'b' } } }),
+    plan: () => planFor(PRODUCT, { runtimeRoot: RUNTIME, skillRoot: RUNTIME, pkg: { scripts: { typecheck: 't', 'lint': 'l', 'test:unit': 'u', build: 'b' } } }),
     step: (step) => { seen.push(step.name); const text = outputs[step.name]; return text ? { ok: false, exit: 1, ms: 5, log: 'l.log', text } : greenStep(); },
     push: (o) => { pushes.push(o); return [{}]; },
   };
   const r = pushGitRepo(PRODUCT, { deps });
   assert.equal(r.verdict, 'red');
-  assert.deepEqual(seen, ['npm run typecheck', 'npm run lint:check', 'npm run test:unit', 'canon-scan'], 'build is skipped after the red typecheck');
+  assert.deepEqual(seen, ['npm run typecheck', 'npm run lint', 'npm run test:unit', 'canon-scan'], 'build is skipped after the red typecheck');
   assert.equal(r.steps.find((s) => s.name === 'npm run build').status, 'skipped');
   assert.deepEqual(r.steps.find((s) => s.name === 'npm run test:unit').failures, [{ file: 'src/a.spec.ts', items: ['a › b'] }]);
   assert.equal(pushes.length, 0, 'a red run never reaches the push');

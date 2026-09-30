@@ -1,6 +1,5 @@
 {{header}}
-# Push gate: types, lint (eslint over the repository, stylelint over the CSS), format, the architecture check on the owners this push touches.
+# Push gate: types, lint (eslint over the repository, stylelint over the CSS), format; one `hfs lint` runs eslint, the repository check and stylelint.
 npm run typecheck
-npm run lint:check
+npm run lint
 npm run format:check
-npm run hfs:check -- --fast

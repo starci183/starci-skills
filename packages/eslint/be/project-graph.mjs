@@ -17,7 +17,7 @@ const RUNTIME = join(dirname(fileURLToPath(import.meta.url)), "runtime")
 const mine = LINT_ENFORCERS.filter((enforcer) => enforcer.plugins.includes("be"))
 
 /** The rules this law contributes to the plugin: one per graph enforcer of this profile. */
-export const rules = Object.fromEntries(mine.map((e) => [e.id, projectRule({ codes: e.codes, description: e.description, runtimeRoot: RUNTIME, hfsOf })]))
+export const rules = Object.fromEntries(mine.map((e) => [e.id, projectRule({ enforcer: e, runtimeRoot: RUNTIME, hfsOf })]))
 
 /** Every one at error. */
 export const recommended = Object.fromEntries(mine.map((e) => [`starci-be/${e.id}`, "error"]))

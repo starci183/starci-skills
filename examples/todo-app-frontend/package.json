@@ -11,11 +11,13 @@
     "build": "npm run build --workspace @starci/todo-web --",
     "start": "npm run start --workspace @starci/todo-web --",
     "typecheck": "npm run typecheck --workspace @starci/todo-web --",
-    "lint:check": "eslint . --max-warnings=0"
+    "lint": "hfs lint",
+    "lint:fix": "hfs lint --fix"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@starci/eslint-canon-fe": "6.0.2",
+    "@starci/hfs": "1.0.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "22.20.4",
     "@types/react": "^19.0.0",

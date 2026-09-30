@@ -28,7 +28,7 @@ Next.js, React, TypeScript, npm workspaces; UI primitives come from
 ## Development
 
 Run `npm ci`, `node ../../packages/fe-kit/scripts/link-peers.mjs todo-app-frontend`, then
-`npm run typecheck`, `npm run lint:check` and `npm run build`.
+`npm run typecheck`, `npm run lint` and `npm run build`.
 
 The app reads one environment variable, `NEXT_PUBLIC_API_GRAPHQL_URL` (the backend's GraphQL endpoint), only through
 `apps/web/src/modules/config`. It has no default: `next dev` and `next start` need it set.
@@ -38,7 +38,7 @@ The app reads one environment variable, `NEXT_PUBLIC_API_GRAPHQL_URL` (the backe
 ```sh
 npm ci
 node ../../packages/fe-kit/scripts/link-peers.mjs todo-app-frontend
-npm run typecheck && npm run lint:check && npm run build
+npm run typecheck && npm run lint && npm run build
 ```
 
 The second line is what makes the first useful: `packages/fe-kit` is consumed as source through the

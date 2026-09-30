@@ -14,7 +14,7 @@
 //      paths are reported and NOTHING is stashed, reset or cleaned. (Untracked files are counted, not blocking.)
 //   2. the full suite of that repository, each step to a log file:
 //        .claude          npm test, npm run check
-//        product repo     npm run typecheck, npm run lint:check, npm run test:unit (unit only - e2e is manual-only
+//        product repo     npm run typecheck, npm run lint, npm run test:unit (unit only - e2e is manual-only
 //                         and never run here), npm run build where the script exists, canon-scan
 //                         (scripts/checks/canon-scan.mjs --root <repo>); a script the repository lacks is `absent`.
 //   3. red: a failure list grouped by spec file (or by file for typecheck/lint/canon), exit 1, and the flow STOPS -
@@ -65,7 +65,7 @@ export const isRuntime = (repo, runtimeRoot = SKILL_ROOT) => samePath(repo, runt
 const readPackage = (repo) => { try { return JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')); } catch { return null; } };
 
 /**
- * The full-suite steps of one checkout. Runtime: npm test + npm run check. Product: typecheck, lint:check, test:unit,
+ * The full-suite steps of one checkout. Runtime: npm test + npm run check. Product: typecheck, lint, test:unit,
  * build (each only when the repository's package.json declares the script - a missing one is an `absent` step, never
  * a pass by silence) and canon-scan. e2e is never a step.
  * Returns {kind, steps: [{name, cmd: 'npm'|'node', args, absent?, after?}]}.
@@ -82,7 +82,7 @@ export function planFor(repo, { runtimeRoot = SKILL_ROOT, pkg = readPackage(repo
     kind: 'product',
     steps: [
       npmStep('typecheck'),
-      npmStep('lint:check'),
+      npmStep('lint'),
       npmStep('test:unit'),
       npmStep('build', { after: 'npm run typecheck' }),
       { name: 'canon-scan', cmd: 'node', args: [path.join(skillRoot, 'scripts', 'checks', 'canon-scan.mjs'), '--root', repo] },

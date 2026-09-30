@@ -9,7 +9,7 @@ import { checkRepoPresentation } from '../scripts/checks/architecture/hfs.mjs';
 // The repository-tree rules of the HFS machine (knowledge/hfs/README.md): HFS_APPS_REQUIRED, HFS_APP_LAYOUT_INVALID,
 // HFS_ROOT_ENTRY_MISSING, HFS_ROOT_SRC_FORBIDDEN_FE, HFS_SRC_LAYOUT_INVALID, HFS_PACKAGE_MANAGER_MIXED, HFS_ROOT_MARKDOWN_FORBIDDEN.
 const ROOT_FE = {
-  '.gitattributes': '* text=auto\n', '.gitignore': 'node_modules\n', '.github/workflows/ci.yml': 'name: ci\non: workflow_dispatch\n', '.husky/pre-commit': 'npm run lint:check\n',
+  '.gitattributes': '* text=auto\n', '.gitignore': 'node_modules\n', '.github/workflows/ci.yml': 'name: ci\non: workflow_dispatch\n', '.husky/pre-commit': 'npm run lint\n',
   'eslint.config.mjs': 'export default [];\n', 'package-lock.json': '{}\n', 'README.md': '# fixture\n', 'sonar-project.properties': 'sonar.projectKey=x\n',
 };
 const APP_FE = Object.fromEntries(['package.json', 'next.config.ts', 'tsconfig.json', 'postcss.config.mjs'].map(name => [`apps/web/${name}`, name.endsWith('.json') ? '{}\n' : 'export default {};\n']));
@@ -108,9 +108,9 @@ test('HFS_README_DEVELOPMENT_INCOMPLETE: the Development section shows the manag
     fs.writeFileSync(path.join(root, '.gitattributes'), '* text=auto\n');
     return checkRepoPresentation({ root, profile: 'be' }).violations.filter(item => item.ruleId === 'HFS_README_DEVELOPMENT_INCOMPLETE');
   };
-  const managed = ['npm ci', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm test'];
+  const managed = ['npm ci', 'npm run typecheck', 'npm run lint', 'npm run build', 'npm test'];
   assert.deepEqual(judged(managed), []);
-  assert.equal(judged(['npm ci', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm run test:unit']).length, 1, 'test:unit is not a managed script');
+  assert.equal(judged(['npm ci', 'npm run typecheck', 'npm run lint', 'npm run build', 'npm run test:unit']).length, 1, 'test:unit is not a managed script');
   assert.equal(judged(managed.slice(0, 4)).length, 1, 'a missing test command is a finding');
-  assert.deepEqual(judged(['npm install', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm run test']), []);
+  assert.deepEqual(judged(['npm install', 'npm run typecheck', 'npm run lint', 'npm run build', 'npm run test']), []);
 });

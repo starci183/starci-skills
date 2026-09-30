@@ -19,8 +19,8 @@
     "start": "concurrently -n landing,shop -c cyan,magenta \"npm:start:landing\" \"npm:start:shop\"",
     "start:landing": "node scripts/serve.mjs landing start",
     "start:shop": "node scripts/serve.mjs shop start",
-    "lint": "eslint .",
-    "lint:check": "eslint . --max-warnings=0",
+    "lint": "hfs lint",
+    "lint:fix": "hfs lint --fix",
     "prepare": "husky",
     "typecheck": "tsc --noEmit"
   },

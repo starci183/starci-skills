@@ -186,59 +186,12 @@ const scratch = () => {
   return dir;
 };
 
-test('hfs check --sonar writes every error finding (hfs and machine alike) before the verdict; a tree without the sonar finding has none of it', async () => {
+test('the superseded Sonar commands are gone, not aliased: hfs check --sonar and hfs report are refused', async () => {
   const out = scratch();
   const violating = repo(BE, (dir) => fs.appendFileSync(path.join(dir, 'sonar-project.properties'), 'sonar.host.url=https://sonar.example.org\n'));
-  const file = path.join(out, 'reports', 'hfs.sonar.json');
-  const failed = await cli(['check', '--repo', violating, '--json', '--sonar', file], PRESETS.be);
-  assert.equal(failed.code, 1);
-  const { findings } = JSON.parse(failed.out);
-  const report = JSON.parse(fs.readFileSync(file, 'utf8'));
-  assert.deepEqual(schemaProblems(report), []);
-  const errors = findings.filter((f) => f.level === 'error');
-  assert.ok(errors.some((f) => f.code === 'HFS_SONAR_CONFIG'));
-  assert.deepEqual(report.rules.map((rule) => rule.id), [...new Set(errors.map((f) => f.code))].sort(), 'one rule per code of the check');
-  assert.equal(report.issues.length, errors.length, 'one issue per error finding');
-  const sonar = report.issues.filter((issue) => issue.ruleId === 'HFS_SONAR_CONFIG');
-  assert.match(sonar[0].primaryLocation.message, /^sonar-project.properties: /);
-  assert.match(report.rules.find((rule) => rule.id === 'HFS_SONAR_CONFIG').description, /Cấu hình Sonar lệch/);
-  const again = path.join(out, 'again.json');
-  await cli(['check', '--repo', violating, '--sonar', again], PRESETS.be);
-  assert.equal(fs.readFileSync(again, 'utf8'), fs.readFileSync(file, 'utf8'), 'two runs over one tree are byte-identical');
-
-  const passing = repo(BE);
-  const clean = path.join(out, 'clean.json');
-  await cli(['check', '--repo', passing, '--sonar', clean], PRESETS.be);
-  assert.deepEqual(schemaProblems(JSON.parse(fs.readFileSync(clean, 'utf8'))), []);
-  assert.ok(!JSON.parse(fs.readFileSync(clean, 'utf8')).rules.some((rule) => rule.id === 'HFS_SONAR_CONFIG'));
-});
-
-test('hfs report <linter> converts an eslint or stylelint json file, files a finding outside sonar.sources on the anchor, and refuses text that is not one', async () => {
-  const out = scratch();
-  const input = path.join(out, 'stylelint.json');
-  fs.writeFileSync(input, JSON.stringify([{ source: path.join(out, 'apps', 'web', 'src', 'a.css'), warnings: [{ line: 4, rule: 'starci/token-only', severity: 'error', text: 'Raw value (starci/token-only)' }] }]));
-  const done = await cli(['report', 'stylelint', input, path.join(out, 'stylelint.sonar.json'), '--repo', out]);
-  assert.equal(done.code, 0, done.err);
-  assert.match(done.out, /hfs report stylelint: 1 issue written/);
-  const report = JSON.parse(fs.readFileSync(path.join(out, 'stylelint.sonar.json'), 'utf8'));
-  assert.deepEqual(schemaProblems(report), []);
-  assert.equal(report.issues[0].primaryLocation.filePath, 'apps/web/src/a.css');
-  const eslintInput = path.join(out, 'eslint.json');
-  fs.writeFileSync(eslintInput, JSON.stringify([{ filePath: path.join(out, 'packages', 'kit', 'src', 'index.ts'), messages: [{ ruleId: 'starci-fe/x', line: 2, message: 'x' }] }]));
-  fs.writeFileSync(path.join(out, 'sonar-project.properties'), 'sonar.sources=apps\n');
-  execFileSync('git', ['-C', out, 'init', '-q']);
-  for (const file of ['apps/web/src/main.ts', 'packages/kit/src/index.ts']) { fs.mkdirSync(path.dirname(path.join(out, file)), { recursive: true }); fs.writeFileSync(path.join(out, file), 'export {};\n'); }
-  execFileSync('git', ['-C', out, 'add', '-A']);
-  const filed = await cli(['report', 'eslint', eslintInput, path.join(out, 'eslint.sonar.json'), '--repo', out]);
-  assert.equal(filed.code, 0, filed.err);
-  const eslintReport = JSON.parse(fs.readFileSync(path.join(out, 'eslint.sonar.json'), 'utf8'));
-  assert.deepEqual(schemaProblems(eslintReport), []);
-  assert.deepEqual(eslintReport.issues.map((issue) => [issue.primaryLocation.filePath, issue.primaryLocation.message]), [['apps/web/src/main.ts', 'packages/kit/src/index.ts: x']], 'a package the sources do not list is not dropped');
-  fs.writeFileSync(input, '{ "not": "an array" }');
-  assert.equal((await cli(['report', 'stylelint', input, path.join(out, 'x.json'), '--repo', out])).code, 2);
-  assert.equal((await cli(['report', 'stylelint', input, '--repo', out])).code, 2);
-  assert.equal((await cli(['report', 'tslint', input, path.join(out, 'x.json'), '--repo', out])).code, 2);
-  assert.equal((await cli(['report-stylelint', input, path.join(out, 'x.json'), '--repo', out])).code, 2, 'the old command is gone, not aliased');
+  assert.equal((await cli(['check', '--repo', violating, '--sonar', path.join(out, 'x.json')], PRESETS.be)).code, 2, 'hfs check --sonar is gone');
+  assert.equal((await cli(['report', 'eslint', 'a.json', 'b.json', '--repo', violating])).code, 2, 'hfs report is gone');
+  assert.equal(fs.existsSync(path.join(out, 'x.json')), false);
 });
 
 const managed = async (dir, declaration) => {
@@ -254,12 +207,12 @@ test('HFS_SONAR_CONFIG: a host URL, a dropped report path or any edit of sonar-p
     const text = fs.readFileSync(file, 'utf8');
     fs.writeFileSync(file, `${text}sonar.host.url=https://sonar.example.org\n`);
     assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: a host URL`);
-    fs.writeFileSync(file, text.replace('reports/eslint.sonar.json', 'reports/eslint.json'));
-    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: the ESLint import path dropped`);
+    fs.writeFileSync(file, text.replace('reports/lint.sonar.json', 'reports/eslint.json'));
+    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: the lint import path dropped`);
     fs.writeFileSync(file, `${text}sonar.eslint.reportPaths=reports/eslint.json\n`);
     assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: Sonar's own ESLint import is not used`);
     fs.writeFileSync(file, text.replace(/^sonar\.externalIssuesReportPaths=.*\n/m, ''));
-    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: the HFS import path dropped`);
+    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: the import path dropped`);
     fs.writeFileSync(file, text);
     assert.deepEqual(await managed(dir, declaration), []);
   }
@@ -288,22 +241,20 @@ test('HFS_SONAR_CONFIG: a stack declaration that names another quality gate than
   assert.deepEqual(await found(), []);
 });
 
-test('the managed configuration wires the reports: properties name them, the workflows produce them before the scan, none is allowed to fail silently', () => {
+test('the managed configuration wires the one report: properties name reports/lint.sonar.json, the workflow produces it once through npm run lint before the scan, no step swallows a failure', () => {
   for (const declaration of [BE, FE]) {
     const files = Object.fromEntries(renderTargets(declaration, PRESETS[declaration.profile]).map((target) => [target.path, target.content]));
     const properties = files['sonar-project.properties'];
     assert.doesNotMatch(properties, /sonar\.eslint\.reportPaths/, 'no second import path for eslint');
-    assert.match(properties, declaration.profile === 'fe' ? /^sonar\.externalIssuesReportPaths=reports\/hfs\.sonar\.json,reports\/eslint\.sonar\.json,reports\/stylelint\.sonar\.json$/m : /^sonar\.externalIssuesReportPaths=reports\/hfs\.sonar\.json,reports\/eslint\.sonar\.json$/m);
-    assert.doesNotMatch(properties, /sonar\.host\.url/);
+    assert.match(properties, /^sonar\.externalIssuesReportPaths=reports\/lint\.sonar\.json$/m);
+    assert.doesNotMatch(properties, /sonar.host.url/);
     const steps = parseYaml(files['.github/workflows/ci.yml']).jobs.ci.steps;
-    const at = (predicate) => steps.findIndex(predicate);
-    const scan = at((step) => String(step.uses).startsWith('SonarSource/sonarqube-scan-action'));
-    const producers = steps.map((step, index) => [step, index]).filter(([step]) => /hfs:report|lint:report|hfs report /.test(step.run ?? ''));
-    assert.ok(producers.length >= (declaration.profile === 'fe' ? 5 : 3), `${declaration.profile}: the hfs report, the eslint report and its import (front end: the stylelint report and its import too)`);
-    for (const command of ['npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', ...(declaration.profile === 'fe' ? ['npx hfs report stylelint reports/stylelint.json reports/stylelint.sonar.json'] : [])]) assert.ok(steps.some((step) => step.run === command), `${declaration.profile}: ${command}`);
-    for (const [, index] of producers) assert.ok(index < scan, `${declaration.profile}: a report is produced before the Sonar scan`);
+    const scan = steps.findIndex((step) => String(step.uses).startsWith('SonarSource/sonarqube-scan-action'));
+    const producers = steps.map((step, index) => [step, index]).filter(([step]) => /npm run lint|hfs |eslint|stylelint/.test(step.run ?? ''));
+    assert.deepEqual(producers.map(([step]) => step.run), ['npm run lint -- --sonar reports/lint.sonar.json'], `${declaration.profile}: one lint step produces the one report`);
+    for (const [, index] of producers) assert.ok(index < scan, `${declaration.profile}: the report is produced before the Sonar scan`);
     for (const step of steps) assert.equal(step['continue-on-error'], undefined, 'no step swallows a failure');
-    for (const step of [steps[scan], steps[scan + 1], ...producers.filter(([step]) => /lint:report|hfs report /.test(step.run)).map(([step]) => step)]) assert.match(String(step.if), /!cancelled\(\)/, 'a failed check still reaches Sonar');
+    for (const step of [steps[scan], steps[scan + 1]]) assert.match(String(step.if), /!cancelled\(\)/, 'a failed lint still reaches Sonar');
   }
 });
 

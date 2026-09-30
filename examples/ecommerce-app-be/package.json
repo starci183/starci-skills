@@ -10,18 +10,15 @@
     "migrate": "node dist/apps/migrate/src/main.js",
     "typecheck": "tsc -p tsconfig.json",
     "typecheck:e2e": "tsc -p src/tests/e2e/tsconfig.json",
-    "lint": "eslint --fix .",
-    "lint:check": "eslint .",
-    "lint:report": "eslint . --format json --output-file reports/eslint.json",
+    "lint": "hfs lint",
+    "lint:fix": "hfs lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "jest --selectProjects unit --coverage",
     "test:affected": "jest --selectProjects unit --passWithNoTests",
     "test:e2e": "npm run typecheck:e2e && jest --selectProjects e2e",
     "test:e2e:live": "npm run typecheck:e2e && jest --selectProjects e2e --testPathIgnorePatterns /node_modules/ --testPathPattern e2e.live",
-    "contract:emit": "hfs emit-contracts",
-    "hfs:check": "hfs check",
-    "hfs:report": "hfs check --sonar reports/hfs.sonar.json"
+    "contract:emit": "hfs emit-contracts"
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",

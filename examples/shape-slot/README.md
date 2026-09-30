@@ -30,7 +30,7 @@ The root files (`.husky/`, `.github/workflows/`, `sonar-project.properties`, the
 
 ```bash
 npm install
-npm run lint:check    # eslint-canon-fe, including the shape-slot law: 0 errors
+npm run lint    # eslint-canon-fe, including the shape-slot law: 0 errors
 npm run typecheck     # tsc: 0 errors
 npm run build         # next build (needs NEXT_PUBLIC_API_BASE_URL)
 npx hfs check         # hfs check: 0 errors

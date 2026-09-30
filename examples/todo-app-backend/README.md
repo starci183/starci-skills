@@ -27,7 +27,7 @@ under `.starcistacks/dev`.
 
 ## Development
 
-From this directory run `npm ci`, then `npm run typecheck`, `npm run lint:check`,
+From this directory run `npm ci`, then `npm run typecheck`, `npm run lint`,
 `npm run build` and `npm test`. The live stack requires provisioned demo secrets;
 see `docs/guides/testing.md` before running live checks. Tests have four jest projects: unit specs are `<name>.service.spec.ts` beside each `*.service.ts` (`npm test`, per-file 100 percent coverage), and integration, e2e and contract specs under `src/tests/` run inside the one test world
 (`npm run test:integration`, `npm run test:e2e`, `npm run test:contract`). Only unit runs in hooks and the default CI job.

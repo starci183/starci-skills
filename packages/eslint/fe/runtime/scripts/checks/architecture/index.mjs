@@ -15,7 +15,6 @@ import { checkTiers, TIER_RULE_IDS } from './tiers.mjs';
 import { checkReachability, REACHABILITY_RULE_IDS } from './reachability.mjs';
 import { checkDeadExports, DEAD_EXPORT_RULE_IDS } from './dead-exports.mjs';
 import { checkRequiredFiles, REQUIRED_FILE_RULE_IDS } from './required-files.mjs';
-import { checkSizeGrowth, SIZE_GROWTH_RULE_IDS } from './size-growth.mjs';
 import { checkClones, CLONE_RULE_IDS } from './clones.mjs';
 import { checkSymbols, SYMBOL_RULE_IDS } from './symbols.mjs';
 import { checkConnectionMap, CONNECTION_RULE_IDS } from './connection-map.mjs';
@@ -139,11 +138,11 @@ export const ERROR_RULE_IDS = Object.freeze([
 ]);
 
 const machineIds = () => [
-  ...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS, ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...SYMBOL_RULE_IDS,
+  ...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS, ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...CLONE_RULE_IDS, ...SYMBOL_RULE_IDS,
   ...Object.values(BACKEND_MACHINE).flatMap(([, ids]) => ids), ...Object.values(FRONTEND_MACHINE).flatMap(([, ids]) => ids),
 ];
 /**
- * The rules only the HFS machine emits: the tier, reachability, dead-export, required-file, size, clone and symbol checks and the
+ * The rules only the HFS machine emits: the tier, reachability, dead-export, required-file, clone and symbol checks and the
  * backend composition and data machine and frontend repository machine. A rule id an ordinary check also emits (the composition
  * spec and the app-composition check both report BE_APP_COMPOSITION_ONLY) is not here. A spec about another rule judges its own
  * report without these (they have their own specs); every one of them is in ARCHITECTURE_RULE_IDS.
@@ -157,7 +156,7 @@ export const HFS_MACHINE_RULE_IDS = Object.freeze((() => {
 /** Every code the machine can emit, derived from the rule id lists of its checks (`hfs check` ships exactly these why entries). */
 export const ARCHITECTURE_RULE_IDS = Object.freeze([...new Set([
   ...COMMON_RULE_IDS, ...BACKEND_RULE_IDS, ...FRONTEND_RULE_IDS, ...HFS_RULE_IDS, ...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS,
-  ...DEAD_EXPORT_RULE_IDS, ...DOC_LANGUAGE_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS,
+  ...DEAD_EXPORT_RULE_IDS, ...DOC_LANGUAGE_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...CLONE_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS,
   ...REGISTRATION_RULE_IDS, ...SWR_DATA_RULE_IDS, ...SYMBOL_RULE_IDS, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID, PUBLIC_CONTRACT_RULE_ID,
   READONLY_BOUNDARY_RULE_ID, ...ERROR_RULE_IDS, ...CONFIG_UNREAD_RULE_IDS, ...Object.values(BACKEND_MACHINE).flatMap(([, ids]) => ids), ...Object.values(FRONTEND_MACHINE).flatMap(([, ids]) => ids),
 ])].sort());
@@ -235,18 +234,18 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   }
   // HFS machine: the slot-driven graph checks read the whole program, also when the caller asked for one path.
   const hfsContext = paths.length ? buildTypeScriptContext(config, injectedTypeScript) : context;
-  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, sizeGrowth: null, clones: null, symbols: null, docLanguage: null };
+  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, clones: null, symbols: null, docLanguage: null };
   if (hfsContext.program) {
     const graph = buildHfsGraph(config, hfsContext);
     const input = { config, context: hfsContext, graph, base };
     const runs = { tiers: () => checkTiers(graph), reachability: () => checkReachability(input), deadExports: () => checkDeadExports(input),
-      requiredFiles: () => checkRequiredFiles(input), sizeGrowth: () => checkSizeGrowth(input), clones: () => checkClones(input), symbols: () => checkSymbols(input), docLanguage: () => checkDocLanguage(input) };
+      requiredFiles: () => checkRequiredFiles(input), clones: () => checkClones(input), symbols: () => checkSymbols(input), docLanguage: () => checkDocLanguage(input) };
     if (graph.profile === 'be') for (const [name, [check]] of Object.entries(BACKEND_MACHINE)) runs[name] = () => check(input);
     if (graph.profile === 'fe') for (const [name, [check]] of Object.entries(FRONTEND_MACHINE)) runs[name] = () => check(input);
     if (fast) { delete runs.deadExports; delete runs.clones; delete runs.symbols; }
     for (const [name, run] of Object.entries(runs)) {
       const result = run();
-      violations.push(...result.violations);
+      violations.push(...result.violations.map(violation => ({ ...violation, check: name })));
       hfsChecks[name] = result.coverage;
     }
   }
@@ -290,7 +289,6 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     ...(hfsChecks.reachability?.status === 'checked' ? REACHABILITY_RULE_IDS : []),
     ...(hfsChecks.deadExports?.status === 'checked' ? DEAD_EXPORT_RULE_IDS : []),
     ...(hfsChecks.requiredFiles?.status === 'checked' ? REQUIRED_FILE_RULE_IDS : []),
-    ...(hfsChecks.sizeGrowth?.status === 'checked' ? SIZE_GROWTH_RULE_IDS : []),
     ...(hfsChecks.clones?.status === 'checked' ? CLONE_RULE_IDS : []),
     ...(hfsChecks.symbols?.status === 'checked' ? SYMBOL_RULE_IDS : []),
     ...(hfsChecks.docLanguage?.status === 'checked' ? DOC_LANGUAGE_RULE_IDS : []),

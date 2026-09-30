@@ -12,7 +12,6 @@ import {
 } from '../packages/hfs/sync/index.mjs';
 import { braceVariants } from '../scripts/lib/glob.mjs';
 import { loadSlotManifest } from '../scripts/lib/hfs-slots.mjs';
-import { declaredPushGateLint } from '../scripts/kernel/push-gate.mjs';
 import { declaredSonarKeys, readDeclaredSonarKey } from '../packages/hfs/sync/sonar-key.mjs';
 import { hygieneFindings, runWorkHygiene } from '../packages/hfs/sync/hygiene.mjs';
 
@@ -121,11 +120,11 @@ describe('.husky/pre-commit', () => {
 
 describe('.husky/pre-push', () => {
   const PUSH_STEPS = {
-    be: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm run test:affected -- --changedSince=origin/main'],
-    fe: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast'],
+    be: ['npm run typecheck', 'npm run lint', 'npm run format:check', 'npm run test:affected -- --changedSince=origin/main'],
+    fe: ['npm run typecheck', 'npm run lint', 'npm run format:check'],
   };
   for (const hfs of [BE, FE]) {
-    it(`${hfs.profile} runs typecheck, lint and hfs check --fast, and never e2e`, () => {
+    it(`${hfs.profile} runs typecheck and the one lint, and never e2e`, () => {
       const hook = rendered(hfs)['.husky/pre-push'];
       for (const step of PUSH_STEPS[hfs.profile]) assert.ok(hook.includes(step), step);
       assert.doesNotMatch(hook, /test:(e2e|integration|contract)|typecheck:tests|playwright/);
@@ -139,25 +138,15 @@ describe('.husky/pre-push', () => {
       }
     });
   }
-  it('lets the settle push gate follow the hook to the repository lint script', t => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-pushgate-'));
-    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-    fs.mkdirSync(path.join(dir, '.husky'));
-    fs.writeFileSync(path.join(dir, '.husky', 'pre-push'), rendered(BE)['.husky/pre-push']);
-    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ scripts: { 'lint:check': 'eslint . --max-warnings=0', typecheck: 'tsc --noEmit' } }));
-    const declared = declaredPushGateLint(dir);
-    assert.equal(declared.source, '.husky/pre-push');
-    assert.deepEqual(declared.commands.map(command => command.script), ['lint:check']);
-  });
 });
 
 describe('.github/workflows', () => {
   const CI_STEPS = {
-    be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run build', 'npm ci'],
-    fe: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run lint:report:css', 'npx hfs report stylelint reports/stylelint.json reports/stylelint.sonar.json', 'npm run build', 'npm ci'],
+    be: ['npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run build', 'npm ci'],
+    fe: ['npm run lint -- --sonar reports/lint.sonar.json', 'npm run format:check', 'npm run typecheck', 'npm run build', 'npm ci'],
   };
   for (const hfs of [BE, FE]) {
-    it(`${hfs.profile} ci.yml runs lint, typecheck, unit, hfs check and sonar, with no e2e`, () => {
+    it(`${hfs.profile} ci.yml runs the one lint, typecheck, unit and sonar, with no e2e`, () => {
       const text = rendered(hfs)['.github/workflows/ci.yml'];
       const doc = parseYaml(text);
       assert.deepEqual(Object.keys(doc.on).sort(), ['pull_request', 'push']);
@@ -217,10 +206,10 @@ describe('sonar-project.properties', () => {
     assert.equal(fe['sonar.projectKey'], 'nivo-fe');
     assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json');
     assert.equal(fe['sonar.sources'], 'apps', 'no package slot: the sources are the apps');
-    // One import path for every linter (hfs report): Sonar's own ESLint import is not used, it drops issues on files outside sonar.sources.
+    // One import path for every engine (hfs lint): Sonar's own ESLint import is not used, it drops issues on files outside sonar.sources.
     assert.ok(!('sonar.eslint.reportPaths' in fe) && !('sonar.eslint.reportPaths' in be));
-    assert.equal(fe['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json,reports/eslint.sonar.json,reports/stylelint.sonar.json');
-    assert.equal(be['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json,reports/eslint.sonar.json');
+    assert.equal(fe['sonar.externalIssuesReportPaths'], 'reports/lint.sonar.json');
+    assert.equal(be['sonar.externalIssuesReportPaths'], 'reports/lint.sonar.json');
     assert.ok(!('sonar.host.url' in be) && !('sonar.host.url' in fe), 'the host is SONAR_HOST_URL, never a property (R11)');
   });
   it('has no codecov file and no coverage upload: codecov.yml is not a managed file', () => {
@@ -413,7 +402,7 @@ describe('the back-end tool configuration', () => {
 describe('the package.json scripts of a back end', () => {
   const scripts = hfs => Object.fromEntries(renderTargets(hfs, PRESETS.be).find(target => target.path === 'package.json').content.trim().split('\n').map(line => [line.slice(0, line.indexOf(': ')), line.slice(line.indexOf(': ') + 2)]));
   it('are the fixed scripts, plus build and one start script per runnable app and migrate', () => {
-    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'contract:emit', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'migrate', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'typecheck', 'typecheck:tests']);
+    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'contract:emit', 'format', 'format:check', 'lint', 'lint:fix', 'migrate', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts(BE)['start:core'], 'node dist/apps/core/src/main.js');
     assert.equal(scripts(BE).migrate, 'node dist/apps/migrate/src/main.js');
     assert.equal(scripts(BE).test, 'jest --selectProjects unit --coverage');
@@ -448,10 +437,10 @@ describe('the package.json scripts of a back end', () => {
 describe('the package.json scripts of a front end', () => {
   const scripts = hfs => renderTargets(hfs, PRESETS.fe).find(target => target.path === 'package.json').scripts;
   it('are one lint gate over eslint and stylelint, plus the fixed scripts and dev/start per app', () => {
-    assert.deepEqual(Object.keys(scripts(FE)).sort(), ['build', 'codegen', 'dev:admin', 'dev:app', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'lint:report:css', 'prepare', 'start:admin', 'start:app', 'typecheck']);
-    const lint = scripts(FE)['lint:check'];
-    assert.match(lint, /eslint \. --max-warnings=0/);
-    assert.match(lint, /stylelint "\{apps,packages\}\/\*\/src\/\*\*\/\*\.css"/);
+    assert.deepEqual(Object.keys(scripts(FE)).sort(), ['build', 'codegen', 'dev:admin', 'dev:app', 'format', 'format:check', 'lint', 'lint:fix', 'prepare', 'start:admin', 'start:app', 'typecheck']);
+    const lint = scripts(FE).lint;
+    assert.equal(lint, 'npm run codegen --silent && hfs lint --stylelint "{apps,packages}/*/src/**/*.css"');
+    assert.equal(scripts(FE)['lint:fix'], lint.replace('hfs lint', 'hfs lint --fix'));
     assert.doesNotMatch(lint, /--ignore-pattern/, 'no path is hidden from the lint run');
     assert.ok(!('lint:e2e' in scripts(FE)), 'there is no second lint script');
     assert.equal(scripts(FE)['dev:app'], 'npm run dev --workspace apps/app');
@@ -463,11 +452,6 @@ describe('the package.json scripts of a front end', () => {
       assert.doesNotMatch(name, /^test/, `${name} is a test script`);
       assert.doesNotMatch(command, /scripts\/|contract-check|check-i18n-catalog|check-fe-architecture/, `${name} calls a repository-local checker`);
     }
-  });
-  it('lint and the report scripts are one command each for the two linters', () => {
-    const all = scripts(FE);
-    assert.equal(all['lint:report'], 'eslint . --format json --output-file reports/eslint.json');
-    assert.equal(all['lint:report:css'], 'stylelint "{apps,packages}/*/src/**/*.css" --formatter json --output-file reports/stylelint.json');
   });
   it('the sources and the tsconfig paths include packages/ exactly when hfs.json opts into a package slot', () => {
     const properties = hfs => Object.fromEntries(rendered(hfs)['sonar-project.properties'].split('\n').filter(line => line && !line.startsWith('#')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));

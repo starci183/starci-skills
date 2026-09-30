@@ -7,30 +7,30 @@
 import path from 'node:path';
 import { projectGraph } from './project-graph.mjs';
 import { posixPath } from './path-key.mjs';
+import { belongsTo, codeOf } from '../checks/architecture/surface.mjs';
 
 /**
  * A rule reporting the graph findings of `codes` on the linted file.
  *
- * @param {{ codes: string[], description: string, runtimeRoot: string, hfsOf: (context: object) => object }} input
+ * @param {{ enforcer: object, runtimeRoot: string, hfsOf: (context: object) => object }} input - `enforcer` is a row of LINT_ENFORCERS (id, codes, description, origin, via)
  * @returns {object} An ESLint rule.
  */
-export const projectRule = ({ codes, description, runtimeRoot, hfsOf }) => {
-  const owned = new Set(codes);
+export const projectRule = ({ enforcer, runtimeRoot, hfsOf }) => {
   return {
-    meta: { type: 'problem', docs: { description }, schema: [], messages: { finding: '{{message}}' } },
+    meta: { type: 'problem', docs: { description: enforcer.description }, schema: [], messages: { finding: '{{message}}' } },
     create(context) {
       const hfs = hfsOf(context);
       const rel = posixPath(path.relative(hfs.repoRoot, context.filename));
       if (rel.startsWith('..')) return {};
       const { byFile } = projectGraph({ repoRoot: hfs.repoRoot, runtimeRoot, injectedTypeScript: context.settings?.starci?.injectedTypeScript?.() });
-      const mine = (byFile.get(rel) ?? []).filter((finding) => owned.has(finding.ruleId));
+      const mine = (byFile.get(rel) ?? []).filter((finding) => belongsTo(enforcer, finding));
       return {
         Program(node) {
           for (const finding of mine) {
             const line = Number.isInteger(finding.line) && finding.line >= 1 ? finding.line : 1;
             // the machine counts columns from 1, ESLint from 0
             const column = Number.isInteger(finding.column) && finding.column >= 1 ? finding.column - 1 : 0;
-            context.report({ node, loc: { start: { line, column } }, messageId: 'finding', data: { message: `[${finding.ruleId}] ${finding.message}` } });
+            context.report({ node, loc: { start: { line, column } }, messageId: 'finding', data: { message: `[${codeOf(finding)}] ${finding.message}` } });
           }
         },
       };

@@ -76,7 +76,7 @@ rules:
     hfsRules: [R13, R24]
     requirement: |
       Pre-commit, pre-push, op settle, land gate and CI run the same `@starci/hfs` at the version pinned in
-      `canon-pins.yaml`. CI runs `npx @starci/hfs check`; pre-push runs `typecheck`, `lint:check` and `hfs check --fast`. There is
+      `canon-pins.yaml`. CI runs `npm run lint` (`hfs lint`, which includes the repository check); pre-push runs `typecheck` and `lint`. There is
       no rule only agents can run. Every `@starci/*` package is installed from the npm registry at the pinned version.
     rationale: |
       A repository that is green under an old rule while the agent grades it under a new rule wastes every cycle.
@@ -134,7 +134,7 @@ rules:
       No integration, e2e or contract spec, test world or e2e-only dependency joins husky, lint-staged, the default typecheck,
       coverage, or an automatic CI trigger. A back end has `typecheck:tests` (`src/tests/tsconfig.json`) and its
       `test:integration`, `test:e2e` and `test:contract` run it first; a front end has no e2e script, config or workflow.
-      `lint:check` lints the back-end e2e trees in its one ESLint run (linting is not running e2e). A kept e2e workflow is
+      `lint` lints the back-end e2e trees in its one ESLint run (linting is not running e2e). A kept e2e workflow is
       `workflow_dispatch` only. A front end has no tests at all (FE_NO_TESTS).
     rationale: |
       These suites are slow and environment-bound, but their code must not rot, so their type check is a separate manual gate.

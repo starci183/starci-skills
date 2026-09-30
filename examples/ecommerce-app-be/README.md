@@ -29,7 +29,7 @@ stack is declared in `.starcistacks/dev`.
 
 ## Development
 
-`npm ci`, then `npm run typecheck`, `npm run lint:check`, `npm run build`, `npm test`. The runbook with the
+`npm ci`, then `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`. The runbook with the
 environment keys, migrations and seeds is `.starcistacks/dev/README.md`; `docs/guides/testing.md` describes the suites.
 
 ## Work
@@ -44,7 +44,7 @@ keys. `.starcistacks/dev/infra/metadata.json` stays the resolved port map the fr
 
 ## Verification
 
-From this directory run `npm run typecheck`, `npm run lint:check`, `npm run build`, and
+From this directory run `npm run typecheck`, `npm run lint`, `npm run build`, and
 `npm test`. The unit suite runs the service specs with coverage and fails when a `*.service.ts` file is below 100 percent lines, branches, functions or statements. From the parent
 `.claude` tree, run `node scripts/checks/canon-scan.mjs --root examples/ecommerce-app-be --json`
 and `node scripts/checks/check-starcistacks.mjs examples/ecommerce-app-be`.

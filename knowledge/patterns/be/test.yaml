@@ -434,7 +434,7 @@ rules:
     hfsRules: [R48]
     requirement: |-
       Do not ship call-only specs, e2e steps that only check a success flag, sleep-based waits (wait with `waitFor` deadlines),
-      guard overrides, provider or DI overrides under `src/tests`, live model calls in e2e, or branched outcomes inside one flow step. The e2e canon rules apply to `src/tests/e2e/**` through `lint:check`.
+      guard overrides, provider or DI overrides under `src/tests`, live model calls in e2e, or branched outcomes inside one flow step. The e2e canon rules apply to `src/tests/e2e/**` through `lint`.
     rationale: |-
       A test that cannot fail for the wrong reason is not evidence, and time-based waiting hides races.
     cases:

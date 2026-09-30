@@ -119,28 +119,28 @@ test('HFS_STACKS_SHAPE: the slot allows list and the custody .gitignore rules (s
 
 // ------------------------------------------------------------------------------------------------ R13 HFS_CI_MISSING_CANON
 
-const CI_STEP = '      - name: hfs check\n        run: npm run hfs:report\n';
+const CI_STEP = '      - name: lint\n        run: npm run lint -- --sonar reports/lint.sonar.json\n';
 
-test('HFS_CI_MISSING_CANON: a CI without the hfs check, a --fast check, another version, a script that is not the check and a pre-push without typecheck or lint are refused', () => {
+test('HFS_CI_MISSING_CANON: a CI without the hfs lint, another version, a script that is not the lint and a pre-push without typecheck or lint are refused', () => {
   const ci = fs.readFileSync(path.join(repoOf(BE), '.github/workflows/ci.yml'), 'utf8');
-  assert.ok(ci.includes(CI_STEP), 'the rendered CI runs the check through the hfs:report script');
-  const withStep = (line) => ci.replace('run: npm run hfs:report', `run: ${line}`);
+  assert.ok(ci.includes(CI_STEP), 'the rendered CI runs the one lint through the lint script');
+  const withStep = (line) => ci.replace('run: npm run lint -- --sonar reports/lint.sonar.json', `run: ${line}`);
   const missing = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', ci.replace(CI_STEP, ''))) });
   assert.deepEqual(only(missing, 'HFS_CI_MISSING_CANON').map((f) => f.path), ['.github/workflows/ci.yml']);
-  const fast = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', withStep('npx hfs check --fast'))) });
-  assert.equal(only(fast, 'HFS_CI_MISSING_CANON').length, 1);
-  const drifted = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', withStep('npx @starci/hfs@0.0.1 check'))) });
+  const check = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', withStep('npx hfs check'))) });
+  assert.equal(only(check, 'HFS_CI_MISSING_CANON').length, 1, 'hfs check is not the lint entry');
+  const drifted = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', withStep('npx @starci/hfs@0.0.1 lint'))) });
   assert.match(only(drifted, 'HFS_CI_MISSING_CANON')[0].message, new RegExp(`pinned at ${pins['@starci/hfs'].version.replace(/\./g, '\.')}`));
-  const hollow = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, 'package.json', json({ name: 'demo', private: true, scripts: { 'hfs:report': 'echo ok' } }))) });
-  assert.equal(only(hollow, 'HFS_CI_MISSING_CANON').length, 1, 'a script that does not run hfs check is no check');
-  const prePush = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.husky/pre-push', '# gate\nnpm run typecheck\nnpx hfs check --fast\n')) });
-  assert.deepEqual(only(prePush, 'HFS_CI_MISSING_CANON').map((f) => f.step), ['lint:check']);
+  const hollow = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, 'package.json', json({ name: 'demo', private: true, scripts: { lint: 'echo ok' } }))) });
+  assert.equal(only(hollow, 'HFS_CI_MISSING_CANON').length, 1, 'a script that does not run hfs lint is no lint');
+  const prePush = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.husky/pre-push', '# gate\nnpm run typecheck\nnpm run format:check\n')) });
+  assert.deepEqual(only(prePush, 'HFS_CI_MISSING_CANON').map((f) => f.step), ['lint']);
 });
 
 test('HFS_CI_MISSING_CANON: the rendered CI and pre-push, and the pinned version spelled out, are clean', () => {
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(BE) }), 'HFS_CI_MISSING_CANON'), []);
   const ci = fs.readFileSync(path.join(repoOf(FE), '.github/workflows/ci.yml'), 'utf8');
-  const pinned = checkRepo({ repoRoot: repoOf(FE, (dir) => put(dir, '.github/workflows/ci.yml', ci.replace('run: npm run hfs:report', `run: npx @starci/hfs@${pins['@starci/hfs'].version} check`))) });
+  const pinned = checkRepo({ repoRoot: repoOf(FE, (dir) => put(dir, '.github/workflows/ci.yml', ci.replace('run: npm run lint -- --sonar reports/lint.sonar.json', `run: npx @starci/hfs@${pins['@starci/hfs'].version} lint`))) });
   assert.deepEqual(only(pinned, 'HFS_CI_MISSING_CANON'), []);
 });
 

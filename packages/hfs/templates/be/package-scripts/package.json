@@ -4,9 +4,8 @@
     {{appScripts}}
     "typecheck": "tsc -p tsconfig.json",
     "typecheck:tests": "tsc -p src/tests/tsconfig.json",
-    "lint": "eslint --fix .",
-    "lint:check": "eslint .",
-    "lint:report": "eslint . --format json --output-file reports/eslint.json",
+    "lint": "hfs lint",
+    "lint:fix": "hfs lint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "jest --selectProjects unit --coverage",
@@ -15,8 +14,6 @@
     "test:e2e": "npm run typecheck:tests && jest --selectProjects e2e",
     "test:contract": "npm run typecheck:tests && jest --selectProjects contract",
     "test:stack": "starci-test-stack",
-    "contract:emit": "hfs emit-contracts",
-    "hfs:check": "hfs check",
-    "hfs:report": "hfs check --sonar reports/hfs.sonar.json"
+    "contract:emit": "hfs emit-contracts"
   }
 }

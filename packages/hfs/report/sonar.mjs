@@ -1,13 +1,10 @@
-// hfs report: the ONE way the findings of the StarCi canon reach Sonar (contract change hfs-sonar-import).
-//
-//   hfs check --sonar <file>               writes every error-level finding of the check (repository, managed files and the whole
-//                                          architecture machine) as a Sonar Generic Issue Import document (SonarQube 10.3+ format:
-//                                          `{ rules, issues }`), engineId `starci-hfs`, rule id = the finding code
-//   hfs report <eslint|stylelint> <in> <out>
-//                                          converts the linter's own json output (`eslint -f json`, `stylelint --formatter json`)
-//                                          into the same document format, engineId `eslint` / `stylelint`, rule id = the linter's
-//                                          rule. Sonar's own ESLint import (sonar.eslint.reportPaths) is not used: it drops an issue
-//                                          on a file outside sonar.sources, and a stylelint result has no native import at all.
+// Sonar documents of the ONE lint entry `hfs lint` (contract changes hfs-sonar-import, hfs-lint-entry): the building blocks that turn the
+// findings of the StarCi canon into a Sonar Generic Issue Import document (SonarQube 10.3+ format: `{ rules, issues }`).
+//   sonarReport(findings)        the repository findings of `hfs check`, engineId `starci-hfs`, rule id = the finding code
+//   linterReport(kind, results)  a linter's own json output (`eslint -f json`, `stylelint --formatter json`), engineId `eslint` / `stylelint`,
+//                                rule id = the linter's rule. Sonar's own ESLint import (sonar.eslint.reportPaths) is not used: it drops an
+//                                issue on a file outside sonar.sources, and a stylelint result has no native import at all.
+//   mergeReports(reports)        the documents of one `hfs lint` run as ONE file (reports/lint.sonar.json, sonar.externalIssuesReportPaths)
 // One placement rule for every engine: Sonar imports an issue only on a file it indexes (a tracked source or stylesheet under
 // sonar.sources). A finding on any other path (hfs.json, a workflow, a package under an unindexed root, e2e/, a directory) is filed
 // on the first source file of sonar.sources and its message names the real path, so no finding is dropped.
@@ -40,6 +37,12 @@ function document(rules, issues) {
     || cmp(a.primaryLocation.message, b.primaryLocation.message));
   const used = new Set(sorted.map((issue) => issue.ruleId));
   return { rules: [...rules.values()].filter((rule) => used.has(rule.id)).sort((a, b) => cmp(a.id, b.id)), issues: sorted };
+}
+
+/** One document of several (the starci-hfs, eslint and stylelint documents of one `hfs lint` run): rules by id, issues in the one sort order. */
+export function mergeReports(reports) {
+  const rules = new Map(reports.flatMap((report) => report.rules).map((rule) => [rule.id, rule]));
+  return document(rules, reports.flatMap((report) => report.issues));
 }
 
 /**
@@ -106,7 +109,6 @@ const LINTERS = Object.freeze({
     text: (message) => message.message,
     describe: (id) => `ESLint rule ${id} of the StarCi canon (@starci/eslint-canon-be and @starci/eslint-canon-fe) or of a plugin it composes.`,
     describeError: 'ESLint could not lint a file: a parse error or an invalid configuration.',
-    shape: 'an array of results with a filePath and messages',
   },
   stylelint: {
     engine: STYLELINT_ENGINE,
@@ -117,11 +119,10 @@ const LINTERS = Object.freeze({
     text: stylelintText,
     describe: (id) => `Stylelint rule ${id} of the StarCi CSS canon (@starci/stylelint-canon, HFS R61).`,
     describeError: 'Stylelint could not read a stylesheet: a parse error or an invalid option.',
-    shape: 'an array of results with a source and warnings',
   },
 });
 
-export const LINTER_KINDS = Object.freeze(Object.keys(LINTERS));
+const LINTER_KINDS = Object.freeze(Object.keys(LINTERS));
 
 /**
  * A linter's json results (`eslint -f json`: [{ filePath, messages: [{ ruleId, line, endLine, message }] }]; `stylelint
@@ -161,20 +162,4 @@ export function sourceRootsOf(propertiesText) {
 export function writeReport(file, report) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(report, null, 2)}\n`);
-}
-
-/** `hfs report <eslint|stylelint> <in> <out> [--repo <dir>]`: convert a linter's json report; returns the number of issues written. */
-export function convertReportFile({ kind, input, output, root, sourceRoots = [], tracked = [] }) {
-  const linter = LINTERS[kind];
-  if (linter === undefined) throw new Error(`unknown linter ${kind}; expected ${LINTER_KINDS.join(' or ')}`);
-  let results;
-  try {
-    results = JSON.parse(fs.readFileSync(input, 'utf8'));
-  } catch (error) {
-    throw new Error(`${input} is not a readable ${kind} json report (${error.message})`);
-  }
-  if (!Array.isArray(results)) throw new Error(`${input} is not a ${kind} json report: expected ${linter.shape}`);
-  const report = linterReport(kind, results, { root, sourceRoots, tracked });
-  writeReport(output, report);
-  return report.issues.length;
 }

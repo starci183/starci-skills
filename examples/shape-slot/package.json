@@ -10,8 +10,8 @@
   "prettier": "@starci/prettier-config",
   "scripts": {
     "prepare": "husky",
-    "lint": "eslint .",
-    "lint:check": "eslint . --max-warnings=0",
+    "lint": "hfs lint",
+    "lint:fix": "hfs lint --fix",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspaces --if-present"
   },

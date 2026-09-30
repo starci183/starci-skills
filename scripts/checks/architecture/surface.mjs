@@ -10,7 +10,9 @@ const BE = ['be'];
 const FE = ['fe'];
 const BOTH = ['be', 'fe'];
 
-const enforcer = (id, plugins, codes, description) => Object.freeze({ id, plugins: Object.freeze(plugins), codes: Object.freeze(codes), description });
+// `via` names the machine check (the key of its run in index.mjs) when two enforcers share a code; `origin: 'repo'` marks a finding of the
+// slot manifest's per-path judgement (hfs-path-findings.mjs) instead of the machine. A finding reaches exactly one rule.
+const enforcer = (id, plugins, codes, description, extra = {}) => Object.freeze({ id, plugins: Object.freeze(plugins), codes: Object.freeze(codes), description, ...extra });
 
 export const LINT_ENFORCERS = Object.freeze([
   enforcer('duplicate-code', BOTH, ['HFS_DUPLICATE_CODE'], 'A block of production code never repeats elsewhere in the owner graph.'),
@@ -31,16 +33,15 @@ export const LINT_ENFORCERS = Object.freeze([
   enforcer('app-composition-only', BE, ['BE_APP_COMPOSITION_ONLY', 'BE_APP_BUSINESS_ROLE'], 'An app only composes modules and holds no business role.'),
   enforcer('entrypoint-only-in-apps', BE, ['BE_ENTRYPOINT_ONLY_IN_APPS'], 'NestFactory and bootstrap live only in an app main file.'),
   enforcer('schema-owner', BE, ['BE_SCHEMA_OWNER'], 'Each entity array is registered by one owner across all apps.'),
-  enforcer('error-home', BE, ['BE_ERROR_HOME'], 'An error code is declared once in the repository.'),
+  enforcer('error-code-unique', BE, ['BE_ERROR_HOME'], 'An error code is declared once in the repository.'),
   enforcer('error-masked', BE, ['BE_ERROR_MASKED'], 'Every app wires the error filter that masks internal errors.'),
   enforcer('default-deny-app-guard', BE, ['BE_DEFAULT_DENY'], 'Every app registers the default-deny guard before any other guard.'),
   // BE_MODULE_SHAPE is emitted by both register-once and module-per-transport.
-  enforcer('register-once', BE, ['BE_MODULE_SHAPE'], 'A module is registered once and imported by one module.'),
-  enforcer('module-per-transport', BE, ['BE_MODULE_SHAPE'], 'An app imports transport modules only.'),
+  enforcer('register-once', BE, ['BE_MODULE_SHAPE'], 'A module is registered once and imported by one module.', { via: 'registerOnce' }),
+  enforcer('module-per-transport', BE, ['BE_MODULE_SHAPE'], 'An app imports transport modules only.', { via: 'modulePerTransport' }),
   enforcer('module-registration', BE, ['BE_MODULE_HANDLER_REGISTRATION', 'BE_MODULE_PROVIDER_REREGISTRATION'], 'Every handler is registered by a module and no provider is registered twice.'),
   enforcer('background-unowned', BE, ['BE_BACKGROUND_UNOWNED'], 'Every background job is reachable from a worker app.'),
   enforcer('test-world-files', BE, ['BE_TEST_TOPOLOGY'], 'The test world files match the stack declaration.'),
-  enforcer('contract-fixture-guard', BE, ['BE_CONTRACT_UNGUARDED'], 'Every provider fixture is guarded by a contract spec.'),
   enforcer('unit-spec-providers', BE, ['BE_SPEC_QUALITY'], 'A unit spec provides exactly the dependencies its service constructor takes.'),
   enforcer('transport-owner', FE, ['FE_TRANSPORT_OWNER'], 'One client and one outcome type own the transport of the repository.'),
   enforcer('swr-data-lifecycle', FE, ['FE_SWR_KEY_IDENTITY', 'FE_SWR_MUTATION_RESOURCE_IDENTITY'], 'SWR keys and mutations share one resource identity.'),
@@ -59,6 +60,10 @@ export const LINT_ENFORCERS = Object.freeze([
   enforcer('component-purity', FE, ['FE_COMPONENT_WORLD_OWNERSHIP', 'FE_WORLD_OWNER_RENDER_BOUNDARY', 'FE_CONNECTED_BLOCK_RENDER_PAIR', 'FE_PURE_REACHES_DATA', 'FE_PURE_WORLD_HOOK', 'FE_PURE_WORLD_IMPORT'], 'A pure component reaches no data or world state; its connected entry owns them.'),
   enforcer('grammar-entry', FE, ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_EXPORT_BYPASS'], 'Vendor grammar is reached only through its owner entry.'),
   enforcer('i18n-keys', FE, ['FE_I18N_KEYS'], 'Translation keys read by source and keys held by catalogs agree both ways.'),
+  // The per-path judgements of the slot manifest (scripts/lib/hfs-path-findings.mjs), on a tracked TypeScript file.
+  enforcer('slot-undeclared', BOTH, ['HFS_SLOT_UNDECLARED', 'HFS_SLOT_AMBIGUOUS', 'HFS_SLOT_NOT_ENABLED'], 'A TypeScript file is owned by exactly one slot of the repository.', { origin: 'repo' }),
+  enforcer('source-suffix', BE, ['BE_SOURCE_FORM'], 'A source file name is index.ts, main.ts, a migration or <kebab-name>.<suffix>.ts with a suffix of the closed list.', { origin: 'repo' }),
+  enforcer('spec-placement', BE, ['BE_SPEC_PLACEMENT'], 'A spec file lives in one of the four test layers and nowhere else.', { origin: 'repo' }),
   // The two below are emitted into context.errors today, not into violations.
   enforcer('package-imports-app', BOTH, ['ARCH_PACKAGE_IMPORTS_APP'], 'A package never imports an app.'),
   enforcer('package-export-bypass', BOTH, ['ARCH_PACKAGE_EXPORT_BYPASS'], 'A package is imported only through its declared exports.'),
@@ -75,6 +80,12 @@ export function attachesToSource(repositoryRoot, violation) {
   return fs.existsSync(path.join(repositoryRoot, ...file.split('/')));
 }
 
-export function onLintSurface(repositoryRoot, violation) {
-  return LINT_CODES.has(violation?.ruleId) && attachesToSource(repositoryRoot, violation);
-}
+/** The finding's code: a machine violation spells it `ruleId`, a repository finding `code`. */
+export const codeOf = (finding) => finding?.ruleId ?? finding?.code;
+
+/** Whether `finding` (with its origin and check tags) belongs to `enforcer`. */
+export const belongsTo = (enforcer, finding) => enforcer.codes.includes(codeOf(finding))
+  && (finding.origin ?? 'machine') === (enforcer.origin ?? 'machine') && (enforcer.via === undefined || finding.check === enforcer.via);
+
+/** True when some lint rule owns the finding and it sits on an existing TypeScript file: it is an ESLint report, not a `hfs check` finding. */
+export const onLintSurface = (repositoryRoot, finding) => LINT_ENFORCERS.some(enforcer => belongsTo(enforcer, finding)) && attachesToSource(repositoryRoot, finding);

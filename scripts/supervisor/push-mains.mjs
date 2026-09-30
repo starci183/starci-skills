@@ -18,7 +18,7 @@
 //
 // The push runs from a scratch worktree of committed main, never from the live working tree: a product
 // checkout is shared with running op workers, whose uncommitted edits make the repository's pre-push hook
-// (husky: nivo-backend `npm run lint:check && npm run test:unit`, nivo-fe turbo lint) red for reasons
+// (husky: nivo-backend `npm run lint && npm run test:unit`, nivo-fe turbo lint) red for reasons
 // unrelated to the commits being pushed — while one op is mid-edit nivo never pushes (cluster
 // push-hooks-test-inflight-tree, 2026-09-24 15:34Z: 42 unit failures that lived only in uncommitted edits).
 // The scratch gets the live checkout's node_modules (root and every workspace package that has its own) and

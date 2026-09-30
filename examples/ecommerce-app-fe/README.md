@@ -39,7 +39,7 @@ Next.js, React, TypeScript, npm workspaces, `@starci/grammar`.
 
 ## Development
 
-From this directory run `npm install`, then `npm run typecheck`, `npm run lint:check`,
+From this directory run `npm install`, then `npm run typecheck`, `npm run lint`,
 and `npm run build`. The commands below start the apps using the
 paired backend's port projection.
 

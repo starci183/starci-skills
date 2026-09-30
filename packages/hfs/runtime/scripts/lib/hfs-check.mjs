@@ -59,8 +59,9 @@ import { pipelineFindings } from './hfs-rules/pipeline.mjs';
 import { proofCommandFindings } from './hfs-rules/proof-commands.mjs';
 import { repoLocalCheckFindings } from './hfs-rules/repo-local-checks.mjs';
 import { readJson } from './hfs-rules/read.mjs';
-import { secretFindings, slotOwnsSecrets } from './hfs-rules/secrets.mjs';
-import { specPlacementFindings } from './hfs-rules/spec-placement.mjs';
+import { secretFindings } from './hfs-rules/secrets.mjs';
+import { pathFindings } from './hfs-path-findings.mjs';
+import { onLintSurface } from '../checks/architecture/surface.mjs';
 import { stacksFindings } from './hfs-rules/stacks.mjs';
 import { testTopologyFindings } from './hfs-rules/test-topology.mjs';
 import { feNoTestsFindings, isFeTestPath } from './hfs-rules/fe-no-tests.mjs';
@@ -148,53 +149,6 @@ function pinFindings({ repoRoot, files, profile, pins, only }) {
   return findings;
 }
 
-const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const SOURCE_ROOT = /^(?:src|apps)\//;
-const FREE_NAMES = new Set(['index.ts', 'main.ts']);
-const PLAIN_ENTRY = /^<[a-z][a-z0-9-]*>.ts$/;
-
-/**
- * BE_SOURCE_FORM (R89): every tracked src/ or apps/ TypeScript file of a back end is index.ts, main.ts, a migration of
- * be.persistence, or <kebab-name>.<suffix>.ts with <suffix> in the closed vocabulary ruleParams.be.suffixes (a name such
- * as api.composition.spec.ts keeps its inner words kebab-case). A suffix of ruleParams.be.bannedSuffixes anywhere in the
- * name is refused by name. Paths no slot owns are HFS_SLOT_UNDECLARED's, not this code's.
- */
-function sourceFormFindings({ files, resolver }) {
-  const { suffixes, bannedSuffixes } = resolver.ruleParams();
-  // A suffix a slot names in its own file pattern (`*.builder.ts` of be.tests.fixtures.builders) is that slot's role: a file with it
-  // anywhere else is refused, so a builder cannot live beside a service or in the fixtures root.
-  const boundSuffixes = new Map();
-  for (const slot of resolver.slots()) {
-    const bound = /\*\.([a-z0-9-]+)\.ts$/.exec(slot.path ?? '')?.[1];
-    if (bound && suffixes.includes(bound)) boundSuffixes.set(bound, slot);
-  }
-  const findings = [];
-  for (const file of files) {
-    if (!file.endsWith('.ts') || !SOURCE_ROOT.test(file)) continue;
-    const c = resolver.classifyPath(file);
-    if (c.status !== 'owned' || c.tracking === 'ignored') continue;
-    const base = path.posix.basename(file);
-    if (FREE_NAMES.has(base)) continue;
-    // A literal file name the owning slot itself requires or allows (persistence/connection.ts, world/global-setup.ts) is its role.
-    const slot = resolver.slot(c.slot);
-    if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].some((entry) => entry === base)) continue;
-    // A slot whose `allows` holds a bare <name>.ts entry (be.tests.world.kit) names its files plainly, as platform/primitives does: kebab-case is the whole form.
-    const admitted = allowsFile(resolver, file);
-    if (admitted?.allowed && PLAIN_ENTRY.test(admitted.entry ?? '') && KEBAB.test(base.slice(0, -'.ts'.length))) continue;
-    if (c.slot === 'be.persistence' && path.posix.basename(path.posix.dirname(file)) === 'migrations') continue;
-    const parts = base.slice(0, -'.ts'.length).split('.');
-    const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));
-    if (banned) {
-      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})` });
-    } else if (boundSuffixes.has(parts.at(-1)) && parts.length >= 2 && boundSuffixes.get(parts.at(-1)).id !== c.slot) {
-      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: parts.at(-1), message: `${file}: the suffix .${parts.at(-1)}.ts belongs to ${boundSuffixes.get(parts.at(-1)).path} only; move the file there` });
-    } else if (parts.length < 2 || !parts.every((part) => KEBAB.test(part)) || !suffixes.includes(parts.at(-1))) {
-      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, message: `${file}: the name must be <kebab-name>.<suffix>.ts with a suffix from the closed list (${suffixes.join(', ')}), or index.ts, main.ts or a migration` });
-    }
-  }
-  return findings;
-}
-
 /** Instances (slot, root, bindings) present in the tracked tree, for every slot that names required files or a minimum. */
 function instancesOf(resolver, files) {
   const found = new Map();
@@ -267,7 +221,7 @@ function treeFindings({ repoRoot, resolver }) {
  * counts}; a missing or invalid hfs.json is one HFS_DECLARATION_INVALID / HFS_MANIFEST_MAJOR_MISMATCH error finding, never
  * an exception.
  */
-export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only, extraFindings = [], tree = files === undefined, manifest = loadSlotManifest({ root }) }) {
+export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only, extraFindings = [], tree = files === undefined, manifest = loadSlotManifest({ root }), surface = 'all' }) {
   const why = readWhy(root);
   let repo;
   try {
@@ -285,25 +239,7 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
   const scoped = only ? new Set(only) : null;
   const inScope = (file) => !scoped || scoped.has(file);
 
-  for (const file of tracked) {
-    if (!inScope(file)) continue;
-    if (repo.profile === 'fe' && isFeTestPath(file)) continue;   // a test path of a front end is FE_NO_TESTS's, the one finding of that file
-    const c = resolver.classifyPath(file);
-    if (c.status === 'no-slot') {
-      findings.push({ code: 'HFS_SLOT_UNDECLARED', level: 'error', path: file, nearest: c.nearest, message: `${file} matches no slot${c.nearest ? `; nearest slot ${c.nearest.slot} (${c.nearest.pattern}), matched ${c.nearest.matchedPrefix || '.'} then expected ${c.nearest.expectedNext ?? 'nothing'}` : ''}` });
-    } else if (c.status === 'ambiguous') {
-      findings.push({ code: 'HFS_SLOT_AMBIGUOUS', level: 'error', path: file, candidates: c.candidates, message: `${file} is owned equally by ${c.candidates.map((x) => x.slot ?? x).join(', ')}` });
-    } else if (c.status === 'not-enabled') {
-      findings.push({ code: 'HFS_SLOT_NOT_ENABLED', level: 'error', path: file, slot: c.slot, message: `${file} belongs to ${c.slot}, an opt-in slot hfs.json neither lists in optionalSlots nor implies through an app kind` });
-    } else if (c.status === 'forbidden') {
-      const slot = resolver.slot(c.slot);
-      if (slotOwnsSecrets(slot)) continue;   // the secret scan reports the file (R06): one finding per file
-      const own = slot.rules?.includes('HFS_TOOL_CONFIG_LOCAL') ? 'HFS_TOOL_CONFIG_LOCAL' : 'HFS_FORBIDDEN_PRESENT';
-      findings.push({ code: own, level: 'error', path: file, slot: c.slot, goesTo: c.goesTo, message: `${file} is tracked but ${c.slot} is forbidden in the tree${c.goesTo ? `; it belongs at ${c.goesTo}` : ''}` });
-    } else if (c.tracking === 'ignored') {
-      findings.push({ code: 'HFS_TRACKED_MUST_BE_IGNORED', level: 'error', path: file, slot: c.slot, message: `${file} is tracked but ${c.slot} must be gitignored` });
-    }
-  }
+  findings.push(...pathFindings({ files: tracked.filter(inScope), resolver, profile: repo.profile }));
 
   const required = resolver.requiredPaths();
   const missing = new Set();
@@ -329,7 +265,6 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
   // The tree checks of the rules that read file content or configuration (hfs-rules/*): whole-repository, cheap, no tool run.
   const secrets = secretFindings({ repoRoot, files: tracked.filter(inScope), resolver });
   const declared = declaration === undefined ? readJson(repoRoot, 'hfs.json') : declaration;
-  if (repo.profile === 'be') findings.push(...sourceFormFindings({ files: tracked.filter(inScope), resolver }));
   findings.push(
     ...secrets,
     ...depFindings({ repoRoot, files: tracked }),
@@ -337,7 +272,7 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
     ...contractFindings({ repoRoot, files: tracked, repo, resolver, stacks: declared?.stacks }),
     ...repoLocalCheckFindings({ repoRoot, files: tracked }),
     ...lintSuppressionFindings({ repoRoot, files: tracked }),
-    ...(repo.profile === 'be' ? [...stacksFindings({ repoRoot, files: tracked, resolver }), ...testTopologyFindings({ repoRoot, files: tracked }), ...specPlacementFindings({ files: tracked, resolver }), ...proofCommandFindings({ repoRoot, files: tracked, resolver })] : [...frontendFindings({ repoRoot, files: tracked, repo }), ...feNoTestsFindings({ repoRoot, files: tracked.filter(inScope) })]),
+    ...(repo.profile === 'be' ? [...stacksFindings({ repoRoot, files: tracked, resolver }), ...testTopologyFindings({ repoRoot, files: tracked }), ...proofCommandFindings({ repoRoot, files: tracked, resolver })] : [...frontendFindings({ repoRoot, files: tracked, repo }), ...feNoTestsFindings({ repoRoot, files: tracked.filter(inScope) })]),
     ...extraFindings,
   );
 
@@ -351,7 +286,8 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
 
   if (tree) findings.push(...treeFindings({ repoRoot, resolver }));
 
-  const finished = withWhy(findings, why);
+  // `hfs check` leaves to the lint canon the per-path findings that sit on an existing TypeScript file (hfs-path-findings.mjs).
+  const finished = withWhy(surface === 'check' ? findings.filter((finding) => !(finding.origin === 'repo' && onLintSurface(repoRoot, finding))) : findings, why);
   const counts = summarize(finished);
   return { ok: counts.error === 0, repoRoot, manifest: manifest.version, profile: repo.profile, apps: repo.apps, tracked: tracked.length, findings: finished, counts };
 }
@@ -399,8 +335,8 @@ function machineFindings(report) {
  */
 export function checkRepository({ repoRoot, root = skillRoot, fast = false, base, extraFindings = [], manifest = loadSlotManifest({ root }), machine = checkArchitecture }) {
   const changed = fast ? changedSince(repoRoot, base) : null;
-  const baseSha = changed ? changed.base : (base ? (mergeBaseOf(repoRoot, base) ?? refuse('HFS_REPO_UNREADABLE', `--base ${base} has no merge-base with HEAD`, { repoRoot, base })) : undefined);
-  const slotResult = checkRepo({ repoRoot, root, manifest, extraFindings, ...(changed ? { only: changed.files, tree: false } : {}) });
+  const baseSha = changed?.base;
+  const slotResult = checkRepo({ repoRoot, root, manifest, extraFindings, surface: 'check', ...(changed ? { only: changed.files, tree: false } : {}) });
   if (slotResult.profile === null) return { ...slotResult, machine: { status: 'skipped', reason: 'hfs.json is not valid' } };
 
   let paths;

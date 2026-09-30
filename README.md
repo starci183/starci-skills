@@ -60,7 +60,7 @@ maps the runtime directories below.
 From this repository root, run `npm ci`, `npm run check` for syntax and contract gates,
 and `npm test` for the Node test suite. The runtime package has no separate TypeScript
 typecheck, lint, or build script; product examples declare their own `typecheck`,
-`lint:check`, `build`, and `test` commands. Run the runtime presentation gate with
+`lint`, `build`, and `test` commands. Run the runtime presentation gate with
 `node scripts/checks/repo-presentation.mjs --root . --runtime`.
 
 ## Install

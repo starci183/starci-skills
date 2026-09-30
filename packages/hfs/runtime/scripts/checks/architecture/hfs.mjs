@@ -189,7 +189,7 @@ function privateHost(hostname) {
 
 // The scripts the README Development section shows; each is required only when the managed package-scripts template of the
 // profile (packages/hfs/templates/<profile>/package-scripts/package.json, the one source of the managed script names) has it.
-const DEVELOPMENT_SCRIPTS = ['typecheck', 'lint:check', 'build', 'test'];
+const DEVELOPMENT_SCRIPTS = ['typecheck', 'lint', 'build', 'test'];
 // The templates sit beside the runtime in a checkout (packages/hfs/templates) and one level above the bundled runtime of @starci/hfs.
 const TEMPLATE_ROOTS = [path.resolve(import.meta.dirname, '..', '..', '..', 'packages', 'hfs', 'templates'), path.resolve(import.meta.dirname, '..', '..', '..', '..', 'templates')];
 const managedScriptCache = new Map();

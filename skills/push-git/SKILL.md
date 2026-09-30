@@ -27,7 +27,7 @@ nothing is ahead.
    only counted). If it is dirty, the run reports the dirty paths and stops for that repository.
 2. The full suite, every step to a log file:
    - `.claude`: `npm test` and `npm run check`.
-   - product repository: `npm run typecheck`, `npm run lint:check`, `npm run test:unit` (unit only - e2e is manual-only
+   - product repository: `npm run typecheck`, `npm run lint`, `npm run test:unit` (unit only - e2e is manual-only
      and never run), `npm run build` where the script exists, and `canon-scan`. A script the repository lacks is
      reported `absent`.
 3. Red: the run prints the failures grouped by spec file (typecheck, lint and canon by file), exits 1 and STOPS - no

@@ -25,7 +25,7 @@ function clone(t, at) {
   const root = at ? path.join(top, at) : top;
   write(top, 'stray.txt');
   write(root, 'forbidden-entry.txt');
-  write(root, '.husky/pre-push', 'npm run lint:check\n');
+  write(root, '.husky/pre-push', 'npm run lint\n');
   git(top, 'config', '--local', 'core.hooksPath', '.git/no-hooks');
   git(top, 'add', '-A');
   return { top, root };
