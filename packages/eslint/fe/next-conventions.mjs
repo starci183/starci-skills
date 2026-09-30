@@ -12,7 +12,8 @@
  */
 
 import { attribute, attributeValue, calleeName, leadingTextOf, stringOf } from "./lib/ast.mjs"
-import { baseName, isSpecFile, stem } from "./lib/scope.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { baseName, isSpecFile, slotOfFile, stem } from "./lib/scope.mjs"
 import { normalizePath } from "./lib/path.mjs"
 
 /** Another i18n stack: a second place that decides which language a reader sees. */
@@ -329,6 +330,84 @@ export const noHardcodedRoute = {
   },
 }
 
+// -- FE-NEXT-10 -----------------------------------------------------------------------------------
+
+/** The next-intl stack factories: module specifier -> the export that builds one layer of the stack (`default` for a default export). */
+const STACK_FACTORIES = new Map([
+  ["next-intl/routing", new Set(["defineRouting"])],
+  ["next-intl/navigation", new Set(["createNavigation"])],
+  ["next-intl/server", new Set(["getRequestConfig"])],
+  ["next-intl/middleware", new Set(["default"])],
+])
+
+/** The variable a name binds to, walking up from the scope of a node. */
+const bindingOf = (context, identifier) => {
+  let scope = (context.sourceCode ?? context.getSourceCode()).getScope(identifier)
+  while (scope) {
+    const variable = scope.set.get(identifier.name)
+    if (variable) return variable.defs[0] ?? null
+    scope = scope.upper
+  }
+  return null
+}
+
+/** The name a stack factory has where the call reads it: "defineRouting" (next-intl/routing), else null. */
+const stackFactoryOf = (context, callee) => {
+  if (callee.type === "Identifier") {
+    const definition = bindingOf(context, callee)
+    if (definition?.type !== "ImportBinding") return null
+    const source = String(definition.parent.source.value)
+    const specifier = definition.node
+    const exported = specifier.type === "ImportSpecifier" ? specifier.imported.name ?? specifier.imported.value : specifier.type === "ImportDefaultSpecifier" ? "default" : null
+    return exported !== null && STACK_FACTORIES.get(source)?.has(exported) ? { source, name: exported === "default" ? "createMiddleware" : exported } : null
+  }
+  if (callee.type === "MemberExpression" && !callee.computed && callee.object.type === "Identifier" && callee.property.type === "Identifier") {
+    const definition = bindingOf(context, callee.object)
+    if (definition?.type !== "ImportBinding" || definition.node.type !== "ImportNamespaceSpecifier") return null
+    const source = String(definition.parent.source.value)
+    return STACK_FACTORIES.get(source)?.has(callee.property.name) ? { source, name: callee.property.name } : null
+  }
+  return null
+}
+
+/**
+ * The next-intl stack is written once per repository.
+ *
+ * `defineRouting` (`next-intl/routing`), `createNavigation` (`next-intl/navigation`), `getRequestConfig` (`next-intl/server`) and
+ * `createMiddleware` (`next-intl/middleware`), resolved by the import that binds the called name (a renamed import or a namespace
+ * member counts), are called only in a file of the i18n package (slot `fe.package.i18n`, `createAppI18n`), or in the `fe.modules.i18n`
+ * slot of a repository that declares exactly one app. In a multi-app repository an app's `modules/i18n` imports the package
+ * factory; three byte-identical `request.ts` files, one per app, are three stacks that drift.
+ *
+ * It does not replace `no-second-i18n-stack`: that rule refuses another i18n LIBRARY at its import, this one refuses a second copy of
+ * next-intl's own stack. Different evidence, different remedy.
+ */
+export const i18nStackInOneModule = {
+  meta: {
+    type: "problem",
+    docs: { description: "next-intl's routing, navigation, request config and middleware factories are called only in the i18n package (or the only app's `modules/i18n`)." },
+    schema: [],
+    messages: {
+      stack:
+        "`{{name}}` builds a layer of the next-intl stack here. The stack is written once per repository, {{where}}; a copy in an app is a second stack that drifts from the first (three apps once carried byte-identical `request.ts` files). Import what the shared factory returns instead of calling `{{name}}`.",
+    },
+  },
+  create(context) {
+    if (isSpecFile(context.filename || context.getFilename())) return {}
+    const hfs = hfsOf(context)
+    const slot = slotOfFile(context)
+    const single = hfs.apps.length === 1
+    if (slot === "fe.package.i18n" || (slot === "fe.modules.i18n" && single)) return {}
+    const where = single ? "in the app's `modules/i18n`" : "in the i18n package (`packages/<family>-i18n`, exported as `createAppI18n`) that every app's `modules/i18n` calls"
+    return {
+      CallExpression(node) {
+        const factory = stackFactoryOf(context, node.callee)
+        if (factory) context.report({ node, messageId: "stack", data: { name: factory.name, where } })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-middleware-file": noMiddlewareFile,
@@ -340,6 +419,7 @@ export const rules = {
   "navigation-from-intl": navigationFromIntl,
   "no-native-anchor": noNativeAnchor,
   "no-hardcoded-route": noHardcodedRoute,
+  "i18n-stack-in-one-module": i18nStackInOneModule,
 }
 
 /** Every rule is an error. */

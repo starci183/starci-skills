@@ -7,8 +7,10 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
+import { at, FE_DECLARATION, slotTester } from "./fixtures/typed/tester.mjs"
 import {
   htmlLangFromLocale,
+  i18nStackInOneModule,
   localeSegmentIsLocale,
   navigationFromIntl,
   noHardcodedRoute,
@@ -204,6 +206,71 @@ test("FE-NEXT-9: a route is built by modules/routes, not written at the call", (
       { filename: NAV, code: 'router.push("/agentos/workspaces/new")', errors: [{ messageId: "route" }] },
       { filename: NAV, code: "router.replace(`/orders/${id}`)", errors: [{ messageId: "route" }] },
       { filename: "D:/repo/src/features/pages/Home/index.tsx", code: 'redirect("/sign-in")', errors: [{ messageId: "route" }] },
+    ],
+  })
+})
+
+test("FE-NEXT-10: the next-intl stack is written once per repository", () => {
+  const multi = slotTester()
+  const single = slotTester({ declaration: { ...FE_DECLARATION, apps: [{ name: "web", kind: "next" }] } })
+  const ROUTING = 'import { defineRouting } from "next-intl/routing"\nexport const routing = defineRouting({ locales: ["vi"], defaultLocale: "vi", localePrefix: "as-needed" })'
+  const NAVIGATION = 'import { createNavigation } from "next-intl/navigation"\nexport const { Link } = createNavigation(routing)'
+  const REQUEST = 'import { getRequestConfig } from "next-intl/server"\nexport default getRequestConfig(async () => ({ locale: "vi", messages: {} }))'
+  const MIDDLEWARE = 'import createMiddleware from "next-intl/middleware"\nexport const proxy = createMiddleware(routing)'
+  const PACKAGE = at("packages/nivo-i18n/src/app.ts")
+  const APP_INDEX = at("apps/web/src/modules/i18n/index.ts")
+  const APP_REQUEST = at("apps/web/src/modules/i18n/request.ts")
+  multi.run("i18n-stack-in-one-module", i18nStackInOneModule, {
+    valid: [
+      // the package factory is where the stack is written, all four layers
+      { filename: PACKAGE, code: ROUTING },
+      { filename: PACKAGE, code: NAVIGATION },
+      { filename: PACKAGE, code: REQUEST },
+      { filename: PACKAGE, code: MIDDLEWARE },
+      { filename: at("packages/nivo-i18n/src/request.ts"), code: REQUEST },
+      // an app calls the package factory, not next-intl's
+      { filename: APP_INDEX, code: 'import { createAppI18n } from "@nivo/i18n"\nexport const i18n = createAppI18n({ locales: ["vi"] })' },
+      { filename: APP_REQUEST, code: 'import { i18n } from "./index"\nexport default i18n.requestConfig' },
+      // using the stack's products is not building one
+      { filename: at("apps/web/src/features/pages/home/component.tsx"), code: 'import { useTranslations } from "next-intl"\nimport { getTranslations } from "next-intl/server"\nconst t = await getTranslations("home")' },
+      // a function that only has the name, not bound to next-intl
+      { filename: APP_REQUEST, code: 'import { getRequestConfig } from "./config"\nexport default getRequestConfig(async () => ({}))' },
+      { filename: APP_REQUEST, code: "const getRequestConfig = (f) => f\nexport default getRequestConfig(() => 1)" },
+      { filename: APP_REQUEST, code: "export const x = api.createNavigation(routing)" },
+      // the same name from the same module, but not called
+      { filename: APP_INDEX, code: 'import type { defineRouting } from "next-intl/routing"\nexport type Define = typeof defineRouting' },
+      // a spec builds a stack to prove a module
+      { filename: at("apps/web/src/modules/i18n/request.spec.ts"), code: NAVIGATION },
+    ],
+    invalid: [
+      // a multi-app repository: no app builds a layer, whichever layer and however it is imported
+      { filename: APP_REQUEST, code: REQUEST, errors: [{ messageId: "stack" }] },
+      { filename: at("apps/admin/src/modules/i18n/request.ts"), code: REQUEST, errors: [{ messageId: "stack" }] },
+      { filename: at("apps/web/src/modules/i18n/routing.ts"), code: ROUTING, errors: [{ messageId: "stack" }] },
+      { filename: at("apps/web/src/modules/i18n/navigation.ts"), code: NAVIGATION, errors: [{ messageId: "stack" }] },
+      { filename: at("apps/web/src/proxy.ts"), code: MIDDLEWARE, errors: [{ messageId: "stack" }] },
+      { filename: APP_REQUEST, code: 'import { getRequestConfig as request } from "next-intl/server"\nexport default request(async () => ({}))', errors: [{ messageId: "stack" }] },
+      { filename: APP_REQUEST, code: 'import * as server from "next-intl/server"\nexport default server.getRequestConfig(async () => ({}))', errors: [{ messageId: "stack" }] },
+      { filename: APP_REQUEST, code: 'import mw from "next-intl/middleware"\nexport const proxy = mw(routing)', errors: [{ messageId: "stack" }] },
+      // outside `modules/i18n` altogether, and in a package that is not the i18n package
+      { filename: at("apps/web/src/hooks/lesson/useLesson.ts"), code: NAVIGATION, errors: [{ messageId: "stack" }] },
+      { filename: at("packages/nivo-ui/src/leaves/Menu/component.tsx"), code: NAVIGATION, errors: [{ messageId: "stack" }] },
+      { filename: at("packages/nivo-api/src/client.ts"), code: REQUEST, errors: [{ messageId: "stack" }] },
+    ],
+  })
+  single.run("i18n-stack-in-one-module", i18nStackInOneModule, {
+    valid: [
+      // a repository with exactly one app writes the stack in that app's modules/i18n
+      { filename: APP_REQUEST, code: REQUEST },
+      { filename: at("apps/web/src/modules/i18n/routing.ts"), code: ROUTING },
+      { filename: at("apps/web/src/modules/i18n/navigation.ts"), code: NAVIGATION },
+      { filename: PACKAGE, code: REQUEST },
+    ],
+    invalid: [
+      // still one place: not a hook, a feature or the proxy
+      { filename: at("apps/web/src/hooks/lesson/useLesson.ts"), code: NAVIGATION, errors: [{ messageId: "stack" }] },
+      { filename: at("apps/web/src/features/pages/home/component.tsx"), code: REQUEST, errors: [{ messageId: "stack" }] },
+      { filename: at("apps/web/src/proxy.ts"), code: MIDDLEWARE, errors: [{ messageId: "stack" }] },
     ],
   })
 })
