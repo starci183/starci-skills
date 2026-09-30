@@ -421,7 +421,7 @@ P2 vệ sinh.
     inline trong `start-workflow-restart.spec` với env var khác helper chung.
 33. Packages: `packages/grammar/reference-renders/` 15 MB PNG tracked, không ai đọc;
     `packages/package.json` workspaces chỉ `eslint/*`, engines 20.9 vs root 22.13;
-    `e2e-kit`/`fe-kit` chỉ examples dùng. `examples/todo-app-backend/coverage/` tracked
+    `fe-kit` chỉ examples dùng. `examples/todo-app-backend/coverage/` tracked
     dù CONTRIBUTING cấm generated output.
 34. `package.json`: không `check`/`lint`; `tests/` + `scripts/` ship trong tarball;
     `.experiments/` tracked. `config.yaml` local đã drift so với example (`debug: true`

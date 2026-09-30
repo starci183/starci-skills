@@ -6,7 +6,7 @@ name: todo-app-example
 # examples/todo-app-backend/README.md#continuous-verification for the job-by-job summary. The live stack and
 # Playwright UAT job is e2e and runs MANUALLY only (owner ruling 2026-09-29): see todo-app-live-e2e.yml.
 #
-# Both example apps compile sources out of packages/ (`@fe-kit/*`, `@e2e-kit/*`), so a change there is a
+# Both example apps compile sources out of packages/ (`@fe-kit/*`), so a change there is a
 # change to what these jobs check.
 
 on:

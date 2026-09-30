@@ -163,15 +163,6 @@ exceptions:
     reason: npm lockfile; package managers require JSON filename and syntax.
   - path: package.json
     reason: npm package manifest; Node/npm require JSON filename and syntax.
-  - path: packages/e2e-kit/package-lock.json
-    reason: >
-      npm lockfile inside the packages workspace project; npm writes JSON by contract.
-  - path: packages/e2e-kit/package.json
-    reason: >
-      npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
-  - path: packages/e2e-kit/tsconfig.json
-    reason: >
-      TypeScript toolchain config inside the packages workspace project; tsc reads JSON (with comments).
   - path: packages/eslint/be/package.json
     reason: >
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.

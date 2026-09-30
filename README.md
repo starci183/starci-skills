@@ -134,7 +134,7 @@ benchmark/          model-pool evidence: expectations.yaml, append-only snapshot
 docs/               documentation
 examples/           reference projects with recorded .starciwork evidence
 tests/              node:test specs — npm test
-packages/           vendored toolkits (eslint configs, grammar, e2e-kit, fe-kit, heroicons)
+packages/           vendored toolkits (eslint configs, grammar, fe-kit, heroicons)
 ```
 
 ## CLI

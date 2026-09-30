@@ -10,7 +10,7 @@ import {enclosingRepository, loadArchitectureConfig} from '../scripts/checks/arc
  * `--root` is that project, not the repository, so a `file:` dependency pointing at a sibling package
  * resolves outside `--root` while still being an ordinary, resolvable part of the same checkout - which is
  * exactly the shape `examples/todo-app-backend` and `examples/todo-app-frontend` have against
- * `packages/e2e-kit` and `packages/fe-kit`. Refusing it failed the whole architecture check closed
+ * `packages/shared-kit` and `packages/fe-kit`. Refusing it failed the whole architecture check closed
  * (ARCH_CONFIG_INVALID) over a monorepo layout nobody had done anything wrong in.
  *
  * The boundary is therefore the enclosing git repository rather than `--root`, and the three cases that
@@ -59,9 +59,9 @@ test('a file: dependency inside the same repository resolves without becoming a 
   const {root, write, manifest} = repo(t);
   write('.git', 'gitdir: elsewhere\n');
   manifest('', {name: 'monorepo', version: '0.0.0', private: true});
-  project(write, manifest, 'examples/app', {'@kit/e2e': 'file:../../packages/e2e-kit'});
-  manifest('packages/e2e-kit', {name: '@kit/e2e', version: '0.0.0'});
-  write('packages/e2e-kit/src/index.ts', 'export const kit = 1;\n');
+  project(write, manifest, 'examples/app', {'@kit/e2e': 'file:../../packages/shared-kit'});
+  manifest('packages/shared-kit', {name: '@kit/e2e', version: '0.0.0'});
+  write('packages/shared-kit/src/index.ts', 'export const kit = 1;\n');
 
   const config = loadArchitectureConfig(path.join(root, 'examples/app'));
   assert.deepEqual(config.workspaces, [],
@@ -95,8 +95,8 @@ test('a file: dependency pointing at something that is not a package is refused 
 test('with no repository around it, the project itself is the boundary', t => {
   const {root, write, manifest} = repo(t);
   manifest('', {name: 'monorepo', version: '0.0.0', private: true});
-  project(write, manifest, 'examples/app', {'@kit/e2e': 'file:../../packages/e2e-kit'});
-  manifest('packages/e2e-kit', {name: '@kit/e2e', version: '0.0.0'});
+  project(write, manifest, 'examples/app', {'@kit/e2e': 'file:../../packages/shared-kit'});
+  manifest('packages/shared-kit', {name: '@kit/e2e', version: '0.0.0'});
   assert.throws(() => loadArchitectureConfig(path.join(root, 'examples/app')),
     /must resolve to a package directory inside the repository/,
     'the wider boundary is a git checkout, not any parent directory that happens to exist');
