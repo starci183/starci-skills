@@ -13,6 +13,7 @@
     "allowJs": false,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "importHelpers": true,
     "noEmit": true,
     "incremental": false,
     "declaration": false,
