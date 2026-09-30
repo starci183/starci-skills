@@ -107,7 +107,7 @@ provenance:
     - path: "packages/grammar/src/common/components-forms.css"
       sha256: "040d8eaf37ec3339f66d36ac6e1f5ff6a5818a95a68091b40509a642cf0a6229"
     - path: "packages/grammar/src/common/components-overlays.css"
-      sha256: "cdbe09291ec8b64942a9edebb648813db9f3bd38296a0c2cddeffee4b1e4fa90"
+      sha256: "87b538125ce216f4c9fb721f5a0debf53cced370efd067b514e584482bcb445a"
     - path: "packages/grammar/src/common/components-navigation.css"
       sha256: "3ad1b4ee2024ae544fbdb855b52b9e04896936909ce12aea712cfcd306a673e1"
     - path: "packages/grammar/src/common/spacing.ts"
@@ -180,12 +180,12 @@ identity:
     navigation: "19 renderers, COMMON_NAVIGATION_COMPONENTS in src/common/renderers-navigation.ts"
   counts:
     renderers: 96
-    tokens: 157
+    tokens: 156
     tokensAssignedByCommon: 97
     tokensAssignedAndAlsoReadByCommon: 63
     tokensWrittenByRenderers: 2
-    tokensReadOnlyByCommon: 60
-    tokensReadByCommon: 123
+    tokensReadOnlyByCommon: 59
+    tokensReadByCommon: 122
     claimEntries: 408
     distinctClaimIds: 90
     emittedClasses: 398
@@ -494,7 +494,7 @@ tokens:
     assignedBy: "host"
     readBy: "common"
     commonFallback: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace"
-    uses: 1
+    uses: 2
     source: "packages/grammar/src/common/styles.css:1070"
   - name: "--foreground"
     value: "oklch(21.03% 0.0059 285.89)"
@@ -1035,12 +1035,6 @@ tokens:
     assignedBy: "common"
     alsoReadBy: 4
     source: "packages/grammar/src/common/styles.css:1996"
-  - name: "--starci-font-mono"
-    assignedBy: "host"
-    readBy: "common"
-    commonFallback: "ui-monospace, SFMono-Regular, Menlo, monospace"
-    uses: 1
-    source: "packages/grammar/src/common/components-overlays.css:685"
   - name: "--success"
     value: "oklch(73.29% 0.1935 150.81)"
     valueRules: 2

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0 - 2026-10-01
+
+Minor, additive (lane FONT; owner: the brand layer must be able to set the brand typeface).
+
+- **Font tokens.** The grammar now reads `--font-sans` (the core family root's `font-family`) and `--font-mono` (the leading-number
+  and the code/monospace surfaces), each with a system-font fallback, so an app's brand layer sets its typeface on `:root` (and
+  `.dark`) with one token and every component follows. Nothing is re-declared on the family root, so a brand value on `:root` wins.
+- **Removed `--starci-font-sans` and `--starci-font-mono`** (host-set names no product declared; superseded by the two tokens
+  above, no alias kept). The heritage family keeps `--heritage-sans`/`--heritage-display` (its own namespace).
+
 ## 0.7.2 - 2026-09-30
 
 Patch, additive (nivo-fe wave, lane F0; owner approved publishing @starci packages).

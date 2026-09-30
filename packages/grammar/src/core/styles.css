@@ -85,7 +85,7 @@
         min-width: 0;
         background: var(--starci-core-canvas);
         color: var(--starci-core-foreground);
-        font-family: var(--starci-font-sans, ui-sans-serif, system-ui, sans-serif);
+        font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
     }
 
     .grammar-common-root[data-grammar-family="core"][data-grammar-theme="dark"] {

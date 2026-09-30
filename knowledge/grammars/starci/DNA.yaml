@@ -106,7 +106,7 @@ provenance:
     - path: "packages/grammar/src/core/dna.ts"
       sha256: "9fe62c245605c526f2a92b13c8fe91895bae08c1513535c4072f6b6c70cd522d"
     - path: "packages/grammar/src/core/styles.css"
-      sha256: "135ff13d8e77a0e81dd05693faec58c8b11eadab17b359092f9916170bd7c287"
+      sha256: "29c858979b648b2424e796f77184b0dd6aa9ae08df1131196a20d1cca0f756b6"
     - path: "packages/grammar/src/common/registry.tsx"
       sha256: "b640a2809a3bcc97e4a7646adb4610d0ef7b1ed6796caf98ec8761d75a407f78"
 identity:

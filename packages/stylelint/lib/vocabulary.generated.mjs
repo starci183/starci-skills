@@ -89,13 +89,12 @@ export const VENDOR = [
   "--code-surface",
   "--field-border-width",
   "--font-mono",
+  "--font-sans",
   "--muted-surface",
   "--radius-lg",
   "--radius-md",
   "--radius-sm",
   "--radius-xl",
-  "--starci-font-mono",
-  "--starci-font-sans",
   "--trigger-width",
 ]
 
