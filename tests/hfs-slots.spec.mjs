@@ -216,7 +216,7 @@ test('BE fixture: import direction', () => {
   assert.equal(ok('src/modules/integrations/stripe/index.ts', 'src/modules/domain/stock/index.ts').reason, 'tierDirection');
   assert.equal(ok('apps/core/src/app.module.ts', 'src/features/orders/index.ts').allowed, true);
   assert.equal(ok('apps/core/src/app.module.ts', 'apps/worker/src/app.module.ts').reason, 'crossApp');                                     // apps never import each other
-  assert.equal(ok('src/tests/e2e/orders/place.e2e-spec.ts', 'src/tests/e2e/setup/app.ts').allowed, true);
+  assert.equal(ok('src/tests/e2e/orders/place.e2e-spec.ts', 'src/tests/world/use-test-world.ts').allowed, true);
   assert.equal(ok('src/tests/e2e/orders/place.e2e-spec.ts', 'apps/core/src/app.module.ts').allowed, true);                                  // an app's public entry is app.module.ts
   assert.equal(ok('src/tests/e2e/orders/place.e2e-spec.ts', 'apps/core/src/main.ts').reason, 'notPublicEntry');
   assert.equal(ok('src/tests/fixtures/orders.ts', 'src/features/orders/index.ts').reason, 'tierDirection');                                // fixtures never import a feature
@@ -312,6 +312,24 @@ test('classification reports the folder kind and the role of a file from the slo
   assert.equal(at('apps/web/src/hooks/orders/useOrders.ts').role, undefined);
   assert.equal(at('apps/web/src/app/[locale]/cart/page.tsx').role, 'page');
   assert.equal(at('playwright.config.ts').role, 'playwright');
+});
+
+test('BE fixture: test kinds agree folder with suffix, and the retired e2e/world folder is forbidden', () => {
+  const be = openHfs({ declaration: BE });
+  const owner = (p) => { const c = be.classifyPath(p); return `${c.status}:${c.slot ?? ''}`; };
+  assert.equal(owner('src/tests/integration/inbox/claim.integration-spec.ts'), 'owned:be.tests.integration');
+  assert.equal(owner('src/tests/contract/stripe/charge.contract-spec.ts'), 'owned:be.tests.contract');
+  assert.equal(owner('src/tests/world/fakes/stripe/server.ts').split(':')[0], 'owned');
+  const retired = be.classifyPath('src/tests/e2e/world/use-e2e-world.ts');
+  assert.equal(retired.status, 'forbidden');
+  assert.equal(retired.slot, 'be.tests.e2e-world-retired');
+  assert.equal(retired.goesTo.startsWith('src/tests/world/'), true);
+  assert.equal(owner('src/tests/e2e/world/orders.e2e-spec.ts'), 'forbidden:be.tests.e2e-world-retired');
+  assert.equal(owner('src/tests/e2e/orders/place.e2e-spec.ts'), 'owned:be.tests.e2e');
+  // folder <-> suffix: a spec of the other kind matches no slot
+  assert.equal(be.classifyPath('src/tests/integration/inbox/claim.e2e-spec.ts').status, 'no-slot');
+  assert.equal(be.classifyPath('src/tests/e2e/orders/place.integration-spec.ts').status, 'no-slot');
+  assert.equal(be.classifyPath('src/tests/contract/stripe/charge.e2e-spec.ts').status, 'no-slot');
 });
 
 test('an unknown path is reported with its nearest slot and HFS_SLOT_UNDECLARED', () => {

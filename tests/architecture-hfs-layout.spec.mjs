@@ -41,10 +41,10 @@ test('HFS_ROOT_SRC_FORBIDDEN_FE: a front-end repository with a root src/ tree is
   assert.deepEqual(ids(run(t, 'be', { ...ROOT_BE, 'src/modules/domain/alpha/alpha.service.ts': 'export const a = 1;\n' }), 'HFS_ROOT_SRC_FORBIDDEN_FE'), []);
 });
 
-test('HFS_SRC_LAYOUT_INVALID: a back-end src/ child other than features, modules and tests, and a tests/ child other than e2e and fixtures, are findings', t => {
+test('HFS_SRC_LAYOUT_INVALID: a back-end src/ child other than features, modules and tests, and a tests/ child other than world, fixtures, integration, e2e and contract, are findings', t => {
   const bad = run(t, 'be', { ...ROOT_BE, 'src/utils/x.ts': 'export const a = 1;\n', 'src/tests/helpers/y.ts': 'export const b = 1;\n', 'src/features/f/.keep': '', 'src/modules/domain/.keep': '' });
   assert.deepEqual(ids(bad, 'HFS_SRC_LAYOUT_INVALID'), ['src/tests/helpers', 'src/utils']);
-  const good = run(t, 'be', { ...ROOT_BE, 'src/features/f/.keep': '', 'src/modules/domain/.keep': '', 'src/tests/e2e/.keep': '', 'src/tests/fixtures/.keep': '' });
+  const good = run(t, 'be', { ...ROOT_BE, 'src/features/f/.keep': '', 'src/modules/domain/.keep': '', 'src/tests/world/.keep': '', 'src/tests/integration/.keep': '', 'src/tests/e2e/.keep': '', 'src/tests/contract/.keep': '', 'src/tests/fixtures/.keep': '' });
   assert.deepEqual(ids(good, 'HFS_SRC_LAYOUT_INVALID'), []);
 });
 

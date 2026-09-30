@@ -7,5 +7,5 @@
       "@tests/*": ["./src/tests/*"]
     }
   },
-  "exclude": ["node_modules", "dist", "src/tests/e2e"]
+  "exclude": ["node_modules", "dist", "src/tests/world", "src/tests/integration", "src/tests/e2e", "src/tests/contract"]
 }

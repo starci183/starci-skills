@@ -1,5 +1,5 @@
 {{header}}
-# Push gate: types, lint, format, the architecture check on the owners this push touches, unit specs affected since main. Never e2e.
+# Push gate: types, lint, format, the architecture check on the owners this push touches, unit specs affected since main. Never integration, e2e or contract.
 npm run typecheck
 npm run lint:check
 npm run format:check

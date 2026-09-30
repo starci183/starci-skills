@@ -158,8 +158,11 @@ src/features/<feature>/
 src/modules/domain/<capability>/      index.ts, module, module-definition, options, config, decorators, log-events, errors/, persistence/, messages/, services
 src/modules/platform/<capability>/    composition, config, errors, primitives, logging, clock, cqrs are required; database, http, retry, inbox, outbox, ... by need
 src/modules/integrations/<provider>/  index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts, errors/
-src/tests/e2e/<area>/*.e2e-spec.ts    plus e2e/live/<area>/ and e2e/setup/
-src/tests/fixtures/                   typed builders, mock<T>() doubles, database.ts; never imports a feature
+src/tests/world/                      the only test infrastructure: global-setup.ts, use-test-world.ts, fakes/<provider>/
+src/tests/fixtures/                   typed builders and doubles, database.ts (mockEntityManager, fakeTransaction); never imports a feature
+src/tests/integration/<capability>/*.integration-spec.ts   one capability module on the real database, no HTTP
+src/tests/e2e/<area>/*.e2e-spec.ts    flows through the real apps
+src/tests/contract/<provider>/*.contract-spec.ts   provider sandboxes, run only by test:contract
 contracts/<app>/schema.graphql        opt-in committed contract
 ```
 
@@ -373,19 +376,25 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
 
 ## 7. Tests
 
-- Two kinds only: unit `<name>.spec.ts(x)` beside the subject, and e2e `*.e2e-spec.ts`. Backend e2e sits in
-  `src/tests/e2e/<area>/`, environment code in `src/tests/e2e/setup/`, data in `src/tests/fixtures/`. Frontend e2e sits
-  in the root `e2e/`, Playwright only.
-- E2E runs by hand: no husky, lint-staged, default typecheck, coverage, Codecov or automatic CI; the e2e workflow is
-  `workflow_dispatch` only (R12).
-- Backend: one `jest.config.js` (preset `@starci/jest-preset`) with exactly the projects `unit` and `e2e`; ts-jest
-  `diagnostics: false` and `isolatedModules: true`; types are checked by `typecheck` (unit specs included) at pre-push
-  and CI and by `typecheck:e2e` for e2e. `test:e2e` is `npm run typecheck:e2e && jest --selectProjects e2e`.
-  `test:e2e:live` filters by the folder `src/tests/e2e/live/` (`E2E_LIVE=1`), never by file name, and differs from
-  `test:e2e` (R47).
-- Backend e2e boots the real `AppModule` and overrides providers; it never hand-assembles a lane module. Fixtures are
-  typed builders and `mock<T>()` from `@starci/jest-preset`, not `as never` or `as unknown as`; they never import a
-  feature. No `testing/` folder in `src/modules`. A spec does not read source code with `fs` (R48).
+- Backend, four kinds by folder and suffix (R47): unit `<name>.spec.ts` beside its subject; integration
+  `src/tests/integration/<capability>/*.integration-spec.ts` (`useTestWorld({ modules })`, real database, no HTTP); e2e
+  `src/tests/e2e/<area>/*.e2e-spec.ts` (`useTestWorld({ apps })`); contract `src/tests/contract/<provider>/*.contract-spec.ts`
+  (provider sandboxes, skipped without sandbox config). Frontend e2e sits in the root `e2e/`, Playwright only.
+- `src/tests/world/` is the only test infrastructure: `global-setup.ts`, `use-test-world.ts` and `fakes/<provider>/`
+  (network-edge fakes with `failNext`, `replayWebhook`, `delay`, plus payload fixtures). Nothing under `src/tests`
+  overrides a provider or DI token: external services are network fakes, everything first-party is real.
+  `src/tests/fixtures/` holds typed doubles and builders; a unit spec takes `mockEntityManager()` and
+  `fakeTransaction()` from `src/tests/fixtures/database.ts` (R48).
+- Integration, e2e and contract run by hand: no husky, lint-staged, default typecheck, coverage, Codecov or automatic
+  CI; the e2e workflow is `workflow_dispatch` only (R12). `test:contract` is never part of `test` or `test:e2e`.
+- Backend: one `jest.config.js` (preset `@starci/jest-preset`) with exactly the projects `unit`, `integration`, `e2e`
+  and `contract`; ts-jest `diagnostics: false` and `isolatedModules: true`; types are checked by `typecheck` (unit specs
+  and fixtures included) at pre-push and CI and by `typecheck:tests` (`src/tests/tsconfig.json`) for the world,
+  integration, e2e and contract trees. `test:integration`, `test:e2e` and `test:contract` are each
+  `npm run typecheck:tests && jest --selectProjects <name>`; `test` is `jest --selectProjects unit`.
+- A backend e2e boots the real apps through the world; it never hand-assembles a lane module. Fixtures are typed
+  builders and doubles, not `as never` or `as unknown as`; they never import a feature. No `testing/` folder in
+  `src/modules`. A spec does not read source code with `fs` (R48).
 - Frontend: Playwright projects for 1440x900, 768x1024 and 390x844; no absolute path, docker call or write to another
   repository; no `test.skip` for a missing environment; one axe assertion per connected screen; no class-string pinning
   in component specs (R66, R67).
@@ -416,7 +425,7 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
   `@starci/playwright-preset`, `@starci/stylelint-canon`, and the `@starci/hfs` CLI (`check`, `sync`, `contract:*`).
   Files that cannot extend (husky, workflow, `.gitignore` block, sonar, codecov) are generated by `hfs sync` and
   hash-checked (R05). A back end's whole tool configuration is generated too: `tsconfig.json` (the preset and the three
-  aliases), `tsconfig.build.json`, `src/tests/e2e/tsconfig.json` (the e2e tree's own config, found by typed lint and `typecheck:e2e`), the one-line `eslint.config.mjs`, `jest.config.js`, `.prettierrc`,
+  aliases), `tsconfig.build.json`, `src/tests/tsconfig.json` (the config of the world, integration, e2e and contract trees, found by typed lint and `typecheck:tests`), the one-line `eslint.config.mjs`, `jest.config.js`, `.prettierrc`,
   `.prettierignore`, and the `scripts` block of `package.json`. A front end's is the same mechanism: `tsconfig.json` (the
   `next.json` preset, excluding the e2e tree), `tsconfig.e2e.json`, the one-line `eslint.config.mjs` (one ESLint run over apps, packages and `e2e/`), the one-line `stylelint.config.mjs`
   (`appTokens` derived from the `globals.css` files by `loadAppTokens`), the one-line `vitest.config.ts`, `.prettierrc`, `.prettierignore`, and the
@@ -458,7 +467,7 @@ A rule's gates are data in `rules.yaml`; adding a rule to a gate edits the manif
 3. No feature or owner is left uncomposed or unmounted; no dead export.
 4. The backend and frontend contracts match by hash.
 5. `typecheck`, `lint:check`, `build`, `test:unit`, `prettier --check` and the Sonar gate are green.
-6. `typecheck:e2e` is green and `lint:check` (which lints `e2e/` in the same ESLint run) is green; e2e still runs by hand.
+6. `typecheck:tests` (back end) or `typecheck:e2e` (front end) is green and `lint:check` is green; integration, e2e and contract still run by hand.
 7. `git status` is clean, with no untracked entry outside a slot marked `ignored`.
 
 ## 12. Rule catalog
@@ -520,8 +529,8 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R44 | `BE_SECRET_DEFAULT` | No default for a secret key or infrastructure URL. |
 | R45 | `BE_MODULE_SHAPE` | `@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport; every handler and provider registered exactly once. |
 | R46 | `BE_BACKGROUND_UNOWNED` | Every sweep, outbox or retry has a job or consumer run by a worker app. |
-| R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`; ONE e2e world (`src/tests/e2e/world`: global-setup runs `apps/migrate` once, `useE2eWorld({ apps })` gives `world.apps.<name>.api`, `world.db.<connection>`, `world.fake`, `world.waitFor`) owns containers, DataSource, migrations and `process.env`; an e2e spec never imports or does any of them, and e2e fakes only external services (integration tokens), never a first-party app, module or provider. |
-| R48 | `BE_SPEC_QUALITY` | No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); an e2e enters through transport, waits with `waitFor`, boots through `src/tests/e2e/setup`, reads persisted state back and reaches no model provider. |
+| R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit`, `integration`, `e2e` and `contract`, live by folder, `diagnostics: false`; unit specs `<name>.spec.ts` sit beside their subject (a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec) and take `mockEntityManager()` and `fakeTransaction()` from `src/tests/fixtures/database.ts`; `src/tests/world/` is the ONLY test infrastructure: `global-setup.ts` runs `apps/migrate` once, `use-test-world.ts` exports `useTestWorld({ apps } | { modules })` (`world.apps.<name>.api`, `world.db.<connection>`, `world.fake.<provider>`, `world.waitFor`) and `fakes/<provider>/` holds the network-edge fakes (`failNext`, `replayWebhook`, `delay`, payload fixtures); it alone owns containers, DataSource, migrations and `process.env`; nothing under `src/tests` overrides a provider or DI token, external services are network fakes only; `src/tests/integration/<capability>/*.integration-spec.ts` (`{ modules }`, real database, no HTTP), `src/tests/e2e/<area>/*.e2e-spec.ts` (`{ apps }`) and `src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped without sandbox config, run only by `test:contract`, never by `test` or `test:e2e`) agree folder with suffix; no `.test.ts`, `int-spec` or `harness-spec`, no `live/` and no `src/tests/e2e/world`. |
+| R48 | `BE_SPEC_QUALITY` | No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); a unit spec takes its EntityManager from `mockEntityManager()` or `fakeTransaction()`, never an ad-hoc `jest.fn` object; an e2e enters through transport, waits with `waitFor`, boots through `useTestWorld`, reads persisted state back and reaches no model provider. |
 | R68 | `BE_SQL_INTERPOLATED` | SQL text carries no runtime substitution; values are numbered parameters. |
 | R69 | `BE_QUERY_UNBOUNDED` | A read that can return many rows states `take`, `limit` or `LIMIT`, or pages by cursor. |
 | R70 | `BE_HTTP_TIMEOUT` | Every outbound `fetch`, axios or HttpService call states a timeout or an abort signal. |
@@ -537,7 +546,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R80 | `BE_INBOX_DEDUPE_MISSING` | Every consumer and every `SignedWebhook` handler makes `claim(source, eventId)` on the `Inbox` port its first awaited expression and returns early when the claim answers `false`. |
 | R81 | `BE_HAND_ROLLED_RETRY` | A loop that catches an error and waits before trying again goes through the shared `platform/retry` helper, never a hand-written loop. |
 | R82 | `BE_TRANSACTION_EXTERNAL_CALL` | No transaction spans an external call; commit first and call out after, or write an outbox message inside the transaction. |
-| R83 | `BE_UNNAMED_DATA_ACCESS` | The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, `apps/migrate` and the e2e world `src/tests/e2e/world`, whose `world.db.<connection>` EntityManager the specs use. |
+| R83 | `BE_UNNAMED_DATA_ACCESS` | The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, `apps/migrate` and the test world `src/tests/world`, whose `world.db.<connection>` EntityManager the specs use. |
 | R84 | `BE_CONNECTION_DUPLICATE` | One physical database is one connection and one `Inject<Conn>EntityManager()` injector declared once in `platform/database`; `hfs.json` connections, connection files, injectors and module registrations correspond one to one. |
 | R85 | `BE_RAW_INJECT` | Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there. |
 | R86 | `BE_SQL_TABLE_OWNER` | SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded. |

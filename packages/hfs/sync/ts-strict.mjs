@@ -1,5 +1,5 @@
 // HFS_TS_STRICT (R22): a repository's root tsconfig.json extends the canon preset (be.json for a back end, next.json for a
-// front end), adds `paths` when the template has them and the template's `exclude` (the e2e tree, which its own tsconfig checks),
+// front end), adds `paths` when the template has them and the template's `exclude` (the world, integration, e2e and contract trees of a back end, which src/tests/tsconfig.json checks; the e2e tree of a front end),
 // and nothing else. Every strict flag lives in @starci/tsconfig; a repository that sets, lowers or adds any compiler option, or changes the program with
 // include/exclude/files/references, has left the preset. The expected shape is read from the rendered
 // template (templates/<profile>/tool-config/tsconfig.json), so the preset name and the aliases exist in one place only.

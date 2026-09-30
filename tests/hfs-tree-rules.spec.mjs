@@ -229,7 +229,7 @@ test('BE_TEST_TOPOLOGY: a .test file, a testing/ folder, a second jest configura
 test('BE_TEST_TOPOLOGY: unit specs beside their subject, the root jest.config.js and the jest setup file are clean', () => {
   const result = checkRepo({ repoRoot: repoOf(BE, (dir) => {
     put(dir, 'src/features/orders/application/place-order.spec.ts');
-    put(dir, 'src/tests/e2e/setup/jest.setup.ts');
+    put(dir, 'src/tests/world/global-setup.ts');
   }) });
   assert.deepEqual(only(result, 'BE_TEST_TOPOLOGY'), []);
 });

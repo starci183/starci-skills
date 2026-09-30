@@ -215,12 +215,13 @@ slots:
     profiles: [be]
     # Managed files (hfs sync renders them, hfs check compares them): the whole tool configuration of a back end. Each is
     # a reference to a canon package, never a configuration: tsconfig.json extends @starci/tsconfig/be.json and adds the
-    # three path aliases and excludes the e2e tree; tsconfig.build.json puts an overlay preset after it and adds only the
-    # path-relative options a preset cannot hold; the e2e tree's own src/tests/e2e/tsconfig.json (the nearest config of an
-    # e2e file, so typed lint and typecheck:e2e both find it) extends it with the e2e preset; eslint.config.mjs is the
+    # three path aliases and excludes the world, integration, e2e and contract trees (fixtures stay in the root program: unit
+    # specs import them); tsconfig.build.json puts an overlay preset after it and adds only the path-relative options a
+    # preset cannot hold; the tests' own src/tests/tsconfig.json (the nearest config of a world, integration, e2e or contract
+    # file, so typed lint and typecheck:tests both find it) extends it with the e2e preset; eslint.config.mjs is the
     # one-line starciBeConfig call; jest.config.js calls the @starci/jest-preset factory; .prettierrc names
     # @starci/prettier-config; .prettierignore is the template.
-    path: "{tsconfig.json,tsconfig.build.json,src/tests/e2e/tsconfig.json,eslint.config.mjs,jest.config.js,.prettierrc,.prettierignore}"
+    path: "{tsconfig.json,tsconfig.build.json,src/tests/tsconfig.json,eslint.config.mjs,jest.config.js,.prettierrc,.prettierignore}"
     presence: required
     tracked: tracked
     tier: none
@@ -761,6 +762,14 @@ slots:
     tests: e2e
     why: provider sandbox contracts, skipped without sandbox config; run only by test:contract, never part of test or test:e2e
     rules: [BE_TEST_TOPOLOGY]
+  - id: be.tests.e2e-world-retired
+    profiles: [be]
+    path: "src/tests/e2e/world/"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "src/tests/world/ (the only test infrastructure location; e2e/<area>/ holds only *.e2e-spec.ts)"
 
   # ----- BE: work and stacks -----------------------------------------------------------------------------
   - id: be.starciwork

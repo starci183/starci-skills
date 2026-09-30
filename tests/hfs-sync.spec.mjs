@@ -70,7 +70,7 @@ describe('hfs.json validation', () => {
 
 describe('the generated file set', () => {
   it('a back end owns its tool configuration, package scripts, hooks, workflows, quality files and .starciwork/.gitignore; a front end owns its tool configuration, package scripts, hooks, workflows and quality files', () => {
-    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'codecov.yml', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'src/tests/e2e/tsconfig.json', 'tsconfig.build.json', 'tsconfig.json']);
+    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'codecov.yml', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'src/tests/tsconfig.json', 'tsconfig.build.json', 'tsconfig.json']);
     assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', 'codecov.yml', 'eslint.config.mjs', 'package.json', 'sonar-project.properties', 'stylelint.config.mjs', 'tsconfig.e2e.json', 'tsconfig.json', 'vitest.config.ts']);
   });
   it('the file list is the managedBy slots of the manifest, not code: each listed file is a literal path of a slot naming managedBy', () => {
@@ -102,10 +102,10 @@ describe('the generated file set', () => {
 });
 
 describe('.husky/pre-commit', () => {
-  it('back end runs staged lint, typecheck, unit specs of staged files and work hygiene, and never e2e', () => {
+  it('back end runs staged lint, typecheck, unit specs of staged files and work hygiene, and never integration, e2e or contract', () => {
     const hook = rendered(BE)['.husky/pre-commit'];
     for (const step of ['npm run typecheck', 'npx eslint $sources', 'npx prettier --check $sources', 'npm test -- --passWithNoTests --findRelatedTests $specs', 'npx hfs work-hygiene']) assert.ok(hook.includes(step), step);
-    assert.doesNotMatch(hook, /lint-staged|test:e2e|typecheck:e2e|selectProjects e2e|playwright/);
+    assert.doesNotMatch(hook, /lint-staged|test:(e2e|integration|contract)|typecheck:tests|selectProjects (e2e|integration|contract)|playwright/);
   });
   it('front end runs staged eslint, stylelint and prettier (no lint-staged), vitest related, has no work hygiene, and never e2e', () => {
     const hook = rendered(FE)['.husky/pre-commit'];
@@ -123,7 +123,7 @@ describe('.husky/pre-push', () => {
     it(`${hfs.profile} runs typecheck, lint, hfs check --fast and the affected unit specs, and never e2e`, () => {
       const hook = rendered(hfs)['.husky/pre-push'];
       for (const step of PUSH_STEPS[hfs.profile]) assert.ok(hook.includes(step), step);
-      assert.doesNotMatch(hook, /test:e2e|typecheck:e2e|playwright/);
+      assert.doesNotMatch(hook, /test:(e2e|integration|contract)|typecheck:tests|playwright/);
     });
   }
   for (const hfs of [BE, FE]) {
@@ -388,10 +388,10 @@ describe('the back-end tool configuration', () => {
   it('eslint.config.mjs is exactly the one-liner', () => {
     assert.equal(at('eslint.config.mjs'), 'import { loadHfs, starciBeConfig } from "@starci/eslint-canon-be"\n\nexport default starciBeConfig({ hfs: loadHfs(import.meta.url) })\n');
   });
-  it('tsconfig.json extends the preset, adds only the three aliases and excludes the e2e tree; the build and e2e configs add only what a preset cannot hold', () => {
-    assert.deepEqual(JSON.parse(at('tsconfig.json')), { extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { '@features/*': ['./src/features/*'], '@modules/*': ['./src/modules/*'], '@tests/*': ['./src/tests/*'] } }, exclude: ['node_modules', 'dist', 'src/tests/e2e'] });
+  it('tsconfig.json extends the preset, adds only the three aliases and excludes the world, integration, e2e and contract trees; the build and tests configs add only what a preset cannot hold', () => {
+    assert.deepEqual(JSON.parse(at('tsconfig.json')), { extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { '@features/*': ['./src/features/*'], '@modules/*': ['./src/modules/*'], '@tests/*': ['./src/tests/*'] } }, exclude: ['node_modules', 'dist', 'src/tests/world', 'src/tests/integration', 'src/tests/e2e', 'src/tests/contract'] });
     assert.deepEqual(JSON.parse(at('tsconfig.build.json')), { extends: ['./tsconfig.json', '@starci/tsconfig/build.json'], compilerOptions: { outDir: './dist' }, exclude: ['node_modules', 'dist', '**/*.spec.ts', 'src/tests'] });
-    assert.deepEqual(JSON.parse(at('src/tests/e2e/tsconfig.json')), { extends: ['../../../tsconfig.json', '@starci/tsconfig/e2e.json'], include: ['./**/*.ts'], exclude: [] });
+    assert.deepEqual(JSON.parse(at('src/tests/tsconfig.json')), { extends: ['../../tsconfig.json', '@starci/tsconfig/e2e.json'], include: ['./**/*.ts'], exclude: [] });
   });
   it('jest.config.js is the preset call, .prettierrc references the shared config, and neither carries a header comment', () => {
     assert.equal(at('jest.config.js'), 'module.exports = require("@starci/jest-preset").starciJestConfig()\n');
@@ -413,10 +413,12 @@ describe('the back-end tool configuration', () => {
 describe('the package.json scripts of a back end', () => {
   const scripts = hfs => Object.fromEntries(renderTargets(hfs, PRESETS.be).find(target => target.path === 'package.json').content.trim().split('\n').map(line => [line.slice(0, line.indexOf(': ')), line.slice(line.indexOf(': ') + 2)]));
   it('are the fixed scripts, plus build and one start script per runnable app and migrate', () => {
-    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'migrate', 'start:core', 'test', 'test:e2e', 'test:e2e:live', 'typecheck', 'typecheck:e2e']);
+    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'migrate', 'start:core', 'test', 'test:contract', 'test:e2e', 'test:integration', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts(BE)['start:core'], 'node dist/apps/core/src/main.js');
     assert.equal(scripts(BE).migrate, 'node dist/apps/migrate/src/main.js');
-    assert.equal(scripts(BE)['test:e2e'], 'npm run typecheck:e2e && jest --selectProjects e2e');
+    assert.equal(scripts(BE).test, 'jest --selectProjects unit');
+    for (const project of ['integration', 'e2e', 'contract']) assert.equal(scripts(BE)[`test:${project}`], `npm run typecheck:tests && jest --selectProjects ${project}`);
+    assert.equal(scripts(BE)['typecheck:tests'], 'tsc -p src/tests/tsconfig.json');
     assert.doesNotMatch(Object.values(scripts(BE)).join('\n'), /--rule|--no-inline-config|--no-eslintrc/);
   });
   it('gain a start script per app kind and name a second migrate app by its name', () => {
