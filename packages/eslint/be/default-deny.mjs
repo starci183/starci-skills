@@ -6,13 +6,16 @@
  *   - `no-untyped-body` refuses a `@Body()` (or `@Args()`) parameter with no type, `unknown`, `any`, `object`,
  *     `{}` or `Record<string, unknown>`; it refuses `GraphQLJSON` as a tunnel around the schema; and it refuses
  *     a `switch (input.operation)` in a transport file, because each operation is its own typed operation.
- *   - `public-needs-reason` refuses `@Public()` without `{ reason: "<why>" }`. An open door states why it is
- *     open, so the list of open doors can be read and reviewed.
+ *   - `public-needs-reason` refuses `@Public()` without `{ reason: PublicReason.X }`, where `PublicReason` is the enum
+ *     `domain/identity` exports (judged by the enum's declaring owner, type-aware). An open door states why it is open
+ *     from a closed list, so the open doors can be read and reviewed; a string or another enum is refused.
  *
  * The `APP_GUARD` registration and the app-level guard live in the composition check, not here: a rule reading
  * one file cannot see which module the app registered.
  */
-import { decoratorName, keyName, staticText } from "./lib/ast.mjs"
+import { decoratorName, keyName } from "./lib/ast.mjs"
+import { isOwnedEnumMember } from "./lib/declared.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
 import { isDeclarationFile, normalizePath } from "./lib/path.mjs"
 
 const BODY_DECORATORS = new Set(["Body", "Args"])
@@ -45,7 +48,8 @@ export const noUntypedBody = {
     create(context) {
         const filename = normalizePath(context.filename || context.getFilename())
         if (isDeclarationFile(filename)) return {}
-        const inTransport = filename.includes("/transport/")
+        const slot = hfsOf(context).slotOf(filename) ?? ""
+        const inTransport = slot.startsWith("be.transport.") || slot.startsWith("be.feature.transport.")
         return {
             Identifier(node) {
                 if (node.name === "GraphQLJSON" && !/^Import.*Specifier$/.test(node.parent?.type ?? "")) {
@@ -74,14 +78,14 @@ export const noUntypedBody = {
     },
 }
 
-/** An open door states why it is open. */
+/** An open door states why it is open, from the closed `PublicReason` list of `domain/identity`. */
 export const publicNeedsReason = {
     meta: {
         type: "problem",
-        docs: { description: "`@Public()` carries `{ reason: \"<why>\" }`." },
+        docs: { description: "`@Public()` carries `{ reason: PublicReason.X }` with `PublicReason` from `domain/identity`." },
         schema: [],
         messages: {
-            reason: "`@Public()` has no reason. Write `@Public({ reason: \"<why this operation is open>\" })` so the open doors can be reviewed.",
+            reason: "`@Public()` needs `{ reason: PublicReason.X }` with a member of the `PublicReason` enum exported by `domain/identity`; a string, another enum or a missing reason is refused. A new reason is a change to the canon, not to this file.",
         },
     },
     create(context) {
@@ -94,10 +98,10 @@ export const publicNeedsReason = {
                 const argument = expression.type === "CallExpression" ? expression.arguments[0] : undefined
                 let reason = null
                 if (argument?.type === "ObjectExpression") {
-                    const property = argument.properties.find((item) => item.type === "Property" && keyName(item.key) === "reason")
-                    reason = property ? staticText(property.value) : null
+                    const property = argument.properties.find((item) => item.type === "Property" && !item.computed && keyName(item.key) === "reason")
+                    reason = property ? property.value : null
                 }
-                if (reason === null || reason.trim() === "") context.report({ node, messageId: "reason" })
+                if (reason === null || !isOwnedEnumMember(context, reason, "PublicReason", "domain", "identity")) context.report({ node, messageId: "reason" })
             },
         }
     },
