@@ -427,6 +427,7 @@ rules:
     failureCodes: ["BE_CONFIG_OWNER"]
     enforcers:
       - {kind: eslint-be, id: no-direct-env-read}
+      - {kind: eslint-be, id: config-parsed-in-main}
   - id: R44
     code: "BE_SECRET_DEFAULT"
     law: "No default for a secret key or infrastructure URL."

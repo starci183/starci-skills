@@ -626,10 +626,10 @@ BE_APP_COMPOSITION_ONLY:
 BE_CONFIG_OWNER:
   title: "Environment read outside platform/config"
   title_vi: "Đọc biến môi trường ngoài platform/config"
-  meaning_vi: "Một tệp đọc process.env (truy cập, destructuring, Reflect.get hay import env của node:process), import @nestjs/config hoặc dotenv, gọi envConfig(), hoặc ghép đường dẫn từ process.cwd() với src hay .starcistacks, ngoài tệp khai báo lớp EnvSource của platform/config, nên cấu hình của capability không đi qua bộ đọc có kiểu duy nhất."
+  meaning_vi: "Một tệp đọc process.env (truy cập, destructuring, Reflect.get hay import env của node:process), import @nestjs/config hoặc dotenv, gọi một hàm đọc cấu hình của <capability>.config.ts ngoài main.ts (tệp config, spec của nó hoặc test world), hoặc ghép đường dẫn từ process.cwd() với src hay .starcistacks, ngoài tệp khai báo lớp EnvSource của platform/config, nên cấu hình của capability không đi qua bộ đọc có kiểu duy nhất."
   causes_vi:
     - "Đọc process.env trực tiếp trong service, module hoặc factory"
-    - "Import @nestjs/config, dotenv hoặc gọi envConfig() thay vì nhận options do main.ts truyền vào AppModule.register"
+    - "Import @nestjs/config, dotenv hoặc gọi platformConfig()/parse<C>Config() trong service, ở phạm vi module hay trong factory thay vì nhận options do main.ts truyền vào AppModule.register"
     - "path.join(process.cwd(), \"src\", ...)"
   nextStep_vi: "Thêm khóa vào <capability>.config.ts (parse<C>Config(env: EnvSource)) và lấy giá trị qua <capability>.options.ts; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry

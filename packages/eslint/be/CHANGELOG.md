@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed (lane AUTHCHK): `config-parsed-in-main` (R43) is back. The merge `9958cce38` (merge main into lane/ut-int, round 2) resolved `config-owner.mjs` and its test to the blob from before the rule existed. That dropped the rule, the test world's `process.env` allowance and the removal of the name-based `envConfig()` check, together with its catalog enforcer, README row, failure-code text, code-patterns id and contract change `hfs-be-config-parsed-in-main`. The rule and its fixture files are restored exactly as `d5f11c337` left them.
+
 ## 2.1.2 - 2026-10-01
 
 - Fixed: a local export list (`export { x }`, no module specifier) crashed the backend machine behind the project-graph rules (`Cannot read properties of undefined (reading 'kind')` in every file of a repository that has one). The packed-load spec covers it.

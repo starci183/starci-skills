@@ -1,0 +1,14 @@
+id: hfs-be-config-parsed-in-main
+effectiveAt: '2026-09-30T12:00:00+07:00'
+summary: >-
+  New BE lint rule config-parsed-in-main (R43, BE_CONFIG_OWNER): a function exported by a <capability>.config.ts is
+  called only from apps/<app>/src/main.ts and the app's <app>.options.ts, its own config file or spec, src/tests/world/ and a provider contract spec (src/tests/contract); a module-scope call of a
+  function returning a <c>.options.ts type is refused everywhere else. The name-based envConfig() check of
+  no-direct-env-read is deleted (superseded: it was a name match a getter of another name passed). Failure-code text of
+  BE_CONFIG_OWNER updated; the test world (slot be.tests.world) may read and write process.env (no-direct-env-read); no API verb, YAML key or finding code changes.
+reach: new-legs
+paths:
+  - packages/eslint/be/config-owner.mjs
+  - knowledge/hfs/rules.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/contract-changes/hfs-be-config-parsed-in-main.yaml
