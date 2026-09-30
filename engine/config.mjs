@@ -220,6 +220,7 @@ function validateUat(uat){
 /** The owner's UAT concurrency settings: {maxConcurrent, source}. An absent or null block is the default. */
 export function uatSettings(config=loadConfig()){
   if(config?.uat!==undefined)validateUat(config.uat);
+  if(config?.claudeDebug!==undefined)validateClaudeDebug(config.claudeDebug);
   const value=plain(config?.uat)?config.uat.maxConcurrent:null;
   return Number.isInteger(value)?{maxConcurrent:value,source:'uat'}:{maxConcurrent:UAT_DEFAULTS.maxConcurrent,source:'default'};
 }
@@ -279,7 +280,7 @@ function refuseRetiredProvider(value,where){
   if(typeof value==='string'&&/^qwen(?:-agent)?$/i.test(value.trim()))throw Error(`Invalid config.yaml: ${where} names qwen. Qwen đã bị gỡ; dùng claude, codex hoặc devin.`);
 }
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','claudeDebug'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
   if(config?.asks!==undefined)validateAsks(config.asks);
   if(config?.uat!==undefined)validateUat(config.uat);
@@ -447,6 +448,29 @@ export const SPEC_DEFAULTS=Object.freeze({harness:false,unit:true,e2e:false});
 export function specsSettings(config){const specs=plain(config?.specs)?config.specs:{};return Object.fromEntries(SPEC_FAMILIES.map(key=>[key,typeof specs[key]==='boolean'?specs[key]:SPEC_DEFAULTS[key]]));}
 /** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig): true only when the owner opted in to `--specs all`. */
 export function harnessSpecsEnabled(root=configRoot){return specsSettings(inspectOwnerConfig(root).config).harness;}
+/**
+ * config.yaml `claudeDebug` (skills/claude-debug, scripts/supervisor/debug-pass.mjs): {interval, worktreeLimit}.
+ *   interval       <n>s | <n>m | <n>h — the cadence of the chat's Claude Code `/loop <interval> /claude-debug pass`.
+ *   worktreeLimit  integer >= 1 — more registered worktrees than this in one repository is a core-watch alert.
+ * Both keys are required when the block is present; code carries no default (config.example.yaml does).
+ */
+export const DURATION_PATTERN=/^(\d+)(s|m|h)$/;
+/** '10m' | '90s' | '1h' in milliseconds, or null for anything else (zero included). */
+export function durationMs(text){const m=DURATION_PATTERN.exec(String(text??'').trim());const ms=m?Number(m[1])*{s:1000,m:60000,h:3600000}[m[2]]:0;return ms>0?ms:null;}
+function validateClaudeDebug(block){
+  const bad=invalid('claudeDebug');
+  if(!plain(block))bad(' must be {interval: <n>s|<n>m|<n>h, worktreeLimit: <integer >= 1>}.');
+  for(const key of Object.keys(block))if(!['interval','worktreeLimit'].includes(key))bad(` has unknown key ${key} (allowed: interval, worktreeLimit).`);
+  if(durationMs(block.interval)===null)bad('.interval must be <n>s, <n>m or <n>h with n >= 1 (e.g. 10m).');
+  if(!Number.isInteger(block.worktreeLimit)||block.worktreeLimit<1)bad('.worktreeLimit must be an integer >= 1.');
+}
+/** The owner's claudeDebug block: {interval, intervalMs, worktreeLimit}. Refuses when config.yaml has none. */
+export function claudeDebugSettings(config=loadConfig()){
+  const block=config?.claudeDebug;
+  if(block===undefined||block===null)throw Error('Invalid config.yaml: claudeDebug is missing; copy the claudeDebug block from config.example.yaml (e.g. claudeDebug: {interval: 10m, worktreeLimit: 40}).');
+  validateClaudeDebug(block);
+  return {interval:block.interval,intervalMs:durationMs(block.interval),worktreeLimit:block.worktreeLimit};
+}
 export function loadConfig(root=configRoot,{initialize=false}={}){
   const yaml=path.join(root,'config.yaml');
   if(initialize&&!fs.existsSync(yaml)){

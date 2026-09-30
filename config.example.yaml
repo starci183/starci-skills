@@ -156,6 +156,12 @@ asks:
 # reclaimed. STARCI_UAT_MAX_CONCURRENT overrides it for one process tree.
 uat:
   maxConcurrent: 10
+# claudeDebug — the core-debug chat (skills/claude-debug). `/claude-debug` starts one Claude Code
+# `/loop <interval> /claude-debug pass` per host (a second invocation starts none); each tick is one read-only pass
+# (scripts/supervisor/debug-pass.mjs). worktreeLimit: more registered worktrees than this in one repository is an alert.
+claudeDebug:
+  interval: 10m
+  worktreeLimit: 40
 # reconciler — the host's one reconciler engine (scripts/reconciler/engine.mjs; contract
 # modules/reconciler/reconciler.yaml). Each controller runs off | shadow (reads, records what it would do as
 # reconciler.would rows, runs nothing) | active (acts; the old loop yields that duty via scripts/reconciler/owns.mjs).

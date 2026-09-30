@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // debug-pass.mjs — the state behind `/claude-debug` (skills/claude-debug): one loop per host, one pass per tick, one lane per alert.
 //
-//   node scripts/supervisor/debug-pass.mjs setup [--interval 10m]    record the chat's /loop unless a live one exists
+//   node scripts/supervisor/debug-pass.mjs setup                     record the chat's /loop unless a live one exists
 //   node scripts/supervisor/debug-pass.mjs pass [--snapshot <file>]  one pass: core-watch snapshot -> alerts to dispatch
 //     [--child-timeout <sec>] [--token-window <min>] [--token-spike <n>]   passed to the core-watch snapshot
 //   node scripts/supervisor/debug-pass.mjs claim --key <alert> --lane <lane>     a lane now fixes that alert
@@ -9,7 +9,8 @@
 //   node scripts/supervisor/debug-pass.mjs release --key <alert>                 forget a fix (lane died, fix did not help)
 //   node scripts/supervisor/debug-pass.mjs stop                                  forget the loop (after the chat ends its /loop)
 //   node scripts/supervisor/debug-pass.mjs status
-// Every verb prints one JSON object.
+// Every verb prints one JSON object. The loop interval is config.yaml claudeDebug.interval (engine/config.mjs
+// claudeDebugSettings); code carries no default.
 //
 // State: <state root>/claude-debug/state.json (engine/machine-db.mjs starciLocalRoot, so STARCI_LOCAL_ROOT moves it). It is
 // chat-side bookkeeping, not engine state, so it stays out of machine.sqlite (whose writers are the engine's own):
@@ -23,13 +24,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { starciLocalRoot } from '../../engine/machine-db.mjs';
+import { claudeDebugSettings } from '../../engine/config.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { renameOver } from '../lib/rename-over.mjs';
 import { snapshot, watchOptions } from './core-watch.mjs';
 
 export const LOOP_GRACE_MS = 5 * 60_000;
 export const CLAIM_TTL_MS = 30 * 60_000;
-export const DEFAULT_INTERVAL = '10m';
 
 /** The state file of this host (or of STARCI_LOCAL_ROOT). */
 export const statePath = (env = process.env) => path.join(starciLocalRoot(env), 'claude-debug', 'state.json');
@@ -48,10 +49,12 @@ export function saveState(file, state) {
   renameOver(tmp, file);
 }
 
-/** '10m' | '90s' | '1h' in ms, or null. */
-export function intervalMs(text) {
-  const m = /^(\d+)(s|m|h)$/.exec(String(text ?? '').trim());
-  return m ? Number(m[1]) * { s: 1000, m: 60_000, h: 3_600_000 }[m[2]] : null;
+/**
+ * Who fixes an alert by default, for the diagnosis table: `owner` for an open owner ask and for the owner's own
+ * config.yaml; `core` (a lane of this chat) for everything else. The chat's diagnosis may still note a core alert.
+ */
+export function fixOwnerOf(key) {
+  return /^wf:.*:owner$/.test(key) || key.startsWith('config:') ? 'owner' : 'core';
 }
 
 /** True while the loop record still passes on time. */
@@ -61,15 +64,13 @@ export function loopLive(loop, now) {
 }
 
 /**
- * Setup: a live loop is kept and nothing is created; otherwise `startLoop(loop)` runs once and the new record replaces
+ * Setup (`settings` = claudeDebugSettings(): {interval, intervalMs}): a live loop is kept and nothing is created; otherwise `startLoop(loop)` runs once and the new record replaces
  * a stale one. Returns {created, loop, replaced}. Mutates `state`.
  */
-export function setupLoop(state, { now, interval = DEFAULT_INTERVAL, startLoop = () => {} }) {
+export function setupLoop(state, { now, settings, startLoop = () => {} }) {
   if (loopLive(state.loop, now)) return { created: false, loop: state.loop, replaced: null };
-  const ms = intervalMs(interval);
-  if (!ms) throw new Error(`bad --interval ${interval} (use <n>s|<n>m|<n>h)`);
   const replaced = state.loop ?? null;
-  const loop = { id: `loop-${now.toString(36)}`, interval, intervalMs: ms, startedAt: now, lastPassAt: null };
+  const loop = { id: `loop-${now.toString(36)}`, interval: settings.interval, intervalMs: settings.intervalMs, startedAt: now, lastPassAt: null };
   startLoop(loop);
   state.loop = loop;
   return { created: true, loop, replaced };
@@ -86,7 +87,7 @@ export function runPass(state, snap, { now, dispatch }) {
   const rows = [];
   for (const [key, fix] of Object.entries(state.fixes)) {
     if (alerts.has(key)) continue;
-    rows.push({ key, text: fix.text, state: 'resolved', lane: fix.lane ?? null, since: fix.since });
+    rows.push({ key, text: fix.text, state: 'resolved', fixOwner: fixOwnerOf(key), lane: fix.lane ?? null, since: fix.since });
     delete state.fixes[key];
   }
   const dispatched = [];
@@ -95,14 +96,14 @@ export function runPass(state, snap, { now, dispatch }) {
     const expired = open?.state === 'dispatching' && now - Number(open.since) > CLAIM_TTL_MS;
     if (open && !expired) {
       open.text = text;
-      rows.push({ key, text, state: open.state, lane: open.lane ?? null, since: open.since });
+      rows.push({ key, text, state: open.state, fixOwner: fixOwnerOf(key), lane: open.lane ?? null, since: open.since });
       continue;
     }
-    const got = dispatch({ key, text }) ?? {};
+    const got = dispatch({ key, text, fixOwner: fixOwnerOf(key) }) ?? {};
     const fix = got.lane ? { state: 'fixing', lane: got.lane } : got.reason ? { state: 'noted', reason: got.reason } : { state: 'dispatching' };
     state.fixes[key] = { ...fix, text, since: now };
-    dispatched.push({ key, text });
-    rows.push({ key, text, state: fix.state, lane: fix.lane ?? null, since: now });
+    dispatched.push({ key, text, fixOwner: fixOwnerOf(key), state: fix.state });
+    rows.push({ key, text, state: fix.state, fixOwner: fixOwnerOf(key), lane: fix.lane ?? null, since: now });
   }
   return { dispatched, rows };
 }
@@ -124,11 +125,11 @@ async function main(argv = process.argv.slice(2)) {
   const state = loadState(file);
   const now = Date.now();
   let out;
-  if (verb === 'setup') out = setupLoop(state, { now, interval: flag(argv, '--interval') ?? DEFAULT_INTERVAL });
+  if (verb === 'setup') out = setupLoop(state, { now, settings: claudeDebugSettings() });
   else if (verb === 'pass') {
     const fixture = flag(argv, '--snapshot');
     const snap = fixture ? JSON.parse(fs.readFileSync(fixture, 'utf8')) : await snapshot(watchOptions(argv));
-    out = { at: snap.at, ok: snap.ok, facts: snap.facts, loop: state.loop?.id ?? null, ...runPass(state, snap, { now, dispatch: () => null }) };
+    out = { at: snap.at, ok: snap.ok, facts: snap.facts, loop: state.loop?.id ?? null, ...runPass(state, snap, { now, dispatch: (a) => (a.fixOwner === 'owner' ? { reason: 'fix owner: the owner' } : null) }) };
   } else if (verb === 'claim' || verb === 'note' || verb === 'release') {
     const key = flag(argv, '--key');
     if (!key) throw new Error(`${verb} needs --key <alert>`);
@@ -137,7 +138,7 @@ async function main(argv = process.argv.slice(2)) {
     out = settleFix(state, key, { now, lane, reason: flag(argv, '--reason') ?? 'no core fix owed', release: verb === 'release' });
   } else if (verb === 'stop') { out = { stopped: state.loop?.id ?? null }; state.loop = null; }
   else if (verb === 'status') out = { loop: state.loop, live: loopLive(state.loop, now), fixes: state.fixes };
-  else { console.log('usage: debug-pass.mjs setup [--interval 10m] | pass [--snapshot <file>] | claim --key <k> --lane <lane> | note --key <k> --reason <text> | release --key <k> | stop | status'); process.exitCode = verb ? 2 : 0; return; }
+  else { console.log('usage: debug-pass.mjs setup | pass [--snapshot <file>] | claim --key <k> --lane <lane> | note --key <k> --reason <text> | release --key <k> | stop | status'); process.exitCode = verb ? 2 : 0; return; }
   if (verb !== 'status') saveState(file, state);
   console.log(JSON.stringify(out));
 }
