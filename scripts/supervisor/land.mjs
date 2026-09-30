@@ -288,7 +288,34 @@ function makeScratch({ root, base, env }) {
 function treeCheck(dir, script) {
   if (!fs.existsSync(path.join(dir, script))) return { ok: true, skipped: true };
   const r = run(process.execPath, [script], { cwd: dir, timeout: 600_000 });
-  return { ok: r.ok, output: tail(r.stdout + r.stderr, 15) };
+  const full = r.stdout + r.stderr;
+  return { ok: r.ok, output: tail(full, 15), full };
+}
+
+/**
+ * The finding lines of a tree check's output: every non-empty trimmed line but the script's own summary lines
+ * (`<script>: ...`, which carry counts such as "11 dead cite(s) of 5368 checked"). Each of the four TREE_CHECKS
+ * prints one line per finding naming a file (path or path:line).
+ */
+export function findingLines(script, output) {
+  const header = `${path.basename(script, '.mjs')}:`;
+  return [...new Set(String(output ?? '').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith(header)))];
+}
+
+/**
+ * Whether a tree check's candidate run `cur` passes against its run `pre` on main: green, or red on main too with no
+ * finding line main lacks (a finding the land removed is fine). A red run printing no finding line falls back to
+ * the exact text. {ok, newFindings[]}
+ */
+export function baselineVerdict(script, pre, cur) {
+  if (cur.ok) return { ok: true, newFindings: [] };
+  const text = (r) => r?.full ?? r?.output ?? '';
+  const found = findingLines(script, text(cur));
+  if (!pre || pre.ok) return { ok: false, newFindings: found };
+  if (!found.length) return { ok: text(pre) === text(cur), newFindings: [] };
+  const known = new Set(findingLines(script, text(pre)));
+  const newFindings = found.filter((l) => !known.has(l));
+  return { ok: newFindings.length === 0, newFindings };
 }
 
 const readSpecs = (dir) => {
@@ -336,9 +363,8 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   for (const script of TREE_CHECKS) {
     const r = treeCheck(dir, script);
     if (r.skipped) continue;
-    const pre = baseline?.[script];
-    const ok = r.ok || (pre && !pre.ok && pre.output === r.output);
-    checks.push({ name: path.basename(script), ok, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : {}) }) });
+    const { ok, newFindings } = baselineVerdict(script, baseline?.[script], r);
+    checks.push({ name: path.basename(script), ok, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings }) }) });
   }
   let coverage;
   try {
