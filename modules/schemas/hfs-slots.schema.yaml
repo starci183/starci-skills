@@ -153,6 +153,12 @@ $defs:
       allows: {$ref: '#/$defs/stringList'}
       forbids: {$ref: '#/$defs/stringList'}
       layers: {$ref: '#/$defs/stringList'}
+      composedBy:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+        description: the app kinds that may compose this slot (a transport folder); an app of another kind never imports its module
       budget:
         type: object
         minProperties: 1

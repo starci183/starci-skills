@@ -49,7 +49,7 @@ function diskFiles(root, relative = '') {
 }
 
 /** The repository tree as file and directory sets over posix relatives. */
-function treeOf(root) {
+export function treeOf(root) {
   const list = gitFiles(root) ?? diskFiles(root);
   const files = new Set(list);
   const directories = new Set();

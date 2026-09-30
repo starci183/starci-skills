@@ -261,7 +261,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["HFS_ARCH_CONFIG_UNREAD"]
     enforcers:
-      - {kind: machine, id: arch-config-unread, status: planned}
+      - {kind: machine, id: arch-config-unread, at: scripts/checks/architecture/config-unread.mjs}
   - id: R25
     code: "HFS_UNUSED_EXPORT"
     title_vi: "Mã chết: export công khai và tệp không ai dùng"
@@ -306,7 +306,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["BE_FEATURE_SHAPE"]
     enforcers:
-      - {kind: machine, id: feature-shape, status: planned}
+      - {kind: machine, id: feature-shape, at: scripts/checks/architecture/feature-shape.mjs}
   - id: R30
     code: "BE_PUBLIC_SURFACE"
     title_vi: "Import sâu qua cổng công khai"
@@ -319,7 +319,7 @@ rules:
       - {kind: eslint-be, id: no-folder-reexport}
       - {kind: machine, id: owner-export-bypass, at: scripts/checks/architecture/owners.mjs}
       - {kind: machine, id: alias-reexport, at: scripts/checks/architecture/symbols.mjs}
-      - {kind: machine, id: index-export-count, status: planned}
+      - {kind: machine, id: index-export-count, at: scripts/checks/architecture/public-surface.mjs}
       - {kind: eslint-be, id: no-relative-capability-escape}
       - {kind: eslint-be, id: no-self-module-alias}
   - id: R31
@@ -340,7 +340,7 @@ rules:
     failureCodes: ["BE_APP_COMPOSITION_ONLY"]
     enforcers:
       - {kind: machine, id: app-composition-only, at: scripts/checks/architecture/backend.mjs}
-      - {kind: machine, id: composition-spec-boots-real-module, status: planned}
+      - {kind: machine, id: composition-spec-boots-real-module, at: scripts/checks/architecture/composition-spec.mjs}
   - id: R33
     code: "BE_ENTRYPOINT_ONLY_IN_APPS"
     title_vi: "Entrypoint nằm ngoài apps"
@@ -367,7 +367,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["BE_SCHEMA_OWNER"]
     enforcers:
-      - {kind: machine, id: schema-owner, status: planned}
+      - {kind: machine, id: schema-owner, at: scripts/checks/architecture/schema-owner.mjs}
   - id: R36
     code: "BE_SQL_OUTSIDE_PERSISTENCE"
     title_vi: "SQL thô ngoài persistence/<name>.sql.ts"
@@ -479,7 +479,7 @@ rules:
       - {kind: eslint-be, id: no-module-let}
       - {kind: eslint-be, id: one-module-per-file}
       - {kind: machine, id: register-once, at: scripts/checks/architecture/register-once.mjs}
-      - {kind: machine, id: module-per-transport, status: planned}
+      - {kind: machine, id: module-per-transport, at: scripts/checks/architecture/module-per-transport.mjs}
   - id: R46
     code: "BE_BACKGROUND_UNOWNED"
     title_vi: "Việc nền không có ai chạy"
@@ -488,7 +488,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["BE_BACKGROUND_UNOWNED"]
     enforcers:
-      - {kind: machine, id: background-unowned, status: planned}
+      - {kind: machine, id: background-unowned, at: scripts/checks/architecture/background-unowned.mjs}
   - id: R47
     code: "BE_TEST_TOPOLOGY"
     title_vi: "Cấu hình test lệch chuẩn"
@@ -540,7 +540,7 @@ rules:
       - {kind: eslint-fe, id: client-fetch-has-signal}
       - {kind: eslint-fe, id: no-shared-transport-state}
       - {kind: eslint-fe, id: no-data-fetch-in-effect}
-      - {kind: machine, id: transport-owner, status: planned}
+      - {kind: machine, id: transport-owner, at: scripts/checks/architecture/transport-owner.mjs}
       - {kind: eslint-fe, id: api-client-attaches-the-locale}
       - {kind: eslint-fe, id: locale-header-belongs-to-the-link}
   - id: R51
@@ -584,7 +584,7 @@ rules:
     enforcers:
       - {kind: eslint-fe, id: no-middleware-file}
       - {kind: eslint-fe, id: page-exports-metadata}
-      - {kind: machine, id: route-files-thin, status: planned}
+      - {kind: machine, id: route-files-thin, at: scripts/checks/architecture/route-files-thin.mjs}
   - id: R55
     code: "FE_CLIENT_BOUNDARY"
     title_vi: "use client sai chỗ"
@@ -606,7 +606,7 @@ rules:
     failureCodes: ["FE_HOOKS_ARE_HOOKS"]
     enforcers:
       - {kind: eslint-fe, id: hooks-folder-holds-hooks-only}
-      - {kind: machine, id: hooks-are-hooks, status: planned}
+      - {kind: machine, id: hooks-are-hooks, at: scripts/checks/architecture/hooks-are-hooks.mjs}
   - id: R57
     code: "FE_OWNER_REACHABLE"
     title_vi: "Owner không được route nào mount"
@@ -697,7 +697,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["FE_PACKAGE_SHAPE"]
     enforcers:
-      - {kind: machine, id: package-shape, status: planned}
+      - {kind: machine, id: package-shape, at: scripts/checks/architecture/package-shape.mjs}
   - id: R64
     code: "FE_APP_ISOLATION"
     title_vi: "App import app khác"
