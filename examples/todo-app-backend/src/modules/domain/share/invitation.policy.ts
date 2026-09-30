@@ -1,4 +1,5 @@
 import { InvitationStatus, ShareRole } from "./share.contracts"
+import type { StoredInvitationStatus } from "./share.contracts"
 
 /** How many days a pending invitation can still be accepted. */
 export const INVITATION_EXPIRY_DAYS = 14
@@ -16,7 +17,7 @@ export const isWellFormedEmail = (email: string): boolean => EMAIL_PATTERN.test(
 export const isShareRole = (role: string): boolean => Object.values<string>(ShareRole).includes(role)
 
 /** The status a stored row reads as at `at`: a pending row past its window reads as expired, everything else as stored. */
-export const liveStatusOf = (row: { readonly status: string; readonly sentAt: Date }, at: Date): string =>
+export const liveStatusOf = (row: StoredInvitationStatus, at: Date): string =>
     row.status === InvitationStatus.Pending &&
     at.getTime() > row.sentAt.getTime() + INVITATION_EXPIRY_DAYS * MILLISECONDS_PER_DAY
         ? InvitationStatus.Expired

@@ -18,7 +18,7 @@ describe("MetricsRegistry", () => {
 
     it("escapes quotes, backslashes and newlines in label values", () => {
         const registry = new MetricsRegistry()
-        registry.recordRequest("GET", 'a"b\c\nd', 200, 1)
-        expect(registry.renderPrometheus()).toContain('route="a\\"b\\c\nd"')
+        registry.recordRequest("GET", 'a"b\\c\nd', 200, 1)
+        expect(registry.renderPrometheus()).toContain('route="a\\"b\\\\c\\nd"')
     })
 })

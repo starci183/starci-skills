@@ -351,3 +351,31 @@ export interface DispatchedGroup {
     /** Bounced for good. */
     readonly bounced: number
 }
+
+/** What the admit message of one event is built from. */
+export interface NotifyAdmitMessageParams {
+    /** The stable event id; the pair (queue, event id) is unique. */
+    readonly eventId: string
+    /** The notification kind. */
+    readonly kind: string
+    /** The person to notify. */
+    readonly recipientId: string
+    /** The channel. */
+    readonly channel: string
+    /** What the notification is about. */
+    readonly payload: NotifyPayload
+    /** The instant of the event. */
+    readonly at: Date
+}
+
+/** What the dispatch message of one digest group is built from. */
+export interface NotifyDispatchMessageParams {
+    /** The deterministic event id of the group and kind. */
+    readonly eventId: string
+    /** Flush of a closed window or retry of a failed send. */
+    readonly kind: NotifyDispatchKind
+    /** The digest group. */
+    readonly groupId: string
+    /** When the message becomes due. */
+    readonly dueAt: Date
+}

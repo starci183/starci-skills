@@ -105,3 +105,11 @@ export interface MayCompleteParams {
     /** The owner of the task. */
     readonly ownerId: string
 }
+
+/** What decides how an invitation reads at a given instant: its stored status and when it was sent. */
+export interface StoredInvitationStatus {
+    /** The stored status. */
+    readonly status: string
+    /** When the invitation was sent. */
+    readonly sentAt: Date
+}

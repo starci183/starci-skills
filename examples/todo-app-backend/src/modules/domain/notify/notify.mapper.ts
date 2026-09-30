@@ -1,7 +1,14 @@
 import { defineQueue } from "@modules/platform/messaging"
 import type { OutboxMessage } from "@modules/platform/outbox"
 import { isRecord } from "@modules/platform/primitives"
-import type { NotifyAdmitPayload, NotifyDispatchKind, NotifyDispatchPayload, NotifyPayload } from "./notify.contracts"
+import type {
+    NotifyAdmitMessageParams,
+    NotifyAdmitPayload,
+    NotifyDispatchKind,
+    NotifyDispatchMessageParams,
+    NotifyDispatchPayload,
+    NotifyPayload,
+} from "./notify.contracts"
 
 const isScalar = (value: unknown): value is string | number | boolean | null =>
     value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean"
@@ -51,14 +58,7 @@ export const NOTIFY_DISPATCH_QUEUE = defineQueue<NotifyDispatchPayload>({
 })
 
 /** The message for the admit queue, written in the transaction of the change that caused it; deliverable at the instant of the event. */
-export const toNotifyAdmitMessage = (params: {
-    readonly eventId: string
-    readonly kind: string
-    readonly recipientId: string
-    readonly channel: string
-    readonly payload: NotifyPayload
-    readonly at: Date
-}): OutboxMessage => ({
+export const toNotifyAdmitMessage = (params: NotifyAdmitMessageParams): OutboxMessage => ({
     queue: NOTIFY_ADMIT_QUEUE.name,
     eventId: params.eventId,
     payload: {
@@ -72,12 +72,7 @@ export const toNotifyAdmitMessage = (params: {
 })
 
 /** The message for the dispatch queue, deliverable at `dueAt`; the same event id twice keeps one message. */
-export const toNotifyDispatchMessage = (params: {
-    readonly eventId: string
-    readonly kind: NotifyDispatchKind
-    readonly groupId: string
-    readonly dueAt: Date
-}): OutboxMessage => ({
+export const toNotifyDispatchMessage = (params: NotifyDispatchMessageParams): OutboxMessage => ({
     queue: NOTIFY_DISPATCH_QUEUE.name,
     eventId: params.eventId,
     payload: { kind: params.kind, groupId: params.groupId },

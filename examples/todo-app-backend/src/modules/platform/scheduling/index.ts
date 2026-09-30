@@ -1,4 +1,6 @@
 export { parseSchedulingConfig } from "./scheduling.config"
+export type { CronSchedule } from "./scheduling.contracts"
 export { InjectJobRegistry } from "./scheduling.decorators"
 export { SchedulingModule } from "./scheduling.module"
 export type { JobRegistry, ScheduledJob } from "./scheduling.port"
+export type { SchedulingOptions } from "./scheduling.options"

@@ -5,5 +5,5 @@ export const defineQueue = <Payload extends object>(definition: QueueDefinition<
     definition
 
 /** The pause before the next delivery after `attempt` deliveries failed: the base backoff doubled per earlier failure. */
-export const backoffDelayMs = (queue: { readonly backoffMs: number }, attempt: number): number =>
+export const backoffDelayMs = (queue: Pick<QueueDefinition<object>, "backoffMs">, attempt: number): number =>
     queue.backoffMs * 2 ** Math.max(0, attempt - 1)

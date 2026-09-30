@@ -6,7 +6,8 @@ interface RequestMetric {
     durationSumMs: number
 }
 
-const escapeLabel = (value: string): string => value.replace(/\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\n")
+const escapeLabel = (value: string): string =>
+    value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")
 
 const labelsOf = (key: string): string => {
     const [method = "", route = "", status = ""] = key.split("|")
