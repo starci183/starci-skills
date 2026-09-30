@@ -1,0 +1,9 @@
+id: hfs-messages-no-barrel
+effectiveAt: '2026-09-30T18:00:00+07:00'
+summary: >-
+  Lane C0 (BE-CONVENTION 1.15: exactly one index.ts per owner root, no nested barrels): the slots be.domain.messages and
+  be.feature.messages no longer require messages/index.ts; the owner's index.ts exports the catalog.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-messages-no-barrel.yaml
+  - knowledge/hfs/slots.yaml

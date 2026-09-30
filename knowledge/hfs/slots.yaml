@@ -530,7 +530,6 @@ slots:
     presence: optional            # a capability that raises no user-facing text carries none
     tracked: tracked
     tier: inherit
-    requires: [index.ts]
     allows: ["<capability>.messages.ts", "*.spec.ts"]   # one keyed catalog per capability, vi and en, read through the platform/i18n MessageCatalog port
     tests: unit-beside
     rules: [BE_USER_COPY_LITERAL]
@@ -541,7 +540,6 @@ slots:
     presence: optional
     tracked: tracked
     tier: feature
-    requires: [index.ts]
     allows: ["<feature>.messages.ts", "*.spec.ts"]   # one keyed catalog per feature, vi and en, read through the platform/i18n MessageCatalog port
     tests: unit-beside
     rules: [BE_USER_COPY_LITERAL]
