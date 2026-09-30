@@ -2,6 +2,7 @@
 
 ## 2.0.0 - unreleased (lane C0, BE-CONVENTION)
 
+- Added: the Operations law (R95 `BE_OPERATION_CONTRACT`, `operations.mjs`): `operation-contract-decidable` refuses an `OperationContract` whose input or output is `any`, `unknown`, `Record<string, unknown>`, an unbound generic, a function or a standard-library class, or whose refusal codes are not a closed union of string literals; `operation-route-driven-by-table` requires a route that takes `OperationRequest<Table>` or answers `OperationReply<Table>` to do both, of one table. The canon types are recognised by where they are declared (the platform capability `operations`).
 - Changed: the messages and header of `tests-no-override` and `tests-infra-only-in-world` (`test-world.mjs`) follow the owner refinement 2026-09-30 of R47: a service of the repository's own stack runs real and is failed on purpose through `world.infra.<service>`, only an external SaaS is a network fake (`world.fake.<provider>`). Detection is unchanged.
 - Breaking: one configuration, `export default starciBeConfig({ hfs: loadHfs(import.meta.url) })`. The factory is async
   (ESLint awaits it), turns typed linting on for every `.ts/.mts/.cts/.js/.mjs/.cjs` (`parserOptions.projectService`),

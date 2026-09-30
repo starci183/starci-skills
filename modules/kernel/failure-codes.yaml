@@ -12225,7 +12225,7 @@ HFS_CONTRACT_SNAPSHOT_DRIFT:
   title_vi: "Bản hợp đồng lệch bản thật"
   meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `npm run contract:emit` (BE) / `contract:pull` (FE) rồi commit kết quả. Nếu emit không chạy được thì finding nêu nguyên văn lỗi của emit; không bao giờ bỏ qua âm thầm."
   causes_vi:
-    - "Vi phạm luật R23: BE: `contracts/<app>/schema.graphql` phải bằng bản `hfs emit-contracts` phát ra ngay lúc kiểm tra (đồ thị module đọc từ mã nguồn, không cần env, DB hay mạng); chỉ chạy ở lượt kiểm tra đầy đủ, `--fast` bỏ qua và nói rõ trong phần coverage. FE: `modules/api/contract/*` bằng bản BE (so hash)."
+    - "Vi phạm luật R23: BE: `contracts/<app>/schema.graphql` và `contracts/<app>/openapi.json` (sinh từ bảng thao tác có kiểu `apps/<app>/src/operations.ts`) phải bằng bản `hfs emit-contracts` phát ra ngay lúc kiểm tra (đồ thị module đọc từ mã nguồn, không cần env, DB hay mạng); chỉ chạy ở lượt kiểm tra đầy đủ, `--fast` bỏ qua và nói rõ trong phần coverage. FE: `modules/api/contract/*` bằng bản BE (so hash)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -13356,5 +13356,17 @@ FE_SLOT_FILE_ROLE:
   causes_vi:
     - "Vi phạm luật R94: mỗi slot thư mục của front end (route, feature, components, hooks, modules/api) chỉ chứa các tệp mà `allows` của nó gọi tên, và chứa chúng trong thư mục riêng; tệp không slot nào sở hữu là HFS_PATH_NO_SLOT."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đổi tên tệp về vai trò được phép hoặc chuyển nó về slot đúng; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
+BE_OPERATION_CONTRACT:
+  title: "A versioned operation has no typed contract"
+  title_vi: "Thao tác có phiên bản không có hợp đồng kiểu"
+  meaning_vi: "Mỗi thao tác `<tên>@<phiên bản>` của một app được khai báo đúng một lần trong bảng thao tác có kiểu `apps/<app>/src/operations.ts` (`OperationContract<Input, Output, RefusalCode>` đăng ký bằng `defineOperations`). Bộ kiểm tra thấy đầu vào hoặc đầu ra là `any`, `unknown`, `Record<string, unknown>`, kiểu generic chưa gán, hàm hoặc `Date`; mã từ chối không phải hợp các chuỗi literal đóng; hoặc route phục vụ bảng không nhận `OperationRequest<Table>` và trả `Promise<OperationReply<Table>>` của cùng một bảng."
+  causes_vi:
+    - "Đầu vào hoặc kết quả của thao tác khai báo là `unknown` nên client phải tự gõ kiểu tay"
+    - "Mã từ chối khai báo là `string` thay vì hợp các literal như `\"DENIED\" | \"INVALID\"`"
+    - "Route nhận `@Body() body: unknown` hoặc chỉ dùng một nửa `OperationRequest` / `OperationReply`"
+  nextStep_vi: "Khai báo kiểu có tên, đóng cho đầu vào và đầu ra của từng thao tác, liệt kê mã từ chối bằng hợp literal, và cho route nhận `OperationRequest<typeof OPERATIONS>` và trả `Promise<OperationReply<typeof OPERATIONS>>`; chạy `npm run contract:emit` để sinh `contracts/<app>/openapi.json`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục BE-OPERATIONS-1; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding

@@ -1098,3 +1098,13 @@ rules:
     failureCodes: ["FE_SLOT_FILE_ROLE"]
     enforcers:
       - {kind: machine, id: fe-slot-allows, at: scripts/checks/architecture/fe-slot-allows.mjs}
+  - id: R95
+    code: "BE_OPERATION_CONTRACT"
+    title_vi: "Thao tác có phiên bản không có hợp đồng kiểu"
+    law: "A versioned operation is declared once in the app's typed operation table (`OperationContract<Input, Output, RefusalCode>` registered by `defineOperations`): its input and output are closed types (never `any`, `unknown` or `Record<string, unknown>`), its refusal codes a closed union of string literals, and the route that serves the table takes `OperationRequest<Table>` and answers `Promise<OperationReply<Table>>` of that one table."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_OPERATION_CONTRACT"]
+    enforcers:
+      - {kind: eslint-be, id: operation-contract-decidable}
+      - {kind: eslint-be, id: operation-route-driven-by-table}

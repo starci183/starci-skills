@@ -453,6 +453,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
   - id: fe.contract.copy
     profiles: [fe]
@@ -475,7 +476,7 @@ slots:
     owner: true
     minInstances: 1
     requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
-    allows: [main.ts, app.module.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
+    allows: [main.ts, app.module.ts, "<app>.composition.spec.ts", "<app>.options.ts", operations.ts]
     tests: unit-beside            # the composition spec boots the REAL AppModule with stubbed options
     budget: {app.module.ts: 250, main.ts: 80}
     rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED]

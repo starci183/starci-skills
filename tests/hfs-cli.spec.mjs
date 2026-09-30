@@ -534,9 +534,9 @@ test('--fast with the real machine: an uncomposed module already on main is not 
 test('HFS_CONTRACT_SNAPSHOT_DRIFT against the app: the full check emits every api app and says so, --fast skips it and says so, an emit that cannot run is a finding', async () => {
   const dir = branched();
   const full = await cli(['check', '--repo', dir, '--json']);
-  assert.deepEqual(JSON.parse(full.out).contracts, { status: 'checked', apps: [{ app: 'core', status: 'no-graphql' }] });
+  assert.deepEqual(JSON.parse(full.out).contracts, { status: 'checked', apps: [{ app: 'core', artifact: 'schema.graphql', status: 'none' }] });
   assert.deepEqual(only(JSON.parse(full.out), 'HFS_CONTRACT_SNAPSHOT_DRIFT'), []);
-  assert.match((await cli(['check', '--repo', dir])).out, /contract snapshots: emitted and compared, core no-graphql/);
+  assert.match((await cli(['check', '--repo', dir])).out, /contract snapshots: emitted and compared, core\/schema\.graphql none/);
   assert.match((await cli(['check', '--repo', dir, '--fast'])).out, /contract snapshots: skipped, --fast does not emit the apps/);
   assert.equal(JSON.parse((await cli(['check', '--repo', dir, '--fast', '--json'])).out).contracts.status, 'skipped');
   put(dir, 'apps/core/src/app.module.ts', "import { Missing } from './missing';\nexport class AppModule {\n  static register() {\n    return { module: AppModule, imports: [Missing] };\n  }\n}\n");
@@ -544,7 +544,29 @@ test('HFS_CONTRACT_SNAPSHOT_DRIFT against the app: the full check emits every ap
   const [finding] = only(broken, 'HFS_CONTRACT_SNAPSHOT_DRIFT');
   assert.match(finding.message, /cannot be verified.*cannot resolve \.\/missing/);
   assert.match(finding.whyVi, HAS_VIETNAMESE);
-  assert.equal(broken.contracts.apps[0].status, 'emit-failed');
+  assert.deepEqual(broken.contracts.apps.map((a) => a.status), ['emit-failed', 'emit-failed']);
+});
+
+test('emit-contracts writes contracts/<app>/openapi.json from the typed operation table, and the full check judges it', async () => {
+  const dir = branched();
+  const canon = fs.readFileSync(path.join(root, 'packages', 'eslint', 'be', 'fixtures', 'typed', 'src', 'modules', 'platform', 'operations', 'operation-contract.ts'), 'utf8');
+  put(dir, 'apps/core/src/contract.ts', canon);
+  put(dir, 'apps/core/src/operations.ts', `import { defineOperations, query } from './contract';
+export interface Ask { readonly id: string }
+export interface Answer { readonly total: number }
+export const OPERATIONS = defineOperations({ 'shop.total@1': query<Ask, Answer, 'DENIED'>() });
+`);
+  const emitted = await cli(['emit-contracts', '--repo', dir]);
+  assert.equal(emitted.code, 0, emitted.err + emitted.out);
+  assert.match(emitted.out, /wrote contracts\/core\/openapi\.json/);
+  const document = JSON.parse(fs.readFileSync(path.join(dir, 'contracts', 'core', 'openapi.json'), 'utf8'));
+  assert.deepEqual(document['x-operations'], [{ id: 'shop.total@1', kind: 'query' }]);
+  git(dir, 'add', '-A', '--', '.', ':!node_modules');
+  const fresh = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
+  assert.deepEqual(fresh.contracts.apps.filter((a) => a.artifact === 'openapi.json'), [{ app: 'core', artifact: 'openapi.json', status: 'fresh' }]);
+  put(dir, 'apps/core/src/operations.ts', fs.readFileSync(path.join(dir, 'apps/core/src/operations.ts'), 'utf8').replace("'DENIED'", "'DENIED' | 'GONE'"));
+  const stale = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
+  assert.match(only(stale, 'HFS_CONTRACT_SNAPSHOT_DRIFT')[0].message, /contracts\/core\/openapi\.json \([0-9a-f]{12}\) differs from what core emits now/);
 });
 
 test('HFS_FORMAT: --fast never runs prettier, the full check runs the repository\'s own, and a repository with none is a refusal, never a pass', async () => {

@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aliasTarget, aliasesOf, appModulePath } from './contracts.mjs';
+import { compilerOptionsOf } from './compiler.mjs';
 import { createGraphReader } from './static-graph.mjs';
 
 const [rootArgument, app] = process.argv.slice(2);
@@ -34,7 +35,14 @@ const host = {
     return found;
   },
 };
-const composition = createGraphReader({ ts, host }).compose(path.join(repoRoot, appModulePath(app)));
+let composition;
+try {
+  composition = createGraphReader({ ts, host }).compose(path.join(repoRoot, appModulePath(app)));
+} catch (error) {
+  process.stderr.write(`${error.message}
+`);
+  process.exit(1);
+}
 if (composition === null) process.exit(3);
 require('reflect-metadata');
 
@@ -52,23 +60,8 @@ Module._resolveFilename = function resolve(request, ...rest) {
 // The code is compiled the way `tsc` compiles it (a Program over the resolver files and what they import), not file by file:
 // `emitDecoratorMetadata` writes the type of a decorated property from the type checker (`facet: Facet` with a string-literal
 // union is `String`), which a per-file transpile cannot know and which decides GraphQL field types.
-const configDiagnostic = (diagnostic) => {
-  throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, ' '));
-};
-const parsed = ts.getParsedCommandLineOfConfigFile(path.join(repoRoot, 'tsconfig.json'), {}, { ...ts.sys, onUnRecoverableConfigFileDiagnostic: configDiagnostic });
-// Nest's code-first schema needs both decorator switches; a configuration that cannot be read completely (an `extends` package that
-// is not installed here) falls back to what a Nest project compiles with and is reported like a stand-in.
-for (const error of parsed.errors) process.stderr.write(`stand-in tsconfig.json (${ts.flattenDiagnosticMessageText(error.messageText, ' ')}): compiler options fall back to the Nest defaults
-`);
-const options = {
-  target: ts.ScriptTarget.ES2022,
-  module: ts.ModuleKind.CommonJS,
-  esModuleInterop: true,
-  ...parsed.options,
-  experimentalDecorators: true,
-  emitDecoratorMetadata: true,
-  declaration: false, declarationMap: false, sourceMap: false, inlineSourceMap: false, incremental: false, composite: false, tsBuildInfoFile: undefined, noEmit: false, noEmitOnError: false, outDir: undefined, rootDir: undefined,
-};
+const options = compilerOptionsOf(ts, repoRoot, (message) => process.stderr.write(`stand-in ${message}
+`));
 const roots = [...composition.resolvers, ...composition.scalars, ...composition.include].map(({ file }) => file);
 const program = ts.createProgram({ rootNames: [...new Set(roots)], options });
 const compile = (filename) => {
