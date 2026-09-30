@@ -18,6 +18,13 @@ import { checkRequiredFiles, REQUIRED_FILE_RULE_IDS } from './required-files.mjs
 import { checkSizeGrowth, SIZE_GROWTH_RULE_IDS } from './size-growth.mjs';
 import { checkClones, CLONE_RULE_IDS } from './clones.mjs';
 import { checkSymbols, SYMBOL_RULE_IDS } from './symbols.mjs';
+import { checkConnectionMap, CONNECTION_RULE_IDS } from './connection-map.mjs';
+import { checkSqlOwner, SQL_OWNER_RULE_IDS } from './sql-owner.mjs';
+import { checkRegisterOnce, REGISTER_ONCE_RULE_IDS } from './register-once.mjs';
+import { checkErrorMasked, ERROR_MASKED_RULE_IDS } from './error-masked.mjs';
+import { checkDefaultDeny, DEFAULT_DENY_RULE_IDS } from './default-deny.mjs';
+import { checkEntrypoints, ENTRYPOINT_RULE_IDS } from './entrypoint.mjs';
+import { checkErrorCodes, ERROR_CODE_RULE_IDS } from './error-codes.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -29,6 +36,17 @@ const LIMITATIONS = [
   'Backend contract rules prove selected declaration and readonly field forms only; they do not prove runtime validation, serialization compatibility, provider scope, token identity, or dependency behavior.',
   'Frontend SWR lifecycle rules prove declared key bindings and installed SWR identity only; domain identity completeness, stale-result behavior and mutation effects require target behavior evidence.',
 ];
+
+// The backend composition and data machine (R33, R38, R39, R41, R45, R84, R86): name -> [check, the rule ids it makes truthful].
+const BACKEND_MACHINE = {
+  connectionMap: [checkConnectionMap, CONNECTION_RULE_IDS],
+  sqlOwner: [checkSqlOwner, SQL_OWNER_RULE_IDS],
+  registerOnce: [checkRegisterOnce, REGISTER_ONCE_RULE_IDS],
+  errorMasked: [checkErrorMasked, ERROR_MASKED_RULE_IDS],
+  defaultDeny: [checkDefaultDeny, DEFAULT_DENY_RULE_IDS],
+  entrypoints: [checkEntrypoints, ENTRYPOINT_RULE_IDS],
+  errorCodes: [checkErrorCodes, ERROR_CODE_RULE_IDS],
+};
 
 const COMMON_RULE_IDS = [
   'ARCH_DYNAMIC_DEPENDENCY_UNPROVEN',
@@ -156,6 +174,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     const input = { config, context: hfsContext, graph, base };
     const runs = { tiers: () => checkTiers(graph), reachability: () => checkReachability(input), deadExports: () => checkDeadExports(input),
       requiredFiles: () => checkRequiredFiles(input), sizeGrowth: () => checkSizeGrowth(input), clones: () => checkClones(input), symbols: () => checkSymbols(input) };
+    if (graph.profile === 'be') for (const [name, [check]] of Object.entries(BACKEND_MACHINE)) runs[name] = () => check(input);
     if (fast) { delete runs.deadExports; delete runs.clones; delete runs.symbols; }
     for (const [name, run] of Object.entries(runs)) {
       const result = run();
@@ -199,6 +218,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     ...(hfsChecks.sizeGrowth?.status === 'checked' ? SIZE_GROWTH_RULE_IDS : []),
     ...(hfsChecks.clones?.status === 'checked' ? CLONE_RULE_IDS : []),
     ...(hfsChecks.symbols?.status === 'checked' ? SYMBOL_RULE_IDS : []),
+    ...Object.entries(BACKEND_MACHINE).flatMap(([name, [, ids]]) => (hfsChecks[name]?.status === 'checked' ? ids : [])),
     ...(frontendChecked ? FRONTEND_RULE_IDS : []),
     ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
     ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),
