@@ -36,10 +36,10 @@ rules:
     cases:
       - id: case-1
         when: A new write operation
-        write: application/start-checkout.command.ts, start-checkout.handler.ts, start-checkout.contracts.ts (the handler has no spec: its service does).
+        write: 'application/start-checkout.command.ts, start-checkout.handler.ts, start-checkout.contracts.ts (the handler has no spec: its service does).'
       - id: case-2
         when: A new read operation
-        write: application/get-cart.query.ts, get-cart.handler.ts, get-cart.contracts.ts (the handler has no spec: its service does).
+        write: 'application/get-cart.query.ts, get-cart.handler.ts, get-cart.contracts.ts (the handler has no spec: its service does).'
     verification:
       automated:
         - BE_CQRS_SHAPE

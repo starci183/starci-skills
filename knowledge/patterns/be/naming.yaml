@@ -37,19 +37,19 @@ rules:
     cases:
       - id: case-1
         when: Feature application
-        write: place-order.command.ts, place-order.query.ts, place-order.handler.ts, place-order.contracts.ts
+        write: 'place-order.command.ts, place-order.query.ts, place-order.handler.ts, place-order.contracts.ts'
       - id: case-2
         when: Feature transport
-        write: place-order.resolver.ts, place-order.controller.ts, place-order.mapper.ts, dto/place-order.input.ts, dto/place-order.type.ts, dto/place-order.request.ts, dto/place-order.response.ts, checkout-graphql.module.ts, checkout-http.module.ts
+        write: 'place-order.resolver.ts, place-order.controller.ts, place-order.mapper.ts, dto/place-order.input.ts, dto/place-order.type.ts, dto/place-order.request.ts, dto/place-order.response.ts, checkout-graphql.module.ts, checkout-http.module.ts'
       - id: case-3
         when: Background transport
-        write: settle-payments.job.ts in transport/schedule, payment-settled.consumer.ts in transport/message, backup.cli.ts in transport/cli, billing-schedule.module.ts, billing-message.module.ts
+        write: 'settle-payments.job.ts in transport/schedule, payment-settled.consumer.ts in transport/message, backup.cli.ts in transport/cli, billing-schedule.module.ts, billing-message.module.ts'
       - id: case-4
         when: Capability
-        write: purchase.module.ts, purchase.module-definition.ts, purchase.config.ts, purchase.options.ts, purchase.decorators.ts, purchase.log-events.ts, purchase.service.ts, purchase.contracts.ts, credit-limit.policy.ts
+        write: 'purchase.module.ts, purchase.module-definition.ts, purchase.config.ts, purchase.options.ts, purchase.decorators.ts, purchase.log-events.ts, purchase.service.ts, purchase.contracts.ts, credit-limit.policy.ts'
       - id: case-5
         when: Persistence
-        write: entities/purchase.entity.ts, migrations/1790000000000-create-purchases.ts, purchase.sql.ts, purchase.rows.ts, connection.ts
+        write: 'entities/purchase.entity.ts, migrations/1790000000000-create-purchases.ts, purchase.sql.ts, purchase.rows.ts, connection.ts'
       - id: case-6
         when: Errors
         write: errors/purchase.error.ts holds the code enum, the kind table and the one error class.
@@ -58,7 +58,7 @@ rules:
         write: 'unit `commission.service.spec.ts` beside `commission.service.ts`; e2e `place-order.e2e-spec.ts` under src/tests/e2e/checkout/'
       - id: case-8
         when: App
-        write: main.ts, app.module.ts, api.options.ts
+        write: 'main.ts, app.module.ts, api.options.ts'
     verification:
       automated:
         - HFS_SLOT_UNDECLARED

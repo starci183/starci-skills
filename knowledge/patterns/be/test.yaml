@@ -58,7 +58,7 @@ rules:
     cases:
       - id: case-1
         when: Unit
-        write: commission.service.spec.ts beside commission.service.ts, the only unit spec kind
+        write: 'commission.service.spec.ts beside commission.service.ts, the only unit spec kind'
       - id: case-2
         when: Integration
         write: src/tests/integration/inbox/claim-once.integration-spec.ts calling useTestWorld({ modules }) and asserting rows through world.db

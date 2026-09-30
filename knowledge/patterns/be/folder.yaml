@@ -40,13 +40,13 @@ rules:
     cases:
       - id: case-1
         when: A new business rule with owned state
-        write: src/modules/domain/<capability>/ with index.ts, <capability>.module.ts, <capability>.module-definition.ts, <capability>.options.ts and colocated specs.
+        write: 'src/modules/domain/<capability>/ with index.ts, <capability>.module.ts, <capability>.module-definition.ts, <capability>.options.ts and colocated specs.'
       - id: case-2
         when: A technical runtime facility such as scheduling or messaging
         write: src/modules/platform/<capability>/ with index.ts and its port, decorators and module files.
       - id: case-3
         when: A payment or LLM provider client
-        write: src/modules/integrations/<provider>/ with index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts and errors/.
+        write: 'src/modules/integrations/<provider>/ with index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts and errors/.'
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
