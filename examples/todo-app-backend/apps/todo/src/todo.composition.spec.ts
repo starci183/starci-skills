@@ -1,23 +1,23 @@
 import "reflect-metadata"
-import { APP_GUARD } from "@nestjs/core"
+import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { CommandBus } from "@nestjs/cqrs"
 import { Test } from "@nestjs/testing"
 import type { TestingModule } from "@nestjs/testing"
-import { getDataSourceToken, getEntityManagerToken } from "@nestjs/typeorm"
+import { getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { mock } from "@starci/jest-preset/mock"
 import { SubscriptionService } from "@modules/domain/plan"
 import { AuthGuard, SessionService } from "@modules/domain/identity"
 import { TaskService } from "@modules/domain/task"
-import { ConfigError, EnvSource, Secret } from "@modules/platform/config"
-import { PRIMARY_CONNECTION } from "@modules/platform/database"
-import { ERRORS_SERVICE } from "@modules/platform/errors"
+import { EnvSource, Secret } from "@modules/platform/config"
+import { DATABASE_PROBE, PRIMARY_CONNECTION } from "@modules/platform/database"
+import { ERRORS_SERVICE, ErrorsFilter } from "@modules/platform/errors"
 import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
-import { LOGGER } from "@modules/platform/logging"
+import type { Probe } from "@modules/platform/probes"
 import { mockEntityManager } from "@tests/fixtures/database"
 import { AppModule } from "./app.module"
-import { parseTodoAppOptions } from "./todo.options"
 import type { TodoAppOptions } from "./todo.options"
+import { parseTodoAppOptions } from "./todo.options"
 
 const options: TodoAppOptions = {
     port: 0,
@@ -33,25 +33,9 @@ const options: TodoAppOptions = {
     notifySmtp: { host: "localhost", port: 0, from: "todo@example.test", connectTimeoutMs: 100, commandTimeoutMs: 100 },
 }
 
-const environment: Record<string, string> = {
-    PORT: "3001",
-    PRIMARY_DB_URL: "postgres://localhost:5501/todo",
-    HTTP_SECURITY_ALLOWED_ORIGINS: "http://localhost:3000",
-    KEYCLOAK_TOKEN_URL: "http://localhost:8089/token",
-    KEYCLOAK_CLIENT_ID: "todo-api",
-    SEPAY_BASE_URL: "http://localhost:0",
-    SEPAY_API_KEY: "k",
-    SEPAY_WEBHOOK_SECRET: "w",
-    UPLOAD_DIR: "/tmp/todo-uploads",
-    UPLOAD_SIGNING_SECRET: "s",
-    SMTP_HOST: "localhost",
-    SMTP_PORT: "1025",
-    SMTP_FROM: "todo@example.test",
-}
-
 describe("todo AppModule", () => {
     let module: TestingModule
-    const manager = mockEntityManager()
+    const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
 
     beforeAll(async () => {
         const dataSource = mock<DataSource>({ isInitialized: false, manager, entityMetadatas: [], options: { type: "postgres" } })
@@ -75,11 +59,11 @@ describe("todo AppModule", () => {
         }
         expect(module.get(CommandBus)).toBeInstanceOf(CommandBus)
         expect(module.get(ERRORS_SERVICE)).toBeDefined()
-        expect(module.get(LOGGER)).toBeDefined()
     })
 
-    it("binds the one primary EntityManager to the connection double", () => {
-        expect(module.get(getEntityManagerToken(PRIMARY_CONNECTION))).toBe(manager)
+    it("binds the one primary EntityManager to the connection double", async () => {
+        await module.get<Probe>(DATABASE_PROBE).check()
+        expect(manager.query).toHaveBeenCalledTimes(1)
     })
 
     it("registers the app guards in order: rate limit, origin, auth", () => {
@@ -88,7 +72,30 @@ describe("todo AppModule", () => {
         )
         expect(guards).toEqual([RateLimitGuard, OriginGuard, AuthGuard])
     })
+
+    it("binds the one masking filter", () => {
+        const filters = (AppModule.register(options).providers ?? []).flatMap((provider) =>
+            "provide" in provider && provider.provide === APP_FILTER && "useClass" in provider ? [provider.useClass] : [],
+        )
+        expect(filters).toEqual([ErrorsFilter])
+    })
 })
+
+const environment: Record<string, string> = {
+    PORT: "3001",
+    PRIMARY_DB_URL: "postgres://localhost:5501/todo",
+    HTTP_SECURITY_ALLOWED_ORIGINS: "http://localhost:3000",
+    KEYCLOAK_TOKEN_URL: "http://localhost:8089/token",
+    KEYCLOAK_CLIENT_ID: "todo-api",
+    SEPAY_BASE_URL: "http://localhost:0",
+    SEPAY_API_KEY: "k",
+    SEPAY_WEBHOOK_SECRET: "w",
+    UPLOAD_DIR: "/tmp/todo-uploads",
+    UPLOAD_SIGNING_SECRET: "s",
+    SMTP_HOST: "localhost",
+    SMTP_PORT: "1025",
+    SMTP_FROM: "todo@example.test",
+}
 
 describe("parseTodoAppOptions", () => {
     it("reads the port, the primary database and every capability from the environment", () => {
@@ -101,6 +108,6 @@ describe("parseTodoAppOptions", () => {
     })
 
     it("stops the boot when a required key is missing", () => {
-        expect(() => parseTodoAppOptions(new EnvSource({}))).toThrow(ConfigError)
+        expect(() => parseTodoAppOptions(new EnvSource({}))).toThrow("CONFIG_KEY_MISSING")
     })
 })

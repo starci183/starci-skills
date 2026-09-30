@@ -8,7 +8,7 @@ import { CLAIM_EVENT, RELEASE_EVENT } from "./persistence/inbox.sql"
 
 @Injectable()
 /** The Inbox adapter over the claims table: the unique (source, event id) pair decides who claims first. */
-export class PostgresInboxService implements Inbox {
+export class PostgresInbox implements Inbox {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         @InjectClock() private readonly clock: Clock,

@@ -1,6 +1,7 @@
 import { CommandHandler } from "@nestjs/cqrs"
 import { PaymentService, PlanErrorCode, SettlementService, SubscriptionService } from "@modules/domain/plan"
-import { SepayClient } from "@modules/integrations/sepay"
+import { InjectSepay } from "@modules/integrations/sepay"
+import type { SepayClient } from "@modules/integrations/sepay"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { ICQRSHandler } from "@modules/platform/cqrs"
@@ -27,7 +28,7 @@ export class ReconcilePaymentHandler extends ICQRSHandler<ReconcilePaymentComman
         private readonly payments: PaymentService,
         private readonly subscriptions: SubscriptionService,
         private readonly settlement: SettlementService,
-        private readonly sepay: SepayClient,
+        @InjectSepay() private readonly sepay: SepayClient,
     ) {
         super(logger)
     }

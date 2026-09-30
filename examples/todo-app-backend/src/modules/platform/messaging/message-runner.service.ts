@@ -29,7 +29,7 @@ const describeFailure = (error: unknown): string =>
  * store, hands each to its consumer, completes it on success, and reschedules or buries it on failure. An app that
  * registers no consumer never polls.
  */
-export class MessageRunnerService implements ConsumerRegistry, OnApplicationBootstrap, OnApplicationShutdown {
+export class MessageRunner implements ConsumerRegistry, OnApplicationBootstrap, OnApplicationShutdown {
     private readonly consumers = new Map<string, RegisteredConsumer>()
     private timer: NodeJS.Timeout | undefined
     private stopped = false

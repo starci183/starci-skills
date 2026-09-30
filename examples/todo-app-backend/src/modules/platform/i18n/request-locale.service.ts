@@ -6,7 +6,7 @@ const DEFAULT_LOCALE: Locale = "vi"
 
 @Injectable()
 /** Picks Vietnamese or English from Accept-Language, Vietnamese by default (this example stores no user preference). */
-export class AcceptLanguageLocaleService implements RequestLocale {
+export class AcceptLanguageLocale implements RequestLocale {
     /** The first listed language that is Vietnamese or English, Vietnamese when none is. */
     of(acceptLanguage: AcceptLanguage): Locale {
         const header = typeof acceptLanguage === "string" ? acceptLanguage : (acceptLanguage ?? []).join(",")

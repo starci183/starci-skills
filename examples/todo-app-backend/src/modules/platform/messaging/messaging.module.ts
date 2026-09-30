@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { MessageRunnerService } from "./message-runner.service"
+import { MessageRunner } from "./message-runner.service"
 import { CONSUMER_REGISTRY } from "./messaging.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./messaging.module-definition"
 
@@ -14,8 +14,8 @@ export class MessagingModule extends ConfigurableModuleClass {
             ...base,
             providers: [
                 ...(base.providers ?? []),
-                MessageRunnerService,
-                { provide: CONSUMER_REGISTRY, useExisting: MessageRunnerService },
+                MessageRunner,
+                { provide: CONSUMER_REGISTRY, useExisting: MessageRunner },
             ],
             exports: [CONSUMER_REGISTRY],
         }

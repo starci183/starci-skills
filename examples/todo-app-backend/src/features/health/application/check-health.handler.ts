@@ -4,7 +4,7 @@ import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { ok, refused } from "@modules/platform/primitives"
 import { InjectProbeChecker, ProbesErrorCode } from "@modules/platform/probes"
-import type { ProbeCheckerService } from "@modules/platform/probes"
+import type { ProbeChecker } from "@modules/platform/probes"
 import type { CheckHealthResult } from "./check-health.contracts"
 import { CheckHealthQuery } from "./check-health.query"
 
@@ -13,7 +13,7 @@ import { CheckHealthQuery } from "./check-health.query"
 export class CheckHealthHandler extends ICQRSHandler<CheckHealthQuery, CheckHealthResult> {
     constructor(
         @InjectLogger() logger: Logger,
-        @InjectProbeChecker() private readonly checker: ProbeCheckerService,
+        @InjectProbeChecker() private readonly checker: ProbeChecker,
     ) {
         super(logger)
     }

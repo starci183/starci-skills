@@ -9,7 +9,7 @@ export const DATABASE_PROBE: unique symbol = Symbol("platform.database.probe")
 
 @Injectable()
 /** The health probe of the database capability: the primary connection must answer a ping. */
-export class DatabaseProbeService implements Probe {
+export class DatabaseProbe implements Probe {
     /** The name the health report lists this probe under. */
     readonly name = "database"
 

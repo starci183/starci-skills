@@ -1,7 +1,8 @@
 import { CommandHandler } from "@nestjs/cqrs"
 import { InjectPlanOptions, PaymentService, SubscriptionService } from "@modules/domain/plan"
 import type { PlanOptions } from "@modules/domain/plan"
-import { SepayClient } from "@modules/integrations/sepay"
+import { InjectSepay } from "@modules/integrations/sepay"
+import type { SepayClient } from "@modules/integrations/sepay"
 import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectPrimaryEntityManager } from "@modules/platform/database"
 import { InjectLogger } from "@modules/platform/logging"
@@ -23,7 +24,7 @@ export class UpgradePlanHandler extends ICQRSHandler<UpgradePlanCommand, Upgrade
         @InjectPlanOptions() private readonly options: PlanOptions,
         private readonly subscriptions: SubscriptionService,
         private readonly payments: PaymentService,
-        private readonly sepay: SepayClient,
+        @InjectSepay() private readonly sepay: SepayClient,
     ) {
         super(logger)
     }

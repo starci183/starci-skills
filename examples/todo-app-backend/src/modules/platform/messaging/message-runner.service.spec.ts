@@ -2,7 +2,7 @@ import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import type { Logger } from "@modules/platform/logging"
 import type { Outbox, OutboxRecord } from "@modules/platform/outbox"
-import { MessageRunnerService } from "./message-runner.service"
+import { MessageRunner } from "./message-runner.service"
 import { MessagingLogEvent } from "./messaging.log-events"
 import type { MessagingOptions } from "./messaging.options"
 import { defineQueue } from "./queue.policy"
@@ -57,7 +57,7 @@ interface Ledger {
 }
 
 interface Rig {
-    readonly runner: MessageRunnerService
+    readonly runner: MessageRunner
     readonly ledger: Ledger
     readonly logger: Logger
 }
@@ -83,12 +83,12 @@ const build = (claimed: ReadonlyArray<OutboxRecord>, handle: jest.Mock): Rig => 
         }),
     })
     const logger = mock<Logger>()
-    const runner = new MessageRunnerService(OPTIONS, outbox, new FakeClock(AT), logger)
+    const runner = new MessageRunner(OPTIONS, outbox, new FakeClock(AT), logger)
     runner.add({ queue: QUEUE, handle })
     return { runner, ledger, logger }
 }
 
-describe("MessageRunnerService", () => {
+describe("MessageRunner", () => {
     it("claims only the registered queues and completes a handled message", async () => {
         const handled: Array<unknown> = []
         const handle = jest.fn().mockImplementation((message: unknown) => {

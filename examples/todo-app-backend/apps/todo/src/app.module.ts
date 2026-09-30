@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { APP_GUARD } from "@nestjs/core"
+import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { AUDIT_ERROR_KINDS, AUDIT_MESSAGES, AuditModule, auditEntities, auditMigrations } from "@modules/domain/audit"
 import { NOTIFY_ERROR_KINDS, NOTIFY_MESSAGES, NotifyModule, notifyEntities, notifyMigrations } from "@modules/domain/notify"
 import { PLAN_ERROR_KINDS, PLAN_MESSAGES, PlanModule, planEntities, planMigrations } from "@modules/domain/plan"
@@ -24,7 +24,7 @@ import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
 import { DATABASE_ERROR_KINDS, DATABASE_PROBE, DatabaseModule } from "@modules/platform/database"
-import { ERRORS_MESSAGES, ErrorsModule } from "@modules/platform/errors"
+import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
 import { GraphqlModule } from "@modules/platform/graphql"
 import { HTTP_ERROR_KINDS, HTTP_MESSAGES, HttpModule } from "@modules/platform/http"
 import {
@@ -154,6 +154,7 @@ export class AppModule {
                 TodoHttpModule,
             ],
             providers: [
+                { provide: APP_FILTER, useClass: ErrorsFilter },
                 { provide: APP_GUARD, useClass: RateLimitGuard },
                 { provide: APP_GUARD, useClass: OriginGuard },
                 { provide: APP_GUARD, useClass: AuthGuard },

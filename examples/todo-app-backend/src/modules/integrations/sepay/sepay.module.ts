@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { SepayClient } from "./sepay.client"
+import { SEPAY } from "./sepay.decorators"
 import { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } from "./sepay.module-definition"
 
 @Module({})
@@ -11,8 +12,8 @@ export class SepayModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []), SepayClient],
-            exports: [MODULE_OPTIONS_TOKEN, SepayClient],
+            providers: [...(base.providers ?? []), { provide: SEPAY, useClass: SepayClient }],
+            exports: [MODULE_OPTIONS_TOKEN, SEPAY],
         }
     }
 }

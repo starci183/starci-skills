@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule } from "@nestjs/typeorm"
-import { DATABASE_PROBE, DatabaseProbeService } from "./database-probe.service"
+import { DATABASE_PROBE, DatabaseProbe } from "./database-probe.service"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
 
 @Module({})
@@ -28,7 +28,7 @@ export class DatabaseModule extends ConfigurableModuleClass {
                     }),
                 ),
             ],
-            providers: [...(base.providers ?? []), { provide: DATABASE_PROBE, useClass: DatabaseProbeService }],
+            providers: [...(base.providers ?? []), { provide: DATABASE_PROBE, useClass: DatabaseProbe }],
             exports: [DATABASE_PROBE],
         }
     }

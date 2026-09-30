@@ -1,16 +1,17 @@
 import "reflect-metadata"
 import { Test } from "@nestjs/testing"
 import type { TestingModule } from "@nestjs/testing"
-import { getDataSourceToken, getEntityManagerToken } from "@nestjs/typeorm"
+import { getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { mock } from "@starci/jest-preset/mock"
 import { TaskService } from "@modules/domain/task"
-import { ConfigError, EnvSource, Secret } from "@modules/platform/config"
-import { PRIMARY_CONNECTION } from "@modules/platform/database"
+import { EnvSource, Secret } from "@modules/platform/config"
+import { DATABASE_PROBE, PRIMARY_CONNECTION } from "@modules/platform/database"
+import type { Probe } from "@modules/platform/probes"
 import { mockEntityManager } from "@tests/fixtures/database"
 import { AppModule } from "./app.module"
-import { parseWorkerAppOptions } from "./worker.options"
 import type { WorkerAppOptions } from "./worker.options"
+import { parseWorkerAppOptions } from "./worker.options"
 
 const options: WorkerAppOptions = {
     database: { name: PRIMARY_CONNECTION, url: new Secret("postgres://localhost:0/todo") },
@@ -28,7 +29,7 @@ const options: WorkerAppOptions = {
 
 describe("worker AppModule", () => {
     let module: TestingModule
-    const manager = mockEntityManager()
+    const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
 
     beforeAll(async () => {
         const dataSource = mock<DataSource>({ isInitialized: false, manager, entityMetadatas: [], options: { type: "postgres" } })
@@ -46,13 +47,14 @@ describe("worker AppModule", () => {
         expect(module.get(TaskService)).toBeInstanceOf(TaskService)
     })
 
-    it("binds the one primary EntityManager to the connection double", () => {
-        expect(module.get(getEntityManagerToken(PRIMARY_CONNECTION))).toBe(manager)
+    it("binds the one primary EntityManager to the connection double", async () => {
+        await module.get<Probe>(DATABASE_PROBE).check()
+        expect(manager.query).toHaveBeenCalledTimes(1)
     })
 })
 
 describe("parseWorkerAppOptions", () => {
     it("stops the boot when a required key is missing", () => {
-        expect(() => parseWorkerAppOptions(new EnvSource({}))).toThrow(ConfigError)
+        expect(() => parseWorkerAppOptions(new EnvSource({}))).toThrow("CONFIG_KEY_MISSING")
     })
 })

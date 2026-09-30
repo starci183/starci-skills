@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_INTERCEPTOR } from "@nestjs/core"
-import { MetricsRegistryService } from "./metrics-registry.service"
+import { MetricsRegistry } from "./metrics-registry.service"
 import { METRICS } from "./observability.decorators"
 import { ObservabilityInterceptor } from "./observability.interceptor"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./observability.module-definition"
@@ -16,7 +16,7 @@ export class ObservabilityModule extends ConfigurableModuleClass {
             ...base,
             providers: [
                 ...(base.providers ?? []),
-                { provide: METRICS, useClass: MetricsRegistryService },
+                { provide: METRICS, useClass: MetricsRegistry },
                 { provide: APP_INTERCEPTOR, useClass: ObservabilityInterceptor },
             ],
             exports: [METRICS],

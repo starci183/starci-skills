@@ -1,13 +1,13 @@
-import { BundleMessageCatalogService } from "./bundle-message-catalog.service"
+import { BundleMessageCatalog } from "./bundle-message-catalog.service"
 
-const catalog = new BundleMessageCatalogService({
+const catalog = new BundleMessageCatalog({
     bundles: [
         { vi: { "a.b": "xin chao {{name}}" }, en: { "a.b": "hello {{name}}" } },
         { vi: { "c.d": "tam biet" }, en: { "c.d": "bye" } },
     ],
 })
 
-describe("BundleMessageCatalogService", () => {
+describe("BundleMessageCatalog", () => {
     it("fills placeholders in the requested locale", () => {
         expect(catalog.get("a.b", { name: "An" }, "en")).toBe("hello An")
         expect(catalog.get("a.b", { name: "An" }, "vi")).toBe("xin chao An")

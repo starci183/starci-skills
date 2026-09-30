@@ -1,12 +1,12 @@
 import { mock } from "@starci/jest-preset/mock"
 import type { Logger } from "@modules/platform/logging"
 import { ProbesErrorCode } from "@modules/platform/probes"
-import type { ProbeCheckerService, ProbeReport } from "@modules/platform/probes"
+import type { ProbeChecker, ProbeReport } from "@modules/platform/probes"
 import { CheckHealthHandler } from "./check-health.handler"
 import { CheckHealthQuery } from "./check-health.query"
 
 const handlerFor = (report: ProbeReport): CheckHealthHandler =>
-    new CheckHealthHandler(mock<Logger>(), mock<ProbeCheckerService>({ run: jest.fn().mockResolvedValue(report) }))
+    new CheckHealthHandler(mock<Logger>(), mock<ProbeChecker>({ run: jest.fn().mockResolvedValue(report) }))
 
 const query = new CheckHealthQuery({ request: {} })
 

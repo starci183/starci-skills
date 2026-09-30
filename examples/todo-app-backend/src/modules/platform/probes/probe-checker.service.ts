@@ -10,7 +10,7 @@ import type { Probe } from "./probes.port"
 
 @Injectable()
 /** Runs every probe of the app and reports which dependency answered; a failing probe is logged, never rethrown. */
-export class ProbeCheckerService {
+export class ProbeChecker {
     constructor(
         @InjectProbesOptions() private readonly options: ProbesOptions,
         @InjectProbes() private readonly probes: ReadonlyArray<Probe>,

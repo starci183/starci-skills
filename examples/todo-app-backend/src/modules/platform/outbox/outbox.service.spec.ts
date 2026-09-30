@@ -1,16 +1,16 @@
 import { FakeClock } from "@starci/jest-preset/clock"
 import { mockEntityManager } from "@tests/fixtures/database"
-import { PostgresOutboxService } from "./outbox.service"
+import { PostgresOutbox } from "./outbox.service"
 import { BURY_MESSAGE, CLAIM_DUE_MESSAGES, COMPLETE_MESSAGE, INSERT_MESSAGE, RETRY_MESSAGE } from "./persistence/outbox.sql"
 
 const AT = new Date("2026-09-30T10:00:00.000Z")
 const LATER = new Date("2026-09-30T10:05:00.000Z")
 
-describe("PostgresOutboxService", () => {
+describe("PostgresOutbox", () => {
     it("enqueues through the manager of the caller transaction, not its own", async () => {
         const own = mockEntityManager()
         const inTransaction = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
-        await new PostgresOutboxService(own, new FakeClock(AT)).enqueue(inTransaction, {
+        await new PostgresOutbox(own, new FakeClock(AT)).enqueue(inTransaction, {
             queue: "audit.append",
             eventId: "e1",
             payload: { a: 1 },
@@ -33,7 +33,7 @@ describe("PostgresOutboxService", () => {
                 .fn()
                 .mockResolvedValue([[{ id: "m1", queue: "q", event_id: "e1", payload: { a: 1 }, attempts: 1 }], 1]),
         })
-        const records = await new PostgresOutboxService(own, new FakeClock(AT)).claimDue({
+        const records = await new PostgresOutbox(own, new FakeClock(AT)).claimDue({
             at: AT,
             queues: ["q"],
             limit: 10,
@@ -45,7 +45,7 @@ describe("PostgresOutboxService", () => {
 
     it("completes, retries and buries by id", async () => {
         const own = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
-        const outbox = new PostgresOutboxService(own, new FakeClock(AT))
+        const outbox = new PostgresOutbox(own, new FakeClock(AT))
         await outbox.complete("m1")
         await outbox.retry({ id: "m1", at: LATER, error: "boom" })
         await outbox.bury({ id: "m1", error: "gave up" })
