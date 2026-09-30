@@ -1,5 +1,5 @@
 import { Test } from "@nestjs/testing"
-import { builder, FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import { TaskService } from "@modules/domain/task"
 import type { TaskView } from "@modules/domain/task"
 import { UPLOAD_STORAGE, UploadStorageError, UploadStorageErrorCode } from "@modules/integrations/upload"
@@ -18,12 +18,12 @@ import { signUploadToken } from "./upload-token.policy"
 const NOW = "2026-09-10T10:00:00.000Z"
 const at = new Date(NOW)
 const SECRET = "test-signing-secret"
-const options = builder<UploadOptions>({
+const options: UploadOptions = {
     maxBytes: 1000,
     allowedMimes: ["text/plain", "image/png"],
     presignTtlMs: 60_000,
     signingSecret: new Secret(SECRET),
-})
+}
 
 const bytes = Buffer.from("hello")
 
@@ -54,7 +54,7 @@ const build = async (em = mockEntityManager()) => {
             UploadService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
             { provide: CLOCK, useValue: new FakeClock(NOW) },
-            { provide: UPLOAD_OPTIONS, useValue: options() },
+            { provide: UPLOAD_OPTIONS, useValue: options },
             { provide: UPLOAD_STORAGE, useValue: storage },
             { provide: TaskService, useValue: tasks },
         ],

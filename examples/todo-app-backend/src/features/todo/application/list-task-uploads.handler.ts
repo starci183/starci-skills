@@ -17,7 +17,6 @@ export class ListTaskUploadsHandler extends ICQRSHandler<ListTaskUploadsQuery, L
     }
 
     protected override async process(query: ListTaskUploadsQuery): Promise<ListTaskUploadsResult> {
-        const { request, principal } = query.params
-        return this.uploads.listForTask({ actorId: principal.id, taskId: request.taskId })
+        return this.uploads.listForTask({ actorId: query.params.principal.id, taskId: query.params.request.taskId })
     }
 }

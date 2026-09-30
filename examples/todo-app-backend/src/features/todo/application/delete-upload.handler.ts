@@ -17,7 +17,6 @@ export class DeleteUploadHandler extends ICQRSHandler<DeleteUploadCommand, Delet
     }
 
     protected override async process(command: DeleteUploadCommand): Promise<DeleteUploadResult> {
-        const { request, principal } = command.params
-        return this.uploads.remove({ actorId: principal.id, uploadId: request.uploadId })
+        return this.uploads.remove({ actorId: command.params.principal.id, uploadId: command.params.request.uploadId })
     }
 }

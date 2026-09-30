@@ -17,12 +17,11 @@ export class CreateDirectUploadHandler extends ICQRSHandler<CreateDirectUploadCo
     }
 
     protected override async process(command: CreateDirectUploadCommand): Promise<CreateDirectUploadResult> {
-        const { request, principal } = command.params
         return this.uploads.createDirect({
-            ownerId: principal.id,
-            filename: request.filename,
-            mime: request.mime,
-            content: request.content,
+            ownerId: command.params.principal.id,
+            filename: command.params.request.filename,
+            mime: command.params.request.mime,
+            content: command.params.request.content,
         })
     }
 }

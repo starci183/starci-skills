@@ -106,12 +106,9 @@ export class UploadService {
             at: this.clock.now(),
         })
         if (admitted.kind === "refused") return admitted
-        try {
-            const verdict = await this.storage.store({ uploadId, content })
-            if (!verdict.accepted) return refused(UploadErrorCode.ScanRejected, { uploadId, reason: verdict.reason })
-        } catch (error) {
-            return this.storageRefusal(error, uploadId)
-        }
+        const stored = await this.viaStorage(uploadId, () => this.storage.store({ uploadId, content }))
+        if (stored.kind === "refused") return stored
+        if (!stored.value.accepted) return refused(UploadErrorCode.ScanRejected, { uploadId, reason: stored.value.reason })
         const ready = await this.entityManager.transaction((manager) =>
             manager.save(UploadEntity, { ...this.rowOf(admitted.value), sizeBytes: content.length, status: "ready" }),
         )
@@ -141,11 +138,8 @@ export class UploadService {
         const authorized = await this.authorize(params.uploadId, params.actorId)
         if (authorized.kind === "refused") return authorized
         const uploadId = authorized.value.id
-        try {
-            await this.storage.delete({ uploadId })
-        } catch (error) {
-            return this.storageRefusal(error, uploadId)
-        }
+        const deleted = await this.viaStorage(uploadId, () => this.storage.delete({ uploadId }))
+        if (deleted.kind === "refused") return deleted
         await this.entityManager.transaction((manager) => manager.delete(UploadEntity, uploadId))
         return ok({ uploadId, deleted: true })
     }
@@ -175,13 +169,10 @@ export class UploadService {
         const ready = this.requireReady(authorized.value)
         if (ready.kind === "refused") return ready
         const uploadId = ready.value.id
-        try {
-            const content = await this.storage.get({ uploadId })
-            if (content === null) return refused(UploadErrorCode.NotFound, { uploadId, reason: "object-missing" })
-            return ok({ filename: ready.value.filename, mime: ready.value.mime, content })
-        } catch (error) {
-            return this.storageRefusal(error, uploadId)
-        }
+        const read = await this.viaStorage(uploadId, () => this.storage.get({ uploadId }))
+        if (read.kind === "refused") return read
+        if (read.value === null) return refused(UploadErrorCode.NotFound, { uploadId, reason: "object-missing" })
+        return ok({ filename: ready.value.filename, mime: ready.value.mime, content: read.value })
     }
 
     /** Writes a pending upload row for the owner, or refuses a media type off the allowlist or a size out of bounds. */
@@ -273,10 +264,17 @@ export class UploadService {
         return valid ? null : refused(UploadErrorCode.TooLarge, { sizeBytes, maxBytes: this.options.maxBytes })
     }
 
-    /** A failure of the storage integration is a refusal; any other failure is a bug and is rethrown. */
-    private storageRefusal(error: unknown, uploadId: string): Outcome<never, UploadErrorCode.StorageUnavailable> {
-        if (error instanceof UploadStorageError) return refused(UploadErrorCode.StorageUnavailable, { uploadId })
-        throw error
+    /** Runs one call of the byte plane: a failure of the storage integration is a refusal, any other failure is a bug and is rethrown. */
+    private async viaStorage<Value>(
+        uploadId: string,
+        call: () => Promise<Value>,
+    ): Promise<Outcome<Value, UploadErrorCode.StorageUnavailable>> {
+        try {
+            return ok(await call())
+        } catch (error) {
+            if (error instanceof UploadStorageError) return refused(UploadErrorCode.StorageUnavailable, { uploadId })
+            throw error
+        }
     }
 
     private rowOf(upload: UploadView): UploadEntity {

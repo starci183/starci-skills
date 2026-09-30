@@ -113,11 +113,18 @@ export type InviteResult = Outcome<
     ShareErrorCode
 >
 
-/** The answer of accepting: the bound role and status, or a refusal. */
-export type AcceptResult = Outcome<
-    { readonly invitationId: string; readonly role: string; readonly status: string },
-    ShareErrorCode
->
+/** What accepting an invitation answers: the bound role and the live status. */
+export interface AcceptedInvitation {
+    /** The invitation. */
+    readonly invitationId: string
+    /** The granted role. */
+    readonly role: string
+    /** The live status. */
+    readonly status: string
+}
+
+/** The answer of accepting: the accepted invitation, or a refusal. */
+export type AcceptResult = Outcome<AcceptedInvitation, ShareErrorCode>
 
 /** The answer of revoking: the revoked invitation, or a refusal. */
 export type RevokeResult = Outcome<{ readonly invitationId: string; readonly status: string }, ShareErrorCode>

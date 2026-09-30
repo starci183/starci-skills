@@ -12,6 +12,7 @@ import { InvitationEntity } from "./persistence/entities/invitation.entity"
 import { toInvitationView } from "./persistence/invitation.rows"
 import { InvitationStatus } from "./share.contracts"
 import type {
+    AcceptedInvitation,
     AcceptParams,
     AcceptResult,
     CollaboratorList,
@@ -83,7 +84,7 @@ export class InvitationService {
      * Binds the accepting person to a pending invitation addressed to their own email. Accepting again by the same
      * person changes nothing; a closed, expired, revoked or foreign invitation is refused.
      */
-    async accept(params: AcceptParams): Promise<AcceptResult> {
+    accept(params: AcceptParams): Promise<AcceptResult> {
         const at = this.clock.now()
         return this.entityManager.transaction(async (manager) => {
             const row = await manager.findOne(InvitationEntity, {
@@ -112,7 +113,7 @@ export class InvitationService {
     }
 
     /** Revokes an invitation for its owner, pending or accepted; an expired or revoked one is refused as closed. */
-    async revoke(params: RevokeParams): Promise<RevokeResult> {
+    revoke(params: RevokeParams): Promise<RevokeResult> {
         const at = this.clock.now()
         return this.entityManager.transaction(async (manager) => {
             const row = await manager.findOne(InvitationEntity, {
@@ -159,7 +160,7 @@ export class InvitationService {
         return live === InvitationStatus.Pending || live === InvitationStatus.Accepted
     }
 
-    private accepted(row: InvitationEntity, at: Date): { invitationId: string; role: string; status: string } {
+    private accepted(row: InvitationEntity, at: Date): AcceptedInvitation {
         const view = toInvitationView(row, at)
         return { invitationId: view.id, role: view.role, status: view.status }
     }

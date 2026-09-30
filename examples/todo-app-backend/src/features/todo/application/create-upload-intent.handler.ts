@@ -17,12 +17,11 @@ export class CreateUploadIntentHandler extends ICQRSHandler<CreateUploadIntentCo
     }
 
     protected override async process(command: CreateUploadIntentCommand): Promise<CreateUploadIntentResult> {
-        const { request, principal } = command.params
         return this.uploads.createIntent({
-            ownerId: principal.id,
-            filename: request.filename,
-            mime: request.mime,
-            sizeBytes: request.sizeBytes,
+            ownerId: command.params.principal.id,
+            filename: command.params.request.filename,
+            mime: command.params.request.mime,
+            sizeBytes: command.params.request.sizeBytes,
         })
     }
 }

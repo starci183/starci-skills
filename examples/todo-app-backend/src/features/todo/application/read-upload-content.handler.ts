@@ -17,7 +17,6 @@ export class ReadUploadContentHandler extends ICQRSHandler<ReadUploadContentQuer
     }
 
     protected override async process(query: ReadUploadContentQuery): Promise<ReadUploadContentResult> {
-        const { request, principal } = query.params
-        return this.uploads.readContent({ actorId: principal.id, uploadId: request.uploadId })
+        return this.uploads.readContent({ actorId: query.params.principal.id, uploadId: query.params.request.uploadId })
     }
 }
