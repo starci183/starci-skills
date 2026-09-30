@@ -93,7 +93,7 @@ const opFixture=t=>{
   process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
   t.after(()=>{if(savedMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=savedMachine;
     if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;});
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stubFile=path.join(root,'fake-orca.mjs');fs.writeFileSync(stubFile,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stubFile]),

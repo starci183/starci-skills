@@ -41,7 +41,7 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot,{recursive:true});
   const env={...process.env,

@@ -189,7 +189,7 @@ test('quit-agent empties a draft before its quit command, and types nothing over
 
 const nudgeFixture=t=>{
   const w=orcaWorld(t);
-  const repo=path.join(w.root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(w.root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});
   const workflowId='wf-nudge-draft',jobId='job-nudge-draft';
   // ledgerFileFor resolves under env.LOCALAPPDATA — seed the file the spawned api will open.

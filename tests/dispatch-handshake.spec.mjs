@@ -41,7 +41,7 @@ const fixture=t=>{
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const make=mode=>{
     const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handshake-'));dirs.push(root);
-    const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+    const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
     const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
     const env={...process.env,
       STARCI_ORCA_COMMAND:process.execPath,          // the stub runs as `node fake-orca.mjs ...`
