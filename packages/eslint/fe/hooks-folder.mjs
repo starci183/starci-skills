@@ -15,14 +15,8 @@
  * architecture machine that sees the whole tree.
  */
 
-import { baseName, isSpecFile } from "./lib/scope.mjs"
-import { normalizePath } from "./lib/path.mjs"
-
-/** The path below the first `hooks/` folder, as segments, or null when the file is not in one. */
-const belowHooks = (file) => {
-  const match = /\/src\/hooks\/(.+)$/.exec(file) || /\/hooks\/(.+)$/.exec(file)
-  return match ? match[1].split("/") : null
-}
+import { hfsOf } from "./lib/hfs.mjs"
+import { baseName, classOf, fileOf, inSlot, isSpecFile } from "./lib/scope.mjs"
 
 /** Names that mark a hook. */
 const isHookName = (name) => /^use[A-Z0-9]/.test(name)
@@ -67,20 +61,27 @@ export const hooksFolderHoldsHooksOnly = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    const segments = belowHooks(file)
-    if (!segments) return {}
+    // Slot `fe.hooks` owns `apps/<app>/src/hooks/<domain>/`; a file no slot puts there is not judged here.
+    if (!inSlot(context, "fe.hooks")) return {}
+    const file = fileOf(context)
+    const found = classOf(context)
+    // A file directly in `hooks/` is its own root: the slot binds the file name as the `domain`.
+    const directlyInHooks = hfsOf(context).relative(file) === found.root
     const name = baseName(file)
     const spec = isSpecFile(file)
     const subject = spec ? name.replace(/\.(?:test|spec)\.(?:ts|tsx)$/, ".ts") : name
-    const domain = segments.length >= 2 ? segments[segments.length - 2] : null
+    const domain = found.bindings.domain
     const isHookFile = /^use[A-Z0-9]\w*\.ts$/.test(subject)
-    const isSharedFile = domain !== null && subject === `${domain}.shared.ts`
+    // The slot names the domain's entry (`index.ts`, role `entry`) and its shared helper file (`<domain>.shared.ts`, role `shared`).
+    // Both sit directly in the domain folder: a nested `x/index.ts` is a file the slot does not name.
+    const directlyInDomain = hfsOf(context).relative(file) === `${found.root}/${name}`
+    const isEntryFile = directlyInDomain && (found.role === "entry" || (spec && subject === "index.ts"))
+    const isSharedFile = directlyInDomain && (found.role === "shared" || (spec && subject === `${domain}.shared.ts`))
 
     return {
       Program(program) {
-        if (segments.length < 2) return context.report({ node: program, messageId: "domain" })
-        if (!isHookFile && !isSharedFile) context.report({ node: program, messageId: "notHook", data: { name } })
+        if (directlyInHooks) return context.report({ node: program, messageId: "domain" })
+        if (!isHookFile && !isSharedFile && !isEntryFile) context.report({ node: program, messageId: "notHook", data: { name } })
       },
       ImportDeclaration(node) {
         if (SERVER_ONLY.test(String(node.source.value)) && !spec) {
@@ -88,7 +89,7 @@ export const hooksFolderHoldsHooksOnly = {
         }
       },
       "Program:exit"(program) {
-        if (spec || (!isHookFile && !isSharedFile)) return
+        if (spec || directlyInHooks || (!isHookFile && !isSharedFile)) return
         const exported = program.body
           .filter((node) => node.type === "ExportNamedDeclaration" || node.type === "ExportDefaultDeclaration")
           .flatMap((node) => exportedNames(node).map((exportedName) => ({ node, name: exportedName })))

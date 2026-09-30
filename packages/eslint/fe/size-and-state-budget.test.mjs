@@ -5,27 +5,23 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, fixtureHfs, slotTester } from "./fixtures/typed/tester.mjs"
 import {
-  MAX_COMPONENT_LINES,
   componentLineBudget,
   noHandRolledPolling,
   rules,
   unitHookBudget,
 } from "./size-and-state-budget.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const BLOCK = "D:/repo/src/components/blocks/Feed/index.tsx"
-const HOOK = "D:/repo/src/hooks/feed/useFeed.ts"
+const BLOCK = at("apps/web/src/components/blocks/Feed/index.tsx")
+const DRAWING = at("apps/web/src/components/blocks/Feed/component.tsx")
+const HOOK = at("apps/web/src/hooks/feed/useFeed.ts")
+
+// The budgets are the slot manifest's own numbers: the rule keeps no copy.
+const COMPONENTS = fixtureHfs().slot("fe.components").budget
+const FEATURE = fixtureHfs().slot("fe.feature").budget
 
 /** `count` lines of code that do nothing. */
 const lines = (count) => Array.from({ length: count }, (_, index) => `const line${index} = ${index}`).join("\n")
@@ -38,19 +34,33 @@ test("every rule this law declares is a rule", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
 })
 
-test("BUDGET-1: a component file has at most 300 lines", () => {
-  assert.equal(MAX_COMPONENT_LINES, 300)
+test("BUDGET-1: a component file stays within the line budget its slot states for its role", () => {
+  assert.deepEqual([COMPONENTS["component.tsx"], COMPONENTS["index.tsx"]], [300, 200])
   tester.run("component-line-budget", componentLineBudget, {
     valid: [
-      { filename: BLOCK, code: lines(300) },
-      { filename: BLOCK, code: `${lines(300)}\n` },
-      // only components are held to it: a hook file, a module and a spec are not
+      { filename: DRAWING, code: lines(300) },
+      { filename: DRAWING, code: `${lines(300)}
+` },
+      { filename: BLOCK, code: lines(200) },
+      { filename: at("apps/web/src/features/pages/Home/component.tsx"), code: lines(FEATURE["component.tsx"]) },
+      // only a role that has a budget is held to it: a hook, a module and a spec are not
       { filename: HOOK, code: lines(400) },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: lines(400) },
+      { filename: at("apps/web/src/modules/config/index.ts"), code: lines(400) },
+      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: lines(400) },
+      // a file the slots do not put in a component owner is not judged by this rule
+      { filename: at("apps/web/src/modules/components/x.tsx"), code: lines(400) },
+      { filename: at("apps/web/src/lib/Big.tsx"), code: lines(400) },
+      // a component owner's styling file has no line budget of its own
+      { filename: at("apps/web/src/components/blocks/Feed/classNames.ts"), code: lines(400) },
     ],
     invalid: [
-      { filename: BLOCK, code: lines(301), errors: [{ messageId: "lines", data: { count: 301, max: 300 } }] },
-      { filename: "D:/repo/src/features/pages/Home/index.tsx", code: lines(650), errors: [{ messageId: "lines" }] },
+      { filename: DRAWING, code: lines(301), errors: [{ messageId: "lines", data: { count: 301, max: 300 } }] },
+      // the connected entry has the smaller budget
+      { filename: BLOCK, code: lines(201), errors: [{ messageId: "lines", data: { count: 201, max: 200 } }] },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: lines(650), errors: [{ messageId: "lines" }] },
+      { filename: at("apps/admin/src/features/overlays/Confirm/component.tsx"), code: lines(301), errors: [{ messageId: "lines" }] },
+      // a layer folder named like a component still gets its budget from the slot
+      { filename: at("apps/web/src/components/leaves/blocks/index.tsx"), code: lines(201), errors: [{ messageId: "lines" }] },
     ],
   })
 })
@@ -64,13 +74,18 @@ test("BUDGET-2: a unit holds at most six state hooks and six data hooks", () => 
       { filename: BLOCK, code: `${unit("A", 4, 4)}\n${unit("B", 4, 4)}` },
       // a callback that is not a unit does not own the calls
       { filename: BLOCK, code: "export const Feed = () => { const a = items.map(() => 1); const [x] = useState(0); return a }" },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: unit("Feed", 9, 9) },
+      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: unit("Feed", 9, 9) },
+      // a slot that states no useState / dataHooks budget puts no bound on the count (hooks, features, modules)
+      { filename: HOOK, code: unit("useFeed", 7, 0) },
+      { filename: at("apps/web/src/modules/feed/index.ts"), code: unit("Feed", 9, 9) },
+      // a file no slot owns is not judged
+      { filename: at("apps/web/src/lib/x.tsx"), code: unit("Feed", 9, 9) },
     ],
     invalid: [
       { filename: BLOCK, code: unit("Feed", 7, 0), errors: [{ messageId: "state" }] },
       { filename: BLOCK, code: unit("Feed", 0, 7), errors: [{ messageId: "data" }] },
       { filename: BLOCK, code: unit("Feed", 8, 8), errors: [{ messageId: "state" }, { messageId: "data" }] },
-      { filename: HOOK, code: unit("useFeed", 7, 0), errors: [{ messageId: "state" }] },
+      { filename: at("apps/admin/src/components/leaves/Chip/component.tsx"), code: unit("Chip", 7, 0), errors: [{ messageId: "state" }] },
       {
         filename: BLOCK,
         code: "export function Feed() { const a = useState(0); const b = useState(0); const c = useState(0); const d = useState(0); const e = useState(0); const f = useState(0); const g = React.useState(0); return null }",
@@ -86,7 +101,7 @@ test("BUDGET-3: no hand-rolled polling loop", () => {
       { filename: BLOCK, code: "const E = () => { const d = useQueryFeedSwr({ refreshInterval: 5000 }); return d }" },
       // a one-shot delay is not a loop
       { filename: BLOCK, code: "const E = () => { useEffect(() => { const t = setTimeout(() => setOpen(false), 300); return () => clearTimeout(t) }, []) }" },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: "setInterval(() => 1, 10)" },
+      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "setInterval(() => 1, 10)" },
     ],
     invalid: [
       { filename: BLOCK, code: "const E = () => { useEffect(() => { const t = setInterval(load, 5000); return () => clearInterval(t) }, []) }", errors: [{ messageId: "interval" }] },

@@ -12,22 +12,17 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
+import { hfsFromDeclaration } from "./lib/hfs.mjs"
+import { at, FE_DECLARATION, slotTester } from "./fixtures/typed/tester.mjs"
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { noArbitraryValue, noFractionalStep, noHandRolledHeading, noUnresolvedTokenClass, rules } from "./tokens.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const LEAF = "D:/repo/src/components/leaves/Text/index.tsx"
-const CLASS_NAMES = "D:/repo/src/components/leaves/Text/classNames.ts"
+const LEAF = at("apps/web/src/components/leaves/Text/index.tsx")
+const CLASS_NAMES = at("apps/web/src/components/leaves/Text/classNames.ts")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -38,12 +33,18 @@ test("every rule this law declares is exported under its published name", () => 
 test("TOKEN-3: a fractional step is off the ladder, wherever it is written", () => {
   tester.run("no-fractional-step", noFractionalStep, {
     valid: [
+      // a file under a src folder that no product slot owns is not judged (the machine's HFS_PATH_NO_SLOT covers it)
+      { filename: at("apps/web/src/lib/x.ts"), code: "const G = \"gap-1.5\"" },
+      // a script is not product source
+      { filename: at("scripts/x.ts"), code: "const G = \"gap-1.5\"" },
       { filename: LEAF, code: "const G = \"inline-flex items-center gap-2\"" },
       { filename: LEAF, code: "const E = () => <p className=\"gap-3 p-4\" />" },
       // a decimal that is not a measurement
       { filename: LEAF, code: "const RATIO = \"1.5\"" },
     ],
     invalid: [
+      // a shared package's layer folder is product source
+      { filename: at("packages/nivo-ui/src/leaves/Text/index.tsx"), code: "const E = () => <p className=\"gap-1.5\" />", errors: [{ messageId: "fractional" }] },
       // markup
       { filename: LEAF, code: "const E = () => <p className=\"gap-1.5\" />", errors: [{ messageId: "fractional" }] },
       // the shape that hid from every earlier version: a module constant
@@ -113,25 +114,36 @@ const themedRoot = () => {
 
 const THEMED = themedRoot()
 
+/** The typed-fixture declaration rooted at the themed repository, so its files classify by slot there. */
+const themedTester = new RuleTester({
+  languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module", parserOptions: { ecmaFeatures: { jsx: true } } },
+  settings: { starci: { hfs: hfsFromDeclaration(FE_DECLARATION, THEMED) } },
+})
+
 test("TOKEN-9: a class naming a theme token is dead unless the theme defines it", () => {
-  tester.run("no-unresolved-token-class", noUnresolvedTokenClass, {
+  themedTester.run("no-unresolved-token-class", noUnresolvedTokenClass, {
     valid: [
       // The token exists, so the class means what it says.
-      { filename: `${THEMED}/src/components/pages/Reader/component.tsx`, code: 'const M = "mx-auto max-w-app-sm"' },
-      { filename: `${THEMED}/src/components/layouts/Rail/component.tsx`, code: 'const R = "max-h-rail overflow-y-auto"' },
+      { filename: `${THEMED}/apps/web/src/features/pages/Reader/component.tsx`, code: 'const M = "mx-auto max-w-app-sm"' },
+      { filename: `${THEMED}/apps/web/src/features/layouts/Rail/component.tsx`, code: 'const R = "max-h-rail overflow-y-auto"' },
       // Tailwind's own scale, not a theme promise: nothing here is derivable from a variable name.
-      { filename: `${THEMED}/src/components/pages/Reader/component.tsx`, code: 'const S = "max-w-sm gap-4 text-muted"' },
+      { filename: `${THEMED}/apps/web/src/features/pages/Reader/component.tsx`, code: 'const S = "max-w-sm gap-4 text-muted"' },
       // Outside src, this is somebody else\'s rule to enforce.
       { filename: `${THEMED}/scripts/report.mjs`, code: 'const M = "max-w-app-xl"' },
+      // A file under a src folder that no product slot owns is not product source (the old `/src/` test judged it).
+      { filename: `${THEMED}/apps/web/src/lib/x.ts`, code: 'const M = "max-w-app-xl"' },
+      // The e2e tree is not product source, and a spec asserts about class names rather than declaring them.
+      { filename: `${THEMED}/e2e/support/view.ts`, code: 'const M = "max-w-app-xl"' },
+      { filename: `${THEMED}/apps/web/src/features/pages/Reader/component.spec.tsx`, code: 'const M = "max-w-app-xl"' },
     ],
     invalid: [
       {
-        filename: `${THEMED}/src/components/pages/Reader/component.tsx`,
+        filename: `${THEMED}/apps/web/src/features/pages/Reader/component.tsx`,
         code: 'const M = "mx-auto max-w-app-xl"',
         errors: [{ messageId: "unresolved", data: { value: "max-w-app-xl", variable: "--container-app-xl" } }],
       },
       {
-        filename: `${THEMED}/src/components/layouts/Rail/component.tsx`,
+        filename: `${THEMED}/apps/web/src/features/layouts/Rail/component.tsx`,
         code: 'const R = "max-h-drawer"',
         errors: [{ messageId: "unresolved" }],
       },

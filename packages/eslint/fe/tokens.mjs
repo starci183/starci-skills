@@ -16,10 +16,7 @@ import { dirname, join } from "node:path"
  * license one.
  */
 
-import { normalizePath } from "./lib/path.mjs"
-
-/** Product source lives under `src/`; tooling and config are out of scope. */
-const isSourceFile = (filename) => normalizePath(filename).includes("/src/")
+import { fileOf, isProductSource } from "./lib/scope.mjs"
 
 /**
  * A fractional step, in any family that measures.
@@ -64,7 +61,8 @@ const staticText = (value) => {
 
 /** Walk every place a class string can be written: markup, a constant, or an entry's array. */
 const classTextVisitors = (context, report) => {
-  if (!isSourceFile(context.filename || context.getFilename())) return {}
+  // Product source is a file of a product tier (a slot says so); tooling, config, e2e and specs are out of scope.
+  if (!isProductSource(context)) return {}
   return {
     JSXAttribute(node) {
       if (!isClassAttribute(node)) return
@@ -196,7 +194,7 @@ const STYLESHEET_CANDIDATES = [
 /** Every stylesheet found above the linted file, read once and cached for the run. */
 const themeCache = new Map()
 const themeTextFor = (filename) => {
-  let directory = dirname(normalizePath(filename))
+  let directory = dirname(filename)
   for (let depth = 0; depth < 12 && directory !== "/" && directory !== ""; depth += 1) {
     if (themeCache.has(directory)) return themeCache.get(directory)
     const found = STYLESHEET_CANDIDATES
@@ -225,9 +223,8 @@ export const noUnresolvedTokenClass = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (!isSourceFile(file)) return {}
-    const theme = themeTextFor(file)
+    if (!isProductSource(context)) return {}
+    const theme = themeTextFor(fileOf(context))
     // A reader that cannot find the stylesheet stays quiet rather than calling every token dead.
     if (theme === null) return {}
     // The visitor hands (node, text) in that order; reversing them here is how a rule reports the

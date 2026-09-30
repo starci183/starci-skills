@@ -148,8 +148,12 @@ test("FE-TRANSPORT-3: no module-level mutable state in the API layer", () => {
       { filename: CONTRACT, code: "let x = 1" },
       { filename: at("apps/web/src/modules/api/__generated__/graphql.ts"), code: "let x = 1" },
       { filename: SPEC, code: "let calls = 0" },
+      // a folder named api below another module is not the API layer
+      { filename: at("apps/web/src/modules/config/api/state.ts"), code: "let x = 1" },
     ],
     invalid: [
+      // only the slot's own data folders (contract/, __generated__/) are data: one nested in a domain is code
+      { filename: at("apps/web/src/modules/api/course/contract/read-state.ts"), code: "let x = 1", errors: [{ messageId: "shared" }] },
       { filename: CLIENT, code: "let token = null", errors: [{ messageId: "shared" }] },
       { filename: READER, code: "export let locale = \"vi\"", errors: [{ messageId: "shared" }] },
       { filename: CLIENT, code: "var cache = {}", errors: [{ messageId: "shared" }] },

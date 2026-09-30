@@ -10,19 +10,10 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
 import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import { handlerOnPrefix, noDirectConstAlias, preferArrowExport, rules } from "./naming.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -72,31 +63,33 @@ test("NAMING-3: a path names its file in the one language every reader shares", 
   tester.run("no-second-language-in-path", rules["no-second-language-in-path"], {
     valid: [
       // The ordinary case: an English route, whatever the copy inside it turns out to be.
-      { filename: "/repo/src/app/provisioning/page.tsx", code: "export const x = 1" },
+      { filename: at("apps/web/src/app/provisioning/page.tsx"), code: "export const x = 1" },
       // The words a reader sees live in the catalogue, and the catalogue's own name is English.
-      { filename: "/repo/src/messages/vi.json.ts", code: "export const x = 1" },
+      { filename: at("apps/web/src/messages/vi.json.ts"), code: "export const x = 1" },
       // ENGLISH WORDS THAT LOOK LIKE THE ROMANISED LIST ARE NOT IT. `cap` and `dang` open several
       // ordinary English names, and a rule that refused them would be noise its readers learn to
       // ignore - which costs more than the case it was reaching for.
-      { filename: "/repo/src/app/capacity/page.tsx", code: "export const x = 1" },
-      { filename: "/repo/src/components/leaves/DangerBadge/index.tsx", code: "export const x = 1" },
+      { filename: at("apps/web/src/app/capacity/page.tsx"), code: "export const x = 1" },
+      { filename: at("apps/web/src/components/leaves/DangerBadge/index.tsx"), code: "export const x = 1" },
+      // a locale segment and a route group are ordinary segments
+      { filename: at("apps/web/src/app/[locale]/x/page.tsx"), code: "export const x = 1" },
     ],
     invalid: [
       // Diacritics survive in a folder name even though a URL segment drops them.
       {
-        filename: "/repo/src/app/cấp-phát/page.tsx",
+        filename: at("apps/web/src/app/cấp-phát/page.tsx"),
         code: "export const x = 1",
         errors: [{ messageId: "path" }],
       },
       // The form that actually reaches the filesystem, and the one an accent check cannot see.
       {
-        filename: "/repo/src/app/cap-phat/page.tsx",
+        filename: at("apps/web/src/app/cap-phat/page.tsx"),
         code: "export const x = 1",
         errors: [{ messageId: "path" }],
       },
       // A route group's parentheses are punctuation around the name, not part of it.
       {
-        filename: "/repo/src/app/(auth)/dang-nhap/page.tsx",
+        filename: at("apps/web/src/app/(auth)/dang-nhap/page.tsx"),
         code: "export const x = 1",
         errors: [{ messageId: "path" }],
       },
@@ -120,6 +113,8 @@ test("machine-only: a const introduces a value instead of renaming one identifie
       { filename: PAGE, code: "export const generateMetadata = subscriptionCheckoutMetadata" },
       { filename: PAGE, code: "export const dynamic = forceDynamic" },
       { filename: LAYOUT, code: "export const viewport = appViewport" },
+      { filename: at("apps/web/src/app/[locale]/(app)/x/route.ts"), code: "export const dynamic = forceDynamic" },
+      { filename: at("apps/web/src/app/global-error.tsx"), code: "export const metadata = shared" },
     ],
     invalid: [
       {
@@ -141,6 +136,8 @@ test("machine-only: a const introduces a value instead of renaming one identifie
       // A reserved name outside a route segment file still fires (a helper under app/, a component).
       { filename: ROUTE_HELPER, code: "export const generateMetadata = build", errors: [{ messageId: "alias" }] },
       { filename: COMPONENT, code: "export const metadata = shared", errors: [{ messageId: "alias" }] },
+      // a file named like a segment file outside slot fe.route is an ordinary file
+      { filename: at("apps/web/src/modules/routes/page.ts"), code: "export const metadata = shared", errors: [{ messageId: "alias" }] },
     ],
   })
 })

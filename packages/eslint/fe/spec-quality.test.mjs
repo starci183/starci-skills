@@ -5,10 +5,8 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import tsParser from "@typescript-eslint/parser"
 import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import {
   connectedSpecHasAxe,
@@ -20,21 +18,14 @@ import {
   specTestsItsNeighbour,
 } from "./spec-quality.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
 const BARRELS = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "spec-barrel")
 
-const LEAF_SPEC = "D:/repo/src/components/leaves/Chip/Chip.test.tsx"
-const BLOCK_SPEC = "D:/repo/src/components/blocks/Feed/index.test.tsx"
-const PAGE_SPEC = "D:/repo/src/features/pages/Home/index.test.tsx"
-const COMPONENT = "D:/repo/src/components/blocks/Feed/index.tsx"
+const LEAF_SPEC = at("apps/web/src/components/leaves/Chip/Chip.test.tsx")
+const BLOCK_SPEC = at("apps/web/src/components/blocks/Feed/index.test.tsx")
+const PAGE_SPEC = at("apps/web/src/features/pages/Home/index.test.tsx")
+const COMPONENT = at("apps/web/src/components/blocks/Feed/index.tsx")
 
 test("every rule this law declares is a rule", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -68,7 +59,7 @@ test("SPEC-2: a spec imports the unit beside it", () => {
       { filename: LEAF_SPEC, code: "import { Chip } from \"./Chip.tsx\"" },
       { filename: BLOCK_SPEC, code: "import { Feed } from \"./index\"" },
       { filename: BLOCK_SPEC, code: "import { Feed } from \".\"" },
-      { filename: "D:/repo/src/hooks/feed/useFeed.test.ts", code: "import { useFeed } from \"./useFeed\"" },
+      { filename: at("apps/web/src/hooks/feed/useFeed.test.ts"), code: "import { useFeed } from \"./useFeed\"" },
       { filename: LEAF_SPEC, code: "const mod = await import(\"./Chip\")" },
       { filename: COMPONENT, code: "export const x = 1" },
     ],
@@ -84,12 +75,12 @@ test("SPEC-3: no spec for a barrel, but a spec for an index that holds implement
   tester.run("no-barrel-spec", noBarrelSpec, {
     valid: [
       { filename: BLOCK_SPEC, code: "import { Feed } from \"./index\"" },
-      { filename: "D:/repo/src/hooks/feed/useFeed.test.ts", code: "export {}" },
+      { filename: at("apps/web/src/hooks/feed/useFeed.test.ts"), code: "export {}" },
       // live: starci-next-fe modules/browser-storage/index.ts declares createStore and two stores - it is not a barrel
       { filename: join(BARRELS, "implementation", "index.spec.ts"), code: "export {}" },
       // no sibling index: nothing to call a barrel
       { filename: join(BARRELS, "missing", "index.spec.ts"), code: "export {}" },
-      { filename: "D:/repo/src/hooks/index.test.ts", code: "export {}" },
+      { filename: at("apps/web/src/hooks/orders/index.test.ts"), code: "export {}" },
     ],
     invalid: [
       { filename: join(BARRELS, "barrel", "index.spec.ts"), code: "export {}", errors: [{ messageId: "barrel" }] },
@@ -119,12 +110,17 @@ test("SPEC-5: a connected screen's spec runs an axe assertion", () => {
       { filename: PAGE_SPEC, code: "it(\"a11y\", async () => { await expectNoAxeViolations(container) })" },
       // a leaf's or a pure twin's spec owes none: the connected screen's assertion covers what it draws
       { filename: LEAF_SPEC, code: "it(\"x\", () => {})" },
-      { filename: "D:/repo/src/components/blocks/Feed/component.test.tsx", code: "it(\"x\", () => {})" },
+      { filename: at("apps/web/src/components/blocks/Feed/component.test.tsx"), code: "it(\"x\", () => {})" },
+      // where the old folder regex misfired: a leaf named like a layer, a folder named components inside a module, a ui-package leaf
+      { filename: at("apps/web/src/components/leaves/blocks/index.test.tsx"), code: "it(\"x\", () => {})" },
+      { filename: at("apps/web/src/modules/components/index.test.tsx"), code: "it(\"x\", () => {})" },
+      { filename: at("packages/nivo-ui/src/leaves/Chip/index.test.tsx"), code: "it(\"x\", () => {})" },
     ],
     invalid: [
       { filename: BLOCK_SPEC, code: "it(\"renders\", () => {})", errors: [{ messageId: "axe" }] },
       { filename: PAGE_SPEC, code: "it(\"renders\", () => { expect(a).toBe(1) })", errors: [{ messageId: "axe" }] },
-      { filename: "D:/repo/src/features/overlays/Compose/index.test.tsx", code: "it(\"renders\", () => {})", errors: [{ messageId: "axe" }] },
+      { filename: at("apps/web/src/features/overlays/Compose/index.test.tsx"), code: "it(\"renders\", () => {})", errors: [{ messageId: "axe" }] },
+      { filename: at("apps/web/src/features/layouts/Shell/index.spec.tsx"), code: "it(\"renders\", () => {})", errors: [{ messageId: "axe" }] },
     ],
   })
 })

@@ -5,8 +5,7 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import {
   VIEWPORTS,
   e2eNoAbsolutePath,
@@ -20,13 +19,11 @@ import {
   scope,
 } from "./e2e-shape.mjs"
 
-const tester = new RuleTester({
-  languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
-})
+const tester = slotTester()
 
-const SPEC = "D:/repo/e2e/course/play.e2e-spec.ts"
-const SUPPORT = "D:/repo/e2e/support/session.ts"
-const SRC = "D:/repo/src/components/blocks/Feed/index.tsx"
+const SPEC = at("e2e/course/play.e2e-spec.ts")
+const SUPPORT = at("e2e/support/session.ts")
+const SRC = at("apps/web/src/components/blocks/Feed/index.tsx")
 
 test("every rule this law declares is a rule, and the law names the tree it governs", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -39,16 +36,21 @@ test("E2E-1: a spec is e2e/<area>/<name>.e2e-spec.ts", () => {
     valid: [
       { filename: SPEC, code: "export {}" },
       { filename: SUPPORT, code: "export {}" },
-      { filename: "D:/repo/e2e/fixtures/course.ts", code: "export {}" },
+      { filename: at("e2e/fixtures/course.ts"), code: "export {}" },
+      // outside the e2e tree this rule says nothing: no slot near a spec-looking file of the product tree or of another app
+      { filename: at("src/x/y.spec.ts"), code: "export {}" },
+      { filename: at("apps/web/src/modules/e2e/play.e2e-spec.ts"), code: "export {}" },
+      // an area folder named like a helper folder deeper down is still a helper file, not a spec
+      { filename: at("e2e/support/session.spec.ts"), code: "export {}" },
       // outside the e2e tree this rule says nothing
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: "export {}" },
+      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "export {}" },
     ],
     invalid: [
-      { filename: "D:/repo/e2e/play.e2e-spec.ts", code: "export {}", errors: [{ messageId: "location" }] },
-      { filename: "D:/repo/e2e/course/play.spec.ts", code: "export {}", errors: [{ messageId: "location" }] },
-      { filename: "D:/repo/e2e/course/play.test.ts", code: "export {}", errors: [{ messageId: "location" }] },
-      { filename: "D:/repo/e2e/course/deep/play.e2e-spec.ts", code: "export {}", errors: [{ messageId: "location" }] },
-      { filename: "D:/repo/e2e/support/session.e2e-spec.ts", code: "export {}", errors: [{ messageId: "location" }] },
+      { filename: at("e2e/play.e2e-spec.ts"), code: "export {}", errors: [{ messageId: "location" }] },
+      { filename: at("e2e/course/play.spec.ts"), code: "export {}", errors: [{ messageId: "location" }] },
+      { filename: at("e2e/course/play.test.ts"), code: "export {}", errors: [{ messageId: "location" }] },
+      { filename: at("e2e/course/deep/play.e2e-spec.ts"), code: "export {}", errors: [{ messageId: "location" }] },
+      { filename: at("e2e/support/session.e2e-spec.ts"), code: "export {}", errors: [{ messageId: "location" }] },
     ],
   })
 })
@@ -60,11 +62,14 @@ test("E2E-2: no absolute path", () => {
       { filename: SPEC, code: "await page.goto(\"/vi/courses\")" },
       { filename: SPEC, code: "await page.goto(\"/courses/basics\")" },
       { filename: SRC, code: "const p = \"C:/Users/me\"" },
+      // a folder named e2e inside the product tree is not the e2e tree
+      { filename: at("apps/web/src/modules/e2e/paths.ts"), code: "const p = \"C:/Users/me\"" },
     ],
     invalid: [
       { filename: SPEC, code: "const p = \"D:/repos/nivo-backend/out\"", errors: [{ messageId: "absolute" }] },
       { filename: SPEC, code: "const p = \"C:\\\\Users\\\\me\\\\out\"", errors: [{ messageId: "absolute" }] },
       { filename: SUPPORT, code: "const p = \"/Users/me/out\"", errors: [{ messageId: "absolute" }] },
+      { filename: at("playwright.config.ts"), code: "const p = \"/Users/me/out\"", errors: [{ messageId: "absolute" }] },
       { filename: SUPPORT, code: "const p = `/home/runner/work`", errors: [{ messageId: "absolute" }] },
     ],
   })
@@ -108,7 +113,7 @@ test("E2E-5: no skipped test", () => {
       { filename: SPEC, code: "test(\"plays\", async () => {})" },
       { filename: SPEC, code: "test.describe(\"course\", () => {})" },
       { filename: SPEC, code: "test.beforeEach(async () => {})" },
-      { filename: "D:/repo/src/x.test.ts", code: "test.skip(\"a\", () => {})" },
+      { filename: at("apps/web/src/x.test.ts"), code: "test.skip(\"a\", () => {})" },
     ],
     invalid: [
       { filename: SPEC, code: "test.skip(!process.env.BASE_URL, \"needs env\")", errors: [{ messageId: "skip" }] },
@@ -146,23 +151,25 @@ test("E2E-7: the Playwright config declares the three viewports", () => {
     `export default { projects: [${sizes.map(([w, h]) => `{ use: { viewport: { width: ${w}, height: ${h} } } }`).join(", ")}] }`
   tester.run("playwright-viewports", playwrightViewports, {
     valid: [
-      { filename: "D:/repo/playwright.config.ts", code: config([[1440, 900], [768, 1024], [390, 844]]) },
-      { filename: "D:/repo/apps/web/playwright.config.ts", code: config([[390, 844], [1440, 900], [768, 1024]]) },
+      { filename: at("playwright.config.ts"), code: config([[1440, 900], [768, 1024], [390, 844]]) },
+      { filename: at("playwright.config.ts"), code: config([[390, 844], [1440, 900], [768, 1024]]) },
       { filename: SUPPORT, code: "export const v = { viewport: { width: 1, height: 2 } }" },
+      // another config file is not the Playwright config: only the slot role says which one is
+      { filename: at("vitest.config.ts"), code: config([[1, 2]]) },
     ],
     invalid: [
       {
-        filename: "D:/repo/playwright.config.ts",
+        filename: at("playwright.config.ts"),
         code: config([[1440, 900], [768, 1024]]),
         errors: [{ messageId: "missing", data: { size: "390x844" } }],
       },
       {
-        filename: "D:/repo/playwright.config.ts",
+        filename: at("playwright.config.ts"),
         code: "export default { projects: [{ use: { ...devices[\"Desktop Chrome\"] } }] }",
         errors: [{ messageId: "missing" }, { messageId: "missing" }, { messageId: "missing" }],
       },
       {
-        filename: "D:/repo/playwright.config.ts",
+        filename: at("playwright.config.ts"),
         code: config([[1440, 900], [768, 1024], [390, 844], [1920, 1080]]),
         errors: [{ messageId: "extra", data: { size: "1920x1080" } }],
       },

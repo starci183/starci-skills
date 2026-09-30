@@ -145,7 +145,7 @@ export const noBarrelSpec = {
   },
   create(context) {
     const file = normalizePath(context.filename || context.getFilename())
-    if (!/(?:^|\/)index\.(?:test|spec)\.[cm]?tsx?$/.test(file)) return {}
+    if (!isSpecFile(file) || subjectOf(file) !== "index") return {}
     const sibling = INDEX_SIBLINGS.map((name) => join(dirname(file), name)).find((candidate) => existsSync(candidate))
     if (!sibling || !isBarrelSource(readFileSync(sibling, "utf8"))) return {}
     return { Program: (node) => context.report({ node, messageId: "barrel" }) }
@@ -180,10 +180,18 @@ export const noDoubleCastInSpec = {
 
 // -- SPEC-5 ----------------------------------------------------------------------------------------
 
-/** The specs of connected screens: a block's `index` and a feature's `index`. */
-const isConnectedSpec = (file) =>
-  /(?:^|\/)index\.(?:test|spec)\.[cm]?tsx$/.test(file) &&
-  (/\/components\/blocks\//.test(file) || /\/features\/(?:pages|layouts|overlays)\//.test(file))
+/**
+ * The spec of a connected screen: the spec of the entry (`index.tsx`, role `entry`) of a block or of a feature. The slot answers
+ * both: the sibling the spec is named after is classified, and it must be a component-tier entry in the `blocks` layer or a
+ * `fe.feature` entry.
+ */
+const isConnectedSpec = (context, file) => {
+  const subject = subjectOf(file)
+  const hfs = hfsOf(context)
+  const entry = hfs.classify(join(dirname(file), `${subject}.tsx`))
+  if (entry.role !== "entry") return false
+  return (entry.slot === "fe.components" && entry.kind === "blocks") || entry.slot === "fe.feature"
+}
 
 /** Names that run an accessibility check. */
 const AXE_CALLS = new Set(["axe", "runAxe", "expectNoAxeViolations", "expectNoA11yViolations", "toHaveNoViolations"])
@@ -201,7 +209,7 @@ export const connectedSpecHasAxe = {
   },
   create(context) {
     const file = normalizePath(context.filename || context.getFilename())
-    if (!isConnectedSpec(file)) return {}
+    if (!isSpecFile(file) || !isConnectedSpec(context, file)) return {}
     let ran = false
     return {
       CallExpression(node) {
@@ -234,16 +242,19 @@ const walk = (root, keys, visit) => {
 const resolveSpecifier = (hfs, file, specifier) => {
   if (specifier.startsWith(".")) return resolve(dirname(file), specifier)
   if (!specifier.startsWith("@/")) return null
-  const owner = hfs.ownerOf(file)
-  return owner ? join(hfs.repoRoot, owner, "src", specifier.slice(2)) : null
+  const app = hfs.classify(file).bindings?.app
+  if (app === undefined) return null
+  // The app directory is the directory part of the slot `fe.app.next` (`apps/<app>/{package.json,...}`); `@/` is its `src/`.
+  const appDirectory = hfs.slot("fe.app.next").path.split("/{")[0].replace("<app>", app)
+  return join(hfs.repoRoot, appDirectory, "src", specifier.slice(2))
 }
 
 /** True when the specifier is the app's message catalogue: a file under `messages/` of the i18n module slot. */
 const isCatalogSpecifier = (hfs, file, specifier) => {
   const target = resolveSpecifier(hfs, file, specifier)
   if (!target) return false
-  const path = normalizePath(target)
-  return hfs.slotOf(path) === "fe.modules.i18n" && /\/modules\/i18n\/messages(?:\/|$)/.test(path)
+  const { slot, root } = hfs.classify(target)
+  return slot === "fe.modules.i18n" && hfs.relative(target).startsWith(`${root}/messages/`)
 }
 
 /** A spec renders with the real catalogue; a server helper's mock serves it. */

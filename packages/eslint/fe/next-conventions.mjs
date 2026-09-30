@@ -13,8 +13,7 @@
 
 import { attribute, attributeValue, calleeName, leadingTextOf, stringOf } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
-import { baseName, isSpecFile, slotOfFile, stem } from "./lib/scope.mjs"
-import { normalizePath } from "./lib/path.mjs"
+import { baseName, classOf, fileOf, inSlot, isSpecFile, roleOfFile, slotOfFile, stem } from "./lib/scope.mjs"
 
 /** Another i18n stack: a second place that decides which language a reader sees. */
 const OTHER_I18N = /^(?:react-i18next|i18next|next-i18next|react-intl|next-translate|@lingui\/.+|typesafe-i18n|rosetta)$/
@@ -35,13 +34,16 @@ export const noMiddlewareFile = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    const name = baseName(file)
+    const file = fileOf(context)
     if (isSpecFile(file)) return {}
-    if (stem(file) === "middleware" && /(?:^|\/)src\/middleware\.[cm]?[jt]sx?$/.test(file)) {
-      return { Program: (node) => context.report({ node, messageId: "file", data: { name } }) }
+    // `middleware.ts` is a file no slot owns: the manifest pins the source-root interceptor as `proxy.ts` (slot `fe.source-root-pinned`), so the
+    // retired name is the nearest-slot case - a file directly in that source root that the slot refuses.
+    const found = classOf(context)
+    const pinnedRoot = found.status === "no-slot" && found.nearest?.slot === "fe.source-root-pinned" ? found.nearest.matchedPrefix : null
+    if (pinnedRoot !== null && stem(file) === "middleware" && hfsOf(context).relative(file) === `${pinnedRoot}/${baseName(file)}`) {
+      return { Program: (node) => context.report({ node, messageId: "file", data: { name: baseName(file) } }) }
     }
-    if (stem(file) !== "proxy" || !/(?:^|\/)src\/proxy\.[cm]?[jt]s$/.test(file)) return {}
+    if (!inSlot(context, "fe.source-root-pinned") || stem(file) !== "proxy") return {}
     const check = (node) => {
       const names = []
       const declaration = node.declaration
@@ -70,10 +72,14 @@ export const localeSegmentIsLocale = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    const match = /\/app\/(?:.*\/)?\[(lang|lng|language|i18n)\]\//.exec(file)
-    if (!match) return {}
-    return { Program: (node) => context.report({ node, messageId: "segment", data: { name: match[1] } }) }
+    // A route folder is a segment of slot `fe.route`; the locale one is `[locale]`, never another spelling.
+    if (!inSlot(context, "fe.route")) return {}
+    const hfs = hfsOf(context)
+    const file = fileOf(context)
+    const below = hfs.relative(file).slice(classOf(context).root.length + 1).split("/")
+    const name = below.slice(0, -1).map((segment) => /^\[(lang|lng|language|i18n)\]$/.exec(segment)).find(Boolean)?.[1]
+    if (!name) return {}
+    return { Program: (node) => context.report({ node, messageId: "segment", data: { name } }) }
   },
 }
 
@@ -134,9 +140,6 @@ export const htmlLangFromLocale = {
 
 // -- FE-NEXT-5 -------------------------------------------------------------------------------------
 
-/** True for a route page: a `page.tsx` anywhere under `app`. */
-const isPageFile = (file) => /\/app\/(?:.*\/)?page\.[cm]?tsx?$/.test(file)
-
 /** The names a module exports, from declarations and specifiers. */
 const exportedNames = (program) => {
   const names = new Set()
@@ -164,8 +167,8 @@ export const pageExportsMetadata = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (isSpecFile(file) || !isPageFile(file)) return {}
+    // A page is the file the slot gives the role `page` (spec files carry no role).
+    if (!inSlot(context, "fe.route") || roleOfFile(context) !== "page") return {}
     return {
       "Program:exit"(program) {
         const names = exportedNames(program)
@@ -212,9 +215,9 @@ export const noNullSuspenseFallback = {
 
 // -- FE-NEXT-7 -------------------------------------------------------------------------------------
 
-/** Files that legitimately sit outside the locale provider or own the navigation module. */
-const isNavigationOwner = (file) =>
-  /\/modules\/i18n\//.test(file) || /\/app\/global-error\.[cm]?tsx?$/.test(file) || /\/src\/proxy\.[cm]?[jt]s$/.test(file)
+/** Files that legitimately sit outside the locale provider or own the navigation module: the i18n module, the root error boundary, the source-root interceptor. */
+const isNavigationOwner = (context) =>
+  inSlot(context, "fe.modules.i18n", "fe.source-root-pinned") || (inSlot(context, "fe.route") && roleOfFile(context) === "global-error")
 
 /** The router helpers that are locale-blind in `next/navigation`. */
 const LOCALE_BLIND = new Set(["useRouter", "usePathname", "redirect", "permanentRedirect"])
@@ -233,8 +236,7 @@ export const navigationFromIntl = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (isSpecFile(file) || isNavigationOwner(file)) return {}
+    if (isSpecFile(fileOf(context)) || isNavigationOwner(context)) return {}
     return {
       ImportDeclaration(node) {
         if (node.importKind === "type") return
@@ -293,8 +295,8 @@ const isNavigation = (name) =>
 /** True for `/x`, `/x/y`; false for `//host` and for `/` alone, which every app owns. */
 const isInternalPath = (text) => text.startsWith("/") && !text.startsWith("//") && text.length > 1
 
-/** The one place that may write a route: `modules/routes`. */
-const isRoutesModule = (file) => /\/modules\/routes\//.test(file) || /\/modules\/i18n\//.test(file)
+/** The places that may write a route: the routes module (`fe.modules.routes`) and the i18n module (`fe.modules.i18n`). */
+const isRoutesModule = (context) => inSlot(context, "fe.modules.routes", "fe.modules.i18n")
 
 /** No route written by hand outside `modules/routes`. */
 export const noHardcodedRoute = {
@@ -308,8 +310,7 @@ export const noHardcodedRoute = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (isSpecFile(file) || isRoutesModule(file)) return {}
+    if (isSpecFile(fileOf(context)) || isRoutesModule(context)) return {}
     const source = context.sourceCode ?? context.getSourceCode()
     const report = (node, text) => context.report({ node, messageId: "route", data: { path: text } })
     return {

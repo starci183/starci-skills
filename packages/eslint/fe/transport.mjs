@@ -19,8 +19,7 @@
 
 import ts from "typescript"
 import { hfsOf } from "./lib/hfs.mjs"
-import { globalReferences, inSlot, isApiClient, isOutcomeModule, isSpecFile } from "./lib/scope.mjs"
-import { normalizePath } from "./lib/path.mjs"
+import { globalReferences, isApiClient, isOutcomeModule, isSpecFile, slotOfFile } from "./lib/scope.mjs"
 import { typed } from "./lib/types.mjs"
 
 /** Packages that send an HTTP request: a second transport is a second owner. Matched on the module specifier, never on a file name. */
@@ -91,12 +90,6 @@ const transportUses = (context) => {
     }
   }
   return uses
-}
-
-/** Files under `modules/api/` that the wire law governs (the contract copy and generated output are data). */
-const isApiModuleFile = (filename) => {
-  const file = normalizePath(filename)
-  return /\/modules\/api\//.test(file) && !/\/(?:contract|__generated__)\//.test(file)
 }
 
 // -- FE-TRANSPORT-1 --------------------------------------------------------------------------------
@@ -202,11 +195,18 @@ export const clientFetchHasSignal = {
 /** The slots that make up the API layer: the app's `modules/api` and the shared api package. */
 const API_LAYER_SLOTS = ["fe.modules.api", "fe.transport.client", "fe.transport.outcome", "fe.package.api", "fe.package.api.client", "fe.package.api.outcome"]
 
-/** True for a file of the API layer, except the contract copy and generated output, which are data. */
+/**
+ * True for a file of the API layer, except the data folders its slot allows (`contract/`, `__generated__/`: the contract copy
+ * and generated output are data, not code the wire law governs).
+ */
 const isTransportFile = (context) => {
-  if (!inSlot(context, ...API_LAYER_SLOTS)) return false
-  const segments = hfsOf(context).relative(context.filename || context.getFilename()).split("/")
-  return !segments.includes("contract") && !segments.includes("__generated__")
+  const slotId = slotOfFile(context)
+  if (!API_LAYER_SLOTS.includes(slotId)) return false
+  const hfs = hfsOf(context)
+  const dataFolders = (hfs.slot(slotId).allows ?? []).filter((entry) => entry.endsWith("/")).map((entry) => entry.slice(0, -1))
+  const { root } = hfs.classify(context.filename || context.getFilename())
+  const below = hfs.relative(context.filename || context.getFilename()).slice(root.length + 1).split("/")
+  return !dataFolders.includes(below[0])
 }
 
 // -- FE-TRANSPORT-3 --------------------------------------------------------------------------------

@@ -18,17 +18,26 @@
  * socket), so the loop in a component is always the wrong one.
  */
 
-import { isSpecFile } from "./lib/scope.mjs"
-import { normalizePath } from "./lib/path.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { fileOf, isSpecFile, roleOfFile, slotOfFile } from "./lib/scope.mjs"
 
-/** The largest a component file may be. */
-export const MAX_COMPONENT_LINES = 300
+/**
+ * The budget the slot of the linted file states (`budget` in knowledge/hfs/slots.yaml), or an empty one when no slot owns the file
+ * or the slot states none. The numbers live in the manifest only: a rule that kept its own copy would drift from it.
+ */
+const budgetOf = (context) => {
+  const id = slotOfFile(context)
+  return id === null ? {} : hfsOf(context).slot(id)?.budget ?? {}
+}
 
-/** The most `useState` calls one connected unit may hold. */
-export const MAX_STATE_HOOKS = 6
-
-/** The most data hooks one connected unit may read. */
-export const MAX_DATA_HOOKS = 6
+/** The line limit of the linted file: the budget keyed by the file name its role has in the slot (`component.tsx` for the drawing, `index.tsx` for the entry), or null. */
+const lineBudgetOf = (context) => {
+  const role = roleOfFile(context)
+  const id = slotOfFile(context)
+  const fileName = role === null || id === null ? undefined : hfsOf(context).slot(id)?.roles?.[role]
+  const limit = fileName === undefined ? undefined : budgetOf(context)[fileName]
+  return typeof limit === "number" ? limit : null
+}
 
 /** A hook that reads remote data. */
 const DATA_HOOK = /^use\w*(?:Swr|SWR|Query|Mutation|Fetch|Infinite|Subscription)\w*$/
@@ -58,11 +67,11 @@ const isUnitName = (name) => Boolean(name) && (/^[A-Z]/.test(name) || /^use[A-Z0
 
 // -- BUDGET-1 --------------------------------------------------------------------------------------
 
-/** A component file is at most 300 lines. */
+/** A component file is within the slot's line budget for its role. */
 export const componentLineBudget = {
   meta: {
     type: "suggestion",
-    docs: { description: `A component file has at most ${MAX_COMPONENT_LINES} lines.` },
+    docs: { description: "A component file stays within the line budget its slot states (`component.tsx`, `index.tsx`)." },
     schema: [],
     messages: {
       lines:
@@ -70,14 +79,16 @@ export const componentLineBudget = {
     },
   },
   create(context) {
-    const filename = normalizePath(context.filename || context.getFilename())
-    if (!filename.endsWith(".tsx") || isSpecFile(filename) || !filename.includes("/src/")) return {}
+    // Only a role of a component owner has a line budget (the drawing half and the connected entry); a spec, a hook or a module is not held to it here.
+    if (isSpecFile(fileOf(context))) return {}
+    const max = lineBudgetOf(context)
+    if (max === null) return {}
     const source = context.sourceCode || context.getSourceCode()
     return {
       Program(node) {
         // A trailing newline is not a line of code.
         const count = source.lines.length - (source.lines[source.lines.length - 1] === "" ? 1 : 0)
-        if (count > MAX_COMPONENT_LINES) context.report({ node, messageId: "lines", data: { count, max: MAX_COMPONENT_LINES } })
+        if (count > max) context.report({ node, messageId: "lines", data: { count, max } })
       },
     }
   },
@@ -85,11 +96,11 @@ export const componentLineBudget = {
 
 // -- BUDGET-2 --------------------------------------------------------------------------------------
 
-/** A connected unit holds at most six state hooks and reads at most six data hooks. */
+/** A connected unit holds at most the slot's `useState` budget of state hooks and reads at most its `dataHooks` budget of data hooks. */
 export const unitHookBudget = {
   meta: {
     type: "suggestion",
-    docs: { description: `A unit has at most ${MAX_STATE_HOOKS} state hooks and ${MAX_DATA_HOOKS} data hooks.` },
+    docs: { description: "A unit stays within the state-hook and data-hook budget its slot states (`useState`, `dataHooks`)." },
     schema: [],
     messages: {
       state:
@@ -99,7 +110,10 @@ export const unitHookBudget = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
+    if (isSpecFile(fileOf(context))) return {}
+    // A slot that states no `useState` / `dataHooks` budget puts no bound on that count: the rule refuses to invent one.
+    const { useState: maxState, dataHooks: maxData } = budgetOf(context)
+    if (typeof maxState !== "number" && typeof maxData !== "number") return {}
     /** One frame per function being walked; only a component or hook frame accumulates. */
     const frames = []
     const enter = (node) => frames.push({ node, name: functionName(node), state: 0, data: 0 })
@@ -107,11 +121,11 @@ export const unitHookBudget = {
       const frame = frames.pop()
       if (!frame || !isUnitName(frame.name)) return
       const at = frame.node.id || frame.node
-      if (frame.state > MAX_STATE_HOOKS) {
-        context.report({ node: at, messageId: "state", data: { name: frame.name, count: frame.state, max: MAX_STATE_HOOKS } })
+      if (typeof maxState === "number" && frame.state > maxState) {
+        context.report({ node: at, messageId: "state", data: { name: frame.name, count: frame.state, max: maxState } })
       }
-      if (frame.data > MAX_DATA_HOOKS) {
-        context.report({ node: at, messageId: "data", data: { name: frame.name, count: frame.data, max: MAX_DATA_HOOKS } })
+      if (typeof maxData === "number" && frame.data > maxData) {
+        context.report({ node: at, messageId: "data", data: { name: frame.name, count: frame.data, max: maxData } })
       }
     }
     return {
@@ -163,7 +177,7 @@ export const noHandRolledPolling = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
+    if (isSpecFile(fileOf(context))) return {}
     const source = context.sourceCode || context.getSourceCode()
     return {
       CallExpression(node) {

@@ -2,7 +2,7 @@
  * The rules that hold `e2e-shape.md` (HFS R66, `FE_E2E_SHAPE`).
  *
  * THESE RULES GOVERN THE E2E TREE, NOT `src/`. `starciFeConfig` attaches them to `e2e/**` and
- * `playwright.config.*`; every rule here also scopes itself by path, so a config that reaches it by
+ * `playwright.config.*`; every rule here also scopes itself by HFS slot (tier e2e, the Playwright config role), so a config that reaches it by
  * mistake governs nothing it should not.
  *
  * WHY THE SHAPE IS FIXED. An e2e suite is the only proof that the whole app works, and it is run by
@@ -16,9 +16,7 @@
  * architecture machine reads it); that the specs pass is the run itself.
  */
 
-import { isE2eFile } from "./lib/scope.mjs"
-import { baseName } from "./lib/scope.mjs"
-import { normalizePath } from "./lib/path.mjs"
+import { baseName, classOf, fileOf, inSlot, isE2eSource, roleOfFile } from "./lib/scope.mjs"
 
 /** The three viewports every e2e project set covers, as `width x height`. */
 export const VIEWPORTS = Object.freeze(["1440x900", "768x1024", "390x844"])
@@ -26,11 +24,11 @@ export const VIEWPORTS = Object.freeze(["1440x900", "768x1024", "390x844"])
 /** A file that reads like a spec, by any of the common spellings. */
 const SPEC_LIKE = /(?:\.|-)(?:e2e-)?(?:spec|test)\.[cm]?tsx?$/
 
-/** The one legal spec path: `e2e/<area>/<name>.e2e-spec.ts`. */
-const SPEC_PATH = /(?:^|\/)e2e\/[^/]+\/[^/]+\.e2e-spec\.ts$/
+/** A helper file that is named as a spec. */
+const E2E_SPEC_NAME = /\.e2e-spec\./
 
-/** Helper folders: not specs, and never spec-named. */
-const HELPER_PATH = /(?:^|\/)e2e\/(?:support|fixtures)\//
+/** The slots of the e2e tree: the specs (`fe.e2e`) and their helpers (`fe.e2e-support`). */
+const E2E_SLOTS = ["fe.e2e", "fe.e2e-support"]
 
 /** An absolute filesystem path: a drive, a UNC share, or a well-known root. */
 const ABSOLUTE_PATH = /^(?:[A-Za-z]:[\\/]|\\\\|\/(?:Users|home|tmp|mnt|var|opt|etc|root|d|c)\/)/
@@ -77,15 +75,14 @@ export const e2eSpecLocation = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (!/(?:^|\/)e2e\//.test(file)) return {}
-    const name = baseName(file)
-    const helper = HELPER_PATH.test(file)
-    const specLike = SPEC_LIKE.test(name)
-    const legal = SPEC_PATH.test(file) && !helper
-    if ((specLike && !legal) || (helper && /\.e2e-spec\./.test(name))) {
-      return { Program: (node) => context.report({ node, messageId: "location", data: { name } }) }
-    }
+    const name = baseName(fileOf(context))
+    const found = classOf(context)
+    // A helper slot (`fe.e2e-support`) owns no spec: a helper named like one is a spec in the wrong place.
+    const helperNamedSpec = inSlot(context, "fe.e2e-support") && E2E_SPEC_NAME.test(name)
+    // A spec-looking file no slot owns but that sits inside the e2e tree (the nearest slot is an e2e slot, matched past the repository root)
+    // is a spec off the one place `fe.e2e` gives it. A file outside the e2e tree is not this rule's business.
+    const misplacedSpec = found.status === "no-slot" && E2E_SLOTS.includes(found.nearest?.slot) && found.nearest.matchedDepth >= 1 && SPEC_LIKE.test(name)
+    if (helperNamedSpec || misplacedSpec) return { Program: (node) => context.report({ node, messageId: "location", data: { name } }) }
     return {}
   },
 }
@@ -104,7 +101,7 @@ export const e2eNoAbsolutePath = {
     },
   },
   create(context) {
-    if (!isE2eFile(context.filename || context.getFilename())) return {}
+    if (!isE2eSource(context)) return {}
     const check = (node, text) => {
       if (typeof text === "string" && ABSOLUTE_PATH.test(text)) context.report({ node, messageId: "absolute", data: { path: text } })
     }
@@ -135,7 +132,7 @@ export const e2eNoDocker = {
     },
   },
   create(context) {
-    if (!isE2eFile(context.filename || context.getFilename())) return {}
+    if (!isE2eSource(context)) return {}
     return {
       ImportDeclaration(node) {
         if (DOCKER_MODULE.test(String(node.source.value))) context.report({ node, messageId: "docker" })
@@ -194,7 +191,7 @@ export const e2eNoCrossRepoWrite = {
     },
   },
   create(context) {
-    if (!isE2eFile(context.filename || context.getFilename())) return {}
+    if (!isE2eSource(context)) return {}
     const source = context.sourceCode || context.getSourceCode()
     return {
       CallExpression(node) {
@@ -230,7 +227,7 @@ export const e2eNoSkip = {
     },
   },
   create(context) {
-    if (!isE2eFile(context.filename || context.getFilename())) return {}
+    if (!isE2eSource(context)) return {}
     return {
       CallExpression(node) {
         const callee = node.callee
@@ -267,7 +264,7 @@ export const e2eTypedHelpers = {
     },
   },
   create(context) {
-    if (!isE2eFile(context.filename || context.getFilename())) return {}
+    if (!isE2eSource(context)) return {}
     const checkParams = (node) => {
       if (!isModuleLevel(node)) return
       for (const parameter of node.params) {
@@ -308,7 +305,7 @@ export const playwrightViewports = {
     },
   },
   create(context) {
-    if (!/^playwright\.config\.[cm]?[jt]s$/.test(baseName(context.filename || context.getFilename()))) return {}
+    if (roleOfFile(context) !== "playwright") return {}
     const seen = new Map()
     return {
       Property(node) {

@@ -12,8 +12,8 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
-import { NEXT_RESERVED_EXPORTS, NEXT_ROUTE_SEGMENT_STEMS } from "./lib/next.mjs"
-import { stem } from "./lib/scope.mjs"
+import { NEXT_RESERVED_EXPORTS } from "./lib/next.mjs"
+import { fileOf, inSlot, roleOfFile } from "./lib/scope.mjs"
 
 /** Parents that make a function declaration module-level rather than nested. */
 const MODULE_LEVEL_PARENTS = new Set(["Program", "ExportNamedDeclaration", "ExportDefaultDeclaration"])
@@ -90,10 +90,8 @@ export const noDirectConstAlias = {
     },
   },
   create(context) {
-    const file = context.filename || context.getFilename()
-    const hfs = hfsOf(context)
-    // A route segment file is the one place Next dictates the exported name; `export const generateMetadata = x` is the contract.
-    const segmentFile = hfs.slotOf(file) === "fe.route" && NEXT_ROUTE_SEGMENT_STEMS.has(stem(file))
+    // A route segment file (slot `fe.route`, a role: page, layout, route, ...) is the one place Next dictates the exported name; `export const generateMetadata = x` is the contract.
+    const segmentFile = inSlot(context, "fe.route") && roleOfFile(context) !== null
     return {
       VariableDeclarator(node) {
         if (node.parent?.kind !== "const") return
@@ -158,8 +156,7 @@ export const noSecondLanguageInPath = {
     },
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
-    const offending = segmentsOf(filename).find(
+    const offending = segmentsOf(hfsOf(context).relative(fileOf(context))).find(
       (segment) => SECOND_LANGUAGE_PATH.test(segment) || ROMANISED.includes(segment.replace(/[()[\]]/g, "")),
     )
     if (!offending) return {}

@@ -5,8 +5,6 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
 import { at, FE_DECLARATION, slotTester } from "./fixtures/typed/tester.mjs"
 import {
   htmlLangFromLocale,
@@ -22,14 +20,7 @@ import {
   rules,
 } from "./next-conventions.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
 test("every rule this law declares is a rule", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -38,18 +29,23 @@ test("every rule this law declares is a rule", () => {
 test("FE-NEXT-1: the interceptor is proxy.ts and exports proxy", () => {
   tester.run("no-middleware-file", noMiddlewareFile, {
     valid: [
-      { filename: "D:/repo/src/proxy.ts", code: "export function proxy(request) { return request }" },
-      { filename: "D:/repo/src/proxy.ts", code: "export const proxy = (request) => request\nexport const config = { matcher: [] }" },
-      { filename: "D:/repo/apps/web/src/proxy.ts", code: "export default function proxy() {}" },
+      { filename: at("apps/web/src/proxy.ts"), code: "export function proxy(request) { return request }" },
+      { filename: at("apps/web/src/proxy.ts"), code: "export const proxy = (request) => request\nexport const config = { matcher: [] }" },
+      { filename: at("apps/web/src/proxy.ts"), code: "export default function proxy() {}" },
       // a helper that merely has the word in its name deep in the tree is not the interceptor
-      { filename: "D:/repo/src/modules/http/middleware.ts", code: "export const x = 1" },
+      { filename: at("apps/web/src/modules/http/middleware.ts"), code: "export const x = 1" },
+      // a middleware-named file beside a route or in a component folder is not the source-root interceptor
+      { filename: at("apps/web/src/app/[locale]/middleware.ts"), code: "export const x = 1" },
+      { filename: at("apps/web/src/components/blocks/Nav/middleware.ts"), code: "export const x = 1" },
+      // a proxy.ts in a folder the slot does not pin is no interceptor: its export names are nobody's business here
+      { filename: at("apps/web/src/modules/http/proxy.ts"), code: "export const middleware = 1" },
     ],
     invalid: [
-      { filename: "D:/repo/src/middleware.ts", code: "export function middleware() {}", errors: [{ messageId: "file" }] },
-      { filename: "D:/repo/apps/web/src/middleware.ts", code: "export const x = 1", errors: [{ messageId: "file" }] },
-      { filename: "D:/repo/src/proxy.ts", code: "export function middleware() {}", errors: [{ messageId: "export" }] },
-      { filename: "D:/repo/src/proxy.ts", code: "const middleware = () => 1\nexport { middleware }", errors: [{ messageId: "export" }] },
-      { filename: "D:/repo/src/proxy.ts", code: "export const middleware = () => 1", errors: [{ messageId: "export" }] },
+      { filename: at("apps/web/src/middleware.ts"), code: "export function middleware() {}", errors: [{ messageId: "file" }] },
+      { filename: at("apps/web/src/middleware.ts"), code: "export const x = 1", errors: [{ messageId: "file" }] },
+      { filename: at("apps/web/src/proxy.ts"), code: "export function middleware() {}", errors: [{ messageId: "export" }] },
+      { filename: at("apps/web/src/proxy.ts"), code: "const middleware = () => 1\nexport { middleware }", errors: [{ messageId: "export" }] },
+      { filename: at("apps/web/src/proxy.ts"), code: "export const middleware = () => 1", errors: [{ messageId: "export" }] },
     ],
   })
 })
@@ -57,14 +53,17 @@ test("FE-NEXT-1: the interceptor is proxy.ts and exports proxy", () => {
 test("FE-NEXT-2: the locale segment is [locale]", () => {
   tester.run("locale-segment-is-locale", localeSegmentIsLocale, {
     valid: [
-      { filename: "D:/repo/src/app/[locale]/page.tsx", code: "export default function P() {}" },
-      { filename: "D:/repo/src/app/[locale]/courses/[slug]/page.tsx", code: "export default function P() {}" },
-      { filename: "D:/repo/src/app/api/route.ts", code: "export const GET = 1" },
+      { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "export default function P() {}" },
+      { filename: at("apps/web/src/app/[locale]/courses/[slug]/page.tsx"), code: "export default function P() {}" },
+      { filename: at("apps/web/src/app/api/route.ts"), code: "export const GET = 1" },
+      // a folder named [lang] that the route slot does not own is not a locale segment
+      { filename: at("apps/web/src/components/app/[lang]/page.tsx"), code: "export default function P() {}" },
     ],
     invalid: [
-      { filename: "D:/repo/src/app/[lang]/page.tsx", code: "export default function P() {}", errors: [{ messageId: "segment" }] },
-      { filename: "D:/repo/src/app/[lng]/x/page.tsx", code: "export default function P() {}", errors: [{ messageId: "segment" }] },
-      { filename: "D:/repo/apps/web/src/app/[lang]/layout.tsx", code: "export default function L() {}", errors: [{ messageId: "segment" }] },
+      { filename: at("apps/web/src/app/[lang]/page.tsx"), code: "export default function P() {}", errors: [{ messageId: "segment" }] },
+      { filename: at("apps/web/src/app/[lng]/x/page.tsx"), code: "export default function P() {}", errors: [{ messageId: "segment" }] },
+      { filename: at("apps/web/src/app/[lang]/layout.tsx"), code: "export default function L() {}", errors: [{ messageId: "segment" }] },
+      { filename: at("apps/admin/src/app/[locale]/[i18n]/x/page.tsx"), code: "export const metadata = 1", errors: [{ messageId: "segment" }] },
     ],
   })
 })
@@ -104,19 +103,22 @@ test("FE-NEXT-4: html lang comes from the locale", () => {
 test("FE-NEXT-5: every page exports metadata", () => {
   tester.run("page-exports-metadata", pageExportsMetadata, {
     valid: [
-      { filename: "D:/repo/src/app/[locale]/page.tsx", code: "export const metadata = { title: 'Home' }\nexport default function P() {}" },
-      { filename: "D:/repo/src/app/[locale]/courses/page.tsx", code: "export async function generateMetadata() { return {} }\nexport default function P() {}" },
-      { filename: "D:/repo/src/app/[locale]/courses/page.tsx", code: "export const generateMetadata = async () => ({})\nexport default function P() {}" },
-      { filename: "D:/repo/src/app/[locale]/courses/page.tsx", code: "export { metadata } from '@/features/pages/Courses'\nexport default function P() {}" },
+      { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "export const metadata = { title: 'Home' }\nexport default function P() {}" },
+      { filename: at("apps/web/src/app/[locale]/courses/page.tsx"), code: "export async function generateMetadata() { return {} }\nexport default function P() {}" },
+      { filename: at("apps/web/src/app/[locale]/courses/page.tsx"), code: "export const generateMetadata = async () => ({})\nexport default function P() {}" },
+      { filename: at("apps/web/src/app/[locale]/courses/page.tsx"), code: "export { metadata } from '@/features/pages/Courses'\nexport default function P() {}" },
       // only pages name themselves; a layout inherits and a component is not a route
-      { filename: "D:/repo/src/app/[locale]/layout.tsx", code: "export default function L() {}" },
-      { filename: "D:/repo/src/features/pages/Home/index.tsx", code: "export const Home = () => null" },
-      { filename: "D:/repo/src/app/[locale]/page.test.tsx", code: "export default function P() {}" },
+      { filename: at("apps/web/src/app/[locale]/layout.tsx"), code: "export default function L() {}" },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: "export const Home = () => null" },
+      { filename: at("apps/web/src/app/[locale]/page.test.tsx"), code: "export default function P() {}" },
+      // a page.tsx that no route slot owns is not a page
+      { filename: at("apps/web/src/components/blocks/Nav/page.tsx"), code: "export default function P() {}" },
+      { filename: at("apps/web/src/features/pages/Home/page.tsx"), code: "export default function P() {}" },
     ],
     invalid: [
-      { filename: "D:/repo/src/app/[locale]/page.tsx", code: "export default function P() {}", errors: [{ messageId: "metadata" }] },
+      { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "export default function P() {}", errors: [{ messageId: "metadata" }] },
       {
-        filename: "D:/repo/apps/web/src/app/[locale]/(app)/profile/page.tsx",
+        filename: at("apps/web/src/app/[locale]/(app)/profile/page.tsx"),
         code: "export const revalidate = 60\nexport default function P() {}",
         errors: [{ messageId: "metadata" }],
       },
@@ -143,20 +145,21 @@ test("FE-NEXT-6: a Suspense boundary has a fallback that renders something", () 
 test("FE-NEXT-7: navigation helpers come from modules/i18n/navigation", () => {
   tester.run("navigation-from-intl", navigationFromIntl, {
     valid: [
-      { filename: "D:/repo/src/components/blocks/Nav/index.tsx", code: "import { Link, useRouter, usePathname } from '@/modules/i18n/navigation'" },
-      { filename: "D:/repo/src/components/blocks/Nav/index.tsx", code: "import { notFound, useSearchParams, useParams } from 'next/navigation'" },
-      { filename: "D:/repo/src/components/blocks/Nav/index.tsx", code: "import type { Route } from 'next/navigation'" },
+      { filename: at("apps/web/src/components/blocks/Nav/index.tsx"), code: "import { Link, useRouter, usePathname } from '@/modules/i18n/navigation'" },
+      { filename: at("apps/web/src/components/blocks/Nav/index.tsx"), code: "import { notFound, useSearchParams, useParams } from 'next/navigation'" },
+      { filename: at("apps/web/src/components/blocks/Nav/index.tsx"), code: "import type { Route } from 'next/navigation'" },
       // the boundary outside the locale provider and the navigation module itself
-      { filename: "D:/repo/src/app/global-error.tsx", code: "import { usePathname } from 'next/navigation'" },
-      { filename: "D:/repo/src/modules/i18n/navigation.ts", code: "import { redirect } from 'next/navigation'" },
-      { filename: "D:/repo/src/components/blocks/Nav/index.test.tsx", code: "import Link from 'next/link'" },
+      { filename: at("apps/web/src/app/global-error.tsx"), code: "import { usePathname } from 'next/navigation'" },
+      { filename: at("apps/web/src/modules/i18n/navigation.ts"), code: "import { redirect } from 'next/navigation'" },
+      { filename: at("apps/web/src/components/blocks/Nav/index.test.tsx"), code: "import Link from 'next/link'" },
+      { filename: at("apps/web/src/proxy.ts"), code: "import { redirect } from 'next/navigation'" },
     ],
     invalid: [
-      { filename: "D:/repo/src/components/blocks/Nav/index.tsx", code: "import Link from 'next/link'", errors: [{ messageId: "link" }] },
-      { filename: "D:/repo/src/components/blocks/Nav/index.tsx", code: "import { useRouter } from 'next/navigation'", errors: [{ messageId: "helper" }] },
-      { filename: "D:/repo/src/app/[locale]/page.tsx", code: "import { redirect } from 'next/navigation'", errors: [{ messageId: "helper" }] },
+      { filename: at("apps/web/src/components/blocks/Nav/index.tsx"), code: "import Link from 'next/link'", errors: [{ messageId: "link" }] },
+      { filename: at("apps/web/src/components/blocks/Nav/index.tsx"), code: "import { useRouter } from 'next/navigation'", errors: [{ messageId: "helper" }] },
+      { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "import { redirect } from 'next/navigation'", errors: [{ messageId: "helper" }] },
       {
-        filename: "D:/repo/src/components/blocks/Nav/index.tsx",
+        filename: at("apps/web/src/components/blocks/Nav/index.tsx"),
         code: "import { usePathname, notFound, permanentRedirect } from 'next/navigation'",
         errors: [{ messageId: "helper" }, { messageId: "helper" }],
       },
@@ -173,7 +176,7 @@ test("FE-NEXT-8: no hand-drawn anchor for an internal route", () => {
       { code: 'const A = () => <a href="#main">skip</a>' },
       { code: "const A = () => <a href={url}>x</a>" },
       { code: 'const A = () => <Link href="/courses">x</Link>' },
-      { filename: "D:/repo/src/components/blocks/Nav/index.test.tsx", code: 'const A = () => <a href="/x">x</a>' },
+      { filename: at("apps/web/src/components/blocks/Nav/index.test.tsx"), code: 'const A = () => <a href="/x">x</a>' },
     ],
     invalid: [
       { code: 'const A = () => <a href="/courses">x</a>', errors: [{ messageId: "internal" }] },
@@ -185,7 +188,7 @@ test("FE-NEXT-8: no hand-drawn anchor for an internal route", () => {
 })
 
 test("FE-NEXT-9: a route is built by modules/routes, not written at the call", () => {
-  const NAV = "D:/repo/src/components/blocks/Nav/index.tsx"
+  const NAV = at("apps/web/src/components/blocks/Nav/index.tsx")
   tester.run("no-hardcoded-route", noHardcodedRoute, {
     valid: [
       { filename: NAV, code: "const A = () => <Link href={routes.course(slug)}>x</Link>" },
@@ -195,9 +198,10 @@ test("FE-NEXT-9: a route is built by modules/routes, not written at the call", (
       { filename: NAV, code: 'const A = () => <a href="mailto:hi@example.com">x</a>' },
       { filename: NAV, code: 'const a = value.replace("/x", "")' },
       { filename: NAV, code: 'stack.push("/x")' },
-      { filename: "D:/repo/src/modules/routes/index.ts", code: "export const course = (slug) => `/courses/${slug}`" },
-      { filename: "D:/repo/src/modules/routes/index.tsx", code: 'const A = () => <Link href="/courses">x</Link>' },
-      { filename: "D:/repo/src/components/blocks/Nav/index.test.tsx", code: 'router.push("/courses")' },
+      { filename: at("apps/web/src/modules/routes/index.ts"), code: "export const course = (slug) => `/courses/${slug}`" },
+      { filename: at("apps/web/src/modules/routes/index.tsx"), code: 'const A = () => <Link href="/courses">x</Link>' },
+      { filename: at("apps/admin/src/modules/i18n/navigation.ts"), code: 'redirect("/courses")' },
+      { filename: at("apps/web/src/components/blocks/Nav/index.test.tsx"), code: 'router.push("/courses")' },
     ],
     invalid: [
       { filename: NAV, code: 'const A = () => <Link href="/courses">x</Link>', errors: [{ messageId: "route" }] },
@@ -205,7 +209,9 @@ test("FE-NEXT-9: a route is built by modules/routes, not written at the call", (
       { filename: NAV, code: 'const A = () => <a href="/tasks">x</a>', errors: [{ messageId: "route" }] },
       { filename: NAV, code: 'router.push("/agentos/workspaces/new")', errors: [{ messageId: "route" }] },
       { filename: NAV, code: "router.replace(`/orders/${id}`)", errors: [{ messageId: "route" }] },
-      { filename: "D:/repo/src/features/pages/Home/index.tsx", code: 'redirect("/sign-in")', errors: [{ messageId: "route" }] },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: 'redirect("/sign-in")', errors: [{ messageId: "route" }] },
+      // a folder named routes that the routes slot does not own gets no exemption
+      { filename: at("apps/web/src/components/blocks/routes/index.tsx"), code: 'redirect("/sign-in")', errors: [{ messageId: "route" }] },
     ],
   })
 })
