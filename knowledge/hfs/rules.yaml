@@ -76,7 +76,7 @@ rules:
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_MANAGED_FILE_DRIFT"]
     enforcers:
-      - {kind: hfs, id: managed-file-drift, status: planned}
+      - {kind: hfs, id: managed-file-drift, at: packages/hfs/sync/managed.mjs}
   - id: R06
     code: "HFS_PLAINTEXT_SECRET"
     title_vi: "Bí mật dạng rõ trong kho"
@@ -177,16 +177,17 @@ rules:
     gates: [land, ci]
     failureCodes: ["HFS_TOOL_CONFIG_LOCAL"]
     enforcers:
-      - {kind: hfs, id: tool-config-local, status: planned}
+      - {kind: hfs, id: tool-config-local, at: packages/hfs/sync/managed.mjs}
+      - {kind: hfs, id: tool-config-forbidden, at: scripts/lib/hfs-check.mjs}
   - id: R17
     code: "HFS_RULE_OFF_WITHOUT_REPLACEMENT"
-    title_vi: "Tắt luật mà không có check thay thế"
-    law: "A rule is off only when its replacement check is in a repository gate."
+    title_vi: "Cấu hình ESLint lệch bản render"
+    law: "The ESLint configuration is the rendered one-liner, so no rule is off, warned or redefined in a repository."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["HFS_RULE_OFF_WITHOUT_REPLACEMENT"]
     enforcers:
-      - {kind: hfs, id: rule-off-without-replacement, status: planned}
+      - {kind: hfs, id: rule-off-without-replacement, at: packages/hfs/sync/managed.mjs}
   - id: R18
     code: "HFS_INLINE_SUPPRESSION"
     title_vi: "Tắt luật tại chỗ"
@@ -240,7 +241,7 @@ rules:
       - {kind: eslint-fe, id: no-type-assertion}
       - {kind: eslint-fe, id: no-non-null-assertion}
       - {kind: eslint-fe, id: no-explicit-any}
-      - {kind: hfs, id: ts-strict, status: planned}
+      - {kind: hfs, id: ts-strict, at: packages/hfs/sync/ts-strict.mjs}
       - {kind: eslint-fe, id: no-double-cast}
   - id: R23
     code: "HFS_CONTRACT_SNAPSHOT_DRIFT"

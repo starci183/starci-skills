@@ -94,19 +94,19 @@ rules:
       manual: []
     relatedExamples: []
   - id: REPO-TOOLING-4
-    title: No inline configuration and no rule off without a replacement
+    title: No inline configuration and no rule off
     kind: mandatory
     hfsRules: [R17, R18]
     requirement: |
-      `noInlineConfig` is true in both ESLint factories: no `eslint-disable`, no `@ts-ignore`, no `@ts-expect-error`. A factory
-      turns a rule off only when its replacement check is listed and runs in a gate of the repository. A repository turns off
-      nothing.
+      `noInlineConfig` is true in both ESLint factories: no `eslint-disable`, no `@ts-ignore`, no `@ts-expect-error`. The ESLint
+      configuration of a repository is the rendered one-liner; no rule is off, warned or redefined, and a rule that a check
+      supersedes is removed from the canon plugin in the .claude runtime, never switched off in a repository.
     rationale: |
       A rule declared covered by a check that no gate runs is a rule that does not exist.
     cases:
       - id: case-1
-        when: A rule is superseded by a check
-        write: The factory lists the replacement and the check appears in pre-push or CI, otherwise HFS_RULE_OFF_WITHOUT_REPLACEMENT fails.
+        when: A rule seems wrong for the repository
+        write: Propose the change in the .claude runtime; any edit of eslint.config.mjs fails HFS_RULE_OFF_WITHOUT_REPLACEMENT.
     verification:
       automated:
         - HFS_RULE_OFF_WITHOUT_REPLACEMENT

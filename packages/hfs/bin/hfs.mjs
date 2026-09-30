@@ -2,7 +2,8 @@
 // hfs - the HFS command line of a StarCi product repository.
 //   hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>]
 //                                            every tracked path has a slot; required files exist; nothing forbidden or
-//                                            tracked-that-must-be-ignored; pins match; no empty or ghost directory, no untracked
+//                                            tracked-that-must-be-ignored; pins match; every managed file equals its render
+//                                            (sync/managed.mjs); no empty or ghost directory, no untracked
 //                                            entry outside an ignored slot; soft-size backlog (report only); then the whole
 //                                            architecture machine (tiers, owners, clones, dead exports, module registration, the
 //                                            front-end and back-end source rules), each violation a finding with its why.
@@ -18,9 +19,11 @@
 // (init writes hfs.json only, and only when none exists). Exit codes: 0 clean, 1 error findings, 2 a refusal or bad usage.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkRepository, explainPath, initRepo } from '../runtime/scripts/lib/hfs-check.mjs';
+import { checkRepository, explainPath, initRepo, trackedFiles } from '../runtime/scripts/lib/hfs-check.mjs';
 import { HfsSlotsError } from '../runtime/scripts/lib/hfs-slots.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
+import { SyncError } from '../sync/index.mjs';
+import { managedFindings } from '../sync/managed.mjs';
 
 const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>]
 hfs init [--repo <dir>] [--stdout]
@@ -77,7 +80,8 @@ function printExplain(e, out) {
   if (e.code) out(`  ${e.code}: ${e.titleVi}\n  ${e.whyVi}\n`);
 }
 
-export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s) } = {}) {
+/** `presets` is a test seam: the coverage denominators sync would load from the repository's installed preset. */
+export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets } = {}) {
   const [verb, ...rest] = argv;
   if (!['check', 'init', 'explain', 'sync', 'work-hygiene'].includes(verb)) { stderr(USAGE); return 2; }
   try {
@@ -86,7 +90,8 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     const repoRoot = path.resolve(opts.repo ?? process.cwd());
     if (verb === 'check') {
       if (opts.positional.length) throw new Error('hfs check takes no path');
-      const result = checkRepository({ repoRoot, fast: opts.fast === true, base: opts.base });
+      const extraFindings = await managedFindings({ repoRoot, tracked: trackedFiles(repoRoot), presets });
+      const result = checkRepository({ repoRoot, fast: opts.fast === true, base: opts.base, extraFindings });
       if (opts.json) stdout(`${JSON.stringify(result, null, 2)}\n`); else printCheck(result, stdout);
       return result.ok ? 0 : 1;
     }
@@ -101,7 +106,7 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     if (opts.json) stdout(`${JSON.stringify(explained, null, 2)}\n`); else printExplain(explained, stdout);
     return explained.status === 'no-slot' || explained.status === 'ambiguous' ? 1 : 0;
   } catch (error) {
-    stderr(error instanceof HfsSlotsError ? `${error.message}\n` : `hfs: ${error.message}\n${USAGE}`);
+    stderr(error instanceof HfsSlotsError || error instanceof SyncError ? `${error.message}\n` : `hfs: ${error.message}\n${USAGE}`);
     return 2;
   }
 }

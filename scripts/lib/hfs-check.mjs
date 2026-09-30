@@ -8,7 +8,11 @@
 //   HFS_SLOT_NOT_ENABLED          a tracked path in an opt-in slot the repository did not declare
 //   HFS_SLOT_AMBIGUOUS            two slots of equal specificity own the path (a manifest gap, reported not guessed)
 //   HFS_TRACKED_MUST_BE_IGNORED   a tracked path in an `ignored` slot (build output, generated files)
-//   HFS_FORBIDDEN_PRESENT         a tracked path in a forbidden / `external` slot
+//   HFS_FORBIDDEN_PRESENT         a tracked path in a forbidden / `external` slot; when the slot names one of this module's
+//                                 own codes in `rules` (be.tool-config-local: HFS_TOOL_CONFIG_LOCAL) that code is reported instead
+//   HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL (content), HFS_TS_STRICT
+//                                 the managed files: produced by packages/hfs/sync/managed.mjs, which renders the templates,
+//                                 and passed in as `extraFindings` (this module does not read the templates)
 //   HFS_REQUIRED_MISSING          a file or directory a required slot (or an instance of one) must contain
 //   HFS_MIN_INSTANCES             fewer instances of a slot than minInstances
 //   HFS_CANON_PIN_DRIFT           a dependency whose declared version is not the pinned one
@@ -38,6 +42,7 @@ export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 export const CHECK_CODES = Object.freeze([
   'HFS_PATH_NO_SLOT', 'HFS_SLOT_NOT_ENABLED', 'HFS_SLOT_AMBIGUOUS', 'HFS_TRACKED_MUST_BE_IGNORED', 'HFS_FORBIDDEN_PRESENT',
   'HFS_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG', 'BE_SOURCE_FORM',
+  'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT',
   'HFS_INIT_EXISTS', 'HFS_INIT_UNDETECTED', 'HFS_REPO_UNREADABLE',
   'HFS_DECLARATION_INVALID', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
@@ -203,10 +208,12 @@ function treeFindings({ repoRoot, resolver }) {
  * overrides git ls-files (specs). `only` (a list of paths) limits the per-path checks (slot, pin, size) to those paths; the
  * checks of the tree as a whole (required files, minimum instances, empty directories, untracked entries) are not
  * per-path. `tree: false` skips the file-system checks (empty directories, ghosts, untracked); they also do not run
- * over `files`, which is a dry run. Returns {ok, profile, apps, manifest, tracked, findings, counts}; a missing or invalid
- * hfs.json is one HFS_DECLARATION_INVALID / HFS_MANIFEST_MAJOR_MISMATCH error finding, never an exception.
+ * over `files`, which is a dry run. `extraFindings` are findings another emitter produced for the same repository (the
+ * managed files), judged and counted with this module's own. Returns {ok, profile, apps, manifest, tracked, findings,
+ * counts}; a missing or invalid hfs.json is one HFS_DECLARATION_INVALID / HFS_MANIFEST_MAJOR_MISMATCH error finding, never
+ * an exception.
  */
-export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only, tree = files === undefined, manifest = loadSlotManifest({ root }) }) {
+export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only, extraFindings = [], tree = files === undefined, manifest = loadSlotManifest({ root }) }) {
   const why = readWhy(root);
   let repo;
   try {
@@ -234,7 +241,8 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
     } else if (c.status === 'not-enabled') {
       findings.push({ code: 'HFS_SLOT_NOT_ENABLED', level: 'error', path: file, slot: c.slot, message: `${file} belongs to ${c.slot}, an opt-in slot hfs.json neither lists in optionalSlots nor implies through an app kind` });
     } else if (c.status === 'forbidden') {
-      findings.push({ code: 'HFS_FORBIDDEN_PRESENT', level: 'error', path: file, slot: c.slot, goesTo: c.goesTo, message: `${file} is tracked but ${c.slot} is forbidden in the tree${c.goesTo ? `; it belongs at ${c.goesTo}` : ''}` });
+      const own = resolver.slot(c.slot).rules?.find((code) => CHECK_CODES.includes(code)) ?? 'HFS_FORBIDDEN_PRESENT';
+      findings.push({ code: own, level: 'error', path: file, slot: c.slot, goesTo: c.goesTo, message: `${file} is tracked but ${c.slot} is forbidden in the tree${c.goesTo ? `; it belongs at ${c.goesTo}` : ''}` });
     } else if (c.tracking === 'ignored') {
       findings.push({ code: 'HFS_TRACKED_MUST_BE_IGNORED', level: 'error', path: file, slot: c.slot, message: `${file} is tracked but ${c.slot} must be gitignored` });
     }
@@ -260,6 +268,7 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
 
   findings.push(...pinFindings({ repoRoot, files: tracked, profile: repo.profile, root, only: scoped }));
   if (repo.profile === 'be') findings.push(...sourceFormFindings({ files: tracked.filter(inScope), resolver }));
+  findings.push(...extraFindings);
 
   const soft = resolver.ruleParams().fileLines.soft;
   for (const file of tracked) {
@@ -316,10 +325,10 @@ function machineFindings(report) {
  * paths, the machine on the owners of the changed source files without clones and dead exports, and no file-system tree
  * checks. `machine` is injectable for specs. A missing merge-base under `fast` is an Error, never a silent full pass.
  */
-export function checkRepository({ repoRoot, root = skillRoot, fast = false, base, manifest = loadSlotManifest({ root }), machine = checkArchitecture }) {
+export function checkRepository({ repoRoot, root = skillRoot, fast = false, base, extraFindings = [], manifest = loadSlotManifest({ root }), machine = checkArchitecture }) {
   const changed = fast ? changedSince(repoRoot, base) : null;
   const baseSha = changed ? changed.base : (base ? (mergeBaseOf(repoRoot, base) ?? refuse('HFS_REPO_UNREADABLE', `--base ${base} has no merge-base with HEAD`, { repoRoot, base })) : undefined);
-  const slotResult = checkRepo({ repoRoot, root, manifest, ...(changed ? { only: changed.files, tree: false } : {}) });
+  const slotResult = checkRepo({ repoRoot, root, manifest, extraFindings, ...(changed ? { only: changed.files, tree: false } : {}) });
   if (slotResult.profile === null) return { ...slotResult, machine: { status: 'skipped', reason: 'hfs.json is not valid' } };
 
   let paths;

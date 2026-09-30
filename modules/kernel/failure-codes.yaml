@@ -3342,7 +3342,7 @@ HFS_STACKS_PLAINTEXT:
 HFS_SYNC_DRIFT:
   title: "Generated file drifted from its template"
   title_vi: "Tệp do hfs sync sinh đã lệch khỏi mẫu"
-  meaning_vi: "Một tệp mà hfs sync sinh (husky, workflow, .gitignore, sonar-project.properties, codecov.yml, .starciwork/.gitignore) có nội dung khác bản sinh từ mẫu và hfs.json, hoặc bị xóa."
+  meaning_vi: "Một tệp mà hfs sync sinh (mọi tệp thuộc slot có managedBy trong slots.yaml, khối .gitignore, .starciwork/.gitignore) có nội dung khác bản sinh từ mẫu và hfs.json, hoặc bị xóa."
   causes_vi:
     - "Tệp được sửa tay thay vì sửa mẫu"
     - "hfs.json đổi (app, profile) mà chưa chạy hfs sync --write"
@@ -3354,7 +3354,7 @@ HFS_SYNC_DRIFT:
 HFS_SYNC_HFS_INVALID:
   title: "hfs.json unreadable for sync"
   title_vi: "hfs.json không đọc được cho hfs sync"
-  meaning_vi: "hfs sync cần hfs.json hợp lệ (hfs là 2, profile be hoặc fe, project kebab-case, ít nhất một app) nhưng tệp thiếu hoặc sai."
+  meaning_vi: "hfs sync cần hfs.json hợp lệ (hfs bằng major của slots.yaml, profile be hoặc fe, mỗi app back end có kind, project kebab-case, ít nhất một app) nhưng tệp thiếu hoặc sai."
   causes_vi:
     - "Thiếu hfs.json ở gốc repository"
     - "profile không phải be hoặc fe"
@@ -3401,6 +3401,27 @@ HFS_SYNC_TEMPLATE_VARIABLE:
   causes_vi:
     - "Mẫu được sửa và gõ sai tên biến"
   nextStep_vi: "Người bảo trì runtime sửa mẫu hoặc thêm biến vào hfs sync; sự cố runtime, không phải lỗi của repository sản phẩm."
+  owner: runtime-core
+  kind: check-finding
+
+HFS_SYNC_TEMPLATE_MISSING:
+  title: "Managed slot file has no template"
+  title_vi: "Tệp của slot managedBy chưa có mẫu"
+  meaning_vi: "Một slot trong slots.yaml khai managedBy và liệt kê một tệp, nhưng templates/<profile hoặc common>/<managedBy> của hfs sync không có mẫu cho tệp đó."
+  causes_vi:
+    - "Thêm tệp vào slot managedBy mà quên thêm mẫu"
+    - "Gõ sai tên thư mục managedBy"
+  nextStep_vi: "Người bảo trì runtime thêm mẫu vào templates của gói @starci/hfs hoặc bỏ tệp khỏi slot; sự cố runtime, không phải lỗi của repository sản phẩm."
+  owner: runtime-core
+  kind: check-finding
+
+HFS_SYNC_MANIFEST_MANAGED:
+  title: "Managed slot path is not a list of literal files"
+  title_vi: "Đường dẫn slot managedBy không phải danh sách tệp cụ thể"
+  meaning_vi: "Một slot trong slots.yaml khai managedBy nhưng path của nó có ký tự đại diện hoặc là thư mục, nên hfs sync không biết cần sinh những tệp nào."
+  causes_vi:
+    - "Đặt managedBy cho slot có path dạng glob hoặc thư mục"
+  nextStep_vi: "Người bảo trì runtime liệt kê từng tệp trong path của slot hoặc bỏ managedBy; sự cố runtime, không phải lỗi của repository sản phẩm."
   owner: runtime-core
   kind: check-finding
 
@@ -12053,9 +12074,9 @@ HFS_GITIGNORE_BLOCK_DRIFT:
 HFS_MANAGED_FILE_DRIFT:
   title: "A managed file equals its template render"
   title_vi: "Tệp do .claude quản lý bị lệch"
-  meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch template `<id>` v`<ver>`. Chạy `hfs sync`, không sửa tay."
+  meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `hfs sync --write`, không sửa tay."
   causes_vi:
-    - "Vi phạm luật R05: Tệp có `managedBy` (husky, workflows, sonar, codecov, tsconfig/eslint/prettier stub) phải bằng bản render từ template."
+    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, codecov, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -12143,19 +12164,19 @@ HFS_DEP_VERSION_SKEW:
 HFS_TOOL_CONFIG_LOCAL:
   title: "Configs only call the factories; no local rules"
   title_vi: "Kho tự đặt luật cục bộ"
-  meaning_vi: "Repo tự định nghĩa/tắt luật `<rule>` ở `<file>`. Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
+  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` thứ hai), tệp tự định nghĩa luật ESLint, hoặc lệnh chạy eslint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
   causes_vi:
-    - "Vi phạm luật R16: `eslint.config.mjs` chỉ gọi `starciBeConfig`/`starciFeConfig`; cấm luật cục bộ, script kiểm kiến trúc cục bộ (script kiểm tra kiến trúc cục bộ của kho), tắt luật trong repo."
+    - "Vi phạm luật R16: Cấu hình của repo chỉ gọi factory của `.claude`; cấm tệp cấu hình công cụ khác, tệp luật cục bộ (vd một tệp eslint-local trong thư mục scripts) và cờ dòng lệnh đổi hoặc tắt cấu hình trong hook, workflow, script."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
 HFS_RULE_OFF_WITHOUT_REPLACEMENT:
-  title: "A rule is off only when its replacement check is in a repository gate"
-  title_vi: "Tắt luật mà không có check thay thế"
-  meaning_vi: "Luật `<rule>` bị tắt với lý do 'đã có check thay', nhưng check `<id>` không chạy ở cổng nào của repo."
+  title: "The ESLint configuration is the rendered one-liner, so no rule is off, warned or redefined in a repository"
+  title_vi: "Cấu hình ESLint lệch bản render"
+  meaning_vi: "`eslint.config.mjs` khác bản render (một dòng gọi `starciBeConfig`). Factory không nhận tham số ghi đè, nên một luật chỉ có thể bị tắt, hạ mức hoặc định nghĩa lại trong repo khi tệp này khác bản render. Chạy `hfs sync --write`, không sửa tay."
   causes_vi:
-    - "Vi phạm luật R17: Factory chỉ tắt một luật canon khi check thay thế được liệt kê VÀ có trong cổng của repo (ENF-MANDATORY-2 thành máy)."
+    - "Vi phạm luật R17: `eslint.config.mjs` phải đúng bằng bản render; luật thay thế nằm trong plugin của `.claude`, không bao giờ tắt trong repo."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -12219,9 +12240,9 @@ HFS_DUPLICATE_SYMBOL:
 HFS_TS_STRICT:
   title: "tsconfig extends `@starci/tsconfig` and lowers no flag"
   title_vi: "tsconfig hạ cờ strict"
-  meaning_vi: "tsconfig hạ cờ `<flag>`. Các cờ strict do `.claude` quy định."
+  meaning_vi: "`tsconfig.json` đặt hoặc hạ cờ `<flag>`. `tsconfig.json` chỉ extends `@starci/tsconfig/be.json` và khai báo `paths` của ba alias; mọi cờ do preset quy định."
   causes_vi:
-    - "Vi phạm luật R22: `tsconfig` extends `@starci/tsconfig/{be,fe}.json`: `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `allowJs: false`; repo không hạ cờ."
+    - "Vi phạm luật R22: `tsconfig.json` chỉ có `extends` và `paths`; các cờ `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noUnusedLocals`, `noUnusedParameters`, `allowJs: false` nằm trong preset và repo không đặt, không hạ cờ nào."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding

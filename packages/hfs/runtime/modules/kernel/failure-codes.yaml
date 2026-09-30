@@ -883,6 +883,16 @@ HFS_INIT_UNDETECTED:
   owner: op-retry
   kind: verb-refusal
 
+HFS_MANAGED_FILE_DRIFT:
+  title: "A managed file equals its template render"
+  title_vi: "Tệp do .claude quản lý bị lệch"
+  meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `hfs sync --write`, không sửa tay."
+  causes_vi:
+    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, codecov, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_MANIFEST_INVALID:
   title: "HFS slot manifest invalid"
   title_vi: "Bảng kê ô HFS sai định dạng"
@@ -1118,6 +1128,16 @@ HFS_ROOT_SRC_FORBIDDEN_FE:
   owner: op-retry
   kind: check-finding
 
+HFS_RULE_OFF_WITHOUT_REPLACEMENT:
+  title: "The ESLint configuration is the rendered one-liner, so no rule is off, warned or redefined in a repository"
+  title_vi: "Cấu hình ESLint lệch bản render"
+  meaning_vi: "`eslint.config.mjs` khác bản render (một dòng gọi `starciBeConfig`). Factory không nhận tham số ghi đè, nên một luật chỉ có thể bị tắt, hạ mức hoặc định nghĩa lại trong repo khi tệp này khác bản render. Chạy `hfs sync --write`, không sửa tay."
+  causes_vi:
+    - "Vi phạm luật R17: `eslint.config.mjs` phải đúng bằng bản render; luật thay thế nằm trong plugin của `.claude`, không bao giờ tắt trong repo."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_SIZE_GROWTH:
   title: "Source file over the size budget grew"
   title_vi: "Tệp mã nguồn vượt hạn mức dòng vẫn tiếp tục dài thêm"
@@ -1195,6 +1215,16 @@ HFS_TEST_KIND_RETIRED:
   owner: op-retry
   kind: check-finding
 
+HFS_TOOL_CONFIG_LOCAL:
+  title: "Configs only call the factories; no local rules"
+  title_vi: "Kho tự đặt luật cục bộ"
+  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` thứ hai), tệp tự định nghĩa luật ESLint, hoặc lệnh chạy eslint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
+  causes_vi:
+    - "Vi phạm luật R16: Cấu hình của repo chỉ gọi factory của `.claude`; cấm tệp cấu hình công cụ khác, tệp luật cục bộ (vd một tệp eslint-local trong thư mục scripts) và cờ dòng lệnh đổi hoặc tắt cấu hình trong hook, workflow, script."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_TRACKED_MUST_BE_IGNORED:
   title: "Tracked path that must be gitignored"
   title_vi: "Tệp bị theo dõi nhưng lẽ ra phải bị bỏ qua"
@@ -1203,6 +1233,16 @@ HFS_TRACKED_MUST_BE_IGNORED:
     - "Thư mục dist, coverage, .next hoặc tệp sinh tự động bị git add"
     - ".gitignore thiếu dòng cho thư mục này"
   nextStep_vi: "Gỡ tệp khỏi Git bằng git rm --cached và thêm vào khối .gitignore chuẩn; không xoá thư mục trên đĩa. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_TS_STRICT:
+  title: "tsconfig extends `@starci/tsconfig` and lowers no flag"
+  title_vi: "tsconfig hạ cờ strict"
+  meaning_vi: "`tsconfig.json` đặt hoặc hạ cờ `<flag>`. `tsconfig.json` chỉ extends `@starci/tsconfig/be.json` và khai báo `paths` của ba alias; mọi cờ do preset quy định."
+  causes_vi:
+    - "Vi phạm luật R22: `tsconfig.json` chỉ có `extends` và `paths`; các cờ `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noUnusedLocals`, `noUnusedParameters`, `allowJs: false` nằm trong preset và repo không đặt, không hạ cờ nào."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 

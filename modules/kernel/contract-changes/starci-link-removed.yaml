@@ -30,9 +30,9 @@ paths:
   - packages/hfs/README.md
   - packages/hfs/package.json
   - packages/hfs/sync/index.mjs
-  - packages/hfs/templates/common/ci.yml
-  - packages/hfs/templates/be/e2e.yml
-  - packages/hfs/templates/fe/e2e.yml
+  - packages/hfs/templates/fe/ci-workflows/github/workflows/ci.yml
+  - packages/hfs/templates/be/ci-workflows/github/workflows/e2e.yml
+  - packages/hfs/templates/fe/ci-workflows/github/workflows/e2e.yml
   - packages/hfs/templates/common/gitignore.base
   - tests/canon-pins.spec.mjs
   - tests/hfs-cli.spec.mjs

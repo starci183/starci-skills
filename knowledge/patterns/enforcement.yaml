@@ -34,8 +34,8 @@ rules:
     requirement: |
       Do not weaken lint, expand ignores, add suppression directives, move production code into test lanes, alias forbidden
       dependencies or rename a forbidden persistence facade to obtain a pass. Inspect the effective config for the exact changed
-      files, not only the published plugin's available rules. A declared rule that is absent or off in the consuming config is
-      not enforced, and a rule is off only when its replacement check runs in a gate of the repository.
+      files, not only the published plugin's available rules. The consuming config is a managed file (the rendered one-liner),
+      so no rule can be absent, off, warned or redefined in it: any difference from the render is HFS_RULE_OFF_WITHOUT_REPLACEMENT.
     rationale: |
       Package exports do not prove the consuming repository activates those rules.
     verification:
