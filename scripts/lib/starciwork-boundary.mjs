@@ -132,6 +132,28 @@ export function agentDataCategory(rel, { dir = false } = {}) {
  * The .starciwork/.gitignore of a product repository: deny everything at the root, re-admit
  * the §5.1 roots, then deny agent output inside them. Tracked files are not affected by an ignore rule; a tracked
  * agent file is removed by the change that drops it, not by this ignore.
+ *
+ * The template is read on first use, never at import: a caller that only needs the boundary predicates
+ * (api.mjs reaches this module through check-example-work.mjs) must keep loading on a tree that carries no
+ * packages/hfs/templates copy; the read still fails loudly the moment the text itself is asked for.
  */
-export const STARCIWORK_GITIGNORE = Object.freeze(fs.readFileSync(TEMPLATE, 'utf8').trimEnd().split(/\r?\n/));
-export const starciworkGitignoreText = () => `${STARCIWORK_GITIGNORE.join('\n')}\n`;
+let cachedLines;
+const gitignoreLines = () => (cachedLines ??= Object.freeze(fs.readFileSync(TEMPLATE, 'utf8').trimEnd().split(/\r?\n/)));
+const frozenWrite = () => { throw new TypeError('STARCIWORK_GITIGNORE is a frozen view of the hfs template'); };
+export const STARCIWORK_GITIGNORE = new Proxy([], {
+  get: (_t, p) => Reflect.get(gitignoreLines(), p),
+  has: (_t, p) => Reflect.has(gitignoreLines(), p),
+  ownKeys: () => Reflect.ownKeys(gitignoreLines()),
+  getOwnPropertyDescriptor: (_t, p) => {
+    const d = Reflect.getOwnPropertyDescriptor(gitignoreLines(), p);
+    // The proxy target holds none of these slots: every index must report configurable, and 'length' must keep
+    // the writable shape of its non-configurable target slot.
+    if (!d) return d;
+    return p === 'length' ? { ...d, writable: true } : { ...d, configurable: true };
+  },
+  set: frozenWrite,
+  deleteProperty: frozenWrite,
+  defineProperty: frozenWrite,
+  setPrototypeOf: frozenWrite,
+});
+export const starciworkGitignoreText = () => `${gitignoreLines().join('\n')}\n`;
