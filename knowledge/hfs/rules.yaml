@@ -1006,7 +1006,7 @@ rules:
       - {kind: machine, id: doc-language, at: scripts/checks/architecture/doc-language.mjs}
   - id: R97
     code: "FE_NO_TESTS"
-    law: "A front-end repository has no tests by standard: no `*.spec.*`, `*.test.*` or `*-spec.*` file, no `e2e/` or `__tests__/` directory, no vitest, Playwright, jest or Cypress configuration or setup file, no test script, and no test-runner, test-environment, testing-library or axe dependency in any `package.json`; there is no exception, `scripts/` included."
+    law: "A front-end repository has no tests by standard: no `*.spec.*`, `*.test.*` or `*-spec.*` file, no `e2e/`, `__tests__/`, `__mocks__/` or `test-support/` directory, no vitest, Playwright, jest or Cypress configuration or setup file, no test script, and no test-runner, test-environment, testing-library or axe dependency in any `package.json`; there is no exception, `scripts/` included."
     kinds: [check]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["FE_NO_TESTS"]

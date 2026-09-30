@@ -231,7 +231,8 @@ test('FE multi-app fixture', () => {
   const owner = (p) => fe.classifyPath(p).slot;
   assert.equal(owner('apps/web/next.config.ts'), 'fe.app.next');
   assert.equal(owner('apps/admin/package.json'), 'fe.app.next');
-  assert.equal(owner('apps/web/vitest.config.ts'), 'fe.app-optional');
+  assert.equal(owner('apps/web/public/logo.svg'), 'fe.app-optional');
+  assert.equal(fe.classifyPath('apps/web/vitest.config.ts').status, 'no-slot', 'a front end has no test configuration slot: FE_NO_TESTS owns the path');
   assert.equal(owner('apps/web/src/app/[locale]/page.tsx'), 'fe.route');
   assert.equal(owner('apps/web/src/features/pages/Home/index.tsx'), 'fe.feature');
   assert.equal(owner('apps/web/src/components/blocks/Header/component.tsx'), 'fe.components');
@@ -243,7 +244,7 @@ test('FE multi-app fixture', () => {
   assert.equal(owner('apps/web/src/modules/brand/brand.css'), 'fe.modules.brand');
   assert.equal(owner('apps/web/src/modules/cart/index.ts'), 'fe.modules');
   assert.equal(owner('packages/nivo-ui/src/index.ts'), 'fe.package.ui');
-  assert.equal(owner('e2e/checkout/pay.e2e-spec.ts'), 'fe.e2e');
+  assert.equal(fe.classifyPath('e2e/checkout/pay.e2e-spec.ts').status, 'no-slot', 'a front end has no e2e slot');
   assert.equal(owner('apps/web/Dockerfile'), 'repo.app-image');
   assert.equal(fe.classifyPath('src/index.ts').status, 'no-slot');                              // FE has no root src/
   assert.equal(fe.classifyPath('.starciwork/x.yaml').status, 'no-slot');                        // and no .starciwork
@@ -253,18 +254,17 @@ test('FE multi-app fixture', () => {
   const paths = fe.requiredPaths().paths.map((e) => e.path);
   for (const app of ['web', 'admin']) for (const p of [`apps/${app}/next.config.ts`, `apps/${app}/src/app/[locale]/layout.tsx`, `apps/${app}/src/modules/i18n/`, `apps/${app}/src/modules/routes/`, `apps/${app}/src/modules/config/`])
     assert.equal(paths.includes(p), true, `missing ${p}`);
-  assert.equal(paths.includes('apps/web/vitest.config.ts'), false);
   assert.equal(paths.includes('apps/web/src/modules/api/'), false, 'the transport may live in the shared api package; FE_TRANSPORT_OWNER counts the clients');
-  assert.deepEqual(fe.requiredFiles('e2e/checkout/pay.e2e-spec.ts'), ['playwright.config.ts']);
   assert.equal(fe.classifyPath('tsconfig.e2e.json').status, 'no-slot', 'the front-end e2e tsconfig is no longer a managed file');
   assert.equal(fe.classifyPath('.github/workflows/e2e.yml').status, 'no-slot', 'a front end has no e2e workflow');
   // the tool configuration of a front end: managed files, the repository's own three, and the forbidden ones
-  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs', 'vitest.config.ts', '.prettierrc', '.prettierignore']) assert.equal(owner(file), 'fe.tool-config', file);
-  for (const file of ['vitest.setup.ts', 'playwright.config.ts', 'turbo.json']) assert.equal(owner(file), 'fe.tool-config-repo', file);
-  for (const file of ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', 'stylelint.config.cjs', '.prettierrc.json', 'vitest.config.mjs', 'jest.config.js', '.lintstagedrc.json']) assert.equal(owner(file), 'fe.tool-config-local', file);
+  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs', '.prettierrc', '.prettierignore']) assert.equal(owner(file), 'fe.tool-config', file);
+  for (const file of ['vitest.config.ts', 'vitest.setup.ts', 'playwright.config.ts']) assert.equal(fe.classifyPath(file).status, 'no-slot', file);
+  assert.equal(owner('turbo.json'), 'fe.tool-config-repo');
+  for (const file of ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', 'stylelint.config.cjs', '.prettierrc.json', '.lintstagedrc.json']) assert.equal(owner(file), 'fe.tool-config-local', file);
   assert.equal(owner('package.json'), 'fe.package-manifest');
   assert.equal(owner('package-lock.json'), 'fe.lockfile');
-  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs', 'vitest.config.ts', '.prettierrc', '.prettierignore', 'package.json', 'package-lock.json']) assert.equal(paths.includes(file), true, `${file} is required`);
+  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs', '.prettierrc', '.prettierignore', 'package.json', 'package-lock.json']) assert.equal(paths.includes(file), true, `${file} is required`);
   assert.equal(fe.slot('fe.tool-config-local').presence, 'forbidden');
   assert.equal(fe.slot('fe.tool-config').managedBy, 'tool-config');
   assert.equal(fe.slot('fe.package-manifest').managedBy, 'package-scripts');
@@ -291,7 +291,6 @@ test('FE multi-app fixture', () => {
   assert.equal(ok('apps/web/src/modules/config/index.ts', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');
   assert.equal(ok('apps/web/src/features/pages/Home/index.tsx', 'packages/nivo-ui/src/index.ts').allowed, true);
   assert.equal(ok('packages/nivo-ui/src/button.ts', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');
-  assert.equal(ok('e2e/checkout/pay.e2e-spec.ts', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');                            // black box: no app source
   assert.equal(fe.slotEnabled(fe.slot('fe.package.ui')), true);
   assert.equal(openHfs({ declaration: { ...FE, optionalSlots: [] } }).classifyPath('packages/nivo-ui/src/index.ts').status, 'not-enabled');
 });
@@ -313,7 +312,6 @@ test('classification reports the folder kind and the role of a file from the slo
   assert.equal(at('apps/web/src/hooks/orders/index.ts').role, 'entry');
   assert.equal(at('apps/web/src/hooks/orders/useOrders.ts').role, undefined);
   assert.equal(at('apps/web/src/app/[locale]/cart/page.tsx').role, 'page');
-  assert.equal(at('playwright.config.ts').role, 'playwright');
 });
 
 test('BE fixture: test kinds agree folder with suffix, and the retired e2e/world folder is forbidden', () => {

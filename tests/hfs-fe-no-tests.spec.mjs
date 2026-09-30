@@ -23,7 +23,7 @@ const pathsOf = (findings) => findings.map((finding) => finding.path).sort();
 test('FE_NO_TESTS: a spec, an e2e file, a test directory and a test-tool file anywhere are findings, scripts/ included', (t) => {
   const files = [
     'apps/web/src/components/leaves/Text/index.spec.tsx', 'apps/web/src/modules/api/client.test.ts', 'e2e/flows/sign-in.e2e-spec.ts',
-    'e2e/support/backend-double.ts', 'apps/web/src/__tests__/a.ts', 'scripts/check-i18n.spec.mjs', 'vitest.config.ts', 'apps/web/vitest.setup.ts',
+    'e2e/support/backend-double.ts', 'apps/web/src/__tests__/a.ts', 'apps/web/src/__mocks__/next-intl.ts', 'apps/web/src/test-support/mock-result.ts', 'scripts/check-i18n.spec.mjs', 'vitest.config.ts', 'apps/web/vitest.setup.ts',
     'playwright.config.ts', 'jest.config.js', 'tsconfig.e2e.json', '.github/workflows/e2e.yml',
   ];
   const findings = feNoTestsFindings({ repoRoot: tree(t, {}), files });

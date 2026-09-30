@@ -1,7 +1,7 @@
 // fe-no-tests.mjs - FE_NO_TESTS (R95): a front-end repository has no tests by standard (owner 2026-09-30). There is no exception: a spec
 // anywhere in a front-end repository is a finding, `scripts/` included.
 //   - a tracked test file: `*.spec.*`, `*.test.*`, `*-spec.*` (also `*.e2e-spec.*`);
-//   - a tracked test directory: `e2e/` or `__tests__/`;
+//   - a tracked test directory: `e2e/`, `__tests__/`, `__mocks__/` or `test-support/`;
 //   - a tracked test-tool file: `vitest.*`, `jest.*`, `playwright.*` (config, setup, workspace), `cypress.config.*`, `tsconfig.e2e.json`, `e2e.yml`;
 //   - a test script in a package.json: a script named `test`, `test:*` (or with a pre/post prefix), or one that runs a test runner;
 //   - a test dependency in a package.json: a test runner, a test environment, testing-library or an axe package.
@@ -11,7 +11,7 @@ import { found, readJson } from './read.mjs';
 
 export const FE_NO_TESTS = 'FE_NO_TESTS';
 const SPEC_FILE = /(?:\.(?:spec|test)|-spec)\.[cm]?[jt]sx?$/;
-const TEST_DIRECTORY = /(?:^|\/)(?:e2e|__tests__)\//;
+const TEST_DIRECTORY = /(?:^|\/)(?:e2e|__tests__|__mocks__|test-support)\//;
 const TEST_TOOL_FILE = /(?:^|\/)(?:(?:vitest|jest|playwright)\.[^/]+|cypress\.config\.[^/]+|tsconfig\.e2e\.json|e2e\.ya?ml)$/;
 const TEST_SCRIPT_NAME = /^(?:pre|post)?test(?::|$)/;
 const TEST_RUNNER_COMMAND = /(?:^|[\s&|;(])(?:npx\s+)?(?:vitest|jest|playwright|cypress|mocha)(?=$|[\s&|;)])|\bnode\s+(?:--\S+\s+)*--test\b/;
