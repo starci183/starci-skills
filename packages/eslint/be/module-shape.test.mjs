@@ -10,6 +10,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import {
+    capabilityModuleShape,
     isGlobalOnlyInApp,
     noCrossOwnerModuleImport,
     noGlobalDecorator,
@@ -169,5 +170,56 @@ test("a file declares one module", () => {
     tester.run("one-module-per-file", oneModulePerFile, {
         valid: [{ filename: MODULE, code: "@Module({}) class A {}\nclass B {}" }],
         invalid: [{ filename: MODULE, code: "@Module({}) class A {}\n@Module({}) class B {}", errors: [{ messageId: "many" }] }],
+    })
+})
+
+const BASE = 'import { ConfigurableModuleClass, OPTIONS_TYPE } from "./plan.module-definition"\nimport type { DynamicModule } from "@nestjs/common"\n'
+const DEFINITION = at("src/modules/domain/plan/plan.module-definition.ts")
+const CHAIN = "export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<PlanOptions>().setExtras({ isGlobal: false }, (d, e) => ({ ...d, global: e.isGlobal })).build()"
+
+test("a capability's representative module extends its module definition; sub-modules and feature modules are plain", () => {
+    tester.run("capability-module-shape", capabilityModuleShape, {
+        valid: [
+            { filename: MODULE, code: `${BASE}@Module({}) export class PlanModule extends ConfigurableModuleClass {}` },
+            // the one allowed override
+            { filename: MODULE, code: `${BASE}@Module({}) export class PlanModule extends ConfigurableModuleClass { static register(options: typeof OPTIONS_TYPE): DynamicModule { return super.register(options) } }` },
+            // a platform and an integrations capability follow the same shape
+            { filename: at("src/modules/platform/cache/cache.module.ts"), code: 'import { ConfigurableModuleClass } from "./cache.module-definition"\n@Module({}) export class CacheModule extends ConfigurableModuleClass {}' },
+            // a sub-module and a feature module are plain
+            { filename: at("src/modules/domain/plan/plan-items.module.ts"), code: "@Module({ providers: [] }) export class PlanItemsModule {}" },
+            { filename: at("src/features/checkout/application/checkout.module.ts"), code: "@Module({ providers: [] }) export class CheckoutModule {}" },
+            { filename: at("src/features/checkout/transport/graphql/checkout-graphql.module.ts"), code: "@Module({ providers: [] }) export class CheckoutGraphqlModule {}" },
+            // the app module composes: it has its own register(options: AppOptions)
+            { filename: APP, code: "@Module({}) export class AppModule { static register(options: AppOptions) { return {} } }" },
+            // the definition
+            { filename: DEFINITION, code: CHAIN },
+            { filename: at("src/modules/platform/cache/cache.module-definition.ts"), code: "export const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<CacheOptions>().setExtras({ isGlobal: false }, (d, e) => ({ ...d, global: e.isGlobal })).setClassMethodName('register').build()" },
+        ],
+        invalid: [
+            { filename: MODULE, code: "@Module({}) export class PlanModule {}", errors: [{ messageId: "extendsBase" }] },
+            { filename: MODULE, code: "@Module({}) export class PlanModule extends Other {}", errors: [{ messageId: "extendsBase" }] },
+            // the base must come from this capability's own definition
+            { filename: MODULE, code: 'import { ConfigurableModuleClass } from "./other.module-definition"\n@Module({}) export class PlanModule extends ConfigurableModuleClass {}', errors: [{ messageId: "extendsBase" }] },
+            { filename: MODULE, code: 'import { ConfigurableModuleClass } from "@nestjs/common"\n@Module({}) export class PlanModule extends ConfigurableModuleClass {}', errors: [{ messageId: "extendsBase" }] },
+            // an alias of a different export is not the base
+            { filename: MODULE, code: 'import { OPTIONS_TYPE as ConfigurableModuleClass } from "./plan.module-definition"\n@Module({}) export class PlanModule extends ConfigurableModuleClass {}', errors: [{ messageId: "extendsBase" }] },
+            // register overrides of any other shape
+            { filename: MODULE, code: `${BASE}@Module({}) export class PlanModule extends ConfigurableModuleClass { static register(options: PlanOptions): DynamicModule { return super.register(options) } }`, errors: [{ messageId: "registerSignature" }] },
+            { filename: MODULE, code: `${BASE}@Module({}) export class PlanModule extends ConfigurableModuleClass { static register(options: typeof OPTIONS_TYPE) { return super.register(options) } }`, errors: [{ messageId: "registerSignature" }] },
+            { filename: MODULE, code: `${BASE}@Module({}) export class PlanModule extends ConfigurableModuleClass { register(options: typeof OPTIONS_TYPE): DynamicModule { return {} as never } }`, errors: [{ messageId: "registerSignature" }] },
+            // sub-modules and feature modules are not configurable
+            { filename: at("src/modules/domain/plan/plan-items.module.ts"), code: 'import { ConfigurableModuleClass } from "./plan.module-definition"\n@Module({}) export class PlanItemsModule extends ConfigurableModuleClass {}', errors: [{ messageId: "plain" }] },
+            { filename: at("src/modules/domain/plan/plan-items.module.ts"), code: "@Module({}) export class PlanItemsModule { static register() { return {} } }", errors: [{ messageId: "plain" }] },
+            { filename: at("src/features/checkout/application/checkout.module.ts"), code: "@Module({}) export class CheckoutModule extends Base {}", errors: [{ messageId: "plain" }] },
+            { filename: at("src/features/checkout/checkout.module.ts"), code: "@Module({}) export class CheckoutModule { static register() { return {} } }", errors: [{ messageId: "plain" }] },
+            // a feature has no module definition
+            { filename: at("src/features/checkout/checkout.module-definition.ts"), code: CHAIN, errors: [{ messageId: "featureDefinition" }] },
+            // the definition chain
+            { filename: DEFINITION, code: "export const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<PlanOptions>().build()", errors: [{ messageId: "chain" }] },
+            { filename: DEFINITION, code: "export const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<PlanOptions>().setExtras({ isGlobal: true }, (d, e) => d).build()", errors: [{ messageId: "chain" }] },
+            { filename: DEFINITION, code: "export const { ConfigurableModuleClass } = new ConfigurableModuleBuilder<PlanOptions>().setExtras({ isGlobal }, (d, e) => d).build()", errors: [{ messageId: "chain" }] },
+            { filename: DEFINITION, code: "export const builder = new ConfigurableModuleBuilder<PlanOptions>().setExtras({ isGlobal: false }, (d, e) => d)", errors: [{ messageId: "chain" }] },
+            { filename: DEFINITION, code: "export const x = 1", errors: [{ messageId: "chain" }] },
+        ],
     })
 })

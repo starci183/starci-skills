@@ -212,11 +212,11 @@ profiles:
         sourceRuleIds: [BE-ARCHITECTURE-3, BE-FOLDER-3]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
         mechanical:
-          requirement: A module is global only on the manifest allowlist, names its options type, has static register methods, is one per file, is never built with new, and no module keeps mutable module-level state.
+          requirement: A module is never global from inside (`@Global()` appears nowhere, `isGlobal` is set to true only in an app root `app.module.ts`), never imports another owner's module, names its options type, has only a static register factory, is one per file, is never built with new, and no module keeps mutable module-level state.
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/global-module-allowlist, starci-be/typed-module-definition, starci-be/static-module-register, starci-be/no-new-injectable, starci-be/no-module-let, starci-be/one-module-per-file]
+            ruleIds: [starci-be/no-global-decorator, starci-be/is-global-only-in-app, starci-be/no-cross-owner-module-import, starci-be/capability-module-shape, starci-be/typed-module-definition, starci-be/static-module-register, starci-be/no-new-injectable, starci-be/no-module-let, starci-be/one-module-per-file]
             expected: { severity: error }
         semantic:
           guidance: docs/backend-source-pattern.md
@@ -366,11 +366,11 @@ profiles:
         sourceRuleIds: [BE-FUNCTION-4, BE-FUNCTION-6]
         applicability: { include: ['src/features/**/*.ts', 'apps/*/src/features/**/*.ts', 'libs/*/src/features/**/*.ts'] }
         mechanical:
-          requirement: Protected entry operations carry a recognized guard and transport doors remain in features.
+          requirement: No door picks its own guard (authentication is the global APP_GUARD chain) and transport doors remain in features.
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/identity-needs-guard, starci-be/door-lives-in-features, starci-be/rest-door-needs-a-reason]
+            ruleIds: [starci-be/no-auth-use-guards, starci-be/door-lives-in-features, starci-be/rest-door-needs-a-reason]
             expected: { severity: error }
         semantic:
           guidance: docs/architecture-rules.md

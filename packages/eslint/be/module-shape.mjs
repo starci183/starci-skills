@@ -13,6 +13,11 @@
  *     capability's representative module is reached through its `Inject*()` decorators, never by import. One owner may
  *     import its own modules (a transport module its feature's application module, a representative its sub-modules);
  *     the app composes every owner.
+ *   - `capability-module-shape` holds the files of a capability: its representative `<c>.module.ts` extends the
+ *     `ConfigurableModuleClass` of its own `<c>.module-definition.ts` (and may override only
+ *     `static register(options: typeof OPTIONS_TYPE): DynamicModule`); that definition is a typed
+ *     `ConfigurableModuleBuilder` with `.setExtras({ isGlobal: false }, ...)` and `.build()`; every sub-module and every
+ *     feature module is a plain `@Module` class, and a feature has no module definition.
  *   - `typed-module-definition` requires `ConfigurableModuleBuilder<Options>` to state its options type.
  *   - `static-module-register` allows one factory name, `register`, and requires it `static`: no `forRoot`, `forFeature`
  *     or `registerAsync`, because options are parsed once in `main.ts`.
@@ -22,7 +27,7 @@
  *   - `one-module-per-file` allows one `@Module` class in a file, so one transport or application module has one home.
  */
 import ts from "typescript"
-import { decoratorName, keyName } from "./lib/ast.mjs"
+import { decoratorName, keyName, walk } from "./lib/ast.mjs"
 import { importsFrom } from "./lib/declared.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isDeclarationFile, isSpecFile, normalizePath } from "./lib/path.mjs"
@@ -282,11 +287,130 @@ export const oneModulePerFile = {
     },
 }
 
+const CAPABILITY_TIERS = new Set(["domain", "platform", "integrations"])
+
+/** `{ inside, name }`: the owner-relative path of a file and the owner's directory name, or null outside an owner. */
+const insideOwner = (hfs, filename) => {
+    const root = hfs.ownerOf(filename)
+    if (!root) return null
+    return { inside: hfs.relative(filename).slice(root.length + 1), name: root.split("/").at(-1), tier: hfs.tierOf(filename) }
+}
+
+/** True for `static register(options: typeof OPTIONS_TYPE): DynamicModule`, the one allowed override. */
+const isRegisterOverride = (member) => {
+    if (!member.static) return false
+    const fn = member.value
+    const parameter = fn.params?.[0]
+    const annotation = parameter?.type === "Identifier" ? parameter.typeAnnotation?.typeAnnotation : null
+    const returns = fn.returnType?.typeAnnotation
+    return (
+        fn.params.length === 1 &&
+        annotation?.type === "TSTypeQuery" &&
+        annotation.exprName.type === "Identifier" &&
+        annotation.exprName.name === "OPTIONS_TYPE" &&
+        returns?.type === "TSTypeReference" &&
+        returns.typeName.type === "Identifier" &&
+        returns.typeName.name === "DynamicModule"
+    )
+}
+
+/** The method names a builder chain calls, from the `new ConfigurableModuleBuilder<...>()` outward, with each call. */
+const builderChain = (newExpression) => {
+    const calls = []
+    for (let node = newExpression; node.parent?.type === "MemberExpression" && node.parent.object === node && node.parent.parent?.type === "CallExpression"; node = node.parent.parent) {
+        calls.push({ name: keyName(node.parent.property), call: node.parent.parent })
+    }
+    return calls
+}
+
+/**
+ * The shape of a capability's module files (BE-CONVENTION 1.2): the representative `<c>.module.ts` extends the
+ * `ConfigurableModuleClass` of its own `<c>.module-definition.ts`; that definition builds a typed
+ * `ConfigurableModuleBuilder` with `.setExtras({ isGlobal: false }, ...)` and `.build()`; every other module of the
+ * capability, and every feature module, is a plain static `@Module` class with no definition and no `register`.
+ */
+export const capabilityModuleShape = {
+    meta: {
+        type: "problem",
+        docs: { description: "A capability's representative module extends its module definition's `ConfigurableModuleClass`; sub-modules and feature modules are plain." },
+        schema: [],
+        messages: {
+            extendsBase: "The representative module of `{{name}}` must be `@Module({...}) export class X extends ConfigurableModuleClass {}` with `ConfigurableModuleClass` imported from `./{{name}}.module-definition`.",
+            registerSignature: "The only `register` a capability module may declare is the override `static register(options: typeof OPTIONS_TYPE): DynamicModule`, with `OPTIONS_TYPE` from `./{{name}}.module-definition`.",
+            plain: "`{{class}}` is a sub-module or a feature module: a plain static `@Module` class with no base class, no `register` and no module definition. Only the capability's representative module `{{name}}.module.ts` is configurable.",
+            chain: "The module definition must be `new ConfigurableModuleBuilder<XOptions>().setExtras({ isGlobal: false }, (d, e) => ({ ...d, global: e.isGlobal })).build()`: {{missing}}.",
+            featureDefinition: "A feature has no module definition: feature modules are static. Delete this file and register the feature's providers in its `@Module`.",
+        },
+    },
+    create(context) {
+        const filename = normalizePath(context.filename || context.getFilename())
+        if (isDeclarationFile(filename)) return {}
+        const hfs = hfsOf(context)
+        const where = insideOwner(hfs, filename)
+        if (!where) return {}
+        const base = filename.split("/").at(-1)
+        const isDefinition = base.endsWith(".module-definition.ts")
+        const isModuleFile = base.endsWith(".module.ts")
+        if (where.tier === "feature" && isDefinition) return { Program: (program) => context.report({ node: program, loc: { line: 1, column: 0 }, messageId: "featureDefinition" }) }
+        if (CAPABILITY_TIERS.has(where.tier) && isDefinition) {
+            return {
+                Program(program) {
+                    let found = false
+                    walk(program, (node) => {
+                        if (node.type !== "NewExpression" || node.callee.type !== "Identifier" || node.callee.name !== "ConfigurableModuleBuilder") return
+                        found = true
+                        const calls = builderChain(node)
+                        const extras = calls.find((entry) => entry.name === "setExtras")
+                        const defaults = extras?.call.arguments[0]
+                        const localByDefault =
+                            defaults?.type === "ObjectExpression" &&
+                            defaults.properties.some((item) => item.type === "Property" && keyName(item.key) === "isGlobal" && item.value.type === "Literal" && item.value.value === false)
+                        const missing = []
+                        if (!localByDefault) missing.push("`.setExtras({ isGlobal: false }, ...)` is missing or does not default `isGlobal` to a literal `false`")
+                        if (calls.at(-1)?.name !== "build") missing.push("the chain does not end in `.build()`")
+                        if (missing.length > 0) context.report({ node, messageId: "chain", data: { missing: missing.join("; ") } })
+                    })
+                    if (!found) context.report({ node: program, loc: { line: 1, column: 0 }, messageId: "chain", data: { missing: "no `new ConfigurableModuleBuilder<XOptions>()` is built here" } })
+                },
+            }
+        }
+        if (!isModuleFile || (where.tier !== "feature" && !CAPABILITY_TIERS.has(where.tier))) return {}
+        const importedFrom = new Map()
+        const representative = CAPABILITY_TIERS.has(where.tier) && where.inside === `${where.name}.module.ts`
+        return {
+            ClassDeclaration(node) {
+                if (!isModuleClass(node)) return
+                if (!representative) {
+                    const hasRegister = node.body.body.some((member) => member.type === "MethodDefinition" && member.key.type === "Identifier" && member.key.name === "register")
+                    if (node.superClass || hasRegister) context.report({ node: node.id ?? node, messageId: "plain", data: { class: node.id?.name ?? "This class", name: where.name } })
+                    return
+                }
+                const base = node.superClass
+                const imported = base?.type === "Identifier" ? importedFrom.get(base.name) : null
+                if (!imported || imported.name !== "ConfigurableModuleClass" || imported.source !== `./${where.name}.module-definition`) {
+                    context.report({ node: node.id ?? node, messageId: "extendsBase", data: { name: where.name } })
+                }
+                for (const member of node.body.body) {
+                    if (member.type === "MethodDefinition" && member.key.type === "Identifier" && member.key.name === "register" && !isRegisterOverride(member)) {
+                        context.report({ node: member, messageId: "registerSignature", data: { name: where.name } })
+                    }
+                }
+            },
+            ImportDeclaration(node) {
+                for (const specifier of node.specifiers) {
+                    if (specifier.type === "ImportSpecifier") importedFrom.set(specifier.local.name, { name: specifier.imported.name ?? specifier.imported.value, source: String(node.source.value) })
+                }
+            },
+        }
+    },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "no-global-decorator": noGlobalDecorator,
     "is-global-only-in-app": isGlobalOnlyInApp,
     "no-cross-owner-module-import": noCrossOwnerModuleImport,
+    "capability-module-shape": capabilityModuleShape,
     "typed-module-definition": typedModuleDefinition,
     "static-module-register": staticModuleRegister,
     "no-new-injectable": noNewInjectable,
@@ -299,6 +423,7 @@ export const recommended = {
     "starci-be/no-global-decorator": "error",
     "starci-be/is-global-only-in-app": "error",
     "starci-be/no-cross-owner-module-import": "error",
+    "starci-be/capability-module-shape": "error",
     "starci-be/typed-module-definition": "error",
     "starci-be/static-module-register": "error",
     "starci-be/no-new-injectable": "error",

@@ -626,11 +626,12 @@ BE_APP_COMPOSITION_ONLY:
 BE_CONFIG_OWNER:
   title: "Environment read outside platform/config"
   title_vi: "Đọc biến môi trường ngoài platform/config"
-  meaning_vi: "Một tệp đọc process.env (hoặc gọi readEnvironment() trong factory) ngoài platform/config, nên cấu hình của capability không đi qua bộ phân tích chung và không có kiểu."
+  meaning_vi: "Một tệp đọc process.env (truy cập, destructuring, Reflect.get hay import env của node:process), import @nestjs/config hoặc dotenv, gọi envConfig(), hoặc ghép đường dẫn từ process.cwd() với src hay .starcistacks, ngoài tệp khai báo lớp EnvSource của platform/config, nên cấu hình của capability không đi qua bộ đọc có kiểu duy nhất."
   causes_vi:
     - "Đọc process.env trực tiếp trong service, module hoặc factory"
-    - "Gọi readEnvironment() trong useFactory thay vì nhận options do main.ts truyền vào AppModule.register"
-  nextStep_vi: "Thêm khóa vào <capability>.config.ts (zod) và lấy giá trị qua <capability>.options.ts; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+    - "Import @nestjs/config, dotenv hoặc gọi envConfig() thay vì nhận options do main.ts truyền vào AppModule.register"
+    - "path.join(process.cwd(), \"src\", ...)"
+  nextStep_vi: "Thêm khóa vào <capability>.config.ts (parse<C>Config(env: EnvSource)) và lấy giá trị qua <capability>.options.ts; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -663,14 +664,15 @@ BE_CQRS_SHAPE:
 BE_DEFAULT_DENY:
   title: "Open or untyped door"
   title_vi: "Cửa mở hoặc nhận dữ liệu không kiểu"
-  meaning_vi: "Một operation nhận body không kiểu (unknown, any, GraphQLJSON, switch theo operation), công khai mà không có @Public({ reason }), hoặc so sánh bí mật bằng toán tử bằng thay vì timingSafeEqual. Mặc định mọi route phải đăng nhập và mọi đầu vào phải có kiểu."
+  meaning_vi: "Một operation nhận body không kiểu (unknown, any, GraphQLJSON, switch theo operation), công khai mà không có @Public({ reason: PublicReason.X }) lấy từ enum của domain/identity, tự chọn guard bằng @UseGuards, hoặc so sánh bí mật bằng toán tử bằng thay vì timingSafeEqual. Mặc định mọi route đi qua chuỗi APP_GUARD toàn cục và mọi đầu vào phải có kiểu."
   causes_vi:
     - "@Body() hoặc @Args() không khai kiểu, hoặc khai unknown, any, object"
     - "GraphQLJSON được dùng để chui dữ liệu không kiểu qua schema"
-    - "@Public() thiếu reason"
+    - "@Public() thiếu reason, hoặc reason là chuỗi hay thuộc enum khác PublicReason"
+    - "@UseGuards(...) trên controller hay resolver thay vì chuỗi APP_GUARD toàn cục"
     - "Token, mật khẩu hoặc chữ ký được so sánh bằng === hay !=="
     - "Gốc app api không cung cấp APP_GUARD theo thứ tự throttler, CSRF origin guard của platform/http-security, AuthGuard của domain/identity, hoặc thiếu, lặp một guard"
-  nextStep_vi: "Khai DTO hoặc kiểu hợp đồng cho từng operation, thêm reason cho @Public, và so sánh bí mật bằng crypto.timingSafeEqual; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  nextStep_vi: "Khai DTO hoặc kiểu hợp đồng cho từng operation, dùng @Public({ reason: PublicReason.X }) khi cần mở cửa, bỏ @UseGuards, và so sánh bí mật bằng crypto.timingSafeEqual; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -688,14 +690,15 @@ BE_ENTITY_IN_CONTRACT:
 BE_ERROR_HOME:
   title: "Error declared outside its capability"
   title_vi: "Lỗi không nằm ở capability sở hữu"
-  meaning_vi: "Một lớp lỗi nằm ngoài thư mục errors/ của capability sở hữu nó, kế thừa base đã bỏ (AbstractException) hoặc Error trần, nằm trong exceptions/, hoặc domain ném lỗi của platform; hoặc code ném new Error hay exception của framework."
+  meaning_vi: "Một lớp lỗi nằm ngoài errors/<capability>.error.ts của capability sở hữu nó, kế thừa Error trần hay base đã bỏ thay vì DomainError, hoặc tệp errors/<capability>.error.ts không đúng hình dạng (một enum <C>ErrorCode, một bảng <C>_ERROR_KINDS kiểu Record<<C>ErrorCode, ErrorKind>, một lớp <C>Error rỗng); hoặc code ném giá trị không phải DomainError (new Error, exception của framework, chuỗi), hoặc domain ném lỗi của platform."
   causes_vi:
-    - "Lớp lỗi đặt ở tệp service hoặc thư mục exceptions/ thay vì <capability>/errors/"
+    - "Lớp lỗi đặt ở tệp service hay tệp khác thay vì <capability>/errors/<capability>.error.ts"
     - "Lớp lỗi kế thừa Error hoặc AbstractException thay vì DomainError"
-    - "throw new Error(...) hoặc throw new NotFoundException(...) thoát ra khỏi capability"
-    - "Domain ném EnvError hay PersistenceError của platform"
+    - "throw new Error(...), throw new NotFoundException(...) hoặc throw một chuỗi thoát ra khỏi capability"
+    - "Giá trị enum không theo <CAPABILITY>_<WHAT>, bảng kind thiếu kiểu Record hoặc lớp lỗi có thân"
+    - "Domain ném ConfigError hay lỗi khác của platform"
     - "Giá trị của enum <C>ErrorCode không phải chuỗi literal dạng <CAPABILITY>_<WHAT>, có hậu tố _ERROR hay _EXCEPTION, hoặc trùng với một mã ở nơi khác trong repo"
-  nextStep_vi: "Chuyển lỗi về <capability>/errors/, kế thừa DomainError, dịch lỗi platform thành lỗi của capability; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  nextStep_vi: "Chuyển lỗi về errors/<capability>.error.ts với đúng ba thành phần, kế thừa DomainError, dịch lỗi platform thành lỗi của capability; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -713,11 +716,11 @@ BE_FEATURE_LAYOUT_INVALID:
 BE_LOGGER_REQUIRED:
   title: "Catch swallows the failure"
   title_vi: "Catch nuốt lỗi"
-  meaning_vi: "Một catch (hoặc .catch) rỗng, hoặc không ném lại, không ghi log qua logger port, cũng không trả outcome có kiểu mang cause, nên lỗi thật biến mất không để lại dấu vết."
+  meaning_vi: "Một catch (hoặc .catch) rỗng, hoặc không ném lại, không gọi phương thức nào của Logger (từ platform/logging), cũng không trả outcome có kiểu mang cause, nên lỗi thật biến mất không để lại dấu vết."
   causes_vi:
     - "catch {} rỗng"
     - "catch chỉ trả null, false hoặc undefined"
-    - "catch chỉ gọi console, vốn không phải logger port"
+    - "catch chỉ gọi console hoặc một đối tượng không có kiểu Logger, vốn không phải logger port"
   nextStep_vi: "Ném lại lỗi, ghi log bằng logger của platform/logging, hoặc trả outcome có kiểu mang cause; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -746,16 +749,18 @@ BE_MODULE_PROVIDER_REREGISTRATION:
 BE_MODULE_SHAPE:
   title: "Nest module shape invalid"
   title_vi: "Hình dạng module Nest sai"
-  meaning_vi: "Một module vi phạm hình dạng chuẩn: @Global() ngoài danh sách cho phép của bảng kê, ConfigurableModuleBuilder không khai kiểu options, register không static, nhiều module trong một tệp, new một provider, hoặc biến let ở cấp module."
+  meaning_vi: "Một module vi phạm hình dạng chuẩn: @Global() ở bất kỳ đâu, isGlobal: true ngoài apps/<app>/src/app.module.ts, import module của owner khác vào @Module({ imports }), ConfigurableModuleBuilder không khai kiểu options, có forRoot, forFeature hay registerAsync thay vì chỉ static register, nhiều module trong một tệp, new một provider, hoặc biến let ở cấp module."
   causes_vi:
-    - "@Global() trên module không thuộc platform/config, platform/logging, platform/database"
+    - "@Global() trên bất kỳ module nào (kể cả trong spec)"
+    - "isGlobal: true ở ngoài app.module.ts của app"
+    - "Module của một capability khác bị import vào imports thay vì dùng qua Inject<Thing>()"
     - "new ConfigurableModuleBuilder() không có kiểu options"
-    - "register, registerAsync, forRoot hay forFeature không phải static"
+    - "register không static, hoặc có forRoot, forFeature, registerAsync"
     - "new XService() hoặc let ở cấp module tạo trạng thái toàn cục"
     - "Bộ máy đồ thị module: module đại diện của capability được đăng ký hai lần trong một app, thiếu isGlobal: true ở gốc app, hoặc bị module khác import"
     - "Module con có hơn một nơi import, hoặc vừa nằm ở gốc app vừa được module khác import"
     - "isGlobal: true xuất hiện ngoài gốc app apps/<app>/src/app.module.ts"
-  nextStep_vi: "Bỏ @Global, khai kiểu options, đặt phương thức static, tách module, để container dựng provider; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  nextStep_vi: "Bỏ @Global, để app đăng ký capability đúng một lần với isGlobal: true, dùng capability khác qua Inject<Thing>(), khai kiểu options, chỉ dùng static register, tách module, để container dựng provider; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -807,11 +812,11 @@ BE_SCHEMA_AUTHORITY:
 BE_SECRET_DEFAULT:
   title: "Literal default for a secret or URL"
   title_vi: "Giá trị mặc định cố định cho bí mật hoặc URL"
-  meaning_vi: "Một khóa bí mật, mật khẩu, token hoặc URL hạ tầng có giá trị mặc định viết thẳng trong mã, hoặc đường dẫn ghép từ process.cwd() với src hay .starcistacks. Thiếu biến thì app phải dừng khi boot, nêu tên khóa."
+  meaning_vi: "Một giá trị kiểu Secret hoặc Url của platform/config có giá trị mặc định: đối số mặc định cho env.secret/url/host, toán tử ??, || hay ??= trên giá trị đó, hoặc chuỗi mặc định (\"\", localhost, 127.0.0.1, 0.0.0.0, http(s)://...) đưa vào hàm đọc trả về Secret hay Url. Thiếu biến thì app phải dừng khi boot, nêu tên khóa."
   causes_vi:
-    - "env.X ?? \"...\" hoặc .default(\"...\") cho khóa bí mật hoặc URL"
-    - "Hằng số hoặc thuộc tính tên password, secret, token, key hay url mang giá trị viết sẵn"
-    - "path.join(process.cwd(), \"src\", ...)"
+    - "env.secret(\"K\", \"dev\") hoặc env.url(\"K\", \"http://localhost\")"
+    - "secret ?? new Secret(\"dev\") hoặc url || \"http://localhost:3000\""
+    - "Hàm đọc trả về Secret hay Url được gọi với giá trị mặc định viết sẵn"
   nextStep_vi: "Bỏ giá trị mặc định, để phần kiểm tra cấu hình báo lỗi nêu tên khóa khi thiếu; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -12360,9 +12365,10 @@ BE_ERROR_MASKED:
 BE_INPUT_BOUNDED:
   title: "Bounded input, depth limits, rate limits"
   title_vi: "Input không giới hạn"
-  meaning_vi: "Input `<field>` ở `<file>` không giới hạn độ dài/định dạng."
+  meaning_vi: "Một thuộc tính của lớp input ở `<file>` không có class-validator đúng với kiểu của nó (string thiếu @MaxLength, enum thiếu @IsEnum, mảng thiếu @ArrayMaxSize, object lồng thiếu @ValidateNested cùng @Type), hoặc phân trang bằng skip, offset, OFFSET hay số trang thay vì cursor."
   causes_vi:
-    - "Vi phạm luật R42: Mọi field string của input có giới hạn (`@MaxLength`/scalar có bound); GraphQL có giới hạn depth/complexity; có rate limit ở cửa auth và webhook."
+    - "Thuộc tính của lớp input không có decorator class-validator nào, hoặc thiếu ràng buộc mà kiểu của nó đòi hỏi"
+    - "skip hoặc offset trong tùy chọn find*, OFFSET trong câu SQL, hoặc trường page, pageNumber, offset trong DTO"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding

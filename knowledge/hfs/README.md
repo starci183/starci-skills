@@ -190,19 +190,23 @@ carries the cause; an empty `catch {}` is forbidden.
 
 ### 5.5 Default deny (R41, R42)
 
-`domain/identity` exports `AuthGuard`, `@Public({ reason })` and `@Roles()`. Every api app registers `APP_GUARD`. A
-public operation carries `@Public({ reason })` (auth, signed webhook, health). Webhooks use the shared signature
-verifier and compare secrets with `timingSafeEqual`. No `@Body() x: unknown`, no `GraphQLJSON` parameter, no
-`switch (input.operation)` in transport. Input strings are bounded, GraphQL has depth and complexity limits, and the
-auth and webhook doors are rate limited.
+`domain/identity` exports `AuthGuard`, `@Public({ reason: PublicReason.X })` and `@Roles()`. Every api app registers
+`APP_GUARD`, and that chain is the only authentication and authorization: no `@UseGuards`. A public operation carries
+`@Public({ reason: PublicReason.X })` with a member of the closed `PublicReason` enum of `domain/identity` (auth, signed
+webhook, health); a string or another enum is refused. Webhooks use the shared signature verifier and compare secrets with
+`timingSafeEqual`. No `@Body() x: unknown`, no `GraphQLJSON` parameter, no `switch (input.operation)` in transport. Every
+property of an input class carries the validators its type calls for (a string `@MaxLength`, an enum `@IsEnum`, an array
+`@ArrayMaxSize`, a nested object `@ValidateNested()` with `@Type`), and pagination is by cursor only: no `skip`, `offset`,
+`OFFSET` or page number. GraphQL has depth and complexity limits, and the auth and webhook doors are rate limited.
 
 ### 5.6 Configuration and secrets (R43, R44)
 
-Only `platform/config` (`EnvSource`, which also resolves `*_FILE`) touches `process.env`. Each capability and provider
-has `<name>.config.ts` (`parse<Name>Config(env): <Name>Options`, zod) and `<name>.options.ts`. `main.ts` reads the
-environment once and passes options to `AppModule.register(options)`; modules receive options through DI. Keys
-matching `PASSWORD|SECRET|TOKEN|KEY|CREDENTIAL` and infrastructure URLs have no default; a missing value stops boot with
-an error that names the key. There is one config path; dotfile env preloaders do not exist. No `process.cwd()` joined
+Only the file of `platform/config` that declares `EnvSource` (which also resolves `*_FILE`) touches `process.env`. Each
+capability and provider has `<name>.config.ts` (`parse<Name>Config(env: EnvSource): <Name>Options`) and
+`<name>.options.ts`. `main.ts` reads the environment once and passes options to `AppModule.register(options)`; modules
+receive options through DI. A value typed `Secret` or `Url` by `platform/config` has no default of any kind (no default
+argument, no `??` or `||` fallback, no `""`, `localhost` or `http://` literal); a missing value stops boot with an error
+that names the key. There is one config path: no `@nestjs/config`, `dotenv` or `envConfig()`. No `process.cwd()` joined
 with `src` or `.starcistacks`.
 
 ### 5.7 Background work (R46)
@@ -216,9 +220,10 @@ cron. A method named `sweep*`, `deliver*`, `reconcile*` or `retry*` that no job 
 
 A feature root holds `index.ts`, `<feature>.module.ts`, `application/` and `transport/<protocol>/` only. `application/`
 has no protocol-named folder. Each transport has exactly one Nest module `<feature>-<protocol>.module.ts`, plus one
-application module; never one module per operation. `@Global()` only on `platform/{config,logging,database}`;
-`ConfigurableModuleBuilder<Options>` always carries a real options type; `register` is `static`; no module-level `let`;
-no `new` of an `@Injectable`. Every feature and every transport module is composed by at least one app. Apps hold only
+application module; never one module per operation. `@Global()` appears nowhere and `isGlobal: true` only in an app's
+`app.module.ts`; a module never lists another owner's module in `imports`; `ConfigurableModuleBuilder<Options>` always
+carries a real options type; `register` is the one factory and is `static`; no module-level `let`; no `new` of an
+`@Injectable`. Every feature and every transport module is composed by at least one app. Apps hold only
 `main.ts`, `app.module.ts`, `<app>.options.ts` and the composition spec. Entrypoints (`main.ts`, `bootstrap()`,
 top-level `void x()`) exist only in `apps/*/src`.
 
@@ -231,7 +236,7 @@ timeout or an abort signal (R70). A logger call names no credential and no perso
 are not used (R72). An `async` function awaits (R73). A migration's `down()` reverses its `up()` (R74). A handler and a
 public method of an Injectable, Resolver or Controller declare their return type (R75). `JSON.parse` of outside text sits
 inside a `try` (R76). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`; the input classes of R42 carry a
-`class-validator` decorator on every property (`dto-needs-validator`).
+`class-validator` decorators its types call for (`input-bounded`).
 
 ### 5.10 Copy, time, delivery and transactions (R78 to R82)
 
@@ -457,11 +462,11 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R38 | `BE_ERROR_HOME` | Errors live in the owning capability's `errors/` and extend `DomainError`. |
 | R39 | `BE_ERROR_MASKED` | One filter per app; undeclared errors are masked. |
 | R40 | `BE_LOGGER_REQUIRED` | `platform/logging` exists; every `catch` logs, rethrows or returns a reasoned outcome. |
-| R41 | `BE_DEFAULT_DENY` | APP_GUARD plus `@Public({ reason })`; typed bodies; `timingSafeEqual`. |
-| R42 | `BE_INPUT_BOUNDED` | Bounded input, depth limits, rate limits; every property of an input class carries a `class-validator` decorator. |
+| R41 | `BE_DEFAULT_DENY` | APP_GUARD plus `@Public({ reason: PublicReason.X })`; no `@UseGuards`; typed bodies; `timingSafeEqual`. |
+| R42 | `BE_INPUT_BOUNDED` | Bounded input, cursor-only pagination, depth limits, rate limits; every property of an input class carries the `class-validator` decorators its type calls for. |
 | R43 | `BE_CONFIG_OWNER` | Only `platform/config` reads `process.env`; config per capability. |
 | R44 | `BE_SECRET_DEFAULT` | No default for a secret key or infrastructure URL. |
-| R45 | `BE_MODULE_SHAPE` | `@Global` only on config, logging, database; typed options; one module per transport. |
+| R45 | `BE_MODULE_SHAPE` | `@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport. |
 | R46 | `BE_BACKGROUND_UNOWNED` | Every sweep, outbox or retry has a job or consumer run by a worker app. |
 | R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`. |
 | R48 | `BE_SPEC_QUALITY` | No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); an e2e enters through transport, waits with `waitFor`, boots through `src/tests/e2e/setup`, reads persisted state back and reaches no model provider. |

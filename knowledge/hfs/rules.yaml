@@ -394,6 +394,8 @@ rules:
     failureCodes: ["BE_ERROR_HOME"]
     enforcers:
       - {kind: eslint-be, id: error-home}
+      - {kind: eslint-be, id: throw-domain-error}
+      - {kind: eslint-be, id: error-family-shape}
       - {kind: machine, id: error-home, at: scripts/checks/architecture/error-codes.mjs}
   - id: R39
     code: "BE_ERROR_MASKED"
@@ -419,7 +421,7 @@ rules:
   - id: R41
     code: "BE_DEFAULT_DENY"
     title_vi: "Mặc định không chặn truy cập"
-    law: "APP_GUARD plus `@Public({ reason })`; typed bodies; `timingSafeEqual`."
+    law: "APP_GUARD plus `@Public({ reason: PublicReason.X })`; no `@UseGuards`; typed bodies; `timingSafeEqual`."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_DEFAULT_DENY"]
@@ -427,18 +429,18 @@ rules:
       - {kind: eslint-be, id: no-untyped-body}
       - {kind: eslint-be, id: public-needs-reason}
       - {kind: eslint-be, id: secret-compare-timing-safe}
+      - {kind: eslint-be, id: no-auth-use-guards}
       - {kind: machine, id: default-deny-app-guard, at: scripts/checks/architecture/default-deny.mjs}
-      - {kind: eslint-be, id: identity-needs-guard}
   - id: R42
     code: "BE_INPUT_BOUNDED"
     title_vi: "Input không giới hạn"
-    law: "Bounded input, depth limits, rate limits; every property of an input class carries a `class-validator` decorator."
+    law: "Bounded input, cursor-only pagination, depth limits, rate limits; every property of an input class carries the `class-validator` decorators its type calls for."
     kinds: [lint, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_INPUT_BOUNDED"]
     enforcers:
-      - {kind: eslint-be, id: dto-needs-validator}
-      - {kind: eslint-be, id: input-bounded, status: planned}
+      - {kind: eslint-be, id: input-bounded}
+      - {kind: eslint-be, id: no-offset-pagination}
   - id: R43
     code: "BE_CONFIG_OWNER"
     title_vi: "Đọc process.env ngoài platform/config"
@@ -460,12 +462,15 @@ rules:
   - id: R45
     code: "BE_MODULE_SHAPE"
     title_vi: "Module sai hình dạng"
-    law: "`@Global` only on config, logging, database; typed options; one module per transport."
+    law: "`@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_MODULE_SHAPE"]
     enforcers:
-      - {kind: eslint-be, id: global-module-allowlist}
+      - {kind: eslint-be, id: no-global-decorator}
+      - {kind: eslint-be, id: is-global-only-in-app}
+      - {kind: eslint-be, id: no-cross-owner-module-import}
+      - {kind: eslint-be, id: capability-module-shape}
       - {kind: eslint-be, id: typed-module-definition}
       - {kind: eslint-be, id: static-module-register}
       - {kind: eslint-be, id: no-new-injectable}
