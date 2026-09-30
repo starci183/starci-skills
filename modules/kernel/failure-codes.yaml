@@ -9143,6 +9143,16 @@ live-paths-dirty:
   nextStep_vi: "Lần land bị từ chối để khỏi ghi đè; xử lý các tệp dở rồi land lại."
   owner: owner
   kind: runtime-fault
+live-deps-missing:
+  title: "Live runtime dependencies missing while landing"
+  title_vi: "Thiếu thư viện của runtime khi land"
+  meaning_vi: "Thư mục node_modules của runtime đang chạy bị trống hoặc bị mất bớt, nên land không chạy kiểm tra (nếu chạy, spec sẽ đỏ vì thiếu thư viện chứ không phải do commit)."
+  causes_vi:
+    - "Một lệnh xóa đệ quy hoặc npm cài lại đã đi xuyên qua junction node_modules của một thư mục tạm/staging"
+    - "npm ci trên runtime chưa xong hoặc bị ngắt giữa chừng"
+  nextStep_vi: "Land dừng và không đổi gì; chạy npm ci trong runtime, tìm tiến trình đã làm trống node_modules, rồi land lại."
+  owner: supervisor
+  kind: verb-refusal
 live-repo-bare:
   title: "Live repo is set bare"
   title_vi: "Kho chính bị đặt chế độ bare"
