@@ -74,6 +74,9 @@ test('applyProfileText rewrites the reconciler block, keeps explicit gc/fleet/le
   assert.match(out.text, /reconciler:\r\n {2}enabled: true\r\n {2}profile: operational\r\n {2}controllers: \{gc: \{mode: active\}\}\r\n# specs\r\nspecs:/);
   assert.equal(applyProfileText(out.text).changed, false);
   assert.match(applyProfileText('model: x\n').text, /profile: operational/);
+  const observe = applyProfileText(text, 'observe');
+  assert.match(observe.text, /profile: observe\r\n {2}controllers: \{\}\r\n# specs/);
+  assert.throws(() => applyProfileText(text, 'bogus'), /unknown reconciler profile/);
 });
 
 test('ui/dist is stale when a ui source is newer than the newest built file, or missing', () => {
