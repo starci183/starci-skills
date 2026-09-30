@@ -129,10 +129,11 @@ steps:
       - conventions
     writes: [source]
     action:
-      en: Write the manifest and toolchain first - hfs.json, package.json with the pinned engines and
-        scripts, and the config stubs that extend the @starci presets (tsconfig, prettier, jest, canon eslint);
-        then run `hfs sync --write`, which generates husky, .github/workflows/ci.yml and e2e.yml, .gitignore,
-        sonar-project.properties, codecov.yml and .starciwork/.gitignore, and `hfs sync --check` must pass -
+      en: Write the manifest first - hfs.json and package.json with the pinned engines and dependencies;
+        then run `hfs sync --write`, which generates the tool configuration (tsconfig.json, tsconfig.build.json,
+        tsconfig.e2e.json, eslint.config.mjs, jest.config.js, .prettierrc, .prettierignore), the package.json scripts, husky,
+        .github/workflows/ci.yml and e2e.yml, .gitignore, sonar-project.properties, codecov.yml and
+        .starciwork/.gitignore, and `hfs check` must report no managed-file finding -
         a generated file is never hand-written or edited, and a value `hfs sync` does not carry is a named gap in the
         scaffold evidence, never an improvised choice - then the declared layout, then the first source tree by running `hfs sync --init`
         (packages/hfs/templates/be/skeleton, never overwriting) - per api app the entrypoint that reads the
@@ -168,7 +169,7 @@ proofs:
   - id: baseline-runs
     requirement:
       en: The repository baseline for the nest profile is present and executes — a staged change makes the
-        pre-commit hook run lint-staged, the pre-push hook runs typecheck and affected tests, and
+        pre-commit hook run eslint and prettier on the staged files, the pre-push hook runs typecheck and affected tests, and
         .github/workflows/ci.yml parses and names the lint, typecheck, test and build gates. The
         observed hook and CI output is recorded.
   - id: services-declared

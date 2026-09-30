@@ -9,7 +9,7 @@ checkout. The machine loads `typescript` from the repository it checks (never it
 npx hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>]   # exit 1 on any error-level finding
 npx hfs init    [--repo <dir>] [--stdout]     # write a starter hfs.json (never overwrites); --stdout only prints
 npx hfs explain <path> [--repo <dir>] [--json]
-npx hfs sync (--check | --write) [--root <dir>]   # generated files: husky, CI, .gitignore block, sonar, codecov (sync/, templates/)
+npx hfs sync (--check | --write) [--root <dir>]   # generated files: the managedBy slots of slots.yaml, the .gitignore block (sync/, templates/)
 npx hfs work-hygiene                              # pre-commit guard for staged .starciwork / .starcistacks paths
 ```
 
@@ -30,9 +30,17 @@ Its own checks:
 | `HFS_MIN_INSTANCES` | error | fewer instances of a slot than `minInstances` |
 | `HFS_CANON_PIN_DRIFT` | error | a dependency not at the exact version of `knowledge/hfs/canon-pins.yaml` |
 | `HFS_SIZE_SOFT_BACKLOG` | info | a source file over `ruleParams.fileLines.soft`; report only, never fails |
+| `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, codecov, `tsconfig.build.json`, `tsconfig.e2e.json`, `jest.config.js`, `.prettierrc`, `.prettierignore`, the `scripts` block of a back end's `package.json`, compared as parsed JSON) |
+| `HFS_RULE_OFF_WITHOUT_REPLACEMENT` | error | a back end's `eslint.config.mjs` differs from its one-line render, so a rule could be off, warned or redefined in it |
+| `HFS_TOOL_CONFIG_LOCAL` | error | a back end holds a tool config outside the managed set (`.eslintrc*`, `.eslintignore`, a second `eslint.config.*`, another prettier or jest config), a file that defines an ESLint rule, or a script that runs eslint or prettier with a flag that swaps the configuration |
+| `HFS_TS_STRICT` | error | a back end's `tsconfig.json` sets, lowers or adds anything but `extends` the preset and the three `paths`; the finding names the flag |
 | `HFS_EMPTY_DIR` | error | a directory with no file below it (git tracks none), outside `.git`, `node_modules` and `ignored` slots; the topmost one is reported |
 | `HFS_GHOST_TREE` | error | an empty directory beside a sibling whose name is within two edits of its own (`business` / `bussiness`) |
 | `HFS_UNTRACKED_ROOT_ENTRY` | error | an entry git neither tracks nor ignores (`git ls-files -o --exclude-standard`), outside an `ignored` slot |
+
+The managed files are judged by `sync/managed.mjs` and `sync/ts-strict.mjs` (the package renders the templates; the runtime copy does not). The list of managed
+files is the `managedBy` slots of `slots.yaml`; `hfs sync --write` renders them and `hfs check` compares them, so a hand edit and a forgotten `sync` are the same finding.
+Each finding is reported once: the eslint one-liner under R17, `tsconfig.json` under R22 when it names a flag, everything else under R05.
 
 The architecture machine (`scripts/checks/architecture.mjs` of the runtime, the same code bundled here): tiers and import
 direction, owner public API, cycles, module registration and composition, clones, dead exports, required files, size growth,

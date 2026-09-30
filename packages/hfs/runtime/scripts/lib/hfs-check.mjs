@@ -8,8 +8,8 @@
 //   HFS_SLOT_NOT_ENABLED          a tracked path in an opt-in slot the repository did not declare
 //   HFS_SLOT_AMBIGUOUS            two slots of equal specificity own the path (a manifest gap, reported not guessed)
 //   HFS_TRACKED_MUST_BE_IGNORED   a tracked path in an `ignored` slot (build output, generated files)
-//   HFS_FORBIDDEN_PRESENT         a tracked path in a forbidden / `external` slot; when the slot names one of this module's
-//                                 own codes in `rules` (be.tool-config-local: HFS_TOOL_CONFIG_LOCAL) that code is reported instead
+//   HFS_FORBIDDEN_PRESENT         a tracked path in a forbidden / `external` slot; in the slot be.tool-config-local (.eslintrc*,
+//                                 .eslintignore, a second eslint.config.*, another prettier or jest config) the code is HFS_TOOL_CONFIG_LOCAL instead
 //   HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL (content), HFS_TS_STRICT
 //                                 the managed files: produced by packages/hfs/sync/managed.mjs, which renders the templates,
 //                                 and passed in as `extraFindings` (this module does not read the templates)
@@ -241,7 +241,7 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
     } else if (c.status === 'not-enabled') {
       findings.push({ code: 'HFS_SLOT_NOT_ENABLED', level: 'error', path: file, slot: c.slot, message: `${file} belongs to ${c.slot}, an opt-in slot hfs.json neither lists in optionalSlots nor implies through an app kind` });
     } else if (c.status === 'forbidden') {
-      const own = resolver.slot(c.slot).rules?.find((code) => CHECK_CODES.includes(code)) ?? 'HFS_FORBIDDEN_PRESENT';
+      const own = resolver.slot(c.slot).rules?.includes('HFS_TOOL_CONFIG_LOCAL') ? 'HFS_TOOL_CONFIG_LOCAL' : 'HFS_FORBIDDEN_PRESENT';
       findings.push({ code: own, level: 'error', path: file, slot: c.slot, goesTo: c.goesTo, message: `${file} is tracked but ${c.slot} is forbidden in the tree${c.goesTo ? `; it belongs at ${c.goesTo}` : ''}` });
     } else if (c.tracking === 'ignored') {
       findings.push({ code: 'HFS_TRACKED_MUST_BE_IGNORED', level: 'error', path: file, slot: c.slot, message: `${file} is tracked but ${c.slot} must be gitignored` });
