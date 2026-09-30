@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {endLaunchGrace,notGraceSeed} from './helpers/launch-grace.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {classifyAgentScreen,exitedAgentPromptRow,shellPromptPrefix,shellReceivedText} from '../scripts/kernel/terminal-liveness.mjs';
@@ -113,16 +114,18 @@ const opFixture=t=>{
   }finally{ledger.close();}
   const events=kind=>{
     const l=inspectLedger({file:ledgerFileFor(repo)});
-    try{return l.db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json));}
+    try{return l.db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json)).filter(notGraceSeed);}
     finally{l.close();}
   };
-  return {repo,workflowId,jobId,run,orcaState,writeState,sends,events};
+  const pastLaunchGrace=()=>endLaunchGrace(ledgerFileFor(repo),{workflowId,jobId});
+  return {repo,workflowId,jobId,run,orcaState,writeState,sends,events,pastLaunchGrace};
 };
 
 test('status reads an exited worker dead, observe names it, and nudge refuses without typing',t=>{
   const fx=opFixture(t);
   const d=fx.run(['dispatch','--repo',fx.repo,'--job',fx.jobId,'--model','codex-agent','--spawn','--json']);
   assert.equal(d.status,0,d.stderr||d.stdout);
+  fx.pastLaunchGrace();
   fx.writeState(s=>{s.terminals['fake-terminal-1'].screen=DEAD_CODEX;});
 
   const status=json(fx.run(['status','--repo',fx.repo,'--workflow',fx.workflowId,'--json']).stdout);
@@ -218,6 +221,7 @@ test('nudge: an agent that dies under a stale-active frame gets no delivered cla
   const fx=opFixture(t);
   const d=fx.run(['dispatch','--repo',fx.repo,'--job',fx.jobId,'--model','codex-agent','--spawn','--json']);
   assert.equal(d.status,0,d.stderr||d.stdout);
+  fx.pastLaunchGrace();
   // Frozen for 20 minutes (stale-active turn-idle), and the host shell reads whatever is typed next.
   fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:NIVO_FROZEN,lastOutputAt:Date.now()-20*60_000,shellAfterSend:NIVO_PS});});
   const before=fx.sends().length;
@@ -240,6 +244,7 @@ test('nudge: a wake a shell received names the same recovery as every dead-worke
   const fx=opFixture(t);
   const d=fx.run(['dispatch','--repo',fx.repo,'--job',fx.jobId,'--model','codex-agent','--spawn','--json']);
   assert.equal(d.status,0,d.stderr||d.stdout);
+  fx.pastLaunchGrace();
   fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:NIVO_FROZEN,lastOutputAt:Date.now()-20*60_000,shellAfterSend:NIVO_PS});});
   const nudged=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId]);
   assert.notEqual(nudged.status,0);
@@ -251,6 +256,7 @@ test('nudge: the residue frame (prompt over the footer) is refused before anythi
   const fx=opFixture(t);
   const d=fx.run(['dispatch','--repo',fx.repo,'--job',fx.jobId,'--model','codex-agent','--spawn','--json']);
   assert.equal(d.status,0,d.stderr||d.stdout);
+  fx.pastLaunchGrace();
   fx.writeState(s=>{Object.assign(s.terminals['fake-terminal-1'],{screen:NIVO_EXITED_RESIDUE,lastOutputAt:Date.now()-20*60_000});});
   const before=fx.sends().length;
   const nudged=fx.run(['nudge','--repo',fx.repo,'--job',fx.jobId,'--json']);
