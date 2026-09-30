@@ -32,13 +32,13 @@ src/
     domain/<capability>/            # business invariants, owned state: index.ts, module, module-definition, options, config, decorators, errors/, persistence/, services
     platform/<capability>/          # composition, config, errors, logging, clock, cqrs, database, ... each with its port and injector
     integrations/<provider>/        # index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts, errors/
-  tests/{fixtures,e2e}/             # e2e/<area>/*.e2e-spec.ts, e2e/setup/ (containers, boot), e2e/live/<area>/ (opt-in)
+  tests/{world,fixtures,integration,e2e,contract}/   # world/ (the only infrastructure: global-setup, useTestWorld, fakes/<provider>/), integration/<capability>/, e2e/<area>/, contract/<provider>/
 contracts/<app>/schema.graphql      # opt-in committed contract
 ```
 
 Nothing else exists at `src/` level, and no `types`, `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or `exceptions` folder exists under `src/modules` or `src/features`. Within a capability create only what it owns: one `index.ts` at the root, `<c>.module.ts` and `<c>.module-definition.ts` when it registers providers, `<c>.config.ts` and `<c>.options.ts` when it is configured, `<c>.decorators.ts` for its injectors, `<c>.log-events.ts`, `errors/`, `messages/`, `persistence/`, services, policies, contracts and colocated specs.
 
-Tests come in two kinds (`knowledge/patterns/be/test.yaml` BE-TEST-1): unit `<name>.spec.ts` beside its subject, and e2e `*.e2e-spec.ts` under `src/tests/e2e/` with environment code in `src/tests/e2e/setup/`. E2E runs by hand: the default `tsconfig.json`, `typecheck`, lint, lint-staged and husky exclude `src/tests/e2e/**`; `typecheck:e2e` (`tsconfig.e2e.json`) runs before `test:e2e`; coverage and `test:ci` read the jest `unit` project only; any e2e CI job is `workflow_dispatch` only. The unit project maps no module into `src/tests/e2e/`.
+Tests come in four kinds by folder and suffix (`knowledge/patterns/be/test.yaml` BE-TEST-1): unit `<name>.spec.ts` beside its subject, integration `src/tests/integration/<capability>/*.integration-spec.ts`, e2e `src/tests/e2e/<area>/*.e2e-spec.ts` and contract `src/tests/contract/<provider>/*.contract-spec.ts`; the only test infrastructure is `src/tests/world/` (`useTestWorld`, network-edge fakes). Integration, e2e and contract run by hand: the default `tsconfig.json`, `typecheck`, lint, lint-staged and husky exclude those trees; `typecheck:tests` (`src/tests/tsconfig.json`) runs before `test:integration`, `test:e2e` and `test:contract`; coverage and `test:ci` read the jest `unit` project only; any e2e CI job is `workflow_dispatch` only. The unit project maps no module into `src/tests/{world,integration,e2e,contract}/`.
 
 Every backend repository is an `apps/<app>/` monorepo, including a single-application one: each deployable process composes in `apps/<app>/src` and nothing else lives there, while `src/features` and `src/modules` stay at the repository root and are shared by every app. Independently owned reusable packages sit in `packages/<capability>` and declare explicit exports. Topology never reverses dependencies.
 

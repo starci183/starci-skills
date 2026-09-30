@@ -144,7 +144,7 @@ rules:
     cases:
       - id: case-1
         when: Default export
-        write: Named exports everywhere; only src/tests/e2e/setup/*.global-setup.ts default-exports the Jest API.
+        write: Named exports everywhere; only src/tests/world/global-setup.ts and global-teardown.ts default-export the Jest API.
       - id: case-2
         when: process.env
         write: Only platform/config reads it; a capability config parses the values that EnvSource passes.

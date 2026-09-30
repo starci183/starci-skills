@@ -3,7 +3,7 @@ id: be.test
 title: Test
 purpose: |-
   Given a backend unit, where does its spec live, how is the subject built, what does it assert and what does it leave
-  alone? Two test kinds exist. Unit specs run automatically. E2E runs by hand.
+  alone? Four test kinds exist by folder. Unit specs run automatically. Integration, e2e and contract run by hand.
 appliesTo:
   - backend
 family: be
@@ -31,35 +31,40 @@ rules:
     kind: mandatory
     hfsRules: [R12, R47]
     requirement: |-
-      Exactly two test kinds exist. Unit is `<name>.spec.ts` beside its subject. E2E is `*.e2e-spec.ts` under
-      `src/tests/e2e/<area>/`, with live third-party suites under `src/tests/e2e/live/<area>/`, environment code
-      (containers, boot of the real AppModule) in `src/tests/e2e/setup/` and shared data in `src/tests/fixtures/`. One root
-      `jest.config.js` uses the preset `@starci/jest-preset` and declares exactly two projects, `unit` and `e2e`. The unit
-      project maps no module into `src/tests/e2e`. Scripts are `test:unit`, `test:e2e` and `test:e2e:live`. `test:e2e`
-      is `npm run typecheck:e2e && jest --selectProjects e2e`. The live suite is separated by the folder `live/` with
-      `E2E_LIVE=1`, never by file name, and `test:e2e:live` differs from `test:e2e`. E2E runs by hand: no e2e spec, e2e
-      code or e2e-only dependency enters husky, lint-staged, the default typecheck, coverage or Codecov, or an
-      automatic CI trigger; a kept e2e workflow is `workflow_dispatch` only. `tsconfig.json` excludes
-      `src/tests/e2e/**`, `tsconfig.e2e.json` backs `typecheck:e2e`, and coverage and `test:ci` read the unit project only.
+      Four test kinds exist and the folder and the file suffix always agree. Unit is `<name>.spec.ts` beside its subject.
+      Integration is `src/tests/integration/<capability>/*.integration-spec.ts` (one capability module on the real database, no
+      HTTP, through `useTestWorld({ modules })`). E2E is `src/tests/e2e/<area>/*.e2e-spec.ts` (through
+      `useTestWorld({ apps })`). Contract is `src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped
+      without sandbox config). `src/tests/world/` is the only test infrastructure (`global-setup.ts`, `use-test-world.ts`,
+      `fakes/<provider>/` network-edge fakes with `failNext`, `replayWebhook`, `delay`); `src/tests/fixtures/` holds typed
+      doubles and builders. There is no `live/` folder and no `src/tests/e2e/world`. One root `jest.config.js` uses the
+      preset `@starci/jest-preset` and declares exactly four projects: `unit`, `integration`, `e2e` and `contract`. The unit
+      project maps no module into `src/tests/{world,integration,e2e,contract}`. Scripts are `test` (unit), `test:integration`,
+      `test:e2e` and `test:contract`, each of the last three `npm run typecheck:tests && jest --selectProjects <name>`;
+      `test:contract` is never part of `test` or `test:e2e`. Integration, e2e and contract run by hand: none of their specs,
+      code or dependencies enters husky, lint-staged, the default typecheck, coverage or Codecov, or an automatic CI
+      trigger; a kept e2e workflow is `workflow_dispatch` only. `tsconfig.json` excludes `src/tests/world`,
+      `src/tests/integration`, `src/tests/e2e` and `src/tests/contract`, `src/tests/tsconfig.json` backs `typecheck:tests`,
+      and coverage and `test:ci` read the unit project only.
     rationale: |-
-      One placement rule makes discovery mechanical, and keeping e2e out of the automatic gates keeps the routine
-      gates fast and deterministic while the manual gate still refuses to run on code that does not type check.
+      One placement rule makes discovery mechanical, and keeping integration, e2e and contract out of the automatic gates keeps the routine
+      gates fast and deterministic while the manual gates still refuse to run on code that does not type check.
     cases:
       - id: case-1
         when: Unit
         write: place-order.handler.spec.ts beside place-order.handler.ts
       - id: case-2
-        when: E2E
-        write: src/tests/e2e/checkout/place-order.e2e-spec.ts with globalSetup and globalTeardown in src/tests/e2e/setup/
+        when: Integration
+        write: src/tests/integration/inbox/claim-once.integration-spec.ts calling useTestWorld({ modules }) and asserting rows through world.db
       - id: case-3
-        when: A live third-party suite
-        write: src/tests/e2e/live/payments/payos-webhook.e2e-spec.ts, run only by `E2E_LIVE=1 jest --selectProjects e2e src/tests/e2e/live`
+        when: E2E
+        write: src/tests/e2e/checkout/place-order.e2e-spec.ts calling useTestWorld({ apps }) with globalSetup in src/tests/world/
       - id: case-4
         when: Projects
-        write: 'jest.config.js is `module.exports = { preset: "@starci/jest-preset", projects: [unit, e2e] }` produced by the preset factory, with no second jest config and no per-lane script.'
+        write: 'jest.config.js is `module.exports = require("@starci/jest-preset").starciJestConfig()`, declaring the projects unit, integration, e2e and contract, with no second jest config and no per-lane script.'
       - id: case-5
         when: Type checking
-        write: '`typecheck` covers app and unit specs at pre-push and CI; `typecheck:e2e` runs `tsc -p tsconfig.e2e.json` and `test:e2e` depends on it, so e2e never runs on code that does not compile.'
+        write: '`typecheck` covers app, unit specs and fixtures at pre-push and CI; `typecheck:tests` runs `tsc -p src/tests/tsconfig.json` and `test:integration`, `test:e2e` and `test:contract` depend on it, so they never run on code that does not compile.'
     verification:
       automated:
         - BE_TEST_TOPOLOGY
@@ -103,14 +108,14 @@ rules:
     kind: mandatory
     hfsRules: [R32, R48]
     requirement: |-
-      Use direct construction for isolated behavior. `Test.createTestingModule` is used only in composition specs and e2e.
+      Use direct construction for isolated behavior. `Test.createTestingModule` is used only in composition specs; integration and e2e specs boot through `useTestWorld`.
       Every app has `<app>.composition.spec.ts` that boots the real `AppModule.register(testOptions)` and resolves real
-      provider tokens. E2E boots the real `AppModule.register(testOptions)` on Testcontainers Postgres, runs the real migrations
-      through the `apps/migrate` runner function, overrides only integration tokens (exported from `*.decorators.ts`) with fixture
-      doubles and never overrides a guard, authenticates through an identity fixture that issues real tokens, asserts persisted
-      state and waits with `waitFor` deadlines. Database mocks establish local behavior only; transaction, lock and crash claims
-      need the real store. Configuration is substituted at the owned config boundary by passing options, never by patching
-      `process.env`.
+      provider tokens. An e2e boots the real apps through `useTestWorld({ apps })` on Testcontainers Postgres, runs the real
+      migrations through the `apps/migrate` runner function once in `global-setup.ts`, fakes only external services at the
+      network edge (`world.fake.<provider>`), overrides no provider or DI token and never a guard, authenticates through an
+      identity fixture that issues real tokens, asserts persisted state and waits with `waitFor` deadlines. Database mocks
+      establish local behavior only; transaction, lock and crash claims need the real store (an integration spec). Configuration
+      is substituted at the owned config boundary by passing options, never by patching `process.env`.
     rationale: |-
       A hand-assembled module can pass while the real app cannot start, so composition is proved on the real module.
     cases:
@@ -118,8 +123,8 @@ rules:
         when: The composition spec
         write: 'const moduleRef = await Test.createTestingModule({ imports: [AppModule.register(testOptions)] }).compile(); expect(moduleRef.get(CheckoutModule)).toBeDefined()'
       - id: case-2
-        when: An e2e provider override
-        write: 'Test.createTestingModule({ imports: [AppModule.register(options)] }).overrideProvider(PAYOS).useValue(fakePayos) with PAYOS imported from the integration decorators file.'
+        when: An external service in e2e
+        write: 'const world = useTestWorld({ apps: { core: { module: AppModule } } }); world.fake.payos.failNext(); await world.fake.payos.replayWebhook(payload)'
       - id: case-3
         when: Config
         write: 'pass parsePurchaseConfig(EnvSource of a plain object) output as options; do not set process.env'
@@ -166,8 +171,7 @@ rules:
     hfsRules: [R48]
     requirement: |-
       Do not ship call-only specs, e2e steps that only check a success flag, sleep-based waits (wait with `waitFor` deadlines),
-      guard overrides, live model calls in e2e, or branched outcomes inside one flow step. The e2e canon rules apply to `src/tests/e2e/**` through `lint:e2e`,
-      which runs by hand and must be green before an e2e conclusion is drawn.
+      guard overrides, provider or DI overrides under `src/tests`, live model calls in e2e, or branched outcomes inside one flow step. The e2e canon rules apply to `src/tests/e2e/**` through `lint:check`.
     rationale: |-
       A test that cannot fail for the wrong reason is not evidence, and time-based waiting hides races.
     cases:
@@ -182,7 +186,7 @@ rules:
         write: poll for state; never sleep in a flow
       - id: case-4
         when: A provider call
-        write: only a live e2e under src/tests/e2e/live/ may call a provider
+        write: only a contract spec under src/tests/contract/<provider>/ may call a provider sandbox
       - id: case-5
         when: Branching
         write: one step proves one outcome
@@ -219,8 +223,8 @@ rules:
     kind: mandatory
     hfsRules: [R11, R47]
     requirement: |-
-      ts-jest runs with `diagnostics: false` and `isolatedModules: true` in both projects; types are checked once, by
-      `typecheck` and `typecheck:e2e`. Coverage is collected from the unit project only, and its exclusion list is the
+      ts-jest runs with `diagnostics: false` and `isolatedModules: true` in every project; types are checked once, by
+      `typecheck` and `typecheck:tests`. Coverage is collected from the unit project only, and its exclusion list is the
       one list that `sonar.coverage.exclusions` is generated from. Excluded from coverage: tests, fixtures, `main.ts`,
       declaration files.
     rationale: |-

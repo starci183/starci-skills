@@ -31,9 +31,15 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `HFS_MIN_INSTANCES` | error | fewer instances of a slot than `minInstances` |
 | `HFS_CANON_PIN_DRIFT` | error | a dependency not at the exact version of `knowledge/hfs/canon-pins.yaml` |
 | `HFS_SIZE_SOFT_BACKLOG` | info | a source file over `ruleParams.fileLines.soft`; report only, never fails |
+<<<<<<< HEAD
 | `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, codecov, `tsconfig.build.json`, `src/tests/e2e/tsconfig.json` (back end; a front end keeps `tsconfig.e2e.json`), `jest.config.js` (back end), `vitest.config.ts` (front end), `.prettierrc`, `.prettierignore`, the `scripts` block of `package.json`, compared as parsed JSON) |
 | `HFS_RULE_OFF_WITHOUT_REPLACEMENT` | error | `eslint.config.mjs`, or a front end's `stylelint.config.mjs`, differs from its one-line render, so a rule could be off, warned or redefined in it |
 | `HFS_TOOL_CONFIG_LOCAL` | error | a repository holds a tool config outside the managed set (`.eslintrc*`, `.eslintignore`, a second `eslint.config.*` or `stylelint.config.*`, another prettier, vitest, jest or lint-staged config), a file that defines an ESLint rule or a stylelint plugin, a tool configuration key in a `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), or a script that runs eslint, stylelint or prettier with a flag that swaps the configuration |
+=======
+| `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, codecov, `tsconfig.build.json`, `src/tests/tsconfig.json` (back end; a front end keeps `tsconfig.e2e.json`), `jest.config.js`, `.prettierrc`, `.prettierignore`, the `scripts` block of a back end's `package.json`, compared as parsed JSON) |
+| `HFS_RULE_OFF_WITHOUT_REPLACEMENT` | error | a back end's `eslint.config.mjs` differs from its one-line render, so a rule could be off, warned or redefined in it |
+| `HFS_TOOL_CONFIG_LOCAL` | error | a back end holds a tool config outside the managed set (`.eslintrc*`, `.eslintignore`, a second `eslint.config.*`, another prettier or jest config), a file that defines an ESLint rule, or a script that runs eslint or prettier with a flag that swaps the configuration |
+>>>>>>> a69e81f4d (docs(hfs): owner test layout in hfs README/rules, patterns, docs, changelogs)
 | `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render (no host URL; the ESLint report and HFS import paths), or the stack declaration names another quality gate than the one of `knowledge/sonar-gate.yaml` |
 | `HFS_TS_STRICT` | error | the root `tsconfig.json` sets, lowers or adds anything but `extends` the preset (`be.json`, `next.json`), the template's `exclude` and (back end) the three `paths`; the finding names the flag |
 | `HFS_EMPTY_DIR` | error | a directory with no file below it (git tracks none), outside `.git`, `node_modules` and `ignored` slots; the topmost one is reported |

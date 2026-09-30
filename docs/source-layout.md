@@ -63,14 +63,19 @@ module source roots, see [backend source pattern](backend-source-pattern.md)),
 `apps/<app>/src`; see `knowledge/patterns/fe/folder.yaml`), and forbids
 `.starciwork/`, `.starcistacks/` and `.sops.yaml`.
 
-**Tests: two kinds, e2e by hand.** Unit specs (`<name>.spec.ts(x)` beside the
-subject) are the only tests any automatic gate runs. E2E (`*.e2e-spec.ts`:
-backend `src/tests/e2e/**`, frontend root `e2e/**`) never joins husky, coverage
-or an automatic CI trigger: the default `tsconfig.json`, `typecheck` and lint
-exclude the e2e tree, `tsconfig.e2e.json` backs `typecheck:e2e`, `test:e2e` runs
-`typecheck:e2e` first, `test:ci` collects coverage from unit runs only, and a
-kept e2e workflow is `workflow_dispatch` only (`knowledge/patterns/be/test.yaml`
-BE-TEST-1, `knowledge/patterns/fe/test.yaml` FE-TEST-7).
+**Tests: unit automatic, the rest by hand.** Unit specs (`<name>.spec.ts(x)` beside
+the subject) are the only tests any automatic gate runs. A backend also has
+integration (`src/tests/integration/<capability>/*.integration-spec.ts`), e2e
+(`src/tests/e2e/<area>/*.e2e-spec.ts`) and contract
+(`src/tests/contract/<provider>/*.contract-spec.ts`) specs, with the only test
+infrastructure in `src/tests/world/`; frontend e2e is the root `e2e/**`. They never
+join husky, coverage or an automatic CI trigger: the backend root `tsconfig.json`
+excludes the world, integration, e2e and contract trees, `src/tests/tsconfig.json`
+backs `typecheck:tests`, and `test:integration`, `test:e2e` and `test:contract`
+run it first (a frontend keeps `tsconfig.e2e.json` and `typecheck:e2e`).
+`test:ci` collects coverage from unit runs only, and a kept e2e workflow is
+`workflow_dispatch` only (`knowledge/patterns/be/test.yaml` BE-TEST-1,
+`knowledge/patterns/fe/test.yaml` FE-TEST-7).
 
 ```text
 apps/<app>/                          # backend: composition only (kind api | worker | migrate | cli)
@@ -98,7 +103,7 @@ apps/<app>/                          # frontend: one workspace package
 │   ├── domain/<capability>/         # business invariants, owned state, errors/, persistence/
 │   ├── platform/<capability>/       # config, logging, errors, primitives (required), database, scheduling, messaging, ...
 │   └── integrations/<provider>/     # external protocol clients, failure translation, <provider>.config.ts
-└── tests/{fixtures,e2e}/            # e2e/<area>/*.e2e-spec.ts, e2e/setup/, e2e/live/<area>/ (opt-in)
+└── tests/{world,fixtures,integration,e2e,contract}/   # world/ (only infrastructure), integration/<capability>/, e2e/<area>/, contract/<provider>/
 ```
 
 Only the three module tiers exist: `domain` (business rules), `platform`
