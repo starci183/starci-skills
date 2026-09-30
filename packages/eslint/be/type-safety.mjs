@@ -320,8 +320,4 @@ export const recommended = {
   "starci-be/no-inline-object-type": "error",
   "starci-be/no-const-enum": "error",
   "starci-be/explicit-handler-return-type": "error",
-  "@typescript-eslint/array-type": ["error", {
-    default: "generic",
-    readonly: "generic",
-  }],
 }

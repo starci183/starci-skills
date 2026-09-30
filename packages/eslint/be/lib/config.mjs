@@ -40,6 +40,8 @@ export const BORROWED = Object.freeze({
     "@typescript-eslint/no-floating-promises": "error",
     "@typescript-eslint/no-misused-promises": "error",
     "@typescript-eslint/switch-exhaustiveness-check": "error",
+    "@typescript-eslint/array-type": ["error", { default: "generic", readonly: "generic" }],
+    "no-console": "error",
 })
 
 const levelOf = (setting) => (Array.isArray(setting) ? setting[0] : setting)

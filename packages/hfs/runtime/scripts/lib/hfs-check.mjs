@@ -121,6 +121,9 @@ function sourceFormFindings({ files, resolver }) {
     if (c.status !== 'owned' || c.tracking === 'ignored') continue;
     const base = path.posix.basename(file);
     if (FREE_NAMES.has(base)) continue;
+    // A literal file name the owning slot itself requires or allows (persistence/connection.ts, fixtures/database.ts) is its role.
+    const slot = resolver.slot(c.slot);
+    if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].some((entry) => entry === base)) continue;
     if (c.slot === 'be.persistence' && path.posix.basename(path.posix.dirname(file)) === 'migrations') continue;
     const parts = base.slice(0, -'.ts'.length).split('.');
     const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));

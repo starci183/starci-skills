@@ -251,15 +251,13 @@ export const rules = {
  * Flip to `error` once the count reaches zero; shipping `error` over standing debt is what teaches an
  * author to scroll past a rule instead of fixing it.
  *
- * `no-console` is the standard rule rather than a house one, listed here so a repository switches
- * all three on together: it is the third way out of the pipeline, and leaving it off makes the
- * other two decorative.
+ * `no-console` is the standard rule rather than a house one; the config factory borrows it
+ * (`lib/config.mjs` BORROWED) so it is on wherever these two are.
  */
 export const recommended = {
   "starci-be/no-framework-logger": "error",
   "starci-be/no-interpolated-log-message": "error",
   "starci-be/no-error-wording-as-log-identity": "error",
-  "no-console": "error",
 }
 
 /**

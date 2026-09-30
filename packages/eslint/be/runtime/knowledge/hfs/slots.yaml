@@ -656,6 +656,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: fixtures
+    allows: [database.ts]         # mockEntityManager() and fakeTransaction() (BE-CONVENTION 1.16); other fixtures use role suffixes
     tests: unit-beside
     why: typed data builders and typed mock<T>() doubles; importable by unit specs and e2e; never imports a feature
 
