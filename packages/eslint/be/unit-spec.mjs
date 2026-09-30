@@ -23,7 +23,7 @@
 import { hfsOf } from "./lib/hfs.mjs"
 import { walk } from "./lib/ast.mjs"
 import { importOf } from "./lib/import-source.mjs"
-import { isPackageType } from "./lib/types.mjs"
+import { isPackageType, typeOrigins } from "./lib/types.mjs"
 import { baseOf, isServiceSpecFile, isUnitSpecFile, serviceNameOfSpec } from "./lib/unit-spec.mjs"
 
 const TESTING_PACKAGE = "@nestjs/testing"
@@ -370,6 +370,15 @@ const formOf = (context, node, depth = 0) => {
     }
 }
 
+/** The kit type each double produces, by declared name: what a parameter or a property typed so is a double of. */
+const KIT_TYPES = Object.freeze({ MockEntityManager: "mockEntityManager", FakeCache: "fakeCache", FakeLock: "fakeLock", RecordingOutbox: "recordingOutbox", FakeClock: "FakeClock", FakeIds: "fakeIds", FakeTransaction: "fakeTransaction" })
+
+/** The kit double a value's TYPE says it is (a helper parameter typed `MockEntityManager`, `tx.em` of a `fakeTransaction`), or null. */
+const kitDoubleOfType = (context, node, kit) => {
+    const found = typeOrigins(context, node).find((origin) => Object.hasOwn(KIT_TYPES, origin.name) && origin.module === kit)
+    return found ? KIT_TYPES[found.name] : null
+}
+
 /** The double a token's provider value must come from. */
 export const specInfraDoubleFromKit = {
     meta: {
@@ -401,7 +410,13 @@ export const specInfraDoubleFromKit = {
                 const found = formOf(context, node.value)
                 const want = describe(entry)
                 const data = { token: spelled, want, kit: table.kit }
-                if (found === null) return context.report({ node: node.value, messageId: "unknown", data })
+                if (found === null) {
+                    // not a call, a literal or a traceable const: the declared type of the value decides (a helper parameter, `tx.em`)
+                    const typedAs = kitDoubleOfType(context, node.value, table.kit)
+                    if (typedAs === null) return context.report({ node: node.value, messageId: "unknown", data })
+                    if (typedAs !== entry.double) return context.report({ node: node.value, messageId: "wrong", data: { ...data, got: `a \`${typedAs}\` double` } })
+                    return undefined
+                }
                 if (!entry.forms.includes(found.form)) {
                     const got = found.name ? `\`${found.form === "new" ? "new " : ""}${found.name}(...)\`` : `a ${found.form} value`
                     return context.report({ node: node.value, messageId: "wrong", data: { ...data, got } })

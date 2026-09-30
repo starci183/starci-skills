@@ -172,7 +172,7 @@ test("spec-infra-double-from-kit: a provider takes its value from the kit double
             { filename: SPEC, code: provide("KEYCLOAK_ADMIN", "mock<KeycloakAdmin>()", "interface KeycloakAdmin { users(): void }") },
             { filename: SPEC, code: provide("BucketName", "'uploads'") },
             { filename: SPEC, code: provide("REGISTRY", "[mock<Step>()]", "interface Step { run(): void }") },
-            // the transaction runner takes fakeTransaction
+            // a helper parameter typed with the kit type, or its ReturnType, is the kit double\n            { filename: SPEC, code: provide("PRIMARY_ENTITY_MANAGER", "em", "import type { MockEntityManager } from '@starci/jest-preset'"+"\nexport const build = (em: MockEntityManager) => ({ em })") },\n            { filename: SPEC, code: provide("PRIMARY_ENTITY_MANAGER", "em", "export const build = async (em: ReturnType<typeof mockEntityManager>) => em") },\n            { filename: SPEC, code: provide("CLOCK", "clock", "import type { FakeClock as Clk } from '@starci/jest-preset'\nexport const build = (clock: Clk) => clock") },\n            // the manager of a fakeTransaction, bound or inline\n            { filename: SPEC, code: provide("PRIMARY_ENTITY_MANAGER", "tx.em", "const tx = fakeTransaction(mockEntityManager())") },\n            { filename: SPEC, code: provide("PRIMARY_ENTITY_MANAGER", "fakeTransaction(mockEntityManager()).em") },\n            // the transaction runner takes fakeTransaction
             { filename: SPEC, code: provide("TRANSACTION_RUNNER", "fakeTransaction()") },
             // a provider without useValue, and a value with no token, are not judged
             { filename: SPEC, code: 'export const p = { provide: "CLOCK", useFactory: () => 1 }' },
@@ -200,7 +200,7 @@ test("spec-infra-double-from-kit: a provider takes its value from the kit double
             // anything else is mock<T>()
             { filename: SPEC, code: provide("KEYCLOAK_ADMIN", "{ users: () => [] }"), errors: [{ messageId: "wrong" }] },
             { filename: SPEC, code: provide("KEYCLOAK_ADMIN", "mockEntityManager()"), errors: [{ messageId: "wrong" }] },
-            // a value that cannot be traced to a double
+            // a typed parameter is judged by its type: the wrong kit type for the token, or no kit type at all\n            { filename: SPEC, code: provide("CLOCK", "em", "export const build = (em: ReturnType<typeof mockEntityManager>) => em"), errors: [{ messageId: "wrong" }] },\n            { filename: SPEC, code: provide("PRIMARY_ENTITY_MANAGER", "em", "interface Loose { find(): void }\nexport const build = (em: Loose) => em"), errors: [{ messageId: "unknown" }] },\n            // a value that cannot be traced to a double
             { filename: SPEC, code: provide("CLOCK", "harness.clock", "declare const harness: { clock: object }"), errors: [{ messageId: "unknown" }] },
         ],
     })
