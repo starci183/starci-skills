@@ -4,7 +4,7 @@ import { treeOf } from './required-files.mjs';
 import { documentLanguageHits, isDocument, isLocalizedDataFile } from '../../lib/language.mjs';
 
 /**
- * R95 `doc-language` (HFS_DOC_NOT_ENGLISH). Every Markdown and YAML document under knowledge/, docs/, src/ and apps/ is English:
+ * R96 `doc-language` (HFS_DOC_NOT_ENGLISH). Every Markdown and YAML document under knowledge/, docs/, src/ and apps/ is English:
  * prose, patterns and examples alike, and a code fence inside Markdown counts because an example is read exactly like the
  * prose around it. Detection is structural on characters (scripts/lib/language.mjs), never a word list.
  *
