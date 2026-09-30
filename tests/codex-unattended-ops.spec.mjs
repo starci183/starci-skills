@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
+import {writeGreenSonar} from './helpers/sonar-scan.mjs';
 import {jobResultSql} from '../scripts/kernel/api-lib/rows.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {buildSpawnCommand} from '../scripts/agent/lib.mjs';
@@ -197,7 +198,7 @@ test('a Codex op dispatches as an unattended command terminal: Task, preamble, a
   fs.mkdirSync(scratch,{recursive:true});
   const report=path.join(scratch,'report.json');fs.writeFileSync(report,JSON.stringify({
     schema:'starci/op-report@1',outcome:'done',summary:'codex op completed',head:'abc1234def',
-    files:['docs/codex-result.md'],checks:[{name:'self-check',command:'true',exitCode:0}],
+    files:['docs/codex-result.md',(writeGreenSonar(path.join(fx.repo,'docs')),'docs/sonar.json')],checks:[{name:'self-check',command:'true',exitCode:0}],
   }));
   const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
   assert.equal(filed.status,0,`report failed: ${filed.stderr||filed.stdout}`);

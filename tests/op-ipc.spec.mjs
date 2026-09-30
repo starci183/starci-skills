@@ -34,6 +34,7 @@ const OP='code.refactor';
 const OWNED=['docs/','src/op-ipc.txt'];
 const checkEnvelope=(...checks)=>({checks});
 import {normalizeOwnedPath} from '../engine/admission.mjs';
+import {writeGreenSonar} from './helpers/sonar-scan.mjs';
 // The ask here exercises the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is on
 // by default, so this spec runs with it off - tests/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -116,7 +117,7 @@ const writeEnvelope=(fx,{outcome='done',sentinel='SENTINEL-ALPHA',name='report-1
   fs.mkdirSync(path.dirname(file),{recursive:true});
   fs.writeFileSync(file,JSON.stringify({
     schema:'starci/op-report@1',outcome,summary:`op ${outcome} — ${sentinel}`,
-    files,checks:[{name:'self-check',command:'true',exitCode:0}],
+    files:[...files,...(outcome==='done'?[(writeGreenSonar(path.join(fx.repo,'docs')),'docs/sonar.json')]:[])],checks:[{name:'self-check',command:'true',exitCode:0}],
     ...(outcome==='partial'?{open:['one unfinished item']}:{}),
     // OP commits (commitPolicy), so api report requires head on done|partial.
     ...(['done','partial'].includes(outcome)?{head:'abc1234def'}:{}),

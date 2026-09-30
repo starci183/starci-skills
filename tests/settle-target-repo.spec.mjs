@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {writeGreenSonar} from './helpers/sonar-scan.mjs';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,fileReport,recordCheckRun} from '../engine/ledger-db.mjs';
 
 // git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
@@ -96,7 +97,7 @@ const seedJob=(repo,{op,owned,head,repository,jobId='op-target-1',wf='wf-target'
       writeContract(db,{attemptId:attempt.attempt_id,markdown:'# contract',context:{worktree:repo},createdAt:at});
       setJobStatus(db,{jobId,to:'running',reason:'seed',at});
       fileReport(db,{attemptId:attempt.attempt_id,outcome:'done',
-        report:{outcome:'done',summary:'landed',head,branch:'main',dispatch:`ctx-${jobId}`,from:jobId},fromTerminal:`term-${jobId}`,createdAt:at});
+        report:{outcome:'done',summary:'landed',head,branch:'main',files:[writeGreenSonar(path.join(repo,'..','sonar-'+jobId))],dispatch:`ctx-${jobId}`,from:jobId},fromTerminal:`term-${jobId}`,createdAt:at});
       recordCheckRun(db,{attemptId:attempt.attempt_id,name:'unit',phase:'verify',runner:'kernel',authority:'runtime',
         status:'pass',exitCode:0,command:'unit',createdAt:at});
     });
