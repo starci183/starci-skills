@@ -86,7 +86,7 @@ async function newBuyer(tag, password) {
   return { email, personId: registered.data.register.personId, token: signedIn.data.signIn.sessionToken };
 }
 
-const password = 'live-proof-password';
+const password = `live-proof-${Date.now()}`;
 
 if (process.argv.slice(2).includes('--expect-down')) {
   // The honest negative: against a down stack every door must refuse, not hang or fake ok.
@@ -121,7 +121,7 @@ if (process.argv.slice(2).includes('--expect-down')) {
   });
 
   await step('identity: a wrong password and an unknown email are refused alike', async () => {
-    const wrongPassword = await gql(IDENTITY, SIGN_IN, { input: { email: buyer.email, password: 'not-the-password' } });
+    const wrongPassword = await gql(IDENTITY, SIGN_IN, { input: { email: buyer.email, password: `${password}-wrong` } });
     const unknownEmail = await gql(IDENTITY, SIGN_IN, { input: { email: `ghost-${Date.now()}@ecommerce.dev`, password } });
     assert(wrongPassword.code === 'ACCOUNT_INVALID_CREDENTIALS' && unknownEmail.code === wrongPassword.code, `refusals were ${wrongPassword.code}/${unknownEmail.code}`);
   });
