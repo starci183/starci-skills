@@ -4,6 +4,9 @@ import { CartService } from "@modules/domain/cart"
 import { CatalogService } from "@modules/domain/catalog"
 import { PaymentService } from "@modules/domain/payment"
 import { InjectOrderEntityManager } from "@modules/platform/database"
+import { ok } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
+import { evaluateCheckout } from "./checkout.policy"
 import { OrderError, OrderErrorCode } from "./errors/order.error"
 import type {
     GetBuyerStatusResult,
@@ -11,6 +14,7 @@ import type {
     FindPlacedOrderParams,
     FindPlacedOrderResult,
     PlaceOrderParams,
+    PlaceOrderRequest,
     PlacedOrder,
 } from "./order.contracts"
 import { OrderEntity } from "./persistence/entities/order.entity"
@@ -21,7 +25,8 @@ import { COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sq
 
 @Injectable()
 /**
- * Confirms orders. `place` runs inside the caller transaction: it claims the idempotency key, takes the stock with
+ * Confirms orders. `placeOrder` answers a replayed key with the first order, otherwise prices the cart against the
+ * catalog and, when it can be confirmed, runs `confirm` in one transaction: it claims the idempotency key, takes the stock with
  * guarded decrements, writes the lines, captures the payment and clears the cart, so a failure at any step rolls the
  * whole confirmation back and the buyer keeps the cart.
  */
@@ -33,8 +38,34 @@ export class OrderService {
         private readonly payments: PaymentService,
     ) {}
 
+    /**
+     * Confirms the cart of a person. A replayed key answers the first order; an empty cart, an unknown product or too
+     * little stock is a refusal; otherwise the order, stock, payment and cart clear all happen in one transaction.
+     */
+    async placeOrder(request: PlaceOrderRequest): Promise<Outcome<PlacedOrder, OrderErrorCode>> {
+        const { personId, idempotencyKey } = request
+        if (idempotencyKey !== undefined) {
+            const replay = await this.findPlaced({ personId, idempotencyKey })
+            if (replay) return ok(replay)
+        }
+        const lines = await this.cart.list({ personId })
+        const products = await this.catalog.byIds({ ids: lines.map((line) => line.productId) })
+        const evaluation = evaluateCheckout(lines, products)
+        if (evaluation.kind === "refused") return evaluation
+        const placed = await this.entityManager.transaction((manager) =>
+            this.confirm({ manager, personId, plan: evaluation.value, idempotencyKey }),
+        )
+        return ok(placed)
+    }
+
+    /** Whether one person has confirmed orders; an unknown person is not an error, no orders is the honest answer. */
+    async buyerStatus(params: BuyerStatusParams): Promise<GetBuyerStatusResult> {
+        const rows: Array<OrderCountRow> = await this.entityManager.query(COUNT_PERSON_ORDERS, [params.personId])
+        return toBuyerStatus(params.personId, rows)
+    }
+
     /** The order an earlier confirmation with the same key produced, marked as a replay, or null. */
-    async findPlaced(params: FindPlacedOrderParams): Promise<FindPlacedOrderResult> {
+    private async findPlaced(params: FindPlacedOrderParams): Promise<FindPlacedOrderResult> {
         const manager = params.manager ?? this.entityManager
         const order = await manager.findOneBy(OrderEntity, {
             personId: params.personId,
@@ -44,7 +75,7 @@ export class OrderService {
     }
 
     /** Confirms an evaluated cart in the caller transaction. */
-    async place(params: PlaceOrderParams): Promise<PlacedOrder> {
+    private async confirm(params: PlaceOrderParams): Promise<PlacedOrder> {
         const { manager, personId, plan, idempotencyKey } = params
         const rows: Array<OrderIdRow> = await manager.query(INSERT_ORDER_IF_NEW, [
             personId,
@@ -91,12 +122,6 @@ export class OrderService {
             paymentId: payment.paymentId,
             replayed: false,
         }
-    }
-
-    /** Whether one person has confirmed orders; an unknown person is not an error, no orders is the honest answer. */
-    async buyerStatus(params: BuyerStatusParams): Promise<GetBuyerStatusResult> {
-        const rows: Array<OrderCountRow> = await this.entityManager.query(COUNT_PERSON_ORDERS, [params.personId])
-        return toBuyerStatus(params.personId, rows)
     }
 
     /** A concurrent request with the same key won the insert: answer that order as a replay. */

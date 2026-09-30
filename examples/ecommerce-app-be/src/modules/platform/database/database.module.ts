@@ -3,6 +3,7 @@ import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { DatabaseProbeService } from "./database-probe.service"
+import { DATABASE_MANAGERS } from "./database.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
 
 @Module({})
@@ -32,11 +33,11 @@ export class DatabaseModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 {
-                    provide: DatabaseProbeService,
+                    provide: DATABASE_MANAGERS,
                     inject: options.connections.map((connection) => getDataSourceToken(connection.name)),
-                    useFactory: (...sources: Array<DataSource>) =>
-                        new DatabaseProbeService(sources.map((source) => source.manager)),
+                    useFactory: (...sources: Array<DataSource>) => sources.map((source) => source.manager),
                 },
+                DatabaseProbeService,
             ],
             exports: [DatabaseProbeService],
         }

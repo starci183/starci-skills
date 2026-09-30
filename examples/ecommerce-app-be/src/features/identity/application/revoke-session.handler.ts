@@ -1,14 +1,13 @@
 import { CommandHandler } from "@nestjs/cqrs"
-import { SessionErrorCode, SessionService } from "@modules/domain/session"
+import { SessionService } from "@modules/domain/session"
 import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { ok, refused } from "@modules/platform/primitives"
-import type { Revoked, RevokeSessionResult } from "./revoke-session.contracts"
+import type { RevokeSessionResult } from "./revoke-session.contracts"
 import { RevokeSessionCommand } from "./revoke-session.command"
 
 @CommandHandler(RevokeSessionCommand)
-/** Ends a session, but only one that belongs to the caller: someone else token answers the same refusal as an unknown one. */
+/** Ends a session, but only one that belongs to the caller: the session service answers a token of someone else like an unknown one. */
 export class RevokeSessionHandler extends ICQRSHandler<RevokeSessionCommand, RevokeSessionResult> {
     constructor(
         @InjectLogger() logger: Logger,
@@ -17,11 +16,8 @@ export class RevokeSessionHandler extends ICQRSHandler<RevokeSessionCommand, Rev
         super(logger)
     }
 
-    protected override async process(command: RevokeSessionCommand): Promise<RevokeSessionResult> {
+    protected override process(command: RevokeSessionCommand): Promise<RevokeSessionResult> {
         const { request, principal } = command.params
-        const session = await this.sessions.verify(request.sessionToken)
-        if (session === null || session.personId !== principal.id) return refused(SessionErrorCode.Invalid)
-        await this.sessions.revoke(request.sessionToken)
-        return ok<Revoked>({ revoked: true })
+        return this.sessions.revokeOwn({ personId: principal.id, sessionToken: request.sessionToken })
     }
 }

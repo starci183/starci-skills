@@ -1,5 +1,7 @@
 import { Injectable } from "@nestjs/common"
 import { EntityManager } from "typeorm"
+import { InjectClock } from "@modules/platform/clock"
+import type { Clock } from "@modules/platform/clock"
 import { InjectOrderEntityManager } from "@modules/platform/database"
 import type { CapturePaymentParams, FindPaymentParams, FindPaymentResult, PaymentView } from "./payment.contracts"
 import { PaymentEntity } from "./persistence/entities/payment.entity"
@@ -16,9 +18,12 @@ const toPaymentView = (row: PaymentEntity): PaymentView => ({
  * paid once.
  */
 export class PaymentService {
-    constructor(@InjectOrderEntityManager() private readonly entityManager: EntityManager) {}
+    constructor(
+        @InjectOrderEntityManager() private readonly entityManager: EntityManager,
+        @InjectClock() private readonly clock: Clock,
+    ) {}
 
-    /** Records a captured payment for an order in the caller transaction. */
+    /** Records a captured payment for an order in the caller transaction, stamped by the clock. */
     async capture(params: CapturePaymentParams): Promise<PaymentView> {
         const saved = await params.manager.save(
             PaymentEntity,
@@ -27,6 +32,7 @@ export class PaymentService {
                 orderId: params.orderId,
                 amountMinorUnits: params.amountMinorUnits,
                 status: "captured",
+                createdAt: this.clock.now(),
             }),
         )
         return toPaymentView(saved)

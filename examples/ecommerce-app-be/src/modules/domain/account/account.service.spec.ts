@@ -1,82 +1,174 @@
-import { mockEntityManager } from "@tests/fixtures/database"
+import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { SessionService } from "@modules/domain/session"
+import { ORDER_API } from "@modules/integrations/order-api"
+import type { OrderApiClient } from "@modules/integrations/order-api"
+import { IDENTITY_ENTITY_MANAGER } from "@modules/platform/database"
+import { Test } from "@nestjs/testing"
 import { AccountService } from "./account.service"
 import { AccountErrorCode } from "./errors/account.error"
 import { hashPassword } from "./password.policy"
 import { INSERT_PERSON_IF_NEW } from "./persistence/account.sql"
 import { PersonEntity } from "./persistence/entities/person.entity"
 
-const person = (): PersonEntity =>
+const person = (id: string, email: string, password: string): PersonEntity =>
     Object.assign(new PersonEntity(), {
-        id: "p-1",
-        email: "a@example.com",
-        passwordHash: hashPassword("secret-pass"),
+        id,
+        email,
+        passwordHash: hashPassword(password),
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
     })
+
+const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
+    const sessions = mock<SessionService>()
+    const orderApi = mock<OrderApiClient>()
+    const moduleRef = await Test.createTestingModule({
+        providers: [
+            AccountService,
+            { provide: IDENTITY_ENTITY_MANAGER, useValue: entityManager },
+            { provide: SessionService, useValue: sessions },
+            { provide: ORDER_API, useValue: orderApi },
+        ],
+    }).compile()
+    return { accounts: moduleRef.get(AccountService), sessions, orderApi }
+}
 
 describe("AccountService", () => {
     describe("verifyCredentials", () => {
-        it("names the person when the email and password match", async () => {
-            const entityManager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(person()) })
-            const outcome = await new AccountService(entityManager).verifyCredentials({
-                email: "a@example.com",
-                password: "secret-pass",
+        it("succeeds with the person whose email and password match", async () => {
+            const em = mockEntityManager({ findOneBy: [PersonEntity, person("p-1", "an@shop.test", "s3cret-pw")] })
+            const { accounts } = await build(em)
+
+            expect(await accounts.verifyCredentials({ email: "an@shop.test", password: "s3cret-pw" })).toSucceedWith({
+                personId: "p-1",
             })
-            expect(outcome).toEqual({ kind: "ok", value: { personId: "p-1" } })
-            expect(entityManager.findOneBy).toHaveBeenCalledWith(PersonEntity, { email: "a@example.com" })
+            expect(em.findOneBy).toHaveBeenCalledWith(PersonEntity, { email: "an@shop.test" })
         })
 
-        it("refuses a wrong password and an unknown email with the same code", async () => {
-            const wrongPassword = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(person()) })
-            const unknown = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null) })
-            const first = await new AccountService(wrongPassword).verifyCredentials({
-                email: "a@example.com",
-                password: "nope",
+        it("refuses an unknown email with the same code as a wrong password", async () => {
+            const { accounts } = await build(mockEntityManager({ findOneBy: [PersonEntity, null] }))
+
+            expect(await accounts.verifyCredentials({ email: "x@shop.test", password: "s3cret-pw" })).toBeRefused(
+                AccountErrorCode.InvalidCredentials,
+            )
+        })
+
+        it("refuses a wrong password", async () => {
+            const em = mockEntityManager({ findOneBy: [PersonEntity, person("p-1", "an@shop.test", "s3cret-pw")] })
+            const { accounts } = await build(em)
+
+            expect(await accounts.verifyCredentials({ email: "an@shop.test", password: "other-pw" })).toBeRefused(
+                AccountErrorCode.InvalidCredentials,
+            )
+        })
+    })
+
+    describe("signIn", () => {
+        it("starts a session for the person whose credentials match", async () => {
+            const em = mockEntityManager({ findOneBy: [PersonEntity, person("p-1", "an@shop.test", "s3cret-pw")] })
+            const { accounts, sessions } = await build(em)
+            sessions.issue.mockResolvedValue({ sessionToken: "t-1", personId: "p-1" })
+
+            expect(await accounts.signIn({ email: "an@shop.test", password: "s3cret-pw" })).toSucceedWith({
+                sessionToken: "t-1",
+                personId: "p-1",
             })
-            const second = await new AccountService(unknown).verifyCredentials({
-                email: "x@example.com",
-                password: "nope",
-            })
-            expect(first).toMatchObject({ kind: "refused", code: AccountErrorCode.InvalidCredentials })
-            expect(second).toMatchObject({ kind: "refused", code: AccountErrorCode.InvalidCredentials })
+            expect(sessions.issue).toHaveBeenCalledWith({ personId: "p-1" })
+        })
+
+        it("refuses wrong credentials and starts no session", async () => {
+            const { accounts, sessions } = await build(mockEntityManager({ findOneBy: [PersonEntity, null] }))
+
+            expect(await accounts.signIn({ email: "x@shop.test", password: "s3cret-pw" })).toBeRefused(
+                AccountErrorCode.InvalidCredentials,
+            )
+            expect(sessions.issue).not.toHaveBeenCalled()
         })
     })
 
     describe("register", () => {
-        it("inserts through the caller manager with a hashed password and names the new person", async () => {
-            const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([{ id: "p-2" }]) })
-            const outcome = await new AccountService(mockEntityManager()).register({
-                manager,
-                email: "b@example.com",
-                password: "secret-pass",
+        it("inserts the person with a hashed password in one transaction and returns the new id", async () => {
+            const tx = fakeTransaction(mockEntityManager({ query: [INSERT_PERSON_IF_NEW, [{ id: "p-7" }]] }))
+            const { accounts } = await build(tx.em)
+
+            expect(await accounts.register({ email: "an@shop.test", password: "s3cret-pw" })).toSucceedWith({
+                personId: "p-7",
             })
-            expect(outcome).toEqual({ kind: "ok", value: { personId: "p-2" } })
-            expect(manager.query).toHaveBeenCalledWith(INSERT_PERSON_IF_NEW, [
-                "b@example.com",
-                hashPassword("secret-pass"),
-            ])
+            expect(tx.em.query).toHaveBeenCalledWith(INSERT_PERSON_IF_NEW, ["an@shop.test", hashPassword("s3cret-pw")])
+            expect(tx.commits).toBe(1)
         })
 
-        it("refuses a taken email when the insert answers no row", async () => {
-            const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
-            const outcome = await new AccountService(mockEntityManager()).register({
-                manager,
-                email: "b@example.com",
-                password: "secret-pass",
-            })
-            expect(outcome).toMatchObject({ kind: "refused", code: AccountErrorCode.EmailTaken })
+        it("refuses a taken email", async () => {
+            const tx = fakeTransaction(mockEntityManager({ query: [INSERT_PERSON_IF_NEW, []] }))
+            const { accounts } = await build(tx.em)
+
+            expect(await accounts.register({ email: "an@shop.test", password: "s3cret-pw" })).toBeRefused(
+                AccountErrorCode.EmailTaken,
+            )
+        })
+
+        it("rolls back and rethrows when the insert fails", async () => {
+            const em = mockEntityManager({ query: [INSERT_PERSON_IF_NEW, []] })
+            em.query.mockRejectedValue(new Error("deadlock"))
+            const tx = fakeTransaction(em)
+            const { accounts } = await build(tx.em)
+
+            await expect(accounts.register({ email: "an@shop.test", password: "s3cret-pw" })).rejects.toThrow("deadlock")
+
+            expect(tx.rollbacks).toBe(1)
+            expect(tx.committedWrites).toEqual([])
         })
     })
 
     describe("getAccount", () => {
-        it("answers the id and email but never the hash", async () => {
-            const entityManager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(person()) })
-            const outcome = await new AccountService(entityManager).getAccount({ personId: "p-1" })
-            expect(outcome).toEqual({ kind: "ok", value: { personId: "p-1", email: "a@example.com" } })
+        it("succeeds with the id and email, never the hash", async () => {
+            const em = mockEntityManager({ findOneBy: [PersonEntity, person("p-1", "an@shop.test", "s3cret-pw")] })
+            const { accounts } = await build(em)
+
+            expect(await accounts.getAccount({ personId: "p-1" })).toSucceedWith({
+                personId: "p-1",
+                email: "an@shop.test",
+            })
+            expect(em.findOneBy).toHaveBeenCalledWith(PersonEntity, { id: "p-1" })
         })
 
-        it("refuses an unknown person", async () => {
-            const entityManager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null) })
-            const outcome = await new AccountService(entityManager).getAccount({ personId: "missing" })
-            expect(outcome).toMatchObject({ kind: "refused", code: AccountErrorCode.PersonUnknown })
+        it("refuses a person that no longer exists", async () => {
+            const { accounts } = await build(mockEntityManager({ findOneBy: [PersonEntity, null] }))
+
+            expect(await accounts.getAccount({ personId: "p-9" })).toBeRefused(AccountErrorCode.PersonUnknown)
+        })
+    })
+
+    describe("overview", () => {
+        it("fails with the order service error instead of answering hasOrders false", async () => {
+            const em = mockEntityManager({ findOneBy: [PersonEntity, person("p-1", "an@shop.test", "s3cret-pw")] })
+            const { accounts, orderApi } = await build(em)
+            orderApi.getBuyerStatus.mockRejectedValue(new Error("order service unavailable"))
+
+            await expect(accounts.overview({ personId: "p-1", sessionToken: "t-1" })).rejects.toThrow(
+                "order service unavailable",
+            )
+        })
+
+        it("joins the account with the buyer status the order service reports", async () => {
+            const em = mockEntityManager({ findOneBy: [PersonEntity, person("p-1", "an@shop.test", "s3cret-pw")] })
+            const { accounts, orderApi } = await build(em)
+            orderApi.getBuyerStatus.mockResolvedValue({ personId: "p-1", hasOrders: true })
+
+            expect(await accounts.overview({ personId: "p-1", sessionToken: "t-1" })).toSucceedWith({
+                personId: "p-1",
+                email: "an@shop.test",
+                hasOrders: true,
+            })
+            expect(orderApi.getBuyerStatus).toHaveBeenCalledWith("t-1")
+        })
+
+        it("refuses an unknown person without asking the order service", async () => {
+            const { accounts, orderApi } = await build(mockEntityManager({ findOneBy: [PersonEntity, null] }))
+
+            expect(await accounts.overview({ personId: "p-9", sessionToken: "t-1" })).toBeRefused(
+                AccountErrorCode.PersonUnknown,
+            )
+            expect(orderApi.getBuyerStatus).not.toHaveBeenCalled()
         })
     })
 })

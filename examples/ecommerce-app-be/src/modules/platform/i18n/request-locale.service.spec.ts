@@ -1,15 +1,33 @@
+import { Test } from "@nestjs/testing"
 import { RequestLocaleService } from "./request-locale.service"
 
 describe("RequestLocaleService", () => {
-    const locale = new RequestLocaleService()
+    const build = async (): Promise<RequestLocaleService> => {
+        const moduleRef = await Test.createTestingModule({ providers: [RequestLocaleService] }).compile()
+        return moduleRef.get(RequestLocaleService)
+    }
 
-    it("picks the first supported language of the header", () => {
-        expect(locale.of("fr-FR, en-US;q=0.8, vi;q=0.5")).toBe("en")
-        expect(locale.of("vi-VN")).toBe("vi")
+    it("picks Vietnamese when the header lists Vietnamese", async () => {
+        expect((await build()).of("vi-VN,vi;q=0.9")).toBe("vi")
     })
 
-    it("falls back to Vietnamese when nothing supported is named", () => {
-        expect(locale.of("fr, de")).toBe("vi")
-        expect(locale.of(undefined)).toBe("vi")
+    it("picks English when the header lists English, whatever the letter case", async () => {
+        expect((await build()).of("EN-us")).toBe("en")
+    })
+
+    it("picks the first supported language and skips unsupported ones", async () => {
+        expect((await build()).of("fr-FR, de;q=0.8, en;q=0.5, vi;q=0.4")).toBe("en")
+    })
+
+    it("joins a repeated header before choosing", async () => {
+        expect((await build()).of(["fr", "en"])).toBe("en")
+    })
+
+    it("falls back to Vietnamese when no listed language is supported", async () => {
+        expect((await build()).of("fr-FR,de")).toBe("vi")
+    })
+
+    it("falls back to Vietnamese when the header is absent", async () => {
+        expect((await build()).of(undefined)).toBe("vi")
     })
 })

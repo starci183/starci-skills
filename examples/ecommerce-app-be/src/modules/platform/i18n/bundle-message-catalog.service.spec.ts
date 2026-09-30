@@ -1,24 +1,44 @@
+import { builder } from "@starci/jest-preset"
+import { Test } from "@nestjs/testing"
 import { BundleMessageCatalogService } from "./bundle-message-catalog.service"
+import { MODULE_OPTIONS_TOKEN } from "./i18n.module-definition"
+import type { I18nOptions } from "./i18n.options"
 
-const catalog = new BundleMessageCatalogService({
+const options = builder<I18nOptions>({
     bundles: [
-        { vi: { "a.b": "xin chao {{name}}" }, en: { "a.b": "hello {{name}}" } },
-        { vi: { "c.d": "tam biet" }, en: { "c.d": "bye" } },
+        { vi: { "greet.hello": "Xin chao {{name}}" }, en: { "greet.hello": "Hello {{name}}" } },
+        { vi: { "cart.count": "{{count}} san pham" }, en: { "cart.count": "{{count}} items" } },
     ],
 })
 
 describe("BundleMessageCatalogService", () => {
-    it("fills placeholders in the requested locale", () => {
-        expect(catalog.get("a.b", { name: "An" }, "en")).toBe("hello An")
-        expect(catalog.get("a.b", { name: "An" }, "vi")).toBe("xin chao An")
+    const build = async (overrides?: Partial<I18nOptions>): Promise<BundleMessageCatalogService> => {
+        const moduleRef = await Test.createTestingModule({
+            providers: [BundleMessageCatalogService, { provide: MODULE_OPTIONS_TOKEN, useValue: options(overrides) }],
+        }).compile()
+        return moduleRef.get(BundleMessageCatalogService)
+    }
+
+    it("returns the text of a key in each language with placeholders filled", async () => {
+        const catalog = await build()
+
+        expect(catalog.get("greet.hello", { name: "An" }, "vi")).toBe("Xin chao An")
+        expect(catalog.get("greet.hello", { name: "An" }, "en")).toBe("Hello An")
     })
 
-    it("merges the bundles of several owners", () => {
-        expect(catalog.get("c.d", {}, "en")).toBe("bye")
+    it("reads keys owned by any of the merged bundles", async () => {
+        expect((await build()).get("cart.count", { count: 3 }, "en")).toBe("3 items")
     })
 
-    it("answers the key of an unknown message and keeps a placeholder without a value", () => {
-        expect(catalog.get("missing", {}, "en")).toBe("missing")
-        expect(catalog.get("a.b", {}, "en")).toBe("hello {{name}}")
+    it("keeps a placeholder as written when no value is given for it", async () => {
+        expect((await build()).get("greet.hello", {}, "en")).toBe("Hello {{name}}")
+    })
+
+    it("returns the key itself when no bundle owns it", async () => {
+        expect((await build()).get("missing.key", {}, "vi")).toBe("missing.key")
+    })
+
+    it("returns the key when the app composed no bundle", async () => {
+        expect((await build({ bundles: [] })).get("greet.hello", {}, "en")).toBe("greet.hello")
     })
 })

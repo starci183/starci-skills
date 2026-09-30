@@ -1,32 +1,39 @@
-import { IsString, MaxLength } from "class-validator"
-import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
+import { Test } from "@nestjs/testing"
+import { IsString, MinLength } from "class-validator"
+import { HttpSecurityErrorCode } from "./errors/http-security.error"
 import { RequestValidationService } from "./request-validation.service"
 
-class SampleInput {
+class SignUpBody {
     @IsString()
-    @MaxLength(3)
+    @MinLength(3)
     name!: string
 }
 
-const metadata = { type: "body" as const, metatype: SampleInput }
-
 describe("RequestValidationService", () => {
-    const pipe = new RequestValidationService()
+    const build = async (): Promise<RequestValidationService> => {
+        const moduleRef = await Test.createTestingModule({ providers: [RequestValidationService] }).compile()
+        return moduleRef.get(RequestValidationService)
+    }
+    const metadata = { type: "body" as const, metatype: SignUpBody }
 
-    it("passes a valid body", async () => {
-        await expect(pipe.transform({ name: "abc" }, metadata)).resolves.toEqual({ name: "abc" })
+    it("returns the body as an instance of its declared class", async () => {
+        const body = await (await build()).transform({ name: "An Nguyen" }, metadata)
+
+        expect(body).toBeInstanceOf(SignUpBody)
+        expect(body).toEqual({ name: "An Nguyen" })
     })
 
-    it("refuses an invalid field with the capability error naming it", async () => {
-        const call = pipe.transform({ name: "abcdef" }, metadata)
-        await expect(call).rejects.toBeInstanceOf(HttpSecurityError)
-        await expect(call).rejects.toMatchObject({
+    it("refuses an unknown property, naming it", async () => {
+        await expect((await build()).transform({ name: "An Nguyen", admin: true }, metadata)).rejects.toMatchObject({
             code: HttpSecurityErrorCode.RequestInvalid,
-            params: { fields: "name" },
+            params: { fields: "admin" },
         })
     })
 
-    it("refuses a property the input does not declare", async () => {
-        await expect(pipe.transform({ name: "abc", extra: 1 }, metadata)).rejects.toBeInstanceOf(HttpSecurityError)
+    it("refuses an invalid value, naming the offending fields", async () => {
+        await expect((await build()).transform({ name: "A" }, metadata)).rejects.toMatchObject({
+            code: HttpSecurityErrorCode.RequestInvalid,
+            params: { fields: "name" },
+        })
     })
 })

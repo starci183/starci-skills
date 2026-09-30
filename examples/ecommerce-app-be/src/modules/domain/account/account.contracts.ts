@@ -1,5 +1,3 @@
-import type { EntityManager } from "typeorm"
-
 /** The person a successful credential check or registration names. */
 export interface AccountPersonView {
     /** The person id. */
@@ -22,14 +20,30 @@ export interface VerifyCredentialsParams {
     readonly password: string
 }
 
-/** What registering needs; the write joins the caller transaction. */
-export interface RegisterPersonParams extends VerifyCredentialsParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
-}
+/** What registering needs. */
+export type RegisterPersonParams = VerifyCredentialsParams
+
+/** What signing in needs. */
+export type SignInParams = VerifyCredentialsParams
 
 /** What reading one account needs. */
 export interface GetAccountParams {
     /** The person id. */
     readonly personId: string
+}
+
+/** What reading the account overview needs. */
+export interface AccountOverviewParams extends GetAccountParams {
+    /** The bearer token of the caller, forwarded to the order service for the buyer status. */
+    readonly sessionToken: string
+}
+
+/** The account joined with the live buyer status read from the order service. */
+export interface AccountOverview {
+    /** The person id. */
+    readonly personId: string
+    /** The sign-in email. */
+    readonly email: string
+    /** True when the order service reports confirmed orders. */
+    readonly hasOrders: boolean
 }

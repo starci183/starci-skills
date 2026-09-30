@@ -1,42 +1,87 @@
-import { LIST_ROWS_MAX } from "@modules/platform/database"
-import { mockEntityManager } from "@tests/fixtures/database"
+import { mockEntityManager } from "@starci/jest-preset"
+import { LIST_ROWS_MAX, ORDER_ENTITY_MANAGER } from "@modules/platform/database"
+import { Test } from "@nestjs/testing"
+import { In, MoreThanOrEqual } from "typeorm"
 import { CatalogService } from "./catalog.service"
 import { ProductEntity } from "./persistence/entities/product.entity"
 
-const product = (id: string, stock: number): ProductEntity =>
-    Object.assign(new ProductEntity(), { id, name: `Product ${id}`, priceMinorUnits: 100, stock })
+const product = (id: string, priceMinorUnits: number, stock: number): ProductEntity =>
+    Object.assign(new ProductEntity(), { id, name: `Product ${id}`, priceMinorUnits, stock })
+
+const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [CatalogService, { provide: ORDER_ENTITY_MANAGER, useValue: entityManager }],
+    }).compile()
+    return moduleRef.get(CatalogService)
+}
 
 describe("CatalogService", () => {
-    it("lists products by id under the list bound", async () => {
-        const entityManager = mockEntityManager({ find: jest.fn().mockResolvedValue([product("a", 3)]) })
-        await expect(new CatalogService(entityManager).list()).resolves.toEqual([
-            { id: "a", name: "Product a", priceMinorUnits: 100, stock: 3 },
-        ])
-        expect(entityManager.find).toHaveBeenCalledWith(ProductEntity, { order: { id: "ASC" }, take: LIST_ROWS_MAX })
-    })
+    describe("list", () => {
+        it("returns every product by SKU, capped at the list maximum", async () => {
+            const em = mockEntityManager({ find: [ProductEntity, [product("sku-1", 500, 3), product("sku-2", 900, 0)]] })
 
-    it("keys the requested products by id and reads nothing for an empty request", async () => {
-        const entityManager = mockEntityManager({
-            find: jest.fn().mockResolvedValue([product("a", 3), product("b", 1)]),
+            expect(await (await build(em)).list()).toEqual([
+                { id: "sku-1", name: "Product sku-1", priceMinorUnits: 500, stock: 3 },
+                { id: "sku-2", name: "Product sku-2", priceMinorUnits: 900, stock: 0 },
+            ])
+            expect(em.find).toHaveBeenCalledWith(ProductEntity, { order: { id: "ASC" }, take: LIST_ROWS_MAX })
         })
-        const service = new CatalogService(entityManager)
-        await expect(service.byIds({ ids: ["a", "b"] })).resolves.toMatchObject({ a: { id: "a" }, b: { id: "b" } })
-        await expect(service.byIds({ ids: [] })).resolves.toEqual({})
-        expect(entityManager.find).toHaveBeenCalledTimes(1)
     })
 
-    it("reserves stock through the caller manager with a guarded decrement", async () => {
-        const manager = mockEntityManager({ decrement: jest.fn().mockResolvedValue({ affected: 1 }) })
-        await expect(
-            new CatalogService(mockEntityManager()).reserveStock({ manager, productId: "a", quantity: 2 }),
-        ).resolves.toBe(true)
-        expect(manager.decrement).toHaveBeenCalledWith(ProductEntity, expect.objectContaining({ id: "a" }), "stock", 2)
+    describe("byIds", () => {
+        it("returns the products keyed by id and leaves an unknown id absent", async () => {
+            const em = mockEntityManager({ find: [ProductEntity, [product("sku-1", 500, 3)]] })
+
+            const lookup = await (await build(em)).byIds({ ids: ["sku-1", "sku-9"] })
+
+            expect(lookup).toEqual({ "sku-1": { id: "sku-1", name: "Product sku-1", priceMinorUnits: 500, stock: 3 } })
+            expect(lookup["sku-9"]).toBeUndefined()
+            expect(em.find).toHaveBeenCalledWith(ProductEntity, {
+                where: { id: In(["sku-1", "sku-9"]) },
+                take: LIST_ROWS_MAX,
+            })
+        })
+
+        it("returns an empty lookup for no id without reading the database", async () => {
+            const em = mockEntityManager()
+
+            expect(await (await build(em)).byIds({ ids: [] })).toEqual({})
+        })
     })
 
-    it("reports a failed reservation when no row matched", async () => {
-        const manager = mockEntityManager({ decrement: jest.fn().mockResolvedValue({ affected: 0 }) })
-        await expect(
-            new CatalogService(mockEntityManager()).reserveStock({ manager, productId: "a", quantity: 9 }),
-        ).resolves.toBe(false)
+    describe("reserveStock", () => {
+        it("takes the units with a guarded decrement and returns true when a row changed", async () => {
+            const manager = mockEntityManager({ decrement: [ProductEntity, { affected: 1 }] })
+
+            const reserved = await (await build(mockEntityManager())).reserveStock({
+                manager,
+                productId: "sku-1",
+                quantity: 2,
+            })
+
+            expect(reserved).toBe(true)
+            expect(manager.decrement).toHaveBeenCalledWith(
+                ProductEntity,
+                { id: "sku-1", stock: MoreThanOrEqual(2) },
+                "stock",
+                2,
+            )
+        })
+
+        it("returns false when the stock no longer covers the quantity", async () => {
+            const manager = mockEntityManager({ decrement: [ProductEntity, { affected: 0 }] })
+
+            expect(
+                await (await build(mockEntityManager())).reserveStock({ manager, productId: "sku-1", quantity: 9 }),
+            ).toBe(false)
+        })
+
+        it("returns false when the driver reports no affected count", async () => {
+            const manager = mockEntityManager({ decrement: [ProductEntity, {}] })
+
+            expect(
+                await (await build(mockEntityManager())).reserveStock({ manager, productId: "sku-1", quantity: 1 }),
+            ).toBe(false)
+        })
     })
 })

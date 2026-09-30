@@ -1,4 +1,6 @@
 import type { EntityManager } from "typeorm"
+import type { CartLine } from "@modules/domain/cart"
+import type { ProductView } from "@modules/domain/catalog"
 
 /** One priced line of a checkout plan: the catalog unit price captured at evaluation time. */
 export interface CheckoutLine {
@@ -69,8 +71,46 @@ export interface PlaceOrderParams {
     readonly idempotencyKey?: string
 }
 
+/** What confirming the cart of a person needs. */
+export interface PlaceOrderRequest {
+    /** The buyer. */
+    readonly personId: string
+    /** The replay key, when the client sent one: repeating a confirmation with it returns the first order. */
+    readonly idempotencyKey?: string
+}
+
 /** What reading a buyer status needs. */
 export interface BuyerStatusParams {
     /** The person. */
+    readonly personId: string
+}
+
+/** What reading the cart view of a person needs. */
+export interface ViewCartParams {
+    /** The cart owner. */
+    readonly personId: string
+}
+
+/** The cart of a person and the catalog it prices against. */
+export interface CartView {
+    /** The lines of the cart. */
+    readonly items: ReadonlyArray<CartLine>
+    /** The catalog products. */
+    readonly catalog: ReadonlyArray<ProductView>
+}
+
+/** What adding to the cart of a person needs. */
+export interface AddToCartParams {
+    /** The cart owner. */
+    readonly personId: string
+    /** The SKU. */
+    readonly productId: string
+    /** How many units to add. */
+    readonly quantity: number
+}
+
+/** What emptying the cart of a person needs. */
+export interface EmptyCartParams {
+    /** The cart owner. */
     readonly personId: string
 }

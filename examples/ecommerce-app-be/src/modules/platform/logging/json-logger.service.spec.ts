@@ -1,51 +1,73 @@
-import { Writable } from "node:stream"
-import { FakeClock } from "@starci/jest-preset/clock"
+import type { Writable } from "node:stream"
+import { FakeClock, mock } from "@starci/jest-preset"
+import { CLOCK } from "@modules/platform/clock"
+import { Test } from "@nestjs/testing"
 import { JsonLoggerService } from "./json-logger.service"
-
-interface Sink {
-    stream: Writable
-    lines: () => Array<string>
-}
-
-const sink = (): Sink => {
-    const chunks: Array<string> = []
-    const stream = new Writable({
-        write(chunk: Buffer, _encoding, done) {
-            chunks.push(chunk.toString())
-            done()
-        },
-    })
-    return { stream, lines: () => chunks.join("").split(/\r?\n/).filter(Boolean) }
-}
-
-const TIME = "2026-01-01T00:00:00.000Z"
+import { LOG_ERR, LOG_OUT } from "./logging.decorators"
 
 describe("JsonLoggerService", () => {
-    it("stamps info lines with the clock and writes them to the out stream", () => {
-        const out = sink()
-        const err = sink()
-        new JsonLoggerService(new FakeClock(TIME), out.stream, err.stream).info("thing.happened", { id: 1 })
-        expect(out.lines()).toEqual([JSON.stringify({ level: "info", event: "thing.happened", time: TIME, id: 1 })])
-        expect(err.lines()).toEqual([])
+    const build = async () => {
+        const clock = new FakeClock("2026-05-06T07:08:09.000Z")
+        const out = mock<Writable>()
+        const err = mock<Writable>()
+        const moduleRef = await Test.createTestingModule({
+            providers: [
+                JsonLoggerService,
+                { provide: CLOCK, useValue: clock },
+                { provide: LOG_OUT, useValue: out },
+                { provide: LOG_ERR, useValue: err },
+            ],
+        }).compile()
+        return { logger: moduleRef.get(JsonLoggerService), clock, out, err }
+    }
+
+    it("writes an info line to the out stream stamped by the clock", async () => {
+        const { logger, out, err } = await build()
+
+        logger.info("cart.opened", { personId: "p-1" })
+
+        expect(out.write).toHaveBeenCalledWith(
+            `${JSON.stringify({ level: "info", event: "cart.opened", time: "2026-05-06T07:08:09.000Z", personId: "p-1" })}\n`,
+        )
+        expect(err.write).not.toHaveBeenCalled()
     })
 
-    it("writes warn and error lines to the err stream and serializes the cause by name and message", () => {
-        const out = sink()
-        const err = sink()
-        const logger = new JsonLoggerService(new FakeClock(TIME), out.stream, err.stream)
-        logger.warn("thing.slow")
-        logger.error("thing.failed", new TypeError("boom"), { id: 2 })
-        expect(err.lines()).toEqual([
-            JSON.stringify({ level: "warn", event: "thing.slow", time: TIME }),
-            JSON.stringify({
+    it("writes a warn line without fields to the err stream", async () => {
+        const { logger, clock, out, err } = await build()
+        clock.advance(1000)
+
+        logger.warn("cache.slow")
+
+        expect(err.write).toHaveBeenCalledWith(
+            `${JSON.stringify({ level: "warn", event: "cache.slow", time: "2026-05-06T07:08:10.000Z" })}\n`,
+        )
+        expect(out.write).not.toHaveBeenCalled()
+    })
+
+    it("writes an error line with the name and message of an Error cause", async () => {
+        const { logger, err } = await build()
+
+        logger.error("db.failed", new TypeError("boom"), { operation: "PlaceOrderHandler" })
+
+        expect(err.write).toHaveBeenCalledWith(
+            `${JSON.stringify({
                 level: "error",
-                event: "thing.failed",
-                time: TIME,
+                event: "db.failed",
+                time: "2026-05-06T07:08:09.000Z",
                 errorName: "TypeError",
                 errorMessage: "boom",
-                id: 2,
-            }),
-        ])
-        expect(out.lines()).toEqual([])
+                operation: "PlaceOrderHandler",
+            })}\n`,
+        )
+    })
+
+    it("writes an error line with the text of a cause that is not an Error", async () => {
+        const { logger, err } = await build()
+
+        logger.error("db.failed", "plain failure")
+
+        expect(err.write).toHaveBeenCalledWith(
+            `${JSON.stringify({ level: "error", event: "db.failed", time: "2026-05-06T07:08:09.000Z", errorMessage: "plain failure" })}\n`,
+        )
     })
 })

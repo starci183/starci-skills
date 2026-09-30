@@ -1,5 +1,5 @@
 export { accountEntities, accountMigrations } from "./persistence/connection"
-export type { AccountPersonView } from "./account.contracts"
+export type { AccountOverview, AccountPersonView } from "./account.contracts"
 export { AccountModule } from "./account.module"
 export { AccountService } from "./account.service"
 export { ACCOUNT_ERROR_KINDS, AccountError, AccountErrorCode } from "./errors/account.error"

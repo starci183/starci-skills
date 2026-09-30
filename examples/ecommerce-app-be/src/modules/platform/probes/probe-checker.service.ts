@@ -1,6 +1,9 @@
 import { Injectable } from "@nestjs/common"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { ok, refused } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
+import { ProbesErrorCode } from "./errors/probes.error"
 import type { ProbeReport, ProbeState } from "./probes.contracts"
 import { InjectProbesOptions, InjectProbes } from "./probes.decorators"
 import { ProbesLogEvent } from "./probes.log-events"
@@ -16,8 +19,13 @@ export class ProbeCheckerService {
         @InjectLogger() private readonly logger: Logger,
     ) {}
 
-    /** Probes every dependency and reports the state of each. */
-    async run(): Promise<ProbeReport> {
+    /** The report when every dependency answers, or the refusal carrying the state of each so an operator sees which one is down. */
+    async check(): Promise<Outcome<ProbeReport, ProbesErrorCode.DependencyUnavailable>> {
+        const report = await this.report()
+        return report.healthy ? ok(report) : refused(ProbesErrorCode.DependencyUnavailable, report.checks)
+    }
+
+    private async report(): Promise<ProbeReport> {
         const states = await Promise.all(
             this.probes.map(async (probe) => [probe.name, await this.state(probe)] as const),
         )

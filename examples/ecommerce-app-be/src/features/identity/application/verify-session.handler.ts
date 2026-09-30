@@ -1,9 +1,8 @@
 import { QueryHandler } from "@nestjs/cqrs"
-import { SessionErrorCode, SessionService } from "@modules/domain/session"
+import { SessionService } from "@modules/domain/session"
 import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { ok, refused } from "@modules/platform/primitives"
 import type { VerifySessionResult } from "./verify-session.contracts"
 import { VerifySessionQuery } from "./verify-session.query"
 
@@ -17,8 +16,7 @@ export class VerifySessionHandler extends ICQRSHandler<VerifySessionQuery, Verif
         super(logger)
     }
 
-    protected override async process(query: VerifySessionQuery): Promise<VerifySessionResult> {
-        const session = await this.sessions.verify(query.params.request.sessionToken)
-        return session === null ? refused(SessionErrorCode.Invalid) : ok(session)
+    protected override process(query: VerifySessionQuery): Promise<VerifySessionResult> {
+        return this.sessions.authenticate(query.params.request.sessionToken)
     }
 }
