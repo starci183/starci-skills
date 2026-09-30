@@ -86,3 +86,11 @@ export function gitAdd(dir) {
 export function cleanup(dirs) {
   for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });
 }
+
+/** Installs the coverage presets `hfs sync` and `hfs check` load from the checked repository (a fresh process has no injected presets), without tracking them. */
+export function installPresets(dir) {
+  for (const name of ['jest-preset', 'vitest-preset']) {
+    fs.cpSync(path.resolve(import.meta.dirname, '..', 'packages', name), path.join(dir, 'node_modules', '@starci', name), { recursive: true });
+  }
+  return dir;
+}

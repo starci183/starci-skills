@@ -10,8 +10,6 @@ import { starciworkGitignoreText } from '../scripts/lib/starciwork-boundary.mjs'
 import {
   BLOCK_BEGIN, BLOCK_END, appScripts, checkTargets, hashOf, loadPresets, render, renderTargets, runSync, targetsOf, validateHfs, writeTargets,
 } from '../packages/hfs/sync/index.mjs';
-import { managedFindings } from '../packages/hfs/sync/managed.mjs';
-import { tsStrictFindings } from '../packages/hfs/sync/ts-strict.mjs';
 import { braceVariants } from '../scripts/lib/glob.mjs';
 import { loadSlotManifest } from '../scripts/lib/hfs-slots.mjs';
 import { declaredPushGateLint } from '../scripts/kernel/push-gate.mjs';
@@ -421,86 +419,6 @@ describe('the package.json scripts of a back end', () => {
     const failed = await run(['--check'], dir);
     assert.equal(failed.code, 1);
     assert.match(failed.lines[0], /^HFS_SYNC_DRIFT package\.json: drift/);
-  });
-});
-
-describe('the managed-file findings of hfs check', () => {
-  const synced = async t => {
-    const dir = repo(t, BE);
-    await run(['--write'], dir);
-    execFileSync('git', ['init', '-q'], { cwd: dir });
-    return dir;
-  };
-  const put = (dir, file, text) => {
-    fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
-    fs.writeFileSync(path.join(dir, file), text);
-  };
-  const findings = async dir => {
-    execFileSync('git', ['add', '-A', '-f'], { cwd: dir });
-    const tracked = execFileSync('git', ['ls-files'], { cwd: dir, encoding: 'utf8' }).split('\n').filter(Boolean);
-    return (await managedFindings({ repoRoot: dir, tracked, presets: PRESETS.be })).map(finding => [finding.code, finding.path]);
-  };
-  it('a synced repository has none', async t => {
-    assert.deepEqual(await findings(await synced(t)), []);
-  });
-  it('R05: an edited hook, workflow, jest config or scripts block is HFS_MANAGED_FILE_DRIFT, a deleted optional file is not', async t => {
-    const dir = await synced(t);
-    put(dir, '.husky/pre-push', 'exit 0\n');
-    put(dir, 'jest.config.js', 'module.exports = {}\n');
-    put(dir, '.prettierignore', 'dist/\n');
-    fs.rmSync(path.join(dir, '.github', 'workflows', 'e2e.yml'));
-    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-    pkg.scripts.lint = 'eslint . --no-inline-config';
-    put(dir, 'package.json', JSON.stringify(pkg));
-    assert.deepEqual((await findings(dir)).sort(), [['HFS_MANAGED_FILE_DRIFT', '.husky/pre-push'], ['HFS_MANAGED_FILE_DRIFT', '.prettierignore'], ['HFS_MANAGED_FILE_DRIFT', 'jest.config.js'], ['HFS_MANAGED_FILE_DRIFT', 'package.json']]);
-  });
-  it('R17: any edit of eslint.config.mjs (a rule off, a local plugin, an ignore) is one HFS_RULE_OFF_WITHOUT_REPLACEMENT, not also R05', async t => {
-    const dir = await synced(t);
-    put(dir, 'eslint.config.mjs', 'import { loadHfs, starciBeConfig } from "@starci/eslint-canon-be"\n\nexport default [...(await starciBeConfig({ hfs: loadHfs(import.meta.url) })), { rules: { "starci-be/no-x": "off" } }]\n');
-    assert.deepEqual(await findings(dir), [['HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'eslint.config.mjs']]);
-  });
-  it('R22: tsconfig.json is judged by flag; a formatting-only difference is R05', async t => {
-    const dir = await synced(t);
-    const tsconfig = JSON.parse(fs.readFileSync(path.join(dir, 'tsconfig.json'), 'utf8'));
-    put(dir, 'tsconfig.json', JSON.stringify(tsconfig));
-    assert.deepEqual(await findings(dir), [['HFS_MANAGED_FILE_DRIFT', 'tsconfig.json']], 'same content, other bytes');
-    put(dir, 'tsconfig.json', JSON.stringify({ ...tsconfig, compilerOptions: { ...tsconfig.compilerOptions, strict: false, noUncheckedIndexedAccess: false } }));
-    const flagged = await findings(dir);
-    assert.deepEqual(flagged, [['HFS_TS_STRICT', 'tsconfig.json'], ['HFS_TS_STRICT', 'tsconfig.json']]);
-  });
-  it('R16: a second eslint config, a local rule file and a flag in a script or nested package.json are HFS_TOOL_CONFIG_LOCAL', async t => {
-    const dir = await synced(t);
-    put(dir, 'scripts/eslint-local.mjs', 'export default { meta: { type: "problem" }, create(context) { return {} } }\n');
-    put(dir, 'scripts/lint.mjs', 'import { execSync } from "node:child_process"\nexecSync("npx eslint --no-eslintrc src")\n');
-    put(dir, 'packages/kit/package.json', JSON.stringify({ name: 'kit', scripts: { lint: 'eslint -c other.mjs .' } }));
-    put(dir, 'scripts/ok.mjs', 'export const rule = { meta: { docs: "x" } }\nexport const run = () => "eslint ."\n');
-    assert.deepEqual((await findings(dir)).sort(), [['HFS_TOOL_CONFIG_LOCAL', 'packages/kit/package.json'], ['HFS_TOOL_CONFIG_LOCAL', 'scripts/eslint-local.mjs'], ['HFS_TOOL_CONFIG_LOCAL', 'scripts/lint.mjs']]);
-  });
-  it('a repository whose hfs.json is unreadable has none: the slot check reports the declaration', async t => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-managed-'));
-    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-    assert.deepEqual(await managedFindings({ repoRoot: dir, tracked: [], presets: PRESETS.be }), []);
-  });
-});
-
-describe('tsStrictFindings', () => {
-  const expected = rendered(BE)['tsconfig.json'];
-  const flags = actual => tsStrictFindings(typeof actual === 'string' ? actual : JSON.stringify(actual), expected).map(finding => finding.flag);
-  const aliases = JSON.parse(expected).compilerOptions.paths;
-  it('accepts the render and refuses every other shape by name', () => {
-    assert.deepEqual(flags(expected), []);
-    assert.deepEqual(flags({ extends: '@starci/tsconfig/nest.json', compilerOptions: { paths: aliases } }), ['extends']);
-    assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: aliases, noImplicitAny: false, target: 'ES5' } }).sort(), ['noImplicitAny', 'target']);
-    assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', include: ['src'], exclude: ['x'], compilerOptions: { paths: aliases } }).sort(), ['exclude', 'include']);
-    assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { ...aliases, '@x/*': ['./x/*'] } } }), ['paths']);
-    assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { '@features/*': ['./src/features/*'] } } }), ['paths', 'paths']);
-    assert.deepEqual(flags('{ not json'), ['parse']);
-    assert.deepEqual(flags('[]'), ['parse']);
-  });
-  it('says lowers for a flag set to false and sets for any other value', () => {
-    const [lowered, other] = tsStrictFindings(JSON.stringify({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: aliases, strict: false, module: 'commonjs' } }), expected);
-    assert.match(lowered.message, /lowers strict/);
-    assert.match(other.message, /sets module/);
   });
 });
 

@@ -9,7 +9,7 @@ import { ARCHITECTURE_RULE_IDS } from '../scripts/checks/architecture/index.mjs'
 import { HfsSlotsError } from '../scripts/lib/hfs-slots.mjs';
 import { main } from '../packages/hfs/bin/hfs.mjs';
 import { BUNDLES, driftOfRuntime, importClosure } from '../packages/hfs/scripts/sync-runtime.mjs';
-import { BE, FE, PRESETS, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { BE, FE, PRESETS, cleanup, gitAdd, installPresets, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const pins = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins;
@@ -310,7 +310,7 @@ test('sync is delegated to the packaged sync command: a repository without the g
 });
 
 test('the packaged entry point runs from a fresh process with no runtime checkout around it', () => {
-  const dir = repoOf(BE);
+  const dir = installPresets(installTypeScript(repoOf(BE)));
   const run = spawnSync(process.execPath, [path.join(root, 'packages/hfs/bin/hfs.mjs'), 'check', '--repo', dir, '--json'], { encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   assert.equal(JSON.parse(run.stdout).ok, true);
