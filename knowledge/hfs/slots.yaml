@@ -133,8 +133,6 @@ ruleParams:
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
     fileLines: {soft: 500, hardGrowth: true}
-    # FE_TRANSPORT_OWNER: the one module per app that may call fetch.
-    clientModule: "apps/<app>/src/modules/api/client.ts"
     duplicateBlock: {lines: 8, tokens: 60}
 
 slots:
@@ -746,7 +744,7 @@ slots:
     tracked: tracked
     tier: none
     minInstances: 1
-    requires: [package.json, next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/, src/modules/api/,
+    requires: [package.json, next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/,
                "src/app/global-error.tsx", "src/app/[locale]/layout.tsx", "src/app/[locale]/error.tsx", "src/app/[locale]/not-found.tsx", "src/app/[locale]/loading.tsx"]
     tests: none
     rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS]
@@ -819,7 +817,7 @@ slots:
     tracked: tracked
     tier: modules
     owner: true
-    requiredInstances: {capability: [api, config, i18n, routes]}
+    requiredInstances: {capability: [config, i18n, routes]}
     requires: [index.ts]
     tests: unit-beside
     budget: {file: 400}
@@ -827,13 +825,34 @@ slots:
   - id: fe.modules.api
     profiles: [fe]
     path: "apps/<app>/src/modules/api/"
-    presence: required
+    presence: optional
     tracked: tracked
     tier: transport
-    requires: [index.ts, client.ts, outcome.ts]      # client.ts is the only fetch; outcome.ts the only result vocabulary
-    allows: [client.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/*.graphql", "<domain>/<domain>.mapper.ts", contract/, __generated__/, "*.spec.ts"]
+    # The app's reads of the one client. A repository has exactly ONE transport client and ONE Outcome union: the app's
+    # client.ts/outcome.ts (fe.transport.client/outcome) in a one-app repository, or the api package's
+    # (fe.package.api.client/outcome) when the repository shares it (FE_TRANSPORT_OWNER, machine).
+    requires: [index.ts]
+    allows: [index.ts, client.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/*.graphql", "<domain>/<domain>.mapper.ts", contract/, __generated__/, "*.spec.ts"]
     tests: unit-beside
     rules: [FE_TRANSPORT_OWNER, FE_HTTP_STATUS_COLLAPSE, FE_WIRE_GENERATED]
+  - id: fe.transport.client
+    profiles: [fe]
+    path: "apps/<app>/src/modules/api/client.ts"
+    presence: optional
+    tracked: tracked
+    tier: transport
+    tests: unit-beside
+    why: the one fetch of a one-app repository (timeout, abort, 401/403 -> refused); a shared client is fe.package.api.client
+    rules: [FE_TRANSPORT_OWNER]
+  - id: fe.transport.outcome
+    profiles: [fe]
+    path: "apps/<app>/src/modules/api/outcome.ts"
+    presence: optional
+    tracked: tracked
+    tier: transport
+    tests: unit-beside
+    why: the one Outcome union of a one-app repository; a shared union is fe.package.api.outcome
+    rules: [FE_HTTP_STATUS_COLLAPSE]
   - id: fe.modules.config
     profiles: [fe]
     path: "apps/<app>/src/modules/config/"
@@ -848,7 +867,10 @@ slots:
     presence: required
     tracked: tracked
     tier: foundation
-    requires: [config.ts, routing.ts, navigation.ts, request.ts, messages/]
+    # The app's i18n module: its catalogs and the one call of the repository's i18n factory. The next-intl stack (routing,
+    # navigation, request config) is written once per repository: in the i18n package (fe.package.i18n, `createAppI18n`)
+    # when the repository has one, else in the only app's module.
+    requires: [index.ts]
     tests: unit-beside
     rules: [FE_I18N_PLACEMENT, FE_I18N_CATALOG]
   - id: fe.modules.brand
@@ -887,6 +909,46 @@ slots:
     tests: unit-beside
     why: built to dist with explicit named exports; only composites, branches and leaves; no unused export; no colour literal
     rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT, FE_STYLE_TOKEN_ONLY]
+  - id: fe.package.api
+    profiles: [fe]
+    path: "packages/<family>-api/"
+    presence: opt-in
+    tracked: tracked
+    tier: package
+    owner: true
+    requires: [package.json, src/index.ts, src/client.ts, src/outcome.ts, tsconfig.json]
+    tests: unit-beside
+    why: the one transport client and the one Outcome union shared by every app of the repository; no app keeps its own
+    rules: [FE_TRANSPORT_OWNER, FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
+  - id: fe.package.api.client
+    profiles: [fe]
+    path: "packages/<family>-api/src/client.ts"
+    presence: optional     # enabled with its package (fe.package.api is the opt-in)
+    tracked: tracked
+    tier: package
+    tests: unit-beside
+    why: the repository's one fetch (timeout, abort, 401/403 -> refused)
+    rules: [FE_TRANSPORT_OWNER]
+  - id: fe.package.api.outcome
+    profiles: [fe]
+    path: "packages/<family>-api/src/outcome.ts"
+    presence: optional     # enabled with its package (fe.package.api is the opt-in)
+    tracked: tracked
+    tier: package
+    tests: unit-beside
+    why: the repository's one Outcome union
+    rules: [FE_HTTP_STATUS_COLLAPSE]
+  - id: fe.package.i18n
+    profiles: [fe]
+    path: "packages/<family>-i18n/"
+    presence: opt-in
+    tracked: tracked
+    tier: package
+    owner: true
+    requires: [package.json, src/index.ts, tsconfig.json]
+    tests: unit-beside
+    why: the next-intl stack (routing, navigation, request config) written once, exported as the createAppI18n factory every app calls
+    rules: [FE_I18N_PLACEMENT, FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
   - id: fe.e2e
     profiles: [fe]
     path: "e2e/<area>/*.e2e-spec.ts"

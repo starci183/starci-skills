@@ -5,30 +5,29 @@ component ownership, accessibility, loading behavior, vendor boundaries, transla
 and colocated class-name composition consistent without prescribing a custom rendering protocol.
 
 ```bash
-npm i -D @starci/eslint-canon-fe eslint-plugin-react-hooks
+npm i -D @starci/eslint-canon-fe eslint-plugin-react-hooks typescript
 ```
+
+A repository's `eslint.config.mjs` is the managed one-liner `hfs sync` renders (and `hfs check` compares, R05/R17):
 
 ```js
-import { starciFeConfig } from "@starci/eslint-canon-fe"
-
-export default [...starciFeConfig({ layout: "single-app" })]
+import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"
+export default starciFeConfig({ hfs: loadHfs(import.meta.url) })
 ```
 
-The factory returns two flat-config blocks and owns everything about the law: which rules are on
-(every one, at `error` - nothing is off and nothing is a warning), the React Hooks rules
-(`eslint-plugin-react-hooks` 7, its recommended set lifted to `error`, including
-`set-state-in-effect` and `refs`), and the inline-directive fence (`noInlineConfig` plus
-`reportUnusedDisableDirectives`). A repository names its layout and nothing else.
+`loadHfs` reads the repository's `hfs.json` and the slot manifest shipped in `runtime/`. The factory returns three
+flat-config blocks and owns everything about the law: which files are linted (from the HFS profile), which rules are on
+(every one, at `error` - nothing is off and nothing is a warning), the React Hooks rules (`eslint-plugin-react-hooks` 7, its
+recommended set lifted to `error`), typed linting, and the inline-directive fence (`noInlineConfig` plus
+`reportUnusedDisableDirectives`). The repository states nothing.
 
-- The **source** block governs `src/**` (`single-app`) or `packages/*/src/**` (every workspace package, not one named `ui`) and `apps/*/src/**`
-  (`monorepo`). A package keeps its grammar tiers at `src/{composites,branches,leaves}`; the client-boundary rule reads that layout as well as an app's `src/components/`.
-- The **e2e** block governs `e2e/**` and `playwright.config.*` with the e2e rules and the
-  escape-hatch fence.
+- The **ignore** block: `node_modules`, `.next`, `dist`, `coverage`, `__generated__` and `.starci/`.
+- The **source** block governs `apps/*/src/**` and `packages/*/src/**` with types (`parserOptions.projectService`) and
+  `settings.starci.hfs`, the slot view path-scoped rules ask (`lib/hfs.mjs` `hfsOf`), never a path pattern.
+- The **e2e** block governs `e2e/**` and `playwright.config.ts` with the e2e rules and the escape-hatch fence.
 
-`recommended`, `sourceRecommended`, `e2eRecommended`, `why`, `audits` and the plugin itself are also
-exported. `sourceRecommended` is the map to compare against a production probe file with
-`audits["effective-config"]`; `why[rule]` is `{ code, vi, fixVi }`, the finding code and the
-Vietnamese why the harness quotes.
+`recommended`, `sourceRecommended`, `e2eRecommended`, `why`, `loadHfs`, `linterOptions` and the plugin itself are also
+exported; `why[rule]` is `{ code, vi, fixVi }`, the finding code and the Vietnamese why the harness quotes.
 
 ## Rules
 

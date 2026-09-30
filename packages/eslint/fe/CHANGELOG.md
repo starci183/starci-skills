@@ -1,12 +1,23 @@
 # Changelog
 
-## 6.0.0 - unreleased (lane C0)
+## 6.0.0 - unreleased (lanes C0, F0)
+
+- **Breaking: `starciFeConfig({ hfs: loadHfs(import.meta.url) })` replaces `starciFeConfig({ layout })`.** The factory reads the
+  repository's `hfs.json` and the shipped slot manifest (`runtime/`, refreshed by `packages/hfs/scripts/sync-runtime.mjs`), lints
+  every app's and every workspace package's `src/` with typed linting (`parserOptions.projectService`) and the e2e tree
+  syntax-only, ignores build output, `__generated__/` and `.starci/`, and puts the slot view in `settings.starci.hfs`
+  (`lib/hfs.mjs` `hfsOf(context)`); `lib/types.mjs` holds the type-aware helpers. `LAYOUTS`/`LAYOUT_GLOBS` are deleted.
+- **Breaking: the `lint-adoption` law and its `effective-config` audit are deleted**, with `audits`/`auditOwners`: the
+  managed `eslint.config.mjs` one-liner that `hfs check` compares with its render (R17) is the one proof that no rule is off.
+- `linterOptions` lives in `lib/config.mjs` only (the copy in `lint-escape-hatch.mjs` is gone).
+- New peer dependency `typescript >=5.9`; `@typescript-eslint/parser` is a dependency. Tests build typed cases with
+  `fixtures/typed/tester.mjs` (`typedTester`, `slotTester`, `at`).
 
 - **Breaking: `no-direct-heroicon-import` is deleted.** It was a second name for a second copy of
   `no-vendor-icon-outside-icon-leaf` (icon law); one obligation has one rule (redundancy RED20). The copy in
   `vendor-boundary.mjs` is gone; `no-vendor-icon-outside-icon-leaf` is unchanged.
 - `no-internal-starci-href` gained its RuleTester cases.
-- New law `size-growth` (R20 `HFS_SIZE_GROWTH`): `file-size-growth` refuses a new source file over the line budget and an existing file over it that is longer than at the parent commit. The budget is `ruleParams.fe.fileLines` of the slot manifest, read through `lib/params.mjs` from the package's own `runtime/` copy (`packages/hfs/scripts/sync-runtime.mjs` keeps it equal to the runtime's); the rule takes no option.
+- New law `size-growth` (R20 `HFS_SIZE_GROWTH`): `file-size-growth` refuses a new source file over the line budget and an existing file over it that is longer than at the parent commit. The budget is `ruleParams.fe.fileLines` of the slot manifest, read through the slot view (`hfsOf(context).ruleParams`, the package's own `runtime/` copy) (`packages/hfs/scripts/sync-runtime.mjs` keeps it equal to the runtime's); the rule takes no option.
 - Every rule is catalogued under an HFS rule id (R91 FE_SOURCE_FORM, R92 FE_COMPONENT_API, R93 FE_VENDOR_BOUNDARY added).
 
 ## 5.1.2 - 2026-09-30

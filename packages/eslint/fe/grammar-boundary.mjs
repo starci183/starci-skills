@@ -9,8 +9,5 @@
 /** No product-specific AST restrictions are needed for the neutral Grammar boundary. */
 export const rules = {}
 
-/** No repository audit is coupled to the neutral Grammar boundary. */
-export const audits = {}
-
 /** The neutral boundary contributes no mandatory rule levels. */
 export const recommended = {}

@@ -236,7 +236,7 @@ test('FE multi-app fixture', () => {
   assert.equal(owner('apps/web/src/features/pages/Home/index.tsx'), 'fe.feature');
   assert.equal(owner('apps/web/src/components/blocks/Header/component.tsx'), 'fe.components');
   assert.equal(owner('apps/web/src/hooks/orders/useOrders.ts'), 'fe.hooks');
-  assert.equal(owner('apps/web/src/modules/api/client.ts'), 'fe.modules.api');
+  assert.equal(owner('apps/web/src/modules/api/client.ts'), 'fe.transport.client');
   assert.equal(owner('apps/web/src/modules/api/contract/core.graphql'), 'fe.contract.copy');   // the contract copy is a slot of its own
   assert.equal(owner('apps/web/src/modules/api/read/orders.ts'), 'fe.modules.api');            // anything else below the module stays the module's
   assert.equal(owner('apps/web/src/modules/i18n/messages/en.json'), 'fe.modules.i18n');
@@ -251,9 +251,10 @@ test('FE multi-app fixture', () => {
   assert.equal(fe.classifyPath('apps/admin/src/modules/cart/index.ts').bindings.app, 'admin');
   // required paths are expanded per declared app
   const paths = fe.requiredPaths().paths.map((e) => e.path);
-  for (const app of ['web', 'admin']) for (const p of [`apps/${app}/next.config.ts`, `apps/${app}/src/app/[locale]/layout.tsx`, `apps/${app}/src/modules/api/`, `apps/${app}/src/modules/i18n/`, `apps/${app}/src/modules/routes/`, `apps/${app}/src/modules/config/`])
+  for (const app of ['web', 'admin']) for (const p of [`apps/${app}/next.config.ts`, `apps/${app}/src/app/[locale]/layout.tsx`, `apps/${app}/src/modules/i18n/`, `apps/${app}/src/modules/routes/`, `apps/${app}/src/modules/config/`])
     assert.equal(paths.includes(p), true, `missing ${p}`);
   assert.equal(paths.includes('apps/web/vitest.config.ts'), false);
+  assert.equal(paths.includes('apps/web/src/modules/api/'), false, 'the transport may live in the shared api package; FE_TRANSPORT_OWNER counts the clients');
   assert.deepEqual(fe.requiredFiles('e2e/checkout/pay.e2e-spec.ts'), ['playwright.config.ts', 'tsconfig.e2e.json']);
   // import direction, cross-app and layers
   const ok = (a, b) => fe.importAllowed(a, b);
@@ -381,16 +382,22 @@ test('ruleParams: the parameters the canon lint lanes read', () => {
   const fe = ruleParams(manifest, 'fe');
   assert.deepEqual(fe.fileLines, { soft: 500, hardGrowth: true });
   assert.deepEqual(fe.duplicateBlock, { lines: 8, tokens: 60 });
-  assert.equal(fe.clientModule, 'apps/<app>/src/modules/api/client.ts');
+  assert.equal('clientModule' in fe, false, 'the transport client is a slot (fe.transport.client, fe.package.api.client), not a parameter');
   assert.equal(manifest.slots.find((s) => s.id === 'be.domain').budget.indexExports, 60);
   assert.equal(manifest.slots.find((s) => s.id === 'be.feature').budget.indexExports, 60);
   assert.deepEqual(openHfs({ declaration: BE }).ruleParams(), be);
   assert.deepEqual(openHfs({ declaration: FE }).ruleParams(), fe);
   assert.throws(() => { ruleParams(manifest, 'be').fileLines.soft = 1; }, TypeError);
-  // the FE client module resolves to the api module
-  assert.equal(openHfs({ declaration: FE }).classifyPath(fe.clientModule.replace('<app>', 'web')).slot, 'fe.modules.api');
+  // the transport client and the Outcome union are slots of their own, in an app or in the shared api package
+  const feHfs = openHfs({ declaration: { ...FE, optionalSlots: ['repo.packages', 'fe.package.ui', 'fe.package.api', 'fe.package.i18n'] } });
+  assert.equal(feHfs.classifyPath('apps/web/src/modules/api/client.ts').slot, 'fe.transport.client');
+  assert.equal(feHfs.classifyPath('apps/web/src/modules/api/outcome.ts').slot, 'fe.transport.outcome');
+  assert.equal(feHfs.classifyPath('packages/nivo-api/src/client.ts').slot, 'fe.package.api.client');
+  assert.equal(feHfs.classifyPath('packages/nivo-api/src/outcome.ts').slot, 'fe.package.api.outcome');
+  assert.equal(feHfs.classifyPath('packages/nivo-api/src/graphql.ts').slot, 'fe.package.api');
+  assert.equal(feHfs.classifyPath('packages/nivo-i18n/src/app.ts').slot, 'fe.package.i18n');
   // schema and loader agree that ruleParams is required and closed
-  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.clientModule; }, (d) => { delete d.ruleParams.be.duplicateBlock; }, (d) => { d.ruleParams.fe.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }]) {
+  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.duplicateBlock; }, (d) => { delete d.ruleParams.be.duplicateBlock; }, (d) => { d.ruleParams.fe.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }]) {
     const doc = parseYaml(manifestText); mutate(doc);
     assert.equal(validateManifestSchema(doc), false);
     refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');

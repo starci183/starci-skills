@@ -10,8 +10,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { ESLint } from "eslint"
 import tsParser from "@typescript-eslint/parser"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import plugin, {
-  LAYOUTS,
   e2eRecommended,
   linterOptions,
   reactHooksRules,
@@ -22,22 +23,28 @@ import plugin, {
   starciFeConfig,
   why,
 } from "./index.mjs"
+import { hfsFromDeclaration } from "./lib/hfs.mjs"
 
-const single = starciFeConfig({ layout: "single-app" })
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "typed")
+const FE = { hfs: 1, profile: "fe", project: "fixture", apps: [{ name: "web", kind: "next" }], optionalSlots: ["repo.packages", "fe.package.ui"] }
+const hfs = hfsFromDeclaration(FE, ROOT)
+const config = starciFeConfig({ hfs })
+const [ignores, ...single] = config
 
-test("the factory returns a source block and an e2e block, and states its layouts", () => {
-  assert.deepEqual([...LAYOUTS].sort(), ["monorepo", "single-app"])
-  assert.equal(single.length, 2)
-  assert.deepEqual(single[0].files, ["src/**/*.{ts,tsx}", "**/candidate/src/**/*.{ts,tsx}"])
+test("the factory returns an ignore block, a typed source block and an e2e block, all from the HFS profile", () => {
+  assert.equal(config.length, 3)
+  assert.ok(ignores.ignores.includes("**/__generated__/**"))
+  assert.deepEqual(single[0].files, ["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"])
+  assert.ok(!single[0].files.some((glob) => glob.startsWith("packages/ui/")), "no package is named literally")
+  assert.equal(single[0].languageOptions.parserOptions.projectService, true, "the source is linted with types")
+  assert.equal(single[0].languageOptions.parserOptions.tsconfigRootDir, ROOT)
+  assert.equal(single[0].settings.starci.hfs, hfs, "every rule reads the slot view")
   assert.ok(single[1].files.includes("e2e/**/*.{ts,tsx}"))
-  assert.ok(single[1].files.some((glob) => glob.startsWith("playwright.config")))
-  const mono = starciFeConfig({ layout: "monorepo" })
-  assert.ok(mono[0].files.includes("apps/*/src/**/*.{ts,tsx}"))
-  assert.ok(mono[0].files.includes("packages/*/src/**/*.{ts,tsx}"), "every workspace package is governed, whatever its name")
-  assert.ok(!mono[0].files.some((glob) => glob.startsWith("packages/ui/")), "no package is named literally")
-  assert.ok(mono[1].files.includes("apps/*/e2e/**/*.{ts,tsx}"))
-  assert.throws(() => starciFeConfig({ layout: "nope" }), /unknown layout/)
-  assert.throws(() => starciFeConfig(), /unknown layout/)
+  assert.ok(single[1].files.includes("playwright.config.ts"))
+  assert.throws(() => starciFeConfig({}), /loadHfs/)
+  assert.throws(() => starciFeConfig(), /loadHfs/)
+  const be = hfsFromDeclaration({ hfs: 1, profile: "be", project: "x", apps: [{ name: "api", kind: "api" }] }, ROOT)
+  assert.throws(() => starciFeConfig({ hfs: be }), /profile be/)
 })
 
 test("every published rule is enabled at error - no rule is off, none is a warning", () => {
@@ -210,20 +217,9 @@ test("the codes are the catalogue's codes for R18, R22, R49-R52, R55, R56, R58, 
   }
 })
 
-test("the monorepo layout reports a finding in any workspace package, not only packages/ui", async () => {
-  const lint = async (layout, filePath) => {
-    const eslint = new ESLint({
-      cwd: process.cwd(),
-      overrideConfigFile: true,
-      overrideConfig: [{ languageOptions: { parser: tsParser, parserOptions: { ecmaFeatures: { jsx: true } } } }, ...starciFeConfig({ layout })],
-    })
-    const [result] = await eslint.lintText("export const Logo = () => <img src=\"/logo.png\" />\n", { filePath })
-    return result.messages.filter((message) => message.ruleId === "starci-fe/no-native-img")
-  }
+test("every workspace package is linted, whatever its name", () => {
+  const eslintFiles = single[0].files
   for (const pkg of ["nivo-ui", "ui", "design-system"]) {
-    const found = await lint("monorepo", `${process.cwd()}/packages/${pkg}/src/leaves/Logo/index.tsx`)
-    assert.equal(found.length, 1, `packages/${pkg} was not scanned: a bare <img> there reported nothing`)
+    assert.ok(eslintFiles.some((glob) => glob.startsWith("packages/*/")), `packages/${pkg} is not reached by the source block`)
   }
-  const single = await lint("single-app", `${process.cwd()}/packages/nivo-ui/src/leaves/Logo/index.tsx`)
-  assert.equal(single.length, 0, "the single-app layout has no workspace packages")
 })

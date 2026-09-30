@@ -2,7 +2,7 @@
  * The rule that holds the file size budget (HFS R20 `HFS_SIZE_GROWTH`, the file-level half).
  *
  * A source file has a hard-growth budget of `fileLines.soft` lines while `fileLines.hardGrowth` holds
- * (`ruleParams.fe.fileLines` of the slot manifest, read through `lib/params.mjs`). `file-size-growth` is the ratchet and
+ * (`ruleParams.fe.fileLines` of the slot manifest, read through the slot view `hfsOf(context).ruleParams`). `file-size-growth` is the ratchet and
  * fails only on a file that must not be this long: a NEW file over the budget, or an existing file over the budget that
  * is longer than its recorded size. The recorded size is the file's line count at the parent commit
  * (`git show HEAD:<file>`). A file may stay as large as it is; it may not grow, and it may not be born large. The rule
@@ -13,7 +13,7 @@
  * hook and state budgets are stricter still where they apply (`size-and-state-budget`); this ratchet is the one that
  * needs the previous revision.
  */
-import { feParams } from "./lib/params.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
 import { hardGrowthLines, lineCount, recordedLines } from "./runtime/scripts/lib/recorded-lines.mjs"
 
 /** Whether a file is a source file this budget governs. */
@@ -33,7 +33,7 @@ export const fileSizeGrowth = {
   create(context) {
     const filename = context.filename || context.getFilename()
     if (!governed(filename)) return {}
-    const max = hardGrowthLines(feParams.fileLines)
+    const max = hardGrowthLines(hfsOf(context).ruleParams.fileLines)
     return {
       "Program:exit"(node) {
         const lines = lineCount((context.sourceCode || context.getSourceCode()).text)

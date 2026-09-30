@@ -66,10 +66,9 @@ properties:
       fe:
         type: object
         additionalProperties: false
-        required: [fileLines, clientModule, duplicateBlock]
+        required: [fileLines, duplicateBlock]
         properties:
           fileLines: {$ref: '#/$defs/fileLines'}
-          clientModule: {type: string, minLength: 1}
           duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
   crossOwner: {type: string}
   crossApp: {type: string}

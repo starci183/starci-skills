@@ -12,7 +12,7 @@ import { readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname } from "node:path"
 import test from "node:test"
-import plugin, { audits, lawOwners, linterOptions, recommended, ruleDeclarations, ruleOwners, rules } from "./index.mjs"
+import plugin, { lawOwners, linterOptions, recommended, ruleDeclarations, ruleOwners, rules } from "./index.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -32,10 +32,10 @@ test("every law in the folder is gathered - a new module cannot be forgotten her
   )
 })
 
-test("repository audits are gathered with the plugin laws", () => {
-  assert.equal(typeof audits["effective-config"], "function")
-  assert.equal(audits["effective-config-covers-new-files"], undefined)
-  assert.equal(audits["grammar-eslint-version-parity"], undefined)
+test("the plugin publishes rules only: no repository audit rides beside it", async () => {
+  const module = await import("./index.mjs")
+  assert.equal(module.audits, undefined, "the effective-config audit is superseded by the managed eslint.config.mjs (R17)")
+  assert.equal(module.auditOwners, undefined)
 })
 
 /*

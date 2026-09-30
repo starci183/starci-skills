@@ -4,7 +4,8 @@ import path from "node:path"
 import test from "node:test"
 import { Linter, RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { linterOptions, noInlineLintConfig, rules } from "./lint-escape-hatch.mjs"
+import { linterOptions } from "./lib/config.mjs"
+import { noInlineLintConfig, rules } from "./lint-escape-hatch.mjs"
 
 const tester = new RuleTester({
   languageOptions: {

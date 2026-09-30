@@ -2,7 +2,7 @@
 
 Law module: `size-growth.mjs`. Catalogue: R20 HFS_SIZE_GROWTH.
 
-A source file has a line budget, `ruleParams.fe.fileLines` of `knowledge/hfs/slots.yaml`, read through `lib/params.mjs` (the package ships its own copy of the manifest in `runtime/`). A file over the budget may not be new and may not be longer than it was at the parent commit; a file within the budget is never a finding. The rule takes no option, there is no baseline file and no allowlist: the record is the repository's own history. `*.d.ts` declaration files are not governed.
+A source file has a line budget, `ruleParams.fe.fileLines` of `knowledge/hfs/slots.yaml`, read through the slot view `hfsOf(context).ruleParams` (the package ships its own copy of the manifest in `runtime/`). A file over the budget may not be new and may not be longer than it was at the parent commit; a file within the budget is never a finding. The rule takes no option, there is no baseline file and no allowlist: the record is the repository's own history. `*.d.ts` declaration files are not governed.
 
 Every rule below is an error in `starciFeConfig`; none can be switched off or suppressed inline.
 

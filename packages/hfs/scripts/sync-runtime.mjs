@@ -5,8 +5,8 @@
 //   packages/hfs/runtime         what `hfs` reads: the slot loader, the check, the architecture machine and every file either
 //                                imports (computed from the import graph, not listed), plus the failure-code catalog slice
 //                                holding exactly the codes `hfs check` can emit (its own and the machine's rule id lists)
-//   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots and hfs.json)
-//   packages/eslint/fe/runtime   what @starci/eslint-canon-fe reads through lib/params.mjs (the manifest's ruleParams.fe)
+//   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots, hfs.json, the view)
+//   packages/eslint/fe/runtime   the same files for @starci/eslint-canon-fe (lib/hfs.mjs, lib/params.mjs)
 //   node packages/hfs/scripts/sync-runtime.mjs [--check]     --check exits 1 when a copy differs (npm run check runs it)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,6 +22,7 @@ const SLOT_FILES = [
   'scripts/lib/glob.mjs',
   'scripts/lib/path-key.mjs',
   'scripts/lib/hfs-slots.mjs',
+  'scripts/lib/hfs-view.mjs',
   'knowledge/hfs/slots.yaml',
 ];
 /** The entry modules of `hfs check`; everything they import, statically, is bundled. */

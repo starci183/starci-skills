@@ -11,7 +11,7 @@ import { join } from "node:path"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { feParams } from "./lib/params.mjs"
+import { fixtureHfs } from "./fixtures/typed/tester.mjs"
 import { fileSizeGrowth, rules } from "./size-growth.mjs"
 import { recordedLines } from "./runtime/scripts/lib/recorded-lines.mjs"
 
@@ -22,7 +22,11 @@ const tester = new RuleTester({
     sourceType: "module",
     parserOptions: { ecmaFeatures: { jsx: true } },
   },
+  settings: { starci: { hfs: fixtureHfs() } },
 })
+
+/** The front-end parameters the rule reads through the slot view. */
+const feParams = fixtureHfs().ruleParams
 
 /** The budget is the manifest's (`ruleParams.fe.fileLines`); the cases are sized against it. */
 const BUDGET = feParams.fileLines.soft

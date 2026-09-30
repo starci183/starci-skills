@@ -22,11 +22,7 @@ import { recommended as classNamesRecommended, rules as classNamesRules } from "
 import { recommended as e2eShapeRecommended, rules as e2eShapeRules, scope as e2eShapeScope } from "./e2e-shape.mjs"
 import { recommended as envOwnerRecommended, rules as envOwnerRules } from "./env-owner.mjs"
 import { recommended as fileLayoutRecommended, rules as fileLayoutRules } from "./file-layout.mjs"
-import {
-  audits as grammarBoundaryAudits,
-  recommended as grammarBoundaryRecommended,
-  rules as grammarBoundaryRules,
-} from "./grammar-boundary.mjs"
+import { recommended as grammarBoundaryRecommended, rules as grammarBoundaryRules } from "./grammar-boundary.mjs"
 import { recommended as formattingRecommended, rules as formattingRules } from "./formatting.mjs"
 import { recommended as hooksFolderRecommended, rules as hooksFolderRules } from "./hooks-folder.mjs"
 import { recommended as hygieneRecommended, rules as hygieneRules } from "./hygiene.mjs"
@@ -34,18 +30,7 @@ import { recommended as iconRecommended, rules as iconRules } from "./icon.mjs"
 import { recommended as landmarkRecommended, rules as landmarkRules } from "./landmark.mjs"
 import { recommended as listsRecommended, rules as listsRules } from "./lists.mjs"
 import { recommended as loadingRecommended, rules as loadingRules } from "./loading.mjs"
-import {
-  LAYOUT_GLOBS,
-  LAYOUTS,
-  audits as lintAdoptionAudits,
-  recommended as lintAdoptionRecommended,
-  rules as lintAdoptionRules,
-} from "./lint-adoption.mjs"
-import {
-  linterOptions as strictLinterOptions,
-  recommended as lintEscapeRecommended,
-  rules as lintEscapeRules,
-} from "./lint-escape-hatch.mjs"
+import { recommended as lintEscapeRecommended, rules as lintEscapeRules } from "./lint-escape-hatch.mjs"
 import { recommended as namingRecommended, rules as namingRules } from "./naming.mjs"
 import { recommended as nativeControlsRecommended, rules as nativeControlsRules } from "./native-controls.mjs"
 import { recommended as nextConventionsRecommended, rules as nextConventionsRules } from "./next-conventions.mjs"
@@ -62,6 +47,7 @@ import { recommended as translationRecommended, rules as translationRules } from
 import { recommended as typeSafetyRecommended, rules as typeSafetyRules } from "./type-safety.mjs"
 import { recommended as typographyRecommended, rules as typographyRules } from "./typography.mjs"
 import { recommended as vendorRecommended, rules as vendorRules } from "./vendor-boundary.mjs"
+import { buildFeConfig } from "./lib/config.mjs"
 import { why } from "./lib/why.mjs"
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
@@ -77,12 +63,7 @@ const CONTRIBUTIONS = [
   { law: "e2e-shape", rules: e2eShapeRules, recommended: e2eShapeRecommended, scope: e2eShapeScope },
   { law: "env-owner", rules: envOwnerRules, recommended: envOwnerRecommended },
   { law: "file-layout", rules: fileLayoutRules, recommended: fileLayoutRecommended },
-  {
-    law: "grammar-boundary",
-    rules: grammarBoundaryRules,
-    recommended: grammarBoundaryRecommended,
-    audits: grammarBoundaryAudits,
-  },
+  { law: "grammar-boundary", rules: grammarBoundaryRules, recommended: grammarBoundaryRecommended },
   { law: "formatting", rules: formattingRules, recommended: formattingRecommended },
   { law: "hooks-folder", rules: hooksFolderRules, recommended: hooksFolderRecommended },
   { law: "hygiene", rules: hygieneRules, recommended: hygieneRecommended },
@@ -90,12 +71,6 @@ const CONTRIBUTIONS = [
   { law: "landmark", rules: landmarkRules, recommended: landmarkRecommended },
   { law: "lists", rules: listsRules, recommended: listsRecommended },
   { law: "loading", rules: loadingRules, recommended: loadingRecommended },
-  {
-    law: "lint-adoption",
-    rules: lintAdoptionRules,
-    recommended: lintAdoptionRecommended,
-    audits: lintAdoptionAudits,
-  },
   { law: "lint-escape-hatch", rules: lintEscapeRules, recommended: lintEscapeRecommended },
   { law: "naming", rules: namingRules, recommended: namingRecommended },
   { law: "native-controls", rules: nativeControlsRules, recommended: nativeControlsRecommended },
@@ -115,20 +90,8 @@ const CONTRIBUTIONS = [
   { law: "vendor-boundary", rules: vendorRules, recommended: vendorRecommended },
 ]
 
-/** Every gathered law, including repository audits that publish no AST rule. */
+/** Every gathered law. */
 export const lawOwners = CONTRIBUTIONS.map((entry) => entry.law)
-
-/** Which law declares each repository-level audit. */
-export const auditOwners = Object.fromEntries(
-  CONTRIBUTIONS.flatMap((entry) =>
-    Object.keys(entry.audits ?? {}).map((name) => [name, entry.law]),
-  ),
-)
-
-/** Repository-level audits gathered beside the plugin. */
-export const audits = Object.fromEntries(
-  CONTRIBUTIONS.flatMap((entry) => Object.entries(entry.audits ?? {})),
-)
 
 /**
  * Which law declares each rule.
@@ -192,7 +155,8 @@ export const e2eRecommended = Object.fromEntries(
 )
 
 /** Flat-config options that make inline directives ineffective rather than merely forbidden. */
-export const linterOptions = strictLinterOptions
+export { linterOptions } from "./lib/config.mjs"
+export { loadHfs } from "./lib/hfs.mjs"
 
 /**
  * The Vietnamese why of each rule that carries a catalogue code: `{ code, vi, fixVi }`.
@@ -208,8 +172,6 @@ const plugin = {
 }
 
 export default plugin
-
-export { LAYOUTS }
 
 /**
  * The React Hooks plugin, from wherever the consuming repository installed it.
@@ -261,53 +223,29 @@ export const reactHooksRules = (reactHooks) => {
 }
 
 /**
- * Attach this canon to a repository: every rule, every level an error, both trees.
+ * The whole flat config of a front end: `export default starciFeConfig({ hfs: loadHfs(import.meta.url) })`.
  *
- * A consuming `eslint.config.mjs` is three lines - it names its layout and spreads the result:
+ * It owns nothing the repository could choose: which files are linted comes from the HFS profile (every app's and every
+ * workspace package's `src/`, and the e2e tree), not which rules are on, not their level, not whether an inline comment may
+ * switch one off. NO RULE IS OFF - the factory throws rather than emit a block in which a published rule is missing or
+ * below error, so a rule added to this package reaches every repository or the build of this package fails.
  *
- *     import { starciFeConfig } from "@starci/eslint-canon-fe"
- *     export default [...starciFeConfig({ layout: "single-app" })]
- *
- * It owns nothing about the law: not which rules are on, not their level, not whether an inline
- * comment may switch one off. NO RULE IS OFF - the factory throws rather than emit a block in which a
- * published rule is missing, so a rule added to this package reaches every repository or the build of
- * this package fails, and a repository cannot end up governed by a stale list.
- *
- * TWO BLOCKS. The first governs the product source (`src/**`, per layout) with every source rule and
- * the React Hooks rules; the second governs `e2e/**` and `playwright.config.*` with the e2e rules and
- * the escape-hatch fence. A repository's own plugins, ignores and language options stay its own
- * business; what it may not keep is a second opinion about the law.
- *
- * @param {object} input - Attachment options.
- * @param {"monorepo" | "single-app"} input.layout - Which shape this repository has.
- * @returns {object[]} Two flat-config blocks.
+ * @param {{ hfs: object }} input - The HFS view of the repository (`loadHfs(import.meta.url)`).
+ * @returns {object[]} The flat config: ignores, the typed source block, the e2e block.
  */
-export const starciFeConfig = ({ layout } = {}) => {
-  const globs = LAYOUT_GLOBS[layout]
-  if (!globs) {
-    throw new Error(`unknown layout "${layout}" - expected one of: ${LAYOUTS.join(", ")}`)
-  }
+export const starciFeConfig = ({ hfs } = {}) => {
   const published = Object.keys(rules).map((name) => `starci-fe/${name}`)
   const notRequested = published.filter((name) => recommended[name] !== "error")
   if (notRequested.length > 0) {
     throw new Error(`starciFeConfig: these published rules are not requested at error: ${notRequested.join(", ")}`)
   }
   const reactHooks = loadReactHooks()
-  const source = { ...sourceRecommended, ...reactHooksRules(reactHooks) }
-  // The escape-hatch fence is a source rule that must also cover the e2e tree.
-  const e2e = { ...e2eRecommended, "starci-fe/no-inline-lint-config": "error" }
-  return [
-    {
-      files: globs.src,
-      linterOptions: { ...linterOptions },
-      plugins: { "starci-fe": plugin, "react-hooks": reactHooks },
-      rules: source,
-    },
-    {
-      files: globs.e2e,
-      linterOptions: { ...linterOptions },
-      plugins: { "starci-fe": plugin },
-      rules: e2e,
-    },
-  ]
+  return buildFeConfig({
+    hfs,
+    plugin,
+    reactHooks,
+    source: { ...sourceRecommended, ...reactHooksRules(reactHooks) },
+    // The escape-hatch fence is a source rule that must also cover the e2e tree.
+    e2e: { ...e2eRecommended, "starci-fe/no-inline-lint-config": "error" },
+  })
 }

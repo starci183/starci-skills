@@ -81,11 +81,3 @@ export const rules = {
 export const recommended = {
   "starci-fe/no-inline-lint-config": "error",
 }
-
-/**
- * Consuming flat configs apply this beside the recommended rules.
- *
- * `noInlineConfig` makes an inline directive ineffective; `reportUnusedDisableDirectives` makes one
- * that suppresses nothing an error, so a leftover from before the fence is not mistaken for a live one.
- */
-export const linterOptions = Object.freeze({ noInlineConfig: true, reportUnusedDisableDirectives: "error" })

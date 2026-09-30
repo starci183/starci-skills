@@ -21,6 +21,7 @@
     "eslint": "^9.18.0",
     "@typescript-eslint/parser": "^8.70.0",
     "@typescript-eslint/eslint-plugin": "^8.70.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "eslint-plugin-react-hooks": "^7.1.1"
   }
 }
