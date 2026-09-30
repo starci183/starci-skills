@@ -2,15 +2,13 @@ schema: starci/canon-pins@1
 purpose: >-
   The exact version of every dependency a StarCi product repository pins. One version per dependency for the whole
   family. Raising a version is a change to this file first (with the package bump when it is a @starci package),
-  then `starci link` and the repositories' own upgrade lane. Read on 2026-09-29 from the packages under
+  then the repositories' own upgrade lane (each sets the exact version and reinstalls; nothing else installs a @starci package). Read on 2026-09-29 from the packages under
   .claude/packages and from the installed node_modules of nivo-backend, nivo-fe, starci-next, starci-next-fe,
   mia-mia-backend and miamia-fe; where they disagreed the newest version installed in more than one repository
   won, and the runtime's own version won for @starci packages.
 pins:
-  # --- @starci packages. @starci/grammar is a PUBLISHED npm package (install: registry): a product repository installs
-  # the exact pinned version from the npm registry, never `file:`. The other @starci packages (eslint-canon-*, hfs,
-  # jest-preset, tsconfig, prettier-config, vitest-preset, playwright-preset, stylelint-canon) are still installed
-  # from the runtime checkout by `starci link` as file:.starci/packages/<name>.
+  # --- @starci packages. Every @starci package is a PUBLISHED npm package (install: registry): a product repository
+  # installs the exact pinned version from the npm registry in the root and every workspace package.json, never `file:`.
   '@starci/grammar':
     version: 0.7.1
     group: starci
@@ -21,53 +19,62 @@ pins:
   '@starci/eslint-canon-be':
     version: 1.7.0
     group: starci
+    install: registry
     side: be
     source: packages/eslint/be/package.json
     why: 'back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.7.0: the round-3 catch-up landed the nest code-pattern profile''s version and content digest, left unbumped when R78-R82 landed, plus the inbox-dedupe-required shape-detection fix; 1.7.0 adds named-entity-manager-only (R83).'
   '@starci/eslint-canon-fe':
     version: 5.1.2
     group: starci
+    install: registry
     side: fe
     source: packages/eslint/fe/package.json
     why: 'every front-end repository carries 3.0.2 or 4.0.0 while the runtime source is 5.1.0: the vn-ok pragma is gone, starciFeConfig enables every rule and the React Hooks rules at error, and 5.1.0 adds the list, effect, formatter, navigation, metadata and type-safety rules that repositories used to carry in their own config.'
   '@starci/stylelint-canon':
     version: 1.1.0
     group: starci
+    install: registry
     side: fe
     source: packages/stylelint/package.json
     why: no front-end repository lints its CSS yet (nivo-fe apps/landing carries 4.3k lines of raw CSS); the runtime source is the first release.
   '@starci/tsconfig':
     version: 1.0.0
     group: starci
+    install: registry
     side: both
     source: packages/tsconfig/package.json
   '@starci/prettier-config':
     version: 1.0.0
     group: starci
+    install: registry
     side: both
     source: packages/prettier-config/package.json
   '@starci/jest-preset':
     version: 1.1.0
     group: starci
+    install: registry
     side: be
     source: packages/jest-preset/package.json
     why: gains the FakeClock test double (./clock) for the platform/clock Clock port, used by the R79 no-ambient-clock migration.
   '@starci/vitest-preset':
     version: 1.0.0
     group: starci
+    install: registry
     side: fe
     source: packages/vitest-preset/package.json
   '@starci/playwright-preset':
     version: 1.0.0
     group: starci
+    install: registry
     side: fe
     source: packages/playwright-preset/package.json
   '@starci/hfs':
     version: 1.0.0
     group: starci
+    install: registry
     side: both
     source: packages/hfs/package.json
-    why: the hfs command line (check, init, explain) of every product repository, installed by starci link.
+    why: the hfs command line (check, init, explain) of every product repository, installed from the npm registry.
   # --- tooling
   typescript:
     version: 5.9.3

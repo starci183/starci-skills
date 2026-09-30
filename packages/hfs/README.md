@@ -1,7 +1,7 @@
 # @starci/hfs
 
-The HFS command line of a StarCi product repository. It is installed by `starci link` (see [`packages/README.md`](../README.md)),
-never from a registry, and it is self-contained: `runtime/` carries the slot manifest, the canon pins, the Vietnamese why
+The HFS command line of a StarCi product repository. It is installed from the npm registry at the exact version in `knowledge/hfs/canon-pins.yaml` (see [`packages/README.md`](../README.md)),
+and it is self-contained: `runtime/` carries the slot manifest, the canon pins, the Vietnamese why
 catalog slice and the loader, so it runs where there is no runtime checkout.
 
 ```sh

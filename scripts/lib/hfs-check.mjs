@@ -69,14 +69,7 @@ export function openRepo({ repoRoot, root = skillRoot, manifest = loadSlotManife
   return { manifest, repo, resolver: createSlotResolver(manifest, repo) };
 }
 
-const pinnedSpec = (spec, pin, packageDir, repoRoot) => {
-  if (pin.group !== 'starci' || pin.install === 'registry') return spec === pin.version ? null : `declared ${spec}, pinned ${pin.version}`;
-  if (!String(spec).startsWith('file:')) return `declared ${spec}, pinned ${pin.version}; a @starci package is installed by starci link as file:.starci/packages/<name>`;
-  const linked = path.join(packageDir, String(spec).slice('file:'.length), 'package.json');
-  let version = null;
-  try { version = JSON.parse(fs.readFileSync(linked, 'utf8')).version; } catch { /* the linked copy is absent */ }
-  return version === pin.version ? null : `linked copy is ${version ?? `missing (${path.relative(repoRoot, linked) || linked}); run starci link`}, pinned ${pin.version}`;
-};
+const pinnedSpec = (spec, pin) => (spec === pin.version ? null : `declared ${spec}, pinned ${pin.version}`);
 
 function pinFindings({ repoRoot, files, profile, root }) {
   const pins = parseYaml(fs.readFileSync(path.join(root, CANON_PINS_FILE), 'utf8'))?.pins ?? {};
@@ -84,13 +77,12 @@ function pinFindings({ repoRoot, files, profile, root }) {
   for (const file of files.filter((f) => f === 'package.json' || f.endsWith('/package.json'))) {
     let pkg;
     try { pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, file), 'utf8')); } catch { continue; }
-    const dir = path.dirname(path.join(repoRoot, file));
     for (const [name, pin] of Object.entries(pins)) {
       if (pin.side !== 'both' && pin.side !== profile) continue;
       for (const section of DEP_SECTIONS) {
         const spec = pkg[section]?.[name];
         if (spec === undefined) continue;
-        const drift = pinnedSpec(spec, pin, dir, repoRoot);
+        const drift = pinnedSpec(spec, pin);
         if (drift) findings.push({ code: 'HFS_CANON_PIN_DRIFT', level: 'error', path: file, dependency: name, section, pinned: pin.version, declared: spec, message: `${name} in ${file} ${section}: ${drift}` });
       }
     }

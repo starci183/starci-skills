@@ -26,6 +26,9 @@
     "!*.test.*",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "@types/jest": ">=29",
     "jest": ">=29",

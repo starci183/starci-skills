@@ -1,8 +1,6 @@
 # StarCi packages and how a product repository gets them
 
-The packages under `.claude/packages` are the shared tooling of every StarCi product repository. **They are not
-published to a registry.** A product repository (and its CI) installs them from the runtime checkout, which
-`STARCI_HOME` names (the directory holding `bin/`, `packages/` and `knowledge/`), with one command.
+The packages under `.claude/packages` are the shared tooling of every StarCi product repository. **Every one of them is published to the public npm registry** (scope `@starci`), and a product repository (and its CI) installs it from there at the exact version pinned in `knowledge/hfs/canon-pins.yaml`: `"@starci/x": "<version>"`, never a range, never `file:`. One pattern, no other way to obtain them.
 
 | Package | Side | Replaces in the repo |
 |---|---|---|
@@ -20,50 +18,11 @@ The exact version of each, and of every framework a repository pins, is
 [`knowledge/hfs/canon-pins.yaml`](../knowledge/hfs/canon-pins.yaml). `node scripts/checks/check-canon-pins.mjs` proves each
 @starci pin equals its package here; with `--repo <dir>` it proves a repository matches the pins.
 
-## `starci link`
+## Installing and upgrading
 
-```sh
-export STARCI_HOME=/path/to/runtime      # PowerShell: $env:STARCI_HOME = "D:\Repositories\starci-academy-backend\.claude"
-node "$STARCI_HOME/bin/starci.mjs" link --side be --install     # or --side fe
-```
+Set each `@starci/*` dependency (root and every workspace) to the exact version in `knowledge/hfs/canon-pins.yaml`, then `npm install`. CI needs nothing else: `npm ci` reads the registry.
 
-For every `@starci/*` package the side owns, `link`:
-
-1. copies exactly the files `npm pack` would publish (the package's `files` list) into
-   `<repo>/.starci/packages/<name>/`: a plain directory, no symlink, no junction, no administrator rights, no tarball;
-2. sets `"@starci/<name>": "file:.starci/packages/<name>"` in `package.json` (`dependencies` if the repository already
-   lists it there, else `devDependencies`). The path is relative to the repository, so the same text is valid on every
-   machine;
-3. adds `/.starci/` to `.gitignore` and writes `.starci/link.json`;
-4. with `--install`, runs `npm install`.
-
-npm installs a `file:` directory as a link to that directory. It lies inside the repository, so the package resolves its
-peers (`jest`, `typescript`, `@types/jest`, `vitest`) from the repository's own `node_modules`, never from the runtime.
-`package-lock.json` records `{"resolved": ".starci/packages/<name>", "link": true}` with no integrity hash, so it is
-identical on Windows and Linux and does not depend on how `npm pack` compresses. The generated copy is untracked;
-`package.json` and the lockfile are what is committed.
-
-**CI.** Check out the runtime, then run `link` **before** `npm ci` (`npm ci` needs the directory to exist):
-
-```yaml
-- uses: actions/checkout@v4
-  with: { repository: starci183/starci-skills, path: .starci-runtime }
-- run: echo "STARCI_HOME=$GITHUB_WORKSPACE/.starci-runtime" >> "$GITHUB_ENV"
-- run: node "$STARCI_HOME/bin/starci.mjs" link --side be
-- run: npm ci
-```
-
-**Upgrading.** Raise the version in `knowledge/hfs/canon-pins.yaml` together with the package, then re-run `link` in each
-repository (it replaces the copy) and `npm install`. After pulling a newer runtime the local flow is the same two commands.
-
-**Why not the alternatives.** `"file:${STARCI_HOME}/packages/x"` is not portable: npm does not expand variables in
-`package.json`. `file:../../runtime/packages/x` bakes one machine's layout into a committed file. A directory link to the
-runtime makes peers resolve from the runtime's `node_modules`, and a symlink needs Developer Mode on Windows. A packed
-tarball records an integrity hash that changes with line endings or the zlib version, and `npm ci` then fails.
-
-Proven on 2026-09-29 on a scratch copy of mia-mia-backend: `link --side be
---install`, then a clean `rm -rf node_modules && link && npm ci` (691 packages, four `link: true` lockfile entries), then
-`tsc --noEmit`, `jest --selectProjects unit` and `prettier --check` against the linked packages.
+**Publishing.** Raise the version in the package and in `knowledge/hfs/canon-pins.yaml` in the same change (`node scripts/checks/check-canon-pins.mjs` proves they agree), `npm publish` from the package directory (each has `publishConfig.access: public` and a `files` allowlist; check it with `npm pack --dry-run`), verify with `npm view <name>@<version> version`, then move the repositories to the new pin in their own upgrade lanes. A version already on the registry is never republished: bump it.
 
 ---
 

@@ -8,7 +8,7 @@ summary: >-
   runtime/ so it works without a runtime checkout. Failure codes HFS_SLOT_NOT_ENABLED, HFS_SLOT_AMBIGUOUS,
   HFS_TRACKED_MUST_BE_IGNORED, HFS_FORBIDDEN_PRESENT, HFS_REQUIRED_MISSING, HFS_MIN_INSTANCES, HFS_CANON_PIN_DRIFT,
   HFS_SIZE_SOFT_BACKLOG, HFS_INIT_EXISTS, HFS_INIT_UNDETECTED and HFS_REPO_UNREADABLE join the catalog with Vietnamese
-  text. knowledge/hfs/canon-pins.yaml gains the @starci/hfs pin (side both) so `starci link` installs the package. Additive:
+  text. knowledge/hfs/canon-pins.yaml gains the @starci/hfs pin (side both). Additive:
   no existing key, check or verb changes.
 reach: new-legs
 paths:

@@ -10,8 +10,7 @@ summary: >-
   apps/migrate. `no-injected-repository` now also refuses `@InjectRepository(...)` wherever written and states the
   same one pattern. New prose pattern BE-PERSISTENCE-7; the BE-PERSISTENCE-6 examples no longer use
   `tx.getRepository`. canon-pins move @starci/eslint-canon-be to 1.7.0 and the nest profile carries the new version
-  and content digest. `starci link` (packages/hfs) skips a pin whose `install` is `registry` and `--help`/`-h`
-  only prints usage. A repository adopts the rule through its own migration lane; there is no compatibility window.
+  and content digest. A repository adopts the rule through its own migration lane; there is no compatibility window.
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/hfs-be-named-entity-manager.yaml
@@ -27,5 +26,3 @@ paths:
   - packages/eslint/be/CHANGELOG.md
   - packages/eslint/be/data-access.mjs
   - packages/eslint/be/data-access.test.mjs
-  - scripts/install/link-packages.mjs
-  - tests/link-packages.spec.mjs

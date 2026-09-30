@@ -86,7 +86,7 @@ export async function loadPresets(root, profile) {
   try {
     resolved = require.resolve(name);
   } catch {
-    throw new SyncError('HFS_SYNC_PRESET_MISSING', `${name} is not installed under ${root}; run "starci link --side ${profile}" first`);
+    throw new SyncError('HFS_SYNC_PRESET_MISSING', `${name} is not installed under ${root}; set it to the exact version in knowledge/hfs/canon-pins.yaml and reinstall`);
   }
   const preset = profile === 'be' ? require(resolved) : await import(pathToFileURL(resolved).href);
   return { sonarExclusions: preset.sonarExclusions(), sonarCoverageExclusions: preset.sonarCoverageExclusions() };

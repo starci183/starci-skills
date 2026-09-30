@@ -6,7 +6,7 @@ description: >-
   StarCi family (HFS decision 10 and K18). A pin is an exact semver, never a range: `^`, `~`, `>=`, `x` and
   dist-tags are refused. A `@starci/*` pin names its `source`, the package.json inside this runtime whose version
   it must equal, so a package cannot be bumped without the pin moving in the same change. The document is data
-  read by scripts/checks/check-canon-pins.mjs and by the `starci link` installer; it grants no authority to edit a
+  read by scripts/checks/check-canon-pins.mjs; every pin, `@starci/*` included, is installed from the npm registry at exactly its version. It grants no authority to edit a
   product repository.
 type: object
 additionalProperties: false
@@ -56,7 +56,7 @@ $defs:
       version: {$ref: '#/$defs/exactVersion'}
       group:
         enum: [starci, tooling, test, framework, ui]
-        description: What the dependency is for. `starci` packages ship from this runtime; the rest come from the npm registry.
+        description: What the dependency is for. Every group is installed from the npm registry at the exact version; `starci` packages are published from this runtime.
       side:
         enum: [be, fe, both]
         description: Which repository kind pins it. `both` is every back-end and front-end repository.
@@ -64,14 +64,12 @@ $defs:
         type: string
         pattern: ^packages/[a-z0-9/-]+/package\.json$
         description: >-
-          For a `starci` pin only - the package.json in this runtime whose `version` the pin must equal. A pin
-          with a source is installed by `starci link`; a pin without one comes from the registry.
+          For a `starci` pin only - the package.json in this runtime whose `version` the pin must equal.
       install:
         enum: [registry]
         description: >-
-          For a `starci` pin only - `registry` means the package is published to the npm registry at exactly this
-          version and a product repository installs it from there (`"<version>"`, never `file:`). Without it a
-          `starci` pin is installed by `starci link` as `file:.starci/packages/<name>`.
+          Required on a `starci` pin - `registry`: the package is published to the npm registry at exactly this
+          version and a product repository installs it from there (`"<version>"`, never `file:`).
       why:
         type: string
         minLength: 1

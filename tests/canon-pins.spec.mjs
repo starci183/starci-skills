@@ -76,7 +76,7 @@ test('the schema itself accepts a minimal valid document and pins the required n
   assert.ok(schema().properties.pins.required.includes('@heroui/react'));
 });
 
-test('checkRepoPins judges a repository: registry pins by declared spec, @starci pins by the linked copy', (t) => {
+test('checkRepoPins judges a repository: every pin, @starci packages included, by its declared exact spec', (t) => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-pins-repo-'));
   t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({
@@ -85,12 +85,10 @@ test('checkRepoPins judges a repository: registry pins by declared spec, @starci
   const before = checkRepoPins({ repo, side: 'be', root: ROOT });
   assert.equal(before.ok, false);
   assert.match(before.errors.join('\n'), /typescript: declared \^5\.7\.3, pinned 5\.9\.3/);
-  assert.match(before.errors.join('\n'), /@starci\/tsconfig: pinned 1\.0\.0, linked copy is missing/);
+  assert.match(before.errors.join('\n'), /@starci\/tsconfig: declared file:\.starci\/packages\/tsconfig, pinned 1\.0\.0/);
   assert.doesNotMatch(before.errors.join('\n'), /vitest/, 'a front-end pin is not judged on a back-end repository');
   assert.doesNotMatch(before.errors.join('\n'), /jest:/, 'an exact declared pin passes');
-  fs.mkdirSync(path.join(repo, '.starci', 'packages', 'tsconfig'), { recursive: true });
-  fs.writeFileSync(path.join(repo, '.starci', 'packages', 'tsconfig', 'package.json'), JSON.stringify({ version: '1.0.0' }));
-  fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ devDependencies: { typescript: '5.9.3', '@starci/tsconfig': 'file:.starci/packages/tsconfig' } }));
+  fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ devDependencies: { typescript: '5.9.3', '@starci/tsconfig': loadPins(ROOT).pins['@starci/tsconfig'].version } }));
   assert.deepEqual(checkRepoPins({ repo, side: 'be', root: ROOT }).errors, []);
   const grammar = loadPins(ROOT).pins['@starci/grammar'];
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ dependencies: { '@starci/grammar': grammar.version } }));

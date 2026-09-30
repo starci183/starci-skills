@@ -1,6 +1,6 @@
 # @starci/tsconfig
 
-Four TypeScript configs, all strict, all with `noImplicitAny`. Install with `starci link` (see [`packages/README.md`](../README.md)); there is no registry publish.
+Four TypeScript configs, all strict, all with `noImplicitAny`. Install it from the npm registry at the exact version in [`knowledge/hfs/canon-pins.yaml`](../../knowledge/hfs/canon-pins.yaml) (see [`packages/README.md`](../README.md)).
 
 | File | For | Adds to `base.json` |
 |---|---|---|

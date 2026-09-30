@@ -18,6 +18,9 @@
     "index.d.ts",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "vitest": ">=3"
   },

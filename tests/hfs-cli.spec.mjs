@@ -104,13 +104,10 @@ test('an opt-in slot the repository did not declare is HFS_SLOT_NOT_ENABLED, and
   assert.equal(checkRepo({ repoRoot: repoOf(declared, mutate) }).ok, true);
 });
 
-test('pin drift: a range, an old version, a registry @starci spec and a missing link are drift; the exact pin and a good link are not', () => {
+test('pin drift: a range, an old version and a file: link are drift; the exact registry pin is not, for @starci packages too', () => {
   const ts = pins.typescript.version;
   const tsconfig = pins['@starci/tsconfig'].version;
-  const withPackage = (pkg, link) => repoOf(BE, (dir) => {
-    put(dir, 'package.json', `${JSON.stringify({ name: 'demo', ...pkg })}\n`);
-    if (link) put(dir, '.starci/packages/tsconfig/package.json', `${JSON.stringify({ name: '@starci/tsconfig', version: link })}\n`);
-  });
+  const withPackage = (pkg) => repoOf(BE, (dir) => put(dir, 'package.json', `${JSON.stringify({ name: 'demo', ...pkg })}\n`));
   const drift = (dir) => only(checkRepo({ repoRoot: dir }), 'HFS_CANON_PIN_DRIFT');
   const linked = { devDependencies: { '@starci/tsconfig': 'file:.starci/packages/tsconfig' } };
 
@@ -119,15 +116,14 @@ test('pin drift: a range, an old version, a registry @starci spec and a missing 
   assert.equal(range.length, 1);
   assert.deepEqual([range[0].dependency, range[0].pinned, range[0].declared, range[0].path], ['typescript', ts, `^${ts}`, 'package.json']);
   assert.equal(drift(withPackage({ devDependencies: { typescript: '4.9.5' } })).length, 1);
-  assert.equal(drift(withPackage({ devDependencies: { '@starci/tsconfig': tsconfig } })).length, 1, 'a @starci package comes from starci link, not a registry version');
-  assert.equal(drift(withPackage(linked)).length, 1, 'no linked copy');
-  assert.equal(drift(withPackage(linked, '0.0.1')).length, 1, 'stale linked copy');
-  assert.deepEqual(drift(withPackage(linked, tsconfig)), []);
+  assert.deepEqual(drift(withPackage({ devDependencies: { '@starci/tsconfig': tsconfig } })), [], 'a @starci package installs from the registry at the pinned version');
+  assert.equal(drift(withPackage({ devDependencies: { '@starci/tsconfig': `^${tsconfig}` } })).length, 1, 'a range is drift');
+  assert.equal(drift(withPackage(linked)).length, 1, 'a file: link is drift');
   const grammar = pins['@starci/grammar'].version;
   assert.equal(pins['@starci/grammar'].install, 'registry', '@starci/grammar is a published package');
   assert.deepEqual(drift(withPackage({ dependencies: { '@starci/grammar': grammar } })), [], 'grammar installs from the registry at the pinned version');
   assert.equal(drift(withPackage({ dependencies: { '@starci/grammar': `^${grammar}` } })).length, 1, 'a range is drift');
-  assert.equal(drift(withPackage({ dependencies: { '@starci/grammar': 'file:.starci/packages/grammar' } })).length, 1, 'grammar is not linked');
+  assert.equal(drift(withPackage({ dependencies: { '@starci/grammar': 'file:.starci/packages/grammar' } })).length, 1, 'grammar is not a file: link');
 });
 
 test('pins of the other side are not judged, and every package.json of a workspace repository is', () => {

@@ -1,8 +1,6 @@
 # @starci/vitest-preset
 
-The vitest configs of a Next front end: one lane per app or package, one root config. Install with `starci link` (see
-[`packages/README.md`](../README.md)); there is no registry publish. The preset imports nothing but `node:path`, so the
-repository passes its own plugins.
+The vitest configs of a Next front end: one lane per app or package, one root config. Install it from the npm registry at the exact version in [`knowledge/hfs/canon-pins.yaml`](../../knowledge/hfs/canon-pins.yaml) (see [`packages/README.md`](../README.md)). The preset imports nothing but `node:path`, so the repository passes its own plugins.
 
 ```ts
 // apps/app/vitest.config.ts

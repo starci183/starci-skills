@@ -57,21 +57,21 @@ rules:
       manual: []
     relatedExamples: []
   - id: REPO-PINS-3
-    title: '@starci/grammar comes from the registry, the other @starci packages from the runtime checkout'
+    title: Every @starci package comes from the npm registry at its exact pinned version
     kind: mandatory
     hfsRules: [R15, R13]
     requirement: |
-      `@starci/grammar` is a published npm package: a product repository declares the exact pinned version (`"0.7.1"`, never a
-      range, never `file:`) and installs it from the npm registry. The other `@starci/*` packages (eslint-canon-*, hfs, jest-preset,
-      tsconfig, prettier-config, vitest-preset, playwright-preset, stylelint-canon) are consumed from the runtime checkout through
-      `STARCI_HOME` in the workspace and in CI (`starci link`); publishing one of them moves it to the registry by an
-      `install: registry` pin, not by changing the pins.
+      Every `@starci/*` package (grammar, eslint-canon-be, eslint-canon-fe, stylelint-canon, tsconfig, prettier-config,
+      jest-preset, vitest-preset, playwright-preset, hfs) is a published npm package: a product repository declares the exact pinned
+      version from `knowledge/hfs/canon-pins.yaml` (`"0.7.1"`, never a range, never `file:`) in the root and every workspace
+      package.json and installs it from the npm registry. There is no other way to obtain a @starci package.
     rationale: |
-      CI can only run the same machine as the agents when it can obtain the same package builds: from the registry for a published package, from the runtime checkout for the rest.
+      CI, the agents and a fresh clone obtain the same package builds from the same place, and the lockfile records a registry
+      integrity hash instead of a path on one machine.
     cases:
       - id: case-1
         when: CI installs the canon
-        write: The workflow checks out the runtime repository and points STARCI_HOME at it before npm ci (the unpublished @starci packages); @starci/grammar installs from the registry.
+        write: The workflow runs `npm ci`; nothing checks out the runtime repository.
     verification:
       automated:
         - HFS_CI_MISSING_CANON

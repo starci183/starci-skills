@@ -118,7 +118,7 @@ describe('.github/workflows', () => {
       assert.deepEqual(doc.on.push.branches, ['main']);
       const runs = doc.jobs.ci.steps.map(step => step.run).filter(Boolean);
       for (const command of ['npm run lint:check', 'npm run typecheck', 'npm run test:ci', 'npx hfs check', 'npx hfs sync --check', 'npm ci']) assert.ok(runs.includes(command), command);
-      assert.ok(runs.includes(`node "$STARCI_HOME/bin/starci.mjs" link --side ${hfs.profile}`));
+      assert.doesNotMatch(text, /starci link|STARCI_HOME|starci-runtime/);
       const uses = doc.jobs.ci.steps.map(step => step.uses).filter(Boolean);
       assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-scan-action')));
       assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-quality-gate-action')));
@@ -252,7 +252,7 @@ describe('loading the presets a repository installs', () => {
     assert.deepEqual(await loadPresets(dir, 'fe'), PRESETS.fe);
   });
   it('names the missing preset and the command that installs it', async t => {
-    await assert.rejects(loadPresets(repo(t, BE), 'be'), /HFS_SYNC_PRESET_MISSING.*@starci\/jest-preset.*starci link --side be/);
+    await assert.rejects(loadPresets(repo(t, BE), 'be'), /HFS_SYNC_PRESET_MISSING.*@starci\/jest-preset.*canon-pins\.yaml/);
   });
 });
 

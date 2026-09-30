@@ -1,7 +1,6 @@
 # @starci/playwright-preset
 
-The Playwright config of a front-end repository. Install with `starci link` (see [`packages/README.md`](../README.md));
-there is no registry publish.
+The Playwright config of a front-end repository. Install it from the npm registry at the exact version in [`knowledge/hfs/canon-pins.yaml`](../../knowledge/hfs/canon-pins.yaml) (see [`packages/README.md`](../README.md)).
 
 ```ts
 // playwright.config.ts

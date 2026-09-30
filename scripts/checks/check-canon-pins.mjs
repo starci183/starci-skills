@@ -10,7 +10,7 @@
 //   node scripts/checks/check-canon-pins.mjs --repo <product repo> [--side be|fe] [--json]
 //
 // With --repo the same pins judge a product repository: every pinned dependency it declares must be that exact
-// version (a registry pin) or the linked copy under .starci/packages must carry it (a @starci pin), and a
+// version (every pin, @starci packages included, is installed from the npm registry) and a
 // dependency the side owns but the repo does not declare is reported by the repo's own lint, not here.
 // Exit 0 is clean; any finding exits 1.
 import fs from 'node:fs';
@@ -43,6 +43,7 @@ export function checkCanonPins({ root = skillRoot } = {}) {
   for (const [name, pin] of Object.entries(doc?.pins ?? {})) {
     if (!pin || typeof pin !== 'object') continue;
     if (pin.group === 'starci' && !pin.source) errors.push(`CANON_PIN_NO_SOURCE ${name}: a starci pin names the package.json it must equal`);
+    if (pin.group === 'starci' && pin.install !== 'registry') errors.push(`CANON_PIN_NO_SOURCE ${name}: a starci pin is installed from the npm registry (install: registry)`);
     if (pin.group !== 'starci' && (pin.source || pin.install)) errors.push(`CANON_PIN_NO_SOURCE ${name}: only a starci pin carries a source or an install`);
     if (!pin.source) continue;
     const file = path.join(root, pin.source);
@@ -63,12 +64,6 @@ export function checkRepoPins({ repo, side, root = skillRoot }) {
     if (side && pin.side !== 'both' && pin.side !== side) continue;
     const specs = DEP_KEYS.map((key) => pkg[key]?.[name]).filter((spec) => spec !== undefined);
     if (!specs.length) continue;
-    if (pin.group === 'starci' && pin.install !== 'registry') {
-      const linked = path.join(repo, '.starci', 'packages', name.replace(/^@starci\//, ''), 'package.json');
-      const version = fs.existsSync(linked) ? readJson(linked).version : null;
-      if (version !== pin.version) errors.push(`CANON_PIN_DRIFT ${name}: pinned ${pin.version}, linked copy is ${version ?? 'missing (run starci link)'}`);
-      continue;
-    }
     for (const spec of specs) if (spec !== pin.version) errors.push(`CANON_PIN_DRIFT ${name}: declared ${spec}, pinned ${pin.version}`);
   }
   return { ok: errors.length === 0, errors };

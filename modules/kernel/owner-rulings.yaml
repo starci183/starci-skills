@@ -122,3 +122,8 @@ rulings:
     date: '2026-09-29'
     ruling: "The Qwen provider is removed from the runtime with no backward compatibility (\"xóa qwen đi quá lỏ!! không mua nữa đâu, devin codex claude đủ r\"): only claude, codex and devin remain, and a config.yaml that still names qwen is refused with \"Qwen đã bị gỡ; dùng claude, codex hoặc devin\"."
     enforcedBy: [modules/models/runtimes.yaml, modules/models/registry.yaml, engine/config.mjs, modules/kernel/contract-changes/provider-qwen-removed.yaml]
+  - id: one-pattern-no-legacy
+    date: '2026-09-30'
+    ruling: "One pattern, no exceptions, no legacy, no backward compatibility: a mechanism that is superseded or unusable is deleted with all its references, never kept as an alias, fallback or second path."
+    confirmed: '2026-09-30 owner decision on the starci link removal, task pub1'
+    enforcedBy: [modules/kernel/contract-changes/starci-link-removed.yaml]

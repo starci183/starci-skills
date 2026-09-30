@@ -29,7 +29,7 @@ nul
 .tmp-*
 # Worktrees live under D:/starci-lanes, never inside the repository.
 .worktrees/
-# The linked @starci packages, copied in by `starci link`.
+# StarCi runtime state of the repository (ledger), never tracked.
 .starci/
 .next/
 next-env.d.ts
