@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 - unreleased (lane F0)
+## 2.0.0 - 2026-09-30
 
 - **New rule `starci/status-contrast`** (R61 `FE_STYLE_TOKEN_ONLY`; the config runs fourteen rules): the brand layer's status colours
   follow HeroUI's soft pairs. Every status tone (`success`, `warning`, `danger`, `info`) has `--<tone>-soft` and

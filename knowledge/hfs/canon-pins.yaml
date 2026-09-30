@@ -24,19 +24,19 @@ pins:
     source: packages/eslint/be/package.json
     why: 'back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.7.0: the round-3 catch-up landed the nest code-pattern profile''s version and content digest, left unbumped when R78-R82 landed, plus the inbox-dedupe-required shape-detection fix; 1.7.0 adds named-entity-manager-only (R83); 1.7.1 reads the slot manifest from the installed @starci/hfs runtime copy instead of the product repository.'
   '@starci/eslint-canon-fe':
-    version: 5.1.2
+    version: 6.0.0
     group: starci
     install: registry
     side: fe
     source: packages/eslint/fe/package.json
-    why: 'every front-end repository carries 3.0.2 or 4.0.0 while the runtime source is 5.1.0: the vn-ok pragma is gone, starciFeConfig enables every rule and the React Hooks rules at error, and 5.1.0 adds the list, effect, formatter, navigation, metadata and type-safety rules that repositories used to carry in their own config.'
+    why: '6.0.0 attaches through starciFeConfig({ hfs: loadHfs(import.meta.url) }) (typed linting, slot view), scopes every rule by slot and adds the F0 enforcers (one client, one Outcome, one i18n stack, server-only readers, effect cleanup and indirect fetch, raw structural elements, soft-pair status text); the layout option is gone.'
   '@starci/stylelint-canon':
-    version: 1.1.0
+    version: 2.0.0
     group: starci
     install: registry
     side: fe
     source: packages/stylelint/package.json
-    why: no front-end repository lints its CSS yet (nivo-fe apps/landing carries 4.3k lines of raw CSS); the runtime source is the first release.
+    why: '2.0.0 adds status-contrast (HeroUI soft pairs measured per theme), fixes brand-layer-shape on the shared :root,.light,.dark block and the info soft pair, and derives appTokens with loadAppTokens(import.meta.url) for the managed one-line stylelint.config.mjs.'
   '@starci/tsconfig':
     version: 1.0.0
     group: starci

@@ -1,6 +1,6 @@
 # Changelog
 
-## 6.0.0 - unreleased (lanes C0, F0)
+## 6.0.0 - 2026-09-30
 
 - **Census fixes (starci-next-fe main, lane F0):** `one-outcome-union` treats a `kind` union as a result union only with an `ok`
   arm beside a failure kind (a mapper's view union - `LessonViewerView`, `StudyStepView` - is a screen state);

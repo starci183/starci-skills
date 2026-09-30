@@ -1,0 +1,15 @@
+id: fe-canon-release-f0
+effectiveAt: '2026-09-30T23:00:00+07:00'
+summary: >-
+  Lane F0 release: @starci/eslint-canon-fe 6.0.0 (starciFeConfig({ hfs }), typed, slot-scoped, the F0 enforcers) and
+  @starci/stylelint-canon 2.0.0 (status-contrast, brand-layer-shape soft-pair fix, loadAppTokens) are published to npm and pinned
+  exactly in knowledge/hfs/canon-pins.yaml; nivo-fe and starci-next-fe move to the exact pins with the managed one-line
+  eslint.config.mjs.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/fe-canon-release-f0.yaml
+  - knowledge/hfs/canon-pins.yaml
+  - packages/eslint/fe/package.json
+  - packages/eslint/fe/CHANGELOG.md
+  - packages/stylelint/package.json
+  - packages/stylelint/CHANGELOG.md
