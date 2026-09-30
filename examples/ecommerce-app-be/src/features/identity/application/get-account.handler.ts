@@ -17,7 +17,9 @@ export class GetAccountHandler extends ICQRSHandler<GetAccountQuery, GetAccountR
     }
 
     protected override process(query: GetAccountQuery): Promise<GetAccountResult> {
-        const { request, principal } = query.params
-        return this.accounts.overview({ personId: principal.id, sessionToken: request.sessionToken })
+        return this.accounts.overview({
+            personId: query.params.principal.id,
+            sessionToken: query.params.request.sessionToken,
+        })
     }
 }

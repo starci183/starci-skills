@@ -10,6 +10,10 @@ export class OrderModule extends ConfigurableModuleClass {
     /** Registers the capability once per app. */
     static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
-        return { ...base, providers: [...(base.providers ?? []), OrderService, CheckoutService], exports: [OrderService, CheckoutService] }
+        return {
+            ...base,
+            providers: [...(base.providers ?? []), OrderService, CheckoutService],
+            exports: [OrderService, CheckoutService],
+        }
     }
 }

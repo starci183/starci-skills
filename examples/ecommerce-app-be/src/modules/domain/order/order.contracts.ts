@@ -114,3 +114,9 @@ export interface EmptyCartParams {
     /** The cart owner. */
     readonly personId: string
 }
+
+/** The confirmation that a cart is empty now. */
+export interface EmptiedCart {
+    /** Always true. */
+    readonly cleared: true
+}

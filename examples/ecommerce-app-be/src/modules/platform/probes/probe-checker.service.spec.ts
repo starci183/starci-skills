@@ -4,9 +4,8 @@ import type { Logger } from "@modules/platform/logging"
 import { Test } from "@nestjs/testing"
 import { ProbesErrorCode } from "./errors/probes.error"
 import { ProbeCheckerService } from "./probe-checker.service"
-import { PROBES } from "./probes.decorators"
+import { PROBES, PROBES_OPTIONS } from "./probes.decorators"
 import { ProbesLogEvent } from "./probes.log-events"
-import { MODULE_OPTIONS_TOKEN } from "./probes.module-definition"
 import type { ProbesOptions } from "./probes.options"
 import type { Probe } from "./probes.port"
 
@@ -25,7 +24,7 @@ describe("ProbeCheckerService", () => {
         const moduleRef = await Test.createTestingModule({
             providers: [
                 ProbeCheckerService,
-                { provide: MODULE_OPTIONS_TOKEN, useValue: options() },
+                { provide: PROBES_OPTIONS, useValue: options() },
                 { provide: PROBES, useValue: probes },
                 { provide: LOGGER, useValue: logger },
             ],

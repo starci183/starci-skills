@@ -1,5 +1,6 @@
 import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
+import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type {
     CatalogProductView,
@@ -16,7 +17,6 @@ import {
     LINES_OF_ORDER,
     PAYMENTS_OF_PERSON,
     PAYMENT_COUNT,
-    SET_STOCK,
 } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
@@ -36,7 +36,7 @@ describe("order lifecycle: order history", () => {
     const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
     beforeAll(async () => {
-        await world.db.order.query(SET_STOCK, ["sku-thermos", 2])
+        await productBuilder(world.db.order).build({ id: "sku-thermos", stock: 2 })
     })
 
     const productOf = (data: CartData | null, id: string): CatalogProductView =>

@@ -1,7 +1,6 @@
 export { DatabaseModule } from "./database.module"
 export { DatabaseProbeService } from "./database-probe.service"
 export type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "./database.options"
-export { DATABASE_MANAGERS, InjectDatabaseManagers } from "./database.decorators"
 export { LIST_ROWS_MAX, sql } from "./database.sql"
 export { DATABASE_ERROR_KINDS } from "./errors/database.error"
 export { parseIdentityDatabaseConfig } from "./identity.config"

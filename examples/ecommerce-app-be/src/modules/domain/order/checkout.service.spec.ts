@@ -1,12 +1,15 @@
 import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
-import { CartService } from "@modules/domain/cart"
-import { CatalogService } from "@modules/domain/catalog"
+import { CART_SERVICE } from "@modules/domain/cart"
+import type { CartService } from "@modules/domain/cart"
+import { CATALOG_SERVICE } from "@modules/domain/catalog"
+import type { CatalogService } from "@modules/domain/catalog"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { Test } from "@nestjs/testing"
+import { productView } from "@tests/fixtures/builders/catalog.builder"
 import { CheckoutService } from "./checkout.service"
 import { OrderErrorCode } from "./errors/order.error"
 
-const shirt = { id: "sku-1", name: "Shirt", priceMinorUnits: 500, stock: 4 }
+const shirt = productView()
 
 const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
     const cart = mock<CartService>()
@@ -15,8 +18,8 @@ const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
         providers: [
             CheckoutService,
             { provide: ORDER_ENTITY_MANAGER, useValue: entityManager },
-            { provide: CartService, useValue: cart },
-            { provide: CatalogService, useValue: catalog },
+            { provide: CART_SERVICE, useValue: cart },
+            { provide: CATALOG_SERVICE, useValue: catalog },
         ],
     }).compile()
     return { checkout: moduleRef.get(CheckoutService), cart, catalog }
@@ -91,7 +94,7 @@ describe("CheckoutService", () => {
             const { checkout, cart } = await build(tx.em)
             cart.clear.mockResolvedValue(undefined)
 
-            await checkout.emptyCart({ personId: "p-1" })
+            expect(await checkout.emptyCart({ personId: "p-1" })).toEqual({ cleared: true })
 
             expect(cart.clear).toHaveBeenCalledWith({ manager: expect.anything(), personId: "p-1" })
             expect(tx.commits).toBe(1)

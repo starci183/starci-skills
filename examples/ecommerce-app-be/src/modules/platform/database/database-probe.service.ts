@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import type { Probe } from "@modules/platform/probes"
-import { InjectDatabaseManagers } from "./database.decorators"
+import { InjectDatabaseManagers } from "./database-probe.tokens"
 import { PING } from "./database.sql"
 
 @Injectable()

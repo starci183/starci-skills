@@ -1,6 +1,7 @@
 export { cartEntities, cartMigrations } from "./persistence/connection"
+export { CartItemEntity } from "./persistence/entities/cart-item.entity"
 export type { CartLine } from "./cart.contracts"
-export { InjectCartService } from "./cart.decorators"
+export { CART_SERVICE, InjectCartService } from "./cart.decorators"
 export { CartModule } from "./cart.module"
 export { CartService } from "./cart.service"
 export { CART_ERROR_KINDS } from "./errors/cart.error"

@@ -1,6 +1,10 @@
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
-import { PaymentService } from "./payment.service"
+import type { PaymentService } from "./payment.service"
 
-/** Injects the PaymentService of this capability. Parameter type: PaymentService. */
-export const InjectPaymentService = (): TypedParameterDecorator<PaymentService> => injector<PaymentService>(PaymentService)
+/** Token of the PaymentService of this capability, for the capabilities that use it. */
+export const PAYMENT_SERVICE: unique symbol = Symbol("domain.payment.service")
+
+/** Injects the PaymentService. Parameter type: PaymentService. */
+export const InjectPaymentService = (): TypedParameterDecorator<PaymentService> =>
+    injector<PaymentService>(PAYMENT_SERVICE)

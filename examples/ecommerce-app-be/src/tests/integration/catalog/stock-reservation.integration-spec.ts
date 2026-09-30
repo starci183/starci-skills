@@ -1,6 +1,6 @@
 import { CatalogService } from "@modules/domain/catalog"
+import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { readStock } from "../../fixtures/persistence/e2e-verification.rows"
-import { UPSERT_PRODUCT } from "../../fixtures/persistence/e2e-verification.sql"
 import { CATALOG_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
 
@@ -13,7 +13,12 @@ describe("catalog: stock reservation (integration)", () => {
     const world = useTestWorld({ modules: CATALOG_CAPABILITY_MODULES })
 
     it("two simultaneous checkouts for the last unit: exactly one takes it and stock ends at zero", async () => {
-        await world.db.order.query(UPSERT_PRODUCT, ["sku-race", "Race product", 1000, 1])
+        await productBuilder(world.db.order).build({
+            id: "sku-race",
+            name: "Race product",
+            priceMinorUnits: 1000,
+            stock: 1,
+        })
         const catalog = world.resolve(CatalogService)
 
         const outcomes = await Promise.all(
@@ -29,7 +34,12 @@ describe("catalog: stock reservation (integration)", () => {
     })
 
     it("a reservation that is rolled back leaves the stock untouched", async () => {
-        await world.db.order.query(UPSERT_PRODUCT, ["sku-rollback", "Rollback product", 1000, 3])
+        await productBuilder(world.db.order).build({
+            id: "sku-rollback",
+            name: "Rollback product",
+            priceMinorUnits: 1000,
+            stock: 3,
+        })
         const catalog = world.resolve(CatalogService)
 
         await expect(
@@ -43,7 +53,12 @@ describe("catalog: stock reservation (integration)", () => {
     })
 
     it("refuses a reservation the stock cannot cover and takes nothing", async () => {
-        await world.db.order.query(UPSERT_PRODUCT, ["sku-short", "Short product", 1000, 1])
+        await productBuilder(world.db.order).build({
+            id: "sku-short",
+            name: "Short product",
+            priceMinorUnits: 1000,
+            stock: 1,
+        })
         const catalog = world.resolve(CatalogService)
 
         const reserved = await world.db.order.transaction((manager) =>

@@ -8,8 +8,7 @@ import type { KeycloakAdmin } from "./keycloak-admin.port"
 export const KEYCLOAK_ADMIN: unique symbol = Symbol("integrations.keycloak-admin")
 
 /** Injects the keycloak admin port. Parameter type: KeycloakAdmin. */
-export const InjectKeycloakAdmin = (): TypedParameterDecorator<KeycloakAdmin> =>
-    injector<KeycloakAdmin>(KEYCLOAK_ADMIN)
+export const InjectKeycloakAdmin = (): TypedParameterDecorator<KeycloakAdmin> => injector<KeycloakAdmin>(KEYCLOAK_ADMIN)
 
 /** Injects the options of the keycloak admin integration. Parameter type: KeycloakAdminOptions. */
 export const InjectKeycloakAdminOptions = (): TypedParameterDecorator<KeycloakAdminOptions> =>

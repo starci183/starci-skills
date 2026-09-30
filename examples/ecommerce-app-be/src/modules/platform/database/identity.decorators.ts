@@ -1,11 +1,9 @@
-import { getEntityManagerToken } from "@nestjs/typeorm"
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
 import type { EntityManager } from "typeorm"
-import { IDENTITY_CONNECTION } from "./identity.connection"
 
-/** Token of the shared EntityManager of the `identity` database. */
-export const IDENTITY_ENTITY_MANAGER = getEntityManagerToken(IDENTITY_CONNECTION)
+/** Token of the shared EntityManager of the `identity` database; the database module provides it for the connection it opens. */
+export const IDENTITY_ENTITY_MANAGER: unique symbol = Symbol("platform.database.identity-entity-manager")
 
 /** Injects the shared EntityManager of the `identity` database. Parameter type: EntityManager. */
 export const InjectIdentityEntityManager = (): TypedParameterDecorator<EntityManager> =>

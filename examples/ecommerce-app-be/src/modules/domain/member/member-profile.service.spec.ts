@@ -67,7 +67,9 @@ describe("MemberProfileService", () => {
             const { service, cache, keycloak } = await build()
             keycloak.findMember.mockResolvedValue(refused(KeycloakAdminErrorCode.MemberMissing, { memberId: "m-1" }))
 
-            await expect(service.profile({ memberId: "m-1" })).resolves.toBeRefused(KeycloakAdminErrorCode.MemberMissing)
+            await expect(service.profile({ memberId: "m-1" })).resolves.toBeRefused(
+                KeycloakAdminErrorCode.MemberMissing,
+            )
 
             expect(cache.has(ENTRY)).toBe(false)
             expect(cache.keys()).toEqual([])

@@ -6,7 +6,7 @@ import { MESSAGE_CATALOG } from "@modules/platform/i18n"
 import type { MessageCatalog } from "@modules/platform/i18n"
 import { Test } from "@nestjs/testing"
 import { DomainError } from "./domain.error"
-import { MODULE_OPTIONS_TOKEN } from "./errors.module-definition"
+import { ERRORS_OPTIONS } from "./errors.decorators"
 import { ErrorsLogEvent } from "./errors.log-events"
 import type { ErrorsOptions } from "./errors.options"
 import { ErrorsService } from "./errors.service"
@@ -23,7 +23,7 @@ describe("ErrorsService", () => {
         const moduleRef = await Test.createTestingModule({
             providers: [
                 ErrorsService,
-                { provide: MODULE_OPTIONS_TOKEN, useValue: options() },
+                { provide: ERRORS_OPTIONS, useValue: options() },
                 { provide: MESSAGE_CATALOG, useValue: catalog },
                 { provide: LOGGER, useValue: logger },
             ],

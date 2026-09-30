@@ -17,7 +17,9 @@ export class PlaceOrderHandler extends ICQRSHandler<PlaceOrderCommand, PlaceOrde
     }
 
     protected override process(command: PlaceOrderCommand): Promise<PlaceOrderResult> {
-        const { request, principal } = command.params
-        return this.orders.placeOrder({ personId: principal.id, idempotencyKey: request.idempotencyKey })
+        return this.orders.placeOrder({
+            personId: command.params.principal.id,
+            idempotencyKey: command.params.request.idempotencyKey,
+        })
     }
 }

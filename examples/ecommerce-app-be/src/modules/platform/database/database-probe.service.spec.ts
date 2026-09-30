@@ -1,6 +1,6 @@
 import { mockEntityManager } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
-import { DATABASE_MANAGERS } from "./database.decorators"
+import { DATABASE_MANAGERS } from "./database-probe.tokens"
 import { PING } from "./database.sql"
 import { DatabaseProbeService } from "./database-probe.service"
 

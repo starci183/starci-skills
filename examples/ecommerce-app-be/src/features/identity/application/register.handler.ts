@@ -17,7 +17,9 @@ export class RegisterHandler extends ICQRSHandler<RegisterCommand, RegisterResul
     }
 
     protected override process(command: RegisterCommand): Promise<RegisterResult> {
-        const { email, password } = command.params.request
-        return this.accounts.register({ email, password })
+        return this.accounts.register({
+            email: command.params.request.email,
+            password: command.params.request.password,
+        })
     }
 }

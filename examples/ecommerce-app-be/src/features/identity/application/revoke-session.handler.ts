@@ -17,7 +17,9 @@ export class RevokeSessionHandler extends ICQRSHandler<RevokeSessionCommand, Rev
     }
 
     protected override process(command: RevokeSessionCommand): Promise<RevokeSessionResult> {
-        const { request, principal } = command.params
-        return this.sessions.revokeOwn({ personId: principal.id, sessionToken: request.sessionToken })
+        return this.sessions.revokeOwn({
+            personId: command.params.principal.id,
+            sessionToken: command.params.request.sessionToken,
+        })
     }
 }

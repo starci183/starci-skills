@@ -4,12 +4,14 @@ import { MODULE_OPTIONS_TOKEN } from "./errors.module-definition"
 import type { ErrorsOptions } from "./errors.options"
 import type { ErrorsService } from "./errors.service"
 
+/** Token of the options of this capability, the token its configurable module provides them under. */
+export const ERRORS_OPTIONS: typeof MODULE_OPTIONS_TOKEN = MODULE_OPTIONS_TOKEN
+
 /** Token of the service that describes failures for the transports. */
 export const ERRORS_SERVICE: unique symbol = Symbol("platform.errors.service")
 
 /** Injects the options of the errors capability. Parameter type: ErrorsOptions. */
-export const InjectErrorsOptions = (): TypedParameterDecorator<ErrorsOptions> =>
-    injector<ErrorsOptions>(MODULE_OPTIONS_TOKEN)
+export const InjectErrorsOptions = (): TypedParameterDecorator<ErrorsOptions> => injector<ErrorsOptions>(ERRORS_OPTIONS)
 
 /** Injects the service that describes failures for the transports. Parameter type: ErrorsService. */
 export const InjectErrorsService = (): TypedParameterDecorator<ErrorsService> => injector<ErrorsService>(ERRORS_SERVICE)

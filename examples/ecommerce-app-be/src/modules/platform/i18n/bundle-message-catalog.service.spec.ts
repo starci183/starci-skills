@@ -1,7 +1,7 @@
 import { builder } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
 import { BundleMessageCatalogService } from "./bundle-message-catalog.service"
-import { MODULE_OPTIONS_TOKEN } from "./i18n.module-definition"
+import { I18N_OPTIONS } from "./i18n.decorators"
 import type { I18nOptions } from "./i18n.options"
 
 const options = builder<I18nOptions>({
@@ -14,7 +14,7 @@ const options = builder<I18nOptions>({
 describe("BundleMessageCatalogService", () => {
     const build = async (overrides?: Partial<I18nOptions>): Promise<BundleMessageCatalogService> => {
         const moduleRef = await Test.createTestingModule({
-            providers: [BundleMessageCatalogService, { provide: MODULE_OPTIONS_TOKEN, useValue: options(overrides) }],
+            providers: [BundleMessageCatalogService, { provide: I18N_OPTIONS, useValue: options(overrides) }],
         }).compile()
         return moduleRef.get(BundleMessageCatalogService)
     }

@@ -20,12 +20,6 @@ export interface VerifyCredentialsParams {
     readonly password: string
 }
 
-/** What registering needs. */
-export type RegisterPersonParams = VerifyCredentialsParams
-
-/** What signing in needs. */
-export type SignInParams = VerifyCredentialsParams
-
 /** What reading one account needs. */
 export interface GetAccountParams {
     /** The person id. */

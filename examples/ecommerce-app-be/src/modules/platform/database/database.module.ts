@@ -3,8 +3,18 @@ import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { DatabaseProbeService } from "./database-probe.service"
-import { DATABASE_MANAGERS } from "./database.decorators"
+import { DATABASE_MANAGERS } from "./database-probe.tokens"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
+import { IDENTITY_CONNECTION } from "./identity.connection"
+import { IDENTITY_ENTITY_MANAGER } from "./identity.decorators"
+import { ORDER_CONNECTION } from "./order.connection"
+import { ORDER_ENTITY_MANAGER } from "./order.decorators"
+
+/** The token each declared connection provides its shared EntityManager under. */
+const ENTITY_MANAGER_TOKENS: ReadonlyMap<string, symbol> = new Map([
+    [IDENTITY_CONNECTION, IDENTITY_ENTITY_MANAGER],
+    [ORDER_CONNECTION, ORDER_ENTITY_MANAGER],
+])
 
 @Module({})
 /**
@@ -15,6 +25,18 @@ export class DatabaseModule extends ConfigurableModuleClass {
     /** Registers the capability once per app with the connections it opens. */
     static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
+        const managers = options.connections.flatMap((connection) => {
+            const token = ENTITY_MANAGER_TOKENS.get(connection.name)
+            return token === undefined
+                ? []
+                : [
+                      {
+                          provide: token,
+                          inject: [getDataSourceToken(connection.name)],
+                          useFactory: (source: DataSource) => source.manager,
+                      },
+                  ]
+        })
         return {
             ...base,
             imports: [
@@ -37,9 +59,10 @@ export class DatabaseModule extends ConfigurableModuleClass {
                     inject: options.connections.map((connection) => getDataSourceToken(connection.name)),
                     useFactory: (...sources: Array<DataSource>) => sources.map((source) => source.manager),
                 },
+                ...managers,
                 DatabaseProbeService,
             ],
-            exports: [DatabaseProbeService],
+            exports: [DatabaseProbeService, ...managers.map((manager) => manager.provide)],
         }
     }
 }

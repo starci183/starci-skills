@@ -17,7 +17,6 @@ export class SignInHandler extends ICQRSHandler<SignInCommand, SignInResult> {
     }
 
     protected override process(command: SignInCommand): Promise<SignInResult> {
-        const { email, password } = command.params.request
-        return this.accounts.signIn({ email, password })
+        return this.accounts.signIn({ email: command.params.request.email, password: command.params.request.password })
     }
 }

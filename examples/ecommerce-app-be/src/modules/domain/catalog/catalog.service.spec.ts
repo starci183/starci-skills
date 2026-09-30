@@ -1,12 +1,10 @@
 import { mockEntityManager } from "@starci/jest-preset"
 import { LIST_ROWS_MAX, ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { Test } from "@nestjs/testing"
+import { productEntity, productView } from "@tests/fixtures/builders/catalog.builder"
 import { In, MoreThanOrEqual } from "typeorm"
 import { CatalogService } from "./catalog.service"
 import { ProductEntity } from "./persistence/entities/product.entity"
-
-const product = (id: string, priceMinorUnits: number, stock: number): ProductEntity =>
-    Object.assign(new ProductEntity(), { id, name: `Product ${id}`, priceMinorUnits, stock })
 
 const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
     const moduleRef = await Test.createTestingModule({
@@ -18,11 +16,19 @@ const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
 describe("CatalogService", () => {
     describe("list", () => {
         it("returns every product by SKU, capped at the list maximum", async () => {
-            const em = mockEntityManager({ find: [ProductEntity, [product("sku-1", 500, 3), product("sku-2", 900, 0)]] })
+            const em = mockEntityManager({
+                find: [
+                    ProductEntity,
+                    [
+                        productEntity({ id: "sku-1", stock: 3 }),
+                        productEntity({ id: "sku-2", priceMinorUnits: 900, stock: 0 }),
+                    ],
+                ],
+            })
 
             expect(await (await build(em)).list()).toEqual([
-                { id: "sku-1", name: "Product sku-1", priceMinorUnits: 500, stock: 3 },
-                { id: "sku-2", name: "Product sku-2", priceMinorUnits: 900, stock: 0 },
+                productView({ id: "sku-1", stock: 3 }),
+                productView({ id: "sku-2", priceMinorUnits: 900, stock: 0 }),
             ])
             expect(em.find).toHaveBeenCalledWith(ProductEntity, { order: { id: "ASC" }, take: LIST_ROWS_MAX })
         })
@@ -30,11 +36,11 @@ describe("CatalogService", () => {
 
     describe("byIds", () => {
         it("returns the products keyed by id and leaves an unknown id absent", async () => {
-            const em = mockEntityManager({ find: [ProductEntity, [product("sku-1", 500, 3)]] })
+            const em = mockEntityManager({ find: [ProductEntity, [productEntity({ id: "sku-1", stock: 3 })]] })
 
             const lookup = await (await build(em)).byIds({ ids: ["sku-1", "sku-9"] })
 
-            expect(lookup).toEqual({ "sku-1": { id: "sku-1", name: "Product sku-1", priceMinorUnits: 500, stock: 3 } })
+            expect(lookup).toEqual({ "sku-1": productView({ id: "sku-1", stock: 3 }) })
             expect(lookup["sku-9"]).toBeUndefined()
             expect(em.find).toHaveBeenCalledWith(ProductEntity, {
                 where: { id: In(["sku-1", "sku-9"]) },
@@ -53,7 +59,9 @@ describe("CatalogService", () => {
         it("takes the units with a guarded decrement and returns true when a row changed", async () => {
             const manager = mockEntityManager({ decrement: [ProductEntity, { affected: 1 }] })
 
-            const reserved = await (await build(mockEntityManager())).reserveStock({
+            const reserved = await (
+                await build(mockEntityManager())
+            ).reserveStock({
                 manager,
                 productId: "sku-1",
                 quantity: 2,

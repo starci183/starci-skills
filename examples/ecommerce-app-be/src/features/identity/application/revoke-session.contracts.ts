@@ -7,8 +7,5 @@ export interface RevokeSessionRequest {
     readonly sessionToken: string
 }
 
-/** The confirmation that the session ended. */
-export type Revoked = RevokedSession
-
 /** The confirmation, or the refusal when the token is not a live session of the caller. */
-export type RevokeSessionResult = Outcome<Revoked, SessionErrorCode.Invalid>
+export type RevokeSessionResult = Outcome<RevokedSession, SessionErrorCode.Invalid>

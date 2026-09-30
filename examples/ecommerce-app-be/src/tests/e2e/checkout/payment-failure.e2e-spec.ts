@@ -1,15 +1,11 @@
 import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
+import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData, ClearCartData } from "../../fixtures/e2e-views.contracts"
 import type { PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
-import {
-    ORDER_COUNT,
-    PAYMENTS_OF_PERSON,
-    PAYMENT_COUNT,
-    SET_STOCK,
-} from "../../fixtures/persistence/e2e-verification.sql"
+import { ORDER_COUNT, PAYMENTS_OF_PERSON, PAYMENT_COUNT } from "../../fixtures/persistence/e2e-verification.sql"
 import type { TestApi } from "../../world/test-api.client"
 import { useTestWorld } from "../../world/use-test-world"
 
@@ -36,7 +32,7 @@ describe("payment failure", () => {
     const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
     beforeAll(async () => {
-        await world.db.order.query(SET_STOCK, ["sku-thermos", 2])
+        await productBuilder(world.db.order).build({ id: "sku-thermos", stock: 2 })
     })
 
     it("a refused confirmation rolls back atomically; the corrected retry captures exactly once", async () => {

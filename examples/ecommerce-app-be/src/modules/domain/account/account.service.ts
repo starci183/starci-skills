@@ -13,8 +13,6 @@ import type {
     AccountPersonView,
     AccountView,
     GetAccountParams,
-    RegisterPersonParams,
-    SignInParams,
     VerifyCredentialsParams,
 } from "./account.contracts"
 import { AccountErrorCode } from "./errors/account.error"
@@ -45,14 +43,16 @@ export class AccountService {
     }
 
     /** Checks the credentials and starts a session; a wrong email and a wrong password are the same refusal. */
-    async signIn(params: SignInParams): Promise<Outcome<IssuedSession, AccountErrorCode.InvalidCredentials>> {
+    async signIn(
+        params: VerifyCredentialsParams,
+    ): Promise<Outcome<IssuedSession, AccountErrorCode.InvalidCredentials>> {
         const verified = await this.verifyCredentials(params)
         if (verified.kind === "refused") return verified
         return ok(await this.sessions.issue({ personId: verified.value.personId }))
     }
 
     /** Registers a person in one transaction; a taken email is a refusal. */
-    async register(params: RegisterPersonParams): Promise<Outcome<AccountPersonView, AccountErrorCode.EmailTaken>> {
+    async register(params: VerifyCredentialsParams): Promise<Outcome<AccountPersonView, AccountErrorCode.EmailTaken>> {
         return this.entityManager.transaction(async (manager) => {
             const rows: Array<PersonIdRow> = await manager.query(INSERT_PERSON_IF_NEW, [
                 params.email,

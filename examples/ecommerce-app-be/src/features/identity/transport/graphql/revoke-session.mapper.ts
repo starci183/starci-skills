@@ -1,4 +1,5 @@
-import type { RevokeSessionRequest, Revoked } from "../../application/revoke-session.contracts"
+import type { RevokedSession } from "@modules/domain/session"
+import type { RevokeSessionRequest } from "../../application/revoke-session.contracts"
 import type { RevokeSessionInput } from "./dto/revoke-session.input"
 import type { RevokeSessionType } from "./dto/revoke-session.type"
 
@@ -8,4 +9,4 @@ export const toRevokeSessionRequest = (input: RevokeSessionInput): RevokeSession
 })
 
 /** Maps the confirmation to the GraphQL type. */
-export const toRevokeSessionType = (result: Revoked): RevokeSessionType => ({ revoked: result.revoked })
+export const toRevokeSessionType = (result: RevokedSession): RevokeSessionType => ({ revoked: result.revoked })

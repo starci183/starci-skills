@@ -8,7 +8,7 @@ import { InjectOrderEntityManager } from "@modules/platform/database"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { OrderErrorCode } from "./errors/order.error"
-import type { AddToCartParams, CartView, EmptyCartParams, ViewCartParams } from "./order.contracts"
+import type { AddToCartParams, CartView, EmptiedCart, EmptyCartParams, ViewCartParams } from "./order.contracts"
 
 @Injectable()
 /** The cart side of checkout: what a person holds, adding a catalog product to it and emptying it, each write in one transaction. */
@@ -41,7 +41,8 @@ export class CheckoutService {
     }
 
     /** Empties the cart of a person. */
-    async emptyCart(params: EmptyCartParams): Promise<void> {
+    async emptyCart(params: EmptyCartParams): Promise<EmptiedCart> {
         await this.entityManager.transaction((manager) => this.cart.clear({ manager, personId: params.personId }))
+        return { cleared: true }
     }
 }

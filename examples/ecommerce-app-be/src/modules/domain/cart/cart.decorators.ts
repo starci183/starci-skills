@@ -1,6 +1,9 @@
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
-import { CartService } from "./cart.service"
+import type { CartService } from "./cart.service"
 
-/** Injects the CartService of this capability. Parameter type: CartService. */
-export const InjectCartService = (): TypedParameterDecorator<CartService> => injector<CartService>(CartService)
+/** Token of the CartService of this capability, for the capabilities that use it. */
+export const CART_SERVICE: unique symbol = Symbol("domain.cart.service")
+
+/** Injects the CartService. Parameter type: CartService. */
+export const InjectCartService = (): TypedParameterDecorator<CartService> => injector<CartService>(CART_SERVICE)

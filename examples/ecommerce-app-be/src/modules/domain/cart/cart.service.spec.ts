@@ -1,13 +1,11 @@
 import { mockEntityManager } from "@starci/jest-preset"
 import { LIST_ROWS_MAX, ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { Test } from "@nestjs/testing"
+import { cartItemEntity } from "@tests/fixtures/builders/cart.builder"
 import { CartService } from "./cart.service"
 import { CartErrorCode } from "./errors/cart.error"
 import { CartItemEntity } from "./persistence/entities/cart-item.entity"
 import { UPSERT_CART_ITEM } from "./persistence/cart.sql"
-
-const item = (productId: string, quantity: number): CartItemEntity =>
-    Object.assign(new CartItemEntity(), { id: `i-${productId}`, personId: "p-1", productId, quantity })
 
 const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
     const moduleRef = await Test.createTestingModule({
@@ -19,7 +17,15 @@ const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
 describe("CartService", () => {
     describe("list", () => {
         it("returns the lines of the person by product, capped at the list maximum", async () => {
-            const em = mockEntityManager({ find: [CartItemEntity, [item("sku-1", 2), item("sku-2", 1)]] })
+            const em = mockEntityManager({
+                find: [
+                    CartItemEntity,
+                    [
+                        cartItemEntity({ productId: "sku-1", quantity: 2 }),
+                        cartItemEntity({ productId: "sku-2", quantity: 1 }),
+                    ],
+                ],
+            })
 
             const lines = await (await build(em)).list({ personId: "p-1" })
 

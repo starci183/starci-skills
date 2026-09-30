@@ -1,5 +1,6 @@
 import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
+import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData, AccountData, BuyerStatusData } from "../../fixtures/e2e-views.contracts"
 import type { OrderSummaryRow, PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
@@ -9,7 +10,6 @@ import {
     ORDER_LINE_COUNT,
     CART_ITEM_COUNT,
     PAYMENTS_OF_PERSON,
-    SET_STOCK,
 } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
@@ -27,7 +27,7 @@ describe("checkout journey", () => {
     const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
     beforeAll(async () => {
-        await world.db.order.query(SET_STOCK, ["sku-thermos", 2])
+        await productBuilder(world.db.order).build({ id: "sku-thermos", stock: 2 })
     })
 
     it("register, browse the catalog, add to the cart, place the order, pay, and end with an empty cart", async () => {

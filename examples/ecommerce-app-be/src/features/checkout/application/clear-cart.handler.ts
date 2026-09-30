@@ -16,8 +16,7 @@ export class ClearCartHandler extends ICQRSHandler<ClearCartCommand, ClearCartRe
         super(logger)
     }
 
-    protected override async process(command: ClearCartCommand): Promise<ClearCartResult> {
-        await this.checkout.emptyCart({ personId: command.params.principal.id })
-        return { cleared: true }
+    protected override process(command: ClearCartCommand): Promise<ClearCartResult> {
+        return this.checkout.emptyCart({ personId: command.params.principal.id })
     }
 }

@@ -17,11 +17,10 @@ export class AddCartItemHandler extends ICQRSHandler<AddCartItemCommand, AddCart
     }
 
     protected override process(command: AddCartItemCommand): Promise<AddCartItemResult> {
-        const { request, principal } = command.params
         return this.checkout.addToCart({
-            personId: principal.id,
-            productId: request.productId,
-            quantity: request.quantity,
+            personId: command.params.principal.id,
+            productId: command.params.request.productId,
+            quantity: command.params.request.quantity,
         })
     }
 }

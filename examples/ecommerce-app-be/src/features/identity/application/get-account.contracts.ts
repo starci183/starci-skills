@@ -9,5 +9,3 @@ export interface GetAccountRequest {
 
 /** The overview, or the refusal when the caller person no longer exists. */
 export type GetAccountResult = Outcome<AccountOverview, AccountErrorCode.PersonUnknown>
-
-export type { AccountOverview }

@@ -1,9 +1,11 @@
 import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
-import { SessionService } from "@modules/domain/session"
+import { SESSION_SERVICE } from "@modules/domain/session"
+import type { SessionService } from "@modules/domain/session"
 import { ORDER_API } from "@modules/integrations/order-api"
 import type { OrderApiClient } from "@modules/integrations/order-api"
 import { IDENTITY_ENTITY_MANAGER } from "@modules/platform/database"
 import { Test } from "@nestjs/testing"
+import { personEntity } from "@tests/fixtures/builders/account.builder"
 import { AccountService } from "./account.service"
 import { AccountErrorCode } from "./errors/account.error"
 import { hashPassword } from "./password.policy"
@@ -11,12 +13,7 @@ import { INSERT_PERSON_IF_NEW } from "./persistence/account.sql"
 import { PersonEntity } from "./persistence/entities/person.entity"
 
 const person = (id: string, email: string, password: string): PersonEntity =>
-    Object.assign(new PersonEntity(), {
-        id,
-        email,
-        passwordHash: hashPassword(password),
-        createdAt: new Date("2026-01-01T00:00:00.000Z"),
-    })
+    personEntity({ id, email, passwordHash: hashPassword(password) })
 
 const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
     const sessions = mock<SessionService>()
@@ -25,7 +22,7 @@ const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
         providers: [
             AccountService,
             { provide: IDENTITY_ENTITY_MANAGER, useValue: entityManager },
-            { provide: SessionService, useValue: sessions },
+            { provide: SESSION_SERVICE, useValue: sessions },
             { provide: ORDER_API, useValue: orderApi },
         ],
     }).compile()
@@ -112,7 +109,9 @@ describe("AccountService", () => {
             const tx = fakeTransaction(em)
             const { accounts } = await build(tx.em)
 
-            await expect(accounts.register({ email: "an@shop.test", password: "s3cret-pw" })).rejects.toThrow("deadlock")
+            await expect(accounts.register({ email: "an@shop.test", password: "s3cret-pw" })).rejects.toThrow(
+                "deadlock",
+            )
 
             expect(tx.rollbacks).toBe(1)
             expect(tx.committedWrites).toEqual([])

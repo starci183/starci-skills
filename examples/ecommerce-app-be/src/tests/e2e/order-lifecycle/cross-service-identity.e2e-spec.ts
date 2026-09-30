@@ -1,9 +1,10 @@
 import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
+import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import type { CartData, PlaceOrderData, AccountData, RevokeSessionData } from "../../fixtures/e2e-views.contracts"
 import type { OrderRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
-import { ORDERS_OF_PERSON, SET_STOCK } from "../../fixtures/persistence/e2e-verification.sql"
+import { ORDERS_OF_PERSON } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
@@ -21,7 +22,7 @@ describe("order lifecycle: identity to order boundary", () => {
     const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
     beforeAll(async () => {
-        await world.db.order.query(SET_STOCK, ["sku-thermos", 2])
+        await productBuilder(world.db.order).build({ id: "sku-thermos", stock: 2 })
     })
 
     it("a revoked session is refused at the order boundary until re-auth resumes the same buyer", async () => {

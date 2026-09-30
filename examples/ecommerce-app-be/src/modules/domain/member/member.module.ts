@@ -9,6 +9,10 @@ export class MemberModule extends ConfigurableModuleClass {
     /** Registers the capability once per app. */
     static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
-        return { ...base, providers: [...(base.providers ?? []), MemberProfileService], exports: [MemberProfileService] }
+        return {
+            ...base,
+            providers: [...(base.providers ?? []), MemberProfileService],
+            exports: [MemberProfileService],
+        }
     }
 }
