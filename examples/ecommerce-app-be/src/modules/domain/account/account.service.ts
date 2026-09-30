@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common"
-import { EntityManager } from "typeorm"
-import { SessionService } from "@modules/domain/session"
-import type { IssuedSession } from "@modules/domain/session"
+import type { EntityManager } from "typeorm"
+import { InjectSessionService } from "@modules/domain/session"
+import type { IssuedSession, SessionService } from "@modules/domain/session"
 import { InjectOrderApi } from "@modules/integrations/order-api"
 import type { OrderApiClient } from "@modules/integrations/order-api"
 import { InjectIdentityEntityManager } from "@modules/platform/database"
@@ -29,7 +29,7 @@ import { PersonEntity } from "./persistence/entities/person.entity"
 export class AccountService {
     constructor(
         @InjectIdentityEntityManager() private readonly entityManager: EntityManager,
-        private readonly sessions: SessionService,
+        @InjectSessionService() private readonly sessions: SessionService,
         @InjectOrderApi() private readonly orderApi: OrderApiClient,
     ) {}
 

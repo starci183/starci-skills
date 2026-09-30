@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common"
-import { EntityManager } from "typeorm"
+import type { EntityManager } from "typeorm"
 import { InjectOrderEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
 import type { AddCartItemParams, CartLine, ClearCartParams, ListCartParams } from "./cart.contracts"
 import { CartError, CartErrorCode } from "./errors/cart.error"

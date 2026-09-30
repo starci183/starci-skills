@@ -1,8 +1,9 @@
 import { Injectable } from "@nestjs/common"
-import { EntityManager } from "typeorm"
-import { CartService } from "@modules/domain/cart"
-import type { CartLine } from "@modules/domain/cart"
-import { CatalogService } from "@modules/domain/catalog"
+import type { EntityManager } from "typeorm"
+import { InjectCartService } from "@modules/domain/cart"
+import type { CartLine, CartService } from "@modules/domain/cart"
+import { InjectCatalogService } from "@modules/domain/catalog"
+import type { CatalogService } from "@modules/domain/catalog"
 import { InjectOrderEntityManager } from "@modules/platform/database"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
@@ -14,8 +15,8 @@ import type { AddToCartParams, CartView, EmptyCartParams, ViewCartParams } from 
 export class CheckoutService {
     constructor(
         @InjectOrderEntityManager() private readonly entityManager: EntityManager,
-        private readonly cart: CartService,
-        private readonly catalog: CatalogService,
+        @InjectCartService() private readonly cart: CartService,
+        @InjectCatalogService() private readonly catalog: CatalogService,
     ) {}
 
     /** The cart lines of a person and the catalog they price against. */

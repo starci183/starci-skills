@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common"
-import { EntityManager, In, MoreThanOrEqual } from "typeorm"
+import { In, MoreThanOrEqual } from "typeorm"
+import type { EntityManager } from "typeorm"
 import { InjectOrderEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
 import type { ProductLookup, ProductView, ProductsByIdsParams, ReserveStockParams } from "./catalog.contracts"
 import { ProductEntity } from "./persistence/entities/product.entity"

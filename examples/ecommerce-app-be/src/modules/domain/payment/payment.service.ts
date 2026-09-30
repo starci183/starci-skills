@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common"
-import { EntityManager } from "typeorm"
+import type { EntityManager } from "typeorm"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectOrderEntityManager } from "@modules/platform/database"

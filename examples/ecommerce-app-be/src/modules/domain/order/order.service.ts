@@ -1,8 +1,11 @@
 import { Injectable } from "@nestjs/common"
-import { EntityManager } from "typeorm"
-import { CartService } from "@modules/domain/cart"
-import { CatalogService } from "@modules/domain/catalog"
-import { PaymentService } from "@modules/domain/payment"
+import type { EntityManager } from "typeorm"
+import { InjectCartService } from "@modules/domain/cart"
+import type { CartService } from "@modules/domain/cart"
+import { InjectCatalogService } from "@modules/domain/catalog"
+import type { CatalogService } from "@modules/domain/catalog"
+import { InjectPaymentService } from "@modules/domain/payment"
+import type { PaymentService } from "@modules/domain/payment"
 import { InjectOrderEntityManager } from "@modules/platform/database"
 import { ok } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
@@ -33,9 +36,9 @@ import { COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sq
 export class OrderService {
     constructor(
         @InjectOrderEntityManager() private readonly entityManager: EntityManager,
-        private readonly cart: CartService,
-        private readonly catalog: CatalogService,
-        private readonly payments: PaymentService,
+        @InjectCartService() private readonly cart: CartService,
+        @InjectCatalogService() private readonly catalog: CatalogService,
+        @InjectPaymentService() private readonly payments: PaymentService,
     ) {}
 
     /**
