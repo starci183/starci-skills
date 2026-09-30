@@ -15,6 +15,13 @@ import { REQUIRED_FILE_RULE_IDS } from '../scripts/checks/architecture/required-
 import { SIZE_GROWTH_RULE_IDS } from '../scripts/checks/architecture/size-growth.mjs';
 import { CLONE_RULE_IDS } from '../scripts/checks/architecture/clones.mjs';
 import { SYMBOL_RULE_IDS } from '../scripts/checks/architecture/symbols.mjs';
+import { CONNECTION_RULE_IDS } from '../scripts/checks/architecture/connection-map.mjs';
+import { SQL_OWNER_RULE_IDS } from '../scripts/checks/architecture/sql-owner.mjs';
+import { REGISTER_ONCE_RULE_IDS } from '../scripts/checks/architecture/register-once.mjs';
+import { ERROR_MASKED_RULE_IDS } from '../scripts/checks/architecture/error-masked.mjs';
+import { DEFAULT_DENY_RULE_IDS } from '../scripts/checks/architecture/default-deny.mjs';
+import { ENTRYPOINT_RULE_IDS } from '../scripts/checks/architecture/entrypoint.mjs';
+import { ERROR_CODE_RULE_IDS } from '../scripts/checks/architecture/error-codes.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -22,9 +29,10 @@ const ts = require('typescript');
 // The architecture rules exercised through hfs.json fixtures. The declaration is hfs.json (profile be|fe plus
 // apps); owners, roots, registration and the Grammar contract are derived, so a rule is exercised by shaping the tree.
 // The HFS machine (tier direction, reachability, dead exports, required files, size growth, duplicate blocks) runs on every
-// fixture too and has its own specs; check() below drops its findings so this spec judges the rules it is about.
+// fixture too and has its own specs (as do the backend composition and data checks); check() below drops its findings so this spec judges the rules it is about.
 const HFS_MACHINE_RULE_IDS = new Set([...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS, ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS,
-  ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...SYMBOL_RULE_IDS]);
+  ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...SYMBOL_RULE_IDS, ...CONNECTION_RULE_IDS, ...SQL_OWNER_RULE_IDS, ...REGISTER_ONCE_RULE_IDS, ...ERROR_MASKED_RULE_IDS,
+  ...DEFAULT_DENY_RULE_IDS, ...ENTRYPOINT_RULE_IDS, ...ERROR_CODE_RULE_IDS]);
 
 function scoped(report) {
   const violations = report.violations.filter(item => !HFS_MACHINE_RULE_IDS.has(item.ruleId));
