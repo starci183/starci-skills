@@ -35,6 +35,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isMain } from '../runtime/scripts/checks/common.mjs';
 import { checkRepository, explainPath, initRepo, trackedFiles } from '../runtime/scripts/lib/hfs-check.mjs';
 import { HfsSlotsError } from '../runtime/scripts/lib/hfs-slots.mjs';
 import { formatFindings } from '../sync/format.mjs';
@@ -201,4 +202,6 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = await main(process.argv.slice(2));
+// Run when this file is the entry point, compared by real path: through a node_modules junction or an npx shim argv[1] is
+// the junction path while import.meta.url is the resolved one, and a plain comparison silently skipped main (hfs printed nothing).
+if (isMain(import.meta.url)) process.exitCode = await main(process.argv.slice(2));

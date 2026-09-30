@@ -57,7 +57,7 @@ pins:
     source: packages/jest-preset/package.json
     why: '2.1.0: four projects on the test world, the unit kit (mockEntityManager, fakeTransaction, fakeIds, FakeClock, Outcome matchers) and the recordingOutbox claim side.'
   '@starci/hfs':
-    version: 2.0.1
+    version: 2.0.2
     group: starci
     install: registry
     side: both

@@ -7,6 +7,7 @@
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {checkArchitecture} from './architecture/index.mjs';
+import { isMain } from './common.mjs';
 
 export {checkArchitecture};
 
@@ -38,4 +39,4 @@ export function architectureMain(argv, {check = checkArchitecture, write = (text
   return report?.ok === true ? 0 : 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = architectureMain(process.argv.slice(2));
+if (isMain(import.meta.url)) process.exitCode = architectureMain(process.argv.slice(2));

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 - 2026-10-01
+
+- Fixed: `hfs` printed nothing and checked nothing when started through a node_modules junction or symlink (every lane worktree, some npx shims): the entry-point test compared `argv[1]` with the resolved module path. It now compares real paths (`isMain` of `scripts/checks/common.mjs`, shared by the bin and the architecture entry). Spec: `tests/hfs-cli-worktree.spec.mjs` runs `hfs check` inside a `git worktree add` checkout with a junctioned node_modules and requires a report or a loud refusal.
+
 ## 2.0.1 - 2026-10-01
 
 - Fixed: `hfs sync` validates the whole hfs.json declaration against the manifest before rendering (a pre-2.0 `connections` list of names is refused), so a pin bump can never leave eslint unable to start.
