@@ -1,21 +1,15 @@
 import { Test } from "@nestjs/testing"
 import { mockEntityManager } from "@starci/jest-preset"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { invitationRow } from "@tests/fixtures/builders/share.builder"
 import { AccessService } from "./access.service"
 import { InvitationEntity } from "./persistence/entities/invitation.entity"
 
-const editor: InvitationEntity = {
-    id: "i-1",
-    taskId: "t-1",
-    ownerId: "owner-1",
-    email: "ann@example.com",
-    role: "editor",
+const editor = invitationRow({
     status: "accepted",
-    sentAt: new Date("2026-09-01T10:00:00.000Z"),
     acceptedAt: new Date("2026-09-02T10:00:00.000Z"),
-    revokedAt: null,
     personId: "ann",
-}
+})
 
 const build = async (manager: ReturnType<typeof mockEntityManager>) => {
     const moduleRef = await Test.createTestingModule({

@@ -1,33 +1,15 @@
 import { Test } from "@nestjs/testing"
 import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import { TaskService } from "@modules/domain/task"
-import type { TaskView } from "@modules/domain/task"
 import { CLOCK } from "@modules/platform/clock"
 import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { invitationRow, SHARE_AT, SHARE_EXPIRED_SENT_AT, sharedTask } from "@tests/fixtures/builders/share.builder"
 import { ShareErrorCode } from "./errors/share.error"
 import { InvitationService } from "./invitation.service"
 import { InvitationEntity } from "./persistence/entities/invitation.entity"
 
-const NOW = "2026-09-10T10:00:00.000Z"
-const at = new Date(NOW)
-
-const task: TaskView = { id: "t-1", owner: "owner-1", title: "Write", complete: false, completedAt: null }
-
-const row = (overrides: Partial<InvitationEntity> = {}): InvitationEntity => ({
-    id: "i-1",
-    taskId: "t-1",
-    ownerId: "owner-1",
-    email: "ann@example.com",
-    role: "editor",
-    status: "pending",
-    sentAt: new Date("2026-09-01T10:00:00.000Z"),
-    acceptedAt: null,
-    revokedAt: null,
-    personId: null,
-    ...overrides,
-})
-
-const expired = row({ sentAt: new Date("2026-08-01T10:00:00.000Z") })
+const at = new Date(SHARE_AT)
+const expired = invitationRow({ sentAt: SHARE_EXPIRED_SENT_AT })
 
 const build = async (em = mockEntityManager()) => {
     const tx = fakeTransaction(em)
@@ -36,7 +18,7 @@ const build = async (em = mockEntityManager()) => {
         providers: [
             InvitationService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
-            { provide: CLOCK, useValue: new FakeClock(NOW) },
+            { provide: CLOCK, useValue: new FakeClock(SHARE_AT) },
             { provide: TaskService, useValue: tasks },
         ],
     }).compile()
@@ -57,7 +39,7 @@ describe("InvitationService", () => {
 
         it("refuses somebody else's task", async () => {
             const { service, tx, tasks } = await build()
-            tasks.find.mockResolvedValue(task)
+            tasks.find.mockResolvedValue(sharedTask())
 
             await expect(service.invite({ ...request, ownerId: "intruder" })).resolves.toBeRefused(ShareErrorCode.Forbidden)
             expect(tx.outcomes).toEqual([])
@@ -65,7 +47,7 @@ describe("InvitationService", () => {
 
         it("refuses a malformed email", async () => {
             const { service, tx, tasks } = await build()
-            tasks.find.mockResolvedValue(task)
+            tasks.find.mockResolvedValue(sharedTask())
 
             await expect(service.invite({ ...request, email: "nope" })).resolves.toBeRefused({
                 code: ShareErrorCode.InvalidEmail,
@@ -76,7 +58,7 @@ describe("InvitationService", () => {
 
         it("refuses a role that is neither viewer nor editor", async () => {
             const { service, tx, tasks } = await build()
-            tasks.find.mockResolvedValue(task)
+            tasks.find.mockResolvedValue(sharedTask())
 
             await expect(service.invite({ ...request, role: "admin" })).resolves.toBeRefused({
                 code: ShareErrorCode.InvalidRole,
@@ -86,9 +68,9 @@ describe("InvitationService", () => {
         })
 
         it("creates a pending invitation for the normalized email, stamped with the clock", async () => {
-            const saved = row({ sentAt: at })
+            const saved = invitationRow({ sentAt: at })
             const { service, em, tx, tasks } = await build(mockEntityManager({ findOne: [InvitationEntity, null], save: [InvitationEntity, saved] }))
-            tasks.find.mockResolvedValue(task)
+            tasks.find.mockResolvedValue(sharedTask())
 
             await expect(service.invite(request)).resolves.toSucceedWith({
                 invitationId: "i-1",
@@ -118,11 +100,11 @@ describe("InvitationService", () => {
         })
 
         it.each([
-            ["pending", row()],
-            ["accepted", row({ status: "accepted", personId: "ann" })],
+            ["pending", invitationRow()],
+            ["accepted", invitationRow({ status: "accepted", personId: "ann" })],
         ])("refuses inviting an address that already has a %s invitation, and saves nothing", async (_status, existing) => {
             const { service, em, tasks } = await build(mockEntityManager({ findOne: [InvitationEntity, existing] }))
-            tasks.find.mockResolvedValue(task)
+            tasks.find.mockResolvedValue(sharedTask())
 
             await expect(service.invite(request)).resolves.toBeRefused({
                 code: ShareErrorCode.InvitationAlreadyExists,
@@ -133,11 +115,11 @@ describe("InvitationService", () => {
 
         it.each([
             ["expired", expired],
-            ["revoked", row({ status: "revoked", revokedAt: new Date("2026-09-03T10:00:00.000Z") })],
+            ["revoked", invitationRow({ status: "revoked", revokedAt: new Date("2026-09-03T10:00:00.000Z") })],
         ])("re-opens an %s invitation of the same pair, keeping its id", async (_status, existing) => {
-            const reopened = row({ role: "viewer", sentAt: at })
+            const reopened = invitationRow({ role: "viewer", sentAt: at })
             const { service, em, tasks } = await build(mockEntityManager({ findOne: [InvitationEntity, existing], save: [InvitationEntity, reopened] }))
-            tasks.find.mockResolvedValue(task)
+            tasks.find.mockResolvedValue(sharedTask())
 
             await expect(service.invite({ ...request, role: "viewer" })).resolves.toSucceedWith({
                 invitationId: "i-1",
@@ -167,7 +149,7 @@ describe("InvitationService", () => {
         })
 
         it("refuses an invitation addressed to another email", async () => {
-            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, row()] }))
+            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow()] }))
 
             await expect(service.accept({ ...request, email: "bob@example.com" })).resolves.toBeRefused(ShareErrorCode.EmailMismatch)
         })
@@ -179,27 +161,27 @@ describe("InvitationService", () => {
         })
 
         it("refuses a revoked invitation", async () => {
-            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, row({ status: "revoked" })] }))
+            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow({ status: "revoked" })] }))
 
             await expect(service.accept(request)).resolves.toBeRefused(ShareErrorCode.InvitationRevoked)
         })
 
         it("answers the same success when the same person accepts again, and saves nothing", async () => {
-            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, row({ status: "accepted", personId: "ann" })] }))
+            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow({ status: "accepted", personId: "ann" })] }))
 
             await expect(service.accept(request)).resolves.toSucceedWith({ invitationId: "i-1", role: "editor", status: "accepted" })
             expect(em.save).not.toHaveBeenCalled()
         })
 
         it("refuses an invitation already accepted by somebody else", async () => {
-            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, row({ status: "accepted", personId: "someone" })] }))
+            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow({ status: "accepted", personId: "someone" })] }))
 
             await expect(service.accept(request)).resolves.toBeRefused(ShareErrorCode.InvitationAlreadyClosed)
         })
 
         it("binds the accepting person to a pending invitation at the instant of the clock", async () => {
-            const saved = row({ status: "accepted", acceptedAt: at, personId: "ann" })
-            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, row()], save: [InvitationEntity, saved] }))
+            const saved = invitationRow({ status: "accepted", acceptedAt: at, personId: "ann" })
+            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow()], save: [InvitationEntity, saved] }))
 
             await expect(service.accept(request)).resolves.toSucceedWith({ invitationId: "i-1", role: "editor", status: "accepted" })
             expect(em.save).toHaveBeenCalledWith(
@@ -219,7 +201,7 @@ describe("InvitationService", () => {
         })
 
         it("refuses somebody who does not own the invitation, and saves nothing", async () => {
-            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, row()] }))
+            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow()] }))
 
             await expect(service.revoke({ ...request, ownerId: "intruder" })).resolves.toBeRefused(ShareErrorCode.Forbidden)
             expect(em.save).not.toHaveBeenCalled()
@@ -227,7 +209,7 @@ describe("InvitationService", () => {
 
         it.each([
             ["expired", expired],
-            ["revoked", row({ status: "revoked" })],
+            ["revoked", invitationRow({ status: "revoked" })],
         ])("refuses an %s invitation as closed", async (_status, existing) => {
             const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, existing] }))
 
@@ -235,10 +217,10 @@ describe("InvitationService", () => {
         })
 
         it.each([
-            ["pending", row()],
-            ["accepted", row({ status: "accepted", personId: "ann" })],
+            ["pending", invitationRow()],
+            ["accepted", invitationRow({ status: "accepted", personId: "ann" })],
         ])("revokes a %s invitation at the instant of the clock", async (_status, existing) => {
-            const saved = row({ status: "revoked", revokedAt: at })
+            const saved = invitationRow({ status: "revoked", revokedAt: at })
             const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, existing], save: [InvitationEntity, saved] }))
 
             await expect(service.revoke(request)).resolves.toSucceedWith({ invitationId: "i-1", status: "revoked" })
@@ -247,7 +229,7 @@ describe("InvitationService", () => {
     })
 
     describe("listFor", () => {
-        const rows = [row(), row({ id: "i-2", email: "bob@example.com", status: "accepted", personId: "bob" }), row({ id: "i-3", sentAt: new Date("2026-08-01T10:00:00.000Z") })]
+        const rows = [invitationRow(), invitationRow({ id: "i-2", email: "bob@example.com", status: "accepted", personId: "bob" }), invitationRow({ id: "i-3", sentAt: SHARE_EXPIRED_SENT_AT })]
 
         it("lists every invitation of the task for its owner, with live statuses", async () => {
             const { service, em } = await build(mockEntityManager({ find: [InvitationEntity, rows] }))

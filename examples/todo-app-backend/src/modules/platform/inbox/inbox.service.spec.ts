@@ -1,14 +1,13 @@
 import { Test } from "@nestjs/testing"
 import { FakeClock, mockEntityManager } from "@starci/jest-preset"
+import { PLATFORM_AT } from "@tests/fixtures/builders/platform.builder"
 import { CLOCK } from "@modules/platform/clock"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { PostgresInbox } from "./inbox.service"
 import { CLAIM_EVENT, RELEASE_EVENT } from "./persistence/inbox.sql"
 
-const AT = "2026-05-01T10:00:00.000Z"
-
 const build = async (manager: ReturnType<typeof mockEntityManager>) => {
-    const clock = new FakeClock(AT)
+    const clock = new FakeClock(PLATFORM_AT)
     const moduleRef = await Test.createTestingModule({
         providers: [PostgresInbox, { provide: PRIMARY_ENTITY_MANAGER, useValue: manager }, { provide: CLOCK, useValue: clock }],
     }).compile()
@@ -22,7 +21,7 @@ describe("PostgresInbox", () => {
             const inbox = await build(manager)
 
             await expect(inbox.claim("payments", "e-1")).resolves.toBe(true)
-            expect(manager.query).toHaveBeenCalledWith(CLAIM_EVENT, ["payments", "e-1", new FakeClock(AT).now()])
+            expect(manager.query).toHaveBeenCalledWith(CLAIM_EVENT, ["payments", "e-1", new FakeClock(PLATFORM_AT).now()])
         })
 
         it("answers false when the event was claimed before", async () => {

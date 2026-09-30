@@ -2,27 +2,10 @@ import { Test } from "@nestjs/testing"
 import { mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { paymentIntentRow, PLAN_AT, PLAN_PERIOD_END } from "@tests/fixtures/builders/plan.builder"
 import { PlanErrorCode } from "./errors/plan.error"
 import { PaymentService } from "./payment.service"
 import { PaymentIntentEntity } from "./persistence/entities/payment-intent.entity"
-import type { PaymentIntentView } from "./plan.contracts"
-
-const AT = new Date("2026-09-30T10:00:00.000Z")
-const LATER = new Date("2026-10-01T00:00:00.000Z")
-
-const row = (overrides: Partial<PaymentIntentEntity> = {}): PaymentIntentEntity => ({
-    id: "i1",
-    subscriptionId: "s1",
-    gateway: "sepay",
-    gatewayIntentId: "g1",
-    amount: 99000,
-    currency: "VND",
-    status: "pending",
-    appliedAt: null,
-    ...overrides,
-})
-
-const view = (overrides: Partial<PaymentIntentView> = {}): PaymentIntentView => ({ ...row(), ...overrides })
 
 const LOCK = { where: { id: "i1" }, lock: { mode: "pessimistic_write" } }
 
@@ -37,11 +20,11 @@ describe("PaymentService", () => {
     describe("create", () => {
         it("records a pending intent with no appliedAt through the manager it was handed", async () => {
             const { service, own } = await build()
-            const manager = mockEntityManager({ save: [PaymentIntentEntity, row()] })
+            const manager = mockEntityManager({ save: [PaymentIntentEntity, paymentIntentRow()] })
 
             await expect(
                 service.create({ manager, subscriptionId: "s1", gatewayIntentId: "g1", amount: 99000, currency: "VND" }),
-            ).resolves.toEqual(view())
+            ).resolves.toEqual(paymentIntentRow())
 
             expect(manager.save).toHaveBeenCalledWith(PaymentIntentEntity, {
                 id: expect.any(String),
@@ -59,18 +42,18 @@ describe("PaymentService", () => {
 
     describe("findById", () => {
         it("reads through its own manager for a plain read", async () => {
-            const { service, own } = await build(mockEntityManager({ findOneBy: [PaymentIntentEntity, row()] }))
+            const { service, own } = await build(mockEntityManager({ findOneBy: [PaymentIntentEntity, paymentIntentRow()] }))
 
-            await expect(service.findById({ id: "i1" })).resolves.toEqual(view())
+            await expect(service.findById({ id: "i1" })).resolves.toEqual(paymentIntentRow())
 
             expect(own.findOneBy).toHaveBeenCalledWith(PaymentIntentEntity, { id: "i1" })
         })
 
         it("reads through the manager it was handed and not through its own", async () => {
             const { service, own } = await build()
-            const manager = mockEntityManager({ findOneBy: [PaymentIntentEntity, row()] })
+            const manager = mockEntityManager({ findOneBy: [PaymentIntentEntity, paymentIntentRow()] })
 
-            await expect(service.findById({ id: "i1", manager })).resolves.toEqual(view())
+            await expect(service.findById({ id: "i1", manager })).resolves.toEqual(paymentIntentRow())
 
             expect(manager.findOneBy).toHaveBeenCalledWith(PaymentIntentEntity, { id: "i1" })
             expect(own.findOneBy).not.toHaveBeenCalled()
@@ -85,18 +68,18 @@ describe("PaymentService", () => {
 
     describe("findByGatewayIntentId", () => {
         it("finds the intent the gateway names by its own id", async () => {
-            const { service, own } = await build(mockEntityManager({ findOneBy: [PaymentIntentEntity, row()] }))
+            const { service, own } = await build(mockEntityManager({ findOneBy: [PaymentIntentEntity, paymentIntentRow()] }))
 
-            await expect(service.findByGatewayIntentId({ gatewayIntentId: "g1" })).resolves.toEqual(view())
+            await expect(service.findByGatewayIntentId({ gatewayIntentId: "g1" })).resolves.toEqual(paymentIntentRow())
 
             expect(own.findOneBy).toHaveBeenCalledWith(PaymentIntentEntity, { gatewayIntentId: "g1" })
         })
 
         it("reads through the manager it was handed", async () => {
             const { service, own } = await build()
-            const manager = mockEntityManager({ findOneBy: [PaymentIntentEntity, row()] })
+            const manager = mockEntityManager({ findOneBy: [PaymentIntentEntity, paymentIntentRow()] })
 
-            await expect(service.findByGatewayIntentId({ gatewayIntentId: "g1", manager })).resolves.toEqual(view())
+            await expect(service.findByGatewayIntentId({ gatewayIntentId: "g1", manager })).resolves.toEqual(paymentIntentRow())
 
             expect(own.findOneBy).not.toHaveBeenCalled()
         })
@@ -112,25 +95,25 @@ describe("PaymentService", () => {
         it("applies an unapplied intent once, under a row lock", async () => {
             const { service } = await build()
             const manager = mockEntityManager({
-                findOne: [PaymentIntentEntity, row()],
-                save: [PaymentIntentEntity, row({ status: "paid", appliedAt: AT })],
+                findOne: [PaymentIntentEntity, paymentIntentRow()],
+                save: [PaymentIntentEntity, paymentIntentRow({ status: "paid", appliedAt: PLAN_AT })],
             })
 
-            await expect(service.markPaidIfNotApplied({ manager, id: "i1", at: AT })).resolves.toSucceedWith({
-                intent: view({ status: "paid", appliedAt: AT }),
+            await expect(service.markPaidIfNotApplied({ manager, id: "i1", at: PLAN_AT })).resolves.toSucceedWith({
+                intent: paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }),
                 alreadyApplied: false,
             })
 
             expect(manager.findOne).toHaveBeenCalledWith(PaymentIntentEntity, LOCK)
-            expect(manager.save).toHaveBeenCalledWith(PaymentIntentEntity, { ...row(), status: "paid", appliedAt: AT })
+            expect(manager.save).toHaveBeenCalledWith(PaymentIntentEntity, { ...paymentIntentRow(), status: "paid", appliedAt: PLAN_AT })
         })
 
         it("changes nothing for an intent that was applied before and says so", async () => {
             const { service } = await build()
-            const manager = mockEntityManager({ findOne: [PaymentIntentEntity, row({ status: "paid", appliedAt: AT })] })
+            const manager = mockEntityManager({ findOne: [PaymentIntentEntity, paymentIntentRow({ status: "paid", appliedAt: PLAN_AT })] })
 
-            await expect(service.markPaidIfNotApplied({ manager, id: "i1", at: LATER })).resolves.toSucceedWith({
-                intent: view({ status: "paid", appliedAt: AT }),
+            await expect(service.markPaidIfNotApplied({ manager, id: "i1", at: PLAN_PERIOD_END })).resolves.toSucceedWith({
+                intent: paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }),
                 alreadyApplied: true,
             })
 
@@ -141,7 +124,7 @@ describe("PaymentService", () => {
             const { service } = await build()
             const manager = mockEntityManager({ findOne: [PaymentIntentEntity, null] })
 
-            await expect(service.markPaidIfNotApplied({ manager, id: "i1", at: AT })).resolves.toBeRefused(
+            await expect(service.markPaidIfNotApplied({ manager, id: "i1", at: PLAN_AT })).resolves.toBeRefused(
                 PlanErrorCode.PaymentIntentNotFound,
             )
 
@@ -153,22 +136,22 @@ describe("PaymentService", () => {
         it("sets a never-applied intent failed under a row lock", async () => {
             const { service } = await build()
             const manager = mockEntityManager({
-                findOne: [PaymentIntentEntity, row()],
-                save: [PaymentIntentEntity, row({ status: "failed" })],
+                findOne: [PaymentIntentEntity, paymentIntentRow()],
+                save: [PaymentIntentEntity, paymentIntentRow({ status: "failed" })],
             })
 
-            await expect(service.markFailed({ manager, id: "i1", at: AT })).resolves.toSucceedWith(view({ status: "failed" }))
+            await expect(service.markFailed({ manager, id: "i1", at: PLAN_AT })).resolves.toSucceedWith(paymentIntentRow({ status: "failed" }))
 
             expect(manager.findOne).toHaveBeenCalledWith(PaymentIntentEntity, LOCK)
-            expect(manager.save).toHaveBeenCalledWith(PaymentIntentEntity, { ...row(), status: "failed" })
+            expect(manager.save).toHaveBeenCalledWith(PaymentIntentEntity, { ...paymentIntentRow(), status: "failed" })
         })
 
         it("never overturns an intent that was applied", async () => {
             const { service } = await build()
-            const manager = mockEntityManager({ findOne: [PaymentIntentEntity, row({ status: "paid", appliedAt: AT })] })
+            const manager = mockEntityManager({ findOne: [PaymentIntentEntity, paymentIntentRow({ status: "paid", appliedAt: PLAN_AT })] })
 
-            await expect(service.markFailed({ manager, id: "i1", at: LATER })).resolves.toSucceedWith(
-                view({ status: "paid", appliedAt: AT }),
+            await expect(service.markFailed({ manager, id: "i1", at: PLAN_PERIOD_END })).resolves.toSucceedWith(
+                paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }),
             )
 
             expect(manager.save).not.toHaveBeenCalled()
@@ -178,7 +161,7 @@ describe("PaymentService", () => {
             const { service } = await build()
             const manager = mockEntityManager({ findOne: [PaymentIntentEntity, null] })
 
-            await expect(service.markFailed({ manager, id: "i1", at: AT })).resolves.toBeRefused(PlanErrorCode.PaymentIntentNotFound)
+            await expect(service.markFailed({ manager, id: "i1", at: PLAN_AT })).resolves.toBeRefused(PlanErrorCode.PaymentIntentNotFound)
 
             expect(manager.save).not.toHaveBeenCalled()
         })

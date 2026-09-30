@@ -1,10 +1,11 @@
 import { Test } from "@nestjs/testing"
 import { mockEntityManager } from "@starci/jest-preset"
+import { PLATFORM_AT } from "@tests/fixtures/builders/platform.builder"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { PostgresLease } from "./lease.service"
 import { ACQUIRE_LEASE, RELEASE_LEASE } from "./persistence/lease.sql"
 
-const AT = new Date("2026-05-01T10:00:00.000Z")
+const AT = new Date(PLATFORM_AT)
 
 const build = async (manager: ReturnType<typeof mockEntityManager>) => {
     const moduleRef = await Test.createTestingModule({

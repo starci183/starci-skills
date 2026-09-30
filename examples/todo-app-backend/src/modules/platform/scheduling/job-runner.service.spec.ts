@@ -1,27 +1,24 @@
 import { Test } from "@nestjs/testing"
-import { builder, FakeClock, fakeLock, mock } from "@starci/jest-preset"
+import { FakeClock, fakeLock, mock } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { LEASE } from "@modules/platform/lease"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
+import { PLATFORM_AT, schedulingOptions } from "@tests/fixtures/builders/platform.builder"
 import { SchedulingError, SchedulingErrorCode } from "./errors/scheduling.error"
 import { JobRunner } from "./job-runner.service"
 import { SchedulingLogEvent } from "./scheduling.log-events"
-import type { SchedulingOptions } from "./scheduling.options"
 import type { ScheduledJob } from "./scheduling.port"
 import { SCHEDULING_OPTIONS } from "./scheduling.decorators"
 
-const AT = "2026-05-01T10:00:00.000Z"
-const options = builder<SchedulingOptions>({ tickMs: 1000 })
-
 const build = async () => {
-    const clock = new FakeClock(AT)
+    const clock = new FakeClock(PLATFORM_AT)
     const lease = fakeLock(clock)
     const logger = mock<Logger>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             JobRunner,
-            { provide: SCHEDULING_OPTIONS, useValue: options() },
+            { provide: SCHEDULING_OPTIONS, useValue: schedulingOptions() },
             { provide: LEASE, useValue: lease },
             { provide: CLOCK, useValue: clock },
             { provide: LOGGER, useValue: logger },
@@ -75,11 +72,11 @@ describe("JobRunner", () => {
             const job = jobOf("digest", { cron: "0 10 * * *" })
             runner.add(job)
 
-            await runner.tick(new Date(AT))
+            await runner.tick(new Date(PLATFORM_AT))
             await runner.tick(new Date("2026-05-01T10:00:30.000Z"))
 
             expect(job.run).toHaveBeenCalledTimes(1)
-            expect(job.run).toHaveBeenCalledWith(new Date(AT))
+            expect(job.run).toHaveBeenCalledWith(new Date(PLATFORM_AT))
         })
 
         it("skips a cron job in a minute its expression does not admit", async () => {
@@ -87,7 +84,7 @@ describe("JobRunner", () => {
             const job = jobOf("digest", { cron: "5 10 * * *" })
             runner.add(job)
 
-            await runner.tick(new Date(AT))
+            await runner.tick(new Date(PLATFORM_AT))
 
             expect(job.run).not.toHaveBeenCalled()
         })
@@ -97,7 +94,7 @@ describe("JobRunner", () => {
             const job = jobOf("purge", { everyMs: 60_000 })
             runner.add(job)
 
-            await runner.tick(new Date(AT))
+            await runner.tick(new Date(PLATFORM_AT))
             await runner.tick(new Date("2026-05-01T10:00:59.999Z"))
             expect(job.run).toHaveBeenCalledTimes(1)
 
@@ -111,7 +108,7 @@ describe("JobRunner", () => {
             runner.add(job)
             await lease.acquire({ name: "purge", holder: "other-replica", ttlMs: 60_000 })
 
-            await runner.tick(new Date(AT))
+            await runner.tick(new Date(PLATFORM_AT))
 
             expect(job.run).not.toHaveBeenCalled()
             expect(logger.info).not.toHaveBeenCalled()
@@ -126,7 +123,7 @@ describe("JobRunner", () => {
                 }),
             )
 
-            await runner.tick(new Date(AT))
+            await runner.tick(new Date(PLATFORM_AT))
 
             expect(lease.isHeld("purge")).toBe(true)
             expect(lease.fenceOf("purge")).toBe(1)
@@ -139,7 +136,7 @@ describe("JobRunner", () => {
             const job = jobOf("purge", { everyMs: 1000 }, () => Promise.reject(failure))
             runner.add(job)
 
-            await runner.tick(new Date(AT))
+            await runner.tick(new Date(PLATFORM_AT))
 
             expect(logger.error).toHaveBeenCalledWith(SchedulingLogEvent.JobFailed, failure, { job: "purge", fence: 1 })
             expect(lease.isHeld("purge")).toBe(false)
@@ -154,7 +151,7 @@ describe("JobRunner", () => {
             const job = jobOf("purge", { everyMs: 1000 }, () => running.promise)
             runner.add(job)
 
-            const first = runner.tick(new Date(AT))
+            const first = runner.tick(new Date(PLATFORM_AT))
             await flush()
             await runner.tick(new Date("2026-05-01T10:00:02.000Z"))
             running.open()

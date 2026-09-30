@@ -1,12 +1,12 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { builder, FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import { TaskService } from "@modules/domain/task"
-import type { TaskView } from "@modules/domain/task"
 import { UPLOAD_STORAGE, UploadStorageError, UploadStorageErrorCode } from "@modules/integrations/upload"
 import type { UploadStorage } from "@modules/integrations/upload"
 import { CLOCK } from "@modules/platform/clock"
 import { Secret } from "@modules/platform/config"
 import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { UPLOAD_AT, UPLOAD_SECRET, uploadRow, uploadTask } from "@tests/fixtures/builders/upload.builder"
 import { UploadErrorCode } from "./errors/upload.error"
 import { UploadEntity } from "./persistence/entities/upload.entity"
 import { UPLOAD_TOKEN_HEADER } from "./upload.contracts"
@@ -15,33 +15,20 @@ import type { UploadOptions } from "./upload.options"
 import { UploadService } from "./upload.service"
 import { signUploadToken } from "./upload-token.policy"
 
-const NOW = "2026-09-10T10:00:00.000Z"
-const at = new Date(NOW)
-const SECRET = "test-signing-secret"
-const options: UploadOptions = {
+const at = new Date(UPLOAD_AT)
+const options = builder<UploadOptions>({
     maxBytes: 1000,
     allowedMimes: ["text/plain", "image/png"],
     presignTtlMs: 60_000,
-    signingSecret: new Secret(SECRET),
-}
+    signingSecret: new Secret(UPLOAD_SECRET),
+})()
 
 const bytes = Buffer.from("hello")
 
-const pending: UploadEntity = {
-    id: "u-1",
-    owner: "p-1",
-    taskId: null,
-    filename: "note.txt",
-    mime: "text/plain",
-    sizeBytes: 5,
-    storageKey: "uploads/u-1",
-    status: "pending",
-    createdAt: new Date("2026-09-10T09:00:00.000Z"),
-}
-const ready: UploadEntity = { ...pending, status: "ready" }
-const task: TaskView = { id: "t-1", owner: "p-1", title: "Write", complete: false, completedAt: null }
+const pending = uploadRow()
+const ready = uploadRow({ status: "ready" })
 
-const tokenFor = (uploadId: string, expiresAtMs: number) => signUploadToken({ uploadId, expiresAtMs, secret: SECRET })
+const tokenFor = (uploadId: string, expiresAtMs: number) => signUploadToken({ uploadId, expiresAtMs, secret: UPLOAD_SECRET })
 const validToken = tokenFor("u-1", at.getTime() + 30_000)
 const storeError = () => new UploadStorageError({ code: UploadStorageErrorCode.Failed })
 
@@ -53,7 +40,7 @@ const build = async (em = mockEntityManager()) => {
         providers: [
             UploadService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
-            { provide: CLOCK, useValue: new FakeClock(NOW) },
+            { provide: CLOCK, useValue: new FakeClock(UPLOAD_AT) },
             { provide: UPLOAD_OPTIONS, useValue: options },
             { provide: UPLOAD_STORAGE, useValue: storage },
             { provide: TaskService, useValue: tasks },
@@ -298,7 +285,7 @@ describe("UploadService", () => {
 
         it("refuses a task of somebody else", async () => {
             const { service, tasks } = await build(mockEntityManager({ findOneBy: [UploadEntity, ready] }))
-            tasks.find.mockResolvedValue({ ...task, owner: "p-2" })
+            tasks.find.mockResolvedValue(uploadTask({ owner: "p-2" }))
 
             await expect(service.attach(request)).resolves.toBeRefused({ code: UploadErrorCode.Forbidden, params: { taskId: "t-1" } })
         })
@@ -306,7 +293,7 @@ describe("UploadService", () => {
         it("points the upload at the task and keeps every other column", async () => {
             const attached = { ...ready, taskId: "t-1" }
             const { service, tasks, em } = await build(mockEntityManager({ findOneBy: [UploadEntity, ready], save: [UploadEntity, attached] }))
-            tasks.find.mockResolvedValue(task)
+            tasks.find.mockResolvedValue(uploadTask())
 
             const outcome = await service.attach(request)
 
@@ -366,7 +353,7 @@ describe("UploadService", () => {
 
         it("refuses a task of somebody else and reads no uploads", async () => {
             const { service, tasks } = await build()
-            tasks.find.mockResolvedValue({ ...task, owner: "p-2" })
+            tasks.find.mockResolvedValue(uploadTask({ owner: "p-2" }))
 
             await expect(service.listForTask(request)).resolves.toBeRefused({ code: UploadErrorCode.Forbidden, params: { taskId: "t-1" } })
         })
@@ -374,7 +361,7 @@ describe("UploadService", () => {
         it("lists the owner's uploads of the task, bounded, as public summaries", async () => {
             const attached = { ...ready, taskId: "t-1" }
             const { service, tasks, em } = await build(mockEntityManager({ find: [UploadEntity, [attached]] }))
-            tasks.find.mockResolvedValue(task)
+            tasks.find.mockResolvedValue(uploadTask())
 
             await expect(service.listForTask(request)).resolves.toSucceedWith({
                 uploads: [

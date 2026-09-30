@@ -2,31 +2,10 @@ import { Test } from "@nestjs/testing"
 import { mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { PLAN_PERIOD_END, subscriptionRow } from "@tests/fixtures/builders/plan.builder"
 import { SubscriptionEntity } from "./persistence/entities/subscription.entity"
 import type { SubscriptionView } from "./plan.contracts"
 import { SubscriptionService } from "./subscription.service"
-
-const PERIOD_END = new Date("2026-10-30T00:00:00.000Z")
-
-const row = (overrides: Partial<SubscriptionEntity> = {}): SubscriptionEntity => ({
-    id: "s1",
-    personId: "p1",
-    plan: "free",
-    status: "free",
-    periodEnd: null,
-    gatewayCustomerId: null,
-    ...overrides,
-})
-
-const view = (overrides: Partial<SubscriptionView> = {}): SubscriptionView => ({
-    id: "s1",
-    personId: "p1",
-    plan: "free",
-    status: "free",
-    periodEnd: null,
-    gatewayCustomerId: null,
-    ...overrides,
-})
 
 const build = async (own: MockEntityManager = mockEntityManager()) => {
     const moduleRef = await Test.createTestingModule({
@@ -41,10 +20,10 @@ describe("SubscriptionService", () => {
             const { service } = await build()
             const manager = mockEntityManager({
                 findOneBy: [SubscriptionEntity, null],
-                save: [SubscriptionEntity, row()],
+                save: [SubscriptionEntity, subscriptionRow()],
             })
 
-            await expect(service.getOrCreate({ manager, personId: "p1" })).resolves.toEqual(view())
+            await expect(service.getOrCreate({ manager, personId: "p1" })).resolves.toEqual(subscriptionRow())
 
             expect(manager.findOneBy).toHaveBeenCalledWith(SubscriptionEntity, { personId: "p1" })
             expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, {
@@ -59,11 +38,11 @@ describe("SubscriptionService", () => {
 
         it("returns the row a person already has and writes nothing", async () => {
             const { service } = await build()
-            const active = row({ plan: "paid", status: "active", periodEnd: PERIOD_END })
+            const active = subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END })
             const manager = mockEntityManager({ findOneBy: [SubscriptionEntity, active] })
 
             await expect(service.getOrCreate({ manager, personId: "p1" })).resolves.toEqual(
-                view({ plan: "paid", status: "active", periodEnd: PERIOD_END }),
+                subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END }),
             )
 
             expect(manager.save).not.toHaveBeenCalled()
@@ -73,18 +52,18 @@ describe("SubscriptionService", () => {
     describe("findById", () => {
         it("reads through the manager it was handed and not through its own", async () => {
             const { service, own } = await build()
-            const manager = mockEntityManager({ findOneBy: [SubscriptionEntity, row()] })
+            const manager = mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow()] })
 
-            await expect(service.findById({ id: "s1", manager })).resolves.toEqual(view())
+            await expect(service.findById({ id: "s1", manager })).resolves.toEqual(subscriptionRow())
 
             expect(manager.findOneBy).toHaveBeenCalledWith(SubscriptionEntity, { id: "s1" })
             expect(own.findOneBy).not.toHaveBeenCalled()
         })
 
         it("reads through its own manager for a plain read", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, row()] }))
+            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow()] }))
 
-            await expect(service.findById({ id: "s1" })).resolves.toEqual(view())
+            await expect(service.findById({ id: "s1" })).resolves.toEqual(subscriptionRow())
         })
 
         it("answers null for an unknown id", async () => {
@@ -106,26 +85,26 @@ describe("SubscriptionService", () => {
         })
 
         it("reads an active subscription as paid without a cap", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, row({ status: "active" })] }))
+            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "active" })] }))
 
             await expect(service.readEffectivePlan({ personId: "p1" })).resolves.toEqual({ id: "paid", taskCap: null })
         })
 
         it("reads a past-due subscription as paid", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, row({ status: "past-due" })] }))
+            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "past-due" })] }))
 
             await expect(service.readEffectivePlan({ personId: "p1" })).resolves.toEqual({ id: "paid", taskCap: null })
         })
 
         it("reads a pending subscription as free", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, row({ status: "pending" })] }))
+            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "pending" })] }))
 
             await expect(service.readEffectivePlan({ personId: "p1" })).resolves.toEqual({ id: "free", taskCap: 20 })
         })
 
         it("reads a lapsed subscription as free without writing to it", async () => {
             const { service, own } = await build(
-                mockEntityManager({ findOneBy: [SubscriptionEntity, row({ plan: "paid", status: "lapsed" })] }),
+                mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ plan: "paid", status: "lapsed" })] }),
             )
 
             await expect(service.readEffectivePlan({ personId: "p1" })).resolves.toEqual({ id: "free", taskCap: 20 })
@@ -136,13 +115,13 @@ describe("SubscriptionService", () => {
 
     describe("checkCap", () => {
         it("allows a task below the cap of the free plan", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, row()] }))
+            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow()] }))
 
             await expect(service.checkCap({ personId: "p1", activeTaskCount: 19 })).resolves.toEqual({ allowed: true })
         })
 
         it("refuses a task at the cap of the free plan and names the cap and the upgrade path", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, row()] }))
+            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow()] }))
 
             await expect(service.checkCap({ personId: "p1", activeTaskCount: 20 })).resolves.toEqual({
                 allowed: false,
@@ -158,7 +137,7 @@ describe("SubscriptionService", () => {
         })
 
         it("allows any count on the paid plan", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, row({ status: "active" })] }))
+            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "active" })] }))
 
             await expect(service.checkCap({ personId: "p1", activeTaskCount: 10_000 })).resolves.toEqual({ allowed: true })
         })
@@ -172,9 +151,9 @@ describe("SubscriptionService", () => {
         }
 
         it("startCheckout moves a free subscription to pending", async () => {
-            const { service, own, manager, subscription } = await transition(view(), row({ status: "pending" }))
+            const { service, own, manager, subscription } = await transition(subscriptionRow(), subscriptionRow({ status: "pending" }))
 
-            await expect(service.startCheckout({ manager, subscription })).resolves.toEqual(view({ status: "pending" }))
+            await expect(service.startCheckout({ manager, subscription })).resolves.toEqual(subscriptionRow({ status: "pending" }))
 
             expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, {
                 id: "s1",
@@ -188,14 +167,14 @@ describe("SubscriptionService", () => {
         })
 
         it("confirm activates the subscription on the paid plan until the period end", async () => {
-            const pending = view({ status: "pending" })
+            const pending = subscriptionRow({ status: "pending" })
             const { service, manager } = await transition(
                 pending,
-                row({ plan: "paid", status: "active", periodEnd: PERIOD_END }),
+                subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END }),
             )
 
-            await expect(service.confirm({ manager, subscription: pending, periodEnd: PERIOD_END })).resolves.toEqual(
-                view({ plan: "paid", status: "active", periodEnd: PERIOD_END }),
+            await expect(service.confirm({ manager, subscription: pending, periodEnd: PLAN_PERIOD_END })).resolves.toEqual(
+                subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END }),
             )
 
             expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, {
@@ -203,23 +182,23 @@ describe("SubscriptionService", () => {
                 personId: "p1",
                 plan: "paid",
                 status: "active",
-                periodEnd: PERIOD_END,
+                periodEnd: PLAN_PERIOD_END,
                 gatewayCustomerId: null,
             })
         })
 
         it("abandon returns the subscription to free and clears the period end", async () => {
-            const pending = view({ status: "pending" })
-            const { service, manager } = await transition(pending, row())
+            const pending = subscriptionRow({ status: "pending" })
+            const { service, manager } = await transition(pending, subscriptionRow())
 
-            await expect(service.abandon({ manager, subscription: pending })).resolves.toEqual(view())
+            await expect(service.abandon({ manager, subscription: pending })).resolves.toEqual(subscriptionRow())
 
             expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, expect.objectContaining({ status: "free", plan: "free", periodEnd: null }))
         })
 
         it("markRenewalDue moves an active subscription to past-due", async () => {
-            const active = view({ plan: "paid", status: "active", periodEnd: PERIOD_END })
-            const { service, manager } = await transition(active, row({ plan: "paid", status: "past-due", periodEnd: PERIOD_END }))
+            const active = subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END })
+            const { service, manager } = await transition(active, subscriptionRow({ plan: "paid", status: "past-due", periodEnd: PLAN_PERIOD_END }))
 
             await expect(service.markRenewalDue({ manager, subscription: active })).resolves.toMatchObject({ status: "past-due" })
 
@@ -227,8 +206,8 @@ describe("SubscriptionService", () => {
         })
 
         it("lapse moves a past-due subscription to lapsed", async () => {
-            const due = view({ plan: "paid", status: "past-due", periodEnd: PERIOD_END })
-            const { service, manager } = await transition(due, row({ plan: "paid", status: "lapsed", periodEnd: PERIOD_END }))
+            const due = subscriptionRow({ plan: "paid", status: "past-due", periodEnd: PLAN_PERIOD_END })
+            const { service, manager } = await transition(due, subscriptionRow({ plan: "paid", status: "lapsed", periodEnd: PLAN_PERIOD_END }))
 
             await expect(service.lapse({ manager, subscription: due })).resolves.toMatchObject({ status: "lapsed" })
 
@@ -236,19 +215,19 @@ describe("SubscriptionService", () => {
         })
 
         it("downgrade makes an active subscription free at once", async () => {
-            const active = view({ plan: "paid", status: "active", periodEnd: PERIOD_END })
-            const { service, manager } = await transition(active, row())
+            const active = subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END })
+            const { service, manager } = await transition(active, subscriptionRow())
 
-            await expect(service.downgrade({ manager, subscription: active })).resolves.toEqual(view())
+            await expect(service.downgrade({ manager, subscription: active })).resolves.toEqual(subscriptionRow())
 
             expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, expect.objectContaining({ status: "free", plan: "free", periodEnd: null }))
         })
 
         it("downgrade makes a past-due subscription free at once", async () => {
-            const due = view({ plan: "paid", status: "past-due", periodEnd: PERIOD_END })
-            const { service, manager } = await transition(due, row())
+            const due = subscriptionRow({ plan: "paid", status: "past-due", periodEnd: PLAN_PERIOD_END })
+            const { service, manager } = await transition(due, subscriptionRow())
 
-            await expect(service.downgrade({ manager, subscription: due })).resolves.toEqual(view())
+            await expect(service.downgrade({ manager, subscription: due })).resolves.toEqual(subscriptionRow())
 
             expect(manager.save).toHaveBeenCalledTimes(1)
         })
@@ -256,7 +235,7 @@ describe("SubscriptionService", () => {
         it("downgrade returns a free, pending or lapsed subscription untouched and writes nothing", async () => {
             const { service } = await build()
             const manager = mockEntityManager()
-            const untouched: SubscriptionView[] = [view(), view({ status: "pending" }), view({ status: "lapsed" })]
+            const untouched: SubscriptionView[] = [subscriptionRow(), subscriptionRow({ status: "pending" }), subscriptionRow({ status: "lapsed" })]
 
             for (const subscription of untouched) {
                 await expect(service.downgrade({ manager, subscription })).resolves.toBe(subscription)

@@ -1,20 +1,17 @@
 import { Test } from "@nestjs/testing"
-import { builder, FakeClock, mock } from "@starci/jest-preset"
+import { FakeClock, mock } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { OUTBOX } from "@modules/platform/outbox"
-import type { Outbox, OutboxRecord } from "@modules/platform/outbox"
+import type { Outbox } from "@modules/platform/outbox"
+import { messagingOptions, outboxRecord, PLATFORM_AT } from "@tests/fixtures/builders/platform.builder"
 import { MessagingError, MessagingErrorCode } from "./errors/messaging.error"
 import { MessageRunner } from "./message-runner.service"
 import type { ConsumedMessage, QueueDefinition } from "./messaging.contracts"
 import { MessagingLogEvent } from "./messaging.log-events"
-import type { MessagingOptions } from "./messaging.options"
 import type { MessageConsumer } from "./messaging.port"
 import { MESSAGING_OPTIONS } from "./messaging.decorators"
-
-const AT = "2026-05-01T10:00:00.000Z"
-const options = builder<MessagingOptions>({ pollMs: 500, batchSize: 10, visibilityMs: 30_000 })
 
 const queue: QueueDefinition<object> = {
     name: "audit.append",
@@ -23,28 +20,19 @@ const queue: QueueDefinition<object> = {
     parse: (value) => (typeof value === "object" ? value : null),
 }
 
-const record = (overrides: Partial<OutboxRecord> = {}): OutboxRecord => ({
-    id: "m-1",
-    queue: "audit.append",
-    eventId: "e-1",
-    payload: { a: 1 },
-    attempts: 1,
-    ...overrides,
-})
-
 const consumerOf = (handle: MessageConsumer<object>["handle"] = () => Promise.resolve()): MessageConsumer<object> => ({
     queue,
     handle: jest.fn(handle),
 })
 
 const build = async () => {
-    const clock = new FakeClock(AT)
+    const clock = new FakeClock(PLATFORM_AT)
     const outbox = mock<Outbox>()
     const logger = mock<Logger>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             MessageRunner,
-            { provide: MESSAGING_OPTIONS, useValue: options() },
+            { provide: MESSAGING_OPTIONS, useValue: messagingOptions() },
             { provide: OUTBOX, useValue: outbox },
             { provide: CLOCK, useValue: clock },
             { provide: LOGGER, useValue: logger },
@@ -67,7 +55,7 @@ describe("MessageRunner", () => {
             await runner.drain()
 
             expect(outbox.claimDue).toHaveBeenCalledWith({
-                at: new Date(AT),
+                at: new Date(PLATFORM_AT),
                 queues: ["audit.append"],
                 limit: 10,
                 visibilityMs: 30_000,
@@ -78,7 +66,7 @@ describe("MessageRunner", () => {
             const { runner, outbox } = await build()
             const consumer = consumerOf()
             const expected: ConsumedMessage<object> = { id: "m-1", eventId: "e-1", payload: { a: 1 }, attempt: 2 }
-            outbox.claimDue.mockResolvedValue([record({ attempts: 2 })])
+            outbox.claimDue.mockResolvedValue([outboxRecord({ attempts: 2 })])
             runner.add(consumer)
 
             await runner.drain()
@@ -91,7 +79,7 @@ describe("MessageRunner", () => {
 
         it("leaves a claimed message of a queue without a consumer alone", async () => {
             const { runner, outbox } = await build()
-            outbox.claimDue.mockResolvedValue([record({ queue: "other.queue" })])
+            outbox.claimDue.mockResolvedValue([outboxRecord({ queue: "other.queue" })])
             runner.add(consumerOf())
 
             await runner.drain()
@@ -103,7 +91,7 @@ describe("MessageRunner", () => {
 
         it("reschedules a failed delivery with a doubling backoff and logs the retry", async () => {
             const { runner, outbox, logger } = await build()
-            outbox.claimDue.mockResolvedValue([record({ attempts: 2 })])
+            outbox.claimDue.mockResolvedValue([outboxRecord({ attempts: 2 })])
             runner.add(consumerOf(() => Promise.reject(new TypeError("boom"))))
 
             await runner.drain()
@@ -120,7 +108,7 @@ describe("MessageRunner", () => {
         it("buries a delivery that ran out of attempts and logs it", async () => {
             const { runner, outbox, logger } = await build()
             const failure = new Error("boom")
-            outbox.claimDue.mockResolvedValue([record({ attempts: 3 })])
+            outbox.claimDue.mockResolvedValue([outboxRecord({ attempts: 3 })])
             runner.add(consumerOf(() => Promise.reject(failure)))
 
             await runner.drain()
@@ -132,7 +120,7 @@ describe("MessageRunner", () => {
 
         it("describes a failure that is not an Error by its text", async () => {
             const { runner, outbox } = await build()
-            outbox.claimDue.mockResolvedValue([record({ attempts: 3 })])
+            outbox.claimDue.mockResolvedValue([outboxRecord({ attempts: 3 })])
             runner.add(consumerOf(() => Promise.reject("plain failure")))
 
             await runner.drain()
@@ -143,7 +131,7 @@ describe("MessageRunner", () => {
         it("fails a delivery whose payload does not parse without calling the consumer", async () => {
             const { runner, outbox, logger } = await build()
             const consumer = consumerOf()
-            outbox.claimDue.mockResolvedValue([record({ payload: null, attempts: 3 })])
+            outbox.claimDue.mockResolvedValue([outboxRecord({ payload: null, attempts: 3 })])
             runner.add(consumer)
 
             await runner.drain()
@@ -156,7 +144,7 @@ describe("MessageRunner", () => {
         it("delivers every claimed message in order", async () => {
             const { runner, outbox } = await build()
             const consumer = consumerOf()
-            outbox.claimDue.mockResolvedValue([record({ id: "m-1", eventId: "e-1" }), record({ id: "m-2", eventId: "e-2" })])
+            outbox.claimDue.mockResolvedValue([outboxRecord({ id: "m-1", eventId: "e-1" }), outboxRecord({ id: "m-2", eventId: "e-2" })])
             runner.add(consumer)
 
             await runner.drain()

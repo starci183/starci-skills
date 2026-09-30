@@ -1,22 +1,12 @@
 import { Test } from "@nestjs/testing"
-import { builder } from "@starci/jest-preset"
+import { i18nOptions } from "@tests/fixtures/builders/platform.builder"
 import { BundleMessageCatalog } from "./bundle-message-catalog.service"
 import type { I18nOptions } from "./i18n.options"
 import { I18N_OPTIONS } from "./i18n.decorators"
 
-const options = builder<I18nOptions>({
-    bundles: [
-        {
-            vi: { "task.title": "Cong viec {{title}}", "task.count": "{{n}} viec" },
-            en: { "task.title": "Task {{title}}", "task.count": "{{n}} tasks" },
-        },
-        { vi: { "share.ok": "Da chia se" }, en: { "share.ok": "Shared" } },
-    ],
-})
-
 const build = async (overrides?: Partial<I18nOptions>) => {
     const moduleRef = await Test.createTestingModule({
-        providers: [BundleMessageCatalog, { provide: I18N_OPTIONS, useValue: options(overrides) }],
+        providers: [BundleMessageCatalog, { provide: I18N_OPTIONS, useValue: i18nOptions(overrides) }],
     }).compile()
     return moduleRef.get(BundleMessageCatalog)
 }
