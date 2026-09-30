@@ -3,14 +3,14 @@
  *
  *   node --test e2e-flow.test.mjs
  *
- * The valid cases carry most of the weight. Both rules fire only inside `*.e2e-spec.ts`, and a
- * version that widened to every spec would refuse the ordinary unit test - where a sleep is
- * sometimes the thing under test, and a conditional is just code.
+ * The valid cases carry most of the weight. Every rule fires only inside `*.e2e-spec.ts`, and a version that widened
+ * to every spec would refuse the ordinary unit test, where a sleep is sometimes the thing under test and a
+ * conditional is just code. Receivers are identified by type: a renamed bus or handler is still caught, and a lookalike
+ * name is not.
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import {
   e2eUsesProductionTransport,
   noBranchInFlowStep,
@@ -19,50 +19,10 @@ import {
   rules,
 } from "./e2e-flow.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-  },
-})
+const tester = typedTester()
 
-const FLOW = "/repo/src/tests/e2e/course-purchase.e2e-spec.ts"
-const UNIT = "/repo/src/modules/billing/charge.spec.ts"
-
-test("operational E2E preserves the production transport boundary", () => {
-  tester.run("e2e-uses-production-transport", e2eUsesProductionTransport, {
-    valid: [{ filename: FLOW, code: "await request(app).post('/graphql').send(body)" }],
-    invalid: [{
-      filename: FLOW,
-      code: "import { CommandBus } from '@nestjs/cqrs'; await commandBus.execute(command)",
-      errors: [{ messageId: "busImport" }, { messageId: "direct" }],
-    }, {
-      filename: FLOW,
-      code: "await enrollWorker.finalize(job)",
-      errors: [{ messageId: "actor" }],
-    }],
-  })
-})
-
-/** The shipped business inventory; absence is a broken lane, not a skip. */
-
-/*
- * THE CANONICAL-INVENTORY TEST IS NOT HERE, AND THAT IS THE FIX.
- *
- * It used to assert that every flow in a 47-entry list had a matching
- * `src/tests/e2e/<flow>.e2e-spec.ts`, resolving the repository root as `../../../`.
- * That path was correct while these machines lived INSIDE the backend checkout. When they
- * were lifted out into this standalone package the relative path came with them unchanged,
- * so it now resolves to this repository -- which has no `src/tests/e2e` and never will.
- * The test therefore failed on every run since the lift, and the suite has been red since.
- *
- * Pointing it at a sibling checkout would be worse than leaving it broken: a machine that
- * reads a consumer's filesystem asserts something it cannot know, passes or fails on where
- * somebody happened to clone a repository, and silently stops checking the moment a second
- * consumer adopts the canon. The inventory is a fact about ONE backend, so it is that
- * backend's gate. It now lives in the consumer, where the 47 files actually are.
- */
+const FLOW = at("src/tests/e2e/checkout/course-purchase.e2e-spec.ts")
+const UNIT = at("src/modules/domain/billing/charge.spec.ts")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -70,25 +30,61 @@ test("every rule this law declares is exported under its published name", () => 
   }
 })
 
+test("operational E2E preserves the production transport boundary", () => {
+  const HANDLER = "import { StartCheckoutHandler } from '../../../features/checkout/application/start-checkout.handler'\n"
+  tester.run("e2e-uses-production-transport", e2eUsesProductionTransport, {
+    valid: [
+      { filename: FLOW, code: "declare const request: (app: object) => { post(path: string): { send(body: object): Promise<void> } }\ndeclare const app: object\nawait request(app).post('/graphql').send({})" },
+      // a lookalike name is not a bus: the receiver's type decides
+      { filename: FLOW, code: "declare const commandBus: { execute(input: object): void }\ncommandBus.execute({})" },
+      { filename: FLOW, code: "declare const checkoutWorker: { finalize(job: object): void }\ncheckoutWorker.finalize({})" },
+      // a unit spec may call its subject
+      { filename: UNIT, code: HANDLER + "declare const handler: StartCheckoutHandler\nawait handler.handle()" },
+    ],
+    invalid: [
+      {
+        filename: FLOW,
+        code: "import { CommandBus } from '@nestjs/cqrs'\ndeclare const bus: CommandBus\nawait bus.execute({})",
+        errors: [{ messageId: "busImport" }, { messageId: "direct" }],
+      },
+      // a renamed receiver is still the bus
+      {
+        filename: FLOW,
+        code: "import { QueryBus } from '@nestjs/cqrs'\ndeclare const unrelated: QueryBus\nawait unrelated.execute({})",
+        errors: [{ messageId: "busImport" }, { messageId: "direct" }],
+      },
+      {
+        filename: FLOW,
+        code: HANDLER + "declare const anything: StartCheckoutHandler\nawait anything.handle()",
+        errors: [{ messageId: "actor" }],
+      },
+    ],
+  })
+})
+
 test("E2E-3: a flow polls for a state and never waits for a duration", () => {
+  const SLEEP = "declare const sleep: (ms: number) => Promise<void>\n"
   tester.run("no-sleep-in-flow", noSleepInFlow, {
     valid: [
       // the shape the rule exists to push people towards
-      { filename: FLOW, code: "await pollUntil(() => order.status === \"paid\", { deadlineMs: 5000 })" },
+      { filename: FLOW, code: "declare const waitFor: (probe: () => boolean, options: { timeoutMs: number }) => Promise<void>\nawait waitFor(() => true, { timeoutMs: 5000 })" },
       // a unit spec is a different lane; a timer there may be the thing under test
-      { filename: UNIT, code: "await sleep(50)" },
+      { filename: UNIT, code: SLEEP + "await sleep(50)" },
       { filename: UNIT, code: "await new Promise((resolve) => setTimeout(resolve, 10))" },
-      // a name that merely contains a sleeper word is not one
-      { filename: FLOW, code: "await waitForOrderPaid(order.id)" },
+      // a name that merely contains a sleeper word is not one: it takes no duration
+      { filename: FLOW, code: "declare const waitForOrderPaid: (id: string) => Promise<void>\nawait waitForOrderPaid('o1')" },
+      // a number argument on a call that does not return Promise<void> is not a wait
+      { filename: FLOW, code: "declare const jest: { advanceTimersByTime(ms: number): void }\njest.advanceTimersByTime(500)" },
+      // a local function that shadows the timer name is not the timer
+      { filename: FLOW, code: "const setTimeout = (fn: () => void) => fn()\nsetTimeout(() => undefined)" },
     ],
     invalid: [
-      { filename: FLOW, code: "await sleep(500)", errors: [{ messageId: "sleep" }] },
-      { filename: FLOW, code: "await delay(500)", errors: [{ messageId: "sleep" }] },
-      {
-        filename: FLOW,
-        code: "await new Promise((resolve) => setTimeout(resolve, 500))",
-        errors: [{ messageId: "timer" }],
-      },
+      // any name: the call takes one number and returns Promise<void>
+      { filename: FLOW, code: SLEEP + "await sleep(500)", errors: [{ messageId: "sleep" }] },
+      { filename: FLOW, code: "declare const settle: (ms: number) => Promise<void>\nawait settle(500)", errors: [{ messageId: "sleep" }] },
+      { filename: FLOW, code: "await new Promise((resolve) => setTimeout(resolve, 500))", errors: [{ messageId: "timer" }] },
+      { filename: FLOW, code: "import { setTimeout as pause } from 'node:timers/promises'\nawait pause(500)", errors: [{ messageId: "sleep" }] },
+      { filename: FLOW, code: "setTimeout(() => undefined, 10)", errors: [{ messageId: "sleep" }] },
     ],
   })
 })
@@ -124,21 +120,27 @@ test("E2E-7: a step asserts one outcome, so it takes no branch", () => {
   })
 })
 
-test("E2E-8 (per-file half): a flow boots through the shared world, not a testing module of its own", () => {
+test("E2E-8 (per-file half): a flow boots through the shared setup, not a testing module of its own", () => {
   tester.run("no-wiring-in-flow-spec", noWiringInFlowSpec, {
     valid: [
-      // the shape the law asks for: enter through the shared helper
-      { filename: FLOW, code: "const world = await bootFlowWorld({ modelAnswer })" },
-      { filename: FLOW, code: "const app = await createE2eApp()" },
-      // `Test.createTestingModule` is legitimate where it belongs: the shared helper itself
-      { filename: "/repo/src/tests/helpers/flow-world.ts", code: "await Test.createTestingModule({ imports: [] }).compile()" },
-      // a unit spec building its own narrow module is a different lane and not this rule's business
-      { filename: UNIT, code: "await Test.createTestingModule({ providers: [Service] }).compile()" },
+      // the shape the law asks for: enter through the shared setup
+      { filename: FLOW, code: "declare const bootWorld: () => Promise<object>\nconst world = await bootWorld()" },
+      // `Test.createTestingModule` is legitimate where it belongs: the setup itself
+      { filename: at("src/tests/e2e/setup/world.ts"), code: "import { Test } from '@nestjs/testing'\nawait Test.createTestingModule({ imports: [] }).compile()" },
+      // a unit spec building its own narrow module is a different lane
+      { filename: UNIT, code: "import { Test } from '@nestjs/testing'\nawait Test.createTestingModule({ providers: [] }).compile()" },
+      // a lookalike `Test` that is not the Nest one
+      { filename: FLOW, code: "declare const Test: { createTestingModule(options: object): void }\nTest.createTestingModule({})" },
     ],
     invalid: [
       {
         filename: FLOW,
-        code: "const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()",
+        code: "import { Test } from '@nestjs/testing'\nconst moduleRef = await Test.createTestingModule({ imports: [] }).compile()",
+        errors: [{ messageId: "wiring" }],
+      },
+      {
+        filename: FLOW,
+        code: "import { Test as Builder } from '@nestjs/testing'\nawait Builder.createTestingModule({ imports: [] }).compile()",
         errors: [{ messageId: "wiring" }],
       },
     ],

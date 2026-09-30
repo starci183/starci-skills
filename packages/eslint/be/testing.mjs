@@ -1,59 +1,39 @@
 /**
- * The rules that hold `testing.md`.
+ * The rules that hold `testing.md` (catalog R47 `BE_TEST_TOPOLOGY` and R48 `BE_SPEC_QUALITY`).
  *
- * MOST OF THAT LAW IS NOT MACHINE-CHECKABLE, and pretending otherwise would be worse than
- * checking nothing. No rule can tell whether a file represents a business flow, whether the
- * unhappy path it covers drags a critical flow behind it, or whether the decision branches are
- * covered - those are read by a person.
+ * MOST OF THAT LAW IS NOT MACHINE-CHECKABLE, and pretending otherwise would be worse than checking nothing. No rule
+ * can tell whether a file represents a business flow, whether the unhappy path it covers drags a critical flow
+ * behind it, or whether the decision branches are covered - those are read by a person. What a rule CAN see is a
+ * shape that is wrong on its face regardless of intent:
  *
- * What a rule CAN see is the two shapes that are wrong on their face regardless of intent: a spec
- * whose every assertion is about a call rather than a result, and an end-to-end spec that never
- * reads any state back. Both were measured before being written: eight specs and one e2e file in
- * the source repository, which is why the second lands with a carve-out rather than at zero.
+ *   - a spec whose every assertion is about a call rather than a result (`no-call-only-spec`);
+ *   - a subject that has no twin spec beside it, a spec with no subject beside it, and a file of a kind the
+ *     convention bans (`.test.ts`, `int-spec`, `harness-spec`) (`unit-test-colocated`);
+ *   - an e2e that never reads persisted state back, and an e2e that reaches a model provider
+ *     (`e2e-asserts-persisted-state`, `no-model-call-in-e2e`);
+ *   - an e2e filename that names an API shape instead of a business flow (`no-api-shaped-e2e-filename`);
+ *   - a model stub that returns a bare marker instead of a payload the production parser can parse
+ *     (`no-marker-model-stub`).
  *
- * Two more codes turned out to have a genuinely mechanical HALF, added later and kept narrow on
- * purpose:
- *
- *   - TESTING-1. A filename cannot be checked against a business sentence - but the anti-pattern
- *     the law names by example (`rewards-queries.e2e-spec.ts`) IS a closed, denylisted shape: a
- *     filename whose last segment is an API noun rather than a business one. The rule refuses only
- *     that shape; it does not claim to certify a good name, and it is the same requirement E2E-1 in
- *     `e2e-flow.md` states on the same file, so one rule holds both codes rather than reporting the
- *     same file twice under two names.
- *   - TESTING-7. "A stub of a model returns a payload the production parser can actually parse" -
- *     the rule cannot verify the payload parses, but it CAN refuse the one shape the law names by
- *     example: a bare marker string (`"stubbed"`, `"ok"`, `"test"`) standing in for the whole
- *     answer. An object literal, or a `JSON.stringify(...)` call, is out of the rule's reach on
- *     purpose - that is where a false positive would start.
- *
- * TESTING-5 / TESTING-8 ("a configured lane either holds tests or does not exist") was drafted as a
- * filesystem-reading rule and then WITHDRAWN. It reads correctly as JS to `@typescript-eslint/parser`
- * (`{"rootDir": "..."}` parses as an `ExpressionStatement` over an `ObjectExpression` under this
- * parser, no wrapping needed) and its own file-scoped RuleTester cases passed. It is left out anyway,
- * because the question it would answer is not "does this repository's config have this shape" but
- * "does the CONSUMING repository's `eslint.config.mjs` even point a linter at this file at all" - and
- * in the measured reference repository it does not: `files` there is five TypeScript globs under
- * `src`, `apps`, `libs`, `test` and `tests` - none of them `.json` - so `jest-e2e.json` and
- * `jest-harness.json` sit outside every one of them. A rule that cannot be reached by the config
- * that would run it is not a `warn`-with-a-count away from correct; it is dead code reporting a "0"
- * that means "never asked", not "already true" - the one measurement this family refuses to publish
- * as if it were the other.
+ * Every path question is asked of the slot manifest (`hfsOf(context)`): a rule never tests a path with a regular
+ * expression. A file name is a role vocabulary of the slots (`*.spec.ts`, `*.e2e-spec.ts`, `*.handler.ts`) and is read
+ * from the basename. A state read is recognised by the TYPE of the receiver (`EntityManager`, `DataSource`,
+ * `QueryRunner` of `typeorm`), never by its variable name.
  */
 
 import { statSync } from "node:fs"
-import { normalizePath } from "./lib/path.mjs"
+import { basename, dirname, join } from "node:path"
+import { hfsOf } from "./lib/hfs.mjs"
+import { isPackageType } from "./lib/types.mjs"
+
+/** The file name of a linted path, in forward-slash form. */
+const baseOf = (filename) => basename(String(filename || "").replace(/\\/g, "/"))
 
 /** Test kind 1 of exactly two: a unit spec, `<name>.spec.ts` beside its subject. */
-const isUnitSpec = (filename) => /\.spec\.ts$/.test(normalizePath(filename))
+const isUnitSpec = (filename) => /\.spec\.ts$/.test(baseOf(filename))
 
 /** Test kind 2 of exactly two: `*.e2e-spec.ts`. */
-const isE2eSpec = (filename) => /\.e2e-spec\.ts$/.test(normalizePath(filename))
-
-/** The opt-in live e2e filter (`test:e2e:live`): e2e specs under `src/tests/e2e/live/` that need live third-party accounts. */
-const isLiveE2eSpec = (filename) => isE2eSpec(filename) && /\/src\/tests\/e2e\/live\//.test(normalizePath(filename))
-
-/** Test-only environment helpers whose only authority is the live e2e filter. */
-const isLiveE2eHelper = (filename) => /\/src\/tests\/e2e\/live\//.test(normalizePath(filename)) && !isE2eSpec(filename)
+const isE2eSpec = (filename) => /\.e2e-spec\.ts$/.test(baseOf(filename))
 
 /**
  * Matchers that assert a CALL happened rather than what came out of it.
@@ -73,9 +53,6 @@ const CALL_MATCHERS = new Set([
   "toHaveReturned",
 ])
 
-/** Names that mean the test read state back out of the database. */
-const STATE_READERS = /^(?:entityManager|dataSource|EntityManager|DataSource|getRepository|queryRunner)$/
-
 /**
  * The matcher a given `expect(...)` call ends in.
  *
@@ -91,6 +68,7 @@ const matcherOf = (expectCall) => {
   }
   return last
 }
+
 
 // -- TESTING-6 -------------------------------------------------------------------------------------
 
@@ -129,51 +107,89 @@ export const noCallOnlySpec = {
   },
 }
 
-// -- TESTING-7 -------------------------------------------------------------------------------------
 
-const UNIT_TEST_BUCKET = /\/(?:src\/tests|tests?\/unit)(?:\/|$)/
-const HFS_TEST_CATEGORY = /\/src\/tests\/(?:fixtures|e2e)\//
+// -- R47 twin specs -------------------------------------------------------------------------------
+
+/** The extensions a subject beside a spec may have. */
 const SUBJECT_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs"]
 
-/** A structural test in an HFS test category may test a source file beside it. */
-const isColocatedTestInfrastructureSpec = (filename) => {
-  if (!HFS_TEST_CATEGORY.test(filename) || !isUnitSpec(filename)) return false
-  const subject = filename.slice(0, -".spec.ts".length)
-  return SUBJECT_EXTENSIONS.some((extension) => {
-    try {
-      return statSync(`${subject}${extension}`).isFile()
-    } catch {
-      return false
-    }
-  })
+/** Whether a file exists (a spec is beside its subject on disk, so this is the one question the disk answers). */
+const exists = (path) => {
+  try {
+    return statSync(path).isFile()
+  } catch {
+    return false
+  }
 }
 
-/** Backend units are colocated `.spec.ts` files, including structural test infrastructure. */
+/** Kinds of test file the convention bans: `.test.ts`, `*.int-spec.ts`, `*.harness-spec.ts` (any spec kind other than `spec` and `e2e-spec`). */
+const BANNED_TEST_FILE = /(?:\.test|\.int-spec|\.harness-spec)\.[cm]?[jt]sx?$/
+
+/**
+ * The roles that need a twin spec (BE-CONVENTION 1.16): a basename suffix, in the slots where that role lives.
+ * `null` means the role is a role in every slot that owns code.
+ */
+const TWIN_ROLES = [
+  { suffix: ".handler.ts", role: "handler", slots: ["be.feature.application"] },
+  { suffix: ".service.ts", role: "domain service", slots: ["be.domain"] },
+  { suffix: ".consumer.ts", role: "consumer", slots: ["be.transport.message"] },
+  { suffix: ".job.ts", role: "job", slots: ["be.transport.schedule"] },
+  { suffix: ".guard.ts", role: "guard", slots: null },
+  { suffix: ".mapper.ts", role: "mapper", slots: ["be.transport.http", "be.transport.graphql"] },
+  { suffix: ".policy.ts", role: "policy", slots: ["be.domain"] },
+  { suffix: ".client.ts", role: "client", slots: ["be.integrations", "be.integrations.model", "be.platform", "be.domain"] },
+  { suffix: ".rows.ts", role: "row mapper", slots: ["be.persistence"] },
+]
+
+/** The twin-spec role of a source file, or null. */
+const twinRoleOf = (hfs, filename) => {
+  const name = baseOf(filename)
+  const slot = hfs.slotOf(filename)
+  if (!slot) return null
+  return TWIN_ROLES.find((entry) => name.endsWith(entry.suffix) && (entry.slots === null || entry.slots.includes(slot))) ?? null
+}
+
+/** Twin specs beside their subjects; no `.test.ts`, `int-spec` or `harness-spec` file. */
 export const unitTestColocated = {
   meta: {
     type: "problem",
-    docs: { description: "Backend unit tests are colocated `.spec.ts` files; generic `.test.ts` and non-colocated unit buckets are forbidden." },
+    docs: { description: "A handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin `.spec.ts` beside it; a spec has its subject beside it; there are only two kinds of test file." },
     schema: [],
     messages: {
-      suffix: "`{{name}}` uses `.test.ts`. A backend unit is a colocated `.spec.ts` file beside its production owner.",
-      bucket: "`{{path}}` files a unit away from its subject. Colocate it with the owner, or place a structural spec beside the test-infrastructure file it checks in an HFS src/tests category.",
+      suffix: "`{{name}}` is a banned kind of test file. A test is a `<name>.spec.ts` unit beside its subject or a `*.e2e-spec.ts` flow under `src/tests/e2e/`; there is no `.test.ts`, `int-spec` or `harness-spec`.",
+      orphan: "`{{name}}` has no subject beside it. A unit spec is `<name>.spec.ts` next to `<name>.ts` and tests that one file; move it beside its subject, or rename it after the file it tests.",
+      twin: "This {{role}} has no twin spec. Add `{{twin}}` beside it: it constructs the {{role}} with `new` and typed doubles and asserts results or state.",
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    const genericUnit = /\.test\.ts$/.test(file)
-    const bucketedUnit = isUnitSpec(file) && UNIT_TEST_BUCKET.test(file) && !isColocatedTestInfrastructureSpec(file)
-    if (!genericUnit && !bucketedUnit) return {}
-    return {
-      Program(node) {
-        if (genericUnit) context.report({ node, messageId: "suffix", data: { name: file.slice(file.lastIndexOf("/") + 1) } })
-        if (bucketedUnit) context.report({ node, messageId: "bucket", data: { path: file } })
-      },
+    const filename = context.filename || context.getFilename()
+    const name = baseOf(filename)
+    const hfs = hfsOf(context)
+    if (/\.d\.[cm]?ts$/.test(name)) return {}
+    if (BANNED_TEST_FILE.test(name)) {
+      return { Program(node) { context.report({ node, messageId: "suffix", data: { name } }) } }
     }
+    if (isUnitSpec(name)) {
+      const stem = join(dirname(filename), name.slice(0, -".spec.ts".length))
+      if (SUBJECT_EXTENSIONS.some((extension) => exists(`${stem}${extension}`))) return {}
+      return { Program(node) { context.report({ node, messageId: "orphan", data: { name } }) } }
+    }
+    const role = twinRoleOf(hfs, filename)
+    if (!role) return {}
+    const stem = join(dirname(filename), name.slice(0, -".ts".length))
+    if (exists(`${stem}.spec.ts`)) return {}
+    return { Program(node) { context.report({ node, messageId: "twin", data: { role: role.role, twin: `${name.slice(0, -".ts".length)}.spec.ts` } }) } }
   },
 }
 
+
 // -- TESTING-2 -------------------------------------------------------------------------------------
+
+/** The typeorm types a flow reads persisted state through. */
+const STATE_TYPES = ["EntityManager", "DataSource", "QueryRunner"]
+
+/** Whether an expression is a receiver of persisted state, by the TYPE it has and the package that declares it. */
+const isStateReader = (context, node) => STATE_TYPES.some((name) => isPackageType(context, node, name, "typeorm"))
 
 /** An end-to-end spec that never reads state back proves only that the server replied. */
 export const e2eAssertsPersistedState = {
@@ -183,15 +199,18 @@ export const e2eAssertsPersistedState = {
     schema: [],
     messages: {
       noState:
-        "This e2e never reads any state back - it asserts on responses alone, so the flow can stop persisting and this file stays green. Read the row, the balance or the entitlement out of the database and assert THAT. A flow that genuinely has no persisted consequence needs an eslint-disable naming what it observes instead.",
+        "This e2e never reads any state back - it asserts on responses alone, so the flow can stop persisting and this file stays green. Read the row, the balance or the entitlement out of the database through the `EntityManager` and assert THAT.",
     },
   },
   create(context) {
     if (!isE2eSpec(context.filename || context.getFilename())) return {}
     let readsState = false
     return {
-      Identifier(node) {
-        if (STATE_READERS.test(node.name)) readsState = true
+      MemberExpression(node) {
+        if (!readsState && isStateReader(context, node.object)) readsState = true
+      },
+      CallExpression(node) {
+        if (!readsState && node.arguments.some((argument) => argument.type !== "SpreadElement" && isStateReader(context, argument))) readsState = true
       },
       "Program:exit"(node) {
         if (readsState) return
@@ -201,21 +220,13 @@ export const e2eAssertsPersistedState = {
   },
 }
 
+
 // -- TESTING-9 -------------------------------------------------------------------------------------
 
 /** Provider SDKs. Importing one into a flow test is a real model call by any other name. */
-const PROVIDER_PACKAGES = /^(?:@anthropic-ai\/|openai$|openai\/|ollama$|@google\/generative-ai|@mistralai\/|cohere-ai)/
+const PROVIDER_PACKAGES = /^(?:@anthropic-ai\/|openai$|openai\/|ollama$|@google\/generative-ai|@google\/genai|@mistralai\/|cohere-ai)/
 
-/**
- * The harness's own model helpers, which exist to reach a provider.
- *
- * Matched WITHOUT the `tests/` prefix: an e2e sits beside the helper folder, so the import it
- * actually writes is the relative `../helpers/models.service`, and a pattern anchored on the
- * absolute path never sees it.
- */
-const HARNESS_MODEL_HELPERS = /helpers\/models(?:\.service)?$/
-
-/** An e2e never calls a model; only a live e2e (src/tests/e2e/live/) may reach a provider. */
+/** An e2e never calls a model; only a live e2e (slot `be.tests.e2e-live`) may reach a provider. */
 export const noModelCallInE2e = {
   meta: {
     type: "problem",
@@ -223,143 +234,22 @@ export const noModelCallInE2e = {
     schema: [],
     messages: {
       provider:
-        "`{{source}}` reaches a model provider from an e2e. A model call costs money, takes seconds and answers differently every time - so this makes the flow suite expensive, slow and flaky at once, and the assertion has to be loosened until it stops catching anything. Stub the model and assert what can actually break: the entitlement, the quota, the persisted answer. Judging the answer itself belongs in a live e2e under src/tests/e2e/live/.",
+        "`{{source}}` reaches a model provider from an e2e. A model call costs money, takes seconds and answers differently every time - so this makes the flow suite expensive, slow and flaky at once, and the assertion has to be loosened until it stops catching anything. Override the model integration token with a fixture double and assert what can actually break: the entitlement, the quota, the persisted answer. Judging the answer itself belongs in a live e2e under `src/tests/e2e/live/`.",
     },
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (!isE2eSpec(filename) || isLiveE2eSpec(filename)) return {}
+    if (!isE2eSpec(filename) || hfsOf(context).slotOf(filename) === "be.tests.e2e-live") return {}
     return {
       ImportDeclaration(node) {
         const source = node.source && node.source.value
-        if (typeof source !== "string") return
-        if (!PROVIDER_PACKAGES.test(source) && !HARNESS_MODEL_HELPERS.test(source)) return
+        if (typeof source !== "string" || !PROVIDER_PACKAGES.test(source)) return
         context.report({ node, messageId: "provider", data: { source } })
       },
     }
   },
 }
 
-// -- TESTING-10 ------------------------------------------------------------------------------------
-
-/** Official provider clients that a harness may call without a house routing layer. */
-const DIRECT_PROVIDER_PACKAGES = /^(?:@anthropic-ai\/sdk(?:\/|$)|openai(?:\/|$)|@google\/genai(?:\/|$)|@google\/generative-ai(?:\/|$)|@mistralai\/(?:mistralai|mistralai-ts)(?:\/|$)|cohere-ai(?:\/|$)|ollama(?:\/|$))/
-
-/** Helpers that hide a model call or impersonate the production gateway. */
-const FORBIDDEN_HARNESS_HELPERS = /(?:^|\/)(?:models(?:\.service)?|harness-invoke(?:\.service)?)$/
-
-/** Consumer/CLI credential authorities that are never provider API credentials. */
-const FORBIDDEN_HARNESS_AUTH = /(?:CLAUDE_CODE_OAUTH_TOKEN|claude-code-token|sk-ant-oat|OAUTH_BETA|CHATGPT_(?:SESSION|AUTH)_TOKEN|CODEX_(?:SESSION|AUTH)_TOKEN|auth-profile)/i
-
-/** Imported symbols that reveal a fake production gateway in the harness lane. */
-const FORBIDDEN_HARNESS_SYMBOLS = new Set([
-  "AiInvokeService",
-  "HarnessInvokeService",
-  "createHarnessInvoke",
-])
-
-/** Return the static property name of an object/member property when one exists. */
-const propertyName = (property) => {
-  if (!property) return null
-  if (property.type === "Identifier") return property.name
-  if (property.type === "Literal") return property.value
-  return null
-}
-
-/** Find the `AiInvokeService` token in a `Pick<AiInvokeService, ...>` type. */
-const aiInvokePickToken = (sourceCode) => {
-  const tokens = sourceCode.getTokens(sourceCode.ast)
-  for (let index = 0; index < tokens.length - 2; index += 1) {
-    if (tokens[index].value !== "Pick" || tokens[index + 1].value !== "<") continue
-    if (tokens[index + 2].value === "AiInvokeService") return tokens[index + 2]
-  }
-  return null
-}
-
-/** A file declares itself a model harness with the comment `@harness-kind model`; any other kind is not one. */
-const DECLARED_MODEL_HARNESS = /@harness-kind\s+model\b/
-
-/**
- * A model harness is identified by what it does, never by where it lives: it imports an LLM provider
- * SDK, reaches for a house model helper or gateway symbol, or declares `@harness-kind model`. A live
- * e2e for an identity provider (Keycloak), a payment gateway or any other third party sits in the same
- * `src/tests/e2e/live/` folder and is not a model harness, so this rule leaves it alone.
- */
-
-/** A harness calls one explicit provider SDK and never disguises it as `AiInvokeService`. */
-export const harnessCallsProviderDirectly = {
-  meta: {
-    type: "problem",
-    docs: { description: "A model-quality harness calls an approved provider SDK directly with provider API credentials." },
-    schema: [],
-    messages: {
-      missingProvider:
-        "This model harness (it reaches for a house model helper or gateway, or declares `@harness-kind model`) imports no approved provider SDK. A model-quality harness calls the declared provider client directly; a house helper, tier or gateway override can make it green about a model production does not use.",
-      gateway:
-        "`{{name}}` impersonates or replaces the production AI gateway from a harness. Reuse the production prompt builder and parser around a direct provider SDK call instead.",
-      helper:
-        "`{{source}}` hides the provider call behind a house harness helper. Import and call the approved provider SDK in this harness; only credential loading may be shared.",
-      consumerAuth:
-        "`{{authority}}` is a consumer or CLI credential authority, not a provider-issued server API key. Read an explicit harness API-key environment variable instead.",
-    },
-  },
-  create(context) {
-    const filename = context.filename || context.getFilename()
-    const harness = isLiveE2eSpec(filename)
-    const authScope = harness || isLiveE2eHelper(filename)
-    if (!authScope) return {}
-
-    let hasProviderImport = false
-    let modelSignal = false
-    return {
-      ImportDeclaration(node) {
-        const source = node.source && node.source.value
-        if (typeof source !== "string") return
-        if (harness && DIRECT_PROVIDER_PACKAGES.test(source)) hasProviderImport = true
-        if (harness && FORBIDDEN_HARNESS_HELPERS.test(source.replace(/\.(?:ts|js)$/, ""))) {
-          modelSignal = true
-          context.report({ node, messageId: "helper", data: { source } })
-        }
-        if (!harness) return
-        for (const specifier of node.specifiers) {
-          const imported = specifier.imported && (specifier.imported.name || specifier.imported.value)
-          const local = specifier.local && specifier.local.name
-          const name = imported || local
-          if (!FORBIDDEN_HARNESS_SYMBOLS.has(name)) continue
-          modelSignal = true
-          context.report({ node: specifier, messageId: "gateway", data: { name } })
-        }
-      },
-      Literal(node) {
-        if (typeof node.value !== "string" || !FORBIDDEN_HARNESS_AUTH.test(node.value)) return
-        context.report({ node, messageId: "consumerAuth", data: { authority: node.value } })
-      },
-      Property(node) {
-        if (!harness || propertyName(node.key) !== "provide") return
-        if (!node.value || node.value.type !== "Identifier" || node.value.name !== "AiInvokeService") return
-        context.report({ node, messageId: "gateway", data: { name: "provide: AiInvokeService" } })
-      },
-      CallExpression(node) {
-        if (!harness || !node.callee || node.callee.type !== "MemberExpression") return
-        if (propertyName(node.callee.property) !== "overrideProvider") return
-        const argument = node.arguments && node.arguments[0]
-        if (!argument || argument.type !== "Identifier" || argument.name !== "AiInvokeService") return
-        context.report({ node, messageId: "gateway", data: { name: "overrideProvider(AiInvokeService)" } })
-      },
-      "Program:exit"(node) {
-        if (!harness) return
-        const sourceCode = context.sourceCode || context.getSourceCode()
-        const pickToken = aiInvokePickToken(sourceCode)
-        if (pickToken) {
-          modelSignal = true
-          context.report({ node: pickToken, messageId: "gateway", data: { name: 'Pick<AiInvokeService, "run">' } })
-        }
-        const declared = sourceCode.getAllComments().some((comment) => DECLARED_MODEL_HARNESS.test(comment.value))
-        if ((modelSignal || declared) && !hasProviderImport) context.report({ node, messageId: "missingProvider" })
-      },
-    }
-  },
-}
 
 // -- TESTING-1 (and E2E-1 in e2e-flow.md, the same requirement on the same file) -------------------
 
@@ -373,7 +263,7 @@ const API_SHAPED_FILENAME_NOUNS = new Set([
 
 /** The hyphen-separated words of an e2e filename, with the lane suffix stripped. */
 const e2eFilenameSegments = (filename) => {
-  const base = normalizePath(filename).split("/").pop() || ""
+  const base = baseOf(filename)
   return base.replace(/\.e2e-spec\.ts$/, "").split("-").filter(Boolean)
 }
 
@@ -406,10 +296,11 @@ export const noApiShapedE2eFilename = {
   },
 }
 
+
 // -- TESTING-7 -------------------------------------------------------------------------------------
 
-/** Test-infra helpers, where the shared model stub this code governs actually lives. */
-const isTestHelperFile = (filename) => /\/tests\/helpers\//.test(normalizePath(filename))
+/** Test infrastructure: the fixtures and the e2e setup, where the shared model stub lives (slots `be.tests.fixtures`, `be.tests.e2e-setup`). */
+const isTestInfrastructure = (hfs, filename) => ["be.tests.fixtures", "be.tests.e2e-setup"].includes(hfs.slotOf(filename))
 
 /** Bare markers a stub returns when nobody gave it a real answer to stand in for. */
 const MARKER_STRINGS = new Set(["stubbed", "stub", "ok", "test", "mock", "fake", "todo", "tbd", "n/a", "pending", ""])
@@ -433,7 +324,7 @@ export const noMarkerModelStub = {
     },
   },
   create(context) {
-    if (!isTestHelperFile(context.filename || context.getFilename())) return {}
+    if (!isTestInfrastructure(hfsOf(context), context.filename || context.getFilename())) return {}
     return {
       CallExpression(node) {
         const callee = node.callee
@@ -466,47 +357,23 @@ export const noMarkerModelStub = {
 }
 
 /** The rules this law contributes to the plugin. */
+
+/** The rules this law contributes to the plugin. */
 export const rules = {
   "no-call-only-spec": noCallOnlySpec,
   "unit-test-colocated": unitTestColocated,
   "e2e-asserts-persisted-state": e2eAssertsPersistedState,
   "no-model-call-in-e2e": noModelCallInE2e,
-  "harness-calls-provider-directly": harnessCallsProviderDirectly,
   "no-api-shaped-e2e-filename": noApiShapedE2eFilename,
   "no-marker-model-stub": noMarkerModelStub,
 }
 
-/**
- * The level this law asks for, as the plugin's own opinion.
- *
- * MEASURED WITH THE RULES THEMSELVES against the reference repository, which is the only count
- * worth writing down: 1 call-only spec of 181, and 1 e2e of 48 that never reads state back.
- *
- * That number was wrong twice before it was right, and both ways are worth knowing. A grep-based
- * estimate said EIGHT - it counted files whose assertions merely INCLUDED a call matcher, which is
- * the shape this rule deliberately permits. A first run of the rule itself said THREE - it counted
- * eslint's own complaints about inline `eslint-disable` comments referring to rules the measuring
- * config never loaded. Count only the reports carrying this rule's own id.
- *
- * Both land at `warn` with the count, get burned down, and flip to `error` at zero.
- *
- * The two later rules were measured the same way, against the same repository:
- *
- *   - `no-api-shaped-e2e-filename` found TWO of 77 - `installment-plan-queries.e2e-spec.ts` and
- *     `rewards-queries.e2e-spec.ts`, the exact anchor example the law names. Real, pre-existing debt
- *     this task does not fix, so it lands at `warn` rather than claiming a burn-down that has not
- *     happened.
- *   - `no-marker-model-stub` found ZERO of the world's own stub in `tests/helpers/flow-world.ts`:
- *     the default answer is `JSON.stringify({ answer: "..." })`, which is a `CallExpression`, not a
- *     `Literal`, so the rule does not even see it as a candidate. It ships at `error` as a
- *     regression guard on a shape that is already correct.
- */
+/** Every rule of this law ships at `error`. */
 export const recommended = {
-  "starci-be/no-call-only-spec": "error", // no=0 of 182 - burned down from 1
+  "starci-be/no-call-only-spec": "error",
   "starci-be/unit-test-colocated": "error",
-  "starci-be/e2e-asserts-persisted-state": "error", // no=0 of 47 - burned down from 1
-  "starci-be/no-model-call-in-e2e": "error", // no=0 of 47
-  "starci-be/harness-calls-provider-directly": "error",
+  "starci-be/e2e-asserts-persisted-state": "error",
+  "starci-be/no-model-call-in-e2e": "error",
   "starci-be/no-api-shaped-e2e-filename": "error",
-  "starci-be/no-marker-model-stub": "error", // no=0 - the world's stub already returns JSON.stringify(...)
+  "starci-be/no-marker-model-stub": "error",
 }
