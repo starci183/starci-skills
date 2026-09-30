@@ -17,7 +17,7 @@
 //
 // Prerequisites: the dev compose stack is up (postgres, keycloak) - reused read-only from another lane
 // if already running - and this lane's own api is up on its own port against its own database
-// (PORT=3103 DATABASE_URL=postgres://postgres:postgres@localhost:5432/todo_plan ... npm run start:dev).
+// (PORT=3103 PRIMARY_DB_URL=postgres://postgres:postgres@localhost:5432/todo_plan ... npm run start:dev).
 import {
     COMPLETE_TASK, CREATE_TASK, DELETE_TASK, LIST_TASKS, createProof, env, run,
 } from "./live-proof-lib.mjs"

@@ -25,7 +25,7 @@ SQL seeds for the `todo` database. Mounted read-only into postgres'
 
 - **Namespace**: every seeded owner/recipient/person is `uat-*` (the fixture's declared
   `owner LIKE 'uat-%'` namespace). Realm users such as `demo@todo.dev` get zero seeded rows.
-- **Idempotent**: safe to re-run any file (`psql "$DATABASE_URL" -f <file>`); data files
+- **Idempotent**: safe to re-run any file (`psql "$PRIMARY_DB_URL" -f <file>`); data files
   upsert on their primary keys, `01-schema.sql` uses `IF NOT EXISTS`, and the audit chain
   insert is guarded by `WHERE NOT EXISTS` so it grafts only onto an empty table — re-running
   never corrupts an app-extended chain. After the chain lines exist, `setval` keeps the
@@ -50,5 +50,5 @@ docker compose -f .starcistacks/dev/infra/compose/compose.yaml exec -T postgres 
   psql -U postgres -d todo < .starcistacks/dev/seeds/volume/10-volume-tasks.sql
 ```
 
-or against any reachable database: `psql "$DATABASE_URL" -f volume/10-volume-tasks.sql`.
+or against any reachable database: `psql "$PRIMARY_DB_URL" -f volume/10-volume-tasks.sql`.
 Re-running is safe (deterministic ids, upsert/`ON CONFLICT DO NOTHING`).

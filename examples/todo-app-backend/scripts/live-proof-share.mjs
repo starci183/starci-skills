@@ -13,7 +13,7 @@
 //   API_URL=http://localhost:3101 node scripts/live-proof-share.mjs
 //
 // Prerequisites: the dev compose stack is up (postgres, keycloak) and this lane's own api is running on
-// its own port against its own database (PORT=3101 DATABASE_URL=postgres://postgres:postgres@localhost:5432/todo_share
+// its own port against its own database (PORT=3101 PRIMARY_DB_URL=postgres://postgres:postgres@localhost:5432/todo_share
 // KEYCLOAK_TOKEN_URL=http://localhost:8089/realms/todo/protocol/openid-connect/token npm run start:dev).
 // This script only talks HTTP to that running api; it does not start or stop anything itself.
 import {

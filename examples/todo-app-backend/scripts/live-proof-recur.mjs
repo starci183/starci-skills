@@ -9,12 +9,11 @@
 //
 // Prerequisites: the dev compose stack is up (postgres, keycloak) and this feature's own API instance is
 // running on its own lane port against its own database, e.g.:
-//   DATABASE_URL=postgres://postgres:postgres@localhost:5432/todo_recur PORT=3105 \
-//     RECUR_TICK_CRON='*/5 * * * * *' node dist/apps/todo/src/main.js
-// RECUR_TICK_CRON is only set for this proof so integration.recur.scheduler's own tick fires every 5
-// seconds instead of every 5 minutes (the endpoint integration.recur.scheduler declares,
-// AppConfigService's own default) - this script waits for a *real* tick to materialise a real occurrence,
-// never a manually invoked stand-in for one, so a fast tick is what makes that wait practical here.
+//   PRIMARY_DB_URL=postgres://postgres:postgres@localhost:5432/todo_recur PORT=3105 \
+//     RECUR_TICK_CRON='* * * * *' node dist/apps/worker/src/main.js
+// RECUR_TICK_CRON is only set for this proof so the recur generation job fires every minute instead of every five
+// (the scheduling capability takes five-field cron; the worker must run beside the api). This script waits for a
+// *real* tick to materialise a real occurrence, never a manually invoked stand-in for one.
 import {
     createProof, env, run,
 } from "./live-proof-lib.mjs"
@@ -70,7 +69,7 @@ await run(async () => {
     pass()
 
     // integration.recur.scheduler: wait for a REAL tick to materialise today's occurrence (never a manually
-    // invoked stand-in) - requires the API to have been started with a short RECUR_TICK_CRON.
+    // invoked stand-in) - requires the API to have been running the worker with a short RECUR_TICK_CRON.
     step(`waiting up to ${tickTimeoutSeconds}s for a real scheduler tick to materialise today's occurrence`)
     let materialised
     for (let elapsed = 0; elapsed < tickTimeoutSeconds && !materialised; elapsed += 3) {

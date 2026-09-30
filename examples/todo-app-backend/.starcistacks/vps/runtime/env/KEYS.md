@@ -6,7 +6,6 @@ before running `sops -d`. Never reuse that identity or this pattern outside the 
 
 | Key | Encrypted owner | Purpose |
 |---|---|---|
-| `DATABASE_URL` | `runtime/env/app.env.enc` | Postgres connection for the api |
-| `REDIS_URL` | `runtime/env/app.env.enc` | Cache and session store |
+| `PRIMARY_DB_URL` | `runtime/env/app.env.enc` | Postgres connection of the `primary` database, read by the api, the worker and apps/migrate |
 | `KEYCLOAK_ADMIN_PASSWORD_FILE` | Swarm secret `keycloak-admin-password` | Bootstrap password for the realm admin |
 | `MINIO_ROOT_PASSWORD_FILE` | Swarm secret `minio-root-password` | Object store root credential |

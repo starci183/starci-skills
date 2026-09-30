@@ -1,7 +1,7 @@
 // Live proof for the notify feature (examples/todo-app-backend), run against the real dev stack -
 // Postgres, Redis and Keycloak from `docker compose -p todo-app-dev -f
 // .starcistacks/dev/infra/compose/compose.yaml up -d` - and the notify lane's own API/database
-// (PORT=3102, DATABASE_URL pointing at todo_notify). Never fakes: DeliveryService's real port is
+// (PORT=3102, PRIMARY_DB_URL pointing at todo_notify). Never fakes: DeliveryService's real port is
 // NotifySmtpPort/NotifyQueuePort, and this script never swaps them out from underneath the running api.
 //
 // GraphQL gives notify only three doors (notificationPreferences, updateNotificationPreferences,

@@ -3,8 +3,8 @@ services:
     image: postgres:16
     environment:
       # The postgres image refuses to boot without a superuser password (env_file alone declared
-      # DATABASE_URL/REDIS_URL, which this image does not read). POSTGRES_PASSWORD_FILE (not the
-      # POSTGRES_PASSWORD literal this used to be) matches the api's own default DATABASE_URL
+      # PRIMARY_DB_URL, which this image does not read). POSTGRES_PASSWORD_FILE (not the
+      # POSTGRES_PASSWORD literal this used to be) matches the api's own default PRIMARY_DB_URL
       # (AppConfigService) so the two need no coordination; DEMO-ONLY, never a real credential - the
       # value behind the file is still the literal "postgres", just no longer sitting in a tracked
       # compose file in plaintext (stacks-check's plaintext-sensitive-environment finding).

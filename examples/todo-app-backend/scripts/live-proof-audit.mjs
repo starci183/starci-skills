@@ -9,7 +9,7 @@
 //   DEMO_EMAIL=... DEMO_PASSWORD=... node scripts/live-proof-audit.mjs
 //
 // Prerequisites: the dev compose stack is up (postgres, keycloak) and this lane's own api is running on
-// its own port against its own database (DATABASE_URL pointing at todo_audit). This script only talks
+// its own port against its own database (PRIMARY_DB_URL pointing at todo_audit). This script only talks
 // HTTP to the running api; it does not start or stop anything itself.
 import {
     CREATE_TASK, createProof, env, run,
