@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": [],
+    "baseUrl": ".",
+    "paths": {
+      "@modules/*": [
+        "./src/modules/*"
+      ],
+      "@features/*": [
+        "./src/features/*"
+      ],
+      "@tests/*": [
+        "./src/tests/*"
+      ]
+    }
+  },
+  "include": [
+    "anchor.ts"
+  ]
+}

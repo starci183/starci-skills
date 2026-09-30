@@ -16,6 +16,7 @@
  * every conversation about the failure. Aliasing one here to match a target's older spelling would
  * leave two names for one rule and no way to tell which a message came from.
  */
+import { buildBeConfig } from "./lib/config.mjs"
 import { recommended as asyncDisciplineRecommended, rules as asyncDisciplineRules } from "./async-discipline.mjs"
 import { recommended as authorizationRecommended, rules as authorizationRules } from "./authorization.mjs"
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
@@ -112,22 +113,28 @@ export const rules = Object.fromEntries(
 )
 
 /**
- * The levels this canon asks for, as the plugin's own opinion.
- *
- * Unlike the front end, this axis allows `warn`, and the allowance is the burn-down playbook rather
- * than a softer standard: a rule measured with debt arrives at `warn` with a ledger entry naming the
- * offenders, and flips to `error` the day that entry closes. Switching a rule on over existing
- * offenders is what teaches an author to scroll past it, and a reader who has learned to scroll past
- * one rule reads none of them.
+ * The levels this canon asks for: every rule at `error`. There is no `warn` and no burn-down level; a rule with
+ * debt is fixed in the repositories before it ships, never published weaker.
  */
 export const recommended = Object.fromEntries(
     CONTRIBUTIONS.flatMap((entry) => Object.entries(entry.recommended)),
 )
 
 /** The plugin object, shaped the way a flat config expects it. */
-export default {
+const plugin = {
     meta: { name: "eslint-plugin-starci-be" },
     rules,
 }
 
-export { starciBeConfig, linterOptions } from "./lib/config.mjs"
+export default plugin
+
+/**
+ * The whole flat config of a back end: `export default starciBeConfig({ hfs: loadHfs(import.meta.url) })`.
+ *
+ * @param {{ hfs: object }} input - The HFS view of the repository.
+ * @returns {Promise<Array<object>>} The flat config.
+ */
+export const starciBeConfig = ({ hfs }) => buildBeConfig({ hfs, plugin, recommended })
+
+export { linterOptions } from "./lib/config.mjs"
+export { loadHfs } from "./lib/hfs.mjs"

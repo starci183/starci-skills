@@ -1,0 +1,26 @@
+id: hfs-canon-be-factory
+effectiveAt: '2026-09-30T15:40:00+07:00'
+summary: >-
+  Lane C0 (BE-CONVENTION 1.17, 3.1 principles 2-4): @starci/eslint-canon-be 2.0.0 (unreleased) is configured by one
+  managed line, `export default starciBeConfig({ hfs: loadHfs(import.meta.url) })`. The async factory turns typed
+  linting on for every tracked TS/JS file, ignores only dist/, coverage/ and node_modules/, borrows the
+  typescript-eslint type-escape and promise rules, ships every rule at error (the six warn levels are gone) and puts the
+  repository's HFS slot view in settings.starci.hfs (packages/eslint/be/lib/hfs.mjs: slotOf, tierOf, ownerOf,
+  ruleParams, connections) so path-scoped rules stop matching path patterns; lib/types.mjs answers a node's type for
+  type-aware rules. The package ships its own byte copy of the slot manifest and resolver in runtime/ (lib/slots.mjs,
+  which reached into the runtime checkout, is deleted); packages/hfs/scripts/sync-runtime.mjs keeps both copies and
+  `npm run check` refuses a stale one. Typed rule tests run through packages/eslint/be/fixtures/typed/tester.mjs.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-canon-be-factory.yaml
+  - package.json
+  - packages/package.json
+  - packages/hfs/scripts/sync-runtime.mjs
+  - packages/eslint/be/package.json
+  - packages/eslint/be/index.mjs
+  - packages/eslint/be/lib/config.mjs
+  - packages/eslint/be/lib/hfs.mjs
+  - packages/eslint/be/lib/types.mjs
+  - packages/eslint/be/fixtures/typed/tester.mjs
+  - packages/eslint/be/README.md
+  - packages/eslint/be/CHANGELOG.md

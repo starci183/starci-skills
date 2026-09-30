@@ -6,10 +6,12 @@ import { join } from "node:path"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
+import { fixtureHfs } from "./fixtures/typed/tester.mjs"
 import { fileSizeGrowth, recordedLines } from "./size-budget.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
+    settings: { starci: { hfs: fixtureHfs() } },
 })
 const SERVICE = "D:/repo/src/modules/domain/plan/plan.service.ts"
 const lines = (n) => Array.from({ length: n }, (_, i) => `export const v${i} = ${i}`).join("\n") + "\n"

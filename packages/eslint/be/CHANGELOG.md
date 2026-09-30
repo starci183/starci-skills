@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.0.0 - unreleased (lane C0, BE-CONVENTION)
+
+- Breaking: one configuration, `export default starciBeConfig({ hfs: loadHfs(import.meta.url) })`. The factory is async
+  (ESLint awaits it), turns typed linting on for every `.ts/.mts/.cts/.js/.mjs/.cjs` (`parserOptions.projectService`),
+  ignores only `dist/`, `coverage/`, `node_modules/`, borrows `@typescript-eslint/{consistent-type-assertions (never),
+  no-explicit-any, no-non-null-assertion, no-floating-promises, no-misused-promises, switch-exhaustiveness-check}` and
+  puts the repository's slot view in `settings.starci.hfs` (`lib/hfs.mjs`: `slotOf`, `tierOf`, `ownerOf`, `ruleParams`,
+  `connections`). It takes no globs, ignores or overrides. `sources`/`plugin`/`recommended` parameters are gone.
+- Breaking: every rule ships at `error` in `recommended` (the six `warn` levels are gone); the factory refuses any other level.
+- Breaking: `lib/slots.mjs` (which reached into the runtime checkout) is deleted; the manifest ships in `runtime/`
+  (byte copy kept by `packages/hfs/scripts/sync-runtime.mjs`). New `lib/types.mjs` answers what a node's TYPE is
+  (`typeOrigins`, `isPackageType`) for the type-aware rules.
+- Removed: the SAB-only `cdc` and `event-delivery` laws (`projection-listener-contract`, `no-dynamic-projection-group-id`,
+  `projection-recompute-must-upsert`, `nats-bridge-delivery-contract`, `no-call-site-transport-override`).
+- Dependencies: `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` ^8.70; peer `typescript` >=5.9; node >=22.13.
+  The 1.7.1 dependency on `@starci/hfs` (and its sibling-workspace fallback) is gone: the package carries its own
+  manifest copy in `runtime/`, one resolution path, no fallback.
+
 ## 1.7.1 - 2026-09-30
 
 - Fixed: eslint no longer fails to start in a product repository with `HFS slot manifest not found at <repo>/knowledge/hfs/slots.yaml`. `lib/slots.mjs` used to look for the manifest at a path above the package (the product repository, or a linked runtime copy that no longer exists). The package now depends on `@starci/hfs` and resolves the manifest and the YAML reader as `@starci/hfs/runtime/knowledge/hfs/slots.yaml` and `@starci/hfs/runtime/engine/yaml.mjs`, so what the canon reads travels with the installed packages. `STARCI_HFS_SLOTS` still overrides the manifest file.

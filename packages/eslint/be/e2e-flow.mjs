@@ -218,5 +218,5 @@ export const recommended = {
   "starci-be/e2e-uses-production-transport": "error",
   "starci-be/no-sleep-in-flow": "error",
   "starci-be/no-branch-in-flow-step": "error",
-  "starci-be/no-wiring-in-flow-spec": "warn", // no=60 of 77 - pre-existing, not burned down here
+  "starci-be/no-wiring-in-flow-spec": "error",
 }

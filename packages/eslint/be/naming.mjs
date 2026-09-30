@@ -213,7 +213,7 @@ export const rules = {
  * that touches an old file, which teaches people to disable it.
  */
 export const recommended = {
-  "starci-be/no-version-in-name": "warn",
-  "starci-be/no-bare-verb-export": "warn",
-  "starci-be/no-vendor-module-factory-name": "warn",
+  "starci-be/no-version-in-name": "error",
+  "starci-be/no-bare-verb-export": "error",
+  "starci-be/no-vendor-module-factory-name": "error",
 }

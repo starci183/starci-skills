@@ -2,7 +2,7 @@
  * The rules that hold the shape of a Nest module in HFS (catalog R45 `BE_MODULE_SHAPE`).
  *
  *   - `global-module-allowlist` lets `@Global()` appear only on the platform capabilities the slot manifest
- *     names (`ruleParams.be.globalModules`; read through `lib/slots.mjs`).
+ *     names (`ruleParams.be.globalModules`; read through `settings.starci.hfs`, see `lib/hfs.mjs`).
  *     A global module hides who depends on whom, so it is reserved for the three every capability needs.
  *   - `typed-module-definition` requires `ConfigurableModuleBuilder<Options>` to state its options type.
  *   - `static-module-register` requires `register`, `registerAsync`, `forRoot` and `forFeature` to be `static`.
@@ -17,7 +17,7 @@
  */
 import { decoratorName } from "./lib/ast.mjs"
 import { isDeclarationFile, isTestLane, normalizePath } from "./lib/path.mjs"
-import { hfsParams } from "./lib/slots.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
 
 /** `platform/<capability>` of a file inside `src/modules/platform`, else null. */
 const platformCapability = (filename) => {
@@ -44,7 +44,7 @@ export const globalModuleAllowlist = {
     create(context) {
         const filename = normalizePath(context.filename || context.getFilename())
         if (isDeclarationFile(filename) || isTestLane(filename)) return {}
-        const allowed = context.options[0]?.allowed ?? hfsParams.globalModules
+        const allowed = context.options[0]?.allowed ?? hfsOf(context).ruleParams.globalModules.map((dir) => dir.replace(/^src\/modules\//, "").replace(/\/+$/, ""))
         const capability = platformCapability(filename)
         if (capability !== null && allowed.includes(capability)) return {}
         return {

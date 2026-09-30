@@ -10,10 +10,11 @@ import {
     staticModuleRegister,
     typedModuleDefinition,
 } from "./module-shape.mjs"
-import { hfsParams, paramsFromManifest } from "./lib/slots.mjs"
+import { fixtureHfs } from "./fixtures/typed/tester.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
+    settings: { starci: { hfs: fixtureHfs() } },
 })
 const MODULE = "D:/repo/src/modules/domain/plan/plan.module.ts"
 
@@ -41,16 +42,10 @@ test("@Global is allowed only on the platform allowlist", () => {
     })
 })
 
-test("the parameters come from the manifest ruleParams and nothing else", () => {
-    const stated = paramsFromManifest({
-        ruleParams: { be: { globalModules: ["src/modules/platform/config/"], fileLines: { soft: 400, hardGrowth: true } } },
-        slots: [{ id: "be.feature", budget: { indexExports: 40 } }],
-    })
-    assert.deepEqual([...stated.globalModules], ["platform/config"])
-    assert.deepEqual(stated.fileLines, { soft: 400, hardGrowth: 400 })
-    assert.equal(stated.indexExports, 40)
-    assert.throws(() => paramsFromManifest({ slots: [] }), /ruleParams.be.globalModules/)
-    assert.ok(hfsParams.globalModules.length > 0)
+test("the parameters come from settings.starci.hfs and nothing else", () => {
+    assert.ok(fixtureHfs().ruleParams.globalModules.length > 0)
+    const bare = new RuleTester({ languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" } })
+    assert.throws(() => bare.run("global-module-allowlist", globalModuleAllowlist, { valid: [{ filename: MODULE, code: "@Module({}) class PlanModule {}" }], invalid: [] }), /settings\.starci\.hfs/)
 })
 
 test("a configurable module builder names its options type", () => {

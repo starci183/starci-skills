@@ -6,7 +6,6 @@
   "description": "The machines behind the StarCi lint canon: one flat-config plugin per side, each rule paired with the test that proves it fires. Lives in the .claude trust tree; published as @starci/eslint-canon-{be,fe}.",
   "workspaces": [
     "eslint/*"
-
   ],
   "scripts": {
     "test": "npm run test --workspaces --if-present",
@@ -20,6 +19,8 @@
   },
   "devDependencies": {
     "eslint": "^9.18.0",
-    "@typescript-eslint/parser": "^8.20.0"
+    "@typescript-eslint/parser": "^8.70.0",
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
+    "typescript": "^6.0.3"
   }
 }

@@ -10,6 +10,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
+import { fixtureHfs } from "./fixtures/typed/tester.mjs"
 import {
   mustDeepModuleImport,
   noSelfModuleAlias,
@@ -24,6 +25,7 @@ const tester = new RuleTester({
     ecmaVersion: 2022,
     sourceType: "module",
   },
+  settings: { starci: { hfs: fixtureHfs() } },
 })
 
 const IN_AI = "D:/repo/src/modules/domain/ai/ai-invoke.service.ts"

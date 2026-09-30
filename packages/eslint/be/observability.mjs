@@ -258,7 +258,7 @@ export const rules = {
 export const recommended = {
   "starci-be/no-framework-logger": "error",
   "starci-be/no-interpolated-log-message": "error",
-  "starci-be/no-error-wording-as-log-identity": "warn",
+  "starci-be/no-error-wording-as-log-identity": "error",
   "no-console": "error",
 }
 

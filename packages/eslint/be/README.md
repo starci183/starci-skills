@@ -12,40 +12,24 @@ npm i -D @starci/eslint-canon-be
 
 ## Use it
 
-```js
-import starciBe, { recommended } from "@starci/eslint-canon-be"
-
-export default [
-    // …your own ignores, language options and other plugins…
-    {
-        files: ["src/**/*.ts"],
-        plugins: { "starci-be": starciBe },
-        rules: recommended,
-    },
-]
-```
-
-Which globs the law applies to is your repository's fact. What the law says is not — so there is no
-option to switch a rule off or lower it to a warning.
-
-Prefer the factory, which owns the levels for you:
+`eslint.config.mjs` of a back end is a managed file (`hfs sync` renders it; `hfs check` refuses any other content):
 
 ```js
-import starciBe, { recommended, starciBeConfig } from "@starci/eslint-canon-be"
+import { loadHfs, starciBeConfig } from "@starci/eslint-canon-be"
 
-export default [
-    // …your own ignores, language options and other plugins…
-    starciBeConfig({ sources: ["apps/**/*.ts", "src/**/*.ts"], plugin: starciBe, recommended }),
-]
+export default starciBeConfig({ hfs: loadHfs(import.meta.url) })
 ```
 
-It states `warn` as `error` for a zero-warning gate, applies
-`noInlineConfig` and unused-disable reporting, and refuses a recommendation that carries a rule switched `off`. HFS
-keeps no retired-rule list: a rule the standard no longer holds is deleted from the plugin, and every rule that ships is on.
-The parameters a rule takes from the slot manifest (the `@Global()` allowlist, the file line budget, the width of an
-`index.ts`) come through `lib/slots.mjs`, which reads `knowledge/hfs/slots.yaml` and falls back to the rule catalog's values.
+That is the whole configuration. `loadHfs` reads the repository's `hfs.json` beside the config file and the slot
+manifest this package ships in `runtime/` (a byte copy of `knowledge/hfs/slots.yaml`, refreshed by
+`packages/hfs/scripts/sync-runtime.mjs`). `starciBeConfig` returns the flat config: typed linting
+(`parserOptions.projectService`) over every `.ts/.mts/.cts/.js/.mjs/.cjs`, ignores `dist/`, `coverage/` and
+`node_modules/` only, `noInlineConfig` with unused-disable reporting, the borrowed typescript-eslint rules, every canon
+rule at `error`, and `settings.starci.hfs` - the slot view each path-scoped rule asks (`lib/hfs.mjs`). The factory takes
+no globs, ignores or rule overrides, and refuses a recommendation with any rule not at `error`. A rule the standard no
+longer holds is deleted from the plugin; every rule that ships is on.
 
-Also exported: `rules`, `ruleOwners`, `lawOwners`, `starciBeConfig`, `linterOptions`.
+Also exported: `rules`, `ruleOwners`, `lawOwners`, `ruleDeclarations`, `recommended`, `linterOptions`.
 
 ## What it actually catches
 

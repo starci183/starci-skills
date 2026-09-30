@@ -164,5 +164,5 @@ export const rules = {
 export const recommended = {
   "starci-be/rest-door-needs-a-reason": "error",
   "starci-be/door-lives-in-features": "error",
-  "starci-be/no-capability-imports-features": "warn",
+  "starci-be/no-capability-imports-features": "error",
 }

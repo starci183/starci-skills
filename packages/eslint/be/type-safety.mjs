@@ -539,7 +539,7 @@ export const recommended = {
   "starci-be/no-inline-param-type": "error",
   "starci-be/no-inline-object-type": "error",
   "starci-be/no-const-enum": "error",
-  "starci-be/no-unguarded-unknown-cast": "warn", // no=3 -- see type-safety.mjs's doc comment
+  "starci-be/no-unguarded-unknown-cast": "error",
   "starci-be/no-never-cast": "error",
   "starci-be/no-non-null-assertion": "error",
   "starci-be/explicit-handler-return-type": "error",

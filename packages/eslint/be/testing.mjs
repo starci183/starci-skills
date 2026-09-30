@@ -507,6 +507,6 @@ export const recommended = {
   "starci-be/e2e-asserts-persisted-state": "error", // no=0 of 47 - burned down from 1
   "starci-be/no-model-call-in-e2e": "error", // no=0 of 47
   "starci-be/harness-calls-provider-directly": "error",
-  "starci-be/no-api-shaped-e2e-filename": "warn", // no=2 of 77 - pre-existing, not burned down here
+  "starci-be/no-api-shaped-e2e-filename": "error",
   "starci-be/no-marker-model-stub": "error", // no=0 - the world's stub already returns JSON.stringify(...)
 }

@@ -2,7 +2,7 @@
  * The rules that hold the file size budget (catalog R20 `HFS_SIZE_GROWTH`, the file-level half).
  *
  * A source file has a hard-growth budget of `fileLines.hardGrowth` lines (`ruleParams.be.fileLines` of the
- * slot manifest, read through `lib/slots.mjs`). `file-size-growth` is the ratchet and fails only on a file that must not
+ * slot manifest, read through `settings.starci.hfs`, see `lib/hfs.mjs`). `file-size-growth` is the ratchet and fails only on a file that must not
  * be this long: a NEW file over the budget, or an existing file over the budget that is longer than its recorded size.
  * The recorded size is the file's line count at the parent commit (`git show HEAD:<file>`), or an entry of the
  * `recorded` option. A file may stay as large as it is; it may not grow, and it may not be born large.
@@ -15,7 +15,10 @@
 import { execFileSync } from "node:child_process"
 import { basename, dirname } from "node:path"
 import { isDeclarationFile, isMigrationFile, isTestLane, normalizePath } from "./lib/path.mjs"
-import { hfsParams } from "./lib/slots.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+
+/** The line count above which a file may not grow: the soft budget when `hardGrowth` holds, else no limit. */
+const hardGrowthLines = ({ soft, hardGrowth }) => (hardGrowth ? soft : Number.POSITIVE_INFINITY)
 
 const lineCount = (text) => {
     const lines = text.split(/\r?\n/)
@@ -78,7 +81,7 @@ export const fileSizeGrowth = {
         const filename = normalizePath(context.filename || context.getFilename())
         if (!governed(filename)) return {}
         const options = context.options[0] ?? {}
-        const max = options.max ?? hfsParams.fileLines.hardGrowth
+        const max = options.max ?? hardGrowthLines(hfsOf(context).ruleParams.fileLines)
         return {
             "Program:exit"(node) {
                 const lines = lineCount((context.sourceCode || context.getSourceCode()).text)

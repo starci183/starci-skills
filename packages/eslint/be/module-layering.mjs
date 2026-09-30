@@ -31,7 +31,7 @@
  */
 
 import { normalizePath } from "./lib/path.mjs"
-import { hfsParams } from "./lib/slots.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
 
 /**
  * Category folders that hold capabilities rather than being one.
@@ -76,6 +76,9 @@ const ALIASES = [
  *
  * Reaching into one's own owner through its alias is `no-self-module-alias`'s finding, not this one's.
  */
+/** The public-surface width: the `budget.indexExports` of the first back-end slot that states one. */
+const indexExportBudget = (hfs) => ["be.domain", "be.feature"].map((id) => hfs.slot(id)?.budget?.indexExports).find(Number.isInteger)
+
 export const mustDeepModuleImport = {
   meta: {
     type: "problem",
@@ -276,7 +279,7 @@ export const noFolderReexport = {
   create(context) {
     const filename = normalizePath(context.filename || context.getFilename())
     const isIndex = INDEX_FILE_RE.test(filename)
-    const max = context.options[0]?.maxExports ?? hfsParams.indexExports
+    const max = context.options[0]?.maxExports ?? indexExportBudget(hfsOf(context))
     let count = 0
 
     const checkSpecifier = (node, specifier) => {

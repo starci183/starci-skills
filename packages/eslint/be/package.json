@@ -12,18 +12,17 @@
   "files": [
     "*.mjs",
     "lib/*.mjs",
+    "runtime/**",
     "!*.test.mjs",
     "README.md",
     "CHANGELOG.md"
   ],
   "engines": {
-    "node": ">=20.9.0"
-  },
-  "dependencies": {
-    "@starci/hfs": "1.0.1"
+    "node": ">=22.13.0"
   },
   "peerDependencies": {
-    "eslint": ">=9"
+    "eslint": ">=9",
+    "typescript": ">=5.9"
   },
   "publishConfig": {
     "access": "public"
@@ -36,5 +35,9 @@
     "eslintplugin",
     "starci",
     "canon"
-  ]
+  ],
+  "dependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
+    "@typescript-eslint/parser": "^8.70.0"
+  }
 }
