@@ -154,6 +154,10 @@ test("a function exported by a <c>.config.ts is called only by main.ts, its conf
             { filename: PLATFORM_CONFIG_FILE, code: readFileSync(PLATFORM_CONFIG_FILE, "utf8") },
             { filename: CONFIG_SPEC, code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)` },
             { filename: WORLD, code: `${PLATFORM_CONFIG}export const options = parsePlatformConfig(env)` },
+            // the app's own options file composes the capability parsers for main.ts
+            { filename: at("apps/api/src/api.options.ts"), code: `${PLATFORM_CONFIG}export const parseApiOptions = (env: EnvSource) => ({ platform: parsePlatformConfig(env) })` },
+            // a provider contract spec registers a module with options parsed from the sandbox keys
+            { filename: at("src/tests/contract/stripe/stripe.contract-spec.ts"), code: `${PLATFORM_CONFIG}export const options = parsePlatformConfig(env)` },
             // a method of the EnvSource class (declared in a *.config.ts) is a reader, not a config getter
             { filename: SERVICE, code: `${PLATFORM_CONFIG}export class PlanService { port() { return env.int('PORT') } }` },
             // options read from an injected object, not parsed

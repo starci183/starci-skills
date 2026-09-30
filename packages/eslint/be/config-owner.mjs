@@ -11,7 +11,7 @@
  *     definition.
  *   - `config-parsed-in-main` keeps the parsing of configuration in `main.ts`: a call of a function exported by a
  *     `<capability>.config.ts` (or of a function returning a `<capability>.options.ts` type, at module scope) is refused
- *     outside the app entry, the config file itself, its own spec and the test world. The callee is found through the type
+ *     outside the app entry (`main.ts` and `<app>.options.ts`), the config file itself, its own spec, the test world and a provider contract spec. The callee is found through the type
  *     checker, so no function name is matched.
  *   - `no-secret-default` refuses a default for a value typed `Secret` or `Url` by `platform/config`: a default argument
  *     to an `EnvSource` reader, a `??`/`||` fallback on such a value, and a string literal default (`""`, `"localhost"`,
@@ -181,10 +181,12 @@ export const configParsedInMain = {
         if (isDeclarationFile(filename)) return {}
         const hfs = hfsOf(context)
         const slot = hfs.slotOf(filename) ?? ""
-        const isEntry = slot.startsWith("be.app.") && baseOf(filename) === "main.ts"
-        const isWorld = isTestWorld(hfs, filename)
+        // the composition roots: the app entry and its `<app>.options.ts` (which `main.ts` calls to build `AppOptions`), the test world,
+        // and a provider contract spec (it registers one module with options parsed from the declared sandbox keys, as the world does)
+        const isEntry = slot.startsWith("be.app.") && (baseOf(filename) === "main.ts" || baseOf(filename).endsWith(OPTIONS_SUFFIX))
+        const isComposingTest = isTestWorld(hfs, filename) || slot === "be.tests.contract"
         const isOwnSpec = baseOf(filename).endsWith(CONFIG_SPEC_SUFFIX)
-        if (isEntry || isWorld || isOwnSpec) return {}
+        if (isEntry || isComposingTest || isOwnSpec) return {}
         const { checker, toTs } = typed(context)
         return {
             CallExpression(node) {
