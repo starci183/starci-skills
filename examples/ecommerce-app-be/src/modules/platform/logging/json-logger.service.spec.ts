@@ -15,8 +15,7 @@ const sink = (): Sink => {
             done()
         },
     })
-    return { stream, lines: () => chunks.join("").split("
-").filter(Boolean) }
+    return { stream, lines: () => chunks.join("").split(/\r?\n/).filter(Boolean) }
 }
 
 const TIME = "2026-01-01T00:00:00.000Z"
@@ -38,7 +37,14 @@ describe("JsonLoggerService", () => {
         logger.error("thing.failed", new TypeError("boom"), { id: 2 })
         expect(err.lines()).toEqual([
             JSON.stringify({ level: "warn", event: "thing.slow", time: TIME }),
-            JSON.stringify({ level: "error", event: "thing.failed", time: TIME, errorName: "TypeError", errorMessage: "boom", id: 2 }),
+            JSON.stringify({
+                level: "error",
+                event: "thing.failed",
+                time: TIME,
+                errorName: "TypeError",
+                errorMessage: "boom",
+                id: 2,
+            }),
         ])
         expect(out.lines()).toEqual([])
     })
