@@ -3,8 +3,7 @@ import { OrderDisclosure } from "@/components/branches/OrderDisclosure"
 import { OrderSummary } from "@/components/composites/OrderSummary"
 import { SlotView } from "@/components/composites/SlotView"
 import { StatusChip } from "@/components/leaves/StatusChip"
-import type { Handoff, HandoffStatus, Order, SendInput } from "@/modules/api/sales"
-import type { Slot, SlotLabels } from "@/modules/slot"
+import type { Handoff, HandoffStatus, Order, SendInput, Slot, SlotLabels } from "@/modules/types"
 import {
     handoffBlockActionsClassName,
     handoffBlockBodyClassName,

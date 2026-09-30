@@ -1,7 +1,6 @@
 import { SectionHeader, Text } from "@starci/grammar/common"
 import { SlotView } from "@/components/composites/SlotView"
-import type { SendAttempt } from "@/modules/api/sales"
-import type { Slot, SlotLabels } from "@/modules/slot"
+import type { SendAttempt, Slot, SlotLabels } from "@/modules/types"
 
 /** Shape of the block: one drawing. */
 export type SendHistoryBlockState = "list"

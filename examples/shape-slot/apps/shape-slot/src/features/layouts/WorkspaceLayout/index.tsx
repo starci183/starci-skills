@@ -5,7 +5,7 @@ import { useMediaQuery } from "@/hooks/ui"
 import { WorkspaceLayoutBase } from "./component"
 
 /** Input of WorkspaceLayout. */
-export type WorkspaceLayoutProps = {
+type WorkspaceLayoutProps = {
     readonly workspaceId: string
     readonly activeModule: string
     readonly children: ReactNode

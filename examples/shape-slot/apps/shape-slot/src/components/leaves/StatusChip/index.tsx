@@ -1,7 +1,7 @@
 import { Badge, type BadgeTone } from "@starci/grammar/common"
 
 /** Props for StatusChip: an already-translated label and its tone. */
-export type StatusChipProps = {
+type StatusChipProps = {
     readonly label: string
     readonly tone: BadgeTone
     readonly isSkeleton?: boolean

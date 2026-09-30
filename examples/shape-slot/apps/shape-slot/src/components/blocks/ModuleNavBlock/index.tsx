@@ -2,7 +2,7 @@ import { Button } from "@starci/grammar/common"
 import { moduleHref } from "@/modules/routes"
 
 /** Props for ModuleNavBlock. */
-export type ModuleNavBlockProps = {
+type ModuleNavBlockProps = {
     readonly workspaceId: string
     readonly active: string
     /** An atom, not a shape: the list keeps its layout, only the label length changes. */

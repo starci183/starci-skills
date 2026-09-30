@@ -1,10 +1,11 @@
 "use client"
 
 import useSWR from "swr"
-import { getOrder, type Order } from "@/modules/api/sales"
+import { getOrder } from "@/modules/api"
+import type { Order } from "@/modules/types"
 
 /** What a caller must say about the order it wants. */
-export interface UseQueryOrderSwrParams {
+interface UseQueryOrderSwrParams {
     handoffId?: string
 }
 

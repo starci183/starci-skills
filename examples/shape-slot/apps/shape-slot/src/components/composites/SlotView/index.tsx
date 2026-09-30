@@ -1,9 +1,9 @@
 import type { ReactNode } from "react"
 import { EmptyNotice } from "@starci/grammar/common"
-import type { Slot, SlotLabels } from "@/modules/slot"
+import type { Slot, SlotLabels } from "@/modules/types"
 
 /** Props for SlotView. */
-export type SlotViewProps<T> = {
+type SlotViewProps<T> = {
     readonly slot: Slot<T>
     /** Fake data of the same shape: the skeleton reuses the ready tree. */
     readonly placeholder: T

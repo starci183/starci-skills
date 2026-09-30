@@ -2,7 +2,7 @@ import { Text } from "@starci/grammar/common"
 import { MoneyText } from "@/components/leaves/MoneyText"
 
 /** Props for OrderSummary: facts plus their resolved terms. */
-export type OrderSummaryProps = {
+type OrderSummaryProps = {
     readonly customer: string
     readonly code: string
     readonly amount: number

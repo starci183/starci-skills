@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import type { SendInput } from "@/modules/api/sales"
+import type { SendInput } from "@/modules/types"
 import { OperatePageBase } from "./component"
 
 /** Input of OperatePage: route params as atoms, plus whether the viewer may edit. */
-export type OperatePageProps = {
+type OperatePageProps = {
     readonly handoffId: string
     readonly canEdit: boolean
 }

@@ -2,13 +2,13 @@ import { Button, Input, Text } from "@starci/grammar/common"
 import { DrawerBranch } from "@/components/branches/DrawerBranch"
 
 /** Shape of the overlay: each value is one drawing. Open / closed is an atom, not a shape. */
-export type SendHandoffOverlayState = "form" | "confirm"
+export type SendHandoffBlockState = "form" | "confirm"
 
 /** Shape the overlay opens in. */
-export const sendHandoffOverlayDefaultState: SendHandoffOverlayState = "form"
+export const sendHandoffBlockDefaultState: SendHandoffBlockState = "form"
 
 /** Localized copy resolved by the connected half. */
-export type SendHandoffOverlayLabels = {
+export type SendHandoffBlockLabels = {
     readonly title: string
     readonly fingerprint: string
     readonly revision: string
@@ -20,23 +20,23 @@ export type SendHandoffOverlayLabels = {
 }
 
 /** One field as atoms: its value and its already-translated error, if any. */
-export type SendHandoffOverlayField = {
+export type SendHandoffBlockField = {
     readonly value: string
     readonly error?: string
 }
 
 /** Atoms only: react-hook-form stays in the connected half; the pure half sees values and errors. */
-export type SendHandoffOverlayData = {
+export type SendHandoffBlockData = {
     readonly isOpen: boolean
     readonly isSending: boolean
-    readonly fingerprint: SendHandoffOverlayField
-    readonly revision: SendHandoffOverlayField
-    readonly note: SendHandoffOverlayField
-    readonly labels: SendHandoffOverlayLabels
+    readonly fingerprint: SendHandoffBlockField
+    readonly revision: SendHandoffBlockField
+    readonly note: SendHandoffBlockField
+    readonly labels: SendHandoffBlockLabels
 }
 
 /** Actions the pure half emits; every argument is an atom. */
-export type SendHandoffOverlayActions = {
+export type SendHandoffBlockActions = {
     readonly close: () => void
     readonly change: (field: "fingerprint" | "revision" | "note", value: string) => void
     readonly review: () => void
@@ -44,15 +44,15 @@ export type SendHandoffOverlayActions = {
     readonly confirm: () => void
 }
 
-/** Props for SendHandoffOverlayBase. */
-export type SendHandoffOverlayBaseProps = {
-    readonly state: SendHandoffOverlayState
-    readonly props: SendHandoffOverlayData
-    readonly on: SendHandoffOverlayActions
+/** Props for SendHandoffBlockBase. */
+export type SendHandoffBlockBaseProps = {
+    readonly state: SendHandoffBlockState
+    readonly props: SendHandoffBlockData
+    readonly on: SendHandoffBlockActions
 }
 
 /** Pure half: a drawer in one of two shapes. */
-export const SendHandoffOverlayBase = (props: SendHandoffOverlayBaseProps) => {
+export const SendHandoffBlockBase = (props: SendHandoffBlockBaseProps) => {
     const { labels, fingerprint, revision, note } = props.props
     return (
         <DrawerBranch isOpen={props.props.isOpen} title={labels.title} onDismiss={props.on.close}>

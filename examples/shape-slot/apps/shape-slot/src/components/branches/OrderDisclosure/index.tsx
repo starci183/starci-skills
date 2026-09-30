@@ -2,10 +2,10 @@
 
 import { useState } from "react"
 import { SurfaceAccordionCard, Text } from "@starci/grammar/common"
-import type { OrderLine } from "@/modules/api/sales"
+import type { OrderLine } from "@/modules/types"
 
 /** Props for OrderDisclosure. */
-export type OrderDisclosureProps = {
+type OrderDisclosureProps = {
     readonly lines: ReadonlyArray<OrderLine>
     readonly title: string
 }

@@ -1,7 +1,7 @@
 import { Text } from "@starci/grammar/common"
 
 /** Input of MoneyText. */
-export type MoneyTextProps = {
+type MoneyTextProps = {
     readonly value: number
     readonly isSkeleton?: boolean
 }

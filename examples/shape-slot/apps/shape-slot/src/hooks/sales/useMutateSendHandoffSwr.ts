@@ -2,15 +2,16 @@
 
 import { useSWRConfig } from "swr"
 import useSWRMutation from "swr/mutation"
-import { sendHandoff, type Handoff, type SendInput } from "@/modules/api/sales"
+import { sendHandoff } from "@/modules/api"
+import type { Handoff, SendInput } from "@/modules/types"
 import { QUERY_HANDOFF_SWR_KEY } from "./useQueryHandoffSwr"
 import { QUERY_SEND_ATTEMPTS_SWR_KEY } from "./useQuerySendAttemptsSwr"
 
 /** The key prefix of the send command. */
-export const MUTATE_SEND_HANDOFF_SWR_KEY = "MUTATE_SEND_HANDOFF_SWR"
+const MUTATE_SEND_HANDOFF_SWR_KEY = "MUTATE_SEND_HANDOFF_SWR"
 
 /** The trigger argument: the exact revision the sender saw. */
-export type MutateSendHandoffSwrArg = SendInput
+type MutateSendHandoffSwrArg = SendInput
 
 /**
  * Sends a handoff to accounting. On success it revalidates the two reads it made stale,

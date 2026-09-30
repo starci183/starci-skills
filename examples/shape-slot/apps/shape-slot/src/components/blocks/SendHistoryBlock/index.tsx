@@ -2,12 +2,12 @@
 
 import { useTranslations } from "next-intl"
 import { useQuerySendAttemptsSwr } from "@/hooks/sales"
-import { useSlotLabels } from "@/hooks/slot"
-import { toSlot } from "@/modules/slot"
+import { toSlot, useSlotLabels } from "@/hooks/slot"
+
 import { SendHistoryBlockBase } from "./component"
 
 /** Input of SendHistoryBlock: the id only. */
-export type SendHistoryBlockProps = { readonly handoffId: string }
+type SendHistoryBlockProps = { readonly handoffId: string }
 
 /** Connected half: owns its one api. */
 export const SendHistoryBlock = (props: SendHistoryBlockProps) => {

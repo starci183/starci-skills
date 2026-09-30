@@ -5,7 +5,7 @@ import { Drawer } from "@heroui/react"
 import { drawerBranchBodyClassName, drawerBranchTriggerClassName } from "./classNames"
 
 /** Props for DrawerBranch. */
-export type DrawerBranchProps = {
+type DrawerBranchProps = {
     /** Owned by whoever mounts it, never by the branch. */
     readonly isOpen: boolean
     readonly title: string

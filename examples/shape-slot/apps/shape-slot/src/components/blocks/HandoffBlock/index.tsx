@@ -2,13 +2,13 @@
 
 import { useTranslations } from "next-intl"
 import { useQueryHandoffSwr, useQueryOrderSwr } from "@/hooks/sales"
-import { useSlotLabels } from "@/hooks/slot"
-import type { SendInput } from "@/modules/api/sales"
-import { toSlot } from "@/modules/slot"
+import { toSlot, useSlotLabels } from "@/hooks/slot"
+import type { SendInput } from "@/modules/types"
+
 import { HandoffBlockBase, handoffBlockDefaultState, type HandoffBlockState } from "./component"
 
 /** Input of HandoffBlock: atoms (the id) and one action the page listens to. */
-export type HandoffBlockProps = {
+type HandoffBlockProps = {
     readonly handoffId: string
     readonly onRequestSend: (input: SendInput) => void
 }

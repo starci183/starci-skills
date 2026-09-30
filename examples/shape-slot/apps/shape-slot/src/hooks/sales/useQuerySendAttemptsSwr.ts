@@ -1,10 +1,11 @@
 "use client"
 
 import useSWR from "swr"
-import { getSendAttempts, type SendAttempt } from "@/modules/api/sales"
+import { getSendAttempts } from "@/modules/api"
+import type { SendAttempt } from "@/modules/types"
 
 /** What a caller must say about the attempts it wants. */
-export interface UseQuerySendAttemptsSwrParams {
+interface UseQuerySendAttemptsSwrParams {
     handoffId?: string
 }
 

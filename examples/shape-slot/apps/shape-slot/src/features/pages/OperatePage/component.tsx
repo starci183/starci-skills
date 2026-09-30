@@ -1,7 +1,7 @@
 import { HandoffBlock } from "@/components/blocks/HandoffBlock"
 import { SendHistoryBlock } from "@/components/blocks/SendHistoryBlock"
-import { SendHandoffOverlay } from "@/features/overlays/SendHandoffOverlay"
-import type { SendInput } from "@/modules/api/sales"
+import { SendHandoffBlock } from "@/components/blocks/SendHandoffBlock"
+import type { SendInput } from "@/modules/types"
 import { operatePageEditGridClassName } from "./classNames"
 
 /** Shape of the page: "edit" adds the history column, so it is its own drawing. */
@@ -37,6 +37,6 @@ export const OperatePageBase = (props: OperatePageBaseProps) => (
         ) : (
             <HandoffBlock handoffId={props.props.handoffId} onRequestSend={props.on.openSend} />
         )}
-        <SendHandoffOverlay handoffId={props.props.handoffId} input={props.props.sendInput} onClose={props.on.closeSend} />
+        <SendHandoffBlock handoffId={props.props.handoffId} input={props.props.sendInput} onClose={props.on.closeSend} />
     </>
 )

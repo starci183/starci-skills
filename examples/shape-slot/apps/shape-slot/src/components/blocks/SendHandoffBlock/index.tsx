@@ -4,17 +4,16 @@ import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useTranslations } from "next-intl"
-import { useMutateSendHandoffSwr } from "@/hooks/sales"
-import type { SendInput } from "@/modules/api/sales"
-import { sendHandoffSchema, type SendHandoffFormValues } from "@/modules/api/sales/schemas"
+import { sendHandoffSchema, useMutateSendHandoffSwr, type SendHandoffFormValues } from "@/hooks/sales"
+import type { SendInput } from "@/modules/types"
 import {
-    SendHandoffOverlayBase,
-    sendHandoffOverlayDefaultState,
-    type SendHandoffOverlayState,
+    SendHandoffBlockBase,
+    sendHandoffBlockDefaultState,
+    type SendHandoffBlockState,
 } from "./component"
 
-/** Props for SendHandoffOverlay: the id, what to prefill (undefined = closed), and how to close. */
-export type SendHandoffOverlayProps = {
+/** Props for SendHandoffBlock: the id, what to prefill (undefined = closed), and how to close. */
+type SendHandoffBlockProps = {
     readonly handoffId: string
     readonly input?: SendInput
     readonly onClose: () => void
@@ -24,11 +23,11 @@ export type SendHandoffOverlayProps = {
  * Connected half: owns the form (react-hook-form + zod) and the send command (SWR mutation).
  * It reads no data, so it has no slot. The pure half only sees values, translated errors and actions.
  */
-export const SendHandoffOverlay = (props: SendHandoffOverlayProps) => {
+export const SendHandoffBlock = (props: SendHandoffBlockProps) => {
     const t = useTranslations("sales.send")
     const tRoot = useTranslations()
     const send = useMutateSendHandoffSwr(props.handoffId)
-    const [state, setState] = useState<SendHandoffOverlayState>(sendHandoffOverlayDefaultState)
+    const [state, setState] = useState<SendHandoffBlockState>(sendHandoffBlockDefaultState)
     const form = useForm<SendHandoffFormValues>({
         resolver: zodResolver(sendHandoffSchema),
         defaultValues: { fingerprint: "", revision: 0, note: "" },
@@ -44,12 +43,12 @@ export const SendHandoffOverlay = (props: SendHandoffOverlayProps) => {
     const errorOf = (key?: string) => (key === undefined ? undefined : tRoot(key))
 
     const onClose = () => {
-        setState(sendHandoffOverlayDefaultState)
+        setState(sendHandoffBlockDefaultState)
         props.onClose()
     }
 
     return (
-        <SendHandoffOverlayBase
+        <SendHandoffBlockBase
             state={state}
             props={{
                 isOpen: props.input !== undefined,

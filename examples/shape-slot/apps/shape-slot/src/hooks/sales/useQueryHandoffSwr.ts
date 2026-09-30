@@ -1,10 +1,11 @@
 "use client"
 
 import useSWR from "swr"
-import { getHandoff, type Handoff } from "@/modules/api/sales"
+import { getHandoff } from "@/modules/api"
+import type { Handoff } from "@/modules/types"
 
 /** What a caller must say about the handoff it wants. */
-export interface UseQueryHandoffSwrParams {
+interface UseQueryHandoffSwrParams {
     handoffId?: string
 }
 
