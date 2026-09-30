@@ -24,7 +24,7 @@ const KERNEL_IDLE=[' Yielding — waiting on the code.refactor report.','✻ Bre
 const world=(t,prefix)=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),prefix));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stubFile=path.join(root,'fake-orca.mjs');fs.writeFileSync(stubFile,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stubFile]),
@@ -275,7 +275,7 @@ test('wakeKernel: a wake send refused terminal_not_writable on a stale-active fr
   const {wakeKernel}=await import('../scripts/kernel/wake-delivery.mjs');
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kernel-unwritable-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const workflowId='wf-unwritable',terminal='kernel-terminal-9';
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
@@ -295,7 +295,7 @@ test('a refused transition wake records kernel-wake-unwritable once',async t=>{
   const {wakeKernelForTransition}=await import('../scripts/kernel/wake-delivery.mjs');
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kernel-unwritable-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const workflowId='wf-unwritable',terminal='kernel-terminal-9';
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{

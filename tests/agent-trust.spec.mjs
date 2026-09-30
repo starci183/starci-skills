@@ -243,7 +243,7 @@ const opFixture=(t,extra={})=>{
   process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
   t.after(()=>{if(savedMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=savedMachine;
     if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;});
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const trustHome=path.join(root,'trust-home');fs.mkdirSync(path.join(trustHome,'.codex'),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
@@ -305,7 +305,7 @@ test('a gate that persists after its one answer is refused and the terminal clos
 
 const kernelFixture=(t,kernelLine,extra={})=>{
   const root=tmp(t,'starci-gate-kernel-');
-  const repo=path.join(root,'repo');fs.mkdirSync(repo);
+  const repo=path.join(root,'repo');fs.mkdirSync(repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
   const trustHome=path.join(root,'trust-home');fs.mkdirSync(trustHome);

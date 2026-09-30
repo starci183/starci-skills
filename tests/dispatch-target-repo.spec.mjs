@@ -58,6 +58,8 @@ const fixture=(t,{bound=true}={})=>{
     return {r,body};
   };
   const enqueue=(jobId,op,owned)=>{
+    // an unbound repository takes the spelling verbatim, so the directory it names is a real one inside the checkout
+    if(!bound)for(const grant of owned)if(!grant.startsWith('.starciwork'))fs.mkdirSync(path.join(be,path.posix.dirname(grant)),{recursive:true});
     const ledger=openLedger({file:ledgerFileFor(be,{env})});
     // Op jobs are unit tries now: the fixture seeds the unit and keeps the workflow running for dispatch.
     try{seedWorkflow(ledger,{id:'wf-dispatch-target',jobs:[{jobId,opId:op,payload:{opId:op,owned_paths:owned}}]});}

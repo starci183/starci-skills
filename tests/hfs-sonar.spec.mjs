@@ -10,7 +10,7 @@ import { renderTargets } from '../packages/hfs/sync/index.mjs';
 import { managedFindings } from '../packages/hfs/sync/managed.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import { loadSonarGate, serverConditions } from '../scripts/checks/sonar-gate.mjs';
-import { BE, FE, PRESETS, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { BE, FE, FORMATTED, PRESETS, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 
 // One Sonar mechanism (contract change hfs-sonar-import, rules R11, R20, R21): the findings of `hfs check` and the eslint and stylelint
 // results become Sonar Generic Issue Import documents through one placement rule; the managed configuration names the reports; the gate holds them at zero.
@@ -171,7 +171,7 @@ test('a linter finding outside sonar.sources (packages, e2e, a config file) is f
 const cli = async (argv, presets) => {
   let out = '';
   let err = '';
-  const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets });
+  const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets, prettier: FORMATTED }); // this spec is not about formatting
   return { code, out, err };
 };
 const repo = (declaration, mutate) => {

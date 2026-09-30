@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { found } from './read.mjs';
+import { safeRemoveTree } from '../safe-remove.mjs';
 
 export const CONTRACT_SNAPSHOT_DRIFT = 'HFS_CONTRACT_SNAPSHOT_DRIFT';
 export const GRAPHQL_TRANSPORT_SLOT = 'be.transport.graphql';
@@ -119,7 +120,7 @@ export function contractEmitFindings({ repoRoot, files, repo, emit }) {
       }
     }
   } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
+    safeRemoveTree(scratch);
   }
   return { findings, apps };
 }

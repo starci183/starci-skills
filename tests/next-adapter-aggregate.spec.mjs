@@ -7,6 +7,7 @@ import {createRequire} from 'node:module';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../engine/yaml.mjs';
 import {checkScopedLint} from '../scripts/checks/check-scoped-lint.mjs';
+import {architectureWithoutMachine} from './helpers/scoped-architecture.mjs';
 import {trackHfsTree,writeHfsTree} from './_hfs-tree-fixture.mjs';
 import {checkArchitecture} from '../scripts/checks/architecture/index.mjs';
 
@@ -47,7 +48,7 @@ function fixture(t,obligations){
     isPathIgnored:async()=>false,calculateConfigForFile:async()=>({linterOptions:{noInlineConfig:true},rules:{},plugins:{}}),
     lintFiles:async files=>files.map(filePath=>({filePath,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0})),
   }};
-  const options={profile:'next',profileCatalog,runtime,all:true};
+  const options={profile:'next',profileCatalog,runtime,architecture:architectureWithoutMachine,all:true};
   return {root,write,link,manifest,profileCatalog,runtime,options,check:overrides=>{trackHfsTree(root);return checkScopedLint(root,[],{...options,...overrides});}};
 }
 

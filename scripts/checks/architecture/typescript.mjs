@@ -257,7 +257,9 @@ function boundaryViolation(root, edge, fromWorkspace, toWorkspace, ruleId, messa
 export function buildTypeScriptContext(config, injectedTypeScript, paths = []) {
   const loaded = injectedTypeScript ? { ts: injectedTypeScript, resolved: '(injected test compiler)', version: String(injectedTypeScript.version) }
     : loadTargetTypeScript(config.root);
-  const context = sharedInProgramRun('architecture-context', loaded.ts, { config, paths }, () => typeScriptContext(config, loaded, paths));
+  // config.hfs is the opened slot resolver (functions), so it never keys a shared value: the repository declaration it was opened
+  // from (plain data) identifies it, the manifest being the runtime's one.
+  const context = sharedInProgramRun('architecture-context', loaded.ts, { config: { ...config, hfs: config.hfs?.repo ?? null }, paths }, () => typeScriptContext(config, loaded, paths));
   // Callers add to and sort the errors: each gets its own list.
   return { ...context, errors: [...context.errors] };
 }

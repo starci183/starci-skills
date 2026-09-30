@@ -7,21 +7,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { checkArchitecture } from '../scripts/checks/architecture.mjs';
+import { HFS_MACHINE_RULE_IDS as MACHINE_RULE_IDS } from '../scripts/checks/architecture/index.mjs';
 import { loadArchitectureConfig } from '../scripts/checks/architecture/config.mjs';
-import { TIER_RULE_IDS } from '../scripts/checks/architecture/tiers.mjs';
-import { REACHABILITY_RULE_IDS } from '../scripts/checks/architecture/reachability.mjs';
-import { DEAD_EXPORT_RULE_IDS } from '../scripts/checks/architecture/dead-exports.mjs';
-import { REQUIRED_FILE_RULE_IDS } from '../scripts/checks/architecture/required-files.mjs';
-import { SIZE_GROWTH_RULE_IDS } from '../scripts/checks/architecture/size-growth.mjs';
-import { CLONE_RULE_IDS } from '../scripts/checks/architecture/clones.mjs';
-import { SYMBOL_RULE_IDS } from '../scripts/checks/architecture/symbols.mjs';
-import { CONNECTION_RULE_IDS } from '../scripts/checks/architecture/connection-map.mjs';
-import { SQL_OWNER_RULE_IDS } from '../scripts/checks/architecture/sql-owner.mjs';
-import { REGISTER_ONCE_RULE_IDS } from '../scripts/checks/architecture/register-once.mjs';
-import { ERROR_MASKED_RULE_IDS } from '../scripts/checks/architecture/error-masked.mjs';
-import { DEFAULT_DENY_RULE_IDS } from '../scripts/checks/architecture/default-deny.mjs';
-import { ENTRYPOINT_RULE_IDS } from '../scripts/checks/architecture/entrypoint.mjs';
-import { ERROR_CODE_RULE_IDS } from '../scripts/checks/architecture/error-codes.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -30,9 +17,7 @@ const ts = require('typescript');
 // apps); owners, roots, registration and the Grammar contract are derived, so a rule is exercised by shaping the tree.
 // The HFS machine (tier direction, reachability, dead exports, required files, size growth, duplicate blocks) runs on every
 // fixture too and has its own specs (as do the backend composition and data checks); check() below drops its findings so this spec judges the rules it is about.
-const HFS_MACHINE_RULE_IDS = new Set([...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS, ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS,
-  ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...SYMBOL_RULE_IDS, ...CONNECTION_RULE_IDS, ...SQL_OWNER_RULE_IDS, ...REGISTER_ONCE_RULE_IDS, ...ERROR_MASKED_RULE_IDS,
-  ...DEFAULT_DENY_RULE_IDS, ...ENTRYPOINT_RULE_IDS, ...ERROR_CODE_RULE_IDS]);
+const HFS_MACHINE_RULE_IDS = new Set(MACHINE_RULE_IDS);
 
 function scoped(report) {
   const violations = report.violations.filter(item => !HFS_MACHINE_RULE_IDS.has(item.ruleId));
@@ -159,7 +144,7 @@ test('backend accepts inward composition and narrow bootstrap configuration', t 
   const root = fixture(t, 'backend', {
     'src/modules/domain/catalog/value.ts': 'export const value = 1\n',
     'src/features/http/feature.ts': 'import { value } from "@modules/catalog/value"; export const feature = value\n',
-    'apps/core/src/config/runtime.config.ts': 'export const runtime = { port: 3000 }\n',
+    'apps/core/src/core.options.ts': 'export const runtime = { port: 3000 }\n',
     'apps/core/src/app.module.ts': 'import { feature } from "@features/http/feature"; export const AppModule = feature\n',
     'apps/core/src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
   });
@@ -168,7 +153,7 @@ test('backend accepts inward composition and narrow bootstrap configuration', t 
   assert.equal(result.files, 5);
   assert.deepEqual(result.coverage.sourceFiles, [
     'apps/core/src/app.module.ts',
-    'apps/core/src/config/runtime.config.ts',
+    'apps/core/src/core.options.ts',
     'apps/core/src/main.ts',
     'src/features/http/feature.ts',
     'src/modules/domain/catalog/value.ts',
@@ -231,7 +216,9 @@ test('frontend catches route drawing, upward tiers, direct/deep data access, bar
   const rules = new Set(result.violations.map(item => item.ruleId));
   assert.ok(checkAll(root).violations.some(item => item.ruleId === 'FE_TIER_DIRECTION' && item.path.endsWith('Leaf/index.tsx')), JSON.stringify(result, null, 2));
   for (const expected of ['FE_ROUTE_ONE_PAGE', 'FE_COMPONENT_DEEP_HOOK_IMPORT',
-    'FE_PURE_REACHES_DATA', 'FE_PURE_WORLD_HOOK', 'FE_TRANSPORT_OWNER']) assert.ok(rules.has(expected), `${expected}: ${JSON.stringify(result, null, 2)}`);
+    'FE_PURE_REACHES_DATA', 'FE_PURE_WORLD_HOOK']) assert.ok(rules.has(expected), `${expected}: ${JSON.stringify(result, null, 2)}`);
+  // FE_TRANSPORT_OWNER belongs to the frontend repository machine (check() drops it): read it from the unfiltered report.
+  assert.ok(checkAll(root).violations.some(item => item.ruleId === 'FE_TRANSPORT_OWNER' && item.path.endsWith('Pure/component.tsx')), 'raw fetch outside the transport client');
   assert.ok(result.violations.find(item => item.ruleId === 'FE_PURE_REACHES_DATA').dependencyChain.some(item => item.endsWith('bridge.ts')));
 });
 
@@ -675,10 +662,10 @@ test('Nest registration becomes unavailable for hidden or dynamic module metadat
 test('backend source shape accepts adopted application, transport, persistence, enum, and GraphQL naming forms', t => {
   const root = fixture(t, 'backend', {
     'src/modules/platform/framework/index.ts': 'export { Args as GqlArgs, InputType as GqlInput, Mutation as GqlMutation, Query as GqlQuery, registerEnumType as registerGraphQlEnum } from "@nestjs/graphql"; export { Entity as DatabaseEntity } from "typeorm";\n',
-    'src/features/orders/index.ts': 'export { CreateOrderUseCase } from "./application/create-order.use-case";\n',
+    'src/features/orders/index.ts': 'export { CreateOrderHandler } from "./application/create-order.handler";\n',
     'src/features/orders/orders.module.ts': 'export class OrdersModule {}\n',
     'src/features/orders/application/create-order.contracts.ts': 'export interface CreateOrderParams { readonly itemId:string } export interface CreateOrderResult { readonly id:string }\n',
-    'src/features/orders/application/create-order.use-case.ts': 'import type { CreateOrderParams,CreateOrderResult } from "./create-order.contracts"; export class CreateOrderUseCase { execute(input:CreateOrderParams):CreateOrderResult{return {id:input.itemId}} }\n',
+    'src/features/orders/application/create-order.handler.ts': 'import type { CreateOrderParams,CreateOrderResult } from "./create-order.contracts"; export class CreateOrderHandler { execute(input:CreateOrderParams):CreateOrderResult{return {id:input.itemId}} }\n',
     'src/features/orders/transport/graphql/dto/create-order.request.ts': 'import { GqlInput } from "../../../../../modules/platform/framework"; @GqlInput() export class CreateOrderRequest { itemId!:string }\n',
     'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { GqlArgs,GqlMutation } from "../../../../modules/platform/framework"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @GqlMutation(()=>String,{name:"createOrder"}) create(@GqlArgs("input") request:CreateOrderRequest){return request.itemId} }\n',
     'src/modules/platform/database/entities/order.entity.ts': 'import { DatabaseEntity } from "../../framework"; @DatabaseEntity() export class OrderEntity {}\n',
@@ -937,10 +924,10 @@ test('backend rejects decorator and declaration roles hidden in config-shaped ap
     'src/features/feature.ts': 'export const feature=1\n',
     'apps/core/src/main.ts': 'void 0\n',
     'apps/core/src/app.module.ts': 'export const AppModule=1\n',
-    'apps/core/src/config/runtime.config.ts': 'function Injectable(){return ()=>{}}; @Injectable() export class PaymentProvider {}\n',
+    'apps/core/src/core.options.ts': 'function Injectable(){return ()=>{}}; @Injectable() export class PaymentProvider {}\n',
   });
   const result = check(root);
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path.endsWith('runtime.config.ts')), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path.endsWith('core.options.ts')), JSON.stringify(result, null, 2));
 });
 
 test('backend composition roots support app source layouts without swallowing modules or features', t => {

@@ -21,7 +21,7 @@ const fixture=t=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo);
+  const repo=path.join(root,'repo');fs.mkdirSync(repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
   const log=path.join(root,'calls.jsonl');
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
@@ -50,6 +50,7 @@ const killTerminal=(f,handle)=>{
   fs.writeFileSync(f.state,JSON.stringify(state));
 };
 const enqueueOp=(f,workflowId,jobId,ownedPath)=>{
+  fs.mkdirSync(path.join(f.repo,ownedPath),{recursive:true});
   const ledger=openLedger({file:ledgerFileFor(f.repo)});
   try{
     seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId:'code.refactor',

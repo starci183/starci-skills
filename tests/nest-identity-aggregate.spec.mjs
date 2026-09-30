@@ -6,6 +6,7 @@ import test from 'node:test';
 import { createRequire } from 'node:module';
 import { trackHfsTree, writeHfsTree } from './_hfs-tree-fixture.mjs';
 import { checkScopedLint } from '../scripts/checks/check-scoped-lint.mjs';
+import { architectureWithoutMachine } from './helpers/scoped-architecture.mjs';
 
 const require = createRequire(import.meta.url);
 const digest = 'a'.repeat(64);
@@ -147,7 +148,7 @@ export function execute(): never { throw new WidgetError({}); }`);
       lintFiles: async files => files.map(filePath => ({ filePath, messages: [], suppressedMessages: [], errorCount: 0, warningCount: 0, fatalErrorCount: 0 })),
     },
   };
-  const options = { profile: 'nest', profileCatalog, runtime, all: true };
+  const options = { profile: 'nest', profileCatalog, runtime, architecture: architectureWithoutMachine, all: true };
   return { root, write, manifest, profileCatalog, options, check: overrides => { trackHfsTree(root); return checkScopedLint(root, [], { ...options, ...overrides }); } };
 }
 

@@ -111,6 +111,7 @@ test('api dispatch attaches context.grammar and refuses grammar-context-missing 
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_SOURCE_ROOT:root,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
+  fs.mkdirSync(path.join(repo,'src','app'),{recursive:true});
   const ledger=openLedger({file:ledgerFileFor(repo,{env})});
   try{seedWorkflow(ledger,{id:'wf-grammar',jobs:[{jobId:'job-impl',opId:'interface.implement',
     payload:{opId:'interface.implement',records:[],owned_paths:['src/app'],model:'devin-agent'}}]});}

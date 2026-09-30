@@ -9,9 +9,11 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {openMachine,openMachineReader} from '../engine/machine-db.mjs';
 process.env.STARCI_SLEEP_SCALE??='0.02';
 import {jobRowOf} from '../scripts/kernel/api-lib/rows.mjs';
+import {writeGreenSonar} from './helpers/sonar-scan.mjs';
 
 // Build the workflow and logical unit required by the current ledger before
 // exercising dispatch. Each fixture op job represents a distinct unit.
+const grantDirs=(fx,...dirs)=>{for(const dir of dirs)fs.mkdirSync(path.join(fx.repo,dir),{recursive:true});};
 const enqueueFixtureJob=(ledger,args)=>{
   ledger.ensureWorkflow({workflowId:args.workflowId});
   if(args.kind==='op')ledger.write.createUnit({workflowId:args.workflowId,unitId:args.jobId,
@@ -41,7 +43,7 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot,{recursive:true});
   const env={...process.env,
@@ -232,7 +234,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   // contract's two-step worker-stop/worker-release lifecycle.
   const report=reportFile(fx.repo,jobId);fs.writeFileSync(report,JSON.stringify({
     schema:'starci/op-report@1',outcome:'done',summary:'managed dispatch completed',head:'abc1234def',
-    files:['docs/managed-result.md'],checks:[{name:'self-check',command:'true',exitCode:0}],
+    files:['docs/managed-result.md',(writeGreenSonar(path.join(fx.repo,'docs')),'docs/sonar.json')],checks:[{name:'self-check',command:'true',exitCode:0}],
   }));
   const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
   assert.equal(filed.status,0,`report failed: ${filed.stderr||filed.stdout}`);
@@ -280,7 +282,7 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   assert.equal(d.status,0,d.stderr||d.stdout);
   assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managed?.agentTerminalHandle,'fake-terminal-1');
   const report=reportFile(fx.repo,jobId);fs.writeFileSync(report,JSON.stringify({
-    schema:'starci/op-report@1',outcome:'done',summary:'done',head:'abc1234def',files:['docs/r.md'],checks:[{name:'self',command:'true',exitCode:0}]}));
+    schema:'starci/op-report@1',outcome:'done',summary:'done',head:'abc1234def',files:['docs/r.md',(writeGreenSonar(path.join(fx.repo,'docs')),'docs/sonar.json')],checks:[{name:'self',command:'true',exitCode:0}]}));
   assert.equal(fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json').status,0);
   fx.env.STARCI_CALLER='runtime-settler';
   assert.equal(fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'v',command:'v',exitCode:0,evidence:'green'}]}),'--json').status,0);
@@ -346,6 +348,7 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-claude-auth'").run();
     enqueueFixtureJob(ledger,{jobId,workflowId:'wf-claude-auth',opId:'architecture.decide',kind:'op',
       payload:{opId:'architecture.decide',owned_paths:['docs/'],difficulty:'hard'}});
+    grantDirs(fx,'docs/sibling');
     enqueueFixtureJob(ledger,{jobId:siblingJobId,workflowId:'wf-claude-auth',opId:'architecture.decide',kind:'op',
       payload:{opId:'architecture.decide',owned_paths:['docs/sibling/'],difficulty:'hard'}});
   }finally{ledger.close();}
@@ -660,6 +663,7 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
     enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
       .run(`kernel-${workflowId}`);
+    grantDirs(fx,...[1,2,3].map(n=>`docs/ws-${n}`));
     for(const n of [1,2,3])
       enqueueFixtureJob(ledger,{jobId:`job-ws-${n}`,workflowId,opId:'architecture.decide',kind:'op',
         payload:{opId:'architecture.decide',owned_paths:[`docs/ws-${n}/`],difficulty:'hard'}});
@@ -720,6 +724,7 @@ test('a circuit that reopens for the same failure waits longer each time (circui
     enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
       .run(`kernel-${workflowId}`);
+    grantDirs(fx,...[1,2,3,4].map(n=>`docs/bo-${n}`));
     for(const n of [1,2,3,4])
       enqueueFixtureJob(ledger,{jobId:`job-bo-${n}`,workflowId,opId:'architecture.decide',kind:'op',
         payload:{opId:'architecture.decide',owned_paths:[`docs/bo-${n}/`],difficulty:'hard'}});

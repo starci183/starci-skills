@@ -12,7 +12,7 @@ appliesTo:
 family: starci
 provenance:
   package: "@starci/grammar"
-  version: "0.7.0"
+  version: "0.7.2"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   captured: "2026-09-23"
   publicEntry: "@starci/grammar/common"
@@ -111,7 +111,7 @@ provenance:
       sha256: "b640a2809a3bcc97e4a7646adb4610d0ef7b1ed6796caf98ec8761d75a407f78"
 identity:
   package: "@starci/grammar"
-  version: "0.7.0"
+  version: "0.7.2"
   checkout: "b6a13be97a9d1e15b7d3f628709158e81c744a2a"
   familyId: "core"
   dnaId: "starci-core"
@@ -1595,7 +1595,7 @@ renderers:
     source: "packages/grammar/src/core/primitive/Input/index.tsx"
     closedValues:
       - prop: "kind"
-        values: ["email", "password", "newPassword", "code", "text"]
+        values: ["email", "tel", "password", "newPassword", "code", "text"]
       - prop: "variant"
         values: ["primary", "secondary"]
     claims: ["FONT-1", "GAP-2", "TONE-2"]

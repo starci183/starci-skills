@@ -8,6 +8,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {writeGreenSonar} from './helpers/sonar-scan.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
 import {INPUT_DIGEST_SCHEMA,baselineWorkInputs,createDigester,inputKindOf,lawTokens,opInputPaths,recordInputs,workInputPaths} from '../scripts/kernel/input-digests.mjs';
 
@@ -39,6 +40,8 @@ const fixture=(t,{registry=null}={})=>{
   for(const dir of ['scripts','engine','modules','bin'])fs.cpSync(path.join(ROOT,dir),path.join(skill,dir),{recursive:true});
   fs.cpSync(path.join(ROOT,'packages','grammar','scripts'),path.join(skill,'packages','grammar','scripts'),{recursive:true});
   for(const file of ['CONTEXT.md','package.json'])fs.copyFileSync(path.join(ROOT,file),path.join(skill,file));
+  fs.mkdirSync(path.join(skill,'knowledge'),{recursive:true});
+  fs.copyFileSync(path.join(ROOT,'knowledge','sonar-gate.yaml'),path.join(skill,'knowledge','sonar-gate.yaml')); // the Sonar gate a code-writing settle reads
   fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,
@@ -54,11 +57,16 @@ const fixture=(t,{registry=null}={})=>{
   return {root,skill,repo,env,api,run,write,work};
 };
 const json=r=>{try{return JSON.parse(r.stdout);}catch{const at=r.stdout.indexOf('{'),end=r.stdout.indexOf('\n}');return at<0||end<0?null:JSON.parse(r.stdout.slice(at,end+2));}};
-const withLedger=(fx,fn)=>{const ledger=openLedger({file:ledgerFileFor(fx.repo,{env:fx.env})});try{
+// A write grant names a directory that must exist in the target repository (grant-parent-missing): seeding a job under
+// withLedger creates the directories its owned paths name.
+let grantRepo=null;
+const grantDirsOf=payload=>{if(!grantRepo)return;for(const owned of payload?.owned_paths??[]){const rel=String(owned).replace(/\/+$/,'');if(rel&&!rel.startsWith('.starciwork'))fs.mkdirSync(path.join(grantRepo,path.posix.extname(rel)?path.posix.dirname(rel):rel),{recursive:true});}};
+const withLedger=(fx,fn)=>{grantRepo=fx.repo;const ledger=openLedger({file:ledgerFileFor(fx.repo,{env:fx.env})});try{
   if(!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(WORKFLOW))seedWorkflow(ledger,{id:WORKFLOW});
   return fn(ledger);
 }finally{ledger.close();}};
 const enqueueSeed=(ledger,args)=>{
+  grantDirsOf(args.payload);
   const unitId=args.unitId??args.jobId;
   if(!ledger.db.prepare('SELECT 1 FROM work_units WHERE workflow_id=? AND unit_id=?').get(args.workflowId,unitId))
     ledger.write.createUnit({workflowId:args.workflowId,unitId,opId:args.opId,subjectKey:unitId,goalRevision:1});
@@ -136,7 +144,7 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
   assert.equal(recorded[FR_DIR].digest,sha(`${FR_DIR}/index.yaml\0${sha('fr: v1\n')}\n`),'a record directory counts its record files, never evidence/');
 
   const report=inspect(fx,db=>path.join(db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get('job-refactor').scratch_dir,'report.json'));
-  fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:'abc1234def',files:['src/refactor/a.ts'],checks:[{name:'self',command:'true',exitCode:0}]}));
+  fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:'abc1234def',files:['src/refactor/a.ts',(writeGreenSonar(path.join(fx.repo,'src','refactor')),'src/refactor/sonar.json')],checks:[{name:'self',command:'true',exitCode:0}]}));
   const reported=fx.run('report','--job','job-refactor','--report',report);
   assert.equal(reported.status,0,reported.stderr||reported.stdout);
   const checked=fx.run('check','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));

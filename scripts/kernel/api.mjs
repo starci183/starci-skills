@@ -4151,7 +4151,7 @@ function settleSonarGate(db, jobId, repo) {
   const change = changeById(loadContractChanges(skillRoot), SONAR_ENFORCE_CHANGE);
   if (admittedBeforeChange(admitted, change)) return null;
   const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
-  if (filed.attemptId == null) return null;
+  if (filed.attemptId == null || filed.reportId == null) return null; // no filed report: pass-report-missing owns the refusal
   let roots = [];
   try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
   const { files } = collectJobFiles({ repo, envelope: filed.envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });

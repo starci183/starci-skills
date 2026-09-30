@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../scripts/lib/hfs-slots.mjs';
 import { renderTargets, writeTargets } from '../packages/hfs/sync/index.mjs';
+import { loadSonarGate } from '../scripts/checks/sonar-gate.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index.cjs');
 /** The Sonar exclusions `hfs sync` would load from the preset a repository installs, per profile (a front end has no test runner, so none). */
@@ -19,7 +20,7 @@ export const FE = { hfs: 1, profile: 'fe', project: 'demo', apps: [{ name: 'web'
 /** The repository's `prettier` for a spec that is not about formatting: it judges every file formatted. */
 export const FORMATTED = Object.freeze({ getFileInfo: async () => ({ ignored: false, inferredParser: 'babel' }), resolveConfig: async () => null, check: async () => true });
 /** application-stacks.yaml as the standard shape wants it: a Sonar owned by the host. */
-export const STACKS_DECLARATION = ['schema: starci/application-stacks@1', 'services:', '  sonar:', '    provider: sonarqube', '    mode: local', '    stack:', '      owner: host', '      root: .claude/ext/sonar', '      environment: dev', '    qualityGate: starci-new-code', ''].join('\n');
+export const STACKS_DECLARATION = ['schema: starci/application-stacks@1', 'services:', '  sonar:', '    provider: sonarqube', '    mode: local', `    qualityGate: ${loadSonarGate().gate.name}`, '    stack:', '      owner: host', '      root: .claude/ext/sonar', '      environment: dev', ''].join('\n');
 
 const readmeOf = (name, profile) => [`# ${name}`, '', 'A demo repository for the hfs check specs.', '', '## Overview', '', 'Demo.', '', '## Stack', '', 'TypeScript.', '', '## Repository layout', '', 'apps and src.', '',
   '## Development', '', '```sh', 'npm ci', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm test', '```', '', ...(profile === 'be' ? ['## Work', '', 'Records live in `.starciwork`.', ''] : [])].join('\n');
@@ -45,7 +46,7 @@ export function writeCleanRepo(declaration, { declare = true, into, name = 'demo
   if (declaration.profile === 'be') put('.starcistacks/application-stacks.yaml', STACKS_DECLARATION);
   if (declaration.profile === 'fe') for (const app of declaration.apps) put(`apps/${app.name}/package.json`, `${JSON.stringify({ name: `@demo/${app.name}`, private: true, dependencies: { 'next-intl': '4.13.6' } }, null, 2)}
 `);
-  for (const entry of resolver.requiredPaths().paths) if (!entry.path.endsWith('/')) put(entry.path, entry.path === 'hfs.json' ? '' : /^apps\/[^/]+\/src\/app\.module\.ts$/.test(entry.path) ? 'export class AppModule {}\n' : 'export {};\n');
+  for (const entry of resolver.requiredPaths().paths) if (!entry.path.endsWith('/')) put(entry.path, entry.path === 'hfs.json' ? '' : entry.path.endsWith('.json') ? '{}\n' : /^apps\/[^/]+\/src\/app\.module\.ts$/.test(entry.path) ? 'export class AppModule {}\n' : 'export {};\n');
   if (declaration.profile === 'fe') {
     const required = resolver.requiredPaths().paths.map((entry) => entry.path);
     for (const app of declaration.apps) {
@@ -67,6 +68,21 @@ export function writeCleanRepo(declaration, { declare = true, into, name = 'demo
     put('src/features/orders/application/place-order.handler.ts', 'export {};\n');
     // The machine judges reachability: the app composes the feature and every required module, so a clean repository is clean to it too.
     const owners = ['src/features/orders/index.ts', ...resolver.requiredPaths().paths.map((entry) => entry.path).filter((p) => /^src\/modules\/[^/]+\/[^/]+\/index\.ts$/.test(p))];
+    // An api app is denied by default (throttler, CSRF origin guard, AuthGuard) and masks its errors through the one filter of platform/errors.
+    const write = (relative, text) => { const target = path.join(dir, ...relative.split('/')); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, text); };
+    write('src/modules/platform/errors/index.ts', "export { AllExceptionsFilter } from './all-exceptions.filter';\n");
+    write('src/modules/platform/errors/all-exceptions.filter.ts', 'export class AllExceptionsFilter { catch(): void {} }\n');
+    write('src/modules/platform/http-security/index.ts', "export { CsrfOriginGuard } from './csrf-origin.guard';\n");
+    write('src/modules/platform/http-security/csrf-origin.guard.ts', 'interface RequestHeaders { origin?: string }\ninterface HttpRequest { headers: RequestHeaders }\ninterface HttpHost { getRequest(): HttpRequest }\ninterface GuardContext { switchToHttp(): HttpHost }\nexport class CsrfOriginGuard { canActivate(context: GuardContext): boolean { return context.switchToHttp().getRequest().headers.origin !== undefined; } }\n');
+    write('src/modules/domain/identity/index.ts', "export { AuthGuard } from './auth.guard';\n");
+    write('src/modules/domain/identity/auth.guard.ts', 'export class AuthGuard { canActivate(): boolean { return true; } }\n');
+    write('apps/core/src/app.module.ts', [
+      "import { Module } from '@nestjs/common';", "import { APP_FILTER, APP_GUARD } from '@nestjs/core';", "import { ThrottlerGuard } from '@nestjs/throttler';",
+      "import { AllExceptionsFilter } from '../../../src/modules/platform/errors';", "import { CsrfOriginGuard } from '../../../src/modules/platform/http-security';",
+      "import { AuthGuard } from '../../../src/modules/domain/identity';",
+      '@Module({ providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: CsrfOriginGuard }, { provide: APP_GUARD, useClass: AuthGuard }] })',
+      'export class AppModule {', '  static register(_options: object) { return { module: AppModule, imports: [], providers: [] }; }', '}', ''].join('\n'));
+    write('apps/core/src/core.composition.spec.ts', "import { AppModule } from './app.module';\nit('boots', () => { AppModule.register({}); });\n");
     fs.writeFileSync(path.join(dir, 'apps/core/src/main.ts'), owners.map((file) => `import '../../../${file.replace(/\.ts$/, '')}';`).join('\n') + '\n');
   }
   // Both profiles' tsconfig.json is the managed one (it extends @starci/tsconfig/be.json or next.json, see installTypeScript).

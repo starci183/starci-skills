@@ -15,7 +15,7 @@ test('a filed report makes its worker question inactive before job settlement', 
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo = path.join(tmp, 'repo'); fs.mkdirSync(repo);
+  const repo = path.join(tmp, 'repo'); fs.mkdirSync(repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const stub = path.join(tmp, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
   const state = path.join(tmp, 'state.json');
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
@@ -62,7 +62,7 @@ test('a filed report makes its worker question inactive before job settlement', 
 test('ledger-only status excludes a bridged question after its dispatch reports', (t) => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-question-ledger-only-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
-  const repo = path.join(tmp, 'repo'); fs.mkdirSync(repo);
+  const repo = path.join(tmp, 'repo'); fs.mkdirSync(repo);fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const workflowId = 'wf-question-ledger-only', jobId = 'job-ledger-only', dispatchId = 'dispatch-ledger-only';
   const env={...process.env,STARCI_PROJECTS_ROOT:path.join(tmp,'projects')};
   const ledger = openLedger({ file: ledgerFileFor(repo,{env}) });
