@@ -27,6 +27,7 @@ import { landShellFoundationIfSettled } from '../shell-foundation.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { recordWhy } from '../why-record.mjs';
 import { recordSonarJudgment, refusalText } from '../sonar-settle.mjs';
+import { loopRefusalText, recordLoopJudgment } from '../gate-settle.mjs';
 
 // The job_transitions walk from the job's current status to its settled one. A pass settles only a job whose worker
 // filed a report (running/answering/effect_unknown go through reported); a fail or blocked with a filed report goes
@@ -83,7 +84,7 @@ export default {
       `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   },
   async run({ ledger, args, repo, emit, internals }) {
-    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, closeOperationTask, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleLanding, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
+    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, closeOperationTask, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleLanding, settleOpGate, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
 
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   // A report lives only in the reports table (api report files it from the job scratch, a3-3 evidence-db-report):
@@ -135,6 +136,18 @@ export default {
     if (verdict === 'pass' && !recorded.green) {
       emit({ ok: false, jobId, op: sonar.op, reason: recorded.code, code: recorded.code, detail: sonar.judged.detail, findings: sonar.judged.findings, sonarStatus: recorded.status, ...(recorded.incidentId ? { incidentId: recorded.incidentId } : {}) },
         refusalText(sonar.op, sonar.judged, jobId), args.json);
+      process.exit(1);
+    }
+  }
+
+  // The op loop (READ-CODE-CHECK-FIX-REPORT): judged from the op's own gate JSON and READ digest, recorded as the runtime check
+  // op-gate on the attempt, and a pass that is red, could not run its tools, or skipped READ is refused.
+  const loop = verdict === 'pass' ? await settleOpGate(db, jobId, repo) : null;
+  if (loop) {
+    const recorded = recordLoopJudgment(ledger, { attemptId: loop.attemptId, judgment: loop });
+    if (!recorded.green) {
+      emit({ ok: false, jobId, op: loop.op, reason: recorded.code, code: recorded.code, detail: loop.judged.detail, findings: loop.judged.findings, gateStatus: recorded.status },
+        loopRefusalText(loop.op, loop.judged, jobId), args.json);
       process.exit(1);
     }
   }

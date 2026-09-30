@@ -24,7 +24,9 @@
 // Lifecycle (job state machine: reported -> settled -> released -> worktree-removed):
 //   dispatch        ensureOpWorktree (creates/reuses; a continuation of a job whose unlanded commits were archived
 //                   starts from them); payload.productWorktree records {repoRoot, workflow:{..}, op:{..}, baseSha}
-//   settle pass     integrateOp under the per-workflow lock: rebase op/<op> onto the latest wf/<wf> (merge-tree chain,
+//   settle pass     integrateOp under the per-workflow lock: the land gate first - scripts/checks/gate.mjs on the op
+//                   worktree against its merge-base with wf/<wf>, the same gate the op forced every round (exit 1
+//                   land-gate-red, 2 land-gate-unavailable; wf/<wf> untouched) - then rebase op/<op> onto the latest wf/<wf> (merge-tree chain,
 //                   conflict -> refusal with files+hunks), fast-forward wf/<wf>, post-merge verify ON the workflow branch
 //                   (the op's re-runnable declared checks, paths moved to _wf, + an import check of its changed files);
 //                   red -> wf/<wf> rolled back, refusal product-integrate-red carrying a continuation (not a failure)
@@ -85,7 +87,7 @@ const DEFAULTS = Object.freeze({
   worktrees: { shortIdLength: 8, opRemoveSlaMs: 60_000, archiveTtlMs: 7 * 86_400_000, commandMs: 300_000,
     overlay: { lockfiles: ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'npm-shrinkwrap.json'], maxDepth: 3 },
     ports: { base: 43100, span: 800 } },
-  integrate: { lockWaitMs: 600_000, recheck: 'declared', recheckTimeoutMs: 300_000, importCheck: 'changed-files',
+  integrate: { lockWaitMs: 600_000, gateTimeoutMs: 1_800_000, recheck: 'declared', recheckTimeoutMs: 300_000, importCheck: 'changed-files',
     depsFiles: ['package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'npm-shrinkwrap.json', 'pnpm-workspace.yaml'] },
   land: { lockWaitMs: 1_800_000, checks: [], importScan: true, push: false, syncWorkflowAfterLand: true, maxMainRetries: 3 },
   invariant: { importsCacheMs: 300_000 },
@@ -602,16 +604,31 @@ export const retargetArgv = (argv, from, to) => {
   return argv.map((a) => spellings.reduce((acc, s) => acc.split(s).join(posix(path.resolve(to))), String(a)));
 };
 
+const GATE_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'checks', 'gate.mjs');
+/**
+ * The land gate: scripts/checks/gate.mjs over the op worktree's whole delta since `base` (no --changed), the same gate the op
+ * forced in its loop. Returns its starci/gate@1 report; a gate that printed none is exit 2 with the reason.
+ */
+export function runLandGate({ root, base, timeoutMs }) {
+  if (!root || !fs.existsSync(root)) return { exit: 2, errors: [`the op worktree ${root ?? '(none)'} is gone: nothing to gate`], findings: [], counts: { new: 0 } };
+  const run = spawnSync(process.execPath, [GATE_SCRIPT, '--root', root, '--base', base], { cwd: root, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+  try { return JSON.parse(run.stdout); } catch { return { exit: 2, errors: [`gate.mjs printed no report (exit ${run.status ?? 'timeout'}): ${String(run.stderr || run.error?.message || '').trim().split(/\r?\n/).slice(-1)[0]}`], findings: [], counts: { new: 0 } }; }
+}
+
 /**
  * Integrate one op into its workflow branch (the settle-pass step): under the per-workflow lock, rebase op/<op>'s
  * commits up to `head` onto the latest wf/<wf>, fast-forward wf/<wf> (and its _wf tree), then verify ON the workflow
- * branch. Seams: recheck(checks, {cwd, from, to}) -> [{name, exitCode, tail}] (default: none), hunksOf.
- * Returns {ok, already?, before, after, map, changed, verify} or a refusal {ok:false, reason, ...}:
+ * branch. The land gate runs first (runLandGate: the op branch against its merge-base with wf/<wf>), so a branch green in its
+ * op is green here and a red one never touches wf/<wf>. Seams: gate({root, base, timeoutMs}) -> starci/gate@1 report,
+ * recheck(checks, {cwd, from, to}) -> [{name, exitCode, tail}] (default: none), hunksOf.
+ * Returns {ok, already?, before, after, map, changed, gate, verify} or a refusal {ok:false, reason, ...}:
+ *   land-gate-red               the gate reports new findings on the op branch; `gate` carries them; wf/<wf> untouched
+ *   land-gate-unavailable       a gate tool could not run (exit 2): never a land
  *   product-integrate-conflict  files + hunks; wf/<wf> untouched (the Kernel rebases the slice or re-cuts)
  *   product-integrate-red       the post-merge verify failed; wf/<wf> rolled back; `continuation` names the new base
  *   deps-unit-required          the op changes a dependency manifest and is not the workflow's deps unit
  */
-export function integrateOp({ record, head = null, depsUnit = false, checks = [], recheck = null, hunksOf = conflictHunksOf, settings = productSettings() }) {
+export function integrateOp({ record, head = null, depsUnit = false, checks = [], recheck = null, hunksOf = conflictHunksOf, gate = runLandGate, settings = productSettings() }) {
   const { repoRoot } = record;
   const wf = record.workflow, op = record.op;
   return withLock(workflowLockName(repoRoot, wf.short), () => {
@@ -632,6 +649,11 @@ export function integrateOp({ record, head = null, depsUnit = false, checks = []
     const deps = changed.filter((f) => settings.integrate.depsFiles.includes(path.posix.basename(f)) && !git(repoRoot, ['diff', '--quiet', W, tip, '--', f]).ok);
     if (deps.length && !depsUnit) return { ok: false, reason: 'deps-unit-required', files: deps, depsUnit: { workflowId: record.workflowId, fromJob: record.jobId },
       hint: `a package.json/lockfile change goes through the workflow's serial deps unit: api product-deps --workflow ${record.workflowId} --from-job ${record.jobId} applies ${deps.join(', ')} on ${wf.branch}, installs in its _wf and rebuilds the op overlays; then settle this job again` };
+    const gated = gate({ root: op.path, base, timeoutMs: settings.integrate.gateTimeoutMs });
+    const gateSummary = { exit: gated.exit, base, head: gated.head ?? null, counts: gated.counts ?? null, findings: (gated.findings ?? []).slice(0, 40), errors: gated.errors ?? [] };
+    if (gated.exit !== 0) return { ok: false, reason: gated.exit === 1 ? 'land-gate-red' : 'land-gate-unavailable', gate: gateSummary,
+      hint: gated.exit === 1 ? `the op branch carries findings its base does not have: fix them in ${posix(op.path)} (node scripts/checks/gate.mjs --root ${posix(op.path)} --base ${base}), commit, report the new head`
+        : `the land gate could not run a tool (${gateSummary.errors[0] ?? 'no report'}): fix the environment and settle again; a land without its gate never happens` };
     const chain = rebaseChain(repoRoot, pending, W, { hunksOf });
     if (!chain.ok) return { ok: false, reason: chain.conflicts ? 'product-integrate-conflict' : chain.reason, conflicts: chain.conflicts ?? [], onto: W, detail: chain.detail ?? null,
       hint: `rebase ${op.branch} onto ${wf.branch} (git rebase ${wf.branch} in ${posix(op.path)}), resolve the files, commit, report the new head; or re-cut the slice` };
@@ -663,7 +685,7 @@ export function integrateOp({ record, head = null, depsUnit = false, checks = []
       return { ok: false, reason: 'product-integrate-red', failures, verify, rolledBack: W,
         continuation: { base: W, resumeFrom: tip, branch: op.branch, note: 'the op is green on its own base and breaks the workflow branch: a continuation on the new base, never a failure' } };
     }
-    return { ok: true, before: W, after: chain.head, map: chain.map, changed, verify };
+    return { ok: true, before: W, after: chain.head, map: chain.map, changed, gate: gateSummary, verify };
   }, { waitMs: settings.integrate.lockWaitMs });
 }
 

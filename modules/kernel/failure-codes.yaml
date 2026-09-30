@@ -13016,6 +13016,85 @@ sonar-proof-missing:
   owner: op-retry
   kind: settle-reason
 
+op-gate-proof-missing:
+  title: "No gate result is attached"
+  title_vi: "Chưa đính kèm kết quả cổng kiểm tra"
+  meaning_vi: "Op viết code nhưng report không đính kèm gate.json (schema starci/gate@1) do scripts/checks/gate.mjs in ra, nên runtime không có gì để chấm vòng kiểm tra bắt buộc."
+  causes_vi:
+    - "Op chưa chạy gate.mjs sau khi viết code"
+    - "Tệp gate.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy node scripts/checks/gate.mjs --root <app> --changed <tệp> --out gate.json và đính kèm gate.json khi nộp report."
+  owner: op-retry
+  kind: settle-reason
+
+op-gate-tool-failed:
+  title: "A gate tool could not run"
+  title_vi: "Một công cụ của cổng kiểm tra không chạy được"
+  meaning_vi: "gate.json báo exit 2: hfs lint, codegen, build gói, tsc hoặc jest không chạy được, nên phần code chưa được chấm. Công cụ không chạy được không bao giờ là đạt."
+  causes_vi:
+    - "Thiếu gói trong node_modules của app (eslint, typescript, prettier, jest)"
+    - "Script codegen hoặc build của gói fe bị lỗi"
+    - "Không xác định được commit gốc để so sánh"
+  nextStep_vi: "Việc chốt bị từ chối; op sửa nguyên nhân môi trường được nêu trong errors của gate.json rồi chạy lại cổng, hoặc chốt blocked với lỗi đó. Không bao giờ chốt done khi thiếu cổng."
+  owner: op-retry
+  kind: settle-reason
+
+op-gate-new-findings:
+  title: "The gate reports new findings"
+  title_vi: "Cổng kiểm tra báo lỗi mới"
+  meaning_vi: "gate.json còn lỗi mà commit gốc không có: lỗi lint (theo tệp và luật), lỗi tsc (theo thông điệp đã chuẩn hóa) hoặc spec thất bại. Lỗi đã có sẵn trên commit gốc không bị tính."
+  causes_vi:
+    - "Code mới vi phạm luật lint của canon BE hoặc FE"
+    - "Code mới gây lỗi kiểu TypeScript"
+    - "Spec của slice thất bại"
+  nextStep_vi: "Việc chốt bị từ chối; op sửa đúng các lỗi liệt kê rồi chạy lại cổng, tối đa params.gateRounds vòng. Hết số vòng mà vẫn đỏ thì chốt blocked kèm danh sách lỗi, không bao giờ done."
+  owner: op-retry
+  kind: settle-reason
+
+op-read-digest-missing:
+  title: "The op skipped READ"
+  title_vi: "Op đã bỏ qua bước ĐỌC"
+  meaning_vi: "Report không đính kèm bản tóm tắt ĐỌC (read-digest.json, schema starci/read-digest@1): không có bằng chứng op đã đọc tệp pattern, ví dụ và bản đồ slot trước khi viết code."
+  causes_vi:
+    - "Op viết code ngay mà không chạy scripts/checks/read-digest.mjs"
+    - "Tệp read-digest.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy read-digest.mjs --touch <tệp> --out read-digest.json, đọc đúng các tệp nó liệt kê, kiểm lại code theo đó rồi nộp lại kèm read-digest.json."
+  owner: op-retry
+  kind: settle-reason
+
+op-read-digest-no-pattern:
+  title: "The READ digest names no pattern for a touched file kind"
+  title_vi: "Bản tóm tắt ĐỌC thiếu tệp pattern cho loại tệp đã sửa"
+  meaning_vi: "Với ít nhất một tệp op đã sửa, bản tóm tắt ĐỌC không nêu tệp pattern nào thuộc loại tệp đó (knowledge/op-gate.yaml kinds, theo slot mà hfs explain trả về)."
+  causes_vi:
+    - "Op sửa thêm tệp ngoài danh sách --touch lúc đọc"
+    - "Bản tóm tắt được tạo cho slice khác"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy lại read-digest.mjs với mọi tệp đã sửa, đọc các tệp pattern còn thiếu, kiểm lại code rồi nộp lại."
+  owner: op-retry
+  kind: settle-reason
+
+GATE_BASE_UNKNOWN:
+  title: "The gate has no base to compare with"
+  title_vi: "Cổng kiểm tra không có commit gốc để so sánh"
+  meaning_vi: "gate.mjs không tìm được commit gốc: --base không phải commit, hoặc nhánh không có upstream, main hay master để lấy merge-base."
+  causes_vi:
+    - "Truyền --base sai hoặc commit đó chưa được fetch"
+    - "Worktree không có nhánh main/master và không có upstream"
+  nextStep_vi: "Op truyền --base <commit gốc của op> rồi chạy lại cổng; cổng thiếu gốc là exit 2, không bao giờ là đạt."
+  owner: op-retry
+  kind: check-finding
+
+GATE_NOT_GIT:
+  title: "The gate root is not a git checkout"
+  title_vi: "Thư mục chạy cổng không phải kho git"
+  meaning_vi: "gate.mjs chỉ so sánh được với commit gốc khi --root nằm trong một kho git; thư mục đã cho không phải."
+  causes_vi:
+    - "--root trỏ sai thư mục"
+    - "Worktree của op đã bị xóa"
+  nextStep_vi: "Op chạy lại cổng với --root là worktree của app."
+  owner: op-retry
+  kind: check-finding
+
 STACKS_QUALITY_GATE_DRIFT:
   title: "Sonar quality gate name differs from the standard"
   title_vi: "Tên cổng chất lượng Sonar khác chuẩn chung"
