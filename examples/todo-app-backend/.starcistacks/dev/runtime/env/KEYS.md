@@ -19,6 +19,7 @@ identity and its encrypted documents teach the layout; neither may be reused for
 | `SMTP_API_KEY_FILE` | `runtime/files/smtp-api-key.key.enc` | Outbound mail for task reminders |
 | `SEPAY_API_KEY_FILE` | `runtime/files/sepay-api-key.key.enc` | Calls SePay to create and query a payment intent (integration.plan.sepay) |
 | `SEPAY_WEBHOOK_SECRET_FILE` | `runtime/files/sepay-webhook-secret.key.enc` | Verifies the signature on a SePay webhook before it can confirm a payment |
+| `UPLOAD_SIGNING_SECRET_FILE` | `runtime/files/upload-signing-secret.key.enc` | Signs the presigned PUT upload tokens |
 
 A key that the declaration names and this table does not is an undocumented secret: the check reports it
 rather than assuming somebody knows what it unlocks.

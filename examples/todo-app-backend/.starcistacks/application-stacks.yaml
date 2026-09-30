@@ -81,6 +81,10 @@ environments:
         where: runtime/files/sepay-webhook-secret.key
         recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
         keyCustody: DEMO-ONLY - private identity is untracked and provisioned externally before decryption
+      - name: upload-signing-secret.key
+        where: runtime/files/upload-signing-secret.key
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - private identity is untracked and provisioned externally before decryption
       - name: uat
         where: secrets/uat
         recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
