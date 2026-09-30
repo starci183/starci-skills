@@ -95,9 +95,9 @@ if (r.status === 401 || r.status === 403) return { ok: false, kind: "refused" }
 
 **Fix:** Add a branch `response.status === 401 || response.status === 403` returning `{ ok: false, kind: "refused" }` inside the client.
 
-## `starci-fe/no-http-status-collapse`
+## `starci-fe/no-failure-collapse`
 
-A non-ok response is not folded into one branch or into null; 401/403 become `refused`.
+A failure, a non-ok HTTP response or a failed `Outcome`, is not folded into one branch or into an empty value; its reason is read and kept (an HTTP status is mapped first: 401/403 `refused`, 404 `not-found`, 422 `invalid`, the rest `unavailable`).
 
 **Invalid** (`src/modules/api/client.ts`)
 
@@ -113,9 +113,9 @@ if (!res.ok) return toOutcome(res.status)
 
 **Finding code:** `FE_HTTP_STATUS_COLLAPSE`
 
-**Why:** `<file>` collapses every HTTP code into one branch (or returns null on an error response). 401/403 must become `refused`.
+**Why:** `<file>` collapses every failure (a failed HTTP response or a failed `Outcome`) into one branch or an empty value, so its reason is lost.
 
-**Fix:** Return an `Outcome` by code: `refused` (401/403), `not-found`, `invalid`, `unavailable`; do not return the server's raw error as the reason.
+**Fix:** Keep the reason: branch on an `Outcome`'s reason code; map an HTTP status to an `Outcome` first (`refused` for 401/403, `not-found`, `invalid`, `unavailable`). Never use the server's raw text as the reason.
 
 ## `starci-fe/no-hand-typed-wire`
 

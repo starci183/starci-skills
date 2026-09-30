@@ -46,10 +46,10 @@ export const why = {
     vi: "Client ở `<file>` không có nhánh so sánh `response.status` với 401 và 403 rồi trả `{ kind: \"refused\" }`, nên trạng thái \"cần đăng nhập\" không bao giờ đạt được.",
     fixVi: "Thêm nhánh `response.status === 401 || response.status === 403` trả `{ ok: false, kind: \"refused\" }` ngay trong client.",
   },
-  "no-http-status-collapse": {
+  "no-failure-collapse": {
     code: "FE_HTTP_STATUS_COLLAPSE",
-    vi: "`<file>` gộp mọi mã HTTP thành một nhánh (hoặc trả null khi phản hồi lỗi). 401/403 phải thành `refused`.",
-    fixVi: "Trả `Outcome` theo mã: `refused` (401/403), `not-found`, `invalid`, `unavailable`; không trả nguyên văn lỗi của server làm lý do.",
+    vi: "`<file>` gộp mọi thất bại (phản hồi HTTP lỗi hoặc `Outcome` thất bại) thành một nhánh hoặc một giá trị rỗng, nên lý do bị mất.",
+    fixVi: "Giữ lý do: với `Outcome` thì rẽ nhánh theo mã lý do; với phản hồi HTTP thì đổi mã trạng thái thành `Outcome` (`refused` cho 401/403, `not-found`, `invalid`, `unavailable`). Không dùng nguyên văn lỗi của server làm lý do.",
   },
   "no-hand-typed-wire": {
     code: "FE_WIRE_GENERATED",

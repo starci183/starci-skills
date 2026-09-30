@@ -15,7 +15,7 @@ import {
   clientMapsAuthToRefused,
   fetchOnlyInApiClient,
   noHandTypedWire,
-  noHttpStatusCollapse,
+  noFailureCollapse,
   noSharedTransportState,
   oneOutcomeUnion,
   outcomeKindsExhaustive,
@@ -236,8 +236,8 @@ test("FE-TRANSPORT-4: the client maps a 401 and a 403 status to refused", () => 
   })
 })
 
-test("FE-STATUS-1: a failed response is not one branch and not null", () => {
-  tester.run("no-http-status-collapse", noHttpStatusCollapse, {
+test("FE-STATUS-1: a failure (HTTP response or Outcome) is not one branch and not null", () => {
+  tester.run("no-failure-collapse", noFailureCollapse, {
     valid: [
       { filename: CLIENT, code: "if (!res.ok) return toOutcome(res)" },
       { filename: CLIENT, code: "if (!res.ok) { return { kind: mapStatus(res.status) } }" },
@@ -246,6 +246,8 @@ test("FE-STATUS-1: a failed response is not one branch and not null", () => {
       { filename: CLIENT, code: "const x = res.ok ? await res.json() : toOutcome(res)" },
       // an unrelated null return is not a status collapse
       { filename: HOOK, code: "if (!user) return null" },
+      // UI code consuming an Outcome keeps the reason: it branches on the reason code it read
+      { filename: HOOK, code: "if (!result.ok) return messageFor(result.reason)" },
     ],
     invalid: [
       { filename: CLIENT, code: "if (!res.ok) return null", errors: [{ messageId: "empty" }] },
@@ -259,6 +261,8 @@ test("FE-STATUS-1: a failed response is not one branch and not null", () => {
       { filename: CLIENT, code: "if (!res.ok) return { kind: \"unavailable\" }", errors: [{ messageId: "collapse" }] },
       { filename: CLIENT, code: "const o = { reason: res.statusText }", errors: [{ messageId: "raw" }] },
       { filename: CLIENT, code: "const o = { message: await res.text() }", errors: [{ messageId: "raw" }] },
+      // UI code consuming an Outcome: the failure collapses into null and the reason is lost
+      { filename: HOOK, code: "if (!result.ok) return null", errors: [{ messageId: "empty" }] },
     ],
   })
 })

@@ -525,7 +525,7 @@ rules:
     failureCodes: ["FE_HTTP_STATUS_COLLAPSE", "FE_OUTCOME_KIND_UNHANDLED"]
     enforcers:
       - {kind: eslint-fe, id: client-maps-auth-to-refused}
-      - {kind: eslint-fe, id: no-http-status-collapse}
+      - {kind: eslint-fe, id: no-failure-collapse}
       - {kind: eslint-fe, id: outcome-kinds-exhaustive}
       - {kind: eslint-fe, id: one-outcome-union}
   - id: R52

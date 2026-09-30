@@ -24,7 +24,7 @@ pins:
     source: packages/eslint/be/package.json
     why: '2.0.0 (C0 release): starciBeConfig({ hfs: loadHfs(import.meta.url) }) typed factory and the BE-CONVENTION laws (R36 sql-text-only, R83 no-repository-class, R85/R87/R89 service-deps, R43 config-parsed-in-main, R47/R48 test world, R95 operations, R98-R101 builders).'
   '@starci/eslint-canon-fe':
-    version: 7.0.0
+    version: 7.0.1
     group: starci
     install: registry
     side: fe

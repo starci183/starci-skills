@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.0.1 - 2026-10-01
+
+- Breaking (rule id): `no-http-status-collapse` is renamed `no-failure-collapse`. It fires on UI code that consumes an `Outcome` as well as on HTTP clients, so its name and messages now speak of a failure and its reason (branch on an `Outcome`'s reason code; map an HTTP status to an `Outcome` first). A branch that reads `reason` or `kind` counts as inspecting the failure. Update any `eslint-disable` naming the old id; there is no alias.
+
 ## 7.0.0 - 2026-09-30
 
 - **New: `no-vietnamese-in-source` (R91).** Identifiers, string literals, template text, JSX text, comments and test titles carry no Vietnamese letter, specs included. Detection is structural on characters (`scripts/lib/language.mjs` in `runtime/`, folded to NFC, so NFD is caught too). The only exemption is the i18n fixtures slot `fe.e2e-support.i18n` (`e2e/fixtures/i18n/`). Removed: the second-language branches of `no-hardcoded-copy` (its `second` and `comment` messages) and the `SECOND_LANGUAGE_LETTER` export; the one rule holds the law.

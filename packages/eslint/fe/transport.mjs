@@ -472,22 +472,22 @@ const failureSubject = (test) => {
 /** Statements of a branch body. */
 const bodyStatements = (node) => (node.type === "BlockStatement" ? node.body : [node])
 
-/** True when a subtree mentions a status or the tested response itself, so it can tell the codes apart. */
+/** True when a subtree mentions a status, an Outcome reason or kind, or the tested value itself, so it can tell the failures apart. */
 const inspectsResponse = (text, subjectName) =>
-  /\bstatus\b/.test(text) || (subjectName !== null && new RegExp(`\\b${subjectName}\\b`).test(text))
+  /\bstatus\b|\.(?:reason|kind)\b/.test(text) || (subjectName !== null && new RegExp(`\\b${subjectName}\\b`).test(text))
 
-/** A failed response is not one branch, and never `null`. */
-export const noHttpStatusCollapse = {
+/** A failure (a non-ok HTTP response or a failed `Outcome`) is not one branch, and never `null`: its reason survives to the screen. */
+export const noFailureCollapse = {
   meta: {
     type: "problem",
-    docs: { description: "A non-ok response is not folded into one branch or into null; 401/403 become `refused`." },
+    docs: { description: "A failure, a non-ok HTTP response or a failed `Outcome`, is not folded into one branch or into an empty value; its reason is read and kept." },
     schema: [],
     messages: {
       empty:
-        "A failed response becomes an empty value here. `null` says nothing about WHY: the reader who is signed out, the record that does not exist and the backend that is down all look identical, so the screen can show only one message. Return an `Outcome` (`refused`, `not-found`, `invalid`, `unavailable`) chosen by status; 401/403 must be `refused`.",
+        "A failure becomes an empty value here (`null`, `undefined`, an empty list or object). An empty value says nothing about WHY: a refused, not-found, invalid and unavailable result all look the same, so the screen can show only one message. Keep the reason: pass the `Outcome` (or its reason code) on and let the screen choose the translated message. A raw HTTP response is first mapped to an `Outcome` by status: 401/403 `refused`, 404 `not-found`, 422 `invalid`, the rest `unavailable`.",
       collapse:
-        "Every failed status takes this one branch and the response is never inspected. 401/403 must become `refused`, 404 `not-found`, 422 `invalid`, the rest `unavailable`. Branch on `response.status`.",
-      raw: "The server's own text is used as the reason. That text is written for a developer, may leak internals, and is in the wrong language. Map the status to a reason code and let the screen translate it.",
+        "Every failure takes this one branch and its reason is never read. For an `Outcome`, branch on its reason code (`refused`, `not-found`, `invalid`, `unavailable`); for an HTTP response, map `status` to that reason first (401/403 `refused`, 404 `not-found`, 422 `invalid`, the rest `unavailable`).",
+      raw: "The server's own text is used as the reason. That text is written for a developer, may leak internals, and is in the wrong language. Keep the reason code (from the `Outcome`, or mapped from the HTTP status) and let the screen translate it.",
     },
   },
   create(context) {
@@ -738,7 +738,7 @@ export const rules = {
   "client-fetch-has-signal": clientFetchHasSignal,
   "no-shared-transport-state": noSharedTransportState,
   "client-maps-auth-to-refused": clientMapsAuthToRefused,
-  "no-http-status-collapse": noHttpStatusCollapse,
+  "no-failure-collapse": noFailureCollapse,
   "no-hand-typed-wire": noHandTypedWire,
   "outcome-kinds-exhaustive": outcomeKindsExhaustive,
   "one-outcome-union": oneOutcomeUnion,
