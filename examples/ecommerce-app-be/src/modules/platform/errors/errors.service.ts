@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common"
+import type { GraphQLFormattedError } from "graphql"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { InjectMessageCatalog } from "@modules/platform/i18n"
@@ -9,6 +10,7 @@ import type { ErrorDescription, ErrorKind, ErrorParams } from "./errors.contract
 import { ERRORS_ERROR_KINDS, ErrorsErrorCode } from "./errors.error"
 import { ErrorsLogEvent } from "./errors.log-events"
 import type { ErrorsOptions } from "./errors.options"
+import { formatGraphqlError } from "./graphql-error.mapper"
 import { HTTP_STATUS_BY_KIND } from "./http-status.policy"
 
 @Injectable()
@@ -23,6 +25,10 @@ export class ErrorsService {
     ) {
         this.kinds = new Map([...options.kinds, ERRORS_ERROR_KINDS].flatMap((table) => Object.entries(table)))
     }
+
+    /** The one GraphQL error formatter of the app: the server registration hands it over as its `formatError`. */
+    readonly formatError = (formatted: GraphQLFormattedError, error: unknown): GraphQLFormattedError =>
+        formatGraphqlError(this, formatted, error)
 
     /** Describes `error`: a DomainError of a composed capability keeps its code; anything else is logged and masked as internal. */
     describe(error: unknown): ErrorDescription {

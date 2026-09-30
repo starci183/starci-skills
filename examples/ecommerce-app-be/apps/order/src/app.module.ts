@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { APP_GUARD } from "@nestjs/core"
+import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { IDENTITY_ERROR_KINDS, IDENTITY_MESSAGES, AuthGuard, IdentityModule } from "@modules/domain/identity"
 import { CART_ERROR_KINDS, CartModule, cartEntities, cartMigrations } from "@modules/domain/cart"
 import { CatalogModule, catalogEntities, catalogMigrations } from "@modules/domain/catalog"
@@ -11,7 +11,7 @@ import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
 import { DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbe } from "@modules/platform/database"
-import { ERRORS_MESSAGES, ErrorsModule } from "@modules/platform/errors"
+import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
 import { GraphqlModule } from "@modules/platform/graphql"
 import { HTTP_ERROR_KINDS, HTTP_MESSAGES, HttpModule } from "@modules/platform/http"
 import { HTTP_SECURITY_ERROR_KINDS, HTTP_SECURITY_MESSAGES, HttpSecurityModule, OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
@@ -23,7 +23,7 @@ import { HealthHttpModule } from "@features/health"
 import type { OrderAppOptions } from "./order.options"
 
 @Module({})
-/** The composition root of the order api: every capability is registered once, app-wide, and the three guards run in a fixed order. */
+/** The composition root of the order api: every capability is registered once, app-wide, its one error filter is bound, and the three guards run in a fixed order. */
 export class AppModule {
     /** Builds the order api from its parsed options. */
     static register(options: OrderAppOptions): DynamicModule {
@@ -83,6 +83,7 @@ export class AppModule {
                 CheckoutGraphqlModule,
             ],
             providers: [
+                { provide: APP_FILTER, useClass: ErrorsFilter },
                 { provide: APP_GUARD, useClass: RateLimitGuard },
                 { provide: APP_GUARD, useClass: OriginGuard },
                 { provide: APP_GUARD, useClass: AuthGuard },

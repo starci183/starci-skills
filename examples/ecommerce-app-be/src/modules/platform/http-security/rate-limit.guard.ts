@@ -1,13 +1,10 @@
 import { Injectable, SetMetadata } from "@nestjs/common"
-import type { CanActivate, ExecutionContext } from "@nestjs/common"
-import type { Reflector } from "@nestjs/core"
-import { InjectClock } from "@modules/platform/clock"
-import type { Clock } from "@modules/platform/clock"
-import { InjectReflector } from "@modules/platform/composition"
+import type { ExecutionContext } from "@nestjs/common"
+import { ThrottlerGuard } from "@nestjs/throttler"
+import type { ThrottlerModuleOptions } from "@nestjs/throttler"
 import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
 import { requestOf } from "./execution-request.mapper"
-import { InjectHttpSecurityOptions } from "./http-security.decorators"
-import type { HttpSecurityOptions } from "./http-security.options"
+import type { RateLimitOptions } from "./http-security.options"
 
 /** The rate limit tiers of a door. */
 export enum RateTier {
@@ -18,45 +15,49 @@ export enum RateTier {
 }
 
 const RATE_TIER_KEY = "platform.http-security.rate-tier"
-const BUCKETS_MAX = 10_000
-
-interface Bucket {
-    count: number
-    resetAt: number
-}
 
 /** Marks a door with a rate limit tier other than the default. */
 export const RateLimit = (tier: RateTier): ReturnType<typeof SetMetadata> => SetMetadata(RATE_TIER_KEY, tier)
 
+const tierOf = (context: ExecutionContext): RateTier => {
+    const declared: RateTier | undefined =
+        Reflect.getMetadata(RATE_TIER_KEY, context.getHandler()) ?? Reflect.getMetadata(RATE_TIER_KEY, context.getClass())
+    return declared ?? RateTier.Default
+}
+
+/** The throttler configuration of the app: one window per tier, each counting only the doors of its own tier. */
+export const throttlerOptionsOf = (rateLimit: RateLimitOptions): ThrottlerModuleOptions => ({
+    throttlers: [
+        {
+            name: RateTier.Default,
+            ttl: rateLimit.windowMs,
+            limit: rateLimit.defaultLimit,
+            skipIf: (context) => tierOf(context) !== RateTier.Default,
+        },
+        {
+            name: RateTier.Strict,
+            ttl: rateLimit.windowMs,
+            limit: rateLimit.strictLimit,
+            skipIf: (context) => tierOf(context) !== RateTier.Strict,
+        },
+    ],
+    setHeaders: false,
+})
+
 @Injectable()
-/** The first app guard: a fixed-window counter per caller address and tier, kept in process memory and stamped by the Clock. */
-export class RateLimitGuard implements CanActivate {
-    private readonly buckets = new Map<string, Bucket>()
-
-    constructor(
-        @InjectReflector() private readonly reflector: Reflector,
-        @InjectClock() private readonly clock: Clock,
-        @InjectHttpSecurityOptions() private readonly options: HttpSecurityOptions,
-    ) {}
-
-    /** Counts the request and refuses it when the caller is over the limit of the door tier. */
-    canActivate(context: ExecutionContext): boolean {
-        const tier = this.reflector.getAllAndOverride<RateTier | undefined>(RATE_TIER_KEY, [context.getHandler(), context.getClass()]) ?? RateTier.Default
-        const limit = tier === RateTier.Strict ? this.options.rateLimit.strictLimit : this.options.rateLimit.defaultLimit
-        const now = this.clock.now().getTime()
-        const key = `${tier}:${requestOf(context).ip ?? "unknown"}`
-        const current = this.buckets.get(key)
-        const bucket = current && current.resetAt > now ? current : { count: 0, resetAt: now + this.options.rateLimit.windowMs }
-        bucket.count += 1
-        this.buckets.set(key, bucket)
-        if (this.buckets.size > BUCKETS_MAX) this.prune(now)
-        if (bucket.count > limit) throw new HttpSecurityError({ code: HttpSecurityErrorCode.RateLimited })
-        return true
+/**
+ * The first app guard, the throttler: a window counter per caller address and tier kept by `@nestjs/throttler`. It reads
+ * the caller from the HTTP request under either transport and answers an overrun with the RateLimited capability error.
+ */
+export class RateLimitGuard extends ThrottlerGuard {
+    /** The two fields the throttler reads: the caller address and the headers of the HTTP request behind REST or GraphQL. */
+    protected override getRequestResponse(context: ExecutionContext): { req: Record<string, unknown>; res: Record<string, unknown> } {
+        const request = requestOf(context)
+        return { req: { ip: request.ip, headers: request.headers }, res: {} }
     }
 
-    private prune(now: number): void {
-        for (const [key, bucket] of this.buckets) {
-            if (bucket.resetAt <= now) this.buckets.delete(key)
-        }
+    /** Refuses the request with the RateLimited code, which the one error filter and formatter map to `rate-limited`. */
+    protected override throwThrottlingException(): Promise<void> {
+        return Promise.reject(new HttpSecurityError({ code: HttpSecurityErrorCode.RateLimited }))
     }
 }
