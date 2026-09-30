@@ -311,7 +311,7 @@ export default {
   const orcaCommands = [
     { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${workflowNameOf(db, job.workflow_id)} — ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow by the Kernel; later operations reuse it' },
     { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.try_no}`, '--display-name', title, '--spec', '<prompt>', '--from', '<kernel-terminal>', '--json'] },
-    { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', worktree, '--agent', model.provider ?? '<agent>',
+    { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', checkoutRoot, '--agent', model.provider ?? '<agent>',
       ...(launchModel.modelId ? ['--model', launchModel.modelId, ...(launchModel.effort ? ['--effort', launchModel.effort] : [])] : []), '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'] },
     { step: 'assignee', argv: ['orchestration', 'dispatch-show', '--task', '<task-id>', '--from', '<kernel-terminal>', '--json'] },
     { step: 'title', argv: ['terminal', 'rename', '--terminal', '<assignee>', '--title', title, '--json'] },
@@ -324,7 +324,7 @@ export default {
       leases: opLeaseRequests(payload, leaseCanonOf(db, repo), op),
       launch: launchModel.error ? { agent: model.provider, error: `${model.target} has no launch model: ${launchModel.error}` }
         : { agent: model.provider, model: launchModel.modelId, effort: launchModel.effort ?? null, modelSource: launchModel.source },
-      orca: { worktree, title, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
+      orca: { worktree: checkoutRoot, title, profile: model.profile, commands: orcaCommands.map((c) => ({ step: c.step, cli: `orca ${c.argv.join(' ')}`, note: c.note })) },
       ...(briefExists ? {} : { briefMissing: `modules/ops/ops/${op}.yaml not present — spawn will refuse` }),
       ...(lackingTools.length ? { toolUnavailable: `${model.target} lacks host tool ${lackingTools.join(', ')} — spawn will refuse tool-unavailable` } : {}),
       ...(outsideOrder ? { modelOutsideOrder: outsideOrder } : {}),
@@ -465,11 +465,11 @@ export default {
   // worker-start owns the agent's environment, so no shim reaches it; the history hook in its checkouts does, finding
   // the op by its bound Orca terminal (scripts/guards/install.mjs bindGuardTerminal).
   const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd });
-  return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, title, reserve, inputs, guard, launchModel, scratchDir }, internals, emit);
+  return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, checkoutRoot, title, reserve, inputs, guard, launchModel, scratchDir }, internals, emit);
   },
 };
 
-function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile = null, worktree, title, reserve, inputs = null, guard = null, launchModel, scratchDir = null }, internals, emit) {
+function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile = null, worktree, checkoutRoot = worktree, title, reserve, inputs = null, guard = null, launchModel, scratchDir = null }, internals, emit) {
   const { cleanupManagedWorker, rejectDispatch, ensureWorkflowRun, createOperationTask, recordLaunchTerminal, skillRoot, AGENT_HIERARCHY_SCHEMA, operationNodeId, kernelNodeId, buildContractMarkdown, fileContract } = internals;
   const db = ledger.db;
 
@@ -510,7 +510,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   // the exact assignee (dispatch-show, never a second orchestration dispatch), its [Op] title, and the attestation
   // that the worker's EFFECTIVE agent/model equal the route - a mismatch is a provider-side defect, rejected with the
   // typed infra-provider incident.
-  const launched = spawnAgent({ provider: model.provider, model: modelId, effort, worktree, title, task: taskId, run: runId, from: kernelHandle,
+  const launched = spawnAgent({ provider: model.provider, model: modelId, effort, worktree: checkoutRoot, title, task: taskId, run: runId, from: kernelHandle,
     onCreated: (handle) => recordLaunchTerminal(ledger, jobId, handle), io: { cleanup: cleanupManagedWorker } });
   trust = launched.trust ?? null;
   if (!launched.ok) {
