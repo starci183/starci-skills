@@ -26,8 +26,10 @@ module.exports = require("@starci/jest-preset").starciJestConfig()
   `coverage`, and `coverageThreshold` is `{ "./src/**/*.service.ts": { lines: 100, branches: 100, functions: 100, statements: 100 } }`,
   a glob key that applies to each file on its own, so every service must reach 100 on every metric (an average never passes). The
   managed `test` script runs the unit project with `--coverage` and fails below it. Coverage is measured by v8, which counts the
-  real source and not the helpers TypeScript emits; the TypeScript config of the unit project must set `importHelpers: true`
-  (`@starci/tsconfig` `be.json` does) and the repository lists `tslib` in its dependencies. Reporters are `text-summary` and
+  real source. The unit project overlays `isolatedModules: false` and `importHelpers: true` on the repository tsconfig (ts-jest merges an
+  inline `tsconfig` object over the `tsconfig.json` it finds): with `isolatedModules` on, TypeScript emits an unreachable
+  `typeof Dep !== "undefined" ? Dep : Object` guard per class-typed constructor parameter, and inlined decorator helpers carry branches
+  of their own, so 100 would be unreachable. The repository lists `tslib` in its devDependencies (`UNIT_COMPILER_OPTIONS`). Reporters are `text-summary` and
   `text`; there is no `lcov`.
 - **Sonar does not read coverage.** `sonarCoverageExclusions()` and the lcov report are removed. `sonarExclusions()` still renders
   `sonar.exclusions` (`**/*.spec.ts,**/*.e2e-spec.ts,**/dist/**,**/coverage/**`); the quality gate fails on imported issues only.

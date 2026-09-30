@@ -10,7 +10,7 @@ summary: >-
   `fakeIds`, `mock<T>()`, `builder`, the Outcome matchers); no casts, no ambient clock, no `jest.mock`, no `process.env`.
   The prerequisite is thin transport: handlers, resolvers, controllers and consumers only map input, call exactly one
   service method (or dispatch exactly one bus message) and return the result. Coverage is collected from
-  `src/**/*.service.ts` only at per-file 100 (`test` runs `--coverage`, `importHelpers` and `tslib`); Sonar no longer depends
+  `src/**/*.service.ts` only at per-file 100 (`test` runs `--coverage`; the unit project compiles with `isolatedModules: false` and `importHelpers` over `tslib`); Sonar no longer depends
   on coverage (no lcov, no coverage exclusions, no coverage upload). `@starci/jest-preset` 2.0.0 ships the kit and drops
   `sonarCoverageExclusions()`. knowledge/patterns/be/test.yaml BE-TEST-1 to BE-TEST-15 replace the old rules
   (`mockEntityManager()` from `src/tests/fixtures/database.ts`, the twin-spec, direct-construction and composition-spec

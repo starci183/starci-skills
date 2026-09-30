@@ -17,4 +17,6 @@ export declare function collectCoverageFrom(): string[]
 export declare function sonarExclusions(): string
 export declare const COVERAGE_SOURCES: string[]
 export declare const COVERAGE_EXCLUDES: string[]
+/** The compiler options the unit project overlays on the repository tsconfig so per-file 100 coverage of a decorated service is reachable. */
+export declare const UNIT_COMPILER_OPTIONS: Readonly<{ isolatedModules: false; importHelpers: true }>
 export declare const COVERAGE_THRESHOLD: Readonly<{ lines: 100; branches: 100; functions: 100; statements: 100 }>

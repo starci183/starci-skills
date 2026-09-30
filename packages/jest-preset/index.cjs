@@ -44,6 +44,23 @@ function transform(tsconfig) {
 }
 
 /**
+ * The compiler options the UNIT project overlays on the repository tsconfig (ts-jest merges an inline `tsconfig` object over the
+ * `tsconfig.json` it finds under `rootDir`). They exist so that per-file 100 coverage is reachable for a decorated service:
+ *  - `isolatedModules: false`: with it on, TypeScript cannot tell whether an imported name is a class, and emits a
+ *    `typeof (_a = typeof Dep !== "undefined" && Dep) === "function" ? _a : Object` guard per class-typed constructor parameter for
+ *    `design:paramtypes`; the `Object` arm can never run, so the branch stays uncovered. With the full language service the
+ *    metadata is emitted as plain `Dep`.
+ *  - `importHelpers: true`: the decorator helpers (`__decorate`, `__param`, `__metadata`) come from `tslib`, not inlined per file
+ *    with branches of their own. The repository lists `tslib` in its devDependencies.
+ * Integration, e2e and contract keep the repository setting: they measure nothing.
+ */
+const UNIT_COMPILER_OPTIONS = Object.freeze({ isolatedModules: false, importHelpers: true })
+
+function unitTransform() {
+  return transform({ ...UNIT_COMPILER_OPTIONS })
+}
+
+/**
  * The path aliases of a StarCi back end: the same three `paths` the managed `tsconfig.json` declares, so jest resolves what
  * `tsc` resolves. They are part of the preset, not an option: a repository has no other alias.
  */
@@ -101,7 +118,7 @@ function starciJestConfig() {
     projects: [
       {
         ...shared,
-        transform: transform("tsconfig.json"),
+        transform: unitTransform(),
         displayName: "unit",
         clearMocks: true,
         // The Outcome matchers (`toBeRefused`, `toSucceedWith`) exist in the unit project only.
@@ -136,4 +153,5 @@ module.exports = {
   COVERAGE_SOURCES,
   COVERAGE_EXCLUDES,
   COVERAGE_THRESHOLD,
+  UNIT_COMPILER_OPTIONS,
 }
