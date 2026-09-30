@@ -863,6 +863,41 @@ BE_SPEC_QUALITY:
   owner: op-retry
   kind: check-finding
 
+BE_TEST_BUILDER_HOME:
+  title: "A test data builder is outside the builders folder"
+  title_vi: "Builder dữ liệu test nằm ngoài thư mục builders"
+  meaning_vi: "Mọi hàm dựng dữ liệu test (hàm được export và tạo dòng trong cơ sở dữ liệu qua EntityManager, DataSource hoặc QueryRunner) chỉ được nằm trong src/tests/fixtures/builders/<khu>.builder.ts; SQL đi kèm nằm trong <khu>.sql.ts cạnh nó. Một mô-đun khác của cây test làm việc này là builder đặt sai chỗ, dù tên nó là gì."
+  causes_vi:
+    - "Mô-đun trong src/tests/world hoặc src/tests/fixtures (ngoài builders/) export hàm gọi save, insert hoặc upsert, hoặc chạy INSERT, qua EntityManager"
+    - "Hàm seed hoặc anOrder viết ngay cạnh spec thay vì trong builders/"
+    - "Tên tệp *.repository.ts, *.factory.ts hoặc *.fixture.ts trong src/tests (bị BE_SOURCE_FORM chặn cùng lúc)"
+  nextStep_vi: "Chuyển hàm sang src/tests/fixtures/builders/<khu>.builder.ts, chuyển chuỗi SQL sang <khu>.sql.ts cạnh nó, sửa import trong spec. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_TEST_ROW_BY_BUILDER:
+  title: "A spec hand-builds rows instead of using a builder"
+  title_vi: "Spec tự dựng dòng dữ liệu thay vì dùng builder"
+  meaning_vi: "Spec đơn vị, integration hoặc e2e không tự chèn hay ghi dòng: không có INSERT/UPDATE/DELETE thô, không gọi save, insert, upsert, update, delete, remove trên EntityManager, DataSource hoặc QueryRunner, và không dựng cùng một entity bằng object literal nhiều hơn một lần. Dòng dữ liệu đến từ builder của khu vực đó."
+  causes_vi:
+    - "em.query với chuỗi INSERT INTO ... hoặc chuỗi INSERT/UPDATE/DELETE được truyền vào query trong spec"
+    - "em.save({...}), em.insert(...) hoặc upsert trong spec"
+    - "Cùng một entity được viết thành object literal từ lần thứ hai trở đi trong một spec"
+  nextStep_vi: "Thêm hoặc mở rộng builder của khu vực (orderRow(overrides) cho spec đơn vị, orderBuilder(db).pending().build(overrides) cho integration và e2e) rồi gọi nó trong spec. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_TEST_CONSTRAINTS_ON:
+  title: "A test switches database constraints off"
+  title_vi: "Test tắt hoặc gỡ ràng buộc cơ sở dữ liệu"
+  meaning_vi: "Cây src/tests luôn chạy với ràng buộc bật: không tắt khóa ngoại, trigger hay ràng buộc, không hoãn ràng buộc. Builder tạo đủ chuỗi cha thay vì bỏ qua khóa ngoại."
+  causes_vi:
+    - "session_replication_role, SET CONSTRAINTS ... DEFERRED, DEFERRABLE INITIALLY DEFERRED, ALTER TABLE ... DISABLE hoặc DISABLE TRIGGER trong một câu SQL của cây test"
+    - "DROP CONSTRAINT trong SQL, hoặc QueryRunner.dropForeignKey(s), dropCheckConstraint(s), dropUniqueConstraint(s)"
+  nextStep_vi: "Bỏ câu lệnh tắt ràng buộc và tạo đủ dòng cha bằng builder. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
 BLOB_REF_INVALID:
   title: "Not a blob citation"
   title_vi: "Không phải tham chiếu khối lưu"

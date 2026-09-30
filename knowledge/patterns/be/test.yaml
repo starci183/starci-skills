@@ -599,18 +599,18 @@ rules:
   - id: BE-TEST-16
     title: Test data builders
     kind: mandatory
-    hfsRules: [R48, R89]
+    hfsRules: [R48, R97, R98, R99, R89]
     requirement: |-
       Test data is arranged by builders. A builder lives in `src/tests/fixtures/builders/<area>.builder.ts` (slot
       `be.tests.fixtures.builders`), one file per area, shared by every spec of that area. The file name is exactly `<area>.builder.ts`;
       a `*.repository.ts`, `*.fixture.ts` or `*.factory.ts` file is a finding anywhere, and a `*.builder.ts` outside that folder is a
-      finding. Two kinds exist. (a) Pure object builders, for example `commissionRow(overrides)` and `accrueInput(overrides)`: they
+      finding; so is any other module of the test tree that exports a function creating persisted rows through an EntityManager (R97). Two kinds exist. (a) Pure object builders, for example `commissionRow(overrides)` and `accrueInput(overrides)`: they
       return typed objects with valid defaults, the spec overrides only what matters, and unit specs use them as inputs and as
       `mockEntityManager` results. (b) Persisting builders, for example `orderBuilder(world.db.primary).pending().build(overrides)`: they
       insert real rows through the entity classes, create their own parent chain, and integration and e2e specs use them to arrange
       state. Rules: (a) no spec hand-builds a long row chain or writes a raw INSERT/UPDATE/DELETE or a direct `save`, `insert`,
       `upsert`, `update`, `delete` or `remove` on an EntityManager, DataSource or QueryRunner (reading stays allowed, since a spec
-      asserts persisted state); rows go through builders. (b) Builders run with database constraints ON: no FK disabling, no
+      asserts persisted state), and no spec builds the same persistence entity as an object literal twice; rows go through builders. (b) Builders, and every file under `src/tests`, run with database constraints ON: no FK disabling, no
       `session_replication_role`, no `DISABLE TRIGGER`, no deferred or dropped constraints. (c) Builders arrange data only and never
       assert: no `expect`, no jest globals. (d) Defaults are deterministic: fixed ids or `fakeIds`, fixed dates, no `Date.now()`,
       no argument-less `new Date()`, no `Math.random()`, `randomUUID()` or `crypto.random*`, unless seeded. (e) Raw SQL inside a builder is
@@ -635,8 +635,11 @@ rules:
     verification:
       automated:
         - BE_SOURCE_FORM
+        - persisting-builder-in-builders-slot
         - spec-no-raw-insert
+        - spec-no-repeated-row-literal
         - builder-arranges-only
+        - tests-keep-constraints
       manual:
         - Confirm a persisting builder creates its parent chain through entity classes and that no unit spec builds a long object literal by hand where a builder exists.
     relatedExamples: []

@@ -1,0 +1,22 @@
+id: bld-test-builders
+effectiveAt: '2026-10-01T18:00:00+07:00'
+summary: >-
+  Lane BLD (BE-TEST-16 enforcers). Adds three rules, one per obligation: R97 BE_TEST_BUILDER_HOME (new eslint-be rule
+  persisting-builder-in-builders-slot: a non-spec module of the test tree that exports a function creating persisted rows through an
+  EntityManager, DataSource or QueryRunner is a builder and must be in be.tests.fixtures.builders; the file-name half stays BE_SOURCE_FORM),
+  R98 BE_TEST_ROW_BY_BUILDER (spec-no-raw-insert moves here from R48 and also reads a tagged-template statement; new
+  spec-no-repeated-row-literal: a persistence entity, recognised by its typeorm @Entity declaration through the contextual type, built as an
+  object literal without spread more than once in a spec), R99 BE_TEST_CONSTRAINTS_ON (new tests-keep-constraints: every file under be.tests.*
+  keeps constraints on: constraint-off SQL in a query call or tagged template on a typeorm receiver, and dropForeignKey(s),
+  dropCheckConstraint(s) and dropUniqueConstraint(s) on a QueryRunner). builder-arranges-only stays in R48, now judges the builders slot
+  through hfsOf instead of the file name, and no longer judges constraints (R99 does). Adds the failure codes BE_TEST_BUILDER_HOME,
+  BE_TEST_ROW_BY_BUILDER and BE_TEST_CONSTRAINTS_ON; there is no alias for the old placement.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/bld-test-builders.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/be/test.yaml
+  - packages/eslint/be/builders.mjs
+  - packages/eslint/be/lib/db-writes.mjs
+  - modules/kernel/failure-codes.yaml
