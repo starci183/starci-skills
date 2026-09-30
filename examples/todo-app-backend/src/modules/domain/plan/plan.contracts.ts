@@ -239,7 +239,7 @@ export interface WebhookDeliveryParams {
     /** What the gateway reported. */
     readonly outcome: "paid" | "failed"
     /** The end of the paid period, absent for the default period. */
-    readonly periodEnd: Date | undefined
+    readonly periodEnd?: Date | undefined
 }
 
 /** What a webhook delivery caused: ignored, or what the confirmation changed. */

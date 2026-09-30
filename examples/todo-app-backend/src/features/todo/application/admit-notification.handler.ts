@@ -17,13 +17,12 @@ export class AdmitNotificationHandler extends ICQRSHandler<AdmitNotificationComm
     }
 
     protected override async process(command: AdmitNotificationCommand): Promise<AdmitNotificationResult> {
-        const { request } = command.params
         return this.notify.admitOnce({
-            eventId: request.sourceEventId,
-            kind: request.kind,
-            recipientId: request.recipientId,
-            channel: request.channel,
-            payload: request.payload,
+            eventId: command.params.request.sourceEventId,
+            kind: command.params.request.kind,
+            recipientId: command.params.request.recipientId,
+            channel: command.params.request.channel,
+            payload: command.params.request.payload,
         })
     }
 }

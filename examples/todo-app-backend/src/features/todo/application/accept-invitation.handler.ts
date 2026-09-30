@@ -17,7 +17,6 @@ export class AcceptInvitationHandler extends ICQRSHandler<AcceptInvitationComman
     }
 
     protected override async process(command: AcceptInvitationCommand): Promise<AcceptInvitationResult> {
-        const { request, principal } = command.params
-        return this.invitations.accept({ actorId: principal.id, invitationId: request.invitationId, email: request.email })
+        return this.invitations.accept({ actorId: command.params.principal.id, invitationId: command.params.request.invitationId, email: command.params.request.email })
     }
 }

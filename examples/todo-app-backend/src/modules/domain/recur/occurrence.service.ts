@@ -82,7 +82,7 @@ export class OccurrenceService {
     }
 
     /** Completes the occurrence of the owner and the task it spawned in one transaction; completing again changes nothing. */
-    async complete(params: TransitionOccurrenceParams): Promise<Outcome<OccurrenceTransitioned, TransitionRefusal>> {
+    complete(params: TransitionOccurrenceParams): Promise<Outcome<OccurrenceTransitioned, TransitionRefusal>> {
         const at = this.clock.now()
         return this.entityManager.transaction(async (manager) => {
             const found = await this.findForOwner(manager, params)
@@ -96,7 +96,7 @@ export class OccurrenceService {
     }
 
     /** Skips the occurrence of the owner without completing its task, in one transaction; skipping again changes nothing. */
-    async skip(params: TransitionOccurrenceParams): Promise<Outcome<OccurrenceTransitioned, TransitionRefusal>> {
+    skip(params: TransitionOccurrenceParams): Promise<Outcome<OccurrenceTransitioned, TransitionRefusal>> {
         return this.entityManager.transaction(async (manager) => {
             const found = await this.findForOwner(manager, params)
             if (found.kind === "refused") return found

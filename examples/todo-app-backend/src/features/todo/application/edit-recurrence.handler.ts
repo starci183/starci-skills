@@ -21,16 +21,15 @@ export class EditRecurrenceHandler extends ICQRSHandler<EditRecurrenceCommand, E
     }
 
     protected override async process(command: EditRecurrenceCommand): Promise<EditRecurrenceResult> {
-        const { request, principal } = command.params
         return this.rules.edit({
-            id: request.ruleId,
-            actorId: principal.id,
+            id: command.params.request.ruleId,
+            actorId: command.params.principal.id,
             patch: {
-                frequency: request.frequency,
-                n: request.n,
-                dayOfMonth: request.dayOfMonth,
-                timeZone: request.timeZone,
-                time: request.time,
+                frequency: command.params.request.frequency,
+                n: command.params.request.n,
+                dayOfMonth: command.params.request.dayOfMonth,
+                timeZone: command.params.request.timeZone,
+                time: command.params.request.time,
             },
         })
     }

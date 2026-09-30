@@ -20,7 +20,6 @@ export class MakeRecurringHandler extends ICQRSHandler<MakeRecurringCommand, Mak
     }
 
     protected override async process(command: MakeRecurringCommand): Promise<MakeRecurringResult> {
-        const { request, principal } = command.params
-        return this.rules.create({ ownerId: principal.id, ...request })
+        return this.rules.create({ ownerId: command.params.principal.id, ...command.params.request })
     }
 }

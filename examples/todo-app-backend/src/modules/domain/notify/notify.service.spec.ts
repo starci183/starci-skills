@@ -72,7 +72,12 @@ const build = async () => {
 type Built = Awaited<ReturnType<typeof build>>
 
 /** Stubs an admission of a brand new event of a subscribed person whose window is `opened` or joined. */
-const stubNewAdmission = (built: Built, options: { opened: boolean; windowMinutes?: number | null }) => {
+interface NewAdmissionOptions {
+    readonly opened: boolean
+    readonly windowMinutes?: number | null
+}
+
+const stubNewAdmission = (built: Built, options: NewAdmissionOptions) => {
     built.dedupe.admit.mockResolvedValue({ notification: notificationView(), isNew: true })
     built.preferences.get.mockResolvedValue(preferenceView({ digestWindowMinutes: options.windowMinutes ?? null }))
     built.delivery.admit.mockResolvedValue(deliveryAttemptView())

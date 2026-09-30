@@ -81,7 +81,7 @@ export class RuleService {
     }
 
     /** Changes the fields of a rule of the owner in one transaction; an occurrence already materialised is never rewritten. */
-    async edit(
+    edit(
         params: EditRuleParams,
     ): Promise<Outcome<RuleEdited, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden | RecurErrorCode.RuleInvalid>> {
         return this.entityManager.transaction(async (manager) => {
@@ -110,7 +110,7 @@ export class RuleService {
      * Ends a rule of the owner on the local date and orphans its occurrences dated on or after it that are still
      * materialised, in one transaction: sets endedAt, never deletes a row.
      */
-    async end(params: EndRuleParams): Promise<Outcome<RuleEnded, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden>> {
+    end(params: EndRuleParams): Promise<Outcome<RuleEnded, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden>> {
         return this.entityManager.transaction(async (manager) => {
             const row = await manager.findOneBy(RuleEntity, { id: params.id })
             if (!row) return refused(RecurErrorCode.RuleNotFound)

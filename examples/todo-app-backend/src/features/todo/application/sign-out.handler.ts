@@ -17,7 +17,6 @@ export class SignOutHandler extends ICQRSHandler<SignOutCommand, SignOutResult> 
     }
 
     protected override async process(command: SignOutCommand): Promise<SignOutResult> {
-        const { sessionToken } = command.params.request
-        return this.sessions.signOut({ sessionToken })
+        return this.sessions.signOut(command.params.request)
     }
 }

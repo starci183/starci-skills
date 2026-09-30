@@ -20,7 +20,6 @@ export class EndRecurrenceHandler extends ICQRSHandler<EndRecurrenceCommand, End
     }
 
     protected override async process(command: EndRecurrenceCommand): Promise<EndRecurrenceResult> {
-        const { request, principal } = command.params
-        return this.rules.end({ id: request.ruleId, actorId: principal.id, endedAt: request.endedAt })
+        return this.rules.end({ id: command.params.request.ruleId, actorId: command.params.principal.id, endedAt: command.params.request.endedAt })
     }
 }

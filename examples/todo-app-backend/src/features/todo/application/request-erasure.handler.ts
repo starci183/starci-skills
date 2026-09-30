@@ -17,7 +17,6 @@ export class RequestErasureHandler extends ICQRSHandler<RequestErasureCommand, R
     }
 
     protected override async process(command: RequestErasureCommand): Promise<RequestErasureResult> {
-        const { principal } = command.params
-        return this.erasure.requestForCaller({ personId: principal.id })
+        return this.erasure.requestForCaller({ personId: command.params.principal.id })
     }
 }

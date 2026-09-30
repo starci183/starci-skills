@@ -17,7 +17,6 @@ export class ExportMyDataHandler extends ICQRSHandler<ExportMyDataQuery, ExportM
     }
 
     protected override async process(query: ExportMyDataQuery): Promise<ExportMyDataResult> {
-        const { principal } = query.params
-        return this.log.exportFor(principal.id)
+        return this.log.exportFor(query.params.principal.id)
     }
 }

@@ -17,7 +17,6 @@ export class ReconcilePaymentHandler extends ICQRSHandler<ReconcilePaymentComman
     }
 
     protected override async process(command: ReconcilePaymentCommand): Promise<ReconcilePaymentResult> {
-        const { request, principal } = command.params
-        return this.checkout.reconcile({ personId: principal.id, paymentIntentId: request.paymentIntentId })
+        return this.checkout.reconcile({ personId: command.params.principal.id, paymentIntentId: command.params.request.paymentIntentId })
     }
 }

@@ -52,7 +52,7 @@ export class AuditErasureService {
      * Opens and verifies the erasure request of the caller in one transaction, together with the erasure-requested
      * audit line. A refusal is returned, not thrown, so what the step wrote before refusing still commits.
      */
-    async requestForCaller(params: RequestOwnErasureParams): Promise<Outcome<ErasureReceiptView, ConfirmRefusal>> {
+    requestForCaller(params: RequestOwnErasureParams): Promise<Outcome<ErasureReceiptView, ConfirmRefusal>> {
         const at = this.clock.now()
         return this.entityManager.transaction(async (manager): Promise<Outcome<ErasureReceiptView, ConfirmRefusal>> => {
             const outcome = await this.request({ manager, personId: params.personId, at })
@@ -66,7 +66,7 @@ export class AuditErasureService {
      * Completes the verified erasure request of the caller in one transaction, together with the erasure-completed
      * audit line. A refusal is returned, not thrown.
      */
-    async completeForCaller(params: CompleteOwnErasureParams): Promise<Outcome<ErasureReceiptView, ExecuteRefusal>> {
+    completeForCaller(params: CompleteOwnErasureParams): Promise<Outcome<ErasureReceiptView, ExecuteRefusal>> {
         const at = this.clock.now()
         return this.entityManager.transaction(async (manager): Promise<Outcome<ErasureReceiptView, ExecuteRefusal>> => {
             const outcome = await this.execute({

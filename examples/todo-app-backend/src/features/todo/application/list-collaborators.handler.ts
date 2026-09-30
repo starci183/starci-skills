@@ -17,7 +17,6 @@ export class ListCollaboratorsHandler extends ICQRSHandler<ListCollaboratorsQuer
     }
 
     protected override async process(query: ListCollaboratorsQuery): Promise<ListCollaboratorsResult> {
-        const { request, principal } = query.params
-        return this.invitations.listFor({ actorId: principal.id, taskId: request.taskId })
+        return this.invitations.listFor({ actorId: query.params.principal.id, taskId: query.params.request.taskId })
     }
 }

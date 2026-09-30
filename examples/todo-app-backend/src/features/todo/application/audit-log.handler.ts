@@ -17,12 +17,11 @@ export class AuditLogHandler extends ICQRSHandler<AuditLogQuery, AuditLogResult>
     }
 
     protected override async process(query: AuditLogQuery): Promise<AuditLogResult> {
-        const { request, principal } = query.params
         return this.log.readAs({
-            principalId: principal.id,
-            roles: principal.roles,
-            action: request.action,
-            target: request.target,
+            principalId: query.params.principal.id,
+            roles: query.params.principal.roles,
+            action: query.params.request.action,
+            target: query.params.request.target,
         })
     }
 }

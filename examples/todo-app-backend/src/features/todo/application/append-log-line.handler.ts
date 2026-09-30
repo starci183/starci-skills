@@ -17,7 +17,6 @@ export class AppendLogLineHandler extends ICQRSHandler<AppendLogLineCommand, App
     }
 
     protected override async process(command: AppendLogLineCommand): Promise<AppendLogLineResult> {
-        const { eventId, actorId, action, target, at } = command.params.request
-        return this.log.appendDelivered({ eventId, actorId, action, target, at })
+        return this.log.appendDelivered(command.params.request)
     }
 }

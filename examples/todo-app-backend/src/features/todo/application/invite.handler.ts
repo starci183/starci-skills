@@ -17,12 +17,11 @@ export class InviteHandler extends ICQRSHandler<InviteCommand, InviteResult> {
     }
 
     protected override async process(command: InviteCommand): Promise<InviteResult> {
-        const { request, principal } = command.params
         return this.invitations.invite({
-            ownerId: principal.id,
-            taskId: request.taskId,
-            email: request.email,
-            role: request.role,
+            ownerId: command.params.principal.id,
+            taskId: command.params.request.taskId,
+            email: command.params.request.email,
+            role: command.params.request.role,
         })
     }
 }

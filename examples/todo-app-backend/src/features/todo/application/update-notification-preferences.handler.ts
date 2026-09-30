@@ -22,12 +22,11 @@ export class UpdateNotificationPreferencesHandler extends ICQRSHandler<
     protected override async process(
         command: UpdateNotificationPreferencesCommand,
     ): Promise<UpdateNotificationPreferencesResult> {
-        const { request, principal } = command.params
         return this.preferences.change({
-            personId: principal.id,
-            channel: request.channel,
-            unsubscribed: request.unsubscribed,
-            digestWindowMinutes: request.digestWindowMinutes,
+            personId: command.params.principal.id,
+            channel: command.params.request.channel,
+            unsubscribed: command.params.request.unsubscribed,
+            digestWindowMinutes: command.params.request.digestWindowMinutes,
         })
     }
 }

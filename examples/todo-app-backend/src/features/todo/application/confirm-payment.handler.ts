@@ -17,7 +17,6 @@ export class ConfirmPaymentHandler extends ICQRSHandler<ConfirmPaymentCommand, C
     }
 
     protected override async process(command: ConfirmPaymentCommand): Promise<ConfirmPaymentResult> {
-        const { authorization, gatewayIntentId, outcome, periodEnd } = command.params.request
-        return this.webhook.receive({ authorization, gatewayIntentId, outcome, periodEnd })
+        return this.webhook.receive(command.params.request)
     }
 }

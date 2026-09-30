@@ -17,7 +17,6 @@ export class SkipOccurrenceHandler extends ICQRSHandler<SkipOccurrenceCommand, S
     }
 
     protected override async process(command: SkipOccurrenceCommand): Promise<SkipOccurrenceResult> {
-        const { request, principal } = command.params
-        return this.occurrences.skip({ id: request.occurrenceId, actorId: principal.id })
+        return this.occurrences.skip({ id: command.params.request.occurrenceId, actorId: command.params.principal.id })
     }
 }

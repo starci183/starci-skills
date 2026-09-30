@@ -17,7 +17,6 @@ export class PurgeLapsedSessionsHandler extends ICQRSHandler<PurgeLapsedSessions
     }
 
     protected override async process(command: PurgeLapsedSessionsCommand): Promise<PurgeLapsedSessionsResult> {
-        const { at } = command.params.request
-        return this.sessions.purgeLapsed({ at })
+        return this.sessions.purgeLapsed(command.params.request)
     }
 }

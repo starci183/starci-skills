@@ -20,7 +20,6 @@ export class GenerateRecurrencesHandler extends ICQRSHandler<GenerateRecurrences
     }
 
     protected override async process(command: GenerateRecurrencesCommand): Promise<GenerateRecurrencesResult> {
-        const { request } = command.params
-        return this.generator.generate({ at: request.at })
+        return this.generator.generate({ at: command.params.request.at })
     }
 }

@@ -68,7 +68,7 @@ export class PlanCheckoutService {
     }
 
     /** Returns the person to the free plan at once: accept and freeze, never refused, and no task is touched. */
-    async downgrade(params: DowngradeParams): Promise<DowngradeView> {
+    downgrade(params: DowngradeParams): Promise<DowngradeView> {
         return this.entityManager.transaction(async (manager) => {
             const current = await this.subscriptions.getOrCreate({ manager, personId: params.personId })
             const subscription = await this.subscriptions.downgrade({ manager, subscription: current })

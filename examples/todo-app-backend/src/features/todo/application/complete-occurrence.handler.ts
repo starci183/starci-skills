@@ -17,7 +17,6 @@ export class CompleteOccurrenceHandler extends ICQRSHandler<CompleteOccurrenceCo
     }
 
     protected override async process(command: CompleteOccurrenceCommand): Promise<CompleteOccurrenceResult> {
-        const { request, principal } = command.params
-        return this.occurrences.complete({ id: request.occurrenceId, actorId: principal.id })
+        return this.occurrences.complete({ id: command.params.request.occurrenceId, actorId: command.params.principal.id })
     }
 }

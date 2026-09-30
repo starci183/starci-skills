@@ -20,7 +20,6 @@ export class DispatchNotificationGroupHandler extends ICQRSHandler<
     }
 
     protected override async process(command: DispatchNotificationGroupCommand): Promise<DispatchNotificationGroupResult> {
-        const { eventId, kind, groupId } = command.params.request
-        return this.notify.dispatchOnce({ eventId, kind, groupId })
+        return this.notify.dispatchOnce(command.params.request)
     }
 }

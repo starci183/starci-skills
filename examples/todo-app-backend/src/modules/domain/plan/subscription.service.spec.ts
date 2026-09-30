@@ -235,7 +235,7 @@ describe("SubscriptionService", () => {
         it("downgrade returns a free, pending or lapsed subscription untouched and writes nothing", async () => {
             const { service } = await build()
             const manager = mockEntityManager()
-            const untouched: SubscriptionView[] = [subscriptionRow(), subscriptionRow({ status: "pending" }), subscriptionRow({ status: "lapsed" })]
+            const untouched: Array<SubscriptionView> = [subscriptionRow(), subscriptionRow({ status: "pending" }), subscriptionRow({ status: "lapsed" })]
 
             for (const subscription of untouched) {
                 await expect(service.downgrade({ manager, subscription })).resolves.toBe(subscription)
