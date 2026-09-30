@@ -3097,18 +3097,6 @@ HFS_PACKAGE_MANAGER_MIXED:
   owner: other-op:backend.scaffold
   kind: check-finding
 
-HFS_PATH_NO_SLOT:
-  title: "Path matches no HFS slot"
-  title_vi: "Đường dẫn không khớp ô nào của HFS"
-  meaning_vi: "Một tệp hoặc thư mục trong kho không thuộc ô nào trong bảng kê; mọi đường dẫn được theo dõi phải khớp đúng một ô. Bộ kiểm tra báo kèm ô gần nhất để biết tệp lẽ ra thuộc đâu."
-  causes_vi:
-    - "Tệp đặt sai chỗ, ví dụ một tệp không phải *.e2e-spec.ts nằm trong thư mục kiểm thử e2e"
-    - "Thư mục do kho tự đặt ở gốc hoặc trong src mà HFS không có ô cho nó"
-    - "Tên tệp hoặc thư mục viết sai so với mẫu của ô gần nhất"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển tệp vào ô gần nhất được báo hoặc xoá nó; nếu thực sự cần một loại nội dung mới thì đó là việc thêm ô vào bảng kê, do người giám sát làm, không phải kho tự thêm."
-  owner: op-retry
-  kind: check-finding
-
 HFS_README_BADGE_NOT_LIVE:
   title: "README badge is not a live service"
   title_vi: "Huy hiệu README không phải dịch vụ ngoài đang chạy"
@@ -3207,18 +3195,6 @@ HFS_REPO_UNREADABLE:
   nextStep_vi: "Trỏ --repo vào gốc một kho Git hợp lệ rồi chạy lại."
   owner: op-retry
   kind: input-invalid
-
-HFS_REQUIRED_MISSING:
-  title: "Required file or directory missing"
-  title_vi: "Thiếu tệp hoặc thư mục bắt buộc"
-  meaning_vi: "Một ô bắt buộc (hoặc một thực thể của ô, như một ứng dụng hay một tính năng) đòi có tệp hoặc thư mục này nhưng nó không nằm trong những gì Git theo dõi."
-  causes_vi:
-    - "Tính năng thiếu index.ts, tệp module hoặc thư mục application"
-    - "Ứng dụng thiếu main.ts, app.module.ts hoặc spec ghép ứng dụng"
-    - "Kho thiếu tệp gốc bắt buộc như README.md, hfs.json, .starciwork, .starcistacks"
-  nextStep_vi: "Tạo tệp hoặc thư mục theo mẫu của ô rồi commit; tệp chưa git add vẫn tính là thiếu. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
 
 HFS_ROOT_ENTRY_FORBIDDEN:
   title: "Root entry not on HFS allowlist"
@@ -3327,17 +3303,6 @@ HFS_STACKS_IN_FE:
     - "Sao chép nhầm thư mục stack từ backend sang"
     - "Worker tạo stack ở sai repo"
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải xóa thư mục khỏi repo giao diện và đặt khai báo ở backend."
-  owner: op-retry
-  kind: check-finding
-
-HFS_STACKS_PLAINTEXT:
-  title: "Plaintext secret under .starcistacks"
-  title_vi: "Bí mật dạng rõ nằm trong .starcistacks"
-  meaning_vi: "Một tệp được đưa vào commit trong .starcistacks là bí mật dạng rõ (.env, .pem, .key, .identity, .age) hoặc nằm trong secrets/ mà chưa được mã hóa thành <slug>.enc."
-  causes_vi:
-    - "Tệp .env hoặc khóa được git add nhầm"
-    - "Bí mật được đặt trong secrets/ nhưng chưa mã hóa"
-  nextStep_vi: "Mã hóa bí mật thành .starcistacks/<env>/secrets/<slug>.enc và gỡ bản rõ khỏi commit; Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
@@ -11994,23 +11959,26 @@ SEALED_FILE_IN_WORK:
 HFS_SLOT_UNDECLARED:
   title: "Every tracked path matches exactly one slot"
   title_vi: "Đường dẫn không thuộc ô nào"
-  meaning_vi: "Tệp `<path>` không thuộc slot nào của HFS. Chuyển nó vào slot đúng chủ, hoặc đề xuất slot mới (bump minor) — không thêm ngoại lệ."
+  meaning_vi: "Một tệp hoặc thư mục trong kho không thuộc ô nào trong bảng kê; mọi đường dẫn được theo dõi phải khớp đúng một ô. Bộ kiểm tra báo kèm ô gần nhất để biết tệp lẽ ra thuộc đâu."
   causes_vi:
-    - "Vi phạm luật R01: Mọi path được track phải khớp đúng một slot trong `knowledge/hfs/slots.yaml` (thay allowlist gốc)."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+    - "Vi phạm luật R01: mọi path được track phải khớp đúng một slot trong `knowledge/hfs/slots.yaml` (thay allowlist gốc)."
+    - "Tệp đặt sai chỗ, ví dụ một tệp không phải *.e2e-spec.ts nằm trong thư mục kiểm thử e2e"
+    - "Thư mục do kho tự đặt ở gốc hoặc trong src mà HFS không có ô cho nó"
+    - "Tên tệp hoặc thư mục viết sai so với mẫu của ô gần nhất"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển tệp vào ô gần nhất được báo hoặc xoá nó; nếu thực sự cần một loại nội dung mới thì đó là việc thêm ô vào bảng kê, do người giám sát làm, không phải kho tự thêm."
   owner: op-retry
   kind: check-finding
-
 HFS_SLOT_REQUIRED_MISSING:
   title: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`)"
   title_vi: "Ô thiếu tệp bắt buộc"
-  meaning_vi: "Slot `<slot>` tại `<dir>` thiếu tệp bắt buộc `<file>`."
+  meaning_vi: "Một ô bắt buộc (hoặc một thực thể của ô, như một ứng dụng hay một tính năng) đòi có tệp hoặc thư mục này nhưng nó không nằm trong những gì Git theo dõi."
   causes_vi:
-    - "Vi phạm luật R02: Slot bắt buộc thiếu tệp `requires` (vd feature thiếu `index.ts`, app thiếu composition spec, FE thiếu `global-error.tsx`)."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+    - "Vi phạm luật R02: slot bắt buộc thiếu tệp `requires` (vd feature thiếu `index.ts`, app thiếu composition spec, FE thiếu `global-error.tsx`)."
+    - "Ứng dụng thiếu main.ts, app.module.ts hoặc spec ghép ứng dụng"
+    - "Kho thiếu tệp gốc bắt buộc như README.md, hfs.json, .starciwork, .starcistacks"
+  nextStep_vi: "Tạo tệp hoặc thư mục theo mẫu của ô rồi commit; tệp chưa git add vẫn tính là thiếu. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
-
 HFS_UNTRACKED_ROOT_ENTRY:
   title: "No untracked or ignored entry outside an `ignored` slot"
   title_vi: "Mục lạ ở gốc kho"
@@ -12194,6 +12162,17 @@ HFS_FORMAT:
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
+
+HFS_FORMAT_TOOL_MISSING:
+  title: "The repository's own prettier is not installed"
+  title_vi: "Kho chưa cài prettier của chính nó"
+  meaning_vi: "Kiểm tra định dạng (R19) chạy prettier của chính kho. Kho chưa cài prettier nên không thể xác nhận định dạng, và trạng thái đó không bao giờ được tính là đạt."
+  causes_vi:
+    - "Chưa chạy `npm ci` trong kho"
+    - "prettier không nằm trong devDependencies của kho"
+  nextStep_vi: "Cài đúng phiên bản prettier ghi trong canon-pins.yaml (`npm ci`) rồi chạy lại `hfs check`."
+  owner: op-retry
+  kind: input-invalid
 
 HFS_DUPLICATE_CODE:
   title: "Duplicated code block"

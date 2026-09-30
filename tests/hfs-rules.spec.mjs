@@ -16,6 +16,8 @@ const validateSchema = new Ajv2020({ strict: false, allErrors: true, logger: fal
 
 const refusal = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code, `expected ${code}`);
 const doc = () => parseYaml(catalogText);
+/** The catalog with R01 owing its only enforcer: what the loader and the check must recognise as work still to do. */
+const withPlanned = (d) => { d.rules[0].enforcers = [{ kind: 'hfs', id: 'slot-undeclared', status: 'planned' }]; return d; };
 const load = (mutate) => { const d = doc(); mutate(d); return () => loadRuleCatalog({ text: JSON.stringify(d) }); };
 
 test('the shipped catalog is 1.0.0, validates against its JSON schema and loads with the slot manifest major', () => {
@@ -48,8 +50,10 @@ test('the loader answers by id, code, gate, enforcer and what is still owed', ()
   assert.equal(catalog.lintCode('starci-fe/no-inline-lint-config'), 'HFS_INLINE_SUPPRESSION');
   assert.equal(catalog.lintCode('starci-be/no-such-rule'), undefined);
   assert.equal(catalog.lintCode('other/error-home'), undefined);
+  const owed = loadRuleCatalog({ text: JSON.stringify(withPlanned(doc())) });
+  assert.deepEqual(owed.unbuilt().map((r) => r.id).slice(0, 1), ['R01'], 'a rule whose only enforcer is planned is unbuilt');
+  assert.ok(owed.planned().some((p) => p.rule === 'R01' && p.kind === 'hfs' && p.id === 'slot-undeclared'));
   const unbuilt = catalog.unbuilt().map((r) => r.id);
-  assert.ok(unbuilt.includes('R01'), 'R01 has only a planned enforcer');
   assert.ok(!unbuilt.includes('R12'), 'R12 is enforced by the architecture machine today');
   assert.ok(!unbuilt.includes('R58'), 'R58 is enforced by eslint-fe');
   assert.ok(catalog.planned().every((p) => p.rule && p.kind && p.id));
@@ -91,8 +95,9 @@ test('the loader also refuses what only semantics can see', () => {
   refusal(load((d) => { d.rules[0].gates = ['pre-push', 'settle']; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[5].gates = ['pre-commit', 'land', 'ci']; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].gates.push('sonar'); }), 'HFS_RULES_INVALID');
-  refusal(load((d) => { d.rules[0].enforcers[0].at = 'scripts/x.mjs'; }), 'HFS_RULES_INVALID');
-  refusal(load((d) => { d.rules[0].enforcers[0].status = undefined; }), 'HFS_RULES_INVALID');
+  const owing = (mutate) => load((d) => { withPlanned(d); mutate(d); });
+  refusal(owing((d) => { d.rules[0].enforcers[0].at = 'scripts/x.mjs'; }), 'HFS_RULES_INVALID');
+  refusal(owing((d) => { d.rules[0].enforcers[0].status = undefined; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].enforcers.push({ ...d.rules[0].enforcers[0] }); }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].law = 'one\ntwo'; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.schema = 'starci/hfs-rules@2'; }), 'HFS_RULES_INVALID');
@@ -174,7 +179,7 @@ test('a planned machine enforcer whose code a machine file already emits is stal
   const r26 = catalog.rule('R26');
   const planned = { ...catalog, rules: [{ ...r26, enforcers: r26.enforcers.map((e) => ({ kind: e.kind, id: e.id, planned: true })) }] };
   const emitters = { machine: [{ rel: 'scripts/checks/architecture/tiers.mjs', text: `ruleId: '${r26.code}'` }], hfs: [], 'work-validate': [] };
-  const stale = run(planned, { emitters });
+  const stale = run(planned, { emitters }).filter((f) => f.code === 'HFS_RULE_ENFORCER_STALE');
   assert.deepEqual(stale.map((f) => [f.code, f.rule]), [['HFS_RULE_ENFORCER_STALE', 'R26']]);
 });
 

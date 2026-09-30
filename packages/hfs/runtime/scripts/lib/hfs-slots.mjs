@@ -406,13 +406,13 @@ export function createSlotResolver(manifest, repo) {
 
   /**
    * status: owned | forbidden (external slot) | not-enabled (opt-in slot the repository did not declare) | ambiguous
-   * (two slots of equal specificity; a manifest gap) | no-slot (code HFS_PATH_NO_SLOT, with the nearest slot).
+   * (two slots of equal specificity; a manifest gap) | no-slot (code HFS_SLOT_UNDECLARED, with the nearest slot).
    */
   function classifyPath(input) {
     const p = clean(input);
     const { hit, ambiguous } = best(matches(p));
     if (ambiguous.length) return { path: p, status: 'ambiguous', candidates: ambiguous };
-    if (!hit) return { path: p, status: 'no-slot', code: 'HFS_PATH_NO_SLOT', nearest: nearest(p) };
+    if (!hit) return { path: p, status: 'no-slot', code: 'HFS_SLOT_UNDECLARED', nearest: nearest(p) };
     const { slot, root, bindings } = hit;
     const status = slot.presence === 'forbidden' ? 'forbidden' : (slotEnabled(slot) ? 'owned' : 'not-enabled');
     return { path: p, status, slot: slot.id, root, bindings, presence: slot.presence, tracking: slot.tracked, ...(status === 'forbidden' ? { goesTo: slot.goesTo } : {}) };
@@ -441,7 +441,7 @@ export function createSlotResolver(manifest, repo) {
 
   /**
    * Whether `fromPath` may import `toPath`: {allowed, reason, ...}. Reasons: sameOwner, untiered, crossApp,
-   * tierDirection, layerOrder, notPublicEntry, allowed, slotForbidden, slotNotEnabled, slotAmbiguous, and unowned (HFS_PATH_NO_SLOT for the path no slot owns).
+   * tierDirection, layerOrder, notPublicEntry, allowed, slotForbidden, slotNotEnabled, slotAmbiguous, and unowned (HFS_SLOT_UNDECLARED for the path no slot owns).
    * Cycles are a graph property and belong to the architecture check, not to one edge.
    */
   function importAllowed(fromPath, toPath) {

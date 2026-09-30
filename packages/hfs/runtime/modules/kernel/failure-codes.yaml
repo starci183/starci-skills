@@ -492,6 +492,16 @@ BE_SQL_TABLE_OWNER:
   owner: op-retry
   kind: check-finding
 
+BE_TEST_TOPOLOGY:
+  title: "One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`"
+  title_vi: "Cấu hình test lệch chuẩn"
+  meaning_vi: "Cấu hình test lệch chuẩn: `<detail>`."
+  causes_vi:
+    - "Vi phạm luật R47: Một `jest.config.js` (preset `@starci/jest-preset`), đúng hai project `unit`, `e2e`; unit không map gì vào `src/tests/e2e`; `diagnostics: false` + `isolatedModules: true`; `test:e2e` = `typecheck:e2e && jest --selectProjects e2e`; live lọc theo thư mục `live/`; không `testing/` trong `src/modules`; fixtures không import feature."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 BE_TIER_DIRECTION:
   title: "Backend import against the tier direction"
   title_vi: "Backend import ngược chiều tầng"
@@ -611,6 +621,26 @@ FE_HREF_RESOLVES:
     - "Route đã bị xoá hoặc chưa được tạo"
     - "Thiếu một tham số động trong đường dẫn so với cấu trúc thư mục route"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa liên kết cho khớp route thật hoặc tạo route còn thiếu; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_I18N_CATALOG:
+  title: "Same keys in every catalog, real catalog in specs, `pick` for clients"
+  title_vi: "Catalog ngôn ngữ lệch key"
+  meaning_vi: "Catalog `<locale>` thiếu/thừa key `<k>`."
+  causes_vi:
+    - "Vi phạm luật R60: Catalog các locale cùng tập key; không key thừa/thiếu; spec dùng catalog thật (không mock `useTranslations` trả key); catalog tách namespace, client chỉ nhận `pick`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_I18N_PLACEMENT:
+  title: "`next-intl`, `[locale]`, `modules/i18n/`"
+  title_vi: "i18n sai chuẩn next-intl"
+  meaning_vi: "i18n của app `<a>` không theo chuẩn (`<detail>`)."
+  causes_vi:
+    - "Vi phạm luật R59: `next-intl`, segment `[locale]`, `modules/i18n/{config,routing,navigation,request}.ts` + `modules/i18n/messages/<locale>.json`; app một ngôn ngữ vẫn dùng next-intl với một locale."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
@@ -789,6 +819,16 @@ FE_TRANSPORT_OWNER:
   owner: op-retry
   kind: check-finding
 
+FE_WIRE_GENERATED:
+  title: "Wire types generated from the contract copy"
+  title_vi: "Kiểu wire gõ tay"
+  meaning_vi: "`<file>` tự gõ kiểu wire/ép kiểu phản hồi. Dùng kiểu sinh từ `contract/`."
+  causes_vi:
+    - "Vi phạm luật R52: Kiểu wire sinh từ bản hợp đồng (`codegen`); tài liệu GraphQL trong `.graphql`; cấm `as GraphqlResult<T>`; enum wire không phải `string`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
 FE_WORLD_OWNER_RENDER_BOUNDARY:
   title: "World-state owner renders inline"
   title_vi: "Nơi giữ trạng thái sản phẩm tự render trực tiếp"
@@ -855,6 +895,26 @@ HFS_CANON_PIN_DRIFT:
   owner: op-retry
   kind: check-finding
 
+HFS_CI_MISSING_CANON:
+  title: "CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint"
+  title_vi: "CI thiếu bước canon"
+  meaning_vi: "Workflow/husky thiếu bước `<step>`. Cấu trúc chỉ được kiểm khi agent chạy — CI phải tự kiểm."
+  causes_vi:
+    - "Vi phạm luật R13: CI phải chạy `npx @starci/hfs check` (bản pin); pre-push phải có `typecheck` + `lint:check`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_CONTRACT_SNAPSHOT_DRIFT:
+  title: "Contract snapshot equals the emit, the FE copy equals the BE"
+  title_vi: "Bản hợp đồng lệch bản thật"
+  meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `contract:emit` (BE) / `contract:pull` (FE)."
+  causes_vi:
+    - "Vi phạm luật R23: BE: `contracts/<app>/schema.graphql` bằng bản emit. FE: `modules/api/contract/*` bằng bản BE (so hash)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_DECLARATION_INVALID:
   title: "hfs.json missing or invalid"
   title_vi: "hfs.json thiếu hoặc sai định dạng"
@@ -865,6 +925,16 @@ HFS_DECLARATION_INVALID:
     - "optionalSlots ghi một ô không phải loại tuỳ chọn, hoặc ghi một ô mà loại ứng dụng đã tự bật"
     - "Thiếu loại ứng dụng bắt buộc, ví dụ chưa khai ứng dụng api hoặc chưa khai ứng dụng migrate dù đã khai kết nối cơ sở dữ liệu"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa hfs.json theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DEP_VERSION_SKEW:
+  title: "One version per dependency in the workspace"
+  title_vi: "Một gói nhiều phiên bản"
+  meaning_vi: "`<pkg>` có `<n>` version trong workspace (`<list>`). Chỉ được một."
+  causes_vi:
+    - "Vi phạm luật R14: Mỗi dependency một version trong workspace; cấm bản sao lồng thứ hai (`apps/*/node_modules/@starci/grammar`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
@@ -924,12 +994,43 @@ HFS_FORBIDDEN_PRESENT:
   owner: op-retry
   kind: check-finding
 
+HFS_FORMAT:
+  title: "Prettier is the only formatter"
+  title_vi: "Chưa format bằng Prettier"
+  meaning_vi: "`<file>` chưa được format. Chạy `npm run format`."
+  causes_vi:
+    - "Vi phạm luật R19: Prettier (config `@starci/prettier-config`) là formatter duy nhất; ESLint không còn luật định dạng."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_FORMAT_TOOL_MISSING:
+  title: "The repository's own prettier is not installed"
+  title_vi: "Kho chưa cài prettier của chính nó"
+  meaning_vi: "Kiểm tra định dạng (R19) chạy prettier của chính kho. Kho chưa cài prettier nên không thể xác nhận định dạng, và trạng thái đó không bao giờ được tính là đạt."
+  causes_vi:
+    - "Chưa chạy `npm ci` trong kho"
+    - "prettier không nằm trong devDependencies của kho"
+  nextStep_vi: "Cài đúng phiên bản prettier ghi trong canon-pins.yaml (`npm ci`) rồi chạy lại `hfs check`."
+  owner: op-retry
+  kind: input-invalid
+
 HFS_GHOST_TREE:
   title: "No empty directory beside a near-identical sibling"
   title_vi: "Cây thư mục ma cạnh thư mục gần trùng tên"
   meaning_vi: "Có thư mục rỗng mà tên chỉ khác vài ký tự so với thư mục anh em cùng cấp (thông báo nêu cả hai), tức là bản đổi tên hoặc gõ sai của cùng một cấu trúc chưa được dọn. Giữ bản có tệp, xóa bản rỗng."
   causes_vi:
     - "Vi phạm luật R03: đổi tên cấu trúc để lại bản cũ hoặc bản gõ sai (vd `business` và `bussiness`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_GITIGNORE_BLOCK_DRIFT:
+  title: "The managed `.gitignore` block equals its render"
+  title_vi: "Khối .gitignore lệch bản render"
+  meaning_vi: "Khối .gitignore chuẩn đã bị sửa tay hoặc thiếu dòng `<rule>`. Chạy `hfs sync`."
+  causes_vi:
+    - "Vi phạm luật R04: Khối `.gitignore` do `.claude` quản lý phải trùng bản render (never-tracked list, deny `.env*`, cache)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -1031,16 +1132,14 @@ HFS_PACKAGE_MANAGER_MIXED:
   owner: other-op:backend.scaffold
   kind: check-finding
 
-HFS_PATH_NO_SLOT:
-  title: "Path matches no HFS slot"
-  title_vi: "Đường dẫn không khớp ô nào của HFS"
-  meaning_vi: "Một tệp hoặc thư mục trong kho không thuộc ô nào trong bảng kê; mọi đường dẫn được theo dõi phải khớp đúng một ô. Bộ kiểm tra báo kèm ô gần nhất để biết tệp lẽ ra thuộc đâu."
+HFS_PLAINTEXT_SECRET:
+  title: "Secrets exist only as `.starcistacks/<env>/secrets/<slug>.enc`"
+  title_vi: "Bí mật dạng rõ trong kho"
+  meaning_vi: "Tìm thấy bí mật dạng rõ ở `<path>`. Bí mật chỉ được nằm ở `.starcistacks/<env>/secrets/<slug>.enc` (sops). Không đọc, không in giá trị."
   causes_vi:
-    - "Tệp đặt sai chỗ, ví dụ một tệp không phải *.e2e-spec.ts nằm trong thư mục kiểm thử e2e"
-    - "Thư mục do kho tự đặt ở gốc hoặc trong src mà HFS không có ô cho nó"
-    - "Tên tệp hoặc thư mục viết sai so với mẫu của ô gần nhất"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển tệp vào ô gần nhất được báo hoặc xoá nó; nếu thực sự cần một loại nội dung mới thì đó là việc thêm ô vào bảng kê, do người giám sát làm, không phải kho tự thêm."
-  owner: op-retry
+    - "Vi phạm luật R06: Bí mật chỉ tồn tại ở `.starcistacks/<env>/secrets/<slug>.enc`. Mọi `.env*`, `.secrets/`, `*.key\\|*.pem` plaintext, `runtime/files/*` đều bị từ chối, kể cả khi ignore."
+  nextStep_vi: "Không đọc và không in giá trị. Chủ kho mã hoá bí mật bằng sops vào .starcistacks/<môi-trường>/secrets/<slug>.enc, sau đó xoá tệp rõ; agent không tạo hay xoay khoá."
+  owner: owner
   kind: check-finding
 
 HFS_README_BADGE_NOT_LIVE:
@@ -1154,18 +1253,6 @@ HFS_REQUIRED_FILE_MISSING:
   owner: op-retry
   kind: check-finding
 
-HFS_REQUIRED_MISSING:
-  title: "Required file or directory missing"
-  title_vi: "Thiếu tệp hoặc thư mục bắt buộc"
-  meaning_vi: "Một ô bắt buộc (hoặc một thực thể của ô, như một ứng dụng hay một tính năng) đòi có tệp hoặc thư mục này nhưng nó không nằm trong những gì Git theo dõi."
-  causes_vi:
-    - "Tính năng thiếu index.ts, tệp module hoặc thư mục application"
-    - "Ứng dụng thiếu main.ts, app.module.ts hoặc spec ghép ứng dụng"
-    - "Kho thiếu tệp gốc bắt buộc như README.md, hfs.json, .starciwork, .starcistacks"
-  nextStep_vi: "Tạo tệp hoặc thư mục theo mẫu của ô rồi commit; tệp chưa git add vẫn tính là thiếu. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
 HFS_ROOT_ENTRY_FORBIDDEN:
   title: "Root entry not on HFS allowlist"
   title_vi: "Mục ở thư mục gốc không được phép"
@@ -1264,6 +1351,31 @@ HFS_SLOT_NOT_ENABLED:
   owner: op-retry
   kind: check-finding
 
+HFS_SLOT_REQUIRED_MISSING:
+  title: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`)"
+  title_vi: "Ô thiếu tệp bắt buộc"
+  meaning_vi: "Một ô bắt buộc (hoặc một thực thể của ô, như một ứng dụng hay một tính năng) đòi có tệp hoặc thư mục này nhưng nó không nằm trong những gì Git theo dõi."
+  causes_vi:
+    - "Vi phạm luật R02: slot bắt buộc thiếu tệp `requires` (vd feature thiếu `index.ts`, app thiếu composition spec, FE thiếu `global-error.tsx`)."
+    - "Ứng dụng thiếu main.ts, app.module.ts hoặc spec ghép ứng dụng"
+    - "Kho thiếu tệp gốc bắt buộc như README.md, hfs.json, .starciwork, .starcistacks"
+  nextStep_vi: "Tạo tệp hoặc thư mục theo mẫu của ô rồi commit; tệp chưa git add vẫn tính là thiếu. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SLOT_UNDECLARED:
+  title: "Every tracked path matches exactly one slot"
+  title_vi: "Đường dẫn không thuộc ô nào"
+  meaning_vi: "Một tệp hoặc thư mục trong kho không thuộc ô nào trong bảng kê; mọi đường dẫn được theo dõi phải khớp đúng một ô. Bộ kiểm tra báo kèm ô gần nhất để biết tệp lẽ ra thuộc đâu."
+  causes_vi:
+    - "Vi phạm luật R01: mọi path được track phải khớp đúng một slot trong `knowledge/hfs/slots.yaml` (thay allowlist gốc)."
+    - "Tệp đặt sai chỗ, ví dụ một tệp không phải *.e2e-spec.ts nằm trong thư mục kiểm thử e2e"
+    - "Thư mục do kho tự đặt ở gốc hoặc trong src mà HFS không có ô cho nó"
+    - "Tên tệp hoặc thư mục viết sai so với mẫu của ô gần nhất"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển tệp vào ô gần nhất được báo hoặc xoá nó; nếu thực sự cần một loại nội dung mới thì đó là việc thêm ô vào bảng kê, do người giám sát làm, không phải kho tự thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_SONAR_CONFIG:
   title: "Sonar config is generated, with no host URL and matching coverage exclusions"
   title_vi: "Cấu hình Sonar lệch"
@@ -1294,6 +1406,16 @@ HFS_STACKS_IN_FE:
     - "Sao chép nhầm thư mục stack từ backend sang"
     - "Worker tạo stack ở sai repo"
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải xóa thư mục khỏi repo giao diện và đặt khai báo ở backend."
+  owner: op-retry
+  kind: check-finding
+
+HFS_STACKS_SHAPE:
+  title: "`.starcistacks` has the standard shape and the host Sonar owner"
+  title_vi: "Hình dạng .starcistacks sai"
+  meaning_vi: "`.starcistacks` có `<path>` ngoài hình dạng chuẩn (hoặc còn trỏ `.stacks`)."
+  causes_vi:
+    - "Vi phạm luật R10: `.starcistacks/<env>/` chỉ có `README.md`, `environment.json`, `infra/{compose,k8s,terraform}`, `runtime/{config,env}`, `secrets/`, `seeds/`; khối sonar là `owner: host` trỏ `.claude/ext/sonar`; không còn gốc `.stacks`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 

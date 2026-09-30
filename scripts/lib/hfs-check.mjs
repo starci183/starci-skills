@@ -22,7 +22,7 @@
 //   HFS_CONTRACT_SNAPSHOT_DRIFT   (R23, hfs-rules/contract.mjs) an uncommitted back-end snapshot, or a front-end copy that differs from it
 //   BE_TEST_TOPOLOGY              (R47, hfs-rules/test-topology.mjs) a `.test` file, a testing/ folder, a second jest configuration
 //   FE_WIRE_GENERATED, FE_I18N_PLACEMENT, FE_I18N_CATALOG   (R52, R59, R60, hfs-rules/frontend.mjs) the front-end tree of each app
-//   HFS_GITIGNORE_BLOCK_DRIFT, HFS_SONAR_CONFIG   (R04, R11) produced by packages/hfs/sync/rendered.mjs, which renders the templates
+//   HFS_GITIGNORE_BLOCK_DRIFT, HFS_SONAR_CONFIG   (R04, R11) produced by packages/hfs/sync/managed.mjs, which renders the templates
 //   HFS_FORMAT                    (R19) produced by packages/hfs/sync/format.mjs, which runs the repository's own prettier
 //                                 both are passed in as `extraFindings`: this module reads no template and starts no tool
 //   HFS_CANON_PIN_DRIFT           a dependency whose declared version is not the pinned one

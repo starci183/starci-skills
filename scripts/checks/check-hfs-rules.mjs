@@ -43,7 +43,7 @@ export const RULES_README = 'knowledge/hfs/README.md';
 /** The files each check family's findings come from: a code spelled as a string literal in one of them is emitted. */
 export const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/checks/architecture.mjs', 'scripts/checks/architecture'],
-  hfs: ['scripts/lib/hfs-check.mjs', 'scripts/lib/hfs-slots.mjs', 'packages/hfs/bin', 'packages/hfs/sync'],
+  hfs: ['scripts/lib/hfs-check.mjs', 'scripts/lib/hfs-rules', 'scripts/lib/hfs-slots.mjs', 'packages/hfs/bin', 'packages/hfs/sync'],
   'work-validate': ['scripts/checks/work-validate.mjs', 'scripts/checks/check-example-work.mjs', 'scripts/checks/check-work-artifacts.mjs'],
 });
 /** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */

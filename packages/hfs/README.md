@@ -18,16 +18,16 @@ npx hfs work-hygiene                              # pre-commit guard for staged 
 whole architecture machine over the repository. Every finding carries a why code and its Vietnamese text
 (`modules/kernel/failure-codes.yaml`).
 
-Its own checks:
+Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rendered-file checks (`sync/managed.mjs`) and the prettier check (`sync/format.mjs`) live in `sync/` because they read the templates and the repository's own install, and reach `hfs check` as `extraFindings`; the jest / vitest preset the coverage exclusions come from and prettier are read from the repository's `node_modules`, so run `npm ci` first):
 
 | Code | Level | Meaning |
 |---|---|---|
-| `HFS_PATH_NO_SLOT` | error | a tracked path no slot owns (the nearest slot is named) |
+| `HFS_SLOT_UNDECLARED` | error | a tracked path no slot owns (the nearest slot is named) |
 | `HFS_SLOT_NOT_ENABLED` | error | a path in an opt-in slot `hfs.json` did not declare |
 | `HFS_SLOT_AMBIGUOUS` | error | two slots own the path equally (a manifest gap) |
 | `HFS_TRACKED_MUST_BE_IGNORED` | error | a tracked path in an `ignored` slot (build output, generated) |
 | `HFS_FORBIDDEN_PRESENT` | error | a tracked path in a forbidden / `external` slot |
-| `HFS_REQUIRED_MISSING` | error | a file or directory a required slot, app or instance must contain |
+| `HFS_SLOT_REQUIRED_MISSING` | error | a file or directory a required slot, app or instance must contain |
 | `HFS_MIN_INSTANCES` | error | fewer instances of a slot than `minInstances` |
 | `HFS_CANON_PIN_DRIFT` | error | a dependency not at the exact version of `knowledge/hfs/canon-pins.yaml` |
 | `HFS_SIZE_SOFT_BACKLOG` | info | a source file over `ruleParams.fileLines.soft`; report only, never fails |
@@ -39,6 +39,19 @@ Its own checks:
 | `HFS_EMPTY_DIR` | error | a directory with no file below it (git tracks none), outside `.git`, `node_modules` and `ignored` slots; the topmost one is reported |
 | `HFS_GHOST_TREE` | error | an empty directory beside a sibling whose name is within two edits of its own (`business` / `bussiness`) |
 | `HFS_UNTRACKED_ROOT_ENTRY` | error | an entry git neither tracks nor ignores (`git ls-files -o --exclude-standard`), outside an `ignored` slot |
+| `HFS_PLAINTEXT_SECRET` | error | a tracked plaintext secret: an env, key or credentials file, a value the push scan refuses (never printed), or an `.enc` that is no sops envelope (R06) |
+| `HFS_STACKS_SHAPE` | error | a `.starcistacks` path outside the standard shape (a sealed file outside `<env>/secrets/`, `runtime/files/`, root `DESIGN.md` or `k8s/`), a local Sonar not owned by the host, a service still rooted at `.stacks` (R10) |
+| `HFS_CI_MISSING_CANON` | error | `ci.yml` without a `run: npx hfs check` step (whole check, pinned version), or `.husky/pre-push` without `npm run typecheck` and `npm run lint:check` (R13) |
+| `HFS_DEP_VERSION_SKEW` | error | a dependency at two specs across the root and workspace `package.json` files, or a nested copy of a declared dependency in `package-lock.json` (R14) |
+| `HFS_CONTRACT_SNAPSHOT_DRIFT` | error / info | a back end serving GraphQL without `contracts/<app>/schema.graphql`, a front-end contract copy that differs by hash from the sibling back end named by `hfs.json` `stacks` (info when the sibling is not checked out) (R23) |
+| `BE_TEST_TOPOLOGY` | error | a `*.test.*` file, a `testing/` folder, a second jest configuration or a `jest` key in `package.json` (R47; `int-spec`, `harness-spec` and the retired test folders are the machine's `HFS_TEST_KIND_RETIRED`) |
+| `FE_WIRE_GENERATED` | error | a contract copy with no `codegen` script wired before `build` and `typecheck`, or generated types older than the copy (R52) |
+| `FE_I18N_PLACEMENT` | error | no `next-intl`, no `src/proxy.ts`, a `middleware.ts`, a route file outside `[locale]`, no `vi.json` catalog (R59) |
+| `FE_I18N_CATALOG` | error | a locale catalog lacking a key another locale has (R60) |
+| `HFS_GITIGNORE_BLOCK_DRIFT` | error | the managed `.gitignore` block differs from its render (R04; `sync/managed.mjs`) |
+| `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render: no `sonar.host.url`, the coverage exclusions of the installed jest / vitest preset (R11; `sync/managed.mjs`) |
+| `HFS_FORMAT` | error | a tracked file the repository's own prettier would change (R19; `sync/format.mjs`, not under `--fast`) |
+| `HFS_FORMAT_TOOL_MISSING` | refusal (exit 2) | prettier is not installed in the repository; the format check is never skipped |
 
 The managed files are judged by `sync/managed.mjs` and `sync/ts-strict.mjs` (the package renders the templates; the runtime copy does not). The list of managed
 files is the `managedBy` slots of `slots.yaml`; `hfs sync --write` renders them and `hfs check` compares them, so a hand edit and a forgotten `sync` are the same finding.

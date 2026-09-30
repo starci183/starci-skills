@@ -39,8 +39,8 @@ const withFiles = (t, files) => {
   }
   return root;
 };
-const inAutomaticGate = (root, kinds) => checkHfs({ root, kinds }).violations
-  .filter(item => item.ruleId === 'HFS_E2E_IN_AUTOMATIC_GATE').map(item => `${item.path}: ${item.message.replace(item.path, '~').split('. ')[0].replace(/\.$/u, '')}`).sort();
+const inAutomaticGate = (root, kinds) => checkHfs({ root, kinds }).violations.filter(item => item.ruleId === 'HFS_E2E_IN_AUTOMATIC_GATE')
+  .map(item => `${item.path}: ${item.message.replace(item.path, '~').split('. ')[0].replace(/\.$/u, '')}`).sort();
 const CLEAN_BACKEND = {
   'src/tests/e2e/a.e2e-spec.ts': 'export {}',
   'tsconfig.json': JSON.stringify({ include: ['src/**/*'], exclude: ['src/tests/e2e/**'] }),

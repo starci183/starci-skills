@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { archFixture, findings, gitCommit, runArch } from './_hfs-arch-fixture.mjs';
 
 // HFS check 6 (HFS_SIZE_GROWTH): ruleParams.be.fileLines.soft is 500 in the shipped manifest.
+const SIZE_GROWTH = 'HFS_SIZE_GROWTH';
 const BIG = 'src/modules/domain/alpha/alpha.service.ts';
 const lines = (count, tag = 'a') => `${Array.from({ length: count }, (_, i) => `export const ${tag}${i} = ${i};`).join('\n')}\n`;
 
@@ -16,7 +17,7 @@ function rewrite(root, relative, content) {
 }
 const growth = (root, base) => {
   const report = runArch(root, { base });
-  return { report, hits: findings(report, 'HFS_SIZE_GROWTH'), coverage: report.coverage.hfsMachine.sizeGrowth };
+  return { report, hits: findings(report, SIZE_GROWTH), coverage: report.coverage.hfsMachine.sizeGrowth };
 };
 
 test('an over-soft file that grows fails, with the base line count', (t) => {
@@ -25,6 +26,7 @@ test('an over-soft file that grows fails, with the base line count', (t) => {
   rewrite(root, BIG, lines(530));
   const { hits, coverage } = growth(root, base);
   assert.equal(hits.length, 1);
+  assert.equal(hits[0].ruleId, SIZE_GROWTH);
   assert.equal(hits[0].path, BIG);
   assert.equal(hits[0].lines, 530);
   assert.equal(hits[0].baseLines, 520);
@@ -41,8 +43,9 @@ test('an over-soft file that shrinks or stays unchanged passes', (t) => {
   const base = gitCommit(root);
   assert.equal(growth(root, base).hits.length, 0);
   rewrite(root, BIG, lines(510));
-  const { hits, coverage } = growth(root, base);
+  const { report, hits, coverage } = growth(root, base);
   assert.equal(hits.length, 0);
+  assert.deepEqual(report.violations.filter((violation) => violation.ruleId === SIZE_GROWTH), []);
   assert.equal(coverage.overSoft, 1);
   assert.equal(coverage.grown, 0);
 });

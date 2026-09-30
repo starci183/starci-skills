@@ -38,18 +38,18 @@ rules:
     law: "Every tracked path matches exactly one slot."
     kinds: [check]
     gates: [pre-push, settle, land, ci]
-    failureCodes: ["HFS_SLOT_UNDECLARED"]
+    failureCodes: ["HFS_SLOT_UNDECLARED", "HFS_SLOT_AMBIGUOUS", "HFS_SLOT_NOT_ENABLED", "HFS_FORBIDDEN_PRESENT", "HFS_TRACKED_MUST_BE_IGNORED"]
     enforcers:
-      - {kind: hfs, id: slot-undeclared, status: planned}
+      - {kind: hfs, id: slot-undeclared, at: scripts/lib/hfs-check.mjs}
   - id: R02
     code: "HFS_SLOT_REQUIRED_MISSING"
     title_vi: "Ô thiếu tệp bắt buộc"
     law: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`)."
     kinds: [check, codemod]
     gates: [settle, land, ci]
-    failureCodes: ["HFS_SLOT_REQUIRED_MISSING"]
+    failureCodes: ["HFS_SLOT_REQUIRED_MISSING", "HFS_MIN_INSTANCES"]
     enforcers:
-      - {kind: hfs, id: slot-required-missing, status: planned}
+      - {kind: hfs, id: slot-required-missing, at: scripts/lib/hfs-check.mjs}
   - id: R03
     code: "HFS_UNTRACKED_ROOT_ENTRY"
     title_vi: "Mục lạ ở gốc kho"
@@ -67,7 +67,7 @@ rules:
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_GITIGNORE_BLOCK_DRIFT"]
     enforcers:
-      - {kind: hfs, id: gitignore-block-drift, status: planned}
+      - {kind: hfs, id: gitignore-block-drift, at: packages/hfs/sync/managed.mjs}
   - id: R05
     code: "HFS_MANAGED_FILE_DRIFT"
     title_vi: "Tệp do .claude quản lý bị lệch"
@@ -85,7 +85,8 @@ rules:
     gates: [pre-commit, pre-push, land, ci]
     failureCodes: ["HFS_PLAINTEXT_SECRET"]
     enforcers:
-      - {kind: hfs, id: plaintext-secret, status: planned}
+      - {kind: hfs, id: plaintext-secret, at: scripts/lib/hfs-rules/secrets.mjs}
+      - {kind: hfs, id: plaintext-secret-staged, at: packages/hfs/sync/hygiene.mjs}
   - id: R07
     code: "HFS_AGENT_DATA_TRACKED"
     title_vi: "Dữ liệu của agent bị track"
@@ -122,7 +123,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["HFS_STACKS_SHAPE"]
     enforcers:
-      - {kind: hfs, id: stacks-shape, status: planned}
+      - {kind: hfs, id: stacks-shape, at: scripts/lib/hfs-rules/stacks.mjs}
   - id: R11
     code: "HFS_SONAR_CONFIG"
     title_vi: "Cấu hình Sonar lệch"
@@ -150,7 +151,7 @@ rules:
     failureCodes: ["HFS_CI_MISSING_CANON", "HFS_HOOKS_PATH_REDIRECTED"]
     enforcers:
       - {kind: machine, id: hooks-path-not-redirected, at: scripts/checks/architecture/hfs.mjs}
-      - {kind: hfs, id: ci-missing-canon, status: planned}
+      - {kind: hfs, id: ci-missing-canon, at: scripts/lib/hfs-rules/pipeline.mjs}
   - id: R14
     code: "HFS_DEP_VERSION_SKEW"
     title_vi: "Một gói nhiều phiên bản"
@@ -159,7 +160,7 @@ rules:
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_DEP_VERSION_SKEW"]
     enforcers:
-      - {kind: hfs, id: dep-version-skew, status: planned}
+      - {kind: hfs, id: dep-version-skew, at: scripts/lib/hfs-rules/deps.mjs}
   - id: R15
     code: "HFS_CANON_PIN_DRIFT"
     title_vi: "Phiên bản canon lệch bản pin"
@@ -207,18 +208,18 @@ rules:
     gates: [pre-commit, pre-push, land, ci]
     failureCodes: ["HFS_FORMAT"]
     enforcers:
-      - {kind: hfs, id: format, status: planned}
+      - {kind: hfs, id: format, at: packages/hfs/sync/format.mjs}
   - id: R20
     code: "HFS_SIZE_GROWTH"
     title_vi: "Tệp vượt ngân sách còn phình thêm"
     law: "Over-budget files do not grow; new files are inside budget."
     kinds: [check, design]
     gates: [land, ci, sonar]
-    failureCodes: ["HFS_SIZE_GROWTH"]
+    failureCodes: ["HFS_SIZE_GROWTH", "HFS_SIZE_SOFT_BACKLOG"]
     enforcers:
       - {kind: eslint-be, id: file-size-growth}
       - {kind: eslint-fe, id: file-size-growth}
-      - {kind: hfs, id: size-growth, status: planned}
+      - {kind: machine, id: size-growth, at: scripts/checks/architecture/size-growth.mjs}
       - {kind: sonar, id: cognitive-complexity, at: knowledge/sonar-gate.yaml}
   - id: R21
     code: "HFS_DUPLICATE_CODE"
@@ -252,7 +253,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["HFS_CONTRACT_SNAPSHOT_DRIFT"]
     enforcers:
-      - {kind: hfs, id: contract-snapshot-drift, status: planned}
+      - {kind: hfs, id: contract-snapshot-drift, at: scripts/lib/hfs-rules/contract.mjs}
   - id: R24
     code: "HFS_ARCH_CONFIG_UNREAD"
     title_vi: "Máy kiến trúc không đọc được hfs.json"
@@ -494,9 +495,10 @@ rules:
     law: "One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`; ONE e2e world (`src/tests/e2e/world`: global-setup runs `apps/migrate` once, `useE2eWorld({ apps })` gives `world.apps.<name>.api`, `world.db.<connection>`, `world.fake`, `world.waitFor`) owns containers, DataSource, migrations and `process.env`; an e2e spec never imports or does any of them, and e2e fakes only external services (integration tokens), never a first-party app, module or provider."
     kinds: [check, codemod]
     gates: [land, ci]
-    failureCodes: ["BE_TEST_TOPOLOGY"]
+    failureCodes: ["BE_TEST_TOPOLOGY", "HFS_TEST_KIND_RETIRED"]
     enforcers:
-      - {kind: hfs, id: test-topology, status: planned}
+      - {kind: hfs, id: test-topology, at: scripts/lib/hfs-rules/test-topology.mjs}
+      - {kind: machine, id: test-kind-retired, at: scripts/checks/architecture/hfs.mjs}
       - {kind: eslint-be, id: unit-test-colocated}
       - {kind: eslint-be, id: e2e-no-schema-work}
       - {kind: eslint-be, id: e2e-fakes-external-only}
@@ -564,7 +566,7 @@ rules:
     failureCodes: ["FE_WIRE_GENERATED"]
     enforcers:
       - {kind: eslint-fe, id: no-hand-typed-wire}
-      - {kind: hfs, id: wire-generated, status: planned}
+      - {kind: hfs, id: wire-generated, at: scripts/lib/hfs-rules/frontend.mjs}
   - id: R53
     code: "FE_ERROR_BOUNDARY_MISSING"
     title_vi: "Thiếu error boundary"
@@ -643,7 +645,7 @@ rules:
       - {kind: eslint-fe, id: navigation-from-intl}
       - {kind: eslint-fe, id: no-native-anchor}
       - {kind: eslint-fe, id: use-intl-formatter}
-      - {kind: hfs, id: i18n-placement, status: planned}
+      - {kind: hfs, id: i18n-placement, at: scripts/lib/hfs-rules/frontend.mjs}
   - id: R60
     code: "FE_I18N_CATALOG"
     title_vi: "Catalog ngôn ngữ lệch key"
@@ -653,7 +655,7 @@ rules:
     failureCodes: ["FE_I18N_CATALOG"]
     enforcers:
       - {kind: eslint-fe, id: no-mocked-translations}
-      - {kind: hfs, id: i18n-catalog, status: planned}
+      - {kind: hfs, id: i18n-catalog, at: scripts/lib/hfs-rules/frontend.mjs}
   - id: R61
     code: "FE_STYLE_TOKEN_ONLY"
     title_vi: "CSS ngoài token"
