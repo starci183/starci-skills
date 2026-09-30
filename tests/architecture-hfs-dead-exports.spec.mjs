@@ -127,3 +127,21 @@ test('an export used only by a spec is dead', t => {
   });
   assert.deepEqual(dead(runArch(root), X), ['onlySpec']);
 });
+
+// Exception: a service unit spec and a fixture builder count as consumers (a spec can only provide a token the entry exports).
+const CONSUMER_FILES = {
+  [X]: 'export const TOKEN = 1;\nexport type Params = { a: number };\nexport const nobody = 2;\nexport const onlyE2e = 3;\n',
+  'src/features/a/a.service.spec.ts': "import { TOKEN } from '../../modules/domain/x';\nit('uses', () => { expect(TOKEN).toBe(1); });\n",
+  'src/tests/fixtures/builders/x.builder.ts': "import type { Params } from '../../../modules/domain/x';\nexport const build = (): Params => ({ a: 1 });\n",
+  'src/tests/e2e/x/x.e2e-spec.ts': "import { onlyE2e } from '../../../modules/domain/x';\nit('uses', () => { expect(onlyE2e).toBe(3); });\n",
+};
+
+test('HFS_UNUSED_EXPORT: an export used only by a service spec or a fixture builder passes; one used by nobody, or only by an e2e spec, still fails', t => {
+  const report = runArch(archFixture(t, { files: CONSUMER_FILES }));
+  assert.deepEqual(dead(report, X), ['nobody', 'onlyE2e']);
+});
+
+test('HFS_UNUSED_EXPORT: a spec of another kind does not count as a consumer', t => {
+  const files = { ...CONSUMER_FILES, 'src/features/a/a.handler.spec.ts': "import { nobody } from '../../modules/domain/x';\nit('uses', () => { expect(nobody).toBe(2); });\n" };
+  assert.deepEqual(dead(runArch(archFixture(t, { files })), X), ['nobody', 'onlyE2e']);
+});

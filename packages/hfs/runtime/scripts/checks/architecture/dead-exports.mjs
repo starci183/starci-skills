@@ -16,10 +16,15 @@
  * namespace import, `import x = require`, a dynamic import()/require(), an `export *` or `export * as` of the entry make
  * every name used. A file outside the owner that re-exports the name (`export { n as m } from`) uses it when `m` is itself
  * used by the importers of that file; a re-exporting file nobody imports is a framework entry (a route file) and uses it.
- * Specs and tests are not in the graph, so an export used only by a spec is dead, on purpose.
+ * Specs and tests are not in the graph, so an export used only by a spec is dead, on purpose, with one exception (unit test
+ * standard): a `<name>.service.spec.ts` (the only unit spec kind) and a `*.builder.ts` under src/tests/fixtures/builders read from
+ * disk count as consumers, because a spec can only provide an Inject*() token or a param type the entry exports. Specs of any
+ * other kind, e2e specs and world files still do not count. A consumer inside the owner is skipped like any inside consumer.
  */
 import fs from 'node:fs';
+import { canonical } from './config.mjs';
 import path from 'node:path';
+import { treeOf } from './required-files.mjs';
 
 export const DEAD_EXPORT_RULE_IDS = ['HFS_UNUSED_EXPORT', 'HFS_UNUSED_FILE'];
 
@@ -162,11 +167,40 @@ function deadFiles(graph, config) {
   return { violations, judged, roots: roots.size };
 }
 
+const TEST_CONSUMER = /^(?:(?:src|apps)\/.+\.service\.spec\.ts|src\/tests\/fixtures\/builders\/.+\.builder\.ts)$/u;
+
+/** Pseudo edges from the unit specs of services and the fixture builders (read from disk, outside the production program) to graph files. */
+function testConsumerEdges({ context, graph, config }) {
+  const { ts } = context;
+  const options = context.projects?.[0]?.options ?? {};
+  const edges = [];
+  for (const rel of [...treeOf(config.root).files].filter(file => TEST_CONSUMER.test(file)).sort()) {
+    const abs = path.join(config.root, ...rel.split('/'));
+    let text;
+    try { text = fs.readFileSync(abs, 'utf8'); } catch { continue; }
+    const sourceFile = ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true);
+    for (const statement of sourceFile.statements) {
+      if (!(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) || !statement.moduleSpecifier || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue;
+      const resolved = ts.resolveModuleName(statement.moduleSpecifier.text, abs, options, ts.sys).resolvedModule?.resolvedFileName;
+      const to = resolved ? graph.abs(canonical(resolved)) : null;
+      if (to) edges.push({ from: rel, to, edge: { declaration: statement }, reexport: false });
+    }
+  }
+  return edges;
+}
+
 export function checkDeadExports({ context, graph, config }) {
   const { ts } = context;
   const violations = [];
   const edgesTo = new Map();
-  for (const edge of graph.edges) {
+  const unitOf = rel => {
+    const known = graph.unit(rel);
+    if (known) return known;
+    const classified = graph.resolver.classifyPath(rel);
+    const owner = classified.slot ? graph.resolver.ownerOf(rel) : null;
+    return owner ? `${owner.slot}:${owner.root}` : null;
+  };
+  for (const edge of [...graph.edges, ...testConsumerEdges({ context, graph, config })]) {
     if (!edgesTo.has(edge.to)) edgesTo.set(edge.to, []);
     edgesTo.get(edge.to).push(edge);
   }
@@ -175,7 +209,7 @@ export function checkDeadExports({ context, graph, config }) {
   const consumed = (file, ownerKey, depth, visiting) => {
     const result = { all: false, names: new Set() };
     for (const edge of edgesTo.get(file) ?? []) {
-      if (ownerKey && graph.unit(edge.from) === ownerKey) continue;
+      if (ownerKey && unitOf(edge.from) === ownerKey) continue;
       const bindings = bindingsOf(ts, edge.edge.declaration);
       if (bindings.all) { result.all = true; continue; }
       for (const pair of bindings.pairs) {
@@ -220,7 +254,7 @@ export function checkDeadExports({ context, graph, config }) {
         ruleId: 'HFS_UNUSED_EXPORT',
         path: entry, line, column: 1,
         name, owner: owner.root, slot: owner.slot,
-        message: `${entry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (a spec alone does not count as a use).`,
+        message: `${entry} exports ${name}, but no production file outside ${owner.root || 'the repository root'} imports it; remove the export (only a service unit spec or a fixture builder counts besides production files).`,
       });
     }
   }
