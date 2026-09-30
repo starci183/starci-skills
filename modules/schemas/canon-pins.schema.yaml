@@ -66,6 +66,12 @@ $defs:
         description: >-
           For a `starci` pin only - the package.json in this runtime whose `version` the pin must equal. A pin
           with a source is installed by `starci link`; a pin without one comes from the registry.
+      install:
+        enum: [registry]
+        description: >-
+          For a `starci` pin only - `registry` means the package is published to the npm registry at exactly this
+          version and a product repository installs it from there (`"<version>"`, never `file:`). Without it a
+          `starci` pin is installed by `starci link` as `file:.starci/packages/<name>`.
       why:
         type: string
         minLength: 1

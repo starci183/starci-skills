@@ -80,8 +80,8 @@ rules:
     requirement: |
       Pre-commit, pre-push, op settle, land gate and CI run the same `@starci/hfs` at the version pinned in
       `canon-pins.yaml`. CI runs `npx @starci/hfs check`; pre-push runs `typecheck`, `lint:check` and `hfs check --fast`. There is
-      no rule only agents can run. `@starci/*` packages are consumed from the runtime checkout (`STARCI_HOME`); there is no
-      public registry publish.
+      no rule only agents can run. `@starci/grammar` is installed from the npm registry at the pinned version; the other `@starci/*` packages are consumed from the
+      runtime checkout (`STARCI_HOME`) and are not published.
     rationale: |
       A repository that is green under an old rule while the agent grades it under a new rule wastes every cycle.
     cases:

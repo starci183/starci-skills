@@ -43,7 +43,7 @@ export function checkCanonPins({ root = skillRoot } = {}) {
   for (const [name, pin] of Object.entries(doc?.pins ?? {})) {
     if (!pin || typeof pin !== 'object') continue;
     if (pin.group === 'starci' && !pin.source) errors.push(`CANON_PIN_NO_SOURCE ${name}: a starci pin names the package.json it must equal`);
-    if (pin.group !== 'starci' && pin.source) errors.push(`CANON_PIN_NO_SOURCE ${name}: only a starci pin carries a source`);
+    if (pin.group !== 'starci' && (pin.source || pin.install)) errors.push(`CANON_PIN_NO_SOURCE ${name}: only a starci pin carries a source or an install`);
     if (!pin.source) continue;
     const file = path.join(root, pin.source);
     if (!fs.existsSync(file)) { errors.push(`CANON_PIN_SOURCE ${name}: ${pin.source} does not exist`); continue; }
@@ -63,7 +63,7 @@ export function checkRepoPins({ repo, side, root = skillRoot }) {
     if (side && pin.side !== 'both' && pin.side !== side) continue;
     const specs = DEP_KEYS.map((key) => pkg[key]?.[name]).filter((spec) => spec !== undefined);
     if (!specs.length) continue;
-    if (pin.group === 'starci') {
+    if (pin.group === 'starci' && pin.install !== 'registry') {
       const linked = path.join(repo, '.starci', 'packages', name.replace(/^@starci\//, ''), 'package.json');
       const version = fs.existsSync(linked) ? readJson(linked).version : null;
       if (version !== pin.version) errors.push(`CANON_PIN_DRIFT ${name}: pinned ${pin.version}, linked copy is ${version ?? 'missing (run starci link)'}`);

@@ -123,6 +123,11 @@ test('pin drift: a range, an old version, a registry @starci spec and a missing 
   assert.equal(drift(withPackage(linked)).length, 1, 'no linked copy');
   assert.equal(drift(withPackage(linked, '0.0.1')).length, 1, 'stale linked copy');
   assert.deepEqual(drift(withPackage(linked, tsconfig)), []);
+  const grammar = pins['@starci/grammar'].version;
+  assert.equal(pins['@starci/grammar'].install, 'registry', '@starci/grammar is a published package');
+  assert.deepEqual(drift(withPackage({ dependencies: { '@starci/grammar': grammar } })), [], 'grammar installs from the registry at the pinned version');
+  assert.equal(drift(withPackage({ dependencies: { '@starci/grammar': `^${grammar}` } })).length, 1, 'a range is drift');
+  assert.equal(drift(withPackage({ dependencies: { '@starci/grammar': 'file:.starci/packages/grammar' } })).length, 1, 'grammar is not linked');
 });
 
 test('pins of the other side are not judged, and every package.json of a workspace repository is', () => {

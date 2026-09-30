@@ -2882,12 +2882,13 @@ HFS_APP_LAYOUT_INVALID:
 HFS_CANON_PIN_DRIFT:
   title: "Dependency version differs from the canon pin"
   title_vi: "Phiên bản phụ thuộc lệch khỏi bản đã ghim"
-  meaning_vi: "Một phụ thuộc trong package.json không đúng phiên bản chính xác mà knowledge/hfs/canon-pins.yaml ghim cho cả họ kho; gói @starci phải được cài bằng starci link chứ không lấy từ registry."
+  meaning_vi: "Một phụ thuộc trong package.json không đúng phiên bản chính xác mà knowledge/hfs/canon-pins.yaml ghim cho cả họ kho; @starci/grammar phải được cài từ npm registry đúng phiên bản đã ghim (không dùng file:), còn các gói @starci khác được cài bằng starci link."
   causes_vi:
     - "Phiên bản viết dạng khoảng (^, ~) thay vì phiên bản chính xác"
     - "Một workspace giữ phiên bản cũ của cùng phụ thuộc"
-    - "Gói @starci chưa được starci link nên bản chép trong .starci/packages thiếu hoặc cũ"
-  nextStep_vi: "Đặt phụ thuộc về đúng phiên bản ghim hoặc chạy lại starci link cho gói @starci, rồi cài lại. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+    - "@starci/grammar khai báo dạng file: hoặc khoảng phiên bản thay vì phiên bản chính xác trên registry"
+    - "Gói @starci khác chưa được starci link nên bản chép trong .starci/packages thiếu hoặc cũ"
+  nextStep_vi: "Đặt phụ thuộc về đúng phiên bản ghim (@starci/grammar: phiên bản chính xác từ registry) hoặc chạy lại starci link cho các gói @starci khác, rồi cài lại. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 

@@ -92,6 +92,11 @@ test('checkRepoPins judges a repository: registry pins by declared spec, @starci
   fs.writeFileSync(path.join(repo, '.starci', 'packages', 'tsconfig', 'package.json'), JSON.stringify({ version: '1.0.0' }));
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ devDependencies: { typescript: '5.9.3', '@starci/tsconfig': 'file:.starci/packages/tsconfig' } }));
   assert.deepEqual(checkRepoPins({ repo, side: 'be', root: ROOT }).errors, []);
+  const grammar = loadPins(ROOT).pins['@starci/grammar'];
+  fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ dependencies: { '@starci/grammar': grammar.version } }));
+  assert.deepEqual(checkRepoPins({ repo, side: 'fe', root: ROOT }).errors, [], 'a registry-installed @starci pin passes by its declared version');
+  fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ dependencies: { '@starci/grammar': `^${grammar.version}` } }));
+  assert.match(checkRepoPins({ repo, side: 'fe', root: ROOT }).errors.join(' '), /CANON_PIN_DRIFT @starci\/grammar: declared \^/);
 });
 
 test('the checker CLI exits 0 on the shipped pins and 1 with a code on a broken tree', (t) => {

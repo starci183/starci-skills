@@ -70,7 +70,7 @@ export function openRepo({ repoRoot, root = skillRoot, manifest = loadSlotManife
 }
 
 const pinnedSpec = (spec, pin, packageDir, repoRoot) => {
-  if (pin.group !== 'starci') return spec === pin.version ? null : `declared ${spec}, pinned ${pin.version}`;
+  if (pin.group !== 'starci' || pin.install === 'registry') return spec === pin.version ? null : `declared ${spec}, pinned ${pin.version}`;
   if (!String(spec).startsWith('file:')) return `declared ${spec}, pinned ${pin.version}; a @starci package is installed by starci link as file:.starci/packages/<name>`;
   const linked = path.join(packageDir, String(spec).slice('file:'.length), 'package.json');
   let version = null;

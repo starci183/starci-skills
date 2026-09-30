@@ -7,10 +7,14 @@ purpose: >-
   mia-mia-backend and miamia-fe; where they disagreed the newest version installed in more than one repository
   won, and the runtime's own version won for @starci packages.
 pins:
-  # --- @starci packages: installed from the runtime checkout by `starci link`, never from a registry.
+  # --- @starci packages. @starci/grammar is a PUBLISHED npm package (install: registry): a product repository installs
+  # the exact pinned version from the npm registry, never `file:`. The other @starci packages (eslint-canon-*, hfs,
+  # jest-preset, tsconfig, prettier-config, vitest-preset, playwright-preset, stylelint-canon) are still installed
+  # from the runtime checkout by `starci link` as file:.starci/packages/<name>.
   '@starci/grammar':
     version: 0.7.1
     group: starci
+    install: registry
     side: fe
     source: packages/grammar/package.json
     why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.7.1.
