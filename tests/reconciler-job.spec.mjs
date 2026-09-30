@@ -61,7 +61,8 @@ test('keys parse and route', () => {
   assert.equal(parseKey('nonsense'), null);
   assert.deepEqual(job.routes['op-reported']({ ledgerId: 'n', entityType: 'job', entityId: 'op-a', workflowId: 'wf-x' }), ['job:n:op-a', 'wf:n:wf-x']);
   assert.equal(job.routes['worker-*']({ ledgerId: 'supervisor', entityType: 'job', entityId: 'sup-1' }), 'workers:supervisor');
-  assert.equal(job.routes['product-wf-overlap']({ ledgerId: 'n', seq: 42 }), 'overlap:n:42');
+  assert.deepEqual(job.routes['product-land-refused']({ ledgerId: 'n', entityType: 'job', entityId: 'op-a', workflowId: 'wf-x' }), ['job:n:op-a', 'wf:n:wf-x']);
+  assert.equal(parseKey('overlap:n:42'), null, 'no workflow branch, no overlap key');
   assert.deepEqual(job.concerns, ['job.settle', 'job.worker', 'job.dispatch', 'job.consume-check', 'job.close-verify']);
 });
 
@@ -166,9 +167,9 @@ test('worktree-removed: the clock runs while the folder exists, the reap retries
   } finally { done.close(); }
 });
 
-test('product-integrate-red -> a continuation enqueued from the refused head; the cap hands it to the Kernel', async () => {
-  const fx = fixture({ report: { outcome: 'done' }, handover: { reason: 'settle-refused', code: 'product-integrate-red' },
-    events: [{ kind: 'product-integrate-refused', payload: { reason: 'product-integrate-red', continuation: { base: 'wf/x', resumeFrom: 'def456' } } }] });
+test('product-land-conflict -> a continuation enqueued from the refused head; the cap hands it to the Kernel', async () => {
+  const fx = fixture({ report: { outcome: 'done' }, handover: { reason: 'settle-refused', code: 'product-land-conflict' },
+    events: [{ kind: 'product-land-refused', payload: { reason: 'product-land-conflict', continuation: { base: 'main', resumeFrom: 'def456' } } }] });
   try {
     const ctx = ctxFor(fx);
     const r = await job.reconcile('job:nivo-backend:op-a', ctx);
@@ -187,11 +188,16 @@ test('product-integrate-red -> a continuation enqueued from the refused head; th
   } finally { fx.close(); }
 });
 
-test('deps-unit-required -> the deps unit is enqueued with the manifest files under the repository prefix', () => {
-  const f = { jobId: 'op-a', workflowId: 'wf-x', op: 'code.refactor', payload: { owned_paths: ['nivo-fe/src/a'], params: { canonFamilies: 'all' } } };
-  const argv = enqueueArgvOf(f, { kind: 'deps-unit', files: ['package.json', 'package-lock.json'] });
-  assert.equal(argv[argv.indexOf('--paths') + 1], 'nivo-fe/package.json,nivo-fe/package-lock.json');
-  assert.equal(JSON.parse(argv[argv.indexOf('--params') + 1]).depsUnit, true);
+test('land-gate-red -> a continuation of the same op from its head; a refusal no continuation answers goes to the Kernel', () => {
+  const base = { jobId: 'op-a', workflowId: 'wf-x', op: 'code.refactor', status: 'running', payload: { owned_paths: ['nivo-fe/src/a'] }, report: { outcome: 'done', filedAt: NOW - 1000 },
+    handover: { reason: 'settle-refused', at: NOW - 500 }, head: 'abc123', successor: null, continuations: 0, now: NOW, updatedAt: NOW - 1000, windowMs: settings.settledWindowMs };
+  const red = planJob({ ...base, landRefused: { reason: 'land-gate-red', continuation: null, at: NOW - 500 } }, { settings });
+  assert.equal(red.step.kind, 'continuation');
+  assert.equal(red.step.resumeFrom, 'abc123');
+  const argv = enqueueArgvOf(base, red.step);
+  assert.equal(argv[argv.indexOf('--paths') + 1], 'nivo-fe/src/a');
+  assert.equal(JSON.parse(argv[argv.indexOf('--params') + 1]).resumeFrom, 'abc123');
+  assert.equal(planJob({ ...base, landRefused: { reason: 'land-gate-unavailable', at: NOW - 500 } }, { settings }).step.kind, 'settle-nongreen');
 });
 
 test('the workflow pass: dispatch-ready when below allowedParallel, at most once per window; broken imports hold it', async () => {
@@ -207,17 +213,6 @@ test('the workflow pass: dispatch-ready when below allowedParallel, at most once
   const r = await job.reconcile('wf:n:wf-2', held);
   assert.equal(r.action, 'dispatch-held'); assert.equal(held.calls.api.length, 0);
   assert.equal(held.calls.decisions[0].kind, 'repoint-needed');
-});
-
-test('a product-wf-overlap event -> a cross-workflow DI for the Supervisor', async () => {
-  const fx = fixture({ events: [{ kind: 'product-wf-overlap', payload: { branch: 'wf/x', files: ['src/a.ts'], main: 'm1' } }] });
-  try {
-    const seq = fx.db.prepare("SELECT seq FROM events WHERE kind='product-wf-overlap'").get().seq;
-    const ctx = ctxFor(fx);
-    await job.reconcile(`overlap:nivo-backend:${seq}`, ctx);
-    const di = ctx.calls.decisions[0];
-    assert.equal(di.kind, 'product-wf-overlap'); assert.equal(di.decider, 'supervisor'); assert.equal(di.idempotencyKey, 'product-wf-overlap:wf-x:m1');
-  } finally { fx.close(); }
 });
 
 test('the [Worker] sweep in shadow writes nothing', () => {

@@ -84,7 +84,7 @@ export default {
       `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   },
   async run({ ledger, args, repo, emit, internals }) {
-    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, closeOperationTask, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleLanding, settleOpGate, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
+    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, closeOperationTask, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleLanding, settleProductLand, settleOpGate, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
 
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   // A report lives only in the reports table (api report files it from the job scratch, a3-3 evidence-db-report):
@@ -105,14 +105,6 @@ export default {
 
   const acceptForeign = typeof args['accept-foreign'] === 'string' ? args['accept-foreign'].split(',').map((p) => p.trim()).filter(Boolean) : [];
   const landed = verdict === 'pass' ? settleLanding(db, jobId, repo, null, acceptForeign, null) : null;
-  if (landed?.detail?.integration) {
-    const settlingJob = db.prepare('SELECT workflow_id FROM jobs WHERE job_id=?').get(jobId);
-    const integ = landed.detail.integration;
-    if (settlingJob && (landed.ok ? !integ.already : true)) {
-      ledger.transaction(() => ledger.appendEvent({ workflowId: settlingJob.workflow_id, entityType: 'job', entityId: jobId, kind: landed.ok ? PRODUCT_EVENTS.integrated : PRODUCT_EVENTS.integrateRefused,
-        payload: landed.ok ? integ : { reason: landed.reason, conflicts: (integ.conflicts ?? []).map((c) => c.file), failures: integ.failures ?? null, files: integ.files ?? null, continuation: integ.continuation ?? null } }));
-    }
-  }
   if (landed?.checked && !landed.ok) {
     const out = { ok: false, jobId, op: landed.op, reason: landed.reason, detail: landed.detail, ...(landed.hint ? { hint: landed.hint } : {}) };
     emit(out, `settle REFUSED for ${jobId} (${landed.op}): ${landed.reason} â€” ${JSON.stringify(landed.detail)}; the job stays ${landed.status}. ${landed.hint ?? `Re-dispatch the owning slice to commit its own paths${landed.pushes ? ' and push' : ''}`}, then settle again`, args.json);
@@ -174,6 +166,24 @@ export default {
     emit({ ok: false, jobId, op: hygiene.op, reason: 'work-hygiene-red', codes, findings: hygiene.findings.slice(0, 50), findingCount: hygiene.findings.length, files: hygiene.files },
       `settle REFUSED for ${jobId} (${hygiene.op}): work-hygiene-red - ${codes.join(', ')} (${hygiene.findings.length} finding(s); first: ${hygiene.findings[0].file} - ${hygiene.findings[0].detail}); the job stays ${hygiene.status}. Fix the named Work files (a YAML that parses, records that pass node scripts/checks/work-validate.mjs --strict, no literal password or token outside an .enc file; node scripts/checks/work-hygiene.mjs files --repo <repo> <file>...), commit them, then settle again`, args.json);
     process.exit(1);
+  }
+
+  // The op's land into main, LAST (DESIGN §16.7): every settle refusal above passed, so main never moves for a job that
+  // does not settle. Rebase onto main, land gate, CAS fast-forward, push (product-worktree.mjs integrateOp).
+  if (landed?.productLand) {
+    const land = settleProductLand(landed);
+    const integ = land.integration ?? {};
+    if (!land.ok || !integ.already) {
+      const settlingJob = db.prepare('SELECT workflow_id FROM jobs WHERE job_id=?').get(jobId);
+      if (settlingJob) ledger.transaction(() => ledger.appendEvent({ workflowId: settlingJob.workflow_id, entityType: 'job', entityId: jobId, kind: land.ok ? PRODUCT_EVENTS.landed : PRODUCT_EVENTS.landRefused,
+        payload: land.ok ? integ : { reason: land.reason, conflicts: (integ.conflicts ?? []).map((c) => c.file), gate: integ.gate ?? null, continuation: integ.continuation ?? null } }));
+    }
+    if (!land.ok) {
+      emit({ ok: false, jobId, op: landed.op, reason: land.reason, detail: { ...landed.detail, integration: integ }, ...(land.hint ? { hint: land.hint } : {}) },
+        `settle REFUSED for ${jobId} (${landed.op}): ${land.reason} - ${JSON.stringify({ conflicts: (integ.conflicts ?? []).map((c) => c.file), gate: integ.gate ? { exit: integ.gate.exit, findings: (integ.gate.findings ?? []).length, errors: (integ.gate.errors ?? []).slice(0, 2) } : null })}; the job stays ${landed.status}; main untouched. ${land.hint ?? ''}`, args.json);
+      process.exit(1);
+    }
+    landed.detail = { ...landed.detail, integration: integ };
   }
 
   let released = 0, job, reportsConsumed = false, reportFiled = false, reportOutcome = null, settledAttemptId = null, filedReport = null, citations = null;
@@ -462,8 +472,9 @@ export default {
   }
 
   // released -> worktree-removed (DESIGN Â§16.7): an isolated op's worktree is removed right after its worker is released,
-  // off the settle's path (product-worktree.mjs reap: salvage + assert, junctions unlinked, verified removal); the
-  // settler's productWorktreeDuty is the backstop, the leftover sweep logs whatever both missed as a bug.
+  // off the settle's path (product-worktree.mjs reap: salvage, preserve a non-green op's work, links removed first,
+  // verified removal, branch deleted); the settler's productWorktreeDuty is the backstop, the reconciler GC's
+  // gc:worktrees pass removes whatever both missed.
   if (ownProductWorktreeOf(db.prepare('SELECT job_id, payload_json FROM jobs WHERE job_id=?').get(jobId) ?? job) && !process.env.NODE_TEST_CONTEXT) {
     try {
       spawn(process.execPath, [path.join(skillRoot, 'scripts', 'kernel', 'product-worktree.mjs'), 'reap', '--repo', repo, '--job', jobId, '--json'],

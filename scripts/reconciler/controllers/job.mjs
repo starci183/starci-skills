@@ -88,9 +88,9 @@ export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
 }
 export const CLOCK_CODES = Object.freeze(['READY_UNDISPATCHED', 'LEASE_STUCK', 'WORKER_START_STUCK', 'QUESTION_OVERDUE', 'CONSUME_OVERDUE',
   'SETTLE_OVERDUE', 'DECISION_OVERDUE', 'DEAD_WORKER_UNRECONCILED', 'EFFECT_UNKNOWN_STUCK', 'WORKER_RELEASE_LEAK', 'WORKTREE_REMOVE_OVERDUE']);
-/** Settle refusals of an isolated op's integration into its workflow branch (lane rc-product-worktrees). */
-export const INTEGRATE_REFUSALS = Object.freeze(['product-integrate-conflict', 'product-integrate-red']);
-export const PRODUCT_EVENTS = Object.freeze({ integrateRefused: 'product-integrate-refused', worktreeRemoved: 'job-worktree-removed', overlap: 'product-wf-overlap' });
+/** Settle refusals of an isolated op's land into main that a continuation answers (product-worktree.mjs integrateOp). */
+export const LAND_REFUSALS = Object.freeze(['product-land-conflict', 'land-gate-red']);
+export const PRODUCT_EVENTS = Object.freeze({ landRefused: 'product-land-refused', worktreeRemoved: 'job-worktree-removed' });
 
 /* ------------------------------------------------------------------------------------------------ keys */
 
@@ -101,7 +101,7 @@ export function parseKey(key) {
   const s = String(key ?? '');
   if (s === WORKERS_KEY) return { type: 'workers', ledgerId: SUPERVISOR_LEDGER, id: null };
   if (s === HEALTH_KEY) return { type: 'health', ledgerId: null, id: null };
-  const m = /^(job|wf|overlap):([^:]+):(.+)$/.exec(s);
+  const m = /^(job|wf):([^:]+):(.+)$/.exec(s);
   return m ? { type: m[1], ledgerId: m[2], id: m[3] } : null;
 }
 const jobRoute = (ev) => {
@@ -111,7 +111,6 @@ const jobRoute = (ev) => {
   if (ev?.workflowId) keys.push(wfKey(ev.ledgerId, ev.workflowId));
   return keys;
 };
-const overlapRoute = (ev) => (ev?.ledgerId && ev.seq != null ? `overlap:${ev.ledgerId}:${ev.seq}` : null);
 const wfRoute = (ev) => (ev?.ledgerId === SUPERVISOR_LEDGER ? null : ev?.workflowId ? wfKey(ev.ledgerId, ev.workflowId) : null);
 
 /* ------------------------------------------------------------------------------------------------ reads */
@@ -126,7 +125,7 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
   const handover = reported ? kernelHandoverOf(db, reported) : null;
   const released = db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(SETTLE_EVENTS.released, jobId) != null;
   const lastEvent = (kind) => { const r = db.prepare('SELECT payload_json, created_at FROM events WHERE entity_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(jobId, kind); return r ? { ...(parse(r.payload_json) ?? {}), at: Number(r.created_at) } : null; };
-  const refused = reported ? lastEvent(PRODUCT_EVENTS.integrateRefused) : null;
+  const refused = reported ? lastEvent(PRODUCT_EVENTS.landRefused) : null;
   const releasedAt = Number(db.prepare('SELECT MAX(created_at) at FROM events WHERE kind=? AND entity_id=?').get(SETTLE_EVENTS.released, jobId)?.at) || null;
   const successor = db.prepare("SELECT job_id FROM jobs WHERE workflow_id=? AND json_extract(payload_json,'$.retry.retryOf')=? LIMIT 1").get(row.workflow_id, jobId)?.job_id ?? null;
   // Continuations already in this job's lineage (each a retry carrying params.resumeFrom), for the cap.
@@ -143,7 +142,7 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
     report: reported ? { dispatchId: reported.dispatchId, outcome: reported.outcome, filedAt: reported.filedAt, consumedAt: reported.consumedAt } : null,
     handover: handover ? { reason: handover.reason ?? null, detail: handover.detail ?? null, at: handover.at } : null,
     released, releaseProof: releaseProofOf(payload), settledAt: SETTLED.includes(row.status) ? Number(payload.settledAt ?? row.updated_at) : null,
-    integrateRefused: refused && (!reported || refused.at >= reported.filedAt) ? { reason: refused.reason, files: refused.files ?? null, conflicts: refused.conflicts ?? null, continuation: refused.continuation ?? null, at: refused.at } : null,
+    landRefused: refused && (!reported || refused.at >= reported.filedAt) ? { reason: refused.reason, conflicts: refused.conflicts ?? null, continuation: refused.continuation ?? null, at: refused.at } : null,
     head: reported?.report?.head ?? null,
     successor, continuations, releasedAt,
     worktree: payload.productWorktree?.op?.path ? (() => {
@@ -199,14 +198,11 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
   if (live && f.report) {
     // Consume is part of settle (settle-runtime-service): SETTLE_OVERDUE / DECISION_OVERDUE time the report, no
     // separate CONSUME_OVERDUE clock.
-    const refusal = f.handover && f.integrateRefused ? f.integrateRefused.reason : null;
-    if (refusal && INTEGRATE_REFUSALS.includes(refusal) && !f.successor && f.continuations < settings.continuationCap) {
-      // A continuation on the new workflow-branch base, never a failure (product-worktree.mjs integrateOp).
+    const refusal = f.handover && f.landRefused ? f.landRefused.reason : null;
+    if (refusal && LAND_REFUSALS.includes(refusal) && !f.successor && f.continuations < settings.continuationCap) {
+      // A continuation on the new main, never a failure (product-worktree.mjs integrateOp).
       clock('DECISION_OVERDUE', f.handover.at);
-      set({ kind: 'continuation', concern: 'job.settle', reason: refusal, resumeFrom: f.integrateRefused.continuation?.resumeFrom ?? f.head ?? null });
-    } else if (refusal === 'deps-unit-required' && !f.successor && (f.integrateRefused.files ?? []).length) {
-      clock('DECISION_OVERDUE', f.handover.at);
-      set({ kind: 'deps-unit', concern: 'job.settle', reason: refusal, files: f.integrateRefused.files });
+      set({ kind: 'continuation', concern: 'job.settle', reason: refusal, resumeFrom: f.landRefused.continuation?.resumeFrom ?? f.head ?? null });
     } else if (f.handover) {
       clock('DECISION_OVERDUE', f.handover.at);
       set({ kind: 'settle-nongreen', concern: 'job.consume-check', reason: f.handover.reason });
@@ -268,24 +264,15 @@ export function settleDecision(f, ledgerId, { now = Date.now(), settings = jobSe
 }
 
 /**
- * The enqueue argv of a continuation (product-integrate-conflict/-red: the same op, same owned paths and cut, from the
- * refused head on the new workflow-branch base) or of the deps unit (deps-unit-required: the manifest files, params.depsUnit).
- * Pure.
+ * The enqueue argv of a continuation (product-land-conflict / land-gate-red: the same op, same owned paths and cut, from
+ * the refused head on the new main). Pure.
  */
 export function enqueueArgvOf(f, step) {
   const cut = f.payload.cut;
   const cutArgs = cut?.id ? ['--cut-id', String(cut.id), '--cut-ordinal', String(cut.ordinal), '--cut-total', String(cut.total)] : [];
-  if (step.kind === 'continuation') {
-    const params = { ...(f.payload.params ?? {}), ...(step.resumeFrom ? { resumeFrom: String(step.resumeFrom) } : {}) };
-    return ['--workflow', f.workflowId, '--op', f.op, '--paths', (f.payload.owned_paths ?? []).join(','), '--retry-of', f.jobId,
-      '--params', JSON.stringify(params), ...(f.payload.repository ? ['--repository', String(f.payload.repository)] : []), ...cutArgs];
-  }
-  // deps-unit-required: the refusal names repository-relative manifest files; owned paths carry the repository prefix.
-  const owned = (f.payload.owned_paths ?? []).map(String);
-  const head = owned.length && owned.every((o) => o.split('/')[0] === owned[0].split('/')[0]) && owned[0].includes('/') ? owned[0].split('/')[0] : null;
-  const paths = step.files.map((file) => (head && !String(file).startsWith(`${head}/`) ? `${head}/${file}` : String(file)));
-  return ['--workflow', f.workflowId, '--op', f.op, '--paths', paths.join(','), '--retry-of', f.jobId, '--what', 'deps unit',
-    '--params', JSON.stringify({ ...(f.payload.params ?? {}), depsUnit: true, resumeFrom: '' }), ...(f.payload.repository ? ['--repository', String(f.payload.repository)] : [])];
+  const params = { ...(f.payload.params ?? {}), ...(step.resumeFrom ? { resumeFrom: String(step.resumeFrom) } : {}) };
+  return ['--workflow', f.workflowId, '--op', f.op, '--paths', (f.payload.owned_paths ?? []).join(','), '--retry-of', f.jobId,
+    '--params', JSON.stringify(params), ...(f.payload.repository ? ['--repository', String(f.payload.repository)] : []), ...cutArgs];
 }
 
 /* ------------------------------------------------------------------------------------------------ the [Worker] sweep */
@@ -370,7 +357,7 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
     case 'settle':
       // The runtime settler for this one job: reconcileJobSettle (consume, re-verify / canon parity, api check + settle, release).
       return { action: 'settle', ...(await ctx.run('node', [SETTLER_SCRIPT, '--repo', repo, '--job', jobId, '--json'], { timeoutMs: settings.settleRunTimeoutMs })) };
-    case 'continuation': case 'deps-unit':
+    case 'continuation':
       return { action: s.kind, reason: s.reason, ...(await ctx.api(ledgerId, 'enqueue', enqueueArgvOf(f, s))) };
     case 'settle-nongreen':
       return { action: 'settle-nongreen', ...(await ctx.openDecision(settleDecision(f, ledgerId, { now: ctx.now(), settings }))) };
@@ -428,21 +415,6 @@ async function reconcileWorkflow(ctx, ledgerId, workflowId, settings) {
   }
   lastDispatch.set(id, ctx.now());
   return { action: 'dispatch-ready', why: plan.why, ...(await ctx.api(ledgerId, 'dispatch-ready', ['--workflow', workflowId])) };
-}
-
-/** product-wf-overlap (two workflows' branches touch the same files as main moved): a cross-workflow DI for the Supervisor. */
-async function reconcileOverlap(ctx, ledgerId, seq, settings) {
-  const ev = ctx.read(ledgerId, (db) => db.prepare('SELECT workflow_id, entity_id, payload_json, created_at FROM events WHERE seq=? AND kind=?').get(seq, PRODUCT_EVENTS.overlap));
-  if (!ev) return { ok: true, action: 'gone' };
-  const payload = parse(ev.payload_json) ?? {};
-  const files = [...(payload.files ?? payload.conflicts ?? [])].map((x) => (typeof x === 'string' ? x : x?.file)).filter(Boolean);
-  const di = await ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'product-wf-overlap',
-    idempotencyKey: `product-wf-overlap:${ev.workflow_id}:${payload.main ?? payload.mainSha ?? seq}`, decider: 'supervisor', ledger: SUPERVISOR_LEDGER,
-    workflowId: ev.workflow_id, entity: { type: 'workflow', id: ev.workflow_id },
-    summary: `${ev.workflow_id} (${ledgerId}): its workflow branch ${payload.branch ?? ''} overlaps main${files.length ? ` on ${files.length} file(s): ${files.slice(0, 5).join(', ')}` : ''} - order the workflows or re-cut`,
-    evidence: [{ ref: `event:${ledgerId}:${seq}` }], allowedVerbs: ['decide', 'notify', 'incident'], dueAt: ctx.now() + settings.decisionDueMs, escalateTo: 'owner',
-    openedBy: OPENED_BY, openedAt: ctx.now() });
-  return { action: 'overlap', ...(di ?? {}) };
 }
 
 async function reconcileWorkers(ctx, settings) {
@@ -554,7 +526,7 @@ export default {
   timeoutMs: 960_000,
   routes: {
     'op-dispatched': jobRoute, 'op-reported': jobRoute, 'report-consumed': jobRoute, 'checks-recorded': jobRoute, 'op-settled': jobRoute,
-    'op-auto-settled': jobRoute, 'product-integrate-refused': jobRoute, 'job-worktree-removed': jobRoute, 'product-wf-overlap': overlapRoute, 'job-settle-*': jobRoute, 'worker-*': jobRoute, 'incident-raised': wfRoute, 'incident-resolved': wfRoute,
+    'op-auto-settled': jobRoute, 'product-land-refused': jobRoute, 'job-worktree-removed': jobRoute, 'job-settle-*': jobRoute, 'worker-*': jobRoute, 'incident-raised': wfRoute, 'incident-resolved': wfRoute,
   },
   async list(ctx) {
     const settings = jobSettings();
@@ -579,7 +551,6 @@ export default {
     if (k.type === 'workers') return reconcileWorkers(ctx, settings);
     if (k.type === 'health') return reconcileHealth(ctx, settings, { list: ctx.terminalList ?? null });
     if (k.type === 'wf') return reconcileWorkflow(ctx, k.ledgerId, k.id, settings);
-    if (k.type === 'overlap') return reconcileOverlap(ctx, k.ledgerId, Number(k.id), settings);
     return reconcileJob(ctx, k.ledgerId, k.id, settings);
   },
 };

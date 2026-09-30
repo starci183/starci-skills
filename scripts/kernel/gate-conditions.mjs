@@ -21,8 +21,8 @@
 //   --until-foundation <name>                  the ledger's shared foundation <name> landed (api foundation
 //                                              --land; scripts/kernel/foundations.mjs)
 //   --until-landed <workflowId>@<repository>   that workflow's product work reached <repository> main: it is
-//                                              finished, or it product-landed there (product-land-landed), its
-//                                              wf/ branch holds nothing main lacks, and none of its code-writing
+//                                              finished, or one of its ops product-landed there (product-land-landed:
+//                                              every op lands into main at its settle) and none of its code-writing
 //                                              legs is still open (a cross-workflow hold on a restructure, e.g.
 //                                              nivo FE legs held until wf-nivo-fe-canon lands into nivo-fe)
 //
@@ -323,10 +323,6 @@ export function evaluateCondition(db, cond, { repo, workflowId, since = 0 }) {
       const writing = db.prepare(`SELECT job_id,op_id,status FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND op_id IN (${CODE_WRITING_OPS.map(() => '?').join(',')}) AND status IN (${OPEN_JOB_STATUSES.map(() => '?').join(',')})`)
         .all(cond.workflowId, ...CODE_WRITING_OPS, ...OPEN_JOB_STATUSES);
       if (writing.length) return { met: false, evidence: `${cond.workflowId} landed into ${cond.repository} at ${iso(last.at)} but ${writing.length} code-writing leg(s) are still open (${writing.slice(0, 3).map((j) => `${j.job_id} ${j.status}`).join(', ')})` };
-      if (last.branch && last.repoRoot && fs.existsSync(last.repoRoot)) {
-        const ahead = git(last.repoRoot, ['rev-list', '--count', `main..${last.branch}`]);
-        if (ahead.ok && Number(ahead.out) > 0) return { met: false, evidence: `${cond.workflowId} landed into ${cond.repository} at ${iso(last.at)} but ${last.branch} is ${ahead.out} commit(s) ahead of main again` };
-      }
       return { met: true, evidence: `${cond.workflowId} product-landed into ${cond.repository} main at ${iso(last.at)} (${String(last.head ?? '').slice(0, 12) || '-'}), no code-writing leg open` };
     }
     if (cond.type === 'foundation') {

@@ -2,8 +2,8 @@
 // workflow's code must import only paths that exist before the next wave dispatches. fe-canon 2026-09-28: 26 files
 // still imported the old `@/i18n` paths after slice 1 moved them, and the breakage read as "checker unavailable".
 //
-// Scanned tree: each of the workflow's integration worktrees (<repo>/.starciwork/worktrees/<wf>/_wf); a workflow
-// with none scans nothing. Value, when broken:
+// Scanned tree: the live checkout (main) of each product repository the workflow's isolated ops land into (every op
+// lands into main at its settle, DESIGN §16.7); a workflow that never isolated scans nothing. Value, when broken:
 //   {code: 'IMPORTS_BROKEN_AFTER_MOVE', rcaCause: 'broken-import', count, files, sample, trees, repointQueued,
 //    blocksNextWave}
 // blocksNextWave is true while imports are broken and no repoint (canon-wire) unit is queued or running: the Job
@@ -12,15 +12,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { brokenImports } from '../import-scan.mjs';
-import { isolatedJobs, layoutOf, productSettings, git } from '../product-worktree.mjs';
+import { isolatedJobs, productSettings, git } from '../product-worktree.mjs';
 
 const cache = new Map();
 const LIVE = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
 
-/** The trees to scan for one workflow: its _wf worktrees. */
+/** The trees to scan for one workflow: the live checkouts its isolated ops land into. */
 export function importTreesOf(db, { workflowId }) {
-  const byPath = new Map(isolatedJobs(db, { workflowId }).map((j) => [layoutOf({ repoRoot: j.record.repoRoot, workflowId }).workflow.path, j.record.repoRoot]));
-  return [...byPath].filter(([p]) => fs.existsSync(p)).map(([p, repoRoot]) => ({ path: p, kind: 'workflow', repoRoot: repoRoot ?? null }));
+  const roots = new Set(isolatedJobs(db, { workflowId }).map((j) => path.resolve(j.record.repoRoot)));
+  return [...roots].filter((p) => fs.existsSync(p)).map((p) => ({ path: p, kind: 'main', repoRoot: p }));
 }
 
 const stateKey = (tree) => {

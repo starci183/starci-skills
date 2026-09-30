@@ -6174,16 +6174,6 @@ archive-bad-by:
   nextStep_vi: "Lệnh bị từ chối; chạy lại với giá trị --by hợp lệ (mặc định là owner)."
   owner: supervisor
   kind: verb-refusal
-archive-failed:
-  title: "Could not archive the branch"
-  title_vi: "Lưu trữ nhánh không thành công"
-  meaning_vi: "Khi dọn worktree của op, việc lưu nhánh chưa hợp nhất vào tham chiếu lưu trữ bị git từ chối."
-  causes_vi:
-    - "Lệnh git update-ref lỗi"
-    - "Kho git đang bị khóa"
-  nextStep_vi: "Việc dọn dừng và nhánh được giữ nguyên để không mất mã; cần lõi runtime xem lỗi git rồi dọn lại."
-  owner: runtime-core
-  kind: runtime-fault
 archive-job-not-droppable:
   title: "Job cannot be dropped for archive"
   title_vi: "Không thể hủy việc để lưu trữ quy trình"
@@ -7207,44 +7197,6 @@ deferred-tests-bad-kind:
   nextStep_vi: "Không chạy gì; người gọi chọn lại loại hợp lệ."
   owner: supervisor
   kind: input-invalid
-deps-apply-failed:
-  title: "Dependency files could not be applied"
-  title_vi: "Không áp dụng được tệp phụ thuộc"
-  meaning_vi: "Việc cập nhật gói phụ thuộc vào nhánh của luồng việc thất bại ở bước chép các tệp khai báo."
-  causes_vi:
-    - "tệp khai báo gói xung đột hoặc không có ở nhánh nguồn"
-    - "lỗi git khi chép tệp"
-  nextStep_vi: "Việc chưa được tích hợp; cần kiểm tra chi tiết lỗi git rồi chạy lại đơn vị phụ thuộc hoặc báo đội lõi."
-  owner: supervisor
-  kind: runtime-fault
-deps-commit-failed:
-  title: "Dependency commit failed"
-  title_vi: "Commit tệp phụ thuộc thất bại"
-  meaning_vi: "Đã chép được tệp khai báo gói nhưng không tạo được commit, nên runtime hoàn tác về trạng thái trước."
-  causes_vi:
-    - "git từ chối commit, ví dụ do hook hoặc cấu hình tác giả"
-  nextStep_vi: "Runtime đã đặt lại nhánh; cần xem lỗi git rồi chạy lại đơn vị phụ thuộc."
-  owner: supervisor
-  kind: runtime-fault
-deps-install-failed:
-  title: "Dependency install failed"
-  title_vi: "Cài gói phụ thuộc thất bại"
-  meaning_vi: "Đã áp dụng thay đổi gói nhưng bước cài đặt lỗi, nên runtime hoàn tác thay đổi đó."
-  causes_vi:
-    - "mạng hoặc kho gói không truy cập được"
-    - "phiên bản gói xung đột hoặc không tồn tại"
-  nextStep_vi: "Runtime hoàn tác về trạng thái trước và dựng lại lớp phủ; sửa phụ thuộc rồi chạy lại đơn vị phụ thuộc."
-  owner: op-retry
-  kind: runtime-fault
-deps-unit-required:
-  title: "Dependency change needs deps unit"
-  title_vi: "Thay đổi gói cần đi qua đơn vị phụ thuộc"
-  meaning_vi: "Op sửa tệp khai báo gói mà nhánh của luồng việc chưa có, nên phải áp dụng qua đơn vị phụ thuộc riêng trước."
-  causes_vi:
-    - "op sửa package.json hoặc tệp khóa gói"
-  nextStep_vi: "Việc chưa được tích hợp; chạy lệnh product-deps để áp dụng và cài gói, rồi chốt lại việc."
-  owner: supervisor
-  kind: settle-reason
 destination-taken:
   title: "Archive destination already taken"
   title_vi: "Nơi lưu trữ đã bị chiếm"
@@ -8066,15 +8018,6 @@ kind-invalid:
   nextStep_vi: "Lệnh provider-backoff bị từ chối; chọn một loại nằm trong danh sách hiện ra."
   owner: supervisor
   kind: input-invalid
-land-busy:
-  title: "Another land holds the lock"
-  title_vi: "Một lần land khác đang giữ khóa"
-  meaning_vi: "Không giành được khóa để đưa code vào nhánh chính vì một lần land khác đang chạy."
-  causes_vi:
-    - "hai quy trình land cùng lúc"
-  nextStep_vi: "Lần land này thất bại tạm thời; thử lại khi lần kia xong."
-  owner: op-retry
-  kind: runtime-fault
 land-incomplete:
   title: "Land request is incomplete"
   title_vi: "Yêu cầu land thiếu thông tin"
@@ -8186,6 +8129,16 @@ lifecycle-phase-refused:
   nextStep_vi: "Lệnh bị từ chối; xem giai đoạn hiện tại rồi chọn thao tác hợp lệ."
   owner: supervisor
   kind: verb-refusal
+link-stuck:
+  title: "A link in the worktree could not be removed"
+  title_vi: "Không gỡ được liên kết trong cây làm việc"
+  meaning_vi: "Runtime gỡ từng junction hoặc symlink trong worktree trước khi xoá, nhưng một liên kết không gỡ được nên cây được giữ nguyên."
+  causes_vi:
+    - "Một tiến trình còn giữ thư mục liên kết"
+    - "Quyền truy cập trên Windows chặn việc gỡ"
+  nextStep_vi: "Không xoá gì qua liên kết; GC thử lại ở lượt sau. Nếu lặp lại, đóng tiến trình đang giữ thư mục rồi chạy node scripts/lib/worktrees.mjs gc."
+  owner: runtime-core
+  kind: runtime-fault
 live-not-on-main:
   title: "Live checkout is not on main"
   title_vi: "Kho đang chạy không ở nhánh main"
@@ -8296,15 +8249,6 @@ log-writer-closed:
   nextStep_vi: "Việc ghi bị lỗi; cần lõi runtime sửa thứ tự đóng bộ ghi."
   owner: runtime-core
   kind: runtime-fault
-main-conflicts-workflow:
-  title: "Main conflicts with workflow branch"
-  title_vi: "Nhánh main xung đột với nhánh quy trình"
-  meaning_vi: "Gộp main vào nhánh quy trình gặp xung đột ở một số tệp."
-  causes_vi:
-    - "main và quy trình cùng sửa những tệp giống nhau"
-  nextStep_vi: "Việc gộp dừng lại và liệt kê các tệp xung đột; cần giải quyết xung đột rồi gộp lại."
-  owner: supervisor
-  kind: runtime-fault
 main-moved:
   title: "Main moved during land"
   title_vi: "Nhánh main đã đổi trong lúc land"
@@ -8313,6 +8257,16 @@ main-moved:
     - "có lần land khác vừa vào main"
   nextStep_vi: "Lần land bị từ chối; land lại trên main mới."
   owner: op-retry
+  kind: runtime-fault
+main-checkout-damaged:
+  title: "A worktree removal changed the main checkout"
+  title_vi: "Xoá cây làm việc đã làm thay đổi bản checkout chính"
+  meaning_vi: "Sau khi xoá một worktree, bản checkout chính có file bị xoá hoặc thư mục node_modules bị đổi số mục; GC tự dừng mọi việc xoá worktree."
+  causes_vi:
+    - "Một liên kết trong worktree trỏ vào checkout chính và bị đi xuyên qua"
+    - "Có người sửa checkout chính đúng lúc GC chạy"
+  nextStep_vi: "GC đã dừng. Khôi phục checkout chính (git checkout -- các file, cài lại node_modules), tìm liên kết gây lỗi, rồi chạy node scripts/lib/worktrees.mjs resume."
+  owner: supervisor
   kind: runtime-fault
 main-moving:
   title: "Main keeps moving under land"
@@ -8323,6 +8277,16 @@ main-moving:
   nextStep_vi: "Land thất bại sau số lần thử tối đa; thử lại khi main ổn định."
   owner: op-retry
   kind: runtime-fault
+main-unresolved:
+  title: "Main branch not found"
+  title_vi: "Không tìm thấy nhánh main"
+  meaning_vi: "Khi đưa op vào main, runtime không đọc được nhánh main của repo sản phẩm."
+  causes_vi:
+    - "Repo sản phẩm không có nhánh main"
+    - "Repo đang hỏng hoặc bị khoá"
+  nextStep_vi: "Không land gì. Kiểm tra repo sản phẩm có nhánh main rồi chốt lại việc."
+  owner: runtime-core
+  kind: settle-reason
 max-ops:
   title: "Operation slots are full"
   title_vi: "Đã hết chỗ chạy op"
@@ -8485,15 +8449,6 @@ not-an-op-job:
   nextStep_vi: "Không giải phóng phiên nào; bỏ qua."
   owner: runtime-core
   kind: settle-reason
-not-isolated:
-  title: "Job never ran in a worktree"
-  title_vi: "Việc chưa từng chạy trong cây riêng"
-  meaning_vi: "Việc này không có cây làm việc sản phẩm nên không có gì để đưa lên nhánh quy trình."
-  causes_vi:
-    - "op chạy chung kho, không tách cây riêng"
-  nextStep_vi: "Lệnh product-deps bị từ chối; không cần áp dụng gói phụ thuộc cho việc này."
-  owner: supervisor
-  kind: verb-refusal
 not-landed:
   title: "Work is not landed"
   title_vi: "Công việc chưa được land"
@@ -8530,6 +8485,15 @@ nothing-to-land:
   nextStep_vi: "Lần land bị từ chối; kiểm tra công việc đã commit chưa."
   owner: op-retry
   kind: verb-refusal
+op-branch-moved:
+  title: "Op branch moved during the land"
+  title_vi: "Nhánh của op bị đổi trong lúc land"
+  meaning_vi: "Runtime định chuyển nhánh op sang bản đã rebase lên main thì nhánh đã bị ai đó đổi."
+  causes_vi:
+    - "Một tiến trình khác ghi vào nhánh op cùng lúc"
+  nextStep_vi: "Main giữ nguyên. Chốt lại việc; lượt land sau đọc lại đầu nhánh."
+  owner: runtime-core
+  kind: settle-reason
 op-context-refused:
   title: "Op may not run this mode"
   title_vi: "Op không được dùng chế độ này"
@@ -8548,15 +8512,15 @@ op-rev-drift:
   nextStep_vi: "Chỉ là cảnh báo, không chặn chốt; Kernel xem có cần chạy lại theo hợp đồng mới không."
   owner: supervisor
   kind: settle-reason
-op-worktrees-remain:
-  title: "Op worktrees still exist"
-  title_vi: "Vẫn còn cây làm việc của op"
-  meaning_vi: "Không dọn cây làm việc quy trình vì còn các cây của op nằm trong đó."
+op-worktree-dirty:
+  title: "Op worktree has uncommitted changes"
+  title_vi: "Cây làm việc của op còn thay đổi chưa commit"
+  meaning_vi: "Runtime cần đưa cây của op sang bản đã rebase lên main, nhưng các thay đổi chưa commit sẽ bị ghi đè."
   causes_vi:
-    - "op chưa xong hoặc chưa được dọn"
-  nextStep_vi: "Việc dọn bị từ chối; dọn hết cây op trước."
-  owner: runtime-core
-  kind: runtime-fault
+    - "Op sửa file mà không commit trước khi báo cáo"
+  nextStep_vi: "Main giữ nguyên. Op commit hoặc bỏ các thay đổi đó, báo cáo đầu nhánh mới rồi chốt lại."
+  owner: op-retry
+  kind: settle-reason
 orphan-kernel-job:
   title: "Orphaned Kernel job cancelled"
   title_vi: "Việc Kernel mồ côi bị hủy"
@@ -9115,6 +9079,16 @@ prerequisite-unmet:
   nextStep_vi: "Lệnh giao bị từ chối. Kernel làm cho đủ điều kiện (chạy bước còn thiếu) rồi giao lại."
   owner: supervisor
   kind: dispatch-refusal
+preserve-failed:
+  title: "Worktree work could not be preserved"
+  title_vi: "Không giữ lại được phần việc trong cây làm việc"
+  meaning_vi: "Trước khi xoá worktree, runtime lưu thay đổi chưa commit vào nhánh preserved/<tên>, nhưng bước lưu thất bại nên cây được giữ nguyên."
+  causes_vi:
+    - "Lỗi git khi ghi index tạm, cây hoặc commit"
+    - "Repo bị khoá hoặc hết chỗ đĩa"
+  nextStep_vi: "Không xoá gì, không mất việc. GC thử lại ở lượt sau; nếu lặp lại, xem chi tiết bước lỗi trong kết quả rồi sửa repo."
+  owner: runtime-core
+  kind: runtime-fault
 probe-failed:
   title: "Provider recovery probe failed"
   title_vi: "Thăm dò nhà cung cấp AI thất bại"
@@ -9134,16 +9108,6 @@ process-tree-lingers:
   nextStep_vi: "Việc đóng terminal không được ghi nhận là sạch; lượt dọn định kỳ (tick GC) sẽ thu dọn tiến trình còn sót."
   owner: runtime-core
   kind: runtime-fault
-product-integrate-red:
-  title: "Integration broke the workflow branch"
-  title_vi: "Tích hợp làm hỏng nhánh của luồng"
-  meaning_vi: "Phần việc đã xanh trên nền của nó, nhưng khi gộp vào nhánh của luồng thì kiểm tra bị đỏ nên phải hoàn lại."
-  causes_vi:
-    - "Xung đột ngầm với thay đổi của op khác"
-    - "Nhánh luồng đã đổi kể từ lúc op bắt đầu"
-  nextStep_vi: "Nhánh luồng được đưa về trạng thái trước; op tiếp tục trên nền mới (continuation), không tính là thất bại."
-  owner: op-retry
-  kind: runtime-fault
 product-land-conflict:
   title: "Land would conflict with main"
   title_vi: "Đưa vào main sẽ bị xung đột"
@@ -9151,15 +9115,6 @@ product-land-conflict:
   causes_vi:
     - "Main đã thay đổi cùng chỗ với nhánh luồng"
   nextStep_vi: "Không land gì, main giữ nguyên; thông báo liệt kê từng file xung đột để giải quyết trên nhánh luồng rồi land lại."
-  owner: supervisor
-  kind: blocker
-product-land-red:
-  title: "Checks red while landing"
-  title_vi: "Kiểm tra bị đỏ khi đưa vào main"
-  meaning_vi: "Khi thử áp nhánh luồng lên main, một số kiểm tra của cổng land thất bại."
-  causes_vi:
-    - "Code gộp với main mới nhất bị hỏng build hoặc test"
-  nextStep_vi: "Không land, main giữ nguyên; sửa các check đỏ ghi trong kết quả rồi land lại."
   owner: supervisor
   kind: blocker
 product-worktree-unavailable:
@@ -9335,15 +9290,6 @@ reason-missing:
   nextStep_vi: "Không đổi gì. Gửi lại kèm --reason ghi rõ lý do."
   owner: supervisor
   kind: input-invalid
-reason-required:
-  title: "Abandon needs a reason"
-  title_vi: "Bỏ nhánh cần có lý do"
-  meaning_vi: "Lệnh bỏ nhánh sản phẩm bị từ chối vì không ghi lý do."
-  causes_vi:
-    - "Dùng --abandon mà thiếu --reason"
-  nextStep_vi: "Không bỏ gì. Gửi lại kèm --reason."
-  owner: supervisor
-  kind: input-invalid
 record-change-not-owner:
   title: "Workflow does not own the record"
   title_vi: "Luồng không sở hữu hồ sơ này"
@@ -9410,16 +9356,6 @@ recut-empty:
   nextStep_vi: "Không thêm job. Kernel chờ việc đang chạy xong hoặc cắt lại phạm vi rồi thử lại."
   owner: supervisor
   kind: verb-refusal
-ref-unresolved:
-  title: "Git ref could not be resolved"
-  title_vi: "Không tìm thấy nhánh khi thử land"
-  meaning_vi: "Bước kiểm tra trước khi land không tìm thấy nhánh main hoặc nhánh của luồng trong kho."
-  causes_vi:
-    - "Nhánh của luồng chưa được tạo hoặc đã bị xóa"
-    - "Tên nhánh main khác"
-  nextStep_vi: "Không land gì. Kiểm tra nhánh có tồn tại trong kho rồi thử lại."
-  owner: runtime-core
-  kind: runtime-fault
 release-worker-not-settled:
   title: "Release on a job in wrong state"
   title_vi: "Nhả thợ khi job đang ở trạng thái không hợp lệ"
@@ -10046,25 +9982,6 @@ supervisor-di-overdue:
   nextStep_vi: "Hệ thống gửi thông báo khẩn cho chủ dự án để Supervisor được kích hoạt hoặc chủ dự án xử lý."
   owner: owner
   kind: blocker
-sync-merge-failed:
-  title: "Sync merge failed"
-  title_vi: "Gộp đồng bộ nhánh chính thất bại"
-  meaning_vi: "Việc gộp nhánh chính vào nhánh workflow gặp xung đột nên đã bị huỷ."
-  causes_vi:
-    - "Nhánh chính và workflow sửa cùng chỗ"
-  nextStep_vi: "Việc gộp được huỷ giữ nguyên nhánh; cần xử lý xung đột (thường qua job sửa) rồi đồng bộ lại."
-  owner: op-retry
-  kind: runtime-fault
-sync-update-failed:
-  title: "Sync ref update failed"
-  title_vi: "Cập nhật nhánh khi đồng bộ thất bại"
-  meaning_vi: "Đã tạo commit gộp nhưng không cập nhật được tham chiếu của nhánh workflow."
-  causes_vi:
-    - "Nhánh vừa bị người khác đổi"
-    - "Lỗi git tạm thời"
-  nextStep_vi: "Đồng bộ dừng; thử lại sau khi nhánh ổn định."
-  owner: runtime-core
-  kind: runtime-fault
 terminal-send-failed:
   title: "Terminal send failed"
   title_vi: "Gửi vào terminal thất bại"
@@ -10437,34 +10354,6 @@ worker-unavailable:
   nextStep_vi: "Nhắc bị từ chối; xử lý như worker chết (khởi động lại)."
   owner: op-retry
   kind: verb-refusal
-workflow-branch-missing:
-  title: "Workflow branch missing"
-  title_vi: "Thiếu nhánh của workflow"
-  meaning_vi: "Không tìm thấy nhánh git của workflow khi đưa code vào nhánh chính."
-  causes_vi:
-    - "Nhánh bị xoá hoặc chưa tạo"
-  nextStep_vi: "Việc đưa code dừng; cần dựng lại nhánh hoặc kiểm tra workflow."
-  owner: runtime-core
-  kind: runtime-fault
-workflow-ff-failed:
-  title: "Workflow fast-forward failed"
-  title_vi: "Đưa nhánh workflow lên thất bại"
-  meaning_vi: "Không thể fast-forward nhánh workflow tới commit mới."
-  causes_vi:
-    - "Nhánh workflow đã đi khác"
-    - "Worktree đang có thay đổi"
-  nextStep_vi: "Bước gộp dừng; đồng bộ lại nhánh rồi thử lại."
-  owner: runtime-core
-  kind: runtime-fault
-workflow-moved:
-  title: "Workflow branch moved"
-  title_vi: "Nhánh workflow đã bị đổi"
-  meaning_vi: "Nhánh workflow thay đổi trong lúc gộp nên cập nhật bị bỏ."
-  causes_vi:
-    - "Có tiến trình khác cập nhật nhánh cùng lúc"
-  nextStep_vi: "Bước gộp thất bại; thử lại từ đầu trên nhánh mới."
-  owner: runtime-core
-  kind: runtime-fault
 workflow-not-running:
   title: "Workflow not running"
   title_vi: "Workflow không ở trạng thái chạy"
@@ -10493,35 +10382,6 @@ workflow-unknown:
   nextStep_vi: "Lệnh bị từ chối; dùng đúng mã workflow."
   owner: op-retry
   kind: input-invalid
-workflow-unlanded:
-  title: "Workflow branch not landed"
-  title_vi: "Nhánh workflow chưa được đưa vào"
-  meaning_vi: "Không dọn worktree vì nhánh workflow chưa được đưa vào nhánh chính."
-  causes_vi:
-    - "Chưa land"
-    - "Workflow chưa bị bỏ"
-  nextStep_vi: "Việc dọn dẹp dừng; land nhánh hoặc bỏ workflow rồi dọn."
-  owner: owner
-  kind: runtime-fault
-workflow-worktree-dirty:
-  title: "Workflow worktree has changes"
-  title_vi: "Worktree workflow đang có thay đổi"
-  meaning_vi: "Worktree của workflow có thay đổi chưa commit nên không đồng bộ được."
-  causes_vi:
-    - "Có file sửa dở"
-  nextStep_vi: "Bước đồng bộ dừng; commit hoặc dọn thay đổi rồi chạy lại."
-  owner: runtime-core
-  kind: runtime-fault
-workflow-worktree-missing:
-  title: "Workflow worktree missing"
-  title_vi: "Thiếu worktree của workflow"
-  meaning_vi: "Thư mục worktree của workflow không còn tồn tại."
-  causes_vi:
-    - "Bị xoá tay"
-    - "Dọn nhầm"
-  nextStep_vi: "Việc gộp dừng; dựng lại worktree rồi thử lại."
-  owner: runtime-core
-  kind: runtime-fault
 worktree-add-failed:
   title: "Adding worktree failed"
   title_vi: "Tạo worktree thất bại"
@@ -10532,6 +10392,16 @@ worktree-add-failed:
   nextStep_vi: "Không có worktree; xem chi tiết lỗi git rồi thử lại."
   owner: runtime-core
   kind: runtime-fault
+worktree-cap:
+  title: "Repository is at its worktree cap"
+  title_vi: "Repo đã đủ số cây làm việc cho phép"
+  meaning_vi: "Repo sản phẩm đang có đủ số worktree sống theo giới hạn (worktrees.capPerRepo), nên op mới chưa được giao."
+  causes_vi:
+    - "Nhiều op của repo đang chạy cùng lúc"
+    - "Worktree của op đã xong chưa được dọn"
+  nextStep_vi: "Job vẫn xếp hàng, không tốn lượt thử. Khi một op chốt xong hoặc GC dọn worktree, lượt giao sau sẽ chạy."
+  owner: runtime-core
+  kind: dispatch-refusal
 worktree-path-occupied:
   title: "Worktree path occupied"
   title_vi: "Thư mục worktree bị chiếm"
@@ -10541,6 +10411,15 @@ worktree-path-occupied:
   nextStep_vi: "Việc tạo dừng; dọn thư mục thủ công rồi tạo lại."
   owner: runtime-core
   kind: runtime-fault
+worktree-registry-unavailable:
+  title: "Worktree registry unavailable"
+  title_vi: "Không ghi được sổ đăng ký cây làm việc"
+  meaning_vi: "Runtime không ghi được worktree vào machine.sqlite nên không tạo worktree cho op (không có sổ thì không đếm giới hạn và không dọn được)."
+  causes_vi:
+    - "machine.sqlite đang bận hoặc bị khoá"
+  nextStep_vi: "Job vẫn xếp hàng chờ. Lượt giao sau thử lại; nếu lặp lại, kiểm tra machine.sqlite."
+  owner: runtime-core
+  kind: dispatch-refusal
 zip-corrupt:
   title: "Zip archive corrupt"
   title_vi: "File zip bị hỏng"

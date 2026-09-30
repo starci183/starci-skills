@@ -45,7 +45,7 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   run({ ledger, args, repo, emit, internals }) {
-    const { skillRoot, SETTLED, opSlotAdmission, queuedSeamsOf, observeOperationWorker, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, DISPATCH_LEASE_TTL_MS, opLeaseRequests, livePathLeaseWait, reserveOpLeases, envServicesOf, servingWorktreeOf, environmentPreStep, raiseEnvironmentIncident, opGuardLaunch } = internals;
+    const { skillRoot, SETTLED, opSlotAdmission, queuedSeamsOf, observeOperationWorker, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, DISPATCH_LEASE_TTL_MS, opLeaseRequests, livePathLeaseWait, reserveOpLeases, envServicesOf, environmentPreStep, raiseEnvironmentIncident, opGuardLaunch } = internals;
 
   const db = ledger.db, jobId = args.job;
   // Dispatch never re-decides the route; a Kernel's --prefer/--avoid is an unknown option here as on api route.
@@ -180,8 +180,7 @@ export default {
   // stays queued behind an [environment] incident. `--env-gate off` (or STARCI_ENV_GATE=off) skips it.
   let environmentHealth = null;
   if (ENV_GATED_OPS.includes(op) && args['env-gate'] !== 'off' && process.env.STARCI_ENV_GATE !== 'off') {
-    const serve = bestEffort(() => servingWorktreeOf(db, job.workflow_id));
-    environmentHealth = environmentPreStep(repo, payload, serve?.path ? serve : null);
+    environmentHealth = environmentPreStep(repo, payload);
     if (environmentHealth?.declared) {
       ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'environment-checked',
         payload: { op, ready: environmentHealth.ready, hardBlock: environmentHealth.hardBlock, services: envServicesOf(environmentHealth) } }));
@@ -212,9 +211,11 @@ export default {
   const dispatchParams = resolveOpParams(briefDoc, {}).params;
   for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
   // Product worktrees (DESIGN §16.7, scripts/kernel/product-worktree.mjs): an op whose policy.isolation is `worktree` and
-  // whose owned paths land in the bound app repository runs in ONE app worktree
-  // <repo>/.starciwork/worktrees/<wf>/<op> on op/<op>, off the workflow's integration branch wf/<wf>. Only a --spawn
-  // makes it (reused by a requeued attempt; a continuation starts from its predecessor's archived commits).
+  // whose owned paths land in the bound app repository runs in exactly ONE app worktree
+  // <repo>/.starciwork/worktrees/<op> on op/<op>, off the app's main. Only a --spawn makes it (reused by a requeued
+  // attempt; a continuation starts from its predecessor's preserved work). The worktree API caps each repository
+  // (worktrees.capPerRepo): a full repository refuses worktree-cap and the job stays queued until the GC or a settle
+  // frees a slot.
   const productIsolation = (() => {
     if (args.worktree) return { isolate: false, reason: 'worktree-flag' };
     try {
@@ -226,11 +227,14 @@ export default {
   let productWorktree = null;
   if (productIsolation.isolate && args.spawn) {
     const handFrom = [payload.retry?.retryOf, payload.retry?.resumeOf, payload.kernelEdit?.continuationOf].filter(Boolean);
-    const made = ensureOpWorktree({ repoRoot: productIsolation.repoRoot, workflowId: job.workflow_id, jobId, handFrom,
+    const made = ensureOpWorktree({ repoRoot: productIsolation.repoRoot, workflowId: job.workflow_id, jobId, handFrom, ledgerId: ledger.ledgerId ?? null,
       onEvent: (kind, p) => ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind, payload: p })) });
     if (!made.ok) {
-      const out = { ok: false, jobId, op, reason: 'product-worktree-unavailable', detail: { reason: made.reason, detail: made.detail ?? null, repoRoot: productIsolation.repoRoot } };
-      emit(out, `dispatch REFUSED for ${jobId} (${op}): product-worktree-unavailable — ${made.reason}${made.detail ? ` ${JSON.stringify(made.detail).slice(0, 300)}` : ''}; job stays queued`, args.json);
+      const full = made.reason === 'worktree-cap';
+      const detail = { reason: made.reason, detail: made.detail ?? null, repoRoot: productIsolation.repoRoot, ...(full ? { live: made.live, cap: made.cap } : {}) };
+      const out = full ? { ok: false, jobId, op, reason: 'worktree-cap', waiting: true, detail } : { ok: false, jobId, op, reason: 'product-worktree-unavailable', detail };
+      emit(out, full ? `dispatch WAITS for ${jobId} (${op}): worktree-cap — ${productIsolation.repoRoot} holds ${made.live} live worktree(s), cap ${made.cap}; the job stays queued and costs no attempt until a settle or the GC frees a slot`
+        : `dispatch REFUSED for ${jobId} (${op}): product-worktree-unavailable — ${made.reason}${made.detail ? ` ${JSON.stringify(made.detail).slice(0, 300)}` : ''}; job stays queued`, args.json);
       process.exit(1);
     }
     productWorktree = made.record;
@@ -258,10 +262,9 @@ export default {
   const boundGoal = payload.goal_binding?.revision != null
     ? db.prepare('SELECT * FROM goals WHERE workflow_id=? AND revision=?').get(job.workflow_id, payload.goal_binding.revision) ?? null : null;
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
-  if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies,
-    ...(environmentHealth.environments?.some((e) => e.servedFrom) ? { servedFrom: environmentHealth.environments.filter((e) => e.servedFrom).map((e) => ({ env: e.id, ...e.servedFrom })) } : {}) };
+  if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
   if (payload.repairFor) packet.context.repair_for = payload.repairFor;
-  if (productWorktree) packet.context.product_worktree = { repo: productWorktree.repoRoot, op: productWorktree.op, workflow: productWorktree.workflow, baseSha: productWorktree.baseSha ?? null, ...(productWorktree.preview ? { preview: true } : {}) };
+  if (productWorktree) packet.context.product_worktree = { repo: productWorktree.repoRoot, op: productWorktree.op, main: productWorktree.main ?? 'main', baseSha: productWorktree.baseSha ?? null, ...(productWorktree.preview ? { preview: true } : {}) };
   else if (productIsolation.reason && productIsolation.reason !== 'policy-shared') packet.context.product_isolation = { isolate: false, reason: productIsolation.reason };
   // The cut manifest the brief binds before the first edit (cut-seam.mjs cutManifestOf): every ordinal's paths and
   // status, the path union and the passed ordinals, read from the ledger now. Packet-only: never persisted on the job.

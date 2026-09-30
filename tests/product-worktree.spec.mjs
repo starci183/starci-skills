@@ -1,8 +1,8 @@
 // Product worktrees (DESIGN §16.7, FMEA #20; scripts/kernel/product-worktree.mjs). fe-canon 2026-09-28: 16 code.refactor
 // slices shared ONE nivo-fe tree, a slice moving apps/app/src/i18n/request.ts changed a sibling's checker inputs mid-run
-// (INPUTS_CHANGED_DURING_CHECK). Each op now works in its own worktree off its workflow's integration branch, with a
+// (INPUTS_CHANGED_DURING_CHECK). Each op now works in exactly one worktree off main (owner order lane WT), with a
 // node_modules junction overlay whose workspace packages point at the worktree's OWN copy, and the worktree is removed
-// (junctions unlinked first, verified) right after the job is released.
+// (links removed first, verified) right after the job is released. The land into main is tests/worktree-lifecycle.spec.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,13 +11,9 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import {
-  ensureOpWorktree, ensureWorkflowWorktree, integrateOp, removeOpWorktree, removeWorkflowWorktree, layoutOf, verifyResolution,
-  reapJobWorktree, archivedOpRef, planIsolation, shortIdOf, EVENTS, applyDepsUnit, installedIn,
+  ensureOpWorktree, removeOpWorktree, verifyResolution, reapJobWorktree, preservedOpRef, planIsolation, shortIdOf, EVENTS,
 } from '../scripts/kernel/product-worktree.mjs';
 import { WORKTREES_REL } from '../scripts/lib/worktree-exclude.mjs';
-
-// The land gate is judged by tests/op-gate-loop.spec.mjs; these fixtures carry no app install, so their land gate is green.
-const greenGate = () => ({ exit: 0, counts: { new: 0 }, findings: [], errors: [] });
 
 const WF = 'wf-nivo-fe-canon-mujek980';
 const git = (cwd, ...args) => {
@@ -62,17 +58,18 @@ function fixtureRepo(t) {
   return { base, repo };
 }
 
-test('two jobs of one workflow get two sibling worktrees off wf/<wf>; the product checkout stays clean', (t) => {
+test('two jobs of one workflow get exactly one worktree each off main, no workflow worktree; the product checkout stays clean', (t) => {
   const { repo } = fixtureRepo(t);
   const a = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-d704825abb' });
   const b = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-97666fb9ba' });
   assert.ok(a.ok, JSON.stringify(a)); assert.ok(b.ok, JSON.stringify(b));
-  const root = path.join(repo, ...WORKTREES_REL.split('/'), 'mujek980');
-  assert.equal(a.record.workflow.path, path.join(root, '_wf'));
+  const root = path.join(repo, ...WORKTREES_REL.split('/'));
   assert.equal(a.record.op.path, path.join(root, 'd704825a'));
   assert.equal(b.record.op.path, path.join(root, '97666fb9'));
   assert.equal(a.record.op.branch, 'op/d704825a');
-  assert.equal(a.record.workflow.branch, 'wf/mujek980');
+  assert.equal(a.record.workflow, undefined, 'no workflow integration worktree');
+  assert.deepEqual(fs.readdirSync(root).sort(), ['97666fb9', 'd704825a'], 'only the two op trees');
+  assert.equal(git(repo, 'worktree', 'list', '--porcelain').split('\n').filter((l) => l.startsWith('worktree ')).length, 3, 'main + one per op');
   assert.equal(git(repo, 'config', '--get', 'branch.op/d704825a.description'), 'op-code.refactor-d704825abb', 'the short branch names its full job id');
   assert.equal(git(repo, 'config', '--get', 'core.longpaths'), 'true');
   assert.match(fs.readFileSync(path.join(repo, '.git', 'info', 'exclude'), 'utf8'), /^\/\.starciwork\/worktrees\/$/m);
@@ -124,67 +121,19 @@ test('a file move in one op worktree is invisible to its sibling; removal never 
   assert.ok(fs.existsSync(path.join(repo, 'packages', 'ui', 'index.js')), 'the root workspace package is untouched');
   assert.ok(fs.existsSync(path.join(repo, 'apps', 'app', 'node_modules', 'lodash', 'package.json')));
   assert.ok(fs.existsSync(path.join(b.op.path, 'packages', 'ui', 'index.js')), 'the sibling worktree is untouched');
-  // Its commit was never integrated: the branch is archived for a continuation, not lost.
-  assert.ok(removed.branch.archived?.ref.startsWith('refs/starci/archive/op/'), JSON.stringify(removed.branch));
-  assert.equal(archivedOpRef(repo, 'op-code.refactor-d704825abb')?.sha, git(repo, 'rev-parse', removed.branch.archived.ref));
-  // A continuation of that job starts from the archived commit and consumes the archive.
+  // Its commit never landed: it is preserved for a continuation, not lost, and the op branch is gone.
+  assert.equal(removed.preserved?.ref, 'refs/heads/preserved/op-code.refactor-d704825abb', JSON.stringify(removed));
+  assert.equal(preservedOpRef(repo, 'op-code.refactor-d704825abb')?.sha, git(repo, 'rev-parse', removed.preserved.ref));
+  assert.equal(removed.branch.deleted, true);
+  assert.equal(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/op/d704825a'], { cwd: repo }).status, 1, 'no op branch left');
+  // A continuation of that job starts from the preserved work and consumes it.
   const cont = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-aa11bb22cc', handFrom: ['op-code.refactor-d704825abb'] });
   assert.ok(cont.ok, JSON.stringify(cont));
   assert.ok(fs.existsSync(path.join(cont.record.op.path, 'apps/app/src/modules/i18n/request.ts')), 'the continuation holds the partial commit');
-  assert.equal(archivedOpRef(repo, 'op-code.refactor-d704825abb'), null, 'the archive was handed over');
+  assert.equal(preservedOpRef(repo, 'op-code.refactor-d704825abb'), null, 'the preserved branch was handed over');
 });
 
-test('integration: a green op lands in wf/<wf>; a conflicting one is refused with hunks; a red post-merge verify rolls back', (t) => {
-  const { repo } = fixtureRepo(t);
-  const a = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-d704825abb' }).record;
-  const b = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-97666fb9ba' }).record;
-  write(a.op.path, 'apps/app/src/i18n/request.ts', 'export const locale = "en";\n');
-  git(a.op.path, 'commit', '-qam', 'a: en');
-  write(b.op.path, 'apps/app/src/i18n/request.ts', 'export const locale = "fr";\n');
-  git(b.op.path, 'commit', '-qam', 'b: fr');
-  const before = git(repo, 'rev-parse', 'wf/mujek980');
-  const okA = integrateOp({ gate: greenGate, record: a, head: git(a.op.path, 'rev-parse', 'HEAD') });
-  assert.ok(okA.ok, JSON.stringify(okA));
-  assert.equal(git(repo, 'rev-parse', 'wf/mujek980'), okA.after);
-  assert.equal(fs.readFileSync(path.join(a.workflow.path, 'apps/app/src/i18n/request.ts'), 'utf8'), 'export const locale = "en";\n', 'the _wf tree moved with its branch');
-  assert.equal(git(repo, 'cherry', 'wf/mujek980', git(a.op.path, 'rev-parse', 'HEAD'), before).split('\n')[0][0], '-', 'the rebased commit is patch-equivalent in wf');
-  assert.equal(integrateOp({ gate: greenGate, record: a, head: git(a.op.path, 'rev-parse', 'HEAD') }).already, true, 'idempotent');
-  const conflict = integrateOp({ gate: greenGate, record: b, head: git(b.op.path, 'rev-parse', 'HEAD') });
-  assert.equal(conflict.ok, false);
-  assert.equal(conflict.reason, 'product-integrate-conflict');
-  assert.equal(conflict.conflicts[0].file, 'apps/app/src/i18n/request.ts');
-  assert.match(conflict.conflicts[0].hunks[0].text, /<<<<<<< /);
-  assert.equal(git(repo, 'rev-parse', 'wf/mujek980'), okA.after, 'a refused integration leaves wf untouched');
-  // An op green on its own base that imports a path the workflow branch lacks: rolled back, a continuation.
-  const c = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-cc33dd44ee' }).record;
-  write(c.op.path, 'apps/app/src/c.ts', 'import { x } from "@/i18n/gone";\nexport const c = x;\n');
-  git(c.op.path, 'add', '-A'); git(c.op.path, 'commit', '-qm', 'c');
-  const red = integrateOp({ gate: greenGate, record: c, head: git(c.op.path, 'rev-parse', 'HEAD') });
-  assert.equal(red.reason, 'product-integrate-red', JSON.stringify(red));
-  assert.match(red.failures.join(' '), /IMPORTS_BROKEN_AFTER_MOVE/);
-  assert.equal(red.continuation.base, okA.after);
-  assert.equal(git(repo, 'rev-parse', 'wf/mujek980'), okA.after, 'rolled back');
-  assert.ok(!fs.existsSync(path.join(a.workflow.path, 'apps/app/src/c.ts')));
-  // A dependency manifest change is the deps unit's.
-  const d = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-ee55ff66aa' }).record;
-  write(d.op.path, 'package.json', JSON.stringify({ name: 'nivo', private: true, workspaces: ['apps/*', 'packages/*'], dependencies: { x: '1' } }));
-  git(d.op.path, 'commit', '-qam', 'deps');
-  const refused = integrateOp({ gate: greenGate, record: d });
-  assert.equal(refused.reason, 'deps-unit-required');
-  assert.match(refused.hint, /api product-deps --workflow wf-nivo-fe-canon-mujek980 --from-job op-code.refactor-ee55ff66aa/);
-  // The serial deps unit: the manifests land on wf/<wf>, _wf gets a real install, the op overlays now mirror it.
-  const installs = [];
-  const deps = applyDepsUnit({ record: d, install: (argv, cwd) => { installs.push({ argv, cwd }); write(cwd, 'node_modules/x/package.json', '{"name":"x"}'); return { ok: true, exitCode: 0 }; } });
-  assert.ok(deps.ok, JSON.stringify(deps));
-  assert.deepEqual(deps.files, ['package.json']);
-  assert.deepEqual(installs, [{ argv: ['npm', 'ci'], cwd: d.workflow.path }]);
-  assert.ok(installedIn(d.workflow.path), 'the _wf holds the real install');
-  assert.equal(real(path.join(d.op.path, 'node_modules', 'x')), real(path.join(d.workflow.path, 'node_modules', 'x')), 'the op overlay mirrors the workflow install');
-  assert.ok(deps.rebuilt.some((r) => r.path === d.op.path && r.ok));
-  assert.equal(integrateOp({ gate: greenGate, record: d }).ok, true, 'its manifests are the workflow branch now: the op settles');
-});
-
-test('released -> worktree-removed: the reap records the transition once; the workflow worktree waits for its land', (t) => {
+test('released -> worktree-removed: the reap records the transition once', (t) => {
   const { base, repo } = fixtureRepo(t);
   const ledgerRepo = path.join(base, 'nivo-backend');
   fs.mkdirSync(ledgerRepo);
@@ -206,20 +155,17 @@ test('released -> worktree-removed: the reap records the transition once; the wo
   assert.deepEqual(JSON.parse(ev[0].payload_json).verified, { dirGone: true, pruned: true });
   assert.equal(JSON.parse(ev[0].payload_json).from, 'released');
   assert.equal(reapJobWorktree({ ledger, ledgerRepo, jobId }).skipped, 'already-removed', 'idempotent');
-  // The workflow worktree: unlanded -> kept; landed (wf in main) -> removed with its branch, <wf> dir gone.
-  const lay = layoutOf({ repoRoot: repo, workflowId: WF });
-  assert.equal(removeWorkflowWorktree({ repoRoot: repo, workflowId: WF }).ok, true, 'wf/<wf> has no commit of its own yet: nothing unlanded');
-  assert.ok(!fs.existsSync(lay.wfDir), 'the empty <wf> directory is removed');
+  assert.ok(!fs.existsSync(made.record.op.path));
   assert.ok(fs.existsSync(path.join(repo, 'node_modules', 'react', 'index.js')));
   } finally { ledger.close(); }
 });
 
-test('isolation is opt-in by op policy and uses the one app repository for either side', (t) => {
+test('isolation is opt-in by op policy and never takes the Work owner repository', (t) => {
   const { repo } = fixtureRepo(t);
-  const binding = { appRoot: repo, repos: [{ role: 'be', root: path.join(repo, 'be') }, { role: 'fe', root: path.join(repo, 'fe') }] };
+  const binding = { ownerRole: 'be', repos: [{ role: 'be', root: process.cwd() }, { role: 'fe', root: repo }] };
   assert.equal(planIsolation({ brief: { policy: {} }, placements: [], binding }).reason, 'policy-shared');
-  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'be', via: 'placement' }], binding }).repoRoot, repo);
-  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'be' }, { role: 'fe' }], binding }).repoRoot, repo);
+  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'be', via: 'placement' }], binding }).reason, 'work-owner-only');
+  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'fe', via: 'path-repository-name' }], binding }).isolate, true);
   assert.equal(shortIdOf('wf-nivo-fe-canon-mujek980'), 'mujek980');
   assert.equal(shortIdOf('op-code.refactor-d704825abb'), 'd704825a');
 });
@@ -227,9 +173,9 @@ test('isolation is opt-in by op policy and uses the one app repository for eithe
 test('the .starciwork holding the worktrees container is never the Work root of a path inside a worktree', async () => {
   const { workRootOf } = await import('../scripts/work/work-io.mjs');
   const repo = path.resolve(os.tmpdir(), 'nivo-fe');
-  assert.equal(workRootOf(path.join(repo, '.starciwork', 'worktrees', 'mujek980', 'd704825a', 'apps', 'app')), null);
-  assert.equal(workRootOf(path.join(repo, '.starciwork', 'worktrees', 'mujek980', 'd704825a', '.starciwork', 'features')),
-    path.join(repo, '.starciwork', 'worktrees', 'mujek980', 'd704825a', '.starciwork'), 'a worktree\'s own Work dir still is');
+  assert.equal(workRootOf(path.join(repo, '.starciwork', 'worktrees', 'd704825a', 'apps', 'app')), null);
+  assert.equal(workRootOf(path.join(repo, '.starciwork', 'worktrees', 'd704825a', '.starciwork', 'features')),
+    path.join(repo, '.starciwork', 'worktrees', 'd704825a', '.starciwork'), 'a worktree\'s own Work dir still is');
 });
 
 test('defaultIsolation worktree takes every committing op; non-committing ops and the runtime repo keep the shared tree', async () => {
@@ -239,27 +185,6 @@ test('defaultIsolation worktree takes every committing op; non-committing ops an
   assert.equal(isolationOf({ policy: { commitPolicy: { mode: 'none' } } }, settings), 'shared', 'an op that never commits would lose its writes');
   assert.equal(isolationOf({ policy: {} }, settings), 'shared');
   assert.equal(isolationOf({ policy: { isolation: 'shared', commitPolicy: { mode: 'scoped-local-commit' } } }, settings), 'shared', 'a brief may opt out');
-  const binding = { appRoot: SKILL_ROOT, repos: [{ role: 'be', root: path.join(SKILL_ROOT, 'be') }, { role: 'fe', root: path.join(SKILL_ROOT, 'fe') }] };
-  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'fe', via: 'path-repository' }], binding }).reason, 'runtime-repo');
-});
-
-test('the environment pre-step serves the product repo\'s services from the WORKFLOW worktree on its own port', async () => {
-  const { retargetEnvironment } = await import('../scripts/uat/env-health.mjs');
-  const repo = path.resolve(os.tmpdir(), 'nivo-backend'), fe = path.resolve(os.tmpdir(), 'nivo-fe');
-  const wf = path.join(fe, '.starciwork', 'worktrees', 'mujek980', '_wf');
-  const doc = { id: 'env.local', configuration: { ports: { app: 3067, api: 3068 },
-    start: { app: { command: 'npm run dev -- -p 3067', cwd: '../nivo-fe/apps/app' }, api: { command: 'npm run start', cwd: '.' } } },
-  probes: [{ id: 'app', target: 'http://localhost:3067/', expect: 200 }, { id: 'api', target: 'http://localhost:3068/health/live' }],
-  target: { origins: { app: 'http://localhost:3067' } } };
-  const { doc: out, moved } = retargetEnvironment(doc, { repo, worktree: { path: wf, repoRoot: fe, port: 43500, tag: 'mujek980' } });
-  assert.deepEqual(Object.keys(moved), ['app'], 'only the product repository\'s service moves; the API stays shared');
-  assert.equal(out.id, 'env.local@mujek980', 'one registry entry per worktree');
-  assert.equal(out.configuration.start.app.cwd, path.join(wf, 'apps', 'app'));
-  assert.deepEqual(out.configuration.start.app.command, ['npm', 'run', 'dev', '--', '-p', '43500']);
-  assert.equal(out.configuration.start.app.env.PORT, '43500');
-  assert.equal(out.probes[0].target, 'http://localhost:43500/');
-  assert.equal(out.probes[1].target, 'http://localhost:3068/health/live');
-  assert.equal(out.target.origins.app, 'http://localhost:43500');
-  assert.equal(doc.configuration.start.app.cwd, '../nivo-fe/apps/app', 'the declaration itself is untouched');
-  assert.equal(retargetEnvironment(doc, { repo, worktree: null }).doc, doc, 'no worktree: the live checkout as before');
+  const binding = { ownerRole: 'be', repos: [{ role: 'be', root: path.resolve(SKILL_ROOT, '..') }, { role: 'grammar', root: SKILL_ROOT }] };
+  assert.equal(planIsolation({ brief: { policy: { isolation: 'worktree' } }, placements: [{ role: 'grammar', via: 'path-repository' }], binding }).reason, 'runtime-repo');
 });

@@ -9,8 +9,6 @@
 // servers by hand and none of that reached the ledger as an environment fact.
 //
 //   check  --repo <ledger repo> (--env <id|resource.yaml>[,...] | --paths <owned paths json|csv>)
-//          [--worktree <workflow worktree> --worktree-repo <product repo> --worktree-port N [--worktree-tag <wf>]]
-//          (DESIGN §16.7: the product repo's services start from the WORKFLOW worktree on its own ports; retargetEnvironment)
 //          [--restart] [--probe-timeout-ms N] [--ready-timeout-ms N] [--json]
 //      Resolves the work/resource@1 environment(s) - by id, or from the refs of the uat/e2e records
 //      the paths name - and runs every declared probe. Per service it reports a state:
@@ -267,42 +265,6 @@ const serviceOfUrl = (doc, url) => {
   return { service: byPort ?? byOrigin, port };
 };
 
-const pathInside = (child, parent) => { const rel = path.relative(path.resolve(parent), path.resolve(child)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
-
-/**
- * Serve an environment from a workflow's integration worktree (DESIGN §16.7, mitigation 5): every service whose start
- * cwd lies in the product repository `repoRoot` starts from the same relative dir of `worktree.path` on its own port
- * (worktree.port + the service's index), its declared port rewritten in the probes, origins, ports map and start command
- * and passed as PORT. Services of other repositories (the backend API) stay shared. The environment id gets
- * `@<tag>`, so the server registry keeps one entry per worktree. Pure: returns a new doc and the port map.
- */
-export function retargetEnvironment(doc, { repo, worktree }) {
-  if (!doc || !worktree?.path || !worktree?.repoRoot) return { doc, moved: {} };
-  const out = JSON.parse(JSON.stringify(doc));
-  const start = out?.configuration?.start ?? {};
-  const ports = out?.configuration?.ports ?? {};
-  const moved = {};
-  let i = 0;
-  for (const [name, spec] of Object.entries(start)) {
-    const cwd = path.resolve(repo ?? '.', spec?.cwd ?? '.');
-    if (!pathInside(cwd, worktree.repoRoot)) continue;
-    const from = Number(ports[name]) || null;
-    const to = Number(worktree.port) + i;
-    i += 1;
-    spec.cwd = path.join(worktree.path, path.relative(path.resolve(worktree.repoRoot), cwd));
-    spec.env = { ...(spec.env ?? {}), PORT: String(to) };
-    if (from) {
-      spec.command = splitCommand(spec.command).map((t) => (t === String(from) ? String(to) : t.replace(new RegExp(`^(--port=|-p=)${from}$`), `$1${to}`)));
-      if (out.configuration?.ports) out.configuration.ports[name] = to;
-    }
-    moved[name] = { from, to, cwd: spec.cwd };
-  }
-  const swap = (url) => { try { const u = new URL(url); const hit = Object.values(moved).find((m) => m.from && Number(u.port) === m.from); if (hit) { u.port = String(hit.to); return u.toString().replace(/\/$/, url.endsWith('/') ? '/' : ''); } } catch { /* not a url */ } return url; };
-  for (const probe of Array.isArray(out.probes) ? out.probes : []) if (probe?.target) probe.target = swap(String(probe.target));
-  for (const [k, o] of Object.entries(out?.target?.origins ?? {})) out.target.origins[k] = swap(String(o));
-  if (Object.keys(moved).length) out.id = `${doc.id}@${worktree.tag ?? path.basename(path.dirname(worktree.path))}`;
-  return { doc: out, moved };
-}
 
 /** Check one environment resource. */
 export async function checkEnvironment(doc, { restart = false, roots = [], probeTimeoutMs = DEFAULT_PROBE_TIMEOUT_MS, readyTimeoutMs = DEFAULT_READY_TIMEOUT_MS, env = process.env, repo = null } = {}) {
@@ -360,17 +322,15 @@ export async function checkEnvironment(doc, { restart = false, roots = [], probe
 }
 
 /** Check every environment a request names. */
-export async function checkEnvironments({ repo, ids = [], paths = [], restart = false, probeTimeoutMs, readyTimeoutMs, env = process.env, worktree = null } = {}) {
+export async function checkEnvironments({ repo, ids = [], paths = [], restart = false, probeTimeoutMs, readyTimeoutMs, env = process.env } = {}) {
   const wanted = [...new Set([...ids, ...environmentIdsOfPaths(repo, paths)])];
-  const roots = [...workspaceRoots(repo), ...(worktree?.path ? [path.resolve(worktree.path)] : [])];
+  const roots = workspaceRoots(repo);
   const environments = [], unresolved = [];
   for (const id of wanted) {
     const file = environmentFile(repo, id);
     const declared = file ? readYaml(file) : null;
     if (!declared) { unresolved.push(id); continue; }
-    const { doc, moved } = retargetEnvironment(declared, { repo, worktree });
-    environments.push({ file: path.relative(repo, file).replace(/\\/g, '/'), ...(Object.keys(moved).length ? { servedFrom: { worktree: worktree.path, services: moved } } : {}),
-      ...(await checkEnvironment(doc, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo })) });
+    environments.push({ file: path.relative(repo, file).replace(/\\/g, '/'), ...(await checkEnvironment(declared, { restart, roots, probeTimeoutMs, readyTimeoutMs, env, repo })) });
   }
   const services = environments.flatMap((e) => e.services);
   const ready = environments.every((e) => e.ready);
@@ -407,10 +367,8 @@ export async function envHealthMain(argv, { write = (s) => process.stdout.write(
   if (verb === 'status') return emit({ schema: ENV_HEALTH_SCHEMA, servers: listRegistered(env) }, EXIT_READY);
   if (verb === 'check') {
     if (!args.repo) return emit({ ok: false, error: 'check needs --repo <ledger repo>' }, EXIT_USAGE);
-    const worktree = typeof args.worktree === 'string' && typeof args['worktree-repo'] === 'string' && Number(args['worktree-port']) > 0
-      ? { path: path.resolve(args.worktree), repoRoot: path.resolve(args['worktree-repo']), port: Number(args['worktree-port']), tag: typeof args['worktree-tag'] === 'string' ? args['worktree-tag'] : undefined } : null;
     const result = await checkEnvironments({ repo: path.resolve(args.repo), ids: listOf(args.env), paths: listOf(args.paths), restart: Boolean(args.restart),
-      probeTimeoutMs: Number(args['probe-timeout-ms']) || DEFAULT_PROBE_TIMEOUT_MS, readyTimeoutMs: Number(args['ready-timeout-ms']) || DEFAULT_READY_TIMEOUT_MS, env, worktree });
+      probeTimeoutMs: Number(args['probe-timeout-ms']) || DEFAULT_PROBE_TIMEOUT_MS, readyTimeoutMs: Number(args['ready-timeout-ms']) || DEFAULT_READY_TIMEOUT_MS, env });
     return emit(result, result.ready ? EXIT_READY : EXIT_NOT_READY);
   }
   if (verb === 'serve') {

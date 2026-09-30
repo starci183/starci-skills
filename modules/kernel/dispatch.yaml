@@ -319,28 +319,29 @@ preflight:
     meaning: >-
       Where an isolated op works (DESIGN §16.7; scripts/kernel/product-worktree.mjs). An op whose brief sets
       policy.isolation: worktree (default: modules/kernel/product-land.yaml defaultIsolation) and whose owned
-      paths land in ONE bound product repository other than the Work owner gets its OWN git worktree
-      <repo>/.starciwork/worktrees/<wf>/<op> on branch op/<op>, cut from the workflow's integration branch
-      wf/<wf> (worktree <repo>/.starciwork/worktrees/<wf>/_wf, cut from the product's main at the workflow's
-      first isolated job). `api dispatch --spawn` creates it (a requeued attempt reuses it; a continuation
-      starts from its predecessor's archived commits), places the worker there (the Orca terminal / managed
+      paths land in ONE bound product repository other than the Work owner gets exactly ONE git worktree
+      <repo>/.starciwork/worktrees/<op> on branch op/<op>, cut from the product's main. `api dispatch --spawn`
+      creates it through the one worktree API (scripts/lib/worktrees.mjs createWorktree: registered in
+      machine.sqlite worktrees with its owner op, repo, branch and created-at; capped per repository by
+      modules/kernel/product-land.yaml worktrees.capPerRepo), a requeued attempt reuses it, a continuation starts
+      from its predecessor's preserved/<job> branch. It places the worker there (the Orca terminal / managed
       worker's worktree, owned-path placements, packet paths) and records payload.productWorktree
-      {repoRoot, workflow {short, branch, path, port}, op {short, branch, path}, baseSha}. node_modules is a
-      junction overlay (workspace packages point at the worktree's own copy). Dev servers, UAT and drawing
-      run against the workflow worktree on its port: the environment pre-step of a walk (uat.verify,
-      uat.assisted.verify, e2e.verify) starts the product repository's services from the workflow's _wf worktree on
-      its allocated ports (scripts/uat/env-health.mjs retargetEnvironment; packet context.environment.servedFrom),
-      the other repositories' services stay shared. A dry-run shows the planned paths (preview: true).
+      {repoRoot, workflowId, jobId, main, op {short, branch, path}, baseSha}. node_modules is a junction overlay
+      (workspace packages point at the worktree's own copy). Dev servers, UAT and drawing run against the live
+      checkout (main), where every op lands. A dry-run shows the planned paths (preview: true).
     settle: >-
-      settle --verdict pass proves the commit clean in the op worktree, then rebases op/<op> onto the latest
-      wf/<wf>, fast-forwards it and re-verifies ON the workflow branch (the op's re-runnable declared checks +
-      an import check of its changed files). Refusals: product-integrate-conflict (files + hunks),
-      product-integrate-red (wf/<wf> rolled back; a continuation on the new base, never a failure),
-      deps-unit-required. The worktree is removed right after the worker is released (released ->
-      worktree-removed, verified, SLA worktrees.opRemoveSlaMs); wf/<wf> lands into main through
-      `api product-land` (serial per repository).
+      settle --verdict pass proves the commit clean in the op worktree, then - as its LAST step, once every other
+      settle refusal passed - lands it into main (scripts/kernel/product-worktree.mjs integrateOp, per-repository
+      lock): op/<op> rebased onto main's tip (main's side is never overwritten), the land gate
+      (scripts/checks/gate.mjs) over exactly what lands, main compare-and-swap fast-forwarded, main pushed.
+      Refusals: product-land-conflict (files + hunks; a continuation on the new main, never a failure),
+      land-gate-red, land-gate-unavailable, op-worktree-dirty; main is untouched on every refusal. The worktree
+      and its branch are removed right after the worker is released (released -> worktree-removed, verified,
+      SLA worktrees.opRemoveSlaMs; a failed or blocked op's work is preserved to preserved/<job> first); the
+      reconciler GC (key gc:worktrees, always active) removes whatever outlives its op.
     refusals:
       product-worktree-unavailable: the worktree or its node_modules overlay could not be made (reason in detail); the job stays queued
+      worktree-cap: the product repository holds worktrees.capPerRepo live worktrees; the dispatch waits (the job stays queued, no attempt spent)
 
 spawnMechanics:
   caller: >-

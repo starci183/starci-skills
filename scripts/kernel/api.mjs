@@ -83,7 +83,7 @@ import { planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
 import { domainsOfPaths, latestVersion as latestGraphVersion } from '../work/work-graph-store.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { enqueueRepository, ownedPathPlacements } from './target-repo.mjs';
-import { integrateOp, retargetArgv, isolatedJobs as productIsolatedJobs } from './product-worktree.mjs';
+import { integrateOp } from './product-worktree.mjs';
 import { deliverPrompt, loadAdapter, PROMPT_DELIVERY_STALLED, gateAutoAnswerRule } from '../agent/lib.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
@@ -108,7 +108,6 @@ import { OP_ROLE, callerOf, refuseOpCaller } from './api-lib/caller.mjs';
 import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { closeSelfSafe } from '../lib/close-verify.mjs';
-import { classifyCheck as settlerClassifyCheck, rerunCheck as settlerRerunCheck } from '../reconcile/job-settle.mjs';
 import { releaseSettledSession } from './op-session.mjs';
 import { recordSettledAttemptUsage } from './usage-record.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
@@ -2287,20 +2286,12 @@ const envServicesOf = (health) => (health?.environments ?? []).flatMap((e) => e.
   url: s.url, ...(s.status != null ? { status: s.status } : {}), ...(s.discovered ? { discovered: `${s.discovered.method} ${s.discovered.url}` } : {}),
   ...(s.listener ? { listener: { pid: s.listener.pid, commandLine: String(s.listener.commandLine ?? '').slice(0, 200) } } : {}), ...(s.action ? { action: s.action } : {}) })));
 /** Run scripts/uat/env-health.mjs check --restart for a job's referenced environments; null when it cannot run. */
-// The workflow's integration worktree the stack is served from (DESIGN §16.7): its _wf of a product repository, when
-// the workflow isolated one; null keeps the live checkout (a workflow that never isolated).
-function servingWorktreeOf(db, workflowId) {
-  for (const { record } of productIsolatedJobs(db, { workflowId })) {
-    if (fs.existsSync(record.workflow.path)) return { path: record.workflow.path, repoRoot: record.repoRoot, port: record.workflow.port, tag: record.workflow.short };
-  }
-  return null;
-}
-function environmentPreStep(repo, payload, serve = null) {
+// Every op lands into its product repository's main at its settle, so the stack is served from the live checkout.
+function environmentPreStep(repo, payload) {
   const script = path.join(skillRoot, 'scripts', 'uat', 'env-health.mjs');
   const paths = (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean);
   const env = typeof payload.params?.environment === 'string' ? ['--env', payload.params.environment] : [];
-  const wt = serve?.port ? ['--worktree', serve.path, '--worktree-repo', serve.repoRoot, '--worktree-port', String(serve.port), '--worktree-tag', String(serve.tag ?? '')] : [];
-  const r = spawnSync(process.execPath, [script, 'check', '--repo', repo, '--paths', JSON.stringify(paths), ...env, ...wt, '--restart', '--json'],
+  const r = spawnSync(process.execPath, [script, 'check', '--repo', repo, '--paths', JSON.stringify(paths), ...env, '--restart', '--json'],
     { encoding: 'utf8', windowsHide: true, timeout: 300000 });
   try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return null; }
 }
@@ -4008,24 +3999,8 @@ const foreignPathCheckOf = (db, job, accept = []) => {
 /** The job's OWN product worktree record (payload.productWorktree), never a retry's copy of its predecessor's. */
 const ownProductWorktreeOf = (job) => {
   const rec = jobPayloadOf(job)?.productWorktree;
-  return rec?.op?.path && rec?.workflow?.branch && (!rec.jobId || rec.jobId === job.job_id) ? rec : null;
+  return rec?.op?.path && rec?.op?.branch && (!rec.jobId || rec.jobId === job.job_id) ? rec : null;
 };
-// The op's declared checks re-run ON the workflow branch after the merge: only the runtime checks the settler itself
-// can re-run (job-settle.mjs classifyCheck), their paths moved from the op worktree to the workflow worktree.
-const BASELINE_CHECK = /(?:^|[-_.\s])(?:before|baseline)(?:$|[-_.\s])/i;
-function integrateForSettle(job, rec, envelope) {
-  // Only a check the op itself declared GREEN on its own base is re-run: the post-merge verify asks whether the MERGE
-  // broke something. A check already red on the op's base (a canon slice's accepted residue, a non-final cut's inventory)
-  // was judged by the settle that got here and is never re-blamed on the workflow branch.
-  const declared = (Array.isArray(envelope?.checks) ? envelope.checks : []).filter((c) => !BASELINE_CHECK.test(String(c?.name ?? '')) && c?.exitCode === 0);
-  const recheck = (checks, { cwd, from, to, timeoutMs }) => checks.flatMap((c) => {
-    const cls = settlerClassifyCheck(c, { skillRoot });
-    if (cls.kind !== 'runtime') return [];
-    const r = settlerRerunCheck({ ...cls, argv: retargetArgv(cls.argv, from, to) }, { repo: cwd, timeoutMs });
-    return [{ name: String(c.name ?? cls.rel), exitCode: r.exitCode, status: r.output?.slice?.status ?? r.output?.status ?? null, tail: r.tail, ms: r.ms }];
-  });
-  return integrateOp({ record: rec, head: envelope?.head ?? null, depsUnit: jobPayloadOf(job)?.params?.depsUnit === true, checks: declared, recheck });
-}
 function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportText = null) {
   const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
@@ -4038,8 +4013,8 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
   if (envelope?.outcome !== 'done') return null;
   const pushes = policyPushes(policy);
   const placements = jobPlacements(db, job, repo);
-  // An isolated op (DESIGN §16.7) proves its commit clean in its OWN worktree, then lands it in its workflow branch
-  // below; pushing is product-land's (wf/<wf> -> main), never the op's.
+  // An isolated op (DESIGN §16.7) proves its commit clean in its OWN worktree, then the runtime lands it into main
+  // below (rebase, land gate, fast-forward, push); the op itself never pushes.
   const productRec = ownProductWorktreeOf(job);
   const foreign = foreignPathCheckOf(db, job, acceptForeign);
   if (foreign?.unproven) {
@@ -4063,26 +4038,32 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
       : undefined;
     return { ...proof, op, status: job.status, pushes, ...(hint ? { hint } : {}) };
   }
-  if (productRec) {
-    // Settle passes only once the op's commits are IN its workflow branch: rebased onto wf/<wf>'s tip (conflict ->
-    // files + hunks), wf/<wf> fast-forwarded, then re-verified ON the workflow branch (product-worktree.mjs integrateOp).
-    const integration = integrateForSettle(job, productRec, envelope);
-    if (!integration.ok) {
-      return { checked: true, ok: false, reason: integration.reason, detail: { ...proof.detail, integration }, op, status: job.status, pushes,
-        hint: integration.reason === 'product-integrate-red'
-          ? `the op is green on its own base but breaks ${productRec.workflow.branch} (${(integration.failures ?? []).join('; ').slice(0, 300)}): the workflow branch was rolled back; continue the op on the new base (a continuation from ${String(integration.continuation?.resumeFrom ?? '').slice(0, 12)}, never a failure)`
-          : integration.hint ?? `the op's commits do not integrate into ${productRec.workflow.branch}` };
-    }
-    const inBranch = integratedProof({ root: productRec.repoRoot, head: envelope.head ?? integration.after, branch: productRec.workflow.branch, base: productRec.baseSha ?? null });
-    if (!inBranch.ok) return { checked: true, ok: false, reason: inBranch.reason, detail: { ...proof.detail, integration: { ...integration, inBranch } }, op, status: job.status, pushes };
-    return { ...proof, detail: { ...proof.detail, integration: { branch: productRec.workflow.branch, inBranch: inBranch.via, before: integration.before, after: integration.after, already: Boolean(integration.already),
-      commits: (integration.map ?? []).length, verify: integration.verify ? { checks: (integration.verify.checks ?? []).length, importsBroken: integration.verify.imports?.count ?? 0 } : null } }, op, status: job.status, pushes };
-  }
+  // The land into main runs last (settleProductLand, from api settle once every other settle refusal passed): a settle
+  // refused after main moved would leave main ahead of a job that never settled.
+  if (productRec) return { ...proof, op, status: job.status, pushes, productLand: { record: productRec, head: envelope?.head ?? null } };
   const gate = settlePushGate(db, job, proof.detail, envelope, pushes);
   if (gate.refused) {
     return { checked: true, ok: false, reason: gate.refused.reason, detail: { ...proof.detail, pushGate: gate.refused.detail }, hint: gate.hint, op, status: job.status, pushes };
   }
   return { ...proof, detail: { ...proof.detail, pushGate: gate.detail }, op, status: job.status, pushes };
+}
+
+/**
+ * The land of an isolated op (DESIGN §16.7) into its repository's main, the LAST step of a pass settle: api settle calls it
+ * after every other settle refusal passed. Settle passes only once the op's commits are IN main: rebased onto main's tip
+ * (conflict -> files + hunks), gated (scripts/checks/gate.mjs on exactly what lands), main fast-forwarded and pushed
+ * (product-worktree.mjs integrateOp). {ok, integration} | {ok:false, reason, integration, hint}
+ */
+function settleProductLand(landed) {
+  const { record, head } = landed.productLand;
+  const main = record.main ?? 'main';
+  const integration = integrateOp({ record, head });
+  if (!integration.ok) return { ok: false, reason: integration.reason, integration, hint: integration.hint ?? `the op's commits do not land into ${main}` };
+  const inBranch = integratedProof({ root: record.repoRoot, head: integration.after, branch: main, base: record.baseSha ?? null });
+  if (!inBranch.ok) return { ok: false, reason: inBranch.reason, integration: { ...integration, inBranch } };
+  return { ok: true, integration: { repoRoot: record.repoRoot, branch: main, inBranch: inBranch.via, before: integration.before, after: integration.after, head: integration.after,
+    already: Boolean(integration.already), commits: (integration.map ?? []).length, changed: (integration.changed ?? []).length, gate: integration.gate ?? null, push: integration.push ?? null,
+    ...(integration.depsChanged ? { depsChanged: integration.depsChanged } : {}) } };
 }
 
 // The visual proof a pass owes (job-artifacts.mjs proofMediaGate over the op's policy.proofMedia): read-only,
@@ -4652,7 +4633,7 @@ const API_INTERNALS = Object.freeze({
   kernelNodeId, operationNodeId, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf,
   deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel,
   buildPacket, bestEffort, rejectDispatch, DISPATCH_LEASE_TTL_MS, opLeaseRequests,
-  livePathLeaseWait, reserveOpLeases, buildContractMarkdown, fileContract, envServicesOf, servingWorktreeOf,
+  livePathLeaseWait, reserveOpLeases, buildContractMarkdown, fileContract, envServicesOf,
   environmentPreStep, raiseEnvironmentIncident, recordLaunchTerminal, ensureWorkflowRun,
   createOperationTask, opGuardLaunch,
   runSettleTail, ownerRoot, agentHierarchyOf, bindRunToKernel, foundationDutyOf,
@@ -4689,7 +4670,7 @@ const API_INTERNALS = Object.freeze({
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
   failureShapeOf, latestKernelJobOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,
-  settleDrawAcceptance, settleDrawMetrics, settleLanding, settleOpGate, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
+  settleDrawAcceptance, settleDrawMetrics, settleLanding, settleOpGate, settleProductLand, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {
