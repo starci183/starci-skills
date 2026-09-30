@@ -123,13 +123,13 @@ test('HFS_TOOL_CONFIG_LOCAL: a script that mentions a rule-like object, or runs 
 
 test('HFS_TOOL_CONFIG_LOCAL: a tracked .eslintrc, .eslintignore or second eslint.config is reported through its forbidden slot, an untracked one is not', () => {
   const declaration = { ...BE };
-  const at = (files) => checkRepo({ repoRoot: os.tmpdir(), declaration, files, tree: false }).findings.filter((finding) => finding.code === 'HFS_TOOL_CONFIG_LOCAL' || finding.code === 'HFS_FORBIDDEN_PRESENT').map((finding) => [finding.code, finding.path]);
+  const at = (files) => checkRepo({ repoRoot: os.tmpdir(), declaration, files, tree: false }).findings.filter((finding) => finding.code === 'HFS_TOOL_CONFIG_LOCAL' || finding.code === 'HFS_FORBIDDEN_PRESENT' || finding.code === 'HFS_PLAINTEXT_SECRET').map((finding) => [finding.code, finding.path]);
   assert.deepEqual(at(['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.prettierrc.json', 'jest.config.e2e.js']), [
     ['HFS_TOOL_CONFIG_LOCAL', '.eslintrc.json'], ['HFS_TOOL_CONFIG_LOCAL', '.eslintignore'], ['HFS_TOOL_CONFIG_LOCAL', 'eslint.config.js'],
     ['HFS_TOOL_CONFIG_LOCAL', '.prettierrc.json'], ['HFS_TOOL_CONFIG_LOCAL', 'jest.config.e2e.js'],
   ]);
   assert.deepEqual(at(['eslint.config.mjs', '.prettierrc', '.prettierignore', 'jest.config.js']), []);
-  assert.deepEqual(at(['.env']), [['HFS_FORBIDDEN_PRESENT', '.env']], 'a forbidden slot that names no code of its own keeps HFS_FORBIDDEN_PRESENT');
+  assert.deepEqual(at(['.env']), [['HFS_PLAINTEXT_SECRET', '.env']], 'a root .env stays forbidden: its slot names R06, so the finding carries that code instead of HFS_FORBIDDEN_PRESENT');
 });
 
 test('a repository whose hfs.json is unreadable has no managed-file finding: the slot check reports the declaration', async () => {
@@ -207,7 +207,7 @@ test('a front end: plain tool commands, a createPlugin that is not stylelint and
 });
 
 test('a front end: the forbidden tool files (.eslintrc, a second eslint or stylelint config, prettier or vitest or jest configs, lint-staged) are HFS_TOOL_CONFIG_LOCAL through their slot, the managed and repository-owned ones are not', () => {
-  const at = (files) => checkRepo({ repoRoot: os.tmpdir(), declaration: { ...FE }, files, tree: false }).findings.filter((finding) => finding.code === 'HFS_TOOL_CONFIG_LOCAL' || finding.code === 'HFS_FORBIDDEN_PRESENT').map((finding) => [finding.code, finding.path]);
+  const at = (files) => checkRepo({ repoRoot: os.tmpdir(), declaration: { ...FE }, files, tree: false }).findings.filter((finding) => finding.code === 'HFS_TOOL_CONFIG_LOCAL' || finding.code === 'HFS_FORBIDDEN_PRESENT' || finding.code === 'HFS_PLAINTEXT_SECRET').map((finding) => [finding.code, finding.path]);
   const forbidden = ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', '.stylelintignore', 'stylelint.config.cjs', '.prettierrc.json', 'prettier.config.js', 'vitest.config.mjs', 'jest.config.js', '.lintstagedrc.json', 'lint-staged.config.mjs'];
   assert.deepEqual(at(forbidden).sort(), forbidden.map((file) => ['HFS_TOOL_CONFIG_LOCAL', file]).sort());
   assert.deepEqual(at(['eslint.config.mjs', 'stylelint.config.mjs', 'vitest.config.ts', 'vitest.setup.ts', 'playwright.config.ts', '.prettierrc', '.prettierignore', 'apps/web/vitest.config.ts', 'apps/web/tsconfig.json']), []);

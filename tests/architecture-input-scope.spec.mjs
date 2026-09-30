@@ -17,7 +17,7 @@ const COMPLETE_TREE={
   'src/modules/platform/errors/index.ts':"export { AllExceptionsFilter } from './all-exceptions.filter';\n",
   'src/modules/platform/errors/all-exceptions.filter.ts':'export class AllExceptionsFilter { catch(): void {} }\n',
   'src/modules/platform/http-security/index.ts':"export { CsrfOriginGuard } from './csrf-origin.guard';\n",
-  'src/modules/platform/http-security/csrf-origin.guard.ts':'export class CsrfOriginGuard { canActivate(): boolean { return true; } }\n',
+  'src/modules/platform/http-security/csrf-origin.guard.ts':'export class CsrfOriginGuard { canActivate(request: unknown): boolean { return (request as { headers: { origin?: string } }).headers.origin !== undefined; } }\n',
   'src/modules/domain/identity/index.ts':"export { AuthGuard } from './auth.guard';\n",
   'src/modules/domain/identity/auth.guard.ts':'export class AuthGuard { canActivate(): boolean { return true; } }\n',
   'src/modules/domain/store/index.ts':"export { Service } from './service';\n",
