@@ -8,8 +8,12 @@ import { execFileSync } from 'node:child_process';
 import { parseYaml } from '../engine/yaml.mjs';
 import { starciworkGitignoreText } from '../scripts/lib/starciwork-boundary.mjs';
 import {
-  BLOCK_BEGIN, TARGETS, checkTargets, hashOf, loadPresets, render, renderTargets, runSync, validateHfs, writeTargets,
+  BLOCK_BEGIN, BLOCK_END, appScripts, checkTargets, hashOf, loadPresets, render, renderTargets, runSync, targetsOf, validateHfs, writeTargets,
 } from '../packages/hfs/sync/index.mjs';
+import { managedFindings } from '../packages/hfs/sync/managed.mjs';
+import { tsStrictFindings } from '../packages/hfs/sync/ts-strict.mjs';
+import { braceVariants } from '../scripts/lib/glob.mjs';
+import { loadSlotManifest } from '../scripts/lib/hfs-slots.mjs';
 import { declaredPushGateLint } from '../scripts/kernel/push-gate.mjs';
 import { declaredSonarKeys, readDeclaredSonarKey } from '../packages/hfs/sync/sonar-key.mjs';
 import { hygieneFindings, runWorkHygiene } from '../packages/hfs/sync/hygiene.mjs';
@@ -51,7 +55,7 @@ describe('the template renderer', () => {
     assert.equal(render('token: ${{ secrets.SONAR_TOKEN }}', {}), 'token: ${{ secrets.SONAR_TOKEN }}');
   });
   it('every bundled template renders with the variables sync provides', () => {
-    for (const hfs of [BE, FE]) assert.equal(renderTargets(hfs, PRESETS[hfs.profile]).length, TARGETS.filter(target => target.template[hfs.profile]).length);
+    for (const hfs of [BE, FE]) assert.equal(renderTargets(hfs, PRESETS[hfs.profile]).length, targetsOf(hfs.profile).length);
   });
 });
 
@@ -67,9 +71,21 @@ describe('hfs.json validation', () => {
 });
 
 describe('the generated file set', () => {
-  it('a back end owns eight files including .starciwork/.gitignore and a front end owns the other seven', () => {
-    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.starciwork/.gitignore', 'codecov.yml', 'sonar-project.properties']);
+  it('a back end owns its tool configuration, package scripts, hooks, workflows, quality files and .starciwork/.gitignore; a front end owns seven files', () => {
+    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'codecov.yml', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'tsconfig.build.json', 'tsconfig.e2e.json', 'tsconfig.json']);
     assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', 'codecov.yml', 'sonar-project.properties']);
+  });
+  it('the file list is the managedBy slots of the manifest, not code: each listed file is a literal path of a slot naming managedBy', () => {
+    const manifest = loadSlotManifest();
+    const listed = manifest.slots.filter(slot => slot.managedBy !== undefined && slot.profiles.includes('be')).flatMap(slot => braceVariants(slot.path));
+    for (const file of listed) assert.ok(rendered(BE)[file] !== undefined, `${file} is rendered`);
+    assert.deepEqual(Object.keys(rendered(BE)).filter(file => !listed.includes(file)).sort(), ['.gitignore', '.starciwork/.gitignore'], 'only the block of a shared file and the file inside the .starciwork directory slot are unlisted');
+  });
+  it('a slot that names managedBy for a file with no template, or with a glob path, is refused', () => {
+    const slot = (path, managedBy = 'tool-config') => ({ ...loadSlotManifest(), slots: [{ id: 'x', profiles: ['be'], path, managedBy }] });
+    assert.throws(() => targetsOf('be', { manifest: slot('nothing.json') }), /HFS_SYNC_TEMPLATE_MISSING.*nothing\.json/);
+    assert.throws(() => targetsOf('be', { manifest: slot('src/**') }), /HFS_SYNC_MANIFEST_MANAGED/);
+    assert.throws(() => targetsOf('be', { manifest: slot('tsconfig.json', 'no-such-group') }), /HFS_SYNC_TEMPLATE_MISSING/);
   });
   it('every target hashes its own content', () => {
     for (const target of renderTargets(BE, PRESETS.be)) assert.equal(target.hash, hashOf(target.content));
@@ -79,8 +95,8 @@ describe('the generated file set', () => {
 describe('.husky/pre-commit', () => {
   it('back end runs staged lint, typecheck, unit specs of staged files and work hygiene, and never e2e', () => {
     const hook = rendered(BE)['.husky/pre-commit'];
-    for (const step of ['npx lint-staged', 'npm run typecheck', 'jest --selectProjects unit', '--findRelatedTests $staged', 'npx hfs work-hygiene']) assert.ok(hook.includes(step), step);
-    assert.doesNotMatch(hook, /test:e2e|typecheck:e2e|selectProjects e2e|playwright/);
+    for (const step of ['npm run typecheck', 'npx eslint $sources', 'npx prettier --check $sources', 'npm test -- --passWithNoTests --findRelatedTests $specs', 'npx hfs work-hygiene']) assert.ok(hook.includes(step), step);
+    assert.doesNotMatch(hook, /lint-staged|test:e2e|typecheck:e2e|selectProjects e2e|playwright/);
   });
   it('front end runs vitest related, has no work hygiene, and never e2e', () => {
     const hook = rendered(FE)['.husky/pre-commit'];
@@ -90,13 +106,23 @@ describe('.husky/pre-commit', () => {
 });
 
 describe('.husky/pre-push', () => {
+  const PUSH_STEPS = {
+    be: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm test -- --passWithNoTests --changedSince=origin/main'],
+    fe: ['npm run typecheck', 'npm run lint:check', 'npx hfs check --fast', 'npm run test:affected'],
+  };
   for (const hfs of [BE, FE]) {
     it(`${hfs.profile} runs typecheck, lint, hfs check --fast and the affected unit specs, and never e2e`, () => {
       const hook = rendered(hfs)['.husky/pre-push'];
-      for (const step of ['npm run typecheck', 'npm run lint:check', 'npx hfs check --fast', 'npm run test:affected']) assert.ok(hook.includes(step), step);
+      for (const step of PUSH_STEPS[hfs.profile]) assert.ok(hook.includes(step), step);
       assert.doesNotMatch(hook, /test:e2e|typecheck:e2e|playwright/);
     });
   }
+  it('a back-end hook calls only scripts the managed package.json defines', () => {
+    const scripts = ['', rendered(BE)['package.json']].join('\n');
+    for (const hook of ['.husky/pre-commit', '.husky/pre-push', '.github/workflows/ci.yml', '.github/workflows/e2e.yml']) {
+      for (const [, name] of rendered(BE)[hook].matchAll(/npm run ([\w:-]+)/g)) assert.ok(scripts.includes(`\n${name}: `), `${hook} runs npm run ${name}`);
+    }
+  });
   it('lets the settle push gate follow the hook to the repository lint script', t => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-pushgate-'));
     t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -110,6 +136,10 @@ describe('.husky/pre-push', () => {
 });
 
 describe('.github/workflows', () => {
+  const CI_STEPS = {
+    be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --coverage --ci', 'npm run hfs:check', 'npm run build', 'npm ci'],
+    fe: ['npm run lint:check', 'npm run typecheck', 'npm run test:ci', 'npx hfs check', 'npm ci'],
+  };
   for (const hfs of [BE, FE]) {
     it(`${hfs.profile} ci.yml runs lint, typecheck, unit, hfs check and sonar, with no e2e`, () => {
       const text = rendered(hfs)['.github/workflows/ci.yml'];
@@ -117,7 +147,8 @@ describe('.github/workflows', () => {
       assert.deepEqual(Object.keys(doc.on).sort(), ['pull_request', 'push']);
       assert.deepEqual(doc.on.push.branches, ['main']);
       const runs = doc.jobs.ci.steps.map(step => step.run).filter(Boolean);
-      for (const command of ['npm run lint:check', 'npm run typecheck', 'npm run test:ci', 'npx hfs check', 'npx hfs sync --check', 'npm ci']) assert.ok(runs.includes(command), command);
+      for (const command of CI_STEPS[hfs.profile]) assert.ok(runs.includes(command), command);
+      assert.ok(!runs.some(command => command.includes('hfs sync')), 'hfs check is the one drift gate; there is no second sync step');
       assert.doesNotMatch(text, /starci link|STARCI_HOME|starci-runtime/);
       const uses = doc.jobs.ci.steps.map(step => step.uses).filter(Boolean);
       assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-scan-action')));
@@ -262,10 +293,10 @@ describe('the drift check', () => {
     assert.equal((await run(['--check'], dir)).code, 1, 'nothing is written yet');
     const written = await run(['--write'], dir);
     assert.equal(written.code, 0);
-    assert.match(written.lines.at(-1), /8 written, 0 already in sync/);
+    assert.match(written.lines.at(-1), /16 written, 0 already in sync/);
     const checked = await run(['--check'], dir);
     assert.equal(checked.code, 0);
-    assert.match(checked.lines.at(-1), /8 of 8 in sync/);
+    assert.match(checked.lines.at(-1), /16 of 16 in sync/);
   });
   it('a hand edit fails --check with the file, the hashes and the first differing line, and --write repairs it', async t => {
     const dir = repo(t, BE);
@@ -330,6 +361,146 @@ describe('the drift check', () => {
     assert.ok(checkTargets(dir, targets).every(result => result.status === 'missing'));
     writeTargets(dir, targets);
     assert.deepEqual(checkTargets(dir, targets).map(result => result.actualHash), targets.map(target => target.hash));
+  });
+});
+
+describe('the back-end tool configuration', () => {
+  const at = file => rendered(BE)[file];
+  it('eslint.config.mjs is exactly the one-liner', () => {
+    assert.equal(at('eslint.config.mjs'), 'import { loadHfs, starciBeConfig } from "@starci/eslint-canon-be"\n\nexport default starciBeConfig({ hfs: loadHfs(import.meta.url) })\n');
+  });
+  it('tsconfig.json extends the preset and adds only the three aliases; the build and e2e configs add only what a preset cannot hold', () => {
+    assert.deepEqual(JSON.parse(at('tsconfig.json')), { extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { '@features/*': ['./src/features/*'], '@modules/*': ['./src/modules/*'], '@tests/*': ['./src/tests/*'] } } });
+    assert.deepEqual(JSON.parse(at('tsconfig.build.json')), { extends: ['./tsconfig.json', '@starci/tsconfig/build.json'], compilerOptions: { outDir: './dist' }, exclude: ['node_modules', 'dist', '**/*.spec.ts', 'src/tests'] });
+    assert.deepEqual(JSON.parse(at('tsconfig.e2e.json')), { extends: ['./tsconfig.json', '@starci/tsconfig/e2e.json'], include: ['src/tests/e2e/**/*.ts'] });
+  });
+  it('jest.config.js is the preset call, .prettierrc references the shared config, and neither carries a header comment', () => {
+    assert.equal(at('jest.config.js'), 'module.exports = require("@starci/jest-preset").starciJestConfig()\n');
+    assert.equal(at('.prettierrc'), '"@starci/prettier-config"\n');
+  });
+  it('.prettierignore is the template, headed as generated', () => {
+    assert.match(at('.prettierignore'), /^# Generated by hfs sync \(profile be\)/);
+    assert.deepEqual(at('.prettierignore').split('\n').filter(line => line && !line.startsWith('#')), ['dist/', 'coverage/', 'node_modules/', 'package-lock.json', '.starcistacks/', '.starciwork/']);
+  });
+  it('the preset the templates name exist and export what they call', () => {
+    const ROOT_PACKAGES = path.join(ROOT, 'packages');
+    for (const [name, file] of [['tsconfig', 'be.json'], ['tsconfig', 'build.json'], ['tsconfig', 'e2e.json']]) assert.ok(fs.existsSync(path.join(ROOT_PACKAGES, name, file)), file);
+    assert.equal(typeof jestPreset.starciJestConfig, 'function');
+    assert.ok(fs.existsSync(path.join(ROOT_PACKAGES, 'prettier-config', 'index.cjs')));
+    assert.ok(fs.existsSync(path.join(ROOT_PACKAGES, 'eslint', 'be', 'lib', 'config.mjs')));
+  });
+});
+
+describe('the package.json scripts of a back end', () => {
+  const scripts = hfs => Object.fromEntries(renderTargets(hfs, PRESETS.be).find(target => target.path === 'package.json').content.trim().split('\n').map(line => [line.slice(0, line.indexOf(': ')), line.slice(line.indexOf(': ') + 2)]));
+  it('are the fixed ten, plus build and one start script per runnable app and migrate', () => {
+    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'format', 'format:check', 'hfs:check', 'lint', 'lint:check', 'migrate', 'start:core', 'test', 'test:e2e', 'test:e2e:live', 'typecheck', 'typecheck:e2e']);
+    assert.equal(scripts(BE)['start:core'], 'node dist/apps/core/src/main.js');
+    assert.equal(scripts(BE).migrate, 'node dist/apps/migrate/src/main.js');
+    assert.equal(scripts(BE)['test:e2e'], 'npm run typecheck:e2e && jest --selectProjects e2e');
+    assert.doesNotMatch(Object.values(scripts(BE)).join('\n'), /--rule|--no-inline-config|--no-eslintrc/);
+  });
+  it('gain a start script per app kind and name a second migrate app by its name', () => {
+    const many = { ...BE, apps: [{ name: 'core', kind: 'api' }, { name: 'jobs', kind: 'worker' }, { name: 'a', kind: 'migrate' }, { name: 'b', kind: 'migrate' }] };
+    assert.deepEqual(Object.keys(scripts(many)).filter(name => /^(start|migrate)/.test(name)).sort(), ['migrate:a', 'migrate:b', 'start:core', 'start:jobs']);
+    assert.equal(appScripts([{ name: 'x', kind: 'cli' }]), '"start:x": "node dist/apps/x/src/main.js",');
+  });
+  it('are compared as parsed JSON: key order and the rest of package.json are not drift, an extra or changed script is', async t => {
+    const dir = repo(t, BE);
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', dependencies: { a: '1' }, scripts: { legacy: 'x' } }, null, 4));
+    await run(['--write'], dir);
+    const pkg = () => JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    assert.equal(pkg().name, 'demo');
+    assert.deepEqual(pkg().dependencies, { a: '1' });
+    assert.equal(pkg().scripts.legacy, undefined, 'a script outside the managed block is dropped by --write');
+    assert.equal((await run(['--check'], dir)).code, 0);
+    const reordered = { ...pkg(), scripts: Object.fromEntries(Object.entries(pkg().scripts).reverse()) };
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(reordered));
+    assert.equal((await run(['--check'], dir)).code, 0, 'order is not drift');
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ ...pkg(), scripts: { ...pkg().scripts, extra: 'eslint --rule x' } }));
+    const failed = await run(['--check'], dir);
+    assert.equal(failed.code, 1);
+    assert.match(failed.lines[0], /^HFS_SYNC_DRIFT package\.json: drift/);
+  });
+});
+
+describe('the managed-file findings of hfs check', () => {
+  const synced = async t => {
+    const dir = repo(t, BE);
+    await run(['--write'], dir);
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    return dir;
+  };
+  const put = (dir, file, text) => {
+    fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    fs.writeFileSync(path.join(dir, file), text);
+  };
+  const findings = async dir => {
+    execFileSync('git', ['add', '-A', '-f'], { cwd: dir });
+    const tracked = execFileSync('git', ['ls-files'], { cwd: dir, encoding: 'utf8' }).split('\n').filter(Boolean);
+    return (await managedFindings({ repoRoot: dir, tracked, presets: PRESETS.be })).map(finding => [finding.code, finding.path]);
+  };
+  it('a synced repository has none', async t => {
+    assert.deepEqual(await findings(await synced(t)), []);
+  });
+  it('R05: an edited hook, workflow, jest config or scripts block is HFS_MANAGED_FILE_DRIFT, a deleted optional file is not', async t => {
+    const dir = await synced(t);
+    put(dir, '.husky/pre-push', 'exit 0\n');
+    put(dir, 'jest.config.js', 'module.exports = {}\n');
+    put(dir, '.prettierignore', 'dist/\n');
+    fs.rmSync(path.join(dir, '.github', 'workflows', 'e2e.yml'));
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    pkg.scripts.lint = 'eslint . --no-inline-config';
+    put(dir, 'package.json', JSON.stringify(pkg));
+    assert.deepEqual((await findings(dir)).sort(), [['HFS_MANAGED_FILE_DRIFT', '.husky/pre-push'], ['HFS_MANAGED_FILE_DRIFT', '.prettierignore'], ['HFS_MANAGED_FILE_DRIFT', 'jest.config.js'], ['HFS_MANAGED_FILE_DRIFT', 'package.json']]);
+  });
+  it('R17: any edit of eslint.config.mjs (a rule off, a local plugin, an ignore) is one HFS_RULE_OFF_WITHOUT_REPLACEMENT, not also R05', async t => {
+    const dir = await synced(t);
+    put(dir, 'eslint.config.mjs', 'import { loadHfs, starciBeConfig } from "@starci/eslint-canon-be"\n\nexport default [...(await starciBeConfig({ hfs: loadHfs(import.meta.url) })), { rules: { "starci-be/no-x": "off" } }]\n');
+    assert.deepEqual(await findings(dir), [['HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'eslint.config.mjs']]);
+  });
+  it('R22: tsconfig.json is judged by flag; a formatting-only difference is R05', async t => {
+    const dir = await synced(t);
+    const tsconfig = JSON.parse(fs.readFileSync(path.join(dir, 'tsconfig.json'), 'utf8'));
+    put(dir, 'tsconfig.json', JSON.stringify(tsconfig));
+    assert.deepEqual(await findings(dir), [['HFS_MANAGED_FILE_DRIFT', 'tsconfig.json']], 'same content, other bytes');
+    put(dir, 'tsconfig.json', JSON.stringify({ ...tsconfig, compilerOptions: { ...tsconfig.compilerOptions, strict: false, noUncheckedIndexedAccess: false } }));
+    const flagged = await findings(dir);
+    assert.deepEqual(flagged, [['HFS_TS_STRICT', 'tsconfig.json'], ['HFS_TS_STRICT', 'tsconfig.json']]);
+  });
+  it('R16: a second eslint config, a local rule file and a flag in a script or nested package.json are HFS_TOOL_CONFIG_LOCAL', async t => {
+    const dir = await synced(t);
+    put(dir, 'scripts/eslint-local.mjs', 'export default { meta: { type: "problem" }, create(context) { return {} } }\n');
+    put(dir, 'scripts/lint.mjs', 'import { execSync } from "node:child_process"\nexecSync("npx eslint --no-eslintrc src")\n');
+    put(dir, 'packages/kit/package.json', JSON.stringify({ name: 'kit', scripts: { lint: 'eslint -c other.mjs .' } }));
+    put(dir, 'scripts/ok.mjs', 'export const rule = { meta: { docs: "x" } }\nexport const run = () => "eslint ."\n');
+    assert.deepEqual((await findings(dir)).sort(), [['HFS_TOOL_CONFIG_LOCAL', 'packages/kit/package.json'], ['HFS_TOOL_CONFIG_LOCAL', 'scripts/eslint-local.mjs'], ['HFS_TOOL_CONFIG_LOCAL', 'scripts/lint.mjs']]);
+  });
+  it('a repository whose hfs.json is unreadable has none: the slot check reports the declaration', async t => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-managed-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    assert.deepEqual(await managedFindings({ repoRoot: dir, tracked: [], presets: PRESETS.be }), []);
+  });
+});
+
+describe('tsStrictFindings', () => {
+  const expected = rendered(BE)['tsconfig.json'];
+  const flags = actual => tsStrictFindings(typeof actual === 'string' ? actual : JSON.stringify(actual), expected).map(finding => finding.flag);
+  const aliases = JSON.parse(expected).compilerOptions.paths;
+  it('accepts the render and refuses every other shape by name', () => {
+    assert.deepEqual(flags(expected), []);
+    assert.deepEqual(flags({ extends: '@starci/tsconfig/nest.json', compilerOptions: { paths: aliases } }), ['extends']);
+    assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: aliases, noImplicitAny: false, target: 'ES5' } }).sort(), ['noImplicitAny', 'target']);
+    assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', include: ['src'], exclude: ['x'], compilerOptions: { paths: aliases } }).sort(), ['exclude', 'include']);
+    assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { ...aliases, '@x/*': ['./x/*'] } } }), ['paths']);
+    assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { '@features/*': ['./src/features/*'] } } }), ['paths', 'paths']);
+    assert.deepEqual(flags('{ not json'), ['parse']);
+    assert.deepEqual(flags('[]'), ['parse']);
+  });
+  it('says lowers for a flag set to false and sets for any other value', () => {
+    const [lowered, other] = tsStrictFindings(JSON.stringify({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: aliases, strict: false, module: 'commonjs' } }), expected);
+    assert.match(lowered.message, /lowers strict/);
+    assert.match(other.message, /sets module/);
   });
 });
 
@@ -470,8 +641,8 @@ describe('scripts/checks/check-hfs-sync.mjs', () => {
     const result = await checkHfsSync(dir, { presets: PRESETS.be });
     assert.equal(result.ok, false);
     assert.deepEqual(result.findings.map(finding => [finding.code, finding.file]).sort(), [
+      ['HFS_MANAGED_FILE_DRIFT', 'codecov.yml'],
       ['HFS_STACKS_PLAINTEXT', '.starcistacks/dev/secrets/db.txt'],
-      ['HFS_SYNC_DRIFT', 'codecov.yml'],
       ['HFS_WORK_AGENT_DATA', '.starciwork/features/a/evidence/run.log'],
     ]);
     assert.ok(result.findings.every(finding => CODES.includes(finding.code)));

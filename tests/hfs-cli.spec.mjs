@@ -9,7 +9,7 @@ import { ARCHITECTURE_RULE_IDS } from '../scripts/checks/architecture/index.mjs'
 import { HfsSlotsError } from '../scripts/lib/hfs-slots.mjs';
 import { main } from '../packages/hfs/bin/hfs.mjs';
 import { BUNDLES, driftOfRuntime, importClosure } from '../packages/hfs/scripts/sync-runtime.mjs';
-import { BE, FE, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { BE, FE, PRESETS, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const pins = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins;
@@ -30,10 +30,14 @@ const put = (dir, relative, text = 'export {};\n') => {
 const drop = (dir, relative) => fs.rmSync(path.join(dir, ...relative.split('/')), { recursive: true, force: true });
 const codesOf = (result) => result.findings.map((f) => f.code);
 const only = (result, code) => result.findings.filter((f) => f.code === code);
+const presetsOf = (argv) => {
+  const at = argv.indexOf('--repo');
+  try { return PRESETS[JSON.parse(fs.readFileSync(path.join(argv[at + 1], 'hfs.json'), 'utf8')).profile]; } catch { return undefined; }
+};
 const cli = async (argv) => {
   let out = '';
   let err = '';
-  const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; } });
+  const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets: presetsOf(argv) });
   return { code, out, err };
 };
 const HAS_VIETNAMESE = /[À-ỹ]/;
