@@ -1,6 +1,5 @@
 export { identityEntities, identityMigrations } from "./persistence/connection"
 export { AuthGuard } from "./auth.guard"
-export { isPlausibleEmail } from "./email.policy"
 export { IDENTITY_ERROR_KINDS, IdentityError, IdentityErrorCode } from "./errors/identity.error"
 export { IDENTITY_MESSAGES } from "./messages/identity.messages"
 export { parseIdentityConfig } from "./identity.config"

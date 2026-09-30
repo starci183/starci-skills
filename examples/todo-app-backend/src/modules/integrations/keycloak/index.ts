@@ -1,7 +1,7 @@
 export { KEYCLOAK_ERROR_KINDS, KeycloakError, KeycloakErrorCode } from "./errors/keycloak.error"
 export { KeycloakClient } from "./keycloak.client"
 export { parseKeycloakConfig } from "./keycloak.config"
-export { InjectKeycloak } from "./keycloak.decorators"
+export { InjectKeycloak, KEYCLOAK } from "./keycloak.decorators"
 export { KeycloakLogEvent } from "./keycloak.log-events"
 export { KeycloakModule } from "./keycloak.module"
 export type { KeycloakOptions } from "./keycloak.options"

@@ -1,5 +1,7 @@
 import type { Principal } from "@modules/platform/cqrs"
+import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
+import type { IdentityErrorCode } from "./errors/identity.error"
 
 declare module "express-serve-static-core" {
     /** The request carries the principal the auth guard established. */
@@ -65,10 +67,48 @@ export interface RevokeSessionParams {
     readonly token: string
 }
 
-/** What purging lapsed sessions needs; the write joins the caller transaction. */
+/** What signing in takes: the credential pair. */
+export interface SignInParams {
+    /** The email of the account. */
+    readonly email: string
+    /** The password; it goes to the identity provider and nowhere else. */
+    readonly password: string
+}
+
+/** The session that was opened. */
+export interface SignInSession {
+    /** The opaque bearer token to present as `Authorization: Bearer`. */
+    readonly sessionToken: string
+    /** The person the session belongs to. */
+    readonly personId: string
+}
+
+/** The opened session, or the uniform refusal of the credentials, or the outage of the identity provider. */
+export type SignInOutcome = Outcome<
+    SignInSession,
+    IdentityErrorCode.InvalidCredentials | IdentityErrorCode.ProviderUnavailable
+>
+
+/** What signing out takes: the token of the session to end. */
+export interface SignOutParams {
+    /** The bearer token of the session. */
+    readonly sessionToken: string
+}
+
+/** The confirmation, or the refusal that names why no live session matched the token. */
+export type SignOutOutcome = Outcome<
+    { readonly signedOut: boolean },
+    IdentityErrorCode.NotFound | IdentityErrorCode.Expired
+>
+
+/** What purging lapsed sessions needs. */
 export interface PurgeSessionsParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
     /** Sessions that lapsed at or before this instant are deleted. */
     readonly at: Date
+}
+
+/** How many lapsed sessions were deleted. */
+export interface PurgeSessionsResult {
+    /** The number of session rows that went. */
+    readonly purged: number
 }
