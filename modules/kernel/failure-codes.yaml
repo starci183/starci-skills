@@ -898,6 +898,17 @@ BE_TEST_CONSTRAINTS_ON:
   owner: op-retry
   kind: check-finding
 
+BE_TEST_BUILDER_ARRANGES:
+  title: "A test data builder asserts or has a non-deterministic default"
+  title_vi: "Builder dữ liệu test khẳng định hoặc có giá trị mặc định không ổn định"
+  meaning_vi: "Builder chỉ sắp xếp dữ liệu: không import expect, jest hay @jest/globals, và giá trị mặc định cố định (id từ hằng hoặc fakeIds, ngày cố định) để test lỗi vẫn tái hiện được."
+  causes_vi:
+    - "expect, jest hoặc mô tả test được dùng trong tệp builder"
+    - "Date.now(), new Date() không tham số, Math.random(), randomUUID() hoặc crypto.random* trong builder"
+  nextStep_vi: "Trả về đối tượng hoặc dòng và để spec khẳng định; dùng id cố định hoặc fakeIds() và ngày cố định. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 BLOB_REF_INVALID:
   title: "Not a blob citation"
   title_vi: "Không phải tham chiếu khối lưu"

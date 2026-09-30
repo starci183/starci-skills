@@ -599,7 +599,7 @@ rules:
   - id: BE-TEST-16
     title: Test data builders
     kind: mandatory
-    hfsRules: [R48, R97, R98, R99, R89]
+    hfsRules: [R98, R99, R100, R101, R89]
     requirement: |-
       Test data is arranged by builders. A builder lives in `src/tests/fixtures/builders/<area>.builder.ts` (slot
       `be.tests.fixtures.builders`), one file per area, shared by every spec of that area. The file name is exactly `<area>.builder.ts`;

@@ -1,15 +1,15 @@
 /**
- * The rules that hold the test data builder standard (knowledge BE-TEST-16, catalog R97 to R100).
+ * The rules that hold the test data builder standard (knowledge BE-TEST-16, catalog R98 to R101).
  *
  * Builders live only in `src/tests/fixtures/builders/<area>.builder.ts` (slot `be.tests.fixtures.builders`). The slot manifest refuses the
  * file names (`*.repository.ts`, `*.fixture.ts`, `*.factory.ts`, a `*.builder.ts` elsewhere: BE_SOURCE_FORM); these rules judge what
  * the files DO, so a builder cannot hide under another name:
  *
- *   - `persisting-builder-in-builders-slot` (R97): a module of the test tree that exports something creating persisted rows through an
+ *   - `persisting-builder-in-builders-slot` (R98): a module of the test tree that exports something creating persisted rows through an
  *     EntityManager, DataSource or QueryRunner IS a builder, wherever it sits and whatever it is called, so it must be in the builders slot.
- *   - `spec-no-raw-insert` (R98): a spec never runs a raw INSERT/UPDATE/DELETE or writes (`save`, `insert`, ...) through a database receiver.
- *   - `spec-no-repeated-row-literal` (R98): a spec never builds the same persistence entity as an object literal twice; the row comes from a builder.
- *   - `builder-arranges-only` (R99): a builder never asserts and has deterministic defaults.
+ *   - `spec-no-raw-insert` (R99): a spec never runs a raw INSERT/UPDATE/DELETE or writes (`save`, `insert`, ...) through a database receiver.
+ *   - `spec-no-repeated-row-literal` (R99): a spec never builds the same persistence entity as an object literal twice; the row comes from a builder.
+ *   - `builder-arranges-only` (R101): a builder never asserts and has deterministic defaults.
  *   - `tests-keep-constraints` (R100): nothing in the test tree switches database constraints off.
  *
  * A receiver is recognised by its TYPE, an entity by its declaration (a class decorated with typeorm's `@Entity`), a builder file by
