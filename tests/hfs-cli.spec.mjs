@@ -309,7 +309,8 @@ test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json 
   assert.equal(clean.code, 0);
   assert.match(clean.out, /0 error findings/);
 
-  const stray = repoOf(BE, (dir) => put(dir, 'src/stray/thing.ts'));
+  // a stray TypeScript file is an ESLint report of the project graph (slot-undeclared); `hfs check` judges the paths no editor shows
+  const stray = repoOf(BE, (dir) => put(dir, 'src/stray/thing.json'));
   const bad = await cli(['check', '--repo', stray, '--json']);
   assert.equal(bad.code, 1);
   const parsed = JSON.parse(bad.out);
@@ -439,15 +440,16 @@ test('the tree checks do not run over an explicit file list (a dry run of specs 
 test('hfs check runs the architecture machine: its violation is a finding under its own code with the Vietnamese why', () => {
   const dir = repoOf(BE, (d) => put(d, 'src/modules/domain/order/a.ts'));
   const result = checkRepository({ repoRoot: dir });
-  const [finding] = only(result, 'BE_FEATURE_NOT_COMPOSED');
+  const [finding] = only(result, 'BE_REQUIRED_MODULE_MISSING');
   assert.equal(result.ok, false);
   assert.equal(finding.level, 'error');
   assert.equal(finding.source, 'machine');
-  assert.equal(finding.path, 'src/modules/domain/order/a.ts');
+  assert.equal(finding.path, 'src/modules/domain/order/index.ts');
   assert.match(finding.whyVi, HAS_VIETNAMESE);
   assert.equal(result.machine.status, 'ran');
   assert.ok(result.machine.files > 0);
-  assert.equal(result.counts.byCode.BE_FEATURE_NOT_COMPOSED.count, 1);
+  assert.equal(result.counts.byCode.BE_REQUIRED_MODULE_MISSING.count, 1);
+  assert.deepEqual(only(result, 'BE_FEATURE_NOT_COMPOSED'), [], 'a finding on a TypeScript file is an ESLint report, not a hfs check finding');
 });
 
 test('a clean back end and a clean front end are clean to the machine too', () => {
@@ -527,15 +529,15 @@ test('--fast judges the changed owners only: the machine gets their paths and sk
 });
 
 test('--fast: slot checks run on the changed paths only, and the tree checks do not run', async () => {
-  const dir = branched((d) => put(d, 'src/stray/old.ts'));
-  put(dir, 'src/stray/new.ts');
+  const dir = branched((d) => put(d, 'src/stray/old.json'));
+  put(dir, 'src/stray/new.json');
   mkdir(dir, 'src/modules/business');
   git(dir, 'add', '-A', '--', '.', ':!node_modules');
   const fast = checkRepository({ repoRoot: dir, fast: true, machine: NO_FINDINGS_MACHINE });
-  assert.deepEqual(only(fast, 'HFS_SLOT_UNDECLARED').map((f) => f.path), ['src/stray/new.ts'], 'the stray file already on main is not this change');
+  assert.deepEqual(only(fast, 'HFS_SLOT_UNDECLARED').map((f) => f.path), ['src/stray/new.json'], 'the stray file already on main is not this change');
   assert.deepEqual(only(fast, 'HFS_EMPTY_DIR'), []);
   const full = checkRepository({ repoRoot: dir, machine: NO_FINDINGS_MACHINE });
-  assert.deepEqual(only(full, 'HFS_SLOT_UNDECLARED').map((f) => f.path).sort(), ['src/stray/new.ts', 'src/stray/old.ts']);
+  assert.deepEqual(only(full, 'HFS_SLOT_UNDECLARED').map((f) => f.path).sort(), ['src/stray/new.json', 'src/stray/old.json']);
   assert.deepEqual(only(full, 'HFS_EMPTY_DIR').map((f) => f.path), ['src/modules/business']);
 
   const cliFast = await cli(['check', '--repo', dir, '--fast', '--json']);
@@ -543,8 +545,8 @@ test('--fast: slot checks run on the changed paths only, and the tree checks do 
   assert.equal(JSON.parse(cliFast.out).fast.changed, 1);
 });
 
-test('--fast with the real machine: an uncomposed module already on main is not judged, a full check reports it', async () => {
-  const dir = branched((d) => { put(d, 'src/modules/domain/order/a.ts'); put(d, 'src/modules/domain/order/index.ts'); });
+test('--fast with the real machine: a Vietnamese document already on main is not judged, a full check reports it', async () => {
+  const dir = branched((d) => { put(d, 'docs/adr/0001-old.md', 'Đây là một tài liệu viết bằng tiếng Việt, không phải tiếng Anh.\n'); });
   put(dir, 'src/features/orders/application/place-order.query.ts', 'export const placed = 1;\n');
   git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
   const fast = await cli(['check', '--repo', dir, '--fast']);
@@ -553,7 +555,7 @@ test('--fast with the real machine: an uncomposed module already on main is not 
   assert.match(fast.out, /owners src\/features\/orders/);
   const full = await cli(['check', '--repo', dir]);
   assert.equal(full.code, 1);
-  assert.match(full.out, /BE_FEATURE_NOT_COMPOSED x1/);
+  assert.match(full.out, /HFS_DOC_NOT_ENGLISH x1/);
 });
 
 test('HFS_CONTRACT_SNAPSHOT_DRIFT against the app: the full check emits every api app and says so, --fast skips it and says so, an emit that cannot run is a finding', async () => {
@@ -614,7 +616,7 @@ test('the CLI: machine findings fail the exit code and print with their Vietname
   const text = await cli(['check', '--repo', dir]);
   assert.equal(text.code, 1);
   assert.match(text.out, /architecture machine: ran over \d+ source files/);
-  assert.match(text.out, /BE_FEATURE_NOT_COMPOSED x1/);
+  assert.match(text.out, /BE_REQUIRED_MODULE_MISSING x1/);
   assert.match(text.out, HAS_VIETNAMESE);
   const json = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
   assert.equal(json.machine.status, 'ran');

@@ -166,7 +166,7 @@ test('a rule with no enforcer, or a lint kind with no lint enforcer, is a findin
   const catalog = loadRuleCatalog();
   const bare = { ...catalog, rules: catalog.rules.map((r) => (r.id === 'R01' ? { ...r, enforcers: [] } : r.id === 'R06' ? { ...r, kinds: ['lint'] } : r)) };
   const findings = run(bare);
-  assert.deepEqual(findings.map((f) => [f.code, f.rule]), [['HFS_RULE_NO_ENFORCER', 'R01'], ['HFS_RULE_NO_ENFORCER', 'R01'], ['HFS_RULE_NO_ENFORCER', 'R06']]);
+  assert.deepEqual(findings.map((f) => [f.code, f.rule]), [['HFS_RULE_NO_ENFORCER', 'R01'], ['HFS_RULE_NO_ENFORCER', 'R01'], ['HFS_RULE_NO_ENFORCER', 'R01'], ['HFS_RULE_NO_ENFORCER', 'R06']]);
 });
 
 test('a failure code with no catalog entry, or an entry that is not Vietnamese, is a finding', () => {
@@ -182,11 +182,11 @@ test('a failure code with no catalog entry, or an entry that is not Vietnamese, 
 
 test('a planned machine enforcer whose code a machine file already emits is stale, unless another built enforcer names that file', () => {
   const catalog = loadRuleCatalog();
-  const r26 = catalog.rule('R26');
-  const planned = { ...catalog, rules: [{ ...r26, enforcers: r26.enforcers.filter((e) => e.at === 'scripts/checks/architecture/tiers.mjs').map((e) => ({ kind: e.kind, id: e.id, planned: true })) }] };
-  const emitters = { machine: [{ rel: 'scripts/checks/architecture/tiers.mjs', text: `ruleId: '${r26.code}'` }], hfs: [], 'work-validate': [] };
+  const r26 = catalog.rule('R02');
+  const planned = { ...catalog, rules: [{ ...r26, enforcers: r26.enforcers.filter((e) => e.at === 'scripts/checks/architecture/required-files.mjs').map((e) => ({ kind: e.kind, id: e.id, planned: true })) }] };
+  const emitters = { machine: [{ rel: 'scripts/checks/architecture/required-files.mjs', text: `ruleId: '${r26.code}'` }], hfs: [], 'work-validate': [] };
   const stale = run(planned, { emitters }).filter((f) => f.code === 'HFS_RULE_ENFORCER_STALE');
-  assert.deepEqual(stale.map((f) => [f.code, f.rule]), [['HFS_RULE_ENFORCER_STALE', 'R26']]);
+  assert.deepEqual(stale.map((f) => [f.code, f.rule]), [['HFS_RULE_ENFORCER_STALE', 'R02']]);
 });
 
 test('a rule that claims every enforcer is built but whose code nothing emits is unemitted', () => {

@@ -28,9 +28,9 @@ test('a clean front-end tree has no unowned, unnamed or retired file', () => {
 });
 
 test('a file directly in src/ is a HFS_SLOT_UNDECLARED error, and a test file anywhere is FE_NO_TESTS and not an undeclared slot', () => {
-  const result = checkRepository({ repoRoot: repoOf((dir) => { put(dir, 'e2e/course/play.spec.ts'); put(dir, 'apps/web/src/x.ts'); }) });
+  const result = checkRepository({ repoRoot: repoOf((dir) => { put(dir, 'e2e/course/play.spec.ts'); put(dir, 'apps/web/src/x.json'); }) });
   assert.equal(result.ok, false);
-  assert.deepEqual(errorsOf(result, 'HFS_SLOT_UNDECLARED').sort(), ['apps/web/src/x.ts']);
+  assert.deepEqual(errorsOf(result, 'HFS_SLOT_UNDECLARED').sort(), ['apps/web/src/x.json']);
   assert.deepEqual(errorsOf(result, 'FE_NO_TESTS').sort(), ['e2e/course/play.spec.ts']);
 });
 
