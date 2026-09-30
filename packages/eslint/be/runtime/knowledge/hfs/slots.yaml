@@ -577,7 +577,7 @@ slots:
     tracked: tracked
     tier: feature
     requires: ["<feature>-message.module.ts"]
-    allows: ["<event>.consumer.ts", "<event>.message.ts", "*.spec.ts"]
+    allows: ["<event>.consumer.ts", "*.spec.ts"]     # BE-CONVENTION 1.6: transport/message holds only consumers; a .message.ts is outside the closed suffix list
     tests: unit-beside
     composedBy: [worker]
     rules: [BE_BACKGROUND_UNOWNED]
