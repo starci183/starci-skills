@@ -58,7 +58,7 @@ export const DECLARED_VIETNAMESE_FIELDS = Object.freeze({
  */
 export const LOCALIZED_TEXT_SLOTS = Object.freeze([
   'be.domain.messages', 'be.feature.messages', 'be.tests.fixtures.i18n',
-  'fe.modules.i18n', 'fe.package.i18n', 'fe.e2e-support.i18n',
+  'fe.modules.i18n', 'fe.package.i18n',
 ]);
 
 /** Whether a document (Markdown or YAML) of `slot` is exempt: only catalogue and fixture DATA (YAML) is; Markdown is prose and never is. */

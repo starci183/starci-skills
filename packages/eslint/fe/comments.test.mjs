@@ -60,7 +60,6 @@ test("COMMENTS-4: no emoji in source", () => {
 const VI_NFC = "hạn cuối đã qua"
 /** The same text decomposed (NFD): base letters followed by combining marks. */
 const VI_NFD = VI_NFC.normalize("NFD")
-const I18N_FIXTURE = at("e2e/fixtures/i18n/copy.ts")
 
 test("COMMENTS-5: no Vietnamese anywhere in source, specs and test titles included", () => {
   assert.notEqual(VI_NFC, VI_NFD)
@@ -69,9 +68,6 @@ test("COMMENTS-5: no Vietnamese anywhere in source, specs and test titles includ
       { filename: SRC, code: "// a plain English comment\nconst deadline = \"passed\"" },
       // a loanword with no Vietnamese letter is not a hit (structural detection, not a word list)
       { filename: SRC, code: "const naive = \"facade Muller\"" },
-      // the i18n fixtures slot is the one placement that may carry localized text
-      { filename: I18N_FIXTURE, code: `export const SAMPLE = "${VI_NFC}"` },
-      { filename: I18N_FIXTURE, code: `// ${VI_NFD}\nexport const SAMPLE = 1` },
     ],
     invalid: [
       { filename: SRC, code: `const message = "${VI_NFC}"`, errors: [{ messageId: "vietnamese" }] },

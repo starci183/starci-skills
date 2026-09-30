@@ -57,7 +57,7 @@ A **backend** repository additionally requires `src/` (the shared feature and
 module source roots, see [backend source pattern](backend-source-pattern.md)),
 `nest-cli.json`, `jest.config.js`, `.starciwork/`, `.starcistacks/` and
 `.sops.yaml`, and has no root `e2e/`. A **frontend** repository allows
-`turbo.json`, has no test configuration at all (a front end has no tests, R95), forbids a root `src/` (all product source lives under
+`turbo.json`, has no test configuration at all (a front end has no tests, R97), forbids a root `src/` (all product source lives under
 `apps/<app>/src`; see `knowledge/patterns/fe/folder.yaml`), and forbids
 `.starciwork/`, `.starcistacks/` and `.sops.yaml`.
 

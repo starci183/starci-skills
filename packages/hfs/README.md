@@ -49,7 +49,7 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `FE_WIRE_GENERATED` | error | a contract copy with no `codegen` script wired before `build` and `typecheck`, or generated types older than the copy (R52) |
 | `FE_I18N_PLACEMENT` | error | no `next-intl`, no `src/proxy.ts`, a `middleware.ts`, a route file outside `[locale]`, no `vi.json` catalog (R59) |
 | `FE_I18N_CATALOG` | error | a locale catalog lacking a key another locale has (R60) |
-| `FE_NO_TESTS` | error | a front end holds a `*.spec.*`, `*.test.*` or `*-spec.*` file, an `e2e/`, `__tests__/`, `__mocks__/` or `test-support/` directory, a vitest, Playwright, jest or Cypress file, a test script, or a test dependency in a `package.json`; no exception (R95; `scripts/lib/hfs-rules/fe-no-tests.mjs`) |
+| `FE_NO_TESTS` | error | a front end holds a `*.spec.*`, `*.test.*` or `*-spec.*` file, an `e2e/`, `__tests__/`, `__mocks__/` or `test-support/` directory, a vitest, Playwright, jest or Cypress file, a test script, or a test dependency in a `package.json`; no exception (R97; `scripts/lib/hfs-rules/fe-no-tests.mjs`) |
 | `HFS_GITIGNORE_BLOCK_DRIFT` | error | the managed `.gitignore` block differs from its render (R04; `sync/managed.mjs`) |
 | `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render: no `sonar.host.url`, the coverage exclusions of the installed jest preset of a back end (R11; `sync/managed.mjs`) |
 | `HFS_FORMAT` | error | a tracked file the repository's own prettier would change (R19; `sync/format.mjs`, not under `--fast`) |
@@ -59,7 +59,7 @@ The managed files are judged by `sync/managed.mjs` and `sync/ts-strict.mjs` (the
 files is the `managedBy` slots of `slots.yaml`; `hfs sync --write` renders them and `hfs check` compares them, so a hand edit and a forgotten `sync` are the same finding.
 Each finding is reported once: the eslint and stylelint one-liners under R17, `tsconfig.json` under R22 when it names a flag, a workflow or hook that lost a canon step under R13 (or R19 for the format step), everything else under R05.
 A front end is rendered by the same mechanism as a back end: `tsconfig.json`, `eslint.config.mjs`, `stylelint.config.mjs`, `.prettierrc`, `.prettierignore`, the hooks, the workflow, the Sonar file
-and the `scripts` block (`lint:check` is the one lint gate, ESLint over the repository plus stylelint; a front end has no test script, no test configuration and no e2e or coverage file: it has no tests, and `FE_NO_TESTS` (R95) refuses any spec, e2e file, test tool, test script or test dependency, `scripts/` included). `turbo.json` stays the repository's own
+and the `scripts` block (`lint:check` is the one lint gate, ESLint over the repository plus stylelint; a front end has no test script, no test configuration and no e2e or coverage file: it has no tests, and `FE_NO_TESTS` (R97) refuses any spec, e2e file, test tool, test script or test dependency, `scripts/` included). `turbo.json` stays the repository's own
 (`fe.tool-config-repo`): it carries the repository's task graph, which no preset can render.
 
 The architecture machine (`scripts/checks/architecture.mjs` of the runtime, the same code bundled here): tiers and import

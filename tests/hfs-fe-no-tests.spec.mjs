@@ -6,7 +6,7 @@ import path from 'node:path';
 import { checkRepo } from '../scripts/lib/hfs-check.mjs';
 import { feNoTestsFindings, isFeTestPath } from '../scripts/lib/hfs-rules/fe-no-tests.mjs';
 
-// FE_NO_TESTS (R95): a front-end repository has no tests by standard, and no exception.
+// FE_NO_TESTS (R97): a front-end repository has no tests by standard, and no exception.
 const FE = { hfs: 1, profile: 'fe', project: 'demo', apps: [{ name: 'web', kind: 'next' }] };
 
 const tree = (t, files) => {

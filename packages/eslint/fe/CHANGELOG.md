@@ -9,7 +9,7 @@
   The factory no longer builds an e2e block (`e2e/**`, `playwright.config.ts`) and returns the ignore block and the typed source block
   only; `sourceRecommended` and `e2eRecommended` are gone (`recommended` is the one set); the spec and e2e exemptions of the other
   rules (`isSpecFile`, `isE2eSource`, the `e2e` tier) are deleted. A test file, a test-tool file or a test dependency in a
-  front-end repository is now refused by `hfs check` (FE_NO_TESTS, R95) instead.
+  front-end repository is now refused by `hfs check` (FE_NO_TESTS, R97) instead.
 
 ## Unreleased (lane C0)
 

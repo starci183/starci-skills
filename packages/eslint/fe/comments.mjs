@@ -12,8 +12,7 @@
  *
  * The exceptions that remain are placements, not judgements, and that is on purpose: a locale dictionary
  * IS the other language, and a fixture reproducing a real string has to reproduce it exactly. A
- * judgement-based exception would be argued per file forever. For the Vietnamese rule the only placement is the i18n
- * fixtures slot; a spec is authoring and is judged like any file.
+ * judgement-based exception would be argued per file forever. The Vietnamese rule has no placement exemption at all.
  */
 
 import { hasSecondLanguage } from "./runtime/scripts/lib/language.mjs"
@@ -134,12 +133,10 @@ export const noVietnameseInSource = {
     schema: [],
     messages: {
       vietnamese:
-        "A Vietnamese letter in source. Every reader has to be able to read all of the code, its comments and its test titles, and half of a two-language file is unavailable to somebody. Write it in English; product copy lives in the `messages/<locale>.json` catalogue behind `t()`, and a real localized string a test must reproduce lives in the i18n fixtures slot (`e2e/fixtures/i18n/`). There is no pragma.",
+        "A Vietnamese letter in source. Every reader has to be able to read all of the code, its comments and its test titles, and half of a two-language file is unavailable to somebody. Write it in English; product copy lives in the `messages/<locale>.json` catalogue behind `t()`; there is no pragma.",
     },
   },
   create(context) {
-    // the one placement that may hold another language: a fixture of the i18n fixtures slot
-    if (inSlot(context, "fe.e2e-support.i18n")) return {}
     return proseVisitors(context, (node, text) => {
       if (hasSecondLanguage(text)) context.report({ node, messageId: "vietnamese" })
     })
