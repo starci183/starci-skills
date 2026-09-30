@@ -126,7 +126,7 @@ const BANNED_TEST_FILE = /(?:\.test|\.int-spec|\.harness-spec)\.[cm]?[jt]sx?$/
 
 /**
  * Unit specs are for services only: every `<name>.service.ts` has its `<name>.service.spec.ts` beside it, every unit spec is
- * one of those, and there are no other kinds of test file. A composition spec is not a unit kind.
+ * one of those, and there are no other kinds of test file.
  */
 export const unitTestColocated = {
   meta: {

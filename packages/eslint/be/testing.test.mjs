@@ -93,11 +93,10 @@ test("R47: only a service is unit-tested, its spec sits beside it, and there are
       { filename: at("src/modules/domain/order/index.ts"), code: "export {}" },
       // a service suffix inside the test tree is a fixture, not a subject
       { filename: at("src/tests/fixtures/orders.service.ts"), code: "export class Orders {}" },
-      // an e2e flow is the second kind of test file, and specs of the world and of the migrate app are not unit specs
+      // the integration, e2e and contract layers and world infrastructure are not unit specs
       { filename: E2E, code: "export {}" },
       { filename: at("src/tests/e2e/checkout/legacy.spec.ts"), code: "export {}" },
       { filename: at("src/tests/world/use-test-world.spec.ts"), code: "export {}" },
-      { filename: at("apps/migrate/src/migrate.composition.spec.ts"), code: "export {}" },
       // a declaration file carries no behaviour
       { filename: at("src/modules/domain/order/order.service.d.ts"), code: "export {}" },
     ],
@@ -117,8 +116,9 @@ test("R47: only a service is unit-tested, its spec sits beside it, and there are
       { filename: at("src/modules/domain/order/policies/refund.policy.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       { filename: at("src/modules/domain/order/order-math.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       { filename: at("src/modules/domain/order/order.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
-      // a composition spec is not a unit kind
+      // a composition spec in an app is not a unit kind
       { filename: at("apps/api/src/api.composition.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("apps/migrate/src/migrate.composition.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
       // a service spec with no service beside it
       { filename: at("src/modules/domain/order/nothing-here.service.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
       // the banned kinds

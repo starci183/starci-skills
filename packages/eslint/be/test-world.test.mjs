@@ -15,7 +15,6 @@ const CONTRACT = at("src/tests/contract/payos/checkout.contract-spec.ts")
 const FIXTURE = at("src/tests/fixtures/order.builders.ts")
 const WORLD = at("src/tests/world/global-setup.ts")
 const USE_WORLD = at("src/tests/world/use-test-world.ts")
-const MIGRATE_SPEC = at("apps/migrate/src/migrate.composition.spec.ts")
 const MIGRATION = '"../../../modules/domain/order/persistence/migrations/1700000000000-create-orders"'
 const LIST = '"../../../modules/domain/order/order.migrations"'
 const MANAGER = 'import type { EntityManager } from "typeorm"\n'
@@ -28,7 +27,6 @@ test("R47: only src/tests/world starts infrastructure, migrates, holds a DataSou
     tester.run("tests-infra-only-in-world", testsInfraOnlyInWorld, {
         valid: [
             { filename: E2E, code: `${MANAGER}declare const world: { db: { primary: EntityManager } }\nexport const rows = world.db.primary.find(Object)` },
-            { filename: MIGRATE_SPEC, code: `import { orderMigrations } from ${'"../../../src/modules/domain/order/order.migrations"'}\nexport const all = orderMigrations` },
             { filename: WORLD, code: 'import { PostgreSqlContainer } from "@testcontainers/postgresql"\nimport { DataSource } from "typeorm"\nexport const db = new PostgreSqlContainer("postgres:16")\ndeclare const source: DataSource\nvoid source.runMigrations()\nprocess.env.PRIMARY_DB_HOST = "localhost"' },
             { filename: E2E, code: "declare const settings: { synchronize(): void }\nsettings.synchronize()\nexport const port = process.env.PORT" },
         ],

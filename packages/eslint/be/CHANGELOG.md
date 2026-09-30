@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Changed: Back-end apps have no composition spec, including the migrate app. `unit-test-colocated` has no app exception; only service unit specs and the integration, e2e and contract layers remain.
+
 ## 2.0.1 - 2026-10-01
 
 - Fixed: `e2e-asserts-persisted-state` accepts `<world>.db.<connection>` and `<world>.services.<name>.api` state reads, the world identified by its `TestWorld` type (from `@starci/test-world` or the `be.tests.world` slot), not by a variable name.

@@ -63,7 +63,7 @@ test("isGlobal: true is written only in apps/<app>/src/app.module.ts", () => {
             { filename: MODULE, code: "const m = CatalogModule.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
             { filename: at("src/features/plan/plan.module.ts"), code: "@Module({ imports: [X.register({ isGlobal: true })] }) class M {}", errors: [{ messageId: "isGlobal" }] },
             { filename: at("apps/api/src/main.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
-            { filename: at("apps/api/src/api.composition.spec.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
+            { filename: at("apps/api/src/api.options.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
             { filename: at("src/modules/domain/plan/plan.module.spec.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
             // a spec does not compose, and the same code in a feature or a domain file stays refused
             { filename: at("src/tests/integration/plan/plan.integration-spec.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },

@@ -69,7 +69,7 @@ export const namedEntityManagerOnly = {
         schema: [],
         messages: {
             property:
-                "`{{type}}` is injected as a class property. Property injection hides the dependency from the constructor and from the composition spec. Receive the named-injector `EntityManager` as a constructor parameter.",
+                "`{{type}}` is injected as a class property. Property injection hides the dependency from the constructor and the app module. Receive the named-injector `EntityManager` as a constructor parameter.",
             infra:
                 "`{{type}}` is injected here. A `DataSource` or `QueryRunner` is built and held only by the platform database capability, the migrate app and the test world in `src/tests/world`; specs take `world.db.<connection>`; everything else injects the shared `EntityManager` through its named injector and calls it directly.",
             getRepository:

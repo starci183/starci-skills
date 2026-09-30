@@ -52,15 +52,16 @@ test('repo.scripts: a script of another kind (.ts) and a nested folder match no 
 
 // ------------------------------------------------------------------------------------------------ R102 BE_SPEC_PLACEMENT
 
-test('BE_SPEC_PLACEMENT: a spec in scripts/, in tools/, beside a non-service file and under src/ elsewhere is refused', () => {
+test('BE_SPEC_PLACEMENT: a spec in an app, scripts/, tools/, beside a non-service file or under src/ elsewhere is refused', () => {
   const result = checkRepo({ repoRoot: repoOf(BE, (dir) => {
+    put(dir, 'apps/core/src/core.composition.spec.ts');
     put(dir, 'scripts/x.spec.mjs');
     put(dir, 'scripts/probe.test.cjs');
     put(dir, 'tools/seed.spec.ts');
     put(dir, 'src/features/orders/application/place-order.spec.ts');
     put(dir, 'src/tests/misc/other.e2e-spec.ts');
   }) });
-  assert.deepEqual(pathsOf(result, 'BE_SPEC_PLACEMENT'), ['scripts/probe.test.cjs', 'scripts/x.spec.mjs', 'src/features/orders/application/place-order.spec.ts', 'src/tests/misc/other.e2e-spec.ts', 'tools/seed.spec.ts']);
+  assert.deepEqual(pathsOf(result, 'BE_SPEC_PLACEMENT'), ['apps/core/src/core.composition.spec.ts', 'scripts/probe.test.cjs', 'scripts/x.spec.mjs', 'src/features/orders/application/place-order.spec.ts', 'src/tests/misc/other.e2e-spec.ts', 'tools/seed.spec.ts']);
 });
 
 test('BE_SPEC_PLACEMENT: a service spec beside its service and the integration, e2e and contract layers are clean', () => {

@@ -2,13 +2,13 @@
  * What is a unit spec, decided by the slot manifest and the file's role suffix, never by a path pattern.
  *
  * A unit spec is a `*.spec.ts` outside the folders that own the other test kinds (`src/tests/{e2e,integration,contract,world}`)
- * and outside `apps/migrate` (the migrate app's own specs). Only a `<name>.service.spec.ts` beside `<name>.service.ts` is a
+ * only. Only a `<name>.service.spec.ts` beside `<name>.service.ts` is a
  * legitimate unit spec (R47); the quality rules of R48 judge exactly those.
  */
 import { basename } from "node:path"
 
-/** The slots whose `*.spec.ts` files are not unit specs: the other test kinds and the migrate app. */
-const OTHER_KIND_SLOTS = new Set(["be.tests.e2e", "be.tests.integration", "be.tests.contract", "be.tests.world", "be.tests.world.kit", "be.app.migrate"])
+/** The slots whose `*.spec.ts` files are not unit specs: the other test kinds and world infrastructure. */
+const OTHER_KIND_SLOTS = new Set(["be.tests.e2e", "be.tests.integration", "be.tests.contract", "be.tests.world", "be.tests.world.kit"])
 
 /** The file name of a linted path. */
 export const baseOf = (filename) => basename(String(filename || "").replace(/\\/g, "/"))

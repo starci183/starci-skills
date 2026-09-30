@@ -38,7 +38,7 @@ const isEnvMember = (node) => node?.type === "MemberExpression" && isProcessEnv(
  * migration (a class declared in a `be.persistence` `migrations/` file, or a value whose type is an array of them) or
  * anything the migrate app declares; importing typeorm's `DataSource` or a testcontainers package; calling
  * `runMigrations`/`synchronize`/`dropDatabase`/`createSchema`... on a typeorm receiver; constructing a container; writing
- * `process.env`. Migration behaviour is tested only by `apps/migrate`'s own specs.
+ * `process.env`. Migration behaviour is tested by the e2e world.
  */
 export const testsInfraOnlyInWorld = {
     meta: {
@@ -46,7 +46,7 @@ export const testsInfraOnlyInWorld = {
         docs: { description: "Only src/tests/world starts infrastructure, migrates, holds a DataSource or writes process.env." },
         schema: [],
         messages: {
-            migration: "This test imports a migration or the migrate app. The schema is prepared once by `src/tests/world/global-setup.ts` running the real `apps/migrate` bootstrap; migrations are tested in `apps/migrate`'s own specs.",
+            migration: "This test imports a migration or the migrate app. The schema is prepared once by `src/tests/world/global-setup.ts` running the real `apps/migrate` bootstrap; migration behaviour is tested through the e2e world.",
             call: "`{{name}}` builds or changes the schema outside `src/tests/world`. The world migrates once; a test uses `world.db.<connection>`.",
             infra: "This test imports or starts infrastructure (testcontainers, typeorm's DataSource). It belongs to `src/tests/world`; a test uses `useTestWorld(...)` and `world.db.<connection>`.",
             env: "This test writes `process.env`. The environment is set once by `src/tests/world`; a test takes the world as it is.",
@@ -201,4 +201,3 @@ export const recommended = {
     "starci-be/tests-no-override": "error",
     "starci-be/test-world-shape": "error",
 }
-

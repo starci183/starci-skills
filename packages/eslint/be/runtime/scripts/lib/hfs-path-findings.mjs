@@ -17,7 +17,7 @@ const PLAIN_ENTRY = /^<[a-z][a-z0-9-]*>.ts$/;
 /**
  * BE_SOURCE_FORM (R89): every tracked src/ or apps/ TypeScript file of a back end is index.ts, main.ts, a migration of
  * be.persistence, or <kebab-name>.<suffix>.ts with <suffix> in the closed vocabulary ruleParams.be.suffixes (a name such
- * as api.composition.spec.ts keeps its inner words kebab-case). A suffix of ruleParams.be.bannedSuffixes anywhere in the
+ * as order.service.spec.ts keeps its inner words kebab-case). A suffix of ruleParams.be.bannedSuffixes anywhere in the
  * name is refused by name. Paths no slot owns are HFS_SLOT_UNDECLARED's, not this code's.
  */
 function sourceFormFindings({ files, resolver }) {

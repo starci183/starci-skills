@@ -1,0 +1,16 @@
+id: be-four-test-layers
+effectiveAt: '2026-10-01T14:00:00+07:00'
+summary: >-
+  Back-end repositories have exactly four test layers: colocated service unit specs,
+  integration, e2e and contract. Apps have no composition spec, including migrate;
+  their module boot is proven by the e2e world. App slots require only production
+  composition files, R102 rejects specs under apps, and the old migrate unit-spec
+  exception is removed. R02 and R32 retain their production-file enforcers.
+reach: new-legs
+paths:
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/be/test.yaml
+  - scripts/lib/hfs-rules/spec-placement.mjs
+  - packages/eslint/be/lib/unit-spec.mjs
+  - modules/kernel/failure-codes.yaml

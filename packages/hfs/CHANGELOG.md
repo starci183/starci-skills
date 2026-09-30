@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Changed: Back-end apps have no composition spec. App slots admit only their production composition files, and R102 rejects a spec under `apps/<app>/src`. The e2e world proves that each app boots.
+
 ## 2.0.2 - 2026-10-01
 
 - Fixed: `hfs` printed nothing and checked nothing when started through a node_modules junction or symlink (every lane worktree, some npx shims): the entry-point test compared `argv[1]` with the resolved module path. It now compares real paths (`isMain` of `scripts/checks/common.mjs`, shared by the bin and the architecture entry). Spec: `tests/hfs-cli-worktree.spec.mjs` runs `hfs check` inside a `git worktree add` checkout with a junctioned node_modules and requires a report or a loud refusal.

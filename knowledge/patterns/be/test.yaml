@@ -34,7 +34,7 @@ rules:
     kind: mandatory
     hfsRules: [R12, R47, R48]
     requirement: |-
-      Four test kinds exist and the folder and the file suffix always agree. Unit is `<name>.service.spec.ts` beside its `<name>.service.ts` and no other file is unit-tested (BE-TEST-7, BE-TEST-8): any other `*.spec.ts` outside `src/tests/{e2e,integration,contract,world}` and `apps/migrate` is a finding, and a composition spec is no longer a unit kind.
+      Four test kinds exist and the folder and the file suffix always agree. Unit is `<name>.service.spec.ts` beside its `<name>.service.ts` and no other file is unit-tested (BE-TEST-7, BE-TEST-8): any other `*.spec.ts` outside `src/tests/{e2e,integration,contract,world}` is a finding, including specs in apps.
       Integration is `src/tests/integration/<capability>/*.integration-spec.ts` (one capability module on the real database, no
       HTTP, through `useTestWorld({ modules })`). E2E is `src/tests/e2e/<area>/*.e2e-spec.ts` (through
       `useTestWorld({ apps })`). Contract is `src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped

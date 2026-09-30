@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, findings, runArch } from './_hfs-arch-fixture.mjs';
 
-// R32 BE_APP_COMPOSITION_ONLY: apps/<app>/src holds composition only (main.ts, app.module.ts, <app>.options.ts, the
-// composition spec); any other source file there is business code in the wrong place.
+// R32 BE_APP_COMPOSITION_ONLY: apps/<app>/src holds composition only (main.ts, app.module.ts, <app>.options.ts);
+// any other source file there is business code in the wrong place.
 const APP = {
   'apps/core/src/main.ts': "import { AppModule } from './app.module';\nexport const boot = AppModule;\n",
   'apps/core/src/app.module.ts': 'export class AppModule {}\n',

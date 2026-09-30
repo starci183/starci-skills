@@ -27,7 +27,7 @@ const readmeOf = (name, profile) => [`# ${name}`, '', 'A demo repository for the
 
 /**
  * A clean product repository for `declaration`: every managed file rendered, every other path the manifest requires, plus one BE
- * feature, clean to the whole check (the README and, for a back end, the composition the machine wants). Not yet a Git repository.
+ * feature, clean to the whole check (including the README and back-end app module). Not yet a Git repository.
  * `into` places it as <into>/<name> instead of a fresh temporary directory (its README names the directory).
  */
 export function writeCleanRepo(declaration, { declare = true, into, name = 'demo' } = {}) {
@@ -82,7 +82,6 @@ export function writeCleanRepo(declaration, { declare = true, into, name = 'demo
       "import { AuthGuard } from '../../../src/modules/domain/identity';",
       '@Module({ providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: CsrfOriginGuard }, { provide: APP_GUARD, useClass: AuthGuard }] })',
       'export class AppModule {', '  static register(_options: object) { return { module: AppModule, imports: [], providers: [] }; }', '}', ''].join('\n'));
-    write('apps/core/src/core.composition.spec.ts', "import { AppModule } from './app.module';\nit('boots', () => { AppModule.register({}); });\n");
     fs.writeFileSync(path.join(dir, 'apps/core/src/main.ts'), owners.map((file) => `import '../../../${file.replace(/\.ts$/, '')}';`).join('\n') + '\n');
   }
   // Both profiles' tsconfig.json is the managed one (it extends @starci/tsconfig/be.json or next.json, see installTypeScript).

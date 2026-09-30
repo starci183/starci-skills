@@ -402,10 +402,11 @@ describe('the back-end tool configuration', () => {
 describe('the package.json scripts of a back end', () => {
   const scripts = hfs => Object.fromEntries(renderTargets(hfs, PRESETS.be).find(target => target.path === 'package.json').content.trim().split('\n').map(line => [line.slice(0, line.indexOf(': ')), line.slice(line.indexOf(': ') + 2)]));
   it('are the fixed scripts, plus build and one start script per runnable app and migrate', () => {
-    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'contract:emit', 'format', 'format:check', 'lint', 'lint:fix', 'migrate', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'typecheck', 'typecheck:tests']);
+    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'contract:emit', 'format', 'format:check', 'lint', 'lint:fix', 'migrate', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'test:stack', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts(BE)['start:core'], 'node dist/apps/core/src/main.js');
     assert.equal(scripts(BE).migrate, 'node dist/apps/migrate/src/main.js');
     assert.equal(scripts(BE).test, 'jest --selectProjects unit --coverage');
+    assert.equal(scripts(BE)['test:stack'], 'starci-test-stack');
     for (const project of ['integration', 'e2e', 'contract']) assert.equal(scripts(BE)[`test:${project}`], `npm run typecheck:tests && jest --selectProjects ${project}`);
     assert.equal(scripts(BE)['typecheck:tests'], 'tsc -p src/tests/tsconfig.json');
     assert.doesNotMatch(Object.values(scripts(BE)).join('\n'), /--rule|--no-inline-config|--no-eslintrc/);

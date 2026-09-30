@@ -2,8 +2,6 @@
 //   - a unit spec is `<name>.service.spec.ts` beside its service, in a slot whose `tests` is `unit-beside` (the slot and the lint rule
 //     `unit-test-colocated` judge the name);
 //   - integration, e2e and contract specs are `src/tests/{integration,e2e,contract}/...`, the slots whose `tests` is `e2e`;
-//   - an app's own folder (`apps/<app>/src/`, the slots that name an `appKind`) holds the app's composition spec, which the architecture
-//     machine's app-composition check judges.
 // Every other tracked `*.spec.*`, `*.test.*` or `*-spec.*` file is a finding, `scripts/` and `tools/` included: an operational script
 // carries no spec, and a spec that guards one moves into a layer or goes. A file no slot owns (`tools/x.spec.ts`) is judged too, so the
 // finding names the rule rather than only the missing slot. Which folder is a layer is read from the slot manifest, never spelled here.
@@ -23,7 +21,7 @@ export function specPlacementFindings({ files, resolver }) {
     if (!isSpecFile(file) || file.includes('node_modules/')) continue;
     const classified = resolver.classifyPath(file);
     const slot = classified.status === 'owned' ? resolver.slot(classified.slot) : null;
-    if (slot && (TEST_SLOT_TESTS.has(slot.tests) || slot.appKind !== undefined)) continue;
+    if (slot && TEST_SLOT_TESTS.has(slot.tests)) continue;
     const where = slot ? `slot ${slot.id}` : 'no slot';
     findings.push(found(SPEC_PLACEMENT, file, `${file} is a spec outside the test layers (${where}); a unit spec is <name>.service.spec.ts beside its service and an integration, e2e or contract spec sits under src/tests/{integration,e2e,contract}; an operational script or a tool carries no spec`));
   }

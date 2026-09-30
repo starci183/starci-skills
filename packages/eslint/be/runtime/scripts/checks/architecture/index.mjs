@@ -143,8 +143,7 @@ const machineIds = () => [
 ];
 /**
  * The rules only the HFS machine emits: the tier, reachability, dead-export, required-file, clone and symbol checks and the
- * backend composition and data machine and frontend repository machine. A rule id an ordinary check also emits (the composition
- * spec and the app-composition check both report BE_APP_COMPOSITION_ONLY) is not here. A spec about another rule judges its own
+ * backend composition and data machine and frontend repository machine. A spec about another rule judges its own
  * report without these (they have their own specs); every one of them is in ARCHITECTURE_RULE_IDS.
  */
 export const HFS_MACHINE_RULE_IDS = Object.freeze((() => {

@@ -245,10 +245,9 @@ BE_APP_BUSINESS_ROLE:
 BE_APP_COMPOSITION_ONLY:
   title: "Composition root has stray source"
   title_vi: "Gốc ghép nối có tệp lạc chỗ"
-  meaning_vi: "Mã trong ứng dụng gốc không phải tệp mà slot ứng dụng cho phép (main.ts, app.module.ts, <app>.options.ts)."
+  meaning_vi: "Mã trong ứng dụng gốc không phải tệp mà slot ứng dụng cho phép (main.ts, app.module.ts, <app>.options.ts; operations.ts ở ứng dụng API)."
   causes_vi:
     - "Thêm tệp không đúng tên vào thư mục ứng dụng gốc"
-    - "Composition spec của app tự khai AppModule, import AppModule từ tệp khác app.module, hoặc không gọi AppModule.register( — module thật không bao giờ được khởi chạy"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -1467,12 +1466,12 @@ HFS_SLOT_NOT_ENABLED:
   kind: check-finding
 
 HFS_SLOT_REQUIRED_MISSING:
-  title: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`)"
+  title: "A slot is missing a required file (feature `index.ts`, app `main.ts`, FE `global-error.tsx`)"
   title_vi: "Ô thiếu tệp bắt buộc"
   meaning_vi: "Một ô bắt buộc (hoặc một thực thể của ô, như một ứng dụng hay một tính năng) đòi có tệp hoặc thư mục này nhưng nó không nằm trong những gì Git theo dõi."
   causes_vi:
-    - "Vi phạm luật R02: slot bắt buộc thiếu tệp `requires` (vd feature thiếu `index.ts`, app thiếu composition spec, FE thiếu `global-error.tsx`)."
-    - "Ứng dụng thiếu main.ts, app.module.ts hoặc spec ghép ứng dụng"
+    - "Vi phạm luật R02: slot bắt buộc thiếu tệp `requires` (vd feature thiếu `index.ts`, app thiếu `main.ts`, FE thiếu `global-error.tsx`)."
+    - "Ứng dụng thiếu main.ts hoặc app.module.ts"
     - "Kho thiếu tệp gốc bắt buộc như README.md, hfs.json, .starciwork, .starcistacks"
   nextStep_vi: "Tạo tệp hoặc thư mục theo mẫu của ô rồi commit; tệp chưa git add vẫn tính là thiếu. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
