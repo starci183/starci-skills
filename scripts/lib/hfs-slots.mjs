@@ -150,7 +150,7 @@ function manifestShapeProblems(m) {
   const rp = m.ruleParams;
   if (!isPlainObject(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isPlainObject(rp[p]))) bad.push('ruleParams must be a map with be and fe');
   else {
-    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 5) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, suffixes and bannedSuffixes');
+    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 6) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, suffixes and bannedSuffixes');
     const owners = rp.be.infraOwners;
     const ownerId = /^(platform|integrations)\/[a-z][a-z0-9-]*$/;
     if (!isPlainObject(owners) || !Object.keys(owners).length || !Object.entries(owners).every(([key, list]) => key && Array.isArray(list) && list.every((o) => ownerId.test(String(o))) && new Set(list).size === list.length)) bad.push('ruleParams.be.infraOwners must map a non-empty specifier to a list of unique platform/<capability> or integrations/<provider> owners ([] means nowhere)');
@@ -158,6 +158,12 @@ function manifestShapeProblems(m) {
     if (!roleList(rp.be.suffixes)) bad.push('ruleParams.be.suffixes must be a non-empty list of unique kebab-case role suffixes');
     if (!roleList(rp.be.bannedSuffixes)) bad.push('ruleParams.be.bannedSuffixes must be a non-empty list of unique kebab-case suffixes');
     else if (roleList(rp.be.suffixes) && rp.be.suffixes.some((x) => rp.be.bannedSuffixes.includes(x))) bad.push('ruleParams.be.suffixes and bannedSuffixes must be disjoint');
+    const formNames = ['call', 'new', 'curried', 'object', 'primitive', 'array'];
+    const formsOk = (v) => Array.isArray(v) && v.length > 0 && v.every((x) => formNames.includes(x)) && new Set(v).size === v.length;
+    const doubleOk = (v) => isPlainObject(v) && /^[A-Za-z][A-Za-z0-9]*$/.test(String(v.double)) && formsOk(v.forms);
+    const regexOk = (v) => { try { return typeof v === 'string' && v.length > 0 && Boolean(new RegExp(v)); } catch { return false; } };
+    const sd = rp.be.specDoubles;
+    if (!isPlainObject(sd) || Object.keys(sd).sort().join() !== 'doubles,fallback,kit' || typeof sd.kit !== 'string' || !sd.kit || !Array.isArray(sd.doubles) || !sd.doubles.length || !sd.doubles.every((e) => doubleOk(e) && regexOk(e.token) && Object.keys(e).length === 3) || !doubleOk(sd.fallback) || Object.keys(sd.fallback).length !== 2) bad.push('ruleParams.be.specDoubles must be {kit, doubles: [{token: regex, double, forms}], fallback: {double, forms}} with forms drawn from call, new, curried, object, primitive, array');
     if (!fileLinesOk(rp.fe.fileLines) || !blockOk(rp.fe.duplicateBlock) || Object.keys(rp.fe).length !== 2) bad.push('ruleParams.fe needs fileLines {soft, hardGrowth} and duplicateBlock {lines >= 2, tokens >= 1}');
   }
   if (!Array.isArray(m.slots) || !m.slots.length) { bad.push('slots must be a non-empty list'); return bad; }

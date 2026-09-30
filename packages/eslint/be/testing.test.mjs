@@ -76,37 +76,51 @@ test("TESTING-6: a spec whose every assertion is a call restates the source", ()
   })
 })
 
-test("R47: a role has a twin spec, a spec has a subject, and there are two kinds of test file", () => {
+test("R47: only a service is unit-tested, its spec sits beside it, and there are only the sanctioned kinds of test file", () => {
   tester.run("unit-test-colocated", unitTestColocated, {
     valid: [
-      // the real subject with its real twin on disk
+      // the real service with its real spec on disk
       { filename: at("src/modules/domain/order/covered.service.ts"), code: "export class CoveredService {}" },
-      // the real twin beside its real subject
+      // the real spec beside its real service
       { filename: at("src/modules/domain/order/covered.service.spec.ts"), code: "export {}" },
-      // a file with no twin role needs no twin
+      // a file that is not a service needs no spec: handlers, guards, mappers, policies, clients are covered through services
+      { filename: at("src/features/checkout/application/start-checkout.handler.ts"), code: "export class StartCheckoutHandler {}" },
+      { filename: at("src/features/checkout/transport/http/session.guard.ts"), code: "export class SessionGuard {}" },
+      { filename: at("src/features/checkout/transport/graphql/order.mapper.ts"), code: "export const toType = () => 1" },
+      { filename: at("src/modules/domain/order/policies/refund.policy.ts"), code: "export class RefundPolicy {}" },
+      { filename: at("src/modules/integrations/payos/payos.client.ts"), code: "export class PayosClient {}" },
       { filename: at("src/modules/domain/order/order.contracts.ts"), code: "export interface Order {}" },
       { filename: at("src/modules/domain/order/index.ts"), code: "export {}" },
-      // a role suffix outside the slot that owns the role is not this rule's business (naming rules judge it)
+      // a service suffix inside the test tree is a fixture, not a subject
       { filename: at("src/tests/fixtures/orders.service.ts"), code: "export class Orders {}" },
-      // an e2e flow is the second kind of test file
+      // an e2e flow is the second kind of test file, and specs of the world and of the migrate app are not unit specs
       { filename: E2E, code: "export {}" },
+      { filename: at("src/tests/e2e/checkout/legacy.spec.ts"), code: "export {}" },
+      { filename: at("src/tests/world/use-test-world.spec.ts"), code: "export {}" },
+      { filename: at("apps/migrate/src/migrate.composition.spec.ts"), code: "export {}" },
       // a declaration file carries no behaviour
       { filename: at("src/modules/domain/order/order.service.d.ts"), code: "export {}" },
     ],
     invalid: [
-      // the roles of BE-CONVENTION 1.16, by slot and basename role
-      { filename: at("src/features/checkout/application/start-checkout.handler.ts"), code: "export class StartCheckoutHandler {}", errors: [{ messageId: "twin" }] },
-      { filename: at("src/modules/domain/order/order.service.ts"), code: "export class OrderService {}", errors: [{ messageId: "twin" }] },
-      { filename: at("src/features/checkout/transport/message/paid.consumer.ts"), code: "export class PaidConsumer {}", errors: [{ messageId: "twin" }] },
-      { filename: at("src/features/checkout/transport/schedule/sweep.job.ts"), code: "export class SweepJob {}", errors: [{ messageId: "twin" }] },
-      { filename: at("src/features/checkout/transport/http/session.guard.ts"), code: "export class SessionGuard {}", errors: [{ messageId: "twin" }] },
-      { filename: at("src/features/checkout/transport/graphql/order.mapper.ts"), code: "export const toType = () => 1", errors: [{ messageId: "twin" }] },
-      { filename: at("src/modules/domain/order/policies/refund.policy.ts"), code: "export class RefundPolicy {}", errors: [{ messageId: "twin" }] },
-      { filename: at("src/modules/integrations/payos/payos.client.ts"), code: "export class PayosClient {}", errors: [{ messageId: "twin" }] },
-      { filename: at("src/modules/domain/order/persistence/order.rows.ts"), code: "export const toOrder = () => 1", errors: [{ messageId: "twin" }] },
-      // a spec with no subject beside it
-      { filename: at("src/modules/domain/order/nothing-here.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
-      { filename: at("src/tests/world/use-test-world.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      // a service with no spec beside it
+      { filename: at("src/modules/domain/order/order.service.ts"), code: "export class OrderService {}", errors: [{ messageId: "missing" }] },
+      { filename: at("src/modules/platform/cache/cache.service.ts"), code: "export class CacheService {}", errors: [{ messageId: "missing" }] },
+      // a unit spec of anything else is a finding, whatever it is named after
+      { filename: at("src/features/checkout/application/start-checkout.handler.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/checkout/transport/graphql/order.resolver.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/checkout/transport/http/order.controller.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/checkout/transport/message/paid.consumer.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/checkout/transport/graphql/order.mapper.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/features/checkout/transport/http/session.guard.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/modules/domain/order/order.module.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/modules/domain/order/persistence/entities/order.entity.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/modules/domain/order/policies/refund.policy.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/modules/domain/order/order-math.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      { filename: at("src/modules/domain/order/order.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      // a composition spec is not a unit kind
+      { filename: at("apps/api/src/api.composition.spec.ts"), code: "export {}", errors: [{ messageId: "notService" }] },
+      // a service spec with no service beside it
+      { filename: at("src/modules/domain/order/nothing-here.service.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
       // the banned kinds
       { filename: at("src/modules/domain/order/order.service.test.ts"), code: "export {}", errors: [{ messageId: "suffix" }] },
       { filename: at("src/modules/domain/order/order.int-spec.ts"), code: "export {}", errors: [{ messageId: "suffix" }] },

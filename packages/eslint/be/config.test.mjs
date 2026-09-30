@@ -57,3 +57,15 @@ test("loadHfs reads the hfs.json beside the config file", () => {
     assert.equal(typeof loadHfs, "function")
     assert.throws(() => loadHfs(new URL("./no-such-dir/eslint.config.mjs", import.meta.url).href), /hfs\.json/)
 })
+
+test("the borrowed cast rules reach a unit spec: no `as` and no `x!` in a `.service.spec.ts`", async () => {
+    const { Linter } = await import("eslint")
+    const { default: tsParser } = await import("@typescript-eslint/parser")
+    const [, block] = await starciBeConfig({ hfs: fixtureHfs() })
+    const borrowed = Object.fromEntries(Object.entries(block.rules).filter(([name]) => name === "@typescript-eslint/consistent-type-assertions" || name === "@typescript-eslint/no-non-null-assertion"))
+    const lint = (code, filename) => new Linter({ configType: "flat" }).verify(code, [{ ...block, languageOptions: { parser: tsParser, ecmaVersion: "latest", sourceType: "module" }, rules: borrowed }], { filename })
+    const spec = "src/modules/domain/order/order.service.spec.ts"
+    assert.deepEqual(lint("declare const raw: unknown\nexport const row = raw as { id: number }", spec).map((message) => message.ruleId), ["@typescript-eslint/consistent-type-assertions"])
+    assert.deepEqual(lint("declare const raw: { id?: number }\nexport const id = raw.id!", spec).map((message) => message.ruleId), ["@typescript-eslint/no-non-null-assertion"])
+    assert.deepEqual(lint("declare const raw: { id?: number }\nexport const id = raw.id ?? 0", spec), [])
+})

@@ -49,7 +49,7 @@ const isBus = (context, node) => isPackageType(context, node, "CommandBus", "@ne
 /** True when a declaration file is owned by the capability `capability` of a platform slot. */
 const declaredByCapability = (hfs, file, capability) => hfs.slotOf(file) === "be.platform" && hfs.ownerOf(file)?.split("/").pop() === capability
 
-// -- transport-dispatch-only -------------------------------------------------------------------------------------
+// -- transport-is-thin -------------------------------------------------------------------------------------
 
 /** What a transport class may hold, by the type of the injected value. */
 const isAllowedInjection = (context, hfs, slot, annotation) => {
@@ -83,16 +83,48 @@ const dispatchesOf = (context, method) => {
     return count
 }
 
-/** A transport class injects only the bus (and the locale or inbox where the convention names them) and dispatches once per handler. */
-export const transportDispatchOnly = {
+/** Statements and expressions that are a decision or a repetition: none of them belongs in a door. */
+const DECISION_NODES = new Set(["IfStatement", "SwitchStatement", "ConditionalExpression", "LogicalExpression", "ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement", "TryStatement", "ThrowStatement"])
+
+/** What an injected type is to a door: `bus`, `inbox`, `locale`, or null. */
+const injectedKind = (context, annotation) => {
+    const origins = typeOrigins(context, annotation)
+    if (origins.some((origin) => (origin.name === "CommandBus" || origin.name === "QueryBus") && origin.module === "@nestjs/cqrs")) return "bus"
+    if (origins.some((origin) => origin.name === "Inbox" && origin.module === null)) return "inbox"
+    if (origins.some((origin) => origin.name === "RequestLocale" && origin.module === null)) return "locale"
+    return null
+}
+
+/** True when an `if` is the one guard R80 demands: `if (!(await this.inbox.claim(...))) return`, or the same on a stored claim answer. */
+const isClaimGuard = (statement, claimed) => {
+    if (statement.type !== "IfStatement" || statement.alternate) return false
+    const consequent = statement.consequent.type === "BlockStatement" && statement.consequent.body.length === 1 ? statement.consequent.body[0] : statement.consequent
+    if (consequent.type !== "ReturnStatement" || consequent.argument) return false
+    let test = statement.test
+    if (test.type === "UnaryExpression" && test.operator === "!") test = test.argument
+    else if (test.type === "BinaryExpression" && test.operator === "===" && test.right.type === "Literal" && test.right.value === false) test = test.left
+    else return false
+    if (test.type === "AwaitExpression") test = test.argument
+    if (test.type === "Identifier") return claimed.has(test.name)
+    return test.type === "CallExpression" && test.callee.type === "MemberExpression" && test.callee.property.name === "claim"
+}
+
+/** True for `this.<name>` where name is one of `names`. */
+const isThisMember = (expression, names) => expression?.type === "MemberExpression" && !expression.computed && expression.object.type === "ThisExpression" && expression.property.type === "Identifier" && names.has(expression.property.name)
+
+/** A door maps its input, dispatches exactly one message on the injected bus and returns the (mapped) result. */
+export const transportIsThin = {
     meta: {
         type: "problem",
-        docs: { description: "A transport class injects only `CommandBus`/`QueryBus` and every handler method dispatches exactly one command or query." },
+        docs: { description: "A transport class injects only `CommandBus`/`QueryBus`, and every handler method maps its input, dispatches exactly one command or query and returns the result: no decision, no loop, no other call." },
         schema: [],
         messages: {
-            injects: "`{{what}}` is injected into a transport class. A door maps its input and dispatches: it injects only `CommandBus` and `QueryBus` (plus `RequestLocale` in a REST door). Move whatever this needs into a handler and dispatch a command or query.",
+            injects: "`{{what}}` is injected into a transport class. A door maps its input and dispatches: it injects only `CommandBus` and `QueryBus` (plus `RequestLocale` in a REST door and the `Inbox` of a consumer). Move whatever this needs into a service and dispatch a command or query; an `EntityManager` never reaches a door.",
             none: "`{{name}}` never dispatches. A transport handler calls `execute(new <Message>(...))` on the injected bus exactly once; anything it does instead belongs in a handler.",
             many: "`{{name}}` dispatches {{count}} times. A transport handler dispatches exactly one command or query; a second dispatch is orchestration that belongs in the handler of one message.",
+            branch: "`{{what}}` is a decision or a loop in a door. A transport method only maps its input, dispatches one message and returns the result; a branch here is business logic that no unit spec covers. Move it into the service the handler calls. (The one `if` a door may hold is the inbox guard `if (!(await this.inbox.claim(source, id))) return`.)",
+            call: "`{{what}}` is a call a door does not make. A door calls the injected bus (`execute`), the inbox claim of a consumer, and pure mapper functions imported from a `*.mapper.ts`; everything else is logic that belongs in a service.",
+            noReturn: "`{{name}}` dispatches but never returns the result. A resolver or controller action returns what the bus answered (mapped by a pure mapper function if it must change shape).",
         },
     },
     create(context) {
@@ -100,24 +132,74 @@ export const transportDispatchOnly = {
         const slot = hfs.slotOf(context.filename)
         if (!isTransportSlot(slot)) return {}
         const sourceCode = context.sourceCode
+        const isMapper = (callee) => {
+            if (callee.type !== "Identifier") return false
+            const found = importOf(context, callee)
+            return found !== null && /(?:^|\/)[^/]+\.mapper(?:\.[cm]?[jt]s)?$/.test(found.source.replace(/\\/g, "/"))
+        }
         return {
             ClassDeclaration(node) {
+                const inboxes = new Set()
+                const locales = new Set()
+                const classify = (name, annotation) => {
+                    const kind = name === null ? null : injectedKind(context, annotation)
+                    if (kind === "inbox") inboxes.add(name)
+                    else if (kind === "locale") locales.add(name)
+                }
                 const constructor = node.body.body.find((member) => member.type === "MethodDefinition" && member.kind === "constructor")
                 for (const original of constructor?.value.params ?? []) {
                     const param = original.type === "TSParameterProperty" ? original.parameter : original
                     const annotation = param.typeAnnotation?.typeAnnotation
                     if (!annotation || !isAllowedInjection(context, hfs, slot, annotation)) context.report({ node: original, messageId: "injects", data: { what: sourceCode.getText(param) } })
+                    else classify(original.type === "TSParameterProperty" && param.type === "Identifier" ? param.name : null, annotation)
                 }
                 for (const member of node.body.body) {
                     if (member.type !== "PropertyDefinition" || !(member.decorators ?? []).some((decorator) => isInjectorDecorator(context, decorator))) continue
                     const annotation = member.typeAnnotation?.typeAnnotation
                     if (!annotation || !isAllowedInjection(context, hfs, slot, annotation)) context.report({ node: member, messageId: "injects", data: { what: sourceCode.getText(member) } })
+                    else classify(member.key.type === "Identifier" ? member.key.name : null, annotation)
                 }
-                for (const method of handlerMethods(context, node, slot)) {
+                const handlers = handlerMethods(context, node, slot)
+                if (handlers.length === 0) return
+                for (const method of node.body.body) {
+                    if (method.type !== "MethodDefinition" || method.kind !== "method" || !method.value.body) continue
+                    const claimed = new Set()
+                    for (const statement of method.value.body.body) {
+                        if (statement.type !== "VariableDeclaration") continue
+                        for (const declarator of statement.declarations) {
+                            const init = declarator.init?.type === "AwaitExpression" ? declarator.init.argument : declarator.init
+                            if (declarator.id.type === "Identifier" && init?.type === "CallExpression" && init.callee.type === "MemberExpression" && init.callee.property.name === "claim" && isThisMember(init.callee.object, inboxes)) claimed.add(declarator.id.name)
+                        }
+                    }
+                    const guards = method.value.body.body.filter((statement) => isClaimGuard(statement, claimed))
+                    const insideGuard = (child) => guards.some((guard) => guard.range[0] <= child.range[0] && child.range[1] <= guard.range[1])
+                    walk(method.value.body, (child) => {
+                        if (DECISION_NODES.has(child.type)) {
+                            if (!insideGuard(child)) context.report({ node: child, messageId: "branch", data: { what: child.type === "LogicalExpression" ? child.operator : child.type.replace(/(Statement|Expression)$/, "").toLowerCase() } })
+                            return
+                        }
+                        if (child.type !== "CallExpression") return
+                        const callee = child.callee
+                        const member = callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" ? callee : null
+                        const allowed = (member !== null && member.property.name === "execute" && isBus(context, member.object))
+                            || (member !== null && member.property.name === "claim" && isThisMember(member.object, inboxes))
+                            || (member !== null && isThisMember(member.object, locales))
+                            || isMapper(callee)
+                        if (!allowed) context.report({ node: child, messageId: "call", data: { what: sourceCode.getText(callee) } })
+                    })
+                }
+                for (const method of handlers) {
                     const count = dispatchesOf(context, method)
                     const name = method.key.type === "Identifier" ? method.key.name : "this handler"
                     if (count === 0) context.report({ node: method.key, messageId: "none", data: { name } })
                     else if (count > 1) context.report({ node: method.key, messageId: "many", data: { name, count: String(count) } })
+                    else if ((method.decorators ?? []).some((decorator) => isRouteDecorator(context, decorator))) {
+                        let returns = false
+                        walk(method.value.body, (child) => {
+                            if (child.type === "ReturnStatement" && child.argument) returns = true
+                        }, { intoFunctions: false })
+                        if (!returns) context.report({ node: method.key, messageId: "noReturn", data: { name } })
+                    }
                 }
             },
         }
@@ -377,7 +459,7 @@ export const rules = {
     "rest-door-needs-a-reason": restDoorNeedsAReason,
     "door-lives-in-features": doorLivesInFeatures,
     "no-capability-imports-features": noCapabilityImportsFeatures,
-    "transport-dispatch-only": transportDispatchOnly,
+    "transport-is-thin": transportIsThin,
     "no-response-envelope": noResponseEnvelope,
     "no-graphql-json": noGraphqlJson,
 }
@@ -387,7 +469,7 @@ export const recommended = {
     "starci-be/rest-door-needs-a-reason": "error",
     "starci-be/door-lives-in-features": "error",
     "starci-be/no-capability-imports-features": "error",
-    "starci-be/transport-dispatch-only": "error",
+    "starci-be/transport-is-thin": "error",
     "starci-be/no-response-envelope": "error",
     "starci-be/no-graphql-json": "error",
 }

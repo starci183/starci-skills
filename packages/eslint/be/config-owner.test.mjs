@@ -25,6 +25,8 @@ test("the process environment is read only by the file that declares EnvSource i
             { filename: SERVICE, code: "const port = options.port" },
             { filename: SERVICE, code: "const env = { region: 1 }; const x = env.region" },
             { filename: SERVICE, code: "const p = path.join(root, 'src')" },
+            // a spec builds its environment from a literal record and reads no process state
+            { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "const env = { PLAN_URL: 'http://plan' }\nexport const url = env.PLAN_URL" },
             // a different process object is not the process
             { filename: SERVICE, code: "const process = { env: { X: 1 } }; export const x = process.env" },
         ],
@@ -45,6 +47,7 @@ test("the process environment is read only by the file that declares EnvSource i
             { filename: SERVICE, code: "export class EnvSource { read() { return process.env } }", errors: [{ messageId: "env" }] },
             // a spec is not exempt
             { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "process.env.X = '1'", errors: [{ messageId: "env" }] },
+            { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "const url = process.env.PLAN_URL", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "import { ConfigService } from '@nestjs/config'\nexport const x = ConfigService", errors: [{ messageId: "package" }] },
             { filename: SERVICE, code: "import 'dotenv/config'", errors: [{ messageId: "package" }] },
             { filename: SERVICE, code: "import dotenv from 'dotenv'\nexport const x = dotenv", errors: [{ messageId: "package" }] },

@@ -14,8 +14,10 @@
 import ts from "typescript"
 import { decoratorCallee, importOf, isImportedFrom, moduleReferences } from "./lib/import-source.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
+import { walk } from "./lib/ast.mjs"
+import { isLoggerType } from "./lib/ports.mjs"
 import { isTransportSlot } from "./lib/transport-slots.mjs"
-import { isPackageType, typed } from "./lib/types.mjs"
+import { isPackageType, typeOrigins, typed } from "./lib/types.mjs"
 
 /** The slot that holds messages and handlers. */
 const APPLICATION = "be.feature.application"
@@ -107,6 +109,78 @@ export const handlerOverridesProcess = {
                 return
             }
             if (!own("process") && processIsAbstract(context, node)) context.report({ node: node.id ?? node, messageId: "noProcess", data: { name } })
+        })
+    },
+}
+
+// -- handler-is-thin ---------------------------------------------------------------------------------------------
+
+/** Statements and expressions that are a decision or a repetition: none of them belongs in a handler. */
+const DECISION_NODES = new Set(["IfStatement", "SwitchStatement", "ConditionalExpression", "LogicalExpression", "ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement", "TryStatement", "ThrowStatement"])
+
+/** True when a type annotation is a domain service: a class named `*Service` declared in a `*.service.ts` file. */
+const isServiceType = (context, annotation) => typeOrigins(context, annotation).some((origin) => origin.module === null && origin.name.endsWith("Service") && origin.file.endsWith(".service.ts"))
+
+/** The injected members of a class: constructor parameters and decorated properties, with the type annotation of each. */
+const injectedMembers = (node) => {
+    const members = []
+    const constructor = constructorOf(node)
+    for (const original of constructor?.value.params ?? []) {
+        const param = original.type === "TSParameterProperty" ? original.parameter : original
+        members.push({ report: original, param, name: original.type === "TSParameterProperty" && param.type === "Identifier" ? param.name : null, annotation: param.typeAnnotation?.typeAnnotation })
+    }
+    for (const member of node.body.body) {
+        if (member.type !== "PropertyDefinition" || (member.decorators ?? []).length === 0) continue
+        members.push({ report: member, param: member, name: member.key.type === "Identifier" ? member.key.name : null, annotation: member.typeAnnotation?.typeAnnotation })
+    }
+    return members
+}
+
+/** A handler maps its input, calls exactly one method of an injected service and returns its result. */
+export const handlerIsThin = {
+    meta: {
+        type: "problem",
+        docs: { description: "A CQRS handler injects only `*Service` classes (and the template's Logger) and its `process` is one `return this.<service>.<method>(...)`." },
+        schema: [],
+        messages: {
+            dependency: "`{{what}}` is injected into a handler. A handler holds services (and the Logger the `ICQRSHandler` template needs) and nothing else: an `EntityManager`, a bus, a client or any other infrastructure is the business of a `*.service.ts`, which is the one file that is unit-tested. Move the work into a service and inject that.",
+            branch: "`{{what}}` is a decision or a loop in a handler. The `process` of a handler only maps its input and returns what one service method answers; every branch belongs in the service, where it is covered by the service spec.",
+            body: "`process` of `{{name}}` must be the single statement `return this.<service>.<method>(<mapped input>)` (with or without `await`). Any other statement is logic that no unit spec covers: move it into the service.",
+            call: "`process` of `{{name}}` must call exactly one method of an injected `*Service` and return its result: this makes {{count}} call(s), or calls something that is not an injected service.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        if (hfs.slotOf(context.filename) !== APPLICATION) return {}
+        const sourceCode = context.sourceCode
+        return classVisitors((node) => {
+            if (!(node.decorators ?? []).some((decorator) => isImportedFrom(context, decoratorCallee(decorator), CQRS_PACKAGE, ["CommandHandler", "QueryHandler"]))) return
+            const name = node.id?.name ?? "this handler"
+            const services = new Set()
+            for (const injected of injectedMembers(node)) {
+                if (injected.annotation && isServiceType(context, injected.annotation)) {
+                    if (injected.name !== null) services.add(injected.name)
+                } else if (!injected.annotation || !isLoggerType(context, injected.annotation)) {
+                    context.report({ node: injected.report, messageId: "dependency", data: { what: sourceCode.getText(injected.param) } })
+                }
+            }
+            const method = node.body.body.find((member) => member.type === "MethodDefinition" && member.kind === "method" && member.key.type === "Identifier" && member.key.name === "process")
+            const body = method?.value.body
+            if (!body) return
+            let calls = 0
+            walk(body, (child) => {
+                if (DECISION_NODES.has(child.type)) context.report({ node: child, messageId: "branch", data: { what: child.type === "LogicalExpression" ? child.operator : child.type.replace(/(Statement|Expression)$/, "").toLowerCase() } })
+                else if (child.type === "CallExpression") calls += 1
+            })
+            const only = body.body.length === 1 && body.body[0].type === "ReturnStatement" ? body.body[0].argument : null
+            if (only === null) {
+                context.report({ node: method.key, messageId: "body", data: { name } })
+                return
+            }
+            const call = only.type === "AwaitExpression" ? only.argument : only
+            const callee = call.type === "CallExpression" ? call.callee : null
+            const onService = callee?.type === "MemberExpression" && !callee.computed && callee.object.type === "MemberExpression" && !callee.object.computed && callee.object.object.type === "ThisExpression" && callee.object.property.type === "Identifier" && services.has(callee.object.property.name)
+            if (calls !== 1 || !onService) context.report({ node: method.key, messageId: "call", data: { name, count: String(calls) } })
         })
     },
 }
@@ -365,6 +439,7 @@ export const noEventBus = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "handler-overrides-process": handlerOverridesProcess,
+    "handler-is-thin": handlerIsThin,
     "message-carries-params-only": messageCarriesParamsOnly,
     "message-typed-result": messageTypedResult,
     "execute-params-shape": executeParamsShape,
@@ -375,6 +450,7 @@ export const rules = {
 /** Every rule of this law at `error`. */
 export const recommended = {
     "starci-be/handler-overrides-process": "error",
+    "starci-be/handler-is-thin": "error",
     "starci-be/message-carries-params-only": "error",
     "starci-be/message-typed-result": "error",
     "starci-be/execute-params-shape": "error",

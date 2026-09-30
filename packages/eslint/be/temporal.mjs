@@ -64,6 +64,9 @@ const rootIdentifier = (node) => {
     return null
 }
 
+/** The slots of the test world: its own helpers (`world/kit`) read real elapsed time like the world itself. */
+const WORLD_SLOTS = new Set(["be.tests.world", "be.tests.world.kit"])
+
 /** Only `platform/clock` reads the ambient clock. */
 export const noAmbientClock = {
     meta: {
@@ -78,7 +81,7 @@ export const noAmbientClock = {
     create(context) {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
-        if (isOwnedBy(hfs, filename, "platform", "clock") || hfs.slotOf(filename) === "be.tests.world") return {}
+        if (isOwnedBy(hfs, filename, "platform", "clock") || WORLD_SLOTS.has(hfs.slotOf(filename))) return {}
         const reportRoot = (node, root, member) => {
             if (!isAmbientRoot(context, root)) return
             const wanted = AMBIENT[root.name]

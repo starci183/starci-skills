@@ -13,9 +13,9 @@
  */
 import { basename } from "node:path"
 import { walk } from "./lib/ast.mjs"
-import ts from "typescript"
 import { hfsOf } from "./lib/hfs.mjs"
-import { isPackageType, typed } from "./lib/types.mjs"
+import { importOf } from "./lib/import-source.mjs"
+import { originsOfType, typed } from "./lib/types.mjs"
 
 const FS_MODULES = new Set(["fs", "node:fs", "fs/promises", "node:fs/promises"])
 const FS_READERS = new Set(["readFile", "readFileSync", "readdir", "readdirSync", "glob", "globSync", "opendir", "opendirSync", "createReadStream"])
@@ -108,47 +108,54 @@ export const specNoSourceRead = {
     },
 }
 
-/** The rules this law contributes to the plugin. */
 /**
- * R48 (test policy 2026-09-30): a unit spec takes its database double from `src/tests/fixtures/database.ts`
- * (`mockEntityManager()`, `fakeTransaction()`), the one typed fake; it never builds an ad-hoc `EntityManager`,
- * `QueryRunner`, `DataSource` or query builder out of `jest.fn`. Refused in a `*.spec.ts`: a call whose result is one of
- * those typeorm types unless the called function is declared in the fixtures slot (`be.tests.fixtures`), and assigning a
- * value to a member of a receiver of those types (`manager.find = jest.fn()`).
+ * R48 (unit-test standard 2026-09-30): a unit spec takes its database double from the kit, `mockEntityManager()` (or
+ * `fakeTransaction()`) imported from `@starci/jest-preset`. It never builds an ad-hoc `EntityManager`, `QueryRunner`,
+ * `DataSource` or query builder, never types a `mock<EntityManager>()` and never takes a double from a repository fixture.
+ * Refused in a `*.spec.ts`: a call whose result is one of those typeorm types unless the called function is
+ * `mockEntityManager` / `fakeTransaction` imported from the kit package, and assigning a value to a member of a receiver of
+ * those types (`manager.find = jest.fn()`). The kit package is `ruleParams.be.specDoubles.kit` of the slot manifest.
  */
 const TYPEORM_DOUBLES = ["EntityManager", "QueryRunner", "DataSource", "SelectQueryBuilder", "QueryBuilder"]
+
+/** The kit functions that build the database double. */
+const DATABASE_DOUBLES = ["mockEntityManager", "fakeTransaction"]
 
 export const specTypedEntityManager = {
     meta: {
         type: "problem",
-        docs: { description: "A unit spec's database double is the fixture's mockEntityManager()/fakeTransaction(), never an ad-hoc jest.fn EntityManager." },
+        docs: { description: "A unit spec's database double is the kit's mockEntityManager()/fakeTransaction() from @starci/jest-preset, never an ad-hoc EntityManager." },
         schema: [],
         messages: {
-            adhoc: "This builds an ad-hoc `{{type}}` double. A unit spec takes the typed fake from `src/tests/fixtures/database.ts` (`mockEntityManager()`, `fakeTransaction()`), so every handler spec states rows and asserts state the same way.",
+            adhoc: "This builds an ad-hoc `{{type}}` double. A unit spec takes the typed fake from `{{kit}}` (`mockEntityManager(...)`, `fakeTransaction(...)`), so every service spec states rows and asserts state the same way; a `mock<EntityManager>()`, a hand-built object or a fixture file is not it.",
         },
     },
     create(context) {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
         if (!/\.spec\.ts$/.test(basename(filename)) || /\.e2e-spec\.ts$/.test(basename(filename))) return {}
-        const doubleType = (node) => TYPEORM_DOUBLES.find((name) => isPackageType(context, node, name, "typeorm"))
-        const fromFixtures = (callee) => {
+        const kit = hfs.ruleParams.specDoubles.kit
+        const doubleType = (node) => {
             const { checker, toTs } = typed(context)
-            const tsNode = toTs(callee)
-            if (!tsNode) return false
-            let symbol = checker.getSymbolAtLocation(tsNode.kind === ts.SyntaxKind.PropertyAccessExpression ? tsNode.name : tsNode)
-            if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
-            return (symbol?.getDeclarations?.() ?? []).some((d) => hfs.slotOf(String(d.getSourceFile().fileName)) === "be.tests.fixtures")
+            const tsNode = toTs(node)
+            if (!tsNode) return undefined
+            const type = checker.getTypeAtLocation(tsNode)
+            const parts = type.isUnionOrIntersection() ? type.types : [type]
+            return TYPEORM_DOUBLES.find((name) => parts.some((part) => originsOfType(checker, part).some((origin) => origin.name === name && origin.module === "typeorm")))
+        }
+        const fromKit = (callee) => {
+            const found = callee.type === "Identifier" ? importOf(context, callee) : null
+            return found !== null && (found.source === kit || found.source.startsWith(`${kit}/`)) && DATABASE_DOUBLES.includes(found.imported)
         }
         return {
             CallExpression(node) {
                 const type = doubleType(node)
-                if (type && !fromFixtures(node.callee)) context.report({ node, messageId: "adhoc", data: { type } })
+                if (type && !fromKit(node.callee)) context.report({ node, messageId: "adhoc", data: { type, kit } })
             },
             AssignmentExpression(node) {
                 if (node.left.type !== "MemberExpression") return
                 const type = doubleType(node.left.object)
-                if (type) context.report({ node, messageId: "adhoc", data: { type } })
+                if (type) context.report({ node, messageId: "adhoc", data: { type, kit } })
             },
         }
     },

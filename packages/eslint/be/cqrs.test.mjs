@@ -11,7 +11,7 @@ import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { executeParamsShape, handlerOverridesProcess, messageCarriesParamsOnly, messageTypedResult, noEventBus, noUseCase, rules } from "./cqrs.mjs"
+import { executeParamsShape, handlerIsThin, handlerOverridesProcess, messageCarriesParamsOnly, messageTypedResult, noEventBus, noUseCase, rules } from "./cqrs.mjs"
 
 const tester = typedTester()
 const APP = "src/features/plan/application"
@@ -69,6 +69,67 @@ abstract class SearchBase<C> extends ICQRSHandler<C, string> { protected async p
             // a renamed decorator import does not hide an execute override
             { filename: HANDLER, code: `${HANDLER_HEAD.replace("CommandHandler,", "CommandHandler as Handles,")}
 @Handles(PlaceOrderCommand) class H extends ICQRSHandler<PlaceOrderCommand, string> { async execute(c: PlaceOrderCommand): Promise<string> { return "" } }`, errors: [{ messageId: "overridesExecute" }] },
+        ],
+    })
+})
+
+const THIN_HEAD = `
+import { CommandHandler } from "@nestjs/cqrs"
+import { CommandBus } from "@nestjs/cqrs"
+import { EntityManager } from "typeorm"
+import { ICQRSHandler } from "@modules/platform/cqrs"
+import { OrderService } from "@modules/domain/order"
+import type { Logger } from "@modules/platform/logging"
+class PlaceOrderCommand { constructor(readonly params: { id: string; flag: boolean }) {} }
+`
+
+/** A handler class whose constructor is `ctor` and whose `process` body is `body`. */
+const thin = (ctor, body) => `${THIN_HEAD}
+@CommandHandler(PlaceOrderCommand) class H extends ICQRSHandler<PlaceOrderCommand, string> {
+  constructor(${ctor}) { super() }
+  protected override async process(command: PlaceOrderCommand): Promise<string> { ${body} }
+}`
+
+test("handler-is-thin: a handler maps input, calls one service method and returns its result", () => {
+    tester.run("handler-is-thin", handlerIsThin, {
+        valid: [
+            { filename: HANDLER, code: thin("logger: Logger, private readonly orders: OrderService", "return this.orders.open(command.params.id)") },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "return await this.orders.open(command.params.id)") },
+            // mapping the input into an object literal is mapping
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "return this.orders.open(`${command.params.id}`)") },
+            // the Logger the template needs, and several services, are allowed dependencies
+            { filename: HANDLER, code: thin("logger: Logger, private readonly a: OrderService, private readonly b: OrderService", "return this.a.open(command.params.id)") },
+            // a class without the cqrs handler decorator is not a handler
+            { filename: HANDLER, code: `${THIN_HEAD}
+class Plain { constructor(private readonly em: EntityManager) {} async process() { if (this.em) { return 1 } return 2 } }` },
+            // outside the application slot the rule is silent
+            { filename: RESOLVER, code: thin("private readonly em: EntityManager", "if (command.params.flag) { return '' } return ''") },
+        ],
+        invalid: [
+            // an EntityManager (or any infrastructure) is not a handler dependency
+            { filename: HANDLER, code: thin("private readonly em: EntityManager, private readonly orders: OrderService", "return this.orders.open(command.params.id)"), errors: [{ messageId: "dependency" }] },
+            { filename: HANDLER, code: thin("private readonly bus: CommandBus, private readonly orders: OrderService", "return this.orders.open(command.params.id)"), errors: [{ messageId: "dependency" }] },
+            // a lookalike name that is not a service class
+            { filename: HANDLER, code: `${THIN_HEAD}
+class Helper {}
+@CommandHandler(PlaceOrderCommand) class H extends ICQRSHandler<PlaceOrderCommand, string> { constructor(private readonly helper: Helper) { super() } protected override async process(): Promise<string> { return this.helper.run() } }`, errors: [{ messageId: "dependency" }, { messageId: "call" }] },
+            // more than one statement, or no return
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "const id = command.params.id; return this.orders.open(id)"), errors: [{ messageId: "body" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "await this.orders.open(command.params.id); return ''"), errors: [{ messageId: "body" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "this.orders.open(command.params.id)"), errors: [{ messageId: "body" }] },
+            // two service calls, or none, or a call that is not on a service
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "return this.orders.open(this.orders.open(command.params.id))"), errors: [{ messageId: "call" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "return command.params.id"), errors: [{ messageId: "call" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "return String(command.params.id)"), errors: [{ messageId: "call" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "return this.other.open(command.params.id)"), errors: [{ messageId: "call" }] },
+            // decisions and repetitions
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "if (command.params.flag) { return '' } return this.orders.open(command.params.id)"), errors: [{ messageId: "body" }, { messageId: "branch" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "return this.orders.open(command.params.flag ? 'a' : 'b')"), errors: [{ messageId: "branch" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "return this.orders.open(command.params.id ?? 'x')"), errors: [{ messageId: "branch" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "return this.orders.open(command.params.flag && command.params.id)"), errors: [{ messageId: "branch" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "try { return this.orders.open(command.params.id) } catch { return '' }"), errors: [{ messageId: "body" }, { messageId: "branch" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "for (const x of [1]) { break } return this.orders.open(command.params.id)"), errors: [{ messageId: "body" }, { messageId: "branch" }] },
+            { filename: HANDLER, code: thin("private readonly orders: OrderService", "switch (command.params.id) { default: return '' }"), errors: [{ messageId: "body" }, { messageId: "branch" }] },
         ],
     })
 })

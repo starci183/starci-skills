@@ -49,7 +49,7 @@ properties:
       be:
         type: object
         additionalProperties: false
-        required: [fileLines, duplicateBlock, infraOwners, suffixes, bannedSuffixes]
+        required: [fileLines, duplicateBlock, infraOwners, specDoubles, suffixes, bannedSuffixes]
         properties:
           fileLines: {$ref: '#/$defs/fileLines'}
           duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
@@ -61,6 +61,31 @@ properties:
               type: array
               uniqueItems: true
               items: {type: string, pattern: '^(platform|integrations)/[a-z][a-z0-9-]*$'}
+          specDoubles:
+            type: object
+            additionalProperties: false
+            required: [kit, doubles, fallback]
+            description: R48 BE_SPEC_QUALITY spec-infra-double-from-kit. The kit package, the ordered token-pattern -> double table and the fallback double a service spec provider takes its useValue from.
+            properties:
+              kit: {type: string, minLength: 1}
+              doubles:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [token, double, forms]
+                  properties:
+                    token: {type: string, minLength: 1, description: A regular expression over the UPPER_SNAKE form of the provider token name.}
+                    double: {type: string, pattern: '^[A-Za-z][A-Za-z0-9]*$'}
+                    forms: {$ref: '#/$defs/doubleForms'}
+              fallback:
+                type: object
+                additionalProperties: false
+                required: [double, forms]
+                properties:
+                  double: {type: string, pattern: '^[A-Za-z][A-Za-z0-9]*$'}
+                  forms: {$ref: '#/$defs/doubleForms'}
           suffixes: {$ref: '#/$defs/roleSuffixes'}
           bannedSuffixes: {$ref: '#/$defs/roleSuffixes'}
       fe:
@@ -95,6 +120,12 @@ $defs:
     properties:
       lines: {type: integer, minimum: 2}
       tokens: {type: integer, minimum: 1}
+  doubleForms:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    description: What the provided value may be - call double(...), new new Double(...), curried double(...)(...), a plain object literal, a primitive literal or an array literal.
+    items: {enum: [call, new, curried, object, primitive, array]}
   roleSuffixes:
     type: array
     minItems: 1

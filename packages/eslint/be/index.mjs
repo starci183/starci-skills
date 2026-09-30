@@ -47,6 +47,7 @@ import { recommended as testingRecommended, rules as testingRules } from "./test
 import { recommended as testWorldRecommended, rules as testWorldRules } from "./test-world.mjs"
 import { recommended as transportRecommended, rules as transportRules } from "./transport.mjs"
 import { recommended as typeSafetyRecommended, rules as typeSafetyRules } from "./type-safety.mjs"
+import { recommended as unitSpecRecommended, rules as unitSpecRules } from "./unit-spec.mjs"
 import { recommended as userCopyRecommended, rules as userCopyRules } from "./user-copy.mjs"
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
@@ -81,6 +82,7 @@ const CONTRIBUTIONS = [
     { law: "test-world", rules: testWorldRules, recommended: testWorldRecommended },
     { law: "transport", rules: transportRules, recommended: transportRecommended },
     { law: "type-safety", rules: typeSafetyRules, recommended: typeSafetyRecommended },
+    { law: "unit-spec", rules: unitSpecRules, recommended: unitSpecRecommended },
     { law: "user-copy", rules: userCopyRules, recommended: userCopyRecommended },
 ]
 

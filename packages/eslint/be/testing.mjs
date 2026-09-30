@@ -7,8 +7,9 @@
  * shape that is wrong on its face regardless of intent:
  *
  *   - a spec whose every assertion is about a call rather than a result (`no-call-only-spec`);
- *   - a subject that has no twin spec beside it, a spec with no subject beside it, and a file of a kind the
- *     convention bans (`.test.ts`, `int-spec`, `harness-spec`) (`unit-test-colocated`);
+ *   - a unit spec of anything but a service, a service with no `<name>.service.spec.ts` beside it, a service spec with no
+ *     service beside it, and a file of a kind the convention bans (`.test.ts`, `int-spec`, `harness-spec`)
+ *     (`unit-test-colocated`);
  *   - an e2e that never reads persisted state back, and an e2e that reaches a model provider
  *     (`e2e-asserts-persisted-state`, `no-model-call-in-e2e`);
  *   - an e2e filename that names an API shape instead of a business flow (`no-api-shaped-e2e-filename`);
@@ -25,6 +26,7 @@ import { statSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isPackageType } from "./lib/types.mjs"
+import { isServiceSpecFile, isUnitSpecFile, serviceNameOfSpec } from "./lib/unit-spec.mjs"
 
 /** The file name of a linted path, in forward-slash form. */
 const baseOf = (filename) => basename(String(filename || "").replace(/\\/g, "/"))
@@ -108,10 +110,7 @@ export const noCallOnlySpec = {
 }
 
 
-// -- R47 twin specs -------------------------------------------------------------------------------
-
-/** The extensions a subject beside a spec may have. */
-const SUBJECT_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs"]
+// -- R47 unit spec topology ------------------------------------------------------------------------
 
 /** Whether a file exists (a spec is beside its subject on disk, so this is the one question the disk answers). */
 const exists = (path) => {
@@ -126,39 +125,19 @@ const exists = (path) => {
 const BANNED_TEST_FILE = /(?:\.test|\.int-spec|\.harness-spec)\.[cm]?[jt]sx?$/
 
 /**
- * The roles that need a twin spec (BE-CONVENTION 1.16): a basename suffix, in the slots where that role lives.
- * `null` means the role is a role in every slot that owns code.
+ * Unit specs are for services only: every `<name>.service.ts` has its `<name>.service.spec.ts` beside it, every unit spec is
+ * one of those, and there are no other kinds of test file. A composition spec is not a unit kind.
  */
-const TWIN_ROLES = [
-  { suffix: ".handler.ts", role: "handler", slots: ["be.feature.application"] },
-  { suffix: ".service.ts", role: "domain service", slots: ["be.domain"] },
-  { suffix: ".consumer.ts", role: "consumer", slots: ["be.transport.message"] },
-  { suffix: ".job.ts", role: "job", slots: ["be.transport.schedule"] },
-  { suffix: ".guard.ts", role: "guard", slots: null },
-  { suffix: ".mapper.ts", role: "mapper", slots: ["be.transport.http", "be.transport.graphql"] },
-  { suffix: ".policy.ts", role: "policy", slots: ["be.domain"] },
-  { suffix: ".client.ts", role: "client", slots: ["be.integrations", "be.integrations.model", "be.platform", "be.domain"] },
-  { suffix: ".rows.ts", role: "row mapper", slots: ["be.persistence"] },
-]
-
-/** The twin-spec role of a source file, or null. */
-const twinRoleOf = (hfs, filename) => {
-  const name = baseOf(filename)
-  const slot = hfs.slotOf(filename)
-  if (!slot) return null
-  return TWIN_ROLES.find((entry) => name.endsWith(entry.suffix) && (entry.slots === null || entry.slots.includes(slot))) ?? null
-}
-
-/** Twin specs beside their subjects; no `.test.ts`, `int-spec` or `harness-spec` file. */
 export const unitTestColocated = {
   meta: {
     type: "problem",
-    docs: { description: "A handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin `.spec.ts` beside it; a spec has its subject beside it; there are only two kinds of test file." },
+    docs: { description: "Only a `<name>.service.ts` is unit-tested: it has its `<name>.service.spec.ts` beside it, any other unit spec is a finding, and there are only the spec kinds `spec`, `e2e-spec`, `integration-spec` and `contract-spec`." },
     schema: [],
     messages: {
-      suffix: "`{{name}}` is a banned kind of test file. A test is a `<name>.spec.ts` unit beside its subject or a `*.e2e-spec.ts` flow under `src/tests/e2e/`; there is no `.test.ts`, `int-spec` or `harness-spec`.",
-      orphan: "`{{name}}` has no subject beside it. A unit spec is `<name>.spec.ts` next to `<name>.ts` and tests that one file; move it beside its subject, or rename it after the file it tests.",
-      twin: "This {{role}} has no twin spec. Add `{{twin}}` beside it: it constructs the {{role}} with `new` and typed doubles and asserts results or state.",
+      suffix: "`{{name}}` is a banned kind of test file. A test is a `<name>.service.spec.ts` unit beside its service or a `*.e2e-spec.ts` flow under `src/tests/e2e/`; there is no `.test.ts`, `int-spec` or `harness-spec`.",
+      notService: "`{{name}}` is a unit spec of something that is not a service. Only `<name>.service.ts` is unit-tested; a handler, resolver, controller, consumer, mapper, entity, guard, module, policy, helper or composition is covered through the service tests and the e2e flows. Delete this spec and move any business rule it checks into a service.",
+      orphan: "`{{name}}` has no service beside it. A unit spec is `<name>.service.spec.ts` next to `<name>.service.ts` and tests that one service; move it beside its service, or rename it after the service it tests.",
+      missing: "This service has no spec. Add `{{spec}}` beside it: it builds the service with `Test.createTestingModule`, provides only its constructor dependencies as typed doubles and asserts results or state.",
     },
   },
   create(context) {
@@ -169,16 +148,18 @@ export const unitTestColocated = {
     if (BANNED_TEST_FILE.test(name)) {
       return { Program(node) { context.report({ node, messageId: "suffix", data: { name } }) } }
     }
-    if (isUnitSpec(name)) {
-      const stem = join(dirname(filename), name.slice(0, -".spec.ts".length))
-      if (SUBJECT_EXTENSIONS.some((extension) => exists(`${stem}${extension}`))) return {}
+    if (isUnitSpecFile(hfs, filename)) {
+      if (!isServiceSpecFile(hfs, filename)) return { Program(node) { context.report({ node, messageId: "notService", data: { name } }) } }
+      if (exists(join(dirname(filename), `${serviceNameOfSpec(filename)}.service.ts`))) return {}
       return { Program(node) { context.report({ node, messageId: "orphan", data: { name } }) } }
     }
-    const role = twinRoleOf(hfs, filename)
-    if (!role) return {}
+    if (!name.endsWith(".service.ts")) return {}
+    // a service outside the test tree; the slot manifest says where the tests live
+    const slot = hfs.slotOf(filename)
+    if (!slot || slot.startsWith("be.tests.")) return {}
     const stem = join(dirname(filename), name.slice(0, -".ts".length))
     if (exists(`${stem}.spec.ts`)) return {}
-    return { Program(node) { context.report({ node, messageId: "twin", data: { role: role.role, twin: `${name.slice(0, -".ts".length)}.spec.ts` } }) } }
+    return { Program(node) { context.report({ node, messageId: "missing", data: { spec: `${name.slice(0, -".ts".length)}.spec.ts` } }) } }
   },
 }
 

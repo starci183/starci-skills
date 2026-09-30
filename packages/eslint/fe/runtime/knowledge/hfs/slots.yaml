@@ -126,6 +126,23 @@ ruleParams:
       "@nestjs/config": []
       dotenv: []
       "@nestjs/event-emitter": []
+    # R48 BE_SPEC_QUALITY spec-infra-double-from-kit: in a `<name>.service.spec.ts` a provider `{ provide: TOKEN, useValue: X }` takes X from
+    # the kit named here (the package root of `kit`). The token name is normalised to UPPER_SNAKE (`EntityManager` -> ENTITY_MANAGER), the
+    # FIRST entry whose `token` regex matches decides, and `fallback` decides for every other token. `forms` say what X may be:
+    # call = `double(...)`, new = `new Double(...)`, curried = `double(...)(...)`, object = a plain object literal (REAL values),
+    # primitive = a string/number/boolean literal, array = an array literal (multi-providers of doubles). A const bound to such a value counts.
+    specDoubles:
+      kit: "@starci/jest-preset"
+      doubles:
+        - {token: "(?:^|_)OPTIONS$", double: builder, forms: [curried, object]}
+        - {token: "(?:^|_)ENTITY_MANAGER$", double: mockEntityManager, forms: [call]}
+        - {token: "(?:^|_)TRANSACTION(?:_RUNNER)?$", double: fakeTransaction, forms: [call]}
+        - {token: "(?:^|_)CLOCK$", double: FakeClock, forms: [new]}
+        - {token: "(?:^|_)OUTBOX(?:_|$)", double: recordingOutbox, forms: [call]}
+        - {token: "(?:^|_)CACHE(?:_|$)", double: fakeCache, forms: [call]}
+        - {token: "(?:^|_)(?:LOCK|LEASE|FENCE|HOLD)(?:_|$)", double: fakeLock, forms: [call]}
+        - {token: "(?:^|_)(?:IDS|ID_GENERATOR|ID_FACTORY)$", double: fakeIds, forms: [call]}
+      fallback: {double: mock, forms: [call, primitive, array]}
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.

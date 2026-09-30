@@ -82,6 +82,8 @@ test("COMMENT-4: a spec or fixture gets no exemption: Vietnamese is refused wher
     valid: [],
     invalid: [
       { filename: SPEC, code: "const reply = { from: \"khách vừa chuyển khoản\" }", errors: [{ messageId: "nonAscii" }] },
+      // a Vietnamese test name is a finding, in a service spec too
+      { filename: at("src/modules/domain/order/order.service.spec.ts"), code: "describe('OrderService', () => {\n  it('từ chối đơn trùng', () => {})\n})", errors: [{ messageId: "nonAscii" }] },
       { filename: FIXTURE, code: "// kiểm tra luồng thanh toán\nconst x = 1", errors: [{ messageId: "nonAscii" }] },
       { filename: SRC, code: "const reply = \"khách vừa chuyển khoản\"", errors: [{ messageId: "nonAscii" }] },
     ],

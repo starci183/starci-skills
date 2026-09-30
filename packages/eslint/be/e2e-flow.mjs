@@ -4,7 +4,7 @@
  * A rule earns its place by being exact: it fires on a syntactic or typed shape, never on a judgement, or it becomes
  * something authors learn to work around. What these four enforce is transport bypass (a bus or an actor called
  * directly), a sleep instead of a poll, a branch inside a step, and a testing module built inside a spec instead of
- * booted by `src/tests/e2e/setup`. They do not pretend to judge business meaning: whether a file is one flow, whether
+ * booted by the test world (`useTestWorld({ apps })`, `src/tests/world/`). They do not pretend to judge business meaning: whether a file is one flow, whether
  * its steps are named, and what the absence of an effect is proved by are read by a person.
  *
  * Receivers are identified by their TypeScript type and by the file their type is declared in, never by a variable
@@ -216,7 +216,7 @@ export const noWiringInFlowSpec = {
         schema: [],
         messages: {
             wiring:
-                "`Test.createTestingModule(...)` builds this flow's own copy of the app. The world is stood up in one place, `src/tests/e2e/setup`, which boots the real `AppModule.register(testOptions)`; a spec file carries no wiring of its own. When the wiring changes, every flow that inlined its own module has to change with it, and two flows standing the world up slightly differently is how nobody learns where they differ. Boot through the setup and override only the integration token this flow needs.",
+                "`Test.createTestingModule(...)` builds this flow's own copy of the app. The world is stood up in one place, `src/tests/world/` through `useTestWorld({ apps })`, which boots the real app; a spec file carries no wiring of its own. When the wiring changes, every flow that inlined its own module has to change with it, and two flows standing the world up slightly differently is how nobody learns where they differ. Boot through the world; nothing is overridden, an external service is the world's network fake (`world.fake.<provider>`).",
         },
     },
     create(context) {

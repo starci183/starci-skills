@@ -12,6 +12,8 @@ const LOOKALIKE = at("src/modules/platform/clockwork/clock.service.ts")
 test("every ambient clock reference is refused outside platform/clock, in specs too", () => {
     tester.run("no-ambient-clock", noAmbientClock, {
         valid: [
+            // a spec drives time with a FakeClock and builds dates from values it holds
+            { filename: SPEC, code: "import { FakeClock } from '@starci/jest-preset'\nconst clock = new FakeClock(0)\nconst at = new Date(0)\nexport { clock, at }" },
             // the one owner that reads the wall clock, asked of the slot view
             { filename: CLOCK, code: "export const now = () => Date.now()" },
             { filename: CLOCK, code: "export const now = () => new Date()" },

@@ -63,5 +63,5 @@ test("a path the slot manifest places in the repository is source, whatever it i
 })
 
 test("the cast rules are the factory's borrowed set, not a second copy here", () => {
-    assert.deepEqual(Object.keys(rules), ["spec-no-source-read"])
+    assert.deepEqual(Object.keys(rules), ["spec-no-source-read", "spec-typed-entity-manager"])
 })
