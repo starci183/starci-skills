@@ -88,7 +88,7 @@ export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
 }
 export const CLOCK_CODES = Object.freeze(['READY_UNDISPATCHED', 'LEASE_STUCK', 'WORKER_START_STUCK', 'QUESTION_OVERDUE', 'CONSUME_OVERDUE',
   'SETTLE_OVERDUE', 'DECISION_OVERDUE', 'DEAD_WORKER_UNRECONCILED', 'EFFECT_UNKNOWN_STUCK', 'WORKER_RELEASE_LEAK', 'WORKTREE_REMOVE_OVERDUE']);
-/** Settle refusals of an isolated op's integration into its workflow branch (lane rc-product-worktrees). */
+/** Settle refusals of an isolated op's land into main that continue it on the new base (product-worktree.mjs landOp). */
 export const INTEGRATE_REFUSALS = Object.freeze(['product-integrate-conflict', 'product-integrate-red']);
 export const PRODUCT_EVENTS = Object.freeze({ integrateRefused: 'product-integrate-refused', worktreeRemoved: 'job-worktree-removed', overlap: 'product-wf-overlap' });
 
@@ -201,7 +201,7 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
     // separate CONSUME_OVERDUE clock.
     const refusal = f.handover && f.integrateRefused ? f.integrateRefused.reason : null;
     if (refusal && INTEGRATE_REFUSALS.includes(refusal) && !f.successor && f.continuations < settings.continuationCap) {
-      // A continuation on the new workflow-branch base, never a failure (product-worktree.mjs integrateOp).
+      // A continuation on the new main base, never a failure (product-worktree.mjs landOp).
       clock('DECISION_OVERDUE', f.handover.at);
       set({ kind: 'continuation', concern: 'job.settle', reason: refusal, resumeFrom: f.integrateRefused.continuation?.resumeFrom ?? f.head ?? null });
     } else if (refusal === 'deps-unit-required' && !f.successor && (f.integrateRefused.files ?? []).length) {

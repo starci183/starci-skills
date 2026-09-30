@@ -320,10 +320,9 @@ preflight:
       Where an isolated op works (DESIGN §16.7; scripts/kernel/product-worktree.mjs). An op whose brief sets
       policy.isolation: worktree (default: modules/kernel/product-land.yaml defaultIsolation) and whose owned
       paths land in ONE bound product repository other than the Work owner gets its OWN git worktree
-      <repo>/.starciwork/worktrees/<wf>/<op> on branch op/<op>, cut from the workflow's integration branch
-      wf/<wf> (worktree <repo>/.starciwork/worktrees/<wf>/_wf, cut from the product's main at the workflow's
-      first isolated job). `api dispatch --spawn` creates it (a requeued attempt reuses it; a continuation
-      starts from its predecessor's archived commits), places the worker there (the Orca terminal / managed
+      <repo>/.starciwork/worktrees/<wf>/<op> on branch op/<op>, cut from main's tip (the workflow worktree
+      <repo>/.starciwork/worktrees/<wf>/_wf, branch wf/<wf>, follows main). `api dispatch --spawn` creates it (a
+      requeued attempt reuses it; a continuation starts from its predecessor's preserved/<op> branch), places the worker there (the Orca terminal / managed
       worker's worktree, owned-path placements, packet paths) and records payload.productWorktree
       {repoRoot, workflow {short, branch, path, port}, op {short, branch, path}, baseSha}. node_modules is a
       junction overlay (workspace packages point at the worktree's own copy). Dev servers, UAT and drawing
@@ -332,13 +331,16 @@ preflight:
       its allocated ports (scripts/uat/env-health.mjs retargetEnvironment; packet context.environment.servedFrom),
       the other repositories' services stay shared. A dry-run shows the planned paths (preview: true).
     settle: >-
-      settle --verdict pass proves the commit clean in the op worktree, then rebases op/<op> onto the latest
-      wf/<wf>, fast-forwards it and re-verifies ON the workflow branch (the op's re-runnable declared checks +
-      an import check of its changed files). Refusals: product-integrate-conflict (files + hunks),
-      product-integrate-red (wf/<wf> rolled back; a continuation on the new base, never a failure),
-      deps-unit-required. The worktree is removed right after the worker is released (released ->
-      worktree-removed, verified, SLA worktrees.opRemoveSlaMs); wf/<wf> lands into main through
-      `api product-land` (serial per repository).
+      settle --verdict pass proves the commit clean in the op worktree, then LANDS it straight into main
+      (scripts/kernel/product-worktree.mjs landOp, per-repository main lock): the merge guard over the op's
+      merges, a rebase onto main when main moved, scripts/checks/gate.mjs on the op worktree against main, the
+      op's re-runnable declared checks and an import check of its changed files - all before main moves - then
+      main is fast-forwarded (the live checkout's changed paths with it), pushed, and wf/<wf> follows it.
+      Refusals, main untouched: land-merge-dropped-main, land-gate-red, land-gate-unavailable,
+      product-integrate-conflict (files + hunks), product-integrate-red (a continuation on the new base, never a
+      failure), deps-unit-required. The worktree and op/<op> are removed right after the worker is released
+      (released -> worktree-removed, junctions first, verified, SLA worktrees.opRemoveSlaMs); work that did not
+      land is kept on preserved/<op> first.
     refusals:
       product-worktree-unavailable: the worktree or its node_modules overlay could not be made (reason in detail); the job stays queued
 

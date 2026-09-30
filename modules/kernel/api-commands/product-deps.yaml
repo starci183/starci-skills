@@ -1,18 +1,20 @@
 # The contract of `api product-deps` (scripts/kernel/api-verbs/product-deps.mjs, scripts/kernel/product-worktree.mjs
 # applyDepsUnit): the workflow's serial deps unit (DESIGN §16.7, mitigation 1).
 purpose: >-
-  Apply the package.json/lockfile changes of one isolated op - the ones its settle refused as deps-unit-required - onto
-  its workflow branch wf/<wf> as one commit in the _wf worktree, install for real there (modules/kernel/product-land.yaml
-  deps.install by lockfile, e.g. npm ci), make that install the node_modules overlay source of the workflow's ops and
-  rebuild their overlays. The refused job then settles again: its manifests now equal the workflow branch's. Serial under
-  the per-workflow lock; a failed install rolls wf/<wf> back and restores the overlay.
+  Apply the package.json/lockfile changes of one isolated op - the ones its settle refused as deps-unit-required - as one
+  commit in the workflow's _wf worktree (wf/<wf> brought to main first), install for real there
+  (modules/kernel/product-land.yaml deps.install by lockfile, e.g. npm ci), land that commit into main (fast-forward, then
+  push), make the install the node_modules overlay source of the workflow's ops and rebuild their overlays. The refused job
+  then settles again: its manifests now equal main's. Serial under the per-repository main lock; a failed install or a
+  refused land rolls wf/<wf> back, restores the overlay and leaves main untouched.
 args: --workflow <id> --from-job <job> [--json]
-writes: [events product-deps-applied / product-deps-failed, product refs/heads/wf/<wf>, the _wf worktree's node_modules, op worktree overlays]
+writes: [events product-deps-applied / product-deps-failed, product refs/heads/main (pushed) and refs/heads/wf/<wf>, the _wf worktree's node_modules, op worktree overlays]
 refusals:
   job-foreign: the job is not one of this workflow
   not-isolated: the job never ran in a product worktree
   workflow-worktree-missing: the workflow has no _wf worktree
   workflow-worktree-dirty: the integration worktree holds uncommitted tracked changes
   deps-install-failed: the install failed (tail in detail); wf/<wf> rolled back
+  deps-land-refused: main could not be fast-forwarded to the deps commit (main moved, or the live checkout is dirty on a manifest); wf/<wf> rolled back
 kernelOnly: true
 exit: 0 applied or nothing to apply, 1 refused

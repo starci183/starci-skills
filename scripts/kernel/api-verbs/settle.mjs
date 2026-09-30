@@ -109,7 +109,7 @@ export default {
     const settlingJob = db.prepare('SELECT workflow_id FROM jobs WHERE job_id=?').get(jobId);
     const integ = landed.detail.integration;
     if (settlingJob && (landed.ok ? !integ.already : true)) {
-      ledger.transaction(() => ledger.appendEvent({ workflowId: settlingJob.workflow_id, entityType: 'job', entityId: jobId, kind: landed.ok ? PRODUCT_EVENTS.integrated : PRODUCT_EVENTS.integrateRefused,
+      ledger.transaction(() => ledger.appendEvent({ workflowId: settlingJob.workflow_id, entityType: 'job', entityId: jobId, kind: landed.ok ? PRODUCT_EVENTS.landed : PRODUCT_EVENTS.integrateRefused,
         payload: landed.ok ? integ : { reason: landed.reason, conflicts: (integ.conflicts ?? []).map((c) => c.file), failures: integ.failures ?? null, files: integ.files ?? null, continuation: integ.continuation ?? null } }));
     }
   }

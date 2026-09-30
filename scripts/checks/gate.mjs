@@ -516,9 +516,10 @@ export function mergeGuard(root, { base, head = 'HEAD', mainTip = mainTipOf(root
 
 /**
  * Run the gate; resolves the starci/gate@1 report. Never throws for a tool failure: it lands in errors[] with exit 2.
- * `hfs` ({dir, bin}) is a spec seam: the hfs install to lint with, default hfsEntry(root).
+ * Spec seams: `hfs` ({dir, bin}) the hfs install to lint with, default hfsEntry(root); `ts` the TypeScript module, default
+ * the app's own install per project.
  */
-export async function runGate({ root, base = null, changed = null, tests = null, main = null, hfs = null }) {
+export async function runGate({ root, base = null, changed = null, tests = null, main = null, hfs = null, ts: typescript = null }) {
   const at = new Date().toISOString();
   const report = { schema: GATE_SCHEMA, at, root: posixPath(path.resolve(root)), base: null, head: null, dirty: null, changed: [], exit: GATE_EXIT.toolFailed, ok: false,
     steps: { merges: null, lint: null, codegen: null, build: [], tsc: [], tests: null, staleBuildInfo: [] }, counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
@@ -562,7 +563,7 @@ export async function runGate({ root, base = null, changed = null, tests = null,
     if (!prepared.errors.length) for (const project of projects) {
       const started = Date.now();
       try {
-        const ts = loadTypeScript(root, project);
+        const ts = typescript ?? loadTypeScript(root, project);
         const head = headTsc(ts, root, project, cache);
         const baseFindings = head.length ? baseTsc(ts, root, project, { base: report.base, delta, readBase, cache }) : [];
         const judged = newTscFindings(head, baseFindings);

@@ -1,6 +1,6 @@
 // Product worktrees (DESIGN §16.7, FMEA #20; scripts/kernel/product-worktree.mjs). fe-canon 2026-09-28: 16 code.refactor
 // slices shared ONE nivo-fe tree, a slice moving apps/app/src/i18n/request.ts changed a sibling's checker inputs mid-run
-// (INPUTS_CHANGED_DURING_CHECK). Each op now works in its own worktree off its workflow's integration branch, with a
+// (INPUTS_CHANGED_DURING_CHECK). Each op now works in its own worktree off main, lands straight into main at its settle, with a
 // node_modules junction overlay whose workspace packages point at the worktree's OWN copy, and the worktree is removed
 // (junctions unlinked first, verified) right after the job is released.
 import test from 'node:test';
@@ -11,12 +11,14 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import {
-  ensureOpWorktree, ensureWorkflowWorktree, integrateOp, removeOpWorktree, removeWorkflowWorktree, layoutOf, verifyResolution,
-  reapJobWorktree, archivedOpRef, planIsolation, shortIdOf, EVENTS, applyDepsUnit, installedIn,
+  ensureOpWorktree, ensureWorkflowWorktree, landOp, removeOpWorktree, removeWorkflowWorktree, layoutOf, verifyResolution,
+  reapJobWorktree, preservedOpRef, planIsolation, shortIdOf, EVENTS, applyDepsUnit, installedIn,
 } from '../scripts/kernel/product-worktree.mjs';
 import { WORKTREES_REL } from '../scripts/lib/worktree-exclude.mjs';
 
-// The land gate is judged by tests/op-gate-loop.spec.mjs; these fixtures carry no app install, so their land gate is green.
+// The land gate is judged by tests/op-land.spec.mjs and tests/op-gate-loop.spec.mjs; these fixtures carry no app install, so
+// their land gate is green, and they have no remote, so nothing is pushed.
+const noPush = () => ({ pushed: false, detail: 'spec' });
 const greenGate = () => ({ exit: 0, counts: { new: 0 }, findings: [], errors: [] });
 
 const WF = 'wf-nivo-fe-canon-mujek980';
@@ -62,7 +64,7 @@ function fixtureRepo(t) {
   return { base, repo };
 }
 
-test('two jobs of one workflow get two sibling worktrees off wf/<wf>; the product checkout stays clean', (t) => {
+test('two jobs of one workflow get two sibling worktrees off main; the product checkout stays clean', (t) => {
   const { repo } = fixtureRepo(t);
   const a = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-d704825abb' });
   const b = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-97666fb9ba' });
@@ -124,17 +126,18 @@ test('a file move in one op worktree is invisible to its sibling; removal never 
   assert.ok(fs.existsSync(path.join(repo, 'packages', 'ui', 'index.js')), 'the root workspace package is untouched');
   assert.ok(fs.existsSync(path.join(repo, 'apps', 'app', 'node_modules', 'lodash', 'package.json')));
   assert.ok(fs.existsSync(path.join(b.op.path, 'packages', 'ui', 'index.js')), 'the sibling worktree is untouched');
-  // Its commit was never integrated: the branch is archived for a continuation, not lost.
-  assert.ok(removed.branch.archived?.ref.startsWith('refs/starci/archive/op/'), JSON.stringify(removed.branch));
-  assert.equal(archivedOpRef(repo, 'op-code.refactor-d704825abb')?.sha, git(repo, 'rev-parse', removed.branch.archived.ref));
-  // A continuation of that job starts from the archived commit and consumes the archive.
+  // Its commit never landed: the work is kept on preserved/<op> for a continuation, not lost.
+  assert.equal(removed.branch.preserved?.branch, `preserved/${a.op.short}`, JSON.stringify(removed.branch));
+  assert.equal(preservedOpRef(repo, 'op-code.refactor-d704825abb')?.sha, git(repo, 'rev-parse', removed.branch.preserved.branch));
+  assert.notEqual(spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${a.op.branch}`], { cwd: repo }).status, 0, 'op/<op> is deleted');
+  // A continuation of that job starts from the preserved work and consumes the branch.
   const cont = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-aa11bb22cc', handFrom: ['op-code.refactor-d704825abb'] });
   assert.ok(cont.ok, JSON.stringify(cont));
   assert.ok(fs.existsSync(path.join(cont.record.op.path, 'apps/app/src/modules/i18n/request.ts')), 'the continuation holds the partial commit');
-  assert.equal(archivedOpRef(repo, 'op-code.refactor-d704825abb'), null, 'the archive was handed over');
+  assert.equal(preservedOpRef(repo, 'op-code.refactor-d704825abb'), null, 'the preserved branch was handed over');
 });
 
-test('integration: a green op lands in wf/<wf>; a conflicting one is refused with hunks; a red post-merge verify rolls back', (t) => {
+test('land: a green op lands straight into main; a conflicting one is refused with hunks; a red pre-land verify leaves main untouched', (t) => {
   const { repo } = fixtureRepo(t);
   const a = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-d704825abb' }).record;
   const b = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-97666fb9ba' }).record;
@@ -142,49 +145,54 @@ test('integration: a green op lands in wf/<wf>; a conflicting one is refused wit
   git(a.op.path, 'commit', '-qam', 'a: en');
   write(b.op.path, 'apps/app/src/i18n/request.ts', 'export const locale = "fr";\n');
   git(b.op.path, 'commit', '-qam', 'b: fr');
-  const before = git(repo, 'rev-parse', 'wf/mujek980');
-  const okA = integrateOp({ gate: greenGate, record: a, head: git(a.op.path, 'rev-parse', 'HEAD') });
+  const okA = landOp({ gate: greenGate, push: noPush, record: a, head: git(a.op.path, 'rev-parse', 'HEAD') });
   assert.ok(okA.ok, JSON.stringify(okA));
-  assert.equal(git(repo, 'rev-parse', 'wf/mujek980'), okA.after);
-  assert.equal(fs.readFileSync(path.join(a.workflow.path, 'apps/app/src/i18n/request.ts'), 'utf8'), 'export const locale = "en";\n', 'the _wf tree moved with its branch');
-  assert.equal(git(repo, 'cherry', 'wf/mujek980', git(a.op.path, 'rev-parse', 'HEAD'), before).split('\n')[0][0], '-', 'the rebased commit is patch-equivalent in wf');
-  assert.equal(integrateOp({ gate: greenGate, record: a, head: git(a.op.path, 'rev-parse', 'HEAD') }).already, true, 'idempotent');
-  const conflict = integrateOp({ gate: greenGate, record: b, head: git(b.op.path, 'rev-parse', 'HEAD') });
+  assert.equal(git(repo, 'rev-parse', 'main'), okA.after, 'main fast-forwarded to the op head');
+  assert.equal(okA.after, git(a.op.path, 'rev-parse', 'HEAD'), 'an op on top of main lands as it is');
+  assert.equal(fs.readFileSync(path.join(repo, 'apps/app/src/i18n/request.ts'), 'utf8'), 'export const locale = "en";\n', 'the live checkout moved with main');
+  assert.equal(git(repo, 'status', '--porcelain', '--untracked-files=no'), '', 'and is clean');
+  assert.equal(git(repo, 'rev-parse', 'wf/mujek980'), okA.after, 'wf/<wf> follows main');
+  assert.equal(okA.push.detail, 'spec');
+  assert.equal(landOp({ gate: greenGate, push: noPush, record: a, head: git(a.op.path, 'rev-parse', 'HEAD') }).already, true, 'idempotent');
+  const conflict = landOp({ gate: greenGate, push: noPush, record: b, head: git(b.op.path, 'rev-parse', 'HEAD') });
   assert.equal(conflict.ok, false);
   assert.equal(conflict.reason, 'product-integrate-conflict');
   assert.equal(conflict.conflicts[0].file, 'apps/app/src/i18n/request.ts');
   assert.match(conflict.conflicts[0].hunks[0].text, /<<<<<<< /);
-  assert.equal(git(repo, 'rev-parse', 'wf/mujek980'), okA.after, 'a refused integration leaves wf untouched');
-  // An op green on its own base that imports a path the workflow branch lacks: rolled back, a continuation.
+  assert.equal(git(repo, 'rev-parse', 'main'), okA.after, 'a refused land leaves main untouched');
+  // An op green on its own base that imports a path main lacks: refused before main moves, a continuation.
   const c = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-cc33dd44ee' }).record;
   write(c.op.path, 'apps/app/src/c.ts', 'import { x } from "@/i18n/gone";\nexport const c = x;\n');
   git(c.op.path, 'add', '-A'); git(c.op.path, 'commit', '-qm', 'c');
-  const red = integrateOp({ gate: greenGate, record: c, head: git(c.op.path, 'rev-parse', 'HEAD') });
+  const cHead = git(c.op.path, 'rev-parse', 'HEAD');
+  const red = landOp({ gate: greenGate, push: noPush, record: c, head: cHead });
   assert.equal(red.reason, 'product-integrate-red', JSON.stringify(red));
   assert.match(red.failures.join(' '), /IMPORTS_BROKEN_AFTER_MOVE/);
   assert.equal(red.continuation.base, okA.after);
-  assert.equal(git(repo, 'rev-parse', 'wf/mujek980'), okA.after, 'rolled back');
-  assert.ok(!fs.existsSync(path.join(a.workflow.path, 'apps/app/src/c.ts')));
+  assert.equal(git(repo, 'rev-parse', 'main'), okA.after, 'main never moved');
+  assert.equal(git(c.op.path, 'rev-parse', 'HEAD'), cHead, 'the op worktree is back on its own head');
+  assert.ok(!fs.existsSync(path.join(repo, 'apps/app/src/c.ts')));
   // A dependency manifest change is the deps unit's.
   const d = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-ee55ff66aa' }).record;
   write(d.op.path, 'package.json', JSON.stringify({ name: 'nivo', private: true, workspaces: ['apps/*', 'packages/*'], dependencies: { x: '1' } }));
   git(d.op.path, 'commit', '-qam', 'deps');
-  const refused = integrateOp({ gate: greenGate, record: d });
+  const refused = landOp({ gate: greenGate, push: noPush, record: d });
   assert.equal(refused.reason, 'deps-unit-required');
   assert.match(refused.hint, /api product-deps --workflow wf-nivo-fe-canon-mujek980 --from-job op-code.refactor-ee55ff66aa/);
-  // The serial deps unit: the manifests land on wf/<wf>, _wf gets a real install, the op overlays now mirror it.
+  // The serial deps unit: the manifests land on main, _wf gets a real install, the op overlays now mirror it.
   const installs = [];
-  const deps = applyDepsUnit({ record: d, install: (argv, cwd) => { installs.push({ argv, cwd }); write(cwd, 'node_modules/x/package.json', '{"name":"x"}'); return { ok: true, exitCode: 0 }; } });
+  const deps = applyDepsUnit({ record: d, push: noPush, install: (argv, cwd) => { installs.push({ argv, cwd }); write(cwd, 'node_modules/x/package.json', '{"name":"x"}'); return { ok: true, exitCode: 0 }; } });
   assert.ok(deps.ok, JSON.stringify(deps));
   assert.deepEqual(deps.files, ['package.json']);
+  assert.equal(git(repo, 'rev-parse', 'main'), deps.commit, 'the deps commit landed on main');
   assert.deepEqual(installs, [{ argv: ['npm', 'ci'], cwd: d.workflow.path }]);
   assert.ok(installedIn(d.workflow.path), 'the _wf holds the real install');
   assert.equal(real(path.join(d.op.path, 'node_modules', 'x')), real(path.join(d.workflow.path, 'node_modules', 'x')), 'the op overlay mirrors the workflow install');
   assert.ok(deps.rebuilt.some((r) => r.path === d.op.path && r.ok));
-  assert.equal(integrateOp({ gate: greenGate, record: d }).ok, true, 'its manifests are the workflow branch now: the op settles');
+  assert.equal(landOp({ gate: greenGate, push: noPush, record: d }).ok, true, 'its manifests are main\'s now: the op settles');
 });
 
-test('released -> worktree-removed: the reap records the transition once; the workflow worktree waits for its land', (t) => {
+test('released -> worktree-removed: the reap records the transition once; the workflow worktree goes at the workflow end', (t) => {
   const { base, repo } = fixtureRepo(t);
   const ledgerRepo = path.join(base, 'nivo-backend');
   fs.mkdirSync(ledgerRepo);
@@ -206,9 +214,11 @@ test('released -> worktree-removed: the reap records the transition once; the wo
   assert.deepEqual(JSON.parse(ev[0].payload_json).verified, { dirGone: true, pruned: true });
   assert.equal(JSON.parse(ev[0].payload_json).from, 'released');
   assert.equal(reapJobWorktree({ ledger, ledgerRepo, jobId }).skipped, 'already-removed', 'idempotent');
-  // The workflow worktree: unlanded -> kept; landed (wf in main) -> removed with its branch, <wf> dir gone.
+  // The workflow worktree: removed with its branch once no op dir is left, <wf> dir gone.
   const lay = layoutOf({ repoRoot: repo, workflowId: WF });
-  assert.equal(removeWorkflowWorktree({ repoRoot: repo, workflowId: WF }).ok, true, 'wf/<wf> has no commit of its own yet: nothing unlanded');
+  const wfGone = removeWorkflowWorktree({ repoRoot: repo, workflowId: WF });
+  assert.equal(wfGone.ok, true, JSON.stringify(wfGone));
+  assert.equal(wfGone.branch.preserved, null, 'wf/<wf> holds nothing main lacks: nothing to preserve');
   assert.ok(!fs.existsSync(lay.wfDir), 'the empty <wf> directory is removed');
   assert.ok(fs.existsSync(path.join(repo, 'node_modules', 'react', 'index.js')));
   } finally { ledger.close(); }

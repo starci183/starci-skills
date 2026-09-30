@@ -159,8 +159,8 @@ incident:
     resolves to a commit, or the path is committed at that repo's HEAD), --until-incident
     <incidentId>[:resolved], --until-foundation <name> (the shared foundation landed: api
     foundation; incident.foundationWait), --until-landed <workflowId>@<repository> (that workflow's
-    product work reached the repository's main: it is finished, or it product-landed there
-    (product-land-landed), its wf/ branch is not ahead of main and none of its code-writing legs
+    product work reached the repository's main: it is finished, or its ops landed there
+    (product-op-landed: each green op lands straight into main at its settle) and none of its code-writing legs
     (gate-conditions.mjs CODE_WRITING_OPS) is open; on a peer-wait the named workflow is the peer and
     the wait reads untilLanded - the cross-workflow hold of FE-writing legs behind a restructure,
     contract change fe-hold-until-landed). They are stored on 'incident-raised' as until:[{type,...}]. The
