@@ -1,60 +1,121 @@
 /**
  * The rule that holds `platform/clock` (catalog R79 `BE_AMBIENT_CLOCK`).
  *
- *   - `no-ambient-clock` refuses `Date.now()`, a bare `new Date()` and `performance.now()` outside
- *     `platform/clock`. Business code asks the injected `Clock` port for the time (`clock.now()`),
- *     because a call to the ambient clock cannot be replaced in a spec - a test then either sleeps
- *     for real or races the wall clock, and a scheduled job cannot be driven to a chosen instant.
+ *   - `no-ambient-clock` refuses every REFERENCE to an ambient clock - `Date.now`, a zero-argument `new Date()`,
+ *     `performance.now`, `process.hrtime`, `Temporal.Now` - anywhere but the `platform/clock` owner. A reference is
+ *     enough: `const read = Date.now` and `{ now } = performance` read the wall clock exactly as a call does, and a
+ *     spec that calls `Date.now()` races the same clock a `FakeClock` exists to drive. Business code asks the injected
+ *     `Clock` port (`clock.now()`); a spec constructs a `FakeClock`. Specs are not exempt.
  *
- * `new Date(value)` - built from a value the caller already holds (a stored timestamp, a parsed
- * header) - is not an ambient read and is left alone; only the zero-argument form reads "now".
+ * `new Date(value)` - built from a value the caller already holds (a stored timestamp, a parsed header) - is not an
+ * ambient read and is left alone; only the zero-argument form reads "now". The owner that may read the clock is asked
+ * of the slot view (`platform` tier, capability `clock`), not of a path.
  */
-import { isDeclarationFile, isTestLane, normalizePath } from "./lib/path.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { isOwnedBy } from "./lib/ports.mjs"
 
-const PLATFORM_CLOCK = /\/src\/modules\/platform\/clock\//
+/** The globals that carry an ambient reading, and the member of each that reads it (`null`: any member). */
+const AMBIENT = Object.freeze({ Date: "now", performance: "now", process: "hrtime", Temporal: "Now" })
 
-/** Whether a callee is `Date.now`. */
-const isDateNow = (node) =>
-    node.type === "MemberExpression" &&
-    !node.computed &&
-    node.object.type === "Identifier" &&
-    node.object.name === "Date" &&
-    node.property.type === "Identifier" &&
-    node.property.name === "now"
+/** Modules whose import of one of the globals above is the same ambient object (`node:perf_hooks` `performance`). */
+const AMBIENT_MODULES = new Set(["node:perf_hooks", "perf_hooks", "node:process", "process", "@js-temporal/polyfill", "temporal-polyfill"])
 
-/** Whether a callee is `performance.now`. */
-const isPerformanceNow = (node) =>
-    node.type === "MemberExpression" &&
-    !node.computed &&
-    node.object.type === "Identifier" &&
-    node.object.name === "performance" &&
-    node.property.type === "Identifier" &&
-    node.property.name === "now"
+/** Modules whose named export IS an ambient reader (`import { hrtime } from "node:process"`). */
+const AMBIENT_EXPORTS = Object.freeze({ "node:process": ["hrtime"], process: ["hrtime"] })
+
+/** The variable a name resolves to from `node`'s scope, or null when it is a global. */
+const variableOf = (context, node, name) => {
+    let scope = (context.sourceCode || context.getSourceCode()).getScope(node)
+    while (scope) {
+        const found = scope.set.get(name)
+        if (found) return found
+        scope = scope.upper
+    }
+    return null
+}
+
+/** Whether the root is the ambient global (or an import of it), not a local of the same name. */
+const isAmbientRoot = (context, root) => {
+    if (!Object.hasOwn(AMBIENT, root.name)) return false
+    if (root.viaGlobalThis) return true
+    const variable = variableOf(context, root.node, root.name)
+    if (!variable || variable.defs.length === 0) return true
+    return variable.defs.every((def) => def.type === "ImportBinding" && AMBIENT_MODULES.has(def.parent.source.value))
+}
+
+/** The property name of a non-computed or string-literal member access, else null. */
+const memberName = (node) => {
+    if (!node.computed && node.property.type === "Identifier") return node.property.name
+    if (node.computed && node.property.type === "Literal" && typeof node.property.value === "string") return node.property.value
+    return null
+}
+
+/** `globalThis.Date` and `Date` are the same root: `{ name, node, viaGlobalThis }`, or null when the node is neither. */
+const rootIdentifier = (node) => {
+    if (node.type === "Identifier") return { name: node.name, node, viaGlobalThis: false }
+    if (node.type === "MemberExpression" && node.object.type === "Identifier" && node.object.name === "globalThis") {
+        const name = memberName(node)
+        return name ? { name, node, viaGlobalThis: true } : null
+    }
+    return null
+}
 
 /** Only `platform/clock` reads the ambient clock. */
 export const noAmbientClock = {
     meta: {
         type: "problem",
-        docs: { description: "`Date.now()`, a bare `new Date()` and `performance.now()` are read only inside `platform/clock`." },
+        docs: { description: "`Date.now`, a zero-argument `new Date()`, `performance.now`, `process.hrtime` and `Temporal.Now` are referenced only inside `platform/clock`." },
         schema: [],
         messages: {
-            now: "`{{call}}` reads the ambient clock directly. Inject the `Clock` port (`clock.now()`) instead: a spec then drives time with a `FakeClock` and a scheduled job can be tested at a chosen instant, neither of which a direct read allows.",
-            date: "`new Date()` with no argument reads the ambient clock. Inject the `Clock` port and build the date from `clock.now()`, or - if this really is parsing a value the caller already holds - pass that value to `new Date(value)`.",
+            now: "`{{call}}` reads the ambient clock. Inject the `Clock` port (`@InjectClock() private readonly clock: Clock`, `clock.now()`); a spec then drives time with a `FakeClock` and a scheduled job runs at a chosen instant, neither of which a direct read allows.",
+            date: "`new Date()` with no argument reads the ambient clock. Inject the `Clock` port and build the date from `clock.now()`, or - if this is parsing a value the caller already holds - pass that value to `new Date(value)`.",
         },
     },
     create(context) {
-        const filename = normalizePath(context.filename || context.getFilename())
-        if (isDeclarationFile(filename) || isTestLane(filename) || PLATFORM_CLOCK.test(filename)) return {}
+        const hfs = hfsOf(context)
+        const filename = context.filename || context.getFilename()
+        if (isOwnedBy(hfs, filename, "platform", "clock")) return {}
+        const reportRoot = (node, root, member) => {
+            if (!isAmbientRoot(context, root)) return
+            const wanted = AMBIENT[root.name]
+            if (member === wanted) context.report({ node, messageId: "now", data: { call: `${root.name}.${member}` } })
+        }
         return {
-            CallExpression(node) {
-                const { callee } = node
-                if (isDateNow(callee)) context.report({ node, messageId: "now", data: { call: "Date.now()" } })
-                else if (isPerformanceNow(callee)) context.report({ node, messageId: "now", data: { call: "performance.now()" } })
+            MemberExpression(node) {
+                const member = memberName(node)
+                const root = rootIdentifier(node.object)
+                if (!root || member === null) return
+                // `process.hrtime.bigint` is the same reader one member deeper: it is reported by the inner `process.hrtime`.
+                reportRoot(node, root, member)
+            },
+            VariableDeclarator(node) {
+                // `const { now } = Date` and `const { hrtime } = process` read the clock through a destructured alias.
+                if (node.id.type !== "ObjectPattern" || !node.init) return
+                const root = rootIdentifier(node.init)
+                if (!root) return
+                for (const property of node.id.properties) {
+                    if (property.type !== "Property" || property.computed) continue
+                    const key = property.key.type === "Identifier" ? property.key.name : property.key.value
+                    if (typeof key === "string") reportRoot(property, root, key)
+                }
+            },
+            ImportDeclaration(node) {
+                const banned = AMBIENT_EXPORTS[node.source.value]
+                if (!banned) return
+                for (const specifier of node.specifiers) {
+                    if (specifier.type === "ImportSpecifier" && banned.includes(specifier.imported.name ?? specifier.imported.value)) {
+                        context.report({ node: specifier, messageId: "now", data: { call: `${specifier.imported.name ?? specifier.imported.value} from ${node.source.value}` } })
+                    }
+                }
             },
             NewExpression(node) {
-                if (node.callee.type === "Identifier" && node.callee.name === "Date" && node.arguments.length === 0) {
-                    context.report({ node, messageId: "date" })
-                }
+                const root = rootIdentifier(node.callee)
+                if (root && root.name === "Date" && isAmbientRoot(context, root) && node.arguments.length === 0) context.report({ node, messageId: "date" })
+            },
+            CallExpression(node) {
+                // `Date()` called as a function returns the current time as a string: the same ambient read.
+                const root = rootIdentifier(node.callee)
+                if (root && root.name === "Date" && isAmbientRoot(context, root) && node.arguments.length === 0) context.report({ node, messageId: "date" })
             },
         }
     },
