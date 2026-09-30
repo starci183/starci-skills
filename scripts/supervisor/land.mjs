@@ -51,9 +51,10 @@
 // `land-failed` and, with --notify, tells the Supervisor through its inbox. Nothing half-lands.
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -320,6 +321,94 @@ export function baselineVerdict(script, pre, cur) {
   return { ok: newFindings.length === 0, newFindings };
 }
 
+/**
+ * The gate's own node --test reporter (written to a temp file per run): one JSON line per failed test, {file, name},
+ * `name` the path of names from the file's top-level test down (' > '), so a failure is known by (spec file, test
+ * name), never by a count. A todo test failing is not a failure.
+ */
+const FAIL_REPORTER = `export default async function* failures(source) {
+  const pending = new Map();
+  const line = (file, f) => JSON.stringify({ file, name: f.path.join(' > ') }) + '\\n';
+  for await (const { type, data } of source) {
+    if (type !== 'test:pass' && type !== 'test:fail') continue;
+    const file = data.file ?? '';
+    const list = pending.get(file) ?? [];
+    const up = list.filter((f) => f.nesting > data.nesting).map((f) => ({ nesting: data.nesting, path: [data.name, ...f.path] }));
+    const next = [...list.filter((f) => f.nesting <= data.nesting), ...(type === 'test:fail' && !data.todo ? [{ nesting: data.nesting, path: [data.name] }] : []), ...up];
+    if (data.nesting === 0) { for (const f of next) yield line(file, f); pending.delete(file); } else pending.set(file, next);
+  }
+  for (const [file, list] of pending) for (const f of list) yield line(file, f);
+}
+`;
+const failKey = (f) => `${f.file}\u0000${f.name}`;
+const uniqFailures = (list) => [...new Map(list.map((f) => [failKey(f), f])).values()];
+const failList = (list) => list.map((f) => `${f.file} :: ${f.name}`).join('; ');
+
+/**
+ * Run `files` with node --test in `dir` (the gate's env, the tree's own test preload, `concurrency`): {ok, status,
+ * error, stdout, stderr, failures} with failures [{file (repo-relative), name}], or null when the reporter wrote
+ * nothing readable (the run crashed before reporting).
+ */
+export function runSpecFiles({ dir, files, concurrency, timeout = specTimeoutMs(files.length) }) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'land-specs-'));
+  try {
+    const reporter = path.join(tmpDir, 'failures.mjs');
+    const out = path.join(tmpDir, 'failures.jsonl');
+    fs.writeFileSync(reporter, FAIL_REPORTER);
+    // The tree's own test preload points the machine registry at a per-run temp file, so no spec it runs enrols a
+    // ledger on this host's registry (a tree from before the preload runs without it).
+    const preload = path.join(dir, 'tests', 'setup', 'isolated-registry.mjs');
+    const importArgs = fs.existsSync(preload) ? ['--import', pathToFileURL(preload).href] : [];
+    const r = run(process.execPath, [...importArgs, '--test', `--test-concurrency=${concurrency}`, '--test-reporter=spec', '--test-reporter-destination=stdout',
+      `--test-reporter=${pathToFileURL(reporter).href}`, `--test-reporter-destination=${out}`, ...files], { cwd: dir, timeout, env: specRunEnv() });
+    let failures = null;
+    try {
+      const rel = (f) => normPath(path.isAbsolute(f) ? path.relative(dir, f) : f);
+      failures = uniqFailures(fs.readFileSync(out, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)).map((f) => ({ file: rel(String(f.file)), name: String(f.name) })));
+    } catch { failures = null; }
+    return { ...r, failures };
+  } finally { try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* temp */ } }
+}
+
+/**
+ * Rerun `files` once in a scratch worktree of `root` at `base`: {ok:true, failures, ran} or {ok:false, error} when the
+ * base run cannot run (no base tree, no scratch, a crash or timeout, a red run naming no failed test).
+ */
+export function specBaseRunAt({ root, base, files, concurrency, env = process.env }) {
+  if (!root) return { ok: false, error: 'no base tree to rerun the failing specs at base' };
+  let scratch;
+  try { scratch = makeScratch({ root, base, env }); } catch (e) { return { ok: false, error: `base scratch failed: ${String(e?.message ?? e).slice(0, 300)}` }; }
+  if (!scratch.ok) return { ok: false, error: `base scratch failed: ${String(scratch.error).slice(0, 300)}` };
+  try {
+    const present = files.filter((f) => fs.existsSync(path.join(scratch.dir, f)));
+    if (!present.length) return { ok: true, failures: [], ran: [] };
+    const r = runSpecFiles({ dir: scratch.dir, files: present, concurrency });
+    if (r.error) return { ok: false, error: `base spec run did not finish: ${r.error}` };
+    if (!r.failures) return { ok: false, error: `base spec run wrote no failure report (exit ${r.status}): ${tail(r.stdout + r.stderr, 6)}` };
+    if (!r.ok && !r.failures.length) return { ok: false, error: `base spec run exited ${r.status} naming no failed test: ${tail(r.stdout + r.stderr, 6)}` };
+    return { ok: true, failures: r.failures, ran: present };
+  } finally { removeScratch(scratch.dir, { root }); }
+}
+
+/**
+ * Whether a red spec run passes against its rerun at base: every failure is in a spec the change did not add or modify
+ * and main fails that same (file, test name) too. {ok, newFailures, changedSpecFailures, inherited, why}
+ */
+export function specBaselineVerdict({ candidate, base, changed = [] }) {
+  if (!candidate) return { ok: false, newFailures: [], changedSpecFailures: [], inherited: [], why: 'the spec run wrote no failure report (it crashed or timed out)' };
+  if (!candidate.length) return { ok: false, newFailures: [], changedSpecFailures: [], inherited: [], why: 'the spec run is red but names no failed test' };
+  const touched = new Set(changed.map(normPath));
+  const changedSpecFailures = candidate.filter((f) => touched.has(f.file));
+  const rest = candidate.filter((f) => !touched.has(f.file));
+  if (rest.length && !base?.ok) return { ok: false, newFailures: [], changedSpecFailures, inherited: [], why: `the rerun at base could not run: ${base?.error ?? 'not run'}` };
+  const known = new Set((base?.failures ?? []).map(failKey));
+  const newFailures = rest.filter((f) => !known.has(failKey(f)));
+  const inherited = rest.filter((f) => known.has(failKey(f)));
+  const ok = !newFailures.length && !changedSpecFailures.length;
+  const why = ok ? null : [changedSpecFailures.length ? `${changedSpecFailures.length} failure(s) in a spec this change added or modified` : null, newFailures.length ? `${newFailures.length} failure(s) main does not have` : null].filter(Boolean).join('; ');
+  return { ok, newFailures, changedSpecFailures, inherited, why };
+}
+
 const readSpecs = (dir) => {
   const tests = path.join(dir, 'tests');
   let names = [];
@@ -347,7 +436,7 @@ export function gateFamiliesTouched({ changed, freeze = [], before = null, after
   return out;
 }
 
-export function runChecks({ dir, base, head, specs = [], specMode = 'touching', baseline = null, runSpecs = true, baseTree = null, gateStability = null, ramGate = specRunGate }) {
+export function runChecks({ dir, base, head, specs = [], specMode = 'touching', baseline = null, runSpecs = true, baseTree = null, gateStability = null, ramGate = specRunGate, env = process.env, specBaseRun = specBaseRunAt }) {
   const checks = [];
   const changedOut = git(['diff', '--name-status', `${base}..${head}`], { cwd: dir });
   const rows = changedOut.stdout.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
@@ -410,13 +499,23 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   const gate = runSpecs && allSpecs.length ? ramGate() : null;
   if (gate && !gate.ok) checks.push({ name: `specs (${allSpecs.length})`, ok: false, specs: allSpecs, output: `spec run paused: host RAM critical after waiting ${Math.round(gate.waitedMs / 1000)}s - ${gate.why}; land again once free RAM is back above allocation.resources.ramThrottle.landSpecResumeAbovePct` });
   if (runSpecs && allSpecs.length && gate?.ok !== false) {
-    const env = specRunEnv();
-    // The candidate's own test preload points the machine registry at a per-run temp file, so no spec it
-    // runs enrols a ledger on this host's registry (a candidate from before the preload runs without it).
-    const preload = path.join(dir, 'tests', 'setup', 'isolated-registry.mjs');
-    const importArgs = fs.existsSync(preload) ? ['--import', pathToFileURL(preload).href] : [];
-    const r = run(process.execPath, [...importArgs, '--test', `--test-concurrency=${gate?.concurrency || specConcurrency()}`, ...allSpecs], { cwd: dir, timeout: specTimeoutMs(allSpecs.length), env });
-    checks.push({ name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tail(r.stdout + r.stderr, r.ok ? 6 : 40) });
+    const concurrency = gate?.concurrency || specConcurrency();
+    const r = runSpecFiles({ dir, files: allSpecs, concurrency });
+    const specCheck = { name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tail(r.stdout + r.stderr, r.ok ? 6 : 40) };
+    // Red: the failing spec files the change did not add or modify run once more at base (red-on-main baseline). A
+    // failure main has too is inherited and reported; any other failure, or a base run that cannot run, refuses.
+    if (!r.ok) {
+      const candidate = r.error ? null : r.failures;
+      const rerun = [...new Set((candidate ?? []).map((f) => f.file).filter((f) => !changed.includes(f)))];
+      const baseRun = rerun.length ? specBaseRun({ root: baseTree, base, files: rerun, concurrency, env }) : null;
+      const v = specBaselineVerdict({ candidate, base: baseRun, changed });
+      Object.assign(specCheck, { ok: v.ok, newFailures: v.newFailures, changedSpecFailures: v.changedSpecFailures, inherited: v.inherited, ...(baseRun ? { baseRun: { ok: baseRun.ok, files: rerun, ...(baseRun.error ? { error: baseRun.error } : {}) } } : {}) });
+      if (v.ok) specCheck.note = 'red on main too: every failure is inherited from main (see specs red on main)';
+      else specCheck.output = `${specCheck.output}\nrefused: ${v.why}${v.changedSpecFailures.length ? `\n  in a changed spec: ${failList(v.changedSpecFailures)}` : ''}${v.newFailures.length ? `\n  new versus main: ${failList(v.newFailures)}` : ''}`;
+      checks.push(specCheck);
+      if (v.ok && v.inherited.length) checks.push({ name: `specs red on main (${v.inherited.length})`, ok: true, advisory: true, specsRedOnMain: true, base, inherited: v.inherited,
+        output: `red on main ${String(base).slice(0, 9)} too, not this change's fault - fix main: ${failList(v.inherited)}` });
+    } else checks.push(specCheck);
   }
   if (narrowed.length) checks.push({ name: 'specs direct: hub files', ok: true, advisory: true, narrowed, output: narrowed.map((n) => `${n.file}: ${n.importers} importing specs, kept ${n.kept}${n.symbols ? ` (exports reached: ${n.symbols.join(', ') || 'none'})` : ` (${n.why}: every importer kept)`}`).join('; ') });
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };
@@ -600,7 +699,7 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
         result.attempts.push({ ...step, reason: 'already-landed' });
         return { ...result, ok: true, alreadyLanded: base, landed: null, base, head: base, checks: [], changed: [] };
       }
-      const checked = check({ dir: scratch.dir, base, head, specs, specMode, baseline, baseTree: root });
+      const checked = check({ dir: scratch.dir, base, head, specs, specMode, baseline, baseTree: root, env });
       step.head = head;
       step.checks = checked.checks;
       const depsAfter = liveDepsState(root);
@@ -717,6 +816,16 @@ function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId 
     if (self.partial.length) result.selfPending = self.partial;
   }
   if (!result.ok && jobId) recordLandFailed(m, { jobId, reason: result.reason ?? null, startedAt });
+  // Specs red on main (inherited, not this land's fault): ONE Supervisor DI per set of failing tests, so main gets fixed.
+  const redOnMain = specsRedOnMainOf(result);
+  if (redOnMain) {
+    try {
+      const signature = createHash('sha1').update(redOnMain.inherited.map(failKey).sort().join('/')).digest('hex').slice(0, 12);
+      m.openSupDecision({ keyParts: { kind: 'specs-red-on-main', repo: path.basename(root).replace(/[^\w.-]/g, '_') || 'runtime', signature }, kind: 'runtime-defect',
+        summary: `${redOnMain.name} at ${String(redOnMain.base).slice(0, 9)}: the land gate tolerated them as inherited; fix main: ${failList(redOnMain.inherited)}`.slice(0, 1000), entityType: 'repo', entityId: root, openedBy: 'land-gate',
+        evidence: redOnMain.inherited.slice(0, 20).map((f) => ({ ref: `spec:${f.file}`, why: f.name.slice(0, 300) })), payload: { base: redOnMain.base, inherited: redOnMain.inherited, commits } });
+    } catch { /* the land_runs row carries the advisory */ }
+  }
   // MB-12: main moved but GitHub did not: its own outcome and ONE Supervisor DI per landed head (the fleet push retries).
   if (pushOwedOf(result)) {
     const why = result.push.refused ?? result.push.error ?? 'push failed';
@@ -809,7 +918,7 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
       if (again.ok) result.landRun = again.value.runId;
       else result.recordDeferred = again.deferred;
     }
-    if (notify || result.grammarRebuild?.ok === false) {
+    if (notify || result.grammarRebuild?.ok === false || specsRedOnMainOf(result)) {
       try { withMachine((m) => m.recordSupMessage({ direction: 'in', channel: 'tell', from: 'land-gate', text: describe(result, { jobId }) }), { env }); } catch { /* the land_runs row is the record */ }
     }
     return result;
@@ -823,10 +932,15 @@ export function landStatus({ env = process.env } = {}) {
   return { busy: Boolean(current), current, queued: queue.filter((t) => t.state === 'queued').length };
 }
 
+/** The "specs red on main (k)" advisory of a land result, or null. */
+export const specsRedOnMainOf = (r) => (r?.checks ?? []).find((c) => c.specsRedOnMain && c.inherited?.length) ?? null;
+
 export function describe(r, { jobId = null } = {}) {
+  const inherited = specsRedOnMainOf(r);
+  const redOnMain = inherited ? `; ${inherited.name} (advisory, fix main): ${failList(inherited.inherited).slice(0, 400)}` : '';
   const who = jobId ?? (r.commits ?? []).map((c) => String(c).slice(0, 9)).join(',');
   if (r.ok && r.alreadyLanded) return `LAND already-landed ${who}: main has it at ${String(r.alreadyLanded).slice(0, 9)}, nothing moved`;
-  if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? `OWED: ${r.push.refused ?? r.push.error}`})` : ''}${r.grammarRebuild ? `; grammar rebuild ${r.grammarRebuild.ok ? 'ok' : `FAILED at ${r.grammarRebuild.step}: ${r.grammarRebuild.detail}`}${r.grammarRebuild.owed?.length ? `; owed ${r.grammarRebuild.owed.join(', ')}` : ''}` : ''}`;
+  if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? `OWED: ${r.push.refused ?? r.push.error}`})` : ''}${r.grammarRebuild ? `; grammar rebuild ${r.grammarRebuild.ok ? 'ok' : `FAILED at ${r.grammarRebuild.step}: ${r.grammarRebuild.detail}`}${r.grammarRebuild.owed?.length ? `; owed ${r.grammarRebuild.owed.join(', ')}` : ''}` : ''}${redOnMain}`;
   const red = (r.checks ?? []).filter((c) => !c.ok).map((c) => `${c.name}${c.output ? `: ${String(c.output).split(/\r?\n/).slice(-3).join(' / ').slice(0, 300)}` : ''}`);
   const conflicts = (r.conflicts ?? []).map((c) => `CONFLICT ${c.file}${c.hunks?.length ? `\n${c.hunks.map((h) => `    @ line ${h.line}\n${h.text.split('\n').map((l) => `      ${l}`).join('\n')}`).join('\n')}` : ''}`);
   return `LAND FAILED ${who}: ${r.reason}${r.preflight ? ' (preflight, before the queue)' : ''}${r.detail ? ` (${String(r.detail).slice(0, 300)})` : ''}${r.dirty ? ` dirty: ${r.dirty.join(', ')}` : ''}${red.length ? `\n  ${red.join('\n  ')}` : ''}${conflicts.length ? `\n  ${conflicts.join('\n  ')}` : ''}${r.hint ? `\n  next: ${r.hint}` : ''}`;
