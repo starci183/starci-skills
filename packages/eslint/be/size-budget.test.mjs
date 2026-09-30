@@ -6,32 +6,39 @@ import { join } from "node:path"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { fixtureHfs } from "./fixtures/typed/tester.mjs"
+import { at, fixtureHfs } from "./fixtures/typed/tester.mjs"
 import { fileSizeGrowth, recordedLines } from "./size-budget.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
     settings: { starci: { hfs: fixtureHfs() } },
 })
-const SERVICE = "D:/repo/src/modules/domain/plan/plan.service.ts"
+/** The budget is the manifest's (`ruleParams.be.fileLines`); the cases are sized against it. */
+const BUDGET = fixtureHfs().ruleParams.fileLines.soft
 const lines = (n) => Array.from({ length: n }, (_, i) => `export const v${i} = ${i}`).join("\n") + "\n"
 
-test("a file over the budget is not born large and does not grow", () => {
-    const recorded = (n) => ({ max: 5, recorded: { "src/modules/domain/plan/plan.service.ts": n } })
+test("a new file over the manifest budget is refused, in a product file and in a spec alike", () => {
     tester.run("file-size-growth", fileSizeGrowth, {
         valid: [
-            { filename: SERVICE, options: [recorded(9)], code: lines(8) },
-            { filename: SERVICE, options: [recorded(9)], code: lines(9) },
-            { filename: SERVICE, options: [{ max: 5 }], code: lines(5) },
-            { filename: "D:/repo/src/tests/e2e/plan/plan.e2e-spec.ts", options: [{ max: 2 }], code: lines(9) },
+            { filename: at("src/modules/domain/order/order.service.ts"), code: lines(BUDGET) },
+            // a declaration file carries no behaviour
+            { filename: at("src/modules/domain/order/types.d.ts"), code: lines(BUDGET + 40) },
+            // a migration is append-only
+            { filename: at("src/modules/domain/order/persistence/migrations/1700000000000-init.ts"), code: lines(BUDGET + 40) },
         ],
         invalid: [
-            { filename: SERVICE, options: [{ max: 5 }], code: lines(6), errors: [{ messageId: "born" }] },
-            { filename: SERVICE, options: [recorded(9)], code: lines(10), errors: [{ messageId: "grew" }] },
-            // crossing the budget from below is growth past a recorded size too
-            { filename: SERVICE, options: [recorded(4)], code: lines(6), errors: [{ messageId: "grew" }] },
+            { filename: at("src/modules/domain/order/order.service.ts"), code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
+            { filename: at("src/modules/domain/order/order.service.spec.ts"), code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
+            { filename: at("src/tests/e2e/checkout/checkout.e2e-spec.ts"), code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
+            { filename: at("src/tests/fixtures/orders.ts"), code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
+            // a file of the persistence slot that is not a migration is a source file
+            { filename: at("src/modules/domain/order/persistence/order.sql.ts"), code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
         ],
     })
+})
+
+test("the rule takes no option: a budget or a recorded size cannot be passed", () => {
+    assert.deepEqual(fileSizeGrowth.meta.schema, [])
 })
 
 test("the recorded size is the file's line count at the parent commit", (t) => {
@@ -45,14 +52,17 @@ test("the recorded size is the file's line count at the parent commit", (t) => {
     }
     mkdirSync(join(dir, "src"))
     const file = join(dir, "src", "big.ts")
-    writeFileSync(file, lines(7))
+    writeFileSync(file, lines(BUDGET + 2))
     git("add", "-A")
     git("commit", "-q", "-m", "seed")
-    assert.equal(recordedLines(file), 7)
+    assert.equal(recordedLines(file), BUDGET + 2)
     assert.equal(recordedLines(join(dir, "src", "new.ts")), null)
-    // the working copy has grown; the rule compares it with the commit, not with itself
+    // the working copy is compared with the commit, not with itself: staying put is fine, growing is not
     tester.run("file-size-growth", fileSizeGrowth, {
-        valid: [{ filename: file, options: [{ max: 5 }], code: lines(7) }],
-        invalid: [{ filename: file, options: [{ max: 5 }], code: lines(8), errors: [{ messageId: "grew" }] }],
+        valid: [
+            { filename: file, code: lines(BUDGET + 2) },
+            { filename: file, code: lines(BUDGET + 1) },
+        ],
+        invalid: [{ filename: file, code: lines(BUDGET + 3), errors: [{ messageId: "grew" }] }],
     })
 })
