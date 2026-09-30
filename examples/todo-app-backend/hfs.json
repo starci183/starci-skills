@@ -8,6 +8,10 @@
       "kind": "api"
     },
     {
+      "name": "worker",
+      "kind": "worker"
+    },
+    {
       "name": "migrate",
       "kind": "migrate"
     }

@@ -10,6 +10,18 @@
       "root": "apps/todo",
       "entryFile": "main",
       "sourceRoot": "apps/todo/src"
+    },
+    "worker": {
+      "type": "application",
+      "root": "apps/worker",
+      "entryFile": "main",
+      "sourceRoot": "apps/worker/src"
+    },
+    "migrate": {
+      "type": "application",
+      "root": "apps/migrate",
+      "entryFile": "main",
+      "sourceRoot": "apps/migrate/src"
     }
   }
 }
