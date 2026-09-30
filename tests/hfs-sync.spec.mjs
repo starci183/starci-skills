@@ -24,8 +24,8 @@ const vitestPreset = await import('../packages/vitest-preset/index.mjs');
 const BE = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] };
 const FE = { hfs: 1, profile: 'fe', project: 'nivo', apps: [{ name: 'app', kind: 'web' }, { name: 'admin', kind: 'web' }] };
 const PRESETS = {
-  be: { sonarExclusions: jestPreset.sonarExclusions(), sonarCoverageExclusions: jestPreset.sonarCoverageExclusions() },
-  fe: { sonarExclusions: vitestPreset.sonarExclusions(), sonarCoverageExclusions: vitestPreset.sonarCoverageExclusions() },
+  be: { sonarExclusions: jestPreset.sonarExclusions() },
+  fe: { sonarExclusions: vitestPreset.sonarExclusions() },
 };
 const rendered = hfs => Object.fromEntries(renderTargets(hfs, PRESETS[hfs.profile]).map(target => [target.path, target.content]));
 
@@ -199,18 +199,18 @@ describe('.gitignore', () => {
 
 describe('sonar-project.properties and codecov.yml', () => {
   const properties = text => Object.fromEntries(text.split('\n').filter(line => line && !line.startsWith('#')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
-  it('take the coverage exclusions from the profile preset, so the denominators cannot drift', () => {
+  it('take the exclusions from the profile preset and read no coverage (owner 2026-09-30: the gate is imported issues only)', () => {
     const be = properties(rendered(BE)['sonar-project.properties']);
     assert.equal(be['sonar.exclusions'], jestPreset.sonarExclusions());
-    assert.equal(be['sonar.coverage.exclusions'], jestPreset.sonarCoverageExclusions());
+    assert.ok(!('sonar.coverage.exclusions' in be) && !('sonar.javascript.lcov.reportPaths' in be));
     assert.equal(be['sonar.projectKey'], 'nivo-backend');
     assert.equal(be['sonar.sources'], 'apps,src');
     const fe = properties(rendered(FE)['sonar-project.properties']);
     assert.equal(fe['sonar.exclusions'], vitestPreset.sonarExclusions());
-    assert.equal(fe['sonar.coverage.exclusions'], vitestPreset.sonarCoverageExclusions());
+    assert.ok(!('sonar.coverage.exclusions' in fe));
     assert.equal(fe['sonar.projectKey'], 'nivo-fe');
     assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json');
-    assert.equal(fe['sonar.javascript.lcov.reportPaths'], 'coverage/lcov.info');
+    assert.ok(!('sonar.javascript.lcov.reportPaths' in fe));
     assert.equal(fe['sonar.sources'], 'apps', 'no package slot: the sources are the apps');
     assert.equal(fe['sonar.tests'], 'apps');
     // One import path for every linter (hfs report): Sonar's own ESLint import is not used, it drops issues on files outside sonar.sources.
@@ -219,9 +219,9 @@ describe('sonar-project.properties and codecov.yml', () => {
     assert.equal(be['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json,reports/eslint.sonar.json');
     assert.ok(!('sonar.host.url' in be) && !('sonar.host.url' in fe), 'the host is SONAR_HOST_URL, never a property (R11)');
   });
-  it('codecov ignores exactly the union of both preset lists and keeps the 80/90 gates', () => {
+  it('codecov ignores exactly the preset exclusions and keeps the 80/90 gates', () => {
     const doc = parseYaml(rendered(BE)['codecov.yml']);
-    assert.deepEqual(doc.ignore, [...jestPreset.sonarExclusions().split(','), ...jestPreset.sonarCoverageExclusions().split(',')]);
+    assert.deepEqual(doc.ignore, jestPreset.sonarExclusions().split(','));
     assert.equal(doc.coverage.status.project.default.target, '80%');
     assert.equal(doc.coverage.status.patch.default.target, '90%');
     assert.equal(doc.coverage.status.project.default.informational, false);

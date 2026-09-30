@@ -104,7 +104,7 @@ export function render(text, vars, readTemplate = readBundled) {
   });
 }
 
-/** Coverage denominators from the preset the repository installs: { sonarExclusions, sonarCoverageExclusions }. */
+/** The Sonar exclusions from the preset the repository installs: { sonarExclusions }. Sonar reads no coverage (owner 2026-09-30). */
 export async function loadPresets(root, profile) {
   const name = profile === 'be' ? '@starci/jest-preset' : '@starci/vitest-preset';
   const require = createRequire(path.join(root, 'package.json'));
@@ -115,7 +115,7 @@ export async function loadPresets(root, profile) {
     throw new SyncError('HFS_SYNC_PRESET_MISSING', `${name} is not installed under ${root}; set it to the exact version in knowledge/hfs/canon-pins.yaml and reinstall`);
   }
   const preset = profile === 'be' ? require(resolved) : await import(pathToFileURL(resolved).href);
-  return { sonarExclusions: preset.sonarExclusions(), sonarCoverageExclusions: preset.sonarCoverageExclusions() };
+  return { sonarExclusions: preset.sonarExclusions() };
 }
 
 /**
@@ -141,7 +141,7 @@ export const STYLE_GLOB = '{apps,packages}/*/src/**/*.css';
 
 /** Every value a template can name, derived from hfs.json and the presets. */
 export function variables(hfs, presets, sonarKey) {
-  const globs = [...presets.sonarExclusions.split(','), ...presets.sonarCoverageExclusions.split(',')];
+  const globs = presets.sonarExclusions.split(',');
   const packages = hfs.profile === 'fe' && opensPackages(hfs);
   return {
     header: HEADER(hfs.profile),
@@ -150,7 +150,6 @@ export function variables(hfs, presets, sonarKey) {
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? `${hfs.project}-${hfs.profile === 'be' ? 'backend' : 'fe'}`,
     sonarExclusions: presets.sonarExclusions,
-    sonarCoverageExclusions: presets.sonarCoverageExclusions,
     codecovIgnore: globs.map(glob => JSON.stringify(glob)).join('\n  - '),
     tsconfigPaths: [...hfs.apps.map(app => `apps/${app.name}/tsconfig.json`), ...(packages ? ['packages/*/tsconfig.json'] : [])].join(','),
     sonarRoots: packages ? 'apps,packages' : 'apps',

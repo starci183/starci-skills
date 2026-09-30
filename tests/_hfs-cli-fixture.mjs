@@ -10,8 +10,8 @@ const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index
 const vitestPreset = await import('../packages/vitest-preset/index.mjs');
 /** The coverage denominators `hfs sync` would load from the preset a repository installs, per profile. */
 export const PRESETS = {
-  be: { sonarExclusions: jestPreset.sonarExclusions(), sonarCoverageExclusions: jestPreset.sonarCoverageExclusions() },
-  fe: { sonarExclusions: vitestPreset.sonarExclusions(), sonarCoverageExclusions: vitestPreset.sonarCoverageExclusions() },
+  be: { sonarExclusions: jestPreset.sonarExclusions() },
+  fe: { sonarExclusions: vitestPreset.sonarExclusions() },
 };
 
 export const BE = { hfs: 1, profile: 'be', project: 'demo', apps: [{ name: 'core', kind: 'api' }] };
