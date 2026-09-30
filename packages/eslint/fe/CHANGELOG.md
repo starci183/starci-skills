@@ -1,5 +1,12 @@
 # Changelog
 
+## 6.0.2 - 2026-09-30
+
+- **Fix: `use-client-only-at-boundary` refused the providers wrapper.** The route tree's `providers.tsx` (root or `[locale]`,
+  role `providers` of `fe.route` in the slot manifest) is the client component a server layout renders around its children to host
+  context providers; the directive is accepted there. A providers wrapper kept elsewhere (a layout feature, a module) is still a
+  finding, and the message names `providers.tsx` as its home.
+
 ## 6.0.1 - 2026-09-30
 
 - **Fix: `no-hand-rolled-polling` refused a shared clock.** A timer is polling only when what it runs reads data - a call whose

@@ -39,6 +39,9 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       { filename: at("apps/web/src/app/error.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/app/global-error.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/app/[locale]/error.tsx"), code: DIRECTIVE },
+      // the providers wrapper the server layout renders around its children (role `providers` of fe.route)
+      { filename: at("apps/web/src/app/[locale]/providers.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/app/providers.tsx"), code: DIRECTIVE },
       // no directive, no finding, wherever the file sits
       { filename: at("apps/web/src/app/[locale]/layout.tsx"), code: PLAIN },
       { filename: at("apps/web/src/app/[locale]/page.tsx"), code: PLAIN },
@@ -56,6 +59,11 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       { filename: at("apps/web/src/features/layouts/Shell/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
       { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
       { filename: at("apps/web/src/components/composites/Row/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      // a providers wrapper kept as a layout feature (nivo-fe features/layouts/ConsoleProviders) is not the providers role:
+      // the convention puts it at the route tree's providers.tsx
+      { filename: at("apps/web/src/features/layouts/ConsoleProviders/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
+      // a file named like the role outside the route tree is no role
+      { filename: at("apps/web/src/modules/theme/providers.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       // the package layout does not widen the app layout, and a package composite is not a boundary
       { filename: at("packages/nivo-ui/src/composites/Row/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: at("apps/web/src/leaves/Menu/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },

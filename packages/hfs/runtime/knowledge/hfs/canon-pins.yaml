@@ -24,7 +24,7 @@ pins:
     source: packages/eslint/be/package.json
     why: 'back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.7.0: the round-3 catch-up landed the nest code-pattern profile''s version and content digest, left unbumped when R78-R82 landed, plus the inbox-dedupe-required shape-detection fix; 1.7.0 adds named-entity-manager-only (R83); 1.7.1 reads the slot manifest from the installed @starci/hfs runtime copy instead of the product repository.'
   '@starci/eslint-canon-fe':
-    version: 6.0.1
+    version: 6.0.2
     group: starci
     install: registry
     side: fe

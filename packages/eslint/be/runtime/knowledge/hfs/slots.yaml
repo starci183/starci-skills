@@ -838,7 +838,8 @@ slots:
              not-found.tsx, layout.tsx,    # next-intl: a request outside every locale renders the root not-found inside a root layout
              "health/{live,ready}/route.ts", "api/**/route.ts", "_*/**", providers.tsx, globals.css,
              "{icon,favicon,apple-icon,opengraph-image,twitter-image}.*", robots.ts, sitemap.ts, manifest.ts, "**/*.spec.ts", "**/*.spec.tsx"]
-    roles: {page: page.tsx, layout: layout.tsx, template: template.tsx, loading: loading.tsx, error: error.tsx, not-found: not-found.tsx, default: default.tsx, route: route.ts, global-error: global-error.tsx}
+    # providers.tsx (root or [locale]) is the client wrapper the server layout renders around its children to host context providers.
+    roles: {page: page.tsx, layout: layout.tsx, template: template.tsx, loading: loading.tsx, error: error.tsx, not-found: not-found.tsx, default: default.tsx, route: route.ts, global-error: global-error.tsx, providers: providers.tsx}
     tests: none
     rules: [FE_ROUTE_FILES_THIN, FE_CLIENT_BOUNDARY, FE_OWNER_REACHABLE]
   - id: fe.source-root-pinned

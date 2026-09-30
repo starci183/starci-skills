@@ -20,7 +20,8 @@ import { classifyImport, fileOf, isProductSource, isSpecFile, kindOfFile, roleOf
 import { typed } from "./lib/types.mjs"
 
 /** The route roles that are client-only by the framework's own rule: `error` and `global-error`. */
-const FRAMEWORK_CLIENT_ROLES = new Set(["error", "global-error"])
+/** Route-tree roles that are client components by construction: the error boundaries, and the providers wrapper a layout renders. */
+const FRAMEWORK_CLIENT_ROLES = new Set(["error", "global-error", "providers"])
 
 /** True when the program opens with the `"use client"` directive. */
 const clientDirective = (program) =>
@@ -58,9 +59,9 @@ export const useClientOnlyAtBoundary = {
     schema: [],
     messages: {
       slot:
-        "`\"use client\"` on a {{slot}}. Routes, pages and layouts are server components: making one a client component ships its whole subtree, including the message catalog, to every reader and stops it reading data on the server. Move the interaction into a block below it and put the directive on that block's `index.tsx`.",
+        "`\"use client\"` on a {{slot}}. Routes, pages and layouts are server components: making one a client component ships its whole subtree, including the message catalog, to every reader and stops it reading data on the server. Move the interaction into a block below it and put the directive on that block's `index.tsx`; context providers go in the route tree's `providers.tsx`.",
       elsewhere:
-        "`\"use client\"` here is not at an interaction boundary. The directive belongs on the `index.tsx` of the interactive block (or overlay), on a leaf whose interaction is intrinsic, or on `error.tsx`/`global-error.tsx`. Below a client block the file is already client; above one it must stay a server component.",
+        "`\"use client\"` here is not at an interaction boundary. The directive belongs on the `index.tsx` of the interactive block (or overlay), on a leaf whose interaction is intrinsic, on `error.tsx`/`global-error.tsx`, or on the route tree's `providers.tsx` (the context providers a layout renders around its children). Below a client block the file is already client; above one it must stay a server component.",
     },
   },
   create(context) {
