@@ -21,6 +21,7 @@
 //      node --check of every changed .mjs; YAML/JSON parse of every changed .yaml/.yml/.json;
 //      check-module-yaml, check-contract-cites, check-api-surface, check-db-openers (red only when red on the candidate and not
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
+//      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
 //        specs that can see the change instead: land-specs.mjs, hub files narrowed to the exports the diff reaches) -
@@ -409,6 +410,46 @@ export function specBaselineVerdict({ candidate, base, changed = [] }) {
   return { ok, newFailures, changedSpecFailures, inherited, why };
 }
 
+/** The generator of the published packages' runtime mirrors (packages/hfs/runtime, packages/eslint/{be,fe}/runtime). */
+export const MIRROR_CHECK = 'packages/hfs/scripts/sync-runtime.mjs';
+export const MIRROR_FIX = 'run node packages/hfs/scripts/sync-runtime.mjs and include the refreshed mirror in the change';
+
+/** `sync-runtime --check` in `dir`, shaped like a tree check run ({ok, output, full}). */
+export function mirrorRun(dir) {
+  if (!fs.existsSync(path.join(dir, MIRROR_CHECK))) return { ok: true, skipped: true };
+  const r = run(process.execPath, [MIRROR_CHECK, '--check'], { cwd: dir, timeout: 600_000 });
+  const full = r.stdout + r.stderr;
+  return { ok: r.ok, output: tail(full, 15), full };
+}
+
+/**
+ * What the candidate's own sync-runtime mirrors, from its exported BUNDLES (never a second list): {bundles[], files[]}
+ * runtime-relative, the failure-code catalog included when a bundle carries its slice. null when it cannot be read.
+ */
+export function mirroredFiles(dir) {
+  const href = pathToFileURL(path.join(dir, MIRROR_CHECK)).href;
+  const script = `const m = await import(${JSON.stringify(href)}); const specs = Object.values(m.BUNDLES);
+process.stdout.write(JSON.stringify({ bundles: Object.keys(m.BUNDLES), files: [...new Set([...specs.flatMap((s) => [...s.files]), ...(specs.some((s) => s.catalog) && m.CATALOG ? [m.CATALOG] : [])])] }));`;
+  const r = run(process.execPath, ['--input-type=module', '-e', script], { cwd: dir, timeout: 120_000 });
+  try { return r.ok ? JSON.parse(r.stdout) : null; } catch { return null; }
+}
+
+/**
+ * The mirror-drift tree check: when the candidate changes a file a sync-runtime bundle mirrors (or a bundle, or the
+ * generator), `sync-runtime --check` runs in the scratch and a new drift refuses with the one fix; drift inherited from
+ * main (`baseline[MIRROR_CHECK]`, same findings-based verdict as TREE_CHECKS) is advisory. null when it does not apply.
+ */
+export function mirrorDriftCheck({ dir, changed, baseline = null }) {
+  if (!fs.existsSync(path.join(dir, MIRROR_CHECK))) return null;
+  const mirrored = mirroredFiles(dir);
+  const files = new Set(mirrored?.files ?? []);
+  const touches = changed.map(normPath).filter((f) => !mirrored || f === MIRROR_CHECK || files.has(f) || mirrored.bundles.some((b) => f.startsWith(`${b}/`)));
+  if (!touches.length) return null;
+  const r = mirrorRun(dir);
+  const { ok, newFindings } = baselineVerdict(MIRROR_CHECK, baseline?.[MIRROR_CHECK], r);
+  return { name: 'sync-runtime --check', ok, touches, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings, hint: MIRROR_FIX }) }) };
+}
+
 const readSpecs = (dir) => {
   const tests = path.join(dir, 'tests');
   let names = [];
@@ -457,6 +498,8 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
     const { ok, newFindings } = baselineVerdict(script, baseline?.[script], r);
     checks.push({ name: path.basename(script), ok, ...(r.ok ? {} : { output: r.output, ...(ok ? { note: 'red on main too, unchanged by this land' } : { newFindings }) }) });
   }
+  const mirror = mirrorDriftCheck({ dir, changed, baseline });
+  if (mirror) checks.push(mirror);
   let coverage;
   try {
     const show = (rev) => readContractChangesDocAt(dir, rev)?.doc ?? null;
@@ -676,6 +719,7 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
     try {
       const baseline = {};
       if (!deps.runChecks) for (const script of TREE_CHECKS) baseline[script] = treeCheck(scratch.dir, script);
+      if (!deps.runChecks) baseline[MIRROR_CHECK] = mirrorRun(scratch.dir);
       const pick = git(['cherry-pick', '--allow-empty', '--keep-redundant-commits', ...commits], { cwd: scratch.dir });
       if (!pick.ok) {
         const said = pick.stderr || pick.stdout || pick.error || '';
