@@ -34,7 +34,7 @@ const typed = typedTester()
 const UNIT = at("src/features/checkout/application/add-to-cart.handler.spec.ts")
 const SRC = at("src/features/checkout/application/add-to-cart.handler.ts")
 const E2E = at("src/tests/e2e/checkout/course-enroll.e2e-spec.ts")
-const LIVE = at("src/tests/e2e/live/grading/challenge-grading.e2e-spec.ts")
+const LIVE = at("src/tests/contract/anthropic/answer.contract-spec.ts")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -106,7 +106,7 @@ test("R47: a role has a twin spec, a spec has a subject, and there are two kinds
       { filename: at("src/modules/domain/order/persistence/order.rows.ts"), code: "export const toOrder = () => 1", errors: [{ messageId: "twin" }] },
       // a spec with no subject beside it
       { filename: at("src/modules/domain/order/nothing-here.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
-      { filename: at("src/tests/e2e/world/world.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      { filename: at("src/tests/world/use-test-world.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
       // the banned kinds
       { filename: at("src/modules/domain/order/order.service.test.ts"), code: "export {}", errors: [{ messageId: "suffix" }] },
       { filename: at("src/modules/domain/order/order.int-spec.ts"), code: "export {}", errors: [{ messageId: "suffix" }] },
@@ -138,11 +138,11 @@ test("TESTING-2: an e2e that never reads state back only proves the server repli
   })
 })
 
-test("TESTING-9: an e2e overrides the model with a fixture double; only a live e2e reaches a provider", () => {
+test("TESTING-9: an e2e reaches a model only through the world's network fake; only a contract spec reaches a provider", () => {
   tester.run("no-model-call-in-e2e", noModelCallInE2e, {
     valid: [
-      { filename: E2E, code: "import { request } from '../setup/world'" },
-      // the live folder is the one place a provider is reachable
+      { filename: E2E, code: "import { useTestWorld } from '../../world/use-test-world'" },
+      // a contract spec is the one place a provider is reachable
       { filename: LIVE, code: "import Anthropic from '@anthropic-ai/sdk'" },
       { filename: LIVE, code: "import OpenAI from 'openai'" },
       // not an e2e
@@ -196,7 +196,7 @@ test("TESTING-7: a model stub returns a payload the production parser can parse,
       { filename: FIXTURE, code: "model.run = jest.fn().mockImplementation(() => 'test')", errors: [{ messageId: "marker" }] },
       { filename: FIXTURE, code: "model.run = jest.fn().mockImplementation(() => { return 'mock' })", errors: [{ messageId: "marker" }] },
       // the e2e setup is test infrastructure too
-      { filename: at("src/tests/e2e/world/world.ts"), code: "model.run = jest.fn().mockResolvedValue('stubbed')", errors: [{ messageId: "marker" }] },
+      { filename: at("src/tests/world/use-test-world.ts"), code: "model.run = jest.fn().mockResolvedValue('stubbed')", errors: [{ messageId: "marker" }] },
     ],
   })
 })

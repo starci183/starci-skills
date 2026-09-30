@@ -44,6 +44,7 @@ import { recommended as specQualityRecommended, rules as specQualityRules } from
 import { recommended as suppressionRecommended, rules as suppressionRules } from "./suppression.mjs"
 import { recommended as temporalRecommended, rules as temporalRules } from "./temporal.mjs"
 import { recommended as testingRecommended, rules as testingRules } from "./testing.mjs"
+import { recommended as testWorldRecommended, rules as testWorldRules } from "./test-world.mjs"
 import { recommended as transportRecommended, rules as transportRules } from "./transport.mjs"
 import { recommended as typeSafetyRecommended, rules as typeSafetyRules } from "./type-safety.mjs"
 import { recommended as userCopyRecommended, rules as userCopyRules } from "./user-copy.mjs"
@@ -77,6 +78,7 @@ const CONTRIBUTIONS = [
     { law: "suppression", rules: suppressionRules, recommended: suppressionRecommended },
     { law: "temporal", rules: temporalRules, recommended: temporalRecommended },
     { law: "testing", rules: testingRules, recommended: testingRecommended },
+    { law: "test-world", rules: testWorldRules, recommended: testWorldRecommended },
     { law: "transport", rules: transportRules, recommended: transportRecommended },
     { law: "type-safety", rules: typeSafetyRules, recommended: typeSafetyRecommended },
     { law: "user-copy", rules: userCopyRules, recommended: userCopyRecommended },

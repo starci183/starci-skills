@@ -43,7 +43,7 @@ const FUNCTION_LIKE = new Set(["ArrowFunctionExpression", "FunctionExpression", 
 /** Whether a file may build connections: the platform database capability and the migrate app. */
 const mayBuildConnections = (hfs, file) => inDatabaseCapability(hfs, file) || inMigrateApp(hfs, file)
 
-/** `new DataSource(` also in the e2e world (`src/tests/e2e/world`), which owns the shared test infrastructure (owner ruling 2026-09-30). */
+/** `new DataSource(` also in the test world (`src/tests/world`), which owns the shared test infrastructure (owner ruling 2026-09-30). */
 const mayConstructDataSource = (hfs, file) => mayBuildConnections(hfs, file) || inTestBootstrap(hfs, file)
 
 /** The connection whose name a string literal spells, or undefined. */

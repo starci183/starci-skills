@@ -129,7 +129,7 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, e2e-spec, global-setup]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup]
     bannedSuffixes: [use-case, repository, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
@@ -676,38 +676,25 @@ slots:
     tests: unit-beside
     why: an ML or LLM model client is an integration; weights and datasets are never in git
 
-  # ----- BE: tests ---------------------------------------------------------------------------------------
-  - id: be.tests.e2e
+  # ----- BE: tests (owner test layout 2026-09-30). Unit specs sit beside their subject (<name>.spec.ts); everything else
+  # lives under src/tests/, one folder per kind, and the folder and the file suffix always agree (a file whose suffix does
+  # not match its folder matches no slot: HFS_SLOT_UNDECLARED).
+  - id: be.tests.world
     profiles: [be]
-    path: "src/tests/e2e/<area>/*.e2e-spec.ts"
+    path: "src/tests/world/"
     presence: optional
     tracked: tracked
     tier: e2e
-    tests: e2e
-    rules: [HFS_CI_E2E_AUTOMATIC, BE_TEST_TOPOLOGY, BE_E2E_FLOW]
-  - id: be.tests.e2e-live
-    profiles: [be]
-    path: "src/tests/e2e/live/<area>/*.e2e-spec.ts"
-    presence: opt-in
-    tracked: tracked
-    tier: e2e
-    tests: e2e
-    why: run only by test:e2e:live (E2E_LIVE=1); excluded from plain test:e2e by folder, never by file name
-  - id: be.tests.e2e-world
-    profiles: [be]
-    path: "src/tests/e2e/world/"
-    presence: optional
-    tracked: tracked
-    tier: e2e
-    allows: [global-setup.ts, global-teardown.ts]   # the jest globalSetup/globalTeardown of the one e2e world (default export: Jest API)
+    allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, fakes/]   # jest globalSetup/globalTeardown default-export (Jest API)
     tests: none
     why: >-
-      the ONE e2e world (owner ruling 2026-09-30): global-setup.ts starts the shared infrastructure (containers) and runs
-      apps/migrate's exported bootstrap once; the world boots one or several REAL apps (AppModule.register(testOptions),
-      wired through typed options) with only integration tokens overridden and exposes
-      useE2eWorld({ apps: { <name>: { module, listen? } } }) -> world.apps.<name>.api, world.db.<connection> (the shared
-      EntityManager), world.fake (external services only), world.waitFor. It is the only test location that may import typeorm's DataSource or testcontainers, call
-      migrate/runMigrations/synchronize, or write process.env; specs use only useE2eWorld.
+      the ONLY test infrastructure location, shared by integration and e2e: global-setup.ts starts the shared
+      infrastructure (containers) and runs apps/migrate's exported bootstrap once; use-test-world.ts exports
+      useTestWorld({ apps: { <name>: { module, listen? } } } | { modules: [...] }) -> world.apps.<name>.api,
+      world.db.<connection> (the shared EntityManager), world.fake.<provider> (a network-edge fake started by the world, with
+      failNext/replayWebhook/delay), world.waitFor; fakes/<provider>/ holds the fake servers and payload fixtures. Nothing is
+      overridden in the DI container. It is the only test location that may import typeorm's DataSource or testcontainers,
+      call migrate/runMigrations/synchronize, or write process.env.
   - id: be.tests.fixtures
     profiles: [be]
     path: "src/tests/fixtures/"
@@ -716,7 +703,34 @@ slots:
     tier: fixtures
     allows: [database.ts]         # mockEntityManager() and fakeTransaction() (BE-CONVENTION 1.16); other fixtures use role suffixes
     tests: unit-beside
-    why: typed data builders and typed mock<T>() doubles; importable by unit specs and e2e; never imports a feature
+    why: typed doubles and data builders; importable by unit specs, integration and e2e; never imports a feature
+  - id: be.tests.integration
+    profiles: [be]
+    path: "src/tests/integration/<capability>/*.integration-spec.ts"
+    presence: optional
+    tracked: tracked
+    tier: e2e
+    tests: e2e
+    why: one capability module on the real database, no HTTP (SQL, transactions, concurrency, inbox claims) through useTestWorld({ modules }); run by test:integration
+    rules: [BE_TEST_TOPOLOGY]
+  - id: be.tests.e2e
+    profiles: [be]
+    path: "src/tests/e2e/<area>/*.e2e-spec.ts"
+    presence: optional
+    tracked: tracked
+    tier: e2e
+    tests: e2e
+    why: flow e2e through useTestWorld({ apps }); external services are the world's network fakes; run by test:e2e
+    rules: [HFS_CI_E2E_AUTOMATIC, BE_TEST_TOPOLOGY, BE_E2E_FLOW]
+  - id: be.tests.contract
+    profiles: [be]
+    path: "src/tests/contract/<provider>/*.contract-spec.ts"
+    presence: optional
+    tracked: tracked
+    tier: e2e
+    tests: e2e
+    why: provider sandbox contracts, skipped without sandbox config; run only by test:contract, never part of test or test:e2e
+    rules: [BE_TEST_TOPOLOGY]
 
   # ----- BE: work and stacks -----------------------------------------------------------------------------
   - id: be.starciwork

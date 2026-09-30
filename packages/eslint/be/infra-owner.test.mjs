@@ -31,7 +31,7 @@ const DOMAIN = at("src/modules/domain/order/order.service.ts")
 const SPEC = at("src/modules/domain/order/order.service.spec.ts")
 const FEATURE = at("src/features/plan/application/place-order.handler.ts")
 const INTEGRATION = at("src/modules/integrations/payos/payos.client.ts")
-const E2E = at("src/tests/e2e/setup/e2e-world.ts")
+const E2E = at("src/tests/world/use-test-world.ts")
 
 test("every rule this law declares is exported under its published name", () => {
     for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)

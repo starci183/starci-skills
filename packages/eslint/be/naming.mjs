@@ -6,7 +6,7 @@
  * OWN static factory borrows a vendor dynamic-module's exact name instead of this tree's `register`.
  *
  * `no-default-export` (BE-CONVENTION 1.15, R89) is the form rule beside them: named exports only, with one Jest
- * `global-setup.ts`/`global-teardown.ts` of slot `be.tests.e2e-world` (the Jest globalSetup API) as the single default export.
+ * `global-setup.ts`/`global-teardown.ts` of slot `be.tests.world` (the Jest globalSetup API) as the single default export.
  *
  * A FOURTH RULE WAS WRITTEN AND DELETED, and the deletion is the useful part. It demanded that a
  * file name spell out the class it declares, and measured 616 offenders in 4430 files -- because
@@ -203,7 +203,7 @@ export const noBareVerbExport = {
 // -- no-default-export -------------------------------------------------------------------------------------------
 
 /** The one file kind that may default-export: a Jest global setup, whose API is a default function. */
-const isGlobalSetup = (context) => hfsOf(context).slotOf(context.filename) === "be.tests.e2e-world" && /\/global-(?:setup|teardown)\.ts$/.test(normalizePath(context.filename))
+const isGlobalSetup = (context) => hfsOf(context).slotOf(context.filename) === "be.tests.world" && /\/global-(?:setup|teardown)\.ts$/.test(normalizePath(context.filename))
 
 /** Named exports only: a default export has no name to grep, rename or import-check. */
 export const noDefaultExport = {

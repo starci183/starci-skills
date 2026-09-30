@@ -226,7 +226,7 @@ export const e2eAssertsPersistedState = {
 /** Provider SDKs. Importing one into a flow test is a real model call by any other name. */
 const PROVIDER_PACKAGES = /^(?:@anthropic-ai\/|openai$|openai\/|ollama$|@google\/generative-ai|@google\/genai|@mistralai\/|cohere-ai)/
 
-/** An e2e never calls a model; only a live e2e (slot `be.tests.e2e-live`) may reach a provider. */
+/** An e2e never calls a model; only a contract spec (`src/tests/contract/`, suffix `.contract-spec.ts`) may reach a provider. */
 export const noModelCallInE2e = {
   meta: {
     type: "problem",
@@ -234,12 +234,12 @@ export const noModelCallInE2e = {
     schema: [],
     messages: {
       provider:
-        "`{{source}}` reaches a model provider from an e2e. A model call costs money, takes seconds and answers differently every time - so this makes the flow suite expensive, slow and flaky at once, and the assertion has to be loosened until it stops catching anything. Override the model integration token with a fixture double and assert what can actually break: the entitlement, the quota, the persisted answer. Judging the answer itself belongs in a live e2e under `src/tests/e2e/live/`.",
+        "`{{source}}` reaches a model provider from an e2e. A model call costs money, takes seconds and answers differently every time - so this makes the flow suite expensive, slow and flaky at once, and the assertion has to be loosened until it stops catching anything. Point the model integration at the world's network fake (`world.fake.<provider>`) and assert what can actually break: the entitlement, the quota, the persisted answer. Judging the answer itself belongs in a contract spec under `src/tests/contract/<provider>/`.",
     },
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (!isE2eSpec(filename) || hfsOf(context).slotOf(filename) === "be.tests.e2e-live") return {}
+    if (!isE2eSpec(filename)) return {}
     return {
       ImportDeclaration(node) {
         const source = node.source && node.source.value
@@ -299,8 +299,8 @@ export const noApiShapedE2eFilename = {
 
 // -- TESTING-7 -------------------------------------------------------------------------------------
 
-/** Test infrastructure: the fixtures and the e2e world, where the shared model stub lives (slots `be.tests.fixtures`, `be.tests.e2e-setup`). */
-const isTestInfrastructure = (hfs, filename) => ["be.tests.fixtures", "be.tests.e2e-world"].includes(hfs.slotOf(filename))
+/** Test infrastructure: the fixtures and the test world, where the shared model stub lives (slots `be.tests.fixtures`, `be.tests.world`). */
+const isTestInfrastructure = (hfs, filename) => ["be.tests.fixtures", "be.tests.world"].includes(hfs.slotOf(filename))
 
 /** Bare markers a stub returns when nobody gave it a real answer to stand in for. */
 const MARKER_STRINGS = new Set(["stubbed", "stub", "ok", "test", "mock", "fake", "todo", "tbd", "n/a", "pending", ""])

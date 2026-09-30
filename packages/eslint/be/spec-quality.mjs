@@ -13,7 +13,9 @@
  */
 import { basename } from "node:path"
 import { walk } from "./lib/ast.mjs"
+import ts from "typescript"
 import { hfsOf } from "./lib/hfs.mjs"
+import { isPackageType, typed } from "./lib/types.mjs"
 
 const FS_MODULES = new Set(["fs", "node:fs", "fs/promises", "node:fs/promises"])
 const FS_READERS = new Set(["readFile", "readFileSync", "readdir", "readdirSync", "glob", "globSync", "opendir", "opendirSync", "createReadStream"])
@@ -107,11 +109,58 @@ export const specNoSourceRead = {
 }
 
 /** The rules this law contributes to the plugin. */
+/**
+ * R48 (test policy 2026-09-30): a unit spec takes its database double from `src/tests/fixtures/database.ts`
+ * (`mockEntityManager()`, `fakeTransaction()`), the one typed fake; it never builds an ad-hoc `EntityManager`,
+ * `QueryRunner`, `DataSource` or query builder out of `jest.fn`. Refused in a `*.spec.ts`: a call whose result is one of
+ * those typeorm types unless the called function is declared in the fixtures slot (`be.tests.fixtures`), and assigning a
+ * value to a member of a receiver of those types (`manager.find = jest.fn()`).
+ */
+const TYPEORM_DOUBLES = ["EntityManager", "QueryRunner", "DataSource", "SelectQueryBuilder", "QueryBuilder"]
+
+export const specTypedEntityManager = {
+    meta: {
+        type: "problem",
+        docs: { description: "A unit spec's database double is the fixture's mockEntityManager()/fakeTransaction(), never an ad-hoc jest.fn EntityManager." },
+        schema: [],
+        messages: {
+            adhoc: "This builds an ad-hoc `{{type}}` double. A unit spec takes the typed fake from `src/tests/fixtures/database.ts` (`mockEntityManager()`, `fakeTransaction()`), so every handler spec states rows and asserts state the same way.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        const filename = context.filename || context.getFilename()
+        if (!/\.spec\.ts$/.test(basename(filename)) || /\.e2e-spec\.ts$/.test(basename(filename))) return {}
+        const doubleType = (node) => TYPEORM_DOUBLES.find((name) => isPackageType(context, node, name, "typeorm"))
+        const fromFixtures = (callee) => {
+            const { checker, toTs } = typed(context)
+            const tsNode = toTs(callee)
+            if (!tsNode) return false
+            let symbol = checker.getSymbolAtLocation(tsNode.kind === ts.SyntaxKind.PropertyAccessExpression ? tsNode.name : tsNode)
+            if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
+            return (symbol?.getDeclarations?.() ?? []).some((d) => hfs.slotOf(String(d.getSourceFile().fileName)) === "be.tests.fixtures")
+        }
+        return {
+            CallExpression(node) {
+                const type = doubleType(node)
+                if (type && !fromFixtures(node.callee)) context.report({ node, messageId: "adhoc", data: { type } })
+            },
+            AssignmentExpression(node) {
+                if (node.left.type !== "MemberExpression") return
+                const type = doubleType(node.left.object)
+                if (type) context.report({ node, messageId: "adhoc", data: { type } })
+            },
+        }
+    },
+}
+
 export const rules = {
     "spec-no-source-read": specNoSourceRead,
+    "spec-typed-entity-manager": specTypedEntityManager,
 }
 
 /** Error from the start: the migration lanes replace the source-reading specs before adoption. */
 export const recommended = {
     "starci-be/spec-no-source-read": "error",
+    "starci-be/spec-typed-entity-manager": "error",
 }

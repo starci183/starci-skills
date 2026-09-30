@@ -51,12 +51,19 @@ const MODULE_NAME_MAPPER = Object.freeze({
   "^@tests/(.*)$": "<rootDir>/src/tests/$1",
 })
 
+/** The test folders under `src/tests/` that a project other than `unit` owns (owner test layout 2026-09-30). */
+const TEST_KIND_FOLDERS = Object.freeze(["world", "integration", "e2e", "contract"])
+const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + String.raw`[\\/]`
+
 /**
- * The whole jest config of a Nest repository: one `unit` project and one `e2e` project. It takes no options: the
- * repository's `jest.config.js` is a managed file (R05), rendered by `hfs sync` as
- * `module.exports = require("@starci/jest-preset").starciJestConfig()`, so there is nothing a repository could tune.
+ * The whole jest config of a Nest repository: projects `unit` (colocated `<name>.spec.ts`), `integration`
+ * (`src/tests/integration/<capability>/<name>.integration-spec.ts`), `e2e` (`src/tests/e2e/<area>/<name>.e2e-spec.ts`) and
+ * `contract` (`src/tests/contract/<provider>/<name>.contract-spec.ts`). It takes no options: the repository's `jest.config.js` is a managed file
+ * (R05), rendered by `hfs sync` as `module.exports = require("@starci/jest-preset").starciJestConfig()`.
  *
- * `src/tests/e2e/live/` is never part of the e2e project; `test:e2e:live` selects it explicitly.
+ * The managed scripts select one project each (`test` = unit, `test:integration`, `test:e2e`, `test:contract`); the
+ * contract project is never part of `test` or `test:e2e`, and a contract spec skips itself without sandbox config. The
+ * test tree compiles against `src/tests/tsconfig.json`, the nearest config of every file under `src/tests/`.
  * Coverage uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
  * as thousands of branches no spec can cover, while v8 measures the real source.
  */
@@ -67,8 +74,14 @@ function starciJestConfig() {
     rootDir: ".",
     roots: ["<rootDir>/src", "<rootDir>/apps"],
     moduleNameMapper: { ...MODULE_NAME_MAPPER },
-    transform: transform("tsconfig.json"),
   }
+  const suite = (displayName, suffix) => ({
+    ...shared,
+    transform: transform("src/tests/tsconfig.json"),
+    displayName,
+    maxWorkers: 1,
+    testMatch: [`<rootDir>/src/tests/${displayName}/**/*.${suffix}.ts`],
+  })
   return {
     testTimeout: 120_000,
     coverageProvider: "v8",
@@ -78,24 +91,22 @@ function starciJestConfig() {
     projects: [
       {
         ...shared,
+        transform: transform("tsconfig.json"),
         displayName: "unit",
         clearMocks: true,
         testMatch: ["**/*.spec.ts"],
-        testPathIgnorePatterns: ["/node_modules/", String.raw`\.e2e-spec\.ts$`, String.raw`[\\/]src[\\/]tests[\\/]e2e[\\/]`],
+        testPathIgnorePatterns: ["/node_modules/", ...TEST_KIND_FOLDERS.map(underTests)],
       },
-      {
-        ...shared,
-        displayName: "e2e",
-        maxWorkers: 1,
-        testMatch: ["<rootDir>/src/tests/e2e/**/*.e2e-spec.ts"],
-        testPathIgnorePatterns: ["/node_modules/", String.raw`[\\/]src[\\/]tests[\\/]e2e[\\/]live[\\/]`],
-      },
+      suite("integration", "integration-spec"),
+      suite("e2e", "e2e-spec"),
+      suite("contract", "contract-spec"),
     ],
   }
 }
 
 module.exports = {
   starciJestConfig,
+  TEST_KIND_FOLDERS,
   MODULE_NAME_MAPPER,
   mock,
   createMock,

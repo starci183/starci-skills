@@ -13,7 +13,6 @@
  */
 import { basename } from "node:path"
 import ts from "typescript"
-import { hfsOf } from "./lib/hfs.mjs"
 import { isPackageType, typeOrigins, typed } from "./lib/types.mjs"
 
 /** Files this law governs. A flow is a named lane, not every file that happens to touch a database. */
@@ -212,171 +211,11 @@ export const noWiringInFlowSpec = {
 }
 
 
-/**
- * R47 (owner ruling 2026-09-30): ONE e2e world. `src/tests/e2e/world/global-setup.ts` starts the shared infrastructure
- * and runs `apps/migrate`'s exported bootstrap once; a spec (slot `be.tests.e2e` / `be.tests.e2e-live`) only uses
- * `useE2eWorld({ apps: { <name>: { module, listen? } } })` (`world.apps.<name>.api`, `world.db.<connection>`,
- * `world.fake` for external services only, `world.waitFor`). Refused in a spec: importing a migration
- * (a class declared in a `be.persistence` `migrations/` file, or a value whose type is an array of them), importing
- * anything the migrate app declares, importing typeorm's `DataSource` or any testcontainers package, calling
- * `runMigrations`, `undoLastMigration`, `synchronize`, `dropDatabase` or `createSchema` on a typeorm receiver,
- * constructing a container, and writing `process.env`. The world folder (slot `be.tests.e2e-world`) is the only test
- * location that does those. Migration behaviour is tested only by `apps/migrate`'s own specs.
- */
-const SCHEMA_CALLS = new Set(["runMigrations", "undoLastMigration", "synchronize", "dropDatabase", "createSchema", "showMigrations"])
-const TYPEORM_RECEIVERS = ["DataSource", "QueryRunner", "EntityManager"]
-const CONTAINER_PACKAGES = /^(?:testcontainers|@testcontainers\/[a-z0-9-]+)$/
-/** `process.env` itself (the global `process`, not a local binding named so). */
-const isProcessEnv = (node) => node?.type === "MemberExpression" && !node.computed && node.object.type === "Identifier" && node.object.name === "process" && node.property.name === "env"
-/** A member of `process.env`. */
-const isEnvMember = (node) => node?.type === "MemberExpression" && isProcessEnv(node.object)
-
-export const e2eNoSchemaWork = {
-    meta: {
-        type: "problem",
-        docs: { description: "An e2e spec never migrates or builds the schema: globalSetup runs apps/migrate once; specs assert through the fixture EntityManager." },
-        schema: [],
-        messages: {
-            migration: "An e2e spec imports a migration or the migrate app. The schema is prepared once by the e2e globalSetup running the real `apps/migrate` entry; test migrations in `apps/migrate`'s own specs.",
-            call: "`{{name}}` builds or changes the schema inside an e2e spec. The e2e globalSetup runs `apps/migrate` once; a spec boots the app and asserts through the fixture's EntityManager.",
-            container: "An e2e spec imports or starts test infrastructure (testcontainers, typeorm's DataSource). It belongs to the e2e world in `src/tests/e2e/world`; the spec uses `useE2eWorld({ apps })` and `world.db.<connection>`.",
-            env: "An e2e spec writes `process.env`. The environment of the booted app is set once by the e2e world (`src/tests/e2e/world`); a spec takes the world as it is.",
-        },
-    },
-    create(context) {
-        const hfs = hfsOf(context)
-        const filename = context.filename || context.getFilename()
-        const slot = hfs.slotOf(filename)
-        if (slot !== "be.tests.e2e" && slot !== "be.tests.e2e-live") return {}
-        const isMigrationDecl = (file) => hfs.slotOf(file) === "be.persistence" && /\/migrations\/[^/]+$/.test(hfs.relative(file))
-        const fromMigrate = (file) => hfs.slotOf(file) === "be.app.migrate"
-        const migrationTyped = (node) => {
-            const { checker, toTs } = typed(context)
-            const tsNode = toTs(node)
-            if (!tsNode) return false
-            let type = checker.getTypeAtLocation(tsNode)
-            if (checker.isArrayType?.(type) || checker.isTupleType?.(type)) type = checker.getTypeArguments(type)[0] ?? type
-            const parts = type?.isUnion?.() ? type.types : [type]
-            return parts.some((part) => {
-                const symbol = part?.getSymbol?.()
-                return (symbol?.getDeclarations?.() ?? []).some((d) => isMigrationDecl(String(d.getSourceFile().fileName)))
-            })
-        }
-        return {
-            ImportDeclaration(node) {
-                const source = String(node.source.value)
-                if (CONTAINER_PACKAGES.test(source)) {
-                    context.report({ node, messageId: "container" })
-                    return
-                }
-                if (source === "typeorm" && node.specifiers.some((s) => s.type === "ImportSpecifier" && (s.imported.name ?? s.imported.value) === "DataSource")) {
-                    context.report({ node, messageId: "container" })
-                    return
-                }
-                for (const specifier of node.specifiers) {
-                    const origins = typeOrigins(context, specifier.local)
-                    if (origins.some((o) => isMigrationDecl(o.file) || fromMigrate(o.file)) || migrationTyped(specifier.local)) {
-                        context.report({ node: specifier, messageId: "migration" })
-                        return
-                    }
-                }
-            },
-            CallExpression(node) {
-                const callee = node.callee
-                if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return
-                if (!SCHEMA_CALLS.has(callee.property.name)) return
-                if (TYPEORM_RECEIVERS.some((name) => isPackageType(context, callee.object, name, "typeorm"))) context.report({ node, messageId: "call", data: { name: callee.property.name } })
-            },
-            NewExpression(node) {
-                const origins = typeOrigins(context, node.callee)
-                if (origins.some((o) => o.module && CONTAINER_PACKAGES.test(o.module))) context.report({ node, messageId: "container" })
-            },
-            // process.env.X = ..., process.env["X"] = ..., delete process.env.X, Object.assign(process.env, ...)
-            "AssignmentExpression, UpdateExpression"(node) {
-                const target = node.type === "AssignmentExpression" ? node.left : node.argument
-                if (isEnvMember(target)) context.report({ node, messageId: "env" })
-            },
-            UnaryExpression(node) {
-                if (node.operator === "delete" && isEnvMember(node.argument)) context.report({ node, messageId: "env" })
-            },
-            "CallExpression[callee.type='MemberExpression'][callee.object.name='Object'][callee.property.name='assign']"(node) {
-                if (isProcessEnv(node.arguments[0])) context.report({ node, messageId: "env" })
-            },
-        }
-    },
-}
-
-
-/**
- * R47 (owner ruling 2026-09-30): in e2e (slots `be.tests.e2e`, `be.tests.e2e-live`, `be.tests.e2e-world`) only EXTERNAL
- * services are faked. `world.fake` overrides integration tokens; a first-party app, module, feature or domain/platform
- * provider is always real. Refused: `.overrideProvider(X)`, `.overrideModule(X)`, `.overrideGuard(X)`,
- * `.overrideInterceptor(X)`, `.overrideFilter(X)`, `.overridePipe(X)` whose target is declared in the repository outside
- * tier `integrations` (resolved with the checker, not by name), and `jest.mock(<relative path>)` / `jest.mock` of a
- * repository alias (`@modules/`, `@features/`) that does not resolve into `integrations`.
- */
-const OVERRIDES = new Set(["overrideProvider", "overrideModule", "overrideGuard", "overrideInterceptor", "overrideFilter", "overridePipe"])
-
-export const e2eFakesExternalOnly = {
-    meta: {
-        type: "problem",
-        docs: { description: "E2E fakes only external services (integration tokens); first-party apps, modules and providers are real." },
-        schema: [],
-        messages: {
-            firstParty: "`{{what}}` fakes a first-party piece (declared in `{{file}}`). An e2e world fakes only external services (integration tokens, `world.fake`); apps, modules, guards and domain or platform providers run for real.",
-        },
-    },
-    create(context) {
-        const hfs = hfsOf(context)
-        const filename = context.filename || context.getFilename()
-        const slot = hfs.slotOf(filename)
-        if (!["be.tests.e2e", "be.tests.e2e-live", "be.tests.e2e-world"].includes(slot)) return {}
-        const firstPartyFile = (file) => {
-            const rel = hfs.relative(file)
-            if (rel.startsWith("..") || /(?:^|\/)node_modules\//.test(rel)) return false
-            const tier = hfs.tierOf(file)
-            return tier !== null && tier !== "integrations" && tier !== "e2e" && tier !== "fixtures" && tier !== "package"
-        }
-        const declaredFile = (node) => {
-            const { checker, toTs } = typed(context)
-            const tsNode = toTs(node)
-            if (!tsNode) return null
-            let symbol = checker.getSymbolAtLocation(tsNode)
-            if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
-            const declaration = symbol?.getDeclarations?.()?.[0]
-            return declaration ? String(declaration.getSourceFile().fileName).replace(/\\/g, "/") : null
-        }
-        return {
-            CallExpression(node) {
-                const callee = node.callee
-                if (callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier") {
-                    if (OVERRIDES.has(callee.property.name) && node.arguments[0]) {
-                        const file = declaredFile(node.arguments[0])
-                        if (file && firstPartyFile(file)) context.report({ node, messageId: "firstParty", data: { what: callee.property.name, file: hfs.relative(file) } })
-                        return
-                    }
-                    if (callee.object.type === "Identifier" && callee.object.name === "jest" && callee.property.name === "mock") {
-                        const target = node.arguments[0]
-                        if (target?.type !== "Literal" || typeof target.value !== "string") return
-                        const { program } = typed(context)
-                        const resolved = ts.resolveModuleName(target.value, filename, program.getCompilerOptions(), ts.sys).resolvedModule
-                        const file = resolved?.resolvedFileName ? String(resolved.resolvedFileName).replace(/\\/g, "/") : null
-                        if (file && !resolved.isExternalLibraryImport && firstPartyFile(file)) context.report({ node, messageId: "firstParty", data: { what: "jest.mock", file: hfs.relative(file) } })
-                    }
-                }
-            },
-        }
-    },
-}
-
-/** The rules this law contributes to the plugin. */
 export const rules = {
     "e2e-uses-production-transport": e2eUsesProductionTransport,
     "no-sleep-in-flow": noSleepInFlow,
     "no-branch-in-flow-step": noBranchInFlowStep,
     "no-wiring-in-flow-spec": noWiringInFlowSpec,
-    "e2e-no-schema-work": e2eNoSchemaWork,
-    "e2e-fakes-external-only": e2eFakesExternalOnly,
 }
 
 /** Every rule of this law ships at `error`. */
@@ -385,6 +224,4 @@ export const recommended = {
     "starci-be/no-sleep-in-flow": "error",
     "starci-be/no-branch-in-flow-step": "error",
     "starci-be/no-wiring-in-flow-spec": "error",
-    "starci-be/e2e-no-schema-work": "error",
-    "starci-be/e2e-fakes-external-only": "error",
 }

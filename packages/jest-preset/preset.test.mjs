@@ -63,9 +63,9 @@ test('the default mock needs the jest runtime and says so outside it', () => {
   assert.throws(() => preset.mock().anything, /needs the jest runtime/);
 });
 
-test('starciJestConfig is unit + e2e, ts-jest, diagnostics false (K20), isolatedModules from the tsconfig', () => {
+test('starciJestConfig is unit + integration + e2e + contract, ts-jest, diagnostics false (K20), isolatedModules from the tsconfig', () => {
   const config = preset.starciJestConfig();
-  assert.deepEqual(config.projects.map((p) => p.displayName), ['unit', 'e2e']);
+  assert.deepEqual(config.projects.map((p) => p.displayName), ['unit', 'integration', 'e2e', 'contract']);
   for (const project of config.projects) {
     const [name, options] = project.transform[String.raw`^.+\.ts$`];
     assert.equal(name, 'ts-jest');
@@ -83,7 +83,7 @@ test('starciJestConfig takes no option: the managed jest.config.js has nothing t
   assert.notEqual(preset.starciJestConfig().projects[0].moduleNameMapper, preset.starciJestConfig().projects[0].moduleNameMapper);
 });
 
-test('both projects map exactly the three aliases the managed tsconfig.json declares', () => {
+test('every project maps exactly the three aliases the managed tsconfig.json declares', () => {
   const expected = { '^@features/(.*)$': '<rootDir>/src/features/$1', '^@modules/(.*)$': '<rootDir>/src/modules/$1', '^@tests/(.*)$': '<rootDir>/src/tests/$1' };
   assert.deepEqual(preset.MODULE_NAME_MAPPER, expected);
   for (const project of preset.starciJestConfig().projects) assert.deepEqual(project.moduleNameMapper, expected);
@@ -93,28 +93,29 @@ test('coverage is measured by v8, not istanbul', () => {
   assert.equal(preset.starciJestConfig().coverageProvider, 'v8');
 });
 
-test('the unit project matches *.spec.ts only and never an e2e spec', () => {
+test('the unit project matches *.spec.ts only and never a file of src/tests/{world,integration,e2e,contract}', () => {
   const [unit] = preset.starciJestConfig().projects;
   assert.deepEqual(unit.testMatch, ['**/*.spec.ts']);
   const ignored = (file) => unit.testPathIgnorePatterns.some((pattern) => new RegExp(pattern).test(file));
-  assert.equal(ignored('/r/src/tests/e2e/a/x.e2e-spec.ts'), true);
-  assert.equal(ignored(String.raw`C:\r\src\tests\e2e\a\x.e2e-spec.ts`), true);
+  for (const folder of ['world', 'integration', 'e2e', 'contract']) {
+    assert.equal(ignored(`/r/src/tests/${folder}/a/x.spec.ts`), true, folder);
+    assert.equal(ignored(`C:\\r\\src\\tests\\${folder}\\a\\x.spec.ts`), true, folder);
+  }
   assert.equal(ignored('/r/src/features/x/y.spec.ts'), false);
+  assert.equal(ignored('/r/src/tests/fixtures/database.spec.ts'), false);
 });
 
-test('the e2e project never runs src/tests/e2e/live/, whatever the environment says (K21)', () => {
-  const ignoresLive = (file) => preset.starciJestConfig().projects[1].testPathIgnorePatterns.some((p) => new RegExp(p).test(file));
-  const saved = process.env.E2E_LIVE;
-  try {
-    for (const value of [undefined, '1']) {
-      if (value === undefined) delete process.env.E2E_LIVE; else process.env.E2E_LIVE = value;
-      assert.equal(ignoresLive('/r/src/tests/e2e/live/x.e2e-spec.ts'), true);
-      assert.equal(ignoresLive(String.raw`C:\r\src\tests\e2e\live\x.e2e-spec.ts`), true);
-      assert.equal(ignoresLive('/r/src/tests/e2e/orders/x.e2e-spec.ts'), false);
-    }
-  } finally {
-    if (saved === undefined) delete process.env.E2E_LIVE; else process.env.E2E_LIVE = saved;
+test('each test kind is its own project, matched by folder and suffix together; contract is never unit or e2e', () => {
+  const byName = Object.fromEntries(preset.starciJestConfig().projects.map((p) => [p.displayName, p]));
+  assert.deepEqual(byName.integration.testMatch, ['<rootDir>/src/tests/integration/**/*.integration-spec.ts']);
+  assert.deepEqual(byName.e2e.testMatch, ['<rootDir>/src/tests/e2e/**/*.e2e-spec.ts']);
+  assert.deepEqual(byName.contract.testMatch, ['<rootDir>/src/tests/contract/**/*.contract-spec.ts']);
+  for (const name of ['integration', 'e2e', 'contract']) {
+    assert.equal(byName[name].maxWorkers, 1, name);
+    assert.equal(byName[name].transform[String.raw`^.+\.ts$`][1].tsconfig, 'src/tests/tsconfig.json', name);
   }
+  assert.equal(byName.unit.transform[String.raw`^.+\.ts$`][1].tsconfig, 'tsconfig.json');
+  assert.deepEqual(preset.TEST_KIND_FOLDERS, ['world', 'integration', 'e2e', 'contract']);
 });
 
 test('coverage denominators: same production set Sonar counts (sources src+apps, no tests, no entrypoints)', () => {
