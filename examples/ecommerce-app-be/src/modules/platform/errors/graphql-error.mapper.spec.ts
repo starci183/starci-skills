@@ -1,7 +1,7 @@
 import { GraphQLError } from "graphql"
 import { mock } from "@starci/jest-preset/mock"
 import type { ErrorDescription } from "./errors.contracts"
-import { ErrorsError, ErrorsErrorCode } from "./errors.error"
+import { ErrorsError, ErrorsErrorCode } from "./errors/errors.error"
 import type { ErrorsService } from "./errors.service"
 import { formatGraphqlError } from "./graphql-error.mapper"
 

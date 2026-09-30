@@ -44,6 +44,14 @@ export const throttlerOptionsOf = (rateLimit: RateLimitOptions): ThrottlerModule
     setHeaders: false,
 })
 
+/** The two objects the throttler reads of a request: the caller and its response. */
+export interface ThrottledExchange {
+    /** The caller address and the headers of the HTTP request. */
+    readonly req: Record<string, unknown>
+    /** Nothing: the guard sets no response headers. */
+    readonly res: Record<string, unknown>
+}
+
 @Injectable()
 /**
  * The first app guard, the throttler: a window counter per caller address and tier kept by `@nestjs/throttler`. It reads
@@ -51,7 +59,7 @@ export const throttlerOptionsOf = (rateLimit: RateLimitOptions): ThrottlerModule
  */
 export class RateLimitGuard extends ThrottlerGuard {
     /** The two fields the throttler reads: the caller address and the headers of the HTTP request behind REST or GraphQL. */
-    protected override getRequestResponse(context: ExecutionContext): { req: Record<string, unknown>; res: Record<string, unknown> } {
+    protected override getRequestResponse(context: ExecutionContext): ThrottledExchange {
         const request = requestOf(context)
         return { req: { ip: request.ip, headers: request.headers }, res: {} }
     }

@@ -2,7 +2,7 @@ import { mock } from "@starci/jest-preset/mock"
 import type { Logger } from "@modules/platform/logging"
 import type { MessageCatalog } from "@modules/platform/i18n"
 import { DomainError } from "./domain.error"
-import { ERRORS_ERROR_KINDS, ErrorsError, ErrorsErrorCode } from "./errors.error"
+import { ERRORS_ERROR_KINDS, ErrorsError, ErrorsErrorCode } from "./errors/errors.error"
 import { ErrorsLogEvent } from "./errors.log-events"
 import { ErrorsService } from "./errors.service"
 
