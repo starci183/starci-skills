@@ -25,6 +25,11 @@
 //                                            printSchema(lexicographicSortSchema) of the resolvers the app root composes; no env, no database, no network.
 //   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar); sync/cli.mjs
 //   hfs work-hygiene                              the pre-commit guard for staged .starciwork and .starcistacks paths; sync/cli.mjs
+//   hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]
+//                                            a back-end `<name>.service.ts` and its `<name>.service.spec.ts` skeleton (scaffold/service.mjs): the spec is built
+//                                            with Test.createTestingModule, one provider per constructor dependency (kit doubles from @starci/jest-preset),
+//                                            one placeholder it per public method. Never overwrites a file.
+//   hfs new spec <file>.service.ts [--repo <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
 // Every finding names a why code and carries its Vietnamese text. The command reads the repository, never writes to it
 // (init writes hfs.json only, and only when none exists). Exit codes: 0 clean, 1 error findings, 2 a refusal or bad usage.
 import fs from 'node:fs';
@@ -37,6 +42,7 @@ import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
+import { ScaffoldError, newService, newSpec } from '../scaffold/service.mjs';
 import { contractEmitFindings } from '../runtime/scripts/lib/hfs-rules/contract.mjs';
 import { LINTER_KINDS, convertReportFile, sonarReport, sourceRootsOf, writeReport } from '../report/sonar.mjs';
 
@@ -47,16 +53,24 @@ hfs emit-contracts [--repo <dir>]
 hfs explain <path> [--repo <dir>] [--json]
 hfs sync (--check | --write) [--root <dir>]
 hfs work-hygiene
+hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]
+hfs new spec <file>.service.ts [--repo <dir>]
 `;
 const PER_CODE_LIMIT = 25;
-const VALUE_FLAGS = new Set(['--repo', '--base', '--sonar']);
+const VALUE_FLAGS = new Set(['--repo', '--base', '--sonar', '--inject']);
+/** Flags that may repeat: their values are collected in order. */
+const LIST_FLAGS = new Set(['--inject']);
 const BOOL_FLAGS = new Set(['--json', '--stdout', '--fast']);
 
 function parse(argv) {
   const opts = { positional: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (VALUE_FLAGS.has(arg)) { opts[arg.slice(2)] = argv[i + 1]; i += 1; if (opts[arg.slice(2)] === undefined) throw new Error(`${arg} needs a value`); }
+    if (VALUE_FLAGS.has(arg)) {
+      if (argv[i + 1] === undefined) throw new Error(`${arg} needs a value`);
+      opts[arg.slice(2)] = LIST_FLAGS.has(arg) ? [...(opts[arg.slice(2)] ?? []), argv[i + 1]] : argv[i + 1];
+      i += 1;
+    }
     else if (BOOL_FLAGS.has(arg)) opts[arg.slice(2)] = true;
     else if (arg.startsWith('--')) throw new Error(`unknown flag ${arg}`);
     else opts.positional.push(arg);
@@ -109,7 +123,7 @@ function printExplain(e, out) {
 /** `presets` and `prettier` are test seams: the Sonar exclusions sync would load from the repository's installed preset, and the repository's own prettier. */
 export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
   const [verb, ...rest] = argv;
-  if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report', 'emit-contracts'].includes(verb)) { stderr(USAGE); return 2; }
+  if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report', 'emit-contracts', 'new'].includes(verb)) { stderr(USAGE); return 2; }
   try {
     if (verb === 'sync' || verb === 'work-hygiene') return await syncMain(argv);
     const opts = parse(rest);
@@ -161,6 +175,16 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
       }
       return 0;
     }
+    if (verb === 'new') {
+      const [kind, ...args] = opts.positional;
+      let written;
+      if (kind === 'service' && args.length === 2) written = newService({ repoRoot, dir: args[0], name: args[1], inject: opts.inject ?? [] });
+      else if (kind === 'spec' && args.length === 1 && opts.inject === undefined) written = newSpec({ repoRoot, file: args[0] });
+      else throw new Error('hfs new takes `service <dir> <name> [--inject ...]` or `spec <file>.service.ts`');
+      for (const file of written) stdout(`created ${file}
+`);
+      return 0;
+    }
     if (verb === 'init') {
       if (opts.positional.length) throw new Error('hfs init takes no path');
       const result = initRepo({ repoRoot, write: !opts.stdout });
@@ -172,7 +196,7 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     if (opts.json) stdout(`${JSON.stringify(explained, null, 2)}\n`); else printExplain(explained, stdout);
     return explained.status === 'no-slot' || explained.status === 'ambiguous' ? 1 : 0;
   } catch (error) {
-    stderr(error instanceof HfsSlotsError || error instanceof SyncError ? `${error.message}\n` : `hfs: ${error.message}\n${USAGE}`);
+    stderr(error instanceof HfsSlotsError || error instanceof SyncError ? `${error.message}\n` : error instanceof ScaffoldError ? `${error.code}: ${error.message}\n` : `hfs: ${error.message}\n${USAGE}`);
     return 2;
   }
 }
