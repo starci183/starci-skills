@@ -59,7 +59,7 @@ test("a DomainError subclass is declared only in errors/<capability>.error.ts of
             { filename: at("src/modules/domain/plan/errors/plan.error.ts"), code: `${ERR_HEAD}export class PlanError extends DomainError<PlanErrorCode> {}` },
             { filename: at("src/features/checkout/errors/checkout.error.ts"), code: `${ERR_HEAD.replace("PlanErrorCode", "CheckoutErrorCode")}export class CheckoutError extends DomainError<CheckoutErrorCode> {}` },
             // the declaration of DomainError itself
-            { filename: at("src/modules/platform/errors/domain.error.ts"), code: "export abstract class DomainError<C extends string> extends Error { readonly code!: C }" },
+            { filename: at("src/modules/platform/errors/domain-error.ts"), code: "export abstract class DomainError<C extends string> extends Error { readonly code!: C }" },
             // a class that is not an error
             { filename: SERVICE, code: "class PlanService {}" },
             // a class named ...Error that is not an Error subtype is not judged by its name

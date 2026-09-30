@@ -1,70 +1,97 @@
+/**
+ * Twin tests for the config rules (R43, R44) and the timing-safe secret comparison (R41).
+ *
+ *   node --test config-owner.test.mjs
+ *
+ * `Secret`, `Url` and `EnvSource` are declared by the fixture repository's `src/modules/platform/config`, so the owner of
+ * a value's type is judged by the slot view.
+ */
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import { noDirectEnvRead, noSecretDefault, secretCompareTimingSafe } from "./config-owner.mjs"
 
-const tester = new RuleTester({
-    languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
-})
-const SERVICE = "D:/repo/src/modules/domain/plan/plan.service.ts"
-const CONFIG = "D:/repo/src/modules/domain/plan/plan.config.ts"
+const tester = typedTester()
+const SERVICE = at("src/modules/domain/plan/plan.service.ts")
+const CONFIG = at("src/modules/domain/plan/plan.config.ts")
+const ENV_SOURCE = at("src/modules/platform/config/env-source.ts")
+const MAIN = at("apps/api/src/main.ts")
 
-test("process.env is read only inside platform/config", () => {
+test("the process environment is read only by the file that declares EnvSource in platform/config", () => {
     tester.run("no-direct-env-read", noDirectEnvRead, {
         valid: [
-            { filename: "D:/repo/src/modules/platform/config/env-source.ts", code: "export const read = () => process.env" },
-            { filename: "D:/repo/src/modules/platform/config/env-source.ts", code: "const x = process['env']" },
+            { filename: ENV_SOURCE, code: "export class EnvSource { static fromProcess() { return { ...process.env } } }" },
+            { filename: ENV_SOURCE, code: "export class EnvSource { static a() { return process['env'] } }" },
+            { filename: ENV_SOURCE, code: "export class EnvSource { static a() { const { env } = process; return env } }" },
             { filename: SERVICE, code: "const port = options.port" },
-            { filename: "D:/repo/apps/api/src/main.ts", code: "const env = readEnvironment()" },
-            // a spec arranges its own environment
-            { filename: "D:/repo/src/modules/domain/plan/plan.service.spec.ts", code: "process.env.X = '1'" },
             { filename: SERVICE, code: "const env = { region: 1 }; const x = env.region" },
+            { filename: SERVICE, code: "const p = path.join(root, 'src')" },
+            // a different process object is not the process
+            { filename: SERVICE, code: "const process = { env: { X: 1 } }; export const x = process.env" },
         ],
         invalid: [
             { filename: SERVICE, code: "const url = process.env.PLAN_URL", errors: [{ messageId: "env" }] },
             { filename: CONFIG, code: "const env = process.env", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const x = process['env']", errors: [{ messageId: "env" }] },
-            { filename: "D:/repo/apps/api/src/main.ts", code: "const x = process.env.PORT", errors: [{ messageId: "env" }] },
-            {
-                filename: "D:/repo/src/modules/domain/plan/plan.module.ts",
-                code: "const m = { useFactory: () => readEnvironment() }",
-                errors: [{ messageId: "factory" }],
-            },
+            { filename: MAIN, code: "const x = process.env.PORT", errors: [{ messageId: "env" }] },
+            { filename: SERVICE, code: "const { env } = process", errors: [{ messageId: "env" }] },
+            { filename: SERVICE, code: "const { env: e, argv } = process", errors: [{ messageId: "env" }] },
+            { filename: SERVICE, code: "const e = Reflect.get(process, 'env')", errors: [{ messageId: "env" }] },
+            { filename: SERVICE, code: "const e = globalThis.process.env", errors: [{ messageId: "env" }] },
+            { filename: SERVICE, code: "import { env } from 'node:process'\nexport const x = env", errors: [{ messageId: "env" }] },
+            { filename: SERVICE, code: "import proc from 'node:process'\nexport const x = proc.env", errors: [{ messageId: "env" }] },
+            // a file in platform/config that does not declare EnvSource is not the reader
+            { filename: at("src/modules/platform/config/other.config.ts"), code: "export const read = () => process.env", errors: [{ messageId: "env" }] },
+            // a file that declares a class named EnvSource outside platform/config is not the reader either
+            { filename: SERVICE, code: "export class EnvSource { read() { return process.env } }", errors: [{ messageId: "env" }] },
+            // a spec is not exempt
+            { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "process.env.X = '1'", errors: [{ messageId: "env" }] },
+            { filename: SERVICE, code: "import { ConfigService } from '@nestjs/config'\nexport const x = ConfigService", errors: [{ messageId: "package" }] },
+            { filename: SERVICE, code: "import 'dotenv/config'", errors: [{ messageId: "package" }] },
+            { filename: SERVICE, code: "import dotenv from 'dotenv'\nexport const x = dotenv", errors: [{ messageId: "package" }] },
+            { filename: SERVICE, code: "const d = require('dotenv')", errors: [{ messageId: "package" }] },
+            { filename: SERVICE, code: "const c = envConfig()", errors: [{ messageId: "envConfig" }] },
+            { filename: SERVICE, code: "const p = path.join(process.cwd(), 'src', 'x')", errors: [{ messageId: "cwdPath" }] },
+            { filename: SERVICE, code: "const p = path.resolve(process.cwd(), '.starcistacks/dev')", errors: [{ messageId: "cwdPath" }] },
         ],
     })
 })
 
-test("a secret or URL config value has no literal default", () => {
+const CFG = "import { EnvSource, Secret } from '@modules/platform/config'\nimport type { Url } from '@modules/platform/config'\ndeclare const env: EnvSource\ndeclare const renamed: EnvSource\ndeclare const secret: Secret\ndeclare const maybeSecret: Secret | undefined\ndeclare const url: Url\ndeclare const maybeUrl: Url | undefined\ndeclare function read(key: string, fallback?: string): Url\ndeclare function readSecret(key: string, fallback?: string): Secret\ndeclare function readText(key: string, fallback?: string): string\n"
+
+test("a value typed Secret or Url has no default, argument or fallback", () => {
     tester.run("no-secret-default", noSecretDefault, {
         valid: [
-            { filename: CONFIG, code: "const password = env.POSTGRES_PASSWORD" },
-            { filename: CONFIG, code: "const schema = z.object({ POSTGRES_PASSWORD: z.string().min(1) })" },
-            { filename: CONFIG, code: "const port = env.PORT ?? '3000'" },
-            { filename: CONFIG, code: "const o = { tokenType: 'Bearer', password: '' }" },
-            { filename: CONFIG, code: "const schema = z.object({ POSTGRES_PORT: z.string().default('5432') })" },
-            { filename: CONFIG, code: "const url = new URL(options.redisUrl)" },
-            // a spec holds fake credentials
-            { filename: "D:/repo/src/modules/domain/plan/plan.service.spec.ts", code: "const password = 'Nivo123_A'" },
-            { filename: SERVICE, code: "const p = path.join(root, 'src')" },
-            { filename: SERVICE, code: "const link = { docsUrl: '/docs' }" },
-            // an UPPER_SNAKE literal names an environment key; it is not the secret
-            { filename: CONFIG, code: "const N8N_API_KEY = 'N8N_API_KEY'" },
-            { filename: CONFIG, code: "export const MEDIA_SIGNING_SECRET_KEY = 'mediaSigningSecret'" },
+            { filename: CONFIG, code: `${CFG}const a = env.secret('PLAN_API_KEY')` },
+            { filename: CONFIG, code: `${CFG}const a = env.url('PLAN_URL')` },
+            // a tunable may have a literal default
+            { filename: CONFIG, code: `${CFG}const a = env.int('PLAN_TIMEOUT', 30)` },
+            { filename: CONFIG, code: `${CFG}const a = env.optional('PLAN_NAME') ?? 'plan'` },
+            // a fallback on a plain string is not a Secret or Url fallback: the type decides, not the name
+            { filename: CONFIG, code: `${CFG}const password = readText('POSTGRES_PASSWORD') ?? 'x'` },
+            { filename: CONFIG, code: `${CFG}const a = readText('PLAN_URL', 'http://localhost')` },
+            { filename: CONFIG, code: `${CFG}const a = read('PLAN_URL')` },
+            { filename: CONFIG, code: "const options = { password: '' , token: 'abc', databaseUrl: 'postgres://u@localhost/db' }" },
+            { filename: CONFIG, code: `${CFG}const a = readSecret('X', 'not-a-default-literal')` },
         ],
         invalid: [
-            { filename: CONFIG, code: "const password = env.POSTGRES_PASSWORD ?? 'Nivo123_A'", errors: [{ messageId: "fallback" }] },
-            { filename: CONFIG, code: "const s = process.env.JWT_SECRET || 'dev-secret'", errors: [{ messageId: "fallback" }] },
-            { filename: CONFIG, code: "const token = config.get('API_TOKEN') ?? 'abc'", errors: [{ messageId: "fallback" }] },
-            { filename: CONFIG, code: "const url = env.REDIS_URL ?? 'redis://localhost:6379'", errors: [{ messageId: "fallback" }] },
-            { filename: CONFIG, code: "const options = { password: 'Nivo123_A' }", errors: [{ messageId: "literal" }] },
-            { filename: CONFIG, code: "const webhookSecret = 'whsec_abc'", errors: [{ messageId: "literal" }] },
-            { filename: CONFIG, code: "class C { private readonly apiKey = 'k-123' }", errors: [{ messageId: "literal" }] },
-            { filename: CONFIG, code: "const o = { databaseUrl: 'postgres://u@localhost/db' }", errors: [{ messageId: "literal" }] },
-            { filename: CONFIG, code: "function f(secret = 'dev') {}", errors: [{ messageId: "literal" }] },
-            { filename: CONFIG, code: "const schema = z.object({ POSTGRES_PASSWORD: z.string().default('x') })", errors: [{ messageId: "schemaDefault" }] },
-            { filename: CONFIG, code: "const schema = z.object({ REDIS_URL: z.string().default('redis://localhost') })", errors: [{ messageId: "schemaDefault" }] },
-            { filename: SERVICE, code: "const p = path.join(process.cwd(), 'src', 'x')", errors: [{ messageId: "cwdPath" }] },
-            { filename: SERVICE, code: "const p = path.resolve(process.cwd(), '.starcistacks/dev')", errors: [{ messageId: "cwdPath" }] },
+            { filename: CONFIG, code: `${CFG}const a = env.secret('PLAN_API_KEY', 'dev')`, errors: [{ messageId: "argument" }] },
+            { filename: CONFIG, code: `${CFG}const a = env.url('PLAN_URL', 'http://localhost:3000')`, errors: [{ messageId: "argument" }] },
+            { filename: CONFIG, code: `${CFG}const a = env.host('PLAN_HOST', 'localhost')`, errors: [{ messageId: "argument" }] },
+            // a renamed receiver is still the EnvSource
+            { filename: CONFIG, code: `${CFG}const a = renamed.secret('K', 'dev')`, errors: [{ messageId: "argument" }] },
+            { filename: CONFIG, code: `${CFG}const a = secret ?? new Secret('dev')`, errors: [{ messageId: "fallback" }] },
+            { filename: CONFIG, code: `${CFG}const a = maybeSecret || new Secret('dev')`, errors: [{ messageId: "fallback" }] },
+            { filename: CONFIG, code: `${CFG}const a = url ?? 'http://localhost:6379'`, errors: [{ messageId: "fallback" }] },
+            { filename: CONFIG, code: `${CFG}const a = maybeUrl || ''`, errors: [{ messageId: "fallback" }] },
+            { filename: CONFIG, code: `${CFG}let a = maybeUrl\na ??= 'https://example.com'`, errors: [{ messageId: "fallback" }] },
+            // any reader that returns a Secret or Url given a default literal, whatever its name
+            { filename: CONFIG, code: `${CFG}const a = read('PLAN_URL', 'localhost')`, errors: [{ messageId: "literal" }] },
+            { filename: CONFIG, code: `${CFG}const a = read('PLAN_URL', '127.0.0.1')`, errors: [{ messageId: "literal" }] },
+            { filename: CONFIG, code: `${CFG}const a = read('PLAN_URL', '0.0.0.0')`, errors: [{ messageId: "literal" }] },
+            { filename: CONFIG, code: `${CFG}const a = read('PLAN_URL', 'https://plan.example')`, errors: [{ messageId: "literal" }] },
+            { filename: CONFIG, code: `${CFG}const a = readSecret('PLAN_KEY', '')`, errors: [{ messageId: "literal" }] },
+            // a spec is not exempt
+            { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: `${CFG}const a = env.secret('K', 'x')`, errors: [{ messageId: "argument" }] },
         ],
     })
 })
@@ -92,7 +119,7 @@ test("a secret is compared with timingSafeEqual, never an equality operator", ()
             { filename: SERVICE, code: "if (req.headers.webhookSecret == secret) {}", errors: [{ messageId: "compare" }] },
             { filename: SERVICE, code: "if (expected === apiKey) {}", errors: [{ messageId: "compare" }] },
             { filename: SERVICE, code: "if (dto.password === user.password) {}", errors: [{ messageId: "compare" }] },
-            { filename: "D:/repo/src/modules/domain/plan/plan.service.spec.ts", code: "if (token === expected) {}", errors: [{ messageId: "compare" }] },
+            { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "if (token === expected) {}", errors: [{ messageId: "compare" }] },
         ],
     })
 })

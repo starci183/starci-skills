@@ -2,172 +2,118 @@
  * The rules that hold HFS configuration and secrets (catalog R43 `BE_CONFIG_OWNER`, R44 `BE_SECRET_DEFAULT`,
  * and the secret-comparison half of R41 `BE_DEFAULT_DENY`).
  *
- *   - `no-direct-env-read` keeps `process.env` inside `platform/config`. Everything else receives typed options
- *     from `<capability>.config.ts`; a `readEnvironment()` call inside a `useFactory` is the same read in
- *     disguise and is refused too.
- *   - `no-secret-default` refuses a literal default for a secret, password, token, key or URL: an `env.X ?? "..."`
- *     fallback, a property or variable of that name holding a non-empty string, a `.default("...")` on a
- *     schema of that name, and a path built from `process.cwd()` and `src` or `.starcistacks`. A missing value
- *     must stop the boot, naming the key.
+ *   - `no-direct-env-read` keeps the process environment inside the one file that declares the `EnvSource` class of
+ *     `platform/config`. Everything else receives typed options from `<capability>.config.ts`. `process.env` in any form
+ *     (member access, destructuring, `Reflect.get(process, "env")`, an `env` import of `node:process`), an import of
+ *     `@nestjs/config` or `dotenv`, a call of `envConfig()`, and a `process.cwd()` path joined into `src` or
+ *     `.starcistacks` are refused everywhere else.
+ *   - `no-secret-default` refuses a default for a value typed `Secret` or `Url` by `platform/config`: a default argument
+ *     to an `EnvSource` reader, a `??`/`||` fallback on such a value, and a string literal default (`""`, `"localhost"`,
+ *     `"127.0.0.1"`, `"0.0.0.0"`, `http(s)://...`) given to any reader that returns one. The TYPE decides; no key name is
+ *     matched. A missing value must stop the boot, naming the key.
  *   - `secret-compare-timing-safe` refuses `===` and `!==` on a secret-named identifier. A secret compares with
  *     `timingSafeEqual`, because the length of the matching prefix is a measurable side channel.
  *
- * Test lanes are outside the default and env rules: a spec arranges its own environment and fake credentials.
- * They are not outside the comparison rule.
+ * No test lane is exempt: a spec builds its `EnvSource` from a literal record and never touches the process environment.
  */
 import { keyName, staticText, walk, wordsOf } from "./lib/ast.mjs"
-import { isDeclarationFile, isTestLane, normalizePath } from "./lib/path.mjs"
+import { isOwnedBy, originsOf } from "./lib/declared.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { isDeclarationFile, normalizePath } from "./lib/path.mjs"
 
-const PLATFORM_CONFIG = /\/src\/modules\/platform\/config\//
+const PROCESS_MODULES = new Set(["process", "node:process"])
 
-/** `process.env` or `process["env"]`. */
-const isProcessEnv = (node) =>
+/** `@nestjs/config`, `dotenv` and their subpaths. */
+const isConfigPackage = (source) => /^(?:@nestjs\/config|dotenv)(?:\/|$)/.test(source)
+
+/** `globalThis.process` and `global.process`. */
+const isGlobalProcess = (node) =>
     node.type === "MemberExpression" &&
+    !node.computed &&
+    keyName(node.property) === "process" &&
     node.object.type === "Identifier" &&
-    node.object.name === "process" &&
-    (node.computed ? node.property.type === "Literal" && node.property.value === "env" : keyName(node.property) === "env")
+    (node.object.name === "globalThis" || node.object.name === "global")
 
-/** Only the platform config capability reads the process environment. */
+/** True when the property of a member expression spells `env`. */
+const spellsEnv = (node) => (node.computed ? staticText(node.property) === "env" : keyName(node.property) === "env")
+
+/** Only the file that declares `EnvSource` reads the process environment. */
 export const noDirectEnvRead = {
     meta: {
         type: "problem",
-        docs: { description: "`process.env` is read only inside `platform/config`." },
+        docs: { description: "The process environment is read only by the `EnvSource` class of `platform/config`." },
         schema: [],
         messages: {
-            env: "`process.env` is read outside `platform/config`. Add the key to the capability's `<capability>.config.ts` (zod) and receive the value through its `<capability>.options.ts`.",
-            factory: "`readEnvironment()` inside a `useFactory` reads the environment per module. `main.ts` reads it once and passes options through `AppModule.register`.",
-        },
-    },
-    create(context) {
-        const filename = normalizePath(context.filename || context.getFilename())
-        if (isDeclarationFile(filename) || isTestLane(filename) || PLATFORM_CONFIG.test(filename)) return {}
-        return {
-            MemberExpression(node) {
-                if (isProcessEnv(node)) context.report({ node, messageId: "env" })
-            },
-            CallExpression(node) {
-                if (node.callee.type !== "Identifier" || node.callee.name !== "readEnvironment") return
-                for (let parent = node.parent; parent; parent = parent.parent) {
-                    if (parent.type === "Property" && keyName(parent.key) === "useFactory") {
-                        context.report({ node, messageId: "factory" })
-                        return
-                    }
-                }
-            },
-        }
-    },
-}
-
-const SECRET_WORDS = new Set(["password", "passwd", "passphrase", "secret", "token", "credential", "credentials", "apikey", "signature", "hmac"])
-const KEY_PREFIXES = new Set(["api", "secret", "private", "access", "signing", "encryption", "master", "auth", "jwt", "session"])
-const URL_WORDS = new Set(["url", "uri", "dsn", "endpoint"])
-const NOT_A_VALUE_WORDS = new Set(["type", "kind", "length", "count", "ttl", "name", "prefix", "header", "scheme", "field", "path", "regex", "pattern"])
-
-/** Whether a config name is a secret, or an infrastructure URL: `POSTGRES_PASSWORD`, `webhookSecret`, `redisUrl`. */
-const configKind = (name) => {
-    const words = wordsOf(name)
-    const last = words.at(-1)
-    if (!last || NOT_A_VALUE_WORDS.has(last)) return null
-    if (SECRET_WORDS.has(last)) return "secret"
-    if (last === "key" && words.length > 1 && KEY_PREFIXES.has(words.at(-2))) return "secret"
-    if (URL_WORDS.has(last)) return "url"
-    return null
-}
-
-/** The name an env read spells: `process.env.X`, `env.X`, `env["X"]`, `config.get("X")`. */
-const envReadName = (node) => {
-    if (node.type === "MemberExpression") {
-        const object = node.object
-        const isEnvObject = isProcessEnv(object) || (object.type === "Identifier" && /^env$/i.test(object.name))
-        if (!isEnvObject) return null
-        return node.computed ? staticText(node.property) : keyName(node.property)
-    }
-    if (node.type === "CallExpression" && node.callee.type === "MemberExpression" && keyName(node.callee.property) === "get") {
-        return staticText(node.arguments[0])
-    }
-    return null
-}
-
-const isNonEmptyText = (node) => {
-    const text = staticText(node)
-    return text !== null && text.trim() !== ""
-}
-
-/** An UPPER_SNAKE literal is the NAME of an environment key (`const API_KEY = "API_KEY"`), not a secret value. */
-const isKeyName = (node, name) => {
-    const text = staticText(node) ?? ""
-    if (/^[A-Z][A-Z0-9_]*$/.test(text)) return true
-    // `const MEDIA_SIGNING_SECRET_KEY = "mediaSigningSecret"`: a constant that names a lookup key holds the key's name
-    return /^[A-Z][A-Z0-9_]*_KEY$/.test(name ?? "") && /^[a-z][A-Za-z0-9]*$/.test(text)
-}
-
-const hasScheme = (node) => /^[a-z][a-z0-9+.-]*:\/\//i.test(staticText(node) ?? "")
-
-const targetName = (node) => {
-    if (node.type === "Property" || node.type === "PropertyDefinition") return keyName(node.key)
-    if (node.type === "VariableDeclarator" && node.id.type === "Identifier") return node.id.name
-    if (node.type === "AssignmentPattern" && node.left.type === "Identifier") return node.left.name
-    return null
-}
-
-/** No secret, password, token, key or URL config has a literal default; a missing value stops the boot. */
-export const noSecretDefault = {
-    meta: {
-        type: "problem",
-        docs: { description: "A secret or URL config value never has a literal default." },
-        schema: [],
-        messages: {
-            fallback: "`{{name}}` falls back to a literal. A missing {{kind}} must stop the boot with an error naming `{{name}}`, not start the app with a value from source.",
-            literal: "`{{name}}` holds a literal {{kind}}. A {{kind}} is supplied by configuration, never written in source.",
-            schemaDefault: "`.default(...)` gives `{{name}}` a value in source. Remove the default so a missing {{kind}} fails validation at boot.",
+            env: "The process environment is read outside the `EnvSource` of `platform/config`. Add the key to the capability's `<capability>.config.ts` (`parse<C>Config(env: EnvSource)`) and receive the value through its `<capability>.options.ts`.",
+            package: "`{{source}}` is a second config path. Configuration is parsed once in `main.ts` by `platform/config` typed readers and reaches a module through `register(options)`.",
+            envConfig: "`envConfig()` re-reads the environment per call site. Receive the value through the capability's options, read with `Inject<C>Options()`.",
             cwdPath: "A path built from `process.cwd()` and `{{segment}}` depends on where the process was started. Resolve it from a configured root.",
         },
     },
     create(context) {
         const filename = normalizePath(context.filename || context.getFilename())
-        if (isDeclarationFile(filename) || isTestLane(filename)) return {}
-        const report = (node, messageId, name, kind) => context.report({ node, messageId, data: { name, kind: kind === "url" ? "URL" : "secret" } })
-        const checkLiteralTarget = (node, value) => {
-            const name = targetName(node)
-            const kind = name ? configKind(name) : null
-            if (kind && value && isNonEmptyText(value) && (kind === "url" ? hasScheme(value) : !isKeyName(value, name))) report(node, "literal", name, kind)
+        if (isDeclarationFile(filename)) return {}
+        const hfs = hfsOf(context)
+        const inConfigOwner = isOwnedBy(hfs, filename, "platform", "config")
+        let declaresEnvSource = false
+        const processNames = new Set(["process"])
+        const isLocal = (identifier) => {
+            for (let scope = context.sourceCode.getScope(identifier); scope; scope = scope.upper) {
+                const variable = scope.set.get(identifier.name)
+                if (variable) return variable.defs.length > 0 && !variable.defs.every((definition) => definition.type === "ImportBinding")
+            }
+            return false
+        }
+        const isProcess = (node) => (node.type === "Identifier" && processNames.has(node.name) && !isLocal(node)) || isGlobalProcess(node)
+        const isEnvSourceFile = () => inConfigOwner && declaresEnvSource
+        const reportEnv = (node) => {
+            if (!isEnvSourceFile()) context.report({ node, messageId: "env" })
+        }
+        const reportSource = (node, source) => {
+            if (isConfigPackage(source)) context.report({ node, messageId: "package", data: { source } })
         }
         return {
-            LogicalExpression(node) {
-                if (node.operator !== "??" && node.operator !== "||") return
-                const name = envReadName(node.left)
-                const kind = name ? configKind(name) : null
-                if (kind && isNonEmptyText(node.right) && (kind === "url" ? hasScheme(node.right) : !isKeyName(node.right, name))) report(node, "fallback", name, kind)
+            Program(program) {
+                declaresEnvSource = program.body.some((statement) => {
+                    const declaration = statement.type === "ExportNamedDeclaration" || statement.type === "ExportDefaultDeclaration" ? statement.declaration : statement
+                    return declaration?.type === "ClassDeclaration" && declaration.id?.name === "EnvSource"
+                })
             },
-            Property(node) {
-                checkLiteralTarget(node, node.value)
+            ImportDeclaration(node) {
+                const source = String(node.source.value)
+                reportSource(node, source)
+                if (!PROCESS_MODULES.has(source)) return
+                for (const specifier of node.specifiers) {
+                    if (specifier.type === "ImportSpecifier" && (specifier.imported.name ?? specifier.imported.value) === "env") reportEnv(specifier)
+                    else if (specifier.type !== "ImportSpecifier") processNames.add(specifier.local.name)
+                }
             },
-            PropertyDefinition(node) {
-                checkLiteralTarget(node, node.value)
+            ImportExpression(node) {
+                const source = staticText(node.source)
+                if (source !== null) reportSource(node, source)
+            },
+            MemberExpression(node) {
+                if (isProcess(node.object) && spellsEnv(node)) reportEnv(node)
             },
             VariableDeclarator(node) {
-                checkLiteralTarget(node, node.init)
-            },
-            AssignmentPattern(node) {
-                checkLiteralTarget(node, node.right)
+                if (!node.init || !isProcess(node.init) || node.id.type !== "ObjectPattern") return
+                if (node.id.properties.some((property) => property.type === "Property" && keyName(property.key) === "env")) reportEnv(node)
             },
             CallExpression(node) {
                 const callee = node.callee
-                if (callee.type === "MemberExpression" && keyName(callee.property) === "default" && isNonEmptyText(node.arguments[0])) {
-                    for (let parent = node.parent; parent; parent = parent.parent) {
-                        if (parent.type === "Property") {
-                            const name = keyName(parent.key)
-                            const kind = name ? configKind(name) : null
-                            if (kind && (kind !== "url" || hasScheme(node.arguments[0]))) report(node, "schemaDefault", name, kind)
-                            return
-                        }
-                    }
-                    return
+                if (callee.type === "Identifier" && callee.name === "envConfig") context.report({ node, messageId: "envConfig" })
+                if (callee.type === "Identifier" && callee.name === "require") {
+                    const source = staticText(node.arguments[0])
+                    if (source !== null) reportSource(node, source)
                 }
-                if (callee.type === "MemberExpression" && ["join", "resolve"].includes(keyName(callee.property) ?? "")) {
+                if (callee.type !== "MemberExpression") return
+                if (callee.object.type === "Identifier" && callee.object.name === "Reflect" && keyName(callee.property) === "get") {
+                    if (node.arguments[0] && isProcess(node.arguments[0]) && staticText(node.arguments[1]) === "env") reportEnv(node)
+                }
+                if (["join", "resolve"].includes(keyName(callee.property) ?? "") && !isEnvSourceFile()) {
                     let cwd = false
                     walk(node, (child) => {
-                        if (child.type === "CallExpression" && child.callee.type === "MemberExpression" && keyName(child.callee.property) === "cwd") cwd = true
+                        if (child.type === "CallExpression" && child.callee.type === "MemberExpression" && isProcess(child.callee.object) && keyName(child.callee.property) === "cwd") cwd = true
                     })
                     if (!cwd) return
                     for (const argument of node.arguments) {
@@ -181,7 +127,63 @@ export const noSecretDefault = {
     },
 }
 
+/** The brand classes of `platform/config` a default must never be given to. */
+const BRANDS = new Set(["Secret", "Url"])
+const SECRET_READERS = new Set(["secret", "url", "host"])
+const DEFAULT_LITERAL = /^(?:|localhost|127\.0\.0\.1|0\.0\.0\.0|https?:\/\/.*)$/i
+
+/** No secret or URL value has a default of any kind: a missing value stops the boot. */
+export const noSecretDefault = {
+    meta: {
+        type: "problem",
+        docs: { description: "A value typed `Secret` or `Url` never has a default, argument or fallback." },
+        schema: [],
+        messages: {
+            fallback: "This `{{operator}}` gives a `Secret` or `Url` a value from source. A missing secret or URL must stop the boot with an error naming the key, not start the app with a fallback.",
+            argument: "`{{method}}` is given a default. A secret, credential, key, host or URL has no default of any kind: remove the second argument so a missing key fails naming itself.",
+            literal: "A string default (`\"\"`, `\"localhost\"`, `\"127.0.0.1\"`, `\"0.0.0.0\"` or an `http(s)://` URL) is given to a reader that returns a `Secret` or `Url`. Remove it so a missing key fails naming itself.",
+        },
+    },
+    create(context) {
+        const filename = normalizePath(context.filename || context.getFilename())
+        if (isDeclarationFile(filename)) return {}
+        const hfs = hfsOf(context)
+        /** True when the node's type is (or contains) `Secret` or `Url` as `platform/config` declares them. */
+        const isBrand = (node) => originsOf(context, node).some((origin) => BRANDS.has(origin.name) && isOwnedBy(hfs, origin.file, "platform", "config"))
+        const isEnvSource = (node) => originsOf(context, node).some((origin) => origin.name === "EnvSource" && isOwnedBy(hfs, origin.file, "platform", "config"))
+        const checkFallback = (node, operator, left) => {
+            if (isBrand(left)) context.report({ node, messageId: "fallback", data: { operator } })
+        }
+        return {
+            LogicalExpression(node) {
+                if (node.operator === "??" || node.operator === "||") checkFallback(node, node.operator, node.left)
+            },
+            AssignmentExpression(node) {
+                if (node.operator === "??=" || node.operator === "||=") checkFallback(node, node.operator, node.left)
+            },
+            CallExpression(node) {
+                if (node.arguments.length < 2) return
+                const callee = node.callee
+                const method = callee.type === "MemberExpression" && !callee.computed ? keyName(callee.property) : null
+                const onEnvSource = method !== null && isEnvSource(callee.object)
+                if (onEnvSource && (SECRET_READERS.has(method) || isBrand(node))) {
+                    context.report({ node: node.arguments[1], messageId: "argument", data: { method } })
+                    return
+                }
+                if (!isBrand(node)) return
+                const literal = node.arguments.slice(1).find((argument) => {
+                    const text = staticText(argument)
+                    return text !== null && DEFAULT_LITERAL.test(text)
+                })
+                if (literal) context.report({ node: literal, messageId: "literal" })
+            },
+        }
+    },
+}
+
 const SECRET_COMPARE_WORDS = new Set(["secret", "password", "passwd", "passphrase", "token", "signature", "hmac", "credential", "credentials", "apikey"])
+const KEY_PREFIXES = new Set(["api", "secret", "private", "access", "signing", "encryption", "master", "auth", "jwt", "session"])
+const NOT_A_VALUE_WORDS = new Set(["type", "kind", "length", "count", "ttl", "name", "prefix", "header", "scheme", "field", "path", "regex", "pattern"])
 
 /** The identifier or property a comparison operand ends in, else null. */
 const operandName = (node) => {
