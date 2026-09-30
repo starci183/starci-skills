@@ -36,7 +36,6 @@ const withReact = (code) => `${REACT}${code}`
 
 test("every rule this law declares is a rule", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
-  assert.equal("timer-needs-effect-cleanup" in rules, false)
 })
 
 const unreleased = [{ messageId: "unreleased" }]

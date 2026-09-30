@@ -6,9 +6,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
-import { at, slotTester } from "./fixtures/typed/tester.mjs"
+import { at, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
 import tsParser from "@typescript-eslint/parser"
-import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import {
   clientNoServerImport,
   serverModuleMarksServerOnly,
