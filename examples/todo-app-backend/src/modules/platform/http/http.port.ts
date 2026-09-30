@@ -11,6 +11,8 @@ export interface HttpRequest {
     readonly headers?: Readonly<Record<string, string>>
     /** A JSON-serializable body, sent as `application/json`. */
     readonly body?: unknown
+    /** Form fields, sent as `application/x-www-form-urlencoded`; use either `body` or `form`, not both. */
+    readonly form?: Readonly<Record<string, string>>
     /** How long to wait for the answer before the call fails as a timeout. */
     readonly timeoutMs: number
     /** Cancels the call when aborted. */

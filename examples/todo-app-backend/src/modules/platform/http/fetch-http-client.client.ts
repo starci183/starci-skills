@@ -18,14 +18,24 @@ export class FetchHttpClient implements HttpClient {
         try {
             return await fetch(request.url, {
                 method: request.method,
-                headers: request.body === undefined ? request.headers : { "content-type": "application/json", ...request.headers },
-                body: request.body === undefined ? undefined : JSON.stringify(request.body),
+                headers: { ...this.contentTypeOf(request), ...request.headers },
+                body: this.bodyOf(request),
                 signal,
             })
         } catch (cause) {
             const timedOut = cause instanceof Error && cause.name === "TimeoutError"
             throw new HttpError({ code: timedOut ? HttpErrorCode.Timeout : HttpErrorCode.Network, cause })
         }
+    }
+
+    private contentTypeOf(request: HttpRequest): Record<string, string> {
+        if (request.form !== undefined) return { "content-type": "application/x-www-form-urlencoded" }
+        return request.body === undefined ? {} : { "content-type": "application/json" }
+    }
+
+    private bodyOf(request: HttpRequest): string | undefined {
+        if (request.form !== undefined) return new URLSearchParams(request.form).toString()
+        return request.body === undefined ? undefined : JSON.stringify(request.body)
     }
 
     private parse(text: string): unknown {

@@ -31,6 +31,23 @@ describe("FetchHttpClient", () => {
         expect(answer.body).toEqual({ echoed: '{"a":1}' })
     })
 
+    it("sends form fields as a urlencoded body with the form content type", async () => {
+        const seen: Array<string> = []
+        const types: Array<string | undefined> = []
+        const { server, url } = await listen((request, response) => {
+            types.push(request.headers["content-type"])
+            request.on("data", (chunk: Buffer) => seen.push(chunk.toString()))
+            request.on("end", () => {
+                response.setHeader("content-type", "application/json")
+                response.end(JSON.stringify({ ok: true }))
+            })
+        })
+        await new FetchHttpClient().request({ method: "POST", url, form: { grant_type: "password", username: "a b" }, timeoutMs: 2000 })
+        await close(server)
+        expect(types).toEqual(["application/x-www-form-urlencoded"])
+        expect(seen.join("")).toBe("grant_type=password&username=a+b")
+    })
+
     it("fails as a timeout when the other side is too slow", async () => {
         const { server, url } = await listen(() => undefined)
         const call = new FetchHttpClient().request({ method: "GET", url, timeoutMs: 50 })
