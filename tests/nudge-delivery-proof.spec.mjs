@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {endLaunchGrace,notGraceSeed} from './helpers/launch-grace.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus} from '../engine/ledger-db.mjs';
 import {wakeDeliveryOf} from '../scripts/kernel/terminal-liveness.mjs';
@@ -118,11 +119,12 @@ const fixture=t=>{
   }finally{ledger.close();}
   const events=kind=>{
     const l=inspectLedger({file:ledgerFileFor(repo)});
-    try{return l.db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json));}
+    try{return l.db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json)).filter(notGraceSeed);}
     finally{l.close();}
   };
   const d=run(['dispatch','--repo',repo,'--job',jobId,'--model','codex-agent','--spawn','--json']);
   assert.equal(d.status,0,d.stderr||d.stdout);
+  endLaunchGrace(ledgerFileFor(repo),{workflowId,jobId}); // these specs exercise nudge delivery, not the launch grace
   // The worker sits at its prompt: status calls it turn-idle and nudge wakes it.
   writeState(s=>{s.terminals['fake-terminal-1'].screen=IDLE;});
   return {repo,workflowId,jobId,run,events,orcaState};
