@@ -29,6 +29,8 @@ The canonical schema is `starci/runtime@1` for each project ledger and `starci/m
 
 The Work DAG groups units only when their operation and predecessor set match. A group displays ×N and opens individual units; edges keep their actual kind (`after`, `seam`, `dependsOn`, `peer-wait`). A grouped node is a visual summary, never a replacement for stored unit identity.
 
+An ended workflow (`phase` `archived`|`finished`) contributes no live row to `v_decision_rows`, `v_blocking` or `v_open_work` and no live `decision_items` count — its resolved Decision Items stay listed as history.
+
 ## 1. HTTP API and source map
 
 Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. The public read API has no request-rate limit (owner ruling 2026-09-29). Error responses have `{error:{code,message}}`. List cursors are opaque. All API routes accept GET and HEAD only; other methods return 405. The SPA and API share one server, default port 4547. A single `/api/live` SSE channel invalidates selected queries; `/api/logs/stream` emits filtered log rows. Conditional JSON reads use ETag/304. Static assets do not consume the API rate budget.

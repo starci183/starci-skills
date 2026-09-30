@@ -11,6 +11,10 @@ import { reason } from '../reason.mjs';
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const OPEN_DI = "('open','claimed','escalated')";
+// An ended workflow's leftovers are never attention (decisions.mjs ENDED): a live DI joined to an
+// archived|finished workflow is locked by events_refuse_archived and can never be resolved.
+const ENDED_JOIN = "LEFT JOIN workflows w ON w.workflow_id=d.workflow_id";
+const ENDED_LIVE = "(w.phase IS NULL OR w.phase NOT IN ('archived','finished'))";
 const source = (db, ...rels) => rels.map(rel => ({ db, rel }));
 const many = (db, sql, ...args) => db.prepare(sql).all(...args);
 const one = (db, sql, ...args) => db.prepare(sql).get(...args) ?? null;
@@ -142,7 +146,7 @@ function fleet(store, url) {
     live: workflows.filter(row => row.phase === 'running').length,
     bad: workflows.filter(row => row.ui === 'bad').length,
     warn: workflows.filter(row => row.ui === 'warn').length,
-    ownerDecisions: ledgerRows(store, (_row, db) => [one(db, "SELECT count(*) AS n FROM decision_items WHERE decider='owner' AND status IN ('open','claimed','escalated')")?.n ?? 0]).reduce((a, b) => a + b, 0),
+    ownerDecisions: ledgerRows(store, (_row, db) => [one(db, `SELECT count(*) AS n FROM decision_items d ${ENDED_JOIN} WHERE d.decider='owner' AND d.status IN ${OPEN_DI} AND ${ENDED_LIVE}`)?.n ?? 0]).reduce((a, b) => a + b, 0),
     violationsOpen,
   } };
 }
@@ -253,7 +257,7 @@ function detail(store, row, db, wf) {
   const seat = seatOf(store.machine.db, row.name, wf);
   const now = Date.now();
   const counts = {
-    decisionsOpen: one(db, `SELECT count(*) AS n FROM decision_items WHERE workflow_id=? AND status IN ${OPEN_DI}`, wf)?.n ?? 0,
+    decisionsOpen: one(db, `SELECT count(*) AS n FROM decision_items d ${ENDED_JOIN} WHERE d.workflow_id=? AND d.status IN ${OPEN_DI} AND ${ENDED_LIVE}`, wf)?.n ?? 0,
     incidentsOpen: one(db, "SELECT count(*) AS n FROM incidents WHERE workflow_id=? AND status='open'", wf)?.n ?? 0,
     violationsOpen: one(store.machine.db, 'SELECT count(*) AS n FROM v_sla_open WHERE ledger_id=? AND workflow_id=? AND violated_at IS NOT NULL', row.ledgerId, wf)?.n ?? 0,
     failed24h: one(db, "SELECT count(*) AS n FROM v_op_history WHERE workflow_id=? AND verdict='fail' AND settled_at>=?", wf, now - DAY)?.n ?? 0,

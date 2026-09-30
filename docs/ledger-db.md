@@ -93,7 +93,9 @@ Timestamps are epoch milliseconds UTC in `*_at` columns. Order by `seq` or rowid
 Views: `v_attempt_state`, `v_op_history`, `v_units`, `v_checks`, `v_decision_rows`, `v_media`,
 `v_record_evidence`, `v_timeline`, `v_workflow_progress`, `v_model_scorecard`, `v_settle_overdue`,
 `v_ledger_leaks`, `v_blocking`, `v_open_work`, `v_search_ids`, `v_live_marks`, `v_blob_refs`.
-Each view that shows an entity carries its `ui` state.
+Each view that shows an entity carries its `ui` state. `v_decision_rows`, `v_blocking` and `v_open_work` never
+list a live row of an ended workflow (`phase` `archived`|`finished`; a missing `workflows` row still counts as
+live) — `v_decision_rows` keeps the ended workflow's resolved history (migration 0005).
 
 ### The attempt row
 
