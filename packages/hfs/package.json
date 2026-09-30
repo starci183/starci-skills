@@ -14,6 +14,7 @@
   },
   "files": [
     "bin/hfs.mjs",
+    "emit/**",
     "report/**",
     "runtime/**",
     "sync/**",

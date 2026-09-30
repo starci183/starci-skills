@@ -21,6 +21,8 @@
 //                                            source file of sonar.sources, the real path in its message).
 //   hfs init    [--repo <dir>] [--stdout]   write a starter hfs.json by detecting the profile and the apps.
 //   hfs explain <path> [--repo <dir>] [--json]   which slot owns the path, its tier, allowed imports, required tests.
+//   hfs emit-contracts [--repo <dir>]      write contracts/<app>/schema.graphql of every api app that serves GraphQL (emit/contracts.mjs):
+//                                            printSchema(lexicographicSortSchema) of the resolvers the app root composes; no env, no database, no network.
 //   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar, codecov); sync/cli.mjs
 //   hfs work-hygiene                              the pre-commit guard for staged .starciwork and .starcistacks paths; sync/cli.mjs
 // Every finding names a why code and carries its Vietnamese text. The command reads the repository, never writes to it
@@ -34,11 +36,13 @@ import { formatFindings } from '../sync/format.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
+import { emitContracts } from '../emit/contracts.mjs';
 import { LINTER_KINDS, convertReportFile, sonarReport, sourceRootsOf, writeReport } from '../report/sonar.mjs';
 
 const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]
 hfs report <eslint|stylelint> <in> <out> [--repo <dir>]
 hfs init [--repo <dir>] [--stdout]
+hfs emit-contracts [--repo <dir>]
 hfs explain <path> [--repo <dir>] [--json]
 hfs sync (--check | --write) [--root <dir>]
 hfs work-hygiene
@@ -102,7 +106,7 @@ function printExplain(e, out) {
 /** `presets` and `prettier` are test seams: the coverage denominators sync would load from the repository's installed preset, and the repository's own prettier. */
 export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
   const [verb, ...rest] = argv;
-  if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report'].includes(verb)) { stderr(USAGE); return 2; }
+  if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report', 'emit-contracts'].includes(verb)) { stderr(USAGE); return 2; }
   try {
     if (verb === 'sync' || verb === 'work-hygiene') return await syncMain(argv);
     const opts = parse(rest);
@@ -125,6 +129,16 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
       const sourceRoots = sourceRootsOf(properties);
       const issues = convertReportFile({ kind, input: path.resolve(input), output: path.resolve(output), root: repoRoot, sourceRoots, tracked: sourceRoots.length ? trackedFiles(repoRoot) : [] });
       stdout(`hfs report ${kind}: ${issues} issue${issues === 1 ? '' : 's'} written to ${output}\n`);
+      return 0;
+    }
+    if (verb === 'emit-contracts') {
+      if (opts.positional.length) throw new Error('hfs emit-contracts takes no path');
+      const declaration = JSON.parse(fs.readFileSync(path.join(repoRoot, 'hfs.json'), 'utf8'));
+      const { written, skipped } = emitContracts({ repoRoot, declaration });
+      for (const file of written) stdout(`wrote ${file}
+`);
+      stdout(`hfs emit-contracts: ${written.length} written${skipped.length ? `, ${skipped.join(', ')} compose no GraphQL resolver` : ''}
+`);
       return 0;
     }
     if (verb === 'init') {

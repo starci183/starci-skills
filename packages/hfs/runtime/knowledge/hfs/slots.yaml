@@ -441,7 +441,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    why: emitted by `npm run contract:emit`; CI fails when the emitted file differs (a contract, not a build artefact)
+    why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand); CI fails when the emitted file differs (a contract, not a build artefact)
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
   - id: be.contract.openapi
     profiles: [be]
