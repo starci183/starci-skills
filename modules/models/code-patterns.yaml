@@ -226,11 +226,11 @@ profiles:
         sourceRuleIds: [BE-ARCHITECTURE-3, BE-FOLDER-4, BE-IMPORTS-1, BE-IMPORTS-4]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
         mechanical:
-          requirement: Another owner is imported through its explicit index entry, never through a path into it; an index lists a bounded set of named exports with no export star, storage token or types folder.
+          requirement: Another owner is imported through its explicit index entry, never through a path into it; an owner has one index that lists a bounded set of named exports with no export star, and a same-owner import never goes through it.
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/must-deep-module-import, starci-be/no-folder-reexport]
+            ruleIds: [starci-be/import-owner-entry, starci-be/no-folder-reexport]
             expected: { severity: error }
         semantic:
           guidance: docs/backend-source-pattern.md

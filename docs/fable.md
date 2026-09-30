@@ -776,7 +776,7 @@ claim pass giờ fail thật vì `verify-*.mjs` của chúng trước không loa
 - 26 `ASSERTED_NOT_OBSERVED` đều là `work/gap@1`: gap là record authored-by-nature, cần thêm
   vào `AUTHORED_BY_NATURE` của `check-evidence-binding.mjs` (lane K).
 - `examples/todo-app-backend/architecture.json`: 8/10 owner entry trỏ barrel `<module>/index.ts`
-  không tồn tại và bị chính rule `must-deep-module-import` cấm. Contract của example tự mâu
+  không tồn tại và bị chính rule `import-owner-entry` cấm. Contract của example tự mâu
   thuẫn; lane K sửa owner entries theo rule.
 - `CANON_VERSION_MISMATCH`: `code-patterns.yaml:456` pin fe canon 3.0.2 vs `packages/eslint/fe`
   3.1.0 (lane K).

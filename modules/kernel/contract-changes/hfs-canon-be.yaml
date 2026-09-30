@@ -6,7 +6,7 @@ summary: >-
   no-untyped-body, public-needs-reason, no-direct-env-read, no-secret-default, secret-compare-timing-safe,
   global-module-allowlist, typed-module-definition, static-module-register, no-new-injectable, no-module-let,
   one-module-per-file, no-inline-suppression, file-size-growth, spec-no-source-read and
-  spec-typed-doubles. `must-deep-module-import` and `no-folder-reexport` now hold the HFS owner `index.ts` surface
+  spec-typed-doubles. `import-owner-entry` and `no-folder-reexport` now hold the HFS owner `index.ts` surface
   (an aliased import names the owner and stops; an index lists a bounded set of named exports) and are on in
   `starciBeConfig`. No rule is off any more: the retired-rule list is gone with the Academy AbstractException rules,
   handler-has-twin-spec, no-handler-encoded-failure, no-self-global-module, no-line-suppression and require-vn-ok-reason.

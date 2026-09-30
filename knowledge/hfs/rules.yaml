@@ -308,12 +308,12 @@ rules:
   - id: R30
     code: "BE_PUBLIC_SURFACE"
     title_vi: "Import sâu qua cổng công khai"
-    law: "Cross-owner imports use `index.ts`; no `export *`; no alias re-export; at most 60 exports."
+    law: "Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export, at most 60 exports."
     kinds: [check, lint, codemod]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_PUBLIC_SURFACE", "ARCH_OWNER_EXPORT_BYPASS", "ARCH_OWNER_EXPORT_STAR", "HFS_ALIAS_REEXPORT"]
     enforcers:
-      - {kind: eslint-be, id: must-deep-module-import}
+      - {kind: eslint-be, id: import-owner-entry}
       - {kind: eslint-be, id: no-folder-reexport}
       - {kind: machine, id: owner-export-bypass, at: scripts/checks/architecture/owners.mjs}
       - {kind: machine, id: alias-reexport, at: scripts/checks/architecture/symbols.mjs}
@@ -409,7 +409,7 @@ rules:
   - id: R40
     code: "BE_LOGGER_REQUIRED"
     title_vi: "Catch nuốt lỗi"
-    law: "`platform/logging` exists; every `catch` logs, rethrows or returns a reasoned outcome."
+    law: "`platform/logging` exists and its `Logger` port is the only logger; every `catch` logs, rethrows or returns a reasoned outcome, and a log call names its event with a member of an owner's `<owner>.log-events.ts` enum."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_LOGGER_REQUIRED"]
@@ -770,7 +770,7 @@ rules:
   - id: R71
     code: "BE_LOG_SECRET"
     title_vi: "Bí mật hoặc dữ liệu cá nhân bị ghi vào log"
-    law: "A logger call carries no credential and no personal identifier by name; log an id or a masked form."
+    law: "A `Logger` call carries no `Secret` or `Pii` value and no credential or personal identifier by name; log an id or a masked form."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_LOG_SECRET"]
@@ -842,7 +842,7 @@ rules:
   - id: R79
     code: "BE_AMBIENT_CLOCK"
     title_vi: "Đọc đồng hồ hệ thống trực tiếp"
-    law: "`Date.now()`, a bare `new Date()` and `performance.now()` are read only inside `platform/clock`; business code asks the injected `Clock` port."
+    law: "`Date.now`, a bare `new Date()`, `performance.now`, `process.hrtime` and `Temporal.Now` are referenced only inside `platform/clock`, specs included; code asks the injected `Clock` port and specs use `FakeClock`."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_AMBIENT_CLOCK"]
@@ -851,7 +851,7 @@ rules:
   - id: R80
     code: "BE_INBOX_DEDUPE_MISSING"
     title_vi: "Thiếu chống trùng lặp qua inbox"
-    law: "Every `@Public()` webhook handler and outbox/queue consumer claims the event through the shared inbox, keyed by `(source, event id)`, before it acts."
+    law: "Every consumer and every `SignedWebhook` handler makes `claim(source, eventId)` on the `Inbox` port its first awaited expression and returns early when the claim answers `false`."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_INBOX_DEDUPE_MISSING"]

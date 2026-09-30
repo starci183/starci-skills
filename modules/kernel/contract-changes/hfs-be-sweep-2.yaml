@@ -1,0 +1,38 @@
+id: hfs-be-sweep-2
+effectiveAt: '2026-09-30T18:00:00+07:00'
+summary: >-
+  Lane C0 RE2 (BE-CONVENTION 1.4.6, 1.10, 1.11, 1.13, 1.15, 1.18, 2.4, 3.1 principles 2-3): the clock, inbox, retry,
+  logging, schema, copy and public-surface back-end rules ask the HFS slot view and the TypeScript checker instead of
+  path patterns and names. no-ambient-clock (R79) refuses every reference to Date.now, a bare new Date(),
+  performance.now, process.hrtime and Temporal.Now outside platform/clock, specs included; inbox-dedupe-required (R80)
+  requires claim(source, eventId) on a receiver typed as the platform/inbox Inbox as the first awaited expression of a
+  consumer or SignedWebhook handler, then an early return on false; no-hand-rolled-retry (R81) judges the wait by owner
+  and type; no-secret-in-log, no-interpolated-log-message, no-error-wording-as-log-identity and no-framework-logger
+  (R40/R71) identify the platform/logging Logger by type, require an owner log-events enum member as the event and refuse
+  Secret/Pii values; no-runtime-schema (R34) requires a literal synchronize false in every typed DataSource options
+  object, bans migrationsRun and detects DDL outside migrations; no-entity-in-contract (R37) follows @Entity types
+  through signatures, execute, contracts and messages; must-deep-module-import is renamed import-owner-entry (R30) and
+  the owner index rules add nested-index, own-index and named-export-only findings; user-copy-through-catalog (R78)
+  judges errors and outbound ports by type. No rule exempts specs or test lanes any more. The catalog enforcer id, the
+  law text of R30, R40, R71, R79 and R80 and the Vietnamese meaning of their codes follow; no code is new.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-be-sweep-2.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/contract-changes/hfs-canon-be.yaml
+  - modules/models/code-patterns.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - packages/eslint/be/README.md
+  - packages/eslint/be/CHANGELOG.md
+  - packages/eslint/be/temporal.mjs
+  - packages/eslint/be/idempotency.mjs
+  - packages/eslint/be/resilience.mjs
+  - packages/eslint/be/log-safety.mjs
+  - packages/eslint/be/observability.mjs
+  - packages/eslint/be/schema-authority.mjs
+  - packages/eslint/be/user-copy.mjs
+  - packages/eslint/be/module-layering.mjs
+  - packages/eslint/be/async-discipline.mjs
+  - packages/eslint/be/lib/ports.mjs
+  - packages/eslint/be/fixtures/typed/tester.mjs

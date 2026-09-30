@@ -96,10 +96,7 @@ const indexExportBudget = (hfs, filename) =>
 
 /**
  * A cross-owner import targets the owner's public entry: the alias and the owner, nothing deeper. A same-owner import
- * is relative and never goes through the owner's own `index.ts`.
- *
- * The rule was named `must-deep-module-import` before BE-CONVENTION 2.4 renamed it to what it does; the old name no
- * longer exists.
+ * is relative and never goes through the owner's own `index.ts` (BE-CONVENTION 2.4).
  */
 export const importOwnerEntry = {
   meta: {

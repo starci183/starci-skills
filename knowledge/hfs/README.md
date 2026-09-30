@@ -191,8 +191,8 @@ them per connection. Migrations are `<epochMs13>-<kebab-name>.ts`.
 One physical database is one connection (`hfs.json` `connections`), one `<conn>.connection.ts`, one `<conn>.config.ts` and
 one injector `Inject<Conn>EntityManager()` in `platform/database` (R84). The database is reached through that shared
 `EntityManager`, injected with the named injector and called directly: `getRepository`, `@InjectRepository`,
-`Repository<T>`, repository or store classes, QueryBuilder, an injected `DataSource` or `QueryRunner` outside
-`platform/database` and `apps/migrate` do not exist (R83). A handler opens the transaction with
+`Repository<T>`, repository or store classes, QueryBuilder, a `DataSource` or `QueryRunner` outside `platform/database`,
+`apps/migrate` and the test bootstrap `src/tests/fixtures` do not exist; specs use the fixture's `EntityManager` (R83). A handler opens the transaction with
 `this.entityManager.transaction(async (manager) => ...)` and only `manager` is used inside it.
 
 Raw SQL is a `sql`-tagged `SqlText` constant in `persistence/<name>.sql.ts` of the owning capability; `.query()` accepts
@@ -287,8 +287,8 @@ port and `InjectMessageCatalog()`, never a literal in source (R78). The catalog 
 `platform/i18n`'s `RequestLocale` (`InjectRequestLocale()`) resolves it inside a request (the authenticated user's stored
 preference, else the first of `vi`/`en` named in `Accept-Language`, else `vi`) and a job resolves it from the message's
 recipient (their stored preference, else `vi`) - never a call-site guess (knowledge/patterns/be/messages.yaml). The ambient
-clock (`Date.now`, a bare `new Date()`, `performance.now`, `process.hrtime`) is read only inside `platform/clock`; business
-code takes the injected `Clock` (`InjectClock()`), so a spec can drive time with a `FakeClock` (R79). Delivery that can
+clock (`Date.now`, a bare `new Date()`, `performance.now`, `process.hrtime`, `Temporal.Now`, called or referenced) is read
+only inside `platform/clock`; code and specs take the injected `Clock` (`InjectClock()`), so a spec can drive time with a `FakeClock` (R79). Delivery that can
 repeat - a signed webhook a sender resends, a queue redelivering a message - is claimed through the shared inbox
 (`InjectInbox()`, table `inbox_claims`, unique on `(source, event id)`, owned by `platform/inbox`): the first awaited
 expression of a consumer or signed-webhook handler is `inbox.claim(source, eventId)` on a receiver typed `Inbox`, and a
@@ -485,7 +485,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R27 | `ARCH_OWNER_CYCLE` | No owner cycles, type-only included. |
 | R28 | `BE_FEATURE_IMPORTS_FEATURE` | A feature never imports a feature. |
 | R29 | `BE_FEATURE_SHAPE` | Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`. |
-| R30 | `BE_PUBLIC_SURFACE` | Cross-owner imports use `index.ts`; no `export *`; no alias re-export; at most 60 exports. |
+| R30 | `BE_PUBLIC_SURFACE` | Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export, at most 60 exports. |
 | R31 | `BE_FEATURE_NOT_COMPOSED` | Every feature and transport module is composed by an app. |
 | R32 | `BE_APP_COMPOSITION_ONLY` | Apps compose only; the composition spec boots the real module. |
 | R33 | `BE_ENTRYPOINT_ONLY_IN_APPS` | Entrypoints only in `apps/*/src`. |
@@ -495,7 +495,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R37 | `BE_ENTITY_IN_CONTRACT` | No ORM entity in a contract or transport type. |
 | R38 | `BE_ERROR_HOME` | Errors live in the owning capability's `errors/` and extend `DomainError`. |
 | R39 | `BE_ERROR_MASKED` | One filter per app; undeclared errors are masked. |
-| R40 | `BE_LOGGER_REQUIRED` | `platform/logging` exists; every `catch` logs, rethrows or returns a reasoned outcome. |
+| R40 | `BE_LOGGER_REQUIRED` | `platform/logging` exists and its `Logger` port is the only logger; every `catch` logs, rethrows or returns a reasoned outcome, and a log call names its event with a member of an owner's `<owner>.log-events.ts` enum. |
 | R41 | `BE_DEFAULT_DENY` | APP_GUARD plus `@Public({ reason: PublicReason.X })`; no `@UseGuards`; typed bodies; `timingSafeEqual`. |
 | R42 | `BE_INPUT_BOUNDED` | Bounded input, cursor-only pagination, depth limits, rate limits; every property of an input class carries the `class-validator` decorators its type calls for. |
 | R43 | `BE_CONFIG_OWNER` | Only `platform/config` reads `process.env`; config per capability. |
@@ -507,7 +507,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R68 | `BE_SQL_INTERPOLATED` | SQL text carries no runtime substitution; values are numbered parameters. |
 | R69 | `BE_QUERY_UNBOUNDED` | A read that can return many rows states `take`, `limit` or `LIMIT`, or pages by cursor. |
 | R70 | `BE_HTTP_TIMEOUT` | Every outbound `fetch`, axios or HttpService call states a timeout or an abort signal. |
-| R71 | `BE_LOG_SECRET` | A logger call carries no credential and no personal identifier by name; log an id or a masked form. |
+| R71 | `BE_LOG_SECRET` | A `Logger` call carries no `Secret` or `Pii` value and no credential or personal identifier by name; log an id or a masked form. |
 | R72 | `BE_TYPE_ESCAPE` | No type escape in any file, specs included: no `as X` (only `as const`), `<X>y`, `x!` or `any` (the factory turns on the typescript-eslint rules `consistent-type-assertions` with `never`, `no-non-null-assertion` and `no-explicit-any`), no `Function` type, no `eval`. |
 | R73 | `BE_ASYNC_NO_AWAIT` | An `async` function contains an `await`; otherwise it is not `async`. |
 | R74 | `BE_MIGRATION_REVERSIBLE` | Every migration declares a `down()` that reverses its `up()`; never empty, never a bare throw. |
@@ -515,8 +515,8 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R76 | `BE_JSON_PARSE_UNGUARDED` | `JSON.parse` sits inside a `try` in its own function and fails as a typed outcome. |
 | R77 | `BE_QUERY_IN_LOOP` | A repository, entity-manager or query-builder read does not run once per element of a loop; read once before the loop by key list. |
 | R78 | `BE_USER_COPY_LITERAL` | A literal exception message, notification text or response copy comes from the per-capability messages catalog through the typed `MessageCatalog` port, not from source. |
-| R79 | `BE_AMBIENT_CLOCK` | `Date.now()`, a bare `new Date()` and `performance.now()` are read only inside `platform/clock`; business code asks the injected `Clock` port. |
-| R80 | `BE_INBOX_DEDUPE_MISSING` | Every `@Public()` webhook handler and outbox/queue consumer claims the event through the shared inbox, keyed by `(source, event id)`, before it acts. |
+| R79 | `BE_AMBIENT_CLOCK` | `Date.now`, a bare `new Date()`, `performance.now`, `process.hrtime` and `Temporal.Now` are referenced only inside `platform/clock`, specs included; code asks the injected `Clock` port and specs use `FakeClock`. |
+| R80 | `BE_INBOX_DEDUPE_MISSING` | Every consumer and every `SignedWebhook` handler makes `claim(source, eventId)` on the `Inbox` port its first awaited expression and returns early when the claim answers `false`. |
 | R81 | `BE_HAND_ROLLED_RETRY` | A loop that catches an error and waits before trying again goes through the shared `platform/retry` helper, never a hand-written loop. |
 | R82 | `BE_TRANSACTION_EXTERNAL_CALL` | No transaction spans an external call; commit first and call out after, or write an outbox message inside the transaction. |
 | R83 | `BE_UNNAMED_DATA_ACCESS` | The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, `apps/migrate` and the test bootstrap `src/tests/fixtures`, whose EntityManager the specs use. |

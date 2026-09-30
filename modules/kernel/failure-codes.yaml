@@ -679,10 +679,12 @@ BE_DEFAULT_DENY:
 BE_ENTITY_IN_CONTRACT:
   title: "ORM entity leaks into a contract"
   title_vi: "Entity ORM lộ ra hợp đồng"
-  meaning_vi: "Một kiểu *Entity của ORM xuất hiện trong hợp đồng (*.contracts.ts), DTO, hoặc kiểu trả về của resolver hay controller, nên cấu trúc bảng bị lộ ra ngoài capability."
+  meaning_vi: "Một kiểu có khai báo @Entity của ORM với nguồn gốc từ typeorm nằm trong tầm với của một chữ ký transport, hàm execute của handler, hợp đồng (*.contracts.ts) hoặc thông điệp (*.command.ts, *.query.ts), trực tiếp hay qua tham số kiểu và thuộc tính, nên cấu trúc bảng bị lộ ra ngoài capability; hoặc một tệp entity nhập @nestjs/graphql hay class-validator."
   causes_vi:
     - "Trả nguyên entity từ resolver hoặc controller"
-    - "Truyền UserEntity xuyên tầng thay vì mã người dùng và vai trò"
+    - "Truyền entity xuyên tầng thay vì mã người dùng và vai trò"
+    - "Một thuộc tính của kiểu hợp đồng có kiểu là Array<OrderEntity>"
+    - "Entity gắn decorator @Field hoặc @IsString"
   nextStep_vi: "Trả một projection (kiểu thường của hợp đồng) và truyền principal id cùng role; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -716,11 +718,13 @@ BE_FEATURE_LAYOUT_INVALID:
 BE_LOGGER_REQUIRED:
   title: "Catch swallows the failure"
   title_vi: "Catch nuốt lỗi"
-  meaning_vi: "Một catch (hoặc .catch) rỗng, hoặc không ném lại, không gọi phương thức nào của Logger (từ platform/logging), cũng không trả outcome có kiểu mang cause, nên lỗi thật biến mất không để lại dấu vết."
+  meaning_vi: "Một catch (hoặc .catch) rỗng, hoặc không ném lại, không gọi phương thức nào của Logger (từ platform/logging), cũng không trả outcome có kiểu mang cause, nên lỗi thật biến mất không để lại dấu vết; hoặc một lời gọi Logger đặt tên sự kiện bằng chuỗi dựng tại chỗ thay vì một thành viên enum trong <owner>.log-events.ts, hoặc dùng Logger của framework thay cho cổng Logger của platform/logging."
   causes_vi:
     - "catch {} rỗng"
     - "catch chỉ trả null, false hoặc undefined"
     - "catch chỉ gọi console hoặc một đối tượng không có kiểu Logger, vốn không phải logger port"
+    - "logger.info(`Checkout ${id} failed`) thay vì logger.info(OrderLogEvent.CheckoutFailed, { id })"
+    - "new Logger('X') của @nestjs/common"
   nextStep_vi: "Ném lại lỗi, ghi log bằng logger của platform/logging, hoặc trả outcome có kiểu mang cause; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -777,12 +781,13 @@ BE_PUBLIC_CONTRACT_FORM:
 BE_PUBLIC_SURFACE:
   title: "Owner public surface violated"
   title_vi: "Bề mặt công khai của owner bị vi phạm"
-  meaning_vi: "Một import chui vào tệp bên trong owner khác thay vì đi qua index.ts của owner, hoặc index.ts export * , export cả thư mục types, export token kho (*_STORE), hoặc export quá nhiều tên."
+  meaning_vi: "Một import chui vào tệp bên trong owner khác thay vì đi qua index.ts của owner, một import cùng owner lại đi vòng qua index.ts của chính nó, một index.ts lồng nhau (không nằm ở gốc owner), hoặc index.ts không chỉ gồm các dòng export { } / export type { } có tên (export *, khai báo, import, export default) hoặc export quá nhiều tên."
   causes_vi:
     - "Import theo đường dẫn sâu như @modules/domain/plan/plan.service"
-    - "index.ts dùng export * hoặc export cả thư mục"
-    - "index.ts export token kho hoặc vượt số export cho phép"
-  nextStep_vi: "Import qua index.ts của owner và liệt kê tường minh những gì owner cung cấp; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+    - "Import cùng owner theo ./index hoặc ../index thay vì tệp khai báo ký hiệu"
+    - "index.ts nằm trong thư mục con của owner, ví dụ persistence/index.ts"
+    - "index.ts dùng export * hoặc chứa khai báo, hoặc vượt số export cho phép"
+  nextStep_vi: "Import owner khác qua index.ts của nó, import cùng owner bằng đường dẫn tương đối tới tệp khai báo, mỗi owner chỉ một index.ts ở gốc và liệt kê tường minh những gì owner cung cấp; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -800,8 +805,9 @@ BE_READONLY_BOUNDARY:
 BE_SCHEMA_AUTHORITY:
   title: "Schema defined at runtime"
   title_vi: "Schema được định nghĩa lúc chạy"
-  meaning_vi: "Một tệp để tiến trình đang chạy quyết định schema: synchronize khác false, gọi dataSource.synchronize(), migrationsRun khác false, chuỗi CREATE/ALTER/DROP TABLE ngoài persistence/migrations/, hoặc tìm entity và migration bằng glob. Schema chỉ đổi bằng migration do apps/migrate chạy."
+  meaning_vi: "Một tệp để tiến trình đang chạy quyết định schema: một đối tượng tùy chọn của DataSource hoặc TypeORM không ghi literal synchronize: false, synchronize khác false, gọi dataSource.synchronize(), có khóa migrationsRun (cấm dưới mọi dạng), chuỗi DDL (CREATE/ALTER/DROP TABLE, INDEX, TYPE...) ngoài persistence/migrations/, hoặc tìm entity và migration bằng glob. Schema chỉ đổi bằng migration do apps/migrate chạy."
   causes_vi:
+    - "new DataSource({ type: 'postgres' }) không ghi synchronize: false"
     - "synchronize: true, hoặc đọc từ biến môi trường"
     - "Chuỗi DDL trong .query ngoài migration"
     - "entities hoặc migrations khai bằng đường dẫn có ký tự *"
@@ -13130,8 +13136,9 @@ BE_HTTP_TIMEOUT:
 BE_LOG_SECRET:
   title: "Secret or personal data in a log call"
   title_vi: "Bí mật hoặc dữ liệu cá nhân bị ghi vào log"
-  meaning_vi: "Đối số của lời gọi logger có tên là thông tin xác thực (password, secret, token, apiKey, authorization, cookie, otp) hoặc định danh cá nhân (email, phone, fullName, idCard, birthDate), nên giá trị đó tồn tại lâu hơn yêu cầu và bị sao chép sang bên thứ ba."
+  meaning_vi: "Một lời gọi trên cổng Logger của platform/logging truyền vào một giá trị có kiểu Secret (platform/config) hoặc Pii (identity), hay đọc ra từ một giá trị như vậy; hoặc một đối số có tên là thông tin xác thực (password, secret, token, apiKey, authorization, cookie, otp) hay định danh cá nhân (email, phone, fullName, idCard, birthDate), nên giá trị đó tồn tại lâu hơn yêu cầu và bị sao chép sang bên thứ ba."
   causes_vi:
+    - "Ghi một giá trị kiểu Secret hoặc Pii, dù đặt tên là gì"
     - "Ghi token hoặc mật khẩu vào log để gỡ lỗi"
     - "Ghi email hoặc số điện thoại vào thông điệp lỗi"
   nextStep_vi: "Ghi id của chủ sở hữu, độ dài, cờ có hay không, hoặc dạng đã che qua mask(...), không ghi giá trị thật. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
@@ -13221,11 +13228,12 @@ BE_USER_COPY_LITERAL:
 BE_AMBIENT_CLOCK:
   title: "Ambient clock read directly"
   title_vi: "Đọc đồng hồ hệ thống trực tiếp"
-  meaning_vi: "Mã nghiệp vụ gọi Date.now(), new Date() không tham số hoặc performance.now() ở ngoài platform/clock, nên không có cách nào thay đồng hồ trong một spec hoặc lái một job theo lịch tới một thời điểm chọn trước."
+  meaning_vi: "Một tệp (kể cả spec) ngoài platform/clock tham chiếu tới đồng hồ hệ thống: Date.now, new Date() không tham số, performance.now, process.hrtime hoặc Temporal.Now, dù gọi hay chỉ tham chiếu, nên không có cách nào thay đồng hồ trong một spec hoặc lái một job theo lịch tới một thời điểm chọn trước."
   causes_vi:
     - "const startedAt = Date.now()"
     - "const at = new Date()"
     - "const mark = performance.now()"
+    - "const read = Date.now, hoặc const { now } = performance"
   nextStep_vi: "Tiêm cổng Clock (đọc thời gian qua clock.now()) thay vì đọc đồng hồ hệ thống trực tiếp; một spec lái thời gian bằng FakeClock của @starci/jest-preset. op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -13233,11 +13241,12 @@ BE_AMBIENT_CLOCK:
 BE_INBOX_DEDUPE_MISSING:
   title: "Webhook or consumer with no inbox dedupe"
   title_vi: "Thiếu chống trùng lặp qua inbox"
-  meaning_vi: "Một handler webhook mang @Public() hoặc một consumer hàng đợi/outbox không có tham chiếu nào tới cổng inbox hoặc dedupe, nên khi bên gửi gửi lại (webhook không thấy phản hồi kịp, hàng đợi giao lại một thông điệp chưa được xác nhận) hành động sẽ chạy lại lần nữa thay vì là một no-op."
+  meaning_vi: "Một handler của consumer (tệp *.consumer.ts trong transport/message) hoặc một handler mang @Public({ reason: PublicReason.SignedWebhook }) không bắt đầu bằng await inbox.claim(source, eventId) trên một receiver có kiểu Inbox của platform/inbox, hoặc có claim nhưng không return sớm khi claim trả false, nên khi bên gửi gửi lại (webhook không thấy phản hồi kịp, hàng đợi giao lại một thông điệp chưa được xác nhận) hành động sẽ chạy lại lần nữa thay vì là một no-op."
   causes_vi:
-    - "@Public({ reason: 'external' }) handle() { return this.service.charge() }"
+    - "@Public({ reason: PublicReason.SignedWebhook }) handle() { return this.service.charge() }"
     - "class PaymentCapturedConsumer { handle() { return this.service.capture() } }"
-  nextStep_vi: "Xác nhận sự kiện qua bảng inbox chung theo khóa (source, event id) trước khi xử lý, để một lượt giao lại trở thành no-op; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+    - "await this.inbox.claim(source, id) rồi chạy tiếp mà không kiểm tra kết quả"
+  nextStep_vi: "Gọi await this.inbox.claim(source, eventId) trước mọi await khác và return khi nó trả false (if (!(await this.inbox.claim(source, eventId))) return), để một lượt giao lại trở thành no-op; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -13256,7 +13265,7 @@ BE_INFRA_OWNER:
 BE_HAND_ROLLED_RETRY:
   title: "Hand-rolled retry loop"
   title_vi: "Tự viết vòng lặp thử lại thay vì dùng bộ trợ giúp chung"
-  meaning_vi: "Một vòng lặp bắt lỗi rồi chờ trước khi thử lại được viết tay tại chỗ, không có giới hạn số lần thử mà bộ kiểm tra nhìn thấy được, không có jitter, và không có cách nào tôn trọng một abort signal."
+  meaning_vi: "Một vòng lặp bắt lỗi (catch hoặc .catch) rồi chờ trước khi thử lại được viết tay tại chỗ; chờ nghĩa là gọi setTimeout, hàm của node:timers/promises, hoặc một hàm khai báo ngoài platform/retry mà thân hàm chờ, dù tên hàm là gì. Vòng lặp như vậy không có giới hạn số lần thử mà bộ kiểm tra nhìn thấy được, không có jitter, và không có cách nào tôn trọng một abort signal."
   causes_vi:
     - "for (let i = 0; i < max; i++) { try { return await fn() } catch (e) { await sleep(backoffMs(i)) } }"
     - "while (true) { try { return await fn() } catch (e) { await new Promise((r) => setTimeout(r, delayMs)) } }"
