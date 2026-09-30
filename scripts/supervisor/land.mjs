@@ -71,6 +71,7 @@ import { grammarDistStatus } from '../checks/grammar-dist.mjs';
 import { CONTRACT_CHANGES_DIR, isContractChangesPath, readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
 import { SKILL_ROOT, landRoot, supervisorSettings } from './home.mjs';
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
+import { DEFAULT_DUE_MS } from '../reconciler/decisions.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export { CONTRACT_CHANGES_DIR };
@@ -122,12 +123,26 @@ export function contractCoverage({ changed, before, after }) {
   return { ok: uncovered.length === 0, governed, uncovered, entries: touched.map((e) => e.id) };
 }
 
-/** Specs that name a changed file (its last two path segments, or its name for a top-level file) plus changed specs. */
+/**
+ * The roots a tree-wide invariant spec scans, as it declares them ONCE: `export const INVARIANT_ROOTS = ['scripts', ...]`
+ * (the list its own walk uses). Such a spec never names the file it catches, so naming alone would skip it.
+ */
+export const invariantRootsOf = (text) => {
+  const m = /^export const INVARIANT_ROOTS = \[([^\]]*)\]/m.exec(String(text ?? ''));
+  return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => normPath(x[1]).replace(/\/+$/, '')) : [];
+};
+/** Invariant specs (invariantRootsOf) scanning a root that holds a changed file. */
+export const specsInvariant = (changed, { specs }) => {
+  const files = changed.map(normPath);
+  return specs.filter(({ file, text }) => file && invariantRootsOf(text).some((r) => files.some((f) => f.startsWith(`${r}/`)))).map((s) => s.file);
+};
+/** Specs that name a changed file (its last two path segments, or its name for a top-level file), the invariant specs
+ *  scanning a changed file's root, plus changed specs. */
 export function specsTouching(changed, { specs }) {
   const needles = changed.map(normPath).filter((f) => !f.startsWith('tests/')).map((f) => f.split('/').slice(-2).join('/'));
   const own = changed.map(normPath).filter((f) => /^tests\/[^/]+\.spec\.mjs$/.test(f));
   const hits = specs.filter(({ file, text }) => needles.some((n) => text.includes(n)) && file).map((s) => s.file);
-  return [...new Set([...own, ...hits])];
+  return [...new Set([...own, ...hits, ...specsInvariant(changed, { specs })])];
 }
 
 /** --specs keywords: `touching` = the named specs plus every spec naming a changed file (the default); `all` = every spec
@@ -368,7 +383,7 @@ export function runSpecFiles({ dir, files, concurrency, timeout = specTimeoutMs(
       failures = uniqFailures(fs.readFileSync(out, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)).map((f) => ({ file: rel(String(f.file)), name: String(f.name) })));
     } catch { failures = null; }
     return { ...r, failures };
-  } finally { try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* temp */ } }
+  } finally { try { safeRemoveTree(tmpDir); } catch { /* temp */ } }
 }
 
 /**
@@ -534,7 +549,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   let extra = [];
   if (specMode === 'all') extra = pool.map((s) => s.file);
   else if (specMode === 'touching') extra = specsTouching(changed, { specs: pool });
-  else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, symbolsOf }); extra = d.files; narrowed = d.narrowed; }
+  else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, symbolsOf }); extra = [...d.files, ...specsInvariant(changed, { specs: pool })]; narrowed = d.narrowed; }
   const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
   if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: '--specs none with an explicit --reason: no spec ran (the reason is recorded as specReason on the land run)' });
   const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));
@@ -846,6 +861,14 @@ function landOutcomeOf(result, { root = SKILL_ROOT, ticketId = null, lane = null
     data: { ticketId, lane, jobId, commits, landed: result.landed ?? null, reason: result.reason ?? null }, refs: [...(lane ? [`lane:${lane}`] : []), ...commits.map((c) => `commit:${c}`)] };
   return { spanId, lane, push, run, laneHead: result.ok && lane ? (result.landed ?? result.alreadyLanded ?? null) : null, log };
 }
+/** The openSupDecision args of the specs-red-on-main DI: ONE per set of failing tests, due like any Supervisor-decided DI. */
+export function specsRedOnMainDecision({ redOnMain, root, commits, now }) {
+  const signature = createHash('sha1').update(redOnMain.inherited.map(failKey).sort().join('/')).digest('hex').slice(0, 12);
+  return { keyParts: { kind: 'specs-red-on-main', repo: path.basename(root).replace(/[^\w.-]/g, '_') || 'runtime', signature }, kind: 'runtime-defect',
+    summary: `${redOnMain.name} at ${String(redOnMain.base).slice(0, 9)}: the land gate tolerated them as inherited; fix main: ${failList(redOnMain.inherited)}`.slice(0, 1000), entityType: 'repo', entityId: root, openedBy: 'land-gate',
+    dueAt: now + DEFAULT_DUE_MS.supervisor, escalateTo: 'owner',
+    evidence: redOnMain.inherited.slice(0, 20).map((f) => ({ ref: `spec:${f.file}`, why: f.name.slice(0, 300) })), payload: { base: redOnMain.base, inherited: redOnMain.inherited, commits } };
+}
 /** The machine records of one land: the core outcome (landOutcomeOf), then the job, self-job and push-owed follow-ups. */
 function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt, outcome = null }) {
   const { runId } = m.recordLandOutcome(outcome ?? landOutcomeOf(result, { root, ticketId, lane, commits, jobId, specMode, startedAt }));
@@ -864,10 +887,7 @@ function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId 
   const redOnMain = specsRedOnMainOf(result);
   if (redOnMain) {
     try {
-      const signature = createHash('sha1').update(redOnMain.inherited.map(failKey).sort().join('/')).digest('hex').slice(0, 12);
-      m.openSupDecision({ keyParts: { kind: 'specs-red-on-main', repo: path.basename(root).replace(/[^\w.-]/g, '_') || 'runtime', signature }, kind: 'runtime-defect',
-        summary: `${redOnMain.name} at ${String(redOnMain.base).slice(0, 9)}: the land gate tolerated them as inherited; fix main: ${failList(redOnMain.inherited)}`.slice(0, 1000), entityType: 'repo', entityId: root, openedBy: 'land-gate',
-        evidence: redOnMain.inherited.slice(0, 20).map((f) => ({ ref: `spec:${f.file}`, why: f.name.slice(0, 300) })), payload: { base: redOnMain.base, inherited: redOnMain.inherited, commits } });
+      m.openSupDecision(specsRedOnMainDecision({ redOnMain, root, commits, now: Date.now() }));
     } catch { /* the land_runs row carries the advisory */ }
   }
   // MB-12: main moved but GitHub did not: its own outcome and ONE Supervisor DI per landed head (the fleet push retries).
@@ -875,7 +895,7 @@ function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId 
     const why = result.push.refused ?? result.push.error ?? 'push failed';
     try {
       m.openSupDecision({ keyParts: { kind: 'push-owed', repo: path.basename(root).replace(/[^\w.-]/g, '_') || 'runtime', head: String(result.landed).slice(0, 12) }, kind: 'push-refused',
-        summary: `Land passed ${String(result.landed).slice(0, 9)} but its push did not: ${String(why).slice(0, 300)}`, entityType: 'repo', entityId: root, openedBy: 'land-gate',
+        summary: `Land passed ${String(result.landed).slice(0, 9)} but its push did not: ${String(why).slice(0, 300)}`, entityType: 'repo', entityId: root, openedBy: 'land-gate', dueAt: Date.now() + DEFAULT_DUE_MS.supervisor, escalateTo: 'owner',
         evidence: [{ ref: `commit:${result.landed}`, why: String(why).slice(0, 500) }], options: [{ key: 'push', verb: 'node scripts/supervisor/push-mains.mjs --repo <runtime root> --json', recommended: true }] });
     } catch { /* the land_runs row and its push row are the record */ }
   }

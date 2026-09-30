@@ -128,6 +128,9 @@ test('safeRemoveWorktree removes a worktree holding node_modules links without g
   assert.equal(intact(), true);
 });
 
+// The land gate runs this spec for any change under these roots (land.mjs invariantRootsOf): declared once, here.
+export const INVARIANT_ROOTS = ['scripts', 'bin', 'engine'];
+
 test('no runtime script deletes a tree recursively or through `git worktree remove` except via safe-remove', () => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const offenders = [];
@@ -146,6 +149,6 @@ test('no runtime script deletes a tree recursively or through `git worktree remo
       });
     }
   };
-  for (const dir of ['scripts', 'bin', 'engine']) if (fs.existsSync(path.join(root, dir))) walk(path.join(root, dir));
+  for (const dir of INVARIANT_ROOTS) if (fs.existsSync(path.join(root, dir))) walk(path.join(root, dir));
   assert.deepEqual(offenders, []);
 });

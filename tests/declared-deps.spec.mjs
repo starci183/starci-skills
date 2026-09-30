@@ -26,7 +26,8 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const declared = new Set([...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.devDependencies ?? {})]);
 
-const ROOTS = ['scripts', 'engine', 'modules', 'bin', 'ext'];
+// The land gate runs this spec for any change under these roots (land.mjs invariantRootsOf): declared once, here.
+export const INVARIANT_ROOTS = ['scripts', 'engine', 'modules', 'bin', 'ext'];
 const RUNTIME_NAMES = new Set(['skillRoot', 'runtimeRoot', 'ROOT', 'moduleRoot']);
 const IMPORT_META = /\bimport\s*\.\s*meta\b/;
 
@@ -47,7 +48,7 @@ function runtimeFiles() {
       else if (e.name.endsWith('.mjs')) out.push(r);
     }
   };
-  for (const base of ROOTS) if (fs.existsSync(path.join(root, base))) walk(base);
+  for (const base of INVARIANT_ROOTS) if (fs.existsSync(path.join(root, base))) walk(base);
   return out.sort();
 }
 
