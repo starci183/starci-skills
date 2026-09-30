@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { AuditAction, toAuditAppendMessage } from "@modules/domain/audit"
-import { CapGuardPolicy } from "@modules/domain/plan"
+import { SubscriptionService } from "@modules/domain/plan"
 import { TaskService } from "@modules/domain/task"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
@@ -51,7 +51,7 @@ export class GeneratorService {
         private readonly rules: RuleService,
         private readonly occurrences: OccurrenceService,
         private readonly tasks: TaskService,
-        private readonly capGuard: CapGuardPolicy,
+        private readonly subscriptions: SubscriptionService,
     ) {}
 
     /** Materialises the occurrences the rules owe at the tick instant, at most LIST_ROWS_MAX; the rest wait for the next tick. */
@@ -98,7 +98,7 @@ export class GeneratorService {
     /** True when the task and the occurrence row were written, false when the task was refused and the occurrence stays owed. */
     private async materialiseDue(occurrence: DueOccurrence): Promise<boolean> {
         const owned = await this.tasks.listOwnedBy({ ownerId: occurrence.ownerId })
-        const verdict = await this.capGuard.check({
+        const verdict = await this.subscriptions.checkCap({
             personId: occurrence.ownerId,
             activeTaskCount: owned.filter((task) => !task.complete).length,
         })

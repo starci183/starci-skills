@@ -1,7 +1,7 @@
 import { Test } from "@nestjs/testing"
 import { FakeClock, fakeTransaction, mock, mockEntityManager, recordingOutbox } from "@starci/jest-preset"
 import { AuditAction } from "@modules/domain/audit"
-import { CapGuardPolicy } from "@modules/domain/plan"
+import { SubscriptionService } from "@modules/domain/plan"
 import { TaskErrorCode, TaskService } from "@modules/domain/task"
 import type { TaskView } from "@modules/domain/task"
 import { CLOCK } from "@modules/platform/clock"
@@ -61,7 +61,7 @@ const build = async () => {
     const rules = mock<RuleService>()
     const occurrences = mock<OccurrenceService>()
     const tasks = mock<TaskService>()
-    const capGuard = mock<CapGuardPolicy>()
+    const subscriptions = mock<SubscriptionService>()
     const moduleRef = await Test.createTestingModule({
         providers: [
             GeneratorService,
@@ -72,13 +72,13 @@ const build = async () => {
             { provide: RuleService, useValue: rules },
             { provide: OccurrenceService, useValue: occurrences },
             { provide: TaskService, useValue: tasks },
-            { provide: CapGuardPolicy, useValue: capGuard },
+            { provide: SubscriptionService, useValue: subscriptions },
         ],
     }).compile()
     occurrences.existingWindowKeys.mockResolvedValue(new Set())
     tasks.listOwnedBy.mockResolvedValue([])
-    capGuard.check.mockResolvedValue({ allowed: true })
-    return { service: moduleRef.get(GeneratorService), tx, outbox, logger, rules, occurrences, tasks, capGuard }
+    subscriptions.checkCap.mockResolvedValue({ allowed: true })
+    return { service: moduleRef.get(GeneratorService), tx, outbox, logger, rules, occurrences, tasks, subscriptions }
 }
 
 describe("GeneratorService", () => {
@@ -121,9 +121,9 @@ describe("GeneratorService", () => {
         })
 
         it("defers an occurrence whose owner is at the plan cap and creates nothing", async () => {
-            const { service, tx, outbox, logger, rules, occurrences, tasks, capGuard } = await build()
+            const { service, tx, outbox, logger, rules, occurrences, tasks, subscriptions } = await build()
             rules.listBatch.mockResolvedValue([rule({ startDate: "2026-09-10" })])
-            capGuard.check.mockResolvedValue({ allowed: false, cap: 3, upgradePath: "/plan/usage" })
+            subscriptions.checkCap.mockResolvedValue({ allowed: false, cap: 3, upgradePath: "/plan/usage" })
 
             await expect(service.generate({ at })).resolves.toEqual({ materialised: 0, deferred: 1 })
 
@@ -135,7 +135,7 @@ describe("GeneratorService", () => {
         })
 
         it("counts only the open tasks of the owner against the cap", async () => {
-            const { service, rules, tasks, capGuard } = await build()
+            const { service, rules, tasks, subscriptions } = await build()
             rules.listBatch.mockResolvedValue([rule({ startDate: "2026-09-10" })])
             tasks.listOwnedBy.mockResolvedValue([task("a"), task("b", { complete: true, completedAt: at }), task("c")])
             tasks.create.mockResolvedValue(ok(task("t1")))
@@ -143,7 +143,7 @@ describe("GeneratorService", () => {
             await service.generate({ at })
 
             expect(tasks.listOwnedBy).toHaveBeenCalledWith({ ownerId: "o1" })
-            expect(capGuard.check).toHaveBeenCalledWith({ personId: "o1", activeTaskCount: 2 })
+            expect(subscriptions.checkCap).toHaveBeenCalledWith({ personId: "o1", activeTaskCount: 2 })
         })
 
         it("defers an occurrence whose task is refused and writes no audit line and no row", async () => {
