@@ -5,7 +5,6 @@ One root `jest.config.js` (managed: `require("@starci/jest-preset").starciJestCo
 | Project | Command | What it is |
 |---|---|---|
 | unit | `npm test` / `npm run test:unit` | In-process specs, `<name>.spec.ts` beside the subject. Fakes at provider boundaries: no docker, no network. |
-| integration | `npm run test:integration` | `src/tests/integration/<capability>/*.integration-spec.ts`: one capability on the real database, `useTestWorld({ modules })`, no HTTP. |
 | e2e | `npm run test:e2e` | `src/tests/e2e/<area>/*.e2e-spec.ts`: A->Z journeys through the public doors of the real apps, `useTestWorld({ apps })`. |
 | contract | `npm run test:contract` | `src/tests/contract/<provider>/*.contract-spec.ts`: our client against the provider's real sandbox; skips itself without sandbox config. Never part of `test` or `test:e2e`. |
 
@@ -41,7 +40,6 @@ They run by hand, never in a hook or the default CI job. Each script type-checks
 (`npm run typecheck:tests`, `src/tests/tsconfig.json`). Integration and e2e need a running Docker daemon (`docker info`).
 
 ```bash
-npm run test:integration                         # capability specs on the real database
 npm run test:e2e                                 # every journey, one worker
 npm run test:e2e -- flows/task-lifecycle         # one spec by path fragment
 npm run test:contract                            # provider sandboxes (skipped without sandbox config)
@@ -67,7 +65,6 @@ describe("area flow (e2e)", () => {
 })
 ```
 
-An integration spec calls `useTestWorld({ modules: [...] })` and drives the capability through its command/query bus.
 
 ## Observability
 
@@ -92,7 +89,7 @@ npm run test:e2e -- flows/probes
 
 ## Uploads
 
-Task attachments live behind the upload capability (`src/modules/integrations/upload`): presigned intents (`POST /uploads/intents` -> `PUT /uploads/<id>/content` with `x-upload-token`), a direct `POST /uploads`, attach/list/download/delete for the owner, size+mime validation, a storage port (local filesystem adapter in dev; S3/minio implements the same port) and a virus-scan port (noop adapter ships the contract). The e2e journey covers the whole lifecycle over the real stack:
+Task attachments live behind the upload capability (`src/modules/integrations/upload`): presigned intents (`GraphQL createUploadIntent` -> `PUT /uploads/<id>/content` with `x-upload-token`), a direct `POST /uploads`, attach/list/download/delete for the owner, size+mime validation, a storage port (local filesystem adapter in dev; S3/minio implements the same port) and a virus-scan port (noop adapter ships the contract). The e2e journey covers the whole lifecycle over the real stack:
 
 ```bash
 npm run test:e2e -- flows/upload-journey
