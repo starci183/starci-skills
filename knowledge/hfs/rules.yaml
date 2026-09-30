@@ -531,7 +531,7 @@ rules:
   - id: R50
     code: "FE_TRANSPORT_OWNER"
     title_vi: "fetch ngoài client duy nhất"
-    law: "One `fetch` in `modules/api/client.ts`, with timeout and abort."
+    law: "One `fetch` per repository, in the transport client: `apps/<app>/src/modules/api/client.ts` of a one-app repository or `packages/<family>-api/src/client.ts` shared by every app; timeout and abort."
     kinds: [check, lint, design]
     gates: [settle, land, ci]
     failureCodes: ["FE_TRANSPORT_OWNER", "FE_EFFECT_FETCH"]
@@ -546,7 +546,7 @@ rules:
   - id: R51
     code: "FE_HTTP_STATUS_COLLAPSE"
     title_vi: "Gộp mọi mã HTTP thành một nhánh"
-    law: "One `Outcome<T>`; 401 and 403 become `refused`."
+    law: "One `Outcome<T>` union per repository (the api slot's `outcome.ts`); 401 and 403 become `refused`."
     kinds: [lint, design]
     gates: [settle, land, ci]
     failureCodes: ["FE_HTTP_STATUS_COLLAPSE", "FE_OUTCOME_KIND_UNHANDLED"]
@@ -632,7 +632,7 @@ rules:
   - id: R59
     code: "FE_I18N_PLACEMENT"
     title_vi: "i18n sai chuẩn next-intl"
-    law: "`next-intl`, `[locale]`, `modules/i18n/`."
+    law: "`next-intl` with `[locale]`; the next-intl stack is written once per repository: `packages/<family>-i18n` (`createAppI18n`) called by each app's `modules/i18n/index.ts`, or the only app's `modules/i18n/`."
     kinds: [check, codemod, lint]
     gates: [settle, land, ci]
     failureCodes: ["FE_I18N_PLACEMENT", "FE_I18N_NAVIGATION", "FE_I18N_FORMATTER"]

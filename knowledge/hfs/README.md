@@ -309,12 +309,17 @@ apps/<app>/
   src/features/{pages,layouts,overlays}/<Name>/
   src/components/{blocks,composites,branches,leaves}/<Name>/
   src/hooks/<domain>/                 use<Name>.ts and one <domain>.shared.ts
-  src/modules/api/                    client.ts, outcome.ts, <domain>/read-*.ts, <domain>/*.graphql, contract/, __generated__/
+  src/modules/api/                    index.ts, <domain>/read-*.ts, <domain>/*.graphql, contract/, __generated__/;
+                                      client.ts + outcome.ts only in a one-app repository
   src/modules/config/                 the only reader of the environment
-  src/modules/i18n/                   config.ts, routing.ts, navigation.ts, request.ts, messages/<locale>.json
+  src/modules/i18n/                   index.ts (calls the i18n package factory) and messages/<locale>.json; the whole
+                                      next-intl stack (routing, navigation, request) only in a one-app repository
   src/modules/routes/                 every href builder
   src/modules/brand/brand.css         the only app file holding colour values
-packages/<family>-ui/                 opt-in, built to dist
+packages/<family>-ui/                 opt-in, built to dist; grammar tiers composites/branches/leaves under src/
+packages/<family>-api/                opt-in: src/client.ts (the one fetch) and src/outcome.ts (the one Outcome) of every app
+packages/<family>-i18n/               opt-in: the next-intl stack once, exported as createAppI18n
+packages/<pkg>/                       any other code two apps share (FE_CROSS_APP_DUPLICATE: an app never keeps a copy)
 e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.config.ts, tsconfig.e2e.json at the root
 ```
 
@@ -325,7 +330,8 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
 - **`hooks/` are hooks (R56).** `hooks/<domain>/` holds React hooks (`use*.ts`, one hook per file) and one
   `<domain>.shared.ts` for shared non-hook helpers. Server readers (fetch and map, no React) live in
   `modules/api/<domain>/read-*.ts`, wrapped in React `cache()` when several blocks call them in one request.
-- **Data transport (R50 to R52).** One client per app: `modules/api/client.ts` is the only `fetch`, with a timeout and
+- **Data transport (R50 to R52).** One client per repository: `packages/<family>-api/src/client.ts` when the repository has
+  several apps (or chooses to share it), else the app's `modules/api/client.ts`; it is the only `fetch`, with a timeout and
   `AbortSignal` and no module-level `let` for a token or locale. It returns
   `Outcome<T> = ok | refused (401/403, code) | invalid (issues) | not-found | unavailable (code, retryable)`. `401` and
   `403` become `refused`; a status is never collapsed into null and server text is never shown as a reason. Wire types
@@ -341,8 +347,10 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
   split by namespace and a client component receives only the `pick`ed part. `force-dynamic` is forbidden on a client
   page.
 - **i18n (R58 to R60).** Every app uses `next-intl` with the `[locale]` segment, default locale `vi`, `localePrefix`
-  `as-needed`, and `src/proxy.ts` (not `middleware.ts`) for locale routing. `modules/i18n/` holds `config.ts`,
-  `routing.ts`, `navigation.ts`, `request.ts` and `messages/<locale>.json`. No display text at any tier (block, page,
+  `as-needed`, and `src/proxy.ts` (not `middleware.ts`) for locale routing. The next-intl stack (routing, navigation,
+  request config) is written once per repository: `packages/<family>-i18n` exports `createAppI18n` and each app's
+  `modules/i18n/index.ts` calls it with its `messages/<locale>.json` (a one-app repository may keep the stack in its
+  `modules/i18n/`). No display text at any tier (block, page,
   layout, `aria-label`, `title`, `placeholder`, `alt`) in any language; there is no escape comment. A single-language app
   still uses `next-intl` with one locale. Catalogs of all locales have the same key set and specs use the real catalog.
   `<html lang>` is set by the `[locale]` layout.
@@ -536,8 +544,8 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | Id | Code | Rule |
 | --- | --- | --- |
 | R49 | `FE_ENV_OWNER` | Only `modules/config` reads the environment; no localhost fallback. |
-| R50 | `FE_TRANSPORT_OWNER` | One `fetch` in `modules/api/client.ts`, with timeout and abort. |
-| R51 | `FE_HTTP_STATUS_COLLAPSE` | One `Outcome<T>`; 401 and 403 become `refused`. |
+| R50 | `FE_TRANSPORT_OWNER` | One `fetch` per repository, in the transport client: `apps/<app>/src/modules/api/client.ts` of a one-app repository or `packages/<family>-api/src/client.ts` shared by every app; timeout and abort. |
+| R51 | `FE_HTTP_STATUS_COLLAPSE` | One `Outcome<T>` union per repository (the api slot's `outcome.ts`); 401 and 403 become `refused`. |
 | R52 | `FE_WIRE_GENERATED` | Wire types generated from the contract copy. |
 | R53 | `FE_ERROR_BOUNDARY_MISSING` | Global, locale error, not-found and loading boundaries exist. |
 | R54 | `FE_ROUTE_FILES_THIN` | Route files mount one owner; Next conventions (`proxy.ts`, metadata). |
@@ -545,7 +553,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R56 | `FE_HOOKS_ARE_HOOKS` | `hooks/` hold hooks and one shared file per domain. |
 | R57 | `FE_OWNER_REACHABLE` | Every owner is mounted; every href resolves to a route. |
 | R58 | `FE_I18N_LITERAL` | No display text at any tier, no escape comment. |
-| R59 | `FE_I18N_PLACEMENT` | `next-intl`, `[locale]`, `modules/i18n/`. |
+| R59 | `FE_I18N_PLACEMENT` | `next-intl` with `[locale]`; the next-intl stack is written once per repository: `packages/<family>-i18n` (`createAppI18n`) called by each app's `modules/i18n/index.ts`, or the only app's `modules/i18n/`. |
 | R60 | `FE_I18N_CATALOG` | Same keys in every catalog, real catalog in specs, `pick` for clients. |
 | R61 | `FE_STYLE_TOKEN_ONLY` | Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`). |
 | R62 | `FE_NATIVE_FORM_CONTROL` | No raw form controls, native images or raw structural tags in product tiers; the grammar renders them. |
