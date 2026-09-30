@@ -1,0 +1,19 @@
+id: rt-dead-scripts
+effectiveAt: '2026-09-30T16:40:00+07:00'
+summary: >-
+  Lane C0, redundancy RED18: `npm run check` runs scripts/checks/check-dead-scripts.mjs, which refuses a tracked runtime
+  script (scripts/, engine/, modules/, bin/, ext/) that no tracked file other than a test names (RT_DEAD_SCRIPT, owner
+  supervisor). The two found are deleted with their tests: scripts/checks/blob-output.mjs (test-only) and
+  scripts/kernel/usage-backfill.mjs (a finished one-shot backfill); both are registered in retired-paths.yaml.
+reach: new-legs
+adds:
+  checks: [check-dead-scripts]
+  codes: [RT_DEAD_SCRIPT]
+paths:
+  - modules/kernel/contract-changes/rt-dead-scripts.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/retired-paths.yaml
+  - package.json
+  - scripts/checks/check-dead-scripts.mjs
+  - tests/check-dead-scripts.spec.mjs
+  - tests/check-output.spec.mjs

@@ -5134,6 +5134,18 @@ ROUTE_NOT_IN_NAV:
   owner: other-op:interface.implement
   kind: check-finding
 
+RT_DEAD_SCRIPT:
+  title: "Runtime script with no reader"
+  title_vi: "Script runtime không còn ai dùng"
+  meaning_vi: "Một tệp .mjs trong scripts/, engine/, modules/, bin/ hoặc ext/ không được tệp nào khác (ngoài test) nhắc tới: không import, không lệnh node trong package.json, không skill, tài liệu hay hợp đồng YAML nào gọi nó. Mã chết kèm test vẫn là mã chết."
+  causes_vi:
+    - "Script chạy một lần (backfill, migrate) được giữ lại sau khi xong việc"
+    - "Cơ chế đã bị thay nhưng tệp cũ chưa xóa"
+    - "Chỉ còn test gọi tới tệp"
+  nextStep_vi: "Người giám sát xóa script cùng test của nó và ghi vào modules/kernel/retired-paths.yaml, hoặc nối nó vào nơi thật sự dùng, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 RULE_DUPLICATED:
   title: "Rule sentence repeated"
   title_vi: "Câu quy tắc bị lặp"
