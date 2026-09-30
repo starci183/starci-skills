@@ -52,7 +52,8 @@ import { closeSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { gitSpawn } from '../lib/git.mjs';
-import { posixPath } from '../lib/path-key.mjs';
+import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
+import { CONTRACT_CHANGES_DIR } from '../kernel/contract-changes-store.mjs';
 import { guardLaunch } from '../guards/install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 
@@ -173,8 +174,11 @@ function attemptIdOf(m, jobId) {
 // the grammar CHANGELOG). They are never leased: .gitattributes merges them `union` at the gate's
 // cherry-pick, and the gate still parses the result.
 // Entry files under modules/kernel/contract-changes/ are one per change and never shared, so never leased either.
+// Neither is the directory itself: every brief names the bare path, and a lease on it serialized every contract
+// job behind its holder (worker-lease-contract-changes-dir, 2026-09-30). A row a finished job left there no
+// longer matches leaseConflicts either, since the asking job's files are filtered the same way.
 export const SHARED_APPEND_FILES = new Set(['packages/grammar/CHANGELOG.md']);
-const leasable = (files) => files.map(normPath).filter((f) => !SHARED_APPEND_FILES.has(f) && !f.startsWith('modules/kernel/contract-changes/'));
+const leasable = (files) => files.map(normPath).filter((f) => !SHARED_APPEND_FILES.has(f) && !sameOrUnder(f, CONTRACT_CHANGES_DIR));
 
 /** Leases other open jobs hold on any of `files`: [{file, jobId}]. */
 export function leaseConflicts(m, files, jobId = null) {
