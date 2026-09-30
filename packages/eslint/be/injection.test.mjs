@@ -221,6 +221,9 @@ test("injector-type-match: T of the injector is the parameter's type", () => {
             { filename: SERVICE, code: `import { InjectFoo, FooClient } from "@modules/integrations/foo"\nexport class S { constructor(@InjectFoo() foo: FooClient) {} }` },
             // a decorator that is not an injector is not compared
             { filename: SERVICE, code: `${CLOCK}const Marker = (): ParameterDecorator => () => undefined\nexport class S { constructor(@Marker() private readonly clock: Clock) {} }` },
+            // a language global augmented by @types/node is not infrastructure
+            { filename: HANDLER, code: `/// <reference types="node" />
+export class H { constructor(private readonly names: ReadonlyArray<string>) {} }` },
             // not a constructor
             { filename: SERVICE, code: `${CLOCK}${LOGGER}export class S { run(@InjectClock() logger: Logger): void { logger.info("x") } }` },
         ],

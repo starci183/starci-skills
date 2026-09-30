@@ -433,8 +433,13 @@ export const infraNeedsInjector = {
                     const { target, decorators } = decoratorsOfParam(param)
                     const annotation = target.typeAnnotation?.typeAnnotation
                     if (!annotation) continue
-                    const infra = typeOrigins(context, annotation).find((origin) => {
-                        if (origin.module !== null) return !/\/node_modules\/typescript\/lib\//.test(origin.file)
+                    const origins = typeOrigins(context, annotation)
+                    // A language global (`ReadonlyArray`, `Array`) is declared in the TypeScript lib and may be augmented by a package
+                    // (`@types/node`): the augmentation does not make it infrastructure.
+                    const isLanguageGlobal = (origin) => origins.some((other) => other.name === origin.name && /\/node_modules\/typescript\/lib\//.test(other.file))
+                    const infra = origins.find((origin) => {
+                        if (isLanguageGlobal(origin)) return false
+                        if (origin.module !== null) return true
                         if (own !== null && hfs.ownerOf(origin.file) === own) return false
                         const tier = hfs.tierOf(origin.file)
                         return tier === "platform" || tier === "integrations"
