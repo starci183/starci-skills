@@ -181,6 +181,7 @@ test('startAgent reuses the prior Run while Orca knows it and takes the Task, el
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-launch-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const saved=process.env.STARCI_PROJECTS_ROOT;
   process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
   t.after(()=>{if(saved===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=saved;});
