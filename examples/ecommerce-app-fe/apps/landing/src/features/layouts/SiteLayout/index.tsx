@@ -8,7 +8,7 @@ import { ROUTES } from "../../../modules/routes"
 import { SiteLayoutBase } from "./component"
 
 /** Framework-layout boundary input: the routed page body and nothing else. */
-export type SiteLayoutProps = { readonly content: ReactNode }
+type SiteLayoutProps = { readonly content: ReactNode }
 
 /**
  * The connected site chrome. Everything the frame says and links to is resolved here - the chrome

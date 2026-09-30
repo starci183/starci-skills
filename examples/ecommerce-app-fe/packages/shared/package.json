@@ -5,33 +5,19 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     },
-    "./modules/config/*": {
-      "types": "./dist/modules/config/*.d.ts",
-      "default": "./dist/modules/config/*.js"
-    },
-    "./components/leaves/*": {
-      "types": "./dist/components/leaves/*/index.d.ts",
-      "default": "./dist/components/leaves/*/index.js"
-    },
-    "./components/composites/SlotView": {
-      "types": "./dist/components/composites/SlotView/index.d.ts",
-      "default": "./dist/components/composites/SlotView/index.js"
-    },
-    "./modules/slot": {
-      "types": "./dist/modules/slot/index.d.ts",
-      "default": "./dist/modules/slot/index.js"
-    },
-    "./modules/theme/*": "./dist/modules/theme/*"
+    "./modules/theme/*": "./src/modules/theme/*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node build.mjs"
   },
   "dependencies": {
+    "@heroui/react": "3.2.6",
     "@starci-examples/fe-kit": "file:../../../../packages/fe-kit",
     "@starci/grammar": "0.7.1",
+    "next-intl": "4.13.6",
     "react": "19.2.3"
   },
   "devDependencies": {

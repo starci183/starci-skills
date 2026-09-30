@@ -1,5 +1,5 @@
 /** A single sellable item. Kept deliberately small: the landing teaser only needs a name, a price and a blurb. */
-export type Product = {
+export type TeaserProduct = {
   readonly id: string;
   readonly name: string;
   readonly blurb: string;
@@ -13,7 +13,7 @@ export type Product = {
  * Editorial sample catalogue for the public teaser. The real catalogue is served by the `order` API that the
  * shop browses; the landing intentionally ships static copy so it renders without any backend running.
  */
-export const CATALOG: ReadonlyArray<Product> = [
+export const CATALOG: ReadonlyArray<TeaserProduct> = [
     {
         id: "aurelis-desk-lamp",
         name: "Aurelis Desk Lamp",
@@ -57,19 +57,3 @@ export const CATALOG: ReadonlyArray<Product> = [
         currency: "USD",
     },
 ]
-
-const CURRENCY_LOCALE: Readonly<Record<string, string>> = {
-    USD: "en-US",
-    EUR: "de-DE",
-    VND: "vi-VN",
-}
-
-/** Format a minor-unit amount for display, falling back to a plain currency-tagged number for unknown codes. */
-export const formatPrice = (priceCents: number, currency: string): string => {
-    const locale = CURRENCY_LOCALE[currency] ?? "en-US"
-    try {
-        return new Intl.NumberFormat(locale, { style: "currency", currency }).format(priceCents / 100)
-    } catch {
-        return `${(priceCents / 100).toFixed(2)} ${currency}`
-    }
-}

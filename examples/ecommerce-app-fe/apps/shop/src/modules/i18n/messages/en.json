@@ -5,17 +5,6 @@
       "description": "Browse the catalogue, manage your cart and review your orders."
     }
   },
-  "display": {
-    "label": "Display and language",
-    "theme": {
-      "toLight": "Switch to light",
-      "toDark": "Switch to dark"
-    },
-    "locale": {
-      "en": "English",
-      "vi": "Tiếng Việt"
-    }
-  },
   "shop": {
     "nav": {
       "brand": "Northwind Shop",
@@ -150,23 +139,6 @@
         "title": "The order service confirms this account has placed orders.",
         "description": "A per-order list is not served yet — each checkout confirmation shows that order's id, total and payment."
       }
-    }
-  },
-  "loading": {
-    "message": "Loading"
-  },
-  "notFound": {
-    "title": "Page not found",
-    "home": "Back to the home page"
-  },
-  "errors": {
-    "page": {
-      "title": "Something went wrong",
-      "retry": "Try again"
-    },
-    "global": {
-      "title": "A serious error occurred",
-      "retry": "Try again"
     }
   }
 }

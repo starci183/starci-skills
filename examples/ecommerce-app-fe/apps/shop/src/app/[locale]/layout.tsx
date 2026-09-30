@@ -5,8 +5,9 @@ import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
 import "@fontsource-variable/inter"
 import "../globals.css"
+import { LocaleShell } from "@ecommerce/shared"
+import { ShopLayout } from "../../features/layouts/ShopLayout"
 import { routing } from "../../modules/i18n"
-import { LocaleShell } from "../../features/layouts/LocaleShell"
 
 type LocaleLayoutProps = {
   readonly children: ReactNode;
@@ -48,7 +49,11 @@ const Layout = async ({ children, params }: LocaleLayoutProps) => {
     const { locale } = await params
     if (!hasLocale(routing.locales, locale)) notFound()
     const messages = await getMessages()
-    return <LocaleShell locale={locale} messages={messages} content={children} />
+    return (
+        <LocaleShell locale={locale} messages={messages}>
+            <ShopLayout content={children} />
+        </LocaleShell>
+    )
 }
 
 export default Layout

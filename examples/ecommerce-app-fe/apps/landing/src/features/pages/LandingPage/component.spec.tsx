@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
 import { render, screen, within } from "@testing-library/react"
-import type { Product } from "../../../modules/catalog"
+import type { TeaserProduct } from "../../../modules/catalog"
 import { LandingPageBase, type LandingPageProps } from "./component"
 
-const teaser: ReadonlyArray<Product> = [
+const teaser: ReadonlyArray<TeaserProduct> = [
     {
         id: "aurelis-desk-lamp",
         name: "Aurelis Desk Lamp",

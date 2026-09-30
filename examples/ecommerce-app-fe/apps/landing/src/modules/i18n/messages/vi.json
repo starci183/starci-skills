@@ -5,17 +5,6 @@
       "description": "Sân trước công khai của Northwind Supply. Duyệt danh mục, rồi tiếp tục đến cửa hàng."
     }
   },
-  "display": {
-    "label": "Hiển thị và ngôn ngữ",
-    "theme": {
-      "toLight": "Chuyển sang sáng",
-      "toDark": "Chuyển sang tối"
-    },
-    "locale": {
-      "en": "English",
-      "vi": "Tiếng Việt"
-    }
-  },
   "landing": {
     "shell": {
       "brand": "Northwind Supply",
@@ -51,23 +40,6 @@
         "title": "Giao hàng trung hòa carbon",
         "copy": "Bù trừ phát thải cho mỗi kiện hàng, đo lường và công khai mỗi quý."
       }
-    }
-  },
-  "loading": {
-    "message": "Đang tải"
-  },
-  "notFound": {
-    "title": "Không tìm thấy trang",
-    "home": "Về trang chủ"
-  },
-  "errors": {
-    "page": {
-      "title": "Đã xảy ra lỗi",
-      "retry": "Thử lại"
-    },
-    "global": {
-      "title": "Đã xảy ra lỗi nghiêm trọng",
-      "retry": "Thử lại"
     }
   }
 }

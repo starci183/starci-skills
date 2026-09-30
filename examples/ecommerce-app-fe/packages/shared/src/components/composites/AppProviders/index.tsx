@@ -5,14 +5,15 @@ import { NextIntlClientProvider } from "next-intl"
 import type { ReactNode } from "react"
 import { FeKitI18nProvider } from "@starci-examples/fe-kit/i18n/i18n-context"
 import { ThemeProvider } from "@starci-examples/fe-kit/theme/theme-context"
-import { i18n, Link, PRODUCT_TIME_ZONE, usePathname, useRouter } from "../i18n"
+import { i18n, PRODUCT_TIME_ZONE } from "../../../modules/i18n/config"
+import { Link, usePathname, useRouter } from "../../../modules/i18n/navigation"
 
 /**
  * The three contexts that sit above every route - the same stack starci-academy-fe mounts, minus
  * the toast store this product does not use:
  *
- * PRODUCT COPY - `NextIntlClientProvider`. The locale resolved once on the server in the shared
- * request config, handed to the client tree so a component can ask for a string.
+ * PRODUCT COPY - `NextIntlClientProvider`. The locale resolved once on the server in the request
+ * config, handed to the client tree so a component can ask for a string.
  *
  * VENDOR LOCALE - `I18nProvider`. Grammar's controls are built on HeroUI, which resolves dates,
  * numbers and its own built-in strings against a locale; without a provider a server render and

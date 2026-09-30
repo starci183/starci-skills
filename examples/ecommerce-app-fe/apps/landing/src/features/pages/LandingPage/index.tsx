@@ -10,7 +10,7 @@ const TEASER_COUNT = 3
 const PILLAR_IDS = ["repairable", "onePrice", "carbonNeutral"] as const
 
 /** Props for the connected landing page: the route mounts it empty and it reads its own world. */
-export type LandingPageProps = Record<never, never>
+type LandingPageProps = Record<never, never>
 
 /**
  * The connected landing page. Everything the screen says and links to is resolved here on the

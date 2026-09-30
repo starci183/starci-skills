@@ -1,5 +1,11 @@
-import { existsSync, readFileSync } from "node:fs"
-import { dirname, join, resolve } from "node:path"
+/**
+ * Node built-ins are taken from `process.getBuiltinModule` when the reader runs, not imported at module
+ * scope: this module rides in the package entry that client components also import, and a top-level
+ * `node:fs` import would put the file system into the browser bundle. Only a server config module
+ * calls `readProjectedPorts`, so the built-ins are only ever asked for on the server.
+ */
+const fs = () => process.getBuiltinModule("node:fs")
+const path = () => process.getBuiltinModule("node:path")
 
 /**
  * The resolved port projection reader, mirroring the backend lane's AppConfigService bargain:
@@ -16,7 +22,7 @@ import { dirname, join, resolve } from "node:path"
 export const METADATA_FILE_ENV = "ECOMMERCE_APP_BE_METADATA"
 
 const SIBLING_REPO_DIR = "ecommerce-app-be"
-const PROJECTION_REL = join(".starcistacks", "dev", "infra", "metadata.json")
+const PROJECTION_REL = ".starcistacks/dev/infra/metadata.json"
 
 /** The slice of metadata.json the frontend reads. Extra keys the BE adds are ignored. */
 export interface ProjectedPorts {
@@ -36,16 +42,16 @@ const REQUIRED_PORT_KEYS: ReadonlyArray<keyof ProjectedPorts> = [
 const findMetadataFile = (): string => {
     const fromEnv = process.env[METADATA_FILE_ENV]
     if (fromEnv) {
-        if (!existsSync(fromEnv)) {
+        if (!fs().existsSync(fromEnv)) {
             throw new Error(`${METADATA_FILE_ENV} points at ${fromEnv}, which does not exist.`)
         }
-        return resolve(fromEnv)
+        return path().resolve(fromEnv)
     }
-    let dir = resolve(process.cwd())
+    let dir = path().resolve(process.cwd())
     for (;;) {
-        const candidate = join(dir, SIBLING_REPO_DIR, PROJECTION_REL)
-        if (existsSync(candidate)) return candidate
-        const parent = dirname(dir)
+        const candidate = path().join(dir, SIBLING_REPO_DIR, PROJECTION_REL)
+        if (fs().existsSync(candidate)) return candidate
+        const parent = path().dirname(dir)
         if (parent === dir) {
             throw new Error(
                 `no ${SIBLING_REPO_DIR}/${PROJECTION_REL.split(/[\\/]/).join("/")} found from ${process.cwd()} upward; set ${METADATA_FILE_ENV} to its path.`,
@@ -63,7 +69,7 @@ export const readProjectedPorts = (): ProjectedPorts => {
     const file = findMetadataFile()
     let parsed: unknown
     try {
-        parsed = JSON.parse(readFileSync(file, "utf8"))
+        parsed = JSON.parse(fs().readFileSync(file, "utf8"))
     } catch {
         throw new Error(`${file} is not readable JSON.`)
     }

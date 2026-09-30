@@ -5,8 +5,11 @@ import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
 import "@fontsource-variable/inter"
 import "../globals.css"
+import { LocaleShell } from "@ecommerce/shared"
+import { SiteLayout } from "../../features/layouts/SiteLayout"
+import { SHOP_URL } from "../../modules/config"
 import { routing } from "../../modules/i18n"
-import { LocaleShell } from "../../features/layouts/LocaleShell"
+import { ShopUrlProvider } from "../../modules/shop-url"
 
 type LocaleLayoutProps = {
     readonly children: ReactNode
@@ -38,6 +41,8 @@ export const generateMetadata = async ({ params }: LocaleLayoutProps): Promise<M
 
 /**
  * Mount the shared runtime context for one language and hand the routed tree to the site layout.
+ * The shop origin is resolved once here, on the server, and carried to the chrome through its
+ * provider.
  *
  * A segment is reader-supplied text. An unknown language is a route that does not exist, not a
  * request to fall back silently - falling back would serve English at a Vietnamese-looking URL
@@ -47,7 +52,13 @@ const Layout = async ({ children, params }: LocaleLayoutProps) => {
     const { locale } = await params
     if (!hasLocale(routing.locales, locale)) notFound()
     const messages = await getMessages()
-    return <LocaleShell locale={locale} messages={messages} content={children} />
+    return (
+        <LocaleShell locale={locale} messages={messages}>
+            <ShopUrlProvider shopUrl={SHOP_URL}>
+                <SiteLayout content={children} />
+            </ShopUrlProvider>
+        </LocaleShell>
+    )
 }
 
 export default Layout

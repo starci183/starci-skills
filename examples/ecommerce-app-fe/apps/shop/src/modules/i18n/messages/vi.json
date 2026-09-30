@@ -5,17 +5,6 @@
       "description": "Duyệt danh mục, quản lý giỏ hàng và xem lại đơn hàng của bạn."
     }
   },
-  "display": {
-    "label": "Hiển thị và ngôn ngữ",
-    "theme": {
-      "toLight": "Chuyển sang sáng",
-      "toDark": "Chuyển sang tối"
-    },
-    "locale": {
-      "en": "English",
-      "vi": "Tiếng Việt"
-    }
-  },
   "shop": {
     "nav": {
       "brand": "Cửa hàng Northwind",
@@ -150,23 +139,6 @@
         "title": "Order service xác nhận tài khoản này đã đặt đơn.",
         "description": "Danh sách từng đơn chưa được phục vụ — trang xác nhận thanh toán cho thấy id, tổng tiền và thanh toán của đơn đó."
       }
-    }
-  },
-  "loading": {
-    "message": "Đang tải"
-  },
-  "notFound": {
-    "title": "Không tìm thấy trang",
-    "home": "Về trang chủ"
-  },
-  "errors": {
-    "page": {
-      "title": "Đã xảy ra lỗi",
-      "retry": "Thử lại"
-    },
-    "global": {
-      "title": "Đã xảy ra lỗi nghiêm trọng",
-      "retry": "Thử lại"
     }
   }
 }

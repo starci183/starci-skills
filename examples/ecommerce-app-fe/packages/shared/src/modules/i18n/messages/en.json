@@ -1,0 +1,30 @@
+{
+  "display": {
+    "label": "Display and language",
+    "theme": {
+      "toLight": "Switch to light",
+      "toDark": "Switch to dark"
+    },
+    "locale": {
+      "en": "English",
+      "vi": "Tiếng Việt"
+    }
+  },
+  "loading": {
+    "message": "Loading"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "home": "Back to the home page"
+  },
+  "errors": {
+    "page": {
+      "title": "Something went wrong",
+      "retry": "Try again"
+    },
+    "global": {
+      "title": "A serious error occurred",
+      "retry": "Try again"
+    }
+  }
+}

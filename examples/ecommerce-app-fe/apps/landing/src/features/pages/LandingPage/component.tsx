@@ -1,10 +1,8 @@
 "use client"
 
 import { Button, Heading, PageContainer, SectionHeader, SurfaceCard, Text } from "@starci/grammar/common"
-import { CatalogueTile } from "@ecommerce/shared/components/leaves/CatalogueTile"
-import { DuckMascot } from "@ecommerce/shared/components/leaves/DuckMascot"
-import { formatPrice } from "../../../modules/catalog"
-import type { Product } from "../../../modules/catalog"
+import { CatalogueTile, DuckMascot, formatPrice } from "@ecommerce/shared"
+import type { TeaserProduct } from "../../../modules/catalog"
 import { landingPageClassNames } from "./classNames"
 
 /** One pillar of the "why Northwind" strip, with its sentence already resolved. */
@@ -28,7 +26,7 @@ export type LandingPageProps = {
         readonly viewFull: string
         readonly pillarsTitle: string
         readonly pillars: ReadonlyArray<LandingPillar>
-        readonly teaser: ReadonlyArray<Product>
+        readonly teaser: ReadonlyArray<TeaserProduct>
         /** The shop origin with the locale already joined, for the cross-app hand-off links. */
         readonly shopHref: string
     }
