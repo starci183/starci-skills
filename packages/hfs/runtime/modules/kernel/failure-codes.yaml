@@ -451,7 +451,7 @@ BE_SCHEMA_OWNER:
   title_vi: "Entity hoặc migration sai chủ"
   meaning_vi: "Entity/migration `<file>` không nằm dưới `persistence/` của capability sở hữu (hoặc sai tên)."
   causes_vi:
-    - "Vi phạm luật R35: Entity + migration nằm trong `<capability>/persistence/` của capability sở hữu bảng, có `connection.ts`; `connection.ts` trỏ tới một connection khai trong `hfs.json`; tên migration `<epochMs13>-<kebab>.ts`, class `<Pascal><epochMs13>`, thuộc tính `name` bằng tên class; `index.ts` của owner export `<c>Entities` và `<c>Migrations`, app compose."
+    - "Vi phạm luật R35: Entity + migration nằm trong `<capability>/persistence/` của capability sở hữu bảng, có `connection.ts` khai báo hai mảng `<c>Entities` và `<c>Migrations` (không có `CONNECTION`); connection của capability là connection mà app đăng ký hai mảng đó vào `DatabaseModule.register`: đúng một connection khai trong `hfs.json` ở mọi app, và mọi `Inject<Conn>EntityManager` trong capability phải là connection ấy; tên migration `<epochMs13>-<kebab>.ts`, class `<Pascal><epochMs13>`, thuộc tính `name` bằng tên class; `index.ts` của owner export `<c>Entities` và `<c>Migrations`, app compose."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding

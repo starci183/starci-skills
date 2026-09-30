@@ -3,17 +3,29 @@ import assert from 'node:assert/strict';
 import { archFixture, runArch, findings, databaseFiles, connectionFiles, TWO_CONNECTIONS } from './_hfs-arch-be-fixture.mjs';
 
 // R35 schema-owner (BE_SCHEMA_OWNER): entities and migrations only in persistence/{entities,migrations} of the owning
-// capability; persistence/connection.ts names an hfs.json connection; the owner's index exports <c>Entities and <c>Migrations;
+// capability; persistence/connection.ts declares the arrays, and the apps register them under exactly one declared connection (no CONNECTION alias); the owner's index exports <c>Entities and <c>Migrations;
 // a migration is <epochMs13>-<kebab>.ts with class <Pascal><epochMs13> and a name property equal to the class name.
 const ENTITY = (klass, table) => `import { Column, Entity, PrimaryColumn } from 'typeorm';\n@Entity("${table}")\nexport class ${klass} {\n  @PrimaryColumn({ name: 'id', type: 'uuid' }) id!: string;\n}\n`;
 const MIGRATION = (klass, name = klass) => `import { MigrationInterface, QueryRunner } from 'typeorm';\nexport class ${klass} implements MigrationInterface {\n  name = "${name}";\n  async up(queryRunner: QueryRunner): Promise<void> { void queryRunner; }\n  async down(queryRunner: QueryRunner): Promise<void> { void queryRunner; }\n}\n`;
 const BILLING = 'src/modules/domain/billing';
+const APP = 'apps/core/src/app.module.ts';
+const REGISTER = (literal, extra = '') => `import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../../../src/modules/platform/database';
+import { PRIMARY_CONNECTION } from '../../../src/modules/platform/database/primary.connection';
+import { AGENTOS_CONNECTION } from '../../../src/modules/platform/database/agentos.connection';
+import { billingEntities, billingMigrations } from '../../../src/modules/domain/billing';
+${extra}
+@Module({ imports: [DatabaseModule.register({ connections: [${literal}] })] })
+export class AppModule {}
+`;
+const PRIMARY_ENTRY = '{ name: PRIMARY_CONNECTION, entities: billingEntities, migrations: billingMigrations }';
 const GOOD = {
   ...databaseFiles,
   ...connectionFiles('primary', 'PRIMARY', 'PRIMARY'),
-  [`${BILLING}/index.ts`]: "export { billingEntities, billingMigrations } from './billing.contracts';\n",
-  [`${BILLING}/billing.contracts.ts`]: "import { InvoiceEntity } from './persistence/entities/invoice.entity';\nimport { CreateInvoices1789800000000 } from './persistence/migrations/1789800000000-create-invoices';\nexport const billingEntities = [InvoiceEntity];\nexport const billingMigrations = [CreateInvoices1789800000000];\n",
-  [`${BILLING}/persistence/connection.ts`]: "import { PRIMARY_CONNECTION } from '../../../platform/database/primary.connection';\nexport const CONNECTION = PRIMARY_CONNECTION;\n",
+  ...connectionFiles('agentos', 'AGENTOS', 'AGENTOS'),
+  [`${BILLING}/index.ts`]: "export { billingEntities, billingMigrations } from './persistence/connection';\n",
+  [`${BILLING}/persistence/connection.ts`]: "import { InvoiceEntity } from './entities/invoice.entity';\nimport { CreateInvoices1789800000000 } from './migrations/1789800000000-create-invoices';\nexport const billingEntities = [InvoiceEntity];\nexport const billingMigrations = [CreateInvoices1789800000000];\n",
+  [APP]: REGISTER(PRIMARY_ENTRY),
   [`${BILLING}/persistence/entities/invoice.entity.ts`]: ENTITY('InvoiceEntity', 'invoices'),
   [`${BILLING}/persistence/migrations/1789800000000-create-invoices.ts`]: MIGRATION('CreateInvoices1789800000000'),
 };
@@ -54,21 +66,55 @@ test('an entity in the migrations folder and a migration in the entities folder 
   assert.equal(hits(report).filter(item => item.path.endsWith('late.entity.ts') && /Migration Late1789800000003/.test(item.message)).length, 1);
 });
 
-test('persistence/connection.ts must resolve to a connection declared in hfs.json', t => {
-  const undeclared = hits(run(t, { [`${BILLING}/persistence/connection.ts`]: 'export const CONNECTION = "ledger";\n' }));
+test('a capability has no CONNECTION alias: its connection is the one its arrays are registered on, which hfs.json declares', t => {
+  const undeclared = hits(run(t, { [APP]: REGISTER('{ name: "ledger", entities: billingEntities, migrations: billingMigrations }') }));
   assert.equal(undeclared.length, 1);
   assert.equal(undeclared[0].connection, 'ledger');
-  const unresolved = hits(run(t, { [`${BILLING}/persistence/connection.ts`]: 'export const CONNECTION = process.env.CONNECTION as string;\n' }));
-  assert.match(unresolved[0].message, /does not resolve/);
-  const absent = hits(run(t, { [`${BILLING}/persistence/connection.ts`]: 'export const OTHER = "primary";\n' }));
-  assert.match(absent[0].message, /must export `CONNECTION`/);
+  assert.match(undeclared[0].message, /does not declare/);
+  const unregistered = hits(run(t, { [APP]: REGISTER('{ name: PRIMARY_CONNECTION }') }));
+  assert.equal(unregistered.length, 1);
+  assert.match(unregistered[0].message, /no app registers them/);
+  const missingArrays = hits(run(t, { [`${BILLING}/persistence/connection.ts`]: 'export const OTHER = 1;\n', [`${BILLING}/index.ts`]: 'export const billing = 1;\n', [APP]: REGISTER('{ name: PRIMARY_CONNECTION }').replace(/import \{ billing.*\n/, '') }));
+  assert.ok(missingArrays.some(item => /must export billingEntities/.test(item.message)), JSON.stringify(missingArrays));
+});
+
+test('the arrays of one capability registered on two connections are BE_SCHEMA_OWNER; the same connection in two apps is fine', t => {
+  const split = hits(run(t, { 'apps/core/src/app.module.ts': REGISTER(`${PRIMARY_ENTRY}, { name: AGENTOS_CONNECTION, entities: billingEntities }`) }));
+  assert.equal(split.length, 1, JSON.stringify(split));
+  assert.equal(split[0].connection, 'agentos');
+  assert.match(split[0].message, /agentos and primary.*exactly one connection/);
+  const acrossApps = hits(run(t, { 'apps/core/src/app.module.ts': REGISTER(PRIMARY_ENTRY), 'apps/migrate/src/main.ts': REGISTER(PRIMARY_ENTRY) }));
+  assert.deepEqual(acrossApps, [], JSON.stringify(acrossApps));
+  const splitAcrossApps = hits(run(t, { 'apps/migrate/src/main.ts': REGISTER('{ name: AGENTOS_CONNECTION, entities: billingEntities, migrations: billingMigrations }') }));
+  assert.equal(splitAcrossApps.length, 1, JSON.stringify(splitAcrossApps));
+});
+
+test('a connection reached through a spread of an options property or a config call is the registered connection', t => {
+  const options = 'export interface Options { database: { name: string } }\nexport const options: Options = { database: { name: "primary" } };\n';
+  const viaProperty = hits(run(t, {
+    'apps/core/src/core.options.ts': options,
+    [APP]: REGISTER('{ ...options.database, entities: billingEntities, migrations: billingMigrations }', "import { options } from './core.options';"),
+  }));
+  assert.deepEqual(viaProperty, [], JSON.stringify(viaProperty));
+  const viaCall = hits(run(t, { [APP]: REGISTER(`${PRIMARY_ENTRY}, { ...parse(), entities: billingEntities, migrations: [...billingMigrations] }`, 'const parse = () => ({ name: AGENTOS_CONNECTION });') }));
+  assert.equal(viaCall.length, 1, JSON.stringify(viaCall));
+  assert.equal(viaCall[0].connection, 'agentos');
+});
+
+test('an entity manager injector of another connection inside the capability is BE_SCHEMA_OWNER; its own connection is fine', t => {
+  const own = hits(run(t, { [`${BILLING}/invoice.reader.ts`]: "import { InjectPrimaryEntityManager } from '../../platform/database/primary.decorators';\nexport const read = () => InjectPrimaryEntityManager();\n" }));
+  assert.deepEqual(own, [], JSON.stringify(own));
+  const foreign = hits(run(t, { [`${BILLING}/invoice.reader.ts`]: "import { InjectAgentosEntityManager } from '../../platform/database/agentos.decorators';\nexport const read = () => InjectAgentosEntityManager();\n" }));
+  assert.equal(foreign.length, 1, JSON.stringify(foreign));
+  assert.equal(foreign[0].connection, 'agentos');
+  assert.equal(foreign[0].expected, 'primary');
 });
 
 test('the owner index must export <c>Entities and <c>Migrations, and nothing else from persistence', t => {
-  const missing = hits(run(t, { [`${BILLING}/index.ts`]: "export { billingEntities } from './billing.contracts';\n" }));
+  const missing = hits(run(t, { [`${BILLING}/index.ts`]: "export { billingEntities } from './persistence/connection';\n" }));
   assert.equal(missing.length, 1);
   assert.equal(missing[0].expected, 'billingMigrations');
-  const extra = hits(run(t, { [`${BILLING}/index.ts`]: "export { billingEntities, billingMigrations } from './billing.contracts';\nexport { InvoiceEntity } from './persistence/entities/invoice.entity';\n" }));
+  const extra = hits(run(t, { [`${BILLING}/index.ts`]: "export { billingEntities, billingMigrations } from './persistence/connection';\nexport { InvoiceEntity } from './persistence/entities/invoice.entity';\n" }));
   assert.equal(extra.length, 1);
   assert.equal(extra[0].name, 'InvoiceEntity');
 });

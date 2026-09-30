@@ -38,7 +38,7 @@ properties:
     type: array
     uniqueItems: true
     description: >-
-      Backend only. One entry per physical database (R84): its logical name (the CONNECTION tag of a be.persistence slot,
+      Backend only. One entry per physical database (R84): its logical name (the connection the arrays of a be.persistence slot are registered on,
       the <conn> of platform/database/<conn>.{connection,config,decorators}.ts, one migrate run) and the prefix of the env
       keys its <conn>.config.ts reads. Names and prefixes are unique and no prefix covers another's keys (checked by
       scripts/lib/hfs-slots.mjs).

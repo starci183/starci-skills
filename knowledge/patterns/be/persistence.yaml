@@ -79,10 +79,11 @@ rules:
     hfsRules: [R35, R37, R74]
     requirement: |-
       Entities and migrations sit in `persistence/{entities,migrations}/` of the capability that owns the table
-      (`domain/<c>/persistence/` or `platform/<c>/persistence/` for technical tables). `persistence/connection.ts` exports
-      `export const CONNECTION = <CONN>_CONNECTION` for one name in `hfs.json` `connections`. The owner's `index.ts` exports
-      `<c>Entities` and `<c>Migrations` arrays, the only two names, and the apps and `apps/migrate` concatenate them per
-      connection into `DatabaseModule.register`. An entity is `@Entity("<plural_snake>")` in `entities/<table>.entity.ts`,
+      (`domain/<c>/persistence/` or `platform/<c>/persistence/` for technical tables). `persistence/connection.ts` declares
+      the `<c>Entities` and `<c>Migrations` arrays and no `CONNECTION` alias. The owner's `index.ts` re-exports those two
+      names, the only two, and the apps and `apps/migrate` concatenate them per connection into `DatabaseModule.register`;
+      a capability's connection is the one its arrays are registered on, exactly one declared in `hfs.json` `connections`
+      across all apps, and every `Inject<Conn>EntityManager` inside the capability names that same connection. An entity is `@Entity("<plural_snake>")` in `entities/<table>.entity.ts`,
       every `@Column` has an explicit `name` and `type`, timestamps are `timestamptz`, an enum is stored as `varchar` with a
       `CHECK` in the migration (no native PG enum), and there is no `eager`, `lazy` or `cascade`. An entity file imports
       neither `@nestjs/graphql` nor `class-validator`. A migration is `<epochMs13>-<kebab-name>.ts` with class

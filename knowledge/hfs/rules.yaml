@@ -371,7 +371,7 @@ rules:
   - id: R35
     code: "BE_SCHEMA_OWNER"
     title_vi: "Entity hoặc migration sai chủ"
-    law: "Entities and migrations live in the owning capability's `persistence/`."
+    law: "Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias)."
     kinds: [check, codemod, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_SCHEMA_OWNER"]

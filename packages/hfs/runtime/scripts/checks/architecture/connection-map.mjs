@@ -22,7 +22,7 @@ import { machineKit, pascal, upperSnake } from './machine-ast.mjs';
 export const CONNECTION_RULE_IDS = ['BE_CONNECTION_DUPLICATE'];
 
 const RULE = 'BE_CONNECTION_DUPLICATE';
-const DATABASE_DIR = 'src/modules/platform/database';
+export const DATABASE_DIR = 'src/modules/platform/database';
 const TYPEORM = '@nestjs/typeorm';
 const MANAGER_CALLS = new Set(['getEntityManagerToken', 'InjectEntityManager']);
 const SOURCE_CALLS = new Set(['getDataSourceToken', 'InjectDataSource']);

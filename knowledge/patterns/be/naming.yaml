@@ -154,8 +154,8 @@ rules:
     requirement: |-
       Module-level constants are UPPER_SNAKE. Exported function values are camelCase arrows. Decorator factories keep PascalCase;
       an injector is `Inject<Thing>` and its token a `unique symbol` constant in `<owner>.decorators.ts`. A connection name is
-      `export const <CONN>_CONNECTION = "<conn>"` in `platform/database/<conn>.connection.ts` and `CONNECTION` in a
-      capability's `persistence/connection.ts`, equal to a name in `hfs.json` `connections`. SQL constants are UPPER_SNAKE in
+      `export const <CONN>_CONNECTION = "<conn>"` in `platform/database/<conn>.connection.ts`, equal to a name in `hfs.json`
+      `connections`; a capability's `persistence/connection.ts` declares no connection constant. SQL constants are UPPER_SNAKE in
       `*.sql.ts`.
     rationale: |-
       Constants are visible at a glance and a connection name has exactly one definition.

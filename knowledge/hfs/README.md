@@ -517,7 +517,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R32 | `BE_APP_COMPOSITION_ONLY` | Apps compose only; the composition spec boots the real module. |
 | R33 | `BE_ENTRYPOINT_ONLY_IN_APPS` | Entrypoints only in `apps/*/src`. |
 | R34 | `BE_SCHEMA_AUTHORITY` | Migrations are the only schema authority; `synchronize` is `false`. |
-| R35 | `BE_SCHEMA_OWNER` | Entities and migrations live in the owning capability's `persistence/`. |
+| R35 | `BE_SCHEMA_OWNER` | Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias). |
 | R36 | `BE_SQL_OUTSIDE_PERSISTENCE` | Raw SQL is `sql`-tagged `SqlText` in `persistence/<name>.sql.ts` of the owning capability; `.query()` takes only `SqlText`; no QueryBuilder. |
 | R37 | `BE_ENTITY_IN_CONTRACT` | No ORM entity in a contract or transport type. |
 | R38 | `BE_ERROR_HOME` | Errors live in the owning capability's `errors/` and extend `DomainError`. |
