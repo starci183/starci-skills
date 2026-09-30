@@ -32,7 +32,7 @@ export class PaymentService {
         payment.amountMinorUnits = amountMinorUnits
         payment.idempotencyKey = orderId
         payment.status = "captured"
-        const saved = await manager.getRepository(PaymentEntity).save(payment)
+        const saved = await manager.save(PaymentEntity, payment)
         return {
             paymentId: saved.id, status: saved.status, amountMinorUnits: saved.amountMinorUnits 
         }

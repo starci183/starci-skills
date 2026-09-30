@@ -4,13 +4,13 @@ profiles:
     title: StarCi NestJS code pattern
     canon:
       package: '@starci/eslint-canon-be'
-      version: 1.6.1
+      version: 1.7.0
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts']
         exclude: ['**/*.test.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: e3479ad9ca32eae82d60396c085446de69faf11c59537613f74149b139a2de68
+        value: 078391d41d4523c6b7fa5e97931cf4eb6c4915e614520b9e97e22ecfbd37d4f8
         files: 37
     sourceRuleRoots:
       - knowledge/patterns/be
@@ -68,6 +68,7 @@ profiles:
       - BE-NAMING-7
       - BE-NAMING-8
       - BE-PERSISTENCE-6
+      - BE-PERSISTENCE-7
       - BE-RESILIENCE-1
       - BE-TEMPORAL-1
       - BE-TEST-1
@@ -334,14 +335,14 @@ profiles:
           review: Trace that an inbox claim actually runs before the side effect on every path, that a retried operation is safe to run more than once, and that the commit-then-call vs. outbox choice matches whether the effect must be exactly-once with the write.
         status: implemented
       - id: NEST-PERSISTENCE-SHAPE
-        sourceRuleIds: [BE-FOLDER-6, BE-FUNCTION-3, BE-FUNCTION-5, BE-TYPING-7]
+        sourceRuleIds: [BE-FOLDER-6, BE-FUNCTION-3, BE-FUNCTION-5, BE-TYPING-7, BE-PERSISTENCE-7]
         applicability: { include: ['src/**/*.ts', 'apps/*/src/**/*.ts', 'libs/*/src/**/*.ts'], exclude: ['**/*.spec.ts'] }
         mechanical:
-          requirement: Preserve named EntityManager injection, transaction callback identity, entity table names and non-eager relations.
+          requirement: Preserve named shared EntityManager injection (never bare, never getRepository, never an injected DataSource), transaction callback identity, entity table names and non-eager relations.
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/must-inject-entity-manager, starci-be/no-injected-repository, starci-be/no-outer-manager-in-transaction, starci-be/require-entity-table-name, starci-be/no-eager-relation]
+            ruleIds: [starci-be/must-inject-entity-manager, starci-be/no-injected-repository, starci-be/no-outer-manager-in-transaction, starci-be/require-entity-table-name, starci-be/no-eager-relation, starci-be/named-entity-manager-only]
             expected: { severity: error }
         semantic:
           guidance: docs/backend-source-pattern.md

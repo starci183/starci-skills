@@ -72,7 +72,10 @@ describe("OrderService - sds.checkout.order-flow t-stock, t-pay, t-confirm",
                 cartItemTx],
         ])
         const manager = mock<EntityManager>({
-            getRepository: jest.fn().mockImplementation((entity: object) => txRepositories.get(entity)) 
+            decrement: jest.fn((entity: object, ...args: unknown[]) => (txRepositories.get(entity) as typeof productTx).decrement(...args)),
+            save: jest.fn((entity: object, value: unknown) => (txRepositories.get(entity) as typeof orderTx).save(value)),
+            create: jest.fn((entity: object, value: object) => (txRepositories.get(entity) as typeof orderTx).create(value)),
+            delete: jest.fn((entity: object, ...args: unknown[]) => (txRepositories.get(entity) as typeof cartItemTx).delete(...args)),
         })
 
         const ordersRepository = {

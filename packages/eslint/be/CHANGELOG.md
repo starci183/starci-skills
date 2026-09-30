@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.0 - 2026-09-30
+
+- New: `named-entity-manager-only` (R83 `BE_UNNAMED_DATA_ACCESS`, in `data-access`): a bare `@InjectEntityManager()` with no connection argument, any `.getRepository(...)` call (on a DataSource, an EntityManager or a transaction manager) and an injected `DataSource` (a constructor parameter typed `DataSource`, `@InjectDataSource()`, `@InjectConnection()`) are refused. A `DataSource` is allowed only under `platform/database/` or `platform/databases/` (also `platform/db`, `platform/datasource`, `platform/typeorm`) and `apps/migrate/`; spec files are skipped. The message says to inject the shared EntityManager with the named injector and call it directly.
+- Changed: `no-injected-repository` now refuses `@InjectRepository(...)` wherever it is written (a property or a method parameter, not only a constructor parameter), and its message states the same one pattern.
+
 ## 1.6.1 - 2026-09-30
 
 - Fixed: `inbox-dedupe-required` (R80 `BE_INBOX_DEDUPE_MISSING`) no longer relies only on `<event>.consumer.ts` under `transport/message/` to recognize a consumer. A method decorated `@EventPattern`, `@MessagePattern`, `@OnEvent` or `@Process`, or a class whose name ends `Consumer` or `OutboxConsumer`, is now a consumer wherever the file sits. The producer half of an outbox (typically `*-outbox.service.ts` / `*OutboxService`, which reads pending rows and publishes) carries none of those shapes and stays unflagged unless it also consumes.

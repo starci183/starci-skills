@@ -94,8 +94,7 @@ export class OrderService {
             const orderId = await this.entityManager.transaction(async (manager) => {
                 for (const line of evaluation.lines) {
                     const spent = await manager
-                        .getRepository(ProductEntity)
-                        .decrement({
+                        .decrement(ProductEntity, {
                             id: line.productId, stock: MoreThanOrEqual(line.quantity) 
                         },
                         "stock",
@@ -106,8 +105,8 @@ export class OrderService {
                         })
                     }
                 }
-                const order = await manager.getRepository(OrderEntity).save(
-                    manager.getRepository(OrderEntity).create({
+                const order = await manager.save(OrderEntity,
+                    manager.create(OrderEntity, {
                         personId,
                         status: "confirmed",
                         totalMinorUnits: evaluation.totalMinorUnits,
@@ -115,9 +114,9 @@ export class OrderService {
                         idempotencyKey: idempotencyKey ?? null,
                     }),
                 )
-                await manager.getRepository(OrderLineEntity).save(
+                await manager.save(OrderLineEntity,
                     evaluation.lines.map((line) =>
-                        manager.getRepository(OrderLineEntity).create({
+                        manager.create(OrderLineEntity, {
                             orderId: order.id,
                             productId: line.productId,
                             quantity: line.quantity,
@@ -129,7 +128,7 @@ export class OrderService {
                     personId,
                     order.id,
                     evaluation.totalMinorUnits)
-                await manager.getRepository(CartItemEntity).delete({
+                await manager.delete(CartItemEntity, {
                     personId 
                 })
                 return order.id

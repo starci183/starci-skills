@@ -84,8 +84,8 @@ topics:
   - id: be.persistence
     title: Persistence and migrations
     path: persistence.yaml
-    decides: Migrations as the only schema authority, apps/migrate, persistence per capability, SQL in repositories, the outbox, no transaction spanning an external call
-    rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-6
+    decides: Migrations as the only schema authority, apps/migrate, persistence per capability, SQL in repositories, the outbox, no transaction spanning an external call, the named shared EntityManager
+    rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-7
   - id: be.background
     title: Background work
     path: background.yaml

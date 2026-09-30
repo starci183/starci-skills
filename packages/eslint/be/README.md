@@ -68,7 +68,7 @@ A sample, not the list:
 | **Spec quality** | A spec does not read repository source with `fs`, and doubles are `mock<T>()`, not `as never` (`spec-no-source-read`, `spec-typed-doubles`) |
 | **CQRS** | A handler does not assemble an aggregate inline; reads and writes do not share one path |
 | **Module layering** | Another owner is imported through its public `index.ts` (`@modules/domain/plan`, `@features/plan`), never through a path into it; an `index.ts` lists a bounded set of named exports, with no `export *`, storage token or types folder; self-aliases and tier-only aliases are refused. |
-| **Data access** | Queries stay where the layer says they may be built; no transaction spans an external call (`no-external-call-in-transaction`) |
+| **Data access** | Queries stay where the layer says they may be built; no transaction spans an external call (`no-external-call-in-transaction`); the database is reached through the named shared `EntityManager` only (`named-entity-manager-only`) |
 | **Transport** | The wire shape is declared, not inferred from whatever a handler happened to return |
 | **Observability** | A failure is logged through the logger port with a typed identity, so a log line can be traced to the law that names it |
 | **Testing** | Unit specs sit beside their subjects, including structural specs in HFS `src/tests` categories; a model-quality harness (one that imports an LLM SDK, reaches a house model helper or declares `@harness-kind model`) calls its provider directly; other live e2e specs, such as an identity provider, are not judged as model harnesses. |
@@ -137,6 +137,7 @@ mapped by `scripts/checks/lint-why.mjs`). The catalog id is the rule number in `
 | `inbox-dedupe-required` | R80 | `BE_INBOX_DEDUPE_MISSING` |
 | `no-hand-rolled-retry` | R81 | `BE_HAND_ROLLED_RETRY` |
 | `no-external-call-in-transaction` | R82 | `BE_TRANSACTION_EXTERNAL_CALL` |
+| `named-entity-manager-only`, `no-injected-repository` | R83 | `BE_UNNAMED_DATA_ACCESS` |
 
 There is no soft size-limit lint rule: a warning under a zero-warning gate is an exception in disguise. Listing files over the soft budget (`ruleParams.be.fileLines.soft`) is a report item of the hfs check or the architecture machine, as migration backlog, and never blocks.
 

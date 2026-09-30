@@ -20,7 +20,7 @@ describe("PaymentService - sds.checkout.order-flow t-pay",
             save: jest.fn() 
         }
         const manager = mock<EntityManager>({
-            getRepository: jest.fn().mockImplementation((entity: unknown) => (entity === PaymentEntity ? paymentRepository : undefined)),
+            save: jest.fn((entity: unknown, value: unknown) => (entity === PaymentEntity ? paymentRepository.save(value) : undefined)),
         })
         let service: PaymentService
 
@@ -43,7 +43,7 @@ describe("PaymentService - sds.checkout.order-flow t-pay",
                     "order-1",
                     2598)
 
-                expect(manager.getRepository).toHaveBeenCalledWith(PaymentEntity)
+                expect(manager.save).toHaveBeenCalledWith(PaymentEntity, expect.any(PaymentEntity))
                 const saved = paymentRepository.save.mock.calls[0][0] as PaymentEntity
                 expect(saved).toMatchObject({
                     personId: "person-1",

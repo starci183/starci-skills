@@ -19,11 +19,11 @@ pins:
     source: packages/grammar/package.json
     why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.7.1.
   '@starci/eslint-canon-be':
-    version: 1.6.1
+    version: 1.7.0
     group: starci
     side: be
     source: packages/eslint/be/package.json
-    why: 'back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.6.1: the round-3 catch-up landed the nest code-pattern profile''s version and content digest, left unbumped when R78-R82 landed, plus the inbox-dedupe-required shape-detection fix.'
+    why: 'back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.7.0: the round-3 catch-up landed the nest code-pattern profile''s version and content digest, left unbumped when R78-R82 landed, plus the inbox-dedupe-required shape-detection fix; 1.7.0 adds named-entity-manager-only (R83).'
   '@starci/eslint-canon-fe':
     version: 5.1.1
     group: starci

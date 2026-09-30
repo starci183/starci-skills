@@ -14,6 +14,7 @@ import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
   mustInjectEntityManager,
+  namedEntityManagerOnly,
   noEagerRelation,
   noExternalCallInTransaction,
   noInjectedRepository,
@@ -79,6 +80,11 @@ test("DATA-2: persistence never arrives as a repository", () => {
       {
         // the type alone is enough - no decorator needed
         code: "class H { constructor(private readonly repo: TreeRepository<CategoryEntity>) {} }",
+        errors: [{ messageId: "repo" }],
+      },
+      {
+        // a decorated property is refused too, not only a constructor parameter
+        code: "class H { @InjectRepository(CourseEntity) private readonly repo: Repository<CourseEntity> }",
         errors: [{ messageId: "repo" }],
       },
     ],
@@ -211,6 +217,55 @@ test("R82: no transaction spans an external call", () => {
       {
         code: "class C { save() { return this.manager.transaction(function (tx) { return axios.post(url, body) }) } }",
         errors: [{ messageId: "external" }],
+      },
+    ],
+  })
+})
+
+test("R83: the shared EntityManager is injected by name and called directly", () => {
+  tester.run("named-entity-manager-only", namedEntityManagerOnly, {
+    valid: [
+      "class S { constructor(@InjectPrimaryEntityManager() private readonly manager: EntityManager) {} }",
+      "class S { constructor(@InjectAgentOsEntityManager() private readonly manager: EntityManager) {} }",
+      "class S { constructor(@InjectEntityManager(PRIMARY_CONNECTION) private readonly manager: EntityManager) {} }",
+      "class S { find() { return this.manager.find(CourseEntity, { where: { id } }) } }",
+      // the platform database module builds the connections
+      {
+        code: "class DatabaseModule { constructor(private readonly dataSource: DataSource) {} }",
+        filename: "/repo/src/modules/platform/database/database.module.ts",
+      },
+      // a spec may build its own connection
+      {
+        code: "class T { run() { return dataSource.getRepository(CourseEntity) } }",
+        filename: "/repo/src/modules/domain/course/course.service.spec.ts",
+      },
+    ],
+    invalid: [
+      {
+        code: "class S { constructor(@InjectEntityManager() private readonly manager: EntityManager) {} }",
+        errors: [{ messageId: "unnamed" }],
+      },
+      {
+        code: "class S { find() { return this.dataSource.getRepository(CourseEntity).find() } }",
+        errors: [{ messageId: "getRepository" }],
+      },
+      {
+        code: "class S { find() { return this.manager.getRepository(CourseEntity).find() } }",
+        errors: [{ messageId: "getRepository" }],
+      },
+      {
+        code: "class S { save() { return this.manager.transaction(async (tx) => tx.getRepository(CourseEntity).save(row)) } }",
+        errors: [{ messageId: "getRepository" }],
+      },
+      {
+        code: "class S { constructor(private readonly dataSource: DataSource) {} }",
+        errors: [{ messageId: "dataSource" }],
+        filename: "/repo/src/modules/domain/course/course.service.ts",
+      },
+      {
+        code: "class S { constructor(@InjectDataSource() private readonly connection: Connection) {} }",
+        errors: [{ messageId: "dataSource" }],
+        filename: "/repo/src/features/sales/application/order.service.ts",
       },
     ],
   })

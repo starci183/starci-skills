@@ -156,13 +156,42 @@ rules:
     cases:
       - id: case-1
         when: A write followed by a notification
-        write: 'const order = await this.db.transaction(async (tx) => tx.getRepository(OrderEntity).save(entity)); await this.notifier.send(...) runs after the transaction, using the saved order.'
+        write: 'const order = await this.db.transaction(async (tx) => tx.save(OrderEntity, entity)); await this.notifier.send(...) runs after the transaction, using the saved order.'
       - id: case-2
         when: The effect must be exactly-once with the write
-        write: 'await this.db.transaction(async (tx) => { await tx.getRepository(OrderEntity).save(entity); await tx.getRepository(OutboxEntity).insert({ topic: "order.placed", payload }) }); the OutboxPublishJob (background.yaml) delivers the message later.'
+        write: 'await this.db.transaction(async (tx) => { await tx.save(OrderEntity, entity); await tx.insert(OutboxEntity, { topic: "order.placed", payload }) }); the OutboxPublishJob (background.yaml) delivers the message later.'
     verification:
       automated:
         - BE_TRANSACTION_EXTERNAL_CALL
       manual:
         - Confirm the chosen option (commit-then-call vs. outbox) matches whether the caller needs the effect to happen exactly once with the write or merely after it.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-7
+    title: The database is reached through the named shared EntityManager
+    kind: mandatory
+    hfsRules: [R83]
+    requirement: |-
+      A use case injects the shared EntityManager through a named injector - `InjectPrimaryEntityManager()`,
+      `InjectAgentOsEntityManager()`, `InjectExpertAcademyEntityManager()` or `@InjectEntityManager(<CONNECTION_TOKEN>)` -
+      and calls it directly (`manager.find(Entity, ...)`, `manager.save(Entity, ...)`, `tx.insert(Entity, ...)`).
+      `@InjectEntityManager()` is never written bare, `.getRepository(...)` is never called on a DataSource or an
+      EntityManager, `@InjectRepository(...)` and `Repository<T>` are never injected, and a `DataSource` is never
+      injected to run queries; only the platform database module and `apps/migrate` build or hold a `DataSource`.
+    rationale: |-
+      This application registers more than one datasource, so a bare injection points at whichever is default and reads
+      correctly while querying the wrong database. A repository handle is bound to one entity and cannot carry a
+      transaction into a second table, and a DataSource used for queries lets a caller bypass the named connection.
+      One shared manager per connection, named at the injection site and called directly, is the one pattern.
+    cases:
+      - id: case-1
+        when: A service reads and writes several tables
+        write: 'constructor(@InjectPrimaryEntityManager() private readonly manager: EntityManager) {} then this.manager.transaction(async (tx) => { await tx.save(OrderEntity, order); await tx.insert(OutboxEntity, row) }).'
+      - id: case-2
+        when: A service needs a connection that is not the primary one
+        write: 'constructor(@InjectAgentOsEntityManager() private readonly manager: EntityManager) {} or @InjectEntityManager(AGENT_OS_CONNECTION), never a bare @InjectEntityManager().'
+    verification:
+      automated:
+        - BE_UNNAMED_DATA_ACCESS
+      manual:
+        - Confirm the named injector points at the datasource that owns the entity being read or written.
     relatedExamples: []

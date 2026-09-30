@@ -28,6 +28,11 @@
  * ...)`. Holding the transaction open for as long as the external call takes means a failure after
  * partial commit, or a success the rollback then reverses with no way back; the fix is to commit
  * first and call out after, or to write an outbox message inside the transaction instead.
+ *
+ * `named-entity-manager-only` (R83 `BE_UNNAMED_DATA_ACCESS`) holds the one way a use case reaches the
+ * database: the shared `EntityManager` injected through a named injector and called directly. It refuses a bare
+ * `@InjectEntityManager()`, any `.getRepository(...)` call, and an injected `DataSource` outside the platform
+ * database module and `apps/migrate`. `no-injected-repository` refuses `@InjectRepository` and `Repository<T>` in the same spirit.
  */
 
 import { walk } from "./lib/ast.mjs"
@@ -104,21 +109,28 @@ export const mustInjectEntityManager = {
 export const noInjectedRepository = {
   meta: {
     type: "problem",
-    docs: { description: "Persistence goes through `EntityManager`, never an injected repository." },
+    docs: { description: "Persistence goes through the shared `EntityManager`, never an injected repository." },
     schema: [],
     messages: {
       repo:
-        "Inject `EntityManager` instead of a repository. A repository is bound to ONE entity, so it cannot carry a transaction into a second table - and a use case that grows a second write then has to be rewritten rather than extended.",
+        "Inject the shared EntityManager with the named injector and call it directly. A repository is bound to ONE entity, so it cannot carry a transaction into a second table - and a use case that grows a second write then has to be rewritten rather than extended.",
     },
   },
   create(context) {
     return {
+      // `@InjectRepository(...)` is refused wherever it is written: a constructor parameter, a property, a method parameter.
+      Decorator(node) {
+        const expression = node.expression
+        if (expression.type === "CallExpression" && expression.callee.type === "Identifier" && expression.callee.name === "InjectRepository") {
+          context.report({ node, messageId: "repo" })
+        }
+      },
       MethodDefinition(node) {
         for (const original of constructorParams(node)) {
           const param = unwrapParam(original)
-          const byDecorator = paramDecorators(original).includes("InjectRepository")
-          const byType = REPOSITORY_TYPES.test(paramTypeName(param) || "")
-          if (byDecorator || byType) context.report({ node: param, messageId: "repo" })
+          // A decorated parameter is reported once, by the Decorator visitor.
+          if (paramDecorators(original).includes("InjectRepository")) continue
+          if (REPOSITORY_TYPES.test(paramTypeName(param) || "")) context.report({ node: param, messageId: "repo" })
         }
       },
     }
@@ -349,6 +361,61 @@ export const noExternalCallInTransaction = {
   },
 }
 
+// -- DATA-7 (R83) ------------------------------------------------------------------------------------
+
+/** Files that build the connections: the platform database module and the migrate app. */
+const CONNECTION_BUILDER = /(?:^|\/)(?:platform\/(?:databases?|db|datasource|typeorm)|apps\/migrate)\//
+
+/** The one way a use case reaches the database: the shared `EntityManager`, named, then called directly. */
+export const namedEntityManagerOnly = {
+  meta: {
+    type: "problem",
+    docs: {
+      description:
+        "The shared EntityManager is injected through a named injector and called directly; no bare `@InjectEntityManager()`, no `getRepository`, no injected `DataSource` (data-access.md DATA-7, R83).",
+    },
+    schema: [],
+    messages: {
+      unnamed:
+        "`@InjectEntityManager()` names no connection, and this application registers more than one - so it points at whichever is default. Inject the shared EntityManager with the named injector (`InjectPrimaryEntityManager()`, `InjectAgentOsEntityManager()`, `InjectExpertAcademyEntityManager()`, or `@InjectEntityManager(<CONNECTION_TOKEN>)`) and call it directly.",
+      getRepository:
+        "`.getRepository(...)` binds a handle to ONE entity and hides which connection it came from. Inject the shared EntityManager with the named injector and call it directly: `manager.find(Entity, ...)`, `manager.save(Entity, ...)`, `tx.insert(Entity, ...)`.",
+      dataSource:
+        "`DataSource` is injected here to reach the database. Inject the shared EntityManager with the named injector and call it directly; a `DataSource` is built only by the platform database module.",
+    },
+  },
+  create(context) {
+    const filename = normalizePath(context.filename || context.getFilename())
+    if (/\.d\.[cm]?ts$/.test(filename) || /\.(?:spec|test)\.[cm]?[jt]sx?$/.test(filename)) return {}
+    const mayBuildConnections = CONNECTION_BUILDER.test(filename)
+    return {
+      Decorator(node) {
+        const expression = node.expression
+        if (expression.type !== "CallExpression" || expression.callee.type !== "Identifier") return
+        if (expression.callee.name === "InjectEntityManager" && expression.arguments.length === 0) {
+          context.report({ node, messageId: "unnamed" })
+        }
+      },
+      CallExpression(node) {
+        const callee = node.callee
+        if (callee.type !== "MemberExpression" || callee.computed) return
+        if (callee.property.type === "Identifier" && callee.property.name === "getRepository") {
+          context.report({ node, messageId: "getRepository" })
+        }
+      },
+      MethodDefinition(node) {
+        if (mayBuildConnections) return
+        for (const original of constructorParams(node)) {
+          const param = unwrapParam(original)
+          const byType = paramTypeName(param) === "DataSource"
+          const byDecorator = paramDecorators(original).some((name) => name === "InjectDataSource" || name === "InjectConnection")
+          if (byType || byDecorator) context.report({ node: param, messageId: "dataSource" })
+        }
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "must-inject-entity-manager": mustInjectEntityManager,
@@ -357,6 +424,7 @@ export const rules = {
   "no-outer-manager-in-transaction": noOuterManagerInTransaction,
   "no-eager-relation": noEagerRelation,
   "no-external-call-in-transaction": noExternalCallInTransaction,
+  "named-entity-manager-only": namedEntityManagerOnly,
 }
 
 /**
@@ -377,6 +445,7 @@ export const recommended = {
   "starci-be/no-outer-manager-in-transaction": "error",
   "starci-be/no-eager-relation": "error",
   "starci-be/no-external-call-in-transaction": "error",
+  "starci-be/named-entity-manager-only": "error",
 }
 
 /** Path helper shared with the other backend law modules. */

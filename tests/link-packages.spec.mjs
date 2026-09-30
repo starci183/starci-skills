@@ -95,3 +95,32 @@ test('starci link is a route of bin/starci.mjs and prints its usage errors', (t)
   assert.equal(ok.status, 0);
   assert.match(ok.stdout, /linked @starci\/tsconfig@1\.0\.0/);
 });
+
+test('link skips a pin whose install is registry: @starci/grammar stays as the exact registry version', (t) => {
+  const dir = repo(t, { name: 'r', dependencies: { '@starci/grammar': '0.7.1' }, devDependencies: { '@starci/vitest-preset': '1.0.0' } });
+  const result = linkPackages({ repo: dir, home: ROOT, side: 'fe' });
+  assert.equal(result.linked.some((entry) => entry.name === '@starci/grammar'), false, 'grammar is not linked');
+  assert.equal(fs.existsSync(path.join(dir, '.starci', 'packages', 'grammar')), false, 'no grammar copy is written');
+  const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+  assert.equal(pkg.dependencies['@starci/grammar'], '0.7.1', 'package.json keeps the registry spec');
+  assert.equal(pkg.devDependencies['@starci/vitest-preset'], 'file:.starci/packages/vitest-preset', 'the other fe packages are still linked');
+});
+
+test('link refuses --only naming a registry pin instead of rewriting it to file:', (t) => {
+  const dir = repo(t, { name: 'r', dependencies: { '@starci/grammar': '0.7.1' } });
+  assert.throws(() => linkPackages({ repo: dir, home: ROOT, only: ['grammar'] }), /@starci\/grammar: install: registry/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).dependencies['@starci/grammar'], '0.7.1');
+});
+
+test('starci link --help and -h only print usage: nothing is written to the repo', (t) => {
+  const dir = repo(t, { name: 'r' });
+  const before = fs.readFileSync(path.join(dir, 'package.json'), 'utf8');
+  for (const flag of ['--help', '-h']) {
+    const run = spawnSync(process.execPath, [path.join(ROOT, 'bin', 'starci.mjs'), 'link', '--repo', dir, '--home', ROOT, flag], { encoding: 'utf8' });
+    assert.equal(run.status, 0);
+    assert.match(run.stdout, /^starci link \[--repo <dir>\]/);
+    assert.doesNotMatch(run.stdout, /linked @starci/);
+  }
+  assert.equal(fs.existsSync(path.join(dir, '.starci')), false, 'no .starci directory');
+  assert.equal(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'), before, 'package.json is untouched');
+});

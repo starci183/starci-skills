@@ -10,7 +10,7 @@ The machine-readable parts live next to this file and are read by every check, l
 | File | Owns |
 | --- | --- |
 | `slots.yaml` | Every kind of content allowed to exist in a repository: path, presence, tracking, tier, required files, tests, budget, managed template. Versioned `MAJOR.MINOR.PATCH`. |
-| `rules.yaml` | The rule catalog `R01` to `R82` with finding code, gates and the Vietnamese why text (catalog below). |
+| `rules.yaml` | The rule catalog `R01` to `R83` with finding code, gates and the Vietnamese why text (catalog below). |
 | `canon-pins.yaml` | The exact versions of every `@starci/*` package and framework this major supports. |
 
 The pattern cases in `knowledge/patterns/{be,fe,repo}/` explain how to write code and structure files inside these
@@ -253,6 +253,11 @@ A loop that catches an error and waits before trying again goes through the shar
 No transaction spans an external call: commit first and call out after, or write an outbox message inside the
 transaction (R82). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`.
 
+The database is reached through the shared `EntityManager`, injected by a named injector (`InjectPrimaryEntityManager()`,
+`InjectAgentOsEntityManager()`, `InjectExpertAcademyEntityManager()` or `@InjectEntityManager(<CONNECTION_TOKEN>)`) and
+called directly. A bare `@InjectEntityManager()`, `.getRepository(...)`, `@InjectRepository(...)`, `Repository<T>` and an
+injected `DataSource` are refused; only the platform database module and `apps/migrate` hold a `DataSource` (R83).
+
 ## 6. Frontend
 
 ### 6.1 Source tree
@@ -475,6 +480,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R80 | `BE_INBOX_DEDUPE_MISSING` | Every `@Public()` webhook handler and outbox/queue consumer claims the event through the shared inbox, keyed by `(source, event id)`, before it acts. |
 | R81 | `BE_HAND_ROLLED_RETRY` | A loop that catches an error and waits before trying again goes through the shared `platform/retry` helper, never a hand-written loop. |
 | R82 | `BE_TRANSACTION_EXTERNAL_CALL` | No transaction spans an external call; commit first and call out after, or write an outbox message inside the transaction. |
+| R83 | `BE_UNNAMED_DATA_ACCESS` | The database is reached through the shared EntityManager injected by a named injector and called directly; no bare `@InjectEntityManager()`, `getRepository`, `@InjectRepository`, `Repository<T>` or injected `DataSource` (outside the platform database module). |
 
 **Frontend**
 

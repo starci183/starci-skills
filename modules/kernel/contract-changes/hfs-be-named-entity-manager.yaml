@@ -1,0 +1,31 @@
+id: hfs-be-named-entity-manager
+effectiveAt: '2026-09-30T12:00:00+07:00'
+summary: >-
+  HFS back-end catalog rule R83 (owner ruling 2026-09-30, task k13): the database is reached through ONE shared
+  EntityManager, injected by a named injector (InjectPrimaryEntityManager(), InjectAgentOsEntityManager(),
+  InjectExpertAcademyEntityManager() or @InjectEntityManager(<CONNECTION_TOKEN>)) and called directly. The new
+  failure code BE_UNNAMED_DATA_ACCESS (Vietnamese) is enforced by `named-entity-manager-only` in
+  `@starci/eslint-canon-be` 1.7.0 (data-access law): a bare `@InjectEntityManager()`, any `.getRepository(...)`
+  call and an injected DataSource are refused, DataSource being allowed only in the platform database module and
+  apps/migrate. `no-injected-repository` now also refuses `@InjectRepository(...)` wherever written and states the
+  same one pattern. New prose pattern BE-PERSISTENCE-7; the BE-PERSISTENCE-6 examples no longer use
+  `tx.getRepository`. canon-pins move @starci/eslint-canon-be to 1.7.0 and the nest profile carries the new version
+  and content digest. `starci link` (packages/hfs) skips a pin whose `install` is `registry` and `--help`/`-h`
+  only prints usage. A repository adopts the rule through its own migration lane; there is no compatibility window.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-be-named-entity-manager.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/models/code-patterns.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/canon-pins.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/be/persistence.yaml
+  - knowledge/patterns/be/index.yaml
+  - packages/eslint/be/package.json
+  - packages/eslint/be/README.md
+  - packages/eslint/be/CHANGELOG.md
+  - packages/eslint/be/data-access.mjs
+  - packages/eslint/be/data-access.test.mjs
+  - scripts/install/link-packages.mjs
+  - tests/link-packages.spec.mjs

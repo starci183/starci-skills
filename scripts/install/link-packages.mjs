@@ -6,7 +6,9 @@
 //
 // What it does, in order:
 //   1. resolves the runtime: --home, else $STARCI_HOME, else the tree this script lives in;
-//   2. reads knowledge/hfs/canon-pins.yaml and takes every `starci` pin the side owns (or --only);
+//   2. reads knowledge/hfs/canon-pins.yaml and takes every `starci` pin the side owns (or --only), except a pin with
+//      `install: registry` (a published package such as @starci/grammar): that one is installed from the npm registry
+//      at its exact pinned version and `starci link` never touches it;
 //   3. copies exactly the files `npm pack` would publish for each package (its `files` list) into
 //      <repo>/.starci/packages/<name>/ — a plain directory, never a symlink or junction, so it works on Windows
 //      without privileges and in CI, and the package resolves peers (jest, typescript, ...) from the repository;
@@ -95,16 +97,19 @@ export function linkPackages({ repo, home, side, only, install = false } = {}) {
   if (!fs.existsSync(path.join(repoDir, 'package.json'))) throw new Error(`${repoDir} has no package.json`);
   const runtime = resolveHome(home);
   const pins = loadPins(runtime).pins;
-  const wanted = Object.entries(pins).filter(([name, pin]) => {
-    if (pin.group !== 'starci') return false;
-    if (only) return only.includes(name) || only.includes(slugOf(name));
+  const starci = Object.entries(pins).filter(([, pin]) => pin.group === 'starci');
+  const named = (name, entry) => entry === name || entry === slugOf(name);
+  if (only) {
+    const unknown = only.filter((entry) => !starci.some(([name]) => named(name, entry)));
+    if (unknown.length) throw new Error(`not a starci pin: ${unknown.join(', ')}`);
+    const published = starci.filter(([name, pin]) => pin.install === 'registry' && only.some((entry) => named(name, entry)));
+    if (published.length) throw new Error(`${published.map(([name]) => name).join(', ')}: install: registry, installed from the npm registry at the pinned version and never linked`);
+  }
+  const wanted = starci.filter(([name, pin]) => {
+    if (pin.install === 'registry') return false;
+    if (only) return only.some((entry) => named(name, entry));
     return !side || pin.side === 'both' || pin.side === side;
   });
-  if (only) {
-    const known = new Set(wanted.flatMap(([name]) => [name, slugOf(name)]));
-    const unknown = only.filter((entry) => !known.has(entry));
-    if (unknown.length) throw new Error(`not a starci pin: ${unknown.join(', ')}`);
-  }
   if (!wanted.length) throw new Error('no starci pin matches that side');
   const linked = wanted.map(([name, pin]) => copyPackage({ home: runtime, pin, name, repo: repoDir }));
   updatePackageJson(repoDir, linked);
@@ -122,7 +127,18 @@ export function linkPackages({ repo, home, side, only, install = false } = {}) {
   return { repo: repoDir, home: runtime, linked, gitignoreUpdated: ignored, installed };
 }
 
+export const LINK_USAGE = `starci link [--repo <dir>] [--side be|fe] [--only <name,name>] [--home <runtime>] [--install] [--json]
+
+Copies the pinned @starci packages from the runtime checkout into <repo>/.starci/packages and points package.json at them.
+A pin with install: registry (@starci/grammar) is installed from the npm registry at its pinned version and is skipped.
+-h, --help   print this text and change nothing
+`;
+
 export function linkMain(argv = []) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    process.stdout.write(LINK_USAGE);
+    return 0;
+  }
   const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
   try {
     const only = flag('--only')?.split(',').map((entry) => entry.trim()).filter(Boolean);
