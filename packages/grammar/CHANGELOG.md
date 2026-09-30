@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.2 - 2026-09-30
+
+Patch, additive (nivo-fe wave, lane F0; owner approved publishing @starci packages).
+
+- `Input` gains `kind="tel"`: `type="tel"`, `inputMode="tel"`, `autoComplete="tel"`, so a phone field opens the phone keypad and
+  offers the saved number (the expert lead form lost both when it moved to the grammar).
+- `IconButton` takes the ARIA disclosure props, typed: `aria-controls?: string` and `aria-expanded?: boolean`, forwarded to the
+  button only when set. There is no open `...rest`: no other attribute passes through.
+
 ## 0.7.1 - 2026-09-30
 
 Test-suite policy only (owner decision 2026-09-30, follow HeroUI): the contrast pairs for a status soft pair (`--<tone>-soft-foreground` on `--<tone>-soft`), the Alert title and a bare status glyph or title on a ground are held to `SOFT_MIN` = 3:1 instead of 4.5:1. Body text, descriptions and interactive text keep 4.5:1. No shipped CSS or API changed.

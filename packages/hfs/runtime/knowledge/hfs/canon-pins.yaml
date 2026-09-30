@@ -10,12 +10,12 @@ pins:
   # --- @starci packages. Every @starci package is a PUBLISHED npm package (install: registry): a product repository
   # installs the exact pinned version from the npm registry in the root and every workspace package.json, never `file:`.
   '@starci/grammar':
-    version: 0.7.1
+    version: 0.7.2
     group: starci
     install: registry
     side: fe
     source: packages/grammar/package.json
-    why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.7.1.
+    why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.7.2 (Input tel kind and IconButton disclosure props).
   '@starci/eslint-canon-be':
     version: 1.7.1
     group: starci

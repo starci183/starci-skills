@@ -10,7 +10,7 @@ import {
     TextField as HeroTextField,
 } from "@heroui/react"
 
-export type InputKind = "email" | "password" | "newPassword" | "code" | "text"
+export type InputKind = "email" | "tel" | "password" | "newPassword" | "code" | "text"
 export type InputVariant = "primary" | "secondary"
 
 type InputIcon = ComponentType<{ readonly className?: string }>
@@ -39,6 +39,7 @@ export type InputProps = {
 
 const KINDS = {
     email: { type: "email", autoComplete: "email", inputMode: "email" },
+    tel: { type: "tel", autoComplete: "tel", inputMode: "tel" },
     password: { type: "password", autoComplete: "current-password", inputMode: "text" },
     newPassword: { type: "password", autoComplete: "new-password", inputMode: "text" },
     code: { type: "text", autoComplete: "one-time-code", inputMode: "numeric" },

@@ -63,7 +63,7 @@ rules:
     requirement: |
       Every `@starci/*` package (grammar, eslint-canon-be, eslint-canon-fe, stylelint-canon, tsconfig, prettier-config,
       jest-preset, vitest-preset, playwright-preset, hfs) is a published npm package: a product repository declares the exact pinned
-      version from `knowledge/hfs/canon-pins.yaml` (`"0.7.1"`, never a range, never `file:`) in the root and every workspace
+      version from `knowledge/hfs/canon-pins.yaml` (`"0.7.2"`, never a range, never `file:`) in the root and every workspace
       package.json and installs it from the npm registry. There is no other way to obtain a @starci package.
     rationale: |
       CI, the agents and a fresh clone obtain the same package builds from the same place, and the lockfile records a registry

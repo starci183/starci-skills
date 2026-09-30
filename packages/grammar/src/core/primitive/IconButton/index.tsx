@@ -17,6 +17,10 @@ export type IconButtonProps = {
     readonly isDisabled?: boolean
     readonly isSkeleton?: boolean
     readonly onPress?: () => void
+    /** Disclosure: the id of the region this button shows and hides (`aria-controls`). */
+    readonly "aria-controls"?: string
+    /** Disclosure: whether that region is open now (`aria-expanded`). */
+    readonly "aria-expanded"?: boolean
 }
 
 /**
@@ -34,6 +38,8 @@ export const IconButton = ({
     isDisabled = false,
     isSkeleton = false,
     onPress,
+    "aria-controls": controls,
+    "aria-expanded": expanded,
 }: IconButtonProps) => (
     <HeroButton
         data-tier="atom"
@@ -48,6 +54,8 @@ export const IconButton = ({
         isIconOnly
         isDisabled={isDisabled || isSkeleton}
         aria-label={label}
+        {...(controls === undefined ? {} : { "aria-controls": controls })}
+        {...(expanded === undefined ? {} : { "aria-expanded": expanded })}
         {...(isDisabled || isSkeleton || onPress === undefined ? {} : { onPress })}
     >
         {isSkeleton ? null : <Icon source={source} usage="leading" />}

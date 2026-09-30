@@ -40,3 +40,21 @@ describe("Core IconButton variant", () => {
         expect(markup).toContain("aria-label=\"More actions\"")
     })
 })
+
+describe("Core IconButton disclosure", () => {
+    it("forwards aria-controls and aria-expanded for a disclosure toggle", () => {
+        const markup = renderToStaticMarkup(
+            <IconButton source={SearchGlyph} label="Show filters" aria-controls="filters" aria-expanded={false} />,
+        )
+
+        expect(markup).toContain("aria-controls=\"filters\"")
+        expect(markup).toContain("aria-expanded=\"false\"")
+    })
+
+    it("stamps no disclosure state on a plain action", () => {
+        const markup = renderToStaticMarkup(<IconButton source={SearchGlyph} label="Search" />)
+
+        expect(markup).not.toContain("aria-controls")
+        expect(markup).not.toContain("aria-expanded")
+    })
+})

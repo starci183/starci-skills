@@ -25,3 +25,20 @@ describe("Core Input", () => {
     })
 })
 
+
+describe("Core Input tel kind", () => {
+    it("opens the phone keypad and offers the saved phone number", () => {
+        const markup = renderToStaticMarkup(<Input id="phone" name="phone" label="Phone" kind="tel" />)
+
+        expect(markup).toContain("type=\"tel\"")
+        expect(markup).toContain("inputMode=\"tel\"")
+        expect(markup).toContain("autoComplete=\"tel\"")
+    })
+
+    it("keeps the text kind free of phone semantics", () => {
+        const markup = renderToStaticMarkup(<Input id="name" name="name" label="Name" />)
+
+        expect(markup).toContain("type=\"text\"")
+        expect(markup).not.toContain("inputMode=\"tel\"")
+    })
+})
