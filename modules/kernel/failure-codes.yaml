@@ -807,11 +807,15 @@ BE_READONLY_BOUNDARY:
 BE_SCHEMA_AUTHORITY:
   title: "Schema defined at runtime"
   title_vi: "Schema được định nghĩa lúc chạy"
-  meaning_vi: "Một tệp để tiến trình đang chạy quyết định schema: một đối tượng tùy chọn của DataSource hoặc TypeORM không ghi literal synchronize: false, synchronize khác false, gọi dataSource.synchronize(), có khóa migrationsRun (cấm dưới mọi dạng), chuỗi DDL (CREATE/ALTER/DROP TABLE, INDEX, TYPE...) ngoài persistence/migrations/, hoặc tìm entity và migration bằng glob. Schema chỉ đổi bằng migration do apps/migrate chạy."
+  meaning_vi: "Một tệp để tiến trình đang chạy quyết định schema: một đối tượng tùy chọn của DataSource hoặc TypeORM không ghi literal synchronize: false, synchronize khác false, gọi dataSource.synchronize() hoặc dropDatabase(), có khóa migrationsRun (cấm dưới mọi dạng), gọi runMigrations() ngoài apps/migrate và test world, dropSchema khác false, dựng schema bằng createSchemaBuilder()/build(), khóa synchronize trong tùy chọn của @Entity, hook onModuleInit/onApplicationBootstrap ghi dữ liệu qua EntityManager hoặc DataSource (seed chỉ chạy trong apps/migrate), chuỗi DDL (CREATE/ALTER/DROP TABLE, INDEX, TYPE, SCHEMA, EXTENSION, TRIGGER, FUNCTION, ADD/DROP CONSTRAINT...) ngoài persistence/migrations/, hoặc tìm entity và migration bằng glob. Schema chỉ đổi bằng migration do apps/migrate chạy."
   causes_vi:
     - "new DataSource({ type: 'postgres' }) không ghi synchronize: false"
     - "synchronize: true, hoặc đọc từ biến môi trường"
     - "Chuỗi DDL trong .query ngoài migration"
+    - "dropSchema: true, hoặc dataSource.createSchemaBuilder().build() lúc chạy"
+    - "@Entity({ synchronize: false }): công tắc riêng cho từng entity"
+    - "onModuleInit ghi dữ liệu bằng entityManager.save/insert/query INSERT: seed lúc khởi động ở mọi tiến trình"
+    - "dataSource.runMigrations() gọi ngoài apps/migrate"
     - "entities hoặc migrations khai bằng đường dẫn có ký tự *"
   nextStep_vi: "Viết một migration trong persistence/migrations/ của capability sở hữu bảng và liệt kê entity, migration tường minh; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
