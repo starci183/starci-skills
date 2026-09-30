@@ -2,40 +2,42 @@ schema: starci/knowledge-source@1
 id: be.architecture-check
 title: Enforceable backend architecture boundaries
 purpose: |-
-  Define the backend responsibility tiers, the one dependency direction between them and the thin application
-  composition root. Every rule here is judged by the architecture machine of @starci/hfs, which reads the tiers and the
-  direction matrix from knowledge/hfs/slots.yaml and never keeps a path list of its own.
+  Define the backend responsibility tiers, the one dependency direction between them, the thin application composition root
+  and the one module shape. Every rule here is judged by the architecture machine of @starci/hfs, which reads the tiers and
+  the direction matrix from knowledge/hfs/slots.yaml and never keeps a path list of its own.
 appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
     - docs/backend-source-pattern.md
+    - owner-locked BE convention 2026-09-30
     - https://docs.nestjs.com/modules
     - https://www.typescriptlang.org/docs/handbook/modules/reference.html
   limitations: |-
     Static TypeScript dependency analysis does not prove Nest dependency-injection identity, provider scope, runtime
-    registration, transaction boundaries or business behavior. The composition spec that boots the real AppModule and
-    the behavior evidence separately prove registration. The selected repository's manifests, tsconfig and resolved
-    package exports are the resolution authority.
+    registration, transaction boundaries or business behavior. The composition spec that boots the real AppModule and the
+    behavior evidence separately prove registration. The selected repository's manifests, tsconfig and resolved package
+    exports are the resolution authority.
 rules:
   - id: BE-ARCHITECTURE-1
     title: Dependency direction follows the tier matrix
     kind: mandatory
-    hfsRules: [R26, R28]
+    hfsRules: [R26, R27, R28]
     requirement: |-
-      Imports follow one matrix. An app may import features, domain, platform, integrations and packages. A feature may
-      import domain, platform, integrations and packages, and never another feature. A domain capability may import
-      other domain capabilities (acyclic), platform, integrations and packages. An integration may import platform and
-      packages only. A platform capability may import platform (acyclic) and packages only. An `import type`, a
-      re-export, a static dynamic-import literal and a package export count exactly like a value import. A type that
-      platform and domain both need moves down to platform or is passed through options.
+      Imports follow one matrix. An app may import features, domain, platform, integrations and packages. A feature may import
+      domain, platform, integrations and packages, and never another feature. A domain capability may import other domain
+      capabilities (acyclic), platform, integrations and packages. An integration may import platform and packages only. A
+      platform capability may import platform (acyclic) and packages only. An `import type`, a re-export, a static dynamic-import
+      literal and a package export count exactly like a value import. A type that platform and domain both need moves down to
+      platform or is passed through options.
     rationale: |-
-      Domain owns invariants, platform is technical runtime, integrations translate providers. Any upward edge makes
-      an owner impossible to test or split, and a type-only edge hides a real cycle from the compiler and the linter.
+      Domain owns invariants, platform is technical runtime, integrations translate providers. Any upward edge makes an owner
+      impossible to test or split, and a type-only edge hides a real cycle from the compiler and the linter.
     cases:
       - id: case-1
         when: A feature needs behavior that another feature already has
@@ -53,6 +55,7 @@ rules:
       automated:
         - BE_TIER_DIRECTION
         - BE_FEATURE_IMPORTS_FEATURE
+        - ARCH_OWNER_CYCLE
         - ARCH_PACKAGE_IMPORTS_APP
         - ARCH_PACKAGE_EXPORT_BYPASS
         - ARCH_INTERNAL_IMPORT_UNRESOLVED
@@ -65,22 +68,23 @@ rules:
     kind: mandatory
     hfsRules: [R32, R33]
     requirement: |-
-      An app directory `apps/<app>/src` holds `main.ts`, `app.module.ts`, an optional `<app>.options.ts` and the
-      required `<app>.composition.spec.ts`. `main.ts` reads the environment once through `EnvSource`, parses every
-      capability config into options, calls `AppModule.register(options)`, and handles startup failure. `app.module.ts`
-      imports feature transport modules and capability modules, registers `APP_GUARD` and `APP_FILTER`, and holds no
-      business handler, service, controller, resolver, repository or entity. The composition spec boots the real
-      AppModule with stubbed options and resolves real provider tokens. A process entrypoint (`main.ts`, `bootstrap()`,
-      a top-level `void x()`) exists only under `apps/*/src`; migrations run from `apps/migrate`.
+      An app directory `apps/<app>/src` holds `main.ts` (at most 80 lines), `app.module.ts` (at most 250 lines, with
+      `static register(options: AppOptions)`), `<app>.options.ts` and the required `<app>.composition.spec.ts`. `main.ts`
+      builds `EnvSource` once, parses every capability config into `AppOptions`, calls `AppModule.register(options)` and handles
+      startup failure. `app.module.ts` registers the capability modules, the transport modules of the app's kind (api:
+      `-graphql`, `-http`, `-websocket`; worker: `-schedule`, `-message`; cli: `-cli`), and `APP_GUARD` and `APP_FILTER`, and
+      holds no business handler, service, controller, resolver or entity. The composition spec boots the real
+      `AppModule.register(testOptions)` and resolves real provider tokens. A process entrypoint (`main.ts`, `bootstrap()`, a
+      top-level `void x()`, `NestFactory.create`) exists only under `apps/*/src`; migrations run from `apps/migrate`.
     rationale: |-
       A thin composition root makes startup explicit and keeps product behavior independently testable below it.
     cases:
       - id: case-1
         when: Process entry
-        write: main.ts reads env, parses options, creates the Nest app from AppModule.register(options), installs process-level adapters, starts, and reports a startup failure with the failing key or module name.
+        write: main.ts builds EnvSource, parses options, creates the Nest app from AppModule.register(options), starts, and reports a startup failure with the failing key or module name.
       - id: case-2
         when: Root dependency composition
-        write: app.module.ts lists `OrdersHttpModule`, `IdentityModule.register(options.identity)` and the platform modules, plus the APP_GUARD and APP_FILTER providers.
+        write: 'app.module.ts lists ClockModule.register({ isGlobal: true }), PurchaseModule.register({ isGlobal: true, ...options.purchase }), CheckoutGraphqlModule and the APP_GUARD and APP_FILTER providers.'
       - id: case-3
         when: A second process kind is needed
         write: Add `apps/worker`, `apps/migrate` or `apps/cli` and declare its kind in hfs.json; never grow the api app.
@@ -94,59 +98,72 @@ rules:
         - Verify that the composition spec resolves real tokens and fails when a module is missing.
     relatedExamples: []
   - id: BE-ARCHITECTURE-3
-    title: Modules export explicit capability APIs
+    title: One module shape; one representative module per capability, registered once per app
     kind: mandatory
     hfsRules: [R30, R45]
     requirement: |-
-      Each owner (feature, domain capability, platform capability, integration) exposes one `index.ts` with named
-      exports only, no `export *`, at most 60 exports, and no repository token or ORM entity type. A consumer imports
-      the owning module and never re-registers its provider. `@Global()` is allowed only on `platform/{config,logging,database}`.
-      A dynamic module uses `ConfigurableModuleBuilder<Options>` with a real options type and a `static register`. Named
-      connections, tenant or workspace instances and request-scoped providers keep distinct tokens and are never made
-      globally interchangeable.
+      Every capability module (`src/modules/{domain,platform,integrations}/<c>/<c>.module.ts`) is
+      `@Module({...}) export class XModule extends ConfigurableModuleClass {}` with a `<c>.module-definition.ts` built by
+      `new ConfigurableModuleBuilder<XOptions>().setExtras({ isGlobal: false }, (definition, extras) => ({ ...definition, global: extras.isGlobal })).build()`.
+      The generic `XOptions` is required; a capability without options declares `export type XOptions = Record<string, never>` in
+      `<c>.options.ts`. Only the method name `register` exists (no `forRoot`, `forFeature`, `registerAsync`); a module that adds
+      providers overrides `static register(options: typeof OPTIONS_TYPE): DynamicModule`. Each capability has one representative
+      module (`AnimalModule`), the only module of the capability registered in an app, exactly once per app, in
+      `apps/<app>/src/app.module.ts`, as `X.register({ isGlobal: true, ...options.x })`. A representative may split its
+      complexity into sub-modules (`PetModule`, `HumanModule`) and import them as plain `imports: [PetModule]`; a sub-module is
+      never registered in an app, never global and has exactly one importer, its parent. Other capabilities reach a capability
+      only through its `Inject<Thing>()` decorators and never import its representative module. `isGlobal: true` appears only in
+      app roots and `@Global()` appears nowhere (tests included). The one legal cross-module import is a transport module
+      importing its own feature's application module. No `new` of an `@Injectable`, no module-level `let`, no two modules in
+      one file, no `PortBinding`-style composition helper, no `ModuleRef`. Each owner exposes one `index.ts` with named exports
+      only, no `export *`, at most 60 names.
     rationale: |-
-      Nest exports are the module's public API. A duplicated provider registration creates a second instance, and
-      global scope is a lifetime decision, not a shortcut for imports.
+      A stateful module imported from two consumers is two instances: two pools, two clients. Registering the representative
+      once at the app root removes that failure class and makes globality a composition decision; splitting a capability into
+      sub-modules only reduces the complexity of one parent.
     cases:
       - id: case-1
-        when: Several features need one shared stateless capability
-        write: Export a narrow module API from that capability and import the module in each consumer.
+        when: A capability with options
+        write: 'purchase.module-definition.ts builds ConfigurableModuleClass and OPTIONS_TYPE from ConfigurableModuleBuilder<PurchaseOptions>; PurchaseModule extends ConfigurableModuleClass and is registered once as PurchaseModule.register({ isGlobal: true, ...options.purchase }).'
       - id: case-2
-        when: Providers differ by connection, tenant or configuration
-        write: Keep explicit `register(options)` calls and distinct tokens.
+        when: A feature needs a provider of another capability
+        write: Inject it through the capability's injector or by class from its public entry; the app registered the capability once, and the feature module does not import it.
       - id: case-3
-        when: A feature needs a provider of another owner
-        write: Import the module that exports it and inject it; do not list the provider again.
+        when: A capability grows too large for one module
+        write: 'PurchaseModule imports PetModule-style sub-modules as plain imports; only PurchaseModule appears in an app''s imports.'
+      - id: case-4
+        when: Providers differ by connection
+        write: 'Keep one connection per database with its own injector and one DatabaseModule.register({ isGlobal: true, connections: [...] }) at the app root.'
     verification:
       automated:
         - BE_PUBLIC_SURFACE
         - BE_MODULE_SHAPE
       manual:
-        - Review provider token, scope, lifetime and duplicate registration through the composition spec.
+        - Review provider token, scope and lifetime through the composition spec.
     relatedExamples: []
   - id: BE-ARCHITECTURE-4
     title: Application contracts do not depend on transport adapters
     kind: mandatory
     hfsRules: [R29, R37]
     requirement: |-
-      Use cases and their plain contracts in `application/` do not import transport DTOs, request or session framework
-      context, generated GraphQL types or protocol decorators, and no ORM entity appears in a contract. Transport
-      adapters under `transport/<protocol>/` import application contracts and project results. Nest injection alone is
-      allowed in `application/`; a namespace alias must not hide a protocol decorator.
+      Messages, handlers and their plain contracts in `application/` do not import transport DTOs, request or session framework
+      context, generated GraphQL types or protocol decorators, and no ORM entity appears in a contract. Transport adapters under
+      `transport/<protocol>/` import application messages and contracts and project results. Nest injection alone is allowed
+      in `application/`; a namespace alias must not hide a protocol decorator.
     rationale: |-
-      Several protocols reuse one scenario only when its contract depends on none of their request or response shapes.
+      Several protocols reuse one operation only when its contract depends on none of their request or response shapes.
     cases:
       - id: case-1
-        when: A use case needs the caller
-        write: Accept a principal (id and role) in a plain contract; never a request object, token or ORM user.
+        when: A handler needs the caller
+        write: Accept `ExecuteParams<T>` whose `principal` is `{ id, roles }`; never a request object, token or ORM user.
       - id: case-2
         when: A result reaches a resolver
-        write: The resolver maps the plain result to its output type in `<action>.mapper.ts` when the conversion has substance.
+        write: The resolver maps the plain result to its `<Action>Type` in `<action>.mapper.ts`.
     verification:
       automated:
-        - BE_APPLICATION_IMPORTS_TRANSPORT
-        - BE_APPLICATION_TRANSPORT_FRAMEWORK
+        - BE_FEATURE_SHAPE
         - BE_ENTITY_IN_CONTRACT
+        - BE_TRANSPORT_SHAPE
       manual:
         - Check generated wire types and same-source public API leaks outside recognizable configured paths.
     relatedExamples: []
@@ -156,11 +173,10 @@ rules:
     hfsRules: [R27, R31]
     requirement: |-
       No cycle exists between owners at any tier, and `import type` edges are part of the graph. Every feature and every
-      transport module is imported by at least one app. Code that no app composes never runs, so it is a finding even
-      when its specs pass.
+      transport module is composed by at least one app. Code that no app composes never runs, so it is a finding even when its
+      specs pass.
     rationale: |-
-      A cycle prevents separate testing and splitting, and an uncomposed feature is dead code that still looks
-      finished.
+      A cycle prevents separate testing and splitting, and an uncomposed feature is dead code that still looks finished.
     cases:
       - id: case-1
         when: Two capabilities need each other

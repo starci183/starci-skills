@@ -2,17 +2,19 @@ schema: starci/knowledge-source@1
 id: be.imports
 title: Imports
 purpose: |-
-  Given a backend file, what may it import, through which path and in which direction? Layout of the import block
-  (braces, line breaks, wrapping) is Prettier's decision and is not a rule.
+  Given a backend file, what may it import, through which path and in which direction? Layout of the import block (braces,
+  line breaks, wrapping) is Prettier's decision and is not a rule.
 appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
     - knowledge/patterns/be/architecture-check.yaml
+    - owner-locked BE convention 2026-09-30
     - https://www.typescriptlang.org/docs/handbook/modules/reference.html
   limitations: |-
     Static analysis resolves aliases, relative paths, literals, re-exports and packages through the repository's actual
@@ -21,31 +23,33 @@ rules:
   - id: BE-IMPORTS-1
     title: Paths
     kind: mandatory
-    hfsRules: [R30]
+    hfsRules: [R30, R25]
     requirement: |-
-      Across owners use the repository aliases from `@starci/tsconfig` (`@modules/*`, `@features/*`, `@tests/*`) or a
-      workspace package export, and always resolve to the target owner's `index.ts`. Inside one owner use relative
-      imports and never import the owner's own public `index.ts` back into its implementation. Deep imports into another
-      owner's files are forbidden; a barrel that re-exports a folder wholesale (`export *`) is forbidden.
+      Across owners use the repository aliases from `@starci/tsconfig` (`@modules/*`, `@features/*`, `@tests/*`) or a workspace
+      package export, and always resolve to the target owner's `index.ts`. Inside one owner use relative imports and never
+      import the owner's own public `index.ts` back into its implementation. Deep imports into another owner's files are
+      forbidden, a barrel that re-exports a folder wholesale (`export *`) is forbidden, and a nested `index.ts` does not exist.
+      An `index.ts` holds only named `export { }` and `export type { }` lines, at most 60 names, and no symbol that nothing
+      outside the owner uses.
     rationale: |-
       One public entry per owner is the only way to change internals without a cross-repository search.
     cases:
       - id: case-1
         when: Across a capability boundary
-        write: 'import { OrdersModule } from "@modules/domain/orders"'
+        write: 'import { PurchaseService } from "@modules/domain/purchase"'
       - id: case-2
         when: Inside one owner
-        write: 'import { OrderRepository } from "./persistence/order.repository"'
+        write: 'import { FIND_OPEN_PURCHASES } from "./persistence/purchase.sql"'
       - id: case-3
         when: Test helpers
-        write: 'import { orderBuilder } from "@tests/fixtures/orders"'
+        write: 'import { mockEntityManager } from "@tests/fixtures/database"'
     verification:
       automated:
         - BE_PUBLIC_SURFACE
         - ARCH_OWNER_EXPORT_BYPASS
         - ARCH_OWNER_EXPORT_STAR
         - ARCH_PACKAGE_EXPORT_BYPASS
-        - no-self-module-alias
+        - HFS_UNUSED_EXPORT
       manual: []
     relatedExamples: []
   - id: BE-IMPORTS-2
@@ -53,9 +57,10 @@ rules:
     kind: mandatory
     hfsRules: [R19]
     requirement: |-
-      The layout of an import declaration (single line, wrapped, trailing comma) is produced by Prettier and is neither
-      linted nor reviewed. Type-only bindings use `import type`; the type-import lint rule checks usage. Side-effect,
-      default-only and namespace imports use their valid TypeScript forms.
+      The layout of an import declaration (single line, wrapped, trailing comma) is produced by Prettier
+      (`@starci/prettier-config`: printWidth 120, 4 spaces, no semicolons, double quotes, trailing commas) and is neither linted
+      nor reviewed; ESLint carries no formatting rule. Type-only bindings use `import type`. Side-effect, default-only and
+      namespace imports use their valid TypeScript forms.
     rationale: |-
       A formatter that decides layout removes a whole class of review noise and one-binding-per-line inflation.
     cases:
@@ -65,7 +70,6 @@ rules:
     verification:
       automated:
         - HFS_FORMAT
-        - "@typescript-eslint/consistent-type-imports"
       manual: []
     relatedExamples: []
   - id: BE-IMPORTS-3
@@ -73,8 +77,8 @@ rules:
     kind: residual
     hfsRules: [R19]
     requirement: |-
-      Import order is not enforced. The conventional grouping is the Nest and framework packages first, then capability
-      imports through aliases, then relative imports, and is left to the author.
+      Import order is not enforced. The conventional grouping is the Nest and framework packages first, then capability imports
+      through aliases, then relative imports, and is left to the author.
     rationale: |-
       Order carries no dependency meaning that a check could judge.
     cases:
@@ -90,16 +94,14 @@ rules:
     kind: mandatory
     hfsRules: [R26, R27, R28, R30]
     requirement: |-
-      Dependencies follow the tier matrix in be/architecture-check.yaml BE-ARCHITECTURE-1. A feature never imports a
-      feature. Cross-owner imports use explicit public entries and required Nest module registrations. Global
-      registration is reserved for `platform/{config,logging,database}`. Named connections, tenant or provider
-      instances and request scopes stay explicit. A cycle between owners, including through `import type`, is a finding.
+      Dependencies follow the tier matrix in architecture-check.yaml BE-ARCHITECTURE-1. A feature never imports a feature.
+      Cross-owner imports use explicit public entries. A cycle between owners, including through `import type`, is a finding.
     rationale: |-
       The direction is what lets owners be tested and split separately.
     cases:
       - id: case-1
         when: Across a capability boundary
-        write: Import the explicit public entry and the module that exports the required provider; do not register that provider a second time.
+        write: Import the explicit public entry and inject the exported service or port; the app registered the capability once.
       - id: case-2
         when: Inside one owner
         write: Use local relative paths.
@@ -113,52 +115,48 @@ rules:
         - Review same-source public API use, exports and actual DI identity.
     relatedExamples: []
   - id: BE-IMPORTS-5
-    title: What a transport or use case imports
+    title: What a transport or handler imports
     kind: mandatory
-    hfsRules: [R26, R37]
+    hfsRules: [R26, R37, R88]
     requirement: |-
-      A use case imports plain application contracts and capability public APIs. A resolver or controller imports its
-      transport DTOs plus the public use-case API. A bus handler additionally imports its message and the framework
-      handler interface. No transport file imports another feature, and no application file imports a transport file.
+      A handler imports its message, its plain contracts, `platform/*` ports and the public APIs of domain capabilities. A
+      resolver or controller imports its transport DTOs, the application messages of its own feature and `platform/cqrs`. No
+      transport file imports another feature, and no application file imports a transport file.
     rationale: |-
       The import set of a unit shows its responsibility.
     cases: []
     verification:
       automated:
-        - BE_APPLICATION_IMPORTS_TRANSPORT
         - BE_FEATURE_IMPORTS_FEATURE
+        - BE_TRANSPORT_SHAPE
       manual: []
     relatedExamples: []
   - id: BE-IMPORTS-6
     title: Forbidden
     kind: mandatory
-    hfsRules: [R40, R43, R30]
+    hfsRules: [R40, R43, R89, R90]
     requirement: |-
-      Source exports are named; the only default export is an actual Jest globalSetup or globalTeardown entry. Raw
-      environment access belongs to `platform/config/env-source.ts`; all other source receives typed options. Raw cache
-      tokens stay inside their declared cache owner. No `console.*` and no Nest `Logger` in application source; use the
-      `Logger` port of `platform/logging`.
+      Source exports are named; the only default export is a Jest `*.global-setup.ts` entry. Raw environment access belongs to
+      `platform/config`; all other source receives typed options. A raw infrastructure library is imported only by its owner
+      (infra.yaml). No `console.*` and no Nest `Logger` in source; use the `Logger` port of `platform/logging`.
     rationale: |-
       One reader of the environment and one logger port keep configuration and diagnostics in one place.
     cases:
       - id: case-1
         when: Default export
-        write: Named exports everywhere; the normalized Jest configuration proves a lifecycle exception, not its file name.
+        write: Named exports everywhere; only src/tests/e2e/setup/*.global-setup.ts default-exports the Jest API.
       - id: case-2
         when: process.env
-        write: Only platform/config/env-source.ts reads it; a capability config parses the values that EnvSource passes.
+        write: Only platform/config reads it; a capability config parses the values that EnvSource passes.
       - id: case-3
         when: console.* or the Nest Logger
-        write: Use `this.logger.info(OrderLog.Placed, { orderId })` on the injected Logger port.
+        write: Use `this.logger.info(PurchaseLogEvent.CheckoutOpened, { purchaseId })` on the injected Logger port.
     verification:
       automated:
         - BE_CONFIG_OWNER
         - BE_LOGGER_REQUIRED
-        - NEST_NAMED_EXPORTS
-        - NEST_ENV_ACCESS
-        - NEST_CACHE_TOKEN_BOUNDARY
-        - no-nest-logger
-        - no-framework-logger
+        - BE_INFRA_OWNER
+        - BE_SOURCE_FORM
       manual: []
     relatedExamples: []
   - id: BE-IMPORTS-7
@@ -176,7 +174,6 @@ rules:
         write: 'moduleNameMapper: { "^@modules/(.*)$": "<rootDir>/src/modules/$1", "^@features/(.*)$": "<rootDir>/src/features/$1", "^@tests/(.*)$": "<rootDir>/src/tests/$1" }'
     verification:
       automated:
-        - NEST_JEST_ALIAS_PARITY
         - BE_TEST_TOPOLOGY
       manual: []
     relatedExamples: []

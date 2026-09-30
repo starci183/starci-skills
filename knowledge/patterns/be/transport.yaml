@@ -1,0 +1,125 @@
+schema: starci/knowledge-source@1
+id: be.transport
+title: Backend transport
+purpose: |-
+  Given a door into the application (GraphQL, HTTP, WebSocket, schedule, message, CLI), how is it written? A transport
+  maps its input, dispatches exactly one command or query on the bus, and maps the result. It injects nothing else,
+  returns no envelope and takes no `GraphQLJSON`.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-09-30
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner-locked BE convention 2026-09-30
+    - https://docs.nestjs.com/graphql/quick-start
+  limitations: |-
+    Static checks prove what a transport file injects, imports and dispatches. They do not prove that a mapping is right,
+    that a status fits the accepted API contract or that a client handles an error code; contract and e2e tests do.
+rules:
+  - id: BE-TRANSPORT-1
+    title: GraphQL is the default door and its files are flat
+    kind: mandatory
+    hfsRules: [R88, R89]
+    requirement: |-
+      GraphQL (code-first, Apollo) is the default door. Resolver files are `transport/graphql/<action>.resolver.ts`, inputs
+      `transport/graphql/dto/<action>.input.ts` (`<Action>Input`), outputs `dto/<action>.type.ts` (`<Action>Type`),
+      `dto/<action>.args.ts` when needed, and mappers `<action>.mapper.ts` (`to<Action>Type`, `to<Action>Request`). The method
+      name is the operation name and `name:` equals the method. There is one Nest module per transport
+      (`<feature>-graphql.module.ts`), never one per operation.
+    rationale: |-
+      One flat shape per operation makes the operation, its input, its output and its mapper findable from the name alone.
+    cases:
+      - id: case-1
+        when: A mutation
+        write: |-
+          @Resolver()
+          /** GraphQL door of startCheckout. */
+          export class StartCheckoutResolver {
+              constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
+
+              @Mutation(() => StartCheckoutType, { name: "startCheckout" })
+              async startCheckout(@CurrentPrincipal() principal: Principal, @Args("input") input: StartCheckoutInput): Promise<StartCheckoutType> {
+                  const outcome = await this.commandBus.execute(new StartCheckoutCommand({ request: toStartCheckoutRequest(input), principal }))
+                  return toStartCheckoutType(unwrapOutcome(outcome, PurchaseError))
+              }
+          }
+    verification:
+      automated:
+        - BE_TRANSPORT_SHAPE
+        - BE_SOURCE_FORM
+      manual: []
+    relatedExamples: []
+  - id: BE-TRANSPORT-2
+    title: A transport injects only the bus and dispatches one message
+    kind: mandatory
+    hfsRules: [R88, R87]
+    requirement: |-
+      A transport file may import its feature's `application/` messages and contracts, `platform/*`, the public decorators of
+      `domain/identity` and its own `dto/`. It injects only `InjectCommandBus` / `InjectQueryBus` (and `InjectRequestLocale`
+      for REST content negotiation): no EntityManager, no domain service, no logic beyond mapping. Every transport handler
+      (resolver method, controller action, gateway handler, consumer, job, cli) dispatches exactly one command or query. A
+      refusal in the result becomes a throw only here, with `unwrapOutcome(outcome, <C>Error)`.
+    rationale: |-
+      A transport that reaches the database or a service can bypass the handler's authorization and its transaction, and a
+      second dispatch in one handler is a scenario that belongs in one command.
+    cases:
+      - id: case-1
+        when: A resolver needs a read and a write
+        write: 'Two operations, two resolver methods, each dispatching one message; a scenario needing both is one command.'
+    verification:
+      automated:
+        - BE_TRANSPORT_SHAPE
+        - BE_CQRS_SHAPE
+      manual: []
+    relatedExamples: []
+  - id: BE-TRANSPORT-3
+    title: No response envelope
+    kind: mandatory
+    hfsRules: [R88, R78]
+    requirement: |-
+      `GraphQLTransformInterceptor`, `@GraphQLSuccessMessage`, `AbstractGraphQLResponse` and `RestTransformInterceptor` do not
+      exist. A resolver returns the typed payload; a failure travels as `errors[].extensions.{code,kind}`; success copy is
+      front-end i18n. `GraphQLJSON` is not an input or output type.
+    rationale: |-
+      An envelope duplicates GraphQL's own error channel, turns failures into HTTP 200 `success: false` and puts user copy
+      in the back end.
+    cases:
+      - id: case-1
+        when: A result
+        write: 'Return `StartCheckoutType` itself; never `{ success, message, data }`.'
+    verification:
+      automated:
+        - BE_TRANSPORT_SHAPE
+        - BE_USER_COPY_LITERAL
+      manual: []
+    relatedExamples: []
+  - id: BE-TRANSPORT-4
+    title: REST, WebSocket, schedule, message and CLI have one shape each
+    kind: mandatory
+    hfsRules: [R88, R89, R46, R90]
+    requirement: |-
+      REST is only for signed webhooks, OAuth redirects and callbacks, health and readiness, and byte streams:
+      `transport/http/<action>.controller.ts`, DTOs `dto/<action>.{request,response}.ts`, versioned routes, no `@Res()`
+      passthrough except a byte stream. WebSocket: `transport/websocket/<channel>.gateway.ts`, the handshake authenticated by
+      `domain/identity`, each `@SubscribeMessage` covered by the global guards, payload DTOs validated like inputs. Schedule:
+      `transport/schedule/<job>.job.ts` (background.yaml). Message: `transport/message/<event>.consumer.ts`
+      (background.yaml). CLI: `transport/cli/<name>.cli.ts` registered through `platform/cli` and composed only by an app of
+      kind `cli`.
+    rationale: |-
+      Each protocol has one place and one shape, so an app composes exactly the transports it serves.
+    cases:
+      - id: case-1
+        when: A health probe
+        write: 'features/health/transport/http/health.controller.ts is `@Public({ reason: PublicReason.Health })` and dispatches CheckHealthQuery.'
+    verification:
+      automated:
+        - BE_TRANSPORT_SHAPE
+        - BE_SOURCE_FORM
+        - BE_BACKGROUND_UNOWNED
+      manual:
+        - Confirm REST is used only where GraphQL cannot serve.
+    relatedExamples: []

@@ -2,46 +2,50 @@ schema: starci/knowledge-source@1
 id: be.api-auth
 title: API authentication and input bounds
 purpose: |-
-  Given an api app, which routes are open, who verifies the caller and how is input bounded? Every route is denied by
-  default. Opening a route is a written, reviewed decision.
+  Given an api app, which operations are open, who verifies the caller, how is state-changing traffic protected and how is
+  input bounded? Every operation is denied by default. Opening one is a written, reviewed decision with a reason from a
+  closed vocabulary.
 appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner-locked BE convention 2026-09-30
     - https://docs.nestjs.com/guards
     - https://www.rfc-editor.org/rfc/rfc8725.html
     - https://nodejs.org/api/crypto.html#cryptotimingsafeequala-b
   limitations: |-
-    Static checks prove that a guard is registered and that no route is open without a reason. They do not prove that a
-    policy is correct, that a token is verified with the right audience, or that a rate limit is effective. Those need
-    contract tests and negative-path evidence.
+    Static checks prove that the guards are registered in order and that no operation is open without a reason. They do not
+    prove that a policy is correct, that a token is verified with the right audience, or that a rate limit is effective.
+    Those need contract tests and negative-path evidence.
 rules:
   - id: BE-AUTH-1
     title: Default deny with APP_GUARD and @Public
     kind: mandatory
     hfsRules: [R41]
     requirement: |-
-      `domain/identity` exports `AuthGuard`, `@Public({ reason })` and `@Roles()`. Every api app registers the guard as
-      `APP_GUARD` in `app.module.ts`. A route or GraphQL operation is open only when it carries `@Public({ reason })` with
-      a written reason: sign-in and recovery doors, a signed webhook, a health probe. Any other operation requires the
-      authenticated principal. A worker, migrate or cli app exposes no route.
+      `domain/identity` exports `AuthGuard`, `@Public({ reason: PublicReason.X })`, `@Roles(...)` and `@CurrentPrincipal()`.
+      Every api app registers, in this order, the `APP_GUARD` throttler, the CSRF origin guard and `AuthGuard`. `PublicReason`
+      is an enum closed at `Health | AuthHandshake | SignedWebhook | CatalogRead`; a new reason is a `.claude` change. An
+      operation is open only when it carries `@Public({ reason })`; any other operation requires the authenticated principal.
+      `@UseGuards` is not used for authentication or authorization. A worker, migrate or cli app exposes no route.
     rationale: |-
-      With allow-by-default a forgotten decorator publishes a route unnoticed. With default deny it fails closed and the
-      exception carries its own justification.
+      With allow-by-default a forgotten decorator publishes an operation unnoticed. With default deny it fails closed and the
+      exception carries a reason a reviewer can read.
     cases:
       - id: case-1
         when: Registration
-        write: 'apps/api/src/app.module.ts provides { provide: APP_GUARD, useClass: AuthGuard }.'
+        write: 'apps/api/src/app.module.ts provides { provide: APP_GUARD, useClass: RateLimitGuard }, { provide: APP_GUARD, useClass: OriginGuard } and { provide: APP_GUARD, useClass: AuthGuard } in that order.'
       - id: case-2
         when: An open door
-        write: '@Public({ reason: "sign-in door, authenticates by password" }) on SignInController.signIn'
+        write: '@Public({ reason: PublicReason.AuthHandshake }) on the signIn operation'
       - id: case-3
         when: A role-restricted operation
-        write: '@Roles(Role.Admin) on the resolver, checked by the same guard.'
+        write: '@Roles("admin") on the resolver method, checked by the same guard.'
     verification:
       automated:
         - BE_DEFAULT_DENY
@@ -55,17 +59,17 @@ rules:
     hfsRules: [R26, R41]
     requirement: |-
       Verifying a token or session belongs to `domain/identity`, which uses `integrations/<provider>` for the identity
-      provider. Platform never verifies a caller and a GraphQL context factory never authenticates. For JWT, verify the
+      provider. Platform never verifies a caller and a GraphQL context factory never authenticates. For a JWT, verify the
       allowed algorithms, issuer and intended audience; decoding is not verification. A workspace or tenant header is a
-      selector, never proof of access, and resource authorization stays in the use case so jobs and other entry points
-      cannot bypass a controller guard.
+      selector, never proof of access, and resource authorization stays in the handler or the domain service so jobs and other
+      entry points cannot bypass a guard.
     rationale: |-
       Authentication is a business capability with its own state and errors. Placing it in platform reverses the tier
       direction.
     cases:
       - id: case-1
         when: Verifying a bearer token
-        write: 'AuthGuard calls IdentityService.verify(token), implemented with integrations/keycloak; the principal is put on the request context.'
+        write: 'AuthGuard dispatches VerifySessionQuery, implemented with integrations/keycloak; the principal is put on the request context and read with @CurrentPrincipal().'
     verification:
       automated:
         - BE_TIER_DIRECTION
@@ -74,19 +78,20 @@ rules:
         - Confirm the audience, issuer and algorithm allow list against the provider contract.
     relatedExamples: []
   - id: BE-AUTH-3
-    title: Signed webhooks and constant-time comparison
+    title: CSRF, signed webhooks and constant-time comparison
     kind: mandatory
     hfsRules: [R41]
     requirement: |-
-      A webhook is `@Public({ reason })` and verifies its signature with the shared verifier before any parsing effect.
-      Every comparison of a secret, signature or token uses `timingSafeEqual` on equal-length buffers. A secret is never
-      compared with `===`.
+      `platform/http-security` owns the origin and referer allowlist guard that every state-changing request passes; only
+      `SignedWebhook` is exempt. A webhook is `@Public({ reason: PublicReason.SignedWebhook })` and verifies its signature with
+      `verifySignature` from `platform/http-security` before any parsing effect. Every comparison of a secret, signature or
+      token uses `timingSafeEqual` on equal-length buffers; a secret is never compared with `===`.
     rationale: |-
       A public door is only safe when the request proves its origin, and a variable-time comparison leaks the secret.
     cases:
       - id: case-1
         when: A provider webhook
-        write: '@Public({ reason: "PayOS webhook, signed" }) then `verifySignature(rawBody, header, secret)` from the shared verifier, which calls timingSafeEqual.'
+        write: '@Public({ reason: PublicReason.SignedWebhook }) then `verifySignature({ rawBody, signature, secret })`, which calls timingSafeEqual.'
     verification:
       automated:
         - BE_DEFAULT_DENY
@@ -96,31 +101,35 @@ rules:
   - id: BE-AUTH-4
     title: Typed operations, no generic tunnels
     kind: mandatory
-    hfsRules: [R41]
+    hfsRules: [R41, R88]
     requirement: |-
-      Each operation is its own typed field or route. `@Body() x: unknown`, a `GraphQLJSON` parameter and a
-      `switch (input.operation)` in transport are forbidden; a generic operation name that fans out to many behaviors
-      becomes one operation per behavior.
+      Each operation is its own typed field or route. `@Body() x: unknown`, `Record<string, unknown>` bodies, a `GraphQLJSON`
+      parameter and a `switch (input.operation)` in transport do not exist; a generic operation name that fans out to many
+      behaviors becomes one operation per behavior.
     rationale: |-
-      A tunnel defeats the contract, the guard and the input bounds, because the checker sees one operation where there
-      are many.
+      A tunnel defeats the contract, the guard and the input bounds, because the checker sees one operation where there are
+      many.
     cases:
       - id: case-1
         when: A generic execute mutation
-        write: 'Split into placeOrder, cancelOrder and refundOrder, each with its own input type and guard.'
+        write: 'Split into placeOrder, cancelOrder and refundOrder, each with its own input type and its own command.'
     verification:
       automated:
         - BE_DEFAULT_DENY
+        - BE_TRANSPORT_SHAPE
       manual:
         - Review that no operation name is decided by a string in a payload.
     relatedExamples: []
   - id: BE-AUTH-5
-    title: Bounded input and rate-limited doors
+    title: Validated, bounded input and rate-limited doors
     kind: mandatory
     hfsRules: [R42]
     requirement: |-
-      Every string field of an input has a length or format bound. GraphQL applies depth and complexity limits. The auth
-      and webhook doors are rate limited by a throttling decorator that names its level.
+      The global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` is registered. Every property
+      of an input class carries class-validator decorators, every string has `@MaxLength`, an enum has `@IsEnum`, and a nested
+      object has `@ValidateNested()` with `@Type(...)`. GraphQL depth is at most 10 and complexity limits are set in
+      `platform/graphql`. A global default rate-limit tier applies to every operation and `@RateLimit(RateTier.Strict)` is on
+      every `AuthHandshake` and `SignedWebhook` door.
     rationale: |-
       Unbounded input and unthrottled doors are the cheapest denial of service and brute-force paths.
     cases:
@@ -129,10 +138,30 @@ rules:
         write: '@IsString() @MaxLength(200) note!: string'
       - id: case-2
         when: A door
-        write: '@UseThrottler(ThrottlerConfig.Strict) on SignInController.signIn'
+        write: '@RateLimit(RateTier.Strict) on the signIn operation'
     verification:
       automated:
         - BE_INPUT_BOUNDED
       manual:
         - Confirm the chosen bounds against the accepted contract.
+    relatedExamples: []
+  - id: BE-AUTH-6
+    title: Pagination is by cursor
+    kind: mandatory
+    hfsRules: [R42]
+    requirement: |-
+      A list operation takes `PageArgs { first: Int (1..PAGE_SIZE_MAX), after?: String }` and returns
+      `<X>Connection { items, pageInfo { endCursor, hasNextPage } }`; cursors are opaque and HMAC-signed by
+      `platform/primitives`. Offset and page-number pagination (`skip`, `offset`, `OFFSET`) is not used.
+    rationale: |-
+      Offset pages are unstable under concurrent writes and their cost grows with the offset.
+    cases:
+      - id: case-1
+        when: A list of purchases
+        write: 'purchases(first: 20, after: $cursor) { items { id } pageInfo { endCursor hasNextPage } }'
+    verification:
+      automated:
+        - BE_INPUT_BOUNDED
+        - BE_QUERY_UNBOUNDED
+      manual: []
     relatedExamples: []

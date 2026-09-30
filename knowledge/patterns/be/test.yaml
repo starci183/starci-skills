@@ -8,11 +8,13 @@ appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
     - knowledge/patterns/be/folder.yaml
+    - owner-locked BE convention 2026-09-30
     - https://docs.nestjs.com/fundamentals/testing
     - https://jestjs.io/docs/configuration
   limitations: |-
@@ -45,7 +47,7 @@ rules:
     cases:
       - id: case-1
         when: Unit
-        write: place-order.use-case.spec.ts beside place-order.use-case.ts
+        write: place-order.handler.spec.ts beside place-order.handler.ts
       - id: case-2
         when: E2E
         write: src/tests/e2e/checkout/place-order.e2e-spec.ts with globalSetup and globalTeardown in src/tests/e2e/setup/
@@ -63,34 +65,36 @@ rules:
         - BE_TEST_TOPOLOGY
         - HFS_E2E_IN_AUTOMATIC_GATE
         - HFS_TEST_KIND_RETIRED
-        - unit-test-colocated
       manual:
         - Record which transport, service, database and external boundary an e2e run actually exercised.
     relatedExamples: []
   - id: BE-TEST-2
-    title: Test the real public execution contract
+    title: Test the real public execution contract with typed doubles
     kind: mandatory
-    hfsRules: [R48]
+    hfsRules: [R48, R72]
     requirement: |-
-      A use-case or handler spec constructs the real subject with typed dependency doubles and calls its public entry
-      (`execute`). Doubles come from `mock<T>()` in `@starci/jest-preset` or typed builders in `src/tests/fixtures/`;
-      `as never`, `as unknown as` and any other cast that pretends a double is the real type are forbidden. A spec never
-      reads source code with `fs` or a regular expression to assert an architecture rule; architecture is lint.
+      A unit spec constructs the real subject with `new` and typed doubles and calls its public entry (a handler's
+      `execute`, a service method). Doubles come from `mock<T>()` in `@starci/jest-preset/mock`, `FakeClock`, and
+      `mockEntityManager()` and `fakeTransaction()` from `src/tests/fixtures/database.ts`. No cast of any kind appears in a
+      spec (`as never`, `as unknown as`, `as X`), no `x!`, and a spec never reads source code with `fs` or a regular
+      expression to assert an architecture rule; architecture is lint. A twin spec exists for every handler, domain service,
+      consumer, job, guard, mapper, policy, client and `*.sql.ts` row mapper, and asserts results and state, not only calls.
     rationale: |-
       A typed double fails to compile when the contract changes, while a cast keeps a stale spec green.
     cases:
       - id: case-1
         when: Subject
-        write: 'const orders = mock<OrderRepository>(); const useCase = new PlaceOrderUseCase(orders, mock<CreditPolicy>())'
+        write: 'const entityManager = mockEntityManager(); const clock = new FakeClock("2026-01-01T00:00:00.000Z"); const handler = new StartCheckoutHandler(logger, entityManager, clock, mock<PurchaseService>())'
       - id: case-2
         when: Ordered answers
-        write: 'orders.exists.mockResolvedValueOnce(false)'
+        write: 'entityManager.findOne.mockResolvedValueOnce(null)'
       - id: case-3
         when: The call
-        write: 'await useCase.execute(input, principal), never a protected hook'
+        write: 'await handler.execute(command), never the protected process hook'
     verification:
       automated:
         - BE_SPEC_QUALITY
+        - BE_TYPE_ESCAPE
       manual:
         - Review that a double matches the real dependency contract.
     relatedExamples: []
@@ -99,24 +103,26 @@ rules:
     kind: mandatory
     hfsRules: [R32, R48]
     requirement: |-
-      Use direct construction for isolated capability behavior. Use `Test.createTestingModule` or the real AppModule
-      when proving registration, injection, named tokens or lifecycle. Every app has `<app>.composition.spec.ts` that
-      boots the real AppModule with stubbed options and resolves real provider tokens. E2E boots the real AppModule and
-      overrides providers; it never assembles a lane module by hand. Database mocks establish local behavior only;
-      transaction, lock and crash claims need the real store. Configuration is substituted at the owned config
-      boundary by passing options, never by patching `process.env`.
+      Use direct construction for isolated behavior. `Test.createTestingModule` is used only in composition specs and e2e.
+      Every app has `<app>.composition.spec.ts` that boots the real `AppModule.register(testOptions)` and resolves real
+      provider tokens. E2E boots the real `AppModule.register(testOptions)` on Testcontainers Postgres, runs the real migrations
+      through the `apps/migrate` runner function, overrides only integration tokens (exported from `*.decorators.ts`) with fixture
+      doubles and never overrides a guard, authenticates through an identity fixture that issues real tokens, asserts persisted
+      state and waits with `waitFor` deadlines. Database mocks establish local behavior only; transaction, lock and crash claims
+      need the real store. Configuration is substituted at the owned config boundary by passing options, never by patching
+      `process.env`.
     rationale: |-
       A hand-assembled module can pass while the real app cannot start, so composition is proved on the real module.
     cases:
       - id: case-1
         when: The composition spec
-        write: 'const moduleRef = await Test.createTestingModule({ imports: [AppModule.register(stubOptions)] }).compile(); expect(moduleRef.get(PlaceOrderUseCase)).toBeDefined()'
+        write: 'const moduleRef = await Test.createTestingModule({ imports: [AppModule.register(testOptions)] }).compile(); expect(moduleRef.get(CheckoutModule)).toBeDefined()'
       - id: case-2
         when: An e2e provider override
-        write: 'Test.createTestingModule({ imports: [AppModule.register(options)] }).overrideProvider(MAILER).useValue(fakeMailer)'
+        write: 'Test.createTestingModule({ imports: [AppModule.register(options)] }).overrideProvider(PAYOS).useValue(fakePayos) with PAYOS imported from the integration decorators file.'
       - id: case-3
         when: Config
-        write: 'pass `parseOrdersConfig({ ORDERS_TTL: "900" })` output as options; do not set process.env'
+        write: 'pass parsePurchaseConfig(EnvSource of a plain object) output as options; do not set process.env'
     verification:
       automated:
         - BE_APP_COMPOSITION_ONLY
@@ -129,25 +135,25 @@ rules:
     kind: mandatory
     hfsRules: [R48]
     requirement: |-
-      Assert error class and code, ordering of side effects, returned rows and persisted arguments as relevant. Test titles
-      start with a word from `NEST_TEST_TITLE_ACTIONS` (accepts, rejects, returns, preserves, refuses, maps, creates).
-      This action-prefix rule is machine-checked; whether title and assertions describe the required behavior is agent
-      review. Adding vocabulary is a reviewed profile change, never a per-file suppression.
+      Assert the refusal code or error code, ordering of side effects, returned rows, persisted state and the `where` that holds
+      ownership, as relevant. Test titles start with a word from `NEST_TEST_TITLE_ACTIONS` (accepts, rejects, returns,
+      preserves, refuses, maps, creates). This action-prefix rule is machine-checked; whether title and assertions describe the
+      required behavior is agent review. Adding vocabulary is a reviewed profile change, never a per-file suppression.
     rationale: |-
       Assertions on type, code and state prove behavior. Message strings and call counts alone do not.
     cases:
       - id: case-1
         when: The error
-        write: 'await expect(useCase.execute(input, principal)).rejects.toMatchObject({ code: "ORDER_NOT_FOUND" })'
+        write: 'await expect(handler.execute(command)).rejects.toMatchObject({ code: "PURCHASE_OFFER_NOT_FOUND" })'
       - id: case-2
         when: Ordering of side effects
-        write: 'expect(reserve).not.toHaveBeenCalled() after a rejected credit check'
+        write: 'expect(manager.insert).not.toHaveBeenCalled() after a refused credit check'
       - id: case-3
         when: A typed outcome
-        write: 'await expect(useCase.execute(input, principal)).resolves.toEqual({ kind: "refused", reason: "credit-limit" })'
+        write: 'await expect(handler.execute(command)).resolves.toEqual({ kind: "refused", code: PurchaseErrorCode.AlreadyOwned })'
       - id: case-4
         when: Phrasing
-        write: 'it("rejects anonymous callers before querying order state", ...)'
+        write: 'it("refuses a learner who already owns the offer", ...)'
     verification:
       automated:
         - NEST_TEST_NAME_FORM
@@ -159,8 +165,8 @@ rules:
     kind: mandatory
     hfsRules: [R48]
     requirement: |-
-      Do not ship call-only specs, e2e steps that only check a success flag, sleep-based waits, live model calls in
-      e2e, or branched outcomes inside one flow step. The e2e canon rules apply to `src/tests/e2e/**` through `lint:e2e`,
+      Do not ship call-only specs, e2e steps that only check a success flag, sleep-based waits (wait with `waitFor` deadlines),
+      guard overrides, live model calls in e2e, or branched outcomes inside one flow step. The e2e canon rules apply to `src/tests/e2e/**` through `lint:e2e`,
       which runs by hand and must be green before an e2e conclusion is drawn.
     rationale: |-
       A test that cannot fail for the wrong reason is not evidence, and time-based waiting hides races.
@@ -169,8 +175,8 @@ rules:
         when: A call alone
         write: a spec that only proves a mock was invoked fails no-call-only-spec
       - id: case-2
-        when: Envelope instead of state
-        write: an e2e step asserts the persisted row, not `success true`
+        when: A success flag instead of state
+        write: an e2e step asserts the persisted row, not a success flag
       - id: case-3
         when: Elapsed time
         write: poll for state; never sleep in a flow
@@ -203,7 +209,7 @@ rules:
     cases:
       - id: case-1
         when: describe
-        write: 'describe("PlaceOrderUseCase", () => { ... })'
+        write: 'describe("PlaceOrderHandler", () => { ... })'
     verification:
       automated: []
       manual: []

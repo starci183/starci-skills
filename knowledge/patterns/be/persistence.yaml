@@ -2,23 +2,27 @@ schema: starci/knowledge-source@1
 id: be.persistence
 title: Backend persistence and migrations
 purpose: |-
-  Given a table, entity or SQL statement, who owns it, how does the schema change and which process applies the change?
-  Migrations are the only schema authority. Persistence lives with the capability that owns the table.
+  Given a table, entity or SQL statement, who owns it, how does the schema change, which connection reaches it and which
+  process applies the change? Migrations are the only schema authority. Persistence lives with the capability that owns the
+  table. One database is one connection, one injector, and the shared EntityManager is called directly.
 appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
     - docs/backend-source-pattern.md
+    - owner-locked BE convention 2026-09-30
     - https://typeorm.io/docs/migrations/why
     - https://www.postgresql.org/docs/16/sql-insert.html
   limitations: |-
-    Static checks prove where schema code and SQL live and that runtime synchronization is off. They do not prove that a
-    migration is correct, reversible or safe on live data. A migration is exercised against a real database in e2e,
-    which runs the migrations themselves. A production data step (baseline, backfill) is an owner-run operation.
+    Static checks prove where schema code and SQL live, that runtime synchronization is off, which connection a manager is
+    injected for and which tables a statement writes. They do not prove that a migration is correct, reversible or safe on
+    live data. A migration is exercised against a real database in e2e, which runs the migrations themselves. A production
+    data step (baseline, backfill) is an owner-run operation.
 rules:
   - id: BE-PERSISTENCE-1
     title: Migrations are the only schema authority
@@ -26,19 +30,19 @@ rules:
     hfsRules: [R34]
     requirement: |-
       `synchronize` is the literal `false` everywhere, including e2e databases, and is never read from the environment.
-      There is no runtime DDL: no `dataSource.synchronize()`, no `migrationsRun` in an api or worker app, no
-      `CREATE`, `ALTER` or `DROP TABLE` string outside `persistence/migrations/**`, and no glob that discovers entities or
-      migrations. E2E runs the real migrations, which is the evidence that they are right.
+      There is no runtime DDL: no `dataSource.synchronize()`, no `migrationsRun`, no `CREATE`, `ALTER` or `DROP TABLE` string
+      outside `persistence/migrations/**`, and no glob that discovers entities or migrations. E2E runs the real migrations
+      through the `apps/migrate` runner function, which is the evidence that they are right.
     rationale: |-
       When an ORM diffs the schema at boot, the live schema is whatever the entity graph implies that day, migrations never
       run, and an enum change can crash a boot.
     cases:
       - id: case-1
         when: The connection options
-        write: 'PlatformDatabaseModule.register({ connection: CONNECTION, entities, migrations, synchronize: false })'
+        write: 'DatabaseModule.register({ connection: PRIMARY_CONNECTION, entities, migrations, synchronize: false })'
       - id: case-2
         when: An e2e database
-        write: 'the setup runs the apps/migrate program against the container before the tests, never synchronize'
+        write: 'the setup runs the apps/migrate runner function against the Testcontainers database before the tests, never synchronize'
     verification:
       automated:
         - BE_SCHEMA_AUTHORITY
@@ -52,7 +56,8 @@ rules:
     requirement: |-
       An app of kind `migrate` is the only process that runs migrations, once per connection, before any api or worker
       process starts (a deploy runs it as an init job). It is required as soon as `hfs.json` declares a connection. It has
-      `main.ts` and a composition spec and no `app.module.ts` business code. Api and worker apps never run migrations.
+      `main.ts` and a composition spec and no business code; it builds its `DataSource` from the same `<conn>.config.ts` the
+      api uses. Api and worker apps never run migrations.
     rationale: |-
       Two processes racing to migrate corrupt a schema, and a migration inside a module cannot be scheduled or retried on
       its own.
@@ -69,72 +74,93 @@ rules:
         - Confirm the deployment runs the migrate step first and once.
     relatedExamples: []
   - id: BE-PERSISTENCE-3
-    title: Persistence per capability
+    title: Entities and migrations belong to the capability that owns the table
     kind: mandatory
-    hfsRules: [R35]
+    hfsRules: [R35, R37, R74]
     requirement: |-
-      Entities and migrations sit in `persistence/` of the capability that owns the table (`domain/<capability>/persistence/`
-      or `platform/<capability>/persistence/` for technical tables). `persistence/connection.ts` exports
-      `CONNECTION` equal to one name in `hfs.json` `connections`. Each capability exports explicit `entities` and
-      `migrations` lists from its `index.ts`; `app.module.ts` and `apps/migrate` compose them per connection. Migration files
-      are `<yyyyMMddHHmmss>-<kebab-name>.ts`, entity files `entities/<table>.entity.ts`. Several databases are several
-      connections, each with its own composed lists.
+      Entities and migrations sit in `persistence/{entities,migrations}/` of the capability that owns the table
+      (`domain/<c>/persistence/` or `platform/<c>/persistence/` for technical tables). `persistence/connection.ts` exports
+      `export const CONNECTION = <CONN>_CONNECTION` for one name in `hfs.json` `connections`. The owner's `index.ts` exports
+      `<c>Entities` and `<c>Migrations` arrays, the only two names, and the apps and `apps/migrate` concatenate them per
+      connection into `DatabaseModule.register`. An entity is `@Entity("<plural_snake>")` in `entities/<table>.entity.ts`,
+      every `@Column` has an explicit `name` and `type`, timestamps are `timestamptz`, an enum is stored as `varchar` with a
+      `CHECK` in the migration (no native PG enum), and there is no `eager`, `lazy` or `cascade`. An entity file imports
+      neither `@nestjs/graphql` nor `class-validator`. A migration is `<epochMs13>-<kebab-name>.ts` with class
+      `<PascalName><epochMs13>` and a `name` property equal to the class name, is hand-written SQL through
+      `queryRunner.query`, has a `down()` that reverses `up()`, carries no seed data and has no unit spec (the e2e run is the
+      proof).
     rationale: |-
-      Schema ownership by capability keeps platform independent of domain types and gives every table one reviewer.
+      Schema ownership by capability keeps platform independent of domain types and gives every table one reviewer;
+      TypeORM reads a 13-digit suffix from a migration class name.
     cases:
       - id: case-1
         when: A new table
-        write: 'src/modules/domain/orders/persistence/entities/order.entity.ts, migrations/20260929101500-create-orders.ts, and an export from orders/index.ts.'
+        write: 'src/modules/domain/purchase/persistence/entities/purchase.entity.ts, migrations/1790000000000-create-purchases.ts (class CreatePurchases1790000000000), and `purchaseEntities` / `purchaseMigrations` exported from purchase/index.ts.'
       - id: case-2
         when: Composition
-        write: 'apps/migrate/src/app.module.ts lists [...ordersEntities, ...identityEntities] for the primary connection.'
+        write: 'apps/migrate/src/app.module.ts lists [...purchaseEntities, ...identityEntities] and [...purchaseMigrations, ...identityMigrations] for the primary connection.'
     verification:
       automated:
         - BE_SCHEMA_OWNER
+        - BE_ENTITY_IN_CONTRACT
+        - BE_MIGRATION_REVERSIBLE
       manual:
-        - Verify the data owner and the connection token of each entity.
+        - Verify the data owner and the connection of each entity.
     relatedExamples: []
   - id: BE-PERSISTENCE-4
-    title: SQL only as SqlText constants
+    title: Raw SQL is a SqlText constant in the owner's persistence folder
     kind: mandatory
-    hfsRules: [R36, R37]
+    hfsRules: [R36, R68]
     requirement: |-
-      Raw SQL is a `SqlText` constant built with the `sql` tag in `<name>.sql.ts` inside `persistence/`; `.query(` takes only a
-      `SqlText` and a parameter array, and there is no query builder. Handlers and domain services run the constant on the
-      injected EntityManager; row shapes and their mappers live in `<name>.rows.ts`. No `*Entity` type appears in a
+      SQL text is a constant (or a function returning one) built with the `sql` tag from `platform/database`, living in
+      `src/modules/{domain,platform}/<c>/persistence/<name>.sql.ts`; the tag returns the branded type `SqlText`. `.query()` on
+      an `EntityManager` receives a `SqlText` first argument and a parameter array, and values are numbered parameters. A
+      dynamic identifier is a `SqlIdent` from `ident(name, allowed)`, the only substitution the tag accepts. Row shapes are
+      `interface <Name>Row` with snake_case keys and `to<Name>(row)` mappers in `<name>.rows.ts`. There is no SQL literal
+      outside `*.sql.ts`, no QueryBuilder (`createQueryBuilder`) and no DDL outside migrations. No `*Entity` type appears in a
       contract, DTO or resolver return type.
     rationale: |-
-      Raw SQL written inline in services cannot be reviewed as a data boundary and couples every layer to the schema.
+      SQL scattered through services cannot be reviewed as a data boundary; a text constant with numbered parameters can be
+      parsed, reviewed and never concatenated.
     cases:
       - id: case-1
         when: A read
-        write: 'FIND_OPEN_ORDERS in order.sql.ts is a SqlText constant; the handler runs entityManager.query(FIND_OPEN_ORDERS, [customerId, LIST_ROWS_MAX]) and maps rows with toOrderSummary from order.rows.ts.'
+        write: |-
+          /** Open purchases of one learner, newest first, bounded by $2. */
+          export const FIND_OPEN_PURCHASES = sql`SELECT id, offer_id, status, created_at FROM purchases
+              WHERE learner_id = $1 AND status = 'open' ORDER BY created_at DESC LIMIT $2`
+      - id: case-2
+        when: Running it
+        write: 'const rows: ReadonlyArray<PurchaseRow> = await this.entityManager.query(FIND_OPEN_PURCHASES, [learnerId, PAGE_SIZE_MAX]); return rows.map(toPurchase)'
     verification:
       automated:
         - BE_SQL_OUTSIDE_PERSISTENCE
+        - BE_SQL_INTERPOLATED
         - BE_ENTITY_IN_CONTRACT
       manual:
-        - Review query loading behavior, indexes and transaction use.
+        - Review query plans, indexes and the mapper from row to contract.
     relatedExamples: []
   - id: BE-PERSISTENCE-5
-    title: Durable effects use an outbox owned by persistence
+    title: Durable effects use the outbox
     kind: mandatory
-    hfsRules: [R46]
+    hfsRules: [R46, R82]
     requirement: |-
-      When a database change must lead to an external message, the outbox row is written in the same local transaction. A
-      publisher job (see background.yaml) retries with bounded backoff and an effect identity; consumers deduplicate
-      transactionally with their local effect. A publish acknowledgement and a consumed business result are different facts,
-      and an outbox alone is not exactly-once processing. Outbox tables and migrations live in the owning platform
-      capability.
+      When a database change must lead to an external message, the handler calls `outbox.enqueue(manager, message)` on an
+      `InjectOutbox()` parameter inside the same transaction. The `platform/outbox` job relays the row with bounded backoff and
+      an effect identity; consumers deduplicate through the inbox (idempotency.yaml). A publish acknowledgement and a consumed
+      business result are different facts, and an outbox alone is not exactly-once processing. Outbox tables and migrations
+      live in the platform capability that owns them.
     rationale: |-
-      An in-process event emission does not prove durable broker delivery.
+      Publishing straight to a broker inside a request does not prove durable delivery, and an in-process event does not
+      survive a crash between commit and delivery.
     cases:
       - id: case-1
         when: An order placed
-        write: 'insert the order and the outbox row in one transaction; OutboxPublishJob delivers the row later.'
+        write: 'await this.entityManager.transaction(async (manager) => { await manager.insert(OrderEntity, row); await this.outbox.enqueue(manager, orderPlacedMessage(row)) }); the outbox relay job delivers the message later.'
     verification:
       automated:
         - BE_BACKGROUND_UNOWNED
+        - BE_TRANSACTION_EXTERNAL_CALL
       manual:
         - Test a crash between the local commit and the publish acknowledgement.
     relatedExamples: []
@@ -143,56 +169,138 @@ rules:
     kind: mandatory
     hfsRules: [R82]
     requirement: |-
-      `.transaction(async (tx) => ...)` never contains `fetch`, an HTTP client call or any method of a
-      `*Client`/`*Sdk` receiver. Every database write happens inside the callback exactly as before; the
-      transaction is awaited to commit; the external call happens after, using values read or returned from inside
-      the transaction. When the call's effect must happen exactly once together with the write - not merely
-      sometime after it - a row is written to the nearest outbox table inside the transaction instead of calling out
-      directly, and the existing outbox publisher (BE-PERSISTENCE-5) delivers it.
+      An `entityManager.transaction(async (manager) => ...)` callback never calls an HTTP client, an integration client, a
+      message publisher or any receiver typed from `integrations/**`, `HttpClient` or `MessagePublisher`. The transaction is
+      awaited to commit and the external call happens after, using the values returned from inside the transaction. When the
+      call's effect must happen exactly once together with the write, an outbox message is enqueued inside the transaction
+      instead (BE-PERSISTENCE-5). The rule identifies the receiver by its declared type, not by its variable name.
     rationale: |-
-      Holding a transaction open for as long as an external call takes means a failure after partial commit, or a
-      success the rollback then reverses with no way back: the database has moved on inside a lock the external
-      party has no idea it is blocking. Committing first (or writing an outbox row) makes the database change
-      durable independently of how long, or how badly, the outside world behaves.
+      Holding a transaction open for as long as an external call takes means a failure after partial commit, or a success the
+      rollback then reverses with no way back. Committing first, or writing an outbox row, makes the change durable
+      independently of how the outside world behaves.
     cases:
       - id: case-1
         when: A write followed by a notification
-        write: 'const order = await this.db.transaction(async (tx) => tx.save(OrderEntity, entity)); await this.notifier.send(...) runs after the transaction, using the saved order.'
+        write: 'const order = await this.entityManager.transaction(async (manager) => manager.save(OrderEntity, entity)); await this.notifier.send(order) runs after the transaction, with the saved order.'
       - id: case-2
         when: The effect must be exactly-once with the write
-        write: 'await this.db.transaction(async (tx) => { await tx.save(OrderEntity, entity); await tx.insert(OutboxEntity, { topic: "order.placed", payload }) }); the OutboxPublishJob (background.yaml) delivers the message later.'
+        write: 'await this.entityManager.transaction(async (manager) => { await manager.save(OrderEntity, entity); await this.outbox.enqueue(manager, orderPlacedMessage(entity)) })'
     verification:
       automated:
         - BE_TRANSACTION_EXTERNAL_CALL
       manual:
-        - Confirm the chosen option (commit-then-call vs. outbox) matches whether the caller needs the effect to happen exactly once with the write or merely after it.
+        - Confirm the chosen option (commit-then-call or outbox) matches whether the caller needs the effect exactly once with the write or merely after it.
     relatedExamples: []
   - id: BE-PERSISTENCE-7
     title: The database is reached through the named shared EntityManager
     kind: mandatory
     hfsRules: [R83]
     requirement: |-
-      A use case injects the shared EntityManager through a named injector - `InjectPrimaryEntityManager()`,
-      `InjectAgentOsEntityManager()`, `InjectExpertAcademyEntityManager()` or `@InjectEntityManager(<CONNECTION_TOKEN>)` -
-      and calls it directly (`manager.find(Entity, ...)`, `manager.save(Entity, ...)`, `tx.insert(Entity, ...)`).
-      `@InjectEntityManager()` is never written bare, `.getRepository(...)` is never called on a DataSource or an
-      EntityManager, `@InjectRepository(...)` and `Repository<T>` are never injected, and a `DataSource` is never
-      injected to run queries; only the platform database module and `apps/migrate` build or hold a `DataSource`.
+      Data access is `this.entityManager.<op>(Entity, ...)` on the injected shared manager, or `manager.<op>` inside a
+      transaction callback, with the entity class passed by class and never by string name. Not used: `getRepository`,
+      `@InjectRepository`, `Repository<T>`, `TypeOrmModule.forFeature`, custom repository or store classes
+      (`*.repository.ts`, `*.store.ts`, `*_STORE` ports), `createQueryBuilder`, `ModuleRef.get`, an injected `DataSource` or
+      `QueryRunner` outside `platform/database` and `apps/migrate`. A manager is injected only in
+      `src/features/<f>/application/*.handler.ts`, `src/modules/domain/<c>/**/*.service.ts` and platform capabilities that own
+      a `persistence/` (database, inbox, outbox, lease); never in `transport/**`, `integrations/**` or `apps/**`.
     rationale: |-
-      This application registers more than one datasource, so a bare injection points at whichever is default and reads
-      correctly while querying the wrong database. A repository handle is bound to one entity and cannot carry a
-      transaction into a second table, and a DataSource used for queries lets a caller bypass the named connection.
-      One shared manager per connection, named at the injection site and called directly, is the one pattern.
+      A repository handle is bound to one entity and cannot carry a transaction into a second table, and a DataSource used
+      for queries lets a caller bypass the named connection. One shared manager per connection, named at the injection site
+      and called directly, is the one pattern.
     cases:
       - id: case-1
-        when: A service reads and writes several tables
-        write: 'constructor(@InjectPrimaryEntityManager() private readonly manager: EntityManager) {} then this.manager.transaction(async (tx) => { await tx.save(OrderEntity, order); await tx.insert(OutboxEntity, row) }).'
+        when: A handler reads and writes several tables
+        write: 'constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {} then this.entityManager.transaction(async (manager) => { await manager.save(OrderEntity, order); await manager.insert(OrderLineEntity, lines) }).'
       - id: case-2
-        when: A service needs a connection that is not the primary one
-        write: 'constructor(@InjectAgentOsEntityManager() private readonly manager: EntityManager) {} or @InjectEntityManager(AGENT_OS_CONNECTION), never a bare @InjectEntityManager().'
+        when: A read by key
+        write: 'await this.entityManager.findOne(PurchaseEntity, { where: { id, learnerId } })'
     verification:
       automated:
         - BE_UNNAMED_DATA_ACCESS
+        - BE_RAW_INJECT
       manual:
-        - Confirm the named injector points at the datasource that owns the entity being read or written.
+        - Confirm the injector points at the connection that owns the entity being read or written.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-8
+    title: One physical database is one connection and one injector
+    kind: mandatory
+    hfsRules: [R84]
+    requirement: |-
+      `hfs.json` `connections` lists every physical database as `{ "name": "<kebab>", "envPrefix": "<SNAKE>" }`; the name is
+      the logical database, never the engine (`primary`, `identity`, `order`). Per connection exactly these files exist in
+      `src/modules/platform/database/`: `<conn>.connection.ts` (`export const <CONN>_CONNECTION = "<conn>"`), `<conn>.config.ts`
+      (reads only `<ENVPREFIX>_*` keys) and `<conn>.decorators.ts`
+      (`Inject<Conn>EntityManager = (): TypedParameterDecorator<EntityManager> => injector<EntityManager>(getEntityManagerToken(<CONN>_CONNECTION))`).
+      No other file declares a connection or calls `TypeOrmModule.forRoot*`, `new DataSource(`, `getEntityManagerToken(`,
+      `InjectEntityManager(` or `InjectDataSource(`, except `apps/migrate` and `src/tests/fixtures/database.ts`. There is no
+      capability-specific injector, no second connection name onto an existing database, and two connections never resolve to
+      the same (host, port, database).
+    rationale: |-
+      A second pool onto the same database, or an injector named after a feature, splits transactions and hides which
+      database a service really queries.
+    cases:
+      - id: case-1
+        when: Two databases
+        write: 'platform/database/identity.{connection,config,decorators}.ts and order.{connection,config,decorators}.ts, and hfs.json connections [{ "name": "identity", "envPrefix": "IDENTITY_DB" }, { "name": "order", "envPrefix": "ORDER_DB" }].'
+    verification:
+      automated:
+        - BE_CONNECTION_DUPLICATE
+        - BE_UNNAMED_DATA_ACCESS
+      manual:
+        - Confirm the stacks env of each environment points each connection at its own database.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-9
+    title: SQL touches only tables it may, and every multi-row read is bounded
+    kind: mandatory
+    hfsRules: [R86, R69, R77]
+    requirement: |-
+      A `SqlText` constant writes only the tables of entities in its own capability's `persistence/entities` and reads only
+      tables of capabilities its owner may import (domain to domain, acyclic); this is checked by parsing the SQL text. Every
+      multi-row read states a bound: `find`, `findBy` and `findAndCount` carry `take`, and a SQL `SELECT` carries `LIMIT` unless
+      it filters on a primary key or unique constraint or projects only aggregates without `GROUP BY`. The bounds are the
+      `platform/database` constants `PAGE_SIZE_MAX` (client pages), `LIST_ROWS_MAX` and `BATCH_ROWS` (keyset batches). A read is
+      never run once per loop element: the keys are read once. The rules identify `EntityManager` by type, not by variable name.
+    rationale: |-
+      A statement that writes another owner's table breaks ownership silently, and an unbounded read turns a growing table
+      into an outage.
+    cases:
+      - id: case-1
+        when: A list read
+        write: 'await this.entityManager.find(PurchaseEntity, { where: { learnerId }, order: { createdAt: "DESC" }, take: PAGE_SIZE_MAX })'
+      - id: case-2
+        when: Reads for several ids
+        write: 'one `WHERE id = ANY($1)` statement before the loop, then a map lookup per element.'
+    verification:
+      automated:
+        - BE_SQL_TABLE_OWNER
+        - BE_QUERY_UNBOUNDED
+        - BE_QUERY_IN_LOOP
+      manual:
+        - Review that a batch scan pages by keyset and does not truncate.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-10
+    title: The handler opens the transaction and hands the manager down
+    kind: mandatory
+    hfsRules: [R83, R82]
+    requirement: |-
+      The application layer opens the transaction with `this.entityManager.transaction(async (manager) => { ... })`, with an
+      explicit isolation level only when it is not READ COMMITTED, and inside the callback only `manager` is used (never the
+      injected outer manager). `TransactionService` and every wrapper do not exist. A domain-service method that writes takes
+      `manager: EntityManager` as a required field of its params object so it always joins the caller's transaction; a read
+      uses the injected manager unless it is handed one. Row locks use `lock: { mode: "pessimistic_write" }` or `FOR UPDATE` in
+      a `.sql.ts`; cross-replica mutual exclusion uses `InjectAdvisoryLock()`; `createQueryRunner` appears only inside
+      `platform/database`.
+    rationale: |-
+      One transaction identity per use makes atomicity checkable: a write through the outer manager inside the callback
+      commits outside the transaction.
+    cases:
+      - id: case-1
+        when: A domain service that writes
+        write: 'async open(params: { manager: EntityManager; learnerId: string; offerId: string; at: Date }): Promise<Outcome<Purchase, PurchaseErrorCode>>'
+    verification:
+      automated:
+        - BE_UNNAMED_DATA_ACCESS
+        - BE_TRANSACTION_EXTERNAL_CALL
+      manual:
+        - Run a refusal-after-write case against a real database and assert the rollback.
     relatedExamples: []

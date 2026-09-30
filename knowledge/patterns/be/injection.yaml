@@ -1,0 +1,128 @@
+schema: starci/knowledge-source@1
+id: be.injection
+title: Backend dependency injection
+purpose: |-
+  Given a class that needs infrastructure, how does the dependency arrive? Every injected infrastructure dependency comes
+  through a zero-argument `Inject<Thing>()` decorator exported from its owner's `<owner>.decorators.ts`, over a
+  `unique symbol` token. Raw `@Inject(` exists only inside `*.decorators.ts`.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-09-30
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner-locked BE convention 2026-09-30
+    - https://docs.nestjs.com/fundamentals/custom-providers
+  limitations: |-
+    Static checks compare an injector's declared type with the parameter annotation and look up where the parameter's type
+    is declared. They do not prove that the module provides the token; the composition spec that boots the real AppModule
+    does.
+rules:
+  - id: BE-INJECTION-1
+    title: Infrastructure arrives through an injector
+    kind: mandatory
+    hfsRules: [R85]
+    requirement: |-
+      A constructor parameter whose declared type is infrastructure - declared under `platform/**`, `integrations/**` or a
+      package (`EntityManager`, `CommandBus`, `Cache`, `Clock`, `Logger`, SDK clients, module options) - carries an
+      `Inject<Thing>()` decorator. Class injection without a decorator is allowed only for a type declared in
+      `src/modules/domain/**` (a domain service) and in the same owner. The parameter name is the camelCase of the port
+      (`clock`, `logger`, `cache`, `commandBus`); an EntityManager is `entityManager`, or `<conn>EntityManager` when one class
+      injects two connections. The rule reads the parameter's type and where it is declared, never the variable name.
+    rationale: |-
+      A raw token at every call site lets `@Inject(CLOCK) private readonly x: Cache` compile, and class injection of a
+      platform class couples every consumer to its implementation.
+    cases:
+      - id: case-1
+        when: A handler needing the database, the time and a domain service
+        write: 'constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager, @InjectClock() private readonly clock: Clock, private readonly purchaseService: PurchaseService) {}'
+      - id: case-2
+        when: A class injecting two databases
+        write: 'constructor(@InjectIdentityEntityManager() private readonly identityEntityManager: EntityManager, @InjectOrderEntityManager() private readonly orderEntityManager: EntityManager) {}'
+    verification:
+      automated:
+        - BE_RAW_INJECT
+      manual:
+        - Confirm each parameter carries the injector of the port its type names.
+    relatedExamples: []
+  - id: BE-INJECTION-2
+    title: An injector is one shape in one file
+    kind: mandatory
+    hfsRules: [R85]
+    requirement: |-
+      An injector is exported from `<owner>.decorators.ts` at the owner root, the only file kind allowed to call `Inject(`,
+      `InjectEntityManager(`, `InjectDataSource(`, `InjectQueue(` or any third-party `Inject*`. It is named `Inject<Thing>`
+      in PascalCase, takes no argument (a keyed variant is a separate injector: `InjectDigitalOceanS3`, `InjectMinioS3`,
+      never `InjectS3(key)`), is typed `(): TypedParameterDecorator<T>`, is built with `injector<T>(token)` from
+      `platform/composition` and is documented with JSDoc naming `T`. The lint rule compares `T` with the parameter
+      annotation. The token is `export const THING: unique symbol = Symbol("<owner>.<thing>")` declared in the same file;
+      a string token is not used and `provide:` is a class or a `unique symbol`.
+    rationale: |-
+      One declaration form ties the token to its type, keeps token choice out of call sites and makes "who uses the cache"
+      a grep for one function name.
+    cases:
+      - id: case-1
+        when: A port with its own token
+        write: |-
+          /** Token of the Clock port. */
+          export const CLOCK: unique symbol = Symbol("platform.clock")
+          /** Injects the Clock port. Parameter type: Clock. */
+          export const InjectClock = (): TypedParameterDecorator<Clock> => injector<Clock>(CLOCK)
+      - id: case-2
+        when: A module's options
+        write: '/** Injects the options of the orders capability. Parameter type: OrdersOptions. */ export const InjectOrdersOptions = (): TypedParameterDecorator<OrdersOptions> => injector<OrdersOptions>(MODULE_OPTIONS_TOKEN)'
+    verification:
+      automated:
+        - BE_RAW_INJECT
+      manual: []
+    relatedExamples: []
+  - id: BE-INJECTION-3
+    title: The injector catalog has fixed names
+    kind: mandatory
+    hfsRules: [R85, R84]
+    requirement: |-
+      When the capability exists its injector exists under this name: `Inject<Conn>EntityManager` (platform/database, one per
+      connection), `InjectClock` (platform/clock), `InjectLogger` (platform/logging), `InjectCache` (integrations/cache),
+      `InjectHttpClient` (platform/http), `InjectMessagePublisher` (platform/messaging), `InjectOutbox` (platform/outbox),
+      `InjectInbox` (platform/inbox), `InjectMessageCatalog` and `InjectRequestLocale` (platform/i18n),
+      `InjectCommandBus` and `InjectQueryBus` (platform/cqrs), `InjectAdvisoryLock` (platform/database), `Inject<Cap>Options`
+      (each capability with options) and `Inject<Provider>` for each integration SDK client (`InjectPayOS`, `InjectStripe`,
+      `InjectDigitalOceanS3`). A spec overrides a token through the same `*.decorators.ts` export.
+    rationale: |-
+      Fixed names let an agent and a reader find the port of any dependency without opening the module, and let e2e override
+      exactly the integration tokens.
+    cases:
+      - id: case-1
+        when: A new integration client
+        write: 'src/modules/integrations/payos/payos.decorators.ts exports PAYOS and InjectPayOS; payos.client.ts is the only file that calls the SDK.'
+    verification:
+      automated:
+        - BE_RAW_INJECT
+        - BE_CONNECTION_DUPLICATE
+      manual: []
+    relatedExamples: []
+  - id: BE-INJECTION-4
+    title: No service locator, no forward reference, no property injection
+    kind: mandatory
+    hfsRules: [R85, R45]
+    requirement: |-
+      `ModuleRef` is not used in product code (it bypasses every injection rule), `forwardRef` is not used (a cycle is an
+      R27 finding, not a DI trick), and `@Inject()` is never written on a field. A module constructs no `@Injectable` with
+      `new`. The rules identify the receiver by its type, so a renamed variable or a lookalike name (`InjectFooEntityManager`
+      outside its home) is judged the same.
+    rationale: |-
+      A service locator or a forward reference hides the dependency graph the machine checks, and a property injection
+      escapes the constructor-parameter rules.
+    cases:
+      - id: case-1
+        when: A class needs another owner's service
+        write: 'Import the owner''s public entry and inject its domain service by class in the constructor.'
+    verification:
+      automated:
+        - BE_RAW_INJECT
+        - BE_MODULE_SHAPE
+      manual: []
+    relatedExamples: []

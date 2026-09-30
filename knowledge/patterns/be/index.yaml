@@ -3,19 +3,22 @@ id: be.index
 title: Backend code patterns
 purpose: |-
   Read knowledge/hfs/README.md (HFS) and docs/backend-source-pattern.md first. The standard defines ownership, the
-  tier direction, one schema authority, default-deny, per-capability configuration and background work as a transport,
-  then the concrete Nest and TypeScript code forms below. Each rule cites the HFS rule ids it implements (hfsRules) and
-  the finding codes that judge it (verification.automated).
+  tier direction, one schema authority, one connection per database, injected infrastructure, CQRS application layer,
+  default-deny, per-capability configuration and background work as a transport, then the concrete Nest and TypeScript
+  code forms below. It is the owner-locked BE convention of 2026-09-30. Each rule cites the HFS rule ids it implements
+  (hfsRules) and the finding codes that judge it (verification.automated); the one rule catalog is knowledge/hfs/rules.yaml.
 appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
     - docs/backend-source-pattern.md
     - docs/portable-source-architecture.md
+    - owner-locked BE convention 2026-09-30
   limitations: |-
     Patterns place code and shape it. They do not approve business requirements or architecture, which belong to
     .starciwork, and static checks do not prove behavior. Inspect the selected repository's installed types, APIs, aliases
@@ -24,27 +27,47 @@ topics:
   - id: be.architecture-check
     title: Architecture check
     path: architecture-check.yaml
-    decides: Tier direction matrix, acyclic owners, thin application composition roots, public owner surface, composed features
+    decides: Tier direction matrix, acyclic owners, thin application composition roots, the one module shape (one representative module per capability, registered once per app), public owner surface, composed features
     rules: BE-ARCHITECTURE-1 … BE-ARCHITECTURE-5
+  - id: be.cqrs
+    title: CQRS application layer
+    path: cqrs.yaml
+    decides: Command and Query messages with ExecuteParams, handlers extending ICQRSHandler, direct bus dispatch, no use cases, forwarders or in-process events
+    rules: BE-CQRS-1 … BE-CQRS-4
+  - id: be.injection
+    title: Dependency injection
+    path: injection.yaml
+    decides: Inject<Thing>() injectors over unique symbol tokens, the fixed injector catalog, no ModuleRef, forwardRef or property injection
+    rules: BE-INJECTION-1 … BE-INJECTION-4
+  - id: be.transport
+    title: Transport
+    path: transport.yaml
+    decides: GraphQL as the default door, bus-only injection, no envelope, REST, WebSocket, schedule, message and CLI shapes
+    rules: BE-TRANSPORT-1 … BE-TRANSPORT-4
+  - id: be.infra
+    title: Infrastructure ownership
+    path: infra.yaml
+    decides: One owning capability per raw library, the HttpClient port with a required timeout, the integration folder, cache keys
+    rules: BE-INFRA-1 … BE-INFRA-4
   - id: be.folder
     title: Folder
     path: folder.yaml
-    decides: Composition, feature application and transport, reusable capabilities, persistence, errors and test ownership
+    decides: Composition, feature application and transport, reusable capabilities, persistence, errors and test ownership, closed folder vocabulary
     rules: BE-FOLDER-1 … BE-FOLDER-7
   - id: be.naming
     title: Naming
     path: naming.yaml
-    decides: Kebab file suffixes per slot, class role suffixes, error identity, enums, constants, methods, GraphQL fields
+    decides: Closed file-suffix vocabulary, class role suffixes, error identity, enums, constants and injectors, methods, GraphQL fields
     rules: BE-NAMING-1 … BE-NAMING-8
   - id: be.function
     title: Function
     path: function.yaml
-    decides: Direct use cases, transport adapters, transaction identity, concurrency invariants, static and dynamic module selection
-    rules: BE-FUNCTION-1 … BE-FUNCTION-8
+    decides: One handler per operation, transport adapters, transaction identity, concurrency invariants, module registration, small function forms and budgets
+    rules: BE-FUNCTION-1 … BE-FUNCTION-9
   - id: be.imports
     title: Imports
     path: imports.yaml
-    decides: Aliases and public entries, layering direction, banned imports; layout is Prettier's
+    decides: Aliases and the one owner entry, layering direction, banned imports; layout is Prettier's
     rules: BE-IMPORTS-1 … BE-IMPORTS-7
   - id: be.comment
     title: Comment
@@ -54,60 +77,60 @@ topics:
   - id: be.typing
     title: Typing
     path: typing.yaml
-    decides: Strict flags, plain application contracts, protocol DTOs, bounded input, no casts
+    decides: Strict flags, plain application contracts, ExecuteParams, protocol DTOs, bounded input, no type escapes anywhere
     rules: BE-TYPING-1 … BE-TYPING-7
   - id: be.error
     title: Error
     path: error.yaml
-    decides: DomainError, capability-owned errors, typed outcomes, the masking HTTP filter and GraphQL formatError
+    decides: Code enum plus kind table per capability, Outcome for refusals, DomainError for failures, the masking REST filter and GraphQL formatError, catalog display text
     rules: BE-ERROR-1 … BE-ERROR-7
   - id: be.test
     title: Test
     path: test.yaml
-    decides: Unit and e2e placement, the jest topology, typed doubles, composition specs, what an assertion proves
+    decides: Unit and e2e placement, the jest topology, typed doubles and twin specs, composition specs, real-AppModule e2e, what an assertion proves
     rules: BE-TEST-1 … BE-TEST-7
   - id: be.api-auth
     title: API authentication and input bounds
     path: api-auth.yaml
-    decides: Default deny with APP_GUARD and public reasons, identity-owned verification, signed webhooks, typed operations, bounded input
-    rules: BE-AUTH-1 … BE-AUTH-5
+    decides: Default deny with APP_GUARD and public reasons, CSRF origin guard, identity-owned verification, signed webhooks, typed operations, bounded validated input, cursor pagination
+    rules: BE-AUTH-1 … BE-AUTH-6
   - id: be.config
     title: Configuration and secrets
     path: config.yaml
-    decides: One environment reader, config per capability, no default secrets or addresses, sealed secrets
+    decides: One environment reader, typed readers, config per capability with Inject<Cap>Options, no default secrets or addresses, all-or-nothing optional integrations, sealed secrets
     rules: BE-CONFIG-1 … BE-CONFIG-4
   - id: be.logging
     title: Logging
     path: logging.yaml
-    decides: The mandatory Logger port, enum identities, structured payloads, handled catches
+    decides: The mandatory Logger port and InjectLogger, JSON-lines adapter, enum identities from log-events, structured fields, handled catches
     rules: BE-LOGGING-1 … BE-LOGGING-3
   - id: be.persistence
     title: Persistence and migrations
     path: persistence.yaml
-    decides: Migrations as the only schema authority, apps/migrate, persistence per capability, SQL in repositories, the outbox, no transaction spanning an external call, the named shared EntityManager
-    rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-7
+    decides: Migrations as the only schema authority, apps/migrate, persistence per capability, SqlText constants, the outbox, no transaction spanning an external call, the named shared EntityManager, one connection per database, table ownership and bounds, transactions
+    rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-10
   - id: be.background
     title: Background work
     path: background.yaml
-    decides: Jobs and consumers as transports, worker apps, runners for every sweep, lease and fencing
-    rules: BE-BACKGROUND-1 … BE-BACKGROUND-4
+    decides: Jobs and consumers as transports, worker apps, runners for every sweep, typed queues and the outbox, lease and fencing
+    rules: BE-BACKGROUND-1 … BE-BACKGROUND-5
   - id: be.messages
     title: Messages catalog and locale
     path: messages.yaml
-    decides: User-facing copy through a per-capability or per-feature vi/en catalog, the MessageCatalog port, request and non-request locale resolution
+    decides: User-facing copy through the owner's vi/en catalog, InjectMessageCatalog, InjectRequestLocale, request and non-request locale resolution
     rules: BE-MESSAGES-1, BE-MESSAGES-2
   - id: be.temporal
     title: The injected clock
     path: temporal.yaml
-    decides: Clock as the only reader of the ambient clock, FakeClock in specs
+    decides: Clock as the only reader of the ambient clock, InjectClock, FakeClock in specs
     rules: BE-TEMPORAL-1
   - id: be.idempotency
     title: Inbox dedupe
     path: idempotency.yaml
-    decides: A webhook or consumer claims the event through the shared inbox before it acts, consumer detection by shape not only filename, the inbox_claims table
+    decides: A webhook or consumer claims the event through InjectInbox before it acts, detected by receiver type, the inbox_claims table
     rules: BE-IDEMPOTENCY-1, BE-IDEMPOTENCY-2
   - id: be.resilience
     title: Retry through the shared helper
     path: resilience.yaml
-    decides: A retried operation goes through platform/retry, never a hand-written loop
+    decides: A retried operation goes through platform/retry or a queue definition, never a hand-written loop
     rules: BE-RESILIENCE-1

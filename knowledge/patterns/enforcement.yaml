@@ -7,7 +7,7 @@ purpose: |
 appliesTo: [backend, frontend]
 family: cross-cutting
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
@@ -45,13 +45,14 @@ rules:
         - HFS_INLINE_SUPPRESSION
 
   - id: ENF-MANDATORY-3
-    title: Lane-aware severity and options
+    title: One severity, no lane exemption
     kind: mandatory
     hfsRules: [R12, R47, R48]
     requirement: |
-      Separate production, module, unit and e2e lanes. Some rules intentionally differ by lane. Check required rules at their
-      canonical severity and options, then require no warnings or errors on the changed scope. Do not privately inject stronger
-      rules into a wrapper and describe the repository's normal lint as compliant.
+      Every rule ships at error and takes no option that widens or switches it off. Specs and e2e code are held to the same law as
+      product source; the only difference between lanes is which files a rule applies to, never how strictly. Require no warnings
+      or errors on the changed scope. Do not privately inject stronger rules into a wrapper and describe the repository's normal
+      lint as compliant.
     rationale: |
       Private wrappers hide the real gate and misreport repository compliance.
 
@@ -115,8 +116,8 @@ rules:
     kind: proposal
     priority: P0
     requirement: |
-      Maintain the HFS convention set and tested code skeletons. BE covers a feature with application and transport, a
-      capability service, a persistence owner, an error family and a worker job. FE covers leaf, connected and pure pair, page and
+      Maintain the HFS convention set and tested code skeletons. BE covers a feature with command, query, handler and transport, a
+      capability service, a persistence owner with its sql constants, an error family and a worker job. FE covers leaf, connected and pure pair, page and
       route, hooks, a reader and paired tests. Typecheck and lint those skeletons against the pinned package versions before
       publishing them.
     rationale: |
@@ -130,8 +131,8 @@ rules:
     kind: proposal
     priority: P1
     requirement: |
-      Strengthen AST checks for transaction callback overloads and outer-manager aliases; inspect dependency provenance for custom
-      persistence facades; verify named connections bind the intended database token. Keep real PostgreSQL rollback and
+      Keep every backend receiver check type-aware: transaction callbacks in either overload, outer-manager aliases, custom
+      persistence facades and named connections bound to the intended database token. Keep real PostgreSQL rollback and
       concurrency tests, because AST checks cannot prove transaction semantics.
     rationale: |
       Checkers miss isolation-level overloads and custom facade architectures.
@@ -156,7 +157,7 @@ rules:
     kind: proposal
     priority: P1
     requirement: |
-      Add mutation regression fixtures that deliberately rename a repository, alias a hook, disable a rule, ignore a changed file,
+      Add mutation regression fixtures that deliberately rename an injected receiver, alias a hook, disable a rule, ignore a changed file,
       omit a required test or use a second-argument transaction callback. The gate must reject each applicable violation; a test of
       documentation wording is not enforcement.
     rationale: |

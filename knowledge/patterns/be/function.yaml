@@ -2,61 +2,65 @@ schema: starci/knowledge-source@1
 id: be.function
 title: Backend function
 purpose: |-
-  Given backend behavior, which unit executes it and how is that unit shaped? Apply the HFS responsibility pattern.
-  Read docs/backend-source-pattern.md for the coherent layout, code forms and verification limits.
+  Given backend behavior, which unit executes it and how is that unit shaped? Apply the HFS responsibility pattern. Read
+  docs/backend-source-pattern.md for the coherent layout, code forms and verification limits, and cqrs.yaml for the message
+  and handler shapes.
 appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
+    - knowledge/hfs/rules.yaml
     - docs/backend-source-pattern.md
+    - owner-locked BE convention 2026-09-30
     - https://docs.nestjs.com/fundamentals/dynamic-modules
     - https://docs.nestjs.com/techniques/validation
   limitations: |-
-    Adopted Nest and TypeScript profile, not universal framework law. Static checks do not establish behavior, DI
-    identity, transaction isolation or concurrency safety.
+    Adopted Nest and TypeScript profile, not universal framework law. Static checks do not establish behavior, DI identity,
+    transaction isolation or concurrency safety.
 rules:
   - id: BE-FUNCTION-1
-    title: A use case has one execution owner
+    title: A handler is the one execution owner of an operation
     kind: mandatory
-    hfsRules: [R29]
+    hfsRules: [R29, R87]
     requirement: |-
-      Default to an injectable use case with a typed public `execute` method in `application/<action>.use-case.ts`.
-      When a bus has real semantics, its handler implements the installed command or query interface and owns that use
-      case. Do not add a second forwarding service or an execute-to-process base class.
+      Each operation has one command or query and one handler in `application/` that owns the scenario: it authorizes the
+      resource, opens the transaction, calls the domain services and returns the declared result. There is no second forwarding
+      service and no use-case class; a transport dispatches the bus directly (cqrs.yaml).
     rationale: |-
       One owner avoids duplicated orchestration and boilerplate without behavior.
     cases:
       - id: case-1
-        when: A scenario with no bus semantics
-        write: 'PlaceOrderUseCase.execute(input, principal) called by the controller and the resolver.'
+        when: A scenario reachable over two protocols
+        write: 'PlaceOrderHandler once; the resolver and the controller each dispatch PlaceOrderCommand.'
     verification:
       automated:
         - BE_FEATURE_SHAPE
+        - BE_CQRS_SHAPE
       manual:
-        - Verify handler registration and test the public execution entry.
+        - Verify handler registration through the composition spec and test the handler through its twin spec.
     relatedExamples: []
   - id: BE-FUNCTION-2
     title: Messages carry stable application contracts
     kind: mandatory
-    hfsRules: [R37]
+    hfsRules: [R37, R87]
     requirement: |-
-      Command and query payloads are readonly plain application inputs with a minimal authenticated principal (id and
-      role) when required. They never import transport DTOs, ORM user entities or raw provider tokens. A durable
-      message has explicit identity, version and serialization rules; an in-process class is not automatically a
-      durable contract.
+      A command or query carries one readonly `params` of `ExecuteParams<Request>` or `PublicExecuteParams<Request>`. The
+      request is a plain application type and the principal is `{ id, roles }`. They never import transport DTOs, ORM entities
+      or raw provider tokens. A durable message (an outbox payload) has an explicit type name, version and serialization rules;
+      an in-process class is not automatically a durable contract.
     rationale: |-
-      Transport representations and credentials do not belong in generic execution envelopes.
+      Transport representations and credentials do not belong in execution messages.
     cases:
       - id: case-1
         when: A durable message
-        write: 'type PaymentSettled = { readonly type: "payment.settled"; readonly version: 1; readonly paymentId: string }'
+        write: 'type PaymentSettledMessage = { readonly type: "payment.settled"; readonly version: 1; readonly paymentId: string }'
     verification:
       automated:
         - BE_ENTITY_IN_CONTRACT
-        - BE_APPLICATION_IMPORTS_TRANSPORT
+        - BE_CQRS_SHAPE
       manual:
         - Verify replay, serialization and authorization at the actual boundary.
     relatedExamples: []
@@ -65,82 +69,85 @@ rules:
     kind: mandatory
     hfsRules: [R26, R36]
     requirement: |-
-      A feature use case coordinates the scenario; a capability service owns cohesive domain, platform or provider
-      behavior. If one capability API already is the whole scenario, a second forwarding class is unnecessary. A
-      persistence port is justified by an actual boundary and preserves transaction identity; exposing a store's manager
-      is not encapsulation.
+      A handler coordinates the scenario; a domain service owns cohesive domain behavior and data access of its capability.
+      If one capability API already is the whole scenario, a second forwarding class is unnecessary. A persistence access is
+      `entityManager` calls and `*.sql.ts` constants, never a store or repository class; exposing a manager through a getter is
+      not encapsulation.
     rationale: |-
       Responsibilities justify abstractions, not suffixes or class counts.
     cases:
       - id: case-1
-        when: A scenario needs orders, credit and stock
-        write: 'PlaceOrderUseCase calls OrdersService, CreditPolicy and StockService, each imported from its own capability index.'
+        when: A scenario needs purchases, credit and stock
+        write: 'PlaceOrderHandler calls PurchaseService, CreditPolicy and StockService, each imported from its own capability index.'
     verification:
       automated:
         - BE_TIER_DIRECTION
+        - BE_SQL_OUTSIDE_PERSISTENCE
       manual:
         - Identify where invariant, transaction and effect ownership live.
     relatedExamples: []
   - id: BE-FUNCTION-4
     title: Transport adapts protocol
     kind: mandatory
-    hfsRules: [R41, R42]
+    hfsRules: [R41, R42, R88]
     requirement: |-
-      Controllers, resolvers, consumers and jobs validate protocol input, obtain a verified principal, map to a plain
-      application input, invoke the use case and project its result. They contain no business decision. Resource
-      authorization stays in the use case or capability so that another entry point cannot bypass it. Every route and
-      operation is protected by the default guard unless it carries `@Public({ reason })`; a body is a typed DTO, never
-      `unknown` or `GraphQLJSON`.
+      Resolvers, controllers, gateways, consumers and jobs validate protocol input, obtain the verified principal, map to a
+      plain request, dispatch one message and project its result (transport.yaml). They contain no business decision. Resource
+      authorization stays in the handler or the domain service so that another entry point cannot bypass it. Every operation is
+      protected by the default guard unless it carries `@Public({ reason })`, and a body is a typed DTO, never `unknown` or
+      `GraphQLJSON`.
     rationale: |-
-      A thin protocol adapter supports multiple entry points without duplicating policy, and default deny means a
-      forgotten decorator closes a route instead of opening it.
+      A thin protocol adapter supports multiple entry points without duplicating policy, and default deny means a forgotten
+      decorator closes an operation instead of opening it.
     cases:
       - id: case-1
         when: A resolver
-        write: '@Mutation(...) placeOrder(@Args("input") input: PlaceOrderInput, @CurrentPrincipal() principal: Principal) { return this.useCase.execute(toContract(input), principal).then(toOutput) }'
+        write: '@Mutation(...) async placeOrder(@CurrentPrincipal() principal: Principal, @Args("input") input: PlaceOrderInput) { return toPlaceOrderType(unwrapOutcome(await this.commandBus.execute(new PlaceOrderCommand({ request: toPlaceOrderRequest(input), principal })), PurchaseError)) }'
     verification:
       automated:
         - BE_DEFAULT_DENY
         - BE_INPUT_BOUNDED
+        - BE_TRANSPORT_SHAPE
       manual:
         - Exercise malformed input, cross-workspace denial and safe response projection.
     relatedExamples: []
   - id: BE-FUNCTION-5
     title: Injection preserves identity and transaction
     kind: mandatory
-    hfsRules: [R35, R36]
+    hfsRules: [R83, R85]
     requirement: |-
-      Inject private readonly dependencies with the correct named connection or provider scope. Every operation in a
-      transaction uses the transaction-scoped manager passed to the callback, never the injected outer manager. Do not
-      substitute one named connection for another or globally collapse distinct clients. Call `super` only when a
-      meaningful base requires it.
+      Inject `private readonly` dependencies through their injectors (injection.yaml). Every operation in a transaction uses
+      the `manager` handed to the callback, never the injected outer manager, and a domain-service method that writes takes
+      `manager` as a required field of its params. Do not substitute one connection for another or globally collapse distinct
+      clients. Call `super` only when a meaningful base requires it (a handler passes it to `ICQRSHandler`).
     rationale: |-
       A token name alone does not prove connection identity or atomicity.
     cases:
       - id: case-1
         when: A transactional method
-        write: 'await this.dataSource.transaction(async (manager) => { await manager.insert(OrderEntity, row); await manager.insert(OutboxEntity, event) })'
+        write: 'await this.entityManager.transaction(async (manager) => { await manager.insert(OrderEntity, row); await this.outbox.enqueue(manager, message) })'
     verification:
       automated:
-        - BE_SCHEMA_OWNER
+        - BE_UNNAMED_DATA_ACCESS
+        - BE_RAW_INJECT
       manual:
-        - Inspect token bodies and test boot plus the real transaction boundary.
+        - Test boot plus the real transaction boundary.
     relatedExamples: []
   - id: BE-FUNCTION-6
     title: Validate authority and enforce concurrent invariants
     kind: mandatory
     hfsRules: [R41]
     requirement: |-
-      Validate input, principal and resource scope before effects. Read-before-write is an optimization, not
-      concurrency-safe idempotency. Enforce uniqueness, conditional transitions and locks at the owning store, define
-      conflict behavior, and bind request idempotency to principal or workspace, operation and request digest. Separate
-      local transaction completion from remote acknowledgement and unknown effects.
+      Validate input, principal and resource scope before effects. Read-before-write is an optimization, not concurrency-safe
+      idempotency. Enforce uniqueness, conditional transitions and locks at the owning store, define conflict behavior, and
+      bind request idempotency to principal or workspace, operation and request digest. Separate local transaction completion
+      from remote acknowledgement and unknown effects.
     rationale: |-
       Two simultaneous callers or a crash expose invariants that serial mocks cannot prove.
     cases:
       - id: case-1
         when: A unique business key
-        write: 'a unique index in the migration plus an insert that handles the conflict as `{ kind: "duplicate" }`.'
+        write: 'a unique index in the migration plus an insert that handles the conflict as a refused outcome with the capability code.'
     verification:
       automated:
         - BE_DEFAULT_DENY
@@ -148,48 +155,70 @@ rules:
         - Run competing attempts and applicable crash and retry cases against the real authority.
     relatedExamples: []
   - id: BE-FUNCTION-7
-    title: Helpers have cohesive ownership
+    title: Helpers have cohesive ownership, files stay inside budget
     kind: mandatory
-    hfsRules: [R21, R25]
+    hfsRules: [R20, R21, R25]
     requirement: |-
-      Keep pure helpers with their owning capability or use case. A helper with no owner goes to `platform/primitives`.
-      Public contracts use named input and output types where that improves clarity; a single primitive may remain
-      positional. Prefer a simple function over a provider class when no lifecycle or injection is required. A helper
-      defined twice under one name is a finding; the second definition is deleted and imports the first.
+      Keep pure helpers with their owning capability or handler. A helper with no owner goes to `platform/primitives`. Public
+      contracts use named params and result types where that improves clarity; a single primitive may remain positional. Prefer
+      a simple function over a provider class when no lifecycle or injection is required. A helper defined twice under one name
+      is a finding; the second definition is deleted and imports the first. A file has at most 500 lines and a function at most
+      80; over-budget files do not grow and new files are inside budget. A duplicated block is 8 lines or 60 tokens.
     rationale: |-
-      Reuse and clarity determine helper form, and copies drift.
+      Reuse and clarity determine helper form, copies drift, and a budget that ratchets keeps units reviewable.
     cases:
       - id: case-1
-        when: isRecord, hashing, ids, cookie parsing
+        when: An Outcome helper, hashing, ids, time arithmetic
         write: 'platform/primitives exports each once.'
     verification:
       automated:
         - HFS_DUPLICATE_CODE
+        - HFS_SIZE_GROWTH
         - HFS_UNUSED_EXPORT
       manual:
         - Confirm purity and absence of hidden config, I/O or authority decisions.
     relatedExamples: []
   - id: BE-FUNCTION-8
-    title: Static modules first; dynamic options when real
+    title: One module shape with register; options arrive through the injector
     kind: mandatory
-    hfsRules: [R43, R45]
+    hfsRules: [R43, R45, R85]
     requirement: |-
-      Use a static Nest module for fixed providers, imports and exports. Use `ConfigurableModuleBuilder<Options>` and a
-      `static register(options)` when consumers configure behavior or distinct instances, and always with a real
-      options type produced by `parse<Name>Config`. Options arrive through DI (`useFactory` with `inject`); a factory
-      never calls an environment reader. Secret custody stays outside source literals. Dynamic options never substitute
-      for provider identity or lifetime design.
+      A capability module is a `ConfigurableModuleBuilder<Options>` module whose only registration method is
+      `register(options)` and registered once per app root as its capability's representative; a feature module is static. Options come from `parse<C>Config` in `main.ts` and are read with
+      `Inject<C>Options()`; a factory never calls an environment reader. Secret custody stays outside source literals. A dynamic
+      option never substitutes for provider identity or lifetime design.
     rationale: |-
-      An empty-options configurable module adds an API without a configuration responsibility, and an environment read
-      inside a factory moves the config boundary out of `main.ts`.
+      An environment read inside a factory moves the config boundary out of `main.ts`, and a second registration method is a
+      second path.
     cases:
       - id: case-1
         when: A configured capability
-        write: 'OrdersModule.register(options.orders) from app.module.ts, where options.orders is the output of parseOrdersConfig(env) computed once in main.ts.'
+        write: 'PurchaseModule.register({ isGlobal: true, ...options.purchase }) from app.module.ts, where options.purchase is the output of parsePurchaseConfig(env) computed once in main.ts.'
     verification:
       automated:
         - BE_MODULE_SHAPE
         - BE_CONFIG_OWNER
       manual:
         - Boot the module with valid and invalid options and verify the intended provider identity.
+    relatedExamples: []
+  - id: BE-FUNCTION-9
+    title: Small function forms
+    kind: mandatory
+    hfsRules: [R73, R75, R76]
+    requirement: |-
+      An `async` function contains an `await`, otherwise it is not `async`. A handler and every public method of an Injectable,
+      Resolver or Controller declares its return type. `JSON.parse` of outside text sits inside a `try` in its own function and
+      fails as a capability error that keeps the cause.
+    rationale: |-
+      A declared return type keeps a contract from drifting silently, and an unguarded parse turns hostile input into a crash.
+    cases:
+      - id: case-1
+        when: Parsing a webhook body
+        write: 'const parseBody = (text: string): unknown => { try { return JSON.parse(text) } catch (error) { throw new PayosError({ code: PayosErrorCode.BodyMalformed, cause: error }) } }'
+    verification:
+      automated:
+        - BE_ASYNC_NO_AWAIT
+        - BE_RETURN_TYPE
+        - BE_JSON_PARSE_UNGUARDED
+      manual: []
     relatedExamples: []

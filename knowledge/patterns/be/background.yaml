@@ -2,18 +2,19 @@ schema: starci/knowledge-source@1
 id: be.background
 title: Backend background work
 purpose: |-
-  Given work that runs without a request (cron, sweep, outbox publish, queue consumption, retry), where does it live and
-  which process runs it? Background work is a transport, run only by an app of kind worker.
+  Given work that runs without a request (cron, sweep, outbox relay, queue consumption, retry), where does it live and which
+  process runs it? Background work is a transport that dispatches one command, run only by an app of kind worker.
 appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner-locked BE convention 2026-09-30
     - docs/backend-source-pattern.md
-    - https://docs.nestjs.com/techniques/task-scheduling
     - https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
   limitations: |-
     Static checks prove that a background method has a runner and that a worker composes it. They do not prove lease
@@ -23,26 +24,30 @@ rules:
   - id: BE-BACKGROUND-1
     title: Background work is a transport
     kind: mandatory
-    hfsRules: [R46, R29]
+    hfsRules: [R46, R88, R90]
     requirement: |-
-      Scheduled work lives in `transport/schedule/<job>.job.ts` and queue consumption in
-      `transport/message/<event>.consumer.ts`, each with its own module (`<feature>-schedule.module.ts`,
-      `<feature>-message.module.ts`). A job or consumer calls a use case exactly as a controller does and holds no business
-      decision. Mechanisms live in `platform/scheduling` and `platform/messaging`. `@Cron` never appears in a domain
-      service.
+      Scheduled work is `transport/schedule/<job>.job.ts` implementing `ScheduledJob { name; schedule: CronSchedule | IntervalSchedule; run(at: Date): Promise<void> }`,
+      registered through `<feature>-schedule.module.ts` into `platform/scheduling`, which owns cron parsing, the lease and the
+      fencing so one replica runs a tick and a job never overlaps itself. Queue consumption is
+      `transport/message/<event>.consumer.ts` registered through `<feature>-message.module.ts` into `platform/messaging` (an
+      adapter over `@nestjs/bullmq` for queues and a Kafka adapter for cross-system streams). A job or consumer dispatches one
+      command exactly as a resolver does and holds no business decision. `@Cron`, `@Interval`, `@Timeout`, `setInterval`,
+      `new Worker(`, `@Processor` and `WorkerHost` appear only inside `platform/{scheduling,messaging}`. A CLI command is
+      `transport/cli/<name>.cli.ts` registered through `platform/cli`.
     rationale: |-
-      One shape for every entry protocol keeps use cases reusable and lets the app choose which protocols it serves.
+      One shape for every entry protocol keeps handlers reusable and lets the app choose which protocols it serves.
     cases:
       - id: case-1
-        when: An outbox publisher
-        write: 'transport/schedule/publish-outbox.job.ts calls PublishOutboxUseCase.execute on each tick.'
+        when: An outbox relay
+        write: 'platform/outbox exposes a job whose run(at) dispatches RelayOutboxCommand on each tick.'
       - id: case-2
         when: A queue consumer
-        write: 'transport/message/payment-settled.consumer.ts maps the message to SettlePaymentInput and calls SettlePaymentUseCase.'
+        write: 'transport/message/payment-settled.consumer.ts maps the payload to SettlePaymentRequest and dispatches SettlePaymentCommand after claiming the event in the inbox.'
     verification:
       automated:
-        - BE_FEATURE_SHAPE
         - BE_BACKGROUND_UNOWNED
+        - BE_INFRA_OWNER
+        - BE_TRANSPORT_SHAPE
       manual: []
     relatedExamples: []
   - id: BE-BACKGROUND-2
@@ -51,14 +56,14 @@ rules:
     hfsRules: [R46, R31]
     requirement: |-
       An app of kind `worker` composes the schedule and message modules; an api app never runs cron or consumes a queue,
-      because cron in an api app runs once per replica. Every schedule or message transport has at least one worker app
-      that composes it, and the worker has a composition spec that boots its real AppModule.
+      because cron in an api app runs once per replica. Every schedule or message transport has at least one worker app that
+      composes it, and the worker has a composition spec that boots its real AppModule.
     rationale: |-
       A job that no process composes never runs, and a job inside a replicated api runs many times.
     cases:
       - id: case-1
         when: A worker app
-        write: 'apps/worker/src/app.module.ts imports OrdersScheduleModule and PaymentsMessageModule and registers no controller.'
+        write: 'apps/worker/src/app.module.ts registers BillingScheduleModule and BillingMessageModule and no controller or resolver.'
     verification:
       automated:
         - BE_BACKGROUND_UNOWNED
@@ -71,15 +76,15 @@ rules:
     kind: mandatory
     hfsRules: [R46]
     requirement: |-
-      A method named `sweep*`, `deliver*`, `reconcile*` or `retry*` must be called by a job or consumer. A method with no
-      runner is a finding even when it is tested, because durable recovery that nothing invokes does not recover anything.
+      A method named `sweep*`, `deliver*`, `reconcile*`, `retry*` or `relay*` must be reachable from a job or consumer that a
+      worker app composes. A method with no runner is a finding even when it is tested, because durable recovery that nothing
+      invokes does not recover anything.
     rationale: |-
-      A built and unit-tested outbox, sweep or reconcile that nothing schedules gives the false impression of durable
-      recovery.
+      A built and unit-tested outbox, sweep or reconcile that nothing schedules gives the false impression of durable recovery.
     cases:
       - id: case-1
         when: A new sweep
-        write: 'add SweepUnsettledPaymentsJob in transport/schedule and compose it in the worker in the same change.'
+        write: 'add a SweepUnsettledPaymentsJob in transport/schedule that dispatches the sweep command, and compose it in the worker in the same change.'
     verification:
       automated:
         - BE_BACKGROUND_UNOWNED
@@ -91,18 +96,41 @@ rules:
     kind: mandatory
     hfsRules: [R46]
     requirement: |-
-      Lease expiry allows a new claimant; it does not stop the old process. A monotonic execution token is checked
-      atomically by the resource that accepts the write. When the provider cannot enforce fencing, use its idempotency or
-      reconciliation contract, constrain overlap, and represent unknown effects explicitly before a retry. A stale worker
-      that resumes after reassignment must have its writes and settlement rejected by the real authority.
+      Lease expiry allows a new claimant; it does not stop the old process. A monotonic execution token is checked atomically
+      by the resource that accepts the write. When the provider cannot enforce fencing, use its idempotency or reconciliation
+      contract, constrain overlap, and represent unknown effects explicitly before a retry. A stale worker that resumes after
+      reassignment must have its writes and settlement rejected by the real authority.
     rationale: |-
       Updating a local record with a fence after an unfenced external call does not fence the external effect.
     cases:
       - id: case-1
         when: A claim
-        write: 'UPDATE ... SET lease_token = :token WHERE id = :id AND lease_expires_at < now() returning the new token; every write checks the token.'
+        write: 'UPDATE ... SET lease_token = $2 WHERE id = $1 AND lease_expires_at < $3 returning the new token, as a SqlText constant; every write checks the token.'
     verification:
       automated: []
       manual:
         - Run a paused old worker resuming after reassignment against the actual store and assert its writes are refused.
+    relatedExamples: []
+  - id: BE-BACKGROUND-5
+    title: Producers publish through typed queues and the outbox
+    kind: mandatory
+    hfsRules: [R82, R90]
+    requirement: |-
+      Producers publish through `InjectMessagePublisher()` with a typed queue definition
+      `defineQueue<Payload>({ name, attempts, backoff })` declared by the owning capability. A publish that must be atomic with
+      a write goes through `InjectOutbox()` `outbox.enqueue(manager, message)` inside the transaction and is relayed by the
+      `platform/outbox` job. `@InjectQueue`, `Queue` and `KafkaClientService` are not used outside `platform/messaging`.
+    rationale: |-
+      A typed queue definition keeps the payload, the attempts and the backoff with the owner, and the outbox keeps the
+      publish atomic with the write.
+    cases:
+      - id: case-1
+        when: A publish atomic with a write
+        write: 'await this.entityManager.transaction(async (manager) => { await manager.save(OrderEntity, order); await this.outbox.enqueue(manager, orderPlacedMessage(order)) })'
+    verification:
+      automated:
+        - BE_INFRA_OWNER
+        - BE_TRANSACTION_EXTERNAL_CALL
+        - BE_RAW_INJECT
+      manual: []
     relatedExamples: []

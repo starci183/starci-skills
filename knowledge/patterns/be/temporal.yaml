@@ -2,9 +2,8 @@ schema: starci/knowledge-source@1
 id: be.temporal
 title: The injected clock
 purpose: |-
-  Given code that needs "now" - a timestamp, a duration, a scheduling decision - where does it read it, and how does
-  a spec drive it? Business code asks an injected `Clock` port for the time; only one implementation reads the
-  ambient system clock.
+  Given code that needs "now" - a timestamp, a duration, a scheduling decision - where does it read it, and how does a spec
+  drive it? Business code asks the injected `Clock` port; only `platform/clock` reads the ambient system clock.
 appliesTo:
   - backend
 family: be
@@ -13,43 +12,44 @@ provenance:
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner-locked BE convention 2026-09-30
     - packages/eslint/be/temporal.mjs
     - packages/jest-preset/clock.cjs
   limitations: |-
-    Static checks find a direct read of `Date.now()`, a bare `new Date()` or `performance.now()` outside
-    `platform/clock` and refuse it. They cannot judge whether a computation built on the injected time is correct;
-    that is a spec driven by `FakeClock`.
+    Static checks find a call or a reference to an ambient time source outside `platform/clock` and refuse it. They cannot
+    judge whether a computation built on the injected time is correct; that is a spec driven by `FakeClock`.
 rules:
   - id: BE-TEMPORAL-1
     title: The Clock port is the only reader of the ambient clock
     kind: mandatory
-    hfsRules: [R79]
+    hfsRules: [R79, R90]
     requirement: |-
-      `platform/clock` exports `Clock` (`interface Clock { now(): Date }`) and `SystemClock`, the one `@Injectable`
-      in the repository allowed to call `Date.now()`, `new Date()` with no argument, or `performance.now()`. Every
-      other class or function that needs the current instant takes `Clock` by constructor injection (or a `clock:
-      Clock` parameter, for a free function) and calls `clock.now()`. `new Date(value)` built from a value the
-      caller already holds (a stored timestamp, a parsed header) is not an ambient read and stays as it is.
+      `platform/clock` exports `Clock { now(): Date }`, `SystemClock` (the only ambient reader), `InjectClock()` and the app
+      timezone constant. Outside `platform/clock` these are not used, whether called or merely referenced: `Date.now`, a
+      zero-argument `new Date()`, `performance.now`, `process.hrtime`, `Temporal.Now`, and imports of `dayjs`, `moment` or
+      `date-fns-tz` (allowed only in `platform/{clock,primitives}`; date arithmetic helpers live in
+      `platform/primitives/time.ts`). Everything else takes `@InjectClock() private readonly clock: Clock` and calls
+      `clock.now()`. A job receives `run(at)`; a handler stamps `this.clock.now()` once and passes it down. `new Date(value)`
+      built from a value the caller already holds is not an ambient read. `setTimeout` and `node:timers` are allowed only in
+      `platform/{retry,scheduling,messaging,http}`.
     rationale: |-
-      A call to the ambient clock cannot be replaced in a spec: the test then either sleeps for real or races the
-      wall clock, and a scheduled job or a "expires after N minutes" rule cannot be driven to a chosen instant. One
-      injected port makes time a normal, fakeable dependency instead of a global.
+      An ambient read cannot be replaced in a spec: the test sleeps for real or races the wall clock, and an "expires after N
+      minutes" rule cannot be driven to a chosen instant. One injected port makes time a normal, fakeable dependency.
     cases:
       - id: case-1
         when: A service that stamps a row
-        write: 'constructor(private readonly clock: Clock) {} ... createdAt: this.clock.now()'
+        write: 'constructor(@InjectClock() private readonly clock: Clock) {} ... createdAt: this.clock.now()'
       - id: case-2
-        when: A duration check
-        write: 'const elapsedMs = this.clock.now().getTime() - startedAt.getTime()'
-      - id: case-3
         when: A value already in hand
-        write: 'new Date(payload.issuedAt) parses a value the caller already received; this is not an ambient read and is left alone.'
-      - id: case-4
+        write: 'new Date(payload.issuedAt) parses a value the caller already received; it is not an ambient read.'
+      - id: case-3
         when: A spec
-        write: 'import { FakeClock } from "@starci/jest-preset/clock"; const clock = new FakeClock("2026-01-01T00:00:00.000Z"); clock.advance(60_000) drives the service without a real sleep.'
+        write: 'const clock = new FakeClock("2026-01-01T00:00:00.000Z"); clock.advance(60_000) drives the subject without a real sleep; specs are held to the same rule as source.'
     verification:
       automated:
         - BE_AMBIENT_CLOCK
+        - BE_INFRA_OWNER
       manual:
-        - Confirm a spec that depends on elapsed time drives FakeClock explicitly instead of a real setTimeout/sleep.
+        - Confirm a spec that depends on elapsed time drives FakeClock explicitly instead of a real sleep.
     relatedExamples: []

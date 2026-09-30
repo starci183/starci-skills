@@ -8,10 +8,12 @@ appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
+    - knowledge/hfs/rules.yaml
     - knowledge/patterns/be/naming.yaml
+    - owner-locked BE convention 2026-09-30
   limitations: |-
     A lint rule proves that a comment exists and has the right form. Whether it explains the actual consequence is agent
     review.
@@ -19,7 +21,7 @@ rules:
   - id: BE-COMMENT-1
     title: Every export has a docblock, placed after the decorators
     kind: mandatory
-    hfsRules: [R18]
+    hfsRules: [R89]
     requirement: |-
       Every export carries a docblock. On a decorated class the block sits between the class decorators and
       `export class`.
@@ -31,20 +33,20 @@ rules:
         write: |-
           @Resolver()
           /**
-           * GraphQL entry for placing an order for the current customer.
+           * GraphQL door of placeOrder for the current customer.
            */
           export class PlaceOrderResolver
       - id: case-2
         when: A module
         write: |-
-          @Module({ imports: [OrdersModule] })
-          /** Registers the HTTP transport of the orders feature. */
-          export class OrdersHttpModule
+          @Module({ imports: [CheckoutModule] })
+          /** Registers the GraphQL transport of the checkout feature. */
+          export class CheckoutGraphqlModule
       - id: case-3
         when: An undecorated export
         write: |-
-          /** Plain application input for placing an order. */
-          export type PlaceOrderInput
+          /** Plain application request for placing an order. */
+          export type PlaceOrderRequest
     verification:
       automated:
         - require-export-jsdoc
@@ -53,7 +55,7 @@ rules:
   - id: BE-COMMENT-2
     title: The docblock states responsibility and invariant, not the name
     kind: mandatory
-    hfsRules: [R18]
+    hfsRules: [R89]
     requirement: |-
       Docblocks explain why a declaration exists, what must not happen, who throws it or why a field is nullable. They
       never restate the name.
@@ -78,7 +80,7 @@ rules:
   - id: BE-COMMENT-3
     title: Methods and fields
     kind: mandatory
-    hfsRules: [R18]
+    hfsRules: [R89]
     requirement: |-
       Methods and declared class, interface and type fields carry non-empty responsibility docblocks. Generic parameters
       have named `@template` documentation. Parameter and return explanations and cross-references are added where
@@ -106,7 +108,7 @@ rules:
   - id: BE-COMMENT-4
     title: Enum members are each documented
     kind: mandatory
-    hfsRules: [R18]
+    hfsRules: [R89]
     requirement: |-
       Every enum member has a docblock.
     rationale: |-
@@ -127,7 +129,7 @@ rules:
   - id: BE-COMMENT-5
     title: Line comments are prose about why
     kind: mandatory
-    hfsRules: [R18]
+    hfsRules: [R89]
     requirement: |-
       Prose line comments sit above code and their first ASCII letter is lowercase. Recognized triple-slash compiler
       references are structured metadata. An agent reviews whether the prose explains a consequence that motivates the
@@ -150,7 +152,7 @@ rules:
   - id: BE-COMMENT-6
     title: Block comments for multi-paragraph reasoning inside a body
     kind: mandatory
-    hfsRules: [R18]
+    hfsRules: [R89]
     requirement: |-
       Reasoning block comments inside a function body open with a capitalized first ASCII letter. Multi-paragraph
       reasoning uses a block. Claim, evidence and corrected history where applicable are content reviewed by an agent.
@@ -173,7 +175,7 @@ rules:
   - id: BE-COMMENT-7
     title: What a comment never contains
     kind: mandatory
-    hfsRules: [R18]
+    hfsRules: [R18, R89]
     requirement: |-
       Comments stay ASCII with no emoji or AI symbols. There is no inline suppression of any kind: no `eslint-disable`,
       no `@ts-ignore`, no `@ts-expect-error`, no escape annotation. A rule that is wrong is changed in `.claude`, never
@@ -184,7 +186,7 @@ rules:
     cases:
       - id: case-1
         when: Non-ASCII
-        write: Comments stay ASCII; no-non-ascii-source, no-ai-symbol and no-emoji fail otherwise.
+        write: Comments stay ASCII; the source rules for non-ASCII text, AI symbols and emoji fail otherwise; Vietnamese text lives only in `messages/` catalogs.
       - id: case-2
         when: A suppression
         write: 'A line like `eslint-disable-next-line` fails HFS_INLINE_SUPPRESSION; fix the code.'

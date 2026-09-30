@@ -1,0 +1,113 @@
+schema: starci/knowledge-source@1
+id: be.infra
+title: Backend infrastructure ownership
+purpose: |-
+  Given a raw library (HTTP, cache, queue, scheduler, logger, date, config, events), which capability may import it? Each
+  raw library is owned by exactly one platform or integration capability; everything else reaches it through that
+  capability's port and injector.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-09-30
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/rules.yaml
+    - owner-locked BE convention 2026-09-30
+  limitations: |-
+    Static checks prove which files import or reference a raw library. They do not prove that the owning capability
+    configures it correctly, that a timeout value is right or that a provider contract is honored.
+rules:
+  - id: BE-INFRA-1
+    title: One owner per raw infrastructure library
+    kind: mandatory
+    hfsRules: [R90]
+    requirement: |-
+      An import or a global reference of a raw library is allowed only in its owner, read from `ruleParams.be.infraOwners` of
+      the slot manifest: `fetch`, `axios`, `got`, `undici`, `node:http(s)` request APIs in `platform/http`; `cache-manager`,
+      `redis`, `ioredis` in `integrations/{cache,redis}`; `bullmq`, `@nestjs/bullmq`, `kafkajs` in `platform/messaging`;
+      `setInterval`, `setTimeout`, `node:timers*` in `platform/{scheduling,retry,messaging,http}`; `winston` in
+      `platform/logging`; `dayjs`, `moment`, `date-fns-tz` in `platform/{clock,primitives}`. `@nestjs/schedule`, `@nestjs/config`,
+      `dotenv` and `@nestjs/event-emitter` are owned by nobody. Everything else asks the owner's port through its injector.
+    rationale: |-
+      A raw library used in two places has two configurations, two failure behaviors and two upgrade paths; one owner keeps
+      timeouts, retries, logging and clocks in one place.
+    cases:
+      - id: case-1
+        when: Code needs to call another service
+        write: 'Inject `@InjectHttpClient() private readonly httpClient: HttpClient` and call `httpClient.request({ method, url, headers, body, timeoutMs })`.'
+      - id: case-2
+        when: Code needs to run something later
+        write: 'A `transport/schedule/<job>.job.ts` or a queue declared with `defineQueue<Payload>` through `InjectMessagePublisher`; never `setTimeout` or `@Cron`.'
+    verification:
+      automated:
+        - BE_INFRA_OWNER
+      manual: []
+    relatedExamples: []
+  - id: BE-INFRA-2
+    title: Outbound HTTP states its timeout in the type
+    kind: mandatory
+    hfsRules: [R70, R90]
+    requirement: |-
+      `platform/http` owns the `HttpClient` port, `request({ method, url, headers, body, timeoutMs, retry?, signal? })`, where
+      `timeoutMs` is a required typed field, so a call without a timeout does not compile. It is implemented on `fetch` and
+      injected with `InjectHttpClient()`. No other HTTP API is reachable outside `platform/http`.
+    rationale: |-
+      A required field turns "every outbound call has a timeout" from a lint heuristic into a type error.
+    cases:
+      - id: case-1
+        when: A provider call
+        write: 'await this.httpClient.request({ method: "POST", url, headers, body, timeoutMs: PROVIDER_TIMEOUT_MS })'
+    verification:
+      automated:
+        - BE_HTTP_TIMEOUT
+        - BE_INFRA_OWNER
+      manual:
+        - Confirm each timeout matches the provider contract.
+    relatedExamples: []
+  - id: BE-INFRA-3
+    title: An integration is one folder that only it may call
+    kind: mandatory
+    hfsRules: [R26, R38, R85]
+    requirement: |-
+      An integration is `src/modules/integrations/<provider>/` with `index.ts`, `<provider>.config.ts`,
+      `<provider>.decorators.ts` (the SDK client token and `Inject<Provider>`), `<provider>.client.ts` (the only file that
+      calls the SDK or the `HttpClient` for that provider), `errors/` and optional `messages/`. An integration imports
+      `platform` only and never the domain; the domain calls the integration's public API. Results are typed and a failure is
+      the integration's `DomainError` or an `Outcome`.
+    rationale: |-
+      A provider is replaceable only when one file speaks its protocol and nothing above it knows the SDK's types.
+    cases:
+      - id: case-1
+        when: A payment provider
+        write: 'integrations/payos/{index.ts, payos.config.ts, payos.decorators.ts, payos.client.ts, errors/payos.error.ts}.'
+    verification:
+      automated:
+        - BE_TIER_DIRECTION
+        - BE_ERROR_HOME
+        - BE_RAW_INJECT
+      manual: []
+    relatedExamples: []
+  - id: BE-INFRA-4
+    title: Cache keys are declared by the owner that caches
+    kind: mandatory
+    hfsRules: [R85, R90]
+    requirement: |-
+      `integrations/cache` owns the Redis and memory stores and exports the `Cache` port (`get`, `set`, `del` taking `{ key, args }`)
+      through `InjectCache()`. The owner that caches declares its keys in `<owner>.cache-keys.ts` with
+      `defineCacheKey<TValue>({ name: "<owner>.<key>", ttl: Duration, store: "redis" | "memory" })`. There is no free-form
+      string key, no TTL at a call site and no central key enum.
+    rationale: |-
+      A key declared with its value type and TTL by its owner cannot drift from its readers and never collides with another
+      owner's key.
+    cases:
+      - id: case-1
+        when: A cached read
+        write: 'const cart = await this.cache.get({ key: CART_KEY, args: { learnerId } })'
+    verification:
+      automated:
+        - BE_RAW_INJECT
+        - BE_INFRA_OWNER
+      manual: []
+    relatedExamples: []
