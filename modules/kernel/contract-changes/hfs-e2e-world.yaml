@@ -1,0 +1,33 @@
+id: hfs-e2e-world
+effectiveAt: '2026-09-30T22:15:00+07:00'
+summary: >-
+  Owner ruling 2026-09-30 (R47, R83): ONE e2e world. Slot be.tests.e2e-world (src/tests/e2e/world/, replacing
+  be.tests.e2e-setup) holds the jest global-setup.ts that starts shared infrastructure and runs apps/migrate's exported
+  bootstrap once, and useE2eWorld({ app }) -> world.api, world.db.<connection>, world.fake. It is the only test location
+  that may import typeorm DataSource or testcontainers, call migrate/runMigrations/synchronize or write process.env
+  (named-entity-manager-only and one-connection-per-database allow DataSource there instead of src/tests/fixtures);
+  e2e-no-schema-work refuses all of them in e2e specs. The back-end e2e typecheck config moves into the tree it checks,
+  src/tests/e2e/tsconfig.json (the nearest config of an e2e file, so typed lint finds it), and the managed root
+  tsconfig.json excludes src/tests/e2e (R12 and R22 agree with the template).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-e2e-world.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - packages/hfs/templates/be/tool-config/tsconfig.json
+  - packages/hfs/templates/be/tool-config/src/tests/e2e/tsconfig.json
+  - packages/hfs/templates/be/package-scripts/package.json
+  - packages/hfs/sync/ts-strict.mjs
+  - packages/hfs/README.md
+  - scripts/checks/architecture/hfs.mjs
+  - packages/eslint/be/e2e-flow.mjs
+  - packages/eslint/be/e2e-schema.test.mjs
+  - packages/eslint/be/naming.mjs
+  - packages/eslint/be/testing.mjs
+  - packages/eslint/be/lib/persistence.mjs
+  - packages/eslint/be/data-access.mjs
+  - packages/eslint/be/connections.mjs
+  - tests/hfs-slots.spec.mjs
+  - tests/hfs-sync.spec.mjs
+  - tests/hfs-managed.spec.mjs

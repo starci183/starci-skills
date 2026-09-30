@@ -299,8 +299,8 @@ export const noApiShapedE2eFilename = {
 
 // -- TESTING-7 -------------------------------------------------------------------------------------
 
-/** Test infrastructure: the fixtures and the e2e setup, where the shared model stub lives (slots `be.tests.fixtures`, `be.tests.e2e-setup`). */
-const isTestInfrastructure = (hfs, filename) => ["be.tests.fixtures", "be.tests.e2e-setup"].includes(hfs.slotOf(filename))
+/** Test infrastructure: the fixtures and the e2e world, where the shared model stub lives (slots `be.tests.fixtures`, `be.tests.e2e-setup`). */
+const isTestInfrastructure = (hfs, filename) => ["be.tests.fixtures", "be.tests.e2e-world"].includes(hfs.slotOf(filename))
 
 /** Bare markers a stub returns when nobody gave it a real answer to stand in for. */
 const MARKER_STRINGS = new Set(["stubbed", "stub", "ok", "test", "mock", "fake", "todo", "tbd", "n/a", "pending", ""])

@@ -89,16 +89,19 @@ test('HFS_TS_STRICT: the rendered tsconfig.json, build and e2e configs are clean
 test('HFS_TS_STRICT: tsStrictFindings names extends, options, program narrowing, aliases and unreadable text', () => {
   const expected = renderTargets(BE, PRESETS.be).find((target) => target.path === 'tsconfig.json').content;
   const aliases = JSON.parse(expected).compilerOptions.paths;
+  const exclude = JSON.parse(expected).exclude;
   const flags = (actual) => tsStrictFindings(typeof actual === 'string' ? actual : JSON.stringify(actual), expected).map((finding) => finding.flag);
   assert.deepEqual(flags(expected), []);
-  assert.deepEqual(flags({ extends: '@starci/tsconfig/nest.json', compilerOptions: { paths: aliases } }), ['extends']);
-  assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: aliases, noImplicitAny: false, target: 'ES5' } }).sort(), ['noImplicitAny', 'target']);
+  assert.deepEqual(flags({ extends: '@starci/tsconfig/nest.json', exclude, compilerOptions: { paths: aliases } }), ['extends']);
+  assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', exclude, compilerOptions: { paths: aliases, noImplicitAny: false, target: 'ES5' } }).sort(), ['noImplicitAny', 'target']);
   assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', include: ['src'], exclude: ['x'], compilerOptions: { paths: aliases } }).sort(), ['exclude', 'include']);
-  assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { ...aliases, '@x/*': ['./x/*'] } } }), ['paths']);
-  assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { '@features/*': ['./src/features/*'] } } }), ['paths', 'paths']);
+  assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', exclude, compilerOptions: { paths: { ...aliases, '@x/*': ['./x/*'] } } }), ['paths']);
+  assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', exclude, compilerOptions: { paths: { '@features/*': ['./src/features/*'] } } }), ['paths', 'paths']);
   assert.deepEqual(flags('{ not json'), ['parse']);
   assert.deepEqual(flags('[]'), ['parse']);
-  const [lowered, other] = tsStrictFindings(JSON.stringify({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: aliases, strict: false, module: 'commonjs' } }), expected);
+  // the template's exclude of the e2e tree is part of the file; dropping it is a finding
+  assert.deepEqual(flags({ extends: '@starci/tsconfig/be.json', compilerOptions: { paths: aliases } }), ['exclude']);
+  const [lowered, other] = tsStrictFindings(JSON.stringify({ extends: '@starci/tsconfig/be.json', exclude, compilerOptions: { paths: aliases, strict: false, module: 'commonjs' } }), expected);
   assert.match(lowered.message, /lowers strict/);
   assert.match(other.message, /sets module/);
 });

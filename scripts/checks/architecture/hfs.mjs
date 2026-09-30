@@ -325,7 +325,7 @@ function e2eInAutomaticGate({ root, tree, backend, frontend, finding }) {
     const files = tree.files();
     if (backend && files.some(file => /^src\/tests\/e2e\/.+\.[cm]?tsx?$/u.test(file)) && !excludesE2e &&
         (defaultAll || JSON.stringify(tsconfig.include ?? []).includes('src')))
-      finding(rule, 'tsconfig.json', 'The default tsconfig includes src/tests/e2e/**. Exclude it and check it with tsconfig.e2e.json (typecheck:e2e).');
+      finding(rule, 'tsconfig.json', 'The default tsconfig includes src/tests/e2e/**. Exclude it and check it with src/tests/e2e/tsconfig.json (typecheck:e2e).');
     if (frontend && !backend && files.some(file => /^e2e\/.+\.[cm]?tsx?$/u.test(file)) && defaultAll && !excludesE2e)
       finding(rule, 'tsconfig.json', 'The root tsconfig includes e2e/**. Exclude it and check it with tsconfig.e2e.json (typecheck:e2e).');
   }

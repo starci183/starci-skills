@@ -1,6 +1,7 @@
-// HFS_TS_STRICT (R22): a back end's tsconfig.json extends the canon preset and adds `paths`, and nothing else. Every strict
-// flag lives in @starci/tsconfig/be.json; a repository that sets, lowers or adds any compiler option, or narrows the
-// program with include/exclude/files/references, has left the preset. The expected shape is read from the rendered
+// HFS_TS_STRICT (R22): a back end's tsconfig.json extends the canon preset, adds `paths` and the template's `exclude` (the
+// e2e tree, which src/tests/e2e/tsconfig.json checks), and nothing else. Every strict flag lives in
+// @starci/tsconfig/be.json; a repository that sets, lowers or adds any compiler option, or changes the program with
+// include/exclude/files/references, has left the preset. The expected shape is read from the rendered
 // template (templates/be/tool-config/tsconfig.json), so the preset name and the aliases exist in one place only.
 export const TS_STRICT_FILE = 'tsconfig.json';
 
@@ -24,7 +25,12 @@ export function tsStrictFindings(actualText, expectedText, file = TS_STRICT_FILE
   const findings = [];
   if (actual.extends !== expected.extends) findings.push(finding('extends', `extends ${describe(actual.extends)}, but the only preset is ${expected.extends}`));
   for (const key of Object.keys(actual)) {
-    if (key !== 'extends' && key !== 'compilerOptions') findings.push(finding(key, `sets ${key}: the program is the whole repository, narrowed by nothing`));
+    if (key === 'extends' || key === 'compilerOptions') continue;
+    if (key in expected && same(actual[key], expected[key])) continue;
+    findings.push(finding(key, key in expected ? `${key} must be ${describe(expected[key])}, found ${describe(actual[key])}` : `sets ${key}: the program is the template's, narrowed by nothing else`));
+  }
+  for (const key of Object.keys(expected)) {
+    if (key !== 'extends' && key !== 'compilerOptions' && !(key in actual)) findings.push(finding(key, `${key} is missing; it must be ${describe(expected[key])}`));
   }
   const options = actual.compilerOptions && typeof actual.compilerOptions === 'object' && !Array.isArray(actual.compilerOptions) ? actual.compilerOptions : {};
   for (const [flag, value] of Object.entries(options)) {

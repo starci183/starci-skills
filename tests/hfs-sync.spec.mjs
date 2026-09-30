@@ -70,7 +70,7 @@ describe('hfs.json validation', () => {
 
 describe('the generated file set', () => {
   it('a back end owns its tool configuration, package scripts, hooks, workflows, quality files and .starciwork/.gitignore; a front end owns seven files', () => {
-    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'codecov.yml', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'tsconfig.build.json', 'tsconfig.e2e.json', 'tsconfig.json']);
+    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'codecov.yml', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'src/tests/e2e/tsconfig.json', 'tsconfig.build.json', 'tsconfig.json']);
     assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', 'codecov.yml', 'sonar-project.properties']);
   });
   it('the file list is the managedBy slots of the manifest, not code: each listed file is a literal path of a slot naming managedBy', () => {
@@ -367,10 +367,10 @@ describe('the back-end tool configuration', () => {
   it('eslint.config.mjs is exactly the one-liner', () => {
     assert.equal(at('eslint.config.mjs'), 'import { loadHfs, starciBeConfig } from "@starci/eslint-canon-be"\n\nexport default starciBeConfig({ hfs: loadHfs(import.meta.url) })\n');
   });
-  it('tsconfig.json extends the preset and adds only the three aliases; the build and e2e configs add only what a preset cannot hold', () => {
-    assert.deepEqual(JSON.parse(at('tsconfig.json')), { extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { '@features/*': ['./src/features/*'], '@modules/*': ['./src/modules/*'], '@tests/*': ['./src/tests/*'] } } });
+  it('tsconfig.json extends the preset, adds only the three aliases and excludes the e2e tree; the build and e2e configs add only what a preset cannot hold', () => {
+    assert.deepEqual(JSON.parse(at('tsconfig.json')), { extends: '@starci/tsconfig/be.json', compilerOptions: { paths: { '@features/*': ['./src/features/*'], '@modules/*': ['./src/modules/*'], '@tests/*': ['./src/tests/*'] } }, exclude: ['node_modules', 'dist', 'src/tests/e2e'] });
     assert.deepEqual(JSON.parse(at('tsconfig.build.json')), { extends: ['./tsconfig.json', '@starci/tsconfig/build.json'], compilerOptions: { outDir: './dist' }, exclude: ['node_modules', 'dist', '**/*.spec.ts', 'src/tests'] });
-    assert.deepEqual(JSON.parse(at('tsconfig.e2e.json')), { extends: ['./tsconfig.json', '@starci/tsconfig/e2e.json'], include: ['src/tests/e2e/**/*.ts'] });
+    assert.deepEqual(JSON.parse(at('src/tests/e2e/tsconfig.json')), { extends: ['../../../tsconfig.json', '@starci/tsconfig/e2e.json'], include: ['./**/*.ts'], exclude: [] });
   });
   it('jest.config.js is the preset call, .prettierrc references the shared config, and neither carries a header comment', () => {
     assert.equal(at('jest.config.js'), 'module.exports = require("@starci/jest-preset").starciJestConfig()\n');

@@ -213,17 +213,22 @@ export const noWiringInFlowSpec = {
 
 
 /**
- * R47 (owner ruling 2026-09-30): an e2e spec (slot `be.tests.e2e` / `be.tests.e2e-live`) never builds the schema. The e2e
- * globalSetup runs the real `apps/migrate` entry once; a spec boots the app, calls it, and asserts through the fixture's
- * EntityManager. Refused in a spec: importing a migration (a class declared in a `be.persistence` `migrations/` file, or
- * a value whose type is an array of them), importing anything the migrate app declares, calling `runMigrations`,
- * `undoLastMigration`, `synchronize`, `dropDatabase` or `createSchema` on a typeorm `DataSource`/`QueryRunner`/
- * `EntityManager`, and constructing a testcontainers container. Migration behaviour is tested only by `apps/migrate`'s
- * own specs.
+ * R47 (owner ruling 2026-09-30): ONE e2e world. `src/tests/e2e/world/global-setup.ts` starts the shared infrastructure
+ * and runs `apps/migrate`'s exported bootstrap once; a spec (slot `be.tests.e2e` / `be.tests.e2e-live`) only uses
+ * `useE2eWorld({ app })` (`world.api`, `world.db.<connection>`, `world.fake`). Refused in a spec: importing a migration
+ * (a class declared in a `be.persistence` `migrations/` file, or a value whose type is an array of them), importing
+ * anything the migrate app declares, importing typeorm's `DataSource` or any testcontainers package, calling
+ * `runMigrations`, `undoLastMigration`, `synchronize`, `dropDatabase` or `createSchema` on a typeorm receiver,
+ * constructing a container, and writing `process.env`. The world folder (slot `be.tests.e2e-world`) is the only test
+ * location that does those. Migration behaviour is tested only by `apps/migrate`'s own specs.
  */
 const SCHEMA_CALLS = new Set(["runMigrations", "undoLastMigration", "synchronize", "dropDatabase", "createSchema", "showMigrations"])
 const TYPEORM_RECEIVERS = ["DataSource", "QueryRunner", "EntityManager"]
 const CONTAINER_PACKAGES = /^(?:testcontainers|@testcontainers\/[a-z0-9-]+)$/
+/** `process.env` itself (the global `process`, not a local binding named so). */
+const isProcessEnv = (node) => node?.type === "MemberExpression" && !node.computed && node.object.type === "Identifier" && node.object.name === "process" && node.property.name === "env"
+/** A member of `process.env`. */
+const isEnvMember = (node) => node?.type === "MemberExpression" && isProcessEnv(node.object)
 
 export const e2eNoSchemaWork = {
     meta: {
@@ -233,7 +238,8 @@ export const e2eNoSchemaWork = {
         messages: {
             migration: "An e2e spec imports a migration or the migrate app. The schema is prepared once by the e2e globalSetup running the real `apps/migrate` entry; test migrations in `apps/migrate`'s own specs.",
             call: "`{{name}}` builds or changes the schema inside an e2e spec. The e2e globalSetup runs `apps/migrate` once; a spec boots the app and asserts through the fixture's EntityManager.",
-            container: "An e2e spec starts a database container. The container belongs to the e2e globalSetup and the test bootstrap in `src/tests/fixtures`; the spec takes the fixture's EntityManager.",
+            container: "An e2e spec imports or starts test infrastructure (testcontainers, typeorm's DataSource). It belongs to the e2e world in `src/tests/e2e/world`; the spec uses `useE2eWorld({ app })` and `world.db.<connection>`.",
+            env: "An e2e spec writes `process.env`. The environment of the booted app is set once by the e2e world (`src/tests/e2e/world`); a spec takes the world as it is.",
         },
     },
     create(context) {
@@ -258,7 +264,14 @@ export const e2eNoSchemaWork = {
         return {
             ImportDeclaration(node) {
                 const source = String(node.source.value)
-                if (CONTAINER_PACKAGES.test(source)) return
+                if (CONTAINER_PACKAGES.test(source)) {
+                    context.report({ node, messageId: "container" })
+                    return
+                }
+                if (source === "typeorm" && node.specifiers.some((s) => s.type === "ImportSpecifier" && (s.imported.name ?? s.imported.value) === "DataSource")) {
+                    context.report({ node, messageId: "container" })
+                    return
+                }
                 for (const specifier of node.specifiers) {
                     const origins = typeOrigins(context, specifier.local)
                     if (origins.some((o) => isMigrationDecl(o.file) || fromMigrate(o.file)) || migrationTyped(specifier.local)) {
@@ -276,6 +289,17 @@ export const e2eNoSchemaWork = {
             NewExpression(node) {
                 const origins = typeOrigins(context, node.callee)
                 if (origins.some((o) => o.module && CONTAINER_PACKAGES.test(o.module))) context.report({ node, messageId: "container" })
+            },
+            // process.env.X = ..., process.env["X"] = ..., delete process.env.X, Object.assign(process.env, ...)
+            "AssignmentExpression, UpdateExpression"(node) {
+                const target = node.type === "AssignmentExpression" ? node.left : node.argument
+                if (isEnvMember(target)) context.report({ node, messageId: "env" })
+            },
+            UnaryExpression(node) {
+                if (node.operator === "delete" && isEnvMember(node.argument)) context.report({ node, messageId: "env" })
+            },
+            "CallExpression[callee.type='MemberExpression'][callee.object.name='Object'][callee.property.name='assign']"(node) {
+                if (isProcessEnv(node.arguments[0])) context.report({ node, messageId: "env" })
             },
         }
     },

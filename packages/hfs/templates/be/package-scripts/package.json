@@ -3,7 +3,7 @@
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     {{appScripts}}
     "typecheck": "tsc -p tsconfig.json",
-    "typecheck:e2e": "tsc -p tsconfig.e2e.json",
+    "typecheck:e2e": "tsc -p src/tests/e2e/tsconfig.json",
     "lint": "eslint --fix .",
     "lint:check": "eslint .",
     "format": "prettier --write .",

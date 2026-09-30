@@ -1,4 +1,0 @@
-{
-  "extends": ["./tsconfig.json", "@starci/tsconfig/e2e.json"],
-  "include": ["src/tests/e2e/**/*.ts"]
-}

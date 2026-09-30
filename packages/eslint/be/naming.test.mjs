@@ -151,7 +151,7 @@ test("R89: named exports only; the Jest global setup of the e2e setup folder is 
     settings: { starci: { hfs: fixtureHfs() } },
   })
   const SERVICE = at("src/modules/domain/order/order.service.ts")
-  const SETUP = at("src/tests/e2e/setup/database.global-setup.ts")
+  const SETUP = at("src/tests/e2e/world/global-setup.ts")
   slotTester.run("no-default-export", noDefaultExport, {
     valid: [
       { filename: SERVICE, code: "export const answer = 42\nexport class OrderService {}" },
@@ -168,9 +168,9 @@ test("R89: named exports only; the Jest global setup of the e2e setup folder is 
       { filename: SERVICE, code: "export { default } from \"./other\"", errors: [{ messageId: "default" }] },
       { filename: SERVICE, code: "export { default as Other } from \"./other\"", errors: [{ messageId: "default" }] },
       { filename: SERVICE, code: "const a = 1\nexport = a", errors: [{ messageId: "default" }] },
-      // a global-setup name outside the setup folder, and a setup-folder file that is not a global setup
-      { filename: at("src/modules/domain/order/database.global-setup.ts"), code: "export default async function setup() {}", errors: [{ messageId: "default" }] },
-      { filename: at("src/tests/e2e/setup/e2e-world.ts"), code: "export default {}", errors: [{ messageId: "default" }] },
+      // a global-setup name outside the e2e world, and a world file that is not the global setup
+      { filename: at("src/modules/domain/order/global-setup.ts"), code: "export default async function setup() {}", errors: [{ messageId: "default" }] },
+      { filename: at("src/tests/e2e/world/world.ts"), code: "export default {}", errors: [{ messageId: "default" }] },
       // a spec is not exempt
       { filename: at("src/modules/domain/order/order.service.spec.ts"), code: "export default {}", errors: [{ messageId: "default" }] },
     ],

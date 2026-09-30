@@ -30,7 +30,7 @@ Its own checks:
 | `HFS_MIN_INSTANCES` | error | fewer instances of a slot than `minInstances` |
 | `HFS_CANON_PIN_DRIFT` | error | a dependency not at the exact version of `knowledge/hfs/canon-pins.yaml` |
 | `HFS_SIZE_SOFT_BACKLOG` | info | a source file over `ruleParams.fileLines.soft`; report only, never fails |
-| `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, codecov, `tsconfig.build.json`, `tsconfig.e2e.json`, `jest.config.js`, `.prettierrc`, `.prettierignore`, the `scripts` block of a back end's `package.json`, compared as parsed JSON) |
+| `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, codecov, `tsconfig.build.json`, `src/tests/e2e/tsconfig.json` (back end; a front end keeps `tsconfig.e2e.json`), `jest.config.js`, `.prettierrc`, `.prettierignore`, the `scripts` block of a back end's `package.json`, compared as parsed JSON) |
 | `HFS_RULE_OFF_WITHOUT_REPLACEMENT` | error | a back end's `eslint.config.mjs` differs from its one-line render, so a rule could be off, warned or redefined in it |
 | `HFS_TOOL_CONFIG_LOCAL` | error | a back end holds a tool config outside the managed set (`.eslintrc*`, `.eslintignore`, a second `eslint.config.*`, another prettier or jest config), a file that defines an ESLint rule, or a script that runs eslint or prettier with a flag that swaps the configuration |
 | `HFS_TS_STRICT` | error | a back end's `tsconfig.json` sets, lowers or adds anything but `extends` the preset and the three `paths`; the finding names the flag |

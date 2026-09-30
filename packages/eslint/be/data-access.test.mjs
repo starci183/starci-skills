@@ -28,7 +28,7 @@ const HANDLER_SPEC = at("src/features/checkout/application/place.handler.spec.ts
 const SERVICE = at("src/modules/domain/order/order.service.ts")
 const DATABASE_MODULE = at("src/modules/platform/database/database.module.ts")
 const MIGRATE = at("apps/migrate/src/main.ts")
-const E2E_WORLD = at("src/tests/fixtures/e2e/database-world.ts")
+const E2E_WORLD = at("src/tests/e2e/world/world.ts")
 const E2E_SPEC = at("src/tests/e2e/checkout/place-order.e2e-spec.ts")
 const ENTITY = at("src/modules/domain/order/persistence/entities/order.entity.ts")
 
@@ -75,7 +75,7 @@ test("R83: no property injection, no injected DataSource or QueryRunner outside 
             { filename: DATABASE_MODULE, code: constructorOf("private readonly dataSource: DataSource") },
             { filename: DATABASE_MODULE, code: constructorOf("private readonly runner: QueryRunner") },
             { filename: MIGRATE, code: constructorOf("private readonly dataSource: DataSource") },
-            // the test bootstrap (slot be.tests.fixtures) owns the e2e database world
+            // the e2e world (slot be.tests.e2e-world) owns the shared test infrastructure
             { filename: E2E_WORLD, code: constructorOf("private readonly dataSource: DataSource") },
             // a getRepository that is not typeorm's
             { filename: HANDLER, code: "declare const registry: { getRepository(name: string): string }\nregistry.getRepository('orders')" },

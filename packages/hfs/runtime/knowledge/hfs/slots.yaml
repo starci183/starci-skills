@@ -205,10 +205,12 @@ slots:
     profiles: [be]
     # Managed files (hfs sync renders them, hfs check compares them): the whole tool configuration of a back end. Each is
     # a reference to a canon package, never a configuration: tsconfig.json extends @starci/tsconfig/be.json and adds the
-    # three path aliases; tsconfig.build.json and tsconfig.e2e.json put an overlay preset after it and add only the
-    # path-relative options a preset cannot hold; eslint.config.mjs is the one-line starciBeConfig call; jest.config.js
-    # calls the @starci/jest-preset factory; .prettierrc names @starci/prettier-config; .prettierignore is the template.
-    path: "{tsconfig.json,tsconfig.build.json,tsconfig.e2e.json,eslint.config.mjs,jest.config.js,.prettierrc,.prettierignore}"
+    # three path aliases and excludes the e2e tree; tsconfig.build.json puts an overlay preset after it and adds only the
+    # path-relative options a preset cannot hold; the e2e tree's own src/tests/e2e/tsconfig.json (the nearest config of an
+    # e2e file, so typed lint and typecheck:e2e both find it) extends it with the e2e preset; eslint.config.mjs is the
+    # one-line starciBeConfig call; jest.config.js calls the @starci/jest-preset factory; .prettierrc names
+    # @starci/prettier-config; .prettierignore is the template.
+    path: "{tsconfig.json,tsconfig.build.json,src/tests/e2e/tsconfig.json,eslint.config.mjs,jest.config.js,.prettierrc,.prettierignore}"
     presence: required
     tracked: tracked
     tier: none
@@ -682,14 +684,20 @@ slots:
     tier: e2e
     tests: e2e
     why: run only by test:e2e:live (E2E_LIVE=1); excluded from plain test:e2e by folder, never by file name
-  - id: be.tests.e2e-setup
+  - id: be.tests.e2e-world
     profiles: [be]
-    path: "src/tests/e2e/setup/"
+    path: "src/tests/e2e/world/"
     presence: optional
     tracked: tracked
     tier: e2e
+    allows: [global-setup.ts, global-teardown.ts]   # the jest globalSetup/globalTeardown of the one e2e world (default export: Jest API)
     tests: none
-    why: boots the REAL AppModule and overrides providers; no per-lane hand-assembled modules
+    why: >-
+      the ONE e2e world (owner ruling 2026-09-30): global-setup.ts starts the shared infrastructure (containers) and runs
+      apps/migrate's exported bootstrap once; the world boots the REAL AppModule.register(testOptions) with integration
+      tokens overridden and exposes useE2eWorld({ app }) -> world.api, world.db.<connection> (the shared EntityManager),
+      world.fake. It is the only test location that may import typeorm's DataSource or testcontainers, call
+      migrate/runMigrations/synchronize, or write process.env; specs use only useE2eWorld.
   - id: be.tests.fixtures
     profiles: [be]
     path: "src/tests/fixtures/"

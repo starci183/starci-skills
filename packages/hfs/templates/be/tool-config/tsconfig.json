@@ -6,5 +6,6 @@
       "@modules/*": ["./src/modules/*"],
       "@tests/*": ["./src/tests/*"]
     }
-  }
+  },
+  "exclude": ["node_modules", "dist", "src/tests/e2e"]
 }

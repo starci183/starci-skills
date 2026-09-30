@@ -24,7 +24,7 @@ const SERVICE = at("src/modules/domain/order/order.service.ts")
 const MIGRATE = at("apps/migrate/src/main.ts")
 const DATABASE_FIXTURE = at("src/tests/fixtures/database.ts")
 const OTHER = at("src/modules/domain/order/order.helper.ts")
-const E2E_WORLD = at("src/tests/fixtures/e2e/database-world.ts")
+const E2E_WORLD = at("src/tests/e2e/world/world.ts")
 const E2E_SPEC = at("src/tests/e2e/checkout/place-order.e2e-spec.ts")
 
 const COMPOSITION = 'import { injector, type TypedParameterDecorator } from "@modules/platform/composition/injector"\n'
@@ -111,7 +111,7 @@ test("R84: a connection is registered once, in the platform database capability 
             { filename: DATABASE_MODULE, code: 'import { TypeOrmModule } from "@nestjs/typeorm"\nconst m = TypeOrmModule.forRootAsync({ name: PRIMARY_CONNECTION })' },
             { filename: DATABASE_MODULE, code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({ name: PRIMARY_CONNECTION })' },
             { filename: MIGRATE, code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({ name: PRIMARY_CONNECTION })' },
-            // the test bootstrap (slot be.tests.fixtures) builds the e2e database world
+            // the e2e world (slot be.tests.e2e-world) builds the DataSource
             { filename: E2E_WORLD, code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({ name: PRIMARY_CONNECTION })' },
             // the same words on a class that is not typeorm's
             { filename: OTHER, code: "class DataSource {}\nconst source = new DataSource()\nconst TypeOrmModule = { forRoot() {} }\nTypeOrmModule.forRoot()" },

@@ -106,7 +106,7 @@ test("R47: a role has a twin spec, a spec has a subject, and there are two kinds
       { filename: at("src/modules/domain/order/persistence/order.rows.ts"), code: "export const toOrder = () => 1", errors: [{ messageId: "twin" }] },
       // a spec with no subject beside it
       { filename: at("src/modules/domain/order/nothing-here.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
-      { filename: at("src/tests/e2e/setup/world.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      { filename: at("src/tests/e2e/world/world.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
       // the banned kinds
       { filename: at("src/modules/domain/order/order.service.test.ts"), code: "export {}", errors: [{ messageId: "suffix" }] },
       { filename: at("src/modules/domain/order/order.int-spec.ts"), code: "export {}", errors: [{ messageId: "suffix" }] },
@@ -196,7 +196,7 @@ test("TESTING-7: a model stub returns a payload the production parser can parse,
       { filename: FIXTURE, code: "model.run = jest.fn().mockImplementation(() => 'test')", errors: [{ messageId: "marker" }] },
       { filename: FIXTURE, code: "model.run = jest.fn().mockImplementation(() => { return 'mock' })", errors: [{ messageId: "marker" }] },
       // the e2e setup is test infrastructure too
-      { filename: at("src/tests/e2e/setup/world.ts"), code: "model.run = jest.fn().mockResolvedValue('stubbed')", errors: [{ messageId: "marker" }] },
+      { filename: at("src/tests/e2e/world/world.ts"), code: "model.run = jest.fn().mockResolvedValue('stubbed')", errors: [{ messageId: "marker" }] },
     ],
   })
 })
