@@ -46,11 +46,13 @@ import { recommended as translationRecommended, rules as translationRules } from
 import { recommended as typeSafetyRecommended, rules as typeSafetyRules } from "./type-safety.mjs"
 import { recommended as typographyRecommended, rules as typographyRules } from "./typography.mjs"
 import { recommended as vendorRecommended, rules as vendorRules } from "./vendor-boundary.mjs"
+import { recommended as projectGraphRecommended, rules as projectGraphRules } from "./project-graph.mjs"
 import { buildFeConfig } from "./lib/config.mjs"
 import { why } from "./lib/why.mjs"
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
 const CONTRIBUTIONS = [
+    { law: "project-graph", rules: projectGraphRules, recommended: projectGraphRecommended },
   { law: "brand-values", rules: brandValuesRules, recommended: brandValuesRecommended },
   { law: "client-boundary", rules: clientBoundaryRules, recommended: clientBoundaryRecommended },
   { law: "comments", rules: commentsRules, recommended: commentsRecommended },

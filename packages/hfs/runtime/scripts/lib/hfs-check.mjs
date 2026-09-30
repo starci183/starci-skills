@@ -411,7 +411,7 @@ export function checkRepository({ repoRoot, root = skillRoot, fast = false, base
   }
   let report;
   try {
-    report = machine({ repositoryRoot: repoRoot, base: baseSha, ...(changed ? { paths, fast: true } : {}) });
+    report = machine({ repositoryRoot: repoRoot, base: baseSha, surface: 'check', ...(changed ? { paths, fast: true } : {}) });
   } catch (error) {
     report = { ok: false, files: 0, kinds: [], violations: [], errors: [{ ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error?.message ?? error) }] };
   }

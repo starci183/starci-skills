@@ -52,9 +52,11 @@ import { recommended as transportRecommended, rules as transportRules } from "./
 import { recommended as typeSafetyRecommended, rules as typeSafetyRules } from "./type-safety.mjs"
 import { recommended as unitSpecRecommended, rules as unitSpecRules } from "./unit-spec.mjs"
 import { recommended as userCopyRecommended, rules as userCopyRules } from "./user-copy.mjs"
+import { recommended as projectGraphRecommended, rules as projectGraphRules } from "./project-graph.mjs"
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
 const CONTRIBUTIONS = [
+    { law: "project-graph", rules: projectGraphRules, recommended: projectGraphRecommended },
     { law: "async-discipline", rules: asyncDisciplineRules, recommended: asyncDisciplineRecommended },
     { law: "authorization", rules: authorizationRules, recommended: authorizationRecommended },
     { law: "builders", rules: buildersRules, recommended: buildersRecommended },

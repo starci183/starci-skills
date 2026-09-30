@@ -43,6 +43,7 @@ import { checkPackageShape, PACKAGE_SHAPE_RULE_IDS } from './package-shape.mjs';
 import { checkFeSlotAllows, FE_SLOT_ALLOWS_RULE_IDS } from './fe-slot-allows.mjs';
 import { checkI18nKeys, I18N_KEYS_RULE_IDS } from './i18n-keys.mjs';
 import { checkDocLanguage, DOC_LANGUAGE_RULE_IDS } from './doc-language.mjs';
+import { LINT_CODES, onLintSurface } from './surface.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -169,7 +170,8 @@ function stable(items) {
  * Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. `fast` leaves out the checks
  * that read the whole repository to answer (clones, dead exports, repository-wide symbols); the pre-push check of the changed owners uses it.
  */
-export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = [], base, fast = false, hfs: openedHfs } = {}) {
+export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = [], base, fast = false, hfs: openedHfs, surface = 'all' } = {}) {
+  if (!['all', 'lint', 'check'].includes(surface)) throw new Error(`unknown surface ${surface}`);
   let config;
   try {
     config = loadArchitectureConfig(repositoryRoot, { hfs: openedHfs });
@@ -249,8 +251,14 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     }
   }
   const inScope = item => !paths.length || (item.path && paths.some(prefix => sameOrUnder(item.path, prefix.replace(/\/$/, ''))));
-  const errors = stable(context.errors.filter(item => item.ruleId.startsWith('ARCH_TSCONFIG_') || !item.path || inScope(item)));
-  const scopedViolations = stable(violations.filter(inScope));
+  // Two findings travel as context errors (package boundary edges); they are obligations of the lint surface like any other finding.
+  const asViolation = item => LINT_CODES.has(item.ruleId);
+  const allErrors = context.errors.filter(item => item.ruleId.startsWith('ARCH_TSCONFIG_') || !item.path || inScope(item));
+  const obligations = surface === 'all' ? violations : [...violations, ...context.errors.filter(asViolation).filter(inScope)];
+  // The lint surface is what an editor can show on a line of a TypeScript file; `hfs check` keeps every other finding of the machine.
+  const onSurface = item => surface === 'all' || onLintSurface(config.root, item) === (surface === 'lint');
+  const errors = stable(surface === 'all' ? allErrors : allErrors.filter(item => !asViolation(item)));
+  const scopedViolations = stable(obligations.filter(inScope).filter(onSurface));
   const sourceFiles = new Set(context.files.map(file => canonical(file.fileName)));
   const missingOwnerEntries = config.owners?.filter(owner => !sourceFiles.has(canonical(path.resolve(config.root, ...owner.entry.split('/'))))) ?? [];
   const coverage = {
