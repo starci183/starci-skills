@@ -161,7 +161,7 @@ function manifestShapeProblems(m) {
     if (!fileLinesOk(rp.fe.fileLines) || !blockOk(rp.fe.duplicateBlock) || Object.keys(rp.fe).length !== 2) bad.push('ruleParams.fe needs fileLines {soft, hardGrowth} and duplicateBlock {lines >= 2, tokens >= 1}');
   }
   if (!Array.isArray(m.slots) || !m.slots.length) { bad.push('slots must be a non-empty list'); return bad; }
-  const slotKeys = new Set(['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'allows', 'forbids', 'layers', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor']);
+  const slotKeys = new Set(['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor']);
   m.slots.forEach((slot, index) => {
     const at = isPlainObject(slot) && typeof slot.id === 'string' ? `slot ${slot.id}` : `slots[${index}]`;
     if (!isPlainObject(slot)) { bad.push(`${at} is not a map`); return; }
@@ -178,7 +178,9 @@ function manifestShapeProblems(m) {
     if (slot.minInstances !== undefined && !(Number.isInteger(slot.minInstances) && slot.minInstances >= 1)) bad.push(`${at}: minInstances must be a positive integer`);
     if (slot.requiredWhen !== undefined && slot.requiredWhen !== 'connections') bad.push(`${at}: requiredWhen may only be connections`);
     if (slot.requiredInstances !== undefined && !(isPlainObject(slot.requiredInstances) && Object.values(slot.requiredInstances).every((v) => strList(v) && v.length))) bad.push(`${at}: requiredInstances must map a variable to a non-empty list of names`);
-    for (const key of ['requires', 'allows', 'forbids', 'layers']) if (slot[key] !== undefined && !strList(slot[key])) bad.push(`${at}: ${key} must be a list of strings`);
+    for (const key of ['requires', 'allows', 'forbids', 'layers', 'kinds']) if (slot[key] !== undefined && !strList(slot[key])) bad.push(`${at}: ${key} must be a list of strings`);
+    if (slot.kinds !== undefined && strList(slot.kinds) && (!slot.kinds.length || new Set(slot.kinds).size !== slot.kinds.length || slot.kinds.some((k) => !NAME.test(k) || (slot.layers ?? []).includes(k)))) bad.push(`${at}: kinds must be a non-empty list of unique folder names that are not layers`);
+    if (slot.roles !== undefined && !(isPlainObject(slot.roles) && Object.keys(slot.roles).length && Object.entries(slot.roles).every(([role, file]) => NAME.test(role) && typeof file === 'string' && file && !file.includes('/')))) bad.push(`${at}: roles must map a role name to a file name`);
     if (slot.composedBy !== undefined && !(strList(slot.composedBy) && slot.composedBy.length && new Set(slot.composedBy).size === slot.composedBy.length)) bad.push(`${at}: composedBy must be a non-empty list of unique app kinds`);
     if (slot.budget !== undefined && !(isPlainObject(slot.budget) && Object.keys(slot.budget).length && Object.values(slot.budget).every((v) => Number.isInteger(v) && v >= 1))) bad.push(`${at}: budget must map names to positive integers`);
     if (slot.managedBy !== undefined && !NAME.test(String(slot.managedBy))) bad.push(`${at}: managedBy must be a template id`);
@@ -216,6 +218,7 @@ function manifestSemanticProblems(m) {
     if (slot.appKind !== undefined && !pathVars.has('app')) bad.push(`slot ${slot.id}: an app-kind slot binds <app> in its path`);
     if (slot.requiredWhen !== undefined && slot.presence !== 'required') bad.push(`slot ${slot.id}: requiredWhen belongs to a required slot`);
     for (const name of Object.keys(slot.requiredInstances ?? {})) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: requiredInstances names <${name}>, which the path does not bind`);
+    for (const file of Object.values(slot.roles ?? {})) for (const name of varsOf(file)) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: roles names <${name}> in ${file}, which the path does not bind`);
     for (const entry of slot.requires ?? []) for (const name of varsOf(entry)) if (!pathVars.has(name)) bad.push(`slot ${slot.id}: requires ${entry} uses <${name}>, which the path does not bind`);
     for (const variant of braceVariants(slot.path)) {
       try { compileVariant(slot, variant); } catch (error) { bad.push(`slot ${slot.id}: pattern ${variant} does not compile (${error.message})`); }
@@ -405,6 +408,27 @@ export function createSlotResolver(manifest, repo) {
   }
 
   /**
+   * The folder kind of a file: the layer or kind folder its slot names (`layers`, `kinds`) that the file sits in. A slot whose
+   * path spells the choice (`components/{blocks,leaves}/<name>/`) answers from the matched pattern; a slot that owns a whole
+   * directory (`packages/<family>-ui/`) answers from the first folder below its root that the list names.
+   */
+  function kindOf({ variant, slot, root }, p) {
+    const names = [...(slot.layers ?? []), ...(slot.kinds ?? [])];
+    if (!names.length) return null;
+    const literal = variant.segments.find((segment) => names.includes(segment));
+    if (literal) return literal;
+    const below = root ? p.slice(root.length + 1) : p;
+    return below.split('/').slice(0, -1).find((segment) => names.includes(segment)) ?? null;
+  }
+
+  /** The role of a file in its slot: the entry of `roles` whose file name (variables filled from the path) is the file's name. */
+  function roleOf(slot, bindings, p) {
+    const name = p.split('/').pop();
+    for (const [role, file] of Object.entries(slot.roles ?? {})) if (fillVars(file, bindings) === name) return role;
+    return null;
+  }
+
+  /**
    * status: owned | forbidden (external slot) | not-enabled (opt-in slot the repository did not declare) | ambiguous
    * (two slots of equal specificity; a manifest gap) | no-slot (code HFS_SLOT_UNDECLARED, with the nearest slot).
    */
@@ -415,7 +439,9 @@ export function createSlotResolver(manifest, repo) {
     if (!hit) return { path: p, status: 'no-slot', code: 'HFS_SLOT_UNDECLARED', nearest: nearest(p) };
     const { slot, root, bindings } = hit;
     const status = slot.presence === 'forbidden' ? 'forbidden' : (slotEnabled(slot) ? 'owned' : 'not-enabled');
-    return { path: p, status, slot: slot.id, root, bindings, presence: slot.presence, tracking: slot.tracked, ...(status === 'forbidden' ? { goesTo: slot.goesTo } : {}) };
+    const kind = kindOf(hit, p);
+    const role = roleOf(slot, bindings, p);
+    return { path: p, status, slot: slot.id, root, bindings, ...(kind ? { kind } : {}), ...(role ? { role } : {}), presence: slot.presence, tracking: slot.tracked, ...(status === 'forbidden' ? { goesTo: slot.goesTo } : {}) };
   }
 
   const slotOf = (p) => { const c = classifyPath(p); return c.slot ? byId.get(c.slot) : null; };

@@ -265,6 +265,7 @@ slots:
     # setup), playwright.config.ts (its web servers, ports and projects: @starci/playwright-preset returns the shared
     # defaults and the repository adds what only it knows) and turbo.json (its task graph).
     path: "{vitest.setup.ts,playwright.config.ts,turbo.json}"
+    roles: {playwright: playwright.config.ts}
     presence: optional
     tracked: tracked
     tier: none
@@ -824,6 +825,7 @@ slots:
     tier: route
     allows: ["[locale]/**/{page,layout,template,loading,error,not-found}.tsx", "[locale]/**/route.ts", global-error.tsx, "page.tsx (redirect only)",
              "health/{live,ready}/route.ts", globals.css, "icon.*", robots.ts, sitemap.ts]
+    roles: {page: page.tsx, layout: layout.tsx, template: template.tsx, loading: loading.tsx, error: error.tsx, not-found: not-found.tsx, route: route.ts, global-error: global-error.tsx}
     tests: none
     rules: [FE_ROUTE_FILES_THIN, FE_CLIENT_BOUNDARY, FE_OWNER_REACHABLE]
   - id: fe.source-root-pinned
@@ -841,8 +843,10 @@ slots:
     tracked: tracked
     tier: feature
     owner: true
+    kinds: [pages, layouts, overlays]
     requires: [index.tsx]
     allows: [index.tsx, component.tsx, classNames.ts, "*.spec.tsx", "*.spec.ts"]
+    roles: {entry: index.tsx, drawing: component.tsx, styles: classNames.ts}   # the connected entry, the pure drawing half and the styling declarations of a component owner
     tests: unit-beside
     budget: {component.tsx: 300, index.tsx: 200}
     rules: [FE_SIZE_BUDGET, FE_OWNER_REACHABLE, FE_I18N_LITERAL]
@@ -856,6 +860,7 @@ slots:
     layers: [blocks, composites, branches, leaves]   # a layer imports only the layers after it
     requires: [index.tsx]
     allows: [index.tsx, component.tsx, classNames.ts, "*.spec.tsx", "*.spec.ts"]
+    roles: {entry: index.tsx, drawing: component.tsx, styles: classNames.ts}   # the connected entry, the pure drawing half and the styling declarations of a component owner
     tests: unit-beside
     budget: {component.tsx: 300, index.tsx: 200, dataHooks: 6, useState: 6}
     rules: [FE_CONNECTED_BLOCK_RENDER_PAIR, FE_I18N_LITERAL, FE_NATIVE_FORM_CONTROL, FE_CLIENT_BOUNDARY]
@@ -868,6 +873,7 @@ slots:
     owner: true                   # a domain is an owner: other domains import it through index.ts only
     requires: [index.ts]
     allows: [index.ts, "use<name>.ts", "<domain>.shared.ts", "*.spec.ts"]   # React hooks only; <domain>.shared.ts = sanctioned non-hook helpers
+    roles: {entry: index.ts, shared: "<domain>.shared.ts"}
     tests: unit-beside
     budget: {file: 200}
     rules: [FE_HOOKS_ARE_HOOKS, FE_DATA_FRESHNESS]
@@ -966,6 +972,8 @@ slots:
     tracked: tracked
     tier: package
     owner: true
+    kinds: [composites, branches, leaves]   # the layer folders under src/ (a package owns no blocks)
+    roles: {entry: index.tsx, drawing: component.tsx, styles: classNames.ts}
     requires: [package.json, src/index.ts, tsconfig.json]
     tests: unit-beside
     why: built to dist with explicit named exports; only composites, branches and leaves; no unused export; no colour literal

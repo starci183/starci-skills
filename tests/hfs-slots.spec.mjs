@@ -294,6 +294,26 @@ test('FE multi-app fixture', () => {
   assert.equal(openHfs({ declaration: { ...FE, optionalSlots: [] } }).classifyPath('packages/nivo-ui/src/index.ts').status, 'not-enabled');
 });
 
+test('classification reports the folder kind and the role of a file from the slot manifest', () => {
+  const fe = openHfs({ declaration: FE });
+  const at = (p) => fe.classifyPath(p);
+  assert.equal(at('apps/web/src/components/leaves/Button/index.tsx').kind, 'leaves');
+  assert.equal(at('apps/web/src/components/blocks/Header/component.tsx').kind, 'blocks');
+  assert.equal(at('apps/web/src/components/blocks/Header/component.tsx').role, 'drawing');
+  assert.equal(at('apps/web/src/components/blocks/leaves/index.tsx').kind, 'blocks', 'a component named like a layer is still in its own layer');
+  assert.equal(at('apps/web/src/features/overlays/Cart/classNames.ts').kind, 'overlays');
+  assert.equal(at('apps/web/src/features/overlays/Cart/classNames.ts').role, 'styles');
+  assert.equal(at('packages/nivo-ui/src/leaves/X/index.tsx').kind, 'leaves');
+  assert.equal(at('packages/nivo-ui/src/leaves/X/index.tsx').role, 'entry');
+  assert.equal(at('packages/nivo-ui/src/index.ts').kind, undefined);
+  assert.equal(at('apps/web/src/modules/components/x.ts').kind, undefined, 'a folder named components inside a module is not a component layer');
+  assert.equal(at('apps/web/src/hooks/orders/orders.shared.ts').role, 'shared');
+  assert.equal(at('apps/web/src/hooks/orders/index.ts').role, 'entry');
+  assert.equal(at('apps/web/src/hooks/orders/useOrders.ts').role, undefined);
+  assert.equal(at('apps/web/src/app/[locale]/cart/page.tsx').role, 'page');
+  assert.equal(at('playwright.config.ts').role, 'playwright');
+});
+
 test('an unknown path is reported with its nearest slot and HFS_SLOT_UNDECLARED', () => {
   const be = openHfs({ declaration: BE });
   const stray = be.classifyPath('src/tests/e2e/orders/place.ts');
