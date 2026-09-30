@@ -24,6 +24,10 @@
 //     one tests/*.spec.mjs (a violating and a passing tree)                                    HFS_RULE_UNTESTED
 //   - a failure code with no entry in modules/kernel/failure-codes.yaml, or an entry lacking a Vietnamese
 //     title_vi, meaning_vi or nextStep_vi                                                     HFS_RULE_CODE_UNCATALOGUED
+//   - one obligation, one rule system (RED20): an `HFS_*`, `BE_*`, `FE_*` or `ARCH_*` code that a knowledge file
+//     (knowledge/patterns/**, architecture-rules.yaml, modules/models/code-patterns.yaml)
+//     names though it is neither a code of the catalog nor a key of failure-codes.yaml; the finding names the file
+//                                                                                             HFS_RULE_CODE_UNCATALOGUED
 // A planned enforcer is not a finding: it is the owed work, listed by --unbuilt (the rules with no existing enforcer at
 // all) and counted in the summary.
 import fs from 'node:fs';
@@ -42,6 +46,9 @@ export const EMITTER_ROOTS = Object.freeze({
   hfs: ['scripts/lib/hfs-check.mjs', 'scripts/lib/hfs-slots.mjs', 'packages/hfs/bin', 'packages/hfs/sync'],
   'work-validate': ['scripts/checks/work-validate.mjs'],
 });
+/** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */
+export const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
+const RULE_CODE = /\b(?:HFS|BE|FE|ARCH)_[A-Z0-9]+(?:_[A-Z0-9]+)*\b/g;
 export const PLUGIN_ENTRY = Object.freeze({ 'eslint-be': 'packages/eslint/be/index.mjs', 'eslint-fe': 'packages/eslint/fe/index.mjs' });
 const LINT_FAMILY = ['eslint-be', 'eslint-fe', 'stylelint'];
 const CHECK_FAMILY = ['machine', 'hfs', 'work-validate'];
@@ -86,6 +93,17 @@ const specProven = (specs, code) => specs.some((text) => {
   return text.split(/\btest\(/).slice(1).filter((block) => names.some((name) => new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(block))).length >= 2;
 });
 
+/** The knowledge files under `root` that may name a rule code, as [{rel, text}] (YAML only). */
+export function readKnowledgeFiles(root) {
+  const walk = (rel) => {
+    const abs = path.join(root, rel);
+    if (!fs.existsSync(abs)) return [];
+    if (fs.statSync(abs).isFile()) return rel.endsWith('.yaml') ? [{ rel, text: fs.readFileSync(abs, 'utf8') }] : [];
+    return fs.readdirSync(abs).sort().flatMap((name) => walk(`${rel}/${name}`));
+  };
+  return KNOWLEDGE_CODE_ROOTS.flatMap(walk);
+}
+
 /** The README rule table: [{id, code, law}] from the rows `| Rnn | \`CODE\` | law |`. */
 export function readmeRuleRows(text) {
   return [...String(text).matchAll(/^\| (R\d{2}) \| `([A-Z0-9_]+)` \| (.*) \|$/gm)].map((m) => ({ id: m[1], code: m[2], law: m[3] }));
@@ -112,7 +130,7 @@ export async function pluginRuleIds(root, kind) {
  * The findings of a catalog: [{code, rule, enforcer?, message}].
  * plugins: {'eslint-be': {ids: Set} | {error}, 'eslint-fe': ...}; failureCodes: the parsed catalog; files: {exists(rel), read(rel)}.
  */
-export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, readme, tests }) {
+export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, readme, tests, knowledge }) {
   const findings = [];
   const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
   for (const rule of catalog.rules) {
@@ -190,6 +208,15 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     const last = catalog.rules.at(-1).id;
     for (const m of String(readme).matchAll(/\bR01(?: to |-)(R\d{2})\b/g)) if (m[1] !== last) add('HFS_RULE_LAW_DRIFT', '-', `${RULES_README} states the range R01 to ${m[1]}, but the catalog ends at ${last}`);
   }
+  if (knowledge !== undefined) {
+    // RED20: a knowledge file states an obligation under the catalog's code or the failure catalog's, never under a third name.
+    const known = new Set([...catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]), ...Object.keys(failureCodes ?? {})]);
+    for (const file of knowledge) {
+      for (const code of new Set(String(file.text).match(RULE_CODE) ?? [])) {
+        if (!known.has(code)) add('HFS_RULE_CODE_UNCATALOGUED', '-', `${file.rel} names ${code}, which is neither a code of knowledge/hfs/rules.yaml nor a key of ${FAILURE_CODES_FILE}; name the catalog code of the rule that judges it or delete the sentence`);
+      }
+    }
+  }
   return findings;
 }
 
@@ -204,7 +231,7 @@ export async function checkHfsRules(root = skillRoot) {
   const failureCodes = parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8')) ?? {};
   const files = { exists: (rel) => fs.existsSync(path.join(root, rel)), read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') };
   const readme = fs.readFileSync(path.join(root, RULES_README), 'utf8');
-  return { catalog, findings: hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters: readEmitters(root), readme, tests: readTests(root) }) };
+  return { catalog, findings: hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters: readEmitters(root), readme, tests: readTests(root), knowledge: readKnowledgeFiles(root) }) };
 }
 
 if (isMain(import.meta.url)) {

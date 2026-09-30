@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../engine/yaml.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, rules } from '../scripts/lib/hfs-slots.mjs';
-import { hfsRulesFindings, pluginRuleIds, checkHfsRules, PLUGIN_ENTRY, readmeRuleRows } from '../scripts/checks/check-hfs-rules.mjs';
+import { hfsRulesFindings, pluginRuleIds, checkHfsRules, PLUGIN_ENTRY, readmeRuleRows, readKnowledgeFiles, KNOWLEDGE_CODE_ROOTS } from '../scripts/checks/check-hfs-rules.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const catalogText = fs.readFileSync(path.join(root, 'knowledge/hfs/rules.yaml'), 'utf8');
@@ -219,6 +219,31 @@ test('an enforcer without a violating and a passing proof is untested', () => {
 test('clean', () => { '${r12.code}' })`;
   assert.deepEqual(run(machine, { tests: { 'eslint-be': '', 'eslint-fe': '', specs: [twoTests] } }), []);
   assert.deepEqual(run(machine, { tests: { 'eslint-be': '', 'eslint-fe': '', specs: [`test('one', () => { '${r12.code}' })`] } }).map((f) => f.code), ['HFS_RULE_UNTESTED']);
+});
+
+test('a knowledge file names a rule code only if the catalog or the failure catalog has it (RED20: one obligation, one rule system)', () => {
+  const catalog = loadRuleCatalog();
+  const file = (text) => ({ rel: 'knowledge/patterns/be/example.yaml', text });
+  // only the RED20 findings: the fixture file stubs above answer for the machine enforcers, which is another test's subject
+  const red20 = (over) => run(catalog, over).filter((f) => f.code === 'HFS_RULE_CODE_UNCATALOGUED' && f.rule === '-');
+  assert.deepEqual(red20({ knowledge: [file('BE_TIER_DIRECTION and HFS_SLOT_UNDECLARED judge it; NEST_ANYTHING and R26 are not codes of these families')] }), []);
+  const stray = red20({ knowledge: [file(['- BE_SQL_OUTSIDE_REPOSITORY', '- BE_SQL_OUTSIDE_REPOSITORY', '- FE_GONE_CODE'].join(String.fromCharCode(10)))] });
+  assert.deepEqual(stray.map((f) => [f.code, f.rule]), [['HFS_RULE_CODE_UNCATALOGUED', '-'], ['HFS_RULE_CODE_UNCATALOGUED', '-']]);
+  assert.ok(stray.every((f) => f.message.startsWith('knowledge/patterns/be/example.yaml names ')));
+  assert.deepEqual(stray.map((f) => / names ([A-Z0-9_]+),/.exec(f.message)?.[1]), ['BE_SQL_OUTSIDE_REPOSITORY', 'FE_GONE_CODE']);
+  // a code that only the failure catalog knows (a sub-code of a rule) is fine
+  const sub = { ...failureCatalog(catalog), ARCH_ONLY_IN_FAILURE_CATALOG: { ...codeEntry } };
+  assert.deepEqual(red20({ failureCodes: sub, knowledge: [file('ARCH_ONLY_IN_FAILURE_CATALOG')] }), []);
+  // a prefix that is not a whole code (`HFS_` alone, `BE` inside a word) is not a code
+  assert.deepEqual(red20({ knowledge: [file('HFS_ WEBE_X ABE_Y')] }), []);
+});
+
+test('the knowledge files RED20 reads are the pattern tree and the rule manifests, YAML only, and a retired file is skipped', () => {
+  assert.deepEqual([...KNOWLEDGE_CODE_ROOTS], ['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
+  const files = readKnowledgeFiles(root);
+  assert.ok(files.length > 0 && files.every((f) => f.rel.endsWith('.yaml') && typeof f.text === 'string'));
+  assert.ok(files.some((f) => f.rel === 'knowledge/patterns/be/persistence.yaml') && files.some((f) => f.rel === 'modules/models/code-patterns.yaml'));
+  assert.deepEqual(readKnowledgeFiles(path.join(root, 'no-such-runtime')), []);
 });
 
 test('pluginRuleIds reads the rule names of a plugin and reports one that cannot load', async () => {

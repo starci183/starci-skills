@@ -7,7 +7,7 @@ purpose: |
 appliesTo: [backend, frontend]
 family: cross-cutting
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-09-30
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
@@ -30,8 +30,8 @@ observations:
     kind: observation
     summary: |
       The repository root and tree are normative knowledge. knowledge/hfs/slots.yaml owns every slot and
-      knowledge/patterns/repo/folder.yaml (REPO-FOLDER-1..6) states the law. The slot check reports HFS_SLOT_* codes and the
-      architecture machine reports the HFS_* root and layout codes.
+      knowledge/patterns/repo/folder.yaml (REPO-FOLDER-1..6) states the law. The slot check reports HFS_SLOT_UNDECLARED and
+      HFS_SLOT_REQUIRED_MISSING and the architecture machine reports the HFS_* root and layout codes.
     automated:
       - HFS_SLOT_UNDECLARED
       - HFS_SLOT_REQUIRED_MISSING
@@ -48,14 +48,15 @@ observations:
     kind: observation
     summary: |
       The architecture machine resolves imports through the TypeScript project and judges the tier direction matrix, feature
-      isolation, acyclic owners (type-only edges included), the owner public entry, and whether every feature is composed by an
-      app. Dynamic decorator or name expressions it cannot resolve are unavailable coverage, not accepted exceptions.
+      isolation, acyclic owners (type-only edges included), the owner public entry, whether every feature is composed by an
+      app, and that each capability's representative module is registered once per app root. Dynamic decorator or name expressions it cannot resolve are unavailable coverage, not accepted exceptions.
     automated:
       - BE_TIER_DIRECTION
       - BE_FEATURE_IMPORTS_FEATURE
       - ARCH_OWNER_CYCLE
       - BE_PUBLIC_SURFACE
       - BE_FEATURE_NOT_COMPOSED
+      - BE_MODULE_SHAPE
   - id: be-module-and-tests
     lane: backend
     kind: observation
@@ -70,41 +71,37 @@ observations:
     lane: backend
     kind: observation
     summary: |
-      Schema authority, SQL placement, configuration ownership and secret defaults are lint and check rules. They prove where
-      code lives, not that a migration is safe on live data or that a deployed environment provides every key.
+      Schema authority, SQL text placement and table ownership, connection uniqueness, configuration ownership and secret
+      defaults are lint and check rules. They prove where code lives and which connection and tables it touches, not that a
+      migration is safe on live data or that a deployed environment provides every key.
     automated:
       - BE_SCHEMA_AUTHORITY
       - BE_SCHEMA_OWNER
       - BE_SQL_OUTSIDE_PERSISTENCE
+      - BE_SQL_TABLE_OWNER
+      - BE_CONNECTION_DUPLICATE
       - BE_CONFIG_OWNER
       - BE_SECRET_DEFAULT
-  - id: lint-must-inject-entity-manager
+  - id: lint-injection-by-type
     lane: backend
     kind: checker-limit
     summary: |
-      must-inject-entity-manager checks constructor parameters spelled EntityManager and decorator names matching
-      Inject*EntityManager. It does not verify the decorator body or actual database token. Review the provider and connection
-      binding separately.
+      The injection rules identify a constructor parameter by the declared type and the file that declares it, never by the
+      variable name, and compare an injector's declared type with the parameter annotation. They do not verify that the
+      module provides the token at runtime; the composition spec that boots the real AppModule does.
     automated:
-      - must-inject-entity-manager
-  - id: lint-no-injected-repository
+      - BE_RAW_INJECT
+      - BE_UNNAMED_DATA_ACCESS
+  - id: lint-transaction-callback
     lane: backend
     kind: checker-limit
     summary: |
-      no-injected-repository detects InjectRepository and Repository, TreeRepository and MongoRepository parameter types. It does
-      not detect custom facades. Structural review must catch those; a clean report cannot approve an alternative persistence
-      architecture.
+      The transaction rules read the callback of an EntityManager transaction call, whichever overload carries it, and judge
+      the receivers used inside it by type. Transaction-manager propagation through a helper and refusal-after-write rollback
+      still need a real PostgreSQL rollback test, because an AST check cannot prove transaction semantics.
     automated:
-      - no-injected-repository
-  - id: lint-no-outer-manager-in-transaction
-    lane: backend
-    kind: checker-limit
-    summary: |
-      no-outer-manager-in-transaction checks a first-argument arrow callback. The isolation-level overload with the callback in
-      argument two is not covered. Check transaction-manager propagation through helpers and refusal-after-write rollback
-      explicitly.
-    automated:
-      - no-outer-manager-in-transaction
+      - BE_UNNAMED_DATA_ACCESS
+      - BE_TRANSACTION_EXTERNAL_CALL
     relatedExamples:
       - transactional-service
   - id: fe-units

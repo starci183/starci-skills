@@ -100,7 +100,7 @@ rules:
       automated:
         - FE_CUSTOM_HOOK_LOCATION
         - FE_COMPONENT_WORLD_OWNERSHIP
-        - FE_COMPONENT_IMPORTS_TRANSPORT
+        - FE_TIER_DIRECTION
       manual:
         - Confirm a data lifecycle has a feature owner and reusable presentation does not import it.
     relatedExamples:
@@ -235,7 +235,7 @@ rules:
       automated:
         - HFS_INLINE_SUPPRESSION
         - ARCH_OWNER_EXPORT_BYPASS
-        - FE_COMPONENT_IMPORTS_TRANSPORT
+        - FE_TIER_DIRECTION
       manual:
         - Confirm Grammar imports use verified @starci/grammar/common exports only.
     relatedExamples: []

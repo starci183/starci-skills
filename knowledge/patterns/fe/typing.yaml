@@ -185,7 +185,7 @@ rules:
         write: "Keep the generated enum in modules/api, then map it at the owning hook or module boundary to a presentation literal."
     verification:
       automated:
-        - FE_COMPONENT_IMPORTS_TRANSPORT
+        - FE_TIER_DIRECTION
       manual: []
     relatedExamples: []
 

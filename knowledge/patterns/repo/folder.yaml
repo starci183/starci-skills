@@ -55,7 +55,6 @@ rules:
       automated:
         - HFS_SLOT_UNDECLARED
         - HFS_SLOT_REQUIRED_MISSING
-        - HFS_SLOT_RETIRED
         - HFS_ARCH_CONFIG_UNREAD
         - HFS_ROOT_ENTRY_FORBIDDEN
         - HFS_ROOT_ENTRY_MISSING
