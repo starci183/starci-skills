@@ -30,9 +30,25 @@ export function secondLanguageHits(text) {
  */
 export const FAILURE_CODE_VIETNAMESE_FIELDS = Object.freeze(['title_vi', 'meaning_vi', 'nextStep_vi', 'causes_vi']);
 
-/** The fields of a document that carry deliberate Vietnamese operator text, keyed by file: a declared field-level exception of that file's typed entry. */
+/**
+ * The fields of a document that carry deliberate Vietnamese text, keyed by file: a declared field-level exception of that file's
+ * typed content, never a path pattern over content. `fields` are block keys (the key's own value and its list items are exempt);
+ * `flowFields` are keys inside an inline flow map (`{ vi: ..., en: ... }`), where only that key's value is exempt. A Vietnamese
+ * value under any other key of the same file is still a finding.
+ *  - modules/kernel/failure-codes.yaml: the operator text the owner mandated for the failure-code catalog.
+ *  - modules/ops/_labels.yaml: the op-label catalogue, one `{ vi, en }` pair per op (the `vi` field is the localized label).
+ *  - modules/goal/archetypes.yaml: the Vietnamese phrase lexicons matched against owner input (the signal phrase sets, and the
+ *    phrase lists of the archetype recognisers).
+ */
 export const DECLARED_VIETNAMESE_FIELDS = Object.freeze({
-  'modules/kernel/failure-codes.yaml': FAILURE_CODE_VIETNAMESE_FIELDS,
+  'modules/kernel/failure-codes.yaml': Object.freeze({ fields: FAILURE_CODE_VIETNAMESE_FIELDS }),
+  'modules/ops/_labels.yaml': Object.freeze({ flowFields: Object.freeze(['vi']) }),
+  'modules/goal/archetypes.yaml': Object.freeze({
+    fields: Object.freeze([
+      'buildIntent', 'canonIntent', 'e2eIntent', 'uatIntent', 'proofNegation', 'integrationIntent', 'integrationNegation', 'brandIntent',
+      'phrases', 'requires', 'excludes', 'backend', 'frontend', 'package',
+    ]),
+  }),
 });
 
 /**
@@ -58,8 +74,8 @@ export function yamlKeyOfEachLine(text) {
   return String(text).split(/\r?\n/).map((raw) => {
     if (raw.trim() === '') return key;
     const indent = raw.length - raw.trimStart().length;
-    const own = /^\s*([A-Za-z_][\w-]*)\s*:(?:\s|$)/.exec(raw);
-    if (own) { key = own[1]; keyIndent = indent; return key; }
+    const own = /^(\s*(?:-\s+)?)([A-Za-z_][\w-]*)\s*:(?:\s|$)/.exec(raw);
+    if (own) { key = own[2]; keyIndent = own[1].length; return key; }
     // a list item may sit at the key's own indent (`key:` then `- item` at the same column)
     if (indent > keyIndent || (indent === keyIndent && /^\s*-\s/.test(raw))) return key;
     key = null;
@@ -74,7 +90,14 @@ export function documentLanguageHits(rel, text) {
   const hits = secondLanguageHits(text);
   if (!declared) return hits;
   const keys = yamlKeyOfEachLine(text);
-  return hits.filter((hit) => !declared.includes(keys[hit.line - 1]));
+  const lines = String(text).split(/\r?\n/);
+  return hits.filter((hit) => {
+    if (declared.fields?.includes(keys[hit.line - 1])) return false;
+    if (!declared.flowFields) return true;
+    // an inline flow map: drop the declared fields' values and judge what is left of the line
+    const rest = declared.flowFields.reduce((line, field) => line.replace(new RegExp(`\\b${field}\\s*:\\s*[^,}]*`, 'g'), ''), lines[hit.line - 1]);
+    return hasSecondLanguage(rest);
+  });
 }
 
 /** The file extensions of a prose document (Markdown and YAML). */

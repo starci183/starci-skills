@@ -5,8 +5,9 @@
 // every Markdown and YAML document of knowledge/, docs/, modules/, packages/, examples/, skills/, ui/ and the repository root.
 //   node scripts/checks/check-doc-language.mjs [--json]
 //
-// The only exception is the declared one of scripts/lib/language.mjs: the Vietnamese operator fields of the failure-code catalog
-// (modules/kernel/failure-codes.yaml). The byte copies under a bundle's runtime/ directory (packages/*/runtime) are checked against
+// The only exceptions are the declared field-level ones of scripts/lib/language.mjs (DECLARED_VIETNAMESE_FIELDS): the Vietnamese
+// operator fields of the failure-code catalog (modules/kernel/failure-codes.yaml), the `vi` field of the op-label catalogue
+// (modules/ops/_labels.yaml) and the phrase-list keys of the Vietnamese lexicons (modules/goal/archetypes.yaml). The byte copies under a bundle's runtime/ directory (packages/*/runtime) are checked against
 // their sources by `sync-runtime.mjs --check`, so they are skipped here. A product repository's message catalogs are JSON or
 // TypeScript, which this check does not read.
 // Exit 0 clean, 1 findings.
@@ -48,7 +49,7 @@ if (isMain(import.meta.url)) {
   const findings = docLanguageFindings();
   if (process.argv.includes('--json')) console.log(JSON.stringify(findings, null, 2));
   else {
-    for (const f of findings) console.error(`${f.code} ${f.path}:${f.line}:${f.column} carries a Vietnamese letter; documents are English (only the failure-code catalog's *_vi fields are exempt)`);
+    for (const f of findings) console.error(`${f.code} ${f.path}:${f.line}:${f.column} carries a Vietnamese letter; documents are English (only the declared fields of scripts/lib/language.mjs are exempt)`);
     console.log(`doc-language: ${runtimeDocuments().length} documents, ${findings.length} findings`);
   }
   process.exit(findings.length ? 1 : 0);

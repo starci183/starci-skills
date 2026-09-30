@@ -8,8 +8,9 @@ summary: >-
   slot fe.e2e-support.i18n. New rule R96 HFS_DOC_NOT_ENGLISH: the architecture machine's `doc-language` check reads every
   Markdown and YAML document under knowledge/, docs/, src/ and apps/ (code fences included; catalogue YAML in a
   localized-text slot is the only exception), and the runtime's own `npm run check` runs the same law
-  (scripts/checks/check-doc-language.mjs) with one declared field-level exception, the Vietnamese operator fields of
-  modules/kernel/failure-codes.yaml (scripts/lib/language.mjs). The rule catalog drops the redundant `title_vi` of every rule
+  (scripts/checks/check-doc-language.mjs) with declared field-level exceptions (scripts/lib/language.mjs DECLARED_VIETNAMESE_FIELDS): the Vietnamese operator fields of
+  modules/kernel/failure-codes.yaml, the `vi` field of modules/ops/_labels.yaml and the phrase-list keys of
+  modules/goal/archetypes.yaml (lead decision). The rule catalog drops the redundant `title_vi` of every rule
   (the failure-code entry carries it). The runtime documents, patterns and examples are translated to English.
 reach: new-legs
 adds:

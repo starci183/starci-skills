@@ -49,6 +49,29 @@ test('the failure-code catalog exempts only its declared Vietnamese fields, not 
   assert.equal(documentLanguageHits("modules/other.yaml", entry).length, 4);
 });
 
+test('the op-label catalogue exempts only the vi field of an inline { vi, en } pair', () => {
+  const rel = 'modules/ops/_labels.yaml';
+  const clean = `labels:\n  request.analyze: { vi: ${VI}, en: Analyze request }\n  task.execute: { vi: ${VI_NFD}, en: Select workflow }\n`;
+  assert.deepEqual(documentLanguageHits(rel, clean), []);
+  // a Vietnamese value in the en field, or in any other key of the file, is still refused
+  assert.deepEqual(documentLanguageHits(rel, `labels:\n  a.b: { vi: ${VI}, en: ${VI} }\n`).map(hit => hit.line), [2]);
+  assert.deepEqual(documentLanguageHits(rel, `${clean}note: ${VI}\n`).map(hit => hit.line), [4]);
+  assert.deepEqual(documentLanguageHits(rel, `# ${VI}\n${clean}`).map(hit => hit.line), [1]);
+  // the same file content elsewhere is refused: the exception is declared for that one file
+  assert.equal(documentLanguageHits('modules/ops/other.yaml', clean).length, 2);
+});
+
+test('the archetype lexicons exempt only their declared phrase-list keys, not the prose beside them', () => {
+  const rel = 'modules/goal/archetypes.yaml';
+  const clean = ['phraseSets:', `  buildIntent: [build, ${VI}]`, 'archetypes:', '  - id: backend', `    requires: [api, ${VI}]`, `    excludes: [${VI}]`, `  - phrases: [run, ${VI}]`, ''].join('\n');
+  assert.deepEqual(documentLanguageHits(rel, clean), []);
+  // a Vietnamese value under any other key of the same file is still refused
+  assert.deepEqual(documentLanguageHits(rel, `${clean}summary: ${VI}\n`).map(hit => hit.line), [8]);
+  assert.deepEqual(documentLanguageHits(rel, `${clean}  - description: ${VI}\n`).map(hit => hit.line), [8]);
+  assert.deepEqual(documentLanguageHits(rel, `${clean}proofLegs: >-\n  ${VI}\n`).map(hit => hit.line), [9]);
+  assert.equal(documentLanguageHits('modules/goal/other.yaml', clean).length, 4);
+});
+
 test('detection is structural on characters: NFC and NFD are caught, loanwords are not', () => {
   assert.equal(hasSecondLanguage(VI), true);
   assert.equal(hasSecondLanguage(VI_NFD), true);
