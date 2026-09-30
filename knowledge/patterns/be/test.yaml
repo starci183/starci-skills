@@ -184,7 +184,7 @@ rules:
         write: 'const clock = new FakeClock("2026-01-01T00:00:00.000Z"); clock.advance(300_000); const ids = fakeIds()'
       - id: case-3
         when: Cache and lock
-        write: 'const cache = fakeCache(clock); expect(cache.ttlOf(key)).toBe(300_000); const lock = fakeLock(clock)'
+        write: 'const cache = fakeCache(clock); expect(cache.ttlOf(key)).toBe(300); const lock = fakeLock(clock)'
       - id: case-4
         when: Everything else
         write: 'const keycloakAdmin = mock<KeycloakAdminService>(); keycloakAdmin.findMember.mockResolvedValue(member)'
@@ -331,7 +331,7 @@ rules:
                   ],
               }).compile()).get(MemberProfileService)
 
-              it("a miss reads Keycloak once and caches the profile for 300 seconds", async () => { /* cache.ttlOf(key) === 300_000 */ })
+              it("a miss reads Keycloak once and caches the profile for 300 seconds", async () => { /* cache.ttlOf(key) === 300 */ })
               it("cache hit does not call Keycloak", async () => { /* expect(keycloakAdmin.findMember).toHaveBeenCalledTimes(1) after two reads */ })
               it("re-reads Keycloak after the TTL expires", async () => { clock.advance(300_001) /* then one more call */ })
               it("refuses a missing member and does not cache it", async () => { /* toBeRefused; cache.has(key) === false */ })

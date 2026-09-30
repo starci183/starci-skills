@@ -63,8 +63,8 @@ module source roots, see [backend source pattern](backend-source-pattern.md)),
 `apps/<app>/src`; see `knowledge/patterns/fe/folder.yaml`), and forbids
 `.starciwork/`, `.starcistacks/` and `.sops.yaml`.
 
-**Tests: unit automatic, the rest by hand.** Unit specs (`<name>.spec.ts(x)` beside
-the subject) are the only tests any automatic gate runs. A backend also has
+**Tests: unit automatic, the rest by hand.** Unit specs (a backend has only `<name>.service.spec.ts` beside each
+`*.service.ts`; a frontend `<name>.spec.ts(x)` beside the subject) are the only tests any automatic gate runs. A backend also has
 integration (`src/tests/integration/<capability>/*.integration-spec.ts`), e2e
 (`src/tests/e2e/<area>/*.e2e-spec.ts`) and contract
 (`src/tests/contract/<provider>/*.contract-spec.ts`) specs, with the only test

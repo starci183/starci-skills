@@ -13,16 +13,14 @@ apps/<app>/src/                     # kind api | worker | migrate | cli, declare
   main.ts                           # at most 80 lines: builds EnvSource once, parses options, bootstraps, handles startup failure
   app.module.ts                     # at most 250 lines: AppModule.register(options), each capability once with isGlobal true, transports, APP_GUARD, APP_FILTER
   <app>.options.ts                  # the options type of the app
-  <app>.composition.spec.ts         # required: boots the REAL AppModule with stubbed options
 src/
   features/<feature>/
     index.ts                        # explicit consumer API; no export-star collection
     <feature>.module.ts             # application module: the handlers
     application/
       <action>.command.ts | <action>.query.ts   # typed Command<R> / Query<R> carrying one params
-      <action>.handler.ts                       # extends ICQRSHandler, overrides process
+      <action>.handler.ts                       # extends ICQRSHandler, overrides process; thin, calls one service method, no spec
       <action>.contracts.ts                     # protocol-neutral request and result
-      <action>.handler.spec.ts
     transport/
       graphql/<feature>-graphql.module.ts, <action>.resolver.ts, <action>.mapper.ts, dto/<action>.{input,type,args}.ts
       http/<feature>-http.module.ts, <action>.controller.ts, dto/<action>.{request,response}.ts   # webhooks, OAuth, health, byte streams only
@@ -36,9 +34,9 @@ src/
 contracts/<app>/schema.graphql      # opt-in committed contract
 ```
 
-Nothing else exists at `src/` level, and no `types`, `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or `exceptions` folder exists under `src/modules` or `src/features`. Within a capability create only what it owns: one `index.ts` at the root, `<c>.module.ts` and `<c>.module-definition.ts` when it registers providers, `<c>.config.ts` and `<c>.options.ts` when it is configured, `<c>.decorators.ts` for its injectors, `<c>.log-events.ts`, `errors/`, `messages/`, `persistence/`, services, policies, contracts and colocated specs.
+Nothing else exists at `src/` level, and no `types`, `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or `exceptions` folder exists under `src/modules` or `src/features`. Within a capability create only what it owns: one `index.ts` at the root, `<c>.module.ts` and `<c>.module-definition.ts` when it registers providers, `<c>.config.ts` and `<c>.options.ts` when it is configured, `<c>.decorators.ts` for its injectors, `<c>.log-events.ts`, `errors/`, `messages/`, `persistence/`, services, policies, contracts and colocated service specs.
 
-Tests come in four kinds by folder and suffix (`knowledge/patterns/be/test.yaml` BE-TEST-1): unit `<name>.spec.ts` beside its subject, integration `src/tests/integration/<capability>/*.integration-spec.ts`, e2e `src/tests/e2e/<area>/*.e2e-spec.ts` and contract `src/tests/contract/<provider>/*.contract-spec.ts`; the only test infrastructure is `src/tests/world/` (`useTestWorld`, network-edge fakes). Integration, e2e and contract run by hand: the default `tsconfig.json`, `typecheck`, lint, lint-staged and husky exclude those trees; `typecheck:tests` (`src/tests/tsconfig.json`) runs before `test:integration`, `test:e2e` and `test:contract`; coverage and `test:ci` read the jest `unit` project only; any e2e CI job is `workflow_dispatch` only. The unit project maps no module into `src/tests/{world,integration,e2e,contract}/`.
+Tests come in four kinds by folder and suffix (`knowledge/patterns/be/test.yaml` BE-TEST-1): unit `<name>.service.spec.ts` beside its `<name>.service.ts` (only services are unit-tested; handlers, resolvers, controllers and consumers are thin and have no unit spec), integration `src/tests/integration/<capability>/*.integration-spec.ts`, e2e `src/tests/e2e/<area>/*.e2e-spec.ts` and contract `src/tests/contract/<provider>/*.contract-spec.ts`; the only test infrastructure is `src/tests/world/` (`useTestWorld`, network-edge fakes). Integration, e2e and contract run by hand: the default `tsconfig.json`, `typecheck`, lint, lint-staged and husky exclude those trees; `typecheck:tests` (`src/tests/tsconfig.json`) runs before `test:integration`, `test:e2e` and `test:contract`; coverage and `test:ci` read the jest `unit` project only, whose coverage is `src/**/*.service.ts` at per-file 100 (Sonar takes no coverage); any e2e CI job is `workflow_dispatch` only. The unit project maps no module into `src/tests/{world,integration,e2e,contract}/`.
 
 Every backend repository is an `apps/<app>/` monorepo, including a single-application one: each deployable process composes in `apps/<app>/src` and nothing else lives there, while `src/features` and `src/modules` stay at the repository root and are shared by every app. Independently owned reusable packages sit in `packages/<capability>` and declare explicit exports. Topology never reverses dependencies.
 

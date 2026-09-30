@@ -57,11 +57,14 @@ metadata check verifies the adopted Jest runner's actual discovery/configuration
 
 ## Construction and evidence
 
-Use direct construction for isolated behavior and the actual Nest testing
-module when the claim concerns registration, injection, tokens or lifecycle.
-No rule requires `as never`, a double cast, a DI container for every service,
-or a test file for every class. Behavior and failure risk determine the tests
-needed. A selected unit spec is colocated; file counts are historical evidence.
+Under the unit standard (`knowledge/patterns/be/test.yaml`, BE-TEST-1 to
+BE-TEST-15) only `*.service.ts` files are unit-tested, each by one colocated
+`<name>.service.spec.ts` that builds the service with
+`Test.createTestingModule({ providers })` (no `new`, no `imports`, no
+`overrideProvider`) and the doubles of `@starci/jest-preset`. No rule permits
+`as never` or a double cast. Handlers, resolvers, controllers and consumers are
+thin and have no unit spec; behavior of the rest is proved by integration and
+e2e. Coverage is per-file 100 of `src/**/*.service.ts`.
 
 Mocked repositories do not prove real database transactions. Source calls do
 not prove execution, assertions or unmocked subject behavior. Relevant tests
@@ -72,9 +75,10 @@ need a bounded adapter improvement; agent prose cannot waive them.
 ## Basis
 
 This is StarCi's adopted source profile, not a universal Nest or Jest mandate.
-Academy backend commit `1731b15ba4ed526477e3c572b9d82c31ab64f1d5` supplies both
-direct handler construction (`add-to-cart.handler.spec.ts`) and testing-module
-service construction (`ai-entitlement.service.spec.ts`). Its `ICQRSHandler`
+Academy backend commit `1731b15ba4ed526477e3c572b9d82c31ab64f1d5` supplied the
+older direct handler construction (`add-to-cart.handler.spec.ts`), which the unit
+standard retired, and testing-module service construction
+(`ai-entitlement.service.spec.ts`), which it adopted. Its `ICQRSHandler`
 exposes `execute` while retaining `process` as a protected hook. Historical
 fixture casts and filename totals do not become new-project requirements.
 
