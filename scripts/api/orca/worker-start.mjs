@@ -25,6 +25,7 @@ export function workerStart({ task, worktree, agent, model, effort, name, repo, 
     errorCode: r.receipt?.error?.code ?? null,
     errorReceipt: r.receipt?.error ?? null,
     error: r.error,
+    hostUnavailable: r.hostUnavailable === true,
   };
 }
 

@@ -171,6 +171,19 @@ const kernelWakeRefusedAt = (terminal) => withKernelLedger((ledger) => ledger.db
 const recordKernelWakeRefused = (terminal, proof) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
   workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_UNWRITABLE_EVENT,
   payload: { terminal, errorCode: KERNEL_NOT_WRITABLE, sendErrorCode: proof?.sendErrorCode ?? KERNEL_NOT_WRITABLE } }))?.created_at ?? Date.now());
+// The kernel job's worker ({dispatchId, agentTerminalHandle}) when the seat signal is gone, or null.
+const lostSeatWorker = () => withKernelLedger((ledger) => {
+  const row = ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
+  const managed = jsonFrom(row?.payload_json)?.managed ?? null;
+  return managed?.dispatchId && managed.agentTerminalHandle ? managed : null;
+});
+// A bare shell prompt at the end of the frame on two reads (the death settle between them): the agent exited.
+const exitedTwice = (handle) => {
+  const exited = () => { try { const r = terminalRead({ terminal: handle, screen: true }); return r?.ok ? exitedAgentPromptRow(r.screen) : null; } catch { return null; } };
+  if (!exited()) return false;
+  if (DEATH_SETTLE_MS > 0) sleepSync(DEATH_SETTLE_MS);
+  return Boolean(exited());
+};
 // A host call, not typed input: it lands where a quit send cannot. A worker-start Kernel is fenced and released by its
 // Dispatch (worker-stop + worker-release), so Orca never reports it live again and start-workflow replaces it; a seat
 // with no Dispatch (terminal-launched) has only its terminal to close.
@@ -328,7 +341,12 @@ function kernelTick(status, phase) {
 
   if (!terminal) {
     if (!repair) return { ok: true, workflowId, phase, action: 'restart-needed', reason: 'kernel signal/terminal absent' };
-    const replaced = replaceKernel({ workflowId, phase });
+    // The seat is gone but the kernel job's own worker may still hold a Dispatch Orca calls live (start-workflow then
+    // refuses a second Kernel, kernel-worker-alive). When that worker's frame proves its agent exited - a bare shell
+    // prompt on two reads - it is fenced and released first, so the replacement is not refused.
+    const lost = lostSeatWorker();
+    const fenced = lost && exitedTwice(lost.agentTerminalHandle) ? stopAndRelease(lost.dispatchId) : null;
+    const replaced = replaceKernel({ workflowId, phase, ...(fenced ? { fenced, lostSeat: lost } : {}) });
     return { ...replaced, terminal: replaced.replacementTerminal ?? null };
   }
 
@@ -345,7 +363,7 @@ function kernelTick(status, phase) {
   if (worker?.ok && worker.state && DEAD_WORKER_STATE.test(worker.state)) {
     const deathReason = `kernel worker ${signalValue.dispatch} is ${worker.state}`;
     if (!repair) return { ok: true, workflowId, phase, terminal, action: 'restart-needed', reason: deathReason };
-    return replaceKernel({ workflowId, phase, terminal, deathReason });
+    return replaceKernel({ workflowId, phase, terminal, deathReason, fenced: stopAndRelease(signalValue.dispatch) });
   }
 
   // An Orca outage is never a dead kernel: wait for Orca to answer, probe
@@ -361,7 +379,7 @@ function kernelTick(status, phase) {
   };
   if (DEAD_VERDICTS.has(verdict.verdict)) {
     if (!repair) return { ok: true, workflowId, phase, terminal, action: 'restart-needed', reason: verdict.reason };
-    return replaceKernel({ workflowId, phase, terminal, deathReason: verdict.reason });
+    return replaceKernel({ workflowId, phase, terminal, deathReason: verdict.reason, fenced: stopAndRelease(signalValue.dispatch) });
   }
   const shown = verdict.shown;
 
@@ -382,7 +400,7 @@ function kernelTick(status, phase) {
       ok: true, workflowId, phase, terminal, action: 'agent-exit-unconfirmed', state: 'agent-exited', shellPrompt,
       reason: again.ok ? 'the second read no longer ends in a shell prompt' : `the second read failed: ${again.error ?? 'unreadable'}`,
     };
-    return replaceKernel({ workflowId, phase, terminal, state: 'agent-exited', shellPrompt, deathReason });
+    return replaceKernel({ workflowId, phase, terminal, state: 'agent-exited', shellPrompt, deathReason, fenced: stopAndRelease(signalValue.dispatch) });
   }
   const screen = classifyKernelScreen(read.screen);
   const { lastOutputAt, outputAgeMs } = outputAgeOf(shown.terminal?.lastOutputAt);

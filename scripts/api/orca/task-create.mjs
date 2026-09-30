@@ -12,7 +12,7 @@ export function taskCreate({ run, spec, taskTitle, displayName, deps, parent, fr
     spec, run, 'task-title': taskTitle, 'display-name': displayName, deps, parent, from,
   });
   const task = r.result?.task ?? null;
-  return { ok: r.exitCode === 0 && Boolean(task?.id), taskId: task?.id ?? null, task, error: r.error };
+  return { ok: r.exitCode === 0 && Boolean(task?.id), taskId: task?.id ?? null, task, error: r.error, hostUnavailable: r.hostUnavailable === true };
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll('\\', '/')}`).href || process.argv[1]?.endsWith('task-create.mjs')) {

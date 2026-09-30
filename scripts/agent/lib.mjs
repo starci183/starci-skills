@@ -425,11 +425,13 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
   };
   if (started?.ok !== true || (started.outcome != null && started.outcome !== 'ok') || !dispatchId) {
     return fail('worker-start', started?.error ?? `worker-start outcome=${started?.outcome ?? 'none'} state=${started?.state ?? 'none'} effect=${started?.effectState ?? 'none'}`,
-      { effectState: started?.effectState ?? 'unknown', errorCode: started?.errorCode ?? null, details: started ?? null });
+      { effectState: started?.effectState ?? 'unknown', errorCode: started?.errorCode ?? null, details: started ?? null,
+        ...(started?.hostUnavailable ? { hostUnavailable: true } : {}) });
   }
   const shown = orca.assignee({ task, from });
   const terminal = shown?.ok ? shown.assigneeHandle : null;
-  if (!terminal) return fail('dispatch-show', shown?.error ?? 'dispatch-show returned no assignee', { details: shown ?? null });
+  if (!terminal) return fail('dispatch-show', shown?.error ?? 'dispatch-show returned no assignee', { details: shown ?? null,
+    ...(shown?.hostUnavailable ? { hostUnavailable: true } : {}) });
   if (onCreated) { try { onCreated(terminal, dispatchId); } catch { /* the receipt still names the handle */ } }
   // A worker in an existing worktree gets Orca's default tab title; the semantic title is presentation only.
   const renamed = title ? bestEffortCall(() => orca.rename({ terminal, title })) : null;
@@ -463,7 +465,7 @@ export function startAgent({ provider, model = null, effort = null, worktree, ti
   const from = entry ? { from: entry } : {};
   const newRun = () => {
     const created = orca.runCreate({ objective, ...from });
-    return created?.ok && created.runId ? { runId: created.runId } : { error: created?.error ?? 'run-create returned no runId' };
+    return created?.ok && created.runId ? { runId: created.runId } : { error: created?.error ?? 'run-create returned no runId', hostUnavailable: created?.hostUnavailable === true };
   };
   const newTask = (runId) => orca.taskCreate({ run: runId, spec, taskTitle: title, displayName: title, ...from });
   let runId = null;
@@ -471,10 +473,11 @@ export function startAgent({ provider, model = null, effort = null, worktree, ti
   let task = runId ? newTask(runId) : null;
   if (!task?.ok || !task.taskId) {
     const made = newRun();
-    if (made.error) return { ok: false, step: 'run-create', error: made.error, provider, effectState: 'none' };
+    if (made.error) return { ok: false, step: 'run-create', error: made.error, provider, effectState: 'none', ...(made.hostUnavailable ? { hostUnavailable: true } : {}) };
     runId = made.runId;
     task = newTask(runId);
   }
-  if (!task?.ok || !task.taskId) return { ok: false, step: 'task-create', error: task?.error ?? 'task-create returned no taskId', provider, runId, effectState: 'none' };
+  if (!task?.ok || !task.taskId) return { ok: false, step: 'task-create', error: task?.error ?? 'task-create returned no taskId', provider, runId, effectState: 'none',
+    ...(task?.hostUnavailable ? { hostUnavailable: true } : {}) };
   return spawnAgent({ provider, model, effort, worktree, title, task: task.taskId, run: runId, from: entry, onCreated, io: io?.spawn ?? null });
 }

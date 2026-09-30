@@ -392,6 +392,8 @@ async function signalHealth(signal) {
   }
   if (value.dispatch) {
     const shown = workerShow({ dispatch: value.dispatch });
+    // An Orca that does not answer proves nothing about the worker: host-unavailable, never a dead seat.
+    if (shown?.hostUnavailable) return { live: false, hostUnavailable: true, reason: shown.error ?? 'worker-show did not answer', terminal: value.terminal ?? null, value };
     const state = shown?.state ?? null;
     const live = shown?.ok === true && !(state && MANAGED_DEAD_STATE.test(state));
     return {
@@ -654,7 +656,7 @@ try {
     approvedAt: firstBoot?.created_at ? new Date(firstBoot.created_at).toISOString() : null, bridge: goalBridge,
     restart: restartAuthority && { ...restartAuthority, attempt: kernelAttemptOf(priorKernelJob) + 1, launcher: LAUNCHERS[launchedBy] } });
   const prompt = renderKernelPrompt({ workflowId, inboxId: claim.inbox_id, goalRevision: goal?.revision ?? 0, launchAuthority });
-  const failStart = (step, error, handle = null, extra = {}) => {
+  const failStart = (step, error, handle = null, extra = {}, exitCode = 1) => {
     const at = Date.now();
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
     ledger.transaction(() => {
@@ -663,7 +665,7 @@ try {
         generation: workflow?.generation ?? 0, kind: 'kernel-start-failed', payload: { step, error, terminal: handle, ...extra }, createdAt: at });
     });
     console.error(JSON.stringify({ ok: false, workflowId, step, error, terminal: handle, ...extra }));
-    process.exit(1);
+    process.exit(exitCode);
   };
   if (route.error)
     failStart(route.errorStep ?? 'kernel-route', route.error, null, { agent: route.agent ?? null, requestedModel: route.model ?? null });
@@ -690,6 +692,8 @@ try {
       ...(spawned.errorCode ? { errorCode: spawned.errorCode } : {}), ...(spawned.dispatchId ? { dispatch: spawned.dispatchId } : {}),
       ...(spawned.cleanup ? { cleanup: spawned.cleanup } : {}), ...(spawned.observation ? { observation: spawned.observation } : {}),
       ...(spawned.trust ? { trust: spawned.trust } : {}) };
+    // An Orca that stopped answering mid-boot proves nothing about any member: host-unavailable (exit 75), no fall-through.
+    if (spawned.hostUnavailable) failStart('host-unavailable', spawned.error, spawned.terminal ?? null, { ...failure, launchStep: spawned.step }, EXIT_HOST_UNAVAILABLE);
     const next = members[index + 1] ?? null;
     if (!route.fallThrough || !next || spawned.effectState !== 'none')
       failStart(spawned.step, spawned.error, spawned.terminal ?? null,
