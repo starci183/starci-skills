@@ -28,6 +28,7 @@ import { recommended as defaultDenyRecommended, rules as defaultDenyRules } from
 import { recommended as e2eFlowRecommended, rules as e2eFlowRules } from "./e2e-flow.mjs"
 import { recommended as errorHandlingRecommended, rules as errorHandlingRules } from "./error-handling.mjs"
 import { recommended as idempotencyRecommended, rules as idempotencyRules } from "./idempotency.mjs"
+import { recommended as infraOwnerRecommended, rules as infraOwnerRules } from "./infra-owner.mjs"
 import { recommended as injectionRecommended, rules as injectionRules } from "./injection.mjs"
 import { recommended as inputBoundsRecommended, rules as inputBoundsRules } from "./input-bounds.mjs"
 import { recommended as logSafetyRecommended, rules as logSafetyRules } from "./log-safety.mjs"
@@ -60,6 +61,7 @@ const CONTRIBUTIONS = [
     { law: "e2e-flow", rules: e2eFlowRules, recommended: e2eFlowRecommended },
     { law: "error-handling", rules: errorHandlingRules, recommended: errorHandlingRecommended },
     { law: "idempotency", rules: idempotencyRules, recommended: idempotencyRecommended },
+    { law: "infra-owner", rules: infraOwnerRules, recommended: infraOwnerRecommended },
     { law: "injection", rules: injectionRules, recommended: injectionRecommended },
     { law: "input-bounds", rules: inputBoundsRules, recommended: inputBoundsRecommended },
     { law: "log-safety", rules: logSafetyRules, recommended: logSafetyRecommended },
