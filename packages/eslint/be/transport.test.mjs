@@ -62,12 +62,21 @@ test("transport-dispatch-only: a door injects only the bus and dispatches exactl
             { filename: JOB, code: `${BUS}export class J { readonly name = "sweep"; constructor(private readonly bus: CommandBus) {} async run(at: Date) { await this.bus.execute(new Place()) } }` },
             { filename: GATEWAY, code: `${BUS}export class G { constructor(private readonly bus: CommandBus) {} @SubscribeMessage("say") say() { return this.bus.execute(new Place()) } handleConnection() { return 1 } }` },
             { filename: CLI, code: `${BUS}export class S { constructor(private readonly bus: CommandBus) {} async run() { await this.bus.execute(new Place()) } }` },
+            // a Nest module wires consumers and jobs into a registry at startup: it is not a door
+            { filename: CONSUMER, code: `${BUS}import { Module } from "@nestjs/common"
+import type { OnModuleInit } from "@nestjs/common"
+interface Registry { add(x: object): void }
+@Module({})
+export class PlanMessageModule implements OnModuleInit { constructor(private readonly registry: Registry) {} onModuleInit(): void { this.registry.add({}) } }` },
             // a DTO class carries decorated fields and no injection
             { filename: DTO, code: `import { Field } from "@nestjs/graphql"\nexport class PlaceInput { @Field() name!: string }` },
             // outside the transport slots the rule is silent
             { filename: DOMAIN, code: `${BUS}export class S { constructor(private readonly em: EntityManager) {} go() { return 1 } }` },
         ],
         invalid: [
+            // the exemption is the Module decorator only: an undecorated class that registers at startup is a consumer with no dispatch
+            { filename: CONSUMER, code: `${BUS}interface Registry { add(x: object): void }
+export class PlanMessageModule { constructor(private readonly registry: Registry) {} onModuleInit(): void { this.registry.add({}) } }`, errors: [{ messageId: "injects" }, { messageId: "none" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly orders: OrderService, private readonly bus: CommandBus) {} @Mutation(() => String) place() { return this.bus.execute(new Place()) } }`, errors: [{ messageId: "injects" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly em: EntityManager, private readonly bus: CommandBus) {} @Mutation(() => String) place() { return this.bus.execute(new Place()) } }`, errors: [{ messageId: "injects" }] },
             // property injection

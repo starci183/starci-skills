@@ -102,6 +102,8 @@ export const transportDispatchOnly = {
         const sourceCode = context.sourceCode
         return {
             ClassDeclaration(node) {
+                // A Nest module class (`@Module`) wires the door into the container (registers consumers and jobs); it is not a door.
+                if ((node.decorators ?? node.parent?.decorators ?? []).some((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", "Module"))) return
                 const constructor = node.body.body.find((member) => member.type === "MethodDefinition" && member.kind === "constructor")
                 for (const original of constructor?.value.params ?? []) {
                     const param = original.type === "TSParameterProperty" ? original.parameter : original

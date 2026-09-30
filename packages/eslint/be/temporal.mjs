@@ -15,7 +15,7 @@
  * owner (like an app's `main.ts` and `platform`), and its readiness polling, deadlines and fake servers measure real
  * elapsed time against real processes, which a `FakeClock` cannot drive. A spec is not the world: specs stay refused.
  */
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { isOwnedBy } from "./lib/ports.mjs"
 
 /** The globals that carry an ambient reading, and the member of each that reads it (`null`: any member). */
@@ -78,7 +78,7 @@ export const noAmbientClock = {
     create(context) {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
-        if (isOwnedBy(hfs, filename, "platform", "clock") || hfs.slotOf(filename) === "be.tests.world") return {}
+        if (isOwnedBy(hfs, filename, "platform", "clock") || inTestWorld(hfs, filename)) return {}
         const reportRoot = (node, root, member) => {
             if (!isAmbientRoot(context, root)) return
             const wanted = AMBIENT[root.name]

@@ -14,6 +14,7 @@
  *   - `injector-type-match`: the `T` of the injector on a constructor parameter is the parameter's annotated type.
  *   - `infra-needs-injector`: a constructor parameter typed by a platform/integrations declaration or by a package
  *     carries an `Inject<Thing>()` decorator; only domain services and types of the same owner are class-injected.
+ *     Only a class the container builds is judged (a Nest class decorator or a decorated parameter); a plain class is not.
  *   - `no-module-ref`, `no-forward-ref`: no service locator, no cycle-hiding trick.
  *   - `no-string-token`: a token is a class or a `unique symbol`, never a string.
  *
@@ -27,7 +28,7 @@ import ts from "typescript"
 import { staticText } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { normalizePath } from "./lib/path.mjs"
-import { isPackageExport, typed, typeOrigins } from "./lib/types.mjs"
+import { isPackageExport, packageOfExport, typed, typeOrigins } from "./lib/types.mjs"
 
 /** The raw decorators of Nest and TypeORM whose call is the injector's job. */
 const RAW_NAMES = new Set(["Inject", "InjectEntityManager", "InjectDataSource", "InjectQueue", "InjectRepository"])
@@ -410,6 +411,14 @@ const check = (context, decorator, target, injected) => {
 
 // -- infra-needs-injector --------------------------------------------------------------------------
 
+/** True when the class of a constructor can be built by the Nest container: a Nest class decorator, or any decorated constructor parameter. */
+const isContainerBuilt = (context, constructor) => {
+    const declaration = constructor.parent?.parent
+    if (declaration?.type !== "ClassDeclaration" && declaration?.type !== "ClassExpression") return false
+    if ((declaration.decorators ?? []).some((decorator) => packageOfExport(context, decorator.expression)?.startsWith("@nestjs/"))) return true
+    return constructorParams(constructor).some((param) => decoratorsOfParam(param).decorators.length > 0)
+}
+
 /** A constructor parameter of an infrastructure type carries an injector. */
 export const infraNeedsInjector = {
     meta: {
@@ -426,9 +435,10 @@ export const infraNeedsInjector = {
         const own = hfs.ownerOf(filename)
         return {
             MethodDefinition(node) {
-                // A CQRS message (`extends Command<R>` / `Query<R>` of @nestjs/cqrs) is built by its caller, never by the container.
-                const heritage = node.parent?.parent?.superClass
-                if (heritage && isPackageExport(context, heritage, "@nestjs/cqrs")) return
+                // Only a class the container can construct is judged: it carries a Nest class decorator (`@Injectable()`, `@Controller()`,
+                // `@Resolver()`, `@Catch()`, `@CommandHandler(...)`), or a parameter decorator that makes TypeScript emit its parameter
+                // metadata. A plain class (a CQRS message, a factory-built adapter, a test fake) is never DI-constructed.
+                if (!isContainerBuilt(context, node)) return
                 for (const param of constructorParams(node)) {
                     const { target, decorators } = decoratorsOfParam(param)
                     const annotation = target.typeAnnotation?.typeAnnotation

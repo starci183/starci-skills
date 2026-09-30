@@ -56,6 +56,9 @@ const obligationOf = (checker, type) => {
     return null
 }
 
+/** True when a string-typed property can only hold a fixed set of literals (`"paid" | "failed"`): a membership validator bounds it as `@MaxLength` does. */
+const isLiteralSet = (type) => presentParts(type).every((part) => part.flags & ts.TypeFlags.StringLiteral)
+
 /** Every property of an input class carries the validators its type calls for. */
 export const inputBounded = {
     meta: {
@@ -93,7 +96,9 @@ export const inputBounded = {
                     continue
                 }
                 const obligation = obligationOf(checker, typeOf(context, member))
-                if (obligation === "string" && !have.has("MaxLength")) context.report({ node: member.key, messageId: "string", data: { name } })
+                const memberType = typeOf(context, member)
+                const boundedByMembership = obligation === "string" && isLiteralSet(memberType) && (have.has("IsIn") || have.has("Equals"))
+                if (obligation === "string" && !have.has("MaxLength") && !boundedByMembership) context.report({ node: member.key, messageId: "string", data: { name } })
                 else if (obligation === "enum" && !have.has("IsEnum")) context.report({ node: member.key, messageId: "enum", data: { name } })
                 else if (obligation === "array" && !have.has("ArrayMaxSize")) context.report({ node: member.key, messageId: "array", data: { name } })
                 else if (obligation === "nested" && !(have.has("ValidateNested") && have.has("transform:Type"))) context.report({ node: member.key, messageId: "nested", data: { name } })
