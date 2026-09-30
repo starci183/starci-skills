@@ -74,3 +74,7 @@ retired:
   - {path: scripts/checks/blob-output.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: no caller besides its test (RED18); checks store output with scripts/checks/output.mjs emitCheckOutput'}
   - {path: scripts/kernel/usage-backfill.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: the one-shot backfill ran; the Host controller sweeps usage (scripts/kernel/usage-record.mjs sweepUsage)'}
   - {path: packages/eslint/be/e2e-schema.test.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'packages/eslint/be/test-world.test.mjs (the test-world law: tests-infra-only-in-world, tests-no-override, test-world-shape)'}
+  - {path: knowledge/patterns/fe/test.yaml, retiredAt: 2026-09-30, removedIn: c0-defer, replacedBy: 'none: a front end has no tests by standard (FE_NO_TESTS, R97)'}
+  - {path: packages/hfs/templates/fe/ci-workflows/github/workflows/e2e.yml, retiredAt: 2026-09-30, removedIn: c0-defer, replacedBy: 'none: a front end has no tests by standard (FE_NO_TESTS, R97)'}
+  - {path: scripts/checks/architecture/size-growth.mjs, retiredAt: 2026-10-01, removedIn: c0-lint, replacedBy: 'eslint file-size-growth (R20) in both canons'}
+  - {path: scripts/secrets-guard.mjs, retiredAt: 2026-10-01, removedIn: rm-scripts, replacedBy: 'hfs work-hygiene staged secret judgement (R06) run by the managed pre-commit hook'}
