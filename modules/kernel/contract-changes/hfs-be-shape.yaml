@@ -1,0 +1,49 @@
+id: hfs-be-shape
+effectiveAt: '2026-09-30T18:30:00+07:00'
+summary: >-
+  Lane C0 sub-lane RC (BE-CONVENTION 1.5, 1.6, 1.10-1.15; R87-R90): eslint-canon-be 2.0.0 (unreleased) gains the CQRS
+  shape rules (message-typed-result, execute-params-shape, no-use-case, no-event-bus; handler-overrides-process and
+  message-carries-params-only now read the slot and types), the transport shape rules (transport-dispatch-only,
+  no-response-envelope, no-graphql-json; door-lives-in-features, no-capability-imports-features and
+  rest-door-needs-a-reason now read the slot and types), naming/no-default-export, and the new infra-owner law
+  (infra-import-owner over ruleParams.be.infraOwners). The slot manifest gains ruleParams.be.infraOwners, suffixes and
+  bannedSuffixes (validated by hfs-slots.mjs and the schema), the application slots drop use-case, and `hfs check`
+  reports BE_SOURCE_FORM for a tracked back-end .ts outside the closed suffix vocabulary. The architecture machine's
+  BE_SOURCE_NAME_INVALID is renamed BE_SOURCE_FORM (one obligation, one code) and its failure-code entry is deleted.
+  no-non-ascii-source loses its test-lane exemption (only message catalogs may hold Vietnamese).
+reach: new-legs
+adds:
+  codes: [BE_SOURCE_FORM]
+paths:
+  - modules/kernel/contract-changes/hfs-be-shape.yaml
+  - docs/nest-contract-check.md
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/slots.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/models/code-patterns.yaml
+  - modules/schemas/hfs-slots.schema.yaml
+  - packages/eslint/be/CHANGELOG.md
+  - packages/eslint/be/README.md
+  - packages/eslint/be/comments.mjs
+  - packages/eslint/be/cqrs.mjs
+  - packages/eslint/be/index.mjs
+  - packages/eslint/be/infra-owner.mjs
+  - packages/eslint/be/lib/import-source.mjs
+  - packages/eslint/be/lib/transport-slots.mjs
+  - packages/eslint/be/naming.mjs
+  - packages/eslint/be/runtime/knowledge/hfs/slots.yaml
+  - packages/eslint/be/runtime/scripts/lib/hfs-slots.mjs
+  - packages/eslint/be/transport.mjs
+  - packages/hfs/runtime/knowledge/hfs/slots.yaml
+  - packages/hfs/runtime/modules/kernel/failure-codes.yaml
+  - packages/hfs/runtime/scripts/lib/hfs-check.mjs
+  - packages/hfs/runtime/scripts/lib/hfs-slots.mjs
+  - scripts/checks/architecture/source-names.mjs
+  - scripts/checks/check-scoped-lint.mjs
+  - scripts/lib/hfs-check.mjs
+  - scripts/lib/hfs-slots.mjs
+  - tests/_hfs-cli-fixture.mjs
+  - tests/architecture.spec.mjs
+  - tests/hfs-cli.spec.mjs
+  - tests/hfs-slots.spec.mjs
+  - tests/scoped-lint-repository-obligations.spec.mjs

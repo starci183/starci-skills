@@ -928,10 +928,10 @@ rules:
     enforcers:
       - {kind: eslint-be, id: handler-overrides-process}
       - {kind: eslint-be, id: message-carries-params-only}
-      - {kind: eslint-be, id: message-typed-result, status: planned}
-      - {kind: eslint-be, id: no-use-case, status: planned}
-      - {kind: eslint-be, id: no-event-bus, status: planned}
-      - {kind: eslint-be, id: execute-params-shape, status: planned}
+      - {kind: eslint-be, id: message-typed-result}
+      - {kind: eslint-be, id: no-use-case}
+      - {kind: eslint-be, id: no-event-bus}
+      - {kind: eslint-be, id: execute-params-shape}
   - id: R88
     code: "BE_TRANSPORT_SHAPE"
     title_vi: "Tầng giao tiếp làm nhiều hơn chuyển lệnh"
@@ -943,9 +943,9 @@ rules:
       - {kind: eslint-be, id: door-lives-in-features}
       - {kind: eslint-be, id: no-capability-imports-features}
       - {kind: eslint-be, id: rest-door-needs-a-reason}
-      - {kind: eslint-be, id: transport-dispatch-only, status: planned}
-      - {kind: eslint-be, id: no-response-envelope, status: planned}
-      - {kind: eslint-be, id: no-graphql-json, status: planned}
+      - {kind: eslint-be, id: transport-dispatch-only}
+      - {kind: eslint-be, id: no-response-envelope}
+      - {kind: eslint-be, id: no-graphql-json}
       - {kind: eslint-be, id: em-injection-slots}
   - id: R89
     code: "BE_SOURCE_FORM"
@@ -965,8 +965,9 @@ rules:
       - {kind: eslint-be, id: no-const-enum}
       - {kind: eslint-be, id: no-inline-object-type}
       - {kind: eslint-be, id: no-inline-param-type}
-      - {kind: eslint-be, id: no-default-export, status: planned}
-      - {kind: hfs, id: source-suffix, status: planned}
+      - {kind: eslint-be, id: no-default-export}
+      - {kind: hfs, id: source-suffix, at: scripts/lib/hfs-check.mjs}
+      - {kind: machine, id: source-names, at: scripts/checks/architecture/source-names.mjs}
   - id: R90
     code: "BE_INFRA_OWNER"
     title_vi: "Thư viện hạ tầng dùng ngoài năng lực sở hữu"
@@ -975,7 +976,7 @@ rules:
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_INFRA_OWNER"]
     enforcers:
-      - {kind: eslint-be, id: infra-import-owner, status: planned}
+      - {kind: eslint-be, id: infra-import-owner}
   - id: R91
     code: "FE_SOURCE_FORM"
     title_vi: "Tệp nguồn FE sai quy ước tên, vị trí hoặc chú thích"
