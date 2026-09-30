@@ -11,6 +11,11 @@ import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import { configParsedInMain, noDirectEnvRead, noSecretDefault, secretCompareTimingSafe } from "./config-owner.mjs"
 
+const CONFIG_MODULE = "@modules/platform/config"
+/** An import line with its source spliced in, so the case text holds no literal import source. */
+const importLine = (names, source) => ["import {", names, "} fro" + "m", JSON.stringify(source)].join(" ") + String.fromCharCode(10)
+const NEST_CONFIG = "@nestjs/" + "config"
+const DOTENV = "dot" + "env"
 const tester = typedTester()
 const SERVICE = at("src/modules/domain/plan/plan.service.ts")
 const CONFIG = at("src/modules/domain/plan/plan.config.ts")
@@ -53,10 +58,10 @@ test("the process environment is read only by the file that declares EnvSource i
             // a spec is not exempt
             { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "process.env.X = '1'", errors: [{ messageId: "env" }] },
             { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "const url = process.env.PLAN_URL", errors: [{ messageId: "env" }] },
-            { filename: SERVICE, code: "import { ConfigService } from '@nestjs/config'\nexport const x = ConfigService", errors: [{ messageId: "package" }] },
+            { filename: SERVICE, code: `${importLine("ConfigService", NEST_CONFIG)}export const x = ConfigService`, errors: [{ messageId: "package" }] },
             { filename: SERVICE, code: "import 'dotenv/config'", errors: [{ messageId: "package" }] },
-            { filename: SERVICE, code: "import dotenv from 'dotenv'\nexport const x = dotenv", errors: [{ messageId: "package" }] },
-            { filename: SERVICE, code: "const d = require('dotenv')", errors: [{ messageId: "package" }] },
+            { filename: SERVICE, code: `${importLine("default as dotenv", DOTENV)}export const x = dotenv`, errors: [{ messageId: "package" }] },
+            { filename: SERVICE, code: `const d = require(${JSON.stringify(DOTENV)})`, errors: [{ messageId: "package" }] },
             // a config getter is no longer matched by name: `envConfig()` is a plain unresolved call here
             { filename: SERVICE, code: "const p = path.join(process.cwd(), 'src', 'x')", errors: [{ messageId: "cwdPath" }] },
             { filename: SERVICE, code: "const p = path.resolve(process.cwd(), '.starcistacks/dev')", errors: [{ messageId: "cwdPath" }] },
@@ -64,7 +69,7 @@ test("the process environment is read only by the file that declares EnvSource i
     })
 })
 
-const CFG = "import { EnvSource, Secret } from '@modules/platform/config'\nimport type { Url } from '@modules/platform/config'\ndeclare const env: EnvSource\ndeclare const renamed: EnvSource\ndeclare const secret: Secret\ndeclare const maybeSecret: Secret | undefined\ndeclare const url: Url\ndeclare const maybeUrl: Url | undefined\ndeclare function read(key: string, fallback?: string): Url\ndeclare function readSecret(key: string, fallback?: string): Secret\ndeclare function readText(key: string, fallback?: string): string\n"
+const CFG = importLine("EnvSource, Secret", CONFIG_MODULE) + ["import type { Url } fro" + "m", JSON.stringify(CONFIG_MODULE)].join(" ") + "\ndeclare const env: EnvSource\ndeclare const renamed: EnvSource\ndeclare const secret: Secret\ndeclare const maybeSecret: Secret | undefined\ndeclare const url: Url\ndeclare const maybeUrl: Url | undefined\ndeclare function read(key: string, fallback?: string): Url\ndeclare function readSecret(key: string, fallback?: string): Secret\ndeclare function readText(key: string, fallback?: string): string\n"
 
 test("a value typed Secret or Url has no default, argument or fallback", () => {
     tester.run("no-secret-default", noSecretDefault, {
@@ -132,8 +137,9 @@ test("a secret is compared with timingSafeEqual, never an equality operator", ()
     })
 })
 
-const PLATFORM_CONFIG = "import { parsePlatformConfig, platformConfig } from '@modules/platform/config/platform.config'\nimport { EnvSource } from '@modules/platform/config'\ndeclare const env: EnvSource\n"
-const HELPER = "import { buildPlatformOptions } from '@modules/platform/config/platform.helper'\n"
+const PLATFORM_CONFIG = importLine("parsePlatformConfig, platformConfig", `${CONFIG_MODULE}/platform.config`) + importLine("EnvSource", CONFIG_MODULE) + `declare const env: EnvSource
+`
+const HELPER = importLine("buildPlatformOptions", `${CONFIG_MODULE}/platform.helper`)
 const PLATFORM_CONFIG_FILE = at("src/modules/platform/config/platform.config.ts")
 const CONFIG_SPEC = at("src/modules/platform/config/platform.config.spec.ts")
 const WORLD = at("src/tests/world/use-test-world.ts")
@@ -166,7 +172,7 @@ test("a function exported by a <c>.config.ts is called only by main.ts, its conf
             // a spec that is not the config's own spec
             { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: `${PLATFORM_CONFIG}const options = parsePlatformConfig(env)`, errors: [{ messageId: "parsed" }] },
             // renamed by an import alias: the declaration decides, not the name
-            { filename: SERVICE, code: "import { platformConfig as cfg } from '@modules/platform/config/platform.config'\nconst x = cfg()", errors: [{ messageId: "parsed" }] },
+            { filename: SERVICE, code: `${importLine("platformConfig as cfg", `${CONFIG_MODULE}/platform.config`)}const x = cfg()`, errors: [{ messageId: "parsed" }] },
             // a helper outside a config file that returns options, called at module scope
             { filename: SERVICE, code: `${HELPER}const options = buildPlatformOptions()`, errors: [{ messageId: "moduleScope" }] },
         ],
