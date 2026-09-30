@@ -509,6 +509,7 @@ rules:
     enforcers:
       - {kind: hfs, id: test-topology, at: scripts/lib/hfs-rules/test-topology.mjs}
       - {kind: machine, id: test-kind-retired, at: scripts/checks/architecture/hfs.mjs}
+      - {kind: machine, id: test-world-files, at: scripts/checks/architecture/test-world-files.mjs}
       - {kind: eslint-be, id: unit-test-colocated}
       - {kind: eslint-be, id: tests-infra-only-in-world}
       - {kind: eslint-be, id: tests-no-override}

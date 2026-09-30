@@ -27,6 +27,7 @@ import { checkEntrypoints, ENTRYPOINT_RULE_IDS } from './entrypoint.mjs';
 import { checkErrorCodes, ERROR_CODE_RULE_IDS } from './error-codes.mjs';
 import { checkConfigUnread, CONFIG_UNREAD_RULE_IDS } from './config-unread.mjs';
 import { checkFeatureShape, FEATURE_SHAPE_RULE_IDS } from './feature-shape.mjs';
+import { checkTestWorldFiles, TEST_WORLD_FILES_RULE_IDS } from './test-world-files.mjs';
 import { checkCompositionSpec, COMPOSITION_SPEC_RULE_IDS } from './composition-spec.mjs';
 import { checkSchemaOwner, SCHEMA_OWNER_RULE_IDS } from './schema-owner.mjs';
 import { checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS } from './module-per-transport.mjs';
@@ -50,7 +51,7 @@ const LIMITATIONS = [
   'Frontend SWR lifecycle rules prove declared key bindings and installed SWR identity only; domain identity completeness, stale-result behavior and mutation effects require target behavior evidence.',
 ];
 
-// The backend composition and data machine (R29, R32, R33, R35, R38, R39, R41, R45, R46, R84, R86): name -> [check, the rule ids it makes truthful].
+// The backend composition and data machine (R29, R32, R33, R35, R38, R39, R41, R45, R46, R47, R84, R86): name -> [check, the rule ids it makes truthful].
 const BACKEND_MACHINE = {
   connectionMap: [checkConnectionMap, CONNECTION_RULE_IDS],
   sqlOwner: [checkSqlOwner, SQL_OWNER_RULE_IDS],
@@ -64,6 +65,7 @@ const BACKEND_MACHINE = {
   schemaOwner: [checkSchemaOwner, SCHEMA_OWNER_RULE_IDS],
   modulePerTransport: [checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS],
   backgroundUnowned: [checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS],
+  testWorldFiles: [checkTestWorldFiles, TEST_WORLD_FILES_RULE_IDS],
 };
 
 // The frontend repository machine (R21, R50, R54, R55, R56, R63, R94): same shape, run for a front-end repository only.

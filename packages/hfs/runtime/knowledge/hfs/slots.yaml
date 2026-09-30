@@ -716,14 +716,14 @@ slots:
     presence: optional
     tracked: tracked
     tier: e2e
-    allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, fakes/]   # jest globalSetup/globalTeardown default-export (Jest API)
+    allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, fakes/, kit/]   # jest globalSetup/globalTeardown default-export (Jest API); plus root files with a role suffix (test-world-files, R47)
     tests: none
     why: >-
       the ONLY test infrastructure location, shared by integration and e2e: global-setup.ts starts the shared
       infrastructure (containers) and runs apps/migrate's exported bootstrap once; use-test-world.ts exports
       useTestWorld({ apps: { <name>: { module, listen? } } } | { modules: [...] }) -> world.apps.<name>.api,
       world.db.<connection> (the shared EntityManager), world.fake.<provider> (a network-edge fake started by the world, with
-      failNext/replayWebhook/delay), world.waitFor; fakes/<provider>/ holds the fake servers and payload fixtures. Nothing is
+      failNext/replayWebhook/delay), world.waitFor; fakes/<provider>/ holds the fake servers and payload fixtures, kit/ the inlined test helpers, and the world root may hold role-suffixed helpers (<name>.client.ts, <name>.contracts.ts, ...). Nothing is
       overridden in the DI container. It is the only test location that may import typeorm's DataSource or testcontainers,
       call migrate/runMigrations/synchronize, or write process.env.
   - id: be.tests.fixtures
