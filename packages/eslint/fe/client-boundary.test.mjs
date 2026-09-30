@@ -6,6 +6,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import tsParser from "@typescript-eslint/parser"
 import {
   clientNoServerImport,
@@ -24,6 +25,8 @@ const tester = new RuleTester({
   },
 })
 
+const slots = slotTester()
+
 const DIRECTIVE = "\"use client\"\nexport const X = () => null"
 const PLAIN = "export const X = () => null"
 
@@ -32,43 +35,43 @@ test("every rule this law declares is a rule", () => {
 })
 
 test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
-  tester.run("use-client-only-at-boundary", useClientOnlyAtBoundary, {
+  slots.run("use-client-only-at-boundary", useClientOnlyAtBoundary, {
     valid: [
-      { filename: "D:/repo/src/components/blocks/Feed/index.tsx", code: DIRECTIVE },
-      { filename: "D:/repo/src/components/leaves/Menu/index.tsx", code: DIRECTIVE },
-      { filename: "D:/repo/src/features/overlays/Compose/index.tsx", code: DIRECTIVE },
+      { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/components/leaves/Menu/index.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/features/overlays/Compose/index.tsx"), code: DIRECTIVE },
       // a workspace package keeps its grammar tiers at src/<tier>, with no components/ folder
-      { filename: "D:/repo/packages/nivo-ui/src/leaves/NivoIcon/index.tsx", code: DIRECTIVE },
-      { filename: "D:/repo/packages/nivo-ui/src/leaves/NivoGrammar/index.ts", code: DIRECTIVE },
-      { filename: "D:/repo/packages/nivo-ui/src/branches/Rail/component.tsx", code: DIRECTIVE },
-      { filename: "D:/repo/packages/ui/src/branches/Rail/index.tsx", code: DIRECTIVE },
-      { filename: "D:/repo/src/app/error.tsx", code: DIRECTIVE },
-      { filename: "D:/repo/src/app/global-error.tsx", code: DIRECTIVE },
-      { filename: "D:/repo/src/app/[locale]/error.tsx", code: DIRECTIVE },
+      { filename: at("packages/nivo-ui/src/leaves/NivoIcon/index.tsx"), code: DIRECTIVE },
+      { filename: at("packages/nivo-ui/src/leaves/NivoGrammar/index.ts"), code: DIRECTIVE },
+      { filename: at("packages/nivo-ui/src/branches/Rail/component.tsx"), code: DIRECTIVE },
+      { filename: at("packages/nivo-ui/src/branches/Rail/index.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/app/error.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/app/global-error.tsx"), code: DIRECTIVE },
+      { filename: at("apps/web/src/app/[locale]/error.tsx"), code: DIRECTIVE },
       // no directive, no finding, wherever the file sits
-      { filename: "D:/repo/src/app/[locale]/layout.tsx", code: PLAIN },
-      { filename: "D:/repo/src/app/[locale]/page.tsx", code: PLAIN },
-      { filename: "D:/repo/src/features/pages/Home/index.tsx", code: PLAIN },
+      { filename: at("apps/web/src/app/[locale]/layout.tsx"), code: PLAIN },
+      { filename: at("apps/web/src/app/[locale]/page.tsx"), code: PLAIN },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: PLAIN },
       // a spec is not product source
-      { filename: "D:/repo/src/app/[locale]/page.test.tsx", code: DIRECTIVE },
+      { filename: at("apps/web/src/app/[locale]/page.test.tsx"), code: DIRECTIVE },
       // a string that merely reads like the directive is not one
-      { filename: "D:/repo/src/app/[locale]/page.tsx", code: "const s = \"use client\"" },
+      { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "const s = \"use client\"" },
     ],
     invalid: [
-      { filename: "D:/repo/src/app/[locale]/layout.tsx", code: DIRECTIVE, errors: [{ messageId: "slot" }] },
-      { filename: "D:/repo/src/app/[locale]/page.tsx", code: DIRECTIVE, errors: [{ messageId: "slot" }] },
-      { filename: "D:/repo/src/app/[locale]/loading.tsx", code: DIRECTIVE, errors: [{ messageId: "slot" }] },
-      { filename: "D:/repo/src/app/[locale]/not-found.tsx", code: DIRECTIVE, errors: [{ messageId: "slot" }] },
-      { filename: "D:/repo/src/features/layouts/Shell/index.tsx", code: DIRECTIVE, errors: [{ messageId: "slot" }] },
-      { filename: "D:/repo/src/features/pages/Home/index.tsx", code: DIRECTIVE, errors: [{ messageId: "slot" }] },
-      { filename: "D:/repo/src/components/composites/Row/index.tsx", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: at("apps/web/src/app/[locale]/layout.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
+      { filename: at("apps/web/src/app/[locale]/page.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
+      { filename: at("apps/web/src/app/[locale]/loading.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
+      { filename: at("apps/web/src/app/[locale]/not-found.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
+      { filename: at("apps/web/src/features/layouts/Shell/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
+      { filename: at("apps/web/src/components/composites/Row/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       // the package layout does not widen the app layout, and a package composite is not a boundary
-      { filename: "D:/repo/packages/nivo-ui/src/composites/Row/index.tsx", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
-      { filename: "D:/repo/apps/app/src/leaves/Menu/index.tsx", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
-      { filename: "D:/repo/apps/app/src/components/branches/Rail/index.tsx", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
-      { filename: "D:/repo/src/components/blocks/Feed/component.tsx", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
-      { filename: "D:/repo/src/hooks/session/useSession.ts", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
-      { filename: "D:/repo/src/modules/api/client.ts", code: "'use client'\nexport const x = 1", errors: [{ messageId: "elsewhere" }] },
+      { filename: at("packages/nivo-ui/src/composites/Row/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: at("apps/web/src/leaves/Menu/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: at("apps/web/src/components/branches/Rail/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: at("apps/web/src/components/blocks/Feed/component.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: at("apps/web/src/hooks/session/useSession.ts"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: at("apps/web/src/modules/api/client.ts"), code: "'use client'\nexport const x = 1", errors: [{ messageId: "elsewhere" }] },
     ],
   })
 })

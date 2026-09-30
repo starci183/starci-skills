@@ -15,7 +15,8 @@
  * above it is a server component and must not have one.
  */
 
-import { PACKAGE_TIERS, ROUTE_SLOTS, isSpecFile, stem } from "./lib/scope.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { ROUTE_SLOTS, isSpecFile, stem } from "./lib/scope.mjs"
 import { normalizePath } from "./lib/path.mjs"
 
 /** The framework's own client-only files. */
@@ -28,21 +29,29 @@ const clientDirective = (program) =>
   ) ?? null
 
 /**
- * The component tiers of a workspace package sit directly under `src/` (grammar tier names,
- * `slots.yaml` `fe.package.ui`: composites, branches, leaves), with no `components/` folder above
- * them. A package has no data layer, so its interactive tiers, branches and leaves, are where the
- * directive is legitimate; a composite is presentation and stays a server-safe component.
+ * The component tiers of a workspace package sit directly under `src/` of the package slot `fe.package.ui`
+ * (grammar tier names: composites, branches, leaves), with no `components/` folder above them. A package has no data
+ * layer, so its interactive tiers, branches and leaves, are where the directive is legitimate; a composite is
+ * presentation and stays a server-safe component.
  */
-const PACKAGE_CLIENT_TIERS = PACKAGE_TIERS.filter((tier) => tier !== "composites")
-const PACKAGE_TIER = new RegExp(`/packages/[^/]+/src/(?:${PACKAGE_CLIENT_TIERS.join("|")})/`)
+const PACKAGE_CLIENT_TIERS = ["branches", "leaves"]
+
+/** True for a file in an interactive tier of the `fe.package.ui` slot: the slot says whose package it is, the tier says where. */
+const isPackageClientTier = (context, file) => {
+  const hfs = hfsOf(context)
+  if (hfs.slotOf(file) !== "fe.package.ui") return false
+  const root = hfs.ownerOf(file)
+  const inside = root === null ? "" : hfs.relative(file).slice(root.length + 1)
+  return PACKAGE_CLIENT_TIERS.some((tier) => inside.startsWith(`src/${tier}/`))
+}
 
 /** Where the directive is a legitimate boundary. */
-const isBoundary = (file) =>
+const isBoundary = (context, file) =>
   FRAMEWORK_CLIENT.has(stem(file)) ||
   (/\/components\/blocks\//.test(file) && stem(file) === "index") ||
   (/\/features\/overlays\//.test(file) && stem(file) === "index") ||
   /\/components\/leaves\//.test(file) ||
-  PACKAGE_TIER.test(file)
+  isPackageClientTier(context, file)
 
 /** The slot a file fills in the route tree, when it fills one. */
 const slotOf = (file) => {
@@ -68,7 +77,7 @@ export const useClientOnlyAtBoundary = {
   },
   create(context) {
     const filename = normalizePath(context.filename || context.getFilename())
-    if (isSpecFile(filename) || isBoundary(filename)) return {}
+    if (isSpecFile(filename) || isBoundary(context, filename)) return {}
     const slot = slotOf(filename)
     return {
       Program(program) {

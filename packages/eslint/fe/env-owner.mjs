@@ -67,7 +67,7 @@ export const noEnvOutsideConfig = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (isConfigModule(filename) || isSpecFile(filename)) return {}
+    if (isConfigModule(context) || isSpecFile(filename)) return {}
     return {
       MemberExpression(node) {
         if (isEnvObject(node)) context.report({ node, messageId: "env" })
