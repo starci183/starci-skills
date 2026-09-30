@@ -114,7 +114,7 @@ const isWord = (token, up) => token?.t === 'word' && token.up === up;
  * The table reference at `start`: {parts, table, alias, next}, {dynamic: true}, or null (a subquery, a function, nothing).
  * `next` is the index after the reference and its alias.
  */
-function tableRef(tokens, start) {
+function tableRef(tokens, start, { columns = false } = {}) {
   let i = start;
   while (isWord(tokens[i], 'ONLY') || isWord(tokens[i], 'LATERAL')) i += 1;
   const first = tokens[i];
@@ -123,7 +123,7 @@ function tableRef(tokens, start) {
   const parts = [nameOf(first)];
   i += 1;
   while (tokens[i]?.v === '.' && isName(tokens[i + 1])) { parts.push(nameOf(tokens[i + 1])); i += 2; }
-  if (tokens[i]?.v === '(') return null;
+  if (tokens[i]?.v === '(' && !columns) return null;
   let alias = null;
   if (isWord(tokens[i], 'AS') && isName(tokens[i + 1])) { alias = nameOf(tokens[i + 1]); i += 2; }
   else if (isName(tokens[i]) && !(tokens[i].t === 'word' && CLAUSE_WORDS.has(tokens[i].up))) { alias = nameOf(tokens[i]); i += 1; }
@@ -296,7 +296,7 @@ export function analyzeSql(text, { uniqueSetsOf = () => null } = {}) {
       if (token.t === 'punct' && token.v === ')') { parens.pop(); continue; }
       if (token.t !== 'word') continue;
       const previous = tokens[i - 1];
-      if (token.up === 'INSERT' && isWord(tokens[i + 1], 'INTO')) { if (level[i] === 0) hasWriteVerb = true; record(writes, tableRef(tokens, i + 2)); }
+      if (token.up === 'INSERT' && isWord(tokens[i + 1], 'INTO')) { if (level[i] === 0) hasWriteVerb = true; record(writes, tableRef(tokens, i + 2, { columns: true })); }
       else if (token.up === 'UPDATE' && !(previous?.t === 'word' && NOT_A_WRITE_BEFORE_UPDATE.has(previous.up))) { if (level[i] === 0) hasWriteVerb = true; record(writes, tableRef(tokens, i + 1)); }
       else if (token.up === 'DELETE' && isWord(tokens[i + 1], 'FROM')) { if (level[i] === 0) hasWriteVerb = true; record(writes, tableRef(tokens, i + 2)); i += 1; }
       else if (token.up === 'MERGE' && isWord(tokens[i + 1], 'INTO')) { if (level[i] === 0) hasWriteVerb = true; record(writes, tableRef(tokens, i + 2)); }

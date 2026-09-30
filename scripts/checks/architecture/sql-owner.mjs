@@ -132,7 +132,7 @@ export function checkSqlOwner(input) {
         if (!verdict.allowed) report(`SQL in ${file.owner.root} reads table ${read.table}, owned by ${entity.owner}, which ${file.owner.root} may not import (${verdict.reason}); read it through the owner's public API.`, { table: read.table, tableOwner: entity.owner, reason: verdict.reason });
       }
       for (const select of result.selects) {
-        if (select.bounded) continue;
+        if (select.bounded || (select.table && !tables.has(select.table.toLowerCase()))) continue;
         report(`SELECT ${select.table ? `on ${select.table} ` : ''}has no LIMIT and does not constrain a primary key or unique column with =; bound it with LIMIT (PAGE_SIZE_MAX, LIST_ROWS_MAX or BATCH_ROWS from platform/database), filter by key, or select only aggregates.`, { table: select.table ?? undefined });
       }
       return true;
