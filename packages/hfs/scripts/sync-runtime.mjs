@@ -51,7 +51,7 @@ export const CATALOG = 'modules/kernel/failure-codes.yaml';
 export const BUNDLES = Object.freeze({
   'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml'])].sort()), catalog: true }),
   'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/lib/recorded-lines.mjs'])])].sort()), catalog: false }),
-  'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/lib/recorded-lines.mjs'])])].sort()), catalog: false }),
+  'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/lib/recorded-lines.mjs', 'scripts/lib/next-contract.mjs'])])].sort()), catalog: false }),
 });
 
 /** The catalog entries for `codes`, in the catalog's own text, keyed by top-level line. */

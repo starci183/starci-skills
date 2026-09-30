@@ -6,6 +6,7 @@ import { loadTargetTypeScript } from '../architecture/typescript.mjs';
 import { compilerIdentity, propertyName, repositoryPath, scriptReport, symbolAt, unalias, unwrap } from './common.mjs';
 import { frameworkMandatedExports } from '../architecture/framework-pinned.mjs';
 import { createTypeScriptProgram, readTypeScriptProject, typeScriptProjectReferencePath } from '../typescript-programs.mjs';
+import { NEXT_RESERVED_EXPORTS } from '../../lib/next-contract.mjs';
 
 export const NEXT_SCRIPT_RULES = Object.freeze([
   'FE_READONLY_PROPS_CONTRACT',
@@ -21,8 +22,6 @@ const SOURCE_FILE = /\.(?:ts|tsx)$/i;
 const DECLARATION_FILE = /\.d\.(?:ts|tsx)$/i;
 const SPEC_FILE = /\.spec\.(?:ts|tsx)$/i;
 const NEXT_ROUTE_FILE = /(?:^|\/)app\/(?:.*\/)?(?:default|error|global-error|layout|loading|not-found|page|route|template)\.(?:ts|tsx)$/i;
-const NEXT_RESERVED_EXPORTS = new Set(['dynamic', 'dynamicParams', 'fetchCache', 'generateMetadata', 'generateStaticParams', 'generateViewport',
-  'maxDuration', 'metadata', 'preferredRegion', 'revalidate', 'runtime', 'viewport']);
 const NEXT_HANDLER_EXPORTS = new Set(['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT']);
 const CONTRACT_SUFFIXES = Object.freeze(['Actions', 'Data', 'Labels', 'Mode', 'Props', 'State']);
 
