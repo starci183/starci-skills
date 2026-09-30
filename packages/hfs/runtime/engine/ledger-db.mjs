@@ -54,7 +54,7 @@ export const JOB_ARTIFACT_ROLES=Object.freeze(['check-output','check-stdout','ch
   'direction','prompt','render','redline','critique','capture','dom','screenshot','video','trace','uat-run','metrics','salvage','scan','other']);
 
 export const LEDGER_SCHEMA='starci/runtime@1';
-export const LEDGER_VERSION=4;
+export const LEDGER_VERSION=5;
 
 const need=(ok,message,code)=>{if(!ok)throw Object.assign(Error(message),code?{code}:{});};
 const json=value=>value===undefined||value===null?null:JSON.stringify(value);
@@ -127,7 +127,7 @@ const INIT_SQL_FILE=new URL('./migrations/runtime/0001-init.sql',import.meta.url
 const INIT_SQL=fs.readFileSync(INIT_SQL_FILE,'utf8');
 const INIT_SQL_SHA=sha256(INIT_SQL);
 /** Forward migrations after 0001-init, in order; each bumps user_version to its `version` (migrateLedger). */
-const FORWARD_MIGRATIONS=Object.freeze([{version:3,name:'0003-usage-unavailable'},{version:4,name:'0004-attempt-why'}]);
+const FORWARD_MIGRATIONS=Object.freeze([{version:3,name:'0003-usage-unavailable'},{version:4,name:'0004-attempt-why'},{version:5,name:'0005-ended-workflow-views'}]);
 export const LEDGER_BUSY_TIMEOUT_MS=15000;
 /**
  * Writer pragmas. wal_autocheckpoint=0 on EVERY connection except the one checkpointer (openLedger({checkpointer:true}),
