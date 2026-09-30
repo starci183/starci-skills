@@ -24,8 +24,8 @@
  */
 export const LAYOUT_GLOBS = {
     monorepo: {
-        src: ["packages/ui/src/**/*.{ts,tsx}", "apps/*/src/**/*.{ts,tsx}", "**/candidate/src/**/*.{ts,tsx}"],
-        e2e: ["e2e/**/*.{ts,tsx}", "apps/*/e2e/**/*.{ts,tsx}", "playwright.config.{ts,mts}", "apps/*/playwright.config.{ts,mts}"],
+        src: ["packages/*/src/**/*.{ts,tsx}", "apps/*/src/**/*.{ts,tsx}", "**/candidate/src/**/*.{ts,tsx}"],
+        e2e: ["e2e/**/*.{ts,tsx}", "apps/*/e2e/**/*.{ts,tsx}", "packages/*/e2e/**/*.{ts,tsx}", "playwright.config.{ts,mts}", "apps/*/playwright.config.{ts,mts}"],
     },
     "single-app": {
         src: ["src/**/*.{ts,tsx}", "**/candidate/src/**/*.{ts,tsx}"],

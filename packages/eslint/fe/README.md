@@ -20,7 +20,7 @@ The factory returns two flat-config blocks and owns everything about the law: wh
 `set-state-in-effect` and `refs`), and the inline-directive fence (`noInlineConfig` plus
 `reportUnusedDisableDirectives`). A repository names its layout and nothing else.
 
-- The **source** block governs `src/**` (`single-app`) or `packages/ui/src/**` and `apps/*/src/**`
+- The **source** block governs `src/**` (`single-app`) or `packages/*/src/**` (every workspace package, not one named `ui`) and `apps/*/src/**`
   (`monorepo`).
 - The **e2e** block governs `e2e/**` and `playwright.config.*` with the e2e rules and the
   escape-hatch fence.

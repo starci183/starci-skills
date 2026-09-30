@@ -33,6 +33,8 @@ test("the factory returns a source block and an e2e block, and states its layout
   assert.ok(single[1].files.some((glob) => glob.startsWith("playwright.config")))
   const mono = starciFeConfig({ layout: "monorepo" })
   assert.ok(mono[0].files.includes("apps/*/src/**/*.{ts,tsx}"))
+  assert.ok(mono[0].files.includes("packages/*/src/**/*.{ts,tsx}"), "every workspace package is governed, whatever its name")
+  assert.ok(!mono[0].files.some((glob) => glob.startsWith("packages/ui/")), "no package is named literally")
   assert.ok(mono[1].files.includes("apps/*/e2e/**/*.{ts,tsx}"))
   assert.throws(() => starciFeConfig({ layout: "nope" }), /unknown layout/)
   assert.throws(() => starciFeConfig(), /unknown layout/)
@@ -206,4 +208,22 @@ test("the codes are the catalogue's codes for R18, R22, R49-R52, R55, R56, R58, 
   ]) {
     assert.ok(codes.has(code), `no rule reports under ${code}`)
   }
+})
+
+test("the monorepo layout reports a finding in any workspace package, not only packages/ui", async () => {
+  const lint = async (layout, filePath) => {
+    const eslint = new ESLint({
+      cwd: process.cwd(),
+      overrideConfigFile: true,
+      overrideConfig: [{ languageOptions: { parser: tsParser, parserOptions: { ecmaFeatures: { jsx: true } } } }, ...starciFeConfig({ layout })],
+    })
+    const [result] = await eslint.lintText("export const Logo = () => <img src=\"/logo.png\" />\n", { filePath })
+    return result.messages.filter((message) => message.ruleId === "starci-fe/no-native-img")
+  }
+  for (const pkg of ["nivo-ui", "ui", "design-system"]) {
+    const found = await lint("monorepo", `${process.cwd()}/packages/${pkg}/src/leaves/Logo/index.tsx`)
+    assert.equal(found.length, 1, `packages/${pkg} was not scanned: a bare <img> there reported nothing`)
+  }
+  const single = await lint("single-app", `${process.cwd()}/packages/nivo-ui/src/leaves/Logo/index.tsx`)
+  assert.equal(single.length, 0, "the single-app layout has no workspace packages")
 })
