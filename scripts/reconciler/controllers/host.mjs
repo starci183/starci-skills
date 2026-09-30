@@ -33,7 +33,8 @@
 //                                 (scripts/kernel/transcripts.mjs snapshot --repo) and of every live seat (snapshotSeats).
 //   host:usage (schedules host/usage, every 5 min, on the transcripts tick) the token meter: scripts/kernel/usage-record.mjs
 //                                 sweep records settled attempts' usage and the increment of every Kernel and the Supervisor seat.
-//   ledger:<ledgerId>             hourly PRAGMA quick_check (LEDGER_CORRUPT clock + DI), nightly VACUUM INTO backup.
+//   ledger:<ledgerId>             hourly PRAGMA quick_check (LEDGER_CORRUPT clock + DI), nightly VACUUM INTO backup. An
+//                                 absent ledger file is not created yet: no check, no clock (an open one clears), no backup.
 //
 // Every clock's state is a code of modules/reconciler/sla.yaml (SERVICE_DOWN, SEAT_VACANT, ...): the SLA layer reads the
 // code from the state. Every mutation goes through ctx.run / ctx.api / ctx.openDecision, so shadow mode records it and runs nothing.
@@ -45,6 +46,7 @@ import {
 } from '../services.mjs';
 import { quickCheck, backupDue } from '../ledger-health.mjs';
 import { goalTextRefusal } from '../../goal/goal-text.mjs';
+import { clocksOf } from '../sla.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
 import { claimDue, finishDuty, listSchedules } from '../schedules.mjs';
 import os from 'node:os';
@@ -641,6 +643,14 @@ export function createHostController(deps = {}) {
     if (!rec.lastCheckAt || now - rec.lastCheckAt >= lh.quickCheckEveryMs) {
       const r = checkLedger(ledger.file);
       rec.lastCheckAt = now; rec.lastCheck = r;
+      if (r.absent) {
+        // The file does not exist yet (a repo with no workflow): not corrupt and nothing to restore or back up. Any
+        // episode closes; the ledger is checked like any other once its file appears.
+        rec.lastCheckAt = 0; rec.state = 'absent'; rec.since = now;
+        await clear(ctx, key, 'LEDGER_CORRUPT');
+        store().put(rec);
+        return { ok: true, skipped: 'absent', check: r };
+      }
       const was = rec.state;
       const next = !r.ok ? 'corrupt' : 'ok';
       if (rec.state !== next) { rec.state = next; rec.since = now; }
@@ -687,6 +697,11 @@ export function createHostController(deps = {}) {
       const keys = bootPending(ctx) ? ['host:boot'] : [];
       keys.push(...registry().map((e) => `service:${e.name}`), 'host:processes', 'host:transcripts');
       for (const l of ctx.ledgers ?? []) keys.push(`ledger:${l.ledgerId}`);
+      // An open LEDGER_CORRUPT clock of a ledger no longer listed (its file absent, or it left supervisor.repos) gets
+      // the pass that clears it.
+      let openCorrupt = [];
+      try { if (ctx.machine) openCorrupt = clocksOf(ctx, { prefixes: ['ledger:'] }).filter((c) => c.state === 'LEDGER_CORRUPT').map((c) => c.entity); } catch { openCorrupt = []; }
+      for (const k of openCorrupt) if (!keys.includes(k)) keys.push(k);
       for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) keys.push(`seat:kernel:${l.ledgerId}:${wf}`);
       keys.push('seat:supervisor');
       return keys;

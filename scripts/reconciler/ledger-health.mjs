@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // ledger-health.mjs — the Host controller's ledger checks (DESIGN 12.2 "ledger corrupt", 13; LANES.md Lane D item 6).
 //
-//   quickCheck(file)        PRAGMA quick_check on a read-only handle: {ok, result: ['ok'] | [problems...]}
+//   quickCheck(file)        PRAGMA quick_check on a read-only handle: {ok, result: ['ok'] | [problems...]}; an absent
+//                           file is {ok: false, absent: true} (not created yet: not corrupt, and never created here)
 //   backupFileOf(...)       <backupDir>/<ledgerId>-<yyyymmdd>.sqlite (local date)
 //   backupDue(...)          the nightly backup of one ledger is due: past backupHour today and no file for today
 //   backupLedger(...)       VACUUM INTO that file from a read-only handle, then keep the newest `keep` of that ledger
@@ -24,9 +25,11 @@ const openReadOnly = (file) => openLedgerReader(file, { verify: false, queryOnly
 /**
  * PRAGMA quick_check on a read-only handle, then a verified open: {ok, result}. An unopenable file is not ok, and a
  * file whose pages are intact but that this runtime refuses (STARCI_LEDGER_SCHEMA_REFUSED) is not ok either: the Host
- * controller reports both as LEDGER_CORRUPT.
+ * controller reports both as LEDGER_CORRUPT. An absent file is {ok: false, absent: true}: a ledger not created yet,
+ * which the Host controller does not report (nothing to restore).
  */
-export function quickCheck(file, { open = openReadOnly, verifiedOpen = (f) => openLedgerReader(f) } = {}) {
+export function quickCheck(file, { open = openReadOnly, verifiedOpen = (f) => openLedgerReader(f), exists = fs.existsSync } = {}) {
+  if (!exists(file)) return { ok: false, absent: true, result: ['absent'] };
   let db = null;
   try {
     db = open(file);

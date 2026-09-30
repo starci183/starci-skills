@@ -20,8 +20,13 @@ import { supervisorSettings } from '../supervisor/home.mjs';
 
 export const EVENT_BATCH = 1000;
 
-/** [{ledgerId, repo, file}]: the product ledgers of config.yaml supervisor.repos, then the Supervisor (file null: machine.sqlite sup_events). */
-export function ledgersOf({ env = process.env, repos = null } = {}) {
+/**
+ * [{ledgerId, repo, file}]: the product ledgers of config.yaml supervisor.repos, then the Supervisor (file null:
+ * machine.sqlite sup_events). A repo whose ledger file does not exist yet (a fresh repo with no workflow) is left out:
+ * it is not corrupt, and a consumer that writes through the kernel api would create it. The engine re-reads this list
+ * every pass, so the ledger joins the pass after its file appears.
+ */
+export function ledgersOf({ env = process.env, repos = null, exists = fs.existsSync } = {}) {
   let list = repos;
   if (!list) { try { list = supervisorSettings().repos; } catch { list = []; } }
   const out = [];
@@ -30,6 +35,7 @@ export function ledgersOf({ env = process.env, repos = null } = {}) {
     const root = path.resolve(String(repo));
     let file;
     try { file = ledgerFileFor(root); } catch { continue; }
+    if (!exists(file)) continue;
     let id = path.basename(root) || 'repo';
     for (let n = 2; taken.has(id); n += 1) id = `${path.basename(root)}-${n}`;
     taken.add(id);
