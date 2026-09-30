@@ -2,7 +2,7 @@ import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
-import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
+import { JsonLoggerService, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { parseIdentityConfig } from "@modules/domain/identity"
 import { parsePlanConfig } from "@modules/domain/plan"
@@ -35,10 +35,10 @@ async function bootstrap(): Promise<void> {
     }
     const app = await NestFactory.createApplicationContext(AppModule.register(options))
     app.enableShutdownHooks()
-    createJsonLogger(new SystemClock()).info(LoggingLogEvent.WorkerStarted, { service: "worker" })
+    new JsonLoggerService(new SystemClock(), process.stdout, process.stderr).info(LoggingLogEvent.WorkerStarted, { service: "worker" })
 }
 
 bootstrap().catch((error: unknown) => {
-    createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "worker" })
+    new JsonLoggerService(new SystemClock(), process.stdout, process.stderr).error(LoggingLogEvent.StartupFailed, error, { service: "worker" })
     process.exit(1)
 })

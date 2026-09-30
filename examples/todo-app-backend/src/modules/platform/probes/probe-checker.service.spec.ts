@@ -19,7 +19,7 @@ const build = async (probes: ReadonlyArray<Probe>) => {
         providers: [
             ProbeCheckerService,
             { provide: PROBES_OPTIONS, useValue: { service: "todo", probes: [] } },
-            { provide: PROBES, useValue: probes },
+            { provide: PROBES, useValue: [...probes] },
             { provide: LOGGER, useValue: logger },
         ],
     }).compile()

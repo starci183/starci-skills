@@ -1,4 +1,4 @@
-export { createJsonLogger } from "./json-logger.service"
+export { JsonLoggerService } from "./json-logger.service"
 export { InjectLogger, LOGGER } from "./logging.decorators"
 export { LoggingLogEvent } from "./logging.log-events"
 export { LoggingModule } from "./logging.module"

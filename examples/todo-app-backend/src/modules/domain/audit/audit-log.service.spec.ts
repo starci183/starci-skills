@@ -6,7 +6,13 @@ import { INBOX } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
 import { MoreThan } from "typeorm"
 import { GENESIS_HASH, hashLine } from "./audit-chain.policy"
-import { AUDIT_AT, appendDeliveredInput, appendLineInput, auditLogLineRow, readAuditLogInput } from "@tests/fixtures/builders/audit.builder"
+import {
+    AUDIT_AT,
+    appendDeliveredInput,
+    appendLineInput,
+    auditLogLineRow,
+    readAuditLogInput,
+} from "@tests/fixtures/builders/audit.builder"
 import { AuditKeystoreService } from "./audit-keystore.service"
 import { AuditLogService } from "./audit-log.service"
 import { AuditAction } from "./audit.contracts"
@@ -37,7 +43,14 @@ const chainOf = (count: number, from = 1, start = GENESIS_HASH): Array<AuditLogL
     const rows: Array<AuditLogLineEntity> = []
     let prevHash = start
     for (let position = 0; position < count; position += 1) {
-        const line = { prevHash, at: AT, action: "task.created", target: `t${from + position}`, keyId: "k1", actor: "sealed" }
+        const line = {
+            prevHash,
+            at: AT,
+            action: "task.created",
+            target: `t${from + position}`,
+            keyId: "k1",
+            actor: "sealed",
+        }
         const hash = hashLine(line)
         rows.push(auditLogLineRow({ id: String(from + position), ...line, hash }))
         prevHash = hash
@@ -61,26 +74,28 @@ const opensSealedActors = (keystore: ReturnType<typeof mock<AuditKeystoreService
 
 describe("AuditLogService", () => {
     describe("append", () => {
-        const appendEm = (last: Array<AuditLogLineEntity>): MockEntityManager =>
-            mockEntityManager({
-                query: [LOCK_AUDIT_CHAIN, []],
-                find: [AuditLogLineEntity, last],
-                save: [AuditLogLineEntity, SAVED_LINE],
-            })
-
         it("takes the chain lock, seals the actor under the person key and chains onto the last hash", async () => {
             const { service, keystore } = await build()
             const tail = chainOf(2).slice(-1)
             const lastHash = tail[0]?.hash ?? ""
-            const manager = appendEm(tail)
+            const manager = mockEntityManager({
+                query: [LOCK_AUDIT_CHAIN, []],
+                find: [AuditLogLineEntity, tail],
+                save: [AuditLogLineEntity, SAVED_LINE],
+            })
             keystore.getOrCreateKey.mockResolvedValue({ keyId: "k1", key: KEY })
             keystore.seal.mockReturnValue("sealed-p1")
 
-            await expect(
-                service.append({ manager, ...appendLineInput() }),
-            ).resolves.toEqual({ lineId: "9" })
+            await expect(service.append({ manager, ...appendLineInput() })).resolves.toEqual({ lineId: "9" })
 
-            const line = { prevHash: lastHash, at: AT, action: "task.completed", target: "t1", keyId: "k1", actor: "sealed-p1" }
+            const line = {
+                prevHash: lastHash,
+                at: AT,
+                action: "task.completed",
+                target: "t1",
+                keyId: "k1",
+                actor: "sealed-p1",
+            }
             expect(manager.query).toHaveBeenCalledWith(LOCK_AUDIT_CHAIN, [])
             expect(keystore.getOrCreateKey).toHaveBeenCalledWith({ manager, personId: "p1", at: AT })
             expect(keystore.seal).toHaveBeenCalledWith(KEY, "p1")
@@ -90,29 +105,39 @@ describe("AuditLogService", () => {
 
         it("starts the chain from the genesis marker when the log is empty", async () => {
             const { service, keystore } = await build()
-            const manager = appendEm([])
+            const manager = mockEntityManager({
+                query: [LOCK_AUDIT_CHAIN, []],
+                find: [AuditLogLineEntity, []],
+                save: [AuditLogLineEntity, SAVED_LINE],
+            })
             keystore.getOrCreateKey.mockResolvedValue({ keyId: "k1", key: KEY })
             keystore.seal.mockReturnValue("sealed-p1")
 
             await service.append({ manager, ...appendLineInput({ action: AuditAction.SignedIn, target: null }) })
 
-            const line = { prevHash: GENESIS_HASH, at: AT, action: "login.signed-in", target: null, keyId: "k1", actor: "sealed-p1" }
+            const line = {
+                prevHash: GENESIS_HASH,
+                at: AT,
+                action: "login.signed-in",
+                target: null,
+                keyId: "k1",
+                actor: "sealed-p1",
+            }
             expect(manager.save).toHaveBeenCalledWith(AuditLogLineEntity, { ...line, hash: hashLine(line) })
         })
     })
 
     describe("appendDelivered", () => {
-        const appendEmFor = (): MockEntityManager =>
-            mockEntityManager({
-                query: [LOCK_AUDIT_CHAIN, []],
-                find: [AuditLogLineEntity, []],
-                save: [AuditLogLineEntity, SAVED_LINE],
-            })
-
         const delivered = appendDeliveredInput()
 
         it("claims the event, then appends the line in its own committed transaction", async () => {
-            const { service, em, keystore, inbox } = await build(appendEmFor())
+            const { service, em, keystore, inbox } = await build(
+                mockEntityManager({
+                    query: [LOCK_AUDIT_CHAIN, []],
+                    find: [AuditLogLineEntity, []],
+                    save: [AuditLogLineEntity, SAVED_LINE],
+                }),
+            )
             const tx = fakeTransaction(em)
             inbox.claim.mockResolvedValue(true)
             keystore.getOrCreateKey.mockResolvedValue({ keyId: "k1", key: KEY })
@@ -123,7 +148,10 @@ describe("AuditLogService", () => {
             expect(inbox.claim).toHaveBeenCalledWith("audit.append", "e1")
             expect(tx.outcomes).toEqual(["commit"])
             expect(tx.committedWrites).toEqual([
-                { method: "save", args: [AuditLogLineEntity, expect.objectContaining({ actor: "sealed-p1", target: "t1" })] },
+                {
+                    method: "save",
+                    args: [AuditLogLineEntity, expect.objectContaining({ actor: "sealed-p1", target: "t1" })],
+                },
             ])
             expect(inbox.release).not.toHaveBeenCalled()
         })
@@ -140,7 +168,13 @@ describe("AuditLogService", () => {
         })
 
         it("releases the claim, rolls back and rethrows when the append fails", async () => {
-            const { service, em, keystore, inbox } = await build(appendEmFor())
+            const { service, em, keystore, inbox } = await build(
+                mockEntityManager({
+                    query: [LOCK_AUDIT_CHAIN, []],
+                    find: [AuditLogLineEntity, []],
+                    save: [AuditLogLineEntity, SAVED_LINE],
+                }),
+            )
             const tx = fakeTransaction(em)
             inbox.claim.mockResolvedValue(true)
             inbox.release.mockResolvedValue(undefined)
@@ -201,10 +235,18 @@ describe("AuditLogService", () => {
                 }),
             )
 
-            await expect(service.verifyChain()).resolves.toEqual({ valid: true, totalLines: LIST_ROWS_MAX + 3, break: null })
+            await expect(service.verifyChain()).resolves.toEqual({
+                valid: true,
+                totalLines: LIST_ROWS_MAX + 3,
+                break: null,
+            })
 
             expect(em.find).toHaveBeenCalledTimes(2)
-            expect(em.find).toHaveBeenNthCalledWith(1, AuditLogLineEntity, { where: {}, order: { id: "ASC" }, take: LIST_ROWS_MAX })
+            expect(em.find).toHaveBeenNthCalledWith(1, AuditLogLineEntity, {
+                where: {},
+                order: { id: "ASC" },
+                take: LIST_ROWS_MAX,
+            })
             expect(em.find).toHaveBeenNthCalledWith(2, AuditLogLineEntity, {
                 where: { id: MoreThan(String(LIST_ROWS_MAX)) },
                 order: { id: "ASC" },
@@ -222,7 +264,11 @@ describe("AuditLogService", () => {
                 }),
             )
 
-            await expect(service.verifyChain()).resolves.toEqual({ valid: true, totalLines: LIST_ROWS_MAX, break: null })
+            await expect(service.verifyChain()).resolves.toEqual({
+                valid: true,
+                totalLines: LIST_ROWS_MAX,
+                break: null,
+            })
 
             expect(em.find).toHaveBeenCalledTimes(2)
         })
@@ -230,7 +276,9 @@ describe("AuditLogService", () => {
 
     describe("readChain", () => {
         it("reads the whole chain oldest first with one key lookup, narrowed by action and target in the query", async () => {
-            const { service, em, keystore } = await build(mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1", "p2"])] }))
+            const { service, em, keystore } = await build(
+                mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1", "p2"])] }),
+            )
             keystore.getKeyMaterials.mockResolvedValue(new Map([["k1", KEY]]))
             opensSealedActors(keystore)
 
@@ -252,11 +300,17 @@ describe("AuditLogService", () => {
 
             await expect(service.readChain({ action: null, target: null })).resolves.toEqual([])
 
-            expect(em.find).toHaveBeenCalledWith(AuditLogLineEntity, { where: {}, order: { id: "ASC" }, take: LIST_ROWS_MAX })
+            expect(em.find).toHaveBeenCalledWith(AuditLogLineEntity, {
+                where: {},
+                order: { id: "ASC" },
+                take: LIST_ROWS_MAX,
+            })
         })
 
         it("tombstones a line whose key is gone", async () => {
-            const { service, keystore } = await build(mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1"])] }))
+            const { service, keystore } = await build(
+                mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1"])] }),
+            )
             keystore.getKeyMaterials.mockResolvedValue(new Map())
 
             await expect(service.readChain({ action: null, target: null })).resolves.toEqual([
@@ -266,7 +320,9 @@ describe("AuditLogService", () => {
         })
 
         it("tombstones a line the live key no longer opens", async () => {
-            const { service, keystore } = await build(mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1"])] }))
+            const { service, keystore } = await build(
+                mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1"])] }),
+            )
             keystore.getKeyMaterials.mockResolvedValue(new Map([["k1", KEY]]))
             keystore.unseal.mockReturnValue({ opened: false, cause: new Error("wrong key") })
 
@@ -278,7 +334,9 @@ describe("AuditLogService", () => {
 
     describe("findLinesForPerson", () => {
         it("reads the own lines oldest first through the key id, resolved and without the key id", async () => {
-            const { service, em, keystore } = await build(mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1", "p1"])] }))
+            const { service, em, keystore } = await build(
+                mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1", "p1"])] }),
+            )
             keystore.getKeyIdForPerson.mockResolvedValue("k1")
             keystore.getKeyMaterials.mockResolvedValue(new Map([["k1", KEY]]))
             opensSealedActors(keystore)
@@ -320,12 +378,16 @@ describe("AuditLogService", () => {
         })
 
         it("lets an administrator read the whole chain narrowed by the filter, without the actor", async () => {
-            const { service, em, keystore } = await build(mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1", "p2"])] }))
+            const { service, em, keystore } = await build(
+                mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1", "p2"])] }),
+            )
             keystore.getKeyMaterials.mockResolvedValue(new Map([["k1", KEY]]))
             opensSealedActors(keystore)
 
             await expect(
-                service.readAs(readAuditLogInput({ principalId: "boss", roles: ["admin"], action: "task.created", target: "t1" })),
+                service.readAs(
+                    readAuditLogInput({ principalId: "boss", roles: ["admin"], action: "task.created", target: "t1" }),
+                ),
             ).resolves.toSucceedWith({
                 lines: [
                     { at: AT, action: "task.created", target: "t0" },
@@ -341,7 +403,9 @@ describe("AuditLogService", () => {
         })
 
         it("lets everyone else read exactly their own lines and ignores the filter", async () => {
-            const { service, em, keystore } = await build(mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1"])] }))
+            const { service, em, keystore } = await build(
+                mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1"])] }),
+            )
             keystore.getKeyIdForPerson.mockResolvedValue("k1")
             keystore.getKeyMaterials.mockResolvedValue(new Map([["k1", KEY]]))
             opensSealedActors(keystore)
@@ -351,18 +415,25 @@ describe("AuditLogService", () => {
             ).resolves.toSucceedWith({ lines: [{ at: AT, action: "task.created", target: "t0" }] })
 
             expect(keystore.getKeyIdForPerson).toHaveBeenCalledWith({ personId: "p1" })
-            expect(em.find).toHaveBeenCalledWith(AuditLogLineEntity, expect.objectContaining({ where: { keyId: "k1" } }))
+            expect(em.find).toHaveBeenCalledWith(
+                AuditLogLineEntity,
+                expect.objectContaining({ where: { keyId: "k1" } }),
+            )
         })
     })
 
     describe("exportFor", () => {
         it("exports the own lines without the actor", async () => {
-            const { service, keystore } = await build(mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1"])] }))
+            const { service, keystore } = await build(
+                mockEntityManager({ find: [AuditLogLineEntity, sealedRows(["p1"])] }),
+            )
             keystore.getKeyIdForPerson.mockResolvedValue("k1")
             keystore.getKeyMaterials.mockResolvedValue(new Map([["k1", KEY]]))
             opensSealedActors(keystore)
 
-            await expect(service.exportFor("p1")).resolves.toEqual({ lines: [{ at: AT, action: "task.created", target: "t0" }] })
+            await expect(service.exportFor("p1")).resolves.toEqual({
+                lines: [{ at: AT, action: "task.created", target: "t0" }],
+            })
         })
 
         it("exports nothing once the key was destroyed by a completed erasure", async () => {
