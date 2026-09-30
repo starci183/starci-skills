@@ -1,7 +1,8 @@
 /**
- * HFS check 7, duplicate blocks across owners (knowledge/hfs/slots.yaml ruleParams.<profile>.duplicateBlockLines = N):
- * a token-normalised block of at least N source lines that appears in two files of two different owner units is a
- * helper copied instead of shared. Clones inside one owner are that owner's business and are not judged.
+ * HFS check 7, R21 duplicate code (knowledge/hfs/slots.yaml ruleParams.<profile>.duplicateBlock = {lines: N, tokens: T},
+ * the one definition of the threshold): a token-normalised block of at least N source lines and T tokens that appears
+ * twice in the production program - in two owners, in two files of one owner, or twice in one file - is code copied
+ * instead of shared.
  *
  * Normalisation: every production file is flattened into its syntax-node sequence (the compiler's parsed tree, walked in
  * source order; comments and whitespace do not exist in it), identifiers become one ID kind, string, template, numeric,
@@ -13,7 +14,7 @@
  * (fewer than N/2 lines outside interface and type alias declarations) or of fewer than N/3 distinct line shapes
  * (a decorated DTO field list repeating one shape) is ignored.
  */
-export const CLONE_RULE_IDS = ['HFS_DUPLICATE_BLOCK'];
+export const CLONE_RULE_IDS = ['HFS_DUPLICATE_CODE'];
 
 const MAX_VIOLATIONS = 200;
 const ID = -1;
@@ -54,7 +55,8 @@ function tokenize(ts, sourceFile) {
   return { kinds: Int32Array.from(kinds), lines: Int32Array.from(lines), types: Uint8Array.from(types) };
 }
 
-function homeText(profile, rel) {
+function homeText(profile, rel, sameOwner) {
+  if (sameOwner) return 'extract it once inside the owner and call it from both places';
   if (profile === 'fe') {
     const app = /^apps\/([^/]+)\//.exec(rel)?.[1] ?? '<app>';
     return `move the shared helper to apps/${app}/src/modules/<capability>/ (pure) or apps/${app}/src/hooks/<domain>/ (React hook) and import it from both`;
@@ -63,7 +65,7 @@ function homeText(profile, rel) {
 }
 
 export function checkClones({ config, context, graph } = {}) {
-  const N = graph.resolver.ruleParams().duplicateBlockLines;
+  const { lines: N, tokens: T } = graph.resolver.ruleParams().duplicateBlock;
   const ts = context.ts ?? context.loaded.ts;
   const entries = [];
   for (const rel of [...graph.files.keys()].sort()) {
@@ -99,6 +101,7 @@ export function checkClones({ config, context, graph } = {}) {
       while (end < count && lines[end] < limit) end += 1;
       if (end === start || lines[end - 1] - lines[start] + 1 < N) continue;
       const length = end - start;
+      if (length < T) continue;
       const key = `${(pre1[end] - Math.imul(pre1[start], pow1[length])) | 0}:${(pre2[end] - Math.imul(pre2[start], pow2[length])) | 0}:${length}`;
       const list = buckets.get(key);
       const item = [fileIndex, start, end];
@@ -116,10 +119,11 @@ export function checkClones({ config, context, graph } = {}) {
   for (const list of buckets.values()) {
     if (list.length < 2) continue;
     for (const item of list) {
-      const unit = entries[item[0]].unit;
-      const partner = list.find((other) => entries[other[0]].unit !== unit);
+      // The first other occurrence is the partner; overlapping windows of one file are one occurrence, not a copy.
+      const partner = list.find((other) => other !== item && (other[0] !== item[0] || other[1] >= item[2] || item[1] >= other[2]));
       if (!partner || !same(item, partner)) continue;
-      const [a, b] = entries[item[0]].rel < entries[partner[0]].rel ? [item, partner] : [partner, item];
+      const order = entries[item[0]].rel === entries[partner[0]].rel ? item[1] < partner[1] : entries[item[0]].rel < entries[partner[0]].rel;
+      const [a, b] = order ? [item, partner] : [partner, item];
       const key = `${a[0]}|${b[0]}|${b[1] - a[1]}`;
       const group = hits.get(key);
       if (group) group.push([a[1], a[2]]); else hits.set(key, [[a[1], a[2]]]);
@@ -127,7 +131,7 @@ export function checkClones({ config, context, graph } = {}) {
   }
   const blocks = [];
   // Shape of a block: the lines outside type declarations and the number of distinct line shapes (a field list of
-  // one decorated DTO shape repeated 25 times is boilerplate, not a copied helper).
+  // one decorated DTO shape repeated N times is boilerplate, not a copied helper).
   const blockShape = (file, start, end) => {
     const nonType = new Set();
     const shapes = new Map();
@@ -162,12 +166,12 @@ export function checkClones({ config, context, graph } = {}) {
   blocks.sort((x, y) => x.a.rel.localeCompare(y.a.rel) || x.line - y.line || x.b.rel.localeCompare(y.b.rel));
   const profile = graph.profile;
   const violations = blocks.slice(0, MAX_VIOLATIONS).map((block) => ({
-    ruleId: 'HFS_DUPLICATE_BLOCK', path: block.a.rel, line: block.line, endLine: block.endLine, twin: block.twin, lines: block.lines,
-    message: `${block.a.rel}:${block.line}-${block.endLine} duplicates ${block.twin.path}:${block.twin.line}-${block.twin.endLine} (${block.lines} lines, identifiers and literals ignored) across two owners; ${homeText(profile, block.a.rel)}.`,
+    ruleId: 'HFS_DUPLICATE_CODE', path: block.a.rel, line: block.line, endLine: block.endLine, twin: block.twin, lines: block.lines,
+    message: `${block.a.rel}:${block.line}-${block.endLine} duplicates ${block.twin.path}:${block.twin.line}-${block.twin.endLine} (${block.lines} lines, threshold ${N} lines / ${T} tokens, identifiers and literals ignored); ${homeText(profile, block.a.rel, block.a.unit === block.b.unit)}.`,
   }));
   const owners = new Set();
   let duplicatedLines = 0;
   for (const block of blocks) { owners.add(block.a.unit); owners.add(block.b.unit); duplicatedLines += block.lines; }
-  return { violations, coverage: { status: 'checked', minLines: N, files: entries.length, cloneBlocks: blocks.length, ownersInvolved: owners.size, duplicatedLines,
+  return { violations, coverage: { status: 'checked', minLines: N, minTokens: T, files: entries.length, cloneBlocks: blocks.length, ownersInvolved: owners.size, duplicatedLines,
     ...(blocks.length > MAX_VIOLATIONS ? { truncated: true } : {}) } };
 }

@@ -61,3 +61,12 @@ retired:
   - {path: tests/qwen-base-pool.spec.mjs, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'tests/allocation-balance.spec.mjs and tests/route-model.spec.mjs cover routing over claude, codex and devin'}
   - {path: tests/qwen-launch-ceilings.spec.mjs, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: it tested the retired Qwen launch ceilings'}
   - {path: tests/qwen-loop-gate.spec.mjs, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: it tested the retired Qwen loop-detection gate'}
+  - {path: scripts/checks/lint-why.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'knowledge/hfs/rules.yaml enforcers read through loadRuleCatalog().lintCode (scripts/lib/hfs-slots.mjs); no hand table of rule -> code (RED19)'}
+  - {path: tests/lint-why.spec.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'tests/hfs-rules.spec.mjs (lintCode, HFS_RULE_UNCATALOGUED)'}
+  - {path: scripts/checks/style-why.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: it had no reader; knowledge/hfs/rules.yaml names each stylelint enforcer'}
+  - {path: tests/style-why.spec.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: it tested the deleted style-why table'}
+  - {path: packages/eslint/be/cdc.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: SAB-only CDC projection rules are deleted from the BE profile (BE-CONVENTION 3.1)'}
+  - {path: packages/eslint/be/cdc.test.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none'}
+  - {path: packages/eslint/be/event-delivery.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: SAB-only NATS delivery rules are deleted; in-process events are banned by R87 and side effects go through the outbox'}
+  - {path: packages/eslint/be/event-delivery.test.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none'}
+  - {path: skills/restart/SKILL.md, retiredAt: 2026-09-29, removedIn: start-set-profile, replacedBy: 'skills/start (start --set-profile); the restart skill is removed'}

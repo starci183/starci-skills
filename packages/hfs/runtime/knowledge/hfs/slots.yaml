@@ -92,14 +92,15 @@ ruleParams:
     globalModules: [src/modules/platform/config/, src/modules/platform/logging/, src/modules/platform/database/]
     # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft.
     fileLines: {soft: 500, hardGrowth: true}
-    # HFS_DUPLICATE_BLOCK: a token-normalised block of at least this many source lines that appears in two owners.
-    duplicateBlockLines: 25
+    # R21 HFS_DUPLICATE_CODE: the ONE threshold of duplicate code (the architecture machine reads it here; no other file states it):
+    # a token-normalised block of at least `lines` source lines and `tokens` tokens that appears twice.
+    duplicateBlock: {lines: 8, tokens: 60}
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
     fileLines: {soft: 500, hardGrowth: true}
     # FE_TRANSPORT_OWNER: the one module per app that may call fetch.
     clientModule: "apps/<app>/src/modules/api/client.ts"
-    duplicateBlockLines: 25
+    duplicateBlock: {lines: 8, tokens: 60}
 
 slots:
 

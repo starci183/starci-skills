@@ -56,7 +56,7 @@ branches:
   - id: hfs-rules
     title: HFS rule catalog
     path: hfs/rules.yaml
-    use: The 77 HFS rules R01-R77 as data - finding code, Vietnamese title, gates, failure codes and every enforcer; read
+    use: The HFS rules as data - finding code, Vietnamese title, gates, failure codes and every enforcer; read
       only through scripts/lib/hfs-slots.mjs (loadRuleCatalog, rules) and held to the packages by scripts/checks/check-hfs-rules.mjs.
   - id: enforcement
     title: Enforcement

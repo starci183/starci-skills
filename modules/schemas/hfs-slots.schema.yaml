@@ -49,19 +49,19 @@ properties:
       be:
         type: object
         additionalProperties: false
-        required: [globalModules, fileLines, duplicateBlockLines]
+        required: [globalModules, fileLines, duplicateBlock]
         properties:
           globalModules: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
           fileLines: {$ref: '#/$defs/fileLines'}
-          duplicateBlockLines: {type: integer, minimum: 2}
+          duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
       fe:
         type: object
         additionalProperties: false
-        required: [fileLines, clientModule, duplicateBlockLines]
+        required: [fileLines, clientModule, duplicateBlock]
         properties:
           fileLines: {$ref: '#/$defs/fileLines'}
           clientModule: {type: string, minLength: 1}
-          duplicateBlockLines: {type: integer, minimum: 2}
+          duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
   crossOwner: {type: string}
   crossApp: {type: string}
   slots:
@@ -79,6 +79,14 @@ $defs:
     properties:
       soft: {type: integer, minimum: 1}
       hardGrowth: {type: boolean}
+  duplicateBlock:
+    type: object
+    additionalProperties: false
+    required: [lines, tokens]
+    description: The one threshold of R21 duplicate code; checks and messages render it from here.
+    properties:
+      lines: {type: integer, minimum: 2}
+      tokens: {type: integer, minimum: 1}
   nameList:
     type: array
     minItems: 1

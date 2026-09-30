@@ -370,10 +370,10 @@ test('ruleParams: the parameters the canon lint lanes read', () => {
   const be = ruleParams(manifest, 'be');
   assert.deepEqual(be.globalModules, ['src/modules/platform/config/', 'src/modules/platform/logging/', 'src/modules/platform/database/']);
   assert.deepEqual(be.fileLines, { soft: 500, hardGrowth: true });
-  assert.equal(be.duplicateBlockLines, 25);
+  assert.deepEqual(be.duplicateBlock, { lines: 8, tokens: 60 });
   const fe = ruleParams(manifest, 'fe');
   assert.deepEqual(fe.fileLines, { soft: 500, hardGrowth: true });
-  assert.equal(fe.duplicateBlockLines, 25);
+  assert.deepEqual(fe.duplicateBlock, { lines: 8, tokens: 60 });
   assert.equal(fe.clientModule, 'apps/<app>/src/modules/api/client.ts');
   assert.equal(manifest.slots.find((s) => s.id === 'be.domain').budget.indexExports, 60);
   assert.equal(manifest.slots.find((s) => s.id === 'be.feature').budget.indexExports, 60);
@@ -385,7 +385,7 @@ test('ruleParams: the parameters the canon lint lanes read', () => {
   for (const dir of be.globalModules) assert.equal(openBe.classifyPath(dir).slot, 'be.platform');
   assert.equal(openHfs({ declaration: FE }).classifyPath(fe.clientModule.replace('<app>', 'web')).slot, 'fe.modules.api');
   // schema and loader agree that ruleParams is required and closed
-  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.clientModule; }, (d) => { delete d.ruleParams.be.duplicateBlockLines; }, (d) => { d.ruleParams.fe.duplicateBlockLines = 1; }]) {
+  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.clientModule; }, (d) => { delete d.ruleParams.be.duplicateBlock; }, (d) => { d.ruleParams.fe.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }]) {
     const doc = parseYaml(manifestText); mutate(doc);
     assert.equal(validateManifestSchema(doc), false);
     refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');

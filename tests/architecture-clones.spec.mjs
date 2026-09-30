@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, findings, runArch } from './_hfs-arch-fixture.mjs';
 
-// HFS check 7 (HFS_DUPLICATE_BLOCK): ruleParams.<profile>.duplicateBlockLines is 25 in the shipped manifest.
+// HFS check 7 (R21 HFS_DUPLICATE_CODE): ruleParams.<profile>.duplicateBlock is {lines: 8, tokens: 60} in the shipped manifest,
+// the one definition of the threshold; a copy inside one owner counts like a copy across owners.
 const A = 'src/modules/domain/alpha/alpha.service.ts';
 const B = 'src/modules/domain/beta/beta.service.ts';
 const A2 = 'src/modules/domain/alpha/alpha.contracts.ts';
@@ -28,7 +29,7 @@ function helper(name, statements, { literal = 1, variable = 'value' } = {}) {
 }
 const lineCount = (text) => text.trimEnd().split('\n').length;
 const cloneOf = (statements, options) => `import { z } from 'zod';\n\n${helper('compute', statements, options)}`;
-const run = (root) => { const report = runArch(root); return { report, hits: findings(report, 'HFS_DUPLICATE_BLOCK'), coverage: report.coverage.hfsMachine.clones }; };
+const run = (root) => { const report = runArch(root); return { report, hits: findings(report, 'HFS_DUPLICATE_CODE'), coverage: report.coverage.hfsMachine.clones }; };
 
 test('a 30-line body copied to another owner with renamed identifiers and changed literals is one finding naming both files', (t) => {
   assert.equal(lineCount(helper('x', 26)), 30);
@@ -40,33 +41,37 @@ test('a 30-line body copied to another owner with renamed identifiers and change
   assert.equal(hits.length, 1);
   assert.equal(hits[0].path, A);
   assert.equal(hits[0].twin.path, B);
-  assert.ok(hits[0].lines >= 25);
+  assert.ok(hits[0].lines >= 8);
   assert.ok(hits[0].message.includes(A) && hits[0].message.includes(B));
+  assert.match(hits[0].message, /threshold 8 lines \/ 60 tokens/);
   assert.match(hits[0].message, /src\/modules\/platform\/primitives\//);
   assert.match(hits[0].message, /src\/modules\/domain\/<capability>\//);
   assert.equal(coverage.status, 'checked');
-  assert.equal(coverage.minLines, 25);
+  assert.equal(coverage.minLines, 8);
+  assert.equal(coverage.minTokens, 60);
   assert.equal(coverage.cloneBlocks, 1);
   assert.equal(coverage.ownersInvolved, 2);
-  assert.ok(coverage.duplicatedLines >= 25);
+  assert.ok(coverage.duplicatedLines >= 8);
 });
 
-test('the same block twice inside one owner is not a finding', (t) => {
+test('the same block twice inside one owner is a finding that says to extract it inside the owner', (t) => {
   const root = archFixture(t, { files: { [A]: cloneOf(26), [A2]: helper('again', 26, { variable: 'item' }) } });
   const { hits, coverage } = run(root);
-  assert.equal(hits.length, 0);
-  assert.equal(coverage.cloneBlocks, 0);
+  assert.equal(hits.length, 1);
+  assert.match(hits[0].message, /extract it once inside the owner/);
+  assert.equal(coverage.cloneBlocks, 1);
+  assert.equal(coverage.ownersInvolved, 1);
 });
 
-test('a 24-line clone across owners is below the threshold', (t) => {
-  assert.equal(lineCount(helper('x', 20)), 24);
-  const root = archFixture(t, { files: { [A]: cloneOf(20), [B]: helper('calculate', 20, { variable: 'item' }) } });
+test('a 7-line clone across owners is below the line threshold', (t) => {
+  assert.equal(lineCount(helper('x', 3)), 7);
+  const root = archFixture(t, { files: { [A]: cloneOf(3), [B]: helper('calculate', 3, { variable: 'item' }) } });
   assert.equal(run(root).hits.length, 0);
 });
 
-test('a 25-line clone across owners is a finding', (t) => {
-  assert.equal(lineCount(helper('x', 21)), 25);
-  const root = archFixture(t, { files: { [A]: cloneOf(21), [B]: helper('calculate', 21, { variable: 'item' }) } });
+test('a 12-line clone across owners is a finding', (t) => {
+  assert.equal(lineCount(helper('x', 8)), 12);
+  const root = archFixture(t, { files: { [A]: cloneOf(8), [B]: helper('calculate', 8, { variable: 'item' }) } });
   assert.equal(run(root).hits.length, 1);
 });
 

@@ -10,7 +10,7 @@ The machine-readable parts live next to this file and are read by every check, l
 | File | Owns |
 | --- | --- |
 | `slots.yaml` | Every kind of content allowed to exist in a repository: path, presence, tracking, tier, required files, tests, budget, managed template. Versioned `MAJOR.MINOR.PATCH`. |
-| `rules.yaml` | The rule catalog `R01` to `R83` with finding code, gates and the Vietnamese why text (catalog below). |
+| `rules.yaml` | The rule catalog (ids from `R01`, no gaps) with finding code, gates and the Vietnamese why text (catalog below). |
 | `canon-pins.yaml` | The exact versions of every `@starci/*` package and framework this major supports. |
 
 The pattern cases in `knowledge/patterns/{be,fe,repo}/` explain how to write code and structure files inside these
@@ -376,8 +376,8 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
 - **Size budgets.** Backend file 500 lines, function 80, `app.module.ts` 250, `index.ts` 60 exports, feature 250 source
   files. Frontend component 300, connected `index.tsx` 200, hook 200, module 400. The mechanism is no-growth
   (`HFS_SIZE_GROWTH`): a new file is inside the budget, a file already over its budget gains no lines against its parent
-  commit. There is no baseline and no allowlist (R20). Duplicated blocks of 8 lines or more, and helpers defined twice
-  under the same name, fail (R21).
+  commit. There is no baseline and no allowlist (R20). A duplicated block at or above the one threshold
+  `ruleParams.<profile>.duplicateBlock` of `slots.yaml`, and a helper defined twice under the same name, fail (R21).
 - **Contracts.** The backend commits `contracts/<app>/schema.graphql` (CI re-emits and compares); a frontend keeps a
   hash-checked copy (R23).
 
@@ -388,7 +388,7 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
 | PC pre-commit | lint-staged: Prettier, ESLint canon on staged files, stylelint, secrets guard | under 10 s | R06, R07, R18, R19, R34, R40, R41, R43 to R45, R49, R55, R58, R61, R62 |
 | PP pre-push | `typecheck`, `lint:check`, `hfs check --fast`, affected unit specs | under 2 min | PC plus R01, R03 to R05, R12 to R15, R22, R26, R27, R30 |
 | OS op settle | `hfs check --paths <owned paths>` and ESLint on the op's paths; a red result does not settle | per op | every file-level and owner-level rule in scope |
-| LG land gate | full `hfs check` including reachability, composition, contract, size growth, duplicates; canon scan; unit; build | per repo | all 77 |
+| LG land gate | full `hfs check` including reachability, composition, contract, size growth, duplicates; canon scan; unit; build | per repo | every rule |
 | CI GitHub | the same pinned `npx @starci/hfs check`, lint, typecheck, unit with coverage, build, `prettier --check` | | as LG except R23 on the frontend |
 | SQ Sonar | duplication, cognitive complexity, coverage on new code | | R20, R21 (second gate) |
 
@@ -424,7 +424,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R10 | `HFS_STACKS_SHAPE` | `.starcistacks` has the standard shape and the host Sonar owner. |
 | R11 | `HFS_SONAR_CONFIG` | Sonar config is generated, with no host URL and matching coverage exclusions. |
 | R12 | `HFS_E2E_IN_AUTOMATIC_GATE` | e2e never joins husky, coverage or automatic CI. |
-| R13 | `HFS_CI_MISSING_CANON` | CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint. |
+| R13 | `HFS_CI_MISSING_CANON` | CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky. |
 | R14 | `HFS_DEP_VERSION_SKEW` | One version per dependency in the workspace. |
 | R15 | `HFS_CANON_PIN_DRIFT` | Canon packages and frameworks match `canon-pins.yaml`. |
 | R16 | `HFS_TOOL_CONFIG_LOCAL` | Configs only call the factories; no local rules. |
@@ -433,7 +433,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R19 | `HFS_FORMAT` | Prettier is the only formatter. |
 | R20 | `HFS_SIZE_GROWTH` | Over-budget files do not grow; new files are inside budget. |
 | R21 | `HFS_DUPLICATE_CODE` | No duplicated blocks or twice-defined helpers. |
-| R22 | `HFS_TS_STRICT` | tsconfig extends `@starci/tsconfig` and lowers no flag. |
+| R22 | `HFS_TS_STRICT` | tsconfig extends `@starci/tsconfig` and lowers no flag; no assertion, `!` or `any` in product source. |
 | R23 | `HFS_CONTRACT_SNAPSHOT_DRIFT` | Contract snapshot equals the emit, the FE copy equals the BE. |
 | R24 | `HFS_ARCH_CONFIG_UNREAD` | The machine reads `hfs.json`; zero files analysed is red. |
 | R25 | `HFS_UNUSED_EXPORT` | No public export without a consumer. |
@@ -452,12 +452,12 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R33 | `BE_ENTRYPOINT_ONLY_IN_APPS` | Entrypoints only in `apps/*/src`. |
 | R34 | `BE_SCHEMA_AUTHORITY` | Migrations are the only schema authority; `synchronize` is `false`. |
 | R35 | `BE_SCHEMA_OWNER` | Entities and migrations live in the owning capability's `persistence/`. |
-| R36 | `BE_SQL_OUTSIDE_REPOSITORY` | Raw SQL only in `*.repository.ts`. |
+| R36 | `BE_SQL_OUTSIDE_PERSISTENCE` | Raw SQL is `sql`-tagged `SqlText` in `persistence/<name>.sql.ts` of the owning capability; `.query()` takes only `SqlText`; no QueryBuilder. |
 | R37 | `BE_ENTITY_IN_CONTRACT` | No ORM entity in a contract or transport type. |
 | R38 | `BE_ERROR_HOME` | Errors live in the owning capability's `errors/` and extend `DomainError`. |
 | R39 | `BE_ERROR_MASKED` | One filter per app; undeclared errors are masked. |
 | R40 | `BE_LOGGER_REQUIRED` | `platform/logging` exists; every `catch` logs, rethrows or returns a reasoned outcome. |
-| R41 | `BE_DEFAULT_DENY` | `APP_GUARD` plus `@Public({ reason })`; typed bodies; `timingSafeEqual`. |
+| R41 | `BE_DEFAULT_DENY` | APP_GUARD plus `@Public({ reason })`; typed bodies; `timingSafeEqual`. |
 | R42 | `BE_INPUT_BOUNDED` | Bounded input, depth limits, rate limits; every property of an input class carries a `class-validator` decorator. |
 | R43 | `BE_CONFIG_OWNER` | Only `platform/config` reads `process.env`; config per capability. |
 | R44 | `BE_SECRET_DEFAULT` | No default for a secret key or infrastructure URL. |
@@ -480,7 +480,14 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R80 | `BE_INBOX_DEDUPE_MISSING` | Every `@Public()` webhook handler and outbox/queue consumer claims the event through the shared inbox, keyed by `(source, event id)`, before it acts. |
 | R81 | `BE_HAND_ROLLED_RETRY` | A loop that catches an error and waits before trying again goes through the shared `platform/retry` helper, never a hand-written loop. |
 | R82 | `BE_TRANSACTION_EXTERNAL_CALL` | No transaction spans an external call; commit first and call out after, or write an outbox message inside the transaction. |
-| R83 | `BE_UNNAMED_DATA_ACCESS` | The database is reached through the shared EntityManager injected by a named injector and called directly; no bare `@InjectEntityManager()`, `getRepository`, `@InjectRepository`, `Repository<T>` or injected `DataSource` (outside the platform database module). |
+| R83 | `BE_UNNAMED_DATA_ACCESS` | A use case reaches the database through the shared EntityManager injected by a named injector and called directly; no bare `@InjectEntityManager()`, no `getRepository`, no `@InjectRepository` or `Repository<T>`, no injected `DataSource` outside the platform database module. |
+| R84 | `BE_CONNECTION_DUPLICATE` | One physical database is one connection and one `Inject<Conn>EntityManager()` injector declared once in `platform/database`; `hfs.json` connections, connection files, injectors and module registrations correspond one to one. |
+| R85 | `BE_RAW_INJECT` | Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there. |
+| R86 | `BE_SQL_TABLE_OWNER` | SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded. |
+| R87 | `BE_CQRS_SHAPE` | The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`; no use-case classes, forwarder services or in-process events. |
+| R88 | `BE_TRANSPORT_SHAPE` | A transport handler maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else, returns no envelope and takes no `GraphQLJSON`. |
+| R89 | `BE_SOURCE_FORM` | Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji or Vietnamese outside message catalogs. |
+| R90 | `BE_INFRA_OWNER` | Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability. |
 
 **Frontend**
 
@@ -502,6 +509,9 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R62 | `FE_NATIVE_FORM_CONTROL` | No raw form controls in product tiers. |
 | R63 | `FE_PACKAGE_SHAPE` | Packages build to `dist` with explicit exports and no dead unit. |
 | R64 | `FE_APP_ISOLATION` | Apps never import apps; ui-screen declares `app`. |
-| R65 | `FE_SIZE_AND_STATE_BUDGET` | Hook and state budgets; no hand-written poll loop. |
+| R65 | `FE_SIZE_AND_STATE_BUDGET` | Hook and state budgets; no hand-written poll loop; keyed lists; timers cleared; no swallowed error or console. |
 | R66 | `FE_E2E_SHAPE` | Playwright shape, three viewports, no environment coupling. |
 | R67 | `FE_SPEC_QUALITY` | No class pinning, no barrel specs, axe per connected screen. |
+| R91 | `FE_SOURCE_FORM` | Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc and no emoji. |
+| R92 | `FE_COMPONENT_API` | A component exposes the canon surface: typed named props and slots, a presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file. |
+| R93 | `FE_VENDOR_BOUNDARY` | Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner, no internal StarCi href. |

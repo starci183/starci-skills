@@ -604,6 +604,32 @@ BE_CONFIG_OWNER:
   owner: op-retry
   kind: check-finding
 
+BE_CONNECTION_DUPLICATE:
+  title: "One database reached through more than one connection or injector"
+  title_vi: "Một cơ sở dữ liệu có hơn một kết nối hoặc injector"
+  meaning_vi: "Mỗi cơ sở dữ liệu vật lý chỉ có một kết nối và một injector Inject<Conn>EntityManager() khai báo một lần trong platform/database. Bộ kiểm tra thấy một injector thứ hai (ví dụ InjectCollabEntityManager bên cạnh InjectAgentOsEntityManager), một tên kết nối thứ hai trỏ vào cùng cơ sở dữ liệu, một lời gọi InjectEntityManager/getEntityManagerToken/InjectDataSource ngoài <conn>.decorators.ts, hoặc hfs.json, tệp kết nối và injector không khớp một-một."
+  causes_vi:
+    - "Một tính năng tự tạo injector hoặc kết nối riêng cho cùng cơ sở dữ liệu"
+    - "Hai tệp cùng export một tên injector nhưng trỏ tới hai kết nối"
+    - "Kết nối mới chưa được khai báo trong hfs.json connections"
+    - "Cấu hình kết nối đọc biến môi trường của kết nối khác"
+  nextStep_vi: "Giữ đúng một <conn>.connection.ts, <conn>.config.ts và <conn>.decorators.ts cho mỗi mục hfs.json connections trong src/modules/platform/database/, xóa injector hoặc kết nối thừa cùng mọi tham chiếu và đổi nơi dùng sang injector duy nhất. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_CQRS_SHAPE:
+  title: "Application layer is not in CQRS shape"
+  title_vi: "Tầng ứng dụng sai hình CQRS"
+  meaning_vi: "Tầng application phải là CQRS: message Command<R>/Query<R> chỉ mang một trường readonly params kiểu ExecuteParams hoặc PublicExecuteParams, handler kế thừa ICQRSHandler và override process (không override execute). Bộ kiểm tra thấy tệp *.use-case.ts, service chuyển tiếp, message không khai kiểu kết quả, EventBus, @EventsHandler hoặc EventEmitter2."
+  causes_vi:
+    - "Còn lớp use case kiểu cũ"
+    - "Message thiếu kiểu kết quả Command<R>"
+    - "Handler override execute"
+    - "Dùng sự kiện trong tiến trình thay cho outbox"
+  nextStep_vi: "Tách mỗi thao tác thành <action>.command.ts hoặc <action>.query.ts, <action>.handler.ts và <action>.contracts.ts; transport gọi bus trực tiếp; hiệu ứng phụ bắt buộc đi qua outbox trong transaction. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
 BE_DEFAULT_DENY:
   title: "Open or untyped door"
   title_vi: "Cửa mở hoặc nhận dữ liệu không kiểu"
@@ -755,6 +781,19 @@ BE_SECRET_DEFAULT:
   owner: op-retry
   kind: check-finding
 
+BE_SOURCE_FORM:
+  title: "Back-end source file breaks the naming or form canon"
+  title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"
+  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji hay tiếng Việt ngoài catalog messages/."
+  causes_vi:
+    - "Tệp dùng hậu tố bị cấm (use-case, repository, store, util, helper, types, constants)"
+    - "Export default"
+    - "Thiếu JSDoc trên export"
+    - "Chú thích tiếng Việt trong mã"
+  nextStep_vi: "Đổi tên tệp theo vai trò trong danh sách đóng, chuyển kiểu vào <tên>.contracts.ts, thêm JSDoc tiếng Anh và bỏ export default. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
 BE_SOURCE_NAME_INVALID:
   title: "Source file name invalid"
   title_vi: "Tên tệp nguồn sai quy ước"
@@ -773,17 +812,6 @@ BE_SPEC_QUALITY:
     - "readFileSync hay readdirSync trên src/, apps/ hoặc __dirname trong spec"
     - "as never hoặc as unknown as X trong spec hay tệp fixtures"
   nextStep_vi: "Chuyển luật kiến trúc sang lint hoặc bộ kiểm tra, và dùng mock<T>() cho double; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
-  owner: op-retry
-  kind: check-finding
-
-BE_SQL_OUTSIDE_REPOSITORY:
-  title: "Raw SQL outside a repository"
-  title_vi: "SQL thô ngoài repository"
-  meaning_vi: "Có .query(...) với chuỗi SQL hoặc createQueryBuilder ngoài tệp *.repository.ts trong persistence/, nên use case hoặc service chứa SQL."
-  causes_vi:
-    - "manager.query(\"...\") trong service hoặc use case"
-    - "createQueryBuilder gọi trực tiếp ngoài repository"
-  nextStep_vi: "Chuyển câu truy vấn vào *.repository.ts của persistence/ thuộc capability sở hữu và gọi qua repository; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -2316,6 +2344,18 @@ FE_CLOSED_VOCABULARY_SHAPE:
   owner: other-op:interface.implement
   kind: check-finding
 
+FE_COMPONENT_API:
+  title: "Front-end component exposes a non-canon surface"
+  title_vi: "Component FE sai bề mặt công khai"
+  meaning_vi: "Component phải có props và slot có kiểu được đặt tên, mỗi khối kết nối có bản trình bày tương ứng, trạng thái đi qua slot view, không mở cửa className hay thuộc tính CSS, không có bản sao trạng thái nghỉ hay prop placeholder, tên lớp nằm ở tệp đi kèm."
+  causes_vi:
+    - "Component nhận className từ ngoài"
+    - "Khối kết nối không có bản trình bày thuần"
+    - "Trạng thái dữ liệu tự chế thay vì qua SlotView"
+  nextStep_vi: "Sửa chữ ký component theo mẫu shape-slot và tách phần trình bày; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 FE_COMPONENT_DEEP_HOOK_IMPORT:
   title: "Component imports a hook too deeply"
   title_vi: "Thành phần nhập hook quá sâu"
@@ -2601,6 +2641,7 @@ FE_STYLE_SOURCE_UNRESOLVED:
   nextStep_vi: "Op interface.implement sửa đường dẫn @source cho trỏ tới thư mục có thật, tính từ chính tệp CSS, rồi kiểm tra lại."
   owner: other-op:interface.implement
   kind: check-finding
+
 FE_STYLE_TOKEN_ONLY:
   title: "CSS bypasses grammar tokens"
   title_vi: "CSS không đi qua token của grammar"
@@ -6273,6 +6314,7 @@ STARCI_MACHINE_BUSY:
   nextStep_vi: "Thử lại sau; land báo gate-busy với why db-busy và không để lại cổng nửa chiếm."
   owner: supervisor
   kind: runtime-fault
+
 STARCI_MACHINE_DB:
   title: "Machine database refused an operation"
   title_vi: "Cơ sở dữ liệu máy từ chối thao tác"
@@ -11850,6 +11892,7 @@ git-failed:
   nextStep_vi: "Không rebase; đọc phần detail rồi land lại sau khi sửa nguyên nhân."
   owner: supervisor
   kind: verb-refusal
+
 SEALED_CUSTODY_LOCATION:
   title: "Sealed secret path is not under .starcistacks"
   title_vi: "Đường dẫn bí mật đã mã hoá không nằm dưới .starcistacks"
@@ -12025,6 +12068,17 @@ HFS_RULE_OFF_WITHOUT_REPLACEMENT:
   owner: op-retry
   kind: check-finding
 
+HFS_RULE_UNCATALOGUED:
+  title: "Plugin rule that no catalog rule names"
+  title_vi: "Luật của plugin không thuộc luật HFS nào"
+  meaning_vi: "Một luật của @starci/eslint-canon-be hoặc @starci/eslint-canon-fe được phát hành nhưng không enforcer nào trong knowledge/hfs/rules.yaml nêu tên nó, hoặc bảng why của plugin gán nó vào một mã mà luật HFS sở hữu không liệt kê; một luật không có mã R thì không có lý do tiếng Việt và không có cổng."
+  causes_vi:
+    - "Thêm luật ESLint mới mà quên danh mục"
+    - "Luật cũ còn trong plugin sau khi luật HFS đã bỏ"
+  nextStep_vi: "Người giám sát thêm luật vào danh sách enforcers của luật R sở hữu, hoặc xóa luật khỏi plugin cùng mọi tham chiếu, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 HFS_FORMAT:
   title: "Prettier is the only formatter"
   title_vi: "Chưa format bằng Prettier"
@@ -12036,12 +12090,14 @@ HFS_FORMAT:
   kind: check-finding
 
 HFS_DUPLICATE_CODE:
-  title: "No duplicated blocks or twice-defined helpers"
+  title: "Duplicated code block"
   title_vi: "Mã trùng lặp"
-  meaning_vi: "Khối code ở `<a>` trùng `<b>` (`<n>` dòng). Đưa về chủ chung (`platform/primitives`, `<domain>.shared.ts`, `packages/*`)."
+  meaning_vi: "Một đoạn mã (bỏ qua khác biệt về tên biến và giá trị chữ hoặc số) xuất hiện hai lần trong mã sản phẩm: ở hai chủ sở hữu, ở hai tệp của một chủ sở hữu, hoặc hai lần trong một tệp. Ngưỡng số dòng và số token là một định nghĩa duy nhất trong ruleParams.<profile>.duplicateBlock của knowledge/hfs/slots.yaml; lời nhắn của bộ kiểm tra ghi rõ ngưỡng và hai vị trí."
   causes_vi:
-    - "Vi phạm luật R21: Không lặp khối ≥ 8 dòng/≥ 60 token giữa các tệp (jscpd + Sonar CPD); không định nghĩa lại helper cùng tên (`isRecord`, `useSalesAccessToken`…) ở nhiều tệp."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+    - "Op cần một hàm hỗ trợ đã có ở nơi khác nhưng chép lại thay vì dùng chung"
+    - "Hai nơi cùng tự viết một logic giống nhau vì chưa ai đưa nó vào chỗ dùng chung"
+    - "Đoạn mã được chép nguyên rồi chỉ đổi tên biến hoặc hằng số"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để đưa đoạn mã về một chỗ duy nhất theo lời nhắn (trong cùng chủ sở hữu, hoặc src/modules/platform/primitives, module miền của năng lực đó, hay packages/* với FE) rồi gọi từ cả hai nơi; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 
@@ -12367,6 +12423,18 @@ FE_SIZE_AND_STATE_BUDGET:
   owner: op-retry
   kind: check-finding
 
+FE_SOURCE_FORM:
+  title: "Front-end source file breaks the layout, naming or comment canon"
+  title_vi: "Tệp nguồn FE sai quy ước tên, vị trí hoặc chú thích"
+  meaning_vi: "Tệp FE phải nằm đúng thư mục tầng với tên cố định, export hàm mũi tên trùng tên thư mục, có JSDoc tiếng Anh và không emoji; luật ESLint nêu trong lời nhắn chỉ rõ phần sai."
+  causes_vi:
+    - "Tệp đặt sai tầng hoặc thư mục phụ trợ trong components"
+    - "Export không khớp tên thư mục"
+    - "Thiếu JSDoc hoặc có emoji"
+  nextStep_vi: "Chuyển tệp về đúng thư mục tầng, đổi tên export theo thư mục và thêm JSDoc tiếng Anh. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
 FE_E2E_SHAPE:
   title: "Playwright shape, three viewports, no environment coupling"
   title_vi: "Spec e2e sai hình dạng"
@@ -12404,6 +12472,18 @@ FE_TYPE_ESCAPE:
   causes_vi:
     - "Vi phạm luật R22: Không ép kiểu (`as T`, `<T>x`), không `!`, không `any` trong mã sản phẩm; thu hẹp bằng type guard, discriminant hoặc parser tại nơi dữ liệu đi vào. Ngoại lệ duy nhất là `as const` và `as unknown`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_VENDOR_BOUNDARY:
+  title: "Vendor primitive or icon used outside its owner"
+  title_vi: "Thư viện giao diện bên ngoài dùng ngoài chủ sở hữu"
+  meaning_vi: "Biểu tượng heroicons chỉ đến component qua lá icon với kích thước theo thang glyph; mỗi primitive của thư viện ngoài nằm sau một chủ sở hữu có tên; không có liên kết nội bộ StarCi cứng."
+  causes_vi:
+    - "Import thẳng @heroicons trong component"
+    - "Dùng kích thước biểu tượng ngoài thang"
+    - "Primitive thư viện ngoài dùng trực tiếp ở nhiều nơi"
+  nextStep_vi: "Dùng lá icon và chủ sở hữu primitive có sẵn; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -12614,6 +12694,18 @@ HFS_RULE_ENFORCER_STALE:
   owner: supervisor
   kind: check-finding
 
+HFS_RULE_LAW_DRIFT:
+  title: "Rule table in the HFS README differs from the catalog"
+  title_vi: "Bảng luật trong README lệch danh mục"
+  meaning_vi: "Bảng luật ở mục 12 của knowledge/hfs/README.md phải có đúng mỗi luật của knowledge/hfs/rules.yaml với cùng mã và cùng câu luật, và không ghi một khoảng R01..Rnn khác danh mục; hai bản khác nhau thì người đọc và máy hiểu luật khác nhau."
+  causes_vi:
+    - "Sửa câu luật ở một nơi"
+    - "Thêm luật mới vào danh mục mà không thêm dòng README"
+    - "Ghi số lượng luật bằng tay"
+  nextStep_vi: "Người giám sát chép câu luật từ rules.yaml vào dòng README (rules.yaml là nguồn), qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 HFS_RULE_CODE_UNCATALOGUED:
   title: "Rule failure code is not explained"
   title_vi: "Mã lỗi của luật chưa được giải thích"
@@ -12622,6 +12714,17 @@ HFS_RULE_CODE_UNCATALOGUED:
     - "Thêm mã lỗi vào rules.yaml mà quên thêm vào danh mục mã lỗi"
     - "Viết title_vi, meaning_vi hoặc nextStep_vi bằng tiếng Anh"
   nextStep_vi: "Người giám sát thêm hoặc sửa mục trong modules/kernel/failure-codes.yaml với đủ tiêu đề, ý nghĩa và bước tiếp theo bằng tiếng Việt, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+HFS_RULE_CODE_UNEMITTED:
+  title: "Rule code that no enforcer emits"
+  title_vi: "Mã lỗi của luật không có bộ kiểm tra nào phát ra"
+  meaning_vi: "Danh mục knowledge/hfs/rules.yaml khẳng định mọi enforcer của luật đã có, nhưng không luật ESLint nào báo mã của luật và không tệp kiểm tra (máy kiến trúc, hfs, work-validate) nào viết mã đó; mã chỉ tồn tại trên giấy."
+  causes_vi:
+    - "Đổi tên mã trong bộ kiểm tra mà không đổi trong danh mục"
+    - "Gỡ status: planned trước khi bộ kiểm tra phát ra mã"
+  nextStep_vi: "Người giám sát sửa danh mục hoặc bộ kiểm tra để mã được phát ra đúng tên, hoặc đánh dấu enforcer còn nợ bằng status: planned, qua một lane đã land."
   owner: supervisor
   kind: check-finding
 
@@ -12635,6 +12738,7 @@ WORK_YAML_UNPARSEABLE:
   nextStep_vi: "Commit hoặc chốt op bị từ chối; đặt giá trị có dấu hai chấm vào dấu nháy hoặc sửa cú pháp tại dòng được nêu rồi làm lại."
   owner: op-retry
   kind: check-finding
+
 WORK_VALIDATE_REFUSED:
   title: "Staged Work record fails its validation"
   title_vi: "Bản ghi Work vừa sửa không qua kiểm tra hợp lệ"
@@ -12645,6 +12749,7 @@ WORK_VALIDATE_REFUSED:
   nextStep_vi: "Commit hoặc chốt op bị từ chối; sửa đúng các lỗi được liệt kê (chỉ tính lỗi thuộc tệp vừa sửa) rồi làm lại."
   owner: op-retry
   kind: check-finding
+
 WORK_SECRET_FILE:
   title: "Secret file inside Work or stacks"
   title_vi: "Tệp bí mật nằm trong Work hoặc stacks"
@@ -12655,6 +12760,7 @@ WORK_SECRET_FILE:
   nextStep_vi: "Commit hoặc chốt op bị từ chối; bỏ tệp khỏi commit, giữ bản mã hóa .enc và để bản rõ ngoài git."
   owner: op-retry
   kind: check-finding
+
 WORK_SECRET_PATTERN:
   title: "Token or private key inside Work or stacks"
   title_vi: "Token hoặc khóa riêng nằm trong Work hoặc stacks"
@@ -12665,6 +12771,7 @@ WORK_SECRET_PATTERN:
   nextStep_vi: "Commit hoặc chốt op bị từ chối; xóa giá trị khỏi tệp, dùng tham chiếu tới kho bí mật mã hóa, và xoay khóa nếu nó đã lộ."
   owner: op-retry
   kind: check-finding
+
 WORK_SECRET_LITERAL:
   title: "Literal credential in a credential-shaped field"
   title_vi: "Giá trị bí mật viết thẳng trong trường mật khẩu hoặc token"
@@ -12675,6 +12782,7 @@ WORK_SECRET_LITERAL:
   nextStep_vi: "Commit hoặc chốt op bị từ chối; chuyển giá trị vào kho mã hóa (.enc) và ghi tham chiếu, hoặc dùng giá trị giả có ghi rõ là mẫu."
   owner: op-retry
   kind: check-finding
+
 WORK_ACCOUNT_LITERAL:
   title: "Literal login in an accounts record"
   title_vi: "Tên đăng nhập viết thẳng trong bản ghi tài khoản"
@@ -12739,6 +12847,7 @@ sonar-proof-missing:
   nextStep_vi: "Việc chốt bị từ chối; op chạy sonar-local scan --wait trên phần code đã sửa và đính kèm sonar.json khi nộp report."
   owner: op-retry
   kind: settle-reason
+
 STACKS_QUALITY_GATE_DRIFT:
   title: "Sonar quality gate name differs from the standard"
   title_vi: "Tên cổng chất lượng Sonar khác chuẩn chung"
@@ -12798,18 +12907,6 @@ FE_TIER_DIRECTION:
   owner: op-retry
   kind: check-finding
 
-HFS_DUPLICATE_BLOCK:
-  title: "Same code block copied across owners"
-  title_vi: "Cùng một đoạn mã bị chép sang chủ sở hữu khác"
-  meaning_vi: "Một đoạn mã dài từ 25 dòng trở lên (bỏ qua khác biệt về tên biến và giá trị chữ hoặc số) xuất hiện giống hệt ở hai chủ sở hữu khác nhau (hai module, hai tính năng hoặc hai ứng dụng). Chép đoạn mã thay vì dùng chung khiến mỗi lần sửa lỗi phải sửa nhiều nơi và các bản sao dần lệch nhau."
-  causes_vi:
-    - "Op cần một hàm hỗ trợ đã có ở chủ sở hữu khác nhưng không có chỗ chung để dùng nên chép lại"
-    - "Hai chủ sở hữu cùng tự viết một logic giống nhau vì chưa ai đưa nó vào chỗ dùng chung"
-    - "Đoạn mã được chép nguyên rồi chỉ đổi tên biến hoặc hằng số để tránh bị phát hiện"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển đoạn mã dùng chung vào ô chung mà thông báo nêu (với BE là src/modules/platform/primitives/ hoặc module miền của năng lực đó; với FE là modules hoặc hooks của ứng dụng) rồi nhập từ đó vào cả hai nơi. Nếu hai đoạn thật sự cần khác nhau thì op phải tách phần khác biệt ra."
-  owner: op-retry
-  kind: check-finding
-
 HFS_REQUIRED_FILE_MISSING:
   title: "Required file, directory or minimum instance is missing"
   title_vi: "Thiếu tệp, thư mục hoặc số lượng tối thiểu bắt buộc theo bảng kê"
@@ -12834,6 +12931,30 @@ BE_SQL_INTERPOLATED:
   owner: op-retry
   kind: check-finding
 
+BE_SQL_OUTSIDE_PERSISTENCE:
+  title: "Raw SQL outside persistence/<name>.sql.ts"
+  title_vi: "SQL thô ngoài persistence/<name>.sql.ts"
+  meaning_vi: "Có câu SQL viết ngoài hằng `sql` trong tệp persistence/<name>.sql.ts của năng lực sở hữu, hoặc `.query()` nhận một chuỗi không phải SqlText, hoặc có createQueryBuilder. SQL rải trong service và handler không được kiểm tra bảng sở hữu và giới hạn đọc."
+  causes_vi:
+    - "manager.query(\"SELECT ...\") viết thẳng trong handler hoặc service"
+    - "createQueryBuilder dùng cho truy vấn phức tạp"
+    - "SQL còn nằm trong *.repository.ts kiểu cũ"
+  nextStep_vi: "Chuyển câu SQL thành hằng `sql` trong src/modules/<tầng>/<năng lực>/persistence/<tên>.sql.ts, kiểu dòng trả về và hàm ánh xạ ở <tên>.rows.ts, rồi gọi entityManager.query(HẰNG, [tham số]); thay QueryBuilder bằng tùy chọn find hoặc hằng sql. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_SQL_TABLE_OWNER:
+  title: "SQL touches another capability's table or reads unbounded"
+  title_vi: "SQL ghi bảng của năng lực khác hoặc đọc không giới hạn"
+  meaning_vi: "Bộ kiểm tra phân tích từng hằng SqlText: câu lệnh ghi (INSERT, UPDATE, DELETE) chỉ được chạm bảng của entity thuộc chính năng lực đó; câu đọc chỉ được chạm bảng của năng lực mà chủ sở hữu được phép import; SELECT nhiều dòng phải có LIMIT trừ khi lọc theo khóa chính hoặc khóa duy nhất hoặc chỉ tính tổng."
+  causes_vi:
+    - "Service của năng lực A cập nhật bảng của năng lực B"
+    - "Truy vấn danh sách quên LIMIT"
+    - "Bảng chưa có entity khai báo ở năng lực sở hữu"
+  nextStep_vi: "Chuyển câu ghi về năng lực sở hữu bảng và gọi qua API công khai của năng lực đó; thêm LIMIT theo PAGE_SIZE_MAX, LIST_ROWS_MAX hoặc BATCH_ROWS của platform/database. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
 BE_QUERY_UNBOUNDED:
   title: "Read without a row bound"
   title_vi: "Truy vấn đọc không có giới hạn số dòng"
@@ -12843,6 +12964,19 @@ BE_QUERY_UNBOUNDED:
     - "find hoặc findBy không có take và không tra theo id"
     - "SELECT thô không có LIMIT"
   nextStep_vi: "Thêm take hoặc LIMIT với hằng có tên, hoặc phân trang theo con trỏ; việc cần đủ mọi dòng (batch, xuất) lặp theo trang keyset chứ không cắt cụt kết quả âm thầm. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_RAW_INJECT:
+  title: "Infrastructure dependency injected without its Inject*() decorator"
+  title_vi: "Phụ thuộc hạ tầng không được tiêm qua Inject*()"
+  meaning_vi: "Mọi tham số constructor có kiểu thuộc hạ tầng (EntityManager, CommandBus, Clock, Logger, Cache, HttpClient, options của module, client SDK) phải mang một decorator Inject<Thing>() không tham số, export từ <owner>.decorators.ts và dựng bằng injector<T>(token) trên token unique symbol. Bộ kiểm tra thấy @Inject( thô ngoài *.decorators.ts, token chuỗi, forwardRef, ModuleRef, tiêm qua thuộc tính, injector sai hình hoặc kiểu T khác kiểu tham số."
+  causes_vi:
+    - "@Inject(TOKEN) viết thẳng ở nơi dùng"
+    - "Token là chuỗi thay vì unique symbol"
+    - "Tiêm lớp hạ tầng (CacheService, AppLogger) không qua injector"
+    - "Dùng ModuleRef.get hoặc forwardRef để né vòng phụ thuộc"
+  nextStep_vi: "Khai báo token `export const THING: unique symbol = Symbol(\"<owner>.<thing>\")` và `export const InjectThing = (): TypedParameterDecorator<Thing> => injector<Thing>(THING)` trong <owner>.decorators.ts rồi dùng @InjectThing() ở mọi nơi; vòng phụ thuộc là lỗi kiến trúc cần gỡ, không dùng forwardRef. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
 
@@ -12971,6 +13105,18 @@ BE_INBOX_DEDUPE_MISSING:
   owner: op-retry
   kind: check-finding
 
+BE_INFRA_OWNER:
+  title: "Infrastructure library used outside its owning capability"
+  title_vi: "Thư viện hạ tầng dùng ngoài năng lực sở hữu"
+  meaning_vi: "Mỗi thư viện hạ tầng thô có đúng một năng lực sở hữu: fetch/axios/got/undici/node:http chỉ ở platform/http; cache-manager/redis/ioredis chỉ ở integrations/cache hoặc integrations/redis; bullmq/kafkajs chỉ ở platform/messaging; setTimeout/setInterval/node:timers chỉ ở platform/{scheduling,retry,messaging,http}; winston chỉ ở platform/logging; dayjs/moment chỉ ở platform/{clock,primitives}; @nestjs/config, dotenv, @nestjs/event-emitter và @nestjs/schedule không được dùng."
+  causes_vi:
+    - "Gọi fetch thẳng trong client tích hợp"
+    - "Hẹn giờ bằng setTimeout trong service"
+    - "Dùng dayjs trong miền"
+  nextStep_vi: "Gọi qua cổng của năng lực sở hữu (HttpClient, Cache, MessagePublisher, Clock, Logger) được tiêm bằng Inject*(). Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
 BE_HAND_ROLLED_RETRY:
   title: "Hand-rolled retry loop"
   title_vi: "Tự viết vòng lặp thử lại thay vì dùng bộ trợ giúp chung"
@@ -12990,6 +13136,18 @@ BE_TRANSACTION_EXTERNAL_CALL:
     - "this.manager.transaction(async (tx) => { await tx.save(Entity, row); await fetch(url) })"
     - "this.manager.transaction(async (tx) => { await this.paymentSdk.charge(id) })"
   nextStep_vi: "Commit giao dịch trước rồi mới gọi ra ngoài, hoặc ghi một thông điệp outbox bên trong giao dịch để một worker gửi đi sau khi commit; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_TRANSPORT_SHAPE:
+  title: "Transport does more than map and dispatch"
+  title_vi: "Tầng giao tiếp làm nhiều hơn chuyển lệnh"
+  meaning_vi: "Mỗi resolver, controller, gateway, consumer, job hoặc lệnh CLI chỉ ánh xạ đầu vào, gửi đúng một command hoặc query qua bus được tiêm và ánh xạ kết quả. Bộ kiểm tra thấy transport tiêm thứ khác ngoài InjectCommandBus/InjectQueryBus (và InjectRequestLocale cho REST), tiêm EntityManager, bọc phản hồi trong envelope, dùng GraphQLJSON hoặc cửa REST không có lý do."
+  causes_vi:
+    - "Resolver gọi service miền trực tiếp"
+    - "Interceptor biến đổi phản hồi thành {success, message, data}"
+    - "Đầu vào kiểu GraphQLJSON không kiểm tra"
+  nextStep_vi: "Đưa logic vào handler của tính năng, để transport chỉ gọi commandBus.execute(new XCommand({ request, principal })) và trả kiểu kết quả; xóa envelope và thay GraphQLJSON bằng input có kiểu. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
 

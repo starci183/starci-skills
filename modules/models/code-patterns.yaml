@@ -376,20 +376,6 @@ profiles:
           guidance: docs/architecture-rules.md
           review: Exercise denied and cross-scope actions; decorator presence does not prove resource authorization.
         status: implemented
-      - id: NEST-DELIVERY-CONTRACT-SHAPE
-        sourceRuleIds: [BE-FUNCTION-6, BE-TEST-5]
-        applicability: { include: ['src/**/*.ts', 'apps/*/src/**/*.ts', 'libs/*/src/**/*.ts'] }
-        mechanical:
-          requirement: Selected projection and bridge implementations use the Academy delivery lifecycle shapes.
-          check:
-            kind: eslint
-            sourceOnly: true
-            ruleIds: [starci-be/projection-listener-contract, starci-be/no-dynamic-projection-group-id, starci-be/projection-recompute-must-upsert, starci-be/nats-bridge-delivery-contract, starci-be/no-call-site-transport-override]
-            expected: { severity: error }
-        semantic:
-          guidance: docs/architecture-rules.md
-          review: Verify durable acknowledgement, deduplication, fencing and unknown-effect recovery separately.
-        status: implemented
       - id: NEST-TEST-STATIC-CONTRACT
         sourceRuleIds: [BE-FOLDER-7, BE-TEST-1, BE-TEST-5, BE-TEST-7]
         applicability: { include: ['**/*.spec.ts', 'src/tests/**/*.ts', 'apps/*/test/**/*.ts'] }

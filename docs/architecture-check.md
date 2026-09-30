@@ -104,7 +104,7 @@ Slots, tiers and required files come from `knowledge/hfs/slots.yaml`; the reposi
 4. **Dead exports** (`HFS_UNUSED_EXPORT`): an owner's `index` exports a name no file outside the owner imports.
 5. **Required files** (`FE_ERROR_BOUNDARY_MISSING`, `BE_REQUIRED_MODULE_MISSING`, `HFS_REQUIRED_FILE_MISSING`): the files each slot and app requires, such as `global-error.tsx`, `error.tsx`, `not-found.tsx`, `loading.tsx` and the required platform modules.
 6. **File size growth** (`HFS_SIZE_GROWTH`): a file above the soft line budget (`ruleParams.<profile>.fileLines.soft`) may not grow against the merge-base, and a new file stays within the budget. Without a resolvable base the coverage is `unavailable`, never a pass.
-7. **Duplicate blocks** (`HFS_DUPLICATE_BLOCK`): a token-normalised clone of at least `ruleParams.<profile>.duplicateBlockLines` lines across two owners; the finding names both locations and the slot where the shared helper belongs.
+7. **Duplicate code** (`HFS_DUPLICATE_CODE`, R21): a token-normalised block that appears twice anywhere in the production program (two owners, two files of one owner, or one file), at or above the one threshold `ruleParams.<profile>.duplicateBlock` (`lines` and `tokens`); the finding names both locations, the threshold, and where the shared code belongs.
 
 ## Failure classes
 

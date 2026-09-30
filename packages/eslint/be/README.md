@@ -1,6 +1,6 @@
 # @starci/eslint-canon-be
 
-**78 ESLint rules, from 26 laws, that hold a NestJS-shaped back end to one way of being written.**
+**ESLint rules, grouped by law (the count is `Object.keys(rules)`; knowledge/hfs/rules.yaml names the HFS rule each one enforces), that hold a NestJS-shaped back end to one way of being written.**
 
 Not a style pack. These rules enforce *architecture*: which layer may import which, whether a
 failure carries its own identity, where a query is allowed to be built, what an end-to-end test is
@@ -103,43 +103,7 @@ ESLint 9+ (flat config), Node 20.9+.
 
 ## HFS rules and their why codes
 
-Each rule below reports through the code-pattern gate with a catalogued Vietnamese reason (`modules/kernel/failure-codes.yaml`,
-mapped by `scripts/checks/lint-why.mjs`). The catalog id is the rule number in `knowledge/hfs/rules.yaml`.
+Every rule of this plugin is an enforcer of one HFS rule. The relation (rule id -> HFS rule -> catalogued Vietnamese why code)
+lives in exactly one place, `knowledge/hfs/rules.yaml` (`enforcers`), and `scripts/checks/check-hfs-rules.mjs` refuses a
+rule of this plugin that no catalog entry names. There is no second table here.
 
-| Rule | Catalog | Why code |
-|---|---|---|
-| `catch-must-account` | R40 | `BE_LOGGER_REQUIRED` |
-| `error-home` | R38 | `BE_ERROR_HOME` |
-| `no-runtime-schema` | R34 | `BE_SCHEMA_AUTHORITY` |
-| `sql-only-in-repository` | R36 | `BE_SQL_OUTSIDE_REPOSITORY` |
-| `no-entity-in-contract` | R37 | `BE_ENTITY_IN_CONTRACT` |
-| `no-untyped-body`, `public-needs-reason`, `secret-compare-timing-safe` | R41 | `BE_DEFAULT_DENY` |
-| `no-direct-env-read` | R43 | `BE_CONFIG_OWNER` |
-| `no-secret-default` | R44 | `BE_SECRET_DEFAULT` |
-| `global-module-allowlist`, `typed-module-definition`, `static-module-register`, `no-new-injectable`, `no-module-let`, `one-module-per-file` | R45 | `BE_MODULE_SHAPE` |
-| `no-inline-suppression` | R18 | `HFS_INLINE_SUPPRESSION` |
-| `file-size-growth` | R20 | `HFS_SIZE_GROWTH` |
-| `spec-no-source-read`, `spec-typed-doubles` | R48 | `BE_SPEC_QUALITY` |
-| `must-deep-module-import`, `no-folder-reexport` | R30 | `BE_PUBLIC_SURFACE` |
-| `dto-needs-validator` | R42 | `BE_INPUT_BOUNDED` |
-| `no-interpolated-sql` | R68 | `BE_SQL_INTERPOLATED` |
-| `query-needs-limit` | R69 | `BE_QUERY_UNBOUNDED` |
-| `no-query-in-loop` | R77 | `BE_QUERY_IN_LOOP` |
-| `http-needs-timeout` | R70 | `BE_HTTP_TIMEOUT` |
-| `no-secret-in-log` | R71 | `BE_LOG_SECRET` |
-| `no-never-cast`, `no-non-null-assertion` | R72 | `BE_TYPE_ESCAPE` |
-| `async-needs-await` | R73 | `BE_ASYNC_NO_AWAIT` |
-| `migration-down-reversible` | R74 | `BE_MIGRATION_REVERSIBLE` |
-| `explicit-handler-return-type` | R75 | `BE_RETURN_TYPE` |
-| `json-parse-needs-guard` | R76 | `BE_JSON_PARSE_UNGUARDED` |
-| `user-copy-through-catalog` | R78 | `BE_USER_COPY_LITERAL` |
-| `no-ambient-clock` | R79 | `BE_AMBIENT_CLOCK` |
-| `inbox-dedupe-required` | R80 | `BE_INBOX_DEDUPE_MISSING` |
-| `no-hand-rolled-retry` | R81 | `BE_HAND_ROLLED_RETRY` |
-| `no-external-call-in-transaction` | R82 | `BE_TRANSACTION_EXTERNAL_CALL` |
-| `named-entity-manager-only`, `no-injected-repository` | R83 | `BE_UNNAMED_DATA_ACCESS` |
-
-There is no soft size-limit lint rule: a warning under a zero-warning gate is an exception in disguise. Listing files over the soft budget (`ruleParams.be.fileLines.soft`) is a report item of the hfs check or the architecture machine, as migration backlog, and never blocks.
-
-The tier direction matrix and the feature-imports-feature ban (R26, R28) are owned by the architecture machine
-(`@starci/hfs`), not by a lint rule: they need the whole import graph.

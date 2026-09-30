@@ -1,4 +1,4 @@
-# knowledge/hfs/rules.yaml - the machine-readable catalog of the 77 HFS rules (R01-R77).
+# knowledge/hfs/rules.yaml - the machine-readable catalog of the HFS rules (the ids run R01 up without gaps; count them, never type the count).
 #
 # One entry per rule: its id, its finding code, a Vietnamese title, the law in one line, how a violation is fixed
 # (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
@@ -168,7 +168,7 @@ rules:
     gates: [pre-push, land, ci]
     failureCodes: ["HFS_CANON_PIN_DRIFT"]
     enforcers:
-      - {kind: hfs, id: canon-pin-drift, status: planned}
+      - {kind: hfs, id: canon-pin-drift, at: scripts/lib/hfs-check.mjs}
   - id: R16
     code: "HFS_TOOL_CONFIG_LOCAL"
     title_vi: "Kho tự đặt luật cục bộ"
@@ -226,7 +226,7 @@ rules:
     gates: [land, ci, sonar]
     failureCodes: ["HFS_DUPLICATE_CODE"]
     enforcers:
-      - {kind: hfs, id: duplicate-code, status: planned}
+      - {kind: machine, id: duplicate-code, at: scripts/checks/architecture/clones.mjs}
       - {kind: sonar, id: duplicated-lines-density, status: planned}
   - id: R22
     code: "HFS_TS_STRICT"
@@ -240,6 +240,7 @@ rules:
       - {kind: eslint-fe, id: no-non-null-assertion}
       - {kind: eslint-fe, id: no-explicit-any}
       - {kind: hfs, id: ts-strict, status: planned}
+      - {kind: eslint-fe, id: no-double-cast}
   - id: R23
     code: "HFS_CONTRACT_SNAPSHOT_DRIFT"
     title_vi: "Bản hợp đồng lệch bản thật"
@@ -275,7 +276,7 @@ rules:
     gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_TIER_DIRECTION"]
     enforcers:
-      - {kind: machine, id: tier-direction, status: planned}
+      - {kind: machine, id: tier-direction, at: scripts/checks/architecture/tiers.mjs}
   - id: R27
     code: "ARCH_OWNER_CYCLE"
     title_vi: "Vòng phụ thuộc giữa các owner"
@@ -284,7 +285,7 @@ rules:
     gates: [pre-push, settle, land, ci]
     failureCodes: ["ARCH_OWNER_CYCLE"]
     enforcers:
-      - {kind: machine, id: owner-cycle, status: planned}
+      - {kind: machine, id: owner-cycle, at: scripts/checks/architecture/tiers.mjs}
   - id: R28
     code: "BE_FEATURE_IMPORTS_FEATURE"
     title_vi: "Feature import feature khác"
@@ -313,8 +314,10 @@ rules:
     enforcers:
       - {kind: eslint-be, id: must-deep-module-import}
       - {kind: eslint-be, id: no-folder-reexport}
-      - {kind: machine, id: owner-export-bypass, at: scripts/checks/architecture/index.mjs}
+      - {kind: machine, id: owner-export-bypass, at: scripts/checks/architecture/owners.mjs}
       - {kind: machine, id: index-export-count, status: planned}
+      - {kind: eslint-be, id: no-relative-capability-escape}
+      - {kind: eslint-be, id: no-self-module-alias}
   - id: R31
     code: "BE_FEATURE_NOT_COMPOSED"
     title_vi: "Feature không được app nào compose"
@@ -323,7 +326,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["BE_FEATURE_NOT_COMPOSED"]
     enforcers:
-      - {kind: machine, id: feature-not-composed, status: planned}
+      - {kind: machine, id: feature-not-composed, at: scripts/checks/architecture/reachability.mjs}
   - id: R32
     code: "BE_APP_COMPOSITION_ONLY"
     title_vi: "App chứa logic ngoài việc compose"
@@ -362,14 +365,16 @@ rules:
     enforcers:
       - {kind: machine, id: schema-owner, status: planned}
   - id: R36
-    code: "BE_SQL_OUTSIDE_REPOSITORY"
-    title_vi: "SQL thô ngoài repository"
-    law: "Raw SQL only in `*.repository.ts`."
+    code: "BE_SQL_OUTSIDE_PERSISTENCE"
+    title_vi: "SQL thô ngoài persistence/<name>.sql.ts"
+    law: "Raw SQL is `sql`-tagged `SqlText` in `persistence/<name>.sql.ts` of the owning capability; `.query()` takes only `SqlText`; no QueryBuilder."
     kinds: [lint, design]
     gates: [settle, land, ci]
-    failureCodes: ["BE_SQL_OUTSIDE_REPOSITORY"]
+    failureCodes: ["BE_SQL_OUTSIDE_PERSISTENCE"]
     enforcers:
       - {kind: eslint-be, id: sql-only-in-repository}
+      - {kind: eslint-be, id: sql-text-only, status: planned}
+      - {kind: eslint-be, id: no-query-builder, status: planned}
   - id: R37
     code: "BE_ENTITY_IN_CONTRACT"
     title_vi: "Entity ORM lộ ra hợp đồng"
@@ -407,6 +412,9 @@ rules:
     failureCodes: ["BE_LOGGER_REQUIRED"]
     enforcers:
       - {kind: eslint-be, id: catch-must-account}
+      - {kind: eslint-be, id: no-error-wording-as-log-identity}
+      - {kind: eslint-be, id: no-interpolated-log-message}
+      - {kind: eslint-be, id: no-framework-logger}
   - id: R41
     code: "BE_DEFAULT_DENY"
     title_vi: "Mặc định không chặn truy cập"
@@ -419,10 +427,11 @@ rules:
       - {kind: eslint-be, id: public-needs-reason}
       - {kind: eslint-be, id: secret-compare-timing-safe}
       - {kind: machine, id: default-deny-app-guard, status: planned}
+      - {kind: eslint-be, id: identity-needs-guard}
   - id: R42
     code: "BE_INPUT_BOUNDED"
     title_vi: "Input không giới hạn"
-    law: "Bounded input, depth limits, rate limits."
+    law: "Bounded input, depth limits, rate limits; every property of an input class carries a `class-validator` decorator."
     kinds: [lint, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_INPUT_BOUNDED"]
@@ -480,6 +489,7 @@ rules:
     failureCodes: ["BE_TEST_TOPOLOGY"]
     enforcers:
       - {kind: hfs, id: test-topology, status: planned}
+      - {kind: eslint-be, id: unit-test-colocated}
   - id: R48
     code: "BE_SPEC_QUALITY"
     title_vi: "Spec đọc mã nguồn hoặc ép kiểu mock"
@@ -490,6 +500,16 @@ rules:
     enforcers:
       - {kind: eslint-be, id: spec-no-source-read}
       - {kind: eslint-be, id: spec-typed-doubles}
+      - {kind: eslint-be, id: e2e-uses-production-transport}
+      - {kind: eslint-be, id: no-branch-in-flow-step}
+      - {kind: eslint-be, id: no-sleep-in-flow}
+      - {kind: eslint-be, id: no-wiring-in-flow-spec}
+      - {kind: eslint-be, id: e2e-asserts-persisted-state}
+      - {kind: eslint-be, id: harness-calls-provider-directly}
+      - {kind: eslint-be, id: no-api-shaped-e2e-filename}
+      - {kind: eslint-be, id: no-call-only-spec}
+      - {kind: eslint-be, id: no-marker-model-stub}
+      - {kind: eslint-be, id: no-model-call-in-e2e}
   - id: R49
     code: "FE_ENV_OWNER"
     title_vi: "Đọc biến môi trường ngoài modules/config"
@@ -513,6 +533,8 @@ rules:
       - {kind: eslint-fe, id: no-shared-transport-state}
       - {kind: eslint-fe, id: no-data-fetch-in-effect}
       - {kind: machine, id: transport-owner, status: planned}
+      - {kind: eslint-fe, id: api-client-attaches-the-locale}
+      - {kind: eslint-fe, id: locale-header-belongs-to-the-link}
   - id: R51
     code: "FE_HTTP_STATUS_COLLAPSE"
     title_vi: "Gộp mọi mã HTTP thành một nhánh"
@@ -543,7 +565,7 @@ rules:
     failureCodes: ["FE_ERROR_BOUNDARY_MISSING", "FE_SUSPENSE_NULL_FALLBACK"]
     enforcers:
       - {kind: eslint-fe, id: no-null-suspense-fallback}
-      - {kind: machine, id: error-boundary-missing, status: planned}
+      - {kind: machine, id: error-boundary-missing, at: scripts/checks/architecture/required-files.mjs}
   - id: R54
     code: "FE_ROUTE_FILES_THIN"
     title_vi: "Tệp route không mỏng"
@@ -586,7 +608,7 @@ rules:
     failureCodes: ["FE_OWNER_REACHABLE", "FE_ROUTE_HARDCODED"]
     enforcers:
       - {kind: eslint-fe, id: no-hardcoded-route}
-      - {kind: machine, id: owner-reachable, status: planned}
+      - {kind: machine, id: owner-reachable, at: scripts/checks/architecture/reachability.mjs}
   - id: R58
     code: "FE_I18N_LITERAL"
     title_vi: "Chữ hiển thị không đi qua t()"
@@ -597,6 +619,7 @@ rules:
     enforcers:
       - {kind: eslint-fe, id: no-hardcoded-copy}
       - {kind: eslint-fe, id: html-lang-from-locale}
+      - {kind: eslint-fe, id: no-copy-resolution-below-block}
   - id: R59
     code: "FE_I18N_PLACEMENT"
     title_vi: "i18n sai chuẩn next-intl"
@@ -632,6 +655,11 @@ rules:
       - {kind: stylelint, id: token-only, status: planned}
       - {kind: eslint-fe, id: no-raw-brand-value}
       - {kind: hfs, id: style-source-unresolved, status: planned}
+      - {kind: eslint-fe, id: no-fractional-step}
+      - {kind: eslint-fe, id: no-arbitrary-value}
+      - {kind: eslint-fe, id: no-hand-rolled-heading}
+      - {kind: eslint-fe, id: no-unresolved-token-class}
+      - {kind: eslint-fe, id: no-heading-tag-outside-heading-component}
   - id: R62
     code: "FE_NATIVE_FORM_CONTROL"
     title_vi: "Control form thô"
@@ -660,7 +688,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["FE_APP_ISOLATION"]
     enforcers:
-      - {kind: machine, id: app-isolation, status: planned}
+      - {kind: machine, id: app-isolation, at: scripts/checks/architecture/tiers.mjs}
   - id: R65
     code: "FE_SIZE_AND_STATE_BUDGET"
     title_vi: "Vượt ngân sách hook và state"
@@ -706,6 +734,7 @@ rules:
       - {kind: eslint-fe, id: no-barrel-spec}
       - {kind: eslint-fe, id: no-double-cast-in-spec}
       - {kind: eslint-fe, id: connected-spec-has-axe}
+      - {kind: eslint-fe, id: unit-test-colocated}
   - id: R68
     code: "BE_SQL_INTERPOLATED"
     title_vi: "Giá trị chạy lúc chạy bị ghép vào chuỗi SQL"
@@ -752,6 +781,8 @@ rules:
     enforcers:
       - {kind: eslint-be, id: no-never-cast}
       - {kind: eslint-be, id: no-non-null-assertion}
+      - {kind: eslint-be, id: no-double-cast}
+      - {kind: eslint-be, id: no-unguarded-unknown-cast}
   - id: R73
     code: "BE_ASYNC_NO_AWAIT"
     title_vi: "Hàm async không có await"
@@ -800,7 +831,7 @@ rules:
   - id: R78
     code: "BE_USER_COPY_LITERAL"
     title_vi: "Chữ hiển thị cho người dùng viết thẳng trong mã nguồn"
-    law: "A literal exception message, notification text or response copy comes from the per-capability messages catalog through the typed MessageCatalog port, not from source."
+    law: "A literal exception message, notification text or response copy comes from the per-capability messages catalog through the typed `MessageCatalog` port, not from source."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_USER_COPY_LITERAL"]
@@ -809,7 +840,7 @@ rules:
   - id: R79
     code: "BE_AMBIENT_CLOCK"
     title_vi: "Đọc đồng hồ hệ thống trực tiếp"
-    law: "Date.now(), a bare new Date() and performance.now() are read only inside platform/clock; business code asks the injected Clock port."
+    law: "`Date.now()`, a bare `new Date()` and `performance.now()` are read only inside `platform/clock`; business code asks the injected `Clock` port."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_AMBIENT_CLOCK"]
@@ -818,7 +849,7 @@ rules:
   - id: R80
     code: "BE_INBOX_DEDUPE_MISSING"
     title_vi: "Thiếu chống trùng lặp qua inbox"
-    law: "Every @Public webhook handler and outbox/queue consumer claims the event through the shared inbox, keyed by (source, event id), before it acts."
+    law: "Every `@Public()` webhook handler and outbox/queue consumer claims the event through the shared inbox, keyed by `(source, event id)`, before it acts."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_INBOX_DEDUPE_MISSING"]
@@ -827,7 +858,7 @@ rules:
   - id: R81
     code: "BE_HAND_ROLLED_RETRY"
     title_vi: "Tự viết vòng lặp thử lại thay vì dùng bộ trợ giúp chung"
-    law: "A loop that catches an error and waits before trying again goes through the shared platform/retry helper (bounded attempts, exponential backoff with jitter, an abort signal), never a hand-written loop."
+    law: "A loop that catches an error and waits before trying again goes through the shared `platform/retry` helper, never a hand-written loop."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_HAND_ROLLED_RETRY"]
@@ -852,3 +883,163 @@ rules:
     enforcers:
       - {kind: eslint-be, id: named-entity-manager-only}
       - {kind: eslint-be, id: no-injected-repository}
+      - {kind: eslint-be, id: must-inject-entity-manager}
+      - {kind: eslint-be, id: no-eager-relation}
+      - {kind: eslint-be, id: no-outer-manager-in-transaction}
+      - {kind: eslint-be, id: require-entity-table-name}
+  - id: R84
+    code: "BE_CONNECTION_DUPLICATE"
+    title_vi: "Một cơ sở dữ liệu có hơn một kết nối hoặc injector"
+    law: "One physical database is one connection and one `Inject<Conn>EntityManager()` injector declared once in `platform/database`; `hfs.json` connections, connection files, injectors and module registrations correspond one to one."
+    kinds: [lint, check]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_CONNECTION_DUPLICATE"]
+    enforcers:
+      - {kind: eslint-be, id: one-connection-per-database, status: planned}
+      - {kind: machine, id: connection-map, status: planned}
+  - id: R85
+    code: "BE_RAW_INJECT"
+    title_vi: "Phụ thuộc hạ tầng không được tiêm qua Inject*()"
+    law: "Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_RAW_INJECT"]
+    enforcers:
+      - {kind: eslint-be, id: injector-only, status: planned}
+      - {kind: eslint-be, id: injector-shape, status: planned}
+      - {kind: eslint-be, id: injector-type-match, status: planned}
+      - {kind: eslint-be, id: infra-needs-injector, status: planned}
+      - {kind: eslint-be, id: no-module-ref, status: planned}
+      - {kind: eslint-be, id: no-forward-ref, status: planned}
+      - {kind: eslint-be, id: no-string-token, status: planned}
+  - id: R86
+    code: "BE_SQL_TABLE_OWNER"
+    title_vi: "SQL ghi bảng của năng lực khác hoặc đọc không giới hạn"
+    law: "SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded."
+    kinds: [check, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_SQL_TABLE_OWNER"]
+    enforcers:
+      - {kind: machine, id: sql-owner, status: planned}
+  - id: R87
+    code: "BE_CQRS_SHAPE"
+    title_vi: "Tầng ứng dụng sai hình CQRS"
+    law: "The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`; no use-case classes, forwarder services or in-process events."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_CQRS_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: handler-overrides-process}
+      - {kind: eslint-be, id: message-carries-params-only}
+      - {kind: eslint-be, id: message-typed-result, status: planned}
+      - {kind: eslint-be, id: no-use-case, status: planned}
+      - {kind: eslint-be, id: no-event-bus, status: planned}
+      - {kind: eslint-be, id: execute-params-shape, status: planned}
+  - id: R88
+    code: "BE_TRANSPORT_SHAPE"
+    title_vi: "Tầng giao tiếp làm nhiều hơn chuyển lệnh"
+    law: "A transport handler maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else, returns no envelope and takes no `GraphQLJSON`."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_TRANSPORT_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: door-lives-in-features}
+      - {kind: eslint-be, id: no-capability-imports-features}
+      - {kind: eslint-be, id: rest-door-needs-a-reason}
+      - {kind: eslint-be, id: transport-dispatch-only, status: planned}
+      - {kind: eslint-be, id: no-response-envelope, status: planned}
+      - {kind: eslint-be, id: no-graphql-json, status: planned}
+      - {kind: eslint-be, id: em-injection-slots, status: planned}
+  - id: R89
+    code: "BE_SOURCE_FORM"
+    title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"
+    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji or Vietnamese outside message catalogs."
+    kinds: [lint, check, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_SOURCE_FORM"]
+    enforcers:
+      - {kind: eslint-be, id: require-export-jsdoc}
+      - {kind: eslint-be, id: require-enum-member-jsdoc}
+      - {kind: eslint-be, id: no-non-ascii-source}
+      - {kind: eslint-be, id: no-restated-name-jsdoc}
+      - {kind: eslint-be, id: no-bare-verb-export}
+      - {kind: eslint-be, id: no-vendor-module-factory-name}
+      - {kind: eslint-be, id: no-version-in-name}
+      - {kind: eslint-be, id: no-const-enum}
+      - {kind: eslint-be, id: no-inline-object-type}
+      - {kind: eslint-be, id: no-inline-param-type}
+      - {kind: eslint-be, id: no-default-export, status: planned}
+      - {kind: hfs, id: source-suffix, status: planned}
+  - id: R90
+    code: "BE_INFRA_OWNER"
+    title_vi: "Thư viện hạ tầng dùng ngoài năng lực sở hữu"
+    law: "Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_INFRA_OWNER"]
+    enforcers:
+      - {kind: eslint-be, id: infra-import-owner, status: planned}
+  - id: R91
+    code: "FE_SOURCE_FORM"
+    title_vi: "Tệp nguồn FE sai quy ước tên, vị trí hoặc chú thích"
+    law: "Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc and no emoji."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_SOURCE_FORM"]
+    enforcers:
+      - {kind: eslint-fe, id: require-export-jsdoc}
+      - {kind: eslint-fe, id: no-emoji-in-source}
+      - {kind: eslint-fe, id: no-shell-tier}
+      - {kind: eslint-fe, id: source-tier-marker-matches-folder}
+      - {kind: eslint-fe, id: surface-folder-two-files-only}
+      - {kind: eslint-fe, id: route-tree-holds-routes-only}
+      - {kind: eslint-fe, id: route-slot-fixed-name}
+      - {kind: eslint-fe, id: no-helper-folder-in-components}
+      - {kind: eslint-fe, id: export-matches-folder}
+      - {kind: eslint-fe, id: no-runtime-namespace}
+      - {kind: eslint-fe, id: monorepo-tier-belongs-to-its-side}
+      - {kind: eslint-fe, id: prefer-arrow-export}
+      - {kind: eslint-fe, id: handler-on-prefix}
+      - {kind: eslint-fe, id: no-second-language-in-path}
+      - {kind: eslint-fe, id: no-direct-const-alias}
+  - id: R92
+    code: "FE_COMPONENT_API"
+    title_vi: "Component FE sai bề mặt công khai"
+    law: "A component exposes the canon surface: typed named props and slots, a presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file."
+    kinds: [lint, design]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_COMPONENT_API"]
+    enforcers:
+      - {kind: eslint-fe, id: no-inline-parameter-type}
+      - {kind: eslint-fe, id: public-component-signature}
+      - {kind: eslint-fe, id: no-per-part-classname-prop}
+      - {kind: eslint-fe, id: no-public-classname-prop}
+      - {kind: eslint-fe, id: no-public-frame-css-props}
+      - {kind: eslint-fe, id: no-css-door-type-laundering}
+      - {kind: eslint-fe, id: base-props-atom}
+      - {kind: eslint-fe, id: base-import-pair}
+      - {kind: eslint-fe, id: no-data-status-shape}
+      - {kind: eslint-fe, id: slot-status-through-slotview}
+      - {kind: eslint-fe, id: presentational-purity}
+      - {kind: eslint-fe, id: connected-block-has-presentational-twin}
+      - {kind: eslint-fe, id: no-resting-twin-component}
+      - {kind: eslint-fe, id: no-placeholder-prop}
+      - {kind: eslint-fe, id: no-resting-branch-at-call-site}
+      - {kind: eslint-fe, id: no-inline-class-name}
+      - {kind: eslint-fe, id: class-names-in-colocated-file}
+      - {kind: eslint-fe, id: cn-arguments-are-single-tokens}
+  - id: R93
+    code: "FE_VENDOR_BOUNDARY"
+    title_vi: "Thư viện giao diện bên ngoài dùng ngoài chủ sở hữu"
+    law: "Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner, no internal StarCi href."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_VENDOR_BOUNDARY"]
+    enforcers:
+      - {kind: eslint-fe, id: no-vendor-icon-outside-icon-leaf}
+      - {kind: eslint-fe, id: heroicons-is-the-glyph-vendor}
+      - {kind: eslint-fe, id: no-off-scale-glyph-size}
+      - {kind: eslint-fe, id: no-decorative-icon-in-metric-cell}
+      - {kind: eslint-fe, id: no-direct-heroicon-import}
+      - {kind: eslint-fe, id: vendor-primitive-has-named-owner}
+      - {kind: eslint-fe, id: no-internal-starci-href}

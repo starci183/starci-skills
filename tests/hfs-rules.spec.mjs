@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../engine/yaml.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, rules } from '../scripts/lib/hfs-slots.mjs';
-import { hfsRulesFindings, pluginRuleIds, checkHfsRules, PLUGIN_ENTRY } from '../scripts/checks/check-hfs-rules.mjs';
+import { hfsRulesFindings, pluginRuleIds, checkHfsRules, PLUGIN_ENTRY, readmeRuleRows } from '../scripts/checks/check-hfs-rules.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const catalogText = fs.readFileSync(path.join(root, 'knowledge/hfs/rules.yaml'), 'utf8');
@@ -24,7 +24,7 @@ test('the shipped catalog is 1.0.0, validates against its JSON schema and loads 
   assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
   const catalog = loadRuleCatalog({ manifest: loadSlotManifest() });
   assert.equal(catalog.major, 1);
-  assert.equal(catalog.rules.length, 77);
+  assert.equal(catalog.rules.length, Number(catalog.rules.at(-1).id.slice(1)), 'ids run from R01 without gaps');
   catalog.rules.forEach((rule, index) => assert.equal(rule.id, `R${String(index + 1).padStart(2, '0')}`));
   for (const rule of catalog.rules) {
     assert.ok(rule.enforcers.length > 0, `${rule.id} has an enforcer`);
@@ -44,6 +44,10 @@ test('the loader answers by id, code, gate, enforcer and what is still owed', ()
   assert.deepEqual(catalog.forGate('pre-commit').map((r) => r.id).filter((id) => ['R06', 'R18', 'R62'].includes(id)), ['R06', 'R18', 'R62']);
   assert.deepEqual(catalog.forEnforcer('eslint-be', 'error-home').map((r) => r.id), ['R38']);
   assert.deepEqual(catalog.forEnforcer('eslint-fe', 'no-inline-lint-config').map((r) => r.id), ['R18']);
+  assert.equal(catalog.lintCode('starci-be/error-home'), 'BE_ERROR_HOME');
+  assert.equal(catalog.lintCode('starci-fe/no-inline-lint-config'), 'HFS_INLINE_SUPPRESSION');
+  assert.equal(catalog.lintCode('starci-be/no-such-rule'), undefined);
+  assert.equal(catalog.lintCode('other/error-home'), undefined);
   const unbuilt = catalog.unbuilt().map((r) => r.id);
   assert.ok(unbuilt.includes('R01'), 'R01 has only a planned enforcer');
   assert.ok(!unbuilt.includes('R12'), 'R12 is enforced by the architecture machine today');
@@ -54,10 +58,10 @@ test('the loader answers by id, code, gate, enforcer and what is still owed', ()
 
 test('rules() and openHfs().rules() give the same frozen catalog', () => {
   const list = rules();
-  assert.equal(list.length, 77);
+  assert.equal(list.length, loadRuleCatalog().rules.length);
   assert.ok(Object.isFrozen(list) && Object.isFrozen(list[0]) && Object.isFrozen(list[0].enforcers));
   const be = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: ['primary', 'agentos'] };
-  assert.equal(openHfs({ declaration: be }).rules().rules.length, 77);
+  assert.equal(openHfs({ declaration: be }).rules().rules.length, list.length);
 });
 
 test('schema and loader agree on a broken catalog', () => {
@@ -161,6 +165,44 @@ test('a failure code with no catalog entry, or an entry that is not Vietnamese, 
   const findings = run(catalog, { failureCodes: english });
   assert.deepEqual(findings.map((f) => f.message.includes('title_vi') || f.message.includes('nextStep_vi')), [true, true]);
   assert.ok(findings.every((f) => f.code === 'HFS_RULE_CODE_UNCATALOGUED' && f.rule === 'R01'));
+});
+
+test('a planned machine enforcer whose code a machine file already emits is stale, unless another built enforcer names that file', () => {
+  const catalog = loadRuleCatalog();
+  const r26 = catalog.rule('R26');
+  const planned = { ...catalog, rules: catalog.rules.map((r) => (r.id === 'R26' ? { ...r, enforcers: r.enforcers.map((e) => ({ kind: e.kind, id: e.id, planned: true })) } : r)) };
+  const emitters = { machine: [{ rel: 'scripts/checks/architecture/tiers.mjs', text: `ruleId: '${r26.code}'` }], hfs: [], 'work-validate': [] };
+  const stale = run(planned, { emitters });
+  assert.deepEqual(stale.map((f) => [f.code, f.rule]), [['HFS_RULE_ENFORCER_STALE', 'R26']]);
+});
+
+test('a rule that claims every enforcer is built but whose code nothing emits is unemitted', () => {
+  const catalog = loadRuleCatalog();
+  const emitters = { machine: [], hfs: [], 'work-validate': [] };
+  const machineOnly = catalog.rules.filter((r) => r.enforcers.every((e) => !e.planned && ['machine', 'hfs', 'work-validate'].includes(e.kind)));
+  assert.ok(machineOnly.length > 0);
+  const findings = run(catalog, { emitters, files: { exists: () => true, read: () => machineOnly.flatMap((r) => r.failureCodes).join(' ') } });
+  for (const r of machineOnly) assert.ok(findings.some((f) => f.code === 'HFS_RULE_CODE_UNEMITTED' && f.rule === r.id), r.id);
+});
+
+test('a plugin rule no catalog entry names is uncatalogued', () => {
+  const catalog = loadRuleCatalog();
+  const plugins = pluginsOf(catalog);
+  plugins['eslint-be'].ids.add('rule-nobody-owns');
+  const findings = run(catalog, { plugins });
+  assert.deepEqual(findings.map((f) => [f.code, f.enforcer]), [['HFS_RULE_UNCATALOGUED', 'eslint-be:rule-nobody-owns']]);
+});
+
+test('the README rule table must repeat the catalog: a changed law, a missing row and a stale range are drift', () => {
+  const catalog = loadRuleCatalog();
+  const table = catalog.rules.map((r) => `| ${r.id} | \`${r.code}\` | ${r.law} |`).join('\n');
+  assert.deepEqual(run(catalog, { readme: table }), []);
+  assert.equal(readmeRuleRows(table).length, catalog.rules.length);
+  const changed = table.replace(/^\| R01 \|(.*)\|$/m, '| R01 | `HFS_SLOT_UNDECLARED` | something else |');
+  assert.deepEqual(run(catalog, { readme: changed }).map((f) => [f.code, f.rule]), [['HFS_RULE_LAW_DRIFT', 'R01']]);
+  const missing = table.split('\n').slice(1).join('\n');
+  assert.deepEqual(run(catalog, { readme: missing }).map((f) => [f.code, f.rule]), [['HFS_RULE_LAW_DRIFT', 'R01']]);
+  assert.deepEqual(run(catalog, { readme: `${table}\nThe catalog R01 to R12.` }).map((f) => f.code), ['HFS_RULE_LAW_DRIFT']);
 });
 
 test('pluginRuleIds reads the rule names of a plugin and reports one that cannot load', async () => {

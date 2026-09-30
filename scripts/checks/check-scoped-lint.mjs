@@ -9,7 +9,7 @@ import {readModuleJson} from '../../engine/runtime-root.mjs';
 import {checkArchitecture,GRAMMAR_RULE_IDS,OWNER_RULE_IDS,SWR_DATA_RULE_IDS} from './architecture/index.mjs';
 import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architecture/typescript.mjs';
 import {discoverNestMetadataInputs} from './code-patterns/nest-metadata.mjs';
-import {whyOfLintRule} from './lint-why.mjs';
+import {loadRuleCatalog} from '../lib/hfs-slots.mjs';
 import {diffRanges,isLocatedFinding,judgeSliceBaseline,materializeBaseTree,measureBaseTree,resolveSliceBase} from './scoped-lint-baseline.mjs';
 import {resolveNodeOrTypeScriptModule,typeScriptProgramRun} from './typescript-programs.mjs';
 import {isWorktreesPath} from '../lib/worktree-exclude.mjs';
@@ -17,6 +17,9 @@ import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
 import {isInside as inside} from './common.mjs';
 import {emitCheckOutput} from './output.mjs';
+let catalogMemo;
+/** The HFS rule catalog, loaded once: the one source of a lint finding's why code. */
+const ruleCatalog=()=>(catalogMemo??=loadRuleCatalog());
 
 export const CODE_PATTERN_REPORT='starci/code-pattern-check@1';
 const PROFILE_SCHEMA='starci/code-pattern-profile@1',STATUSES=new Set(['implemented','missing','conflict']);
@@ -175,7 +178,7 @@ function lintObligations(profile,expectedFiles,sourceSubjects){
 }
 
 export function inspectLintResults(expectedFiles,results){const expected=new Set(expectedFiles.map(file=>path.resolve(file))),seen=new Set(),issues=[];for(const result of results){const file=path.resolve(result.filePath);if(!expected.has(file))issues.push({file,code:'UNEXPECTED_FILE'});if(seen.has(file))issues.push({file,code:'DUPLICATE_RESULT'});seen.add(file);
-  for(const message of result.messages??[])if(message.fatal||message.severity>0)issues.push({file,code:'LINT_MESSAGE',ruleId:message.ruleId??null,line:message.line??null,message:String(message.message??''),...(whyOfLintRule(message.ruleId)?{why:whyOfLintRule(message.ruleId)}:{})});for(const message of result.suppressedMessages??[])issues.push({file,code:'SUPPRESSED_MESSAGE',ruleId:message.ruleId??null,line:message.line??null});}
+  for(const message of result.messages??[])if(message.fatal||message.severity>0)issues.push({file,code:'LINT_MESSAGE',ruleId:message.ruleId??null,line:message.line??null,message:String(message.message??''),...(ruleCatalog().lintCode(message.ruleId)?{why:ruleCatalog().lintCode(message.ruleId)}:{})});for(const message of result.suppressedMessages??[])issues.push({file,code:'SUPPRESSED_MESSAGE',ruleId:message.ruleId??null,line:message.line??null});}
   for(const file of expected)if(!seen.has(file))issues.push({file,code:'MISSING_RESULT'});return issues;}
 // The package.json key a script adapter found undeclared (nest-*.mjs missingContract): the repository owes it,
 // the checker is not broken (nivo WSPV inc-900c9199622e).
