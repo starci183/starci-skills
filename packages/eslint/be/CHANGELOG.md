@@ -4,6 +4,10 @@
 
 - Fixed: a local export list (`export { x }`, no module specifier) crashed the backend machine behind the project-graph rules (`Cannot read properties of undefined (reading 'kind')` in every file of a repository that has one). The packed-load spec covers it.
 
+## 2.1.2 - 2026-10-01
+
+- Fixed: `duplicate-code` and every project-graph rule failed to load in a repository with a local export list (`export { x }`, no module specifier): the backend machine read `moduleSpecifier.kind` of an absent specifier. The packed-load spec now carries such an export.
+
 ## 2.1.1 - 2026-10-01
 
 - Fixed: every rule failed to load in product repositories ("the managed package-scripts template ... cannot be found next to the runtime"): the bundled runtime now carries the data files the architecture machine reads beside its code (the managed package-scripts templates, canon-pins and the Sonar gate). A new runtime spec, `tests/canon-packed-load.spec.mjs`, installs each canon from its packed tarball into a real HFS repository and requires every rule to load.
