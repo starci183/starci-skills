@@ -64,3 +64,78 @@ test('a reader that does not import the client, and a client that never calls fe
   assert.ok(messages.some(text => /read-lonely\.ts: .*does not import/.test(text)), messages.join('\n'));
   assert.ok(messages.some(text => /client\.ts: .*never calls the global fetch/.test(text)), messages.join('\n'));
 });
+
+// Exactly ONE transport client and ONE Outcome union per repository, named by slot: the api package's, or the only app's.
+const TWO_APPS = [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }];
+const PKG = 'packages/shop-api';
+const OUTCOME = "export type Outcome<T> = { kind: 'ok'; value: T } | { kind: 'refused' };\n";
+const TSCONFIG = `${JSON.stringify({
+  compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', allowJs: true, skipLibCheck: true, noEmit: true, paths: { '@shop/api': [`${PKG}/src/index.ts`] } },
+  include: ['src/**/*', 'apps/**/*', 'packages/**/*'],
+}, null, 2)}\n`;
+const PACKAGE = {
+  'tsconfig.json': TSCONFIG,
+  [`${PKG}/package.json`]: JSON.stringify({ name: '@shop/api', private: true }),
+  [`${PKG}/tsconfig.json`]: '{}\n',
+  [`${PKG}/src/index.ts`]: "export { client } from './client';\nexport type { Outcome } from './outcome';\n",
+  [`${PKG}/src/client.ts`]: CLIENT,
+  [`${PKG}/src/outcome.ts`]: OUTCOME,
+};
+const APP_READER = app => ({ [`apps/${app}/src/modules/api/course/read-course.ts`]: "import { client } from '@shop/api';\nexport const readCourse = (id: string) => client.get(`/courses/${id}`, AbortSignal.timeout(8000));\n" });
+const runShape = (t, files, apps = TWO_APPS) => runArch(archFixture(t, { profile: 'fe', apps, declaration: { optionalSlots: ['fe.package.api'] }, files }));
+const messages = report => hits(report).map(item => `${item.path}: ${item.message}`);
+
+test('a two-app repository whose one client and one Outcome union live in the api package, with readers in the apps, raises no FE_TRANSPORT_OWNER', t => {
+  const report = runShape(t, { ...PACKAGE, ...APP_READER('web'), ...APP_READER('admin') });
+  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
+  const coverage = report.coverage.hfsMachine.transportOwner;
+  assert.equal(coverage.clients, 1);
+  assert.equal(coverage.outcomes, 1);
+  assert.equal(coverage.readers, 2);
+});
+
+test('a one-app repository whose client and Outcome union are the app\'s own raises no FE_TRANSPORT_OWNER', t => {
+  const report = run(t, { [`${API}/outcome.ts`]: OUTCOME });
+  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
+  assert.equal(report.coverage.hfsMachine.transportOwner.outcomes, 1);
+});
+
+test('two apps that each keep their own client are FE_TRANSPORT_OWNER on both clients', t => {
+  const report = runShape(t, { 'apps/web/src/modules/api/client.ts': CLIENT, 'apps/admin/src/modules/api/client.ts': CLIENT });
+  assert.deepEqual(hits(report).map(item => item.path).sort(), ['apps/admin/src/modules/api/client.ts', 'apps/web/src/modules/api/client.ts']);
+  assert.match(messages(report)[0], /2 transport clients/);
+});
+
+test('a package client next to an app client is FE_TRANSPORT_OWNER on both', t => {
+  const report = runShape(t, { ...PACKAGE, 'apps/web/src/modules/api/client.ts': CLIENT }, [TWO_APPS[0]]);
+  assert.deepEqual(hits(report).map(item => item.path).sort(), ['apps/web/src/modules/api/client.ts', `${PKG}/src/client.ts`]);
+});
+
+test('two apps that keep one app client, with no package, are FE_TRANSPORT_OWNER: the shared client belongs to the package', t => {
+  const report = runShape(t, { 'apps/web/src/modules/api/client.ts': CLIENT });
+  assert.deepEqual(hits(report).map(item => item.path), ['apps/web/src/modules/api/client.ts']);
+  assert.match(messages(report)[0], /repository of 2 apps/);
+});
+
+test('two Outcome unions (a package one and an app one), or an app one in a two-app repository, are FE_TRANSPORT_OWNER', t => {
+  const twice = runShape(t, { ...PACKAGE, 'apps/web/src/modules/api/outcome.ts': OUTCOME }, [TWO_APPS[0]]);
+  assert.deepEqual(hits(twice).map(item => item.path).sort(), ['apps/web/src/modules/api/outcome.ts', `${PKG}/src/outcome.ts`]);
+  const shared = runShape(t, { ...PACKAGE, 'apps/admin/src/modules/api/outcome.ts': OUTCOME });
+  assert.deepEqual(hits(shared).map(item => item.path).sort(), ['apps/admin/src/modules/api/outcome.ts', `${PKG}/src/outcome.ts`]);
+});
+
+test('a module that fetches in a repository with no client is FE_TRANSPORT_OWNER and says the repository has no client', t => {
+  const report = runShape(t, { 'apps/web/src/hooks/course/useCalled.ts': "export const useCalled = () => fetch('/x');\n" });
+  assert.equal(hits(report).length, 1);
+  assert.match(messages(report)[0], /no transport client/);
+});
+
+test('a repository with no client and no fetch has nothing to own and raises no FE_TRANSPORT_OWNER', t => {
+  const report = runShape(t, { 'apps/web/src/hooks/course/useNothing.ts': 'export const useNothing = () => 1;\n' });
+  assert.deepEqual(hits(report), []);
+});
+
+test('a fetch outside the package client in a package-client repository is FE_TRANSPORT_OWNER, the client itself is not', t => {
+  const report = runShape(t, { ...PACKAGE, 'apps/admin/src/hooks/course/useCalled.ts': "export const useCalled = () => fetch('/x');\n" });
+  assert.deepEqual(hits(report).map(item => item.path), ['apps/admin/src/hooks/course/useCalled.ts']);
+});

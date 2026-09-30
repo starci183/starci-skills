@@ -89,3 +89,28 @@ test('the frontend message names the app modules and hooks homes', (t) => {
   assert.equal(hits.length, 1);
   assert.match(hits[0].message, /apps\/web\/src\/modules\/<capability>\/ \(pure\) or apps\/web\/src\/hooks\/<domain>\/ \(React hook\)/);
 });
+
+const FE_APPS = [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }];
+
+test('a block copied between two apps of a front end says to move it to a package; between two owners of one app it says to extract inside the app', (t) => {
+  const across = runArch(archFixture(t, { profile: 'fe', apps: FE_APPS, files: {
+    'apps/web/src/hooks/cart/cart.shared.ts': helper('computeCart', 26),
+    'apps/admin/src/hooks/cart/cart.shared.ts': helper('computeOrders', 26, { variable: 'item' }),
+  } }));
+  const between = findings(across, 'HFS_DUPLICATE_CODE').filter((hit) => hit.twin.path !== hit.path);
+  assert.ok(between.length >= 1, JSON.stringify(between, null, 1));
+  for (const hit of between) {
+    assert.match(hit.message, /move it to a package \(packages\/<pkg>/);
+    assert.doesNotMatch(hit.message, /extract it once/);
+  }
+  const within = runArch(archFixture(t, { profile: 'fe', apps: FE_APPS, files: {
+    'apps/web/src/hooks/cart/cart.shared.ts': helper('computeCart', 26),
+    'apps/web/src/hooks/order/order.shared.ts': helper('computeOrders', 26, { variable: 'item' }),
+  } }));
+  const inside = findings(within, 'HFS_DUPLICATE_CODE').filter((hit) => hit.twin.path !== hit.path);
+  assert.ok(inside.length >= 1, JSON.stringify(inside, null, 1));
+  for (const hit of inside) {
+    assert.match(hit.message, /extract it once inside the app/);
+    assert.doesNotMatch(hit.message, /package/);
+  }
+});

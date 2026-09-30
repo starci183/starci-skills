@@ -232,7 +232,7 @@ test('frontend catches route drawing, upward tiers, direct/deep data access, bar
   const rules = new Set(result.violations.map(item => item.ruleId));
   assert.ok(checkAll(root).violations.some(item => item.ruleId === 'FE_TIER_DIRECTION' && item.path.endsWith('Leaf/index.tsx')), JSON.stringify(result, null, 2));
   for (const expected of ['FE_ROUTE_ONE_PAGE', 'FE_COMPONENT_DEEP_HOOK_IMPORT',
-    'FE_PURE_REACHES_DATA', 'FE_PURE_WORLD_HOOK']) assert.ok(rules.has(expected), `${expected}: ${JSON.stringify(result, null, 2)}`);
+    'FE_PURE_REACHES_DATA', 'FE_PURE_WORLD_HOOK', 'FE_TRANSPORT_OWNER']) assert.ok(rules.has(expected), `${expected}: ${JSON.stringify(result, null, 2)}`);
   assert.ok(result.violations.find(item => item.ruleId === 'FE_PURE_REACHES_DATA').dependencyChain.some(item => item.endsWith('bridge.ts')));
 });
 
