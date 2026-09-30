@@ -1,0 +1,15 @@
+id: hfs-messages-platform-tier
+effectiveAt: '2026-09-30T20:00:00+07:00'
+summary: >-
+  Lane FPE (BE-CONVENTION 1.15, 1.18: Vietnamese only in messages/ catalogs): the slot be.domain.messages now covers
+  src/modules/{domain,platform,integrations}/<capability>/messages/, so a platform capability may own a catalog and
+  no-non-ascii-source accepts it. Also: no-string-token accepts Nest framework tokens exported by @nestjs/core,
+  infra-needs-injector skips classes extending @nestjs/cqrs messages, unit-test-colocated accepts a spec its slot requires,
+  no-runtime-schema treats DataSource operation overrides as operations and refuses dropDatabase().
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-messages-platform-tier.yaml
+  - knowledge/hfs/slots.yaml
+  - packages/eslint/be/injection.mjs
+  - packages/eslint/be/testing.mjs
+  - packages/eslint/be/schema-authority.mjs

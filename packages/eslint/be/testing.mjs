@@ -149,6 +149,22 @@ const twinRoleOf = (hfs, filename) => {
   return TWIN_ROLES.find((entry) => name.endsWith(entry.suffix) && (entry.slots === null || entry.slots.includes(slot))) ?? null
 }
 
+/**
+ * True when the file is a spec its own slot lists under `requires` (the app slot requires `<app>.composition.spec.ts`, whose subject is
+ * the app module rather than a sibling file). The slot decides, so no name or path is matched here.
+ */
+const isRequiredBySlot = (hfs, filename) => {
+  const classified = hfs.classify(filename)
+  if (!classified.slot) return false
+  const relative = hfs.relative(filename)
+  const root = classified.root && classified.root !== "." ? `${classified.root}/` : ""
+  return (hfs.slot(classified.slot)?.requires ?? []).some((entry) => {
+    const rooted = entry.startsWith("/")
+    const filled = (rooted ? entry.slice(1) : entry).replace(/<(\w+)>/g, (whole, key) => classified.bindings?.[key] ?? whole)
+    return relative === (rooted ? filled : `${root}${filled}`)
+  })
+}
+
 /** Twin specs beside their subjects; no `.test.ts`, `int-spec` or `harness-spec` file. */
 export const unitTestColocated = {
   meta: {
@@ -170,6 +186,7 @@ export const unitTestColocated = {
       return { Program(node) { context.report({ node, messageId: "suffix", data: { name } }) } }
     }
     if (isUnitSpec(name)) {
+      if (isRequiredBySlot(hfs, filename)) return {}
       const stem = join(dirname(filename), name.slice(0, -".spec.ts".length))
       if (SUBJECT_EXTENSIONS.some((extension) => exists(`${stem}${extension}`))) return {}
       return { Program(node) { context.report({ node, messageId: "orphan", data: { name } }) } }

@@ -27,7 +27,7 @@ import ts from "typescript"
 import { staticText } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { normalizePath } from "./lib/path.mjs"
-import { typed, typeOrigins } from "./lib/types.mjs"
+import { isPackageExport, typed, typeOrigins } from "./lib/types.mjs"
 
 /** The raw decorators of Nest and TypeORM whose call is the injector's job. */
 const RAW_NAMES = new Set(["Inject", "InjectEntityManager", "InjectDataSource", "InjectQueue", "InjectRepository"])
@@ -426,6 +426,9 @@ export const infraNeedsInjector = {
         const own = hfs.ownerOf(filename)
         return {
             MethodDefinition(node) {
+                // A CQRS message (`extends Command<R>` / `Query<R>` of @nestjs/cqrs) is built by its caller, never by the container.
+                const heritage = node.parent?.parent?.superClass
+                if (heritage && isPackageExport(context, heritage, "@nestjs/cqrs")) return
                 for (const param of constructorParams(node)) {
                     const { target, decorators } = decoratorsOfParam(param)
                     const annotation = target.typeAnnotation?.typeAnnotation
@@ -533,6 +536,7 @@ export const noStringToken = {
     create(context) {
         const filename = context.filename || context.getFilename()
         const isString = (node) => {
+            if (isPackageExport(context, node, "@nestjs/core")) return false
             if (node.type === "CallExpression" && TOKEN_GETTERS.has(calleeOf(context, node).name ?? "")) return false
             if (staticText(node) !== null) return true
             if (node.type === "TemplateLiteral") return true

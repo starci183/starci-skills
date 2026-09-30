@@ -32,6 +32,7 @@ const tester = new RuleTester({
 
 const SRC = at("src/modules/domain/user/user.service.ts")
 const MESSAGES = at("src/modules/domain/user/messages/user.messages.ts")
+const PLATFORM_MESSAGES = at("src/modules/platform/errors/messages/errors.messages.ts")
 const FEATURE_MESSAGES = at("src/features/plan/messages/plan.messages.ts")
 
 test("every rule this law declares is exported under its published name", () => {
@@ -95,8 +96,12 @@ test("COMMENT-4: source prose is English and no marker exempts a line", () => {
       // a message catalog (slot be.domain.messages or be.feature.messages) is product copy, not source prose
       { filename: FEATURE_MESSAGES, code: "// b\u1ea3n d\u1ecbch\nexport const vi = { hello: 'Xin ch\u00e0o' }" },
       { filename: MESSAGES, code: "export const vi = { hello: 'Xin ch\u00e0o' }" },
+      // a platform capability owns its catalog too (BE-CONVENTION 1.15, 1.18)
+      { filename: PLATFORM_MESSAGES, code: "export const vi = { hello: 'Xin ch\u00e0o' }" },
     ],
     invalid: [
+      // platform source outside its messages/ catalog is still English only
+      { filename: at("src/modules/platform/errors/errors.service.ts"), code: "export const vi = { hello: 'Xin ch\u00e0o' }", errors: [{ messageId: "nonAscii" }] },
       {
         filename: SRC,
         code: "// Ki\u1ec3m tra ng\u01b0\u1eddi d\u00f9ng\nconst x = 1",

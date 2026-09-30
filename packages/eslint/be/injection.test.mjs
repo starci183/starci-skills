@@ -248,6 +248,11 @@ test("infra-needs-injector: class injection only for domain services and the sam
             { filename: HANDLER, code: `class Local { ping(): boolean { return true } }\nexport class H { constructor(private readonly name: string, private readonly ids: Array<number>, private readonly at: Date, private readonly local: Local) {} }` },
             // a class of the same owner, even a platform one
             { filename: at("src/modules/platform/cache/cache.warmer.ts"), code: `import { CacheService } from "./cache.service"\nexport class Warmer { constructor(private readonly cache: CacheService) {} }` },
+            // a CQRS message carries its params and is never DI-constructed
+            { filename: HANDLER, code: `import { Command, Query } from "@nestjs/cqrs"
+import type { EntityManager } from "typeorm"
+export class AddCommand extends Command<number> { constructor(readonly params: EntityManager) { super() } }
+export class GetQuery extends Query<number> { constructor(readonly params: EntityManager) { super() } }` },
             // not a constructor
             { filename: HANDLER, code: `${EM}export class H { run(em: EntityManager): EntityManager { return em } }` },
         ],
@@ -260,6 +265,9 @@ test("infra-needs-injector: class injection only for domain services and the sam
             { filename: HANDLER, code: `${CACHE}export class H { constructor(private readonly cache: CacheService) {} }`, errors: [{ messageId: "missing" }] },
             // a platform port
             { filename: HANDLER, code: `${LOGGER}export class H { constructor(private readonly logger: Logger) {} }`, errors: [{ messageId: "missing" }] },
+            // extending a local class is not a CQRS message
+            { filename: HANDLER, code: `${EM}class Base {}
+export class H extends Base { constructor(private readonly em: EntityManager) { super() } }`, errors: [{ messageId: "missing" }] },
             // an integrations type
             { filename: HANDLER, code: `import type { FooClient } from "@modules/integrations/foo"\nexport class H { constructor(private readonly foo: FooClient) {} }`, errors: [{ messageId: "missing" }] },
             // a package type
@@ -319,6 +327,13 @@ test("no-string-token: a token is a class or a unique symbol", () => {
         valid: [
             { filename: SERVICE, code: `const T: unique symbol = Symbol("order.thing")\nexport const providers = [{ provide: T, useValue: 1 }]` },
             { filename: SERVICE, code: `import { OrderService } from "@modules/domain/order"\nexport const providers = [{ provide: OrderService, useClass: OrderService }]` },
+            // Nest framework tokens exported by @nestjs/core (default-deny itself requires APP_GUARD)
+            { filename: SERVICE, code: `import { APP_GUARD, APP_FILTER, APP_PIPE, APP_INTERCEPTOR } from "@nestjs/core"
+export const providers = [{ provide: APP_GUARD, useClass: Object }, { provide: APP_FILTER, useClass: Object }, { provide: APP_PIPE, useClass: Object }, { provide: APP_INTERCEPTOR, useClass: Object }]` },
+            { filename: SERVICE, code: `import { APP_GUARD as GUARD } from "@nestjs/core"
+export const providers = [{ provide: GUARD, useClass: Object }]` },
+            { filename: SERVICE, code: `import * as core from "@nestjs/core"
+export const providers = [{ provide: core.APP_GUARD, useClass: Object }]` },
             // a connection name constant is fine
             { filename: SERVICE, code: `import { getEntityManagerToken } from "@nestjs/typeorm"\nconst PRIMARY_CONNECTION = "primary"\nexport const token = getEntityManagerToken(PRIMARY_CONNECTION)` },
             // the literal lives in the connection file
@@ -330,6 +345,9 @@ test("no-string-token: a token is a class or a unique symbol", () => {
         invalid: [
             { filename: SERVICE, code: `${COMMON}export class S { constructor(@Inject("X") private readonly x: string) {} }`, errors: [{ messageId: "string" }] },
             { filename: SERVICE, code: `${COMMON}export class S { constructor(@Inject(\`X\`) private readonly x: string) {} }`, errors: [{ messageId: "string" }] },
+            // a local constant named like a Nest token is still a string
+            { filename: SERVICE, code: `const APP_GUARD = "APP_GUARD"
+export const providers = [{ provide: APP_GUARD, useClass: Object }]`, errors: [{ messageId: "string" }] },
             // a string constant is still a string
             { filename: SERVICE, code: `${COMMON}const TOKEN = "X"\nexport class S { constructor(@Inject(TOKEN) private readonly x: string) {} }`, errors: [{ messageId: "string" }] },
             { filename: SERVICE, code: `import { Inject as I } from "@nestjs/common"\nexport class S { constructor(@I("X") private readonly x: string) {} }`, errors: [{ messageId: "string" }] },

@@ -644,8 +644,8 @@ slots:
     rules: [BE_ERROR_HOME]
   - id: be.domain.messages
     profiles: [be]
-    path: "src/modules/{domain,integrations}/<capability>/messages/"
-    presence: optional            # a capability that raises no user-facing text carries none
+    path: "src/modules/{domain,platform,integrations}/<capability>/messages/"
+    presence: optional            # a capability (any tier) that raises no user-facing text carries none
     tracked: tracked
     tier: inherit
     allows: ["<capability>.messages.ts", "*.spec.ts"]   # one keyed catalog per capability, vi and en, read through the platform/i18n MessageCatalog port

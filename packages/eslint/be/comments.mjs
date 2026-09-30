@@ -9,7 +9,7 @@
  *   - `require-enum-member-jsdoc` can check that a doc EXISTS and never that it states a
  *     consequence. That half is read by a person, and the rule says so rather than pretending.
  *   - `no-non-ascii-source` takes no exemption marker: HFS removed `vn-ok`, so text a program depends on
- *     lives in a message catalog (slot be.domain.messages or be.feature.messages), the only place Vietnamese may appear. Specs
+ *     lives in a message catalog (slot be.domain.messages, of any module tier, or be.feature.messages), the only place Vietnamese may appear. Specs
  *     and fixtures get no exemption.
  *   - `no-restated-name-jsdoc` (law 7) holds the decidable slice of law 3 - a doc block whose only
  *     content is the declared name re-spelled in words teaches nothing beyond the import line, so it

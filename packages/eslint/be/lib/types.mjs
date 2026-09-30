@@ -98,3 +98,22 @@ export const isTypeNamed = (context, node, name, fromFile = () => true) =>
  */
 export const isPackageType = (context, node, name, pkg) =>
     typeOrigins(context, node).some((origin) => origin.name === name && origin.module === pkg)
+
+/**
+ * True when the node is a reference to a value the package `pkg` exports (`APP_GUARD` of `@nestjs/core`): the symbol the
+ * expression names, after alias resolution, is declared inside that package. A local constant of the same name is not.
+ *
+ * @param {object} context - The ESLint rule context.
+ * @param {object} node - An identifier or member expression.
+ * @param {string} pkg - The package that must declare the referenced value.
+ * @returns {boolean} Whether the node references an export of that package.
+ */
+export const isPackageExport = (context, node, pkg) => {
+    const { checker, toTs } = typed(context)
+    const tsNode = toTs(node)
+    if (!tsNode) return false
+    const symbol = checker.getSymbolAtLocation(ts.isPropertyAccessExpression(tsNode) ? tsNode.name : tsNode)
+    if (!symbol) return false
+    const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
+    return (target.getDeclarations?.() ?? []).some((declaration) => moduleOf(declaration, String(declaration.getSourceFile().fileName).replace(/\\/g, "/")) === pkg)
+}

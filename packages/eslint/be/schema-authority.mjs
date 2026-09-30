@@ -30,6 +30,9 @@ const DDL = /\b(?:(?:CREATE|ALTER|DROP)\s+(?:OR\s+REPLACE\s+)?(?:UNIQUE\s+)?(?:T
 /** The packages whose option types describe a DataSource. */
 const OPTION_PACKAGES = new Set(["typeorm", "@nestjs/typeorm"])
 
+/** The DataSource operations that change the schema at runtime. */
+const SCHEMA_OPERATIONS = new Set(["synchronize", "dropDatabase"])
+
 const isFalse = (node) => node?.type === "Literal" && node.value === false
 
 /** The text of every string literal and template chunk under `node`. */
@@ -45,14 +48,27 @@ const stringsUnder = (node) => {
 /** The non-union, non-intersection constituents of a TypeScript type. */
 const leavesOf = (type) => (type.isUnionOrIntersection() ? type.types.flatMap(leavesOf) : [type])
 
-/** Whether an object literal is contextually a DataSource options object: its expected type has a `synchronize` member declared by `typeorm`. */
-const isOptionsObject = (context, node) => {
+/** The `synchronize` members that typeorm declares on the contextual type of an object literal, as TypeScript declarations. */
+const synchronizeMembers = (context, node) => {
     const { checker, toTs } = typed(context)
     const tsNode = toTs(node)
     const expected = tsNode ? checker.getContextualType(tsNode) : undefined
-    if (!expected) return false
-    return leavesOf(expected).some((part) => (checker.getPropertyOfType(part, "synchronize")?.declarations ?? [])
-        .some((declaration) => OPTION_PACKAGES.has(packageOfFile(declaration.getSourceFile().fileName))))
+    if (!expected) return []
+    return leavesOf(expected)
+        .flatMap((part) => checker.getPropertyOfType(part, "synchronize")?.declarations ?? [])
+        .filter((declaration) => OPTION_PACKAGES.has(packageOfFile(declaration.getSourceFile().fileName)))
+}
+
+/** A `synchronize` declared as a method is the DataSource operation, not the options flag. */
+const isMethod = (declaration) => ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration)
+
+/** Whether an object literal is contextually a DataSource options object: its expected type has a `synchronize` option (a property, not the `synchronize()` method) declared by `typeorm`. */
+const isOptionsObject = (context, node) => synchronizeMembers(context, node).some((declaration) => !isMethod(declaration))
+
+/** Whether an object literal is contextually a DataSource (or a partial of one) whose `synchronize` is the method: its keys are overrides of operations, not configuration. */
+const isOperationsObject = (context, node) => {
+    const members = synchronizeMembers(context, node)
+    return members.length > 0 && members.every(isMethod)
 }
 
 /** Whether an object literal has a property called `name`. */
@@ -68,7 +84,7 @@ export const noRuntimeSchema = {
             synchronize: "`synchronize` is set to something other than the literal `false`. The schema changes by migration only; a boot-time ORM diff decides it otherwise.",
             synchronizeMissing: "This DataSource options object does not state `synchronize: false`. Write the literal `false` in every options object, so what the connection may do to the schema is readable where it is built.",
             optionsNotLiteral: "`new DataSource(...)` is given options that are not an object literal, so `synchronize: false` cannot be seen. Pass the options as an object literal that states `synchronize: false`.",
-            synchronizeCall: "`.synchronize()` builds the schema at runtime. Write a migration and let `apps/migrate` run it.",
+            synchronizeCall: "`.{{name}}()` changes the schema at runtime. Write a migration and let `apps/migrate` run it.",
             migrationsRun: "`migrationsRun` is banned. Only `apps/migrate` runs migrations, once per connection, before api and worker start.",
             ddl: "A schema-changing statement (`CREATE|ALTER|DROP ...`) outside `persistence/migrations/`. Schema-changing SQL belongs in a migration.",
             glob: "`{{key}}` is found by glob. List the entities and migrations explicitly from each capability's `index.ts` so what runs is what was reviewed.",
@@ -86,6 +102,7 @@ export const noRuntimeSchema = {
                 if (node.computed) return
                 const key = keyName(node.key)
                 if (key === "synchronize" && !isFalse(node.value)) {
+                    if (node.parent?.type === "ObjectExpression" && isOperationsObject(context, node.parent)) return
                     context.report({ node, messageId: "synchronize" })
                 } else if (key === "migrationsRun") {
                     context.report({ node, messageId: "migrationsRun" })
@@ -100,8 +117,8 @@ export const noRuntimeSchema = {
             },
             CallExpression(node) {
                 const callee = node.callee
-                if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier" || callee.property.name !== "synchronize") return
-                if (isPackageType(context, callee.object, "DataSource", "typeorm")) context.report({ node, messageId: "synchronizeCall" })
+                if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier" || !SCHEMA_OPERATIONS.has(callee.property.name)) return
+                if (isPackageType(context, callee.object, "DataSource", "typeorm")) context.report({ node, messageId: "synchronizeCall", data: { name: callee.property.name } })
             },
             Literal(node) {
                 if (!migration && typeof node.value === "string" && DDL.test(node.value)) context.report({ node, messageId: "ddl" })

@@ -16,6 +16,11 @@ test("the schema is decided by migrations, never by the running process", () => 
             { filename: SERVICE, code: `${TYPEORM}const module = TypeOrmModule.forRoot({ type: "postgres", synchronize: false })` },
             { filename: SERVICE, code: `${TYPEORM}const module = TypeOrmModule.forRootAsync({ useFactory: () => ({ type: "postgres", synchronize: false }) })` },
             { filename: SERVICE, code: "const options = { entities: [PlanEntity], migrations: [CreatePlan] }" },
+            // a typed double of a DataSource overrides operations by key: `synchronize` there is a method, not the config flag
+            { filename: SERVICE, code: `${TYPEORM}declare function mock<T>(overrides?: Partial<T>): T
+const ds = mock<DataSource>({ manager: undefined, synchronize: undefined, dropDatabase: undefined })` },
+            { filename: SERVICE, code: `${TYPEORM}declare function mock<T>(overrides?: Partial<T>): T
+const ds = mock<DataSource>({ manager: undefined })` },
             // DDL is written in migrations, whatever the case of the keywords
             { filename: MIGRATION, code: "await queryRunner.query('CREATE TABLE plan (id uuid primary key)')" },
             { filename: MIGRATION, code: "await queryRunner.query(`ALTER TABLE plan ADD COLUMN x int`)" },
@@ -36,6 +41,10 @@ test("the schema is decided by migrations, never by the running process", () => 
             { filename: SERVICE, code: "const options = { synchronize: env.DB_SYNC === 'true' }", errors: [{ messageId: "synchronize" }] },
             { filename: SERVICE, code: "const synchronize = false; const o = { synchronize }", errors: [{ messageId: "synchronize" }] },
             { filename: SERVICE, code: `${TYPEORM}await dataSource.synchronize()`, errors: [{ messageId: "synchronizeCall" }] },
+            { filename: SERVICE, code: `${TYPEORM}await dataSource.dropDatabase()`, errors: [{ messageId: "synchronizeCall" }] },
+            // a typed options object stays refused when it turns synchronize on, and a DataSource double is only exempt by its contextual type
+            { filename: SERVICE, code: `${TYPEORM}declare const options: DataSourceOptions
+const o: DataSourceOptions = { type: "postgres", synchronize: true }`, errors: [{ messageId: "synchronize" }] },
             // migrationsRun is banned in every form, false included
             { filename: SERVICE, code: "const options = { migrationsRun: true }", errors: [{ messageId: "migrationsRun" }] },
             { filename: SERVICE, code: "const options = { migrationsRun: false }", errors: [{ messageId: "migrationsRun" }] },

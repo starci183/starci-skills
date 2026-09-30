@@ -83,6 +83,9 @@ test("R47: a role has a twin spec, a spec has a subject, and there are two kinds
       { filename: at("src/modules/domain/order/covered.service.ts"), code: "export class CoveredService {}" },
       // the real twin beside its real subject
       { filename: at("src/modules/domain/order/covered.service.spec.ts"), code: "export {}" },
+      // the app slot requires its composition spec; its subject is the app module, not a sibling file
+      { filename: at("apps/api/src/api.composition.spec.ts"), code: "export {}" },
+      { filename: at("apps/migrate/src/migrate.composition.spec.ts"), code: "export {}" },
       // a file with no twin role needs no twin
       { filename: at("src/modules/domain/order/order.contracts.ts"), code: "export interface Order {}" },
       { filename: at("src/modules/domain/order/index.ts"), code: "export {}" },
@@ -106,6 +109,10 @@ test("R47: a role has a twin spec, a spec has a subject, and there are two kinds
       { filename: at("src/modules/domain/order/persistence/order.rows.ts"), code: "export const toOrder = () => 1", errors: [{ messageId: "twin" }] },
       // a spec with no subject beside it
       { filename: at("src/modules/domain/order/nothing-here.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      // only the spec the slot requires is exempt: another spec in an app, or a composition spec in a module, has no subject
+      { filename: at("apps/api/src/other.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      { filename: at("apps/api/src/migrate.composition.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
+      { filename: at("src/modules/domain/order/order.composition.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
       { filename: at("src/tests/world/use-test-world.spec.ts"), code: "export {}", errors: [{ messageId: "orphan" }] },
       // the banned kinds
       { filename: at("src/modules/domain/order/order.service.test.ts"), code: "export {}", errors: [{ messageId: "suffix" }] },
