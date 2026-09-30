@@ -10,19 +10,20 @@
  *
  * A call whose options are not an object literal cannot be judged from syntax, so it is left alone.
  */
+import ts from "typescript"
 import { keyName, walk } from "./lib/ast.mjs"
-import { isDeclarationFile, isTestLane, normalizePath } from "./lib/path.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { isOwnedBy } from "./lib/ports.mjs"
+import { isPackageType, isTypeNamed, typed } from "./lib/types.mjs"
+import { isDeclarationFile } from "./lib/path.mjs"
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "head", "request"])
 
-/** The receivers whose method calls are outbound HTTP, by the last name of the receiver. */
-const HTTP_RECEIVER = /^(?:axios|http|httpService|httpClient|axiosInstance)$/
+/** The outbound HTTP client types a call may be made on, by the package that declares each. */
+const HTTP_CLIENT_TYPES = Object.freeze([["AxiosInstance", "axios"], ["AxiosStatic", "axios"], ["HttpService", "@nestjs/axios"]])
 
-const lastName = (node) => {
-  if (node.type === "Identifier") return node.name
-  if (node.type === "MemberExpression" && !node.computed && node.property.type === "Identifier") return node.property.name
-  return null
-}
+/** Whether the node's TYPE is an outbound HTTP client (an axios instance or the Nest `HttpService`), whatever it is called. */
+const isHttpClient = (context, node) => HTTP_CLIENT_TYPES.some(([name, pkg]) => isPackageType(context, node, name, pkg))
 
 const hasKey = (objectNode, names) =>
   objectNode.properties.some((property) => property.type === "Property" && names.includes(keyName(property.key)))
@@ -46,7 +47,7 @@ export const httpNeedsTimeout = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (isTestLane(filename) || isDeclarationFile(filename)) return {}
+    if (isDeclarationFile(filename)) return {}
     return {
       CallExpression(node) {
         const { callee } = node
@@ -61,17 +62,16 @@ export const httpNeedsTimeout = {
         }
         if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return
         const method = callee.property.name
-        const receiver = lastName(callee.object)
-        if (receiver === "axios" && method === "create") {
+        if (!isHttpClient(context, callee.object)) return
+        const receiver = callee.object.type === "Identifier" ? callee.object.name : "client"
+        if (method === "create" && isPackageType(context, callee.object, "AxiosStatic", "axios")) {
           const config = node.arguments[0]
           if (!config || (config.type === "ObjectExpression" && !hasSpread(config) && !hasKey(config, ["timeout", "signal"]))) {
             context.report({ node, messageId: "createNoTimeout" })
           }
           return
         }
-        if (!HTTP_METHODS.has(method) || !receiver || !HTTP_RECEIVER.test(receiver)) return
-        // Node's own `http.get(url, callback)` is not this rule's business: a bare `http` receiver is not an injected client
-        if (receiver === "http" && callee.object.type !== "MemberExpression") return
+        if (!HTTP_METHODS.has(method)) return
         const configAt = method === "request" ? 0 : ["post", "put", "patch"].includes(method) ? 2 : 1
         const config = node.arguments[configAt]
         if (config === undefined) {
@@ -110,7 +110,7 @@ export const jsonParseNeedsGuard = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (isTestLane(filename) || isDeclarationFile(filename)) return {}
+    if (isDeclarationFile(filename)) return {}
     return {
       CallExpression(node) {
         const { callee } = node
@@ -124,17 +124,108 @@ export const jsonParseNeedsGuard = {
   },
 }
 
-const PLATFORM_RETRY = /\/src\/modules\/platform\/retry\//
-const DELAY_NAMES = /^(?:sleep|delay|wait|backoff)$/i
-const LOOP_TYPES = new Set(["ForStatement", "WhileStatement", "DoWhileStatement"])
+/** Modules whose functions wait: `node:timers/promises` `setTimeout` and `scheduler.wait`, and the callback timers. */
+const TIMER_MODULES = new Set(["node:timers/promises", "timers/promises", "node:timers", "timers"])
+const LOOP_TYPES = ["ForStatement", "WhileStatement", "DoWhileStatement", "ForOfStatement", "ForInStatement"]
 
-/** Whether `node` is a call shaped like a delay: `sleep(ms)`, `x.delay(ms)`, or `setTimeout(...)`. */
-const isDelayCall = (node) => {
-  if (node.type !== "CallExpression") return false
-  const { callee } = node
-  if (callee.type === "Identifier") return DELAY_NAMES.test(callee.name) || callee.name === "setTimeout"
-  return callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" && DELAY_NAMES.test(callee.property.name)
+/** The variable a name resolves to from `node`'s scope, or null when it is a global. */
+const variableOf = (context, node, name) => {
+  let scope = (context.sourceCode || context.getSourceCode()).getScope(node)
+  while (scope) {
+    const found = scope.set.get(name)
+    if (found) return found
+    scope = scope.upper
+  }
+  return null
 }
+
+/** Whether an identifier is the global timer function of that name, not a local one. */
+const isGlobalTimer = (context, identifier) => identifier.name === "setTimeout" && (variableOf(context, identifier, identifier.name)?.defs.length ?? 0) === 0
+
+/** Whether an identifier is bound by an import of a timers module (`import { setTimeout as pause } from "node:timers/promises"`). */
+const isTimerImport = (context, identifier) =>
+  variableOf(context, identifier, identifier.name)?.defs.some((def) => def.type === "ImportBinding" && TIMER_MODULES.has(def.parent.source.value)) ?? false
+
+/** The leftmost identifier of `a.b.c`, else null. */
+const rootOf = (node) => {
+  let current = node
+  while (current.type === "MemberExpression") current = current.object
+  return current.type === "Identifier" ? current : null
+}
+
+/** The import a TypeScript identifier resolves to, when it is an import of a timers module. */
+const isTimerImportTs = (checker, identifier) => {
+  const declarations = checker.getSymbolAtLocation(identifier)?.declarations ?? []
+  return declarations.some((declaration) => {
+    const importDeclaration = ts.findAncestor(declaration, ts.isImportDeclaration)
+    return Boolean(importDeclaration) && ts.isStringLiteral(importDeclaration.moduleSpecifier) && TIMER_MODULES.has(importDeclaration.moduleSpecifier.text)
+  })
+}
+
+/** Whether a TypeScript identifier named `setTimeout` is the ambient timer (declared by a `.d.ts`, or by nothing), not a function of the repository. */
+const isGlobalTimerTs = (checker, identifier) =>
+  (checker.getSymbolAtLocation(identifier)?.declarations ?? []).every((declaration) => declaration.getSourceFile().isDeclarationFile)
+
+/** The functions a TypeScript declaration is or holds (`function f`, `const f = () => ...`, a method, a property arrow). */
+const bodiesOf = (declaration) => {
+  if (ts.isFunctionLike(declaration) && declaration.body) return [declaration.body]
+  if ((ts.isVariableDeclaration(declaration) || ts.isPropertyDeclaration(declaration) || ts.isPropertyAssignment(declaration)) && declaration.initializer) {
+    return ts.isFunctionLike(declaration.initializer) && declaration.initializer.body ? [declaration.initializer.body] : []
+  }
+  return []
+}
+
+/**
+ * Whether calling the function a TypeScript call resolves to WAITS: its body calls the global `setTimeout`, a
+ * `node:timers` function, or another function that does (followed up to three levels deep). A function declared by
+ * the `platform/retry` owner is the sanctioned helper and never counts. A function whose body is not in the program
+ * (a package declaration file) cannot be judged and does not count; the timer-import ban (R90) closes that door.
+ */
+const waitsThrough = (context, checker, call, depth, seen) => {
+  const hfs = hfsOf(context)
+  const target = ts.isPropertyAccessExpression(call.expression) ? call.expression.name : call.expression
+  let symbol = checker.getSymbolAtLocation(target)
+  if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
+  for (const declaration of symbol?.declarations ?? []) {
+    if (seen.has(declaration)) continue
+    seen.add(declaration)
+    if (isOwnedBy(hfs, declaration.getSourceFile().fileName, "platform", "retry")) continue
+    for (const body of bodiesOf(declaration)) if (waitsIn(context, checker, body, depth, seen)) return true
+  }
+  return false
+}
+
+/** Whether a TypeScript subtree waits: it calls a timer, or a function that waits. */
+const waitsIn = (context, checker, root, depth, seen) => {
+  let found = false
+  const visit = (node) => {
+    if (found) return
+    if (ts.isCallExpression(node)) {
+      let base = node.expression
+      while (ts.isPropertyAccessExpression(base)) base = base.expression
+      if (ts.isIdentifier(base) && ((base.text === "setTimeout" && isGlobalTimerTs(checker, base)) || isTimerImportTs(checker, base))) found = true
+      else if (depth > 0 && waitsThrough(context, checker, node, depth - 1, seen)) found = true
+    }
+    if (!found) ts.forEachChild(node, visit)
+  }
+  visit(root)
+  return found
+}
+
+/** Whether an ESTree call waits: a global or imported timer, or a function declared outside `platform/retry` whose body waits. */
+const isWaitCall = (context, node) => {
+  const { callee } = node
+  const root = rootOf(callee)
+  if (root && (isGlobalTimer(context, root) || isTimerImport(context, root))) return true
+  const { checker, toTs } = typed(context)
+  const tsCall = toTs(node)
+  return Boolean(tsCall) && waitsThrough(context, checker, tsCall, 3, new Set())
+}
+
+/** Whether a call catches: a `.catch(...)` on a Promise. */
+const isPromiseCatch = (context, node) =>
+  node.type === "CallExpression" && node.callee.type === "MemberExpression" && !node.callee.computed && node.callee.property.type === "Identifier"
+  && node.callee.property.name === "catch" && isTypeNamed(context, node.callee.object, "Promise")
 
 /** A loop that both catches an error and waits is retrying by hand. */
 export const noHandRolledRetry = {
@@ -144,22 +235,26 @@ export const noHandRolledRetry = {
     schema: [],
     messages: {
       handRolled:
-        "This loop catches an error and waits before trying again - a hand-rolled retry with no attempt bound visible here, no jitter and no way to honor an abort signal. Retry through the shared `platform/retry` helper (bounded attempts, exponential backoff with jitter, an abort signal) instead of a loop written at the call site.",
+        "This loop catches an error and waits before trying again - a hand-rolled retry with no attempt bound visible here, no jitter and no way to honor an abort signal. Retry through `retry(work, { maxAttempts, baseDelayMs, maxDelayMs, signal })` from `platform/retry` (or the queue's declared `attempts`/`backoff`) instead of a loop written at the call site.",
     },
   },
   create(context) {
-    const filename = normalizePath(context.filename || context.getFilename())
-    if (isTestLane(filename) || isDeclarationFile(filename) || PLATFORM_RETRY.test(filename)) return {}
+    const filename = context.filename || context.getFilename()
+    if (isDeclarationFile(filename) || isOwnedBy(hfsOf(context), filename, "platform", "retry")) return {}
     const check = (node) => {
       let hasCatch = false
-      let hasDelay = false
       walk(node.body, (child) => {
-        if (child.type === "CatchClause") hasCatch = true
-        else if (isDelayCall(child)) hasDelay = true
+        if (child.type === "CatchClause" || isPromiseCatch(context, child)) hasCatch = true
       }, { intoFunctions: false })
-      if (hasCatch && hasDelay) context.report({ node, messageId: "handRolled" })
+      if (!hasCatch) return
+      // a wait is often a `new Promise((resolve) => setTimeout(resolve, ms))` executor, so the wait search enters functions
+      let hasWait = false
+      walk(node.body, (child) => {
+        if (!hasWait && child.type === "CallExpression" && isWaitCall(context, child)) hasWait = true
+      })
+      if (hasWait) context.report({ node, messageId: "handRolled" })
     }
-    return Object.fromEntries([...LOOP_TYPES].map((type) => [type, check]))
+    return Object.fromEntries(LOOP_TYPES.map((type) => [type, check]))
   },
 }
 
