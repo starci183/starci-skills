@@ -4,10 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { BE, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { BE, cleanup, gitAdd, installPresets, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 import { checkExamples, exampleDirs, formatResults, main } from '../scripts/checks/check-example-architecture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
+const prettierOf = path.resolve(root, 'examples', 'shape-slot', 'node_modules', 'prettier');
 const made = [];
 test.after(() => cleanup(made));
 
@@ -22,7 +23,14 @@ function examples() {
       fs.mkdirSync(path.join(repo, 'src', 'modules', 'domain', 'order'), { recursive: true });
       fs.writeFileSync(path.join(repo, 'src', 'modules', 'domain', 'order', 'index.ts'), 'export {};\n');
     }
-    installTypeScript(gitAdd(repo));
+    installPresets(installTypeScript(repo));
+    // the example's own prettier, the way `npm ci` installs it (the format check judges with the repository's prettier)
+    fs.cpSync(path.join(root, 'packages', 'prettier-config'), path.join(repo, 'node_modules', '@starci', 'prettier-config'), { recursive: true });
+    fs.symlinkSync(prettierOf, path.join(repo, 'node_modules', 'prettier'), 'junction');
+    // an example is formatted the way its own prettier config wants: the format check judges every tracked file
+    const formatted = spawnSync(process.execPath, [path.join(prettierOf, 'bin', 'prettier.cjs'), '--write', '.'], { cwd: repo, encoding: 'utf8' });
+    assert.equal(formatted.status, 0, formatted.stderr + formatted.stdout);
+    gitAdd(repo);
   }
   fs.mkdirSync(path.join(dir, 'not-an-example'));
   fs.writeFileSync(path.join(dir, 'not-an-example', 'README.md'), '# nothing\n');
