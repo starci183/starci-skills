@@ -1,10 +1,6 @@
-import { ORDER_CONNECTION } from "@modules/platform/database"
 import { OrderEntity } from "./entities/order.entity"
 import { OrderLineEntity } from "./entities/order-line.entity"
 import { CreateOrders1789800003000 } from "./migrations/1789800003000-create-orders"
-
-/** The connection whose database holds the tables of the order capability. */
-export const CONNECTION = ORDER_CONNECTION
 
 /** The entities of the order capability, for the connection that holds them. */
 export const orderEntities = [OrderEntity, OrderLineEntity]
