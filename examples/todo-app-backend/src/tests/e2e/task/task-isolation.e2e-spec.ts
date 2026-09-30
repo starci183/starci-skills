@@ -1,174 +1,92 @@
-import {
-    E2EWorld, bootE2EWorld 
-} from "../setup/e2e-world"
-import {
-    E2E_BOOT_TIMEOUT_MS 
-} from "../setup/testing-infra.options"
-
-jest.setTimeout(120_000)
-
-// taskCounts has no GRAPHQL_DOCUMENTS entry yet - the registry names only the doors the retired
-// JS harness exercised; a raw document string is the supported escape hatch for the rest.
-const TASK_COUNTS = "query TaskCounts { taskCounts { open complete } }"
-
-interface TaskSummary {
-  taskId: string;
-  title: string;
-  complete: boolean;
-}
-
-interface TaskCounts {
-  open: number;
-  complete: number;
-}
+import { randomUUID } from "node:crypto"
+import { bootE2eWorld } from "../setup/e2e-world"
+import type { E2EWorld } from "../setup/e2e-world"
+import type { E2EGraphqlHandle } from "../setup/e2e-graphql.client"
+import { present } from "../setup/e2e.error"
+import type { CompleteTaskData, CreateTaskData, TaskCountsData, TasksData } from "../setup/e2e-views.contracts"
 
 /**
- * br.task.single-owner end to end: two signed-in people on one stack, and one person's task
- * stays invisible and untouchable to the other through every door the schema offers - list,
- * counts, complete, reopen, delete. Where the API cannot see the row at all (a stranger's view
- * simply omits it), Postgres is the out-of-band witness: the row still sits under its owner's
- * personId, untouched by the stranger's refused attempts.
+ * br.task.single-owner end to end: two signed-in people on one stack, and one person task stays invisible and
+ * untouchable to the other through every door the schema offers: list, counts, complete, reopen, delete. Where the api
+ * cannot see the row at all (a stranger view simply omits it), Postgres is the out-of-band witness: the row still sits
+ * under its owner personId, untouched by the stranger refused attempts.
  */
-describe("task isolation (e2e)",
-    () => {
-        let world: E2EWorld
+describe("task isolation (e2e)", () => {
+    let world: E2EWorld
 
-        beforeAll(async () => {
-            world = await bootE2EWorld()
-            expect((await world.http.anonymous().get<{ status: string }>("/health")).data.status).toBe("ok")
-        },
-        E2E_BOOT_TIMEOUT_MS)
+    beforeAll(async () => {
+        world = await bootE2eWorld("task/task-isolation")
+        expect((await world.http().get<{ status: string }>("/health")).body.status).toBe("ok")
+    }, 600_000)
 
-        afterAll(async () => {
-            // close() runs the stack's teardown: compose down -v plus the verified-gone check, which
-            // throws here if any container or volume of this run's project remains.
-            await world.moduleRef.close()
-        })
-
-        it("two users on one stack: one user's task is invisible and untouchable to the other",
-            async () => {
-                const {
-                    http, auth, data: dataSource 
-                } = world
-                const title = `e2e isolation ${Date.now()}`
-
-                // The two identities the realm import seeds, each signed in through the public door.
-                const alice = await auth.persona("owner")
-                const bob = await auth.persona("other")
-                expect(bob.personId).not.toBe(alice.personId)
-
-                const tasksOf = async (token: string): Promise<Array<TaskSummary>> => {
-                    const res = await http.graphql<{ tasks: Array<TaskSummary> }>("listTasks",
-                        {
-                            token 
-                        })
-                    expect(res.errors).toBeNull()
-                    return res.data!.tasks
-                }
-                const countsOf = async (token: string): Promise<TaskCounts> => {
-                    const res = await http.graphql<{ taskCounts: TaskCounts }>(TASK_COUNTS,
-                        {
-                            token 
-                        })
-                    expect(res.errors).toBeNull()
-                    return res.data!.taskCounts
-                }
-
-                // Out-of-band: two live session rows, one per distinct person - the identities are real.
-                const sessions = await dataSource.sessions.byTokens([alice.token,
-                    bob.token])
-                expect(sessions).toHaveLength(2)
-                expect(sessions.map((row) => row.person_id).sort()).toEqual([alice.personId,
-                    bob.personId].sort())
-
-                const bobCountsBefore = await countsOf(bob.token)
-
-                const created = await http.graphql<{ createTask: { taskId: string; title: string } }>(
-                    "createTask",
-                    {
-                        variables: {
-                            input: {
-                                title 
-                            } 
-                        }, token: alice.token 
-                    },
-                )
-                expect(created.errors).toBeNull()
-                const taskId = created.data!.createTask.taskId
-
-                // Invisible to Bob at every read door: his list omits it, his counts never move.
-                expect((await tasksOf(alice.token)).map((task) => task.taskId)).toContain(taskId)
-                expect((await tasksOf(bob.token)).map((task) => task.taskId)).not.toContain(taskId)
-                expect(await countsOf(bob.token)).toEqual(bobCountsBefore)
-
-                // Untouchable to Bob at every write door the schema offers for a task id.
-                for (const document of ["completeTask",
-                    "reopenTask",
-                    "deleteTask"] as const) {
-                    const refused = await http.graphql(document,
-                        {
-                            variables: {
-                                id: taskId 
-                            }, token: bob.token 
-                        })
-                    expect(refused.errorCode).toBe("TASK_FORBIDDEN")
-                    expect(refused.data).toBeNull()
-                }
-
-                // Out-of-band: the row still exists, still Alice's, still open - the refusals wrote nothing.
-                const afterRefusals = await dataSource.tasks.byId(taskId)
-                expect(afterRefusals).toEqual([
-                    {
-                        id: taskId, owner: alice.personId, title, complete: false, completed_at: null 
-                    },
-                ])
-
-                // Alice completes it; the boundary does not soften with the state change.
-                const completed = await http.graphql<{ completeTask: { taskId: string; complete: boolean } }>(
-                    "completeTask",
-                    {
-                        variables: {
-                            id: taskId 
-                        }, token: alice.token 
-                    },
-                )
-                expect(completed.errors).toBeNull()
-                expect(completed.data!.completeTask.complete).toBe(true)
-                expect((await tasksOf(bob.token)).map((task) => task.taskId)).not.toContain(taskId)
-                expect(await countsOf(bob.token)).toEqual(bobCountsBefore)
-                const bobReopen = await http.graphql("reopenTask",
-                    {
-                        variables: {
-                            id: taskId 
-                        }, token: bob.token 
-                    })
-                expect(bobReopen.errorCode).toBe("TASK_FORBIDDEN")
-
-                const finalRows = await dataSource.tasks.stateById(taskId)
-                expect(finalRows[0].owner).toBe(alice.personId)
-                expect(finalRows[0].complete).toBe(true)
-                expect(finalRows[0].completed_at).not.toBeNull()
-
-                // Journey ends clean: both sessions signed out, both tokens dead at the door and in the store.
-                for (const session of [alice,
-                    bob]) {
-                    const out = await http.graphql<{ signOut: { signedOut: boolean } }>("signOut",
-                        {
-                            variables: {
-                                input: {
-                                    sessionToken: session.token 
-                                } 
-                            },
-                        })
-                    expect(out.errors).toBeNull()
-                    expect(out.data!.signOut.signedOut).toBe(true)
-                }
-                expect((await http.graphql("listTasks",
-                    {
-                        token: alice.token 
-                    })).errorCode).toBe("SESSION_NOT_FOUND")
-                const remaining = await dataSource.sessions.byTokens([alice.token,
-                    bob.token])
-                expect(remaining).toHaveLength(0)
-            })
+    afterAll(async () => {
+        // close() runs the stack teardown: compose down -v plus the verified-gone check.
+        await world.close()
+        expect(world.stack.cleanupReport?.clean).toBe(true)
     })
+
+    it("two users on one stack: one user task is invisible and untouchable to the other", async () => {
+        const { graphql, auth, database } = world
+        const title = `e2e isolation ${randomUUID()}`
+        // The two identities the realm import seeds, each signed in through the public door.
+        const alice = await auth.persona("owner")
+        const bob = await auth.persona("other")
+        expect(bob.personId).not.toBe(alice.personId)
+        const asAlice = graphql.client(alice.sessionToken)
+        const asBob = graphql.client(bob.sessionToken)
+
+        const taskIdsOf = async (caller: E2EGraphqlHandle): Promise<Array<string>> => {
+            const observed = await caller.read<TasksData>("tasks")
+            expect(observed.errors).toBeNull()
+            return present(observed.data, "tasks data").tasks.map((task) => task.taskId)
+        }
+        const countsOf = async (caller: E2EGraphqlHandle): Promise<TaskCountsData["taskCounts"]> => {
+            const observed = await caller.read<TaskCountsData>("taskCounts")
+            expect(observed.errors).toBeNull()
+            return present(observed.data, "taskCounts data").taskCounts
+        }
+
+        // Out-of-band: two live session rows, one per distinct person: the identities are real.
+        const sessions = await database.sessionsByTokens([alice.sessionToken, bob.sessionToken])
+        expect(sessions.map((row) => row.person_id).sort()).toEqual([alice.personId, bob.personId].sort())
+
+        const bobCountsBefore = await countsOf(asBob)
+        const created = await asAlice.mutate<CreateTaskData>("createTask", { variables: { input: { title } } })
+        expect(created.errors).toBeNull()
+        const taskId = present(created.data, "createTask data").createTask.taskId
+
+        // Invisible to Bob at every read door: his list omits it, his counts never move.
+        expect(await taskIdsOf(asAlice)).toContain(taskId)
+        expect(await taskIdsOf(asBob)).not.toContain(taskId)
+        expect(await countsOf(asBob)).toEqual(bobCountsBefore)
+
+        // Untouchable to Bob at every write door the schema offers for a task id.
+        for (const document of ["completeTask", "reopenTask", "deleteTask"]) {
+            const refused = await asBob.mutate<CompleteTaskData>(document, { variables: { input: { id: taskId } } })
+            expect(refused.errorCode).toBe("TASK_FORBIDDEN")
+            expect(refused.data).toBeNull()
+        }
+
+        // Out-of-band: the row still exists, still owned by Alice, still open: the refusals wrote nothing.
+        expect(await database.taskById(taskId)).toEqual([{ id: taskId, owner: alice.personId, title, complete: false, completed_at: null }])
+
+        // Alice completes it; the boundary does not soften with the state change.
+        const completed = await asAlice.mutate<CompleteTaskData>("completeTask", { variables: { input: { id: taskId } } })
+        expect(completed.errors).toBeNull()
+        expect(completed.data?.completeTask.complete).toBe(true)
+        expect(await taskIdsOf(asBob)).not.toContain(taskId)
+        expect(await countsOf(asBob)).toEqual(bobCountsBefore)
+        const bobReopen = await asBob.mutate<CompleteTaskData>("reopenTask", { variables: { input: { id: taskId } } })
+        expect(bobReopen.errorCode).toBe("TASK_FORBIDDEN")
+        const finalRows = await database.taskById(taskId)
+        expect(finalRows[0]?.owner).toBe(alice.personId)
+        expect(finalRows[0]?.complete).toBe(true)
+        expect(finalRows[0]?.completed_at).not.toBeNull()
+
+        // The journey ends clean: both sessions signed out, both tokens dead at the door and in the store.
+        await auth.signOut(alice.sessionToken)
+        await auth.signOut(bob.sessionToken)
+        expect((await asAlice.read<TasksData>("tasks")).errorCode).toBe("SESSION_NOT_FOUND")
+        expect(await database.sessionsByTokens([alice.sessionToken, bob.sessionToken])).toEqual([])
+    })
+})

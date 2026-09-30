@@ -1,21 +1,17 @@
 # Run-owned ephemeral stack for the end-to-end suite (npm run test:e2e).
 #
-# The suite starts and disposes this project itself, on every run, with a project name and volume set
-# unique to that run. It is derived from the declared dev stack
-# (.starcistacks/dev/infra/compose/{postgres,keycloak,redis}.yaml) and reuses that stack's tracked
-# inputs read-only - the seed scripts and the Keycloak realm import - so the schema and the demo
-# identities the scenarios sign in with are the same bytes the dev stack ships. It does NOT reuse the
-# dev stack's host ports, volumes or containers: every port here is allocated by the suite at run time
-# (127.0.0.1 only) and every volume belongs to this project, so a concurrent `todo-app-dev` stack is
+# The suite starts and disposes this project itself, on every run, with a project name unique to that run
+# (todo-e2e-<spec-hash>-<run-token>) and host ports allocated from the OS on 127.0.0.1: a concurrent todo-app-dev stack is
 # never touched and never becomes the proof surface.
 #
-# Secrets are generated per run by the suite and passed in through the environment, so no plaintext
-# credential sits in this tracked file and no decrypted dev secret materialization is needed to run
-# the suite. Bind-mount sources come from E2E_BACKEND_ROOT, which E2EStackService sets to the app
-# root as an absolute path - the mounts resolve correctly wherever this file sits in the tree.
-# minio and prometheus are deliberately absent: the api does not read them (the two
-# remaining dev-stack services it depends on are postgres, keycloak and redis), and the operator's
-# stack proof covers the dependencies the slice actually needs.
+# Only postgres + keycloak live here. The suite spawns the compiled apps/todo (api) and apps/worker entrypoints as host
+# child processes (the real AppModules, configured through the environment like any deployment) after apps/migrate applied
+# the schema to the one database. There is no redis: the notify queue is the Postgres outbox. The keycloak service imports
+# the tracked realm of the dev stack read-only, so the demo identities a scenario signs in with are the same bytes the
+# dev stack ships; the bind-mount source comes from E2E_BACKEND_ROOT, an absolute path set by the suite. No seed script is
+# mounted: the schema comes only from apps/migrate and every row a scenario needs is created through the public doors.
+#
+# Secrets are generated per run and passed through the environment; no plaintext credential sits in this tracked file.
 
 name: ${E2E_COMPOSE_PROJECT}
 
@@ -29,7 +25,6 @@ services:
     ports:
       - "127.0.0.1:${E2E_PG_PORT}:5432"
     volumes:
-      - ${E2E_BACKEND_ROOT}/.starcistacks/dev/seeds:/docker-entrypoint-initdb.d:ro
       - todo-e2e-postgres:/var/lib/postgresql/data
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
@@ -44,10 +39,6 @@ services:
       - ${E2E_BACKEND_ROOT}/.starcistacks/dev/infra/compose/realm-todo.json:/opt/keycloak/data/import/realm-todo.json:ro
     ports:
       - "127.0.0.1:${E2E_KC_PORT}:8089"
-  redis:
-    image: redis:7
-    ports:
-      - "127.0.0.1:${E2E_REDIS_PORT}:6379"
 
 volumes:
   todo-e2e-postgres: {}

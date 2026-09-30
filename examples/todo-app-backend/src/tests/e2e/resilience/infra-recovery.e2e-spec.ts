@@ -1,78 +1,58 @@
 /**
- * Lane E2E-09 -- infra-down recovery (todo-app-backend).
- *
- * Boots the run-scoped stack, kills the postgres container mid-run (the one dependency the api's
- * /health door probes), asserts the api stays alive and answers with a clean 503 instead of hanging
- * or crashing, starts the same container back (identical ports/volume), and asserts the api recovers
- * to 200. The out-of-band DataSource read at the end proves the data tier itself answers queries
- * again, alongside the api door's own dependency probe turning green. Skips with a reason while the
- * docker daemon is not reachable.
+ * Infra-down recovery. Boots the run-scoped stack, kills the postgres container mid-run (the one dependency the api /health
+ * probe checks; the worker polls the same database), asserts the api stays alive and answers /health with a clean 503 instead
+ * of hanging or crashing, starts the same container back (identical ports and volume), and asserts the api recovers to 200,
+ * the persisted world is intact, and the worker recovered too: a sign-in made after the outage gets its audit line appended
+ * through the outbox and the worker consumer. Skips with a reason when no docker daemon answers.
  */
-import {
-    bootE2EWorld 
-} from "../setup/e2e-world"
-import {
-    apiHealthUrls,
-    composeProjectOf,
-    dockerAvailable,
-    httpStatus,
-    killService,
-    retryUntil,
-    startContainer,
-} from "../setup/e2e-infra-contract"
+import { pollUntil } from "@e2e-kit/platform/poll"
+import { retryUntil } from "@e2e-kit/platform/readiness"
+import { dockerProbe, killService, startContainer } from "../setup/docker.client"
+import { bootE2eWorld } from "../setup/e2e-world"
+import type { ExportMyDataData } from "../setup/e2e-views.contracts"
 
-const runnable = dockerAvailable()
-if (!runnable) {
-    process.stderr.write("[e2e-09] infra-recovery skipped: docker daemon not reachable\n")
-}
-const describeE2E = runnable ? describe : describe.skip
+const describeE2E = dockerProbe().available ? describe : describe.skip
 
-describeE2E("resilience: infra recovery",
-    () => {
-        jest.setTimeout(600_000)
+describeE2E("resilience: infra recovery", () => {
+    jest.setTimeout(900_000)
 
-        it("postgres outage yields a clean api error and the api recovers when postgres returns",
-            async () => {
-                const world = await bootE2EWorld("resilience/infra-recovery")
-                try {
-                    const {
-                        stack, data: dataSource 
-                    } = world
-                    const project = composeProjectOf(stack)
-                    expect(project).not.toBeNull()
+    it("a postgres outage yields a clean api error and the api and the worker recover when postgres returns", async () => {
+        const world = await bootE2eWorld("resilience/infra-recovery")
+        try {
+            const { database, graphql, auth } = world
 
-                    const apis = await apiHealthUrls(stack)
-                    expect(apis.length).toBeGreaterThan(0)
+            // Baseline: the out-of-band data channel answers and the persisted world holds its migrated tables.
+            expect(await database.ping()).toBe(true)
+            expect(await database.tables()).toEqual(expect.arrayContaining(["sessions", "tasks", "outbox_messages", "inbox_claims"]))
 
-                    // Baseline: the out-of-band data channel answers before the chaos begins.
-                    const baseline = await dataSource.schema.ping()
-                    expect(baseline).toBe(true)
+            const killed = killService(world.stack.project, "postgres")
 
-                    const killed = killService(project!,
-                        /postgres/i)
+            // The api tolerates the outage: still answering HTTP, with a declared dependency error.
+            await retryUntil("api /health answers 503", 90_000, async () => (await world.http().get("/health")).status === 503)
 
-                    // The api tolerates the outage: still answering HTTP, with a declared dependency error.
-                    for (const base of apis) {
-                        await retryUntil(`${base}/health answers 503`,
-                            60_000,
-                            async () => (await httpStatus(`${base}/health`,
-                                15_000)) === 503)
-                    }
+            startContainer(killed)
 
-                    startContainer(killed.id)
+            await retryUntil("api /health recovers to 200", 180_000, async () => (await world.http().get("/health")).status === 200)
 
-                    for (const base of apis) {
-                        await retryUntil(`${base}/health recovers to 200`,
-                            180_000,
-                            async () => (await httpStatus(`${base}/health`)) === 200)
-                    }
+            // Persisted-state evidence: postgres itself answers real queries again, and its data survived the outage.
+            expect(await database.ping()).toBe(true)
+            expect(await database.tables()).toEqual(expect.arrayContaining(["sessions", "tasks"]))
 
-                    // Persisted-state evidence: postgres itself answers real queries again - the api's 200
-                    // proves its pool reconnected, this proves the data tier's own surface is back.
-                    const recovered = await dataSource.schema.ping()
-                    expect(recovered).toBe(true)
-                } finally {
-                    await world.moduleRef.close().catch((error: unknown) => error)
-                }
-            })
+            // The worker recovered with the database: a sign-in made now writes its audit message in the transaction of the
+            // session; the line only becomes readable once the worker consumer appended it.
+            const session = await auth.signInAs("owner")
+            await pollUntil(
+                "the audit line of the post-outage sign-in appended by the worker",
+                async () => {
+                    const observed = await graphql.client(session.sessionToken).read<ExportMyDataData>("exportMyData")
+                    const lines = observed.data?.exportMyData ?? []
+                    return lines.some((line) => line.action === "login.signed-in") ? lines : null
+                },
+                120_000,
+                1_000,
+            )
+        } finally {
+            await world.close()
+        }
     })
+})

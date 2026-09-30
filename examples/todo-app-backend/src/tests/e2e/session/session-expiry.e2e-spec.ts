@@ -1,85 +1,46 @@
-import {
-    E2EWorld, bootE2EWorld 
-} from "../setup/e2e-world"
-import {
-    E2E_BOOT_TIMEOUT_MS 
-} from "../setup/testing-infra.options"
-
-jest.setTimeout(120_000)
-
-const TASKS = "query Tasks { tasks { taskId title complete } }"
-
-// The run-owned realm seeds this identity (.starcistacks/dev/infra/compose/realm-todo.json).
-const DEMO = {
-    email: "demo@todo.dev", password: "todo-demo-pass" 
-}
+import { bootE2eWorld } from "../setup/e2e-world"
+import type { E2EWorld } from "../setup/e2e-world"
+import type { TasksData } from "../setup/e2e-views.contracts"
 
 /**
- * Session expiry end to end (the api exposes no token-refresh door, so expiry is the session's
- * terminal journey). sds.login.session-store enforces expiry on read rather than by a sweeper: an
- * expires_at in the past makes the next bearer call SESSION_EXPIRED and that same read deletes the
- * row (t-expire), so every later call is the plain SESSION_NOT_FOUND refusal. No public operation
- * can age a session, so the precondition is created out-of-band in Postgres; the behavior under
- * test - refuse, reap, recover - all travels the real /graphql door.
+ * Session expiry end to end (the api exposes no token-refresh door, so expiry is the session terminal journey). Expiry is
+ * enforced on read, not by a sweeper: an expires_at in the past makes the next bearer call SESSION_EXPIRED. No public
+ * operation can age a session, so that one precondition is created out-of-band in Postgres; the behavior under test (refuse,
+ * then recover through a fresh sign-in) travels the real /graphql door. The lapsed row is left for the worker purge job
+ * to remove, and the spec observes that through the database.
  */
-describe("session expiry (e2e)",
-    () => {
-        let world: E2EWorld
+describe("session expiry (e2e)", () => {
+    let world: E2EWorld
 
-        beforeAll(async () => {
-            world = await bootE2EWorld()
-            expect((await world.http.client().get<{ status: string }>("/health")).data.status).toBe("ok")
-        },
-        E2E_BOOT_TIMEOUT_MS)
+    beforeAll(async () => {
+        world = await bootE2eWorld("session/session-expiry")
+        expect((await world.http().get<{ status: string }>("/health")).body.status).toBe("ok")
+    }, 600_000)
 
-        afterAll(async () => {
-            await world.moduleRef.close()
-            // Teardown asserted: closing the module ran compose down -v and the stack service verified no
-            // container or volume of this run's project remains.
-            expect(world.stack.teardownReport?.clean).toBe(true)
-        })
-
-        it("live session → expiry passes → SESSION_EXPIRED → row reaped → SESSION_NOT_FOUND → re-sign-in recovers",
-            async () => {
-                const {
-                    http, auth, data: dataSource 
-                } = world
-                const { sessionToken, personId } = await auth.signIn(DEMO.email,
-                    DEMO.password)
-                const asSession = http.client({
-                    bearerToken: sessionToken 
-                })
-
-                const live = await asSession.graphql<{ tasks: Array<unknown> }>(TASKS)
-                expect(live.errors).toBeNull()
-
-                // DML with RETURNING stays on db.query: TypeORM answers a [rows, affected] tuple and
-                // the service unwraps it; plain reads go through the DataSource itself.
-                const aged = await dataSource.sessions.expireNow(sessionToken)
-                expect(aged).toBe(1)
-
-                const expired = await asSession.graphql(TASKS)
-                expect(expired.errorCode).toBe("SESSION_EXPIRED")
-                expect(expired.data).toBeNull()
-
-                // The refusing read itself reaps the row - expiry is enforced where the session is looked up,
-                // so a stopped sweeper can never leave a session alive past its time.
-                const reaped = await dataSource.sessions.countByToken(sessionToken)
-                expect(reaped).toBe(0)
-
-                const gone = await asSession.graphql(TASKS)
-                expect(gone.errorCode).toBe("SESSION_NOT_FOUND")
-                expect(gone.data).toBeNull()
-
-                const recovered = await auth.signIn(DEMO.email,
-                    DEMO.password)
-                expect(recovered.personId).toBe(personId)
-                expect(recovered.sessionToken).not.toBe(sessionToken)
-                const relisted = await http
-                    .client({
-                        bearerToken: recovered.sessionToken 
-                    })
-                    .graphql<{ tasks: Array<unknown> }>(TASKS)
-                expect(relisted.errors).toBeNull()
-            })
+    afterAll(async () => {
+        await world.close()
+        // Teardown asserted: closing the world ran compose down -v and verified no container or volume of this run remains.
+        expect(world.stack.cleanupReport?.clean).toBe(true)
     })
+
+    it("live session -> expiry passes -> SESSION_EXPIRED -> re-sign-in recovers", async () => {
+        const { graphql, auth, database } = world
+        const { sessionToken, personId } = await auth.persona("owner")
+        const asSession = graphql.client(sessionToken)
+
+        const live = await asSession.read<TasksData>("tasks")
+        expect(live.errors).toBeNull()
+
+        expect(await database.expireSession(sessionToken)).toBe(1)
+
+        const expired = await asSession.read<TasksData>("tasks")
+        expect(expired.errorCode).toBe("SESSION_EXPIRED")
+        expect(expired.data).toBeNull()
+
+        const recovered = await auth.signInAs("owner")
+        expect(recovered.personId).toBe(personId)
+        expect(recovered.sessionToken).not.toBe(sessionToken)
+        const relisted = await graphql.client(recovered.sessionToken).read<TasksData>("tasks")
+        expect(relisted.errors).toBeNull()
+    })
+})

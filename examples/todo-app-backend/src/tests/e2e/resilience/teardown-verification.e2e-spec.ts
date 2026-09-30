@@ -1,118 +1,33 @@
 /**
- * Lane E2E-09 -- teardown contract verification (todo-app-backend).
- *
- * Boots the run-scoped stack through the shared world, records the exact containers and volumes
- * this run created, closes the module (the same path every spec's afterAll takes), then proves by
- * direct docker observation that none of them remain -- the contract E2EStackService implements in
- * onApplicationShutdown (`down -v` + cleanup verification). A live DataSource read before the close
- * proves the data tier really stood up; the stack's own teardownReport must agree with the daemon's
- * verdict. Skips with a reason while the docker daemon is not reachable.
+ * Teardown contract verification. Boots the run-scoped stack, records the exact containers and volumes this run created,
+ * closes the world (the same path every spec afterAll takes), then proves by direct docker observation that none of them
+ * remain: the contract E2EStack implements in close (`down -v` plus cleanup verification). Skips with a reason when no docker
+ * daemon answers.
  */
-import {
-    E2EWorld, bootE2EWorld 
-} from "../setup/e2e-world"
-import {
-    composeProjectOf,
-    dockerAvailable,
-    dockerLines,
-} from "../setup/e2e-infra-contract"
+import { dockerProbe, projectContainerNames, projectVolumeNames } from "../setup/docker.client"
+import { bootE2eWorld } from "../setup/e2e-world"
 
-const runnable = dockerAvailable()
-if (!runnable) {
-    process.stderr.write("[e2e-09] teardown-verification skipped: docker daemon not reachable\n")
-}
-const describeE2E = runnable ? describe : describe.skip
+const describeE2E = dockerProbe().available ? describe : describe.skip
 
-/**
- * Closes the world unless the step already closed it - the teardown path is the thing under test,
- * so double-closing on failure would mask which close actually ran.
- */
-async function ensureWorldClosed(world: E2EWorld, alreadyClosed: boolean): Promise<void> {
-    if (!alreadyClosed) await world.moduleRef.close().catch((error: unknown) => error)
-}
+describeE2E("resilience: teardown verification", () => {
+    jest.setTimeout(900_000) // first-boot images (postgres, keycloak realm import) and two app processes can take minutes
 
-/** The stack's own teardown self-report must agree with the daemon-level observation. */
-function expectTeardownReportClean(world: E2EWorld): void {
-    const report = world.stack.teardownReport
-    if (report !== null) {
-        expect(report.clean).toBe(true)
-    }
-}
+    it("closing the world removes every container and volume the run created", async () => {
+        const world = await bootE2eWorld("resilience/teardown-verification")
+        const { project } = world.stack
 
-describeE2E("resilience: teardown verification",
-    () => {
-        jest.setTimeout(600_000) // first-boot images + keycloak realm import can take minutes
+        // The persisted world is real before teardown, and the run owns the containers and volumes proven gone below.
+        expect(await world.database.ping()).toBe(true)
+        expect(projectContainerNames(project).length).toBeGreaterThan(0)
+        expect(projectVolumeNames(project).length).toBeGreaterThan(0)
 
-        it("closing the module removes every container and volume the run created",
-            async () => {
-                const world = await bootE2EWorld("resilience/teardown-verification")
-                let closed = false
-                try {
-                    const {
-                        stack, data: dataSource 
-                    } = world
-                    const project = composeProjectOf(stack)
-                    expect(project).not.toBeNull() // stack must expose its run-scoped compose project name
+        await world.close()
 
-                    // Baseline: the stack really did stand a live data tier up before teardown is asked to
-                    // remove it - the DataSource answers a real query against this run's postgres.
-                    const baseline = await dataSource.schema.ping()
-                    expect(baseline).toBe(true)
+        // The contract: after close, nothing of this run project survives on the daemon.
+        expect(projectContainerNames(project)).toEqual([])
+        expect(projectVolumeNames(project)).toEqual([])
 
-                    const containers = dockerLines([
-                        "ps",
-                        "-a",
-                        "--filter",
-                        `label=com.docker.compose.project=${project}`,
-                        "--format",
-                        "{{.Names}}",
-                    ])
-                    const volumes = dockerLines([
-                        "volume",
-                        "ls",
-                        "--filter",
-                        `name=${project}`,
-                        "--format",
-                        "{{.Name}}",
-                    ])
-                    expect(containers.length).toBeGreaterThan(0)
-
-                    await world.moduleRef.close()
-                    closed = true
-
-                    // The contract: after module close, nothing of this run's project survives on the daemon.
-                    expect(
-                        dockerLines(["ps",
-                            "-a",
-                            "--filter",
-                            `label=com.docker.compose.project=${project}`,
-                            "--format",
-                            "{{.Names}}"]),
-                    ).toEqual([])
-                    expect(
-                        dockerLines(["volume",
-                            "ls",
-                            "--filter",
-                            `name=${project}`,
-                            "--format",
-                            "{{.Name}}"]),
-                    ).toEqual([])
-
-                    for (const name of containers) {
-                        expect(() => dockerLines(["container",
-                            "inspect",
-                            name])).toThrow()
-                    }
-                    for (const name of volumes) {
-                        expect(() => dockerLines(["volume",
-                            "inspect",
-                            name])).toThrow()
-                    }
-
-                    expectTeardownReportClean(world)
-                } finally {
-                    await ensureWorldClosed(world,
-                        closed)
-                }
-            })
+        // The stack own teardown self-report agrees with the docker observation.
+        expect(world.stack.cleanupReport?.clean).toBe(true)
     })
+})

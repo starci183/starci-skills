@@ -1,194 +1,159 @@
-import {
-    E2EWorld, bootE2EWorld 
-} from "../setup/e2e-world"
-import {
-    pollUntil 
-} from "../setup/e2e-poll"
-import {
-    E2E_BOOT_TIMEOUT_MS 
-} from "../setup/testing-infra.options"
-import {
-    E2EHttpClient 
-} from "../setup/integrations/http/e2e-http.service"
-
-jest.setTimeout(300_000)
-
-interface AuditLine {
-  at: string;
-  action: string;
-  target: string | null;
-}
-
-const OWNER = {
-    email: "demo@todo.dev", password: "todo-demo-pass" 
-}
-
-const CREATE_TASK = "mutation CreateTask($input: CreateTaskInput!) { createTask(request: $input) { taskId title } }"
-const AUDIT_LOG = "query { auditLog { at action target } }"
-const EXPORT_MY_DATA = "query { exportMyData { at action target } }"
-const REQUEST_ERASURE = "mutation { requestErasure { requestId state } }"
-const COMPLETE_ERASURE = "mutation CompleteErasure($requestId: ID!) { completeErasure(request: {requestId: $requestId}) { requestId state } }"
+import { randomUUID } from "node:crypto"
+import { pollUntil } from "@e2e-kit/platform/poll"
+import { bootE2eWorld } from "../setup/e2e-world"
+import type { E2EWorld } from "../setup/e2e-world"
+import { present } from "../setup/e2e.error"
+import type {
+    AuditLogData,
+    CompleteErasureData,
+    CreateTaskData,
+    ExportMyDataData,
+    RequestErasureData,
+} from "../setup/e2e-views.contracts"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-/** The `iv.tag.ciphertext` shape a sealed actor keeps - the plaintext personId must never appear. */
+
+/** The `iv.tag.ciphertext` shape a sealed actor keeps: the plaintext personId must never appear. */
 const SEALED_BLOB = /^[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+={0,2}$/
 
 /**
- * fr.audit.erasure.request + fr.audit.erasure.complete as one A->Z journey: the subject produces
- * readable audit lines, requests erasure (tRequest chains tVerify on the same caller), completes
- * it (tExecute crypto-shreds the key, tComplete scrubs person_id), and both transitions leave
- * system-actor lines naming only the requestId. Reads happen through the public door; the
- * postgres reads are out-of-band verification of the anonymization, never a shortcut around it.
- * The subject is a throwaway realm account, not a seeded persona: a completed erasure destroys
- * that identity's audit key for the rest of this stack's lifetime, so demo is only ever the
- * control reader.
+ * fr.audit.erasure.request + fr.audit.erasure.complete as one A->Z journey: the subject produces readable audit lines
+ * (asynchronously, through the outbox and the worker), requests erasure (the request is verified in the same step), completes
+ * it (the subject key is crypto-shredded and person_id scrubbed), and both transitions leave system-actor lines naming only
+ * the requestId. Reads happen through the public doors; the postgres reads are out-of-band verification of the
+ * anonymization, never a shortcut around it. The subject is a throwaway realm account, not a seeded persona: a completed
+ * erasure destroys that identity audit key for the rest of this stack lifetime, so the demo owner is only ever the control
+ * reader.
  */
-describe("erasure journey (e2e)",
-    () => {
-        let world: E2EWorld
-        let subjectPersonId = ""
+describe("erasure journey (e2e)", () => {
+    let world: E2EWorld
+    let subjectPersonId: string | null = null
 
-        beforeAll(async () => {
-            world = await bootE2EWorld()
-            const health = await world.http.client().get<{ status: string }>("/health")
-            expect(health.data.status).toBe("ok")
-        },
-        E2E_BOOT_TIMEOUT_MS)
+    beforeAll(async () => {
+        world = await bootE2eWorld("audit/erasure-journey")
+        expect((await world.http().get<{ status: string }>("/health")).body.status).toBe("ok")
+    }, 600_000)
 
-        afterAll(async () => {
-            if (subjectPersonId) await world.auth.deleteAccount(subjectPersonId)
-            await world.moduleRef.close()
-        })
-
-        it("request-erasure -> verified row -> complete-erasure -> subject anonymized (api + db) -> system lines appended",
-            async () => {
-                const {
-                    http, auth, data: dataSource 
-                } = world
-                const marker = `e2e-erasure-${Date.now()}`
-                const subjectEmail = `${marker}@todo.dev`
-                const subjectPassword = "e2e-erasure-pass"
-                const createdAccount = await auth.createAccount({
-                    email: subjectEmail, password: subjectPassword 
-                })
-                subjectPersonId = createdAccount.personId
-                const subject = await auth.signIn(subjectEmail,
-                    subjectPassword)
-                expect(subject.personId).toBe(subjectPersonId)
-                const owner = await auth.signIn(OWNER.email,
-                    OWNER.password)
-                const asSubject: E2EHttpClient = http.client({
-                    bearerToken: subject.sessionToken 
-                })
-                const asOwner: E2EHttpClient = http.client({
-                    bearerToken: owner.sessionToken 
-                })
-
-                // Activity that must become unreadable: one task by the future subject, one by the control.
-                const created = await asSubject.graphql<{ createTask: { taskId: string } }>(CREATE_TASK,
-                    {
-                        input: {
-                            title: `${marker}-subject` 
-                        },
-                    })
-                expect(created.errorCode).toBeNull()
-                const subjectTaskId = created.data!.createTask.taskId
-                const ownerCreated = await asOwner.graphql<{ createTask: { taskId: string } }>(CREATE_TASK,
-                    {
-                        input: {
-                            title: `${marker}-owner` 
-                        },
-                    })
-                expect(ownerCreated.errorCode).toBeNull()
-                const ownerTaskId = ownerCreated.data!.createTask.taskId
-
-                // Wait for the subject's line to be readable through the door before requesting erasure -
-                // the event bus feeds the audit log asynchronously (AuditEventSubscriber ->
-                // AppendLogLineCommand), so a response can beat the line it triggered.
-                const beforeExport = await pollUntil("subject's audit line readable through the door",
-                    async () => {
-                        const res = await asSubject.graphql<{ exportMyData: Array<AuditLine> }>(EXPORT_MY_DATA)
-                        const lines = res.data?.exportMyData ?? null
-                        return (lines?.some((line) => line.target === subjectTaskId) && lines) || null
-                    },
-                    90_000,
-                    1_500)
-                expect(beforeExport.some((line) => line.action === "task.created" && line.target === subjectTaskId)).toBe(true)
-
-                // Out-of-band: the subject's sealing key exists, so their lines are readable today.
-                const keysBefore = await dataSource.audit.keysOfPerson(subject.personId)
-                expect(keysBefore).toHaveLength(1)
-                const subjectKeyId = keysBefore[0].key_id
-                const subjectLinesBefore = await dataSource.audit.lineCountUnderKey(subjectKeyId)
-                expect(subjectLinesBefore).toBeGreaterThan(0)
-
-                // tRequest + tVerify: the door returns the already-verified request.
-                const requested = await asSubject.graphql<{ requestErasure: { requestId: string; state: string } }>(REQUEST_ERASURE)
-                expect(requested.errorCode).toBeNull()
-                const requestId = requested.data!.requestErasure.requestId
-                expect(requestId).toMatch(UUID)
-                expect(requested.data!.requestErasure.state).toBe("verified")
-
-                const requestedRow = await dataSource.audit.erasureRequest(requestId)
-                expect(requestedRow).toHaveLength(1)
-                expect(requestedRow[0].state).toBe("verified")
-                expect(requestedRow[0].person_id).toBe(subject.personId)
-                expect(requestedRow[0].verified_at).not.toBeNull()
-
-                // tExecute destroys the key, then tComplete flips state and drops person_id.
-                const completed = await asSubject.graphql<{ completeErasure: { requestId: string; state: string } }>(
-                    COMPLETE_ERASURE,
-                    {
-                        requestId 
-                    },
-                )
-                expect(completed.errorCode).toBeNull()
-                expect(completed.data!.completeErasure).toEqual({
-                    requestId, state: "complete" 
-                })
-
-                // Anonymized through the API: both of the subject's own reads now return nothing.
-                const exportAfter = await asSubject.graphql<{ exportMyData: Array<AuditLine> }>(EXPORT_MY_DATA)
-                const logAfter = await asSubject.graphql<{ auditLog: Array<AuditLine> }>(AUDIT_LOG)
-                expect(exportAfter.errorCode).toBeNull()
-                expect(logAfter.errorCode).toBeNull()
-                expect(exportAfter.data!.exportMyData).toEqual([])
-                expect(logAfter.data!.auditLog).toEqual([])
-
-                // Anonymized out-of-band: the key row and the person_id on the request are both gone.
-                const keysAfter = await dataSource.audit.keysOfPersonOrKey(subject.personId,
-                    subjectKeyId)
-                expect(keysAfter).toEqual([])
-                const completedRow = await dataSource.audit.erasureRequest(requestId)
-                expect(completedRow[0].state).toBe("complete")
-                expect(completedRow[0].person_id).toBeNull()
-                expect(completedRow[0].executing_at).not.toBeNull()
-                expect(completedRow[0].completed_at).not.toBeNull()
-
-                // Crypto-shred, not deletion: the subject's stored lines survive untouched under the orphaned
-                // keyId, each actor still a sealed blob that no longer resolves to anyone.
-                const subjectLinesAfter = await dataSource.audit.lineCountUnderKey(subjectKeyId)
-                expect(subjectLinesAfter).toBe(subjectLinesBefore)
-                const orphaned = await dataSource.audit.linesUnderKey(subjectKeyId)
-                for (const line of orphaned) {
-                    expect(line.actor).toMatch(SEALED_BLOB)
-                    expect(line.actor).not.toContain(subject.personId)
-                }
-
-                // br.audit.erasure.logged: both transitions appended lines naming the requestId, sealed under
-                // the system key - which survives, so the audit trail itself never orphans.
-                const systemLines = await dataSource.audit.erasureLinesOfRequest(requestId)
-                expect(systemLines.map((line) => line.action)).toEqual(["audit.erasure.requested",
-                    "audit.erasure.completed"])
-                const systemKey = await dataSource.audit.keyById(systemLines[0].key_id)
-                expect(systemKey).toEqual([{
-                    person_id: "system", key_id: systemLines[0].key_id 
-                }])
-
-                // The control is untouched: the owner still reads their own line and never the erased subject's.
-                const ownerExport = await asOwner.graphql<{ exportMyData: Array<AuditLine> }>(EXPORT_MY_DATA)
-                const ownerTargets = ownerExport.data!.exportMyData.map((line) => line.target).filter(Boolean)
-                expect(ownerTargets).toContain(ownerTaskId)
-                expect(ownerTargets).not.toContain(subjectTaskId)
-            })
+    afterAll(async () => {
+        try {
+            if (subjectPersonId !== null) await world.auth.deleteAccount(subjectPersonId)
+        } finally {
+            await world.close()
+        }
+        expect(world.stack.cleanupReport?.clean).toBe(true)
     })
+
+    it("request-erasure -> verified row -> complete-erasure -> subject anonymized (api + db) -> system lines appended", async () => {
+        const { graphql, auth, database } = world
+        const marker = `e2e-erasure-${randomUUID()}`
+        const subjectEmail = `${marker}@todo.dev`
+        const created = await auth.createAccount({ email: subjectEmail, password: "e2e-erasure-pass" })
+        subjectPersonId = created.personId
+        const subject = await auth.signIn(subjectEmail, "e2e-erasure-pass")
+        expect(subject.personId).toBe(subjectPersonId)
+        const owner = await auth.persona("owner")
+        const asSubject = graphql.client(subject.sessionToken)
+        const asOwner = graphql.client(owner.sessionToken)
+
+        // Activity that must become unreadable: one task by the future subject, one by the control.
+        const subjectTask = await asSubject.mutate<CreateTaskData>("createTask", { variables: { input: { title: `${marker}-subject` } } })
+        expect(subjectTask.errorCode).toBeNull()
+        const subjectTaskId = present(subjectTask.data, "createTask data").createTask.taskId
+        const ownerTask = await asOwner.mutate<CreateTaskData>("createTask", { variables: { input: { title: `${marker}-owner` } } })
+        expect(ownerTask.errorCode).toBeNull()
+        const ownerTaskId = present(ownerTask.data, "createTask data").createTask.taskId
+
+        // The audit line is appended asynchronously (outbox message, then the worker consumer), so a response can beat the
+        // line it triggered: wait until both of the subject lines (sign-in and task creation) are readable through the door.
+        const beforeExport = await pollUntil(
+            "the audit lines of the subject readable through the door",
+            async () => {
+                const observed = await asSubject.read<ExportMyDataData>("exportMyData")
+                const lines = observed.data?.exportMyData ?? []
+                const complete =
+                    lines.some((line) => line.action === "task.created" && line.target === subjectTaskId) &&
+                    lines.some((line) => line.action === "login.signed-in")
+                return complete ? lines : null
+            },
+            90_000,
+            1_000,
+        )
+        expect(beforeExport.length).toBeGreaterThanOrEqual(2)
+
+        // Out-of-band: the subject sealing key exists, so their lines are readable today.
+        const keysBefore = await database.auditKeysOfPerson(subject.personId)
+        expect(keysBefore).toHaveLength(1)
+        const subjectKeyId = present(keysBefore[0], "the subject audit key").key_id
+        const subjectLinesBefore = await database.auditLineCountUnderKey(subjectKeyId)
+        expect(subjectLinesBefore).toBe(beforeExport.length)
+
+        // Request and verify: the door returns the already-verified request.
+        const requested = await asSubject.mutate<RequestErasureData>("requestErasure")
+        expect(requested.errorCode).toBeNull()
+        const request = present(requested.data, "requestErasure data").requestErasure
+        expect(request.requestId).toMatch(UUID)
+        expect(request.state).toBe("verified")
+        const requestedRow = await database.auditErasureRequest(request.requestId)
+        expect(requestedRow).toHaveLength(1)
+        expect(requestedRow[0]?.state).toBe("verified")
+        expect(requestedRow[0]?.person_id).toBe(subject.personId)
+        expect(requestedRow[0]?.verified_at).not.toBeNull()
+
+        // Execute: the key is destroyed, then the state flips and person_id is dropped.
+        const completed = await asSubject.mutate<CompleteErasureData>("completeErasure", { variables: { input: { requestId: request.requestId } } })
+        expect(completed.errorCode).toBeNull()
+        expect(completed.data?.completeErasure).toEqual({ requestId: request.requestId, state: "complete" })
+
+        // Anonymized through the api: both of the subject own reads now return nothing.
+        const exportAfter = await asSubject.read<ExportMyDataData>("exportMyData")
+        const logAfter = await asSubject.read<AuditLogData>("auditLog")
+        expect(exportAfter.errorCode).toBeNull()
+        expect(logAfter.errorCode).toBeNull()
+        expect(exportAfter.data?.exportMyData).toEqual([])
+        expect(logAfter.data?.auditLog).toEqual([])
+
+        // Anonymized out-of-band: the key row and the person_id on the request are both gone.
+        expect(await database.auditKeysOfPersonOrKey(subject.personId, subjectKeyId)).toEqual([])
+        const completedRow = await database.auditErasureRequest(request.requestId)
+        expect(completedRow[0]?.state).toBe("complete")
+        expect(completedRow[0]?.person_id).toBeNull()
+        expect(completedRow[0]?.executing_at).not.toBeNull()
+        expect(completedRow[0]?.completed_at).not.toBeNull()
+
+        // Crypto-shred, not deletion: the stored lines of the subject survive untouched under the orphaned key id, each
+        // actor still a sealed blob that no longer resolves to anyone.
+        expect(await database.auditLineCountUnderKey(subjectKeyId)).toBe(subjectLinesBefore)
+        for (const line of await database.auditLinesUnderKey(subjectKeyId)) {
+            expect(line.actor).toMatch(SEALED_BLOB)
+            expect(line.actor).not.toContain(subject.personId)
+        }
+
+        // br.audit.erasure.logged: both transitions appended lines naming the requestId, sealed under the system key, which
+        // survives so the audit trail itself never orphans. The lines arrive through the outbox, so they are awaited.
+        const systemLines = await pollUntil(
+            "the two system erasure lines of the request",
+            async () => {
+                const lines = await database.auditErasureLinesOfRequest(request.requestId)
+                return lines.length === 2 ? lines : null
+            },
+            60_000,
+            500,
+        )
+        expect(systemLines.map((line) => line.action)).toEqual(["audit.erasure.requested", "audit.erasure.completed"])
+        const systemKeyId = present(systemLines[0], "the first system erasure line").key_id
+        expect(await database.auditKeyById(systemKeyId)).toEqual([{ person_id: "system", key_id: systemKeyId }])
+
+        // The control is untouched: the owner still reads their own line and never the erased subject line.
+        const ownerTargets = await pollUntil(
+            "the owner own task line readable through the door",
+            async () => {
+                const observed = await asOwner.read<ExportMyDataData>("exportMyData")
+                const targets = (observed.data?.exportMyData ?? []).map((line) => line.target)
+                return targets.includes(ownerTaskId) ? targets : null
+            },
+            60_000,
+            1_000,
+        )
+        expect(ownerTargets).not.toContain(subjectTaskId)
+    }, 300_000)
+})
