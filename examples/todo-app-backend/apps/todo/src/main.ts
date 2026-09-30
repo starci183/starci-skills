@@ -5,6 +5,7 @@ import { EnvSource } from "@modules/platform/config"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { parseIdentityConfig } from "@modules/domain/identity"
+import { parseCommissionConfig } from "@modules/domain/commission"
 import { parsePlanConfig } from "@modules/domain/plan"
 import { parseRecurConfig } from "@modules/domain/recur"
 import { parseUploadConfig } from "@modules/domain/upload"
@@ -27,6 +28,7 @@ async function bootstrap(): Promise<void> {
         keycloak: parseKeycloakConfig(env),
         sepay: parseSepayConfig(env),
         plan: parsePlanConfig(env),
+        commission: parseCommissionConfig(env),
         recur: parseRecurConfig(env),
         upload: parseUploadConfig(env),
         uploadStorage: parseUploadStorageConfig(env),

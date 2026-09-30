@@ -1,4 +1,5 @@
 import { auditEntities, auditMigrations } from "@modules/domain/audit"
+import { commissionEntities, commissionMigrations } from "@modules/domain/commission"
 import { notifyEntities, notifyMigrations } from "@modules/domain/notify"
 import { planEntities, planMigrations } from "@modules/domain/plan"
 import { recurEntities, recurMigrations } from "@modules/domain/recur"
@@ -25,6 +26,7 @@ export const primaryConnectionOf = (database: DatabaseConnectionConfig): Databas
         ...taskEntities,
         ...shareEntities,
         ...planEntities,
+        ...commissionEntities,
         ...recurEntities,
         ...notifyEntities,
         ...auditEntities,
@@ -38,6 +40,7 @@ export const primaryConnectionOf = (database: DatabaseConnectionConfig): Databas
         ...taskMigrations,
         ...shareMigrations,
         ...planMigrations,
+        ...commissionMigrations,
         ...recurMigrations,
         ...notifyMigrations,
         ...auditMigrations,

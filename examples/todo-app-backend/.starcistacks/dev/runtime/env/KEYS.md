@@ -24,7 +24,7 @@ rather than assuming somebody knows what it unlocks.
 
 Other keys the apps read (all through `EnvSource`, see each capability `<c>.config.ts`): `PORT` (api listener), `HTTP_SECURITY_ALLOWED_ORIGINS`
 (comma separated origins, also the CORS list), `KEYCLOAK_TOKEN_URL`, `KEYCLOAK_CLIENT_ID`, `SEPAY_BASE_URL`, `UPLOAD_DIR`, and the optional tunables
-`SESSION_TTL_DAYS`, `SESSION_ADMIN_SUBJECTS`, `RECUR_TICK_CRON`, `PLAN_PAID_PRICE_MINOR_UNITS`, `PLAN_PAID_CURRENCY`, `UPLOAD_MAX_BYTES`, `UPLOAD_ALLOWED_MIMES`,
+`SESSION_TTL_DAYS`, `SESSION_ADMIN_SUBJECTS`, `RECUR_TICK_CRON`, `PLAN_PAID_PRICE_MINOR_UNITS`, `PLAN_PAID_CURRENCY`, `COMMISSION_BPS`, `UPLOAD_MAX_BYTES`, `UPLOAD_ALLOWED_MIMES`,
 `UPLOAD_PRESIGN_TTL_MS`, `KEYCLOAK_TIMEOUT`, `SEPAY_TIMEOUT`, `SMTP_CONNECT_TIMEOUT`, `SMTP_COMMAND_TIMEOUT`, `SCHEDULING_TICK`, `MESSAGING_POLL`,
 `MESSAGING_BATCH`, `MESSAGING_VISIBILITY`, `HTTP_SECURITY_RATE_*`. Removed: `DATABASE_URL`, `REDIS_URL`, `CORS_ORIGIN`, `TODO_SESSION_TTL_DAYS`,
 `AUDIT_OPERATOR_SUBJECTS`. NOTE: the `runtime/env/app.env.enc` document is encrypted to the demo identity and could not be re-encrypted in this lane:
