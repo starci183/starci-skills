@@ -555,7 +555,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R58 | `FE_I18N_LITERAL` | No display text at any tier, no escape comment. |
 | R59 | `FE_I18N_PLACEMENT` | `next-intl` with `[locale]`; the next-intl stack is written once per repository: `packages/<family>-i18n` (`createAppI18n`) called by each app's `modules/i18n/index.ts`, or the only app's `modules/i18n/`. |
 | R60 | `FE_I18N_CATALOG` | Same keys in every catalog, real catalog in specs, `pick` for clients. |
-| R61 | `FE_STYLE_TOKEN_ONLY` | Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`). |
+| R61 | `FE_STYLE_TOKEN_ONLY` | Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`). Status colours follow HeroUI soft pairs: every status tone has `--<tone>-soft` and `--<tone>-soft-foreground` in light and dark, the soft foreground reaches 3:1 on its tint and on `--background`, body text 4.5:1, a solid tone is never text below 4.5:1, and text and icons take the soft foreground, never the solid tone. |
 | R62 | `FE_NATIVE_FORM_CONTROL` | No raw form controls, native images or raw structural tags in product tiers; the grammar renders them. |
 | R63 | `FE_PACKAGE_SHAPE` | Packages build to `dist` with explicit exports and no dead unit. |
 | R64 | `FE_APP_ISOLATION` | Apps never import apps; ui-screen declares `app`. |

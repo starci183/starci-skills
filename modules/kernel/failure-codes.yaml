@@ -2673,14 +2673,16 @@ FE_STYLE_SOURCE_UNRESOLVED:
 FE_STYLE_TOKEN_ONLY:
   title: "CSS bypasses grammar tokens"
   title_vi: "CSS không đi qua token của grammar"
-  meaning_vi: "CSS của app dùng giá trị màu, khoảng cách, bo góc hoặc chữ viết thẳng, giá trị thô ngoài brand.css, !important, selector class, CSS module, khai lại token của grammar, breakpoint ngoài thang, hoặc globals.css sai hình dạng và sai thứ tự import."
+  meaning_vi: "CSS của app dùng giá trị màu, khoảng cách, bo góc hoặc chữ viết thẳng, giá trị thô ngoài brand.css, !important, selector class, CSS module, khai lại token của grammar, breakpoint ngoài thang, hoặc globals.css sai hình dạng và sai thứ tự import; hoặc màu trạng thái không theo cặp mềm HeroUI (thiếu --<tông>-soft/--<tông>-soft-foreground ở sáng hoặc tối, độ tương phản dưới ngưỡng, chữ hay icon tô bằng tông trạng thái đặc)."
   causes_vi:
     - "Hex, rgb, hsl, oklch hoặc px viết trong CSS ngoài modules/brand/brand.css"
     - "Biến --tên-riêng thay cho token grammar, hoặc khai lại token của grammar ngoài brand.css"
     - "Có tệp *.module.css hoặc selector class trong CSS của app"
     - "globals.css chứa thứ ngoài @import, @source và khối token, hoặc import sai thứ tự"
     - "@media dùng breakpoint ngoài thang của grammar"
-  nextStep_vi: "Op interface.implement bỏ CSS riêng, dùng component và token của grammar; giá trị màu thương hiệu chỉ khai ở modules/brand/brand.css cho cả sáng và tối."
+    - "brand.css thiếu cặp mềm của một tông trạng thái ở sáng hoặc tối, chữ mềm dưới 3:1 trên nền nhạt hoặc nền trang, --foreground dưới 4.5:1, hoặc giá trị màu không phân giải được"
+    - "Component tô chữ hoặc icon bằng text-success, text-danger, fill-warning, stroke-info (tông đặc) thay vì text-<tông>-soft-foreground"
+  nextStep_vi: "Op interface.implement bỏ CSS riêng, dùng component và token của grammar; giá trị màu thương hiệu chỉ khai ở modules/brand/brand.css cho cả sáng và tối, đủ cặp mềm cho mọi tông trạng thái; chữ và icon trạng thái dùng text-<tông>-soft-foreground."
   owner: other-op:interface.implement
   kind: check-finding
 

@@ -676,7 +676,7 @@ rules:
   - id: R61
     code: "FE_STYLE_TOKEN_ONLY"
     title_vi: "CSS ngoài token"
-    law: "Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`)."
+    law: "Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`). Status colours follow HeroUI soft pairs: every status tone has `--<tone>-soft` and `--<tone>-soft-foreground` in light and dark, the soft foreground reaches 3:1 on its tint and on `--background`, body text 4.5:1, a solid tone is never text below 4.5:1, and text and icons take the soft foreground, never the solid tone."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["FE_STYLE_TOKEN_ONLY", "FE_STYLE_SOURCE_UNRESOLVED"]
@@ -689,6 +689,7 @@ rules:
       - {kind: stylelint, id: globals-import-order}
       - {kind: stylelint, id: no-token-redefinition}
       - {kind: stylelint, id: brand-layer-shape}
+      - {kind: stylelint, id: status-contrast}
       - {kind: stylelint, id: no-css-module}
       - {kind: stylelint, id: no-class-selector}
       - {kind: stylelint, id: breakpoint-scale}
@@ -699,6 +700,7 @@ rules:
       - {kind: eslint-fe, id: no-hand-rolled-heading}
       - {kind: eslint-fe, id: no-unresolved-token-class}
       - {kind: eslint-fe, id: no-heading-tag-outside-heading-component}
+      - {kind: eslint-fe, id: status-text-uses-soft-foreground}
   - id: R62
     code: "FE_NATIVE_FORM_CONTROL"
     title_vi: "Control form thô"
