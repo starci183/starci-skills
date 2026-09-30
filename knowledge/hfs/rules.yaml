@@ -554,6 +554,7 @@ rules:
       - {kind: eslint-fe, id: client-maps-auth-to-refused}
       - {kind: eslint-fe, id: no-http-status-collapse}
       - {kind: eslint-fe, id: outcome-kinds-exhaustive}
+      - {kind: eslint-fe, id: one-outcome-union}
   - id: R52
     code: "FE_WIRE_GENERATED"
     title_vi: "Kiểu wire gõ tay"
@@ -638,6 +639,7 @@ rules:
     enforcers:
       - {kind: eslint-fe, id: locale-segment-is-locale}
       - {kind: eslint-fe, id: no-second-i18n-stack}
+      - {kind: eslint-fe, id: i18n-stack-in-one-module}
       - {kind: eslint-fe, id: navigation-from-intl}
       - {kind: eslint-fe, id: no-native-anchor}
       - {kind: eslint-fe, id: use-intl-formatter}
@@ -681,13 +683,14 @@ rules:
   - id: R62
     code: "FE_NATIVE_FORM_CONTROL"
     title_vi: "Control form thô"
-    law: "No raw form controls in product tiers."
+    law: "No raw form controls, native images or raw structural tags in product tiers; the grammar renders them."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["FE_NATIVE_FORM_CONTROL", "FE_NATIVE_IMAGE"]
     enforcers:
       - {kind: eslint-fe, id: no-native-form-control}
       - {kind: eslint-fe, id: no-native-img}
+      - {kind: eslint-fe, id: no-raw-structural-element}
       - {kind: eslint-fe, id: image-has-size}
   - id: R63
     code: "FE_PACKAGE_SHAPE"

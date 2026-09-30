@@ -37,6 +37,13 @@
   (a name suffix `Wire|Dto|DTO|Response|Payload` on an interface or alias in `modules/api`) and the `graphqlType` branch (a name
   pattern `GraphQl*`) are deleted; detection by name is not a detection.
 - Every rule is catalogued under an HFS rule id (R91 FE_SOURCE_FORM, R92 FE_COMPONENT_API, R93 FE_VENDOR_BOUNDARY added).
+- **One client, one Outcome, one i18n stack, grammar components (lane F0-D).**
+  - `lib/scope.mjs`: `isConfigModule`, `isApiClient` and the new `isOutcomeModule` are slot questions (`fe.modules.config`, `fe.transport.client` / `fe.package.api.client`, `fe.transport.outcome` / `fe.package.api.outcome`) taking the rule `context`, not path regexes; `PACKAGE_TIERS` is deleted (`use-client-only-at-boundary` asks slot `fe.package.ui` and reads the tier below the package root); `slotOfFile`, `inSlot` and `globalReferences` (scope-resolved globals) are new. Their rule tests run under `slotTester()`/`typedTester()` with `at("apps/web/src/...")` filenames.
+  - `fetch-only-in-api-client` resolves the global `fetch` (and `globalThis.fetch`, `window.fetch`, `self.fetch`, aliases, destructuring), `new Request`, `new EventSource`, `navigator.sendBeacon` by scope, and fetch libraries (axios, ky, got, undici, ofetch, graphql-request, urql, `@apollo/*`, `@urql/*`) by module specifier; the one file allowed is slot `fe.transport.client` or `fe.package.api.client`. `client-fetch-has-signal` and `no-shared-transport-state` ask the same slots (the shared api package is covered).
+  - `client-maps-auth-to-refused` judges a real branch: the fetch response's status (typed `Response`) compared with 401 and 403 whose consequent builds `kind: "refused"`; three literals anywhere no longer pass.
+  - New `one-outcome-union` (R51): a union alias of object types sharing a literal `ok` or `kind` discriminant is declared only in the outcome slot.
+  - New `i18n-stack-in-one-module` (R59): `defineRouting`, `createNavigation`, `getRequestConfig`, `createMiddleware` (by import specifier) are called only in slot `fe.package.i18n`, or `fe.modules.i18n` of a one-app repository. `no-second-i18n-stack` stays: it refuses another i18n library, a different obligation.
+  - New `no-raw-structural-element` (`grammar-boundary`, R62): raw `h1-h6 p span hr label form fieldset dl dt dd table..th ul ol li header footer nav section main figure figcaption` in app slots and non-`ui` packages; `div br aside article` have no grammar component and stay allowed.
 
 ## 5.1.2 - 2026-09-30
 

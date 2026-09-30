@@ -28,8 +28,8 @@ export const why = {
   },
   "fetch-only-in-api-client": {
     code: "FE_TRANSPORT_OWNER",
-    vi: "`fetch` (hoặc thư viện HTTP khác) ở `<file>` nằm ngoài `modules/api/client.ts`. Mỗi app chỉ có đúng một đường truyền.",
-    fixVi: "Gọi client của app và nhận `Outcome<T>`; không tự gọi `fetch`.",
+    vi: "`fetch` (hoặc `Request`, `EventSource`, `sendBeacon`, thư viện HTTP khác) ở `<file>` nằm ngoài client duy nhất (`modules/api/client.ts`, hoặc `src/client.ts` của gói api dùng chung). Mỗi repo chỉ có đúng một đường truyền.",
+    fixVi: "Gọi client của repo và nhận `Outcome<T>`; không tự gọi `fetch`.",
   },
   "client-fetch-has-signal": {
     code: "FE_TRANSPORT_OWNER",
@@ -43,8 +43,8 @@ export const why = {
   },
   "client-maps-auth-to-refused": {
     code: "FE_HTTP_STATUS_COLLAPSE",
-    vi: "Client ở `<file>` không đổi 401/403 thành `refused`, nên trạng thái \"cần đăng nhập\" không bao giờ đạt được.",
-    fixVi: "Thêm nhánh 401/403 trả `{ kind: \"refused\" }` trong client.",
+    vi: "Client ở `<file>` không có nhánh so sánh `response.status` với 401 và 403 rồi trả `{ kind: \"refused\" }`, nên trạng thái \"cần đăng nhập\" không bao giờ đạt được.",
+    fixVi: "Thêm nhánh `response.status === 401 || response.status === 403` trả `{ ok: false, kind: \"refused\" }` ngay trong client.",
   },
   "no-http-status-collapse": {
     code: "FE_HTTP_STATUS_COLLAPSE",
@@ -300,6 +300,21 @@ export const why = {
     code: "FE_OUTCOME_KIND_UNHANDLED",
     vi: "`switch` trên `kind` ở `<file>` có nhánh `ok` nhưng thiếu một trong refused, invalid, not-found, unavailable.",
     fixVi: "Viết đủ năm nhánh của `Outcome<T>`, mỗi nhánh một màn; không dựa vào `default`.",
+  },
+  "one-outcome-union": {
+    code: "FE_HTTP_STATUS_COLLAPSE",
+    vi: "`<file>` khai báo thêm một union kết quả (`ok` hoặc `kind`) ngoài `outcome.ts`. Repo chỉ có một `Outcome<T>`.",
+    fixVi: "Dùng `Outcome<T>` của `modules/api/outcome.ts` (hoặc gói api dùng chung); thêm chi tiết nghiệp vụ qua tham số thứ hai thay vì khai báo union mới.",
+  },
+  "i18n-stack-in-one-module": {
+    code: "FE_I18N_PLACEMENT",
+    vi: "`<file>` tự dựng một tầng của stack next-intl (`defineRouting`, `createNavigation`, `getRequestConfig`, `createMiddleware`). Stack chỉ được viết một lần cho cả repo.",
+    fixVi: "Gọi factory `createAppI18n` của gói i18n dùng chung trong `modules/i18n/index.ts` và nhập kết quả; repo một app thì chỉ viết stack trong `modules/i18n` của app đó.",
+  },
+  "no-raw-structural-element": {
+    code: "FE_NATIVE_FORM_CONTROL",
+    vi: "`<tag>` thô ở `<file>`. Cấu trúc trang và chữ được ghép từ component của grammar, không viết HTML thô.",
+    fixVi: "Thay bằng component grammar tương ứng (`Heading`, `Text`, `SurfaceCard`, ...); nếu grammar chưa có, thêm vào grammar hoặc gói ui thay vì vẽ tại chỗ.",
   },
   "file-size-growth": {
     code: "HFS_SIZE_GROWTH",

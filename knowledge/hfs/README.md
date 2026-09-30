@@ -548,7 +548,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R59 | `FE_I18N_PLACEMENT` | `next-intl`, `[locale]`, `modules/i18n/`. |
 | R60 | `FE_I18N_CATALOG` | Same keys in every catalog, real catalog in specs, `pick` for clients. |
 | R61 | `FE_STYLE_TOKEN_ONLY` | Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`). |
-| R62 | `FE_NATIVE_FORM_CONTROL` | No raw form controls in product tiers. |
+| R62 | `FE_NATIVE_FORM_CONTROL` | No raw form controls, native images or raw structural tags in product tiers; the grammar renders them. |
 | R63 | `FE_PACKAGE_SHAPE` | Packages build to `dist` with explicit exports and no dead unit. |
 | R64 | `FE_APP_ISOLATION` | Apps never import apps; ui-screen declares `app`. |
 | R65 | `FE_SIZE_AND_STATE_BUDGET` | Hook and state budgets; no hand-written poll loop; keyed lists; timers cleared; no swallowed error or console. |

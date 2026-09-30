@@ -204,3 +204,29 @@ router.push(routes.newWorkspace())
 **Vì sao (why):** `<file>` viết thẳng đường dẫn route ở nơi gọi; route đổi chỗ thì bản sao trỏ vào 404.
 
 **Cách sửa:** Dựng href bằng hàm của `modules/routes` và dùng đúng hàm đó ở mọi nơi.
+
+## `starci-fe/i18n-stack-in-one-module`
+
+next-intl's routing, navigation, request config and middleware factories are called only in the i18n package (or the only app's `modules/i18n`).
+
+`defineRouting` (`next-intl/routing`), `createNavigation` (`next-intl/navigation`), `getRequestConfig` (`next-intl/server`) and `createMiddleware` (`next-intl/middleware`), resolved by the import that binds the called name (a renamed import or a namespace member counts), are called only in a file of slot `fe.package.i18n` (`packages/<family>-i18n`, exporting `createAppI18n`), or in a `fe.modules.i18n` file of a repository that declares exactly one app. In a multi-app repository each app's `modules/i18n` calls the package factory. It sits beside `no-second-i18n-stack`, which refuses another i18n library at its import; this rule refuses a second copy of next-intl's own stack.
+
+**Invalid** (`apps/web/src/modules/i18n/request.ts`, a repository with two apps)
+
+```ts
+import { getRequestConfig } from "next-intl/server"
+export default getRequestConfig(async () => ({ locale: "vi", messages: {} }))
+```
+
+**Valid** (`apps/web/src/modules/i18n/index.ts`)
+
+```ts
+import { createAppI18n } from "@nivo/i18n"
+export const i18n = createAppI18n({ locales: ["vi"] })
+```
+
+**Finding code:** `FE_I18N_PLACEMENT`
+
+**Vì sao (why):** `<file>` tự dựng một tầng của stack next-intl (`defineRouting`, `createNavigation`, `getRequestConfig`, `createMiddleware`). Stack chỉ được viết một lần cho cả repo.
+
+**Cách sửa:** Gọi factory `createAppI18n` của gói i18n dùng chung trong `modules/i18n/index.ts` và nhập kết quả; repo một app thì chỉ viết stack trong `modules/i18n` của app đó.

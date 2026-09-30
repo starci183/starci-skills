@@ -2,13 +2,13 @@
 
 Law module: `transport.mjs`. Catalogue: R50 FE_TRANSPORT_OWNER, R51 FE_HTTP_STATUS_COLLAPSE, R52 FE_WIRE_GENERATED.
 
-One app, one client (`modules/api/client.ts`), one result vocabulary (`Outcome<T>`: `ok`, `refused`, `invalid`, `not-found`, `unavailable`). 401 and 403 become `refused`; nothing collapses a status into `null`; wire types are generated from the contract copy in `modules/api/contract/`.
+One repository, one client, one result vocabulary. The client is the file of HFS slot `fe.transport.client` (`apps/<app>/src/modules/api/client.ts`, a one-app repository) or `fe.package.api.client` (`packages/<family>-api/src/client.ts`, the shared client of a multi-app repository); the vocabulary is `Outcome<T>` (`ok`, `refused`, `invalid`, `not-found`, `unavailable`), declared in the `fe.transport.outcome` / `fe.package.api.outcome` file. The rules read the slot of the file being linted, never its path. 401 and 403 become `refused`; nothing collapses a status into `null`; wire types are generated from the contract copy in `modules/api/contract/`.
 
 Every rule below is an error in `starciFeConfig`; none can be switched off or suppressed inline.
 
 ## `starci-fe/fetch-only-in-api-client`
 
-The app's single `fetch` lives in `modules/api/client.ts`.
+The repository's single `fetch` (and `Request`, `EventSource`, `navigator.sendBeacon`) lives in the api client slot. The global is found by scope resolution: `fetch(...)`, `globalThis.fetch`, `window.fetch`, `self.fetch`, `const f = fetch` and `const { fetch } = globalThis` all count, a local or imported `fetch` does not. A fetch library is refused by module specifier (axios, ky, got, undici, ofetch, graphql-request, urql, `@apollo/*`, ...; `import`, `export ... from`, `import()` and `require`), also inside the client. Another file of the api package (`src/transport.ts`) is not the client.
 
 **Invalid** (`src/hooks/course/useCourse.ts`)
 
@@ -24,9 +24,9 @@ const r = await client.get(url)
 
 **Finding code:** `FE_TRANSPORT_OWNER`
 
-**Vì sao (why):** `fetch` (hoặc thư viện HTTP khác) ở `<file>` nằm ngoài `modules/api/client.ts`. Mỗi app chỉ có đúng một đường truyền.
+**Vì sao (why):** `fetch` (hoặc `Request`, `EventSource`, `sendBeacon`, thư viện HTTP khác) ở `<file>` nằm ngoài client duy nhất (`modules/api/client.ts`, hoặc `src/client.ts` của gói api dùng chung). Mỗi repo chỉ có đúng một đường truyền.
 
-**Cách sửa:** Gọi client của app và nhận `Outcome<T>`; không tự gọi `fetch`.
+**Cách sửa:** Gọi client của repo và nhận `Outcome<T>`; không tự gọi `fetch`.
 
 ## `starci-fe/client-fetch-has-signal`
 
@@ -74,7 +74,7 @@ export const request = (token: string) => token
 
 ## `starci-fe/client-maps-auth-to-refused`
 
-`modules/api/client.ts` handles 401 and 403 and produces `refused`.
+The api client branches on the response status: a comparison of the fetch response's status (typed as a `Response`) with 401 and 403 (`===`, `||`, a literal list `.includes`/`.has`, or a `switch` with both cases) whose consequent builds an object with `kind: "refused"`. The three literals lying anywhere in the file do not pass, and neither does a mapping delegated to a function in another file.
 
 **Invalid** (`src/modules/api/client.ts`)
 
@@ -86,14 +86,14 @@ const r = await fetch(u, { signal })
 
 ```ts
 const r = await fetch(u, { signal })
-if (r.status === 401 || r.status === 403) return { kind: "refused" }
+if (r.status === 401 || r.status === 403) return { ok: false, kind: "refused" }
 ```
 
 **Finding code:** `FE_HTTP_STATUS_COLLAPSE`
 
-**Vì sao (why):** Client ở `<file>` không đổi 401/403 thành `refused`, nên trạng thái "cần đăng nhập" không bao giờ đạt được.
+**Vì sao (why):** Client ở `<file>` không có nhánh so sánh `response.status` với 401 và 403 rồi trả `{ kind: "refused" }`, nên trạng thái "cần đăng nhập" không bao giờ đạt được.
 
-**Cách sửa:** Thêm nhánh 401/403 trả `{ kind: "refused" }` trong client.
+**Cách sửa:** Thêm nhánh `response.status === 401 || response.status === 403` trả `{ ok: false, kind: "refused" }` ngay trong client.
 
 ## `starci-fe/no-http-status-collapse`
 
@@ -168,3 +168,28 @@ switch (outcome.kind) {
 **Vì sao (why):** `switch` trên `kind` ở `<file>` có nhánh `ok` nhưng thiếu một trong refused, invalid, not-found, unavailable.
 
 **Cách sửa:** Viết đủ năm nhánh của `Outcome<T>`, mỗi nhánh một màn; không dựa vào `default`.
+
+## `starci-fe/one-outcome-union`
+
+A result union (`ok` / `kind` discriminant) is declared only in the outcome slot; elsewhere the code composes `Outcome<T>`.
+
+A union type alias is a result union when its resolved members are all object types that carry the same literal-typed discriminant in the result vocabulary: `ok` (each member pins it to one value, `true` and `false` both present) or `kind` (at least one literal of the Outcome vocabulary: `ok`, `refused`, `forbidden`, `invalid`, `not-found`, `unavailable`). The members are read through the type checker, so `Ok<T> | Failure` and intersections are seen as what they are; no name (`*Outcome`, `*Result`) decides anything. UI state unions (`status`, `state`, `type`, a `kind` of tree nodes or menu items) are not result vocabulary and pass; so does an alias that only composes the one union (`type Read = Outcome<Course>`, `Exclude<Outcome<T>, ...>`). `Outcome<T> | { ok: false; kind: "conflict" }` adds an arm to the one union and is refused.
+
+**Invalid** (`src/hooks/invite/useInvite.ts`)
+
+```ts
+export type InviteOutcome = { ok: true } | { ok: false; kind: "refused" }
+```
+
+**Valid** (`src/hooks/invite/useInvite.ts`)
+
+```ts
+import type { Outcome } from "@/modules/api/outcome"
+export type InviteOutcome = Outcome<{ id: string }>
+```
+
+**Finding code:** `FE_HTTP_STATUS_COLLAPSE`
+
+**Vì sao (why):** `<file>` khai báo thêm một union kết quả (`ok` hoặc `kind`) ngoài `outcome.ts`. Repo chỉ có một `Outcome<T>`.
+
+**Cách sửa:** Dùng `Outcome<T>` của `modules/api/outcome.ts` (hoặc gói api dùng chung); thêm chi tiết nghiệp vụ qua tham số thứ hai thay vì khai báo union mới.

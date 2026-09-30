@@ -12526,11 +12526,11 @@ FE_I18N_CATALOG:
   kind: check-finding
 
 FE_NATIVE_FORM_CONTROL:
-  title: "No raw form controls in product tiers"
+  title: "No raw form controls, native images or raw structural tags in product tiers; the grammar renders them"
   title_vi: "Control form thô"
   meaning_vi: "`<tag>` thô ở `<file>`. Dùng renderer của grammar."
   causes_vi:
-    - "Vi phạm luật R62: Không `<select>/<input>/<textarea>/<button>` thô ở tầng sản phẩm; dùng renderer grammar."
+    - "Vi phạm luật R62: Không `<select>/<input>/<textarea>/<button>`, `<img>` thô và không thẻ cấu trúc thô (`<section>`, `<p>`, `<ul>`, `<h1>`...) ở tầng sản phẩm; dùng renderer grammar."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
