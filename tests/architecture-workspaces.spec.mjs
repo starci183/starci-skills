@@ -30,3 +30,18 @@ test('a literal workspace path that does not hold a package.json is still refuse
   const root = tree(['apps/web', 'apps/landing-draft'], (r) => fs.mkdirSync(path.join(r, 'apps', 'landing-draft')));
   assert.throws(() => loadArchitectureConfig(root), /workspace apps\/landing-draft must resolve to a regular package.json/);
 });
+
+test('a package that keeps src/hooks beside its grammar tiers is package source, not a second hooks root (nivo-fe packages/nivo-ui)', () => {
+  const root = tree(['apps/*', 'packages/*'], (r) => {
+    for (const [rel, text] of [
+      ['packages/nivo-ui/package.json', '{"name":"@ws/ui"}'],
+      ['packages/nivo-ui/tsconfig.json', '{"compilerOptions":{"strict":true},"include":["src"]}'],
+      ['packages/nivo-ui/src/leaves/Button/index.tsx', 'export const Button = () => null\n'],
+      ['packages/nivo-ui/src/hooks/useToggle.ts', 'export const useToggle = () => null\n'],
+      ['apps/web/src/hooks/lesson/index.ts', 'export {}\n'],
+    ]) { fs.mkdirSync(path.dirname(path.join(r, rel)), { recursive: true }); fs.writeFileSync(path.join(r, rel), text); }
+  });
+  const config = loadArchitectureConfig(root);
+  assert.deepEqual(config.frontend.hooks, ['apps/web/src/hooks']);
+  assert.ok(config.frontend.components.includes('packages/nivo-ui/src'));
+});

@@ -155,7 +155,11 @@ function discoveredProjects(root, workspaces) {
 function inferredLayout(root, workspaces) {
   // HFS: frontend source roots live only under workspace packages (apps/<app>/, packages/<pkg>/);
   // the repository root itself is never a frontend source root.
-  const collect = suffix => workspaces.map(prefix => `${prefix}/${suffix}`).filter(relative => existingDirectory(root, relative));
+  // The route, feature, component, hook and module roles are app slots (fe.route, fe.feature, fe.components, fe.hooks, fe.modules:
+  // apps/<app>/src/...); a workspace package is tier `package` and holds none of them - its own src/hooks is package source, and a
+  // grammar package's tier folders make it a component root below.
+  const appWorkspaces = workspaces.filter(prefix => prefix.startsWith('apps/'));
+  const collect = suffix => appWorkspaces.map(prefix => `${prefix}/${suffix}`).filter(relative => existingDirectory(root, relative));
   // A design-system workspace whose src carries tier dirs (leaves/branches/…) IS a component root;
   // collecting its src/components too would nest two roots in one role and fail the disjoint check.
   const tierSources = new Set(workspaces.map(prefix => `${prefix}/src`)
