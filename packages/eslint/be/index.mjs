@@ -21,6 +21,7 @@ import { recommended as asyncDisciplineRecommended, rules as asyncDisciplineRule
 import { recommended as authorizationRecommended, rules as authorizationRules } from "./authorization.mjs"
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
 import { recommended as configOwnerRecommended, rules as configOwnerRules } from "./config-owner.mjs"
+import { recommended as connectionsRecommended, rules as connectionsRules } from "./connections.mjs"
 import { recommended as cqrsRecommended, rules as cqrsRules } from "./cqrs.mjs"
 import { recommended as dataAccessRecommended, rules as dataAccessRules } from "./data-access.mjs"
 import { recommended as defaultDenyRecommended, rules as defaultDenyRules } from "./default-deny.mjs"
@@ -52,6 +53,7 @@ const CONTRIBUTIONS = [
     { law: "authorization", rules: authorizationRules, recommended: authorizationRecommended },
     { law: "comments", rules: commentsRules, recommended: commentsRecommended },
     { law: "config-owner", rules: configOwnerRules, recommended: configOwnerRecommended },
+    { law: "connections", rules: connectionsRules, recommended: connectionsRecommended },
     { law: "cqrs", rules: cqrsRules, recommended: cqrsRecommended },
     { law: "data-access", rules: dataAccessRules, recommended: dataAccessRecommended },
     { law: "default-deny", rules: defaultDenyRules, recommended: defaultDenyRecommended },
