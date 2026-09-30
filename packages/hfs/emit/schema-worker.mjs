@@ -93,9 +93,11 @@ const classOf = ({ file, name }) => {
   return exported;
 };
 
-const graphql = require('@nestjs/graphql');
+// The packages of the repository under emission, resolved from it (never from hfs, which declares none of them).
+const FROM_REPOSITORY = { nestGraphql: '@nestjs/graphql', nestCore: '@nestjs/core', graphql: 'graphql' };
+const graphql = require(FROM_REPOSITORY.nestGraphql);
 // the constants and the scalar factory are internals of the package: reached by file, its `exports` map hides them
-const graphqlDist = path.dirname(require.resolve('@nestjs/graphql'));
+const graphqlDist = path.dirname(require.resolve(FROM_REPOSITORY.nestGraphql));
 const { SCALAR_NAME_METADATA, SCALAR_TYPE_METADATA } = require(path.join(graphqlDist, 'graphql.constants.js'));
 const { createScalarType } = require(path.join(graphqlDist, 'utils', 'scalar-types.utils.js'));
 
@@ -106,9 +108,9 @@ const scalarsMap = composition.scalars.map(classOf).map((cls) => {
 });
 const includeModules = composition.include.map(classOf);
 
-const { NestFactory } = require('@nestjs/core');
+const { NestFactory } = require(FROM_REPOSITORY.nestCore);
 const { GraphQLSchemaBuilderModule, GraphQLSchemaFactory } = graphql;
-const { lexicographicSortSchema, printSchema } = require('graphql');
+const { lexicographicSortSchema, printSchema } = require(FROM_REPOSITORY.graphql);
 const context = await NestFactory.createApplicationContext(GraphQLSchemaBuilderModule, { logger: false });
 const schema = await context.get(GraphQLSchemaFactory).create(resolvers, { scalarsMap, includeModules });
 process.stdout.write(printSchema(lexicographicSortSchema(schema)));
