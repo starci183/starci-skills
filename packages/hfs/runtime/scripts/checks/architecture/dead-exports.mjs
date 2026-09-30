@@ -1,6 +1,11 @@
 /**
- * HFS check 4 (knowledge/hfs/slots.yaml rules HFS_UNUSED_EXPORT on repo.packages and fe.package.ui): an export of an
- * owner's public entry that no production file outside the owner imports is dead.
+ * HFS check 4, dead code (knowledge/hfs/rules.yaml R25, both profiles, errors in every gate):
+ *   HFS_UNUSED_EXPORT  an export of an owner's public entry that no production file outside the owner imports is dead.
+ *   HFS_UNUSED_FILE    a production source file that no root reaches is dead. Roots: the files an app slot requires
+ *                      (main.ts, app.module.ts), every route file (slot tier `route`), the public entry of every package,
+ *                      and a source file a framework config of the app names by a relative string literal
+ *                      (next.config.ts pointing next-intl at its request config). Specs and tests are not in the graph,
+ *                      so a file only a spec imports is dead, on purpose. Type-only imports reach a file.
  *
  * Owner = every graph.ownerRoots unit whose tier is not `app` and whose public entry file is in the graph (index.ts or
  * index.tsx, a package's src/index.ts). The exported names of the entry are its named exports, `export { a as b }`,
@@ -13,14 +18,21 @@
  * used by the importers of that file; a re-exporting file nobody imports is a framework entry (a route file) and uses it.
  * Specs and tests are not in the graph, so an export used only by a spec is dead, on purpose.
  */
-export const DEAD_EXPORT_RULE_IDS = ['HFS_UNUSED_EXPORT'];
+import fs from 'node:fs';
+import path from 'node:path';
+
+export const DEAD_EXPORT_RULE_IDS = ['HFS_UNUSED_EXPORT', 'HFS_UNUSED_FILE'];
 
 const PACKAGE_ENTRIES = ['src/index.ts', 'src/index.tsx', 'index.ts', 'index.tsx'];
 const OWNER_ENTRIES = ['index.ts', 'index.tsx'];
 const CHAIN_DEPTH = 6;
+/** Tiers whose files are not production source that an app serves: judged by no dead-file rule. */
+const UNJUDGED_TIERS = new Set(['none', 'e2e', 'fixtures']);
+const CONFIG_EXTENSIONS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '/index.ts', '/index.tsx', '/index.js'];
+const CONFIG_STRING = /['"`](\.{1,2}\/[^'"`\s]+)['"`]/g;
 
 /** The public entry file (repository-relative) of an owner unit, or null when the owner has none in the graph. */
-function entryOf(graph, config, key, owner) {
+export function entryOf(graph, config, key, owner) {
   const declared = config.owners?.find(item => item.id === key)?.entry;
   if (declared && graph.files.has(declared)) return declared;
   for (const candidate of owner.tier === 'package' ? PACKAGE_ENTRIES : OWNER_ENTRIES) {
@@ -60,7 +72,7 @@ function bindingsOf(ts, declaration) {
 }
 
 /** The exported names of an entry source file, each with the line of its declaration. */
-function exportedNames(ts, sourceFile) {
+export function exportedNames(ts, sourceFile) {
   const kind = ts.SyntaxKind;
   const found = new Map();
   const add = (name, node) => {
@@ -85,6 +97,69 @@ function exportedNames(ts, sourceFile) {
     else if (statement.name && statement.name.kind === kind.Identifier) add(statement.name.text, statement);
   }
   return found;
+}
+
+const withoutSlash = value => value.replace(/\/$/, '');
+
+/** The files the graph serves from: what an app slot requires, every route file, every package entry, every config-named file. */
+function rootFiles(graph, config) {
+  const roots = new Set();
+  for (const [rel, node] of graph.files) {
+    if (node.tier === 'route') { roots.add(rel); continue; }
+    if (!node.owner || node.tier !== 'app') continue;
+    const slot = graph.resolver.slot(node.owner.slot);
+    const inside = rel.slice(withoutSlash(node.owner.root).length + 1);
+    if ((slot?.requires ?? []).some(name => name === inside)) roots.add(rel);
+  }
+  for (const [key, owner] of graph.ownerRoots) {
+    if (owner.tier !== 'package') continue;
+    const entry = entryOf(graph, config, key, owner);
+    if (entry) roots.add(entry);
+  }
+  // A framework config of an app (slot fe.app.next) names sources by string, never by import.
+  for (const app of config.apps ?? []) {
+    const directory = `apps/${app.name}`;
+    let names = [];
+    try { names = fs.readdirSync(path.join(config.root, ...directory.split('/'))); } catch { continue; }
+    for (const name of names) {
+      if (graph.resolver.classifyPath(`${directory}/${name}`).slot !== 'fe.app.next' || !/\.[cm]?[jt]sx?$/.test(name)) continue;
+      let text = '';
+      try { text = fs.readFileSync(path.join(config.root, ...directory.split('/'), name), 'utf8'); } catch { continue; }
+      for (const match of text.matchAll(CONFIG_STRING)) {
+        const target = path.posix.join(directory, match[1]);
+        const hit = CONFIG_EXTENSIONS.map(extension => `${target}${extension}`).find(candidate => graph.files.has(candidate));
+        if (hit) roots.add(hit);
+      }
+    }
+  }
+  return roots;
+}
+
+/** HFS_UNUSED_FILE: production files no root reaches through runtime or type-only imports and re-exports. */
+function deadFiles(graph, config) {
+  const roots = rootFiles(graph, config);
+  const forward = new Map();
+  for (const edge of graph.edges) {
+    if (!forward.has(edge.from)) forward.set(edge.from, []);
+    forward.get(edge.from).push(edge.to);
+  }
+  const reached = new Set(roots);
+  const queue = [...roots];
+  while (queue.length) for (const next of forward.get(queue.shift()) ?? []) if (!reached.has(next)) { reached.add(next); queue.push(next); }
+  const violations = [];
+  let judged = 0;
+  for (const [rel, node] of [...graph.files].sort(([a], [b]) => a.localeCompare(b))) {
+    if (node.tier === null || UNJUDGED_TIERS.has(node.tier) || node.tier === 'route') continue;
+    judged += 1;
+    if (reached.has(rel)) continue;
+    violations.push({
+      ruleId: 'HFS_UNUSED_FILE',
+      path: rel, line: 1, column: 1,
+      slot: node.slot, owner: node.owner?.root ?? null,
+      message: `${rel} is not reached from any root (an app main.ts or app.module.ts, a route file, a package entry): nothing imports it, so no process runs it. Delete the file, or import it where it is used (a spec alone does not count).`,
+    });
+  }
+  return { violations, judged, roots: roots.size };
 }
 
 export function checkDeadExports({ context, graph, config }) {
@@ -149,5 +224,8 @@ export function checkDeadExports({ context, graph, config }) {
       });
     }
   }
-  return { violations, coverage: { status: 'checked', owners, exports, dead: violations.length } };
+  const files = deadFiles(graph, config);
+  const deadExports = violations.length;
+  violations.push(...files.violations);
+  return { violations, coverage: { status: 'checked', owners, exports, dead: deadExports, files: files.judged, roots: files.roots, unusedFiles: files.violations.length } };
 }

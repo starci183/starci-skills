@@ -59,6 +59,22 @@ const RETIRED_TEST_FOLDER = /^src\/tests\/(?:integration|harness)(?:\/|$)/u;
 const EXTRA_TEST_CONFIG = /(?:^|\/)(?:jest[.-][^/]*(?:config\.[cm]?[jt]s|\.json)|jest-(?:e2e|int|integration|harness)[^/]*)$/u;
 const NODE_ENTRIES_SKIPPED = new Set(['node_modules', '.git']);
 
+/**
+ * Whether the given root is the top level of its own Git work tree. An example under a runtime clone is a directory of
+ * that clone, not a work tree of its own: the clone's hooks and root are not the example's. A directory outside any work
+ * tree is not a top level either.
+ */
+function ownsGitTopLevel(root) {
+  try {
+    const top = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
+    return same(fs.realpathSync(path.resolve(top)), fs.realpathSync(path.resolve(root)));
+  } catch {
+    return false;
+  }
+}
+
+/** The tracked paths under the given root, relative to it: the pathspec keeps a nested directory from listing the paths of its enclosing clone. */
 function gitPaths(root) {
   try {
     // An empty index is still a Git tree. Falling back to disk in that case would count
@@ -255,15 +271,18 @@ function readText(root, relative) {
 // Husky itself sets core.hooksPath to .husky/_ ; that value and .husky are the only ones allowed.
 const HUSKY_HOOKS_PATH = /^\.husky(?:\/_)?\/?$/u;
 
+/** A directory that is not the top level of its own work tree has no hooks of its own: the check is not applicable there. */
 function hooksPathNotRedirected({ root, finding }) {
+  if (!ownsGitTopLevel(root)) return { status: 'not-applicable', reason: 'the checked root is not the top level of its own Git work tree, so it has no hooks of its own' };
   let value = '';
   try {
     value = execFileSync('git', ['config', '--local', '--get', 'core.hooksPath'], {
       cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
-  } catch { return; } // key not set, or not a Git work tree: nothing is redirected
+  } catch { return { status: 'checked' }; } // key not set: nothing is redirected
   if (value && !HUSKY_HOOKS_PATH.test(value.replaceAll('\\', '/')))
     finding('HFS_HOOKS_PATH_REDIRECTED', '.git/config', `core.hooksPath is set to ${value} in this clone. Unset it (git config --local --unset core.hooksPath) and let husky own the hooks; a redirected path skips the pre-commit and pre-push gates.`);
+  return { status: 'checked' };
 }
 
 function e2eInAutomaticGate({ root, tree, backend, frontend, finding }) {
@@ -415,13 +434,14 @@ export function checkHfs(config) {
   }
 
   e2eInAutomaticGate({ root: config.root, tree, backend, frontend, finding });
-  hooksPathNotRedirected({ root: config.root, finding });
+  const hooksPath = hooksPathNotRedirected({ root: config.root, finding });
 
   return {
     violations,
     coverage: {
       status: 'checked',
       source: tree.source,
+      hooksPath,
       rootEntries: tree.top.length,
       apps,
       ruleIds: [...HFS_RULE_IDS],

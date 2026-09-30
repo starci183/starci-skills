@@ -252,6 +252,16 @@ BE_APP_COMPOSITION_ONLY:
   owner: op-retry
   kind: check-finding
 
+BE_FEATURE_IMPORTS_FEATURE:
+  title: "A feature never imports a feature"
+  title_vi: "Feature import feature khác"
+  meaning_vi: "Feature `<a>` import feature `<b>`. Logic dùng chung phải là một capability domain."
+  causes_vi:
+    - "Vi phạm luật R28: Feature không import feature khác (kể cả qua `index.ts`); dùng chung thì đưa xuống domain."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
 BE_FEATURE_LAYOUT_INVALID:
   title: "Feature folder layout invalid"
   title_vi: "Bố cục thư mục feature sai"
@@ -354,9 +364,8 @@ BE_SOURCE_NAME_INVALID:
 BE_TIER_DIRECTION:
   title: "Backend import against the tier direction"
   title_vi: "Backend import ngược chiều tầng"
-  meaning_vi: "Một tệp backend import từ tầng mà bảng kê HFS không cho phép tầng của nó phụ thuộc vào. Mỗi tầng (app, feature, domain, integrations, platform) chỉ được nhìn xuống các tầng liệt kê trong bảng; hai feature không bao giờ import nhau, và import chỉ kiểu (type-only) cũng tính như import thật."
+  meaning_vi: "Một tệp backend import từ tầng mà bảng kê HFS không cho phép tầng của nó phụ thuộc vào. Mỗi tầng (app, feature, domain, integrations, platform) chỉ được nhìn xuống các tầng liệt kê trong bảng; hai feature import nhau là mã riêng BE_FEATURE_IMPORTS_FEATURE, và import chỉ kiểu (type-only) cũng tính như import thật."
   causes_vi:
-    - "Một feature import feature khác thay vì đi qua một module domain dùng chung"
     - "Một module domain, integrations hoặc platform import ngược lên feature hoặc app"
     - "Một module platform import domain hoặc integrations"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để đưa phần dùng chung xuống đúng tầng (domain hoặc platform) rồi cho cả hai bên import từ đó; không cần ai can thiệp thêm."
@@ -620,6 +629,17 @@ FE_WORLD_OWNER_RENDER_BOUNDARY:
   owner: other-op:interface.implement
   kind: check-finding
 
+HFS_ALIAS_REEXPORT:
+  title: "A declaration re-exported under a second name"
+  title_vi: "Xuất lại một khai báo dưới tên thứ hai"
+  meaning_vi: "Mã sản xuất dùng `export { X as Y }`, `export { default as Y }` hoặc `export * as ns`: một khai báo có hai tên, nên người đọc và công cụ tìm kiếm phải đoán hai tên là một. Luật áp cho cả backend lẫn frontend."
+  causes_vi:
+    - "Cửa vào của owner đổi tên một khai báo để tránh trùng tên với khai báo cùng tên ở owner khác"
+    - "Đổi tên tạm để giữ tên cũ cho nơi dùng cũ"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để đổi tên chính khai báo cho đúng nghĩa, hoặc import và xuất nó bằng tên của nó; không giữ tên cũ song song."
+  owner: op-retry
+  kind: check-finding
+
 HFS_APPS_REQUIRED:
   title: "Repository has no apps directory"
   title_vi: "Kho mã không có thư mục apps"
@@ -679,6 +699,17 @@ HFS_DUPLICATE_CODE:
   owner: op-retry
   kind: check-finding
 
+HFS_DUPLICATE_SYMBOL:
+  title: "One exported name declared in two files"
+  title_vi: "Một tên xuất được khai báo ở hai tệp"
+  meaning_vi: "Một tên mà cửa vào công khai (index.ts) của một chủ sở hữu xuất ra, truy về tệp khai báo nó, cũng được một tệp sản xuất khác của repo khai báo và xuất ra (hàm, lớp, hằng, enum, kiểu, interface). Hai bản khai báo cùng tên khiến import nhầm một bản mà trình biên dịch không báo, ví dụ hai decorator cùng tên InjectPrimaryEntityManager cho hai kết nối khác nhau. Việc xuất lại (re-export) một khai báo duy nhất không phải là bản thứ hai. Không có danh sách tên được miễn."
+  causes_vi:
+    - "Hai module cùng tự viết một helper, decorator hoặc kiểu với cùng một tên thay vì dùng chung một bản"
+    - "Mỗi kết nối hoặc mỗi ứng dụng chép nguyên một tệp rồi giữ nguyên tên xuất"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để giữ đúng một khai báo (dùng chung qua cửa vào của chủ sở hữu thích hợp) hoặc đổi tên bản còn lại cho đúng nghĩa của nó; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
 HFS_E2E_IN_AUTOMATIC_GATE:
   title: "E2E runs in automatic gate"
   title_vi: "Kiểm thử e2e nằm trong cổng tự động"
@@ -725,7 +756,7 @@ HFS_GHOST_TREE:
 HFS_HOOKS_PATH_REDIRECTED:
   title: "A clone redirects core.hooksPath away from husky"
   title_vi: "core.hooksPath bị đổi hướng khỏi husky"
-  meaning_vi: "Cấu hình Git cục bộ của bản clone đặt `core.hooksPath` trỏ ra ngoài `.husky`, nên hook pre-commit và pre-push không chạy và cổng mà mọi clone khác phải qua đã bị bỏ qua."
+  meaning_vi: "Cấu hình Git cục bộ của bản clone đặt `core.hooksPath` trỏ ra ngoài `.husky`, nên hook pre-commit và pre-push không chạy và cổng mà mọi clone khác phải qua đã bị bỏ qua. Chỉ xét khi thư mục được kiểm tra chính là gốc work tree Git của nó; một thư mục nằm trong clone khác (một ví dụ trong clone runtime) không có hook riêng nên không bị xét."
   causes_vi:
     - "Vi phạm luật R13: pre-push chạy typecheck và lint, và không clone nào được đổi `core.hooksPath` để né husky; giá trị duy nhất được phép là `.husky` hoặc `.husky/_` do chính husky đặt."
   nextStep_vi: "Gỡ cấu hình bằng `git config --local --unset core.hooksPath` rồi commit lại qua hook; không dùng `--no-verify` và không đổi đường dẫn hook để né kiểm tra."
@@ -1095,6 +1126,18 @@ HFS_UNUSED_EXPORT:
     - "Nơi từng dùng tên này đã bị xoá hoặc chuyển vào cùng module, còn dòng xuất ở cửa vào bị bỏ sót"
     - "Tên chỉ được dùng trong tệp kiểm thử, nên với bộ kiểm tra nó vẫn là thừa"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để xoá tên khỏi cửa vào (hoặc bỏ luôn phần khai báo nếu không còn ai dùng); nếu tên thực sự cần cho một nơi ngoài module thì nơi đó phải import nó qua cửa vào."
+  owner: op-retry
+  kind: check-finding
+
+HFS_UNUSED_FILE:
+  title: "Production file that nothing reaches"
+  title_vi: "Tệp mã sản xuất không ai chạm tới"
+  meaning_vi: "Một tệp mã sản xuất không được nối tới từ bất kỳ gốc nào: không phải main.ts hay app.module.ts của một ứng dụng, không phải tệp route, không phải cửa vào của một gói, và không tệp sản xuất nào import nó (kể cả import chỉ kiểu). Tệp kiểm thử không được tính; tệp chỉ có spec dùng vẫn là chết. Không tiến trình nào chạy tệp này."
+  causes_vi:
+    - "Nơi từng import tệp đã bị xoá hoặc chuyển đi, còn tệp bị bỏ sót"
+    - "Tệp được thêm nhưng chưa nối vào module hay cửa vào nào"
+    - "Tệp chỉ được spec dùng"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để xoá tệp, hoặc nối nó vào nơi thật sự dùng; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 

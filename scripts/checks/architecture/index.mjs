@@ -85,7 +85,7 @@ function stable(items) {
 }
 
 /**
- * Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. `fast` leaves out the two checks
+ * Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. `fast` leaves out the checks
  * that read the whole repository to answer (clones, dead exports, repository-wide symbols); the pre-push check of the changed owners uses it.
  */
 export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = [], base, fast = false, hfs: openedHfs } = {}) {
