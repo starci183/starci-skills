@@ -1,5 +1,4 @@
 export { orderEntities, orderMigrations } from "./persistence/connection"
-export { OrderEntity } from "./persistence/entities/order.entity"
 export { CheckoutService } from "./checkout.service"
 export { ORDER_ERROR_KINDS, OrderError, OrderErrorCode } from "./errors/order.error"
 export { ORDER_MESSAGES } from "./messages/order.messages"

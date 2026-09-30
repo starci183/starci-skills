@@ -1,12 +1,11 @@
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
 import type { ProbeCheckerService } from "./probe-checker.service"
-import { MODULE_OPTIONS_TOKEN } from "./probes.module-definition"
 import type { ProbesOptions } from "./probes.options"
 import type { Probe } from "./probes.port"
 
-/** Token of the options of this capability, the token its configurable module provides them under. */
-export const PROBES_OPTIONS: typeof MODULE_OPTIONS_TOKEN = MODULE_OPTIONS_TOKEN
+/** Token of the options of the probes capability; its configurable module provides them under this token. */
+export const PROBES_OPTIONS: unique symbol = Symbol("platform.probes.options")
 
 /** Token of the ProbeCheckerService. */
 export const PROBE_CHECKER: unique symbol = Symbol("platform.probes.checker")

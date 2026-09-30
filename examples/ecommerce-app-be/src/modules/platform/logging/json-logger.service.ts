@@ -1,5 +1,4 @@
 import type { Writable } from "node:stream"
-import { Injectable } from "@nestjs/common"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogErr, InjectLogOut } from "./logging.decorators"
@@ -7,7 +6,6 @@ import type { LogFields, Logger } from "./logging.port"
 
 type Level = "info" | "warn" | "error"
 
-@Injectable()
 /** The default adapter: one JSON object per line, stamped by the Clock; info goes to `out`, warn and error to `err`. */
 export class JsonLoggerService implements Logger {
     constructor(

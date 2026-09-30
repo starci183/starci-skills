@@ -1,12 +1,13 @@
 import { FakeClock, mockEntityManager } from "@starci/jest-preset"
+import type { MockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { Test } from "@nestjs/testing"
-import { paymentEntity } from "@tests/fixtures/builders/payment.builder"
+import { paymentRow } from "@tests/fixtures/builders/payment.builder"
 import { PaymentService } from "./payment.service"
 import { PaymentEntity } from "./persistence/entities/payment.entity"
 
-const build = async (entityManager: ReturnType<typeof mockEntityManager>, clock: FakeClock) => {
+const build = async (entityManager: MockEntityManager, clock: FakeClock) => {
     const moduleRef = await Test.createTestingModule({
         providers: [
             PaymentService,
@@ -21,7 +22,7 @@ describe("PaymentService", () => {
     describe("capture", () => {
         it("records a captured payment stamped with the clock through the caller transaction manager", async () => {
             const clock = new FakeClock("2026-02-03T04:05:06.000Z")
-            const manager = mockEntityManager({ save: [PaymentEntity, paymentEntity()] })
+            const manager = mockEntityManager({ save: [PaymentEntity, paymentRow()] })
 
             const view = await (
                 await build(mockEntityManager(), clock)
@@ -45,7 +46,7 @@ describe("PaymentService", () => {
         it("stamps the moment the clock shows when the payment is captured", async () => {
             const clock = new FakeClock("2026-02-03T04:05:06.000Z")
             const manager = mockEntityManager({
-                save: [PaymentEntity, paymentEntity({ id: "pay-2", orderId: "o-2", amountMinorUnits: 100 })],
+                save: [PaymentEntity, paymentRow({ id: "pay-2", orderId: "o-2", amountMinorUnits: 100 })],
             })
             const service = await build(mockEntityManager(), clock)
             clock.advance(60_000)
@@ -62,7 +63,7 @@ describe("PaymentService", () => {
     describe("findByOrder", () => {
         it("returns the payment of the order read with the caller manager when one is given", async () => {
             const own = mockEntityManager()
-            const manager = mockEntityManager({ findOneBy: [PaymentEntity, paymentEntity()] })
+            const manager = mockEntityManager({ findOneBy: [PaymentEntity, paymentRow()] })
 
             const view = await (
                 await build(own, new FakeClock("2026-02-03T04:05:06.000Z"))
@@ -73,7 +74,7 @@ describe("PaymentService", () => {
         })
 
         it("reads with its own manager when no manager is given", async () => {
-            const own = mockEntityManager({ findOneBy: [PaymentEntity, paymentEntity()] })
+            const own = mockEntityManager({ findOneBy: [PaymentEntity, paymentRow()] })
 
             expect(
                 await (await build(own, new FakeClock("2026-02-03T04:05:06.000Z"))).findByOrder({ orderId: "o-1" }),

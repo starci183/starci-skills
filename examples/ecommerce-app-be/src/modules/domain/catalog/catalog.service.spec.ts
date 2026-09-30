@@ -1,12 +1,13 @@
 import { mockEntityManager } from "@starci/jest-preset"
+import type { MockEntityManager } from "@starci/jest-preset"
 import { LIST_ROWS_MAX, ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { Test } from "@nestjs/testing"
-import { productEntity, productView } from "@tests/fixtures/builders/catalog.builder"
+import { productRow, productView } from "@tests/fixtures/builders/catalog.builder"
 import { In, MoreThanOrEqual } from "typeorm"
 import { CatalogService } from "./catalog.service"
 import { ProductEntity } from "./persistence/entities/product.entity"
 
-const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
+const build = async (entityManager: MockEntityManager) => {
     const moduleRef = await Test.createTestingModule({
         providers: [CatalogService, { provide: ORDER_ENTITY_MANAGER, useValue: entityManager }],
     }).compile()
@@ -20,8 +21,8 @@ describe("CatalogService", () => {
                 find: [
                     ProductEntity,
                     [
-                        productEntity({ id: "sku-1", stock: 3 }),
-                        productEntity({ id: "sku-2", priceMinorUnits: 900, stock: 0 }),
+                        productRow({ id: "sku-1", stock: 3 }),
+                        productRow({ id: "sku-2", priceMinorUnits: 900, stock: 0 }),
                     ],
                 ],
             })
@@ -36,7 +37,7 @@ describe("CatalogService", () => {
 
     describe("byIds", () => {
         it("returns the products keyed by id and leaves an unknown id absent", async () => {
-            const em = mockEntityManager({ find: [ProductEntity, [productEntity({ id: "sku-1", stock: 3 })]] })
+            const em = mockEntityManager({ find: [ProductEntity, [productRow({ id: "sku-1", stock: 3 })]] })
 
             const lookup = await (await build(em)).byIds({ ids: ["sku-1", "sku-9"] })
 

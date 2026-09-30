@@ -1,5 +1,4 @@
 export { paymentEntities, paymentMigrations } from "./persistence/connection"
-export { PaymentEntity } from "./persistence/entities/payment.entity"
 export { PAYMENT_SERVICE, InjectPaymentService } from "./payment.decorators"
 export { PaymentModule } from "./payment.module"
 export { PaymentService } from "./payment.service"

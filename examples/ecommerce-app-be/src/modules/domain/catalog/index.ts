@@ -1,5 +1,4 @@
 export { catalogEntities, catalogMigrations } from "./persistence/connection"
-export { ProductEntity } from "./persistence/entities/product.entity"
 export type { ProductLookup, ProductView } from "./catalog.contracts"
 export { CATALOG_SERVICE, InjectCatalogService } from "./catalog.decorators"
 export { CatalogModule } from "./catalog.module"

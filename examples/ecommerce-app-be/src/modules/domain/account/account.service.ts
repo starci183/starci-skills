@@ -52,7 +52,7 @@ export class AccountService {
     }
 
     /** Registers a person in one transaction; a taken email is a refusal. */
-    async register(params: VerifyCredentialsParams): Promise<Outcome<AccountPersonView, AccountErrorCode.EmailTaken>> {
+    register(params: VerifyCredentialsParams): Promise<Outcome<AccountPersonView, AccountErrorCode.EmailTaken>> {
         return this.entityManager.transaction(async (manager) => {
             const rows: Array<PersonIdRow> = await manager.query(INSERT_PERSON_IF_NEW, [
                 params.email,

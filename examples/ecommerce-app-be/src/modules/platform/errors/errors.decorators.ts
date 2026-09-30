@@ -1,11 +1,10 @@
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
-import { MODULE_OPTIONS_TOKEN } from "./errors.module-definition"
 import type { ErrorsOptions } from "./errors.options"
 import type { ErrorsService } from "./errors.service"
 
-/** Token of the options of this capability, the token its configurable module provides them under. */
-export const ERRORS_OPTIONS: typeof MODULE_OPTIONS_TOKEN = MODULE_OPTIONS_TOKEN
+/** Token of the options of the errors capability; its configurable module provides them under this token. */
+export const ERRORS_OPTIONS: unique symbol = Symbol("platform.errors.options")
 
 /** Token of the service that describes failures for the transports. */
 export const ERRORS_SERVICE: unique symbol = Symbol("platform.errors.service")

@@ -1,13 +1,14 @@
 import { mockEntityManager } from "@starci/jest-preset"
+import type { MockEntityManager } from "@starci/jest-preset"
 import { LIST_ROWS_MAX, ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { Test } from "@nestjs/testing"
-import { cartItemEntity } from "@tests/fixtures/builders/cart.builder"
+import { cartItemRow } from "@tests/fixtures/builders/cart.builder"
 import { CartService } from "./cart.service"
 import { CartErrorCode } from "./errors/cart.error"
 import { CartItemEntity } from "./persistence/entities/cart-item.entity"
 import { UPSERT_CART_ITEM } from "./persistence/cart.sql"
 
-const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
+const build = async (entityManager: MockEntityManager) => {
     const moduleRef = await Test.createTestingModule({
         providers: [CartService, { provide: ORDER_ENTITY_MANAGER, useValue: entityManager }],
     }).compile()
@@ -21,8 +22,8 @@ describe("CartService", () => {
                 find: [
                     CartItemEntity,
                     [
-                        cartItemEntity({ productId: "sku-1", quantity: 2 }),
-                        cartItemEntity({ productId: "sku-2", quantity: 1 }),
+                        cartItemRow({ productId: "sku-1", quantity: 2 }),
+                        cartItemRow({ productId: "sku-2", quantity: 1 }),
                     ],
                 ],
             })

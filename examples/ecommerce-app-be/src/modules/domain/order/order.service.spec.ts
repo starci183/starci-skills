@@ -1,4 +1,5 @@
 import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import type { MockEntityManager } from "@starci/jest-preset"
 import { CART_SERVICE } from "@modules/domain/cart"
 import type { CartService } from "@modules/domain/cart"
 import { CATALOG_SERVICE } from "@modules/domain/catalog"
@@ -7,7 +8,7 @@ import { PAYMENT_SERVICE } from "@modules/domain/payment"
 import type { PaymentService } from "@modules/domain/payment"
 import { ORDER_ENTITY_MANAGER } from "@modules/platform/database"
 import { Test } from "@nestjs/testing"
-import { orderEntity, placedOrder } from "@tests/fixtures/builders/order.builder"
+import { orderRow, placedOrder } from "@tests/fixtures/builders/order.builder"
 import { productView } from "@tests/fixtures/builders/catalog.builder"
 import { OrderErrorCode } from "./errors/order.error"
 import { OrderService } from "./order.service"
@@ -18,7 +19,7 @@ import { COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sq
 const shirt = productView()
 const mug = productView({ id: "sku-2", name: "Mug", priceMinorUnits: 250, stock: 10 })
 
-const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
+const build = async (entityManager: MockEntityManager) => {
     const cart = mock<CartService>()
     const catalog = mock<CatalogService>()
     const payments = mock<PaymentService>()
@@ -73,7 +74,7 @@ describe("OrderService", () => {
         })
 
         it("returns the first order of a replayed key and writes nothing", async () => {
-            const em = mockEntityManager({ findOneBy: [OrderEntity, orderEntity({ idempotencyKey: "key-1" })] })
+            const em = mockEntityManager({ findOneBy: [OrderEntity, orderRow({ idempotencyKey: "key-1" })] })
             const { orders, cart, payments } = await build(em)
             payments.findByOrder.mockResolvedValue({ paymentId: "pay-1", amountMinorUnits: 1250 })
 
@@ -89,7 +90,7 @@ describe("OrderService", () => {
         })
 
         it("fails with the payment missing error when a replayed order has no payment", async () => {
-            const em = mockEntityManager({ findOneBy: [OrderEntity, orderEntity({ idempotencyKey: "key-1" })] })
+            const em = mockEntityManager({ findOneBy: [OrderEntity, orderRow({ idempotencyKey: "key-1" })] })
             const { orders, payments } = await build(em)
             payments.findByOrder.mockResolvedValue(null)
 
@@ -185,7 +186,7 @@ describe("OrderService", () => {
                 mockEntityManager({
                     findOneBy: [
                         [OrderEntity, null],
-                        [OrderEntity, orderEntity({ id: "o-3", totalMinorUnits: 500, idempotencyKey: "key-3" })],
+                        [OrderEntity, orderRow({ id: "o-3", totalMinorUnits: 500, idempotencyKey: "key-3" })],
                     ],
                     query: [INSERT_ORDER_IF_NEW, []],
                 }),

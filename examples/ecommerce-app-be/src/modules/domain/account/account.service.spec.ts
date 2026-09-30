@@ -1,11 +1,12 @@
 import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import type { MockEntityManager } from "@starci/jest-preset"
 import { SESSION_SERVICE } from "@modules/domain/session"
 import type { SessionService } from "@modules/domain/session"
 import { ORDER_API } from "@modules/integrations/order-api"
 import type { OrderApiClient } from "@modules/integrations/order-api"
 import { IDENTITY_ENTITY_MANAGER } from "@modules/platform/database"
 import { Test } from "@nestjs/testing"
-import { personEntity } from "@tests/fixtures/builders/account.builder"
+import { personRow } from "@tests/fixtures/builders/account.builder"
 import { AccountService } from "./account.service"
 import { AccountErrorCode } from "./errors/account.error"
 import { hashPassword } from "./password.policy"
@@ -13,9 +14,9 @@ import { INSERT_PERSON_IF_NEW } from "./persistence/account.sql"
 import { PersonEntity } from "./persistence/entities/person.entity"
 
 const person = (id: string, email: string, password: string): PersonEntity =>
-    personEntity({ id, email, passwordHash: hashPassword(password) })
+    personRow({ id, email, passwordHash: hashPassword(password) })
 
-const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
+const build = async (entityManager: MockEntityManager) => {
     const sessions = mock<SessionService>()
     const orderApi = mock<OrderApiClient>()
     const moduleRef = await Test.createTestingModule({

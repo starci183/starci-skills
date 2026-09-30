@@ -1,62 +1,62 @@
-import { builder, mock } from "@starci/jest-preset"
+import { mock } from "@starci/jest-preset"
 import { GraphQLError } from "graphql"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { MESSAGE_CATALOG } from "@modules/platform/i18n"
 import type { MessageCatalog } from "@modules/platform/i18n"
+import { PROBES_ERROR_KINDS, ProbesError, ProbesErrorCode } from "@modules/platform/probes"
 import { Test } from "@nestjs/testing"
-import { DomainError } from "./domain.error"
 import { ERRORS_OPTIONS } from "./errors.decorators"
+import { ErrorsError, ErrorsErrorCode } from "./errors/errors.error"
 import { ErrorsLogEvent } from "./errors.log-events"
-import type { ErrorsOptions } from "./errors.options"
+import type { ErrorKindTable } from "./errors.contracts"
 import { ErrorsService } from "./errors.service"
 
-class ShopError extends DomainError<"SHOP_SOLD_OUT" | "SHOP_UNDECLARED"> {}
-class OwnError extends DomainError<"ERRORS_OPERATION_INVALID"> {}
-
-const options = builder<ErrorsOptions>({ kinds: [{ SHOP_SOLD_OUT: "conflict" }] })
+const build = async (kinds: ReadonlyArray<ErrorKindTable>) => {
+    const catalog = mock<MessageCatalog>()
+    const logger = mock<Logger>()
+    const moduleRef = await Test.createTestingModule({
+        providers: [
+            ErrorsService,
+            { provide: ERRORS_OPTIONS, useValue: { kinds } },
+            { provide: MESSAGE_CATALOG, useValue: catalog },
+            { provide: LOGGER, useValue: logger },
+        ],
+    }).compile()
+    return { errors: moduleRef.get(ErrorsService), catalog, logger }
+}
 
 describe("ErrorsService", () => {
-    const build = async () => {
-        const catalog = mock<MessageCatalog>()
-        const logger = mock<Logger>()
-        const moduleRef = await Test.createTestingModule({
-            providers: [
-                ErrorsService,
-                { provide: ERRORS_OPTIONS, useValue: options() },
-                { provide: MESSAGE_CATALOG, useValue: catalog },
-                { provide: LOGGER, useValue: logger },
-            ],
-        }).compile()
-        return { errors: moduleRef.get(ErrorsService), catalog, logger }
-    }
-
     describe("describe", () => {
         it("keeps the code, kind and params of a declared domain error", async () => {
-            const { errors, logger } = await build()
+            const { errors, logger } = await build([PROBES_ERROR_KINDS])
+            const declared = new ProbesError({
+                code: ProbesErrorCode.DependencyUnavailable,
+                params: { database: "unreachable" },
+            })
 
-            expect(errors.describe(new ShopError({ code: "SHOP_SOLD_OUT", params: { productId: "sku-1" } }))).toEqual({
-                code: "SHOP_SOLD_OUT",
-                kind: "conflict",
-                status: 409,
-                params: { productId: "sku-1" },
+            expect(errors.describe(declared)).toEqual({
+                code: "PROBES_DEPENDENCY_UNAVAILABLE",
+                kind: "unavailable",
+                status: 503,
+                params: { database: "unreachable" },
             })
             expect(logger.error).not.toHaveBeenCalled()
         })
 
         it("keeps the code of an error the errors capability itself declares", async () => {
-            const { errors } = await build()
+            const { errors } = await build([])
 
-            expect(errors.describe(new OwnError({ code: "ERRORS_OPERATION_INVALID" }))).toMatchObject({
+            expect(errors.describe(new ErrorsError({ code: ErrorsErrorCode.OperationInvalid }))).toMatchObject({
                 code: "ERRORS_OPERATION_INVALID",
                 kind: "invalid",
                 status: 400,
             })
         })
 
-        it("masks a domain error no capability declared and logs it", async () => {
-            const { errors, logger } = await build()
-            const undeclared = new ShopError({ code: "SHOP_UNDECLARED" })
+        it("masks a domain error no composed capability declared and logs it", async () => {
+            const { errors, logger } = await build([])
+            const undeclared = new ProbesError({ code: ProbesErrorCode.DependencyUnavailable })
 
             expect(errors.describe(undeclared)).toEqual({
                 code: "ERRORS_INTERNAL",
@@ -68,7 +68,7 @@ describe("ErrorsService", () => {
         })
 
         it("masks any other failure and logs it", async () => {
-            const { errors, logger } = await build()
+            const { errors, logger } = await build([])
             const failure = new Error("boom")
 
             expect(errors.describe(failure).code).toBe("ERRORS_INTERNAL")
@@ -78,7 +78,7 @@ describe("ErrorsService", () => {
 
     describe("describeInvalidOperation", () => {
         it("describes a malformed operation as invalid", async () => {
-            const { errors } = await build()
+            const { errors } = await build([])
 
             expect(errors.describeInvalidOperation()).toEqual({
                 code: "ERRORS_OPERATION_INVALID",
@@ -91,38 +91,51 @@ describe("ErrorsService", () => {
 
     describe("text", () => {
         it("returns the catalog text of the code in the locale", async () => {
-            const { errors, catalog } = await build()
-            catalog.get.mockReturnValue("Het hang")
+            const { errors, catalog } = await build([])
+            catalog.get.mockReturnValue("A dependency is down")
 
-            expect(errors.text("SHOP_SOLD_OUT", { productId: "sku-1" }, "vi")).toBe("Het hang")
-            expect(catalog.get).toHaveBeenCalledWith("errors.SHOP_SOLD_OUT", { productId: "sku-1" }, "vi")
+            expect(errors.text("PROBES_DEPENDENCY_UNAVAILABLE", { database: "unreachable" }, "en")).toBe(
+                "A dependency is down",
+            )
+            expect(catalog.get).toHaveBeenCalledWith(
+                "errors.PROBES_DEPENDENCY_UNAVAILABLE",
+                { database: "unreachable" },
+                "en",
+            )
         })
 
         it("returns the text of the internal error when the code has no catalog entry", async () => {
-            const { errors, catalog } = await build()
+            const { errors, catalog } = await build([])
             catalog.get.mockImplementation((key) => (key === "errors.ERRORS_INTERNAL" ? "Something broke" : key))
 
-            expect(errors.text("SHOP_SOLD_OUT", {}, "en")).toBe("Something broke")
+            expect(errors.text("PROBES_DEPENDENCY_UNAVAILABLE", {}, "en")).toBe("Something broke")
         })
     })
 
     describe("formatError", () => {
         it("answers the code, kind and params of the original error of a GraphQL failure", async () => {
-            const { errors } = await build()
-            const original = new ShopError({ code: "SHOP_SOLD_OUT", params: { productId: "sku-1" } })
-            const graphql = new GraphQLError("wrapped", { originalError: original, path: ["placeOrder"] })
+            const { errors } = await build([PROBES_ERROR_KINDS])
+            const original = new ProbesError({
+                code: ProbesErrorCode.DependencyUnavailable,
+                params: { database: "unreachable" },
+            })
+            const graphql = new GraphQLError(original.code, { originalError: original, path: ["health"] })
 
             expect(errors.formatError(graphql.toJSON(), graphql)).toEqual({
-                message: "SHOP_SOLD_OUT",
+                message: "PROBES_DEPENDENCY_UNAVAILABLE",
                 locations: undefined,
-                path: ["placeOrder"],
-                extensions: { code: "SHOP_SOLD_OUT", kind: "conflict", params: { productId: "sku-1" } },
+                path: ["health"],
+                extensions: {
+                    code: "PROBES_DEPENDENCY_UNAVAILABLE",
+                    kind: "unavailable",
+                    params: { database: "unreachable" },
+                },
             })
         })
 
         it("answers an invalid operation for a GraphQL failure without an original error", async () => {
-            const { errors } = await build()
-            const graphql = new GraphQLError("Syntax Error")
+            const { errors } = await build([])
+            const graphql = new GraphQLError(ErrorsErrorCode.OperationInvalid)
 
             expect(errors.formatError(graphql.toJSON(), graphql).extensions).toEqual({
                 code: "ERRORS_OPERATION_INVALID",
@@ -132,8 +145,8 @@ describe("ErrorsService", () => {
         })
 
         it("masks a failure that is not a GraphQL error", async () => {
-            const { errors } = await build()
-            const graphql = new GraphQLError("plain")
+            const { errors } = await build([])
+            const graphql = new GraphQLError(ErrorsErrorCode.Internal)
 
             expect(errors.formatError(graphql.toJSON(), new Error("boom")).extensions).toEqual({
                 code: "ERRORS_INTERNAL",

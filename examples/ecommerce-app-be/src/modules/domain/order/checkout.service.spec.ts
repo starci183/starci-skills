@@ -1,4 +1,5 @@
 import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import type { MockEntityManager } from "@starci/jest-preset"
 import { CART_SERVICE } from "@modules/domain/cart"
 import type { CartService } from "@modules/domain/cart"
 import { CATALOG_SERVICE } from "@modules/domain/catalog"
@@ -11,7 +12,7 @@ import { OrderErrorCode } from "./errors/order.error"
 
 const shirt = productView()
 
-const build = async (entityManager: ReturnType<typeof mockEntityManager>) => {
+const build = async (entityManager: MockEntityManager) => {
     const cart = mock<CartService>()
     const catalog = mock<CatalogService>()
     const moduleRef = await Test.createTestingModule({

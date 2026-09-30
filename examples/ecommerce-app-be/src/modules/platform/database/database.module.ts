@@ -11,7 +11,9 @@ import { ORDER_CONNECTION } from "./order.connection"
 import { ORDER_ENTITY_MANAGER } from "./order.decorators"
 
 /** The token each declared connection provides its shared EntityManager under. */
-const ENTITY_MANAGER_TOKENS: ReadonlyMap<string, symbol> = new Map([
+type EntityManagerToken = typeof IDENTITY_ENTITY_MANAGER | typeof ORDER_ENTITY_MANAGER
+
+const ENTITY_MANAGER_TOKENS: ReadonlyMap<string, EntityManagerToken> = new Map<string, EntityManagerToken>([
     [IDENTITY_CONNECTION, IDENTITY_ENTITY_MANAGER],
     [ORDER_CONNECTION, ORDER_ENTITY_MANAGER],
 ])

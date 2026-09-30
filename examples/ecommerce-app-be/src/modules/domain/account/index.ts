@@ -1,5 +1,4 @@
 export { accountEntities, accountMigrations } from "./persistence/connection"
-export { PersonEntity } from "./persistence/entities/person.entity"
 export type { AccountOverview, AccountPersonView } from "./account.contracts"
 export { AccountModule } from "./account.module"
 export { AccountService } from "./account.service"

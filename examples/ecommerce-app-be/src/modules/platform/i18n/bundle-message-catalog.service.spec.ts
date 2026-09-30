@@ -4,17 +4,18 @@ import { BundleMessageCatalogService } from "./bundle-message-catalog.service"
 import { I18N_OPTIONS } from "./i18n.decorators"
 import type { I18nOptions } from "./i18n.options"
 
-const options = builder<I18nOptions>({
-    bundles: [
-        { vi: { "greet.hello": "Xin chao {{name}}" }, en: { "greet.hello": "Hello {{name}}" } },
-        { vi: { "cart.count": "{{count}} san pham" }, en: { "cart.count": "{{count}} items" } },
-    ],
-})
+const BUNDLES: I18nOptions["bundles"] = [
+    { vi: { "greet.hello": "Xin chao {{name}}" }, en: { "greet.hello": "Hello {{name}}" } },
+    { vi: { "cart.count": "{{count}} san pham" }, en: { "cart.count": "{{count}} items" } },
+]
 
 describe("BundleMessageCatalogService", () => {
     const build = async (overrides?: Partial<I18nOptions>): Promise<BundleMessageCatalogService> => {
         const moduleRef = await Test.createTestingModule({
-            providers: [BundleMessageCatalogService, { provide: I18N_OPTIONS, useValue: options(overrides) }],
+            providers: [
+                BundleMessageCatalogService,
+                { provide: I18N_OPTIONS, useValue: builder<I18nOptions>({ bundles: BUNDLES })(overrides) },
+            ],
         }).compile()
         return moduleRef.get(BundleMessageCatalogService)
     }
