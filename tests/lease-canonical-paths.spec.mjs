@@ -10,11 +10,11 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {leaseCanonicalizer} from '../scripts/kernel/lease-canon.mjs';
 
 // nivo wf-nivo-fe-debt-mug06w7h inc-52a4a5ee5b12: Modules enqueued `apps/app/src/messages/vi.json` bare
-// (--repository fe) while fe-debt enqueued `nivo-fe/apps/app/src/messages` prefixed with the fe
-// repository's name. Leases compared strings, so both were admitted onto the same catalog. In a bound
+// (--repository fe) while fe-debt enqueued `fe/apps/app/src/messages` prefixed with the side
+// folder's name. Leases compared strings, so both were admitted onto the same catalog. In a bound
 // project every owned path is now spelled `repository:<role>/<path>` for its lease, held rows (also ones
 // taken before this change) are compared in that form through their holder job, and on Windows the
-// comparison ignores case. The same relative path in two repositories never overlaps.
+// comparison ignores case. The same relative path in two sides never overlaps.
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const VI='apps/app/src/messages/vi.json',MESSAGES='apps/app/src/messages';
@@ -23,30 +23,27 @@ const git=(cwd,...args)=>{
   assert.equal(r.status,0,`git ${args.join(' ')}: ${r.stderr}`);
 };
 
-// A tmp Source binding nivo-backend (be, the Work owner) and nivo-fe (fe, gitRepository nivo-fe2).
+// A tmp Source binding one nivo app repository with be/ and fe/ sides.
 const fixture=t=>{
   const dir=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'starci-lease-canon-')));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const be=path.join(dir,'nivo-backend'),fe=path.join(dir,'nivo-fe'),source=path.join(dir,'source');
-  for(const repo of [be,fe]){
-    fs.mkdirSync(path.join(repo,'apps','app','src','messages'),{recursive:true});
-    fs.writeFileSync(path.join(repo,VI),'{}\n');
-    git(repo,'init','--quiet','-b','main');
-    git(repo,'config','user.email','fixture@example.test');
-    git(repo,'config','user.name','Fixture');
-    git(repo,'add',VI);
-    git(repo,'commit','--quiet','-m','seed');
+  const be=path.join(dir,'nivo'),backend=path.join(be,'be'),fe=path.join(be,'fe'),source=path.join(dir,'source');
+  for(const side of [backend,fe]){
+    fs.mkdirSync(path.join(side,'apps','app','src','messages'),{recursive:true});
+    fs.writeFileSync(path.join(side,VI),'{}\n');
   }
+  git(be,'init','--quiet','-b','main');
+  git(be,'config','user.email','fixture@example.test');
+  git(be,'config','user.name','Fixture');
+  git(be,'add','.');
+  git(be,'commit','--quiet','-m','seed');
   fs.mkdirSync(path.join(source,'.workspaces','projects','nivo'),{recursive:true});
   fs.writeFileSync(path.join(source,'.workspaces','projects','nivo','work.json'),JSON.stringify({
-    schema:'starci/workspace-binding@1',project:'nivo',
-    repositories:{
-      be:{pathFromSource:'../nivo-backend',gitRepository:'https://example.test/nivo-backend.git'},
-      fe:{pathFromSource:'../nivo-fe',gitRepository:'https://example.test/nivo-fe2.git'},
-    },
-    work:{ownerRole:'be',pathFromRepository:'.starciwork'},
+    schema:'starci/workspace-binding@2',project:'nivo',
+    repository:{pathFromSource:'../nivo',gitRepository:'https://example.test/nivo.git'},
+    sides:{be:'be',fe:'fe'},work:{pathFromRepository:'.starciwork'},
   }));
   const prior=process.env.STARCI_SOURCE_ROOT;
   const priorProjects=process.env.STARCI_PROJECTS_ROOT;
@@ -59,7 +56,7 @@ const fixture=t=>{
     if(priorProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=priorProjects;
     if(priorMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=priorMachine;
   });
-  return {dir,be,fe,source};
+  return {dir,be,backend,fe,source};
 };
 const withLedger=(repo,fn)=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
 const enqueue=(ledger,{jobId,workflowId,opId='code.refactor',owned,repository})=>{
@@ -81,20 +78,20 @@ const holdLegacy=(ledger,jobId,key)=>{
 test('every spelling of a bound path is one repository-qualified lease path; an unbound repository keeps its own',t=>{
   const {be,fe,dir}=fixture(t);
   const canon=leaseCanonicalizer({repo:be});
-  assert.ok(canon.binding,'the tmp Source binds nivo-backend as the Work owner');
+  assert.ok(canon.binding,'the tmp Source binds nivo as one app repository');
   const fePayload={repository:'fe'};
   assert.equal(canon.canonical(VI,{op:'interface.implement',payload:fePayload}),`repository:fe/${VI}`,'bare, --repository fe');
-  assert.equal(canon.canonical(`nivo-fe/${MESSAGES}`,{op:'code.refactor',payload:{}}),`repository:fe/${MESSAGES}`,'prefixed with the repository name');
-  assert.equal(canon.canonical(`nivo-fe/${MESSAGES}/**`,{op:'code.refactor',payload:{}}),`repository:fe/${MESSAGES}`);
+  assert.equal(canon.canonical(`fe/${MESSAGES}`,{op:'code.refactor',payload:{}}),`repository:fe/${MESSAGES}`,'prefixed with the side folder');
+  assert.equal(canon.canonical(`fe/${MESSAGES}/**`,{op:'code.refactor',payload:{}}),`repository:fe/${MESSAGES}`);
   assert.equal(canon.canonical(`repository:fe/${VI}`),`repository:fe/${VI}`);
-  assert.equal(canon.canonical(`repository:nivo-fe/${VI}`),`repository:fe/${VI}`,'a repository id resolves to its role');
-  assert.equal(canon.canonical(VI,{op:'code.refactor',payload:{repository:'be'}}),`repository:be/${VI}`,'the same relative path in the owner repository');
-  assert.equal(canon.canonical('.starciwork/features/sales/impl/x',{op:'interface.implement',payload:fePayload}),'repository:be/.starciwork/features/sales/impl/x','a Work path lands in the Work owner');
+  assert.equal(canon.canonical(`repository:nivo/${VI}`),`repository:app/${VI}`,'the app repository id resolves to its role');
+  assert.equal(canon.canonical(VI,{op:'code.refactor',payload:{repository:'be'}}),`repository:be/${VI}`,'the same relative path in the backend side');
+  assert.equal(canon.canonical('.starciwork/features/sales/impl/x',{op:'interface.implement',payload:fePayload}),'.starciwork/features/sales/impl/x','a Work path lands at the app root');
   assert.deepEqual(canon.requests({opId:'interface.implement',repository:'fe',owned_paths:[VI,`apps/app/src/messages/en.json`,`apps/app/src/messages`]}),
     [{resourceKey:`path:repository:fe/${MESSAGES}`,units:1}],'descendants collapse after canonicalization');
   const unbound=leaseCanonicalizer({repo:path.join(dir,'elsewhere')});
   assert.equal(unbound.binding,null);
-  assert.equal(unbound.canonical(`nivo-fe/${MESSAGES}`,{payload:{}}),`nivo-fe/${MESSAGES}`,'no binding: the path as written');
+  assert.equal(unbound.canonical(`fe/${MESSAGES}`,{payload:{}}),`fe/${MESSAGES}`,'no binding: the path as written');
   assert.ok(fe);
 });
 
@@ -103,20 +100,20 @@ test('a bare and a prefixed spelling of one file overlap in both directions, leg
   withLedger(be,ledger=>{
     enqueue(ledger,{jobId:'modules-legacy',workflowId:'wf-modules',owned:[VI],repository:'fe'});
     holdLegacy(ledger,'modules-legacy',`path:${VI}`);
-    enqueue(ledger,{jobId:'debt-legacy',workflowId:'wf-debt',owned:[`nivo-fe/apps/landing/src`]});
-    holdLegacy(ledger,'debt-legacy','path:nivo-fe/apps/landing/src');
+    enqueue(ledger,{jobId:'debt-legacy',workflowId:'wf-debt',owned:[`fe/apps/landing/src`]});
+    holdLegacy(ledger,'debt-legacy','path:fe/apps/landing/src');
     const canon=leaseCanonicalizer({repo:be,db:ledger.db});
     const conflictsOf=(payload,exclude)=>findOwnedPathLeaseConflicts(ledger.db,canon.requests(payload),{excludeJobId:exclude,canonicalOf:canon.canonicalOf});
 
     // fe-debt (prefixed) against the Modules lease taken bare before canonical keys.
-    const debt=conflictsOf({opId:'code.refactor',owned_paths:[`nivo-fe/${MESSAGES}`]},'debt-new');
+    const debt=conflictsOf({opId:'code.refactor',owned_paths:[`fe/${MESSAGES}`]},'debt-new');
     assert.deepEqual(debt.map(c=>[c.requested,c.held,c.job_id]),[[`path:repository:fe/${MESSAGES}`,`path:${VI}`,'modules-legacy']]);
     // Modules (bare, fe) against the fe-debt lease taken prefixed.
     const modules=conflictsOf({opId:'interface.implement',repository:'fe',owned_paths:['apps/landing/src/page.tsx']},'modules-new');
     assert.deepEqual(modules.map(c=>c.job_id),['debt-legacy']);
-    // The same relative path in the Work owner repository is another file.
+    // The same relative path in the backend side is another file.
     assert.deepEqual(conflictsOf({opId:'code.refactor',repository:'be',owned_paths:[VI]},'be-new'),[],'be:apps/app/src/messages/vi.json is not fe:apps/app/src/messages/vi.json');
-    assert.deepEqual(conflictsOf({opId:'code.refactor',owned_paths:[`nivo-backend/${VI}`]},'be-named'),[],'nor spelled with the owner repository name');
+    assert.deepEqual(conflictsOf({opId:'code.refactor',owned_paths:[`be/${VI}`]},'be-named'),[],'nor spelled with the backend side folder');
   });
 });
 
@@ -128,7 +125,7 @@ test('lease paths compare case-insensitively on Windows only',()=>{
   assert.equal(findOwnedPathLeaseConflicts(db,[`path:repository:fe/Apps/App/src/Messages/vi.json`],{platform:'linux'}).length,0);
 });
 
-test('api: dispatch takes the canonical lease, a prefixed spelling of the same catalog waits on it, the owner repository path does not',t=>{
+test('api: dispatch takes the canonical lease, a prefixed spelling of the same catalog waits on it, the backend side path does not',t=>{
   const {dir,be,source}=fixture(t);
   const stub=path.join(dir,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,STARCI_SOURCE_ROOT:source,
@@ -146,7 +143,7 @@ test('api: dispatch takes the canonical lease, a prefixed spelling of the same c
       ledger.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(wf);
     }
     enqueue(ledger,{jobId:'modules-vi',workflowId:'wf-modules',owned:[VI],repository:'fe'});
-    enqueue(ledger,{jobId:'debt-messages',workflowId:'wf-debt',owned:[`nivo-fe/${MESSAGES}`]});
+    enqueue(ledger,{jobId:'debt-messages',workflowId:'wf-debt',owned:[`fe/${MESSAGES}`]});
     enqueue(ledger,{jobId:'be-vi',workflowId:'wf-debt',owned:[VI],repository:'be'});
   });
   const leases=jobId=>{const l=inspectLedger({file:ledgerFileFor(be)});try{return l.db.prepare('SELECT resource_key FROM leases WHERE job_id=?').all(jobId).map(r=>r.resource_key);}finally{l.close();}};

@@ -33,7 +33,7 @@ export const snapshotName = (date, sinceHours) => `${date}-${sinceHours}h.json`;
 
 /**
  * The Work owner repo of every .workspaces/projects/<p>/work.json binding under `sourceRoot`
- * (repositories[work.ownerRole ?? 'be'].pathFromSource), each kept once and only when it holds a ledger.
+ * (repository.pathFromSource), each kept once and only when it holds a ledger.
  */
 export function boundRepos({ sourceRoot = starciSourceRoot() } = {}) {
   const projects = path.join(sourceRoot, '.workspaces', 'projects');
@@ -42,7 +42,7 @@ export function boundRepos({ sourceRoot = starciSourceRoot() } = {}) {
   const seen = new Set(), out = [];
   for (const entry of entries.filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
     const doc = readJson(path.join(projects, entry.name, 'work.json'));
-    const rel = doc?.repositories?.[doc?.work?.ownerRole ?? 'be']?.pathFromSource;
+    const rel = doc?.schema === 'starci/workspace-binding@2' ? doc?.repository?.pathFromSource : null;
     if (typeof rel !== 'string' || !rel.trim()) continue;
     const repo = path.resolve(sourceRoot, rel);
     const key = process.platform === 'win32' ? repo.toLowerCase() : repo;

@@ -330,13 +330,11 @@ function projectContext() {
     if (!entry.isDirectory()) continue;
     const file = path.join(projects, entry.name, 'work.json');
     const doc = readJsonFile(file);
-    const be = doc?.repositories?.be?.pathFromSource
-      ? path.resolve(sourceRoot, doc.repositories.be.pathFromSource)
-      : null;
-    if (!be || !samePath(be, repo)) continue;
-    const fe = doc?.repositories?.fe?.pathFromSource
-      ? path.resolve(sourceRoot, doc.repositories.fe.pathFromSource)
-      : null;
+    if (doc?.schema !== 'starci/workspace-binding@2' || typeof doc?.repository?.pathFromSource !== 'string') continue;
+    const app = path.resolve(sourceRoot, doc.repository.pathFromSource);
+    if (!samePath(app, repo)) continue;
+    const fe = path.resolve(app, doc.sides?.fe ?? 'fe');
+    const be = path.resolve(app, doc.sides?.be ?? 'be');
     return { file, project: doc.project ?? entry.name, be, fe };
   }
   return null;

@@ -6,22 +6,23 @@ import path from 'node:path';
 import { checkGrantParents } from '../scripts/kernel/grant-parents.mjs';
 import { loadCatalog } from '../scripts/kernel/why.mjs';
 
-// nivo-fe keeps its app router at apps/app/src/app; there is no src/app.
+// The fe/ side keeps its app router at apps/app/src/app; there is no src/app.
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-grant-parents-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const source = path.join(root, 'source'), be = path.join(root, 'be'), fe = path.join(root, 'nivo-fe');
+  const source = path.join(root, 'source'), app = path.join(root, 'app'), fe = path.join(app, 'fe');
   fs.mkdirSync(path.join(fe, 'apps', 'app', 'src', 'app'), { recursive: true });
-  fs.mkdirSync(be, { recursive: true });
+  fs.mkdirSync(path.join(app, 'be'), { recursive: true });
   fs.mkdirSync(path.join(source, '.workspaces', 'projects', 'sample'), { recursive: true });
   fs.writeFileSync(path.join(source, '.workspaces', 'projects', 'sample', 'work.json'), JSON.stringify({
-    project: 'sample', repositories: { be: { pathFromSource: '../be' }, fe: { pathFromSource: '../nivo-fe' } },
-    work: { ownerRole: 'be', pathFromRepository: '.starciwork' },
+    schema: 'starci/workspace-binding@2', project: 'sample',
+    repository: { pathFromSource: '../app', gitRepository: 'https://example.test/app.git' },
+    sides: { be: 'be', fe: 'fe' }, work: { pathFromRepository: '.starciwork' },
   }));
   const before = process.env.STARCI_SOURCE_ROOT;
   process.env.STARCI_SOURCE_ROOT = source;
   t.after(() => { if (before === undefined) delete process.env.STARCI_SOURCE_ROOT; else process.env.STARCI_SOURCE_ROOT = before; });
-  const check = (ownedPaths, extra = {}) => checkGrantParents({ op: 'interface.implement', payload: { repository: 'fe', ...extra }, ownedPaths, repo: be });
+  const check = (ownedPaths, extra = {}) => checkGrantParents({ op: 'interface.implement', payload: { repository: 'fe', ...extra }, ownedPaths, repo: app });
   return { check };
 }
 

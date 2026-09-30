@@ -241,8 +241,8 @@ export function askRepos(connectors, { env = process.env, extra = [] } = {}) {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const doc = readJsonFile(path.join(projects, entry.name, 'work.json'));
-      const owner = doc?.repositories?.[doc?.work?.ownerRole ?? 'be'];
-      if (typeof owner?.pathFromSource === 'string' && owner.pathFromSource.trim()) candidates.push(path.resolve(source, owner.pathFromSource));
+      const rel = doc?.schema === 'starci/workspace-binding@2' ? doc?.repository?.pathFromSource : null;
+      if (typeof rel === 'string' && rel.trim()) candidates.push(path.resolve(source, rel));
     }
   }
   const seen = new Set(), out = [];

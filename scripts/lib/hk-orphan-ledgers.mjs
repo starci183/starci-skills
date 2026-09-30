@@ -21,7 +21,7 @@
 //                    through engine/machine-db.mjs setLedgerState when one exists — the one writer; nothing here
 //                    opens machine.sqlite for write itself.
 //   legacy stores    a repository bound either in machine.sqlite `repositories` OR in any
-//                    .workspaces/projects/*/work.json (every role: be, fe, grammar, ...; pathFromSource "."
+//                    .workspaces/projects/*/work.json (one app repository; pathFromSource "."
 //                    resolves to the Source host itself, e.g. this runtime's own backend) that still has an
 //                    in-repo .starciwork/runtime.sqlite (+ -wal/-shm), the pre-decision-Q1 location.
 //                    LEDGER_LEGACY_WORK_SQLITE. Report only, here and in `/start --check` (both call
@@ -65,7 +65,7 @@ export const starciSourceRoot = (env = process.env) => (env.STARCI_SOURCE_ROOT ?
 
 /**
  * Every repository root any .workspaces/projects/*\/work.json binds (modules/schemas/workspace-routing.yaml
- * bindingShape), every role (be, fe, grammar, ...), `pathFromSource` resolved against starciSourceRoot — "."
+ * bindingShape), the one app `repository.pathFromSource` resolved against starciSourceRoot — "."
  * resolves to the Source host itself. A missing or unreadable .workspaces/projects, or one malformed work.json, is
  * skipped, never a crash. Deduped, absolute.
  */
@@ -79,10 +79,8 @@ export function workspaceBoundRepoRoots({ env = process.env } = {}) {
     if (!entry.isDirectory()) continue;
     let doc;
     try { doc = JSON.parse(fs.readFileSync(path.join(projectsDir, entry.name, 'work.json'), 'utf8')); } catch { continue; }
-    for (const repo of Object.values(doc?.repositories ?? {})) {
-      const pathFromSource = repo?.pathFromSource;
-      if (typeof pathFromSource === 'string' && pathFromSource.trim()) roots.add(canonicalRoot(path.resolve(sourceRoot, pathFromSource)));
-    }
+    const rel = doc?.schema === 'starci/workspace-binding@2' ? doc?.repository?.pathFromSource : null;
+    if (typeof rel === 'string' && rel.trim()) roots.add(canonicalRoot(path.resolve(sourceRoot, rel)));
   }
   return [...roots];
 }

@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const DEFINE_GOAL = path.join(ROOT, 'scripts', 'goal', 'define-goal.mjs');
 
-// A Source with a two-repository project binding, built in a tmp dir. The
+// A Source with one app project binding, built in a tmp dir. The
 // STARCI_SOURCE_ROOT seam points define-goal's registry lookup at it.
 function projectSource(t) {
   const source = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-source-'));
@@ -19,16 +19,15 @@ function projectSource(t) {
     fs.writeFileSync(file, text);
   };
   write('.workspaces/projects/pair/work.json', JSON.stringify({
-    schema: 'starci/workspace-binding@1',
+    schema: 'starci/workspace-binding@2',
     project: 'pair',
-    repositories: { be: { pathFromSource: 'be' }, fe: { pathFromSource: 'fe' }, grammar: { pathFromSource: 'missing-grammar' } },
-    work: { ownerRole: 'be', pathFromRepository: '.starciwork' },
+    repository: { pathFromSource: 'app', gitRepository: 'https://example.test/pair.git' },
+    sides: { be: 'be', fe: 'fe' },
+    work: { pathFromRepository: '.starciwork' },
   }));
-  write('be/package.json', JSON.stringify({ name: 'be', devDependencies: { jest: '^29' } }));
-  write('be/src/main.ts', 'export const a = 1;\nexport const b = 2;\nexport const c = 3;\n');
-  write('fe/package.json', JSON.stringify({ name: 'fe', devDependencies: { vitest: '^3' } }));
-  write('fe/src/page.tsx', 'export default function Page() { return null; }\n');
-  write('fe/.starciwork/index.yaml', 'schema: work/catalog@1\n');
+  write('app/package.json', JSON.stringify({ name: 'pair', devDependencies: { jest: '^29', vitest: '^3' } }));
+  write('app/be/src/main.ts', 'export const a = 1;\nexport const b = 2;\nexport const c = 3;\n');
+  write('app/fe/src/page.tsx', 'export default function Page() { return null; }\n');
   return source;
 }
 
@@ -43,13 +42,13 @@ test('define-goal --plan STATE shows each role its own compact assess summary', 
   const rows = Object.fromEntries(r.stdout.split('\n')
     .map(line => /^ {2}(be|fe|grammar) {2}(\S.*?) {2}— (.*)$/.exec(line))
     .filter(Boolean).map(m => [m[1], { repo: m[2], line: m[3] }]));
-  assert.deepEqual(Object.keys(rows).sort(), ['be', 'fe', 'grammar']);
-  assert.equal(path.resolve(rows.be.repo), path.join(source, 'be'));
-  assert.match(rows.be.line, /^files 2, loc ~3, tests jest, starciwork absent$/);
-  assert.match(rows.fe.line, /^files 3, loc ~1, tests vitest, starciwork present$/);
-  assert.equal(rows.grammar.line, 'missing');
+  assert.deepEqual(Object.keys(rows).sort(), ['be', 'fe']);
+  assert.equal(path.resolve(rows.be.repo), path.join(source, 'app', 'be'));
+  assert.equal(path.resolve(rows.fe.repo), path.join(source, 'app', 'fe'));
+  assert.match(rows.be.line, /^files 1, loc ~3, tests none, starciwork absent$/);
+  assert.match(rows.fe.line, /^files 1, loc ~1, tests none, starciwork absent$/);
   for (const row of Object.values(rows)) assert.doesNotMatch(row.line, /[{}[\]]/, 'no JSON dump in a STATE row');
-  assert.ok(!fs.existsSync(path.join(source, 'be', '.starciwork')), '--plan writes nothing to the owner repository');
+  assert.ok(!fs.existsSync(path.join(source, 'app', '.starciwork')), '--plan writes nothing to the app repository');
 });
 
 test('define-goal passes the owner Work root, so a settled brand record drops brand.decide', t => {
@@ -57,13 +56,13 @@ test('define-goal passes the owner Work root, so a settled brand record drops br
   const prompt = 'build Collab group chat end to end';
   const without = JSON.parse(plan(source, prompt, '--json').stdout);
   assert.ok(without.opChain.includes('brand.decide'), 'no brand record: brand.decide stays');
-  fs.mkdirSync(path.join(source, 'be', '.starciwork', 'brand'), { recursive: true });
-  fs.writeFileSync(path.join(source, 'be', '.starciwork', 'brand', 'index.yaml'), 'schema: work/brand@1\nid: pair.brand\nstate: done\n');
+  fs.mkdirSync(path.join(source, 'app', '.starciwork', 'brand'), { recursive: true });
+  fs.writeFileSync(path.join(source, 'app', '.starciwork', 'brand', 'index.yaml'), 'schema: work/brand@1\nid: pair.brand\nstate: done\n');
   const r = plan(source, prompt);
   assert.equal(r.status, 0, r.stderr);
   assert.doesNotMatch(r.stdout, /brand\.decide/);
   assert.match(r.stdout, /\n {2}assumed: brand: settled record brand\/index\.yaml state done — satisfied out-of-band, no chain leg\n/);
-  assert.ok(!fs.existsSync(path.join(source, 'be', '.starciwork', 'runtime.sqlite')), '--plan writes nothing');
+  assert.ok(!fs.existsSync(path.join(source, 'app', '.starciwork', 'runtime.sqlite')), '--plan writes nothing');
 });
 
 test('an unmatched prompt prints the chain as underivable instead of a guessed leg list', t => {

@@ -49,7 +49,7 @@ records, or touch product sources. See [runtime distribution](runtime-distributi
 
 ## Git hygiene in bound repositories
 
-`.starciwork/` holds product records only, owned by the project's backend repository. The runtime
+`.starciwork/` holds product records only, at the app repository root. The runtime
 ledger is not in any repository: it lives at `%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`, found through
 `machine.ledgers` ([storage](ledger-db.md)), and agent output lives in the blob store under
 `~/.starci/artifacts`.
@@ -65,31 +65,19 @@ replace paths and remotes with verified real repositories:
 
 ```json
 {
-  "schema": "starci/workspace-binding@1",
+  "schema": "starci/workspace-binding@2",
   "project": "demo",
-  "repositories": {
-    "be": {
-      "pathFromSource": "../demo-backend",
-      "gitRepository": "https://github.com/example/demo-backend.git"
-    },
-    "fe": {
-      "pathFromSource": "../demo-frontend",
-      "gitRepository": "https://github.com/example/demo-frontend.git"
-    },
-    "grammar": {
-      "pathFromSource": "../demo-grammar",
-      "gitRepository": "https://github.com/example/demo-grammar.git",
-      "package": "@example/grammar"
-    }
+  "repository": {
+    "pathFromSource": "../demo-monorepo",
+    "gitRepository": "https://github.com/example/demo-monorepo.git"
   },
-  "work": { "ownerRole": "be", "pathFromRepository": ".starciwork" }
+  "sides": { "be": "be", "fe": "fe" },
+  "work": { "pathFromRepository": ".starciwork" }
 }
 ```
 
-`be` and `fe` deliver the product; `grammar` is optional and delivers the
-language the interface is drawn in. Omit it and a grammar gap becomes a
-question for the owner instead of a guessed repository. All relative paths
-resolve from the host. The ledger lives at
+`be` and `fe` name directories in one app repository. The Work tree is at the
+app root. All relative paths resolve from the host. The ledger lives at
 `%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite` — see [architecture](architecture.md)
 and [source layout](source-layout.md).
 

@@ -4,9 +4,9 @@
 // never --no-verify, never force, never a branch other than main, never a repository not listed.
 //
 //   node scripts/supervisor/push-mains.mjs [--repo <path>]... [--dry-run] [--hooks-only] [--json]
-//       default repositories: the runtime (.claude) plus config.yaml supervisor.repos plus every
-//       target repository one of those ledgers binds (.workspaces/projects/<p>/work.json —
-//       scripts/kernel/target-repo.mjs projectBinding; a checkout is never guessed by name)
+//       default repositories: the runtime (.claude) plus one app checkout per
+//       configured project binding (.workspaces/projects/<p>/work.json —
+//       scripts/kernel/target-repo.mjs projectBinding)
 //   --hooks-only   prepare the scratch of committed main and run its pre-push hook (`git hook run pre-push`)
 //                  without pushing, ahead or not: proves main is green where a push would judge it
 //
@@ -485,27 +485,25 @@ const canonical = (p) => { const resolved = path.resolve(p); try { return fs.rea
 const repoKey = (p) => (process.platform === 'win32' ? canonical(p).toLowerCase() : canonical(p));
 
 /**
- * Every repository the ledger owner `repo` binds — repositories.*.pathFromSource of its project
- * work.json (the same binding api enqueue/dispatch/settle resolve against). [] when no binding
- * names `repo` its Work owner.
+ * The app repository the ledger owner `repo` binds in work.json. [] when no
+ * binding names `repo`.
  */
 export function boundRepos(repo, { sourceRoot = starciSourceRoot() } = {}) {
-  return (projectBinding(repo, { sourceRoot })?.repos ?? []).map((r) => r.root);
+  const app = projectBinding(repo, { sourceRoot })?.appRoot;
+  return app ? [app] : [];
 }
 
 /**
  * The default push set: the runtime (.claude), each config supervisor.repos ledger owner, and every
- * repository each owner binds — the routed targets (starci-next-fe, miamia-fe, ...) a Kernel gate can
- * wait on, which a bare supervisor.repos list never pushed (inc-4de495f55f1e). Canonical-deduped:
- * a binding role that resolves to an already-listed checkout adds nothing.
+ * app repository each owner binds. Canonical-deduped: an app root already in
+ * supervisor.repos is pushed once.
  */
 export function defaultPushRepos(settings = supervisorSettings(), { sourceRoot = starciSourceRoot() } = {}) {
   const seen = new Map();
   const add = (repo) => { const k = repoKey(repo); if (!seen.has(k)) seen.set(k, path.resolve(repo)); };
   add(SKILL_ROOT);
   for (const owner of productRepos(settings, { sourceRoot })) {
-    add(owner);
-    for (const bound of boundRepos(owner, { sourceRoot })) add(bound);
+    add(boundRepos(owner, { sourceRoot })[0] ?? owner);
   }
   return [...seen.values()];
 }

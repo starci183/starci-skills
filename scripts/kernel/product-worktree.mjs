@@ -512,34 +512,33 @@ export const isolationOf = (brief, settings = productSettings()) => String(brief
 
 /**
  * Whether a job gets a product worktree and in which repository: its op isolates, and its owned paths resolve into
- * exactly one bound repository that is not the Work owner (the ledger repo keeps its shared tree: the ledger and
- * the Work records live there). {isolate, reason, repoRoot?, role?}. `placements` are ownedPathPlacements with no
+ * the bound app repository. One op worktree serves both side folders and Work.
+ * {isolate, reason, repoRoot?, role?}. `placements` are ownedPathPlacements with no
  * worktree (target-repo.mjs); `binding` its projectBinding.
  */
 export function planIsolation({ brief, placements, binding, settings = productSettings() }) {
   if (isolationOf(brief, settings) !== 'worktree') return { isolate: false, reason: 'policy-shared' };
   if (!binding) return { isolate: false, reason: 'no-project-binding' };
-  const owner = binding.ownerRole;
-  const roles = new Set((placements ?? []).filter((p) => !p.unresolved && p.role && p.role !== owner && p.via !== 'work-owner').map((p) => p.role));
-  if (!roles.size) return { isolate: false, reason: 'work-owner-only' };
-  if (roles.size > 1) return { isolate: false, reason: 'multi-repo', roles: [...roles] };
-  const role = [...roles][0];
-  const bound = binding.repos.find((r) => r.role === role);
-  if (!bound || !fs.existsSync(path.join(bound.root, '.git'))) return { isolate: false, reason: 'repo-not-a-checkout', role };
+  const roles = new Set((placements ?? []).filter((p) => !p.unresolved && p.role && p.via !== 'work-owner').map((p) => p.role));
+  if (!roles.size) return { isolate: false, reason: 'work-only' };
+  const role = roles.size === 1 ? [...roles][0] : null;
+  const appRoot = binding.appRoot;
+  if (!appRoot || !fs.existsSync(path.join(appRoot, '.git'))) return { isolate: false, reason: 'repo-not-a-checkout', role };
   // The runtime repository (a binding's grammar role is .claude itself) changes only through its own land gate.
-  if (insidePath(bound.root, SKILL_ROOT) || samePath(bound.root, SKILL_ROOT)) return { isolate: false, reason: 'runtime-repo', role };
-  return { isolate: true, repoRoot: path.resolve(bound.root), role };
+  if (insidePath(appRoot, SKILL_ROOT) || samePath(appRoot, SKILL_ROOT)) return { isolate: false, reason: 'runtime-repo', role };
+  return { isolate: true, repoRoot: path.resolve(appRoot), role };
 }
 
 /** The rules every isolated op's prompt carries (mitigation 5: the path is explicit to every tool). */
-export function worktreePromptRules(rec) {
+export function worktreePromptRules(rec, sideCwd = null) {
   if (!rec) return '';
   const op = posix(rec.op.path), wf = posix(rec.workflow.path);
+  const cwd = sideCwd ? posix(sideCwd) : op;
   return [
     '',
     '## Your product worktree (DESIGN §16.7)',
     `- Edit, check and commit ONLY in ${op} (branch ${rec.op.branch}, off ${rec.workflow.branch} at ${String(rec.baseSha ?? '').slice(0, 12)}). Never edit ${posix(rec.repoRoot)} itself or a sibling worktree.`,
-    `- Pass this path explicitly to every tool: canon-scan --root ${op}, check-scoped-lint --root ${op}, starci validate, draw-render, test runners (cwd ${op}).`,
+    `- Run role-specific checks and commands from ${cwd}; the app's package.json and .starciwork are at ${op}.`,
     `- Dev servers, UAT and drawing run against the WORKFLOW worktree ${wf} on port ${rec.workflow.port ?? portOf(rec.workflow.path)}; never start one in ${posix(rec.repoRoot)}.`,
     '- node_modules is a junction overlay of the main checkout: never run npm/pnpm install here. A package.json or lockfile change belongs to the workflow\'s serial deps unit.',
     '- Commit everything you produce under .starciwork/ in this worktree before you report; the runtime salvages and then deletes this worktree right after your settle.',

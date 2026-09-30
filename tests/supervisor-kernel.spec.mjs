@@ -627,26 +627,28 @@ test('the push secret scan skips keyword-assigned values in spec files, never a 
     ['apps/app/src/Auth/index.spec.tsx:2:telegram-bot-token', 'src/config.ts:1:assigned-secret', 'src/config.ts:2:telegram-bot-token']);
 });
 
-test('push-mains: the default list adds every repository a supervisor.repos ledger binds, never a guessed sibling', (t) => {
+test('push-mains: the default list adds each bound app once, never a guessed sibling', (t) => {
   const source = tmp(t, 'sup-src-');
   const mk = (rel) => { const dir = path.join(source, rel); fs.mkdirSync(dir, { recursive: true }); return dir; };
-  const owner = mk('owner-be'); const fe = mk('miamia-fe'); const stray = mk('stray-fe');
-  const next = mk('next-be'); const nextFe = mk('next-fe');
-  const binding = (name, repositories) => {
+  const owner = mk('miamia'); const stray = mk('stray-fe');
+  const next = mk('next');
+  for (const app of [owner, next]) for (const side of ['be', 'fe']) fs.mkdirSync(path.join(app, side));
+  const binding = (name, appRoot) => {
     const dir = path.join(source, '.workspaces', 'projects', name);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'work.json'), JSON.stringify({
-      schema: 'starci/workspace-binding@1', project: name, repositories,
-      work: { ownerRole: 'be', pathFromRepository: '.starciwork' },
+      schema: 'starci/workspace-binding@2', project: name,
+      repository: { pathFromSource: path.relative(source, appRoot), gitRepository: `https://example.invalid/${name}.git` },
+      sides: { be: 'be', fe: 'fe' }, work: { pathFromRepository: '.starciwork' },
     }));
   };
-  binding('miamia', { be: { pathFromSource: 'owner-be', gitRepository: 'https://example.invalid/miamia-be.git' }, fe: { pathFromSource: 'miamia-fe', gitRepository: 'https://example.invalid/miamia-fe.git' } });
-  binding('next', { be: { pathFromSource: 'next-be' }, fe: { pathFromSource: 'next-fe' }, grammar: { pathFromSource: 'owner-be' } });
-  const cfg = { ...settings, repos: ['owner-be', 'next-be'] };
-  assert.deepEqual(boundRepos(owner, { sourceRoot: source }).map((r) => path.resolve(r)), [owner, fe]);
+  binding('miamia', owner);
+  binding('next', next);
+  const cfg = { ...settings, repos: ['miamia', 'next'] };
+  assert.deepEqual(boundRepos(owner, { sourceRoot: source }).map((r) => path.resolve(r)), [owner]);
   const list = defaultPushRepos(cfg, { sourceRoot: source });
-  assert.deepEqual(list, [SKILL_ROOT, owner, fe, next, nextFe].map((p) => path.resolve(p)),
-    'each ledger owner is followed by the target repositories its work.json binds; a role re-binding an owner adds nothing');
+  assert.deepEqual(list, [SKILL_ROOT, owner, next].map((p) => path.resolve(p)),
+    'each app repository is pushed once, with no separate push for its be/ or fe/ folders');
   assert.ok(!list.includes(stray), 'a sibling checkout no binding declares is never pushed');
   assert.deepEqual(defaultPushRepos({ ...settings, repos: ['stray-fe'] }, { sourceRoot: source }), [SKILL_ROOT, stray].map((p) => path.resolve(p)),
     'a ledger owner no binding claims still pushes, with no targets invented');

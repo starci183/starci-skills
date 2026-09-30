@@ -40,21 +40,21 @@ shape:
     without owners is refused and a todo one warned (SDS_OWNERS_MISSING)."
   ui: "features/<feature>/ui/<name>/index.yaml plus <name>/assets/**, schema work/ui-screen@1. Per
     modules/models/kinds.yaml lanes order, drawing precedes implementing: a done work/implementation@1 that names a
-    ui-screen in its own proves, or whose repository is the workspace's frontend repository, is refused
+    ui-screen in its own proves, or whose repository is the workspace's fe side, is refused
     (IMPL_BEFORE_DIRECTION) unless every relevant ui-screen - the ones it proves, or, when it proves none
     by id, every ui-screen its own feature owns - is itself done."
   impl: "features/<feature>/impl/<repository>/<name>/index.yaml, schema work/implementation@1, one flat
-    family folder per feature split by the repository the code lives in (<repository> is the exact value
-    the record's own `repository` field names, e.g. impl/todo-app-backend/<name> beside
-    impl/todo-app-frontend/<name> in a two-repository product) - never an `implementation/` singular
+    family folder per feature split by the app side the code lives in (<repository> is the exact value
+    the record's own `repository` field names, e.g. impl/be/<name> beside
+    impl/fe/<name> in one app) - never an `implementation/` singular
     parent with `frontend/`/`backend/` children, which no example tree or gate ever used. `owners: [{role,
     path}]` names one or more module-root directories, never individual files: `path` (and
     `work/business-rule@1.module`, and `work/sds-component@1.owners[].path` above) is the directory a reader
     would call the module's root - `src/modules/domain/task`, not
     `src/modules/domain/task/ownership.guard.ts` - so a file inside it moving during a refactor is not, by
-    itself, a broken reference. An owner path resolves against the repository the record's `repository`
-    field names (the backend repository when the field is absent); to point at a sibling repository bound
-    in workspace.yaml, prefix the path `repository:<repo-name>/` - `repository:nivo-fe/apps/landing` -
+    itself, a broken reference. An owner path resolves against the side folder the record's `repository`
+    field names (the be side when the field is absent); to point at another side bound
+    in workspace.yaml, prefix the path `repository:<side>/` - `repository:fe/apps/landing` -
     the same convention implementation `files[]` and job `owned_paths` already carry. A done
     implementation's every owner directory must exist on disk
     (OWNER_PATH_MISSING otherwise refuses it); a todo one is warned, not refused. A done implementation
@@ -88,7 +88,7 @@ shape:
     stays local/synthetic, and each entry names {role, identity} (an _resources identity id);
     a literal password is refused."
   productPaths:
-    - "The EXPLICIT list of what a backend repository's .starciwork holds (ARCHITECTURE-DB §5.1); its executable
+    - "The EXPLICIT list of what an app repository's .starciwork holds (ARCHITECTURE-DB §5.1); its executable
       form is scripts/lib/starciwork-boundary.mjs (isProductPath). Everything else is agent data or drift."
     - .gitignore, .gitattributes, workspace.yaml, index.yaml
     - brand/{index.yaml,evidence.yaml}, brand/assets/**
@@ -127,9 +127,9 @@ shape:
       shell/index.yaml cites {name, sha256}. Every reader resolves them through scripts/lib/blob-lookup.mjs. The final
       directions the owner accepts stay product content under ui/<screen>/assets (decision Q2)."
   starciworkIgnore:
-    - "The .starciwork/.gitignore of a backend repository (starciwork-boundary.mjs
+    - "The .starciwork/.gitignore of an app repository (starciwork-boundary.mjs
       STARCIWORK_GITIGNORE, written by scripts/example/work-example.mjs for the example trees): deny the root,
-      re-admit the productPaths roots, deny agent output inside them. A frontend repository has no .starciwork."
+      re-admit the productPaths roots, deny agent output inside them. Side folders have no .starciwork."
     - "/*"
     - "!/.gitignore !/.gitattributes !/workspace.yaml !/index.yaml"
     - "!/brand/ !/shell/ !/_resources/ !/_derived/ !/features/"
@@ -183,7 +183,7 @@ shape:
     A uat-flow's environment and fixtures[] fields, and its accounts.yaml's accounts[].identity
     field, are edges into this family and must resolve to a resource.yaml of the matching kind.
     A repository is not a resource: its portable identity is workspace.yaml repositories[] ({role,
-    name}) and its checkout and remote are the host project binding (starci/workspace-binding@1),
+    name}) and its checkout and remote are the host project binding (starci/workspace-binding@2),
     so there is no _resources/repositories/ record; workspace.manage lists a bound repository there
     and keeps observed remote/HEAD/dirty state in its evidence bundle.
     tests/op-work-paths.spec.mjs holds every op manifest's .starciwork paths to this shape."
@@ -493,14 +493,10 @@ rules:
     genuinely spans more than one path. The gate refuses `directory`/`files` on `work/implementation@1` —
     `owners` carries that shape instead — and the gate refuses an `owners` entry missing either `role` or
     `path`."
-  - "Two topologies host the same record tree. In a multi-repository product, `.starciwork` lives in the
-    bound backend repository and `.workspaces/projects/<project>/{be,fe}.json` at the host routes each side
-    to its repository and its `hfs.json` apps (`examples/todo-app-backend` paired with
-    `examples/todo-app-frontend` demonstrates this shape). In a monorepo, `.starciwork` lives at the
-    repository root and `hfs.json` names its `apps/<app>` entries instead of a second
-    repository. Both host the identical flat `features/<feature>/<family>/<name>/index.yaml`
-    tree; only where `.starciwork` sits and how its roots are declared differ, and a project does
-    not run both shapes for the same product at once."
+  - "One app repository hosts the record tree. `.starciwork` lives at the app root;
+    `.workspaces/projects/<project>/work.json` binds that repository and resolves be and fe to
+    their side folders. `hfs.json` declares the app and its sides. Every feature record lives
+    under the flat `features/<feature>/<family>/<name>/index.yaml` tree."
 example:
   _resources/:
     - environments/dev/resource.yaml

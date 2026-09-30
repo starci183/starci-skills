@@ -13,9 +13,9 @@ import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhas
 for(const key of ['GIT_DIR','GIT_COMMON_DIR','GIT_WORK_TREE','GIT_INDEX_FILE','GIT_OBJECT_DIRECTORY','GIT_ALTERNATE_OBJECT_DIRECTORIES','GIT_IMPLICIT_WORK_TREE','GIT_PREFIX','GIT_CONFIG','GIT_CONFIG_PARAMETERS','GIT_CONFIG_COUNT','GIT_GRAFT_FILE','GIT_NO_REPLACE_OBJECTS','GIT_REPLACE_REF_BASE','GIT_SHALLOW_FILE']) delete process.env[key];
 
 // settle's landed proof resolves each owned path against the job's target
-// repository (scripts/kernel/target-repo.mjs): a split be/fe project binding
-// under a tmp Source, both repos cloned from local bare origins, the ledger in
-// be. STARCI_SOURCE_ROOT points the registry lookup at the tmp Source.
+// repository (scripts/kernel/target-repo.mjs): one app checkout with be/ and fe/
+// sides under a tmp Source, cloned from a local bare origin, the ledger at the
+// app root. STARCI_SOURCE_ROOT points the registry lookup at the tmp Source.
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const json=v=>JSON.stringify(v??null);
@@ -55,15 +55,14 @@ const project=t=>{
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const source=path.join(dir,'source');
   fs.mkdirSync(path.join(source,'.workspaces','projects','shop'),{recursive:true});
-  const be=clone(dir,'shop-backend',{'src/a.ts':'export const a = 1;\n','.gitignore':'.starciwork/\n'});
-  const fe=clone(dir,'shop-fe',{'apps/app/src/page.tsx':'export const Page = 1;\n'});
+  const app=clone(dir,'shop',{'be/src/a.ts':'export const a = 1;\n',
+    'fe/apps/app/src/page.tsx':'export const Page = 1;\n','.gitignore':'.starciwork/\n'});
+  const be={repo:app.repo,side:path.join(app.repo,'be'),commit:(file,body)=>app.commit(`be/${file}`,body)};
+  const fe={repo:path.join(app.repo,'fe'),commit:(file,body)=>app.commit(`fe/${file}`,body)};
   fs.writeFileSync(path.join(source,'.workspaces','projects','shop','work.json'),json({
-    schema:'starci/workspace-binding@1',project:'shop',
-    repositories:{
-      be:{pathFromSource:'../shop-backend',gitRepository:'https://example.test/shop-backend.git'},
-      fe:{pathFromSource:'../shop-fe',gitRepository:'https://example.test/shop-fe.git'},
-    },
-    work:{ownerRole:'be',pathFromRepository:'.starciwork'},
+    schema:'starci/workspace-binding@2',project:'shop',
+    repository:{pathFromSource:'../shop',gitRepository:'https://example.test/shop.git'},
+    sides:{be:'be',fe:'fe'},work:{pathFromRepository:'.starciwork'},
   }));
   const env={...process.env,STARCI_SOURCE_ROOT:source};
   const api=(...args)=>{
@@ -107,37 +106,37 @@ const seedJob=(repo,{op,owned,head,repository,jobId='op-target-1',wf='wf-target'
 const statusOf=(repo,jobId)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;}finally{l.close();}};
 const repoEntry=(detail,root)=>detail.repos.find(r=>real(r.repo)===root);
 
-test('a frontend op\'s bare owned path lands in the fe repo: clean fe + clean be settles pass',t=>{
+test('a frontend op\'s bare owned path lands in fe/: clean app checkout settles pass',t=>{
   const {be,fe,api}=project(t);
   const head=fe.commit('apps/app/src/page.tsx','export const Page = 2;\n');
   const jobId=seedJob(be.repo,{op:'interface.implement',owned:['apps/app/src','.starciwork/features/shop/impl'],head});
   const {r,body}=api('settle','--repo',be.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(r.status,0,r.stderr||r.stdout);
   assert.equal(body.ok,true);
-  assert.equal(real(body.landed.repo),fe.repo,'head is verified in the fe checkout');
+  assert.equal(real(body.landed.repo),be.repo,'head is verified in the app checkout');
   assert.equal(body.landed.headCheck,'verified');
-  assert.deepEqual(repoEntry(body.landed,fe.repo),{repo:repoEntry(body.landed,fe.repo).repo,role:'fe',paths:['apps/app/src'],dirty:[]});
-  assert.equal(repoEntry(body.landed,be.repo).role,'be','the Work path stays with the Work owner');
+  assert.deepEqual(repoEntry(body.landed,be.repo),{repo:repoEntry(body.landed,be.repo).repo,role:'fe',
+    paths:['fe/apps/app/src','.starciwork/features/shop/impl'],dirty:[]});
   assert.equal(statusOf(be.repo,jobId),'succeeded');
 });
 
-test('a dirty file in the fe repo refuses not-landed naming the fe repo',t=>{
+test('a dirty file in fe/ refuses not-landed naming the app checkout',t=>{
   const {be,fe,api}=project(t);
   const head=fe.commit('apps/app/src/page.tsx','export const Page = 2;\n');
   fs.writeFileSync(path.join(fe.repo,'apps','app','src','extra.tsx'),'export const Extra = 1;\n');
-  fs.mkdirSync(path.join(be.repo,'apps','app','src'),{recursive:true});
+  fs.mkdirSync(path.join(be.side,'apps','app','src'),{recursive:true});
   const jobId=seedJob(be.repo,{op:'interface.implement',owned:['apps/app/src'],head});
   const {r,body}=api('settle','--repo',be.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(r.status,1,r.stderr||r.stdout);
   assert.equal(body.reason,'not-landed');
-  assert.deepEqual(body.detail.dirty,['apps/app/src/extra.tsx']);
-  const entry=repoEntry(body.detail,fe.repo);
+  assert.deepEqual(body.detail.dirty,['fe/apps/app/src/extra.tsx']);
+  const entry=repoEntry(body.detail,be.repo);
   assert.equal(entry.role,'fe');
-  assert.deepEqual(entry.dirty,['apps/app/src/extra.tsx']);
+  assert.deepEqual(entry.dirty,['fe/apps/app/src/extra.tsx']);
   assert.equal(statusOf(be.repo,jobId),'running','a refused settle writes nothing');
 });
 
-test('a backend op\'s bare owned path still resolves to the backend repo',t=>{
+test('a backend op\'s bare owned path resolves to be/',t=>{
   const {be,fe,api}=project(t);
   const head=be.commit('src/a.ts','export const a = 2;\n');
   fs.mkdirSync(path.join(fe.repo,'src'));
@@ -145,31 +144,31 @@ test('a backend op\'s bare owned path still resolves to the backend repo',t=>{
   const clean=seedJob(be.repo,{op:'backend.implement',owned:['src/'],head});
   const ok=api('settle','--repo',be.repo,'--job',clean,'--verdict','pass','--json');
   assert.equal(ok.r.status,0,ok.r.stderr||ok.r.stdout);
-  assert.deepEqual(ok.body.landed.repos.map(e=>real(e.repo)),[be.repo],'fe noise under src/ is not the backend op\'s');
+  assert.deepEqual(ok.body.landed.repos.map(e=>real(e.repo)),[be.repo],'fe noise under src/ is outside the backend grant');
 
-  fs.writeFileSync(path.join(be.repo,'src','b.ts'),'export const b = 1;\n');
+  fs.writeFileSync(path.join(be.side,'src','b.ts'),'export const b = 1;\n');
   const dirty=seedJob(be.repo,{op:'backend.implement',owned:['src/'],head,jobId:'op-target-2',wf:'wf-target-2'});
   const refused=api('settle','--repo',be.repo,'--job',dirty,'--verdict','pass','--json');
   assert.equal(refused.r.status,1,refused.r.stdout);
   assert.equal(refused.body.reason,'not-landed');
   assert.equal(real(refused.body.detail.repo),be.repo);
-  assert.deepEqual(refused.body.detail.dirty,['src/b.ts']);
+  assert.deepEqual(refused.body.detail.dirty,['be/src/b.ts']);
 });
 
-test('a path that names its repository is honoured: ../<fe>/… and payload.repository',t=>{
+test('a path that names its side is honoured: fe/… and payload.repository',t=>{
   const {be,fe,api}=project(t);
   const head=fe.commit('apps/app/src/page.tsx','export const Page = 2;\n');
-  const edited=seedJob(be.repo,{op:'interface.implement',owned:['../shop-fe/apps/app/src'],head});
+  const edited=seedJob(be.repo,{op:'interface.implement',owned:['fe/apps/app/src'],head});
   const a=api('settle','--repo',be.repo,'--job',edited,'--verdict','pass','--json');
   assert.equal(a.r.status,0,a.r.stderr||a.r.stdout);
-  assert.equal(repoEntry(a.body.landed,fe.repo).role,'fe');
+  assert.equal(repoEntry(a.body.landed,be.repo).role,'fe');
 
   fs.writeFileSync(path.join(fe.repo,'apps','app','src','page.tsx'),'export const Page = 3;\n');
   const pinned=seedJob(be.repo,{op:'code.refactor',owned:['apps/app/src'],head,repository:'fe',jobId:'op-target-3',wf:'wf-target-3'});
   const b=api('settle','--repo',be.repo,'--job',pinned,'--verdict','pass','--json');
   assert.equal(b.r.status,1,b.r.stdout);
   assert.equal(b.body.reason,'not-landed');
-  assert.deepEqual(repoEntry(b.body.detail,fe.repo).dirty,['apps/app/src/page.tsx']);
+  assert.deepEqual(repoEntry(b.body.detail,be.repo).dirty,['fe/apps/app/src/page.tsx']);
 
   const unbound=seedJob(be.repo,{op:'code.refactor',owned:['apps/app/src'],head,repository:'mobile',jobId:'op-target-4',wf:'wf-target-4'});
   const c=api('settle','--repo',be.repo,'--job',unbound,'--verdict','pass','--json');
@@ -195,13 +194,13 @@ test('api enqueue records the resolved target repository; an unbound repository 
 
   const beJob=enqueue('--op','backend.implement','--paths','src/');
   assert.equal(beJob.r.status,0,beJob.r.stderr||beJob.r.stdout);
-  // An unqualified path binds the one repository it exists in (enqueue-unqualified-path-binding): src/ exists only in
-  // the backend repo, so the job records be explicitly instead of falling back to the dispatch placement.
+  // An unqualified path binds the one side it exists in (enqueue-unqualified-path-binding): src/ exists only in
+  // be/, so the job records be explicitly instead of falling back to the dispatch placement.
   assert.equal(payloadOf(beJob.body.job_id).repository,'be','a bare path binds the repository it exists in');
 
-  const named=enqueue('--op','code.refactor','--paths','apps/app/src','--repository','shop-fe');
+  const named=enqueue('--op','code.refactor','--paths','apps/app/src','--repository','fe');
   assert.equal(named.r.status,0,named.r.stderr||named.r.stdout);
-  assert.equal(payloadOf(named.body.job_id).repository,'fe','a repo name resolves to its binding role');
+  assert.equal(payloadOf(named.body.job_id).repository,'fe','a side name resolves to its binding role');
 
   const unknown=enqueue('--op','code.refactor','--paths','src/','--repository','mobile');
   assert.equal(unknown.r.status,1,unknown.r.stdout);
@@ -214,15 +213,15 @@ test('api enqueue records the resolved target repository; an unbound repository 
 test('ownedPathPlacements: a contract worktree of the target repo is its checkout; no binding keeps the placement',async t=>{
   const {ownedPathPlacements}=await import('../scripts/kernel/target-repo.mjs');
   const {be,fe}=project(t);
-  const child=path.join(path.dirname(fe.repo),'shop-fe-child');
-  git(fe.repo,'worktree','add','--quiet','-b','child',child);
+  const child=path.join(path.dirname(be.repo),'shop-child');
+  git(be.repo,'worktree','add','--quiet','-b','child',child);
   const prior=process.env.STARCI_SOURCE_ROOT;
   t.after(()=>{if(prior===undefined)delete process.env.STARCI_SOURCE_ROOT;else process.env.STARCI_SOURCE_ROOT=prior;});
   process.env.STARCI_SOURCE_ROOT=path.join(path.dirname(be.repo),'source');
   const [src,work]=ownedPathPlacements({op:'interface.implement',payload:{},ownedPaths:['apps/app/src','.starciwork/x'],repo:be.repo,worktree:child,timeoutMs:30000});
-  assert.equal(src.base,child);
-  assert.equal(src.via,'op-frontend');
-  assert.equal(work.base,be.repo);
+  assert.equal(src.base,path.join(child,'fe'));
+  assert.equal(src.via,'op-side');
+  assert.equal(work.base,child);
   assert.equal(work.via,'work-owner');
   process.env.STARCI_SOURCE_ROOT=path.join(path.dirname(be.repo),'nowhere');
   const [plain]=ownedPathPlacements({op:'interface.implement',payload:{},ownedPaths:['apps/app/src'],repo:be.repo,worktree:child,timeoutMs:30000});
@@ -230,14 +229,14 @@ test('ownedPathPlacements: a contract worktree of the target repo is its checkou
   assert.equal(plain.via,'placement','no binding: the dispatch placement is the target, as before');
 });
 
-test('an owned path spelled <owner-name>/… is checked at the owner root, not a nested <owner-name>/ dir',t=>{
+test('an owned path spelled be/… is checked at the backend side',t=>{
   const {be,api}=project(t);
   const head=be.commit('src/a.ts','export const a = 2;\n');
-  fs.writeFileSync(path.join(be.repo,'src','b.ts'),'export const b = 1;\n');
-  const jobId=seedJob(be.repo,{op:'backend.implement',owned:['shop-backend/src'],head});
+  fs.writeFileSync(path.join(be.side,'src','b.ts'),'export const b = 1;\n');
+  const jobId=seedJob(be.repo,{op:'backend.implement',owned:['be/src'],head});
   const {r,body}=api('settle','--repo',be.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(r.status,1,r.stdout);
   assert.equal(body.reason,'not-landed');
-  assert.deepEqual(body.detail.dirty,['src/b.ts']);
+  assert.deepEqual(body.detail.dirty,['be/src/b.ts']);
   assert.equal(repoEntry(body.detail,be.repo).role,'be');
 });

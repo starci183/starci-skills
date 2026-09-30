@@ -4643,7 +4643,19 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   try {
     const items = (placements ?? []).filter((p) => p && !p.unresolved && p.base);
     const owned = items.map((p) => path.resolve(p.base, String(p.path ?? '.').replace(/[\\/]\*\*[\\/]?$/, '') || '.'));
-    const repos = [...new Set([workerCwd ?? repo, ...items.map((p) => p.base)].filter(Boolean).map((r) => path.resolve(r)))];
+    const gitRoot = (value) => {
+      let dir = path.resolve(value);
+      while (true) {
+        if (fs.existsSync(dir)) {
+          const root = gitResult(['rev-parse', '--show-toplevel'], { dir, timeout: 10_000 });
+          if (root.ok && root.stdout.trim()) return path.resolve(root.stdout.trim());
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) return path.resolve(value);
+        dir = parent;
+      }
+    };
+    const repos = [...new Set([workerCwd ?? repo, ...items.map((p) => p.base)].filter(Boolean).map(gitRoot))];
     let config = null;
     try { config = loadConfig(); } catch { config = null; }
     return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config, shims });
