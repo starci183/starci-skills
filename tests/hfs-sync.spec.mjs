@@ -104,7 +104,7 @@ describe('the generated file set', () => {
 describe('.husky/pre-commit', () => {
   it('back end runs staged lint, typecheck, unit specs of staged files and work hygiene, and never integration, e2e or contract', () => {
     const hook = rendered(BE)['.husky/pre-commit'];
-    for (const step of ['npm run typecheck', 'npx eslint $sources', 'npx prettier --check $sources', 'npm test -- --passWithNoTests --findRelatedTests $specs', 'npx hfs work-hygiene']) assert.ok(hook.includes(step), step);
+    for (const step of ['npm run typecheck', 'npx eslint $sources', 'npx prettier --check $sources', 'npm run test:affected -- --findRelatedTests $specs', 'npx hfs work-hygiene']) assert.ok(hook.includes(step), step);
     assert.doesNotMatch(hook, /lint-staged|test:(e2e|integration|contract)|typecheck:tests|selectProjects (e2e|integration|contract)|playwright/);
   });
   it('front end runs staged eslint, stylelint and prettier (no lint-staged), vitest related, has no work hygiene, and never e2e', () => {
@@ -116,7 +116,7 @@ describe('.husky/pre-commit', () => {
 
 describe('.husky/pre-push', () => {
   const PUSH_STEPS = {
-    be: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm test -- --passWithNoTests --changedSince=origin/main'],
+    be: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm run test:affected -- --changedSince=origin/main'],
     fe: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm run test:affected'],
   };
   for (const hfs of [BE, FE]) {
@@ -410,7 +410,7 @@ describe('the back-end tool configuration', () => {
 describe('the package.json scripts of a back end', () => {
   const scripts = hfs => Object.fromEntries(renderTargets(hfs, PRESETS.be).find(target => target.path === 'package.json').content.trim().split('\n').map(line => [line.slice(0, line.indexOf(': ')), line.slice(line.indexOf(': ') + 2)]));
   it('are the fixed scripts, plus build and one start script per runnable app and migrate', () => {
-    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'contract:emit', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'migrate', 'start:core', 'test', 'test:contract', 'test:e2e', 'test:integration', 'typecheck', 'typecheck:tests']);
+    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'contract:emit', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'migrate', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts(BE)['start:core'], 'node dist/apps/core/src/main.js');
     assert.equal(scripts(BE).migrate, 'node dist/apps/migrate/src/main.js');
     assert.equal(scripts(BE).test, 'jest --selectProjects unit --coverage');
