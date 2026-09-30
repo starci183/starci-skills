@@ -1,4 +1,4 @@
-import type { UploadSummary } from "../../application/support/upload-summary.contracts"
+import type { UploadSummary } from "@modules/domain/upload"
 import type { UploadType } from "./dto/upload.type"
 
 /** Maps an upload summary to the GraphQL type; the instant travels as an ISO string. */

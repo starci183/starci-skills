@@ -1,4 +1,5 @@
-import type { DeletedUpload, DeleteUploadRequest } from "../../application/delete-upload.contracts"
+import type { DeletedUpload } from "@modules/domain/upload"
+import type { DeleteUploadRequest } from "../../application/delete-upload.contracts"
 import type { DeleteUploadInput } from "./dto/delete-upload.input"
 import type { DeleteUploadType } from "./dto/delete-upload.type"
 

@@ -39,7 +39,7 @@ interface Entry {
  * the fence tells grants apart) and runs; a job never overlaps itself in this process. An app that registers no job
  * never ticks.
  */
-export class JobRunner implements JobRegistry, OnApplicationBootstrap, OnApplicationShutdown {
+export class JobRunnerService implements JobRegistry, OnApplicationBootstrap, OnApplicationShutdown {
     private readonly entries: Array<Entry> = []
     private readonly holder = randomUUID()
     private timer: NodeJS.Timeout | undefined

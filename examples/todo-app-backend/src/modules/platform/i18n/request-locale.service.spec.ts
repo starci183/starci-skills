@@ -1,12 +1,12 @@
 import { Test } from "@nestjs/testing"
-import { AcceptLanguageLocale } from "./request-locale.service"
+import { AcceptLanguageRequestLocale } from "./request-locale.service"
 
 const build = async () => {
-    const moduleRef = await Test.createTestingModule({ providers: [AcceptLanguageLocale] }).compile()
-    return moduleRef.get(AcceptLanguageLocale)
+    const moduleRef = await Test.createTestingModule({ providers: [AcceptLanguageRequestLocale] }).compile()
+    return moduleRef.get(AcceptLanguageRequestLocale)
 }
 
-describe("AcceptLanguageLocale", () => {
+describe("AcceptLanguageRequestLocale", () => {
     describe("of", () => {
         it.each([
             ["en-US,en;q=0.9,vi;q=0.8", "en"],

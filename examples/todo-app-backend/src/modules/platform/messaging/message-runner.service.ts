@@ -29,7 +29,7 @@ const describeFailure = (error: unknown): string =>
  * store, hands each to its consumer, completes it on success, and reschedules or buries it on failure. An app that
  * registers no consumer never polls.
  */
-export class MessageRunner implements ConsumerRegistry, OnApplicationBootstrap, OnApplicationShutdown {
+export class MessageRunnerService implements ConsumerRegistry, OnApplicationBootstrap, OnApplicationShutdown {
     private readonly consumers = new Map<string, RegisteredConsumer>()
     private timer: NodeJS.Timeout | undefined
     private stopped = false
@@ -49,7 +49,10 @@ export class MessageRunner implements ConsumerRegistry, OnApplicationBootstrap, 
             deliver: async (record) => {
                 const payload = consumer.queue.parse(record.payload)
                 if (payload === null) {
-                    throw new MessagingError({ code: MessagingErrorCode.PayloadInvalid, params: { queue: record.queue } })
+                    throw new MessagingError({
+                        code: MessagingErrorCode.PayloadInvalid,
+                        params: { queue: record.queue },
+                    })
                 }
                 const message: ConsumedMessage<Payload> = {
                     id: record.id,
@@ -110,12 +113,19 @@ export class MessageRunner implements ConsumerRegistry, OnApplicationBootstrap, 
             const failure = describeFailure(error)
             if (record.attempts >= consumer.attempts) {
                 await this.outbox.bury({ id: record.id, error: failure })
-                this.logger.error(MessagingLogEvent.DeliveryBuried, error, { queue: record.queue, attempts: record.attempts })
+                this.logger.error(MessagingLogEvent.DeliveryBuried, error, {
+                    queue: record.queue,
+                    attempts: record.attempts,
+                })
                 return
             }
             const at = new Date(this.clock.now().getTime() + backoffDelayMs(consumer, record.attempts))
             await this.outbox.retry({ id: record.id, at, error: failure })
-            this.logger.warn(MessagingLogEvent.DeliveryRetried, { queue: record.queue, attempt: record.attempts, failure })
+            this.logger.warn(MessagingLogEvent.DeliveryRetried, {
+                queue: record.queue,
+                attempt: record.attempts,
+                failure,
+            })
         }
     }
 }

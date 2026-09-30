@@ -4,5 +4,4 @@ export type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "./data
 export { LIST_ROWS_MAX, sql } from "./database.sql"
 export { DATABASE_ERROR_KINDS } from "./errors/database.error"
 export { parsePrimaryDatabaseConfig } from "./primary.config"
-export { PRIMARY_CONNECTION } from "./primary.connection"
 export { InjectPrimaryEntityManager, PRIMARY_ENTITY_MANAGER } from "./primary.decorators"

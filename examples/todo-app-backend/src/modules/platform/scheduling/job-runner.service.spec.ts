@@ -6,7 +6,7 @@ import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { PLATFORM_AT } from "@tests/fixtures/builders/platform.builder"
 import { SchedulingError, SchedulingErrorCode } from "./errors/scheduling.error"
-import { JobRunner } from "./job-runner.service"
+import { JobRunnerService } from "./job-runner.service"
 import { SchedulingLogEvent } from "./scheduling.log-events"
 import type { SchedulingOptions } from "./scheduling.options"
 import type { ScheduledJob } from "./scheduling.port"
@@ -20,17 +20,21 @@ const build = async () => {
     const logger = mock<Logger>()
     const moduleRef = await Test.createTestingModule({
         providers: [
-            JobRunner,
+            JobRunnerService,
             { provide: SCHEDULING_OPTIONS, useValue: options },
             { provide: LEASE, useValue: lease },
             { provide: CLOCK, useValue: clock },
             { provide: LOGGER, useValue: logger },
         ],
     }).compile()
-    return { runner: moduleRef.get(JobRunner), clock, lease, logger }
+    return { runner: moduleRef.get(JobRunnerService), clock, lease, logger }
 }
 
-const jobOf = (name: string, schedule: ScheduledJob["schedule"], run: ScheduledJob["run"] = () => Promise.resolve()): ScheduledJob => ({
+const jobOf = (
+    name: string,
+    schedule: ScheduledJob["schedule"],
+    run: ScheduledJob["run"] = () => Promise.resolve(),
+): ScheduledJob => ({
     name,
     schedule,
     run: jest.fn(run),
@@ -46,7 +50,7 @@ const gate = () => {
 
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve))
 
-describe("JobRunner", () => {
+describe("JobRunnerService", () => {
     afterEach(() => {
         jest.useRealTimers()
     })
@@ -130,7 +134,11 @@ describe("JobRunner", () => {
 
             expect(lease.isHeld("purge")).toBe(true)
             expect(lease.fenceOf("purge")).toBe(1)
-            expect(logger.info).toHaveBeenCalledWith(SchedulingLogEvent.JobCompleted, { job: "purge", fence: 1, durationMs: 5 })
+            expect(logger.info).toHaveBeenCalledWith(SchedulingLogEvent.JobCompleted, {
+                job: "purge",
+                fence: 1,
+                durationMs: 5,
+            })
         })
 
         it("logs a failed job, releases its lease and runs it again at the next due tick", async () => {

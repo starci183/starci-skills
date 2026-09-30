@@ -235,7 +235,7 @@ type Query {
   auditLog(action: String, target: String): [AuditLogType!]!
   collaborators(input: ListCollaboratorsInput!): [ListCollaboratorsType!]!
   exportMyData: [ExportMyDataType!]!
-  notificationPreferences(request: NotificationPreferencesInput): NotificationPreferencesType!
+  notificationPreferences(input: NotificationPreferencesInput): NotificationPreferencesType!
   planUsage: PlanUsageType!
   taskCounts: TaskCountsType!
   taskUploads(input: TaskUploadsInput!): [UploadType!]!

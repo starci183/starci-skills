@@ -17,7 +17,7 @@ export class NotificationPreferencesResolver {
     @Query(() => NotificationPreferencesType, { name: "notificationPreferences" })
     async notificationPreferences(
         @CurrentPrincipal() principal: Principal,
-        @Args("request", { nullable: true }) input?: NotificationPreferencesInput,
+        @Args("input", { nullable: true }) input?: NotificationPreferencesInput,
     ): Promise<NotificationPreferencesType> {
         const preferences = await this.queryBus.execute(
             new NotificationPreferencesQuery({ request: toNotificationPreferencesRequest(input), principal }),

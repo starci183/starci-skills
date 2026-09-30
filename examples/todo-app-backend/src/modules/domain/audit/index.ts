@@ -2,7 +2,7 @@ export { auditEntities, auditMigrations } from "./persistence/connection"
 export { AUDIT_APPEND_QUEUE, toAuditAppendMessage } from "./audit-append.policy"
 export { AuditErasureService } from "./audit-erasure.service"
 export { AuditLogService } from "./audit-log.service"
-export { AuditAction, SYSTEM_ACTOR_ID } from "./audit.contracts"
+export { AuditAction } from "./audit.contracts"
 export type {
     AppendDeliveredLineParams,
     AppendLineParams,

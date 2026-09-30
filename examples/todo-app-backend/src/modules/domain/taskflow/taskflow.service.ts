@@ -5,12 +5,14 @@ import { NOTIFY_CHANNEL_EMAIL, NOTIFY_KIND_TASK_COMPLETE, toNotifyAdmitMessage }
 import { SubscriptionService } from "@modules/domain/plan"
 import { AccessService } from "@modules/domain/share"
 import { TaskErrorCode, TaskService } from "@modules/domain/task"
+import type { TaskView } from "@modules/domain/task"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectPrimaryEntityManager } from "@modules/platform/database"
 import { InjectOutbox } from "@modules/platform/outbox"
 import type { Outbox } from "@modules/platform/outbox"
 import { ok, refused } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
 import type {
     CompleteTaskflowParams,
@@ -72,10 +74,9 @@ export class TaskflowService {
      * not an error. The audit line and the notification for the owner are written with the change, in one transaction.
      */
     async complete(params: CompleteTaskflowParams): Promise<CompleteTaskflowResult> {
-        const task = await this.tasks.find({ id: params.taskId })
-        if (!task) return refused(TaskErrorCode.NotFound, { taskId: params.taskId })
-        const mayComplete = await this.access.mayComplete({ actorId: params.actorId, taskId: task.id, ownerId: task.owner })
-        if (!mayComplete) return refused(TaskErrorCode.Forbidden, { taskId: task.id })
+        const found = await this.editableTask(params)
+        if (found.kind === "refused") return found
+        const task = found.value
         const at = this.clock.now()
         return this.entityManager.transaction(async (manager) => {
             const completed = await this.tasks.complete({ manager, task, at })
@@ -106,12 +107,26 @@ export class TaskflowService {
 
     /** Reopens a task for the owner or an editor collaborator. */
     async reopen(params: ReopenTaskflowParams): Promise<ReopenTaskflowResult> {
-        const task = await this.tasks.find({ id: params.taskId })
-        if (!task) return refused(TaskErrorCode.NotFound, { taskId: params.taskId })
-        const mayReopen = await this.access.mayComplete({ actorId: params.actorId, taskId: task.id, ownerId: task.owner })
-        if (!mayReopen) return refused(TaskErrorCode.Forbidden, { taskId: task.id })
+        const found = await this.editableTask(params)
+        if (found.kind === "refused") return found
+        const task = found.value
         const at = this.clock.now()
         const reopened = await this.entityManager.transaction((manager) => this.tasks.reopen({ manager, task, at }))
         return ok({ taskId: reopened.id, complete: reopened.complete })
+    }
+
+    /** The task when the actor may change its completion, or the refusal that names why not. */
+    private async editableTask(
+        params: CompleteTaskflowParams | ReopenTaskflowParams,
+    ): Promise<Outcome<TaskView, TaskErrorCode>> {
+        const task = await this.tasks.find({ id: params.taskId })
+        if (!task) return refused(TaskErrorCode.NotFound, { taskId: params.taskId })
+        const mayChange = await this.access.mayComplete({
+            actorId: params.actorId,
+            taskId: task.id,
+            ownerId: task.owner,
+        })
+        if (!mayChange) return refused(TaskErrorCode.Forbidden, { taskId: task.id })
+        return ok(task)
     }
 }

@@ -1,6 +1,6 @@
 import type { UploadErrorCode } from "@modules/domain/upload"
 import type { Outcome } from "@modules/platform/primitives"
-import type { UploadSummary } from "./support/upload-summary.contracts"
+import type { UploadSummary } from "@modules/domain/upload"
 
 /** What attaching an upload takes: the upload and the task. */
 export interface AttachUploadRequest {

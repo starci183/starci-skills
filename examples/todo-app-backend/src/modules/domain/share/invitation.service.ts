@@ -6,6 +6,7 @@ import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/dat
 import { InjectIds } from "@modules/platform/ids"
 import type { Ids } from "@modules/platform/ids"
 import { ok, refused } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
 import { ShareErrorCode } from "./errors/share.error"
 import { isShareRole, isWellFormedEmail, liveStatusOf, normalizeEmail } from "./invitation.policy"
@@ -87,19 +88,15 @@ export class InvitationService {
      * person changes nothing; a closed, expired, revoked or foreign invitation is refused.
      */
     accept(params: AcceptParams): Promise<AcceptResult> {
-        const at = this.clock.now()
-        return this.entityManager.transaction(async (manager) => {
-            const row = await manager.findOne(InvitationEntity, {
-                where: { id: params.invitationId },
-                lock: { mode: "pessimistic_write" },
-            })
-            if (!row) return refused(ShareErrorCode.InvitationNotFound, { invitationId: params.invitationId })
+        return this.lockedTransaction(params.invitationId, async (manager, row, at) => {
             if (normalizeEmail(params.email) !== row.email) {
                 return refused(ShareErrorCode.EmailMismatch, { invitationId: row.id })
             }
             const live = liveStatusOf(row, at)
-            if (live === InvitationStatus.Expired) return refused(ShareErrorCode.InvitationExpired, { invitationId: row.id })
-            if (live === InvitationStatus.Revoked) return refused(ShareErrorCode.InvitationRevoked, { invitationId: row.id })
+            if (live === InvitationStatus.Expired)
+                return refused(ShareErrorCode.InvitationExpired, { invitationId: row.id })
+            if (live === InvitationStatus.Revoked)
+                return refused(ShareErrorCode.InvitationRevoked, { invitationId: row.id })
             if (live === InvitationStatus.Accepted) {
                 if (row.personId === params.actorId) return ok(this.accepted(row, at))
                 return refused(ShareErrorCode.InvitationAlreadyClosed, { invitationId: row.id })
@@ -116,13 +113,7 @@ export class InvitationService {
 
     /** Revokes an invitation for its owner, pending or accepted; an expired or revoked one is refused as closed. */
     revoke(params: RevokeParams): Promise<RevokeResult> {
-        const at = this.clock.now()
-        return this.entityManager.transaction(async (manager) => {
-            const row = await manager.findOne(InvitationEntity, {
-                where: { id: params.invitationId },
-                lock: { mode: "pessimistic_write" },
-            })
-            if (!row) return refused(ShareErrorCode.InvitationNotFound, { invitationId: params.invitationId })
+        return this.lockedTransaction(params.invitationId, async (manager, row, at) => {
             if (row.ownerId !== params.ownerId) return refused(ShareErrorCode.Forbidden, { invitationId: row.id })
             const live = liveStatusOf(row, at)
             if (live === InvitationStatus.Expired || live === InvitationStatus.Revoked) {
@@ -155,6 +146,22 @@ export class InvitationService {
                 return { invitationId: view.id, email: view.email, role: view.role, status: view.status }
             }),
         }
+    }
+
+    /** Runs the step in a transaction on the invitation row locked for update, or refuses as not found. */
+    private lockedTransaction<Value>(
+        invitationId: string,
+        step: (manager: EntityManager, row: InvitationEntity, at: Date) => Promise<Outcome<Value, ShareErrorCode>>,
+    ): Promise<Outcome<Value, ShareErrorCode>> {
+        const at = this.clock.now()
+        return this.entityManager.transaction(async (manager) => {
+            const row = await manager.findOne(InvitationEntity, {
+                where: { id: invitationId },
+                lock: { mode: "pessimistic_write" },
+            })
+            if (!row) return refused(ShareErrorCode.InvitationNotFound, { invitationId })
+            return step(manager, row, at)
+        })
     }
 
     private isOpen(row: InvitationEntity, at: Date): boolean {

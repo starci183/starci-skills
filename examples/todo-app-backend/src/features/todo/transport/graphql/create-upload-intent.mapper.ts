@@ -1,4 +1,5 @@
-import type { CreateUploadIntentRequest, UploadIntent } from "../../application/create-upload-intent.contracts"
+import type { UploadIntent } from "@modules/domain/upload"
+import type { CreateUploadIntentRequest } from "../../application/create-upload-intent.contracts"
 import type { CreateUploadIntentInput } from "./dto/create-upload-intent.input"
 import type { CreateUploadIntentType } from "./dto/create-upload-intent.type"
 

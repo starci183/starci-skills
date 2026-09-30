@@ -1,6 +1,6 @@
 import type { UploadErrorCode } from "@modules/domain/upload"
 import type { Outcome } from "@modules/platform/primitives"
-import type { UploadSummary } from "./support/upload-summary.contracts"
+import type { UploadSummary } from "@modules/domain/upload"
 
 /** What storing the bytes of an intent takes: the upload, its token and the bytes. */
 export interface AcceptUploadContentRequest {

@@ -1,10 +1,9 @@
 import { StreamableFile } from "@nestjs/common"
 import { UploadError } from "@modules/domain/upload"
-import type { UploadErrorCode } from "@modules/domain/upload"
+import type { UploadContent, UploadErrorCode, UploadSummary } from "@modules/domain/upload"
 import { unwrapOutcome } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
-import type { UploadContent, ReadUploadContentResult } from "../../application/read-upload-content.contracts"
-import type { UploadSummary } from "../../application/support/upload-summary.contracts"
+import type { ReadUploadContentResult } from "../../application/read-upload-content.contracts"
 import type { UploadResponse } from "./dto/upload.response"
 
 /** Maps the outcome of an upload operation to the response, or throws the upload error of a refusal; the instant travels as an ISO string. */

@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { JobRunner } from "./job-runner.service"
+import { JobRunnerService } from "./job-runner.service"
 import { JOB_REGISTRY } from "./scheduling.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./scheduling.module-definition"
 
@@ -12,7 +12,11 @@ export class SchedulingModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []), JobRunner, { provide: JOB_REGISTRY, useExisting: JobRunner }],
+            providers: [
+                ...(base.providers ?? []),
+                JobRunnerService,
+                { provide: JOB_REGISTRY, useExisting: JobRunnerService },
+            ],
             exports: [JOB_REGISTRY],
         }
     }

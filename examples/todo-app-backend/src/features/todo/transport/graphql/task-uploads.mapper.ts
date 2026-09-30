@@ -1,4 +1,5 @@
-import type { ListTaskUploadsRequest, TaskUploads } from "../../application/list-task-uploads.contracts"
+import type { TaskUploads } from "@modules/domain/upload"
+import type { ListTaskUploadsRequest } from "../../application/list-task-uploads.contracts"
 import type { TaskUploadsInput } from "./dto/task-uploads.input"
 import type { UploadType } from "./dto/upload.type"
 import { toUploadType } from "./upload.mapper"
