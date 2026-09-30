@@ -461,7 +461,7 @@ describe('work-hygiene', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-hygiene-ledger-'));
     t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
     execFileSync('git', ['init', '-q'], { cwd: dir, stdio: 'ignore' });
-    // No sibling scripts/checks/ledger-hygiene.mjs three levels up from this temp dir: the section is silently absent.
+    // This temp repo is no runtime checkout — its root carries no scripts/checks/ledger-hygiene.mjs: the section is silently absent.
     const lines = [];
     assert.equal(await runWorkHygiene({ cwd: dir, out: line => lines.push(line) }), 0);
     assert.ok(!lines.some(line => /LEDGER_(ORPHAN_STATE_ROOT|LEGACY_WORK_SQLITE)/.test(line)));

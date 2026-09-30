@@ -3,14 +3,15 @@
 // .starcistacks must not be a plaintext secret (only *.enc is sealed). The pre-commit hook judges the staged files;
 // scripts/checks/check-hfs-sync.mjs judges every tracked file.
 //
-// When this package runs from inside its own runtime checkout (packages/hfs lives 3 directories under the repo
-// root), it also reports the state-root ledger findings of scripts/lib/hk-orphan-ledgers.mjs: LEDGER_ORPHAN_STATE_ROOT
-// and LEDGER_LEGACY_WORK_SQLITE (COOK-BRIEF F4 handover, incident 2026-09-30). Installed standalone in a product
-// repository with no such checkout, that section is silently absent — never a crash, never a false negative claimed.
+// Run inside a full runtime checkout — the repository under judgment is the checkout — it also reports the
+// state-root ledger findings of that checkout's scripts/lib/hk-orphan-ledgers.mjs: LEDGER_ORPHAN_STATE_ROOT and
+// LEDGER_LEGACY_WORK_SQLITE (COOK-BRIEF F4 handover, incident 2026-09-30). Any other repository — a product repo,
+// a bare repo — carries no scripts/checks/ledger-hygiene.mjs at its root, so that section is silently absent:
+// never a crash, never machine-state findings blamed on a repository that does not own them.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 const PLAINTEXT_NAME = /(^|\/)(\.env(\..*)?|[^/]*\.(pem|key|identity|age))$/;
 const GUARDED = file => file.startsWith('.starciwork/') || file.startsWith('.starcistacks/');
@@ -56,35 +57,43 @@ export function judge(cwd, files) {
   return { checked: guarded.length, findings: hygieneFindings(guarded, ignoredAmong(cwd, guarded.filter(file => file.startsWith('.starciwork/')))) };
 }
 
-// The sibling scripts/checks/ledger-hygiene.mjs, 3 directories up from this file when it runs inside its own full
-// runtime checkout (packages/hfs/sync/ -> ../../.. is the repo root, the same computation
-// packages/hfs/scripts/sync-runtime.mjs uses). Installed standalone (no such checkout), it does not exist and this
-// section is silently absent — never a crash, never a false claim about a store this install cannot see.
-const RUNTIME_LEDGER_HYGIENE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'scripts', 'checks', 'ledger-hygiene.mjs');
+// The scripts/checks/ledger-hygiene.mjs of the checkout under judgment: the root git names for `cwd`, which carries
+// that script only when the repository IS a full StarCi runtime checkout (packages/hfs/sync/ sits 3 directories
+// under such a root, the same computation packages/hfs/scripts/sync-runtime.mjs uses). A product repository — or a
+// bare repo — has no such file, so the section is silently absent wherever this module happens to be installed.
+const ledgerHygieneScript = cwd => {
+  try {
+    const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8' }).trim();
+    return path.join(root, 'scripts', 'checks', 'ledger-hygiene.mjs');
+  } catch {
+    return null;
+  }
+};
 
 /**
- * The state-root ledger findings (LEDGER_ORPHAN_STATE_ROOT, LEDGER_LEGACY_WORK_SQLITE) as {code, file, message}
- * entries, when this install can reach the sibling runtime script; [] otherwise. Never throws: a report failure is
- * one HFS_LEDGER_HYGIENE_UNAVAILABLE finding, not a crash of `hfs work-hygiene`.
+ * The state-root ledger findings (LEDGER_ORPHAN_STATE_ROOT, LEDGER_LEGACY_WORK_SQLITE) of the checkout containing
+ * `cwd`, as {code, file, message} entries; [] when that checkout carries no ledger-hygiene script. Never throws: a
+ * report failure is one HFS_LEDGER_HYGIENE_UNAVAILABLE finding, not a crash of `hfs work-hygiene`.
  */
-export async function ledgerHygieneFindings() {
-  if (!fs.existsSync(RUNTIME_LEDGER_HYGIENE)) return [];
+export async function ledgerHygieneFindings(cwd = process.cwd()) {
+  const script = ledgerHygieneScript(cwd);
+  if (!script || !fs.existsSync(script)) return [];
   try {
-    const { ledgerHygieneReport } = await import(pathToFileURL(RUNTIME_LEDGER_HYGIENE).href);
+    const { ledgerHygieneReport } = await import(pathToFileURL(script).href);
     const report = await ledgerHygieneReport({ apply: false });
     return [
       ...report.orphans.map(o => ({ code: o.code, file: o.ledgerId, message: `ledger ${o.name ?? o.ledgerId} - ${o.reason}; source roots: ${o.sourceRoots.join(', ') || '(none)'}` })),
       ...report.legacy.map(l => ({ code: l.code, file: l.repoRoot, message: `${l.files.length} legacy file(s) still in the repo: ${l.files.join(', ')}` })),
     ];
   } catch (error) {
-    return [{ code: 'HFS_LEDGER_HYGIENE_UNAVAILABLE', file: RUNTIME_LEDGER_HYGIENE, message: `could not run: ${String(error?.message ?? error).slice(0, 200)}` }];
+    return [{ code: 'HFS_LEDGER_HYGIENE_UNAVAILABLE', file: script, message: `could not run: ${String(error?.message ?? error).slice(0, 200)}` }];
   }
 }
 
 /** `hfs work-hygiene`: checks the staged files, plus the state-root ledger findings when reachable; returns the exit code. */
 export async function runWorkHygiene({ cwd = process.cwd(), out = line => process.stdout.write(`${line}\n`), files } = {}) {
   const { checked, findings } = judge(cwd, files ?? stagedFiles(cwd));
-  const ledgerFindings = await ledgerHygieneFindings();
+  const ledgerFindings = await ledgerHygieneFindings(cwd);
   const all = [...findings, ...ledgerFindings];
   for (const finding of all) out(`${finding.code} ${finding.file} ${finding.message}`);
   out(`hfs work-hygiene: ${checked} staged file(s) checked, ${findings.length} finding(s), ${ledgerFindings.length} ledger finding(s)`);
