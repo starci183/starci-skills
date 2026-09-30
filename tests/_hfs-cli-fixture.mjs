@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../scripts/lib/hfs-slots.mjs';
 import { renderTargets, writeTargets } from '../packages/hfs/sync/index.mjs';
+import { loadSonarGate } from '../scripts/checks/sonar-gate.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index.cjs');
 /** The Sonar exclusions `hfs sync` would load from the preset a repository installs, per profile (a front end has no test runner, so none). */
@@ -19,7 +20,7 @@ export const FE = { hfs: 1, profile: 'fe', project: 'demo', apps: [{ name: 'web'
 /** The repository's `prettier` for a spec that is not about formatting: it judges every file formatted. */
 export const FORMATTED = Object.freeze({ getFileInfo: async () => ({ ignored: false, inferredParser: 'babel' }), resolveConfig: async () => null, check: async () => true });
 /** application-stacks.yaml as the standard shape wants it: a Sonar owned by the host. */
-export const STACKS_DECLARATION = ['schema: starci/application-stacks@1', 'services:', '  sonar:', '    provider: sonarqube', '    mode: local', '    stack:', '      owner: host', '      root: .claude/ext/sonar', '      environment: dev', '    qualityGate: starci-new-code', ''].join('\n');
+export const STACKS_DECLARATION = ['schema: starci/application-stacks@1', 'services:', '  sonar:', '    provider: sonarqube', '    mode: local', `    qualityGate: ${loadSonarGate().gate.name}`, '    stack:', '      owner: host', '      root: .claude/ext/sonar', '      environment: dev', ''].join('\n');
 
 const readmeOf = (name, profile) => [`# ${name}`, '', 'A demo repository for the hfs check specs.', '', '## Overview', '', 'Demo.', '', '## Stack', '', 'TypeScript.', '', '## Repository layout', '', 'apps and src.', '',
   '## Development', '', '```sh', 'npm ci', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm test', '```', '', ...(profile === 'be' ? ['## Work', '', 'Records live in `.starciwork`.', ''] : [])].join('\n');

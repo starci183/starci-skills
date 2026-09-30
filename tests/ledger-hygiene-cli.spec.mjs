@@ -40,7 +40,9 @@ test('ledgerHygieneReport: an orphan ledger and a legacy store are both reported
   const orphanRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ledger-hygiene-cli-orphan-'));
   t.after(() => fs.rmSync(orphanRepo, { recursive: true, force: true }));
   makeLedger(env, { ledgerId: 'orphan-ledger', repoRoot: orphanRepo });
-  const boundRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ledger-hygiene-cli-bound-'));
+  // A bound repository is one whose root is reachable and outside every OS temp directory (an orphan's source roots under
+  // a temp dir are unreachable by definition), so it lives under the home directory.
+  const boundRepo = fs.mkdtempSync(path.join(os.homedir(), '.starci-ledger-hygiene-cli-bound-'));
   t.after(() => fs.rmSync(boundRepo, { recursive: true, force: true }));
   fs.mkdirSync(path.join(boundRepo, '.starciwork'), { recursive: true });
   fs.writeFileSync(path.join(boundRepo, '.starciwork', 'runtime.sqlite'), 'legacy');
@@ -51,7 +53,7 @@ test('ledgerHygieneReport: an orphan ledger and a legacy store are both reported
   assert.equal(dry.orphans.length, 1);
   assert.equal(dry.orphans[0].ledgerId, 'orphan-ledger');
   assert.equal(dry.legacy.length, 1);
-  assert.equal(dry.legacy[0].repoRoot, boundRepo);
+  assert.equal(dry.legacy[0].repoRoot, boundRepo.split(path.sep).join('/'), 'a repo root is reported in the forward-slash form the registry stores');
   assert.deepEqual(dry.applied, []);
 
   const applied = await ledgerHygieneReport({ env, apply: true });

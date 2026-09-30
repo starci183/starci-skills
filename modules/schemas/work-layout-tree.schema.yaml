@@ -226,10 +226,13 @@ allOf:
       type: object
       properties:
         apps:
+          type: array
           items:
             type: object
             required:
               - source
+            properties:
+              source: true
     description: "A scanned tree names what each of its apps scanned. It carries `i18n` exactly when the scan found message
       catalogs (scripts/work/layout-tree.mjs writes it from messages/ or locales/ under the app root and
       omits it otherwise): a fresh app with no catalogs yet is a valid scanned tree, and a catalog path or

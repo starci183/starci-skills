@@ -6,8 +6,9 @@ import test from 'node:test';
 import {spawnSync} from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
+import {sha256File} from '../engine/digest.mjs';
 import {
-  PROTOCOL_PREFIX,computeRequestBindings,digestFile,digestValue,inspectPreparedRequest,
+  PROTOCOL_PREFIX,computeRequestBindings,digestValue,inspectPreparedRequest,
   signalSession,startSession,validateLockedPlaywright,waitSession,
 } from '../scripts/uat/assisted-runner.mjs';
 import {acquireUatSlot,slotHolders} from '../scripts/uat/uat-slots.mjs';
@@ -70,12 +71,12 @@ emit({type:'postcondition',id:'signed-in',expected:'Account home',observed:'Acco
       {id:'confirm',action:'Confirm OTP in browser',expected:'Account home is visible',postconditions:['session persists'],evidence:['screenshot']},
     ]}],
     humanGates:[{id:'gate.otp',flowId:'flow.login',afterStepId:'open',class:'secret-entry',reason:'OTP stays in browser',prompt:'Enter the OTP in the visible browser, then reply ok, fail, or cancel.',responseSchema:{type:'string',enum:['ok','fail','cancel']},evidenceRequired:['post-login screenshot']}],
-    scripts:[{flowId:'flow.login',path:'playwright/flow-login.spec.ts',sha256:digestFile(scriptFile),command:['playwright','test'],cwd:temp}],
-    sessionManifest:{path:'session-manifest.yaml'},redaction:{path:'redaction.yaml',sha256:digestFile(redactionFile)},cleanup:{path:'cleanup.yaml',sha256:digestFile(cleanupFile)},
+    scripts:[{flowId:'flow.login',path:'playwright/flow-login.spec.ts',sha256:sha256File(scriptFile),command:['playwright','test'],cwd:temp}],
+    sessionManifest:{path:'session-manifest.yaml'},redaction:{path:'redaction.yaml',sha256:sha256File(redactionFile)},cleanup:{path:'cleanup.yaml',sha256:sha256File(cleanupFile)},
     receipt:{schema:'starci/assisted-uat-receipt@1',pathTemplate:'receipts/{runId}.yaml',immutable:true},limits:{timeoutMs:30000,retries:0}};
   request.bindings=computeRequestBindings(request);
   write(requestFile,request);
-  const requestDigest=digestFile(requestFile),scripts=request.scripts.map(({flowId,path,sha256})=>({flowId,path,sha256}));
+  const requestDigest=sha256File(requestFile),scripts=request.scripts.map(({flowId,path,sha256})=>({flowId,path,sha256}));
   const session={schema:'starci/assisted-uat-session-manifest@1',sessionId:'session.login.1',request:{path:'request.yaml',sha256:requestDigest},
     bindings:{requestDigest,...request.bindings,scriptsDigest:digestValue(scripts),cleanupPlanDigest:request.cleanup.sha256,redactionPolicyDigest:request.redaction.sha256},
     playwright:{version:'1.99.0',browser:'chromium',revision:'1234'},launch:{command:[process.execPath,driverFile,'playwright','test','chromium','--headed','--workers=1'],cwd:temp,envNames:[]},
@@ -116,9 +117,9 @@ test('prepared request selection fails closed on stale flow and script bytes',t=
 test('cleanup and redaction plans are strict typed inputs, not unchecked command bags',t=>{
   const f=fixture(t),cleanup=path.join(f.assisted,'cleanup.yaml');
   write(cleanup,{schema:'starci/assisted-uat-cleanup@1',actions:[],verify:[],unexpected:true});
-  const request=parseYaml(fs.readFileSync(f.requestFile,'utf8'));request.cleanup.sha256=digestFile(cleanup);request.bindings=computeRequestBindings(request);write(f.requestFile,request);
+  const request=parseYaml(fs.readFileSync(f.requestFile,'utf8'));request.cleanup.sha256=sha256File(cleanup);request.bindings=computeRequestBindings(request);write(f.requestFile,request);
   const sessionFile=path.join(f.assisted,'session-manifest.yaml'),session=parseYaml(fs.readFileSync(sessionFile,'utf8'));
-  session.request.sha256=digestFile(f.requestFile);session.bindings.requestDigest=session.request.sha256;session.bindings.inputDigest=request.bindings.inputDigest;session.bindings.cleanupPlanDigest=request.cleanup.sha256;write(sessionFile,session);
+  session.request.sha256=sha256File(f.requestFile);session.bindings.requestDigest=session.request.sha256;session.bindings.inputDigest=request.bindings.inputDigest;session.bindings.cleanupPlanDigest=request.cleanup.sha256;write(sessionFile,session);
   assert.throws(()=>inspectPreparedRequest({requestPath:f.requestFile,receiptPath:f.receiptFile}),error=>error.code==='assisted-uat-schema-invalid'&&/cleanup schema/.test(error.message));
 });
 
@@ -152,7 +153,7 @@ test('chat and direct commands share one event-driven run, relay only the frozen
   assert.equal('outcome' in receipt,false);assert.equal('pass' in receipt,false);
   assert.ok(receipt.checks.some(check=>check.id==='after-human'&&check.exitCode===0),'machine assertions resumed after the human signal');
   assert.equal(receipt.cleanup.complete,true);assert.equal(receipt.redaction.complete,true);
-  assert.equal(receipt.artifacts[0].sha256,digestFile(path.join(f.assisted,receipt.artifacts[0].path)));
+  assert.equal(receipt.artifacts[0].sha256,sha256File(path.join(f.assisted,receipt.artifacts[0].path)));
   const again=startSession({requestPath:f.requestFile,receiptPath:f.receiptFile,skipRunnerCheck:true});
   assert.equal(again.idempotent,true);assert.equal(again.phase,'finished');
 });
