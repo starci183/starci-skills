@@ -122,3 +122,17 @@ export const enumMemberOf = (context, node) => {
     if (!declaration || !ts.isEnumMember(declaration)) return null
     return { enumName: declaration.parent.name.text, member: declaration.name.getText() }
 }
+
+/**
+ * The package a declaration file belongs to (`typeorm`, `@nestjs/typeorm`), read from its innermost `node_modules/` folder, or null for the repository's own source.
+ *
+ * @param {string} file - A declaration file path.
+ * @returns {string | null} The package name.
+ */
+export const packageOfFile = (file) => {
+    const normal = String(file).replace(/\\/g, "/")
+    const at = normal.lastIndexOf("/node_modules/")
+    if (at < 0) return null
+    const parts = normal.slice(at + "/node_modules/".length).split("/")
+    return parts[0].startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0]
+}
