@@ -357,6 +357,45 @@ test('fakeLock: an explicit `at` wins and no clock is refused without one', asyn
   await assert.rejects(lock.acquire({ name: 'x', holder: 'a', ttlMs: 1 }), /pass the FakeClock/);
 });
 
+test('recordingOutbox claim side: hands out the backlog by queue and limit, empty and duplicate claims, reports and one-shot failures', async () => {
+  const outbox = recordingOutbox();
+  const params = { at: new Date(0), queues: ['mail'], limit: 2, visibilityMs: 1000 };
+  const record = (id, queue) => ({ id, queue, eventId: `e-${id}`, payload: {}, attempts: 1 });
+  assert.deepEqual(await outbox.claimDue(params), []);
+  outbox.queueRecords(record('a', 'mail'), record('b', 'sms'), record('c', 'mail'), record('d', 'mail'));
+  assert.deepEqual((await outbox.claimDue(params)).map((r) => r.id), ['a', 'c']);
+  assert.deepEqual(outbox.backlog.map((r) => r.id), ['b', 'd']);
+  assert.deepEqual((await outbox.claimDue(params)).map((r) => r.id), ['d']);
+  const duplicate = record('x', 'mail');
+  outbox.queueRecords(duplicate, duplicate);
+  assert.deepEqual(await outbox.claimDue(params), [duplicate, duplicate]);
+  assert.equal(outbox.claims.length, 4);
+  await outbox.complete('a');
+  await outbox.retry({ id: 'b', at: new Date(1), error: 'x' });
+  await outbox.bury({ id: 'c', error: 'y' });
+  assert.deepEqual(outbox.completed, ['a']);
+  assert.deepEqual(outbox.retried, [{ id: 'b', at: new Date(1), error: 'x' }]);
+  assert.deepEqual(outbox.buried, [{ id: 'c', error: 'y' }]);
+  const boom = new Error('boom');
+  const calls = {
+    claimDue: () => outbox.claimDue(params),
+    complete: () => outbox.complete('a'),
+    retry: () => outbox.retry({ id: 'b', at: new Date(1), error: 'x' }),
+    bury: () => outbox.bury({ id: 'c', error: 'y' }),
+    enqueue: () => outbox.enqueue({}, { queue: 'mail', eventId: 'z', payload: {} }),
+  };
+  for (const [operation, call] of Object.entries(calls)) {
+    outbox.failNext(operation, boom);
+    await assert.rejects(call(), boom, operation);
+    await call();
+  }
+  outbox.failNext('bury', boom);
+  outbox.queueRecords(record('q', 'mail'));
+  outbox.clear();
+  assert.deepEqual([outbox.claims, outbox.completed, outbox.retried, outbox.buried, outbox.backlog, outbox.messages], [[], [], [], [], [], []]);
+  await outbox.bury({ id: 'c', error: 'y' });
+});
+
 test('recordingOutbox: keeps one message per (queue, eventId), remembers every write and whether it was inside a transaction', async () => {
   const outbox = recordingOutbox();
   assert.equal(outbox.allInTransaction, false);
@@ -422,7 +461,7 @@ test('toSucceedWith: matches an ok outcome by value and rejects a refusal, anoth
 test('the index exports the whole kit and the package.json declares typeorm as an optional peer only', () => {
   for (const name of ['mock', 'mockEntityManager', 'fakeTransaction', 'FakeClock', 'fakeIds', 'fakeCache', 'fakeLock', 'recordingOutbox', 'builder']) assert.equal(typeof preset[name], 'function', name);
   const pkg = require('./package.json');
-  assert.equal(pkg.version, '2.0.0');
+  assert.equal(pkg.version, '2.1.0');
   assert.equal(pkg.peerDependenciesMeta.typeorm.optional, true);
   assert.equal(Object.keys(pkg.dependencies ?? {}).length, 0);
   for (const file of ['entity-manager.cjs', 'ids.cjs', 'matchers.cjs', 'mock.cjs', 'clock.cjs', 'cache.cjs', 'lock.cjs', 'outbox.cjs', 'builders.cjs']) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0
+
+- Added: the claim side of `recordingOutbox()`, so a claim-side consumer is specced with the kit double the `OUTBOX` token requires (`spec-infra-double-from-kit`) instead of `mock<Outbox>()`. `queueRecords(...records)` fills a backlog that `claimDue(params)` hands out in order (only the asked queues, at most `limit`, removed once claimed; an empty backlog is an empty claim, a record queued twice is a duplicate delivery), `failNext(operation, error)` makes the next `enqueue`, `claimDue`, `complete`, `retry` or `bury` reject once, and `claims`, `completed`, `retried`, `buried` and `backlog` expose what happened. `RecordingOutbox<M, R>` takes the claimed record type as a second parameter; `ClaimedRecord`, `ClaimParams`, `RetryParams`, `BuryParams` and `OutboxOperation` are exported from `./outbox`. `clear()` resets the claim side too. No breaking change.
+
 ## 2.0.0 - unreleased
 
 - Breaking: `starciJestConfig()` takes no options. The repository `jest.config.js` is a managed file, exactly `module.exports = require("@starci/jest-preset").starciJestConfig()`, rendered by `hfs sync` and compared by `hfs check` (HFS_MANAGED_FILE_DRIFT), so `moduleNameMapper`, `roots`, `tsconfig`, `rootDir`, `unit` and `e2e` overrides are gone. `StarciJestOptions` is removed.

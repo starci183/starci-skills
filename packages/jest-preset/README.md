@@ -114,6 +114,13 @@ outbox.messages     // what the store would hold: the first write of each (queue
 outbox.writes       // every message written, duplicates included
 outbox.entries      // every write with its manager and `inTransaction`
 outbox.allInTransaction; outbox.messagesOf("queue"); outbox.clear()
+
+// the claim side: script what a worker's claim returns
+outbox.queueRecords(record)                 // the backlog claimDue hands out, in order, filtered by queue and cut at limit
+outbox.queueRecords(record, record)         // a duplicate delivery
+await outbox.claimDue(params)               // [] when the backlog is empty
+outbox.failNext("complete", new Error("db down"))   // the next call of that operation rejects once
+outbox.claims; outbox.completed; outbox.retried; outbox.buried; outbox.backlog
 ```
 
 ## `builder`, `fakeIds` and the Outcome matchers
