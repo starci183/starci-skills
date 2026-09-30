@@ -190,6 +190,7 @@ test("FE-NEXT-9: a route is built by modules/routes, not written at the call", (
       { filename: NAV, code: "router.push(routes.home())" },
       { filename: NAV, code: 'const A = () => <Link href="https://example.com">x</Link>' },
       { filename: NAV, code: 'const A = () => <Link href="/">home</Link>' },
+      { filename: NAV, code: 'const A = () => <a href="mailto:hi@example.com">x</a>' },
       { filename: NAV, code: 'const a = value.replace("/x", "")' },
       { filename: NAV, code: 'stack.push("/x")' },
       { filename: "D:/repo/src/modules/routes/index.ts", code: "export const course = (slug) => `/courses/${slug}`" },
@@ -199,6 +200,7 @@ test("FE-NEXT-9: a route is built by modules/routes, not written at the call", (
     invalid: [
       { filename: NAV, code: 'const A = () => <Link href="/courses">x</Link>', errors: [{ messageId: "route" }] },
       { filename: NAV, code: "const A = () => <Link href={`/courses/${slug}`}>x</Link>", errors: [{ messageId: "route" }] },
+      { filename: NAV, code: 'const A = () => <a href="/tasks">x</a>', errors: [{ messageId: "route" }] },
       { filename: NAV, code: 'router.push("/agentos/workspaces/new")', errors: [{ messageId: "route" }] },
       { filename: NAV, code: "router.replace(`/orders/${id}`)", errors: [{ messageId: "route" }] },
       { filename: "D:/repo/src/features/pages/Home/index.tsx", code: 'redirect("/sign-in")', errors: [{ messageId: "route" }] },

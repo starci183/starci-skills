@@ -21,18 +21,8 @@ export const vendorPrimitiveHasNamedOwner = {
   },
 }
 
-/** Internal navigation uses the application's routed link owner. */
-export const noInternalStarciHref = {
-  meta: { type: "problem", docs: { description: "Internal StarCi links use routed navigation." }, schema: [], messages: { href: "Use the routed navigation owner for internal links." } },
-  create(context) {
-    if (!componentFile(context.filename || context.getFilename())) return {}
-    return { JSXAttribute(node) { if (node.name?.name !== "href") return; const value = node.value?.type === "Literal" ? node.value.value : null; if (typeof value === "string" && value.startsWith("/")) context.report({ node, messageId: "href" }) } }
-  },
-}
-
 export const rules = {
   "vendor-primitive-has-named-owner": vendorPrimitiveHasNamedOwner,
-  "no-internal-starci-href": noInternalStarciHref,
 }
 
 export const recommended = Object.fromEntries(Object.keys(rules).map((name) => [`starci-fe/${name}`, "error"]))

@@ -556,4 +556,4 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R67 | `FE_SPEC_QUALITY` | No class pinning, no barrel specs, axe per connected screen. |
 | R91 | `FE_SOURCE_FORM` | Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc and no emoji. |
 | R92 | `FE_COMPONENT_API` | A component exposes the canon surface: typed named props and slots, a presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file. |
-| R93 | `FE_VENDOR_BOUNDARY` | Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner, no internal StarCi href. |
+| R93 | `FE_VENDOR_BOUNDARY` | Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner. |

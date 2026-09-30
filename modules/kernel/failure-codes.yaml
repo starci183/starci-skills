@@ -12621,7 +12621,7 @@ FE_TYPE_ESCAPE:
 FE_VENDOR_BOUNDARY:
   title: "Vendor primitive or icon used outside its owner"
   title_vi: "Thư viện giao diện bên ngoài dùng ngoài chủ sở hữu"
-  meaning_vi: "Biểu tượng heroicons chỉ đến component qua lá icon với kích thước theo thang glyph; mỗi primitive của thư viện ngoài nằm sau một chủ sở hữu có tên; không có liên kết nội bộ StarCi cứng."
+  meaning_vi: "Biểu tượng heroicons chỉ đến component qua lá icon với kích thước theo thang glyph; mỗi primitive của thư viện ngoài nằm sau một chủ sở hữu có tên."
   causes_vi:
     - "Import thẳng @heroicons trong component"
     - "Dùng kích thước biểu tượng ngoài thang"

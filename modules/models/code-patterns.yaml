@@ -735,11 +735,11 @@ profiles:
         sourceRuleIds: [FE-FOLDER-5, FE-IMPORTS-5, FE-IMPORTS-7]
         applicability: { include: ['**/*.{ts,tsx}'] }
         mechanical:
-          requirement: Use the owned Icon/Heading/vendor primitive doors and reject internal StarCi links or direct vendor bypasses.
+          requirement: Use the owned Icon/Heading/vendor primitive doors and reject direct vendor bypasses.
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-fe/no-vendor-icon-outside-icon-leaf, starci-fe/heroicons-is-the-glyph-vendor, starci-fe/no-heading-tag-outside-heading-component, starci-fe/no-hand-rolled-heading, starci-fe/vendor-primitive-has-named-owner, starci-fe/no-internal-starci-href]
+            ruleIds: [starci-fe/no-vendor-icon-outside-icon-leaf, starci-fe/heroicons-is-the-glyph-vendor, starci-fe/no-heading-tag-outside-heading-component, starci-fe/no-hand-rolled-heading, starci-fe/vendor-primitive-has-named-owner]
             expected: { severity: error }
         semantic:
           guidance: docs/portable-source-architecture.md

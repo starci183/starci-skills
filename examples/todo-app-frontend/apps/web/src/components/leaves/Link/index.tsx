@@ -14,7 +14,7 @@ type LinkProps = {
 };
 
 /**
- * The one routed-navigation owner for internal destinations (starci-fe/no-internal-starci-href):
+ * The one routed-navigation owner for internal destinations (starci-fe/no-hardcoded-route):
  * every in-app `<a>` a component renders is written here, so the navigation mechanism has a single
  * place to change. It stays a real browser destination - Grammar's own TextAction anchor - so
  * middle-click, copy-link and the link role come from the platform, exactly like the Heading leaf

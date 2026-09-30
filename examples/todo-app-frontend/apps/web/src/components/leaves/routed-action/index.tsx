@@ -2,7 +2,7 @@ import { TextAction, type TextActionAppearance } from "@starci/grammar/common"
 
 /**
  * The one place the plan feature hands an internal route to a Grammar action
- * (starci-fe/no-internal-starci-href): callers supply the route identity, this owner decides how it
+ * (starci-fe/no-hardcoded-route): callers supply the route identity, this owner decides how it
  * becomes a real anchor - today Grammar's TextAction destination semantics, so middle-click and the
  * link role stay the platform's. If the app later routes internal links through the client router,
  * it changes here once.

@@ -1046,7 +1046,7 @@ rules:
   - id: R93
     code: "FE_VENDOR_BOUNDARY"
     title_vi: "Thư viện giao diện bên ngoài dùng ngoài chủ sở hữu"
-    law: "Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner, no internal StarCi href."
+    law: "Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["FE_VENDOR_BOUNDARY"]
@@ -1056,4 +1056,3 @@ rules:
       - {kind: eslint-fe, id: no-off-scale-glyph-size}
       - {kind: eslint-fe, id: no-decorative-icon-in-metric-cell}
       - {kind: eslint-fe, id: vendor-primitive-has-named-owner}
-      - {kind: eslint-fe, id: no-internal-starci-href}
