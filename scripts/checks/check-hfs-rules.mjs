@@ -80,7 +80,11 @@ const lintProven = (text, id) => {
 };
 
 /** True when one spec names `code` in two separate test blocks (a finding tree and a clean tree). */
-const specProven = (specs, code) => specs.some((text) => text.split(/\btest\(/).slice(1).filter((block) => block.includes(code)).length >= 2);
+const specProven = (specs, code) => specs.some((text) => {
+  // A spec may bind the code once (`const hits = (report) => findings(report, 'CODE')`) and use that name in its tests.
+  const names = [code, ...[...text.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=[^\n]*/g)].filter((m) => m[0].includes(code)).map((m) => m[1])];
+  return text.split(/\btest\(/).slice(1).filter((block) => names.some((name) => new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(block))).length >= 2;
+});
 
 /** The README rule table: [{id, code, law}] from the rows `| Rnn | \`CODE\` | law |`. */
 export function readmeRuleRows(text) {
