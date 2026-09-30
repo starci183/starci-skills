@@ -33,9 +33,10 @@ test("R73: an async function awaits something", () => {
       { filename: SRC, code: "class Handler extends Base { async run() { return 1 } }" },
       // a framework decorator fixes it
       { filename: SRC, code: "class Boot { @OnEvent('x') async onX() { log() } }" },
-      { filename: SPEC, code: "const load = async () => 1" },
     ],
     invalid: [
+      // specs get the same law: a mock that returns a promise says so with Promise.resolve
+      { filename: SPEC, code: "const load = async () => 1", errors: [{ messageId: "noAwait" }] },
       { filename: SRC, code: "async function load() { return 1 }", errors: [{ messageId: "noAwait" }] },
       { filename: SRC, code: "const load = async () => { return plan }", errors: [{ messageId: "noAwait" }] },
       { filename: SRC, code: "const load = async (request) => service.confirm(request)", errors: [{ messageId: "noAwait" }] },

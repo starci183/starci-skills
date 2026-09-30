@@ -12,7 +12,7 @@
  *   - an `async` generator, whose `yield` is its suspension.
  */
 import { walk } from "./lib/ast.mjs"
-import { isDeclarationFile, isTestLane } from "./lib/path.mjs"
+import { isDeclarationFile } from "./lib/path.mjs"
 
 /** Whether the function body awaits, ignoring nested functions (each is judged alone). */
 const awaits = (fn) => {
@@ -49,7 +49,7 @@ export const asyncNeedsAwait = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (isTestLane(filename) || isDeclarationFile(filename)) return {}
+    if (isDeclarationFile(filename)) return {}
     const check = (node) => {
       if (!node.async || node.generator || !node.body) return
       if (node.body.type !== "BlockStatement" && node.type === "ArrowFunctionExpression") {
