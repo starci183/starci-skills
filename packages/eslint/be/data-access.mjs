@@ -25,7 +25,7 @@ import { hfsOf } from "./lib/hfs.mjs"
 import {
     declaredInjectorNames,
     inDatabaseCapability,
-    inMigrateApp,
+    inMigrateApp, inTestBootstrap,
     infraTypeOf,
     injectionSites,
 } from "./lib/persistence.mjs"
@@ -64,14 +64,14 @@ export const namedEntityManagerOnly = {
         type: "problem",
         docs: {
             description:
-                "No property injection of an `EntityManager`, `DataSource` or `QueryRunner`; a `DataSource` or `QueryRunner` only in the platform database capability and the migrate app; no `getRepository`.",
+                "No property injection of an `EntityManager`, `DataSource` or `QueryRunner`; a `DataSource` or `QueryRunner` only in the platform database capability, the migrate app and the test bootstrap (`src/tests/fixtures`); no `getRepository`.",
         },
         schema: [],
         messages: {
             property:
                 "`{{type}}` is injected as a class property. Property injection hides the dependency from the constructor and from the composition spec. Receive the named-injector `EntityManager` as a constructor parameter.",
             infra:
-                "`{{type}}` is injected here. A `DataSource` or `QueryRunner` is built and held only by the platform database capability and the migrate app; everything else injects the shared `EntityManager` through its named injector and calls it directly.",
+                "`{{type}}` is injected here. A `DataSource` or `QueryRunner` is built and held only by the platform database capability, the migrate app and the test bootstrap in `src/tests/fixtures`; specs take the fixture's `EntityManager`; everything else injects the shared `EntityManager` through its named injector and calls it directly.",
             getRepository:
                 "`.getRepository(...)` binds a handle to ONE entity and hides which connection it came from. Call the shared manager directly: `manager.find(Entity, ...)`, `manager.save(Entity, ...)`, `tx.insert(Entity, ...)`.",
         },
@@ -79,7 +79,7 @@ export const namedEntityManagerOnly = {
     create(context) {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
-        const mayHoldConnections = inDatabaseCapability(hfs, filename) || inMigrateApp(hfs, filename)
+        const mayHoldConnections = inDatabaseCapability(hfs, filename) || inMigrateApp(hfs, filename) || inTestBootstrap(hfs, filename)
         return {
             ...injectionSites(({ node, kind, annotation }) => {
                 if (!annotation) return

@@ -24,7 +24,7 @@ import {
     connectionFileOf,
     connectionsOf,
     inDatabaseCapability,
-    inMigrateApp,
+    inMigrateApp, inTestBootstrap,
     infraTypeOf,
     injectionSites,
     injectorNameOf,
@@ -42,6 +42,9 @@ const FUNCTION_LIKE = new Set(["ArrowFunctionExpression", "FunctionExpression", 
 
 /** Whether a file may build connections: the platform database capability and the migrate app. */
 const mayBuildConnections = (hfs, file) => inDatabaseCapability(hfs, file) || inMigrateApp(hfs, file)
+
+/** `new DataSource(` also in the test bootstrap, which owns the e2e database world (R83 decision 2026-09-30). */
+const mayConstructDataSource = (hfs, file) => mayBuildConnections(hfs, file) || inTestBootstrap(hfs, file)
 
 /** The connection whose name a string literal spells, or undefined. */
 const connectionNamed = (hfs, node) =>
@@ -182,7 +185,7 @@ export const oneConnectionPerDatabase = {
             },
             NewExpression(node) {
                 if (!isPackageType(context, node.callee, "DataSource", "typeorm")) return
-                if (!mayBuildConnections(hfs, filename)) context.report({ node, messageId: "registration", data: { what: "new DataSource(...)" } })
+                if (!mayConstructDataSource(hfs, filename)) context.report({ node, messageId: "registration", data: { what: "new DataSource(...)" } })
                 checkOptionsName(node.arguments[0])
             },
             VariableDeclarator(node) {

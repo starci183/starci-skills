@@ -28,6 +28,8 @@ const HANDLER_SPEC = at("src/features/checkout/application/place.handler.spec.ts
 const SERVICE = at("src/modules/domain/order/order.service.ts")
 const DATABASE_MODULE = at("src/modules/platform/database/database.module.ts")
 const MIGRATE = at("apps/migrate/src/main.ts")
+const E2E_WORLD = at("src/tests/fixtures/e2e/database-world.ts")
+const E2E_SPEC = at("src/tests/e2e/checkout/place-order.e2e-spec.ts")
 const ENTITY = at("src/modules/domain/order/persistence/entities/order.entity.ts")
 
 const TYPEORM = 'import { DataSource, EntityManager, QueryRunner, Repository, TreeRepository } from "typeorm"\ndeclare class OrderEntity {}\n'
@@ -73,6 +75,8 @@ test("R83: no property injection, no injected DataSource or QueryRunner outside 
             { filename: DATABASE_MODULE, code: constructorOf("private readonly dataSource: DataSource") },
             { filename: DATABASE_MODULE, code: constructorOf("private readonly runner: QueryRunner") },
             { filename: MIGRATE, code: constructorOf("private readonly dataSource: DataSource") },
+            // the test bootstrap (slot be.tests.fixtures) owns the e2e database world
+            { filename: E2E_WORLD, code: constructorOf("private readonly dataSource: DataSource") },
             // a getRepository that is not typeorm's
             { filename: HANDLER, code: "declare const registry: { getRepository(name: string): string }\nregistry.getRepository('orders')" },
         ],
@@ -91,6 +95,13 @@ test("R83: no property injection, no injected DataSource or QueryRunner outside 
             // a spec is not exempt
             { filename: HANDLER_SPEC, code: `${TYPEORM}declare const source: DataSource\nsource.getRepository(OrderEntity)`, errors: [{ messageId: "getRepository" }] },
             { filename: HANDLER_SPEC, code: constructorOf("private readonly source: DataSource"), errors: [{ messageId: "infra" }] },
+            // an e2e spec takes the fixture's EntityManager, never a DataSource of its own
+            { filename: E2E_SPEC, code: constructorOf("private readonly source: DataSource"), errors: [{ messageId: "infra" }] },
+            { filename: E2E_SPEC, code: `${TYPEORM}declare const source: DataSource
+source.getRepository(OrderEntity)`, errors: [{ messageId: "getRepository" }] },
+            // the bootstrap may hold a DataSource but still never binds a repository
+            { filename: E2E_WORLD, code: `${TYPEORM}declare const source: DataSource
+source.getRepository(OrderEntity)`, errors: [{ messageId: "getRepository" }] },
         ],
     })
 })

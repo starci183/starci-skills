@@ -24,6 +24,8 @@ const SERVICE = at("src/modules/domain/order/order.service.ts")
 const MIGRATE = at("apps/migrate/src/main.ts")
 const DATABASE_FIXTURE = at("src/tests/fixtures/database.ts")
 const OTHER = at("src/modules/domain/order/order.helper.ts")
+const E2E_WORLD = at("src/tests/fixtures/e2e/database-world.ts")
+const E2E_SPEC = at("src/tests/e2e/checkout/place-order.e2e-spec.ts")
 
 const COMPOSITION = 'import { injector, type TypedParameterDecorator } from "@modules/platform/composition/injector"\n'
 const INJECTOR = `import { getEntityManagerToken } from "@nestjs/typeorm"\nimport type { EntityManager } from "typeorm"\n${COMPOSITION}`
@@ -109,6 +111,8 @@ test("R84: a connection is registered once, in the platform database capability 
             { filename: DATABASE_MODULE, code: 'import { TypeOrmModule } from "@nestjs/typeorm"\nconst m = TypeOrmModule.forRootAsync({ name: PRIMARY_CONNECTION })' },
             { filename: DATABASE_MODULE, code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({ name: PRIMARY_CONNECTION })' },
             { filename: MIGRATE, code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({ name: PRIMARY_CONNECTION })' },
+            // the test bootstrap (slot be.tests.fixtures) builds the e2e database world
+            { filename: E2E_WORLD, code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({ name: PRIMARY_CONNECTION })' },
             // the same words on a class that is not typeorm's
             { filename: OTHER, code: "class DataSource {}\nconst source = new DataSource()\nconst TypeOrmModule = { forRoot() {} }\nTypeOrmModule.forRoot()" },
         ],
@@ -116,6 +120,8 @@ test("R84: a connection is registered once, in the platform database capability 
             { filename: OTHER, code: 'import { TypeOrmModule } from "@nestjs/typeorm"\nconst m = TypeOrmModule.forRoot({})', errors: [{ messageId: "registration" }] },
             { filename: OTHER, code: 'import { TypeOrmModule } from "@nestjs/typeorm"\nconst m = TypeOrmModule.forRootAsync({})', errors: [{ messageId: "registration" }] },
             { filename: SERVICE, code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({})', errors: [{ messageId: "registration" }] },
+            // an e2e spec never builds its own DataSource; it takes the fixture's EntityManager
+            { filename: E2E_SPEC, code: 'import { DataSource } from "typeorm"\nconst source = new DataSource({})', errors: [{ messageId: "registration" }] },
             // an imported alias is the same class
             { filename: SERVICE, code: 'import { DataSource as Db } from "typeorm"\nconst source = new Db({})', errors: [{ messageId: "registration" }] },
         ],

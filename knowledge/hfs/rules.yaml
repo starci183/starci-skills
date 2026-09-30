@@ -878,7 +878,7 @@ rules:
   - id: R83
     code: "BE_UNNAMED_DATA_ACCESS"
     title_vi: "Truy cập cơ sở dữ liệu không qua EntityManager dùng chung có tên"
-    law: "A use case reaches the database through the shared EntityManager injected by a named injector and called directly; no bare `@InjectEntityManager()`, no `getRepository`, no `@InjectRepository` or `Repository<T>`, no injected `DataSource` outside the platform database module."
+    law: "The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, `apps/migrate` and the test bootstrap `src/tests/fixtures`, whose EntityManager the specs use."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_UNNAMED_DATA_ACCESS"]
