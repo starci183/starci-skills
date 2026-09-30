@@ -205,6 +205,22 @@ test('the README rule table must repeat the catalog: a changed law, a missing ro
   assert.deepEqual(run(catalog, { readme: `${table}\nThe catalog R01 to R12.` }).map((f) => f.code), ['HFS_RULE_LAW_DRIFT']);
 });
 
+test('an enforcer without a violating and a passing proof is untested', () => {
+  const catalog = loadRuleCatalog();
+  const r38 = catalog.rule('R38');
+  const proven = { 'eslint-be': 'tester.run("error-home", rule, { valid: [], invalid: [{ code: "x" }] })', 'eslint-fe': '', specs: [] };
+  const only = { ...catalog, rules: [{ ...r38, enforcers: r38.enforcers.filter((e) => e.kind === 'eslint-be' && e.id === 'error-home') }] };
+  assert.deepEqual(run(only, { tests: proven }), []);
+  const validOnly = { ...proven, 'eslint-be': 'tester.run("error-home", rule, { valid: ["x"], invalid: [] })' };
+  assert.deepEqual(run(only, { tests: validOnly }).map((f) => f.code), ['HFS_RULE_UNTESTED']);
+  const r12 = catalog.rule('R12');
+  const machine = { ...catalog, rules: [r12] };
+  const twoTests = `test('finding', () => { '${r12.code}' })
+test('clean', () => { '${r12.code}' })`;
+  assert.deepEqual(run(machine, { tests: { 'eslint-be': '', 'eslint-fe': '', specs: [twoTests] } }), []);
+  assert.deepEqual(run(machine, { tests: { 'eslint-be': '', 'eslint-fe': '', specs: [`test('one', () => { '${r12.code}' })`] } }).map((f) => f.code), ['HFS_RULE_UNTESTED']);
+});
+
 test('pluginRuleIds reads the rule names of a plugin and reports one that cannot load', async () => {
   assert.deepEqual(Object.keys(PLUGIN_ENTRY), ['eslint-be', 'eslint-fe']);
   const found = await pluginRuleIds(root, 'eslint-be');

@@ -12115,6 +12115,18 @@ HFS_RULE_UNCATALOGUED:
   owner: supervisor
   kind: check-finding
 
+HFS_RULE_UNTESTED:
+  title: "Rule enforcer without a violating and a passing test"
+  title_vi: "Bộ kiểm tra của luật chưa có test vi phạm và test hợp lệ"
+  meaning_vi: "Mỗi enforcer đã có của một luật HFS phải có bằng chứng: luật ESLint có một lần chạy RuleTester với cả ca hợp lệ và ca vi phạm; kiểm tra của máy kiến trúc hoặc hfs có một tệp tests/*.spec.mjs nêu mã của luật trong ít nhất hai test (một cây vi phạm, một cây sạch). Thiếu bằng chứng thì độ phủ có thể lùi mà không ai biết."
+  causes_vi:
+    - "Thêm luật mới nhưng chưa viết ca kiểm thử"
+    - "Test chỉ có ca hợp lệ hoặc chỉ có ca vi phạm"
+    - "Đổi tên luật mà không đổi tên trong test"
+  nextStep_vi: "Người giám sát bổ sung ca vi phạm và ca hợp lệ cho enforcer đó trong test của luật, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 HFS_FORMAT:
   title: "Prettier is the only formatter"
   title_vi: "Chưa format bằng Prettier"

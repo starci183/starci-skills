@@ -19,6 +19,9 @@
 //                                                                                             HFS_RULE_UNCATALOGUED
 //   - a row of the rule table in knowledge/hfs/README.md section 12 whose id, code or law differs from the catalog, a
 //     catalog rule the table lacks, or a typed rule range ("R01 to Rnn") that is not the catalog's  HFS_RULE_LAW_DRIFT
+//   - an existing enforcer without a proof: an eslint rule whose law test file has no `.run("<id>"` block with both
+//     `valid:` and `invalid:` cases, or a machine / hfs enforcer none of whose codes is named by two `test(` blocks of
+//     one tests/*.spec.mjs (a violating and a passing tree)                                    HFS_RULE_UNTESTED
 //   - a failure code with no entry in modules/kernel/failure-codes.yaml, or an entry lacking a Vietnamese
 //     title_vi, meaning_vi or nextStep_vi                                                     HFS_RULE_CODE_UNCATALOGUED
 // A planned enforcer is not a finding: it is the owed work, listed by --unbuilt (the rules with no existing enforcer at
@@ -58,6 +61,27 @@ export function readEmitters(root) {
   return out;
 }
 
+/** The test sources that prove the enforcers: {'eslint-be': text, 'eslint-fe': text, specs: [text]}. */
+export function readTests(root) {
+  const texts = (dir, re) => (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).sort().map((f) => fs.readFileSync(path.join(root, dir, f), 'utf8')) : []);
+  return { 'eslint-be': texts('packages/eslint/be', /\.test\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.test\.mjs$/).join('\n'), specs: texts('tests', /\.spec\.mjs$/) };
+}
+
+/** True when a RuleTester run of `id` carries both valid and invalid cases. */
+const lintProven = (text, id) => {
+  for (const m of String(text).matchAll(/\.run\(\s*(['"`])([a-z0-9-]+)\1/g)) {
+    if (m[2] !== id) continue;
+    const rest = text.slice(m.index + m[0].length);
+    const next = rest.search(/\.run\(\s*['"`]/);
+    const block = next === -1 ? rest : rest.slice(0, next);
+    if (/\bvalid\s*:/.test(block) && /\binvalid\s*:\s*\[\s*\S/.test(block)) return true;
+  }
+  return false;
+};
+
+/** True when one spec names `code` in two separate test blocks (a finding tree and a clean tree). */
+const specProven = (specs, code) => specs.some((text) => text.split(/\btest\(/).slice(1).filter((block) => block.includes(code)).length >= 2);
+
 /** The README rule table: [{id, code, law}] from the rows `| Rnn | \`CODE\` | law |`. */
 export function readmeRuleRows(text) {
   return [...String(text).matchAll(/^\| (R\d{2}) \| `([A-Z0-9_]+)` \| (.*) \|$/gm)].map((m) => ({ id: m[1], code: m[2], law: m[3] }));
@@ -84,7 +108,7 @@ export async function pluginRuleIds(root, kind) {
  * The findings of a catalog: [{code, rule, enforcer?, message}].
  * plugins: {'eslint-be': {ids: Set} | {error}, 'eslint-fe': ...}; failureCodes: the parsed catalog; files: {exists(rel), read(rel)}.
  */
-export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, readme }) {
+export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, readme, tests }) {
   const findings = [];
   const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
   for (const rule of catalog.rules) {
@@ -124,6 +148,14 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
       for (const code of rule.failureCodes) {
         if ((code === rule.code && lintBuilt) || lintCodes.has(code) || emittedBy(code).length) continue;
         add('HFS_RULE_CODE_UNEMITTED', rule.id, `${rule.id} claims every enforcer is built, but no enforcer emits ${code}: no eslint or stylelint rule reports the rule's own code and no check file spells it`);
+      }
+    }
+    if (tests !== undefined) for (const e of rule.enforcers) {
+      if (e.planned) continue;
+      if (e.kind === 'eslint-be' || e.kind === 'eslint-fe') {
+        if (!lintProven(tests[e.kind], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no RuleTester run with both valid and invalid cases in packages/eslint/${e.kind.slice(7)}/*.test.mjs`, `${e.kind}:${e.id}`);
+      } else if (CHECK_FAMILY.includes(e.kind) && !rule.failureCodes.some((code) => specProven(tests.specs, code))) {
+        add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no tests/*.spec.mjs naming one of ${rule.failureCodes.join(', ')} in a violating and a passing test`, `${e.kind}:${e.id}`);
       }
     }
     for (const failureCode of rule.failureCodes) {
@@ -168,7 +200,7 @@ export async function checkHfsRules(root = skillRoot) {
   const failureCodes = parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8')) ?? {};
   const files = { exists: (rel) => fs.existsSync(path.join(root, rel)), read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') };
   const readme = fs.readFileSync(path.join(root, RULES_README), 'utf8');
-  return { catalog, findings: hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters: readEmitters(root), readme }) };
+  return { catalog, findings: hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters: readEmitters(root), readme, tests: readTests(root) }) };
 }
 
 if (isMain(import.meta.url)) {

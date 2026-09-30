@@ -41,7 +41,7 @@ test('BE: a feature may import domain, platform and integrations; an import insi
   });
   const report = runArch(root);
   assert.deepEqual(beDirection(report), []);
-  assert.deepEqual(featureImports(report), []);
+  assert.deepEqual(findings(report, 'BE_FEATURE_IMPORTS_FEATURE'), []);
 });
 
 test('BE: domain, platform and integrations never import a feature or an app; platform never imports domain', t => {
@@ -126,7 +126,9 @@ test('FE: feature to feature is forbidden, route to feature and feature to modul
       'apps/web/src/app/[locale]/page.tsx': "import { A } from '../../features/pages/A';\nexport default A;\n",
     },
   });
-  const hits = findings(runArch(root), 'FE_TIER_DIRECTION');
+  const report = runArch(root);
+  const hits = findings(report, 'FE_TIER_DIRECTION');
+  assert.deepEqual(findings(report, 'FE_APP_ISOLATION'), [], 'one app importing its own modules is not an isolation finding');
   assert.equal(hits.length, 1, JSON.stringify(hits));
   assert.equal(hits[0].path, 'apps/web/src/features/pages/A/index.tsx');
   assert.equal(hits[0].resolvedPath, 'apps/web/src/features/pages/B/index.tsx');

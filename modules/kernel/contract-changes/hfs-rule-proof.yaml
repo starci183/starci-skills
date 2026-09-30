@@ -1,0 +1,19 @@
+id: hfs-rule-proof
+effectiveAt: '2026-09-30T19:30:00+07:00'
+summary: >-
+  Lane C0 parity gate (RED19, owner requirement: coverage cannot silently regress): check-hfs-rules refuses an existing
+  enforcer without a proof (HFS_RULE_UNTESTED): an eslint rule needs a RuleTester run with valid and invalid cases, a
+  machine/hfs enforcer a tests/*.spec.mjs naming its code in a violating and a passing test. Missing proofs added for
+  R28, R32, R64 and eslint-fe no-internal-starci-href; the eslint-fe alias copy no-direct-heroicon-import is deleted.
+reach: new-legs
+adds:
+  codes: [HFS_RULE_UNTESTED]
+paths:
+  - modules/kernel/contract-changes/hfs-rule-proof.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/models/code-patterns.yaml
+  - knowledge/hfs/rules.yaml
+  - scripts/checks/check-hfs-rules.mjs
+  - tests/hfs-rules.spec.mjs
+  - tests/architecture-hfs-tiers.spec.mjs
+  - tests/architecture-app-composition.spec.mjs
