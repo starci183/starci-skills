@@ -81,7 +81,7 @@ const lintProven = (text, id) => {
     const rest = text.slice(m.index + m[0].length);
     const next = rest.search(/\.run\(\s*['"`]/);
     const block = next === -1 ? rest : rest.slice(0, next);
-    if (/\bvalid\s*:/.test(block) && /\binvalid\s*:\s*\[\s*\S/.test(block)) return true;
+    if (/\bvalid\s*:/.test(block) && /\binvalid\s*:\s*\[\s*[^\]\s]/.test(block)) return true;
   }
   return false;
 };
@@ -89,7 +89,9 @@ const lintProven = (text, id) => {
 /** True when one spec names `code` in two separate test blocks (a finding tree and a clean tree). */
 const specProven = (specs, code) => specs.some((text) => {
   // A spec may bind the code once (`const hits = (report) => findings(report, 'CODE')`) and use that name in its tests.
-  const names = [code, ...[...text.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=[^\n]*/g)].filter((m) => m[0].includes(code)).map((m) => m[1])];
+  // A top-level declaration runs until the next top-level `const`/`test(`/`function` line.
+  const declarations = [...text.matchAll(/^(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=([\s\S]*?)(?=^(?:export\s+)?(?:const|test\(|function|async function)\b|$(?![\s\S]))/gm)];
+  const names = [code, ...declarations.filter((m) => m[2].includes(code)).map((m) => m[1])];
   return text.split(/\btest\(/).slice(1).filter((block) => names.some((name) => new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(block))).length >= 2;
 });
 

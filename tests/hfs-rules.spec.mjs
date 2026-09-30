@@ -111,7 +111,8 @@ test('a catalog whose major differs from the slot manifest is refused', () => {
 
 const codeEntry = { title_vi: 'Tiêu đề', meaning_vi: 'Ý nghĩa của lỗi', nextStep_vi: 'Bước tiếp theo' };
 const failureCatalog = (catalog, without = []) => Object.fromEntries(catalog.rules.flatMap((r) => r.failureCodes).filter((c) => !without.includes(c)).map((c) => [c, { ...codeEntry }]));
-const allFiles = { exists: () => true, read: () => 'HFS_E2E_IN_AUTOMATIC_GATE BE_APP_COMPOSITION_ONLY SEALED_CUSTODY_LOCATION ARCH_OWNER_EXPORT_BYPASS' };
+// The real enforcer files of this runtime: every `at` exists and emits its rule's codes (the check itself proves it).
+const allFiles = { exists: (rel) => fs.existsSync(path.join(root, rel)), read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') };
 const pluginsOf = (catalog) => {
   const ids = (kind) => new Set(catalog.rules.flatMap((r) => r.enforcers).filter((e) => e.kind === kind && !e.planned).map((e) => e.id));
   return { 'eslint-be': { ids: ids('eslint-be') }, 'eslint-fe': { ids: ids('eslint-fe') } };
@@ -134,17 +135,18 @@ test('an eslint enforcer the plugin does not ship is a finding, and so is a plug
 });
 
 test('a planned eslint enforcer the plugin already ships is stale', () => {
-  const catalog = loadRuleCatalog();
-  const plugins = pluginsOf(catalog);
-  plugins['eslint-be'].ids.add('input-bounded');
+  const base = loadRuleCatalog();
+  const plugins = pluginsOf(base);
+  // mark a shipped eslint enforcer planned again: the plugin still ships it, so the status is stale
+  const catalog = { ...base, rules: base.rules.map((r) => (r.id === 'R38' ? { ...r, enforcers: r.enforcers.map((e) => (e.kind === 'eslint-be' && e.id === 'error-home' ? { ...e, planned: true } : e)) } : r)) };
   const findings = run(catalog, { plugins });
-  assert.deepEqual(findings.map((f) => [f.code, f.rule, f.enforcer]), [['HFS_RULE_ENFORCER_STALE', 'R42', 'eslint-be:input-bounded']]);
+  assert.deepEqual(findings.map((f) => [f.code, f.rule, f.enforcer]), [['HFS_RULE_ENFORCER_STALE', 'R38', 'eslint-be:error-home']]);
 });
 
 test('an existing machine enforcer needs its file to exist and to emit the rule code', () => {
   const catalog = loadRuleCatalog();
   const missing = run(catalog, { files: { exists: (rel) => rel !== 'scripts/checks/architecture/hfs.mjs', read: allFiles.read } });
-  assert.deepEqual(missing.map((f) => [f.code, f.rule]), [['HFS_RULE_ENFORCER_MISSING', 'R12']]);
+  assert.deepEqual(missing.map((f) => [f.code, f.rule]), catalog.rules.filter((r) => r.enforcers.some((e) => !e.planned && e.at === 'scripts/checks/architecture/hfs.mjs')).map((r) => ['HFS_RULE_ENFORCER_MISSING', r.id]));
   const silent = run(catalog, { files: { exists: () => true, read: () => 'nothing here' } });
   assert.ok(silent.length >= 3 && silent.every((f) => f.code === 'HFS_RULE_ENFORCER_MISSING'));
 });
@@ -170,7 +172,7 @@ test('a failure code with no catalog entry, or an entry that is not Vietnamese, 
 test('a planned machine enforcer whose code a machine file already emits is stale, unless another built enforcer names that file', () => {
   const catalog = loadRuleCatalog();
   const r26 = catalog.rule('R26');
-  const planned = { ...catalog, rules: catalog.rules.map((r) => (r.id === 'R26' ? { ...r, enforcers: r.enforcers.map((e) => ({ kind: e.kind, id: e.id, planned: true })) } : r)) };
+  const planned = { ...catalog, rules: [{ ...r26, enforcers: r26.enforcers.map((e) => ({ kind: e.kind, id: e.id, planned: true })) }] };
   const emitters = { machine: [{ rel: 'scripts/checks/architecture/tiers.mjs', text: `ruleId: '${r26.code}'` }], hfs: [], 'work-validate': [] };
   const stale = run(planned, { emitters });
   assert.deepEqual(stale.map((f) => [f.code, f.rule]), [['HFS_RULE_ENFORCER_STALE', 'R26']]);
@@ -209,7 +211,7 @@ test('an enforcer without a violating and a passing proof is untested', () => {
   const catalog = loadRuleCatalog();
   const r38 = catalog.rule('R38');
   const proven = { 'eslint-be': 'tester.run("error-home", rule, { valid: [], invalid: [{ code: "x" }] })', 'eslint-fe': '', specs: [] };
-  const only = { ...catalog, rules: [{ ...r38, enforcers: r38.enforcers.filter((e) => e.kind === 'eslint-be' && e.id === 'error-home') }] };
+  const only = { ...catalog, rules: [{ ...r38, kinds: ['lint'], enforcers: r38.enforcers.filter((e) => e.kind === 'eslint-be' && e.id === 'error-home') }] };
   assert.deepEqual(run(only, { tests: proven }), []);
   const validOnly = { ...proven, 'eslint-be': 'tester.run("error-home", rule, { valid: ["x"], invalid: [] })' };
   assert.deepEqual(run(only, { tests: validOnly }).map((f) => f.code), ['HFS_RULE_UNTESTED']);
