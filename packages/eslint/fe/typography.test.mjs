@@ -9,22 +9,14 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import { noHeadingTagOutsideHeadingComponent, rules } from "./typography.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const BLOCK = "D:/repo/src/components/blocks/dashboard/DailyQuest/component.tsx"
-const OWNER = "D:/repo/src/components/leaves/Heading/index.tsx"
-const TWIN = "D:/repo/src/components/blocks/dashboard/DailyQuest/component.test.tsx"
+const BLOCK = at("apps/web/src/components/blocks/DailyQuest/component.tsx")
+const OWNER = at("apps/web/src/components/leaves/Heading/index.tsx")
+const TWIN = at("apps/web/src/components/blocks/DailyQuest/component.test.tsx")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -42,11 +34,17 @@ test("TYPESET-1: a heading comes from the component that owns tag and size toget
       { filename: TWIN, code: "const E = () => <h2 />" },
       // a span is not a heading, whatever it is styled like - that case is tokens.mjs's
       { filename: BLOCK, code: "const E = () => <span />" },
+      // the owner's drawing half is the owner too, in every app
+      { filename: at("apps/web/src/components/leaves/Heading/component.tsx"), code: "const E = () => <h2 />" },
+      { filename: at("apps/admin/src/components/leaves/Heading/index.tsx"), code: "const E = () => <h2 />" },
     ],
     invalid: [
       { filename: BLOCK, code: "const E = () => <h1 />", errors: [{ messageId: "tag" }] },
       { filename: BLOCK, code: "const E = () => <h3>{title}</h3>", errors: [{ messageId: "tag" }] },
       // past the scale: a structure problem, and the message says so
+      // a Heading owner outside the leaves layer, and a leaf of another name, are not the heading component
+      { filename: at("apps/web/src/components/blocks/Heading/index.tsx"), code: "const E = () => <h2 />", errors: [{ messageId: "tag" }] },
+      { filename: at("apps/web/src/components/leaves/Title/index.tsx"), code: "const E = () => <h2 />", errors: [{ messageId: "tag" }] },
       { filename: BLOCK, code: "const E = () => <h5 />", errors: [{ messageId: "tooDeep" }] },
       { filename: BLOCK, code: "const E = () => <h6 />", errors: [{ messageId: "tooDeep" }] },
     ],

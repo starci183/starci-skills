@@ -3,9 +3,10 @@
  * classNames files own the utility-token composition.
  */
 
-import { normalizePath } from "./lib/path.mjs"
-const isComponentSource = (filename) => normalizePath(filename).includes("/src/components/")
-const isClassNamesFile = (filename) => /\/classNames\.tsx?$/.test(normalizePath(filename))
+import { isComponentFile, roleOfFile } from "./lib/scope.mjs"
+
+/** The styling declarations of a component owner: the file its slot gives the role `styles`. */
+const isClassNamesFile = (context) => isComponentFile(context) && roleOfFile(context) === "styles"
 const isClassAttribute = (node) => node.type === "JSXAttribute" && ["className", "class"].includes(node.name?.name)
 const isCn = (node) => node?.type === "Identifier" && node.name === "cn"
 
@@ -81,7 +82,7 @@ export const noInlineClassName = {
     messages: { inline: "Move this className value to an imported colocated classNames.ts export." },
   },
   create(context) {
-    if (!isComponentSource(context.filename || context.getFilename())) return {}
+    if (!isComponentFile(context)) return {}
     const imported = importedClassNames(context)
     return {
       JSXAttribute(node) {
@@ -102,11 +103,11 @@ export const classNamesInColocatedFile = {
     messages: { misplaced: "Put reusable className declarations in a colocated classNames.ts file." },
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
-    if (!isComponentSource(filename)) return {}
+    if (!isComponentFile(context)) return {}
+    const styles = isClassNamesFile(context)
     return {
       CallExpression(node) {
-        if (!isCn(node.callee) || isClassNamesFile(filename)) return
+        if (!isCn(node.callee) || styles) return
         context.report({ node, messageId: "misplaced" })
       },
     }
@@ -126,8 +127,7 @@ export const cnArgumentsAreSingleTokens = {
     },
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
-    if (!isClassNamesFile(filename)) return {}
+    if (!isClassNamesFile(context)) return {}
     return {
       CallExpression(node) {
         if (!isCn(node.callee)) return

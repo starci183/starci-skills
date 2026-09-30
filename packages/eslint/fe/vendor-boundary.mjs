@@ -5,18 +5,16 @@
  * independent of product composition protocols; ordinary React children and props remain valid.
  */
 
-const normalize = (filename) => String(filename || "").replace(/\\/g, "/")
-const componentFile = (filename) => /\/src\/components\//.test(normalize(filename))
-const leafFile = (filename) => /\/src\/components\/leaves\//.test(normalize(filename))
-const mechanicsFile = (filename) => /\/src\/components\/(branches|overlays)\//.test(normalize(filename))
-const classNamesFile = (filename) => /\/src\/components\/.*\/classNames\.tsx?$/.test(normalize(filename))
+import { isComponentFile, kindOfFile, roleOfFile } from "./lib/scope.mjs"
 
-/** Keep HeroUI mechanics inside leaves, named mechanics branches, and styling-owner modules. */
+/** The layers that may hold vendor mechanics: leaves and branches. */
+const MECHANICS_LAYERS = new Set(["leaves", "branches"])
+
+/** Keep HeroUI mechanics inside leaves, branches, and styling-owner modules (the `styles` file of a component). */
 export const vendorPrimitiveHasNamedOwner = {
   meta: { type: "problem", docs: { description: "HeroUI primitives have a named component or styling owner." }, schema: [], messages: { owner: "Import HeroUI primitives from a named leaf, mechanics branch, or colocated classNames module." } },
   create(context) {
-    const file = context.filename || context.getFilename()
-    if (!componentFile(file) || leafFile(file) || mechanicsFile(file) || classNamesFile(file)) return {}
+    if (!isComponentFile(context) || MECHANICS_LAYERS.has(kindOfFile(context)) || roleOfFile(context) === "styles") return {}
     return { ImportDeclaration(node) { if (String(node.source.value) === "@heroui/react") context.report({ node, messageId: "owner" }) } }
   },
 }

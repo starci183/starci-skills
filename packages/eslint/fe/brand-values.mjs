@@ -18,7 +18,6 @@
  * for one span would be two findings for one fix.
  */
 
-import { isSpecFile } from "./lib/scope.mjs"
 import { isContentFile } from "./comments.mjs"
 
 /** A hex colour: 3, 4, 6 or 8 digits, not a longer word and not part of an identifier. */
@@ -105,8 +104,7 @@ export const noRawBrandValue = {
     },
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
-    if (isSpecFile(filename) || isContentFile(filename)) return {}
+    if (isContentFile(context)) return {}
     const source = context.sourceCode || context.getSourceCode()
     /** Values already reported through an owner, so a string reports once. */
     const claimed = new WeakSet()

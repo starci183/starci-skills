@@ -10,16 +10,13 @@
  * hand-rolled - with the right tag and the wrong look, or the right look and no tag.
  */
 
-import { normalizePath } from "./lib/path.mjs"
+import { classOf, inSlot, isProductSource } from "./lib/scope.mjs"
 
-/** Product source lives under `src/`; tooling and config are out of scope. */
-const isSourceFile = (filename) => normalizePath(filename).includes("/src/")
-
-/** A twin test may build heading markup by hand to assert against it. */
-const isTestFile = (filename) => /\.(?:test|spec)\.(?:ts|tsx)$/.test(normalizePath(filename))
-
-/** The one component that owns the tag and the size together, and therefore may write the tag. */
-const isHeadingComponent = (filename) => normalizePath(filename).includes("/src/components/leaves/Heading/")
+/** The one owner that writes the heading tag: the component named `Heading` in the leaves layer of an app (slot `fe.components`; the owner name is the one name this rule keeps). */
+const isHeadingComponent = (context) => {
+  const owner = classOf(context)
+  return inSlot(context, "fe.components") && owner.kind === "leaves" && owner.bindings?.name === "Heading"
+}
 
 /** The tags a document outline is built from. */
 const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"])
@@ -50,8 +47,7 @@ export const noHeadingTagOutsideHeadingComponent = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (!isSourceFile(file) || isTestFile(file) || isHeadingComponent(file)) return {}
+    if (!isProductSource(context) || isHeadingComponent(context)) return {}
     return {
       JSXOpeningElement(node) {
         const tag = tagName(node)

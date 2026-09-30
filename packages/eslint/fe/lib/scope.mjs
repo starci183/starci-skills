@@ -26,8 +26,26 @@ export const slotOfFile = (context) => hfsOf(context).slotOf(context.filename ||
  */
 export const inSlot = (context, ...ids) => ids.includes(slotOfFile(context))
 
-/** A spec or test file - it asserts about production shapes rather than being one. */
-export const isSpecFile = (filename) => /\.(?:test|spec)\.(?:ts|tsx|mts|cts)$/.test(normalizePath(filename))
+/** The filename a rule is linting. */
+export const fileOf = (context) => context.filename || context.getFilename()
+
+/** The classification of the linted file from the slot view: `{ slot, root, bindings, kind?, role? }` or a no-slot status. */
+export const classOf = (context) => hfsOf(context).classify(fileOf(context))
+
+/** The tier of the linted file in the import direction matrix (`route`, `feature`, `components`, `hooks`, `foundation`, `modules`, `transport`, `e2e`, `package`, `none`), or null when no slot owns it. */
+export const tierOfFile = (context) => hfsOf(context).tierOf(fileOf(context))
+
+/** The folder kind the slot reports for the linted file (a component layer, a feature kind), or null. */
+export const kindOfFile = (context) => classOf(context).kind ?? null
+
+/** The role the slot reports for the linted file (`entry`, `drawing`, `styles`, `shared`, `page`, `layout`, ...), or null. */
+export const roleOfFile = (context) => classOf(context).role ?? null
+
+/**
+ * A spec or test file - it asserts about production shapes rather than being one. The slots define a spec by its name
+ * (`allows: "*.spec.tsx"`), so this stays a file-name test.
+ */
+export const isSpecFile = (filename) => /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(normalizePath(filename))
 
 /** Product source: under `src/`, and not a spec. */
 export const isProductFile = (filename) => {
@@ -40,6 +58,24 @@ export const isE2eFile = (filename) => {
   const file = normalizePath(filename)
   return /(?:^|\/)e2e\//.test(file) || /(?:^|\/)playwright\.config\.[cm]?[jt]s$/.test(file)
 }
+
+/** The tiers of product source: everything a slot places in an app's route, feature, component, hook or module tiers and in a shared package. */
+const PRODUCT_TIERS = new Set(["route", "feature", "components", "hooks", "foundation", "modules", "transport", "package"])
+
+/** Product source: a file of a product tier, and not a spec. */
+export const isProductSource = (context) => PRODUCT_TIERS.has(tierOfFile(context)) && !isSpecFile(fileOf(context))
+
+/** A file of a component tier: slot `fe.components` or `fe.package.ui`, inside one of its layer folders (blocks, composites, branches, leaves). */
+export const isComponentFile = (context) => inSlot(context, "fe.components", "fe.package.ui") && kindOfFile(context) !== null
+
+/** True when the given file (an absolute or repo-relative name, e.g. where an import resolves to) sits in a component layer of slot `fe.components` or `fe.package.ui`. */
+export const isComponentPath = (context, file) => {
+  const found = hfsOf(context).classify(file)
+  return (found.slot === "fe.components" || found.slot === "fe.package.ui") && found.kind !== undefined
+}
+
+/** The e2e tree (tier `e2e`: `fe.e2e`, `fe.e2e-support`) and the Playwright config (role `playwright` of `fe.tool-config`). */
+export const isE2eSource = (context) => tierOfFile(context) === "e2e" || roleOfFile(context) === "playwright"
 
 /** The one place that may read the environment: slot `fe.modules.config`. */
 export const isConfigModule = (context) => inSlot(context, "fe.modules.config")

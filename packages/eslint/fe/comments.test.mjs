@@ -8,22 +8,14 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, fixtureHfs, slotTester } from "./fixtures/typed/tester.mjs"
 import { isContentFile, noEmojiInSource, requireExportJsdoc, rules } from "./comments.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const SRC = "D:/repo/src/components/leaves/Text/index.tsx"
-/** A fixture path that parses: the dictionaries themselves are `.json`, which the TypeScript parser refuses. */
-const LOCALE = "D:/repo/src/components/leaves/Text/fixtures/copy.ts"
+const SRC = at("apps/web/src/components/leaves/Text/index.tsx")
+/** A content file that parses: the e2e fixtures (the dictionaries themselves are `.json`, which the TypeScript parser refuses). */
+const LOCALE = at("e2e/fixtures/copy.ts")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -55,10 +47,13 @@ test("COMMENTS-4: no emoji in source, and content files are exempt", () => {
     valid: [
       { filename: SRC, code: "// a plain comment\nconst x = 1" },
       { filename: LOCALE, code: "const t = \"done 🎉\"" },
+      { filename: at("apps/web/src/components/leaves/Text/index.spec.tsx"), code: "const t = \"done 🎉\"" },
     ],
     invalid: [
       { filename: SRC, code: "// shipped 🎉\nconst x = 1", errors: [{ messageId: "emoji" }] },
       { filename: SRC, code: "const s = \"🎉\"", errors: [{ messageId: "emoji" }] },
+      // a folder named fixtures inside a component owner is authoring, not content
+      { filename: at("apps/web/src/components/leaves/Text/fixtures/copy.ts"), code: "const s = \"🎉\"", errors: [{ messageId: "emoji" }] },
       // a flag is a regional-indicator PAIR, which a single pictograph test misses
       { filename: SRC, code: "const s = \"🇻🇳\"", errors: [{ messageId: "emoji" }] },
     ],
@@ -66,8 +61,15 @@ test("COMMENTS-4: no emoji in source, and content files are exempt", () => {
 })
 
 test("there is no copy-module exemption: a resources folder is authoring, and the dictionaries are content", () => {
-  assert.equal(isContentFile("D:/repo/src/resources/copy.ts"), false)
-  assert.equal(isContentFile("D:/repo/src/modules/i18n/messages/vi.json"), true)
-  assert.equal(isContentFile("D:/repo/src/components/leaves/Text/index.test.tsx"), true)
+  const settings = { starci: { hfs: fixtureHfs() } }
+  const content = (rel) => isContentFile({ filename: at(rel), settings })
+  assert.equal(content("apps/web/src/modules/resources/copy.ts"), false)
+  assert.equal(content("apps/web/src/modules/i18n/messages/vi.json"), true)
+  assert.equal(content("packages/nivo-i18n/messages/vi.json"), true)
+  // code of the i18n module is authoring: only its dictionaries are content
+  assert.equal(content("apps/web/src/modules/i18n/request.ts"), false)
+  assert.equal(content("apps/web/src/components/leaves/Text/index.test.tsx"), true)
+  assert.equal(content("e2e/fixtures/copy.ts"), true)
+  assert.equal(content("apps/web/src/components/leaves/Text/fixtures/copy.ts"), false)
   assert.equal(rules["no-second-language-in-source"], undefined)
 })

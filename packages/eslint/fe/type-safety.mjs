@@ -7,22 +7,13 @@
  * its own: a rule that exists only in one repository's config is a rule the next repository forgets.
  * The array spelling is a formatting question and stays with the formatter.
  *
- * THE EXEMPTION IS A PATH, and it has to be. Proving a closed API refuses bad input means building
+ * THE EXEMPTION IS A SPEC, and it has to be. Proving a closed API refuses bad input means building
  * bad input, and there is no way to construct a value the types forbid without telling the compiler
- * to forget them. A judgement-based exemption would be argued at every call site; a path is argued
- * once, here.
+ * to forget them. A judgement-based exemption would be argued at every call site; a spec is decided
+ * once, by its name.
  */
 
-import { normalizePath } from "./lib/path.mjs"
-
-/** Product source lives under `src/`; tooling and config are out of scope. */
-const isSourceFile = (filename) => normalizePath(filename).includes("/src/")
-
-/** A test may build a value the types forbid, because that is what it is proving. */
-const isTestFile = (filename) => /\.(?:test|spec)\.(?:ts|tsx)$/.test(normalizePath(filename))
-
-/** Product source this rule governs. */
-const isGoverned = (filename) => isSourceFile(filename) && !isTestFile(filename)
+import { isProductSource } from "./lib/scope.mjs"
 
 /** True when a type node is the `unknown` keyword. */
 const isUnknown = (node) => Boolean(node) && node.type === "TSUnknownKeyword"
@@ -41,7 +32,7 @@ export const noDoubleCast = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename || context.getFilename())) return {}
+    if (!isProductSource(context)) return {}
     return {
       TSAsExpression(node) {
         // The outer cast of a `x as unknown as T` pair: its operand is itself a cast to `unknown`.
@@ -77,7 +68,7 @@ export const noTypeAssertion = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename || context.getFilename())) return {}
+    if (!isProductSource(context)) return {}
     const source = context.sourceCode ?? context.getSourceCode()
     const report = (node) =>
       context.report({ node, messageId: "assertion", data: { type: source.getText(node.typeAnnotation) } })
@@ -110,7 +101,7 @@ export const noNonNullAssertion = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename || context.getFilename())) return {}
+    if (!isProductSource(context)) return {}
     return { TSNonNullExpression: (node) => context.report({ node, messageId: "bang" }) }
   },
 }
@@ -129,7 +120,7 @@ export const noExplicitAny = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename || context.getFilename())) return {}
+    if (!isProductSource(context)) return {}
     return { TSAnyKeyword: (node) => context.report({ node, messageId: "any" }) }
   },
 }

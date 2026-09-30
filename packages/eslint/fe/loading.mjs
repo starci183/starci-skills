@@ -12,16 +12,10 @@
  * lint rule is for - the one nothing else will ever report.
  */
 
-import { normalizePath } from "./lib/path.mjs"
+import { classOf, fileOf, isComponentFile, isSpecFile } from "./lib/scope.mjs"
 
-/** The component tree; a placeholder in a test fixture is a fixture, not a second tree. */
-const isComponentFile = (filename) => normalizePath(filename).includes("/src/components/")
-
-/** A twin test may build a resting shape by hand to assert against it. */
-const isTestFile = (filename) => /\.(?:test|spec)\.(?:ts|tsx)$/.test(normalizePath(filename))
-
-/** Product component source these rules govern. */
-const isGoverned = (filename) => isComponentFile(filename) && !isTestFile(filename)
+/** Product component source these rules govern: a component owner's file, and not a spec (a placeholder in a test fixture is a fixture, not a second tree). */
+const isGoverned = (context) => isComponentFile(context) && !isSpecFile(fileOf(context))
 
 /** A flag that means "waiting", in the spellings this codebase uses. */
 const WAITING_FLAG = /\bis(?:Loading|Skeleton|Pending)\b/
@@ -54,13 +48,12 @@ export const noRestingTwinComponent = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (!isGoverned(file)) return {}
-    const hit = file.match(/\/([A-Za-z0-9]*Skeleton)\/index\.tsx?$/) || file.match(/\/([A-Za-z0-9]*Skeleton)\.tsx?$/)
-    if (!hit || !TWIN_NAME.test(hit[1])) return {}
+    if (!isGoverned(context)) return {}
+    const owner = classOf(context)
+    if (owner.role !== "entry" || !TWIN_NAME.test(owner.bindings?.name ?? "")) return {}
     return {
       Program(node) {
-        context.report({ node, messageId: "twin", data: { name: hit[1] } })
+        context.report({ node, messageId: "twin", data: { name: owner.bindings.name } })
       },
     }
   },
@@ -82,7 +75,7 @@ export const noPlaceholderProp = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename || context.getFilename())) return {}
+    if (!isGoverned(context)) return {}
     return {
       JSXAttribute(node) {
         const name = node.name && node.name.type === "JSXIdentifier" ? node.name.name : null
@@ -122,7 +115,7 @@ export const noRestingBranchAtCallSite = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename || context.getFilename())) return {}
+    if (!isGoverned(context)) return {}
     const source = context.sourceCode || context.getSourceCode()
     /** Root element name of one arm, or null when the arm is not an element. */
     const armName = (expression) => {

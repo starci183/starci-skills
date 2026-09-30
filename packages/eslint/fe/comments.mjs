@@ -11,12 +11,12 @@
  * pragma: user-facing text comes from a `next-intl` catalogue, and the catalogue is the only place
  * a second language is content.
  *
- * The exceptions that remain are paths, not judgements, and that is on purpose: a locale dictionary
+ * The exceptions that remain are placements, not judgements, and that is on purpose: a locale dictionary
  * IS the other language, and a fixture reproducing a real string has to reproduce it exactly. A
  * judgement-based exception would be argued per file forever.
  */
 
-import { normalizePath } from "./lib/path.mjs"
+import { fileOf, inSlot, isSpecFile } from "./lib/scope.mjs"
 
 /** The letters that mark the second language a source string must not carry outside a catalogue. */
 export const SECOND_LANGUAGE_LETTER = /[À-ÃÈ-ÊÌÍÒ-ÕÙÚÝà-ãè-êìíò-õùúýĂăĐđĨĩŨũƠơƯưẠ-ỿ]/
@@ -33,26 +33,19 @@ export const hasEmoji = (text) =>
   (/\p{Extended_Pictographic}/u.test(text) || /[\u{1F1E6}-\u{1F1FF}]{2}/u.test(text))
 
 /**
- * Paths whose second-language text or emoji is CONTENT rather than authoring.
+ * Files whose second-language text or emoji is CONTENT rather than authoring, decided by what the file IS.
  *
- * Two kinds only: the locale dictionaries (`messages/<locale>.json`), which are the product's other
- * language, and fixtures and specs, which reproduce real strings and would be testing something else
- * if they translated them. There is no "copy module" path: a `resources/` folder of strings is
- * copy that skipped the catalogue.
+ * Three kinds only: the locale dictionaries (a `.json` file of an i18n slot, `fe.modules.i18n` or `fe.package.i18n`),
+ * which are the product's other language; the e2e support tree (slot `fe.e2e-support`: fixtures and support),
+ * and specs, which reproduce real strings and would be testing something else if they translated them. There is no
+ * "copy module": a `resources/` folder of strings is copy that skipped the catalogue.
+ *
+ * @param {object} context - The ESLint rule context.
+ * @returns {boolean} True when the linted file holds content rather than authoring.
  */
-export const CONTENT_PATHS = [
-  /\/messages\/[a-z-]+\.json$/i,
-  /\/__fixtures?__\//,
-  /\/fixtures?\//,
-  /\.fixture\.(ts|tsx|js|mjs|cjs)$/i,
-  /\.test\.(ts|tsx|js|mjs|cjs)$/i,
-  /\.spec\.(ts|tsx|js|mjs|cjs)$/i,
-]
-
-/** True when a file holds content rather than authoring. */
-export const isContentFile = (filename) => {
-  const file = normalizePath(filename)
-  return CONTENT_PATHS.some((pattern) => pattern.test(file))
+export const isContentFile = (context) => {
+  const file = fileOf(context)
+  return isSpecFile(file) || inSlot(context, "fe.e2e-support") || (inSlot(context, "fe.modules.i18n", "fe.package.i18n") && file.endsWith(".json"))
 }
 
 /** Walk every place prose can hide, and hand each to one check. */
@@ -121,7 +114,7 @@ export const noEmojiInSource = {
     },
   },
   create(context) {
-    if (isContentFile(context.filename || context.getFilename())) return {}
+    if (isContentFile(context)) return {}
     return proseVisitors(context, (node, text) => {
       if (hasEmoji(text)) context.report({ node, messageId: "emoji" })
     })

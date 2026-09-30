@@ -10,21 +10,14 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import { noDoubleCast, noExplicitAny, noNonNullAssertion, noTypeAssertion, rules } from "./type-safety.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const SOURCE = "D:/repo/src/modules/api/graphql/clients/links/bearer.ts"
-const TEST = "D:/repo/src/modules/api/graphql/clients/links/bearer.test.ts"
+const SOURCE = at("apps/web/src/modules/api/client.ts")
+const TEST = at("apps/web/src/modules/api/client.test.ts")
+const TOOLING = at("apps/web/next.config.ts")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -42,6 +35,8 @@ test("TYPE-SAFETY-1: a cast through unknown erases what the compiler knew", () =
       { filename: SOURCE, code: "const n = value as unknown" },
       // a test builds values the types forbid, because that is what it is proving
       { filename: TEST, code: "return operation as unknown as ApolloLink.Operation" },
+      // tooling and config sit in no product tier
+      { filename: TOOLING, code: "const n = value as unknown as Config" },
     ],
     invalid: [
       {
@@ -69,9 +64,12 @@ test("TYPE-SAFETY-2: an assertion is a claim the compiler cannot check", () => {
       { filename: SOURCE, code: "const row = payload as unknown as ResumeRow" },
       // a test builds values the types forbid
       { filename: TEST, code: "const row = payload as ResumeRow" },
+      { filename: TOOLING, code: "const row = payload as ResumeRow" },
     ],
     invalid: [
       { filename: SOURCE, code: "const row = payload as ResumeRow", errors: [{ messageId: "assertion" }] },
+      // a shared package is product source
+      { filename: at("packages/nivo-ui/src/leaves/Badge/index.tsx"), code: "const row = payload as ResumeRow", errors: [{ messageId: "assertion" }] },
       { filename: SOURCE, code: "const el = node as HTMLElement", errors: [{ messageId: "assertion" }] },
       { filename: SOURCE, code: "const key = id as never", errors: [{ messageId: "assertion" }] },
       { filename: SOURCE, code: "const row = <ResumeRow>payload", errors: [{ messageId: "assertion" }] },

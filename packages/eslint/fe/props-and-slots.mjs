@@ -1,7 +1,8 @@
 /** Rules for named React props, ordinary children, and local visual ownership. */
 
-const isTestFile = (filename) => /(?:^|[\\/])(?:[^\\/]+\.)?(?:spec|test)\.[cm]?[jt]sx?$/.test(String(filename || ""))
-const isComponentSource = (filename) => /(?:^|[\\/])src[\\/]components[\\/]/.test(String(filename || "").replace(/\\/g, "/"))
+import { declarationsOf, fileOf as declarationFile } from "./lib/types.mjs"
+import { fileOf, isComponentFile, isComponentPath, isProductSource, isSpecFile, kindOfFile } from "./lib/scope.mjs"
+
 const propertyName = (node) => {
   const key = node?.key ?? node?.property
   if (!key) return null
@@ -69,7 +70,7 @@ export const publicComponentSignature = {
       const actual = type?.type === "TSTypeReference" && type.typeName?.type === "Identifier" ? type.typeName.name : null
       if (!actual || !expected.includes(actual)) context.report({ node: params[0], messageId: "type", data: { name, expected: expected.join(" or ") } })
     }
-    if (!isComponentSource(context.filename || context.getFilename()) || isTestFile(context.filename || context.getFilename())) return {}
+    if (!isComponentFile(context) || isSpecFile(fileOf(context))) return {}
     return {
       VariableDeclarator(node) {
         const name = componentNameOf(node)
@@ -92,7 +93,7 @@ export const noPerPartClassNameProp = {
     messages: { perPart: "Keep internal part styling owned by the component." },
   },
   create(context) {
-    if (!isComponentSource(context.filename || context.getFilename()) || isTestFile(context.filename || context.getFilename())) return {}
+    if (!isComponentFile(context) || isSpecFile(fileOf(context))) return {}
     return { TSPropertySignature(node) { const name = propertyName(node); if (name && name !== "className" && /^[a-z][A-Za-z0-9]*ClassName$/.test(name)) context.report({ node, messageId: "perPart" }) } }
   },
 }
@@ -106,13 +107,19 @@ export const noPublicClassNameProp = {
     messages: { declaration: "Component props must not expose {{prop}}.", usage: "Do not pass {{prop}} to house component {{component}}." },
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
-    if (isTestFile(filename)) return {}
-    const bindings = new Set()
+    if (isSpecFile(fileOf(context))) return {}
+    const declared = isComponentFile(context)
+    /** A house component: the identifier resolves (through its import) to a file of a component layer. */
+    const isHouseComponent = (identifier) => declarationsOf(context, identifier).some((declaration) => isComponentPath(context, declarationFile(declaration)))
     return {
-      ImportDeclaration(node) { if (!/components\//.test(String(node.source?.value || ""))) return; for (const specifier of node.specifiers || []) if (specifier.local?.name) bindings.add(specifier.local.name) },
-      TSPropertySignature(node) { if (isComponentSource(filename) && ["className", "classNames"].includes(propertyName(node))) context.report({ node, messageId: "declaration", data: { prop: propertyName(node) } }) },
-      JSXOpeningElement(node) { const component = node.name?.type === "JSXIdentifier" ? node.name.name : null; if (!component || !bindings.has(component)) return; for (const attribute of node.attributes || []) { const prop = attribute.name?.type === "JSXIdentifier" ? attribute.name.name : null; if (["className", "classNames"].includes(prop)) context.report({ node: attribute, messageId: "usage", data: { prop, component } }) } },
+      TSPropertySignature(node) { if (declared && ["className", "classNames"].includes(propertyName(node))) context.report({ node, messageId: "declaration", data: { prop: propertyName(node) } }) },
+      JSXOpeningElement(node) {
+        const identifier = node.name?.type === "JSXIdentifier" ? node.name : null
+        if (!identifier) return
+        const styled = (node.attributes || []).filter((attribute) => ["className", "classNames"].includes(attribute.name?.type === "JSXIdentifier" ? attribute.name.name : null))
+        if (styled.length === 0 || !isHouseComponent(identifier)) return
+        for (const attribute of styled) context.report({ node: attribute, messageId: "usage", data: { prop: attribute.name.name, component: identifier.name } })
+      },
     }
   },
 }
@@ -121,8 +128,7 @@ export const noPublicClassNameProp = {
 export const noPublicFrameCssProps = {
   meta: { type: "problem", docs: { description: "Non-leaf component props do not expose CSS-shaped frame decisions." }, schema: [], messages: { css: "Move {{prop}} into component-owned layout behavior." } },
   create(context) {
-    const filename = context.filename || context.getFilename()
-    if (isTestFile(filename) || !isComponentSource(filename) || /[\\/]leaves[\\/]/.test(String(filename).replace(/\\/g, "/"))) return {}
+    if (isSpecFile(fileOf(context)) || !isComponentFile(context) || kindOfFile(context) === "leaves") return {}
     const cssProps = new Set(["gap", "padding", "align", "justify", "className", "classNames", "style", "inline", "nested"])
     return { TSPropertySignature(node) { const name = propertyName(node); if (cssProps.has(name)) context.report({ node, messageId: "css", data: { prop: name } }) } }
   },
@@ -132,7 +138,7 @@ export const noPublicFrameCssProps = {
 export const noCssDoorTypeLaundering = {
   meta: { type: "problem", docs: { description: "Omit, Pick, and Exclude cannot hide styling props." }, schema: [], messages: { utility: "Remove {{prop}} from the owning public type instead of hiding it with {{utility}}." } },
   create(context) {
-    if (!String(context.filename || context.getFilename()).replace(/\\/g, "/").includes("/src/")) return {}
+    if (!isProductSource(context)) return {}
     return { TSTypeReference(node) { const utility = node.typeName?.type === "Identifier" ? node.typeName.name : null; const params = node.typeArguments?.params || node.typeParameters?.params || []; if (!utility || !["Omit", "Pick", "Exclude"].includes(utility)) return; const keys = params[1]?.type === "TSLiteralType" ? [params[1].literal?.value] : params[1]?.types?.map((item) => item.literal?.value) || []; const prop = keys.find((key) => ["className", "classNames", "style"].includes(key)); if (prop) context.report({ node, messageId: "utility", data: { utility, prop } }) } }
   },
 }

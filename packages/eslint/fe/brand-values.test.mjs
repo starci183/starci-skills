@@ -8,20 +8,12 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import { noRawBrandValue, rules } from "./brand-values.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const BLOCK = "D:/repo/src/components/blocks/Feed/index.tsx"
+const BLOCK = at("apps/web/src/components/blocks/Feed/index.tsx")
 
 test("every rule this law declares is a rule", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -48,9 +40,14 @@ test("BRAND-1: no raw colour, hex or px value outside brand.css", () => {
       // Tailwind arbitrary px belongs to no-arbitrary-value
       { filename: BLOCK, code: "const c = \"w-[12px]\"" },
       // specs may assert on raw values
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: "const c = \"#ff0000\"" },
+      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "const c = \"#ff0000\"" },
+      // e2e fixtures reproduce real values
+      { filename: at("e2e/fixtures/theme.ts"), code: "const c = \"#ff0000\"" },
     ],
     invalid: [
+      { filename: at("packages/nivo-ui/src/leaves/Badge/index.tsx"), code: "const c = \"#ff0000\"", errors: [{ messageId: "color" }] },
+      // a folder named fixtures inside a component owner is authoring, not content
+      { filename: at("apps/web/src/components/blocks/Feed/fixtures/copy.ts"), code: "const c = \"#ff0000\"", errors: [{ messageId: "color" }] },
       { filename: BLOCK, code: "const c = \"#ff0000\"", errors: [{ messageId: "color" }] },
       { filename: BLOCK, code: "const c = \"#f00\"", errors: [{ messageId: "color" }] },
       { filename: BLOCK, code: "const c = \"#ff000080\"", errors: [{ messageId: "color" }] },
