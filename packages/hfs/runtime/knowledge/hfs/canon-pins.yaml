@@ -25,7 +25,7 @@ pins:
     source: packages/eslint/be/package.json
     why: 'back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.6.1: the round-3 catch-up landed the nest code-pattern profile''s version and content digest, left unbumped when R78-R82 landed, plus the inbox-dedupe-required shape-detection fix.'
   '@starci/eslint-canon-fe':
-    version: 5.1.0
+    version: 5.1.1
     group: starci
     side: fe
     source: packages/eslint/fe/package.json
