@@ -10,10 +10,15 @@ import { spawnSync } from 'node:child_process';
 
 /**
  * Spawn `file` (the git binary) once with `args`: utf8 text, a hidden window, never a shell.
- * Options pass through last, so cwd, timeout, input, env, maxBuffer or encoding:'buffer' land as given.
+ * Options pass through last, so cwd, timeout, input, env or maxBuffer land as given. encoding:'buffer'
+ * is a request for raw bytes, not an encoding: spawnSync encodes a string `input` with it and throws
+ * ERR_UNKNOWN_ENCODING, so it reaches spawnSync as encoding:null (Buffer output either way).
  */
-export const gitSpawn = (file, args, options = {}) =>
-  spawnSync(file, args, { encoding: 'utf8', windowsHide: true, ...options });
+export const gitSpawn = (file, args, options = {}) => {
+  const spawn = { encoding: 'utf8', windowsHide: true, ...options };
+  if (spawn.encoding === 'buffer') spawn.encoding = null;
+  return spawnSync(file, args, spawn);
+};
 
 /** `git args` in `cwd`, or `git -C dir args` when `dir` is given. `git` overrides the binary. */
 export const runGit = (args, { cwd = null, dir = null, git = 'git', ...options } = {}) =>
