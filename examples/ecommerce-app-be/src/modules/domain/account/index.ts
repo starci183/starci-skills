@@ -1,7 +1,14 @@
-import {
-    AccountModule
-} from "./account.module"
-import {
-    AccountService
-} from "./account.service"
-export { AccountModule, AccountService }
+import { PersonEntity } from "./persistence/entities/person.entity"
+import { CreatePersons1789800000000 } from "./persistence/migrations/1789800000000-create-persons"
+
+/** The entities of the account capability, for the connection that holds them. */
+export const accountEntities = [PersonEntity]
+
+/** The migrations of the account capability, in the order they run. */
+export const accountMigrations = [CreatePersons1789800000000]
+
+export type { AccountPersonView, AccountView } from "./account.contracts"
+export { AccountModule } from "./account.module"
+export { AccountService } from "./account.service"
+export { ACCOUNT_ERROR_KINDS, AccountError, AccountErrorCode } from "./errors/account.error"
+export { ACCOUNT_MESSAGES } from "./messages/account.messages"

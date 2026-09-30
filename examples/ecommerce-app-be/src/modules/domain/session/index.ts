@@ -1,3 +1,5 @@
+export { SESSION_ERROR_KINDS, SessionError, SessionErrorCode } from "./errors/session.error"
+export { SESSION_MESSAGES } from "./messages/session.messages"
+export type { IssuedSession, LiveSession } from "./session.contracts"
 export { SessionModule } from "./session.module"
-export { SessionRepository } from "./session.repository"
 export { SessionService } from "./session.service"

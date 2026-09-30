@@ -39,9 +39,11 @@ export class ErrorsService {
         return this.build(ErrorsErrorCode.OperationInvalid, "invalid", {})
     }
 
-    /** The display text of a failure code in `locale`; a code without a catalog entry answers the key itself. */
+    /** The display text of a failure code in `locale`; a code without a catalog entry answers the text of the internal error. */
     text(code: string, params: ErrorParams, locale: Locale): string {
-        return this.catalog.get(`errors.${code}`, params, locale)
+        const key = `errors.${code}`
+        const text = this.catalog.get(key, params, locale)
+        return text === key ? this.catalog.get(`errors.${ErrorsErrorCode.Internal}`, {}, locale) : text
     }
 
     private build(code: string, kind: ErrorKind, params: ErrorParams): ErrorDescription {

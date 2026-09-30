@@ -1,35 +1,14 @@
-import {
-    DynamicModule, Module 
-} from "@nestjs/common"
-import {
-    CheckoutPolicy 
-} from "./checkout.policy"
-import {
-    OrderService 
-} from "./order.service"
-import {
-    ConfigurableModuleClass, OPTIONS_TYPE 
-} from "./order.module-definition"
+import { Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import { ConfigurableModuleClass, OPTIONS_TYPE } from "./order.module-definition"
+import { OrderService } from "./order.service"
 
-@Module({
-})
-/**
- * The `order` capability module: the confirmation of sds.checkout.order-flow - the policy, the
- * transaction and the buyer-status answer. It declares no imports: OrderService's collaborators
- * (cart, catalog, payment) are the sibling capability modules `apps/order` registers app-wide,
- * and its persistence is the same global primary EntityManager. This module's own globality is
- * declared at `apps/order` too, so the checkout feature never imports a capability.
- */
+@Module({})
+/** The order capability over the order database; the cart, catalog and payment capabilities it uses are registered by the app. */
 export class OrderModule extends ConfigurableModuleClass {
-    static register(options: typeof OPTIONS_TYPE = {
-    }): DynamicModule {
+    /** Registers the capability once per app. */
+    static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
-        return {
-            ...base,
-            providers: [...(base.providers ?? []),
-                OrderService,
-                CheckoutPolicy],
-            exports: [OrderService],
-        }
+        return { ...base, providers: [...(base.providers ?? []), OrderService], exports: [OrderService] }
     }
 }

@@ -1,40 +1,40 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    EntityManager 
-} from "typeorm"
-import {
-    PaymentEntity 
-} from "ecommerce-app-be/modules/platform/databases/postgresql/order"
+import { Injectable } from "@nestjs/common"
+import { EntityManager } from "typeorm"
+import { InjectOrderEntityManager } from "@modules/platform/database"
+import type { CapturePaymentParams, FindPaymentParams, PaymentView } from "./payment.contracts"
+import { PaymentEntity } from "./persistence/entities/payment.entity"
 
-/** The captured-payment view a confirmation returns: the ledger row's id, status and amount. */
-export interface PaymentResult {
-  paymentId: string;
-  status: "captured";
-  amountMinorUnits: number;
-}
+const toPaymentView = (row: PaymentEntity): PaymentView => ({
+    paymentId: row.id,
+    amountMinorUnits: row.amountMinorUnits,
+})
 
 @Injectable()
 /**
- * The internal payment ledger - sds.checkout.order-flow t-pay. There is no external PSP in this
- * example, and therefore deliberately no integration node for one: a real gateway would be
- * declared (extensions.work3.integrations + a work/integration@1 record) before it is called.
- * This module is the seam such a gateway plugs into. It writes inside the caller's transaction
- * (it takes the EntityManager, it does not open one), and the capture is keyed by the order id,
- * so a confirmation can never be paid twice.
+ * The internal payment ledger. This example has no external PSP and therefore no integration for one; this capability is
+ * the seam a gateway plugs into. It writes inside the caller transaction and the unique order id means an order is
+ * paid once.
  */
 export class PaymentService {
-    async capture(manager: EntityManager, personId: string, orderId: string, amountMinorUnits: number): Promise<PaymentResult> {
-        const payment = new PaymentEntity()
-        payment.personId = personId
-        payment.orderId = orderId
-        payment.amountMinorUnits = amountMinorUnits
-        payment.idempotencyKey = orderId
-        payment.status = "captured"
-        const saved = await manager.save(PaymentEntity, payment)
-        return {
-            paymentId: saved.id, status: saved.status, amountMinorUnits: saved.amountMinorUnits 
-        }
+    constructor(@InjectOrderEntityManager() private readonly entityManager: EntityManager) {}
+
+    /** Records a captured payment for an order in the caller transaction. */
+    async capture(params: CapturePaymentParams): Promise<PaymentView> {
+        const saved = await params.manager.save(
+            PaymentEntity,
+            params.manager.create(PaymentEntity, {
+                personId: params.personId,
+                orderId: params.orderId,
+                amountMinorUnits: params.amountMinorUnits,
+                status: "captured",
+            }),
+        )
+        return toPaymentView(saved)
+    }
+
+    /** The payment of an order, or null when none was captured. */
+    async findByOrder(params: FindPaymentParams): Promise<PaymentView | null> {
+        const row = await (params.manager ?? this.entityManager).findOneBy(PaymentEntity, { orderId: params.orderId })
+        return row ? toPaymentView(row) : null
     }
 }

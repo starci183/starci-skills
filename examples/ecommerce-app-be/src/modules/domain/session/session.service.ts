@@ -1,50 +1,31 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    randomUUID 
-} from "node:crypto"
-import {
-    AppConfigService 
-} from "ecommerce-app-be/modules/platform/config/identity"
-import {
-    SessionRepository 
-} from "./session.repository"
-
-/** What issue() hands back: the opaque bearer token plus the person it authenticates. */
-export interface IssuedSessionResult {
-  sessionToken: string;
-  personId: string;
-}
-
-/** Person id behind a live bearer, or null when the bearer has no session. */
-export type VerifiedSessionResult = string | null
+import { Injectable } from "@nestjs/common"
+import { randomUUID } from "node:crypto"
+import { InjectCache } from "@modules/integrations/cache"
+import type { Cache } from "@modules/integrations/cache"
+import type { IssuedSession, LiveSession } from "./session.contracts"
+import { SESSION_KEY } from "./session.cache-keys"
 
 @Injectable()
-/** fr.identity.sign-in / br.identity.sign-in: issue, verify, revoke. The token is an opaque
- * uuid - never a self-describing credential - and a verification returns only the person. */
+/** Issue, look up and revoke the opaque bearer sessions kept in the cache; a token is a random uuid, never a self-describing credential. */
 export class SessionService {
-    constructor(
-    private readonly sessions: SessionRepository,
-    private readonly config: AppConfigService,
-    ) {}
+    constructor(@InjectCache() private readonly cache: Cache) {}
 
-    async issue(personId: string): Promise<IssuedSessionResult> {
+    /** Starts a session for `personId` and answers its token. */
+    async issue(params: { readonly personId: string }): Promise<IssuedSession> {
         const sessionToken = randomUUID()
-        await this.sessions.store(sessionToken,
-            personId,
-            this.config.getSessionTtlSeconds())
-        return {
-            sessionToken, personId 
-        }
+        await this.cache.set({ key: SESSION_KEY, args: [sessionToken], value: params.personId })
+        return { sessionToken, personId: params.personId }
     }
 
-    verify(sessionToken: string): Promise<VerifiedSessionResult> {
-        if (!sessionToken) return Promise.resolve(null)
-        return this.sessions.lookup(sessionToken)
+    /** The person behind a live token, or null when the token has no session. */
+    async verify(sessionToken: string): Promise<LiveSession | null> {
+        if (sessionToken === "") return null
+        const personId = await this.cache.get({ key: SESSION_KEY, args: [sessionToken] })
+        return personId === null ? null : { personId }
     }
 
+    /** Ends the session of `sessionToken`; revoking an unknown token is not an error. */
     async revoke(sessionToken: string): Promise<void> {
-        await this.sessions.forget(sessionToken)
+        await this.cache.del({ key: SESSION_KEY, args: [sessionToken] })
     }
 }

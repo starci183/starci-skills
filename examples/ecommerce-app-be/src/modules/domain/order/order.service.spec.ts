@@ -1,395 +1,128 @@
-import {
-    Test 
-} from "@nestjs/testing"
-import {
-    mock 
-} from "@starci/jest-preset/mock"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    EntityManager 
-} from "typeorm"
-import {
-    CartItemEntity, OrderEntity, OrderLineEntity, PaymentEntity, ProductEntity, ORDER_POSTGRESQL 
-} from "@modules/platform/databases/index"
-import {
-    CartService 
-} from "ecommerce-app-be/modules/domain/cart"
-import {
-    CatalogService 
-} from "ecommerce-app-be/modules/domain/catalog"
-import {
-    PaymentService 
-} from "ecommerce-app-be/modules/domain/payment"
-import {
-    CheckoutPolicy 
-} from "./checkout.policy"
-import {
-    CheckoutRefusalException 
-} from "@modules/platform/errors/index"
-import {
-    OrderService 
-} from "./order.service"
+import { mock } from "@starci/jest-preset/mock"
+import type { CartService } from "@modules/domain/cart"
+import type { CatalogService } from "@modules/domain/catalog"
+import type { PaymentService } from "@modules/domain/payment"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { OrderErrorCode } from "./errors/order.error"
+import type { CheckoutPlan } from "./order.contracts"
+import { OrderService } from "./order.service"
+import { OrderEntity } from "./persistence/entities/order.entity"
+import { OrderLineEntity } from "./persistence/entities/order-line.entity"
+import { COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
 
-/**
- * The confirmation of sds.checkout.order-flow with persistence mocked at the provider boundary:
- * the DataSource and its transaction are useValue mocks, so the suite proves call order, the
- * guarded decrement, rollback-on-refusal and the idempotent replay without a live Postgres.
- */
-describe("OrderService - sds.checkout.order-flow t-stock, t-pay, t-confirm",
-    () => {
-        const cartService = {
-            list: jest.fn(), clear: jest.fn() 
-        }
-        const catalogService = {
-            byIds: jest.fn() 
-        }
-        const paymentService = {
-            capture: jest.fn() 
-        }
+const plan: CheckoutPlan = {
+    lines: [
+        { productId: "mug", quantity: 2, unitPriceMinorUnits: 1299 },
+        { productId: "thermos", quantity: 1, unitPriceMinorUnits: 2499 },
+    ],
+    totalMinorUnits: 5097,
+    currency: "USD",
+}
 
-        const productTx = {
-            decrement: jest.fn() 
-        }
-        const orderTx = {
-            create: jest.fn((value: object) => value), save: jest.fn() 
-        }
-        const orderLineTx = {
-            create: jest.fn((value: object) => value), save: jest.fn() 
-        }
-        const cartItemTx = {
-            delete: jest.fn() 
-        }
-        const txRepositories = new Map<object, object>([
-            [ProductEntity,
-                productTx],
-            [OrderEntity,
-                orderTx],
-            [OrderLineEntity,
-                orderLineTx],
-            [CartItemEntity,
-                cartItemTx],
-        ])
-        const manager = mock<EntityManager>({
-            decrement: jest.fn((entity: object, ...args: unknown[]) => (txRepositories.get(entity) as typeof productTx).decrement(...args)),
-            save: jest.fn((entity: object, value: unknown) => (txRepositories.get(entity) as typeof orderTx).save(value)),
-            create: jest.fn((entity: object, value: object) => (txRepositories.get(entity) as typeof orderTx).create(value)),
-            delete: jest.fn((entity: object, ...args: unknown[]) => (txRepositories.get(entity) as typeof cartItemTx).delete(...args)),
-        })
+const existingOrder = (): OrderEntity =>
+    Object.assign(new OrderEntity(), { id: "o-0", personId: "p-1", status: "confirmed", totalMinorUnits: 5097, currency: "USD" })
 
-        const ordersRepository = {
-            findOneBy: jest.fn(), findOneByOrFail: jest.fn(), countBy: jest.fn() 
-        }
-        const paymentsRepository = {
-            findOneBy: jest.fn() 
-        }
-        const entityManager = {
-            findOneBy: jest.fn((entity: object, criteria: unknown) => {
-                if (entity === OrderEntity) return ordersRepository.findOneBy(criteria)
-                if (entity === PaymentEntity) return paymentsRepository.findOneBy(criteria)
-                return undefined
-            }),
-            findOneByOrFail: jest.fn((_entity: object, criteria: unknown) => ordersRepository.findOneByOrFail(criteria)),
-            countBy: jest.fn((_entity: object, criteria: unknown) => ordersRepository.countBy(criteria)),
-            transaction: jest.fn(),
-        }
+const collaborators = (reserved = true): { cart: CartService; catalog: CatalogService; payments: PaymentService } => ({
+    cart: mock<CartService>({ clear: jest.fn().mockResolvedValue(undefined) }),
+    catalog: mock<CatalogService>({ reserveStock: jest.fn().mockResolvedValue(reserved) }),
+    payments: mock<PaymentService>({
+        capture: jest.fn().mockResolvedValue({ paymentId: "pay-1", amountMinorUnits: 5097 }),
+        findByOrder: jest.fn().mockResolvedValue({ paymentId: "pay-0", amountMinorUnits: 5097 }),
+    }),
+})
 
-        let service: OrderService
+const serviceWith = (
+    entityManager = mockEntityManager(),
+    parts = collaborators(),
+): OrderService => new OrderService(entityManager, parts.cart, parts.catalog, parts.payments)
 
-        beforeEach(async () => {
-            jest.clearAllMocks()
-            entityManager.transaction.mockImplementation((work: (m: EntityManager) => Promise<unknown>) => work(manager))
-            const moduleRef = await Test.createTestingModule({
-                providers: [
-                    OrderService,
-                    CheckoutPolicy,
-                    {
-                        provide: getEntityManagerToken(ORDER_POSTGRESQL), useValue: entityManager 
-                    },
-                    {
-                        provide: CartService, useValue: cartService 
-                    },
-                    {
-                        provide: CatalogService, useValue: catalogService 
-                    },
-                    {
-                        provide: PaymentService, useValue: paymentService 
-                    },
-                ],
-            }).compile()
-            service = moduleRef.get(OrderService)
-        })
-
-        function cartAndCatalog() {
-            cartService.list.mockResolvedValue([{
-                productId: "sku-mug", quantity: 2 
-            }])
-            catalogService.byIds.mockResolvedValue({
-                "sku-mug": {
-                    priceMinorUnits: 1299, stock: 40 
-                } 
-            })
-            productTx.decrement.mockResolvedValue({
-                affected: 1 
-            })
-            orderTx.save.mockResolvedValue({
-                id: "order-1" 
-            })
-            ordersRepository.findOneByOrFail.mockResolvedValue({
-                id: "order-1",
-                personId: "person-1",
+describe("OrderService", () => {
+    describe("place", () => {
+        it("claims the key, takes the stock, writes the lines, captures the payment and clears the cart in the caller transaction", async () => {
+            const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([{ id: "o-1" }]), insert: jest.fn().mockResolvedValue({}) })
+            const parts = collaborators()
+            const placed = await serviceWith(mockEntityManager(), parts).place({ manager, personId: "p-1", plan, idempotencyKey: "k-1" })
+            expect(placed).toEqual({
+                orderId: "o-1",
                 status: "confirmed",
-                totalMinorUnits: 2598,
+                totalMinorUnits: 5097,
                 currency: "USD",
-                idempotencyKey: null,
+                paymentId: "pay-1",
+                replayed: false,
             })
-            paymentsRepository.findOneBy.mockResolvedValue({
-                id: "payment-1", orderId: "order-1" 
+            expect(manager.query).toHaveBeenCalledWith(INSERT_ORDER_IF_NEW, ["p-1", 5097, "USD", "k-1"])
+            expect(parts.catalog.reserveStock).toHaveBeenCalledTimes(2)
+            expect(manager.insert).toHaveBeenCalledWith(OrderLineEntity, [
+                { orderId: "o-1", productId: "mug", quantity: 2, unitPriceMinorUnits: 1299 },
+                { orderId: "o-1", productId: "thermos", quantity: 1, unitPriceMinorUnits: 2499 },
+            ])
+            expect(parts.payments.capture).toHaveBeenCalledWith({ manager, personId: "p-1", orderId: "o-1", amountMinorUnits: 5097 })
+            expect(parts.cart.clear).toHaveBeenCalledWith({ manager, personId: "p-1" })
+        })
+
+        it("stores no key when the client sent none", async () => {
+            const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([{ id: "o-1" }]), insert: jest.fn().mockResolvedValue({}) })
+            await serviceWith().place({ manager, personId: "p-1", plan })
+            expect(manager.query).toHaveBeenCalledWith(INSERT_ORDER_IF_NEW, ["p-1", 5097, "USD", null])
+        })
+
+        it("answers the earlier order as a replay when the key was already used, touching no stock", async () => {
+            const manager = mockEntityManager({
+                query: jest.fn().mockResolvedValue([]),
+                findOneBy: jest.fn().mockResolvedValue(existingOrder()),
             })
-            paymentService.capture.mockResolvedValue({
-                paymentId: "payment-1", status: "captured", amountMinorUnits: 2598 
+            const parts = collaborators()
+            const placed = await serviceWith(mockEntityManager(), parts).place({ manager, personId: "p-1", plan, idempotencyKey: "k-1" })
+            expect(placed).toMatchObject({ orderId: "o-0", paymentId: "pay-0", replayed: true })
+            expect(parts.catalog.reserveStock).not.toHaveBeenCalled()
+        })
+
+        it("fails as a defect when the insert claimed nothing and no earlier order explains it", async () => {
+            const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
+            await expect(serviceWith().place({ manager, personId: "p-1", plan })).rejects.toMatchObject({
+                code: OrderErrorCode.PlacementFailed,
             })
-        }
+        })
 
-        it("fr.checkout.place-order: stock decrement, order+lines, capture and cart clear all inside one transaction",
-            async () => {
-                cartAndCatalog()
-                const result = await service.place("person-1")
-
-                expect(result).toEqual({
-                    orderId: "order-1",
-                    status: "confirmed",
-                    totalMinorUnits: 2598,
-                    currency: "USD",
-                    paymentId: "payment-1",
-                    replayed: false,
-                })
-                const criteria = productTx.decrement.mock.calls[0][0] as Record<string, unknown>
-                expect(criteria.id).toBe("sku-mug")
-                expect(criteria.stock).toBeDefined()
-                expect(productTx.decrement.mock.calls[0][1]).toBe("stock")
-                expect(productTx.decrement.mock.calls[0][2]).toBe(2)
-                expect(orderTx.save).toHaveBeenCalledWith(
-                    expect.objectContaining({
-                        personId: "person-1", status: "confirmed", totalMinorUnits: 2598, currency: "USD", idempotencyKey: null 
-                    }),
-                )
-                expect(orderLineTx.save).toHaveBeenCalledWith([
-                    expect.objectContaining({
-                        orderId: "order-1", productId: "sku-mug", quantity: 2, unitPriceMinorUnits: 1299 
-                    }),
-                ])
-                expect(paymentService.capture).toHaveBeenCalledWith(manager,
-                    "person-1",
-                    "order-1",
-                    2598)
-                expect(cartItemTx.delete).toHaveBeenCalledWith({
-                    personId: "person-1" 
-                })
+        it("throws insufficient stock naming the product when the guarded decrement finds no stock, so the transaction rolls back", async () => {
+            const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([{ id: "o-1" }]), insert: jest.fn() })
+            const parts = collaborators(false)
+            await expect(serviceWith(mockEntityManager(), parts).place({ manager, personId: "p-1", plan })).rejects.toMatchObject({
+                code: OrderErrorCode.InsufficientStock,
+                params: { productId: "mug", requested: 2 },
             })
-
-        it("ac.checkout.place-order.empty-cart-is-refused: a policy refusal throws CheckoutRefusalException and never opens the transaction",
-            async () => {
-                cartService.list.mockResolvedValue([])
-                catalogService.byIds.mockResolvedValue({
-                })
-                await expect(service.place("person-1")).rejects.toMatchObject({
-                    response: expect.objectContaining({
-                        code: "CHECKOUT_REFUSAL_EXCEPTION", reason: "cart-empty" 
-                    }),
-                })
-                expect(entityManager.transaction).not.toHaveBeenCalled()
-                expect(paymentService.capture).not.toHaveBeenCalled()
-            })
-
-        it("a cart line the catalog does not know refuses before any transaction opens",
-            async () => {
-                cartService.list.mockResolvedValue([{
-                    productId: "sku-ghost", quantity: 1 
-                }])
-                catalogService.byIds.mockResolvedValue({
-                })
-                await expect(service.place("person-1")).rejects.toMatchObject({
-                    response: expect.objectContaining({
-                        code: "CHECKOUT_REFUSAL_EXCEPTION", reason: "unknown-product", productId: "sku-ghost" 
-                    }),
-                })
-                expect(entityManager.transaction).not.toHaveBeenCalled()
-                expect(paymentService.capture).not.toHaveBeenCalled()
-            })
-
-        it("ac.checkout.place-order.stock-is-checked-at-confirmation: a guarded decrement that moves no row refuses inside the transaction",
-            async () => {
-                cartAndCatalog()
-                productTx.decrement.mockResolvedValue({
-                    affected: 0 
-                })
-                await expect(service.place("person-1")).rejects.toBeInstanceOf(CheckoutRefusalException)
-                expect(orderTx.save).not.toHaveBeenCalled()
-                expect(paymentService.capture).not.toHaveBeenCalled()
-                expect(cartItemTx.delete).not.toHaveBeenCalled()
-            })
-
-        it("a later line whose stock moved between evaluation and decrement refuses for that product - earlier lines never become a partial order",
-            async () => {
-                cartService.list.mockResolvedValue([
-                    {
-                        productId: "sku-mug", quantity: 1 
-                    },
-                    {
-                        productId: "sku-thermos", quantity: 5 
-                    },
-                ])
-                catalogService.byIds.mockResolvedValue({
-                    "sku-mug": {
-                        priceMinorUnits: 1299, stock: 40 
-                    },
-                    "sku-thermos": {
-                        priceMinorUnits: 2499, stock: 5 
-                    },
-                })
-                productTx.decrement
-                    .mockResolvedValueOnce({
-                        affected: 1 
-                    })
-                    .mockResolvedValueOnce({
-                        affected: 0 
-                    })
-                orderTx.save.mockResolvedValue({
-                    id: "order-1" 
-                })
-
-                await expect(service.place("person-1")).rejects.toMatchObject({
-                    response: expect.objectContaining({
-                        code: "CHECKOUT_REFUSAL_EXCEPTION",
-                        reason: "insufficient-stock",
-                        productId: "sku-thermos",
-                        requested: 5,
-                    }),
-                })
-                expect(productTx.decrement).toHaveBeenCalledTimes(2)
-                expect(orderTx.save).not.toHaveBeenCalled()
-                expect(paymentService.capture).not.toHaveBeenCalled()
-                expect(cartItemTx.delete).not.toHaveBeenCalled()
-            })
-
-        it("a capture failure inside the transaction rolls the whole confirmation back - the order never lands and the cart is never cleared",
-            async () => {
-                cartAndCatalog()
-                const failure = new Error("ledger write refused")
-                paymentService.capture.mockRejectedValue(failure)
-
-                await expect(service.place("person-1")).rejects.toBe(failure)
-                expect(orderTx.save).toHaveBeenCalled()
-                expect(orderLineTx.save).toHaveBeenCalled()
-                expect(cartItemTx.delete).not.toHaveBeenCalled()
-            })
-
-        it("an Idempotency-Key replay returns the first answer without opening a transaction",
-            async () => {
-                ordersRepository.findOneBy.mockResolvedValue({
-                    id: "order-1",
-                    personId: "person-1",
-                    status: "confirmed",
-                    totalMinorUnits: 2598,
-                    currency: "USD",
-                    idempotencyKey: "key-1",
-                })
-                paymentsRepository.findOneBy.mockResolvedValue({
-                    id: "payment-1", orderId: "order-1" 
-                })
-
-                const result = await service.place("person-1",
-                    "key-1")
-
-                expect(result).toEqual({
-                    orderId: "order-1",
-                    status: "confirmed",
-                    totalMinorUnits: 2598,
-                    currency: "USD",
-                    paymentId: "payment-1",
-                    replayed: true,
-                })
-                expect(ordersRepository.findOneBy).toHaveBeenCalledWith({
-                    personId: "person-1", idempotencyKey: "key-1" 
-                })
-                expect(entityManager.transaction).not.toHaveBeenCalled()
-                expect(cartService.list).not.toHaveBeenCalled()
-            })
-
-        it("a concurrent replay surfacing as the unique violation answers the same order, marked replayed",
-            async () => {
-                cartAndCatalog()
-                entityManager.transaction.mockRejectedValue(new Error("duplicate key value violates unique constraint \"uq_sales_order_idempotency\""))
-                ordersRepository.findOneBy
-                    .mockResolvedValueOnce(null)
-                    .mockResolvedValueOnce({
-                        id: "order-1",
-                        personId: "person-1",
-                        status: "confirmed",
-                        totalMinorUnits: 2598,
-                        currency: "USD",
-                        idempotencyKey: "key-1",
-                    })
-
-                const result = await service.place("person-1",
-                    "key-1")
-
-                expect(result).toMatchObject({
-                    orderId: "order-1", replayed: true 
-                })
-            })
-
-        it("a replayed order whose ledger row never landed still answers, with an empty paymentId",
-            async () => {
-                ordersRepository.findOneBy.mockResolvedValue({
-                    id: "order-1",
-                    personId: "person-1",
-                    status: "confirmed",
-                    totalMinorUnits: 2598,
-                    currency: "USD",
-                    idempotencyKey: "key-1",
-                })
-                paymentsRepository.findOneBy.mockResolvedValue(null)
-
-                const result = await service.place("person-1",
-                    "key-1")
-
-                expect(result).toEqual({
-                    orderId: "order-1",
-                    status: "confirmed",
-                    totalMinorUnits: 2598,
-                    currency: "USD",
-                    paymentId: "",
-                    replayed: true,
-                })
-                expect(entityManager.transaction).not.toHaveBeenCalled()
-            })
-
-        it("a transaction failure that is not the idempotency violation propagates unchanged",
-            async () => {
-                cartAndCatalog()
-                const failure = new Error("connection reset")
-                entityManager.transaction.mockRejectedValue(failure)
-                ordersRepository.findOneBy.mockResolvedValue(null)
-                await expect(service.place("person-1",
-                    "key-1")).rejects.toBe(failure)
-            })
-
-        it("contract.checkout.order-for-identity provider: buyerStatus counts confirmed orders into hasOrders",
-            async () => {
-                ordersRepository.countBy.mockResolvedValue(3)
-                expect(await service.buyerStatus("person-1")).toEqual({
-                    personId: "person-1", hasOrders: true 
-                })
-                expect(ordersRepository.countBy).toHaveBeenCalledWith({
-                    personId: "person-1" 
-                })
-
-                ordersRepository.countBy.mockResolvedValue(0)
-                expect(await service.buyerStatus("person-2")).toEqual({
-                    personId: "person-2", hasOrders: false 
-                })
-            })
+            expect(manager.insert).not.toHaveBeenCalled()
+            expect(parts.payments.capture).not.toHaveBeenCalled()
+            expect(parts.cart.clear).not.toHaveBeenCalled()
+        })
     })
+
+    describe("findPlaced", () => {
+        it("finds an earlier confirmation by person and key", async () => {
+            const entityManager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(existingOrder()) })
+            await expect(serviceWith(entityManager).findPlaced({ personId: "p-1", idempotencyKey: "k-1" })).resolves.toMatchObject({
+                orderId: "o-0",
+                replayed: true,
+            })
+            expect(entityManager.findOneBy).toHaveBeenCalledWith(OrderEntity, { personId: "p-1", idempotencyKey: "k-1" })
+        })
+
+        it("answers null when the key was never used", async () => {
+            const entityManager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null) })
+            await expect(serviceWith(entityManager).findPlaced({ personId: "p-1", idempotencyKey: "k-1" })).resolves.toBeNull()
+        })
+    })
+
+    describe("buyerStatus", () => {
+        it("is a buyer when the person has orders", async () => {
+            const entityManager = mockEntityManager({ query: jest.fn().mockResolvedValue([{ order_count: 3 }]) })
+            await expect(serviceWith(entityManager).buyerStatus({ personId: "p-1" })).resolves.toEqual({ personId: "p-1", hasOrders: true })
+            expect(entityManager.query).toHaveBeenCalledWith(COUNT_PERSON_ORDERS, ["p-1"])
+        })
+
+        it("is not a buyer at zero orders", async () => {
+            const entityManager = mockEntityManager({ query: jest.fn().mockResolvedValue([{ order_count: 0 }]) })
+            await expect(serviceWith(entityManager).buyerStatus({ personId: "p-2" })).resolves.toEqual({ personId: "p-2", hasOrders: false })
+        })
+    })
+})

@@ -1,92 +1,51 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    EntityManager 
-} from "typeorm"
-import {
-    PersonEntity 
-} from "ecommerce-app-be/modules/platform/databases/postgresql/identity"
-import {
-    InjectPrimaryEntityManager 
-} from "ecommerce-app-be/modules/platform/databases/postgresql/identity"
-import {
-    isRecord 
-} from "ecommerce-app-be/modules/platform/primitives"
-import {
-    PasswordPolicy 
-} from "./password.policy"
-
-/** Postgres' SQLSTATE for a unique-constraint violation: the one save failure that means "this address is taken". */
-const UNIQUE_VIOLATION = "23505"
-
-/** Whether a failed save was the unique-email constraint (TypeORM copies the driver's fields onto its error and also keeps the driver error). */
-const isUniqueViolation = (error: unknown): boolean =>
-    isRecord(error) && (error.code === UNIQUE_VIOLATION || (isRecord(error.driverError) && error.driverError.code === UNIQUE_VIOLATION))
-
-/**
- * The account read model a door answers: the person id and the email they registered with -
- * never the password hash, which never leaves this service.
- */
-export interface AccountResult {
-  personId: string;
-  email: string;
-}
-
-/** Person id when credentials or registration succeed; null asks the door to refuse. */
-export type CredentialPersonResult = string | null
-/** Account view when the person exists; null asks the door to answer unknown. */
-export type AccountLookupResult = AccountResult | null
+import { Injectable } from "@nestjs/common"
+import { EntityManager } from "typeorm"
+import { InjectIdentityEntityManager } from "@modules/platform/database"
+import { ok, refused } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
+import type {
+    AccountPersonView,
+    AccountView,
+    GetAccountParams,
+    RegisterPersonParams,
+    VerifyCredentialsParams,
+} from "./account.contracts"
+import { AccountErrorCode } from "./errors/account.error"
+import { hashPassword, verifyPassword } from "./password.policy"
+import { toPersonId } from "./persistence/account.rows"
+import type { PersonIdRow } from "./persistence/account.rows"
+import { INSERT_PERSON_IF_NEW } from "./persistence/account.sql"
+import { PersonEntity } from "./persistence/entities/person.entity"
 
 @Injectable()
-/**
- * br.identity.sign-in: credential checking and the person behind it. Refusals come back as
- * nulls for the caller to turn into its own refusal; no half of the pair is ever named.
- * Persistence goes through the primary EntityManager - the capability owns behaviour, the
- * databases module owns the connection.
- */
+/** Credential checking, registration and the account behind a person id. Refusals are returned, never thrown. */
 export class AccountService {
-    constructor(
-    @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-    private readonly passwords: PasswordPolicy,
-    ) {}
+    constructor(@InjectIdentityEntityManager() private readonly entityManager: EntityManager) {}
 
-    async verifyCredentials(email: string, password: string): Promise<CredentialPersonResult> {
-        const person = await this.entityManager.findOneBy(PersonEntity,
-            {
-                email 
-            })
-        if (!person) return null
-        return this.passwords.verify(password,
-            person.passwordHash) ? person.id : null
-    }
-
-    /**
-     * The signup door: a visitor becomes a person here, and a buyer at checkout confirmation.
-     * Returns null for a taken address - the unique-email violation only; any other failure is
-     * rethrown so a dead database never reads as "taken" (the caller answers 409; no timing side channel matters
-     * for a public door, but the row is never half-written - one insert or none).
-     */
-    async register(email: string, password: string): Promise<CredentialPersonResult> {
-        const person = new PersonEntity()
-        person.email = email
-        person.passwordHash = this.passwords.hash(password)
-        try {
-            const saved = await this.entityManager.save(person)
-            return saved.id
-        } catch (error) {
-            if (isUniqueViolation(error)) return null
-            throw error
+    /** The person whose email and password match; unknown email and wrong password are the same refusal. */
+    async verifyCredentials(
+        params: VerifyCredentialsParams,
+    ): Promise<Outcome<AccountPersonView, AccountErrorCode.InvalidCredentials>> {
+        const person = await this.entityManager.findOneBy(PersonEntity, { email: params.email })
+        if (!person || !verifyPassword(params.password, person.passwordHash)) {
+            return refused(AccountErrorCode.InvalidCredentials)
         }
+        return ok({ personId: person.id })
     }
 
-    async getAccount(personId: string): Promise<AccountLookupResult> {
-        const person = await this.entityManager.findOneBy(PersonEntity,
-            {
-                id: personId 
-            })
-        return person ? {
-            personId: person.id, email: person.email 
-        } : null
+    /** Registers a person inside the caller transaction; a taken email is a refusal. */
+    async register(params: RegisterPersonParams): Promise<Outcome<AccountPersonView, AccountErrorCode.EmailTaken>> {
+        const rows: Array<PersonIdRow> = await params.manager.query(INSERT_PERSON_IF_NEW, [
+            params.email,
+            hashPassword(params.password),
+        ])
+        const personId = toPersonId(rows)
+        return personId === null ? refused(AccountErrorCode.EmailTaken) : ok({ personId })
+    }
+
+    /** The account of one person. */
+    async getAccount(params: GetAccountParams): Promise<Outcome<AccountView, AccountErrorCode.PersonUnknown>> {
+        const person = await this.entityManager.findOneBy(PersonEntity, { id: params.personId })
+        return person ? ok({ personId: person.id, email: person.email }) : refused(AccountErrorCode.PersonUnknown)
     }
 }

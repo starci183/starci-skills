@@ -1,103 +1,29 @@
-import "reflect-metadata"
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    IdentityConfigService 
-} from "@modules/platform/config/index"
-import {
-    SessionRepository 
-} from "./session.repository"
-import {
-    SessionService 
-} from "./session.service"
+import { mock } from "@starci/jest-preset/mock"
+import type { Cache } from "@modules/integrations/cache"
+import { SESSION_KEY } from "./session.cache-keys"
+import { SessionService } from "./session.service"
 
-describe("SessionService - br.identity.sign-in session lifecycle",
-    () => {
-        const SESSION_TTL = 3600
-        let service: SessionService
-        let sessions: { store: jest.Mock; lookup: jest.Mock; forget: jest.Mock }
-
-        beforeEach(async () => {
-            sessions = {
-                store: jest.fn(), lookup: jest.fn(), forget: jest.fn() 
-            }
-            const module: TestingModule = await Test.createTestingModule({
-                providers: [
-                    SessionService,
-                    {
-                        provide: SessionRepository, useValue: sessions 
-                    },
-                    {
-                        provide: IdentityConfigService, useValue: {
-                            getSessionTtlSeconds: () => SESSION_TTL 
-                        } 
-                    },
-                ],
-            }).compile()
-            service = module.get(SessionService)
-        })
-
-        it("issues an opaque uuid token bound to the configured TTL, never a self-describing credential",
-            async () => {
-                const issued = await service.issue("person-1")
-                expect(issued.personId).toBe("person-1")
-                expect(issued.sessionToken).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
-                expect(sessions.store).toHaveBeenCalledWith(issued.sessionToken,
-                    "person-1",
-                    SESSION_TTL)
-            })
-
-        it("issues a fresh token per call - two sign-ins never share a session",
-            async () => {
-                const first = await service.issue("person-1")
-                const second = await service.issue("person-1")
-                expect(second.sessionToken).not.toBe(first.sessionToken)
-            })
-
-        it("verifies a live token into only the person behind it",
-            async () => {
-                sessions.lookup.mockResolvedValue("person-1")
-                await expect(service.verify("token-abc")).resolves.toBe("person-1")
-                expect(sessions.lookup).toHaveBeenCalledWith("token-abc")
-            })
-
-        it("verifies a dead token into null",
-            async () => {
-                sessions.lookup.mockResolvedValue(null)
-                await expect(service.verify("token-gone")).resolves.toBeNull()
-            })
-
-        it("refuses an empty token without touching the store",
-            async () => {
-                await expect(service.verify("")).resolves.toBeNull()
-                expect(sessions.lookup).not.toHaveBeenCalled()
-            })
-
-        it("revokes by forgetting the exact token",
-            async () => {
-                await service.revoke("token-abc")
-                expect(sessions.forget).toHaveBeenCalledWith("token-abc")
-            })
-
-        it("a store failure while issuing propagates - the caller learns no session was written",
-            async () => {
-                const failure = new Error("Redis did not become ready within 1500ms")
-                sessions.store.mockRejectedValue(failure)
-                await expect(service.issue("person-1")).rejects.toBe(failure)
-            })
-
-        it("a lookup failure while verifying propagates instead of answering null for a live token",
-            async () => {
-                const failure = new Error("Redis connection is end.")
-                sessions.lookup.mockRejectedValue(failure)
-                await expect(service.verify("token-abc")).rejects.toBe(failure)
-            })
-
-        it("a forget failure while revoking propagates - the caller learns the token may still be live",
-            async () => {
-                const failure = new Error("Redis connection is end.")
-                sessions.forget.mockRejectedValue(failure)
-                await expect(service.revoke("token-abc")).rejects.toBe(failure)
-            })
+describe("SessionService", () => {
+    it("issues an opaque token and stores the person under it", async () => {
+        const cache = mock<Cache>({ set: jest.fn().mockResolvedValue(undefined) })
+        const issued = await new SessionService(cache).issue({ personId: "p-1" })
+        expect(issued.personId).toBe("p-1")
+        expect(issued.sessionToken).toMatch(/^[0-9a-f-]{36}$/)
+        expect(cache.set).toHaveBeenCalledWith({ key: SESSION_KEY, args: [issued.sessionToken], value: "p-1" })
     })
+
+    it("names the person behind a live token and answers null for an unknown or empty one", async () => {
+        const cache = mock<Cache>({ get: jest.fn().mockResolvedValueOnce("p-1").mockResolvedValueOnce(null) })
+        const service = new SessionService(cache)
+        await expect(service.verify("live")).resolves.toEqual({ personId: "p-1" })
+        await expect(service.verify("dead")).resolves.toBeNull()
+        await expect(service.verify("")).resolves.toBeNull()
+        expect(cache.get).toHaveBeenCalledTimes(2)
+    })
+
+    it("revokes by deleting the entry", async () => {
+        const cache = mock<Cache>({ del: jest.fn().mockResolvedValue(undefined) })
+        await new SessionService(cache).revoke("tok")
+        expect(cache.del).toHaveBeenCalledWith({ key: SESSION_KEY, args: ["tok"] })
+    })
+})

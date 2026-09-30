@@ -44,4 +44,11 @@ describe("ErrorsService", () => {
         expect(build(mock<Logger>(), catalog).text("SAMPLE_MISSING", { id: "a" }, "en")).toBe("text")
         expect(catalog.get).toHaveBeenCalledWith("errors.SAMPLE_MISSING", { id: "a" }, "en")
     })
+
+    it("answers the text of the internal error for a code the catalog does not know", () => {
+        const catalog = mock<MessageCatalog>({
+            get: jest.fn().mockImplementation((key: string) => (key === "errors.ERRORS_INTERNAL" ? "Oops" : key)),
+        })
+        expect(build(mock<Logger>(), catalog).text("SAMPLE_UNKNOWN", {}, "en")).toBe("Oops")
+    })
 })

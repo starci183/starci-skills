@@ -1,0 +1,28 @@
+import { DomainError } from "@modules/platform/errors"
+import type { ErrorKind } from "@modules/platform/errors"
+
+/** Codes of the order capability. */
+export enum OrderErrorCode {
+    /** The cart is empty, so there is nothing to confirm. */
+    CartEmpty = "ORDER_CART_EMPTY",
+    /** A cart line names a product the catalog does not have. */
+    UnknownProduct = "ORDER_UNKNOWN_PRODUCT",
+    /** A product has less stock than the cart asks for. */
+    InsufficientStock = "ORDER_INSUFFICIENT_STOCK",
+    /** The order row could not be written and no earlier order explains it; a defect. */
+    PlacementFailed = "ORDER_PLACEMENT_FAILED",
+    /** A confirmed order has no payment; a defect. */
+    PaymentMissing = "ORDER_PAYMENT_MISSING",
+}
+
+/** How each order code travels. */
+export const ORDER_ERROR_KINDS: Record<OrderErrorCode, ErrorKind> = {
+    [OrderErrorCode.CartEmpty]: "invalid",
+    [OrderErrorCode.UnknownProduct]: "invalid",
+    [OrderErrorCode.InsufficientStock]: "conflict",
+    [OrderErrorCode.PlacementFailed]: "internal",
+    [OrderErrorCode.PaymentMissing]: "internal",
+}
+
+/** The one error class of the order capability. */
+export class OrderError extends DomainError<OrderErrorCode> {}

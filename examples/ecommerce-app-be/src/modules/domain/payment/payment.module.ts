@@ -1,29 +1,14 @@
-import {
-    DynamicModule, Module 
-} from "@nestjs/common"
-import {
-    PaymentService 
-} from "./payment.service"
-import {
-    ConfigurableModuleClass, OPTIONS_TYPE 
-} from "./payment.module-definition"
+import { Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import { ConfigurableModuleClass, OPTIONS_TYPE } from "./payment.module-definition"
+import { PaymentService } from "./payment.service"
 
-@Module({
-})
-/**
- * The `payment` capability module: the internal capture ledger the checkout transaction writes
- * inside its own EntityManager transaction. This module's globality is declared at `apps/order`
- * (`PaymentModule.register({ isGlobal: true })`), so no feature imports a capability.
- */
+@Module({})
+/** The payment capability over the order database. */
 export class PaymentModule extends ConfigurableModuleClass {
-    static register(options: typeof OPTIONS_TYPE = {
-    }): DynamicModule {
+    /** Registers the capability once per app. */
+    static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
-        return {
-            ...base,
-            providers: [...(base.providers ?? []),
-                PaymentService],
-            exports: [PaymentService],
-        }
+        return { ...base, providers: [...(base.providers ?? []), PaymentService], exports: [PaymentService] }
     }
 }

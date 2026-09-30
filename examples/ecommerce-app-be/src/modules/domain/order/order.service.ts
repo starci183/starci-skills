@@ -1,181 +1,109 @@
-import {
-    Injectable 
-} from "@nestjs/common"
-import {
-    EntityManager, MoreThanOrEqual 
-} from "typeorm"
-import {
-    CartItemEntity 
-} from "ecommerce-app-be/modules/platform/databases/postgresql/order"
-import {
-    OrderEntity 
-} from "ecommerce-app-be/modules/platform/databases/postgresql/order"
-import {
-    OrderLineEntity 
-} from "ecommerce-app-be/modules/platform/databases/postgresql/order"
-import {
-    PaymentEntity 
-} from "ecommerce-app-be/modules/platform/databases/postgresql/order"
-import {
-    ProductEntity 
-} from "ecommerce-app-be/modules/platform/databases/postgresql/order"
-import {
-    InjectPrimaryEntityManager 
-} from "ecommerce-app-be/modules/platform/databases/postgresql/order"
-import {
-    CatalogService 
-} from "ecommerce-app-be/modules/domain/catalog"
-import {
-    CartService 
-} from "ecommerce-app-be/modules/domain/cart"
-import {
-    PaymentService 
-} from "ecommerce-app-be/modules/domain/payment"
-import {
-    CheckoutPolicy 
-} from "./checkout.policy"
-import {
-    CheckoutRefusalException 
-} from "ecommerce-app-be/modules/platform/errors"
-
-/** The confirmation a door answers: the order id, total, payment id and whether this was a replay. */
-export interface PlaceOrderResult {
-  orderId: string;
-  status: "confirmed";
-  totalMinorUnits: number;
-  currency: "USD";
-  paymentId: string;
-  replayed: boolean;
-}
-
-/** The buyer-status answer contract.checkout.order-for-identity provides: does this person have orders. */
-export interface BuyerStatusResult {
-  personId: string;
-  hasOrders: boolean;
-}
+import { Injectable } from "@nestjs/common"
+import { EntityManager } from "typeorm"
+import { CartService } from "@modules/domain/cart"
+import { CatalogService } from "@modules/domain/catalog"
+import { PaymentService } from "@modules/domain/payment"
+import { InjectOrderEntityManager } from "@modules/platform/database"
+import { OrderError, OrderErrorCode } from "./errors/order.error"
+import type { BuyerStatus, BuyerStatusParams, FindPlacedOrderParams, PlaceOrderParams, PlacedOrder } from "./order.contracts"
+import { OrderEntity } from "./persistence/entities/order.entity"
+import { OrderLineEntity } from "./persistence/entities/order-line.entity"
+import { toBuyerStatus, toOrderId } from "./persistence/order.rows"
+import type { OrderCountRow, OrderIdRow } from "./persistence/order.rows"
+import { COUNT_PERSON_ORDERS, INSERT_ORDER_IF_NEW } from "./persistence/order.sql"
 
 @Injectable()
 /**
- * The confirmation of sds.checkout.order-flow - t-stock, t-pay, t-confirm in one transaction:
- * the policy's plan consumes guarded stock, writes the order and its lines, captures the
- * internal payment and clears the cart. A refusal at any step rolls the whole thing back, so a
- * person who was refused keeps the cart and no stock moved. The idempotency key makes a replay
- * return the first answer instead of a second order.
+ * Confirms orders. `place` runs inside the caller transaction: it claims the idempotency key, takes the stock with
+ * guarded decrements, writes the lines, captures the payment and clears the cart, so a failure at any step rolls the
+ * whole confirmation back and the buyer keeps the cart.
  */
 export class OrderService {
     constructor(
-    @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-    private readonly cart: CartService,
-    private readonly catalog: CatalogService,
-    private readonly payments: PaymentService,
-    private readonly policy: CheckoutPolicy,
+        @InjectOrderEntityManager() private readonly entityManager: EntityManager,
+        private readonly cart: CartService,
+        private readonly catalog: CatalogService,
+        private readonly payments: PaymentService,
     ) {}
 
-    async place(personId: string, idempotencyKey?: string): Promise<PlaceOrderResult> {
-        if (idempotencyKey) {
-            const existing = await this.entityManager.findOneBy(OrderEntity,
-                {
-                    personId, idempotencyKey 
-                })
-            if (existing) return this.snapshot(existing,
-                true)
-        }
-        const cartLines = await this.cart.list(personId)
-        const products = await this.catalog.byIds(cartLines.map((line) => line.productId))
-        const evaluation = this.policy.evaluate(cartLines,
-            products)
-        if (!evaluation.ok) {
-            throw new CheckoutRefusalException({
-                ...evaluation 
-            })
-        }
+    /** The order an earlier confirmation with the same key produced, marked as a replay, or null. */
+    async findPlaced(params: FindPlacedOrderParams): Promise<PlacedOrder | null> {
+        const manager = params.manager ?? this.entityManager
+        const order = await manager.findOneBy(OrderEntity, { personId: params.personId, idempotencyKey: params.idempotencyKey })
+        return order ? this.snapshot(order, manager) : null
+    }
 
-        try {
-            const orderId = await this.entityManager.transaction(async (manager) => {
-                for (const line of evaluation.lines) {
-                    const spent = await manager
-                        .decrement(ProductEntity, {
-                            id: line.productId, stock: MoreThanOrEqual(line.quantity) 
-                        },
-                        "stock",
-                        line.quantity)
-                    if (!spent.affected) {
-                        throw new CheckoutRefusalException({
-                            ok: false, reason: "insufficient-stock", productId: line.productId, requested: line.quantity 
-                        })
-                    }
-                }
-                const order = await manager.save(OrderEntity,
-                    manager.create(OrderEntity, {
-                        personId,
-                        status: "confirmed",
-                        totalMinorUnits: evaluation.totalMinorUnits,
-                        currency: evaluation.currency,
-                        idempotencyKey: idempotencyKey ?? null,
-                    }),
-                )
-                await manager.save(OrderLineEntity,
-                    evaluation.lines.map((line) =>
-                        manager.create(OrderLineEntity, {
-                            orderId: order.id,
-                            productId: line.productId,
-                            quantity: line.quantity,
-                            unitPriceMinorUnits: line.unitPriceMinorUnits,
-                        }),
-                    ),
-                )
-                await this.payments.capture(manager,
-                    personId,
-                    order.id,
-                    evaluation.totalMinorUnits)
-                await manager.delete(CartItemEntity, {
-                    personId 
+    /** Confirms an evaluated cart in the caller transaction. */
+    async place(params: PlaceOrderParams): Promise<PlacedOrder> {
+        const { manager, personId, plan, idempotencyKey } = params
+        const rows: Array<OrderIdRow> = await manager.query(INSERT_ORDER_IF_NEW, [
+            personId,
+            plan.totalMinorUnits,
+            plan.currency,
+            idempotencyKey ?? null,
+        ])
+        const orderId = toOrderId(rows)
+        if (orderId === null) return this.replayOf(params)
+        for (const line of plan.lines) {
+            const reserved = await this.catalog.reserveStock({ manager, productId: line.productId, quantity: line.quantity })
+            if (!reserved) {
+                throw new OrderError({
+                    code: OrderErrorCode.InsufficientStock,
+                    params: { productId: line.productId, requested: line.quantity },
                 })
-                return order.id
-            })
-            const order = await this.entityManager.findOneByOrFail(OrderEntity,
-                {
-                    id: orderId 
-                })
-            return this.snapshot(order,
-                false)
-        } catch (error) {
-            // A concurrent replay of the same key surfaces as the unique violation; both answers are the same order.
-            if (idempotencyKey && /uq_sales_order_idempotency|duplicate key/i.test(String((error as Error)?.message))) {
-                const existing = await this.entityManager.findOneBy(OrderEntity,
-                    {
-                        personId, idempotencyKey 
-                    })
-                if (existing) return this.snapshot(existing,
-                    true)
             }
-            throw error
         }
-    }
-
-    /** The provider half of contract.checkout.order-for-identity: how many orders, so hasOrders. */
-    async buyerStatus(personId: string): Promise<BuyerStatusResult> {
-        const count = await this.entityManager.countBy(OrderEntity,
-            {
-                personId 
-            })
+        await manager.insert(
+            OrderLineEntity,
+            plan.lines.map((line) => ({
+                orderId,
+                productId: line.productId,
+                quantity: line.quantity,
+                unitPriceMinorUnits: line.unitPriceMinorUnits,
+            })),
+        )
+        const payment = await this.payments.capture({ manager, personId, orderId, amountMinorUnits: plan.totalMinorUnits })
+        await this.cart.clear({ manager, personId })
         return {
-            personId, hasOrders: count > 0 
+            orderId,
+            status: "confirmed",
+            totalMinorUnits: plan.totalMinorUnits,
+            currency: plan.currency,
+            paymentId: payment.paymentId,
+            replayed: false,
         }
     }
 
-    private async snapshot(order: OrderEntity, replayed: boolean): Promise<PlaceOrderResult> {
-        const payment = await this.entityManager.findOneBy(PaymentEntity,
-            {
-                orderId: order.id 
-            })
+    /** Whether one person has confirmed orders; an unknown person is not an error, no orders is the honest answer. */
+    async buyerStatus(params: BuyerStatusParams): Promise<BuyerStatus> {
+        const rows: Array<OrderCountRow> = await this.entityManager.query(COUNT_PERSON_ORDERS, [params.personId])
+        return toBuyerStatus(params.personId, rows)
+    }
+
+    /** A concurrent request with the same key won the insert: answer that order as a replay. */
+    private async replayOf(params: PlaceOrderParams): Promise<PlacedOrder> {
+        const existing =
+            params.idempotencyKey === undefined
+                ? null
+                : await this.findPlaced({
+                      manager: params.manager,
+                      personId: params.personId,
+                      idempotencyKey: params.idempotencyKey,
+                  })
+        if (existing === null) throw new OrderError({ code: OrderErrorCode.PlacementFailed })
+        return existing
+    }
+
+    private async snapshot(order: OrderEntity, manager: EntityManager): Promise<PlacedOrder> {
+        const payment = await this.payments.findByOrder({ orderId: order.id, manager })
+        if (payment === null) throw new OrderError({ code: OrderErrorCode.PaymentMissing })
         return {
             orderId: order.id,
             status: order.status,
             totalMinorUnits: order.totalMinorUnits,
-            currency: order.currency as "USD",
-            paymentId: payment?.id ?? "",
-            replayed,
+            currency: "USD",
+            paymentId: payment.paymentId,
+            replayed: true,
         }
     }
 }

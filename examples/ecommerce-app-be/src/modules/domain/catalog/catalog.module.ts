@@ -1,29 +1,14 @@
-import {
-    DynamicModule, Module 
-} from "@nestjs/common"
-import {
-    CatalogService 
-} from "./catalog.service"
-import {
-    ConfigurableModuleClass, OPTIONS_TYPE 
-} from "./catalog.module-definition"
+import { Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import { ConfigurableModuleClass, OPTIONS_TYPE } from "./catalog.module-definition"
+import { CatalogService } from "./catalog.service"
 
-@Module({
-})
-/**
- * The `catalog` capability module: the product list and the stock truth the checkout policy
- * reads. Persistence is the primary EntityManager the order database module registers app-wide
- * at `apps/order`; this module's own globality is declared there too.
- */
+@Module({})
+/** The catalog capability over the order database. */
 export class CatalogModule extends ConfigurableModuleClass {
-    static register(options: typeof OPTIONS_TYPE = {
-    }): DynamicModule {
+    /** Registers the capability once per app. */
+    static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
-        return {
-            ...base,
-            providers: [...(base.providers ?? []),
-                CatalogService],
-            exports: [CatalogService],
-        }
+        return { ...base, providers: [...(base.providers ?? []), CatalogService], exports: [CatalogService] }
     }
 }

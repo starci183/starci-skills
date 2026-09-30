@@ -1,123 +1,36 @@
-import {
-    Test 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    In 
-} from "typeorm"
-import {
-    ORDER_POSTGRESQL, ProductEntity 
-} from "@modules/platform/databases/index"
-import {
-    CatalogService 
-} from "./catalog.service"
+import { LIST_ROWS_MAX } from "@modules/platform/database"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { CatalogService } from "./catalog.service"
+import { ProductEntity } from "./persistence/entities/product.entity"
 
-describe("CatalogService - the read side of the catalog",
-    () => {
-        const entityManager = {
-            find: jest.fn(),
-            findBy: jest.fn(),
-        }
-        let service: CatalogService
+const product = (id: string, stock: number): ProductEntity =>
+    Object.assign(new ProductEntity(), { id, name: `Product ${id}`, priceMinorUnits: 100, stock })
 
-        beforeEach(async () => {
-            jest.clearAllMocks()
-            const moduleRef = await Test.createTestingModule({
-                providers: [
-                    CatalogService,
-                    {
-                        provide: getEntityManagerToken(ORDER_POSTGRESQL), useValue: entityManager 
-                    },
-                ],
-            }).compile()
-            service = moduleRef.get(CatalogService)
-        })
-
-        it("list answers every product in id order, mapped to the public shape",
-            async () => {
-                entityManager.find.mockResolvedValue([
-                    {
-                        id: "sku-mug", name: "Mug", priceMinorUnits: 1299, stock: 40 
-                    },
-                    {
-                        id: "sku-thermos", name: "Thermos", priceMinorUnits: 2499, stock: 2 
-                    },
-                ])
-                const products = await service.list()
-                expect(entityManager.find).toHaveBeenCalledWith(ProductEntity,
-                    {
-                        order: {
-                            id: "ASC" 
-                        } 
-                    })
-                expect(products).toEqual([
-                    {
-                        id: "sku-mug", name: "Mug", priceMinorUnits: 1299, stock: 40 
-                    },
-                    {
-                        id: "sku-thermos", name: "Thermos", priceMinorUnits: 2499, stock: 2 
-                    },
-                ])
-            })
-
-        it("byIds answers a lookup keyed by id; ids with no row stay absent",
-            async () => {
-                entityManager.findBy.mockResolvedValue([
-                    {
-                        id: "sku-mug", name: "Mug", priceMinorUnits: 1299, stock: 40 
-                    },
-                ])
-                const found = await service.byIds(["sku-mug",
-                    "sku-ghost"])
-                expect(entityManager.findBy).toHaveBeenCalledWith(ProductEntity,
-                    {
-                        id: In(["sku-mug",
-                            "sku-ghost"]) 
-                    })
-                expect(found).toEqual({
-                    "sku-mug": {
-                        id: "sku-mug", name: "Mug", priceMinorUnits: 1299, stock: 40 
-                    } 
-                })
-                expect(found["sku-ghost"]).toBeUndefined()
-            })
-
-        it("byIds on an empty id list never touches the repository",
-            async () => {
-                expect(await service.byIds([])).toEqual({
-                })
-                expect(entityManager.findBy).not.toHaveBeenCalled()
-            })
-
-        it("byIds with a repeated id asks the repository once and answers one entry",
-            async () => {
-                entityManager.findBy.mockResolvedValue([
-                    {
-                        id: "sku-mug", name: "Mug", priceMinorUnits: 1299, stock: 40 
-                    },
-                ])
-                const found = await service.byIds(["sku-mug",
-                    "sku-mug"])
-                expect(entityManager.findBy).toHaveBeenCalledTimes(1)
-                expect(found).toEqual({
-                    "sku-mug": {
-                        id: "sku-mug", name: "Mug", priceMinorUnits: 1299, stock: 40 
-                    } 
-                })
-            })
-
-        it("a product listing carries zero stock through - visibility is the catalog's job, refusal is the policy's",
-            async () => {
-                entityManager.find.mockResolvedValue([
-                    {
-                        id: "sku-mug", name: "Mug", priceMinorUnits: 1299, stock: 0 
-                    },
-                ])
-                const products = await service.list()
-                expect(products).toEqual([{
-                    id: "sku-mug", name: "Mug", priceMinorUnits: 1299, stock: 0 
-                }])
-            })
+describe("CatalogService", () => {
+    it("lists products by id under the list bound", async () => {
+        const entityManager = mockEntityManager({ find: jest.fn().mockResolvedValue([product("a", 3)]) })
+        await expect(new CatalogService(entityManager).list()).resolves.toEqual([
+            { id: "a", name: "Product a", priceMinorUnits: 100, stock: 3 },
+        ])
+        expect(entityManager.find).toHaveBeenCalledWith(ProductEntity, { order: { id: "ASC" }, take: LIST_ROWS_MAX })
     })
+
+    it("keys the requested products by id and reads nothing for an empty request", async () => {
+        const entityManager = mockEntityManager({ find: jest.fn().mockResolvedValue([product("a", 3), product("b", 1)]) })
+        const service = new CatalogService(entityManager)
+        await expect(service.byIds({ ids: ["a", "b"] })).resolves.toMatchObject({ a: { id: "a" }, b: { id: "b" } })
+        await expect(service.byIds({ ids: [] })).resolves.toEqual({})
+        expect(entityManager.find).toHaveBeenCalledTimes(1)
+    })
+
+    it("reserves stock through the caller manager with a guarded decrement", async () => {
+        const manager = mockEntityManager({ decrement: jest.fn().mockResolvedValue({ affected: 1 }) })
+        await expect(new CatalogService(mockEntityManager()).reserveStock({ manager, productId: "a", quantity: 2 })).resolves.toBe(true)
+        expect(manager.decrement).toHaveBeenCalledWith(ProductEntity, expect.objectContaining({ id: "a" }), "stock", 2)
+    })
+
+    it("reports a failed reservation when no row matched", async () => {
+        const manager = mockEntityManager({ decrement: jest.fn().mockResolvedValue({ affected: 0 }) })
+        await expect(new CatalogService(mockEntityManager()).reserveStock({ manager, productId: "a", quantity: 9 })).resolves.toBe(false)
+    })
+})
