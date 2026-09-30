@@ -14,7 +14,5 @@ const negotiate = createMiddleware(routing)
  * middleware reads the cookie, falls back to the default and redirects to the prefixed path. One routing
  * table for both apps, so `/vi` means the same thing on both origins.
  */
-const proxy = (request: NextRequest) =>
+export const proxy = (request: NextRequest) =>
     UNNEGOTIATED.test(request.nextUrl.pathname) ? NextResponse.next() : negotiate(request)
-
-export default proxy

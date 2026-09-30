@@ -10,7 +10,7 @@ import { routing } from "./index"
  * request to fall back silently - falling back would serve English at a Vietnamese-looking URL and quietly
  * make every such link wrong.
  */
-export const loadLocaleSegment = async (params: Promise<{ readonly locale: string }>) => {
+export const readLocaleSegment = async (params: Promise<{ readonly locale: string }>) => {
     const { locale } = await params
     if (!hasLocale(routing.locales, locale)) notFound()
     return { locale, messages: await getMessages() }

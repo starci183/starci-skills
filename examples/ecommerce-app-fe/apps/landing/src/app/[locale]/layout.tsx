@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { readLocaleSegment } from "@ecommerce/i18n"
+import { readLocaleSegment } from "@ecommerce/i18n/layout"
 import "../globals.css"
 import "../../modules/brand"
 import { LocaleShell } from "@ecommerce/ui"

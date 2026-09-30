@@ -16,7 +16,7 @@ The apps are real, runnable Next.js builds on `@starci/grammar` primitives (the 
 todo-app-frontend consumes): grammar's `GrammarRoot` boundary wraps each app's client shell, and every
 surface maps to a real grammar component (`SurfaceCard`, `SurfaceListCard`, `EmptyNotice`, `Button`,
 `TextAction`, `SectionHeader`, `MediaFrame`, `Badge`) or is honestly an app-owned layout. Brand tokens come
-from each app's `src/modules/brand/brand.css` (teal `#0D9488`; the grammar publishes no font token, so the brand's Inter is not carried,
+from each app's `src/modules/brand/brand.css` (teal `#0D9488`, Inter through the `--font-sans` brand-layer token,
 the on-primary ink chosen because white on teal measures 3.74:1 — under the brand record's 4.5:1 floor).
 The friendly-duck mascot (its direction is a brand record asset at
 `../ecommerce-app-be/.starciwork/brand/assets/duck.prompt.txt`) appears on welcome and genuine empty

@@ -1,1 +1,1 @@
-export { proxy } from "@ecommerce/i18n"
+export { proxy } from "@ecommerce/i18n/proxy"
