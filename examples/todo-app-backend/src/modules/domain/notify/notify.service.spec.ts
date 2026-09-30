@@ -1,18 +1,24 @@
-import { mock } from "@starci/jest-preset/mock"
+import { Test } from "@nestjs/testing"
+import { FakeClock, fakeTransaction, mock, mockEntityManager, recordingOutbox } from "@starci/jest-preset"
+import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { CLOCK } from "@modules/platform/clock"
+import { MESSAGE_CATALOG } from "@modules/platform/i18n"
 import type { MessageCatalog } from "@modules/platform/i18n"
-import type { Outbox } from "@modules/platform/outbox"
-import { mockEntityManager } from "@tests/fixtures/database"
-import type { DedupeService } from "./dedupe.service"
-import type { DeliveryService } from "./delivery.service"
-import type { DigestService } from "./digest.service"
+import { INBOX } from "@modules/platform/inbox"
+import type { Inbox } from "@modules/platform/inbox"
+import { OUTBOX } from "@modules/platform/outbox"
+import { DedupeService } from "./dedupe.service"
+import { DeliveryService } from "./delivery.service"
+import { DigestService } from "./digest.service"
 import { NotifyErrorCode } from "./errors/notify.error"
-import type { DeliveryAttemptView, NotificationView } from "./notify.contracts"
+import type { DeliveryAttemptView, DispatchPlan, NotificationView } from "./notify.contracts"
 import { NotifyService } from "./notify.service"
-import type { PreferencesService } from "./preferences.service"
+import { PreferencesService } from "./preferences.service"
 
-const AT = new Date("2026-09-30T10:00:00.000Z")
+const NOW = "2026-09-30T10:00:00.000Z"
+const AT = new Date(NOW)
 const CLOSES_AT = new Date("2026-09-30T10:10:00.000Z")
-const MINUTE = 60_000
+const RETRY_AT = new Date("2026-09-30T10:00:30.000Z")
 
 const notification = (overrides: Partial<NotificationView> = {}): NotificationView => ({
     id: "n1",
@@ -24,7 +30,7 @@ const notification = (overrides: Partial<NotificationView> = {}): NotificationVi
     ...overrides,
 })
 
-const attempt = (overrides: Partial<DeliveryAttemptView> = {}): DeliveryAttemptView => ({
+const attemptView = (overrides: Partial<DeliveryAttemptView> = {}): DeliveryAttemptView => ({
     notificationId: "n1",
     state: "queued",
     attempt: 0,
@@ -35,216 +41,480 @@ const attempt = (overrides: Partial<DeliveryAttemptView> = {}): DeliveryAttemptV
     ...overrides,
 })
 
-interface Parts {
-    readonly isNew?: boolean
-    readonly unsubscribed?: boolean
-    readonly windowMinutes?: number | null
-    readonly opened?: boolean
+const build = async () => {
+    const clock = new FakeClock(NOW)
+    const tx = fakeTransaction(mockEntityManager())
+    const outbox = recordingOutbox()
+    const inbox = mock<Inbox>()
+    const catalog = mock<MessageCatalog>()
+    catalog.get.mockImplementation((key, params) => `${key} ${JSON.stringify(params)}`)
+    const dedupe = mock<DedupeService>()
+    const digest = mock<DigestService>()
+    const preferences = mock<PreferencesService>()
+    const delivery = mock<DeliveryService>()
+    const moduleRef = await Test.createTestingModule({
+        providers: [
+            NotifyService,
+            { provide: MESSAGE_CATALOG, useValue: catalog },
+            { provide: OUTBOX, useValue: outbox },
+            { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
+            { provide: CLOCK, useValue: clock },
+            { provide: INBOX, useValue: inbox },
+            { provide: DedupeService, useValue: dedupe },
+            { provide: DigestService, useValue: digest },
+            { provide: PreferencesService, useValue: preferences },
+            { provide: DeliveryService, useValue: delivery },
+        ],
+    }).compile()
+    return {
+        service: moduleRef.get(NotifyService),
+        tx,
+        outbox,
+        inbox,
+        catalog,
+        dedupe,
+        digest,
+        preferences,
+        delivery,
+    }
 }
 
-const build = (parts: Parts = {}) => {
-    const inner = mockEntityManager()
-    const catalog = mock<MessageCatalog>({
-        get: jest.fn().mockImplementation((key: string, params: object) => `${key} ${JSON.stringify(params)}`),
+type Built = Awaited<ReturnType<typeof build>>
+
+/** Stubs an admission of a brand new event of a subscribed person whose window is `opened` or joined. */
+const stubNewAdmission = (built: Built, options: { opened: boolean; windowMinutes?: number | null }) => {
+    built.dedupe.admit.mockResolvedValue({ notification: notification(), isNew: true })
+    built.preferences.get.mockResolvedValue({
+        personId: "p1",
+        channel: "email",
+        unsubscribed: false,
+        digestWindowMinutes: options.windowMinutes ?? null,
     })
-    const outbox = mock<Outbox>()
-    const dedupe = mock<DedupeService>({
-        admit: jest.fn().mockResolvedValue({ notification: notification(), isNew: parts.isNew ?? true }),
-        findByDigestGroup: jest.fn().mockResolvedValue([notification()]),
-    })
-    const digest = mock<DigestService>({
-        admit: jest.fn().mockResolvedValue({ windowId: "w1", opened: parts.opened ?? true, closesAt: CLOSES_AT }),
-        flush: jest.fn().mockResolvedValue({ windowId: "w1", personId: "p1", channel: "email" }),
-    })
-    const preferences = mock<PreferencesService>({
-        get: jest.fn().mockResolvedValue({
-            personId: "p1",
-            channel: "email",
-            unsubscribed: parts.unsubscribed ?? false,
-            digestWindowMinutes: parts.windowMinutes ?? null,
-        }),
-    })
-    const delivery = mock<DeliveryService>({
-        admit: jest
-            .fn()
-            .mockResolvedValue(attempt({ state: parts.unsubscribed ? "suppressed" : "queued" })),
-        find: jest.fn().mockResolvedValue(attempt({ state: "delivered" })),
-        markSending: jest.fn().mockResolvedValue([attempt({ state: "sending", attempt: 1 })]),
-        transmit: jest.fn().mockResolvedValue("delivered"),
-        record: jest.fn().mockResolvedValue({ delivered: ["n1"], retried: [], bounced: [], attempt: 1 }),
-    })
-    const service = new NotifyService(catalog, outbox, dedupe, digest, preferences, delivery)
-    return { service, inner, catalog, outbox, dedupe, digest, preferences, delivery }
+    built.delivery.admit.mockResolvedValue(attemptView())
+    built.digest.admit.mockResolvedValue({ windowId: "w1", opened: options.opened, closesAt: CLOSES_AT })
+    built.dedupe.assignDigestGroup.mockResolvedValue(undefined)
 }
 
-const admitParams = (manager: ReturnType<typeof mockEntityManager>) => ({
-    manager,
+const admitParams = (built: Built, overrides: { channel?: string } = {}) => ({
+    manager: built.tx.em,
     kind: "task-complete",
     sourceEventId: "evt-1",
     recipientId: "p1",
-    channel: "email",
+    channel: overrides.channel ?? "email",
     payload: { taskId: "t1" },
     at: AT,
 })
 
-describe("NotifyService.admit", () => {
-    it("queues a delivery, joins the window and writes the one flush message when the window opens", async () => {
-        const { service, inner, digest, dedupe, outbox } = build()
-        const result = await service.admit(admitParams(inner))
-        expect(result).toEqual({
-            kind: "ok",
-            value: { notificationId: "n1", isNew: true, deliveryState: "queued" },
+describe("NotifyService", () => {
+    describe("admit", () => {
+        it("refuses a blank channel before touching any table", async () => {
+            const built = await build()
+
+            await expect(built.service.admit(admitParams(built, { channel: "  " }))).resolves.toBeRefused(
+                NotifyErrorCode.ChannelRequired,
+            )
+
+            expect(built.dedupe.admit).not.toHaveBeenCalled()
+            expect(built.outbox.messages).toEqual([])
         })
-        expect(digest.admit).toHaveBeenCalledWith({ manager: inner, personId: "p1", channel: "email", at: AT, windowMinutes: 10 })
-        expect(dedupe.assignDigestGroup).toHaveBeenCalledWith({ manager: inner, id: "n1", digestGroupId: "w1" })
-        expect(outbox.enqueue).toHaveBeenCalledTimes(1)
-        expect(outbox.enqueue).toHaveBeenCalledWith(inner, {
-            queue: "notify.dispatch",
-            eventId: "notify-flush:w1",
-            payload: { kind: "flush", groupId: "w1" },
-            availableAt: CLOSES_AT,
+
+        it("reads back the first decision of an event admitted before and writes nothing", async () => {
+            const built = await build()
+            built.dedupe.admit.mockResolvedValue({ notification: notification(), isNew: false })
+            built.delivery.find.mockResolvedValue(attemptView({ state: "delivered" }))
+
+            await expect(built.service.admit(admitParams(built))).resolves.toSucceedWith({
+                notificationId: "n1",
+                isNew: false,
+                deliveryState: "delivered",
+            })
+
+            expect(built.delivery.find).toHaveBeenCalledWith({ notificationId: "n1" })
+            expect(built.preferences.get).not.toHaveBeenCalled()
+            expect(built.delivery.admit).not.toHaveBeenCalled()
+            expect(built.digest.admit).not.toHaveBeenCalled()
+            expect(built.outbox.messages).toEqual([])
+        })
+
+        it("reads a repeated event without an attempt as queued", async () => {
+            const built = await build()
+            built.dedupe.admit.mockResolvedValue({ notification: notification(), isNew: false })
+            built.delivery.find.mockResolvedValue(null)
+
+            await expect(built.service.admit(admitParams(built))).resolves.toSucceedWith({
+                notificationId: "n1",
+                isNew: false,
+                deliveryState: "queued",
+            })
+        })
+
+        it("suppresses an unsubscribed recipient before any window, group or outbox message", async () => {
+            const built = await build()
+            built.dedupe.admit.mockResolvedValue({ notification: notification(), isNew: true })
+            built.preferences.get.mockResolvedValue({
+                personId: "p1",
+                channel: "email",
+                unsubscribed: true,
+                digestWindowMinutes: null,
+            })
+            built.delivery.admit.mockResolvedValue(attemptView({ state: "suppressed", failureClass: "unsubscribed" }))
+
+            await expect(built.service.admit(admitParams(built))).resolves.toSucceedWith({
+                notificationId: "n1",
+                isNew: true,
+                deliveryState: "suppressed",
+            })
+
+            expect(built.preferences.get).toHaveBeenCalledWith({ personId: "p1", channel: "email" })
+            expect(built.delivery.admit).toHaveBeenCalledWith({
+                manager: built.tx.em,
+                notificationId: "n1",
+                at: AT,
+                unsubscribed: true,
+            })
+            expect(built.digest.admit).not.toHaveBeenCalled()
+            expect(built.dedupe.assignDigestGroup).not.toHaveBeenCalled()
+            expect(built.outbox.messages).toEqual([])
+        })
+
+        it("opens the default ten minute window, assigns the group and writes the one flush message", async () => {
+            const built = await build()
+            stubNewAdmission(built, { opened: true })
+
+            await expect(built.service.admit(admitParams(built))).resolves.toSucceedWith({
+                notificationId: "n1",
+                isNew: true,
+                deliveryState: "queued",
+            })
+
+            expect(built.digest.admit).toHaveBeenCalledWith({
+                manager: built.tx.em,
+                personId: "p1",
+                channel: "email",
+                at: AT,
+                windowMinutes: 10,
+            })
+            expect(built.dedupe.assignDigestGroup).toHaveBeenCalledWith({
+                manager: built.tx.em,
+                id: "n1",
+                digestGroupId: "w1",
+            })
+            expect(built.outbox.messages).toEqual([
+                {
+                    queue: "notify.dispatch",
+                    eventId: "notify-flush:w1",
+                    payload: { kind: "flush", groupId: "w1" },
+                    availableAt: CLOSES_AT,
+                },
+            ])
+        })
+
+        it("opens the window the person's preference asks for", async () => {
+            const built = await build()
+            stubNewAdmission(built, { opened: true, windowMinutes: 30 })
+
+            await built.service.admit(admitParams(built))
+
+            expect(built.digest.admit).toHaveBeenCalledWith(expect.objectContaining({ windowMinutes: 30 }))
+        })
+
+        it("joins an open window without writing a second flush message", async () => {
+            const built = await build()
+            stubNewAdmission(built, { opened: false })
+
+            await built.service.admit(admitParams(built))
+
+            expect(built.dedupe.assignDigestGroup).toHaveBeenCalledTimes(1)
+            expect(built.outbox.messages).toEqual([])
         })
     })
 
-    it("joins an open window without scheduling a second flush", async () => {
-        const { service, inner, outbox } = build({ opened: false })
-        await service.admit(admitParams(inner))
-        expect(outbox.enqueue).not.toHaveBeenCalled()
-    })
-
-    it("opens the window with the length of the preference override", async () => {
-        const { service, inner, digest } = build({ windowMinutes: 3 })
-        await service.admit(admitParams(inner))
-        expect(digest.admit).toHaveBeenCalledWith(expect.objectContaining({ windowMinutes: 3 }))
-    })
-
-    it("suppresses an unsubscribed recipient before any window or send", async () => {
-        const { service, inner, digest, dedupe, delivery, outbox } = build({ unsubscribed: true })
-        const result = await service.admit(admitParams(inner))
-        expect(result).toEqual({
-            kind: "ok",
-            value: { notificationId: "n1", isNew: true, deliveryState: "suppressed" },
+    describe("prepareDispatch", () => {
+        const prepareParams = (built: Built, kind: "flush" | "retry") => ({
+            manager: built.tx.em,
+            kind,
+            groupId: "w1",
+            at: AT,
         })
-        expect(delivery.admit).toHaveBeenCalledWith(expect.objectContaining({ unsubscribed: true }))
-        expect(digest.admit).not.toHaveBeenCalled()
-        expect(dedupe.assignDigestGroup).not.toHaveBeenCalled()
-        expect(outbox.enqueue).not.toHaveBeenCalled()
-    })
 
-    it("reads back the first decision for a repeated event and writes nothing", async () => {
-        const { service, inner, preferences, delivery, digest, outbox } = build({ isNew: false })
-        const result = await service.admit(admitParams(inner))
-        expect(result).toEqual({
-            kind: "ok",
-            value: { notificationId: "n1", isNew: false, deliveryState: "delivered" },
+        it("prepares nothing when the window to flush is unknown, flushed or still open", async () => {
+            const built = await build()
+            built.digest.flush.mockResolvedValue(null)
+
+            await expect(built.service.prepareDispatch(prepareParams(built, "flush"))).resolves.toBeNull()
+
+            expect(built.digest.flush).toHaveBeenCalledWith({ manager: built.tx.em, windowId: "w1", at: AT })
+            expect(built.dedupe.findByDigestGroup).not.toHaveBeenCalled()
         })
-        expect(preferences.get).not.toHaveBeenCalled()
-        expect(delivery.admit).not.toHaveBeenCalled()
-        expect(digest.admit).not.toHaveBeenCalled()
-        expect(outbox.enqueue).not.toHaveBeenCalled()
-    })
 
-    it("reports queued for a repeated event whose attempt row is gone", async () => {
-        const { service, inner, delivery } = build({ isNew: false })
-        jest.mocked(delivery.find).mockResolvedValue(null)
-        await expect(service.admit(admitParams(inner))).resolves.toMatchObject({
-            kind: "ok",
-            value: { isNew: false, deliveryState: "queued" },
+        it("prepares nothing for a group without notifications", async () => {
+            const built = await build()
+            built.dedupe.findByDigestGroup.mockResolvedValue([])
+
+            await expect(built.service.prepareDispatch(prepareParams(built, "retry"))).resolves.toBeNull()
+
+            expect(built.digest.flush).not.toHaveBeenCalled()
+            expect(built.delivery.markSending).not.toHaveBeenCalled()
+        })
+
+        it("prepares nothing when no attempt of the group is queued any more", async () => {
+            const built = await build()
+            built.dedupe.findByDigestGroup.mockResolvedValue([notification()])
+            built.delivery.markSending.mockResolvedValue([])
+
+            await expect(built.service.prepareDispatch(prepareParams(built, "retry"))).resolves.toBeNull()
+        })
+
+        it("marks the queued attempts sending and renders the task-complete email for one notification", async () => {
+            const built = await build()
+            built.digest.flush.mockResolvedValue({ windowId: "w1", personId: "p1", channel: "email" })
+            built.dedupe.findByDigestGroup.mockResolvedValue([notification()])
+            built.delivery.markSending.mockResolvedValue([attemptView({ state: "sending" })])
+
+            const plan = await built.service.prepareDispatch(prepareParams(built, "flush"))
+
+            expect(plan).toEqual({
+                notificationIds: ["n1"],
+                groupId: "w1",
+                message: {
+                    to: "p1",
+                    subject: 'notify.email.task-complete.subject {"taskId":"t1"}',
+                    body: 'notify.email.line {"kind":"task-complete","payload":"{\\"taskId\\":\\"t1\\"}"}',
+                },
+            })
+            expect(built.dedupe.findByDigestGroup).toHaveBeenCalledWith({ groupId: "w1" })
+            expect(built.delivery.markSending).toHaveBeenCalledWith({
+                manager: built.tx.em,
+                notificationIds: ["n1"],
+                at: AT,
+            })
+            expect(built.catalog.get).toHaveBeenCalledWith("notify.email.line", expect.any(Object), "vi")
+        })
+
+        it("renders an empty task id when a task-complete payload carries none", async () => {
+            const built = await build()
+            built.dedupe.findByDigestGroup.mockResolvedValue([notification({ payload: {} })])
+            built.delivery.markSending.mockResolvedValue([attemptView({ state: "sending" })])
+
+            const plan = await built.service.prepareDispatch(prepareParams(built, "retry"))
+
+            expect(plan?.message.subject).toBe('notify.email.task-complete.subject {"taskId":""}')
+        })
+
+        it("renders the generic subject for a kind that has no subject of its own", async () => {
+            const built = await build()
+            built.dedupe.findByDigestGroup.mockResolvedValue([notification({ kind: "task-reopened" })])
+            built.delivery.markSending.mockResolvedValue([attemptView({ state: "sending" })])
+
+            const plan = await built.service.prepareDispatch(prepareParams(built, "retry"))
+
+            expect(plan?.message.subject).toBe('notify.email.generic.subject {"kind":"task-reopened"}')
+        })
+
+        it("renders one digest message with a line per notification for a group of several", async () => {
+            const built = await build()
+            built.dedupe.findByDigestGroup.mockResolvedValue([
+                notification({ id: "n1" }),
+                notification({ id: "n2", payload: { taskId: "t2" } }),
+            ])
+            built.delivery.markSending.mockResolvedValue([
+                attemptView({ notificationId: "n1", state: "sending" }),
+                attemptView({ notificationId: "n2", state: "sending" }),
+            ])
+
+            const plan = await built.service.prepareDispatch(prepareParams(built, "retry"))
+
+            expect(plan?.notificationIds).toEqual(["n1", "n2"])
+            expect(plan?.message.to).toBe("p1")
+            expect(plan?.message.subject).toBe('notify.email.digest.subject {"count":2}')
+            expect(plan?.message.body.split("\n")).toHaveLength(2)
         })
     })
-})
 
-describe("NotifyService.admit refusals", () => {
-    it("refuses a blank channel and writes nothing", async () => {
-        const { service, inner, dedupe, outbox } = build()
-        const result = await service.admit({ ...admitParams(inner), channel: "  " })
-        expect(result).toMatchObject({ kind: "refused", code: NotifyErrorCode.ChannelRequired })
-        expect(dedupe.admit).not.toHaveBeenCalled()
-        expect(outbox.enqueue).not.toHaveBeenCalled()
-    })
-})
+    describe("transmit", () => {
+        it("sends the message of the plan and answers the verdict", async () => {
+            const built = await build()
+            const plan: DispatchPlan = {
+                notificationIds: ["n1"],
+                groupId: "w1",
+                message: { to: "p1", subject: "Subject", body: "Body" },
+            }
+            built.delivery.transmit.mockResolvedValue("delivered")
 
-describe("NotifyService dispatch", () => {
-    it("flushes the closed window, marks the queued attempts sending and renders one message naming the task", async () => {
-        const { service, inner, digest, delivery, catalog } = build()
-        const plan = await service.prepareDispatch({ manager: inner, kind: "flush", groupId: "w1", at: AT })
-        expect(digest.flush).toHaveBeenCalledWith({ manager: inner, windowId: "w1", at: AT })
-        expect(delivery.markSending).toHaveBeenCalledWith({ manager: inner, notificationIds: ["n1"], at: AT })
-        expect(plan?.notificationIds).toEqual(["n1"])
-        expect(plan?.message.to).toBe("p1")
-        expect(catalog.get).toHaveBeenCalledWith("notify.email.task-complete.subject", { taskId: "t1" }, "vi")
-        expect(plan?.message.subject).toContain("notify.email.task-complete.subject")
+            await expect(built.service.transmit(plan)).resolves.toBe("delivered")
+
+            expect(built.delivery.transmit).toHaveBeenCalledWith(plan.message)
+        })
     })
 
-    it("renders the generic subject for another kind and an empty task id when the payload has none", async () => {
-        const { service, inner, dedupe, catalog } = build()
-        jest.mocked(dedupe.findByDigestGroup).mockResolvedValue([notification({ kind: "new-device" })])
-        await service.prepareDispatch({ manager: inner, kind: "retry", groupId: "w1", at: AT })
-        expect(catalog.get).toHaveBeenCalledWith("notify.email.generic.subject", { kind: "new-device" }, "vi")
-        jest.mocked(dedupe.findByDigestGroup).mockResolvedValue([notification({ payload: {} })])
-        await service.prepareDispatch({ manager: inner, kind: "retry", groupId: "w1", at: AT })
-        expect(catalog.get).toHaveBeenCalledWith("notify.email.task-complete.subject", { taskId: "" }, "vi")
+    describe("settle", () => {
+        const plan: DispatchPlan = {
+            notificationIds: ["n1", "n2"],
+            groupId: "w1",
+            message: { to: "p1", subject: "Subject", body: "Body" },
+        }
+
+        it("counts what the send came to and writes no message when nothing goes back to queued", async () => {
+            const built = await build()
+            built.delivery.record.mockResolvedValue({ delivered: ["n1"], retried: [], bounced: ["n2"], attempt: 1 })
+
+            await expect(
+                built.service.settle({ manager: built.tx.em, plan, verdict: "delivered", at: AT }),
+            ).resolves.toEqual({ delivered: 1, retried: 0, bounced: 1 })
+
+            expect(built.delivery.record).toHaveBeenCalledWith({
+                manager: built.tx.em,
+                notificationIds: ["n1", "n2"],
+                verdict: "delivered",
+                at: AT,
+            })
+            expect(built.outbox.messages).toEqual([])
+        })
+
+        it("writes one retry message after the backoff when attempts go back to queued", async () => {
+            const built = await build()
+            built.delivery.record.mockResolvedValue({ delivered: [], retried: ["n1", "n2"], bounced: [], attempt: 2 })
+
+            await expect(
+                built.service.settle({ manager: built.tx.em, plan, verdict: "transient", at: AT }),
+            ).resolves.toEqual({ delivered: 0, retried: 2, bounced: 0 })
+
+            expect(built.outbox.messages).toEqual([
+                {
+                    queue: "notify.dispatch",
+                    eventId: "notify-retry:w1:2",
+                    payload: { kind: "retry", groupId: "w1" },
+                    availableAt: RETRY_AT,
+                },
+            ])
+        })
     })
 
-    it("collapses a group of several notifications into one digest message", async () => {
-        const { service, inner, dedupe, catalog } = build()
-        jest.mocked(dedupe.findByDigestGroup).mockResolvedValue([
-            notification(),
-            notification({ id: "n2", payload: { taskId: "t2" }, createdAt: new Date(AT.getTime() + MINUTE) }),
-        ])
-        const plan = await service.prepareDispatch({ manager: inner, kind: "flush", groupId: "w1", at: AT })
-        expect(catalog.get).toHaveBeenCalledWith("notify.email.digest.subject", { count: 2 }, "vi")
-        expect(plan?.message.body.split("\n")).toHaveLength(2)
+    describe("admitOnce", () => {
+        const received = {
+            eventId: "evt-1",
+            kind: "task-complete",
+            recipientId: "p1",
+            channel: "email",
+            payload: { taskId: "t1" },
+        }
+
+        it("does nothing for a message that was claimed before", async () => {
+            const built = await build()
+            built.inbox.claim.mockResolvedValue(false)
+
+            await expect(built.service.admitOnce(received)).resolves.toSucceedWith(null)
+
+            expect(built.inbox.claim).toHaveBeenCalledWith("notify.admit", "evt-1")
+            expect(built.tx.outcomes).toEqual([])
+            expect(built.inbox.release).not.toHaveBeenCalled()
+        })
+
+        it("admits the event in one committed transaction stamped with the clock and writes the flush in it", async () => {
+            const built = await build()
+            built.inbox.claim.mockResolvedValue(true)
+            stubNewAdmission(built, { opened: true })
+
+            await expect(built.service.admitOnce(received)).resolves.toSucceedWith({
+                notificationId: "n1",
+                isNew: true,
+                deliveryState: "queued",
+            })
+
+            expect(built.tx.commits).toBe(1)
+            expect(built.dedupe.admit).toHaveBeenCalledWith(
+                expect.objectContaining({ kind: "task-complete", sourceEventId: "evt-1", recipientId: "p1", at: AT }),
+            )
+            expect(built.outbox.allInTransaction).toBe(true)
+            expect(built.outbox.messages.map((message) => message.eventId)).toEqual(["notify-flush:w1"])
+            expect(built.inbox.release).not.toHaveBeenCalled()
+        })
+
+        it("keeps the refusal of a blank channel and leaves the claim in place", async () => {
+            const built = await build()
+            built.inbox.claim.mockResolvedValue(true)
+
+            await expect(built.service.admitOnce({ ...received, channel: "" })).resolves.toBeRefused(
+                NotifyErrorCode.ChannelRequired,
+            )
+
+            expect(built.inbox.release).not.toHaveBeenCalled()
+        })
+
+        it("gives the claim back and rethrows when the admission fails, so the redelivery runs", async () => {
+            const built = await build()
+            built.inbox.claim.mockResolvedValue(true)
+            const failure = new TypeError("database is down")
+            built.dedupe.admit.mockRejectedValue(failure)
+
+            await expect(built.service.admitOnce(received)).rejects.toBe(failure)
+
+            expect(built.tx.rollbacks).toBe(1)
+            expect(built.inbox.release).toHaveBeenCalledWith("notify.admit", "evt-1")
+        })
     })
 
-    it("does not flush for a retry", async () => {
-        const { service, inner, digest } = build()
-        await service.prepareDispatch({ manager: inner, kind: "retry", groupId: "w1", at: AT })
-        expect(digest.flush).not.toHaveBeenCalled()
-    })
+    describe("dispatchOnce", () => {
+        const received = { eventId: "notify-flush:w1", kind: "flush" as const, groupId: "w1" }
 
-    it("answers null and marks nothing when the window is not flushable", async () => {
-        const { service, inner, digest, delivery } = build()
-        jest.mocked(digest.flush).mockResolvedValue(null)
-        await expect(service.prepareDispatch({ manager: inner, kind: "flush", groupId: "w1", at: AT })).resolves.toBeNull()
-        expect(delivery.markSending).not.toHaveBeenCalled()
-    })
+        const stubPlan = (built: Built) => {
+            built.digest.flush.mockResolvedValue({ windowId: "w1", personId: "p1", channel: "email" })
+            built.dedupe.findByDigestGroup.mockResolvedValue([notification()])
+            built.delivery.markSending.mockResolvedValue([attemptView({ state: "sending" })])
+        }
 
-    it("answers null for an empty group and for a group with no queued attempt", async () => {
-        const { service, inner, dedupe, delivery } = build()
-        jest.mocked(dedupe.findByDigestGroup).mockResolvedValueOnce([])
-        await expect(service.prepareDispatch({ manager: inner, kind: "retry", groupId: "w1", at: AT })).resolves.toBeNull()
-        jest.mocked(delivery.markSending).mockResolvedValueOnce([])
-        await expect(service.prepareDispatch({ manager: inner, kind: "retry", groupId: "w1", at: AT })).resolves.toBeNull()
-    })
+        it("sends nothing for a message that was claimed before", async () => {
+            const built = await build()
+            built.inbox.claim.mockResolvedValue(false)
 
-    it("transmits the rendered message and answers the verdict", async () => {
-        const { service, delivery } = build()
-        const message = { to: "p1", subject: "s", body: "b" }
-        await expect(service.transmit({ notificationIds: ["n1"], groupId: "w1", message })).resolves.toBe("delivered")
-        expect(delivery.transmit).toHaveBeenCalledWith(message)
-    })
+            await expect(built.service.dispatchOnce(received)).resolves.toEqual({ delivered: 0, retried: 0, bounced: 0 })
 
-    it("settles a delivered send without writing a retry", async () => {
-        const { service, inner, outbox, delivery } = build()
-        const plan = { notificationIds: ["n1"], groupId: "w1", message: { to: "p1", subject: "s", body: "b" } }
-        const result = await service.settle({ manager: inner, plan, verdict: "delivered", at: AT })
-        expect(result).toEqual({ delivered: 1, retried: 0, bounced: 0 })
-        expect(delivery.record).toHaveBeenCalledWith({ manager: inner, notificationIds: ["n1"], verdict: "delivered", at: AT })
-        expect(outbox.enqueue).not.toHaveBeenCalled()
-    })
+            expect(built.inbox.claim).toHaveBeenCalledWith("notify.dispatch", "notify-flush:w1")
+            expect(built.tx.outcomes).toEqual([])
+        })
 
-    it("writes one retry message thirty seconds out, keyed by group and attempt, when attempts go back to queued", async () => {
-        const { service, inner, outbox, delivery } = build()
-        jest.mocked(delivery.record).mockResolvedValue({ delivered: [], retried: ["n1"], bounced: [], attempt: 2 })
-        const plan = { notificationIds: ["n1"], groupId: "w1", message: { to: "p1", subject: "s", body: "b" } }
-        const result = await service.settle({ manager: inner, plan, verdict: "transient", at: AT })
-        expect(result).toEqual({ delivered: 0, retried: 1, bounced: 0 })
-        expect(outbox.enqueue).toHaveBeenCalledWith(inner, {
-            queue: "notify.dispatch",
-            eventId: "notify-retry:w1:2",
-            payload: { kind: "retry", groupId: "w1" },
-            availableAt: new Date(AT.getTime() + 30_000),
+        it("answers zeros after the first transaction when there is nothing to send", async () => {
+            const built = await build()
+            built.inbox.claim.mockResolvedValue(true)
+            built.digest.flush.mockResolvedValue(null)
+
+            await expect(built.service.dispatchOnce(received)).resolves.toEqual({ delivered: 0, retried: 0, bounced: 0 })
+
+            expect(built.tx.commits).toBe(1)
+            expect(built.delivery.transmit).not.toHaveBeenCalled()
+            expect(built.delivery.record).not.toHaveBeenCalled()
+        })
+
+        it("prepares in one transaction, sends outside any, and settles in a second", async () => {
+            const built = await build()
+            built.inbox.claim.mockResolvedValue(true)
+            stubPlan(built)
+            built.delivery.transmit.mockResolvedValue("transient")
+            built.delivery.record.mockResolvedValue({ delivered: [], retried: ["n1"], bounced: [], attempt: 1 })
+
+            await expect(built.service.dispatchOnce(received)).resolves.toEqual({ delivered: 0, retried: 1, bounced: 0 })
+
+            expect(built.tx.commits).toBe(2)
+            expect(built.delivery.transmit).toHaveBeenCalledTimes(1)
+            expect(built.delivery.record).toHaveBeenCalledWith(
+                expect.objectContaining({ notificationIds: ["n1"], verdict: "transient", at: AT }),
+            )
+            expect(built.outbox.allInTransaction).toBe(true)
+            expect(built.outbox.messages.map((message) => message.eventId)).toEqual(["notify-retry:w1:1"])
+            expect(built.inbox.release).not.toHaveBeenCalled()
+        })
+
+        it("gives the claim back and rethrows when the send step fails, so the redelivery runs", async () => {
+            const built = await build()
+            built.inbox.claim.mockResolvedValue(true)
+            stubPlan(built)
+            const failure = new TypeError("network is down")
+            built.delivery.transmit.mockRejectedValue(failure)
+
+            await expect(built.service.dispatchOnce(received)).rejects.toBe(failure)
+
+            expect(built.delivery.record).not.toHaveBeenCalled()
+            expect(built.inbox.release).toHaveBeenCalledWith("notify.dispatch", "notify-flush:w1")
         })
     })
 })

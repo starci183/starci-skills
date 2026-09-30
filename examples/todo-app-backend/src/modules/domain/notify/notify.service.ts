@@ -1,11 +1,17 @@
 import { Injectable } from "@nestjs/common"
 import type { NotifySmtpMessageParams } from "@modules/integrations/notify-smtp"
+import { InjectClock } from "@modules/platform/clock"
+import type { Clock } from "@modules/platform/clock"
+import { InjectPrimaryEntityManager } from "@modules/platform/database"
 import { InjectMessageCatalog } from "@modules/platform/i18n"
 import type { MessageCatalog } from "@modules/platform/i18n"
+import { InjectInbox } from "@modules/platform/inbox"
+import type { Inbox } from "@modules/platform/inbox"
 import { InjectOutbox } from "@modules/platform/outbox"
 import type { Outbox } from "@modules/platform/outbox"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
+import type { EntityManager } from "typeorm"
 import { DedupeService } from "./dedupe.service"
 import { DeliveryService } from "./delivery.service"
 import { DigestService } from "./digest.service"
@@ -20,11 +26,23 @@ import type {
     NotificationView,
     PrepareDispatchParams,
     PreparedDispatchResult,
+    ReceiveAdmitParams,
+    ReceiveAdmitResult,
+    ReceiveDispatchParams,
     SettleDispatchParams,
 } from "./notify.contracts"
 import { toNotifyDispatchMessage } from "./notify.mapper"
 import { DEFAULT_DIGEST_WINDOW_MINUTES, EMAIL_LOCALE, RETRY_BACKOFF_MS, isBlankChannel } from "./notify.policy"
 import { PreferencesService } from "./preferences.service"
+
+/** The inbox source of the admit messages: the claim is per (source, event id). */
+const ADMIT_SOURCE = "notify.admit"
+
+/** The inbox source of the dispatch messages. */
+const DISPATCH_SOURCE = "notify.dispatch"
+
+/** The result of a dispatch that had nothing to send. */
+const NOTHING_DISPATCHED: DispatchNotificationGroupResult = { delivered: 0, retried: 0, bounced: 0 }
 
 @Injectable()
 /**
@@ -36,12 +54,63 @@ import { PreferencesService } from "./preferences.service"
 export class NotifyService {
     constructor(
         @InjectMessageCatalog() private readonly catalog: MessageCatalog,
-        @InjectOutbox() private readonly outbox: Outbox,
         private readonly dedupe: DedupeService,
+        @InjectOutbox() private readonly outbox: Outbox,
         private readonly digest: DigestService,
+        @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         private readonly preferences: PreferencesService,
+        @InjectClock() private readonly clock: Clock,
         private readonly delivery: DeliveryService,
+        @InjectInbox() private readonly inbox: Inbox,
     ) {}
+
+    /**
+     * Receives one delivered admit message: claims it in the inbox (null and nothing else when it was claimed before),
+     * admits the event in one transaction stamped with the clock, and gives the claim back when that fails so the
+     * redelivery runs.
+     */
+    async admitOnce(params: ReceiveAdmitParams): Promise<ReceiveAdmitResult> {
+        if (!(await this.inbox.claim(ADMIT_SOURCE, params.eventId))) return ok(null)
+        try {
+            const at = this.clock.now()
+            return await this.entityManager.transaction((manager) =>
+                this.admit({
+                    manager,
+                    kind: params.kind,
+                    sourceEventId: params.eventId,
+                    recipientId: params.recipientId,
+                    channel: params.channel,
+                    payload: params.payload,
+                    at,
+                }),
+            )
+        } catch (error) {
+            await this.inbox.release(ADMIT_SOURCE, params.eventId)
+            throw error
+        }
+    }
+
+    /**
+     * Receives one delivered dispatch message: claims it in the inbox (nothing sent when it was claimed before), then
+     * runs the three steps so no transaction is open across the mail host: prepare in one transaction, transmit in
+     * none, settle in a second. The claim is given back when a step fails so the redelivery runs.
+     */
+    async dispatchOnce(params: ReceiveDispatchParams): Promise<DispatchNotificationGroupResult> {
+        if (!(await this.inbox.claim(DISPATCH_SOURCE, params.eventId))) return NOTHING_DISPATCHED
+        try {
+            const at = this.clock.now()
+            const { kind, groupId } = params
+            const plan = await this.entityManager.transaction((manager) =>
+                this.prepareDispatch({ manager, kind, groupId, at }),
+            )
+            if (plan === null) return NOTHING_DISPATCHED
+            const verdict = await this.transmit(plan)
+            return await this.entityManager.transaction((manager) => this.settle({ manager, plan, verdict, at }))
+        } catch (error) {
+            await this.inbox.release(DISPATCH_SOURCE, params.eventId)
+            throw error
+        }
+    }
 
     /**
      * Admits one event. A repeated admission of the same event only reads back the first decision: it never checks
