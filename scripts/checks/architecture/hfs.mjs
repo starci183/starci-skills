@@ -44,7 +44,7 @@ const REQUIRED_COMMON = ['.gitattributes', '.github', '.gitignore', '.husky', 'h
 const OPTIONAL_COMMON = new Set(['.dockerignore', '.editorconfig', '.npmrc', '.nvmrc', '.prettierignore', '.prettierrc', 'docs', 'e2e',
   'packages', 'scripts', 'tsconfig.build.json', 'tsconfig.e2e.json']);
 const REQUIRED_BACKEND = ['.sops.yaml', '.starcistacks', '.starciwork', 'jest.config.js', 'nest-cli.json', 'src'];
-const OPTIONAL_FRONTEND = new Set(['turbo.json', 'vitest.config.ts', 'vitest.setup.ts']);
+const OPTIONAL_FRONTEND = new Set(['stylelint.config.mjs', 'turbo.json', 'vitest.config.ts', 'vitest.setup.ts']);
 const OPTIONAL_FRONTEND_PATTERN = /^playwright\.config\.ts$/;
 const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb']);
 const RUNTIME_ROOT_MARKDOWN = new Set(['README.md', 'CONTEXT.md', 'CONTRIBUTING.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md']);
@@ -251,8 +251,9 @@ export function checkRepoPresentation({ root, runtime = false, tree = treeView(r
 }
 
 // Owner ruling 2026-09-29: e2e runs MANUALLY only. No hook, default typecheck, coverage run or automatic CI
-// trigger may include the e2e tree or run the e2e project.
-const E2E_COMMAND = /\btest:e2e\b|\btypecheck:e2e\b|\blint:e2e\b|\bplaywright\s+test\b|--selectProjects\s+e2e\b|src\/tests\/e2e\b|jest[^\n|&;]*e2e/u;
+// trigger may include the e2e tree or run the e2e project. Linting the e2e files is not running them: ESLint reads them
+// as syntax in the one repository-wide lint run (the factory's e2e block), so no `lint:e2e` command exists to judge.
+const E2E_COMMAND = /\btest:e2e\b|\btypecheck:e2e\b|\bplaywright\s+test\b|--selectProjects\s+e2e\b|src\/tests\/e2e\b|jest[^\n|&;]*e2e/u;
 const UNIT_RUN_SCRIPTS = ['test', 'test:unit', 'test:ci', 'test:affected', 'test:coverage', 'test:cov'];
 // An --ignore-pattern names the e2e tree to keep it OUT of a command; it is not a run of e2e.
 const runsE2e = text => E2E_COMMAND.test(String(text).replace(/--ignore-pattern[= ]+(?:"[^"]*"|'[^']*'|\S+)/gu, ''));

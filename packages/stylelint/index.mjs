@@ -1,9 +1,9 @@
 /**
  * @starci/stylelint-canon: the CSS half of the StarCi lint canon (HFS R61 `FE_STYLE_TOKEN_ONLY`).
  *
- *   // stylelint.config.mjs
- *   import { starciStylelintConfig } from "@starci/stylelint-canon"
- *   export default starciStylelintConfig()
+ *   // stylelint.config.mjs (the managed one-liner `hfs sync` renders)
+ *   import { loadAppTokens, starciStylelintConfig } from "@starci/stylelint-canon"
+ *   export default starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })
  *
  * The factory returns a complete stylelint config with every rule of the canon at error. There is no option to
  * turn a rule off, downgrade it, ignore a file or honour an inline `stylelint-disable`; `assertEveryRuleOn`
@@ -26,6 +26,7 @@ import { tokenOnly } from "./token-only.mjs"
 import { isGrammarToken } from "./lib/vocabulary.mjs"
 
 export { why } from "./lib/why.mjs"
+export { loadAppTokens } from "./lib/app-tokens.mjs"
 export { findRawBrandValue, HEX_COLOR, COLOR_FUNCTION, PIXEL_LENGTH } from "./lib/brand-value.mjs"
 export { isGrammarToken, FAMILY_PREFIXES } from "./lib/vocabulary.mjs"
 export { BRAND_FILE, fileKind } from "./lib/scope.mjs"

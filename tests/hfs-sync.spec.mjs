@@ -69,15 +69,26 @@ describe('hfs.json validation', () => {
 });
 
 describe('the generated file set', () => {
-  it('a back end owns its tool configuration, package scripts, hooks, workflows, quality files and .starciwork/.gitignore; a front end owns seven files', () => {
+  it('a back end owns its tool configuration, package scripts, hooks, workflows, quality files and .starciwork/.gitignore; a front end owns its tool configuration, package scripts, hooks, workflows and quality files', () => {
     assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'codecov.yml', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'src/tests/e2e/tsconfig.json', 'tsconfig.build.json', 'tsconfig.json']);
-    assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', 'codecov.yml', 'sonar-project.properties']);
+    assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', 'codecov.yml', 'eslint.config.mjs', 'package.json', 'sonar-project.properties', 'stylelint.config.mjs', 'tsconfig.e2e.json', 'tsconfig.json', 'vitest.config.ts']);
   });
   it('the file list is the managedBy slots of the manifest, not code: each listed file is a literal path of a slot naming managedBy', () => {
     const manifest = loadSlotManifest();
-    const listed = manifest.slots.filter(slot => slot.managedBy !== undefined && slot.profiles.includes('be')).flatMap(slot => braceVariants(slot.path));
-    for (const file of listed) assert.ok(rendered(BE)[file] !== undefined, `${file} is rendered`);
-    assert.deepEqual(Object.keys(rendered(BE)).filter(file => !listed.includes(file)).sort(), ['.gitignore', '.starciwork/.gitignore'], 'only the block of a shared file and the file inside the .starciwork directory slot are unlisted');
+    for (const hfs of [BE, FE]) {
+      const listed = manifest.slots.filter(slot => slot.managedBy !== undefined && slot.profiles.includes(hfs.profile)).flatMap(slot => braceVariants(slot.path));
+      for (const file of listed) assert.ok(rendered(hfs)[file] !== undefined, `${file} is rendered`);
+      assert.deepEqual(Object.keys(rendered(hfs)).filter(file => !listed.includes(file)).sort(), hfs.profile === 'be' ? ['.gitignore', '.starciwork/.gitignore'] : ['.gitignore'], 'only the block of a shared file and the file inside the .starciwork directory slot are unlisted');
+    }
+  });
+  it('a front end renders the three one-line configurations exactly, and its tsconfigs are the two presets', () => {
+    const files = rendered(FE);
+    assert.equal(files['eslint.config.mjs'], 'import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"\n\nexport default starciFeConfig({ hfs: loadHfs(import.meta.url) })\n');
+    assert.equal(files['stylelint.config.mjs'], 'import { loadAppTokens, starciStylelintConfig } from "@starci/stylelint-canon"\n\nexport default starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })\n');
+    assert.match(files['vitest.config.ts'], /export default defineConfig\(starciVitestWorkspace\(\{ rootDir: import\.meta\.dirname \}\)\)/);
+    assert.equal(files['.prettierrc'], '"@starci/prettier-config"\n');
+    assert.deepEqual(JSON.parse(files['tsconfig.json']), { extends: '@starci/tsconfig/next.json', exclude: ['node_modules', 'e2e', 'playwright.config.ts'] });
+    assert.deepEqual(JSON.parse(files['tsconfig.e2e.json']), { extends: '@starci/tsconfig/e2e.json', include: ['e2e/**/*.ts', 'playwright.config.ts'], exclude: ['node_modules'] });
   });
   it('a slot that names managedBy for a file with no template, or with a glob path, is refused', () => {
     const slot = (path, managedBy = 'tool-config') => ({ ...loadSlotManifest(), slots: [{ id: 'x', profiles: ['be'], path, managedBy }] });
@@ -96,17 +107,17 @@ describe('.husky/pre-commit', () => {
     for (const step of ['npm run typecheck', 'npx eslint $sources', 'npx prettier --check $sources', 'npm test -- --passWithNoTests --findRelatedTests $specs', 'npx hfs work-hygiene']) assert.ok(hook.includes(step), step);
     assert.doesNotMatch(hook, /lint-staged|test:e2e|typecheck:e2e|selectProjects e2e|playwright/);
   });
-  it('front end runs vitest related, has no work hygiene, and never e2e', () => {
+  it('front end runs staged eslint, stylelint and prettier (no lint-staged), vitest related, has no work hygiene, and never e2e', () => {
     const hook = rendered(FE)['.husky/pre-commit'];
-    for (const step of ['npx lint-staged', 'npm run typecheck', 'npx vitest related --run']) assert.ok(hook.includes(step), step);
-    assert.doesNotMatch(hook, /work-hygiene|test:e2e|playwright/);
+    for (const step of ['npm run typecheck', 'npx eslint --max-warnings=0 --no-warn-ignored $sources', 'npx stylelint $styles', 'npx prettier --check --ignore-unknown $formatted', 'npx vitest related --run']) assert.ok(hook.includes(step), step);
+    assert.doesNotMatch(hook, /lint-staged|work-hygiene|test:e2e|playwright/);
   });
 });
 
 describe('.husky/pre-push', () => {
   const PUSH_STEPS = {
     be: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm test -- --passWithNoTests --changedSince=origin/main'],
-    fe: ['npm run typecheck', 'npm run lint:check', 'npx hfs check --fast', 'npm run test:affected'],
+    fe: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm run test:affected'],
   };
   for (const hfs of [BE, FE]) {
     it(`${hfs.profile} runs typecheck, lint, hfs check --fast and the affected unit specs, and never e2e`, () => {
@@ -115,12 +126,14 @@ describe('.husky/pre-push', () => {
       assert.doesNotMatch(hook, /test:e2e|typecheck:e2e|playwright/);
     });
   }
-  it('a back-end hook calls only scripts the managed package.json defines', () => {
-    const scripts = ['', rendered(BE)['package.json']].join('\n');
-    for (const hook of ['.husky/pre-commit', '.husky/pre-push', '.github/workflows/ci.yml', '.github/workflows/e2e.yml']) {
-      for (const [, name] of rendered(BE)[hook].matchAll(/npm run ([\w:-]+)/g)) assert.ok(scripts.includes(`\n${name}: `), `${hook} runs npm run ${name}`);
-    }
-  });
+  for (const hfs of [BE, FE]) {
+    it(`a ${hfs.profile} hook and workflow call only scripts the managed package.json defines`, () => {
+      const scripts = ['', rendered(hfs)['package.json']].join('\n');
+      for (const hook of ['.husky/pre-commit', '.husky/pre-push', '.github/workflows/ci.yml', '.github/workflows/e2e.yml']) {
+        for (const [, name] of rendered(hfs)[hook].matchAll(/npm run ([\w:-]+)/g)) assert.ok(scripts.includes(`\n${name}: `), `${hook} runs npm run ${name}`);
+      }
+    });
+  }
   it('lets the settle push gate follow the hook to the repository lint script', t => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-pushgate-'));
     t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -135,8 +148,8 @@ describe('.husky/pre-push', () => {
 
 describe('.github/workflows', () => {
   const CI_STEPS = {
-    be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --coverage --ci', 'npm run hfs:report', 'npm run lint:report', 'npm run build', 'npm ci'],
-    fe: ['npm run lint:check', 'npm run typecheck', 'npm run test:ci', 'npx hfs check --sonar reports/hfs.sonar.json', 'npx eslint . --format json --output-file reports/eslint.json', 'npx hfs report-stylelint reports/stylelint.json reports/stylelint.sonar.json', 'npm ci'],
+    be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --coverage --ci', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run build', 'npm ci'],
+    fe: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm run test:ci', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run lint:report:css', 'npx hfs report stylelint reports/stylelint.json reports/stylelint.sonar.json', 'npm run build', 'npm ci'],
   };
   for (const hfs of [BE, FE]) {
     it(`${hfs.profile} ci.yml runs lint, typecheck, unit, hfs check and sonar, with no e2e`, () => {
@@ -198,10 +211,12 @@ describe('sonar-project.properties and codecov.yml', () => {
     assert.equal(fe['sonar.projectKey'], 'nivo-fe');
     assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json');
     assert.equal(fe['sonar.javascript.lcov.reportPaths'], 'coverage/lcov.info');
-    assert.equal(fe['sonar.eslint.reportPaths'], 'reports/eslint.json');
-    assert.equal(fe['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json,reports/stylelint.sonar.json');
-    assert.equal(be['sonar.eslint.reportPaths'], 'reports/eslint.json');
-    assert.equal(be['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json');
+    assert.equal(fe['sonar.sources'], 'apps', 'no package slot: the sources are the apps');
+    assert.equal(fe['sonar.tests'], 'apps');
+    // One import path for every linter (hfs report): Sonar's own ESLint import is not used, it drops issues on files outside sonar.sources.
+    assert.ok(!('sonar.eslint.reportPaths' in fe) && !('sonar.eslint.reportPaths' in be));
+    assert.equal(fe['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json,reports/eslint.sonar.json,reports/stylelint.sonar.json');
+    assert.equal(be['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json,reports/eslint.sonar.json');
     assert.ok(!('sonar.host.url' in be) && !('sonar.host.url' in fe), 'the host is SONAR_HOST_URL, never a property (R11)');
   });
   it('codecov ignores exactly the union of both preset lists and keeps the 80/90 gates', () => {
@@ -333,7 +348,8 @@ describe('the drift check', () => {
     await run(['--write'], dir);
     fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify({ ...FE, apps: [...FE.apps, { name: 'docs', kind: 'web' }] }));
     const failed = await run(['--check'], dir);
-    assert.match(failed.lines[0], /sonar-project\.properties/);
+    assert.ok(failed.lines.some(line => /^HFS_SYNC_DRIFT sonar-project\.properties/.test(line)), 'the sonar tsconfig paths name the new app');
+    assert.ok(failed.lines.some(line => /^HFS_SYNC_DRIFT package\.json/.test(line)), 'the scripts gain dev and start for the new app');
   });
   it('a repository .gitignore keeps its own lines; only the managed block is compared and rewritten', async t => {
     const dir = repo(t, BE);
@@ -406,7 +422,7 @@ describe('the package.json scripts of a back end', () => {
   it('gain a start script per app kind and name a second migrate app by its name', () => {
     const many = { ...BE, apps: [{ name: 'core', kind: 'api' }, { name: 'jobs', kind: 'worker' }, { name: 'a', kind: 'migrate' }, { name: 'b', kind: 'migrate' }] };
     assert.deepEqual(Object.keys(scripts(many)).filter(name => /^(start|migrate)/.test(name)).sort(), ['migrate:a', 'migrate:b', 'start:core', 'start:jobs']);
-    assert.equal(appScripts([{ name: 'x', kind: 'cli' }]), '"start:x": "node dist/apps/x/src/main.js",');
+    assert.equal(appScripts('be', [{ name: 'x', kind: 'cli' }]), '"start:x": "node dist/apps/x/src/main.js",');
   });
   it('are compared as parsed JSON: key order and the rest of package.json are not drift, an extra or changed script is', async t => {
     const dir = repo(t, BE);
@@ -424,6 +440,49 @@ describe('the package.json scripts of a back end', () => {
     const failed = await run(['--check'], dir);
     assert.equal(failed.code, 1);
     assert.match(failed.lines[0], /^HFS_SYNC_DRIFT package\.json: drift/);
+  });
+});
+
+describe('the package.json scripts of a front end', () => {
+  const scripts = hfs => renderTargets(hfs, PRESETS.fe).find(target => target.path === 'package.json').scripts;
+  it('are one lint gate over eslint (apps, packages and e2e in one run) and stylelint, plus the fixed scripts and dev/start per app', () => {
+    assert.deepEqual(Object.keys(scripts(FE)).sort(), ['build', 'codegen', 'dev:admin', 'dev:app', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'lint:report:css', 'prepare', 'start:admin', 'start:app', 'test', 'test:affected', 'test:ci', 'test:e2e', 'typecheck', 'typecheck:e2e']);
+    const lint = scripts(FE)['lint:check'];
+    assert.match(lint, /eslint \. --max-warnings=0/);
+    assert.match(lint, /stylelint "\{apps,packages\}\/\*\/src\/\*\*\/\*\.css"/);
+    assert.doesNotMatch(lint, /--ignore-pattern/, 'no path is hidden from the lint run');
+    assert.ok(!('lint:e2e' in scripts(FE)), 'e2e/ is linted by the same eslint run: there is no second lint script');
+    assert.equal(scripts(FE)['dev:app'], 'npm run dev --workspace apps/app');
+  });
+  it('run e2e only through test:e2e, never through a gate script, and call no repository-local checker', () => {
+    const all = scripts(FE);
+    for (const [name, command] of Object.entries(all)) {
+      if (name !== 'test:e2e') assert.doesNotMatch(command, /playwright|test:e2e/, name);
+      assert.doesNotMatch(command, /scripts\/|contract-check|check-i18n-catalog|check-fe-architecture/, `${name} calls a repository-local checker`);
+    }
+    assert.equal(all['test:e2e'], 'npm run typecheck:e2e && playwright test');
+  });
+  it('lint, test and the report scripts are one command each for the two linters', () => {
+    const all = scripts(FE);
+    assert.equal(all['lint:report'], 'eslint . --format json --output-file reports/eslint.json');
+    assert.equal(all['lint:report:css'], 'stylelint "{apps,packages}/*/src/**/*.css" --formatter json --output-file reports/stylelint.json');
+    assert.equal(all.test, 'npm run codegen --silent && vitest run');
+    assert.equal(all['test:ci'], 'npm run codegen --silent && vitest run --coverage');
+  });
+  it('the sources and the tsconfig paths include packages/ exactly when hfs.json opts into a package slot', () => {
+    const properties = hfs => Object.fromEntries(rendered(hfs)['sonar-project.properties'].split('\n').filter(line => line && !line.startsWith('#')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
+    for (const slots of [['repo.packages'], ['fe.package.ui'], ['fe.package.api', 'fe.package.i18n']]) {
+      const fe = properties({ ...FE, optionalSlots: slots });
+      assert.equal(fe['sonar.sources'], 'apps,packages', slots.join());
+      assert.equal(fe['sonar.tests'], 'apps,packages');
+      assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json,packages/*/tsconfig.json');
+    }
+    for (const slots of [undefined, [], ['fe.route']]) {
+      const fe = properties({ ...FE, ...(slots ? { optionalSlots: slots } : {}) });
+      assert.equal(fe['sonar.sources'], 'apps', String(slots));
+      assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json');
+    }
+    assert.equal(properties(BE)['sonar.sources'], 'apps,src', 'a back end is unaffected');
   });
 });
 
@@ -515,23 +574,63 @@ describe('hfs sync --init', () => {
     assert.match(read(dir, 'apps/core/src/main.ts'), /EnvSource\.fromProcess\(\)/);
     assert.doesNotMatch(filesUnder(dir).map(file => read(dir, file)).join('\n'), /\{\{[a-zA-Z]/, 'no template placeholder is left');
   });
-  it('a front end gets the next-intl [locale] shell: vi default, as-needed prefix, proxy.ts, error boundaries and the health route', async t => {
-    const { dir } = await skeleton(t, FE);
+  const SHARED = ['fe.package.i18n', 'fe.package.api'];
+  const APP_SHELL = ['next.config.ts', 'src/proxy.ts', 'vitest.config.ts', 'src/app/global-error.tsx', 'src/app/globals.css', 'src/app/health/live/route.ts',
+    'src/app/[locale]/layout.tsx', 'src/app/[locale]/page.tsx', 'src/app/[locale]/error.tsx', 'src/app/[locale]/not-found.tsx',
+    'src/modules/i18n/index.ts', 'src/modules/i18n/request.ts', 'src/modules/i18n/messages/vi.json', 'src/modules/api/index.ts'];
+  it('a one-app front end keeps the next-intl stack and the one API client in the app: vi default, as-needed prefix, proxy.ts, error boundaries and the health route', async t => {
+    const one = { ...FE, apps: [{ name: 'app', kind: 'web' }] };
+    const { dir } = await skeleton(t, one);
     const files = filesUnder(dir);
-    for (const app of ['app', 'admin']) {
-      for (const file of ['next.config.ts', 'src/proxy.ts', 'src/app/global-error.tsx', 'src/app/globals.css', 'src/app/health/live/route.ts',
-        'src/app/[locale]/layout.tsx', 'src/app/[locale]/page.tsx', 'src/app/[locale]/error.tsx', 'src/app/[locale]/not-found.tsx',
-        'src/modules/i18n/config.ts', 'src/modules/i18n/routing.ts', 'src/modules/i18n/navigation.ts', 'src/modules/i18n/request.ts', 'src/modules/i18n/messages/vi.json']) {
-        assert.ok(files.includes(`apps/${app}/${file}`), `apps/${app}/${file}`);
-      }
+    for (const file of [...APP_SHELL, 'src/modules/i18n/config.ts', 'src/modules/i18n/routing.ts', 'src/modules/i18n/navigation.ts', 'src/modules/api/client.ts', 'src/modules/api/outcome.ts', 'src/modules/api/client.spec.ts']) {
+      assert.ok(files.includes(`apps/app/${file}`), `apps/app/${file}`);
     }
+    assert.ok(!files.some(file => file.startsWith('packages/')), 'no shared package for one app');
     assert.ok(!files.some(file => file.endsWith('middleware.ts')), 'Next 16 uses proxy.ts');
     assert.match(read(dir, 'apps/app/src/modules/i18n/routing.ts'), /defaultLocale: DEFAULT_LOCALE[\s\S]*localePrefix: "as-needed"/);
     assert.match(read(dir, 'apps/app/src/modules/i18n/config.ts'), /DEFAULT_LOCALE: Locale = "vi"/);
     assert.match(read(dir, 'apps/app/src/proxy.ts'), /export default createMiddleware\(routing\)/);
+    assert.match(read(dir, 'apps/app/src/app/[locale]/layout.tsx'), /import \{ routing \} from "\.\.\/\.\.\/modules\/i18n"/, 'the shell reads the module through its index, so both layouts of the repository compile');
     assert.match(read(dir, 'apps/app/src/app/[locale]/layout.tsx'), /<html lang=\{locale\}>/);
     assert.match(read(dir, 'apps/app/src/app/health/live/route.ts'), /\{ status: "ok", info: \{\}, error: \{\}, details: \{\} \}/);
     assert.deepEqual(Object.keys(JSON.parse(read(dir, 'apps/app/src/modules/i18n/messages/vi.json'))).sort(), ['errors', 'home', 'notFound']);
+    const client = read(dir, 'apps/app/src/modules/api/client.ts');
+    assert.match(client, /AbortSignal\.timeout\(REQUEST_TIMEOUT_MS\)/, 'the one fetch carries a timeout signal');
+    assert.match(client, /response\.status === 401 \|\| response\.status === 403\) return \{ kind: "refused" \}/, '401 and 403 are refused');
+    assert.equal(client.match(/\bfetch\(/g).length, 1, 'exactly one fetch');
+    assert.doesNotMatch(filesUnder(dir).map(file => read(dir, file)).join('\n'), /\{\{[a-zA-Z]/, 'no template placeholder is left');
+  });
+  it('a front end with two apps writes the i18n stack and the API client once, as packages/<project>-i18n and -api, and keeps a thin adapter in each app', async t => {
+    const two = { ...FE, optionalSlots: ['repo.packages', ...SHARED] };
+    const { dir, code } = await skeleton(t, two);
+    assert.equal(code, 0);
+    const files = filesUnder(dir);
+    for (const app of ['app', 'admin']) {
+      for (const file of APP_SHELL) assert.ok(files.includes(`apps/${app}/${file}`), `apps/${app}/${file}`);
+      for (const file of ['src/modules/i18n/config.ts', 'src/modules/i18n/routing.ts', 'src/modules/i18n/navigation.ts', 'src/modules/api/client.ts', 'src/modules/api/outcome.ts']) assert.ok(!files.includes(`apps/${app}/${file}`), `apps/${app}/${file} lives in the package`);
+      assert.match(read(dir, `apps/${app}/src/modules/i18n/index.ts`), /createAppI18n\(\{ locales: \["vi"\], defaultLocale: "vi" \}\)/);
+      assert.match(read(dir, `apps/${app}/src/modules/i18n/index.ts`), /from "@nivo\/i18n"/);
+      assert.match(read(dir, `apps/${app}/src/modules/api/index.ts`), /from "@nivo\/api"/);
+      assert.match(read(dir, `apps/${app}/src/proxy.ts`), /createProxy\(routing\)/);
+      assert.match(read(dir, `apps/${app}/next.config.ts`), /transpilePackages: \["@nivo\/i18n", "@nivo\/api"\]/);
+    }
+    for (const file of ['package.json', 'tsconfig.json', 'vitest.config.ts', 'src/index.ts', 'src/app.ts', 'src/app.spec.ts', 'src/proxy.ts', 'src/proxy.spec.ts', 'src/request.ts', 'src/request.spec.ts']) assert.ok(files.includes(`packages/nivo-i18n/${file}`), `packages/nivo-i18n/${file}`);
+    for (const file of ['package.json', 'tsconfig.json', 'vitest.config.ts', 'src/index.ts', 'src/client.ts', 'src/client.spec.ts', 'src/outcome.ts']) assert.ok(files.includes(`packages/nivo-api/${file}`), `packages/nivo-api/${file}`);
+    assert.equal(JSON.parse(read(dir, 'packages/nivo-i18n/package.json')).name, '@nivo/i18n');
+    assert.equal(JSON.parse(read(dir, 'packages/nivo-api/package.json')).name, '@nivo/api');
+    const single = await skeleton(t, { ...FE, apps: [{ name: 'app', kind: 'web' }] });
+    assert.equal(read(dir, 'packages/nivo-api/src/client.ts'), read(single.dir, 'apps/app/src/modules/api/client.ts'), 'one client text, whichever tree holds it');
+    assert.ok(!files.some(file => file.startsWith('apps/') && /\/modules\/api\/(client|outcome)\.ts$/.test(file)), 'no app keeps a client of its own');
+    assert.doesNotMatch(files.map(file => read(dir, file)).join('\n'), /\{\{[a-zA-Z]/, 'no template placeholder is left');
+  });
+  it('refuses a shared skeleton when hfs.json does not opt into both package slots, and writes nothing', async t => {
+    for (const declaration of [FE, { ...FE, optionalSlots: ['fe.package.i18n'] }]) {
+      const dir = repo(t, declaration);
+      const lines = [];
+      assert.equal(await runSync(['--init'], { cwd: dir, out: line => lines.push(line), presets: PRESETS.fe }), 1);
+      assert.match(lines[0], /HFS_SYNC_HFS_INVALID.*fe\.package\.(i18n and fe\.package\.api|api)/);
+      assert.deepEqual(filesUnder(dir), ['hfs.json']);
+    }
   });
   it('never overwrites: a second --init leaves an edited file alone and reports it skipped', async t => {
     const { dir } = await skeleton(t, BE);

@@ -7,7 +7,7 @@ checkout. The machine loads `typescript` from the repository it checks (never it
 
 ```sh
 npx hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]   # exit 1 on any error-level finding
-npx hfs report-stylelint <in> <out> [--repo <dir>]   # stylelint json -> Sonar Generic Issue Import (see Sonar)
+npx hfs report <eslint|stylelint> <in> <out> [--repo <dir>]   # a linter's json -> Sonar Generic Issue Import (see Sonar)
 npx hfs init    [--repo <dir>] [--stdout]     # write a starter hfs.json (never overwrites); --stdout only prints
 npx hfs explain <path> [--repo <dir>] [--json]
 npx hfs sync (--check | --write) [--root <dir>]   # generated files: the managedBy slots of slots.yaml, the .gitignore block (sync/, templates/)
@@ -31,11 +31,13 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `HFS_MIN_INSTANCES` | error | fewer instances of a slot than `minInstances` |
 | `HFS_CANON_PIN_DRIFT` | error | a dependency not at the exact version of `knowledge/hfs/canon-pins.yaml` |
 | `HFS_SIZE_SOFT_BACKLOG` | info | a source file over `ruleParams.fileLines.soft`; report only, never fails |
-| `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, codecov, `tsconfig.build.json`, `src/tests/e2e/tsconfig.json` (back end; a front end keeps `tsconfig.e2e.json`), `jest.config.js`, `.prettierrc`, `.prettierignore`, the `scripts` block of a back end's `package.json`, compared as parsed JSON) |
-| `HFS_RULE_OFF_WITHOUT_REPLACEMENT` | error | a back end's `eslint.config.mjs` differs from its one-line render, so a rule could be off, warned or redefined in it |
-| `HFS_TOOL_CONFIG_LOCAL` | error | a back end holds a tool config outside the managed set (`.eslintrc*`, `.eslintignore`, a second `eslint.config.*`, another prettier or jest config), a file that defines an ESLint rule, or a script that runs eslint or prettier with a flag that swaps the configuration |
+| `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, codecov, `tsconfig.build.json`, `src/tests/e2e/tsconfig.json` (back end; a front end keeps `tsconfig.e2e.json`), `jest.config.js` (back end), `vitest.config.ts` (front end), `.prettierrc`, `.prettierignore`, the `scripts` block of `package.json`, compared as parsed JSON) |
+| `HFS_RULE_OFF_WITHOUT_REPLACEMENT` | error | `eslint.config.mjs`, or a front end's `stylelint.config.mjs`, differs from its one-line render, so a rule could be off, warned or redefined in it |
+| `HFS_CI_MISSING_CANON` | error | the CI workflow or pre-push no longer runs a canon step its render holds: `hfs check` (`hfs:report` / `hfs:check`), `lint:check` (ESLint over apps, packages and `e2e/`, and stylelint) or `typecheck` |
+| `HFS_FORMAT` | error | the CI workflow or pre-push no longer runs `format:check`, or pre-commit no longer runs `prettier --check` (Prettier is the only formatter; `hfs check` does not run it itself) |
+| `HFS_TOOL_CONFIG_LOCAL` | error | a repository holds a tool config outside the managed set (`.eslintrc*`, `.eslintignore`, a second `eslint.config.*` or `stylelint.config.*`, another prettier, vitest, jest or lint-staged config), a file that defines an ESLint rule or a stylelint plugin, a tool configuration key in a `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), or a script that runs eslint, stylelint or prettier with a flag that swaps the configuration |
 | `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render (no host URL; the ESLint report and HFS import paths), or the stack declaration names another quality gate than the one of `knowledge/sonar-gate.yaml` |
-| `HFS_TS_STRICT` | error | a back end's `tsconfig.json` sets, lowers or adds anything but `extends` the preset and the three `paths`; the finding names the flag |
+| `HFS_TS_STRICT` | error | the root `tsconfig.json` sets, lowers or adds anything but `extends` the preset (`be.json`, `next.json`), the template's `exclude` and (back end) the three `paths`; the finding names the flag |
 | `HFS_EMPTY_DIR` | error | a directory with no file below it (git tracks none), outside `.git`, `node_modules` and `ignored` slots; the topmost one is reported |
 | `HFS_GHOST_TREE` | error | an empty directory beside a sibling whose name is within two edits of its own (`business` / `bussiness`) |
 | `HFS_UNTRACKED_ROOT_ENTRY` | error | an entry git neither tracks nor ignores (`git ls-files -o --exclude-standard`), outside an `ignored` slot |
@@ -55,7 +57,10 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 
 The managed files are judged by `sync/managed.mjs` and `sync/ts-strict.mjs` (the package renders the templates; the runtime copy does not). The list of managed
 files is the `managedBy` slots of `slots.yaml`; `hfs sync --write` renders them and `hfs check` compares them, so a hand edit and a forgotten `sync` are the same finding.
-Each finding is reported once: the eslint one-liner under R17, `tsconfig.json` under R22 when it names a flag, everything else under R05.
+Each finding is reported once: the eslint and stylelint one-liners under R17, `tsconfig.json` under R22 when it names a flag, a workflow or hook that lost a canon step under R13 (or R19 for the format step), everything else under R05.
+A front end is rendered by the same mechanism as a back end: `tsconfig.json`, `tsconfig.e2e.json`, `eslint.config.mjs`, `stylelint.config.mjs`, `vitest.config.ts`, `.prettierrc`, `.prettierignore`, the hooks, the workflows, the Sonar and codecov files
+and the `scripts` block (`lint:check` is the one lint gate, ESLint over apps, packages and `e2e/` plus stylelint; `test:e2e` is the only script that runs Playwright). `vitest.setup.ts`, `playwright.config.ts` and `turbo.json` stay the repository's own
+(`fe.tool-config-repo`): they carry the repository's setup, web servers and ports, which no preset can render, and per-app `vitest.config.ts` files carry aliases and plugins.
 
 The architecture machine (`scripts/checks/architecture.mjs` of the runtime, the same code bundled here): tiers and import
 direction, owner public API, cycles, module registration and composition, clones, dead exports, required files, size growth,
@@ -80,19 +85,19 @@ fails while any is open. Nothing is configured per repository; the pieces are ma
 | Source | Report | How Sonar reads it |
 |---|---|---|
 | `hfs check` (repository, managed-file and architecture-machine findings) | `reports/hfs.sonar.json`, from `hfs check --sonar reports/hfs.sonar.json` | `sonar.externalIssuesReportPaths`, engine `starci-hfs`, rule id = the finding code |
-| ESLint (the BE and FE canon plugins alike) | `reports/eslint.json`, from `eslint --format json --output-file reports/eslint.json` | `sonar.eslint.reportPaths` (Sonar's own ESLint import) |
-| stylelint (front end) | `reports/stylelint.json` then `reports/stylelint.sonar.json`, from `hfs report-stylelint` | `sonar.externalIssuesReportPaths`, engine `stylelint`, rule id = the stylelint rule |
+| ESLint (the BE and FE canon plugins alike) | `reports/eslint.json` (`npm run lint:report`) then `reports/eslint.sonar.json`, from `hfs report eslint reports/eslint.json reports/eslint.sonar.json` | `sonar.externalIssuesReportPaths`, engine `eslint`, rule id = the ESLint rule |
+| stylelint (front end) | `reports/stylelint.json` (`npm run lint:report:css`) then `reports/stylelint.sonar.json`, from `hfs report stylelint ...` | `sonar.externalIssuesReportPaths`, engine `stylelint`, rule id = the stylelint rule |
 
 `--sonar` writes the error findings as a Generic Issue Import document (SonarQube 10.3+ format: `{ rules, issues }`) before the verdict, so a
 failing check still leaves its report. A rule's name and description are the catalog's English title and Vietnamese title, meaning and next step;
 impacts are HIGH (maintainability). `info` findings (the soft-size backlog) are report-only and not imported. The output is sorted, so two runs
-over one tree are byte-identical. Sonar drops an issue on a file it does not index, and hfs.json, the workflows and the config files lie outside
-`sonar.sources`: such a finding (and a finding with no path) is filed on the first source file and its message starts with its real path.
+over one tree are byte-identical. Sonar drops an issue on a file it does not index (a tracked source file or stylesheet under `sonar.sources`), so the ONE placement rule of the three engines files a finding on
+any other path (hfs.json, a workflow, a config file, `e2e/`, a package the sources do not list) and a finding with no path on the first source file, its message starting with the real path.
+Sonar's own ESLint import (`sonar.eslint.reportPaths`) is not used: it drops those issues silently. A front end's `sonar.sources` and `sonar.tests` are `apps`, plus `packages` when hfs.json opts into `repo.packages` or an `fe.package.*` slot.
 
-The managed `sonar-project.properties` carries `sonar.eslint.reportPaths` and `sonar.externalIssuesReportPaths` and no `sonar.host.url` (the host is
+The managed `sonar-project.properties` carries `sonar.externalIssuesReportPaths` (`reports/hfs.sonar.json`, `reports/eslint.sonar.json` and, for a front end, `reports/stylelint.sonar.json`) and no `sonar.host.url` (the host is
 `SONAR_HOST_URL`); the managed CI workflow produces the reports and runs the scan and the gate action with `!cancelled()`, so a failed check step still
-reaches Sonar while the job stays failed. There is no `continue-on-error`. A back end runs `npm run hfs:report` and `npm run lint:report`; a front end
-runs the commands inline. The duplicate-block threshold (`ruleParams.<profile>.duplicateBlock`) has no Sonar property for TypeScript (SonarJS detects
+reaches Sonar while the job stays failed. There is no `continue-on-error`. Both profiles run `npm run hfs:report`, `npm run lint:report` (a front end also `npm run lint:report:css`) and `npx hfs report <linter> <in> <out>` for each. The duplicate-block threshold (`ruleParams.<profile>.duplicateBlock`) has no Sonar property for TypeScript (SonarJS detects
 clones with its own token rule), so the machine enforces it (R21) and its findings are imported like every other.
 
 The gate is `knowledge/sonar-gate.yaml`, the one declaration: the new-code conditions and an `overall` part (0 open issues on the whole code,

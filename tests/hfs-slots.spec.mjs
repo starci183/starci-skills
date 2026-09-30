@@ -256,6 +256,17 @@ test('FE multi-app fixture', () => {
   assert.equal(paths.includes('apps/web/vitest.config.ts'), false);
   assert.equal(paths.includes('apps/web/src/modules/api/'), false, 'the transport may live in the shared api package; FE_TRANSPORT_OWNER counts the clients');
   assert.deepEqual(fe.requiredFiles('e2e/checkout/pay.e2e-spec.ts'), ['playwright.config.ts', 'tsconfig.e2e.json']);
+  // the tool configuration of a front end: managed files, the repository's own three, and the forbidden ones
+  for (const file of ['tsconfig.json', 'tsconfig.e2e.json', 'eslint.config.mjs', 'stylelint.config.mjs', 'vitest.config.ts', '.prettierrc', '.prettierignore']) assert.equal(owner(file), 'fe.tool-config', file);
+  for (const file of ['vitest.setup.ts', 'playwright.config.ts', 'turbo.json']) assert.equal(owner(file), 'fe.tool-config-repo', file);
+  for (const file of ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', 'stylelint.config.cjs', '.prettierrc.json', 'vitest.config.mjs', 'jest.config.js', '.lintstagedrc.json']) assert.equal(owner(file), 'fe.tool-config-local', file);
+  assert.equal(owner('package.json'), 'fe.package-manifest');
+  assert.equal(owner('package-lock.json'), 'fe.lockfile');
+  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs', 'vitest.config.ts', '.prettierrc', '.prettierignore', 'tsconfig.e2e.json', 'package.json', 'package-lock.json']) assert.equal(paths.includes(file), true, `${file} is required`);
+  assert.equal(fe.slot('fe.tool-config-local').presence, 'forbidden');
+  assert.equal(fe.slot('fe.tool-config').managedBy, 'tool-config');
+  assert.equal(fe.slot('fe.package-manifest').managedBy, 'package-scripts');
+  assert.equal(fe.classifyPath('tsconfig.build.json').status, 'no-slot', 'a root tsconfig.build.json has no owner in a front end');
   // import direction, cross-app and layers
   const ok = (a, b) => fe.importAllowed(a, b);
   assert.equal(ok('apps/web/src/features/pages/Home/index.tsx', 'apps/web/src/components/blocks/Header/index.tsx').allowed, true);

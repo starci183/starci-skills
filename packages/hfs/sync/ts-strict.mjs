@@ -1,8 +1,8 @@
-// HFS_TS_STRICT (R22): a back end's tsconfig.json extends the canon preset, adds `paths` and the template's `exclude` (the
-// e2e tree, which src/tests/e2e/tsconfig.json checks), and nothing else. Every strict flag lives in
-// @starci/tsconfig/be.json; a repository that sets, lowers or adds any compiler option, or changes the program with
+// HFS_TS_STRICT (R22): a repository's root tsconfig.json extends the canon preset (be.json for a back end, next.json for a
+// front end), adds `paths` when the template has them and the template's `exclude` (the e2e tree, which its own tsconfig checks),
+// and nothing else. Every strict flag lives in @starci/tsconfig; a repository that sets, lowers or adds any compiler option, or changes the program with
 // include/exclude/files/references, has left the preset. The expected shape is read from the rendered
-// template (templates/be/tool-config/tsconfig.json), so the preset name and the aliases exist in one place only.
+// template (templates/<profile>/tool-config/tsconfig.json), so the preset name and the aliases exist in one place only.
 export const TS_STRICT_FILE = 'tsconfig.json';
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
@@ -37,12 +37,12 @@ export function tsStrictFindings(actualText, expectedText, file = TS_STRICT_FILE
     if (flag === 'paths') continue;
     findings.push(finding(flag, `${value === false ? 'lowers' : 'sets'} ${flag} (${describe(value)}); every compiler option comes from the preset`));
   }
-  const aliases = expected.compilerOptions.paths;
+  const aliases = expected.compilerOptions?.paths ?? {};
   for (const alias of Object.keys(aliases)) {
     if (!same(options.paths?.[alias], aliases[alias])) findings.push(finding('paths', `paths must map ${alias} to ${describe(aliases[alias])}, found ${describe(options.paths?.[alias])}`));
   }
   for (const alias of Object.keys(options.paths ?? {})) {
-    if (!(alias in aliases)) findings.push(finding('paths', `paths adds the alias ${alias}; the three aliases of the template are the only ones`));
+    if (!(alias in aliases)) findings.push(finding('paths', `paths adds the alias ${alias}; the aliases of the template are the only ones`));
   }
   return findings;
 }

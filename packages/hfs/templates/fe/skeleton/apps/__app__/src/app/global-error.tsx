@@ -1,6 +1,6 @@
 "use client"
 
-import { DEFAULT_LOCALE } from "../modules/i18n/config"
+import { DEFAULT_LOCALE } from "../modules/i18n"
 import messages from "../modules/i18n/messages/vi.json"
 
 interface GlobalErrorProps {

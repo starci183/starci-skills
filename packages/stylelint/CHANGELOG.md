@@ -20,6 +20,7 @@
   `lib/status-tones.generated.mjs`.
 - The theme selectors of the brand layer moved to `lib/scope.mjs` (`themeOfSelector`) so the two brand rules read one predicate.
 - `brand-layer-shape.test.mjs` asserted one finding for a rejected selector whose tokens then also lacked a light value; it now asserts both.
+- Added `loadAppTokens(import.meta.url)`: the `appTokens` of a repository are derived from the custom properties its `globals.css` files declare (`apps/*/src`, `packages/*/src`; a grammar token is left out, `no-token-redefinition` judges it). The managed `stylelint.config.mjs` is `starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })` and has no repository choice; any difference from that render is `HFS_RULE_OFF_WITHOUT_REPLACEMENT` (R17).
 
 ## 1.1.0
 

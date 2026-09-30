@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server"
-import { Link } from "../../modules/i18n/navigation"
+import { Link } from "../../modules/i18n"
 
 /** Shown when a route calls `notFound()`. */
 const NotFound = async () => {

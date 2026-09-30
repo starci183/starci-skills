@@ -30,11 +30,13 @@ rules:
     hfsRules: [R16, R22]
     requirement: |
       `eslint.config.mjs` calls `starciBeConfig({ hfs })` or `starciFeConfig({ hfs })`. `tsconfig.json` extends
-      `@starci/tsconfig/{be,fe}.json` and adds `paths` only; `tsconfig.e2e.json` extends `@starci/tsconfig/e2e.json`. The jest
-      config calls `@starci/jest-preset`, the vitest config `@starci/vitest-preset`, the Playwright config
-      `@starci/playwright-preset`, stylelint extends `@starci/stylelint-canon`, and the Prettier config is the string
-      `@starci/prettier-config` in `package.json`. A repository defines no local rule, plugin, override, disabled rule or
-      architecture script, and copies no canon config.
+      `@starci/tsconfig/{be,next}.json` (a back end adds its three `paths`, a front end only excludes the e2e tree); `tsconfig.e2e.json`
+      extends `@starci/tsconfig/e2e.json`. The jest config calls `@starci/jest-preset`, the root vitest config
+      `starciVitestWorkspace` of `@starci/vitest-preset`, `stylelint.config.mjs` `starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })`
+      of `@starci/stylelint-canon`, and the Prettier config is the `.prettierrc` string `@starci/prettier-config`. All of these are
+      rendered by `hfs sync` and compared by `hfs check` (R05, R17, R22); only `vitest.setup.ts`, `playwright.config.ts` (its web servers and ports,
+      on top of `@starci/playwright-preset`) and `turbo.json` are the repository's own. A repository defines no local rule, plugin,
+      override, disabled rule or architecture script, keeps no tool configuration key in `package.json`, and copies no canon config.
     rationale: |
       Three copies of an ESLint config are three standards. One package makes every repository answer to the same rules.
     cases:
@@ -135,7 +137,7 @@ rules:
     hfsRules: [R12]
     requirement: |
       No e2e spec, e2e setup or e2e-only dependency joins husky, lint-staged, the default typecheck, coverage or Codecov, or an
-      automatic CI trigger. `typecheck:e2e` and `lint:e2e` exist and are green; `test:e2e` runs `typecheck:e2e` first. A kept e2e
+      automatic CI trigger. `typecheck:e2e` exists and is green, `lint:check` lints `e2e/` in its one ESLint run (linting is not running e2e), and `test:e2e` runs `typecheck:e2e` first. A kept e2e
       workflow is `workflow_dispatch` only.
     rationale: |
       E2E is slow and environment-bound, but its code must not rot, so its type check and lint are separate manual gates.

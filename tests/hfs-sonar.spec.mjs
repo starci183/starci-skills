@@ -5,15 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { main } from '../packages/hfs/bin/hfs.mjs';
-import { anchorOf, sonarReport, sourceRootsOf, stylelintReport } from '../packages/hfs/report/sonar.mjs';
+import { anchorOf, linterReport, sonarReport, sourceRootsOf } from '../packages/hfs/report/sonar.mjs';
 import { renderTargets } from '../packages/hfs/sync/index.mjs';
 import { managedFindings } from '../packages/hfs/sync/managed.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import { loadSonarGate, serverConditions } from '../scripts/checks/sonar-gate.mjs';
 import { BE, FE, PRESETS, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 
-// One Sonar mechanism (contract change hfs-sonar-import, rules R11, R20, R21): the findings of `hfs check` and the stylelint
-// results become Sonar Generic Issue Import documents; the managed configuration names the reports; the gate holds them at zero.
+// One Sonar mechanism (contract change hfs-sonar-import, rules R11, R20, R21): the findings of `hfs check` and the eslint and stylelint
+// results become Sonar Generic Issue Import documents through one placement rule; the managed configuration names the reports; the gate holds them at zero.
 const root = path.resolve(import.meta.dirname, '..');
 const made = [];
 test.after(() => cleanup(made));
@@ -112,7 +112,7 @@ test('stylelint results become issues of engine stylelint: one rule per stylelin
     { source: path.join(root, 'apps', 'web', 'src', 'clean.css'), warnings: [] },
     { source: path.join(path.dirname(root), 'outside.css'), warnings: [{ line: 1, rule: 'starci/token-only', text: 'x' }] },
   ];
-  const report = stylelintReport(results, { root });
+  const report = linterReport('stylelint', results, { root });
   assert.deepEqual(schemaProblems(report), []);
   assert.deepEqual(report.rules.map((rule) => [rule.id, rule.engineId]), [['starci/no-important', 'stylelint'], ['starci/token-only', 'stylelint'], ['stylelint-error', 'stylelint']]);
   assert.deepEqual(report.issues.map((issue) => [issue.primaryLocation.filePath, issue.primaryLocation.textRange.startLine, issue.ruleId, issue.primaryLocation.message]), [
@@ -121,8 +121,51 @@ test('stylelint results become issues of engine stylelint: one rule per stylelin
     ['apps/web/src/b.css', 2, 'starci/token-only', 'Raw value'],
     ['apps/web/src/b.css', 9, 'starci/no-important', 'Unexpected !important'],
   ]);
-  assert.equal(JSON.stringify(stylelintReport([...results].reverse(), { root })), JSON.stringify(report));
-  assert.deepEqual(stylelintReport([{ source: path.join(root, 'a.css'), warnings: [] }], { root }), { rules: [], issues: [] });
+  assert.equal(JSON.stringify(linterReport('stylelint', [...results].reverse(), { root })), JSON.stringify(report));
+  assert.deepEqual(linterReport('stylelint', [{ source: path.join(root, 'a.css'), warnings: [] }], { root }), { rules: [], issues: [] });
+  assert.throws(() => linterReport('tslint', [], { root }), /unknown linter tslint/);
+});
+
+test('eslint results become issues of engine eslint: one rule per rule id, a fatal parse error under eslint-error, warnings included, files outside the repository skipped', () => {
+  const results = [
+    { filePath: path.join(root, 'apps', 'web', 'src', 'b.tsx'), messages: [{ ruleId: 'starci-fe/no-raw-brand-value', severity: 2, line: 9, endLine: 9, message: 'Raw brand value' }, { ruleId: '@typescript-eslint/no-explicit-any', severity: 1, line: 2, message: 'Unexpected any' }] },
+    { filePath: path.join(root, 'apps', 'web', 'src', 'a.ts'), messages: [{ ruleId: null, fatal: true, severity: 2, line: 1, message: 'Parsing error: Unexpected token' }] },
+    { filePath: path.join(root, 'apps', 'web', 'src', 'clean.ts'), messages: [] },
+    { filePath: path.join(path.dirname(root), 'outside.ts'), messages: [{ ruleId: 'starci-fe/x', line: 1, message: 'x' }] },
+  ];
+  const report = linterReport('eslint', results, { root });
+  assert.deepEqual(schemaProblems(report), []);
+  assert.deepEqual(report.rules.map((rule) => [rule.id, rule.engineId]), [['@typescript-eslint/no-explicit-any', 'eslint'], ['eslint-error', 'eslint'], ['starci-fe/no-raw-brand-value', 'eslint']]);
+  assert.deepEqual(report.issues.map((issue) => [issue.primaryLocation.filePath, issue.primaryLocation.textRange.startLine, issue.ruleId, issue.primaryLocation.message]), [
+    ['apps/web/src/a.ts', 1, 'eslint-error', 'Parsing error: Unexpected token'],
+    ['apps/web/src/b.tsx', 2, '@typescript-eslint/no-explicit-any', 'Unexpected any'],
+    ['apps/web/src/b.tsx', 9, 'starci-fe/no-raw-brand-value', 'Raw brand value'],
+  ]);
+  assert.equal(JSON.stringify(linterReport('eslint', [...results].reverse(), { root })), JSON.stringify(report), 'deterministic');
+});
+
+test('a linter finding outside sonar.sources (packages, e2e, a config file) is filed on the first source file with its real path in the message; a stylesheet or source file under the sources keeps its place', () => {
+  const tracked = ['apps/web/src/app/globals.css', 'apps/web/src/main.ts', 'packages/kit/src/index.ts', 'e2e/flows/a.e2e-spec.ts', 'playwright.config.ts', 'README.md'];
+  const eslint = [
+    { filePath: path.join(root, 'packages', 'kit', 'src', 'index.ts'), messages: [{ ruleId: 'starci-fe/x', line: 4, message: 'in a package' }] },
+    { filePath: path.join(root, 'e2e', 'flows', 'a.e2e-spec.ts'), messages: [{ ruleId: 'starci-fe/y', line: 8, message: 'in e2e' }] },
+    { filePath: path.join(root, 'apps', 'web', 'src', 'main.ts'), messages: [{ ruleId: 'starci-fe/z', line: 3, message: 'in an app' }] },
+  ];
+  const unindexed = linterReport('eslint', eslint, { root, sourceRoots: ['apps'], tracked });
+  assert.deepEqual(schemaProblems(unindexed), []);
+  assert.deepEqual(unindexed.issues.map((issue) => [issue.primaryLocation.filePath, issue.primaryLocation.message, issue.primaryLocation.textRange?.startLine]), [
+    ['apps/web/src/main.ts', 'packages/kit/src/index.ts: in a package', undefined],
+    ['apps/web/src/main.ts', 'e2e/flows/a.e2e-spec.ts: in e2e', undefined],
+    ['apps/web/src/main.ts', 'in an app', 3],
+  ]);
+  const indexed = linterReport('eslint', eslint, { root, sourceRoots: ['apps', 'packages'], tracked });
+  assert.deepEqual(indexed.issues.map((issue) => issue.primaryLocation.filePath), ['apps/web/src/main.ts', 'apps/web/src/main.ts', 'packages/kit/src/index.ts'], 'a package the sources list keeps its own file');
+  const css = [{ source: path.join(root, 'apps', 'web', 'src', 'app', 'globals.css'), warnings: [{ line: 6, rule: 'starci/token-only', text: 'Raw value (starci/token-only)' }] }, { source: path.join(root, 'e2e', 'a.css'), warnings: [{ line: 1, rule: 'starci/token-only', text: 'Raw value (starci/token-only)' }] }];
+  const styled = linterReport('stylelint', css, { root, sourceRoots: ['apps'], tracked });
+  assert.deepEqual(styled.issues.map((issue) => [issue.primaryLocation.filePath, issue.primaryLocation.message, issue.primaryLocation.textRange?.startLine]), [
+    ['apps/web/src/app/globals.css', 'Raw value', 6],
+    ['apps/web/src/main.ts', 'e2e/a.css: Raw value', undefined],
+  ]);
 });
 
 const cli = async (argv, presets) => {
@@ -170,19 +213,32 @@ test('hfs check --sonar writes every error finding (hfs and machine alike) befor
   assert.ok(!JSON.parse(fs.readFileSync(clean, 'utf8')).rules.some((rule) => rule.id === 'HFS_SONAR_CONFIG'));
 });
 
-test('hfs report-stylelint converts a stylelint json file, and refuses text that is not one', async () => {
+test('hfs report <linter> converts an eslint or stylelint json file, files a finding outside sonar.sources on the anchor, and refuses text that is not one', async () => {
   const out = scratch();
   const input = path.join(out, 'stylelint.json');
   fs.writeFileSync(input, JSON.stringify([{ source: path.join(out, 'apps', 'web', 'src', 'a.css'), warnings: [{ line: 4, rule: 'starci/token-only', severity: 'error', text: 'Raw value (starci/token-only)' }] }]));
-  const done = await cli(['report-stylelint', input, path.join(out, 'stylelint.sonar.json'), '--repo', out]);
+  const done = await cli(['report', 'stylelint', input, path.join(out, 'stylelint.sonar.json'), '--repo', out]);
   assert.equal(done.code, 0, done.err);
-  assert.match(done.out, /1 issue written/);
+  assert.match(done.out, /hfs report stylelint: 1 issue written/);
   const report = JSON.parse(fs.readFileSync(path.join(out, 'stylelint.sonar.json'), 'utf8'));
   assert.deepEqual(schemaProblems(report), []);
   assert.equal(report.issues[0].primaryLocation.filePath, 'apps/web/src/a.css');
+  const eslintInput = path.join(out, 'eslint.json');
+  fs.writeFileSync(eslintInput, JSON.stringify([{ filePath: path.join(out, 'packages', 'kit', 'src', 'index.ts'), messages: [{ ruleId: 'starci-fe/x', line: 2, message: 'x' }] }]));
+  fs.writeFileSync(path.join(out, 'sonar-project.properties'), 'sonar.sources=apps\n');
+  execFileSync('git', ['-C', out, 'init', '-q']);
+  for (const file of ['apps/web/src/main.ts', 'packages/kit/src/index.ts']) { fs.mkdirSync(path.dirname(path.join(out, file)), { recursive: true }); fs.writeFileSync(path.join(out, file), 'export {};\n'); }
+  execFileSync('git', ['-C', out, 'add', '-A']);
+  const filed = await cli(['report', 'eslint', eslintInput, path.join(out, 'eslint.sonar.json'), '--repo', out]);
+  assert.equal(filed.code, 0, filed.err);
+  const eslintReport = JSON.parse(fs.readFileSync(path.join(out, 'eslint.sonar.json'), 'utf8'));
+  assert.deepEqual(schemaProblems(eslintReport), []);
+  assert.deepEqual(eslintReport.issues.map((issue) => [issue.primaryLocation.filePath, issue.primaryLocation.message]), [['apps/web/src/main.ts', 'packages/kit/src/index.ts: x']], 'a package the sources do not list is not dropped');
   fs.writeFileSync(input, '{ "not": "an array" }');
-  assert.equal((await cli(['report-stylelint', input, path.join(out, 'x.json'), '--repo', out])).code, 2);
-  assert.equal((await cli(['report-stylelint', input, '--repo', out])).code, 2);
+  assert.equal((await cli(['report', 'stylelint', input, path.join(out, 'x.json'), '--repo', out])).code, 2);
+  assert.equal((await cli(['report', 'stylelint', input, '--repo', out])).code, 2);
+  assert.equal((await cli(['report', 'tslint', input, path.join(out, 'x.json'), '--repo', out])).code, 2);
+  assert.equal((await cli(['report-stylelint', input, path.join(out, 'x.json'), '--repo', out])).code, 2, 'the old command is gone, not aliased');
 });
 
 const managed = async (dir, declaration) => {
@@ -198,8 +254,10 @@ test('HFS_SONAR_CONFIG: a host URL, a dropped report path or any edit of sonar-p
     const text = fs.readFileSync(file, 'utf8');
     fs.writeFileSync(file, `${text}sonar.host.url=https://sonar.example.org\n`);
     assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: a host URL`);
-    fs.writeFileSync(file, text.replace(/^sonar\.eslint\.reportPaths=.*\n/m, ''));
-    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: the ESLint report path dropped`);
+    fs.writeFileSync(file, text.replace('reports/eslint.sonar.json', 'reports/eslint.json'));
+    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: the ESLint import path dropped`);
+    fs.writeFileSync(file, `${text}sonar.eslint.reportPaths=reports/eslint.json\n`);
+    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: Sonar's own ESLint import is not used`);
     fs.writeFileSync(file, text.replace(/^sonar\.externalIssuesReportPaths=.*\n/m, ''));
     assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: the HFS import path dropped`);
     fs.writeFileSync(file, text);
@@ -234,17 +292,18 @@ test('the managed configuration wires the reports: properties name them, the wor
   for (const declaration of [BE, FE]) {
     const files = Object.fromEntries(renderTargets(declaration, PRESETS[declaration.profile]).map((target) => [target.path, target.content]));
     const properties = files['sonar-project.properties'];
-    assert.match(properties, /^sonar\.eslint\.reportPaths=reports\/eslint\.json$/m);
-    assert.match(properties, declaration.profile === 'fe' ? /^sonar\.externalIssuesReportPaths=reports\/hfs\.sonar\.json,reports\/stylelint\.sonar\.json$/m : /^sonar\.externalIssuesReportPaths=reports\/hfs\.sonar\.json$/m);
+    assert.doesNotMatch(properties, /sonar\.eslint\.reportPaths/, 'no second import path for eslint');
+    assert.match(properties, declaration.profile === 'fe' ? /^sonar\.externalIssuesReportPaths=reports\/hfs\.sonar\.json,reports\/eslint\.sonar\.json,reports\/stylelint\.sonar\.json$/m : /^sonar\.externalIssuesReportPaths=reports\/hfs\.sonar\.json,reports\/eslint\.sonar\.json$/m);
     assert.doesNotMatch(properties, /sonar\.host\.url/);
     const steps = parseYaml(files['.github/workflows/ci.yml']).jobs.ci.steps;
     const at = (predicate) => steps.findIndex(predicate);
     const scan = at((step) => String(step.uses).startsWith('SonarSource/sonarqube-scan-action'));
-    const producers = steps.map((step, index) => [step, index]).filter(([step]) => /hfs:report|hfs check --sonar|lint:report|--output-file reports\/eslint\.json|report-stylelint/.test(step.run ?? ''));
-    assert.ok(producers.length >= (declaration.profile === 'fe' ? 3 : 2), `${declaration.profile}: the hfs, the eslint and (front end) the stylelint reports`);
+    const producers = steps.map((step, index) => [step, index]).filter(([step]) => /hfs:report|lint:report|hfs report /.test(step.run ?? ''));
+    assert.ok(producers.length >= (declaration.profile === 'fe' ? 5 : 3), `${declaration.profile}: the hfs report, the eslint report and its import (front end: the stylelint report and its import too)`);
+    for (const command of ['npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', ...(declaration.profile === 'fe' ? ['npx hfs report stylelint reports/stylelint.json reports/stylelint.sonar.json'] : [])]) assert.ok(steps.some((step) => step.run === command), `${declaration.profile}: ${command}`);
     for (const [, index] of producers) assert.ok(index < scan, `${declaration.profile}: a report is produced before the Sonar scan`);
     for (const step of steps) assert.equal(step['continue-on-error'], undefined, 'no step swallows a failure');
-    for (const step of [steps[scan], steps[scan + 1], ...producers.filter(([step]) => /lint:report|eslint|stylelint/.test(step.run)).map(([step]) => step)]) assert.match(String(step.if), /!cancelled\(\)/, 'a failed check still reaches Sonar');
+    for (const step of [steps[scan], steps[scan + 1], ...producers.filter(([step]) => /lint:report|hfs report /.test(step.run)).map(([step]) => step)]) assert.match(String(step.if), /!cancelled\(\)/, 'a failed check still reaches Sonar');
   }
 });
 

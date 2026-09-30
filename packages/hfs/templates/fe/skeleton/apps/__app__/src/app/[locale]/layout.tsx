@@ -2,7 +2,7 @@ import { hasLocale, NextIntlClientProvider } from "next-intl"
 import { getMessages, setRequestLocale } from "next-intl/server"
 import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
-import { routing } from "../../modules/i18n/routing"
+import { routing } from "../../modules/i18n"
 import "../globals.css"
 
 interface LocaleLayoutProps {

@@ -1,0 +1,10 @@
+{{header}}
+node_modules/
+.next/
+dist/
+coverage/
+reports/
+.starci/
+package-lock.json
+**/__generated__/
+**/messages/**

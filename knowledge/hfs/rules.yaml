@@ -186,8 +186,8 @@ rules:
       - {kind: hfs, id: tool-config-forbidden, at: scripts/lib/hfs-check.mjs}
   - id: R17
     code: "HFS_RULE_OFF_WITHOUT_REPLACEMENT"
-    title_vi: "Cấu hình ESLint lệch bản render"
-    law: "The ESLint configuration is the rendered one-liner, so no rule is off, warned or redefined in a repository."
+    title_vi: "Cấu hình ESLint hoặc stylelint lệch bản render"
+    law: "The ESLint configuration (and a front end's stylelint configuration) is the rendered one-liner, so no rule is off, warned or redefined in a repository."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["HFS_RULE_OFF_WITHOUT_REPLACEMENT"]

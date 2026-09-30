@@ -29,6 +29,9 @@ jobs:
       - name: lint report
         if: ${{ !cancelled() }}
         run: npm run lint:report
+      - name: eslint sonar import
+        if: ${{ !cancelled() }}
+        run: npx hfs report eslint reports/eslint.json reports/eslint.sonar.json
       - name: format
         run: npm run format:check
       - name: typecheck

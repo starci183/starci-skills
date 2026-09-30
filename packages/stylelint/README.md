@@ -4,11 +4,12 @@ The CSS half of the StarCi lint canon (HFS R61 `FE_STYLE_TOKEN_ONLY`). The TypeS
 `starci-fe/no-raw-brand-value` in `@starci/eslint-canon-fe`; both use one definition of a *raw brand value*
 (`lib/brand-value.mjs`: a hex colour, a colour function such as `rgb`/`hsl`/`oklch`/`color-mix`, or a `px` length).
 
-```js
-// stylelint.config.mjs
-import { starciStylelintConfig } from "@starci/stylelint-canon"
+A repository's `stylelint.config.mjs` is the managed one-liner `hfs sync` renders (and `hfs check` compares, R05/R17):
 
-export default starciStylelintConfig()
+```js
+import { loadAppTokens, starciStylelintConfig } from "@starci/stylelint-canon"
+
+export default starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })
 ```
 
 Peers: `stylelint` (17) and `postcss-value-parser`; exact versions are in `knowledge/hfs/canon-pins.yaml`.
@@ -16,7 +17,8 @@ Peers: `stylelint` (17) and `postcss-value-parser`; exact versions are in `knowl
 ## No rule is off
 
 The factory has one option, `appTokens` (custom properties a repository's `globals.css` declares as aliases of grammar
-tokens). Any other option throws. The config it returns sets every rule to error, `ignoreDisables: true` (a
+tokens); `loadAppTokens(import.meta.url)` derives it from every `globals.css` under `apps/*/src` and `packages/*/src`, so the
+config file holds no repository choice. Any other option throws. The config it returns sets every rule to error, `ignoreDisables: true` (a
 `stylelint-disable` comment switches nothing off) and no `ignoreFiles`. `assertEveryRuleOn(config)` throws when a config
 turns a rule off, downgrades it, omits it, ignores a file or honours inline disables; call it on a config you extended.
 

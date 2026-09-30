@@ -1,23 +1,30 @@
-// hfs report: the ONE way the findings of the HFS canon reach Sonar (contract change hfs-sonar-import).
+// hfs report: the ONE way the findings of the StarCi canon reach Sonar (contract change hfs-sonar-import).
 //
-//   hfs check --sonar <file>            writes every error-level finding of the check (repository, managed files and the whole
-//                                       architecture machine) as a Sonar Generic Issue Import document (SonarQube 10.3+ format:
-//                                       `{ rules, issues }`), engineId `starci-hfs`, rule id = the finding code
-//   hfs report-stylelint <in> <out>     converts stylelint's `--formatter json` output (Sonar has no native stylelint import)
-//                                       into the same document format, engineId `stylelint`, rule id = the stylelint rule
-//   ESLint                              needs no converter: `eslint -f json -o reports/eslint.json` is read by Sonar itself
-//                                       (sonar.eslint.reportPaths)
-// The output is deterministic: rules sorted by id, issues by file, line, column, rule and message, so two runs over one
-// tree are byte-identical. A finding of level `info` (report-only) is not exported: the gate fails on any imported issue.
+//   hfs check --sonar <file>               writes every error-level finding of the check (repository, managed files and the whole
+//                                          architecture machine) as a Sonar Generic Issue Import document (SonarQube 10.3+ format:
+//                                          `{ rules, issues }`), engineId `starci-hfs`, rule id = the finding code
+//   hfs report <eslint|stylelint> <in> <out>
+//                                          converts the linter's own json output (`eslint -f json`, `stylelint --formatter json`)
+//                                          into the same document format, engineId `eslint` / `stylelint`, rule id = the linter's
+//                                          rule. Sonar's own ESLint import (sonar.eslint.reportPaths) is not used: it drops an issue
+//                                          on a file outside sonar.sources, and a stylelint result has no native import at all.
+// One placement rule for every engine: Sonar imports an issue only on a file it indexes (a tracked source or stylesheet under
+// sonar.sources). A finding on any other path (hfs.json, a workflow, a package under an unindexed root, e2e/, a directory) is filed
+// on the first source file of sonar.sources and its message names the real path, so no finding is dropped.
+// The output is deterministic: rules sorted by id, issues by file, line, rule and message, so two runs over one tree are
+// byte-identical. A finding of level `info` (report-only) is not exported: the gate fails on any imported issue.
 import fs from 'node:fs';
 import path from 'node:path';
 
 export const HFS_ENGINE = 'starci-hfs';
+export const ESLINT_ENGINE = 'eslint';
 export const STYLELINT_ENGINE = 'stylelint';
 /** Every imported issue is a maintainability defect of the highest impact: the gate holds the count at zero. */
 const IMPACT = Object.freeze([Object.freeze({ softwareQuality: 'MAINTAINABILITY', severity: 'HIGH' })]);
 const CLEAN_CODE_ATTRIBUTE = 'CONVENTIONAL';
 const SOURCE_FILE = /\.(?:[cm]?[jt]sx?)$/;
+/** The files Sonar indexes under sonar.sources: the source files above and the stylesheets its CSS analyzer reads. */
+const INDEXED_FILE = /\.(?:[cm]?[jt]sx?|css)$/;
 
 const posix = (file) => file.split(path.sep).join('/').replace(/^\.\//, '');
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -46,16 +53,31 @@ export function anchorOf(tracked, sourceRoots) {
 }
 
 /**
- * The Generic Issue Import document of a check's findings (the `findings` of checkRepository, each with the catalog's
- * `title`, `titleVi`, `whyVi` and `nextStepVi`). `sourceRoots` and `tracked` place a finding that lies outside the indexed
- * sources (see anchorOf); without them every finding keeps its own path.
+ * The one placement rule of every engine. `sourceRoots` and `tracked` say which files Sonar indexes; without them every
+ * finding keeps its own path. Returns `place(own, message, line, endLine)`: the `primaryLocation` of the finding (its own file,
+ * or the anchor with the real path named in the message), or null when there is nowhere to file it.
  */
-export function sonarReport(findings, { sourceRoots = [], tracked = [] } = {}) {
+function placement({ sourceRoots = [], tracked = [] }) {
   const anchor = sourceRoots.length ? anchorOf(tracked, sourceRoots) : null;
   const roots = sourceRoots.map((root) => `${posix(root).replace(/\/$/, '')}/`);
   const trackedSet = new Set(tracked.map(posix));
-  // Sonar imports an issue only on a file it indexes: a tracked source file under sonar.sources (a directory, a config file or a JSON file is not one).
-  const indexed = (file) => roots.some((root) => file.startsWith(root)) && SOURCE_FILE.test(file) && (trackedSet.size === 0 || trackedSet.has(file));
+  // Sonar imports an issue only on a file it indexes: a tracked source file or stylesheet under sonar.sources (a directory, a config file or a JSON file is not one).
+  const indexed = (file) => roots.some((root) => file.startsWith(root)) && INDEXED_FILE.test(file) && (trackedSet.size === 0 || trackedSet.has(file));
+  return (own, message, line, endLine) => {
+    const moved = anchor !== null && (own === null || !indexed(own));
+    const filePath = moved ? anchor : own ?? anchor;
+    if (filePath === null) return null;
+    return { message: moved ? `${own ?? 'repository'}: ${message}` : message, filePath, ...(moved ? {} : rangeOf(line, endLine)) };
+  };
+}
+
+/**
+ * The Generic Issue Import document of a check's findings (the `findings` of checkRepository, each with the catalog's
+ * `title`, `titleVi`, `whyVi` and `nextStepVi`). `sourceRoots` and `tracked` place a finding that lies outside the indexed
+ * sources (see placement); without them every finding keeps its own path.
+ */
+export function sonarReport(findings, { sourceRoots = [], tracked = [] } = {}) {
+  const place = placement({ sourceRoots, tracked });
   const rules = new Map();
   const issues = [];
   for (const finding of findings) {
@@ -63,12 +85,9 @@ export function sonarReport(findings, { sourceRoots = [], tracked = [] } = {}) {
     if (!rules.has(finding.code)) {
       rules.set(finding.code, ruleOf(finding.code, HFS_ENGINE, finding.title ?? finding.code, `${finding.title ?? finding.code}. ${finding.titleVi}: ${finding.whyVi} Cách sửa: ${finding.nextStepVi}`));
     }
-    const own = finding.path ? posix(finding.path) : null;
-    const moved = anchor !== null && (own === null || !indexed(own));
-    const filePath = moved ? anchor : own ?? anchor;
-    if (filePath === null) continue;
-    const located = moved ? {} : rangeOf(finding.line);
-    issues.push({ ruleId: finding.code, effortMinutes: 5, primaryLocation: { message: moved ? `${own ?? 'repository'}: ${finding.message}` : finding.message, filePath, ...located } });
+    const primaryLocation = place(finding.path ? posix(finding.path) : null, finding.message, finding.line);
+    if (primaryLocation === null) continue;
+    issues.push({ ruleId: finding.code, effortMinutes: 5, primaryLocation });
   }
   return document(rules, issues);
 }
@@ -76,23 +95,57 @@ export function sonarReport(findings, { sourceRoots = [], tracked = [] } = {}) {
 /** Text of a stylelint warning without the trailing " (rule-name)" its formatter appends. */
 const stylelintText = (warning) => String(warning.text ?? '').replace(new RegExp(`\\s*\\(${String(warning.rule ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)$`), '');
 
+// What differs between the two linters' json output: where the file, the findings, the rule and the text are.
+const LINTERS = Object.freeze({
+  eslint: {
+    engine: ESLINT_ENGINE,
+    errorRule: 'eslint-error',
+    file: (result) => result.filePath,
+    findings: (result) => result.messages,
+    rule: (message) => message.ruleId,
+    text: (message) => message.message,
+    describe: (id) => `ESLint rule ${id} of the StarCi canon (@starci/eslint-canon-be and @starci/eslint-canon-fe) or of a plugin it composes.`,
+    describeError: 'ESLint could not lint a file: a parse error or an invalid configuration.',
+    shape: 'an array of results with a filePath and messages',
+  },
+  stylelint: {
+    engine: STYLELINT_ENGINE,
+    errorRule: 'stylelint-error',
+    file: (result) => result.source,
+    findings: (result) => result.warnings,
+    rule: (warning) => warning.rule,
+    text: stylelintText,
+    describe: (id) => `Stylelint rule ${id} of the StarCi CSS canon (@starci/stylelint-canon, HFS R61).`,
+    describeError: 'Stylelint could not read a stylesheet: a parse error or an invalid option.',
+    shape: 'an array of results with a source and warnings',
+  },
+});
+
+export const LINTER_KINDS = Object.freeze(Object.keys(LINTERS));
+
 /**
- * stylelint's `--formatter json` results ([{ source, warnings: [{ line, endLine, rule, text }] }]) as a Generic Issue Import
- * document. `root` is the directory paths are made relative to (the repository root, where the scan runs). A parse error or
- * an invalid option is a warning stylelint reports without a rule name; it is imported under the rule `stylelint-error`.
+ * A linter's json results (`eslint -f json`: [{ filePath, messages: [{ ruleId, line, endLine, message }] }]; `stylelint
+ * --formatter json`: [{ source, warnings: [{ line, endLine, rule, text }] }]) as a Generic Issue Import document. `root` is
+ * the directory paths are made relative to (the repository root, where the scan runs); a file outside it is skipped.
+ * `sourceRoots` and `tracked` place a finding on a file Sonar does not index (see placement). A parse error or an invalid
+ * option is a finding the linter reports without a rule name; it is imported under the rule `eslint-error` / `stylelint-error`.
  */
-export function stylelintReport(results, { root }) {
+export function linterReport(kind, results, { root, sourceRoots = [], tracked = [] }) {
+  const linter = LINTERS[kind];
+  if (linter === undefined) throw new Error(`unknown linter ${kind}; expected ${LINTER_KINDS.join(' or ')}`);
+  const place = placement({ sourceRoots, tracked });
   const rules = new Map();
   const issues = [];
   for (const result of results) {
-    const source = String(result.source ?? '');
+    const source = String(linter.file(result) ?? '');
     if (!source) continue;
     const relative = posix(path.isAbsolute(source) ? path.relative(root, source) : source);
     if (relative.startsWith('..')) continue;
-    for (const warning of result.warnings ?? []) {
-      const id = warning.rule || 'stylelint-error';
-      if (!rules.has(id)) rules.set(id, ruleOf(id, STYLELINT_ENGINE, id, `Stylelint rule ${id} of the StarCi CSS canon (@starci/stylelint-canon, HFS R61).`));
-      issues.push({ ruleId: id, effortMinutes: 5, primaryLocation: { message: stylelintText(warning) || id, filePath: relative, ...rangeOf(warning.line, warning.endLine) } });
+    for (const finding of linter.findings(result) ?? []) {
+      const id = linter.rule(finding) || linter.errorRule;
+      if (!rules.has(id)) rules.set(id, ruleOf(id, linter.engine, id, id === linter.errorRule ? linter.describeError : linter.describe(id)));
+      const primaryLocation = place(relative, linter.text(finding) || id, finding.line, finding.endLine);
+      if (primaryLocation !== null) issues.push({ ruleId: id, effortMinutes: 5, primaryLocation });
     }
   }
   return document(rules, issues);
@@ -110,16 +163,18 @@ export function writeReport(file, report) {
   fs.writeFileSync(file, `${JSON.stringify(report, null, 2)}\n`);
 }
 
-/** `hfs report-stylelint <in> <out> [--repo <dir>]`: convert a stylelint json report; returns the number of issues written. */
-export function convertStylelintFile({ input, output, root }) {
+/** `hfs report <eslint|stylelint> <in> <out> [--repo <dir>]`: convert a linter's json report; returns the number of issues written. */
+export function convertReportFile({ kind, input, output, root, sourceRoots = [], tracked = [] }) {
+  const linter = LINTERS[kind];
+  if (linter === undefined) throw new Error(`unknown linter ${kind}; expected ${LINTER_KINDS.join(' or ')}`);
   let results;
   try {
     results = JSON.parse(fs.readFileSync(input, 'utf8'));
   } catch (error) {
-    throw new Error(`${input} is not a readable stylelint json report (${error.message})`);
+    throw new Error(`${input} is not a readable ${kind} json report (${error.message})`);
   }
-  if (!Array.isArray(results)) throw new Error(`${input} is not a stylelint json report: expected an array of results`);
-  const report = stylelintReport(results, { root });
+  if (!Array.isArray(results)) throw new Error(`${input} is not a ${kind} json report: expected ${linter.shape}`);
+  const report = linterReport(kind, results, { root, sourceRoots, tracked });
   writeReport(output, report);
   return report.issues.length;
 }

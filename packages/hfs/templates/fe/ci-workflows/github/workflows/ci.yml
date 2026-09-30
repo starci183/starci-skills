@@ -23,18 +23,23 @@ jobs:
           cache: npm
       - run: npm ci
       - name: hfs check
-        run: npx hfs check --sonar reports/hfs.sonar.json
+        run: npm run hfs:report
       - name: lint
         run: npm run lint:check
-      - name: lint report
+      - name: eslint report
         if: ${{ !cancelled() }}
-        run: npx eslint . --format json --output-file reports/eslint.json
+        run: npm run lint:report
+      - name: eslint sonar import
+        if: ${{ !cancelled() }}
+        run: npx hfs report eslint reports/eslint.json reports/eslint.sonar.json
       - name: stylelint report
         if: ${{ !cancelled() }}
-        run: npx stylelint "apps/*/src/**/*.css" --formatter json --output-file reports/stylelint.json
+        run: npm run lint:report:css
       - name: stylelint sonar import
         if: ${{ !cancelled() }}
-        run: npx hfs report-stylelint reports/stylelint.json reports/stylelint.sonar.json
+        run: npx hfs report stylelint reports/stylelint.json reports/stylelint.sonar.json
+      - name: format
+        run: npm run format:check
       - name: typecheck
         run: npm run typecheck
       - name: unit

@@ -16,7 +16,9 @@
 //                                            (exit 2), never a silent full pass. Exit 1 on any error-level finding.
 //                                            --sonar: also write the error findings as a Sonar Generic Issue Import file (report/sonar.mjs),
 //                                            before the verdict, so a failing check still leaves the report Sonar imports.
-//   hfs report-stylelint <in> <out> [--repo <dir>]  convert stylelint's json output into a Sonar Generic Issue Import file.
+//   hfs report <eslint|stylelint> <in> <out> [--repo <dir>]  convert a linter's json output into a Sonar Generic Issue Import file
+//                                            (one converter for both linters; a finding on a file Sonar does not index is filed on the first
+//                                            source file of sonar.sources, the real path in its message).
 //   hfs init    [--repo <dir>] [--stdout]   write a starter hfs.json by detecting the profile and the apps.
 //   hfs explain <path> [--repo <dir>] [--json]   which slot owns the path, its tier, allowed imports, required tests.
 //   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar, codecov); sync/cli.mjs
@@ -32,10 +34,10 @@ import { formatFindings } from '../sync/format.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
-import { convertStylelintFile, sonarReport, sourceRootsOf, writeReport } from '../report/sonar.mjs';
+import { LINTER_KINDS, convertReportFile, sonarReport, sourceRootsOf, writeReport } from '../report/sonar.mjs';
 
 const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]
-hfs report-stylelint <in> <out> [--repo <dir>]
+hfs report <eslint|stylelint> <in> <out> [--repo <dir>]
 hfs init [--repo <dir>] [--stdout]
 hfs explain <path> [--repo <dir>] [--json]
 hfs sync (--check | --write) [--root <dir>]
@@ -100,7 +102,7 @@ function printExplain(e, out) {
 /** `presets` and `prettier` are test seams: the coverage denominators sync would load from the repository's installed preset, and the repository's own prettier. */
 export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
   const [verb, ...rest] = argv;
-  if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report-stylelint'].includes(verb)) { stderr(USAGE); return 2; }
+  if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report'].includes(verb)) { stderr(USAGE); return 2; }
   try {
     if (verb === 'sync' || verb === 'work-hygiene') return await syncMain(argv);
     const opts = parse(rest);
@@ -115,11 +117,14 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
       if (opts.json) stdout(`${JSON.stringify(result, null, 2)}\n`); else printCheck(result, stdout);
       return result.ok ? 0 : 1;
     }
-    if (verb === 'report-stylelint') {
-      if (opts.positional.length !== 2) throw new Error('hfs report-stylelint takes an input and an output file');
-      const issues = convertStylelintFile({ input: path.resolve(opts.positional[0]), output: path.resolve(opts.positional[1]), root: repoRoot });
-      stdout(`hfs report-stylelint: ${issues} issue${issues === 1 ? '' : 's'} written to ${opts.positional[1]}
-`);
+    if (verb === 'report') {
+      if (opts.positional.length !== 3 || !LINTER_KINDS.includes(opts.positional[0])) throw new Error(`hfs report takes a linter (${LINTER_KINDS.join(' or ')}), an input and an output file`);
+      const [kind, input, output] = opts.positional;
+      let properties = '';
+      try { properties = fs.readFileSync(path.join(repoRoot, 'sonar-project.properties'), 'utf8'); } catch { /* no properties: every finding keeps its own path */ }
+      const sourceRoots = sourceRootsOf(properties);
+      const issues = convertReportFile({ kind, input: path.resolve(input), output: path.resolve(output), root: repoRoot, sourceRoots, tracked: sourceRoots.length ? trackedFiles(repoRoot) : [] });
+      stdout(`hfs report ${kind}: ${issues} issue${issues === 1 ? '' : 's'} written to ${output}\n`);
       return 0;
     }
     if (verb === 'init') {

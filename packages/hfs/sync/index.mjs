@@ -119,30 +119,42 @@ export async function loadPresets(root, profile) {
 }
 
 /**
- * The package.json script lines a back end's apps add, each ending with a comma (the template puts them mid-object):
- * `start:<app>` runs a built api, worker or cli app, `migrate` the migrate app.
+ * The package.json script lines the apps add, each ending with a comma (the template puts them mid-object). A back end:
+ * `start:<app>` runs a built api, worker or cli app, `migrate` the migrate app. A front end: `dev:<app>` and `start:<app>`
+ * run the app's own script through its workspace path (the npm workspace of apps/<app>).
  */
-export function appScripts(apps) {
+export function appScripts(profile, apps) {
+  const line = (name, command) => `${JSON.stringify(name)}: ${JSON.stringify(command)},`;
+  if (profile === 'fe') return apps.flatMap(app => [line(`dev:${app.name}`, `npm run dev --workspace apps/${app.name}`), line(`start:${app.name}`, `npm run start --workspace apps/${app.name}`)]).join('\n    ');
   const migrates = apps.filter(app => app.kind === 'migrate');
   return apps.map(app => {
     const name = app.kind === 'migrate' ? (migrates.length === 1 ? 'migrate' : `migrate:${app.name}`) : `start:${app.name}`;
-    return `${JSON.stringify(name)}: ${JSON.stringify(`node dist/apps/${app.name}/src/main.js`)},`;
+    return line(name, `node dist/apps/${app.name}/src/main.js`);
   }).join('\n    ');
 }
+
+/** True when hfs.json opts into a workspace package (repo.packages or any fe.package.* slot): the sources then include packages/. */
+export const opensPackages = hfs => (hfs.optionalSlots ?? []).some(id => id === 'repo.packages' || String(id).startsWith('fe.package.'));
+
+/** The stylesheets of a front end the CSS canon judges: every app and every workspace package (slot fe.route, fe.package.*). */
+export const STYLE_GLOB = '{apps,packages}/*/src/**/*.css';
 
 /** Every value a template can name, derived from hfs.json and the presets. */
 export function variables(hfs, presets, sonarKey) {
   const globs = [...presets.sonarExclusions.split(','), ...presets.sonarCoverageExclusions.split(',')];
+  const packages = hfs.profile === 'fe' && opensPackages(hfs);
   return {
     header: HEADER(hfs.profile),
-    appScripts: appScripts(hfs.apps),
+    appScripts: appScripts(hfs.profile, hfs.apps),
     profile: hfs.profile,
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? `${hfs.project}-${hfs.profile === 'be' ? 'backend' : 'fe'}`,
     sonarExclusions: presets.sonarExclusions,
     sonarCoverageExclusions: presets.sonarCoverageExclusions,
     codecovIgnore: globs.map(glob => JSON.stringify(glob)).join('\n  - '),
-    tsconfigPaths: hfs.apps.map(app => `apps/${app.name}/tsconfig.json`).join(','),
+    tsconfigPaths: [...hfs.apps.map(app => `apps/${app.name}/tsconfig.json`), ...(packages ? ['packages/*/tsconfig.json'] : [])].join(','),
+    sonarRoots: packages ? 'apps,packages' : 'apps',
+    styleGlob: STYLE_GLOB,
   };
 }
 

@@ -1,8 +1,19 @@
 {{header}}
-# Commit gate: staged lint, types, the unit specs the staged files touch. Never e2e.
-npx lint-staged
+# Commit gate: types, lint and format of the staged files, the unit specs the staged files touch. Never e2e.
 npm run typecheck
-staged=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' | grep -v -E '(^|/)e2e/|\.e2e-spec\.ts$' || true)
-if [ -n "$staged" ]; then
-  npx vitest related --run --passWithNoTests $staged
+sources=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' '*.mts' '*.cts' '*.js' '*.jsx' '*.mjs' '*.cjs' || true)
+if [ -n "$sources" ]; then
+  npx eslint --max-warnings=0 --no-warn-ignored $sources
+fi
+styles=$(git diff --cached --name-only --diff-filter=ACMR -- '*.css' || true)
+if [ -n "$styles" ]; then
+  npx stylelint $styles
+fi
+formatted=$(git diff --cached --name-only --diff-filter=ACMR || true)
+if [ -n "$formatted" ]; then
+  npx prettier --check --ignore-unknown $formatted
+fi
+specs=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' | grep -v -E '(^|/)e2e/|\.e2e-spec\.ts$' || true)
+if [ -n "$specs" ]; then
+  npx vitest related --run --passWithNoTests $specs
 fi

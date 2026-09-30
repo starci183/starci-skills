@@ -70,8 +70,7 @@ export function writeCleanRepo(declaration, { declare = true, into, name = 'demo
     const owners = ['src/features/orders/index.ts', ...resolver.requiredPaths().paths.map((entry) => entry.path).filter((p) => /^src\/modules\/[^/]+\/[^/]+\/index\.ts$/.test(p))];
     fs.writeFileSync(path.join(dir, 'apps/core/src/main.ts'), owners.map((file) => `import '../../../${file.replace(/\.ts$/, '')}';`).join('\n') + '\n');
   }
-  // A back end's tsconfig.json is the managed one (it extends @starci/tsconfig/be.json, see installTypeScript); a front end writes its own.
-  if (declaration.profile === 'fe') fs.writeFileSync(path.join(dir, 'tsconfig.json'), `${JSON.stringify({ compilerOptions: { strict: true, module: 'commonjs', target: 'es2022', skipLibCheck: true }, include: ['src', 'apps'] }, null, 2)}\n`);
+  // Both profiles' tsconfig.json is the managed one (it extends @starci/tsconfig/be.json or next.json, see installTypeScript).
   fs.writeFileSync(path.join(dir, 'README.md'), readmeOf(path.basename(dir), declaration.profile));
   if (declare) fs.writeFileSync(path.join(dir, 'hfs.json'), `${JSON.stringify(declaration, null, 2)}\n`);
   else fs.rmSync(path.join(dir, 'hfs.json'), { force: true });

@@ -41,7 +41,7 @@ test('a synced back end and a synced front end have no managed-file finding of a
 
 test('HFS_MANAGED_FILE_DRIFT: an edited hook, jest config, .prettierignore or scripts block is drift, a deleted optional workflow is not', async () => {
   const dir = await synced();
-  put(dir, '.husky/pre-push', 'exit 0\n');
+  put(dir, '.husky/pre-push', `${read(dir, '.husky/pre-push')}echo extra\n`);
   put(dir, 'jest.config.js', 'module.exports = {}\n');
   put(dir, '.prettierignore', 'dist/\n');
   fs.rmSync(path.join(dir, '.github', 'workflows', 'e2e.yml'));
@@ -136,4 +136,109 @@ test('a repository whose hfs.json is unreadable has no managed-file finding: the
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-managed-none-'));
   made.push(dir);
   assert.deepEqual(await managedFindings({ repoRoot: dir, tracked: [], presets: PRESETS.be }), []);
+});
+
+// ----- the front end: the same mechanism, the same codes -----
+
+test('a front end: HFS_RULE_OFF_WITHOUT_REPLACEMENT is any edit of eslint.config.mjs or stylelint.config.mjs, one finding each and never also drift; the renders, with LF or CRLF, are clean', async () => {
+  const dir = await synced(FE);
+  put(dir, 'eslint.config.mjs', 'import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"\n\nexport default [...starciFeConfig({ hfs: loadHfs(import.meta.url) }), { rules: { "starci-fe/no-x": "off" } }]\n');
+  put(dir, 'stylelint.config.mjs', 'import { starciStylelintConfig } from "@starci/stylelint-canon"\n\nexport default { ...starciStylelintConfig(), rules: { "starci/no-important": null } }\n');
+  assert.deepEqual((await findings(dir)).sort(), [['HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'eslint.config.mjs'], ['HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'stylelint.config.mjs']]);
+  const clean = await synced(FE);
+  for (const file of ['eslint.config.mjs', 'stylelint.config.mjs']) put(clean, file, read(clean, file).replace(/\n/g, '\r\n'));
+  assert.deepEqual(await findings(clean), []);
+});
+
+test('a front end: HFS_TS_STRICT judges the root tsconfig.json by flag (another preset, a compiler option, an alias, a dropped e2e exclusion); the render and a formatting-only change are clean or drift', async () => {
+  const dir = await synced(FE);
+  const tsconfig = JSON.parse(read(dir, 'tsconfig.json'));
+  assert.deepEqual(tsconfig.exclude, ['node_modules', 'e2e', 'playwright.config.ts']);
+  const flags = (actual) => tsStrictFindings(JSON.stringify(actual), renderTargets(FE, PRESETS.fe).find((target) => target.path === 'tsconfig.json').content).map((finding) => finding.flag);
+  assert.deepEqual(flags(tsconfig), []);
+  assert.deepEqual(flags({ ...tsconfig, extends: '@starci/tsconfig/base.json' }), ['extends']);
+  assert.deepEqual(flags({ ...tsconfig, compilerOptions: { strict: false, jsx: 'preserve' } }).sort(), ['jsx', 'strict']);
+  assert.deepEqual(flags({ ...tsconfig, compilerOptions: { paths: { '@/*': ['./src/*'] } } }), ['paths'], 'the root config has no alias: each app declares its own in apps/<app>/tsconfig.json');
+  assert.deepEqual(flags({ ...tsconfig, exclude: ['node_modules'] }), ['exclude'], 'the e2e tree is excluded, so the default typecheck never includes it');
+  assert.deepEqual(flags({ ...tsconfig, include: ['**/*'] }), ['include']);
+  put(dir, 'tsconfig.json', JSON.stringify({ ...tsconfig, compilerOptions: { noUncheckedIndexedAccess: false } }));
+  assert.deepEqual(await findings(dir), [['HFS_TS_STRICT', 'tsconfig.json']]);
+  put(dir, 'tsconfig.json', JSON.stringify(tsconfig));
+  assert.deepEqual(await findings(dir), [['HFS_MANAGED_FILE_DRIFT', 'tsconfig.json']], 'same content, other bytes');
+});
+
+test('a front end: HFS_MANAGED_FILE_DRIFT is an edited vitest.config.ts, tsconfig.e2e.json, .prettierrc, .prettierignore, hook or scripts block; an app-level vitest.config.ts, key order and the rest of package.json are not', async () => {
+  const dir = await synced(FE);
+  put(dir, 'vitest.config.ts', 'export default {}\n');
+  put(dir, 'tsconfig.e2e.json', '{}\n');
+  put(dir, '.prettierrc', '{ "semi": false }\n');
+  put(dir, '.prettierignore', 'dist/\n');
+  const pkg = JSON.parse(read(dir, 'package.json'));
+  put(dir, 'package.json', JSON.stringify({ ...pkg, scripts: { ...pkg.scripts, 'lint:e2e': 'eslint e2e' } }));
+  assert.deepEqual((await findings(dir)).sort(), [['HFS_MANAGED_FILE_DRIFT', '.prettierignore'], ['HFS_MANAGED_FILE_DRIFT', '.prettierrc'], ['HFS_MANAGED_FILE_DRIFT', 'package.json'], ['HFS_MANAGED_FILE_DRIFT', 'tsconfig.e2e.json'], ['HFS_MANAGED_FILE_DRIFT', 'vitest.config.ts']]);
+  const fine = await synced(FE);
+  put(fine, 'apps/web/vitest.config.ts', 'export default {}\n');
+  const parsed = JSON.parse(read(fine, 'package.json'));
+  put(fine, 'package.json', JSON.stringify({ ...parsed, name: 'renamed', workspaces: ['apps/*'], devDependencies: { a: '1' }, scripts: Object.fromEntries(Object.entries(parsed.scripts).reverse()) }));
+  assert.deepEqual(await findings(fine), []);
+});
+
+test('a front end: HFS_TOOL_CONFIG_LOCAL is a local eslint rule, a stylelint plugin, a stylelint, eslint or prettier flag in a script or nested package.json, or a tool configuration key of a package.json', async () => {
+  const dir = await synced(FE);
+  put(dir, 'scripts/eslint-local.mjs', 'export default { meta: { type: "problem" }, create(context) { return {} } }\n');
+  put(dir, 'scripts/css-rule.mjs', 'import stylelint from "stylelint"\nexport default stylelint.createPlugin("x/y", () => () => {})\n');
+  put(dir, 'scripts/lint-css.mjs', 'import { execSync } from "node:child_process"\nexecSync("npx stylelint --config other.json apps/**/*.css")\n');
+  put(dir, 'apps/web/package.json', JSON.stringify({ name: 'web', scripts: { lint: 'eslint . --ignore-pattern e2e', css: 'stylelint "src/**/*.css" --ignore-path .none' }, prettier: '@starci/prettier-config', 'lint-staged': { '*.ts': 'eslint' } }));
+  const found = (await findings(dir)).filter(([code]) => code === 'HFS_TOOL_CONFIG_LOCAL').map(([, file]) => file);
+  assert.deepEqual([...new Set(found)].sort(), ['apps/web/package.json', 'scripts/css-rule.mjs', 'scripts/eslint-local.mjs', 'scripts/lint-css.mjs']);
+  assert.equal(found.filter((file) => file === 'apps/web/package.json').length, 4, 'two flags and two configuration keys, one finding each');
+  const root = await synced(FE);
+  const pkg = JSON.parse(read(root, 'package.json'));
+  put(root, 'package.json', JSON.stringify({ ...pkg, eslintConfig: {}, jest: {} }));
+  assert.deepEqual(await findings(root), [['HFS_TOOL_CONFIG_LOCAL', 'package.json'], ['HFS_TOOL_CONFIG_LOCAL', 'package.json']]);
+});
+
+test('a front end: plain tool commands, a createPlugin that is not stylelint and a rule-like object are not HFS_TOOL_CONFIG_LOCAL', async () => {
+  const dir = await synced(FE);
+  put(dir, 'scripts/ok.mjs', 'export const rule = { meta: { docs: "x" } }\nexport const run = () => "eslint . && stylelint \\"**/*.css\\" && prettier --check ."\n');
+  put(dir, 'apps/web/src/editor.ts', 'export const createPlugin = (name: string) => ({ name })\nexport const plugin = createPlugin("mention")\n');
+  put(dir, 'apps/web/package.json', JSON.stringify({ name: 'web', scripts: { dev: 'next dev', typecheck: 'tsc --noEmit --pretty false', lint: 'eslint src' } }));
+  assert.deepEqual(await findings(dir), []);
+});
+
+test('a front end: the forbidden tool files (.eslintrc, a second eslint or stylelint config, prettier or vitest or jest configs, lint-staged) are HFS_TOOL_CONFIG_LOCAL through their slot, the managed and repository-owned ones are not', () => {
+  const at = (files) => checkRepo({ repoRoot: os.tmpdir(), declaration: { ...FE }, files, tree: false }).findings.filter((finding) => finding.code === 'HFS_TOOL_CONFIG_LOCAL' || finding.code === 'HFS_FORBIDDEN_PRESENT').map((finding) => [finding.code, finding.path]);
+  const forbidden = ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', '.stylelintignore', 'stylelint.config.cjs', '.prettierrc.json', 'prettier.config.js', 'vitest.config.mjs', 'jest.config.js', '.lintstagedrc.json', 'lint-staged.config.mjs'];
+  assert.deepEqual(at(forbidden).sort(), forbidden.map((file) => ['HFS_TOOL_CONFIG_LOCAL', file]).sort());
+  assert.deepEqual(at(['eslint.config.mjs', 'stylelint.config.mjs', 'vitest.config.ts', 'vitest.setup.ts', 'playwright.config.ts', '.prettierrc', '.prettierignore', 'apps/web/vitest.config.ts', 'apps/web/tsconfig.json']), []);
+});
+
+test('HFS_CI_MISSING_CANON and HFS_FORMAT: a workflow or hook that drops a canon step its render holds is reported by the step, not as drift; a step only commented out counts as dropped; other edits stay drift', async () => {
+  for (const declaration of [BE, FE]) {
+    const dir = await synced(declaration);
+    const drop = (file, needle) => put(dir, file, read(dir, file).split('\n').filter((line) => !line.includes(needle)).join('\n'));
+    const restore = (file) => put(dir, file, renderTargets(declaration, PRESETS[declaration.profile]).find((target) => target.path === file).content);
+    drop('.github/workflows/ci.yml', 'npm run hfs:report');
+    assert.deepEqual(await findings(dir), [['HFS_CI_MISSING_CANON', '.github/workflows/ci.yml']], `${declaration.profile}: CI without hfs check`);
+    restore('.github/workflows/ci.yml');
+    drop('.github/workflows/ci.yml', 'npm run format:check');
+    assert.deepEqual(await findings(dir), [['HFS_FORMAT', '.github/workflows/ci.yml']], `${declaration.profile}: CI without the format gate`);
+    restore('.github/workflows/ci.yml');
+    put(dir, '.husky/pre-push', read(dir, '.husky/pre-push').replace('npm run typecheck', '# npm run typecheck'));
+    assert.deepEqual(await findings(dir), [['HFS_CI_MISSING_CANON', '.husky/pre-push']], `${declaration.profile}: pre-push with the typecheck commented out`);
+    restore('.husky/pre-push');
+    drop('.husky/pre-push', 'npm run lint:check');
+    drop('.husky/pre-push', 'npm run format:check');
+    assert.deepEqual((await findings(dir)).sort(), [['HFS_CI_MISSING_CANON', '.husky/pre-push'], ['HFS_FORMAT', '.husky/pre-push']], `${declaration.profile}: two steps, one finding each`);
+    restore('.husky/pre-push');
+    drop('.husky/pre-commit', 'prettier --check');
+    assert.deepEqual(await findings(dir), [['HFS_FORMAT', '.husky/pre-commit']], `${declaration.profile}: pre-commit without prettier`);
+    restore('.husky/pre-commit');
+    put(dir, '.husky/pre-push', `${read(dir, '.husky/pre-push')}echo extra\n`);
+    put(dir, '.github/workflows/ci.yml', `${read(dir, '.github/workflows/ci.yml')}# a note\n`);
+    assert.deepEqual((await findings(dir)).sort(), [['HFS_MANAGED_FILE_DRIFT', '.github/workflows/ci.yml'], ['HFS_MANAGED_FILE_DRIFT', '.husky/pre-push']], `${declaration.profile}: every step kept, the rest edited`);
+    restore('.husky/pre-push');
+    restore('.github/workflows/ci.yml');
+    assert.deepEqual(await findings(dir), []);
+  }
 });
