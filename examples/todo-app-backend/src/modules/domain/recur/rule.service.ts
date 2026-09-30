@@ -8,6 +8,7 @@ import type { EntityManager } from "typeorm"
 import { shapeProblemOf } from "./calendar.policy"
 import { RecurErrorCode } from "./errors/recur.error"
 import { RuleEntity } from "./persistence/entities/rule.entity"
+import { OccurrenceService } from "./occurrence.service"
 import { toRuleView } from "./persistence/rule.rows"
 import type {
     CreateRuleParams,
@@ -15,35 +16,51 @@ import type {
     EndRuleParams,
     FindRuleParams,
     ListRulesParams,
+    RuleEdited,
+    RuleEnded,
     RuleLookupResult,
+    RuleMade,
     RuleView,
 } from "./recur.contracts"
 
 @Injectable()
 /**
  * The recurrence rules: the owner is bound at creation and never rewritten, the shape of the fields must fit the
- * frequency, only the owner may edit or end a rule, and ending sets endedAt and never deletes anything.
+ * frequency, only the owner may edit or end a rule, and ending sets endedAt and never deletes anything. Every write runs
+ * in one transaction.
  */
 export class RuleService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
+    constructor(
+        @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        private readonly occurrences: OccurrenceService,
+    ) {}
 
-    /** Creates a rule owned by the caller, or refuses fields that do not fit the frequency. */
-    async create(params: CreateRuleParams): Promise<Outcome<RuleView, RecurErrorCode.RuleInvalid>> {
+    /** Creates a rule owned by the caller in one transaction, or refuses fields that do not fit the frequency. */
+    async create(params: CreateRuleParams): Promise<Outcome<RuleMade, RecurErrorCode.RuleInvalid>> {
         const problem = shapeProblemOf(params.frequency, params.n, params.dayOfMonth)
         if (problem) return refused(RecurErrorCode.RuleInvalid, { reason: problem })
-        const saved = await params.manager.save(RuleEntity, {
-            id: randomUUID(),
-            owner: params.ownerId,
-            title: params.title,
-            frequency: params.frequency,
-            n: params.n,
-            dayOfMonth: params.dayOfMonth,
-            timeZone: params.timeZone,
-            time: params.time,
-            startDate: params.startDate,
-            endedAt: null,
+        const saved = await this.entityManager.transaction((manager) =>
+            manager.save(RuleEntity, {
+                id: randomUUID(),
+                owner: params.ownerId,
+                title: params.title,
+                frequency: params.frequency,
+                n: params.n,
+                dayOfMonth: params.dayOfMonth,
+                timeZone: params.timeZone,
+                time: params.time,
+                startDate: params.startDate,
+                endedAt: null,
+            }),
+        )
+        return ok({
+            ruleId: saved.id,
+            title: saved.title,
+            frequency: saved.frequency,
+            timeZone: saved.timeZone,
+            time: saved.time,
+            startDate: saved.startDate,
         })
-        return ok(toRuleView(saved))
     }
 
     /** The rule with this id, or null. */
@@ -63,36 +80,44 @@ export class RuleService {
         return rows.map(toRuleView)
     }
 
-    /** Changes the fields of a rule of the owner; an occurrence already materialised is never rewritten. */
+    /** Changes the fields of a rule of the owner in one transaction; an occurrence already materialised is never rewritten. */
     async edit(
         params: EditRuleParams,
-    ): Promise<Outcome<RuleView, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden | RecurErrorCode.RuleInvalid>> {
-        const row = await params.manager.findOneBy(RuleEntity, { id: params.id })
-        if (!row) return refused(RecurErrorCode.RuleNotFound)
-        if (row.owner !== params.actorId) return refused(RecurErrorCode.RuleForbidden)
-        const { patch } = params
-        const frequency = patch.frequency ?? row.frequency
-        const n = patch.n !== undefined ? patch.n : row.n
-        const dayOfMonth = patch.dayOfMonth !== undefined ? patch.dayOfMonth : row.dayOfMonth
-        const problem = shapeProblemOf(frequency, n, dayOfMonth)
-        if (problem) return refused(RecurErrorCode.RuleInvalid, { reason: problem })
-        const saved = await params.manager.save(RuleEntity, {
-            ...row,
-            frequency,
-            n,
-            dayOfMonth,
-            timeZone: patch.timeZone ?? row.timeZone,
-            time: patch.time ?? row.time,
+    ): Promise<Outcome<RuleEdited, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden | RecurErrorCode.RuleInvalid>> {
+        return this.entityManager.transaction(async (manager) => {
+            const row = await manager.findOneBy(RuleEntity, { id: params.id })
+            if (!row) return refused(RecurErrorCode.RuleNotFound)
+            if (row.owner !== params.actorId) return refused(RecurErrorCode.RuleForbidden)
+            const { patch } = params
+            const frequency = patch.frequency ?? row.frequency
+            const n = patch.n !== undefined ? patch.n : row.n
+            const dayOfMonth = patch.dayOfMonth !== undefined ? patch.dayOfMonth : row.dayOfMonth
+            const problem = shapeProblemOf(frequency, n, dayOfMonth)
+            if (problem) return refused(RecurErrorCode.RuleInvalid, { reason: problem })
+            const saved = await manager.save(RuleEntity, {
+                ...row,
+                frequency,
+                n,
+                dayOfMonth,
+                timeZone: patch.timeZone ?? row.timeZone,
+                time: patch.time ?? row.time,
+            })
+            return ok({ ruleId: saved.id, frequency: saved.frequency, timeZone: saved.timeZone, time: saved.time })
         })
-        return ok(toRuleView(saved))
     }
 
-    /** Ends a rule of the owner on the local date: sets endedAt, never deletes the row. */
-    async end(params: EndRuleParams): Promise<Outcome<RuleView, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden>> {
-        const row = await params.manager.findOneBy(RuleEntity, { id: params.id })
-        if (!row) return refused(RecurErrorCode.RuleNotFound)
-        if (row.owner !== params.actorId) return refused(RecurErrorCode.RuleForbidden)
-        const saved = await params.manager.save(RuleEntity, { ...row, endedAt: params.endedAt })
-        return ok(toRuleView(saved))
+    /**
+     * Ends a rule of the owner on the local date and orphans its occurrences dated on or after it that are still
+     * materialised, in one transaction: sets endedAt, never deletes a row.
+     */
+    async end(params: EndRuleParams): Promise<Outcome<RuleEnded, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden>> {
+        return this.entityManager.transaction(async (manager) => {
+            const row = await manager.findOneBy(RuleEntity, { id: params.id })
+            if (!row) return refused(RecurErrorCode.RuleNotFound)
+            if (row.owner !== params.actorId) return refused(RecurErrorCode.RuleForbidden)
+            const saved = await manager.save(RuleEntity, { ...row, endedAt: params.endedAt })
+            const orphanedCount = await this.occurrences.orphanEnded({ manager, ruleId: saved.id, endedAt: params.endedAt })
+            return ok({ ruleId: saved.id, endedAt: params.endedAt, orphanedCount })
+        })
     }
 }
