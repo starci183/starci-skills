@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../engine/yaml.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest, openHfs, rules } from '../scripts/lib/hfs-slots.mjs';
-import { hfsRulesFindings, pluginRuleIds, checkHfsRules, PLUGIN_ENTRY, readmeRuleRows, readKnowledgeFiles, KNOWLEDGE_CODE_ROOTS } from '../scripts/checks/check-hfs-rules.mjs';
+import { hfsRulesFindings, pluginRuleIds, stylelintRuleIds, checkHfsRules, PLUGIN_ENTRY, readmeRuleRows, readKnowledgeFiles, KNOWLEDGE_CODE_ROOTS } from '../scripts/checks/check-hfs-rules.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const catalogText = fs.readFileSync(path.join(root, 'knowledge/hfs/rules.yaml'), 'utf8');
@@ -115,7 +115,7 @@ const failureCatalog = (catalog, without = []) => Object.fromEntries(catalog.rul
 const allFiles = { exists: (rel) => fs.existsSync(path.join(root, rel)), read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') };
 const pluginsOf = (catalog) => {
   const ids = (kind) => new Set(catalog.rules.flatMap((r) => r.enforcers).filter((e) => e.kind === kind && !e.planned).map((e) => e.id));
-  return { 'eslint-be': { ids: ids('eslint-be') }, 'eslint-fe': { ids: ids('eslint-fe') } };
+  return { 'eslint-be': { ids: ids('eslint-be') }, 'eslint-fe': { ids: ids('eslint-fe') }, stylelint: { ids: ids('stylelint') } };
 };
 const run = (catalog, over = {}) => hfsRulesFindings({ catalog, plugins: pluginsOf(catalog), failureCodes: failureCatalog(catalog), files: allFiles, ...over });
 
@@ -249,11 +249,52 @@ test('the knowledge files RED20 reads are the pattern tree and the rule manifest
 });
 
 test('pluginRuleIds reads the rule names of a plugin and reports one that cannot load', async () => {
-  assert.deepEqual(Object.keys(PLUGIN_ENTRY), ['eslint-be', 'eslint-fe']);
+  assert.deepEqual(Object.keys(PLUGIN_ENTRY), ['eslint-be', 'eslint-fe', 'stylelint']);
   const found = await pluginRuleIds(root, 'eslint-be');
   assert.ok(found.ids instanceof Set && found.ids.size > 0);
   const lost = await pluginRuleIds(path.join(root, 'no-such-runtime'), 'eslint-fe');
   assert.match(lost.error, /packages\/eslint\/fe\/index\.mjs cannot be loaded/);
+});
+
+// ------------------------------------------------------------------------------------------------ stylelint enforcers
+
+const styleRule = (id) => ({ ...loadRuleCatalog().rule('R61'), enforcers: [{ kind: 'stylelint', id }] });
+const lines = (...parts) => parts.join('\n');
+const styleTest = (id, body) => lines('import { lintRule } from "./testing.mjs"', `const rule = (code) => lintRule("${id}", code)`, body);
+const PASSING = lines('test("accepts a token", async () => {', '  assert.deepEqual(await rule(".a { color: var(--accent); }"), [])', '})', '');
+const VIOLATING = lines('test("refuses a raw value", async () => {', '  const warnings = await rule(".a { color: red; }")', '  assert.equal(warnings.length, 1)', '})', '');
+
+test('a stylelint enforcer must be a rule of packages/stylelint, a shipped one may not stay planned, and a shipped rule must be named', () => {
+  const catalog = loadRuleCatalog();
+  const plugins = pluginsOf(catalog);
+  plugins.stylelint.ids.delete('token-only');
+  assert.deepEqual(run(catalog, { plugins }).map((f) => [f.code, f.rule, f.enforcer]), [['HFS_RULE_ENFORCER_MISSING', 'R61', 'stylelint:token-only']]);
+  const planned = { ...catalog, rules: catalog.rules.map((r) => (r.id === 'R61' ? { ...r, enforcers: r.enforcers.map((e) => (e.id === 'token-only' && e.kind === 'stylelint' ? { ...e, planned: true } : e)) } : r)) };
+  assert.deepEqual(run(planned).map((f) => [f.code, f.enforcer]), [['HFS_RULE_ENFORCER_STALE', 'stylelint:token-only']]);
+  const extra = pluginsOf(catalog);
+  extra.stylelint.ids.add('rule-nobody-owns');
+  assert.deepEqual(run(catalog, { plugins: extra }).map((f) => [f.code, f.enforcer]), [['HFS_RULE_UNCATALOGUED', 'stylelint:rule-nobody-owns']]);
+  assert.match(run(catalog, { plugins: { ...pluginsOf(catalog), stylelint: { error: 'packages/stylelint/index.mjs cannot be read (boom)' } } })[0].message, /cannot be read/);
+});
+
+test('a stylelint enforcer needs a test file that lints it, with a test asserting no warning and one asserting a warning', () => {
+  const only = { ...loadRuleCatalog(), rules: [styleRule('token-only')] };
+  const tests = (files) => ({ 'eslint-be': '', 'eslint-fe': '', stylelint: files, specs: [] });
+  assert.deepEqual(run(only, { tests: tests([styleTest('token-only', PASSING + VIOLATING)]) }).filter((f) => f.code === 'HFS_RULE_UNTESTED'), []);
+  for (const [name, files] of [
+    ['no test file', []],
+    ['a passing case only', [styleTest('token-only', PASSING)]],
+    ['a violating case only', [styleTest('token-only', VIOLATING)]],
+    ['a file that lints another rule', [styleTest('no-important', PASSING + VIOLATING)]],
+  ]) assert.deepEqual(run(only, { tests: tests(files) }).filter((f) => f.code === 'HFS_RULE_UNTESTED').map((f) => f.enforcer), ['stylelint:token-only'], name);
+});
+
+test('stylelintRuleIds reads the rules and their finding codes from the package source, and reports a missing package', () => {
+  const found = stylelintRuleIds(root);
+  assert.ok(found.ids.has('token-only') && found.ids.has('source-resolves'));
+  assert.equal(found.why.get('source-resolves'), 'FE_STYLE_SOURCE_UNRESOLVED');
+  assert.equal(found.why.get('no-inline-lint-config'), 'HFS_INLINE_SUPPRESSION');
+  assert.match(stylelintRuleIds(path.join(root, 'no-such-runtime')).error, /packages\/stylelint\/index\.mjs cannot be read/);
 });
 
 test('the shipped runtime passes its own check: every eslint id exists and every code is catalogued in Vietnamese', async () => {

@@ -198,6 +198,7 @@ rules:
     enforcers:
       - {kind: eslint-be, id: no-inline-suppression}
       - {kind: eslint-fe, id: no-inline-lint-config}
+      - {kind: stylelint, id: no-inline-lint-config}
   - id: R19
     code: "HFS_FORMAT"
     title_vi: "Chưa format bằng Prettier"
@@ -658,7 +659,18 @@ rules:
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["FE_STYLE_TOKEN_ONLY", "FE_STYLE_SOURCE_UNRESOLVED"]
     enforcers:
-      - {kind: stylelint, id: token-only, status: planned}
+      - {kind: stylelint, id: token-only}
+      - {kind: stylelint, id: raw-brand-value}
+      - {kind: stylelint, id: no-apply-raw}
+      - {kind: stylelint, id: no-important}
+      - {kind: stylelint, id: globals-shape}
+      - {kind: stylelint, id: globals-import-order}
+      - {kind: stylelint, id: no-token-redefinition}
+      - {kind: stylelint, id: brand-layer-shape}
+      - {kind: stylelint, id: no-css-module}
+      - {kind: stylelint, id: no-class-selector}
+      - {kind: stylelint, id: breakpoint-scale}
+      - {kind: stylelint, id: source-resolves}
       - {kind: eslint-fe, id: no-raw-brand-value}
       - {kind: hfs, id: style-source-unresolved, status: planned}
       - {kind: eslint-fe, id: no-fractional-step}

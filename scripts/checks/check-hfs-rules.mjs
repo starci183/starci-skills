@@ -49,7 +49,10 @@ export const EMITTER_ROOTS = Object.freeze({
 /** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */
 export const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
 const RULE_CODE = /\b(?:HFS|BE|FE|ARCH)_[A-Z0-9]+(?:_[A-Z0-9]+)*\b/g;
-export const PLUGIN_ENTRY = Object.freeze({ 'eslint-be': 'packages/eslint/be/index.mjs', 'eslint-fe': 'packages/eslint/fe/index.mjs' });
+export const PLUGIN_ENTRY = Object.freeze({ 'eslint-be': 'packages/eslint/be/index.mjs', 'eslint-fe': 'packages/eslint/fe/index.mjs', stylelint: 'packages/stylelint/index.mjs' });
+/** The stylelint canon's "why" map: the finding code of each rule. */
+export const STYLELINT_WHY = 'packages/stylelint/lib/why.mjs';
+const LINT_PLUGINS = Object.keys(PLUGIN_ENTRY);
 const LINT_FAMILY = ['eslint-be', 'eslint-fe', 'stylelint'];
 const CHECK_FAMILY = ['machine', 'hfs', 'work-validate'];
 // A check spells its code as a string literal ('CODE') or as the `[CODE]` tail of a finding line.
@@ -69,10 +72,10 @@ export function readEmitters(root) {
   return out;
 }
 
-/** The test sources that prove the enforcers: {'eslint-be': text, 'eslint-fe': text, specs: [text]}. */
+/** The test sources that prove the enforcers: {'eslint-be': text, 'eslint-fe': text, stylelint: [text], specs: [text]}. */
 export function readTests(root) {
   const texts = (dir, re) => (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).sort().map((f) => fs.readFileSync(path.join(root, dir, f), 'utf8')) : []);
-  return { 'eslint-be': texts('packages/eslint/be', /\.test\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.test\.mjs$/).join('\n'), specs: texts('tests', /\.spec\.mjs$/) };
+  return { 'eslint-be': texts('packages/eslint/be', /\.test\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.test\.mjs$/).join('\n'), stylelint: texts('packages/stylelint', /\.test\.mjs$/), specs: texts('tests', /\.spec\.mjs$/) };
 }
 
 /** True when a RuleTester run of `id` carries both valid and invalid cases. */
@@ -86,6 +89,18 @@ const lintProven = (text, id) => {
   }
   return false;
 };
+
+/**
+ * True when a stylelint test file that lints the rule (`lintRule("<id>"`) has a test asserting no warning (an empty list or a
+ * zero length) and a test asserting a warning (a non-zero length, a matched message or a listed one).
+ */
+const NO_WARNING = /\.deepEqual\([^\n]*,\s*\[\]\s*\)|\.equal\([^\n]*\.length,\s*0\s*\)/;
+const A_WARNING = /\.equal\([^\n]*\.length,\s*[1-9]|\.match\(|\.deepEqual\([^\n]*\.map\(|\.ok\([^\n]*\.(?:some|length)/;
+const stylelintProven = (files, id) => files.some((text) => {
+  if (!new RegExp(`\\blintRule\\(\\s*(['"\`])${id}\\1`).test(text)) return false;
+  const blocks = text.split(/\btest\(/).slice(1);
+  return blocks.some((block) => NO_WARNING.test(block)) && blocks.some((block) => A_WARNING.test(block));
+});
 
 /** True when one spec names `code` in two separate test blocks (a finding tree and a clean tree). */
 const specProven = (specs, code) => specs.some((text) => {
@@ -114,9 +129,29 @@ export function readmeRuleRows(text) {
 /** A Vietnamese text carries at least one letter no other language of this repository uses. */
 const VIETNAMESE = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
 
+/**
+ * The rules of the stylelint canon, read from the package's source text: its peer dependencies (stylelint, postcss) are
+ * installed only inside packages/stylelint, so importing the entry would make this check depend on that install.
+ * {ids, why} like an eslint plugin, or {error}.
+ */
+export function stylelintRuleIds(root) {
+  try {
+    const source = fs.readFileSync(path.join(root, PLUGIN_ENTRY.stylelint), 'utf8');
+    const body = /export const rules = \{([\s\S]*?)\n\}/.exec(source)?.[1];
+    if (body === undefined) return { error: `${PLUGIN_ENTRY.stylelint} exports no rules` };
+    const ids = new Set([...body.matchAll(/^\s*"([a-z0-9-]+)"\s*:/gm)].map((m) => m[1]));
+    const reported = fs.readFileSync(path.join(root, STYLELINT_WHY), 'utf8');
+    const why = new Map([...reported.matchAll(/^ {2}"([a-z0-9-]+)":\s*\{\s*code:\s*"([A-Z0-9_]+)"/gm)].map((m) => [m[1], m[2]]));
+    return { ids, why };
+  } catch (error) {
+    return { error: `${PLUGIN_ENTRY.stylelint} cannot be read (${String(error?.message ?? error).split('\n')[0]})` };
+  }
+}
+
 /** The rule ids of one eslint plugin package under `root`, or {error} when it cannot be loaded. */
 export async function pluginRuleIds(root, kind) {
   const entry = PLUGIN_ENTRY[kind];
+  if (kind === 'stylelint') return stylelintRuleIds(root);
   try {
     const loaded = await import(pathToFileURL(path.join(root, entry)).href);
     const rules = loaded.default?.rules ?? loaded.rules;
@@ -143,7 +178,7 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     }
     for (const enforcer of rule.enforcers) {
       const label = `${enforcer.kind}:${enforcer.id}`;
-      if (enforcer.kind === 'eslint-be' || enforcer.kind === 'eslint-fe') {
+      if (LINT_FAMILY.includes(enforcer.kind)) {
         const plugin = plugins[enforcer.kind];
         if (plugin?.ids === undefined) {
           if (!enforcer.planned) add('HFS_RULE_ENFORCER_MISSING', rule.id, `${rule.id} names ${label} but ${plugin?.error ?? 'the plugin was not loaded'}`, label);
@@ -177,7 +212,9 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     }
     if (tests !== undefined) for (const e of rule.enforcers) {
       if (e.planned) continue;
-      if (e.kind === 'eslint-be' || e.kind === 'eslint-fe') {
+      if (e.kind === 'stylelint') {
+        if (!stylelintProven(tests.stylelint ?? [], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no packages/stylelint/*.test.mjs that lints it (lintRule("${e.id}") with a test asserting no warning and a test asserting one`, `${e.kind}:${e.id}`);
+      } else if (LINT_FAMILY.includes(e.kind)) {
         if (!lintProven(tests[e.kind], e.id)) add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no RuleTester run with both valid and invalid cases in packages/eslint/${e.kind.slice(7)}/*.test.mjs`, `${e.kind}:${e.id}`);
       } else if (CHECK_FAMILY.includes(e.kind) && !rule.failureCodes.some((code) => specProven(tests.specs, code))) {
         add('HFS_RULE_UNTESTED', rule.id, `${e.kind}:${e.id} has no tests/*.spec.mjs naming one of ${rule.failureCodes.join(', ')} in a violating and a passing test`, `${e.kind}:${e.id}`);
@@ -230,7 +267,7 @@ export async function checkHfsRules(root = skillRoot) {
     if (error instanceof HfsSlotsError) return { refusal: { code: error.code, message: error.message } };
     throw error;
   }
-  const plugins = { 'eslint-be': await pluginRuleIds(root, 'eslint-be'), 'eslint-fe': await pluginRuleIds(root, 'eslint-fe') };
+  const plugins = Object.fromEntries(await Promise.all(LINT_PLUGINS.map(async (kind) => [kind, await pluginRuleIds(root, kind)])));
   const failureCodes = parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8')) ?? {};
   const files = { exists: (rel) => fs.existsSync(path.join(root, rel)), read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') };
   const readme = fs.readFileSync(path.join(root, RULES_README), 'utf8');
