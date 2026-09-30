@@ -184,6 +184,14 @@ test('pin drift: a range, an old version and a file: link are drift; the exact r
   assert.equal(drift(withFePackage({ dependencies: { '@starci/grammar': 'file:.starci/packages/grammar' } })).length, 1, 'grammar is not a file: link');
 });
 
+test('package.json ownership: a repository-specific devDependency is neither drift nor a pin finding; a wrong @starci pin still is', () => {
+  const ts = pins.typescript.version;
+  const extra = repoOf(BE, (dir) => put(dir, 'package.json', `${JSON.stringify({ name: 'demo', devDependencies: { ajv: '^8.17.1', typescript: ts } })}\n`));
+  assert.deepEqual(only(checkRepo({ repoRoot: extra }), 'HFS_CANON_PIN_DRIFT'), [], 'ajv is not a pinned name');
+  const wrong = repoOf(BE, (dir) => put(dir, 'package.json', `${JSON.stringify({ name: 'demo', devDependencies: { ajv: '^8.17.1', '@starci/tsconfig': '0.0.1' } })}\n`));
+  assert.deepEqual(only(checkRepo({ repoRoot: wrong }), 'HFS_CANON_PIN_DRIFT').map((f) => f.dependency), ['@starci/tsconfig']);
+});
+
 test('pins of the other side are not judged, and every package.json of a workspace repository is', () => {
   const be = repoOf(BE, (dir) => put(dir, 'package.json', `${JSON.stringify({ name: 'demo', dependencies: { next: '1.0.0' } })}\n`));
   assert.deepEqual(only(checkRepo({ repoRoot: be }), 'HFS_CANON_PIN_DRIFT'), [], 'next is a front-end pin');

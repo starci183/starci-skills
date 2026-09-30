@@ -131,6 +131,7 @@ test("R47: only a service is unit-tested, its spec sits beside it, and there are
 
 test("TESTING-2: an e2e that never reads state back only proves the server replied", () => {
   const READER = "import { EntityManager, DataSource, QueryRunner } from 'typeorm'\n"
+  const WORLD = "import { useTestWorld } from '../../world/test-world.contracts'\n"
   typed.run("e2e-asserts-persisted-state", e2eAssertsPersistedState, {
     valid: [
       // the flow reads a row back through the entity manager, whatever it calls it
@@ -139,11 +140,18 @@ test("TESTING-2: an e2e that never reads state back only proves the server repli
       { filename: E2E, code: READER + "declare const runner: QueryRunner\nit('x', async () => { expect(await runner.query('select 1')).toBe(1) })" },
       // the manager is handed to a fixture reader
       { filename: E2E, code: READER + "declare const em: EntityManager\ndeclare const orderRows: (manager: EntityManager) => Promise<number>\nit('x', async () => { expect(await orderRows(em)).toBe(1) })" },
+      // the world's own state reads: a connection's entity manager and a sibling service's API
+      { filename: E2E, code: WORLD + "const world = useTestWorld()\nit('x', async () => { expect(await world.db.core.find()).toEqual([]) })" },
+      { filename: E2E, code: WORLD + "const w = useTestWorld()\nit('x', async () => { expect(await w.services.billing.api.balance()).toBe(0) })" },
       // a unit spec is a different lane
       { filename: UNIT, code: "it('x', () => { expect(a).toBe(1) })" },
     ],
     invalid: [
       { filename: E2E, code: "it('x', async () => { expect(response.status).toBe(200) })", errors: [{ messageId: "noState" }] },
+      // a world that only waits and calls reads nothing back
+      { filename: E2E, code: WORLD + "const world = useTestWorld()\nit('x', async () => { expect(await world.waitFor('x', async () => 1)).toBe(1) })", errors: [{ messageId: "noState" }] },
+      // `db` on a value that is not the world proves nothing
+      { filename: E2E, code: WORLD + "const world = useTestWorld()\nit('x', () => { expect(world.other.db.find()).toBe(1) })", errors: [{ messageId: "noState" }] },
       // the name entityManager on a value that is not one proves nothing
       { filename: E2E, code: "declare const entityManager: { find(): number }\nit('x', () => { expect(entityManager.find()).toBe(1) })", errors: [{ messageId: "noState" }] },
       // importing the type is not reading state

@@ -25,7 +25,7 @@
 import { statSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 import { hfsOf } from "./lib/hfs.mjs"
-import { isPackageType } from "./lib/types.mjs"
+import { isPackageType, typeOrigins } from "./lib/types.mjs"
 import { isServiceSpecFile, isUnitSpecFile, serviceNameOfSpec } from "./lib/unit-spec.mjs"
 
 /** The file name of a linted path, in forward-slash form. */
@@ -172,6 +172,27 @@ const STATE_TYPES = ["EntityManager", "DataSource", "QueryRunner"]
 /** Whether an expression is a receiver of persisted state, by the TYPE it has and the package that declares it. */
 const isStateReader = (context, node) => STATE_TYPES.some((name) => isPackageType(context, node, name, "typeorm"))
 
+/** The handle `useTestWorld` answers, by where its type is declared: the `@starci/test-world` package or the repository's world slot. */
+const isWorldHandle = (context, node) => {
+  const hfs = hfsOf(context)
+  return typeOrigins(context, node).some((origin) => origin.name === "TestWorld" && (origin.module === "@starci/test-world" || hfs.slotOf(origin.file) === "be.tests.world"))
+}
+
+/** The name a non-computed member access reads, or null. */
+const propertyNameOf = (node) => (node.type === "MemberExpression" && !node.computed && node.property.type === "Identifier" ? node.property.name : null)
+
+/**
+ * Whether a member expression is the world's own state read: `<world>.db` (its connections are EntityManagers) or
+ * `<world>.services.<name>.api` (a sibling service's own API). The receiver is judged by its type, not its name.
+ */
+const isWorldStateRead = (context, node) => {
+  if (propertyNameOf(node) === "db") return isWorldHandle(context, node.object)
+  if (propertyNameOf(node) !== "api") return false
+  const service = node.object
+  const services = service.type === "MemberExpression" ? service.object : null
+  return Boolean(services) && propertyNameOf(services) === "services" && isWorldHandle(context, services.object)
+}
+
 /** An end-to-end spec that never reads state back proves only that the server replied. */
 export const e2eAssertsPersistedState = {
   meta: {
@@ -188,7 +209,7 @@ export const e2eAssertsPersistedState = {
     let readsState = false
     return {
       MemberExpression(node) {
-        if (!readsState && isStateReader(context, node.object)) readsState = true
+        if (!readsState && (isStateReader(context, node.object) || isWorldStateRead(context, node))) readsState = true
       },
       CallExpression(node) {
         if (!readsState && node.arguments.some((argument) => argument.type !== "SpreadElement" && isStateReader(context, argument))) readsState = true

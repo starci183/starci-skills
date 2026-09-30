@@ -58,6 +58,16 @@ test('HFS_MANAGED_FILE_DRIFT: key order in package.json scripts and lines outsid
   assert.deepEqual(await findings(dir), []);
 });
 
+test('HFS_MANAGED_FILE_DRIFT: a back end owns its scripts (test:stack included); a repository devDependency such as ajv is not drift, a changed test:stack is', async () => {
+  const dir = await synced();
+  const pkg = JSON.parse(read(dir, 'package.json'));
+  assert.equal(pkg.scripts['test:stack'], 'starci-test-stack');
+  put(dir, 'package.json', JSON.stringify({ ...pkg, devDependencies: { ajv: '^8.17.1' } }));
+  assert.deepEqual(await findings(dir), []);
+  put(dir, 'package.json', JSON.stringify({ ...pkg, devDependencies: { ajv: '^8.17.1' }, scripts: { ...pkg.scripts, 'test:stack': 'echo no' } }));
+  assert.deepEqual(await findings(dir), [['HFS_MANAGED_FILE_DRIFT', 'package.json']]);
+});
+
 test('HFS_RULE_OFF_WITHOUT_REPLACEMENT: any edit of eslint.config.mjs (a rule off, a local plugin, an ignore) is one finding, not also drift', async () => {
   const dir = await synced();
   put(dir, 'eslint.config.mjs', 'import { loadHfs, starciBeConfig } from "@starci/eslint-canon-be"\n\nexport default [...(await starciBeConfig({ hfs: loadHfs(import.meta.url) })), { rules: { "starci-be/no-x": "off" } }]\n');
