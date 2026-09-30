@@ -58,24 +58,24 @@ import { guardLaunch, bindGuardTerminal } from '../guards/install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 
 /**
- * The guard layer of a [Worker] launch, the same shim bin op workers get (scripts/guards/install.mjs guardLaunch):
- * its staging checkout's node_modules is a junction to the LIVE runtime's, and npm reifying through that junction
- * empties it (node-modules-link-wipe, 2026-09-28) - the npm shim refuses that (DEPS_THROUGH_LINK). No history
+ * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/install.mjs guardLaunch), bound to
+ * the worker's terminal once it starts: its staging checkout's node_modules is a junction to the LIVE runtime's, and
+ * npm reifying through that junction empties it (node-modules-link-wipe, 2026-09-28) - the command guard
+ * (scripts/guards/command-guard.mjs, a PreToolUse hook) refuses that (DEPS_THROUGH_LINK). No history
  * hook (repos []): a [Worker] commits only in its runtime staging branch, and that checkout is a linked worktree of
  * the live runtime repo, so `git rev-parse --git-path hooks` there is the live repo's SHARED hooks dir - a hook
  * installed "for the staging checkout" lands in the live repo and refuses every branch deletion and ref rewrite
  * there (the land gate's sup/* cleanup, lanes; land run 26 refused 3a9558930). Its owned paths are the job's leased
  * files resolved against its staging checkout, absolute like op leases (scripts/kernel/api.mjs opGuardLaunch): a
  * directory lease (a trailing `/**` dropped) covers its subtree. With none, or with paths left relative (resolved
- * against the Supervisor's cwd), the git shim refuses every `git add`/commit (PATH_NOT_OWNED) and no worker can
- * commit (worker-guard-owned-empty). {env, pathPrefix, receipt}.
+ * against the Supervisor's cwd), the command guard refuses every `git add`/commit (PATH_NOT_OWNED) and no worker can
+ * commit (worker-guard-owned-empty). {receipt}.
  */
 export function workerGuard(jobId, { root = SKILL_ROOT, staging = null, files = [], launch = guardLaunch } = {}) {
   try {
     const owned = staging ? (files ?? []).filter(Boolean).map((f) => path.resolve(staging, String(f).replace(/[\\/]\*\*[\\/]?$/, '') || '.')) : [];
-    // worker-start owns the worker's environment, so no shim reaches it: the guard is bound to its terminal (bindGuardTerminal).
-    return launch({ skillRoot: root, jobId, workflowId: 'supervisor', ledgerRepo: null, owned, repos: [], shims: false });
-  } catch (error) { return { env: {}, pathPrefix: null, receipt: { error: String(error?.message ?? error) } }; }
+    return launch({ skillRoot: root, jobId, workflowId: 'supervisor', ledgerRepo: null, owned, repos: [] });
+  } catch (error) { return { receipt: { error: String(error?.message ?? error) } }; }
 }
 
 const selfFile = fileURLToPath(import.meta.url);

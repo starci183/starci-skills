@@ -464,7 +464,7 @@ export default {
   if (scratchDir) ensureJobScratch({ repo, workflowId: job.workflow_id, jobId });
   // worker-start owns the agent's environment, so no shim reaches it; the history hook in its checkouts does, finding
   // the op by its bound Orca terminal (scripts/guards/install.mjs bindGuardTerminal).
-  const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd, shims: false });
+  const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd });
   return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, title, reserve, inputs, guard, launchModel, scratchDir }, internals, emit);
   },
 };

@@ -1,7 +1,7 @@
 // git-policy.mjs — which git commands an op worker may run in a checkout it
-// shares with other workflows. Pure: argv in, verdict out; scripts/guards/shim.mjs
-// applies it in front of the real git, scripts/guards/history-hook.mjs backs it
-// with a reference-transaction hook git itself runs.
+// shares with other workflows. Pure: argv in, verdict out; scripts/guards/command-guard.mjs
+// (a PreToolUse hook) applies it to the agent's shell command before it runs, and the
+// reference-transaction hook git itself runs backs it (scripts/guards/install.mjs).
 //
 // Several workflows of one product ledger build in ONE checkout on ONE branch
 // (nivo: Login, workspace provision, modules and collab on nivo-backend main).
@@ -244,6 +244,15 @@ export function literalAppRouterArgv(argv, { cwd = process.cwd(), stdin = null, 
     return [`${PATHSPEC_FILE}=${listFile}`, '--pathspec-file-nul'];
   });
   return { argv: [...head, ...flat], list, changed };
+}
+
+// `--pathspec-from-file=-` (or `--pathspec-from-file -`) before a bare `--`: the list is on stdin.
+export function pathspecListOnStdin(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === '--') return false;
+    if (args[i] === '--pathspec-from-file=-' || (args[i] === '--pathspec-from-file' && args[i + 1] === '-')) return true;
+  }
+  return false;
 }
 
 // Config git reads from the environment, as `key=value` entries: GIT_CONFIG_PARAMETERS (how git hands `-c` to its

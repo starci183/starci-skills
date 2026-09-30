@@ -27,7 +27,7 @@
 //                                 --turn-interrupt) and the KERNEL_TURN_OVERDUE clock; the same turn
 //                                 turnInterruptGraceMs later -> the seat terminal is closed (--turn-replace) and the
 //                                 seat's watchdog pass replaces it.
-//   host:processes                runaway guard-shim chains (host-health hostVerdict -> stop), orphan runtime loops
+//   host:processes                node/git counts over threshold (host-health hostVerdict -> log), orphan runtime loops
 //                                 (ORPHAN_PROCESS -> stop), the footprint scan, the Orca terminal count (TERMINAL_COUNT_DRIFT).
 //   host:transcripts              every 60 s (schedules host/transcripts): scrollback snapshots of every live op attempt
 //                                 (scripts/kernel/transcripts.mjs snapshot --repo) and of every live seat (snapshotSeats).
@@ -199,7 +199,7 @@ export function createHostController(deps = {}) {
   const hostVerdict = deps.hostVerdict ?? (async (procs) => {
     const [{ hostVerdict: verdict }, { allocationSettings }] = await Promise.all([import('../../supervisor/host-health.mjs'), import('../../../engine/config.mjs')]);
     const h = allocationSettings()?.supervisorTick?.host;
-    return h ? verdict(procs, { ...h, now: Date.now() }) : { stop: [], alert: false };
+    return h ? verdict(procs, h) : { alert: false };
   });
   const orcaTerminals = deps.orcaTerminals ?? (async () => (await probeOrcaAsync({ timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).terminals ?? null);
   const supervisorMode = deps.supervisorMode ?? (async () => { try { return (await import('../../supervisor/home.mjs')).supervisorMode(); } catch { return 'chat'; } });
@@ -541,10 +541,9 @@ export function createHostController(deps = {}) {
     state.lastProcessesAt = now;
     const procs = await listProcesses();
     if (!procs) return { ok: false, error: 'process table unreadable' };
-    const out = { stopped: [], orphans: [] };
+    const out = { orphans: [] };
     const verdict = await hostVerdict(procs);
-    for (const r of verdict.stop ?? []) { await ctx.run('taskkill.exe', ['/F', '/T', '/PID', String(r.rootPid)], { timeoutMs: 120_000 }); out.stopped.push({ kind: r.kind, pid: r.rootPid }); }
-    if (verdict.alert) await ctx.log('reconciler.host.runaway', 'process counts over threshold with nothing safe to stop', { counts: verdict.counts, topParents: verdict.topParents });
+    if (verdict.alert) await ctx.log('reconciler.host.runaway', 'process counts over threshold', { counts: verdict.counts, topParents: verdict.topParents });
     const known = [...(ctx.ledgers ?? []).map((l) => l.repo).filter(Boolean)];
     const runningIds = new Set();
     for (const l of ctx.ledgers ?? []) for (const wf of await running(ctx, l.ledgerId)) runningIds.add(wf);

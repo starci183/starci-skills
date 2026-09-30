@@ -17,6 +17,14 @@
 //              (CODEX_HOME, ~/.codex, Orca's codex-runtime-home) for the launch
 //              cwd and the git root Codex keys trust by, in the key forms Codex
 //              writes (win32: 'd:\lower\case' literal and "D:\\Exact" basic).
+//     devin  → the Devin CLI's own config (%APPDATA%/devin/config.json, else
+//              ~/.config/devin/config.json): agent.model pinned to the routed
+//              model, which worker-start cannot pass to Devin.
+//   Every agent's host also gets the op command guard as a PreToolUse hook
+//   (scripts/guards/command-guard.mjs): Claude's settings.json, Devin's
+//   config.json, and every Codex home's config.toml with the hash Codex
+//   trusts it by (codex app-server hooks/list, then config/batchWrite
+//   hooks.state - the way Orca trusts its own hooks).
 //   Returns the receipt the launch event records:
 //     {agent, paths, status: written|already|skipped|failed, written[], already[], …}
 //
@@ -30,6 +38,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { runGit } from '../lib/git.mjs';
 import { renameOver } from '../lib/rename-over.mjs';
@@ -38,7 +47,7 @@ import { parseJson } from '../lib/json.mjs';
 
 const CLAUDE_CARD = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents', 'claude.yaml');
 
-const TRUST_AGENTS = new Set(['claude', 'codex']);
+const TRUST_AGENTS = new Set(['claude', 'codex', 'devin']);
 const ATTEMPTS = 5;
 
 /* ---------------------------------------------------------------- targets */
@@ -79,8 +88,16 @@ export function trustTargets({ env = process.env, platform = process.platform } 
   return {
     claudeJson: claudeDir ? path.join(claudeDir, '.claude.json') : path.join(home, '.claude.json'),
     claudeSettings: claudeDir ? path.join(claudeDir, 'settings.json') : path.join(home, '.claude', 'settings.json'),
+    devinConfig: devinConfigFile({ env: root ? { APPDATA: path.join(root, 'AppData', 'Roaming') } : env, platform, home }),
     codexHomes,
   };
+}
+
+/** The Devin CLI's user config: %APPDATA%/devin/config.json on Windows, else ~/.config/devin/config.json. */
+export function devinConfigFile({ env = process.env, platform = process.platform, home = os.homedir() } = {}) {
+  return platform === 'win32'
+    ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'devin', 'config.json')
+    : path.join(home, '.config', 'devin', 'config.json');
 }
 
 /* -------------------------------------------------------------- key forms */
@@ -399,6 +416,120 @@ export function writeCodexNoModelNudge({ file, hooks }) {
   return { file, ok: true, written: updated.result.written };
 }
 
+/* ------------------------------------------------------ the command guard */
+
+const GUARD_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'guards', 'command-guard.mjs');
+export const TOOL_GUARD_MARKER = 'command-guard.mjs';
+/** The hook command every host runs: forward slashes, since Claude and Devin run hooks through Git Bash on Windows. */
+export const toolGuardCommand = (script = GUARD_SCRIPT) => `node "${String(script).replace(/\\/g, '/')}"`;
+const isGuardHandler = (h) => typeof h?.command === 'string' && h.command.includes(TOOL_GUARD_MARKER);
+const isGuardGroup = (g) => Array.isArray(g?.hooks) && g.hooks.some(isGuardHandler);
+
+/**
+ * Ensure hooks.PreToolUse of a Claude-format JSON config (Claude's settings.json, Devin's config.json) holds exactly
+ * one command-guard group: {matcher?, hooks: [{type: command, command, timeout}]}. An older guard group (another
+ * runtime path) is replaced; every other hook is kept. `edit(doc)` -> true when it changed doc, in the same write.
+ */
+export function assertJsonToolGuard({ file, command, matcher = null, edit = null, hooks }) {
+  const group = { ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command, timeout: 30 }] };
+  const holds = (d) => {
+    const list = Array.isArray(d?.hooks?.PreToolUse) ? d.hooks.PreToolUse.filter(isGuardGroup) : [];
+    return list.length === 1 && JSON.stringify(list[0]) === JSON.stringify(group);
+  };
+  const updated = atomicUpdate(file, (text) => {
+    const d = text == null ? {} : jsonOf(text);
+    if (d === undefined || !d || typeof d !== 'object' || Array.isArray(d)) throw new Error(`${file} is not a JSON object`);
+    if (d.hooks != null && (typeof d.hooks !== 'object' || Array.isArray(d.hooks))) throw new Error(`${file} hooks is not an object`);
+    const edited = edit ? edit(d) : false;
+    if (holds(d) && !edited) return { text: null, result: null };
+    d.hooks = { ...(d.hooks ?? {}) };
+    const others = Array.isArray(d.hooks.PreToolUse) ? d.hooks.PreToolUse.filter((g) => !isGuardGroup(g)) : [];
+    d.hooks.PreToolUse = [...others, group];
+    const next = JSON.stringify(d, null, 2) + (text?.endsWith('\n') ? '\n' : '');
+    if (text && !numbersSurvive(text, next)) throw new Error(`${file} holds a number JSON cannot round-trip; refusing to rewrite it`);
+    return { text: next, result: null };
+  }, (text) => { const d = jsonOf(text ?? ''); return !!d && holds(d) && (!edit || !edit(structuredClone(d))); }, { hooks });
+  return updated.ok ? { file, ok: true, state: updated.changed ? 'written' : 'already' } : { file, ok: false, state: 'failed', error: updated.error };
+}
+
+/** Devin's config.json: agent.model pinned to `model` (worker-start passes no model to Devin) and the command guard. */
+export function writeDevinProfile({ file, command, model = null, hooks }) {
+  const pin = (d) => {
+    if (!model || d.agent?.model === model) return false;
+    if (d.agent != null && (typeof d.agent !== 'object' || Array.isArray(d.agent))) throw new Error(`${file} agent is not an object`);
+    d.agent = { ...(d.agent ?? {}), model };
+    return true;
+  };
+  return { ...assertJsonToolGuard({ file, command, edit: pin, hooks }), ...(model ? { model } : {}) };
+}
+
+// A Codex hook lives in the home's config.toml as an array-of-tables block the runtime owns, marked on its first line.
+const CODEX_GUARD_BEGIN = '# starci-command-guard (scripts/agent/trust.mjs): the op command guard, a PreToolUse hook';
+export function codexGuardBlock(command, eol = '\n') {
+  const q = (v) => `"${String(v).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+  return [CODEX_GUARD_BEGIN, '[[hooks.PreToolUse]]', 'matcher = "^Bash$"', '', '[[hooks.PreToolUse.hooks]]', 'type = "command"', `command = ${q(command)}`, 'timeout = 30', ''].join(eol);
+}
+/** Put the guard block in a Codex config.toml: appended, or an older block (another runtime path) replaced in place. */
+export function writeCodexToolGuard({ file, command, hooks }) {
+  const eolOf = (text) => (String(text ?? '').includes('\r\n') ? '\r\n' : '\n');
+  const verify = (text) => String(text ?? '').includes(codexGuardBlock(command, eolOf(text)));
+  const updated = atomicUpdate(file, (text) => {
+    const source = text ?? '';
+    if (verify(source)) return { text: null, result: { written: false } };
+    const eol = eolOf(source);
+    const at = source.indexOf(CODEX_GUARD_BEGIN);
+    if (at >= 0) {
+      // The block ends at the first table header that is not its own.
+      const rest = source.slice(at);
+      const end = /^[ \t]*\[(?!\[hooks\.PreToolUse(?:\.hooks)?\]\])/m.exec(rest);
+      return { text: source.slice(0, at) + codexGuardBlock(command, eol) + (end ? eol + rest.slice(end.index) : ''), result: { written: true } };
+    }
+    const base = source && !source.endsWith('\n') ? `${source}${eol}` : source;
+    return { text: `${base}${base ? eol : ''}${codexGuardBlock(command, eol)}`, result: { written: true } };
+  }, verify, { hooks });
+  return updated.ok ? { file, ok: true, written: updated.result.written } : { file, ok: false, error: updated.error };
+}
+
+const APP_SERVER_CLIENT = `
+const { spawn } = require('node:child_process');
+const reqs = JSON.parse(process.argv[1]);
+const p = spawn('codex app-server', { shell: true, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
+const out = []; let buf = ''; let next = 0;
+const send = (o) => p.stdin.write(JSON.stringify(o) + '\\n');
+const ask = () => { if (next >= reqs.length) { console.log(JSON.stringify(out)); p.kill(); process.exit(0); } send({ id: 100 + next, ...reqs[next] }); };
+p.stdout.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch { continue; }
+  if (m.id === 1) { send({ method: 'initialized' }); ask(); }
+  else if (m.id === 100 + next) { out.push(m.error ? { error: m.error } : m.result); next += 1; ask(); } } });
+send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'starci-launch-trust', version: '1' } } });
+`;
+/**
+ * The app-server calls of one Codex home, in order: `requests` [{method, params}] -> results[] (an error result is
+ * {error}). Codex computes the hash it trusts a hook by; the runtime asks it, the way Orca trusts its own hooks.
+ */
+export function codexAppServer({ home, requests, timeoutMs = 60_000 }) {
+  const r = spawnSync(process.execPath, ['-e', APP_SERVER_CLIENT, JSON.stringify(requests)], { encoding: 'utf8', timeout: timeoutMs, windowsHide: true,
+    env: { ...process.env, CODEX_HOME: home } });
+  const results = parseJson(String(r.stdout ?? '').trim().split(/\r?\n/).pop() ?? '', null);
+  if (!Array.isArray(results)) throw new Error(`codex app-server answered nothing (exit ${r.status}${r.error ? `: ${r.error.message}` : ''})`);
+  return results;
+}
+
+/** Trust the guard hook of one Codex home: hooks/list, then hooks.state.<key>.trusted_hash for each untrusted one. */
+export function trustCodexToolGuard({ home, cwd, command, appServer = codexAppServer }) {
+  const listed = (result) => (result?.data ?? []).flatMap((d) => d?.hooks ?? []).filter((h) => h?.command === command && h?.eventName === 'preToolUse');
+  const [before] = appServer({ home, requests: [{ method: 'hooks/list', params: { cwds: [cwd] } }] });
+  const entries = listed(before);
+  if (!entries.length) return { home, ok: false, error: 'codex hooks/list does not show the command guard' };
+  const untrusted = entries.filter((h) => h.trustStatus !== 'trusted');
+  if (!untrusted.length) return { home, ok: true, trusted: 'already' };
+  const value = Object.fromEntries(untrusted.map((h) => [h.key, { trusted_hash: h.currentHash }]));
+  const [, after] = appServer({ home, requests: [
+    { method: 'config/batchWrite', params: { edits: [{ keyPath: 'hooks.state', value, mergeStrategy: 'upsert' }], reloadUserConfig: true } },
+    { method: 'hooks/list', params: { cwds: [cwd] } }] });
+  const still = listed(after).filter((h) => h.trustStatus !== 'trusted');
+  return still.length ? { home, ok: false, error: `codex still reports the guard hook ${still[0].trustStatus ?? 'untrusted'}` } : { home, ok: true, trusted: 'written' };
+}
+
 /* ------------------------------------------------------------------ launch */
 
 /** The launch cwd as a directory, or null for an Orca selector ('active', 'id:…'). */
@@ -413,7 +544,7 @@ export function launchDirectory(worktree) {
  * recorded (the gate auto-answer in lib.mjs is the fallback). Returns null for
  * an agent with no trust prompt.
  */
-export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = process.platform, hooks } = {}) {
+export function ensureLaunchTrust({ agent, cwd, model = null, env = process.env, platform = process.platform, hooks, codexAppServer: appServer = null } = {}) {
   if (!TRUST_AGENTS.has(agent)) return null;
   const dir = launchDirectory(cwd);
   if (!dir) return { agent, paths: [], status: 'skipped', reason: `launch cwd is not a directory: ${cwd ?? 'none'}` };
@@ -426,7 +557,15 @@ export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = pr
     if (!r.ok) receipt.errors.push({ file: r.file, error: r.error });
   };
   const guard = (file, fn) => { try { return fn(); } catch (e) { return { file, ok: false, error: String(e?.message ?? e) }; } };
-  if (agent === 'claude') {
+  const command = toolGuardCommand();
+  if (agent === 'devin') {
+    const profile = guard(targets.devinConfig, () => writeDevinProfile({ file: targets.devinConfig, command, model, hooks }));
+    receipt.toolGuard = [{ file: targets.devinConfig, state: profile.state ?? 'failed' }];
+    if (model) receipt.modelPin = { file: targets.devinConfig, model, state: profile.state ?? 'failed' };
+    if (!profile.ok) receipt.errors.push({ file: targets.devinConfig, error: profile.error ?? profile.state });
+    else if (profile.state === 'written') receipt.written.push({ file: targets.devinConfig, key: model ? 'agent.model,hooks.PreToolUse' : 'hooks.PreToolUse' });
+    else receipt.already.push({ file: targets.devinConfig, key: model ? 'agent.model,hooks.PreToolUse' : 'hooks.PreToolUse' });
+  } else if (agent === 'claude') {
     collect(guard(targets.claudeJson, () => writeClaudeTrust({ file: targets.claudeJson, keys: claudeKeyForms(dir, platform), hooks })));
     const consent = guard(targets.claudeSettings, () => assertClaudeBypassConsent({ file: targets.claudeSettings, hooks }));
     receipt.bypassConsent = consent.state ?? 'failed';
@@ -434,6 +573,9 @@ export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = pr
     const launchEnv = guard(targets.claudeSettings, () => assertClaudeSettingsEnv({ file: targets.claudeSettings, vars: claudeLaunchEnv(), hooks }));
     receipt.launchEnv = launchEnv.state ?? 'failed';
     if (!launchEnv.ok) receipt.errors.push({ file: targets.claudeSettings, error: launchEnv.error ?? launchEnv.state });
+    const toolGuard = guard(targets.claudeSettings, () => assertJsonToolGuard({ file: targets.claudeSettings, command, matcher: 'Bash|PowerShell', hooks }));
+    receipt.toolGuard = [{ file: targets.claudeSettings, state: toolGuard.state ?? 'failed' }];
+    if (!toolGuard.ok) receipt.errors.push({ file: targets.claudeSettings, error: toolGuard.error ?? toolGuard.state });
   } else {
     receipt.paths = codexTrustPaths(dir);
     const keys = [...new Set(receipt.paths.flatMap((p) => codexKeyForms(p, platform)))];
@@ -447,6 +589,13 @@ export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = pr
       const noNudge = guard(file, () => writeCodexNoModelNudge({ file, hooks }));
       (receipt.modelNudge ??= []).push({ file, off: noNudge.ok === true, ...(noNudge.written ? { written: true } : {}), ...(noNudge.ok ? {} : { error: noNudge.error }) });
       if (!noNudge.ok) receipt.errors.push({ file, error: noNudge.error });
+      const hook = guard(file, () => writeCodexToolGuard({ file, command, hooks }));
+      // A re-rooted trust home (specs) never starts the real Codex: its app-server is injected, else the hash step waits.
+      const server = appServer ?? (env.STARCI_AGENT_TRUST_HOME ? null : codexAppServer);
+      const trusted = hook.ok && server ? guard(file, () => trustCodexToolGuard({ home: home.dir, cwd: dir, command, appServer: server })) : null;
+      (receipt.toolGuard ??= []).push({ file, ...(hook.written ? { written: true } : {}), trusted: trusted ? (trusted.ok ? trusted.trusted : 'failed') : 'not-checked' });
+      if (!hook.ok) receipt.errors.push({ file, error: hook.error });
+      if (trusted && !trusted.ok) receipt.errors.push({ file, error: trusted.error });
     }
   }
   receipt.status = receipt.errors.length ? 'failed' : (receipt.written.length ? 'written' : 'already');

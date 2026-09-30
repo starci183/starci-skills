@@ -4596,10 +4596,10 @@ function renewLiveWorkerLeases(ledger, workers, now) {
 // the marker; the api cannot stop raw file access, only refuse its verbs.
 // The shared-checkout guard of one op launch (scripts/guards/install.mjs,
 // modules/kernel/api.yaml conventions.sharedCheckout): the job's owned paths as
-// absolute paths for the git/npm shims, and the history hook in every checkout
-// the job writes. Best effort — a guard that cannot be put in place rides on the
+// absolute paths for the command guard (bound to the worker's terminal once it
+// starts), and the history hook in every checkout the job writes. Best effort — a guard that cannot be put in place rides on the
 // dispatch receipt and never refuses the launch.
-const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }) => {
+const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd }) => {
   try {
     const items = (placements ?? []).filter((p) => p && !p.unresolved && p.base);
     const owned = items.map((p) => path.resolve(p.base, String(p.path ?? '.').replace(/[\\/]\*\*[\\/]?$/, '') || '.'));
@@ -4618,9 +4618,9 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
     const repos = [...new Set([workerCwd ?? repo, ...items.map((p) => p.base)].filter(Boolean).map(gitRoot))];
     let config = null;
     try { config = loadConfig(); } catch { config = null; }
-    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config, shims });
+    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config });
   } catch (e) {
-    return { env: {}, pathPrefix: null, receipt: { error: String(e?.message ?? e) } };
+    return { receipt: { error: String(e?.message ?? e) } };
   }
 };
 /* ------------------------------------------------------------------ extensions */

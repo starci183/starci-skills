@@ -73,6 +73,16 @@ ALIAS_PROPS:
   owner: op-retry
   kind: input-invalid
 
+APP_ROUTER_GLOB:
+  title: "App Router pathspec would glob"
+  title_vi: "Đường dẫn App Router sẽ bị git đọc thành mẫu"
+  meaning_vi: "Lệnh git bị từ chối vì một đoạn App Router như [locale] hay (group) trong đường dẫn sẽ bị git hiểu là mẫu và chạm cả đường dẫn anh em của luồng khác."
+  causes_vi:
+    - "Đặt đường dẫn có ngoặc vuông hoặc ngoặc tròn trực tiếp vào lệnh git"
+  nextStep_vi: "Cổng bảo vệ từ chối; worker chạy lại đúng lệnh được gợi ý với đường dẫn dạng :(literal)."
+  owner: op-retry
+  kind: dispatch-refusal
+
 ARCHETYPE_MISSING:
   title: "Brand archetype missing"
   title_vi: "Thiếu nguyên mẫu thương hiệu"
@@ -1487,17 +1497,7 @@ DEPS_DELETE_WHILE_PEER_LEASED:
   meaning_vi: "Lệnh xóa node_modules bị chặn vì công việc của luồng khác đang chạy kiểm tra từ thư mục đó."
   causes_vi:
     - "Chạy npm ci hoặc xóa thư mục node_modules"
-  nextStep_vi: "Cổng bảo vệ npm từ chối; dùng npm install (có khóa) hoặc báo môi trường bị chặn kèm tên phụ thuộc thiếu."
-  owner: op-retry
-  kind: dispatch-refusal
-
-DEPS_LOCK_TIMEOUT:
-  title: "Dependency lock still held"
-  title_vi: "Khóa cài phụ thuộc vẫn bị giữ"
-  meaning_vi: "Khóa cài đặt phụ thuộc của kho vẫn do một công việc khác giữ sau thời gian chờ."
-  causes_vi:
-    - "Một lần npm install khác đang chạy lâu"
-  nextStep_vi: "Cổng bảo vệ từ chối; thử lại sau khi lần cài kia xong, hoặc báo môi trường bị chặn."
+  nextStep_vi: "Cổng bảo vệ npm từ chối; dùng npm install hoặc báo môi trường bị chặn kèm tên phụ thuộc thiếu."
   owner: op-retry
   kind: dispatch-refusal
 
