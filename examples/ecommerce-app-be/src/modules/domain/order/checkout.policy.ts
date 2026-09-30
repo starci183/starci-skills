@@ -30,5 +30,5 @@ export const evaluateCheckout = (
         lines.push({ productId: line.productId, quantity: line.quantity, unitPriceMinorUnits: product.priceMinorUnits })
         totalMinorUnits += product.priceMinorUnits * line.quantity
     }
-    return ok({ lines, totalMinorUnits, currency: "USD" })
+    return ok<CheckoutPlan>({ lines, totalMinorUnits, currency: "USD" })
 }

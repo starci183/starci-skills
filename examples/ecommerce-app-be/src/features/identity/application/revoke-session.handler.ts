@@ -4,7 +4,7 @@ import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { ok, refused } from "@modules/platform/primitives"
-import type { RevokeSessionResult } from "./revoke-session.contracts"
+import type { Revoked, RevokeSessionResult } from "./revoke-session.contracts"
 import { RevokeSessionCommand } from "./revoke-session.command"
 
 @CommandHandler(RevokeSessionCommand)
@@ -22,6 +22,6 @@ export class RevokeSessionHandler extends ICQRSHandler<RevokeSessionCommand, Rev
         const session = await this.sessions.verify(request.sessionToken)
         if (session === null || session.personId !== principal.id) return refused(SessionErrorCode.Invalid)
         await this.sessions.revoke(request.sessionToken)
-        return ok({ revoked: true })
+        return ok<Revoked>({ revoked: true })
     }
 }

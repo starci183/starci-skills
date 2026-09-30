@@ -1,7 +1,7 @@
 import { bootE2eWorld } from "../setup/e2e-world"
 import type { E2EWorld } from "../setup/e2e-world"
 import { present } from "../setup/e2e.error"
-import type { AccountData, BuyerStatusData, CartData, PlaceOrderData, ProductView } from "../setup/e2e-views.contracts"
+import type { AccountData, BuyerStatusData, CartData, PlaceOrderData, CatalogProductView } from "../setup/e2e-views.contracts"
 
 /**
  * The order lifecycle past the first confirmation: one buyer places several orders and the history they produce is
@@ -29,7 +29,7 @@ describe("order lifecycle: order history", () => {
         expect(world.stack.cleanupReport?.clean).toBe(true)
     })
 
-    const productOf = (data: CartData | null, id: string): ProductView =>
+    const productOf = (data: CartData | null, id: string): CatalogProductView =>
         present(data?.cart.catalog.find((product) => product.id === id), id)
 
     it("a buyer placing several orders builds a confirmed, paid history both services can read", async () => {

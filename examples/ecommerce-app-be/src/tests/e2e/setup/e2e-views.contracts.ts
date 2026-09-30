@@ -1,7 +1,7 @@
 /** The response shapes the public doors answer with, as the specs read them. */
 
 /** A catalog product as the cart query answers it. */
-export interface ProductView {
+export interface CatalogProductView {
     id: string
     name: string
     priceMinorUnits: number
@@ -16,7 +16,7 @@ export interface CartLineView {
 
 /** The cart query data. */
 export interface CartData {
-    cart: { items: Array<CartLineView>; catalog: Array<ProductView> }
+    cart: { items: Array<CartLineView>; catalog: Array<CatalogProductView> }
 }
 
 /** The placeOrder mutation data. */

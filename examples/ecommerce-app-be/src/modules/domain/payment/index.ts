@@ -7,6 +7,5 @@ export const paymentEntities = [PaymentEntity]
 /** The migrations of the payment capability, in the order they run. */
 export const paymentMigrations = [CreatePayments1789800004000]
 
-export type { PaymentView } from "./payment.contracts"
 export { PaymentModule } from "./payment.module"
 export { PaymentService } from "./payment.service"

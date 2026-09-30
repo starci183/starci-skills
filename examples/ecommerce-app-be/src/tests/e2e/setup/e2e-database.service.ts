@@ -1,3 +1,4 @@
+import type { SqlText } from "@modules/platform/database"
 import { openTestDatabase } from "@tests/fixtures/database"
 import type { TestDatabase } from "@tests/fixtures/database"
 import {
@@ -152,7 +153,7 @@ export class E2EDatabase {
         return rows[0]?.count ?? 0
     }
 
-    private async count(statement: typeof ORDER_COUNT, id: string): Promise<number> {
+    private async count(statement: SqlText, id: string): Promise<number> {
         const rows: Array<CountRow> = await this.order.manager.query(statement, [id])
         return rows[0]?.count ?? 0
     }

@@ -7,7 +7,7 @@ export const accountEntities = [PersonEntity]
 /** The migrations of the account capability, in the order they run. */
 export const accountMigrations = [CreatePersons1789800000000]
 
-export type { AccountPersonView, AccountView } from "./account.contracts"
+export type { AccountPersonView } from "./account.contracts"
 export { AccountModule } from "./account.module"
 export { AccountService } from "./account.service"
 export { ACCOUNT_ERROR_KINDS, AccountError, AccountErrorCode } from "./errors/account.error"
