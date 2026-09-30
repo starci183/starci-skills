@@ -1,0 +1,32 @@
+id: hfs-machine-owed
+effectiveAt: '2026-09-30T20:00:00+07:00'
+summary: >-
+  Lane C0 sub-lane Q2 (rules R24, R29, R30, R32, R35, R45, R46, R50, R54, R56, R63): every architecture-machine enforcer the
+  catalog still listed as planned ships, each with a violating and a passing tree. Back end (coverage.hfsMachine.<name>):
+  feature-shape (BE_FEATURE_SHAPE, a feature root and its application and transport folders match the requires and allows
+  of their slots through the resolver), public-surface (BE_PUBLIC_SURFACE: one index.ts per owner, only named export
+  lines, at most the slot's indexExports names, no nested index), composition-spec (BE_APP_COMPOSITION_ONLY: the app's
+  composition spec imports the real AppModule and calls AppModule.register), schema-owner (BE_SCHEMA_OWNER: entities and
+  migrations in the owning capability's persistence, connection.ts naming an hfs.json connection, index exports
+  <c>Entities and <c>Migrations, migration file, class and name shape), module-per-transport (BE_MODULE_SHAPE: one module
+  per transport folder, no module-definition in a feature, apps import only transport modules of their app kind) and
+  background-unowned (BE_BACKGROUND_UNOWNED: every job and consumer composed by a worker app, schedulers only in
+  platform/scheduling, sweep, deliver, reconcile and retry methods reachable from a composed job or consumer). Front end:
+  transport-owner (FE_TRANSPORT_OWNER: the global fetch, aliased or passed as a value, only in modules/api/client.ts, no HTTP
+  library import, readers import the client), route-files-thin (FE_ROUTE_FILES_THIN: layout, template, loading and
+  not-found draw nothing and mount one feature, no route file calls a hook), hooks-are-hooks (FE_HOOKS_ARE_HOOKS: one
+  <domain>.shared.ts, no helper declared twice) and package-shape (FE_PACKAGE_SHAPE: scripts.build, explicit exports, every
+  target inside dist). config-unread (HFS_ARCH_CONFIG_UNREAD, R24) refuses a retired architecture.json and a declaration
+  that analyses no file. The slot manifest gains the slot field composedBy (the app kinds that compose a transport slot) and
+  an indexExports budget on platform and integrations; the loader and hfs-slots.schema.yaml accept the field. No new
+  failure code; the Vietnamese entries of the affected codes gain the machine's causes.
+reach: new-legs
+paths:
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/slots.yaml
+  - modules/schemas/hfs-slots.schema.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/contract-changes/hfs-machine-owed.yaml
+  - scripts/lib/hfs-slots.mjs
+  - scripts/checks/architecture
+  - docs/architecture-check.md
