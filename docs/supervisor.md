@@ -79,7 +79,7 @@ runtime therefore launches every seat with `DISABLE_AUTOUPDATER=1` (`modules/mod
 `launchEnv`: set in a terminal launch's shell, and asserted under `env` in `~/.claude/settings.json` for the
 managed workers Orca launches; an owner-set value is kept). Updates are applied deliberately while no seat runs:
 after a reboot, or with the seats stopped, run `npm i -g @anthropic-ai/claude-code`, check `claude --version`,
-then `/restart` relaunches every seat on the new binary.
+then `/start` relaunches every seat on the new binary.
 
 ## Reconciler duties and decisions
 

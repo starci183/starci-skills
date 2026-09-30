@@ -101,7 +101,7 @@ export function newestEvent(m, kind) {
  * vào chat đi cho persistent" - the role lives in the owner's desktop chat session again: it owns channel 'main'
  * (registers and drains it with no Orca terminal), runs the 10-minute tick itself and lands its Opus lanes through
  * land.mjs --lane. 'kernel' is the optional [Supervisor] Orca kernel (start-supervisor.mjs + watchdog.mjs); in chat
- * mode nothing (resume-all, restart-all, /restart, the watchdog) starts one. STARCI_SUPERVISOR_MODE overrides the
+ * mode nothing (resume-all, restart-all, /start, the watchdog) starts one. STARCI_SUPERVISOR_MODE overrides the
  * config (specs, a one-off CLI run).
  */
 export const SUPERVISOR_MODES = Object.freeze(['chat', 'kernel']);

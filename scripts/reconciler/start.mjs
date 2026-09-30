@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 // scripts/reconciler/start.mjs — `start`: bring EVERYTHING on this host up (except defining or starting new workflows)
-// and print ONE green/red checklist. Owner ask 2026-09-29; skill skills/start/SKILL.md (skills/restart is a wrapper).
+// and print ONE green/red checklist. Owner ask 2026-09-29; skill skills/start/SKILL.md, the ONE start
+// skill (owner ruling 2026-09-30: the `restart` skill is gone; `boot.mjs --restart` stays the engine-only lever).
 //
-//   node scripts/reconciler/start.mjs [--check] [--json] [--wait <sec>] [--no-apply-profile] [--no-build]
-//                                     [--retire-stale-ledgers]
+//   node scripts/reconciler/start.mjs [--check] [--json] [--wait <sec>] [--no-build] [--retire-stale-ledgers]
+//                                     [--set-profile <operational|observe>]
 //
 // Order of an apply run:
-//   1. preflight (read-only): bundled SQLite >= 3.51.3, machine.sqlite quick_check, registered ledgers that are temp/test
-//      paths or missing files, legacy in-repo .starciwork/runtime.sqlite stores, kernel/supervisor pins whose model the
+//   1. preflight (read-only): bundled SQLite >= 3.51.3, machine.sqlite and every registered ledger quick_check, registered
+//      ledgers that are temp/test paths, whose repo_root is gone, or whose file is missing, legacy in-repo .starciwork/runtime.sqlite stores, kernel/supervisor pins whose model the
 //      agent card cannot attest (modelAttestation.displayNames), Orca reachable;
-//   2. the operational profile: config.yaml reconciler.profile operational (job/host/workflow/resource active; gc/fleet/
-//      learning shadow unless configured). Applied unless --no-apply-profile (config.yaml is backed up first);
+//   2. config: config.yaml is NEVER rewritten by a plain run; a profile that is not operational is a red row with the one
+//      command that fixes it. `--set-profile operational|observe` writes that one `reconciler` block (backup first) and
+//      then runs as usual (operational: job/host/workflow/resource active; gc/fleet/learning shadow unless configured);
 //   3. ui/dist rebuilt (npm run build in ui/) when any ui source is newer than the build, before harness-ui is started;
 //   4. the reconciler engine: started when down, restarted (planned, never a crash) when it runs --safe without a real
 //      crash loop behind it;
@@ -28,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/machine-db.mjs';
 import { legacyWorkSqliteFindings, workspaceBoundRepoRoots } from '../lib/hk-orphan-ledgers.mjs';
+import { quickCheck } from './ledger-health.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { ensure, crashLoopPlan, crashLoopRecord, leaderState, restartEngine, status } from './boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, reconcilerConfig, reconcilerNumbers } from './state.mjs';
@@ -66,13 +69,30 @@ export function isTempLedger(file, { tmp = os.tmpdir() } = {}) {
   return Boolean(p) && (p.startsWith(`${t}/`) || /\/(?:temp|tmp)\//.test(p) || /prereq|starci-test|\/scratch\//.test(p));
 }
 
-/** The registered-ledger findings: [{ledgerId, name, file, problem: 'temp'|'missing'}]. Seams: exists, tmp. */
+/**
+ * The registered-ledger findings: [{ledgerId, name, file, repoRoot, problem: 'temp'|'missing-repo'|'missing-file'}]. A ledger
+ * under a temp directory (its file or its repo_root) or whose repo_root no longer exists is stray. Seams: exists, tmp.
+ */
 export function ledgerFindings(ledgers, { exists = (f) => fs.existsSync(f), tmp = os.tmpdir() } = {}) {
   const out = [];
   for (const l of ledgers ?? []) {
     if (l.state === 'retired') continue;
-    if (isTempLedger(l.file, { tmp }) || isTempLedger(l.repoRoot, { tmp })) out.push({ ledgerId: l.ledgerId, name: l.name, file: l.file, problem: 'temp' });
-    else if (!l.file || !exists(l.file)) out.push({ ledgerId: l.ledgerId, name: l.name, file: l.file ?? null, problem: 'missing' });
+    const row = { ledgerId: l.ledgerId, name: l.name, file: l.file ?? null, repoRoot: l.repoRoot ?? null };
+    if (isTempLedger(l.file, { tmp }) || isTempLedger(l.repoRoot, { tmp })) out.push({ ...row, problem: 'temp' });
+    else if (l.repoRoot && !exists(l.repoRoot)) out.push({ ...row, problem: 'missing-repo' });
+    else if (!l.file || !exists(l.file)) out.push({ ...row, problem: 'missing-file' });
+  }
+  return out;
+}
+
+/** quick_check of every registered ledger file that exists: {bad: [{name, result}], checked}. Seams: check, exists. */
+export function ledgerIntegrity(ledgers, { check = (f) => quickCheck(f), exists = (f) => fs.existsSync(f) } = {}) {
+  const out = { bad: [], checked: 0 };
+  for (const l of ledgers ?? []) {
+    if (l.state === 'retired' || !l.file || !exists(l.file)) continue;
+    const r = check(l.file);
+    out.checked += 1;
+    if (!r.ok) out.bad.push({ name: l.name ?? l.ledgerId, result: r.result?.[0] ?? 'failed' });
   }
   return out;
 }
@@ -143,11 +163,12 @@ export function buildUi({ uiDir = path.join(SKILL_ROOT, 'ui'), run = spawnSync }
 /* ------------------------------------------------------------ the operational profile */
 
 /**
- * config.yaml text with `reconciler:` set to the operational profile: enabled, profile operational, and only the explicit
+ * config.yaml text with `reconciler:` set to a named profile: enabled, the profile, and (operational only) the explicit
  * controller entries the profile does not itself run active (an explicit gc/fleet/learning setting survives; an explicit
- * shadow/off of job/host/workflow/resource is what the profile replaces). Returns {text, changed}. Pure.
+ * shadow/off of job/host/workflow/resource is what the profile replaces; observe keeps none). Returns {text, changed}. Pure.
  */
-export function applyProfileText(text) {
+export function applyProfileText(text, profile = PROFILE) {
+  if (!Object.hasOwn(PROFILES, profile)) throw new Error(`unknown reconciler profile ${profile}: use ${Object.keys(PROFILES).join(' | ')}`);
   const eol = /\r\n/.test(text) ? '\r\n' : '\n';
   const lines = String(text).split(/\r?\n/);
   const at = lines.findIndex((l) => /^reconciler:\s*(?:#.*)?$/.test(l));
@@ -155,8 +176,8 @@ export function applyProfileText(text) {
   if (at >= 0) for (let i = at + 1; i < lines.length; i += 1) if (/^\S/.test(lines[i])) { end = i; break; }
   let previous = {};
   if (at >= 0) { try { previous = parseYaml(lines.slice(at, end).join('\n'))?.reconciler ?? {}; } catch { previous = {}; } }
-  const keep = Object.entries(previous.controllers ?? {}).filter(([n, v]) => !REQUIRED_ACTIVE.includes(n) && ['off', 'shadow', 'active'].includes(v?.mode));
-  const block = ['reconciler:', '  enabled: true', `  profile: ${PROFILE}`, `  controllers: {${keep.map(([n, v]) => `${n}: {mode: ${v.mode}}`).join(', ')}}`];
+  const keep = Object.entries(previous.controllers ?? {}).filter(([n, v]) => profile === PROFILE && !REQUIRED_ACTIVE.includes(n) && ['off', 'shadow', 'active'].includes(v?.mode));
+  const block = ['reconciler:', '  enabled: true', `  profile: ${profile}`, `  controllers: {${keep.map(([n, v]) => `${n}: {mode: ${v.mode}}`).join(', ')}}`];
   const next = at < 0 ? [...lines.filter((l, i, a) => !(i === a.length - 1 && l === '')), ...block, ''] : [...lines.slice(0, at), ...block, ...lines.slice(end)];
   const out = next.join(eol);
   return { text: out, changed: out !== text };
@@ -164,15 +185,15 @@ export function applyProfileText(text) {
 
 /** The config profile rows. `conf` is reconcilerConfig(); `raw` the config's own reconciler block. Pure. */
 export function profileItems(conf, raw) {
-  const fix = 'node scripts/reconciler/start.mjs (applies reconciler.profile: operational to config.yaml)';
+  const fix = 'node scripts/reconciler/start.mjs --set-profile operational (writes that one block to config.yaml, backup kept)';
   if (!conf.enabled) return [red('config', 'profile', 'reconciler config', 'reconciler.enabled is not true: no controller runs', fix)];
   if (conf.profile !== PROFILE) {
     const shadow = REQUIRED_ACTIVE.filter((n) => conf.controllers[n]?.mode !== 'active');
-    return [shadow.length ? red('config', 'profile', 'reconciler profile', `profile ${conf.profile ?? 'none'}: ${shadow.map((n) => `${n}=${conf.controllers[n]?.mode ?? 'off'}`).join(' ')} - start needs them active`, fix)
+    return [shadow.length ? red('config', 'profile', 'reconciler profile', `${conf.profile ? `profile ${conf.profile}` : 'no reconciler.profile: an unnamed controller is not run (shadow at most)'}: ${shadow.map((n) => `${n}=${conf.controllers[n]?.mode ?? 'off'}`).join(' ')} - start needs them active`, fix)
       : green('config', 'profile', 'reconciler profile', `no profile, but ${REQUIRED_ACTIVE.join(', ')} are explicitly active`)];
   }
   const overridden = REQUIRED_ACTIVE.filter((n) => conf.controllers[n]?.mode !== 'active');
-  return [overridden.length ? red('config', 'profile', 'reconciler profile', `operational, but controllers.${overridden.join(', ')} is set explicitly to ${overridden.map((n) => conf.controllers[n]?.mode).join('/')}`, `remove controllers.${overridden.join(', controllers.')} from config.yaml reconciler (or run start.mjs)`)
+  return [overridden.length ? red('config', 'profile', 'reconciler profile', `operational, but controllers.${overridden.join(', ')} is set explicitly to ${overridden.map((n) => conf.controllers[n]?.mode).join('/')}`, `remove controllers.${overridden.join(', controllers.')} from config.yaml reconciler (or run start.mjs --set-profile operational)`)
     : green('config', 'profile', 'reconciler profile', `operational (${Object.entries(PROFILES.operational).map(([n, m]) => `${n}=${m}`).join(' ')}${raw?.controllers && Object.keys(raw.controllers).length ? '; explicit overrides kept' : ''})`)];
 }
 
@@ -204,7 +225,7 @@ export function engineItems(s, { safeIsCrashLoop = false } = {}) {
     const required = REQUIRED_ACTIVE.includes(name);
     const shown = `${m.effective}${m.configured !== m.effective ? ` (configured ${m.configured})` : ''}`;
     if (required) items.push(m.effective === 'active' ? green('controllers', `mode:${name}`, `controller ${name}`, shown) : red('controllers', `mode:${name}`, `controller ${name}`, `${shown}, start needs active`,
-      m.configured === 'active' ? 'the engine is not running it yet: node scripts/reconciler/start.mjs' : 'node scripts/reconciler/start.mjs (applies the operational profile)'));
+      m.configured === 'active' ? 'the engine is not running it yet: node scripts/reconciler/start.mjs' : 'node scripts/reconciler/start.mjs --set-profile operational'));
     else items.push(m.effective === 'off' && want !== 'off' ? warn('controllers', `mode:${name}`, `controller ${name}`, `${shown}, profile expects ${want}`) : green('controllers', `mode:${name}`, `controller ${name}`, shown, { required: false }));
   }
   return items;
@@ -292,8 +313,11 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
     if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'node engine/machine-db.mjs (initialises it) or restore from D:/starci-archive/ledger-backups'));
     else { ledgers = q.ledgers; push(q.check === 'ok' ? green('preflight', 'machine-db', 'machine.sqlite quick_check', `ok, ${ledgers.length} ledger(s) registered`) : red('preflight', 'machine-db', 'machine.sqlite quick_check', String(q.check), 'restore machine.sqlite (owner-approved)')); }
   } catch (error) { push(red('preflight', 'machine-db', 'machine.sqlite quick_check', String(error?.message ?? error).slice(0, 200), 'restore machine.sqlite (owner-approved)')); }
+  const integrity = ledgerIntegrity(ledgers);
+  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledgers quick_check', integrity.bad.map((b) => `${b.name}: ${b.result}`).join('; ').slice(0, 400), 'node scripts/reconciler/ledger-health.mjs --check --file <ledger> (restore the ledger from D:/starci-archive/ledger-backups, owner-approved)')
+    : green('preflight', 'ledger-integrity', 'registered ledgers quick_check', `${integrity.checked} ledger file(s) ok`, { required: false }));
   const found = ledgerFindings(ledgers);
-  push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${f.file ?? '-'})`).join('; ').slice(0, 400), 'node scripts/reconciler/start.mjs --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
+  push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'node scripts/reconciler/start.mjs --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
     : green('preflight', 'ledgers', 'registered ledgers', 'no temp/test path and no missing file', { required: false }));
   const legacy = legacyWorkSqliteFindings([...ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot), ...workspaceBoundRepoRoots({ env })]);
   push(legacy.length ? warn('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', `${legacy.length} store(s): ${legacy.map((f) => f.repoRoot).join(', ').slice(0, 300)}`, 'the ledger lives in %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite; archive the in-repo copy (LEDGER_LEGACY_WORK_SQLITE, node scripts/checks/ledger-hygiene.mjs)')
@@ -373,11 +397,11 @@ export function renderText(items, { applied = [] } = {}) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Apply the operational profile to config.yaml (backup first). {changed, backup} or {error}. */
-export function applyProfileFile({ file = path.join(SKILL_ROOT, 'config.yaml'), now = Date.now() } = {}) {
+/** Write a named profile to config.yaml (backup first): only `start --set-profile` calls it. {changed, backup} or {error}. */
+export function applyProfileFile({ file = path.join(SKILL_ROOT, 'config.yaml'), now = Date.now(), profile = PROFILE } = {}) {
   let text;
   try { text = fs.readFileSync(file, 'utf8'); } catch { return { changed: false, error: `${file} is not readable` }; }
-  const out = applyProfileText(text);
+  const out = applyProfileText(text, profile);
   if (!out.changed) return { changed: false };
   const backup = `${file}.bak-${new Date(now).toISOString().replace(/[:.]/g, '-')}`;
   fs.copyFileSync(file, backup);
@@ -387,15 +411,15 @@ export function applyProfileFile({ file = path.join(SKILL_ROOT, 'config.yaml'), 
 
 async function up(opts) {
   const applied = [];
-  const { env = process.env, waitMs, noProfile, noBuild, retire } = opts;
+  const { env = process.env, waitMs, setProfile, noBuild, retire } = opts;
   if (retire) {
     const stale = ledgerFindings(readMachine((m) => m.listLedgers(), [], { env })).filter((f) => f.problem === 'temp');
     if (stale.length) withMachine((m) => { for (const f of stale) m.setLedgerState(f.ledgerId, 'retired', { reason: 'start --retire-stale-ledgers: temp/test path' }); }, { env });
     applied.push(`retired ${stale.length} temp/test ledger(s)${stale.length ? `: ${stale.map((f) => f.name ?? f.ledgerId).join(', ')}` : ''}`);
   }
-  if (!noProfile) {
-    const r = applyProfileFile();
-    applied.push(r.error ? `profile NOT applied: ${r.error}` : r.changed ? `config.yaml reconciler.profile: ${PROFILE} (backup ${path.basename(r.backup)})` : `config.yaml already on profile ${PROFILE}`);
+  if (setProfile) {
+    const r = applyProfileFile({ profile: setProfile });
+    applied.push(r.error ? `profile NOT set: ${r.error}` : r.changed ? `config.yaml reconciler.profile: ${setProfile} (backup ${path.basename(r.backup)})` : `config.yaml already on profile ${setProfile}`);
   }
   let rebuilt = false;
   if (!noBuild) {
@@ -441,7 +465,14 @@ export async function main(argv = process.argv.slice(2)) {
   const has = (f) => argv.includes(f);
   const wait = argv.indexOf('--wait');
   const waitMs = Math.max(0, (Number(wait >= 0 ? argv[wait + 1] : 120) || 120) * 1000);
-  const opts = { waitMs, noProfile: has('--no-apply-profile'), noBuild: has('--no-build'), retire: has('--retire-stale-ledgers') };
+  const sp = argv.indexOf('--set-profile');
+  const setProfile = sp >= 0 ? argv[sp + 1] : null;
+  if (sp >= 0 && (!Object.hasOwn(PROFILES, setProfile) || has('--check'))) {
+    console.error(`start: --set-profile takes ${Object.keys(PROFILES).join(' | ')} and cannot be combined with --check`);
+    process.exitCode = 2;
+    return;
+  }
+  const opts = { waitMs, setProfile, noBuild: has('--no-build'), retire: has('--retire-stale-ledgers') };
   let applied = [];
   if (!has('--check')) applied = await up(opts);
   let items = await gather({ config: safeRun(() => loadConfig(), null) });

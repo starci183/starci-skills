@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { crashLoopPlan, crashLoopRecord, ensure, isPlannedStart, SPAWNED_KIND } from '../scripts/reconciler/boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, configuredMode, reconcilerConfig } from '../scripts/reconciler/state.mjs';
-import { applyProfileText, cmpVersion, engineItems, isTempLedger, ledgerFindings, pinProblems, profileItems, sqliteItem, summarize, uiBuildState } from '../scripts/reconciler/start.mjs';
+import { applyProfileText, cmpVersion, engineItems, isTempLedger, ledgerFindings, ledgerIntegrity, pinProblems, profileItems, sqliteItem, summarize, uiBuildState } from '../scripts/reconciler/start.mjs';
 import { tempState } from '../scripts/reconciler/testing.mjs';
 
 const NOW = 10_000_000;
@@ -104,7 +104,12 @@ test('preflight: SQLite version, temp and missing ledgers, a model pin the agent
     { ledgerId: 'a', name: 'a', file: inTemp },
     { ledgerId: 'b', name: 'b', file: gone }, { ledgerId: 'c', name: 'c', file: ok }, { ledgerId: 'd', name: 'd', file: gone2, state: 'retired' },
   ], { exists: (f) => f === ok, tmp });
-  assert.deepEqual(found.map((f) => `${f.ledgerId}:${f.problem}`), ['a:temp', 'b:missing']);
+  assert.deepEqual(found.map((f) => `${f.ledgerId}:${f.problem}`), ['a:temp', 'b:missing-file']);
+  const repos = ledgerFindings([{ ledgerId: 'e', name: 'e', file: ok, repoRoot: path.join(home, 'gone-repo') }, { ledgerId: 'f', name: 'f', file: ok, repoRoot: ok }], { exists: (f) => f === ok, tmp });
+  assert.deepEqual(repos.map((f) => `${f.ledgerId}:${f.problem}`), ['e:missing-repo']);
+  const integrity = ledgerIntegrity([{ name: 'c', file: ok }, { name: 'x', file: gone }, { name: 'r', file: ok, state: 'retired' }, { name: 'bad', file: 'bad.sqlite' }],
+    { exists: (f) => f !== gone, check: (f) => (f === 'bad.sqlite' ? { ok: false, result: ['page 3 corrupt'] } : { ok: true, result: ['ok'] }) });
+  assert.deepEqual(integrity, { bad: [{ name: 'bad', result: 'page 3 corrupt' }], checked: 2 });
   const card = (agent) => ({ claude: { modelAttestation: { displayNames: { 'claude-opus-5-5': 'Opus 5.5' } } }, codex: { modelAttestation: { mode: 'launch-flag' } } }[agent] ?? null);
   const bad = pinProblems([{ where: 'kernel', agent: 'claude', model: 'claude-sonnet-5-5' }, { where: 'k2', agent: 'claude', model: 'claude-opus-5-5' }, { where: 'k3', agent: 'codex', model: 'gpt' }], { card });
   assert.deepEqual(bad.map((b) => b.where), ['kernel']);

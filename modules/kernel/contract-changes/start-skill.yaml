@@ -1,17 +1,16 @@
 id: start-skill
 effectiveAt: '2026-09-29T12:00:00+07:00'
 summary: >-
-  Owner ask 2026-09-29: one skill `start` (restart is its alias) brings the whole host up and prints one green/red
+  Owner ask 2026-09-29: one skill `start` (there is no restart skill; boot.mjs --restart is the engine-only lever) brings the whole host up and prints one green/red
   checklist (scripts/reconciler/start.mjs; boot.mjs up). config.yaml reconciler.profile operational|observe makes the
   operational controller set explicit (job, host, workflow, resource active; gc, fleet, learning shadow) so a host is
-  never left all-shadow silently; start applies it and shows red when a needed controller is shadow. Crash-loop safe
+  never left all-shadow silently; start shows red when a needed controller is shadow and never rewrites config.yaml itself: `start --set-profile operational|observe` writes that one block (backup first). Crash-loop safe
   mode counts only abnormal engine starts: owner restarts, self-reload and land re-exec handovers and restarts after a
   clean exit (start_reason owner-restart, start, self-reload, planned-restart) no longer count toward
   allocation.reconciler.crashLoop. start rebuilds ui/dist when a ui source is newer and runs the read-only preflight
-  (SQLite >= 3.51.3, machine.sqlite quick_check, temp/test and missing ledgers, legacy in-repo runtime.sqlite, model
+  (SQLite >= 3.51.3, machine.sqlite and every registered ledger quick_check, temp/test and missing-repo/missing-file ledgers, legacy in-repo runtime.sqlite, model
   pins whose agent card lacks modelAttestation.displayNames, Orca). No API verb, ledger table or module YAML key changes.
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/start-skill.yaml
   - skills/start/SKILL.md
-  - skills/restart/SKILL.md

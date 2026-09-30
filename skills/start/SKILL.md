@@ -5,7 +5,7 @@ description: >-
   engine with its operational controller profile, the harness UI (rebuilt when its sources are newer), tunnels and
   connectors, the Supervisor seat and the Kernel seat of every already-running workflow. It never defines or starts a
   new workflow. Thin wrapper over .claude/scripts/reconciler/start.mjs. Use when the owner or supervisor says start,
-  "khởi động", "bật hết", after a reboot or an Orca restart, or runs /start (/restart is the same command).
+  "khởi động", "bật hết", after a reboot or an Orca restart, or runs /start.
 user-invocable: true
 ---
 
@@ -29,14 +29,15 @@ Executable: `.claude/scripts/reconciler/start.mjs` (also `node .claude/scripts/r
    node .claude/scripts/reconciler/start.mjs --json     # the same, machine readable
    ```
 
-   Flags: `--wait <sec>` (how long to re-read until green, default 120), `--no-apply-profile` (validate, do not edit
-   config.yaml), `--no-build` (skip the ui/dist rebuild), `--retire-stale-ledgers` (retire registered ledgers whose
+   Flags: `--wait <sec>` (how long to re-read until green, default 120), `--set-profile operational|observe` (the only
+   thing that writes config.yaml: that one `reconciler` block, the old file saved as `config.yaml.bak-<time>`; a plain run
+   never edits it and shows a red row with this command), `--no-build` (skip the ui/dist rebuild), `--retire-stale-ledgers` (retire registered ledgers whose
    path is a temp/test path, through the machine-db API).
 
-2. What an apply run does, in order: preflight (Node bundles SQLite >= 3.51.3; machine.sqlite quick_check; temp/test or
-   missing registered ledgers; legacy in-repo `.starciwork/runtime.sqlite`; kernel/supervisor pins whose model the agent
-   card cannot attest; Orca reachable) -> applies `reconciler.profile: operational` to config.yaml (job, host, workflow,
-   resource active; gc, fleet, learning shadow; the old file is saved as `config.yaml.bak-<time>`) -> rebuilds `ui/dist`
+2. What an apply run does, in order: preflight (Node bundles SQLite >= 3.51.3; machine.sqlite and every registered ledger quick_check; temp/test, missing-repo or
+   missing-file registered ledgers; legacy in-repo `.starciwork/runtime.sqlite`; kernel/supervisor pins whose model the agent
+   card cannot attest; Orca reachable) -> (with `--set-profile` only: writes the profile to config.yaml; operational = job, host, workflow,
+   resource active; gc, fleet, learning shadow) -> rebuilds `ui/dist`
    when a ui source is newer -> starts the reconciler engine (restarts it out of `--safe` when no real crash loop is on
    record) -> starts every service that is down -> the Supervisor seat (`supervisor.mode: kernel` only) and every running
    workflow's Kernel seat.
@@ -51,5 +52,5 @@ Executable: `.claude/scripts/reconciler/start.mjs` (also `node .claude/scripts/r
    report counts. Do not run the fixes yourself except `start` again; a red config, build or Orca item is the owner's
    or the lane's to act on.
 
-`/restart` is the same command (see `skills/restart`); `node .claude/scripts/reconciler/boot.mjs --restart` remains the
+There is no separate restart skill; `node .claude/scripts/reconciler/boot.mjs --restart` remains the
 lever that only restarts the engine.

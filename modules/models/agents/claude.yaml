@@ -31,7 +31,7 @@ launchEnvReason: >-
   orchestration worker-start composes a managed worker's command itself, scripts/agent/trust.mjs also asserts
   the same key under env in ~/.claude/settings.json before every Claude launch - only when the key is missing, an
   owner-set value is kept. Updates are applied deliberately while no seat runs (docs/supervisor.md "Claude Code
-  updates"): stop the seats, `npm i -g @anthropic-ai/claude-code`, then /restart.
+  updates"): stop the seats, `npm i -g @anthropic-ai/claude-code`, then /start.
 terminalFallback:
   when: orchestration.worker-start is unavailable or a plain command terminal is wanted
   command: claude

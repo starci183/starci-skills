@@ -227,7 +227,7 @@ chatSeat:
   role: |
     The default (config.yaml supervisor.mode chat): the owner's desktop Claude chat session is the Supervisor.
     It persists with the owner's chat, not with an Orca terminal, and no [Supervisor] kernel runs beside it:
-    the skill /restart and the Host controller start none (start-supervisor.mjs answers action chat-mode;
+    the skill /start and the Host controller start none (start-supervisor.mjs answers action chat-mode;
     a watchdog.mjs --once pass does nothing).
   does:
     - "registers channel 'main' from the chat (channel.mjs register --id main --label <text>; no Orca terminal - the chat's CLAUDE_CODE_SESSION_ID is recorded) and is the only reader that drains it (channel.mjs inbox --id main); every other reader uses --peek"
@@ -426,7 +426,7 @@ loop:
       ask's "Generate URL" button or asks with /asks; never re-serve it.
       After a reboot the task StarCi-Reconciler (scripts/reconciler/boot.mjs --install-task) starts the engine
       at logon, so a reboot resumes with no chat at all; node scripts/reconciler/boot.mjs --restart is the
-      manual lever (the skill /restart).
+      manual lever (the skill /start runs it with the rest of the host).
   perCycle:
     - step: observe
       do: read the printed digest — new op reports, open asks with their liveness tag + serving

@@ -161,10 +161,10 @@ repeatedly is replaced.
 
 ### Start
 
-`node scripts/reconciler/start.mjs` (skill `start`; `/restart` is an alias) runs, in order: preflight (Node bundles
-SQLite >= 3.51.3, `machine.sqlite` quick_check, registered ledgers on temp/test paths or with missing files, legacy
+`node scripts/reconciler/start.mjs` (skill `start`, the one start skill; `boot.mjs --restart` is the engine-only lever) runs, in order: preflight (Node bundles
+SQLite >= 3.51.3, `machine.sqlite` quick_check, every registered ledger's quick_check, ledgers on temp/test paths or with a missing repo or file, legacy
 in-repo `.starciwork/runtime.sqlite`, kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
-applies `reconciler.profile: operational` to `config.yaml` (backup first; `--no-apply-profile` only validates);
+reports a `reconciler.profile` other than operational as red (`config.yaml` is never rewritten by a plain run; `--set-profile operational|observe` writes that one block, backup first);
 rebuilds `ui/dist` with `npm run build` in `ui/` when any `ui/src`, `ui/package.json`, `ui/index.html` or vite config is
 newer than the build (a failed build is red); starts the engine, or restarts it out of `--safe` when no real crash loop
 is on record; starts every registry service that is down (never Orca); runs `start-supervisor.mjs` (only in
