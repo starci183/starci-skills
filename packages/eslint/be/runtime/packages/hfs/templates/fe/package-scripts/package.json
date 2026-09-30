@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "prepare": "husky",
+    {{appScripts}}
+    "codegen": "npm run codegen --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run codegen --silent && hfs lint --stylelint \"{{styleGlob}}\"",
+    "lint:fix": "npm run codegen --silent && hfs lint --fix --stylelint \"{{styleGlob}}\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  }
+}
