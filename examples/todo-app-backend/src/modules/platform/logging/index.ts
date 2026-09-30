@@ -1,2 +1,5 @@
-export { LogEvent } from "./log-events"
-export { WinstonService } from "./winston.service"
+export { createJsonLogger } from "./json-logger.service"
+export { InjectLogger, LOGGER } from "./logging.decorators"
+export { LoggingLogEvent } from "./logging.log-events"
+export { LoggingModule } from "./logging.module"
+export type { LogFields, Logger } from "./logging.port"
