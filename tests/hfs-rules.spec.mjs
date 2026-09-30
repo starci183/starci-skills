@@ -38,7 +38,7 @@ test('the shipped catalog is 1.0.0, validates against its JSON schema and loads 
 test('the loader answers by id, code, gate, enforcer and what is still owed', () => {
   const catalog = loadRuleCatalog();
   assert.equal(catalog.rule('R12').code, 'HFS_E2E_IN_AUTOMATIC_GATE');
-  assert.equal(catalog.rule('R99'), null);
+  assert.equal(catalog.rule('R00'), null);
   assert.equal(catalog.byCode('FE_NEXT_CONVENTIONS').id, 'R54');
   assert.equal(catalog.byCode('HFS_SLOT_UNDECLARED').id, 'R01');
   assert.equal(catalog.byCode('NOT_A_CODE'), null);
