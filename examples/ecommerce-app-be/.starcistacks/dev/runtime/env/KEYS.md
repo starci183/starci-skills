@@ -11,6 +11,10 @@ only. Every key without a default is required: a missing or malformed key stops 
 | `IDENTITY_API_PORT` | Port the api listens on | none |
 | `IDENTITY_DB_URL` | Postgres URL of the `identity` connection (secret: may embed credentials) | none |
 | `CACHE_REDIS_URL` | Redis URL of the session store (secret) | none |
+| `KEYCLOAK_ADMIN_URL` | Base URL of the Keycloak server the member profiles are read from | none |
+| `KEYCLOAK_ADMIN_REALM` | Realm the members live in | none |
+| `KEYCLOAK_ADMIN_TOKEN` | Service-account bearer token of the admin API (secret) | none |
+| `KEYCLOAK_ADMIN_TIMEOUT` | Deadline of a call to Keycloak (`250`, `3s`) | `3s` |
 | `ORDER_API_URL` | Base URL of the order service | none |
 | `ORDER_API_TIMEOUT` | Deadline of a call to the order service (`250`, `3s`) | `3s` |
 | `HTTP_SECURITY_ALLOWED_ORIGINS` | Comma-separated origins allowed to send browser state-changing requests | none |

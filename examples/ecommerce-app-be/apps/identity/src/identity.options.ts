@@ -1,6 +1,8 @@
 import type { CacheOptions } from "@modules/integrations/cache"
+import type { KeycloakAdminOptions } from "@modules/integrations/keycloak-admin"
 import type { OrderApiOptions } from "@modules/integrations/order-api"
 import { parseCacheConfig } from "@modules/integrations/cache"
+import { parseKeycloakAdminConfig } from "@modules/integrations/keycloak-admin"
 import { parseOrderApiConfig } from "@modules/integrations/order-api"
 import type { EnvSource } from "@modules/platform/config"
 import { parseIdentityDatabaseConfig } from "@modules/platform/database"
@@ -16,6 +18,8 @@ export interface IdentityAppOptions {
     readonly database: DatabaseConnectionConfig
     /** The Redis session store. */
     readonly cache: CacheOptions
+    /** The Keycloak admin API the member profiles are read from. */
+    readonly keycloakAdmin: KeycloakAdminOptions
     /** Where the order service answers. */
     readonly orderApi: OrderApiOptions
     /** The origin allowlist and rate limits. */
@@ -27,6 +31,7 @@ export const parseIdentityAppOptions = (env: EnvSource): IdentityAppOptions => (
     port: env.int("IDENTITY_API_PORT"),
     database: parseIdentityDatabaseConfig(env),
     cache: parseCacheConfig(env),
+    keycloakAdmin: parseKeycloakAdminConfig(env),
     orderApi: parseOrderApiConfig(env),
     httpSecurity: parseHttpSecurityConfig(env),
 })
