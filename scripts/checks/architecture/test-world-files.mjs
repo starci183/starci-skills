@@ -1,5 +1,5 @@
 import { treeOf } from './required-files.mjs';
-import { allowsFile } from './slot-allows.mjs';
+import { allowsFile } from '../../lib/hfs-allows.mjs';
 
 /**
  * R47 `test-world-files` (BE_TEST_TOPOLOGY). `src/tests/world/` is the only test infrastructure location, and it holds only
