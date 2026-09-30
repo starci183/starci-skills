@@ -110,7 +110,6 @@ test("FE-NEXT-5: every page exports metadata", () => {
       // only pages name themselves; a layout inherits and a component is not a route
       { filename: at("apps/web/src/app/[locale]/layout.tsx"), code: "export default function L() {}" },
       { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: "export const Home = () => null" },
-      { filename: at("apps/web/src/app/[locale]/page.test.tsx"), code: "export default function P() {}" },
       // a page.tsx that no route slot owns is not a page
       { filename: at("apps/web/src/components/blocks/Nav/page.tsx"), code: "export default function P() {}" },
       { filename: at("apps/web/src/features/pages/Home/page.tsx"), code: "export default function P() {}" },
@@ -151,7 +150,6 @@ test("FE-NEXT-7: navigation helpers come from modules/i18n/navigation", () => {
       // the boundary outside the locale provider and the navigation module itself
       { filename: at("apps/web/src/app/global-error.tsx"), code: "import { usePathname } from 'next/navigation'" },
       { filename: at("apps/web/src/modules/i18n/navigation.ts"), code: "import { redirect } from 'next/navigation'" },
-      { filename: at("apps/web/src/components/blocks/Nav/index.test.tsx"), code: "import Link from 'next/link'" },
       { filename: at("apps/web/src/proxy.ts"), code: "import { redirect } from 'next/navigation'" },
     ],
     invalid: [
@@ -180,7 +178,6 @@ test("FE-NEXT-8: no hand-drawn anchor for an internal route", () => {
       { code: 'const A = () => <a href="#main">skip</a>' },
       { code: "const A = () => <a href={url}>x</a>" },
       { code: 'const A = () => <Link href="/courses">x</Link>' },
-      { filename: at("apps/web/src/components/blocks/Nav/index.test.tsx"), code: 'const A = () => <a href="/x">x</a>' },
     ],
     invalid: [
       { code: 'const A = () => <a href="/courses">x</a>', errors: [{ messageId: "internal" }] },
@@ -205,7 +202,6 @@ test("FE-NEXT-9: a route is built by modules/routes, not written at the call", (
       { filename: at("apps/web/src/modules/routes/index.ts"), code: "export const course = (slug) => `/courses/${slug}`" },
       { filename: at("apps/web/src/modules/routes/index.tsx"), code: 'const A = () => <Link href="/courses">x</Link>' },
       { filename: at("apps/admin/src/modules/i18n/navigation.ts"), code: 'redirect("/courses")' },
-      { filename: at("apps/web/src/components/blocks/Nav/index.test.tsx"), code: 'router.push("/courses")' },
     ],
     invalid: [
       { filename: NAV, code: 'const A = () => <Link href="/courses">x</Link>', errors: [{ messageId: "route" }] },
@@ -249,8 +245,6 @@ test("FE-NEXT-10: the next-intl stack is written once per repository", () => {
       { filename: APP_REQUEST, code: "export const x = api.createNavigation(routing)" },
       // the same name from the same module, but not called
       { filename: APP_INDEX, code: 'import type { defineRouting } from "next-intl/routing"\nexport type Define = typeof defineRouting' },
-      // a spec builds a stack to prove a module
-      { filename: at("apps/web/src/modules/i18n/request.spec.ts"), code: NAVIGATION },
     ],
     invalid: [
       // a multi-app repository: no app builds a layer, whichever layer and however it is imported

@@ -12,10 +12,10 @@
  * lint rule is for - the one nothing else will ever report.
  */
 
-import { classOf, fileOf, isComponentFile, isSpecFile } from "./lib/scope.mjs"
+import { classOf, fileOf, isComponentFile } from "./lib/scope.mjs"
 
 /** Product component source these rules govern: a component owner's file, and not a spec (a placeholder in a test fixture is a fixture, not a second tree). */
-const isGoverned = (context) => isComponentFile(context) && !isSpecFile(fileOf(context))
+const isGoverned = (context) => isComponentFile(context)
 
 /** A flag that means "waiting", in the spellings this codebase uses. */
 const WAITING_FLAG = /\bis(?:Loading|Skeleton|Pending)\b/

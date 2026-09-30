@@ -14,7 +14,7 @@
  * `modules/i18n/**` is exempt: it is where the formatters are configured.
  */
 
-import { fileOf, inSlot, isSpecFile } from "./lib/scope.mjs"
+import { fileOf, inSlot } from "./lib/scope.mjs"
 
 /** The locale-sensitive `Date` and `Number` methods. */
 const LOCALE_METHODS = new Set(["toLocaleString", "toLocaleDateString", "toLocaleTimeString"])
@@ -57,7 +57,7 @@ export const useIntlFormatter = {
     },
   },
   create(context) {
-    if (isSpecFile(fileOf(context)) || inSlot(context, "fe.modules.i18n")) return {}
+    if (inSlot(context, "fe.modules.i18n")) return {}
     return {
       ImportDeclaration(node) {
         const source = String(node.source.value)

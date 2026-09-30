@@ -8,8 +8,7 @@
  * (`git show HEAD:<file>`). A file may stay as large as it is; it may not grow, and it may not be born large. The rule
  * takes no option: the budget is the manifest's, the baseline is git's.
  *
- * There is no baseline file and no allowlist: the record is the repository's own history. A spec and an e2e file are
- * source files like any other; a declaration file (`*.d.ts`) carries no behaviour and is not governed. Component,
+ * There is no baseline file and no allowlist: the record is the repository's own history. A declaration file (`*.d.ts`) carries no behaviour and is not governed. Component,
  * hook and state budgets are stricter still where they apply (`size-and-state-budget`); this ratchet is the one that
  * needs the previous revision.
  */

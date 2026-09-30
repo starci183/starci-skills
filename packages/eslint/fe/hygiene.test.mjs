@@ -19,9 +19,7 @@ const typed = typedTester()
 const FILE = at("apps/web/src/components/blocks/Feed/index.tsx")
 const HOOK = at("apps/web/src/hooks/lesson/useLesson.ts")
 const MODULE = at("apps/web/src/modules/api/client.ts")
-const SPEC = at("apps/web/src/components/blocks/Feed/index.test.tsx")
 const PLAIN_FILE = at("apps/web/src/components/blocks/Feed/index.tsx")
-const PLAIN_SPEC = at("apps/web/src/components/blocks/Feed/index.test.tsx")
 
 /** The imports every effect case starts with. */
 const REACT = "import { useEffect, useLayoutEffect, useSyncExternalStore } from \"react\"\n"
@@ -63,8 +61,6 @@ test("HYGIENE-1: timers and frames", () => {
       // a homonym is not the platform's timer, and a local `useEffect` is not React's
       { filename: FILE, code: withReact("declare function setTimeout(cb: () => void, ms: number): void\nuseEffect(() => { setTimeout(() => undefined, 1) }, [])") },
       { filename: FILE, code: "declare function useEffect(cb: () => void): void\nuseEffect(() => { window.addEventListener(\"x\", () => undefined) })" },
-      // specs are not product source
-      { filename: SPEC, code: "setTimeout(() => undefined, 10)" },
     ],
     invalid: [
       { filename: FILE, code: withReact("useEffect(() => { setTimeout(() => set(false), 300) }, [])\ndeclare const set: (v: boolean) => void"), errors: unreleased },
@@ -200,8 +196,6 @@ test("HYGIENE-2: an effect does not start a load", () => {
       { filename: FILE, code: withReact("useEffect(() => { document.fonts.ready.then(() => undefined) }, [])") },
       // a `useEffect` that is not React's
       { filename: FILE, code: "declare function useEffect(cb: () => void): void\ndeclare function load(): Promise<number>\nuseEffect(() => { void load() })" },
-      // specs are not product source
-      { filename: SPEC, code: withReact("declare function load(): Promise<number>\nuseEffect(() => { void load().then(() => undefined) }, [])") },
     ],
     invalid: [
       { filename: FILE, code: withReact("useEffect(() => { fetch('/x').then(() => undefined) }, [])"), errors: [{ messageId: "fetch" }] },
@@ -232,7 +226,6 @@ test("HYGIENE-3: a catch that does nothing hides the failure", () => {
       { filename: PLAIN_FILE, code: "try { run() } catch (error) { throw error }" },
       { filename: PLAIN_FILE, code: "load().catch((error) => report(error))" },
       { filename: PLAIN_FILE, code: "try { run() } finally { done() }" },
-      { filename: PLAIN_SPEC, code: "try { run() } catch {}" },
     ],
     invalid: [
       { filename: PLAIN_FILE, code: "try { run() } catch {}", errors: [{ messageId: "empty" }] },
@@ -248,7 +241,6 @@ test("HYGIENE-4: no console in product source", () => {
     valid: [
       { filename: PLAIN_FILE, code: "const consoleWidth = 80" },
       { filename: PLAIN_FILE, code: "logger.error('x')" },
-      { filename: PLAIN_SPEC, code: "console.log('debug')" },
       { filename: at("apps/web/scripts/build.mjs"), code: "console.log('building')" },
       // a folder named src that no product slot owns is not product source
       { filename: at("tools/src/build.ts"), code: "console.log('building')" },

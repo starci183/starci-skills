@@ -22,7 +22,6 @@ const tester = slotTester()
 
 const BLOCK = at("apps/web/src/components/blocks/sales/HandoffBlock/component.tsx")
 const BLOCK_INDEX = at("apps/web/src/components/blocks/sales/HandoffBlock/index.tsx")
-const BLOCK_SPEC = at("apps/web/src/components/blocks/sales/HandoffBlock/component.spec.tsx")
 const LAYOUT = at("apps/web/src/features/layouts/WorkspaceLayout/component.tsx")
 const PAGE = at("apps/web/src/features/pages/OperatePage/component.tsx")
 const OVERLAY = at("apps/web/src/features/overlays/sales/SendOverlay/component.tsx")
@@ -108,7 +107,6 @@ test("only the sibling index reaches the pure half, and it never re-exports XBas
   tester.run("base-import-pair", baseImportPair, {
     valid: [
       { filename: BLOCK_INDEX, code: "import { HandoffBlockBase } from \"./component\"" },
-      { filename: BLOCK_SPEC, code: "import { HandoffBlockBase } from \"./component\"" },
       { filename: BLOCK_INDEX, code: "export type { HandoffBlockState } from \"./component\"" },
       { filename: PAGE, code: "import { HandoffBlock } from \"@/components/blocks/sales/HandoffBlock\"" },
       // a sibling `./component` outside a split tier is an ordinary module

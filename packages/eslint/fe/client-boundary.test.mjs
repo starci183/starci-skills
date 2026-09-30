@@ -46,8 +46,6 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       { filename: at("apps/web/src/app/[locale]/layout.tsx"), code: PLAIN },
       { filename: at("apps/web/src/app/[locale]/page.tsx"), code: PLAIN },
       { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: PLAIN },
-      // a spec is not product source
-      { filename: at("apps/web/src/app/[locale]/page.test.tsx"), code: DIRECTIVE },
       // a string that merely reads like the directive is not one
       { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "const s = \"use client\"" },
     ],
@@ -87,7 +85,6 @@ test("FE-CLIENT-2: a client component imports nothing that exists only on the se
       { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: 'import "server-only"' },
       // a `read-` file outside the api module is not a server reader
       { filename: CLIENT, code: '"use client"\nimport { readLocal } from "@/modules/storage/read-local"' },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: '"use client"\nimport fs from "node:fs"' },
     ],
     invalid: [
       { filename: CLIENT, code: '"use client"\nimport "server-only"', errors: [{ messageId: "server" }] },
@@ -112,7 +109,6 @@ test("FE-CLIENT-3: web storage is touched only inside modules", () => {
       { filename: at("apps/web/src/modules/session/storage.ts"), code: 'const v = sessionStorage.getItem("k")' },
       { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: "const store = { localStorage: 1 }" },
       { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: "const v = repo.localStorage" },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: 'localStorage.clear()' },
     ],
     invalid: [
       { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: 'const v = localStorage.getItem("k")', errors: [{ messageId: "storage" }] },
@@ -128,7 +124,6 @@ test("FE-CLIENT-4: raw HTML only on a script", () => {
     valid: [
       { code: "const A = () => <script type=\"application/ld+json\" dangerouslySetInnerHTML={{ __html: JSON_LD }} />" },
       { code: "const A = () => <p>{text}</p>" },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "const A = () => <div dangerouslySetInnerHTML={{ __html: x }} />" },
     ],
     invalid: [
       { code: "const A = () => <div dangerouslySetInnerHTML={{ __html: html }} />", errors: [{ messageId: "html" }] },
@@ -175,8 +170,7 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
       { filename: at("apps/web/src/modules/api/course/read-course.ts"), code: MARKED + 'import { get } from "../client"\nexport const readCourse = () => get("/course")' },
       // a client file is client-no-server-import's business
       { filename: HOOK, code: '"use client"\nimport { headers } from "next/headers"\nexport const useX = () => headers' },
-      // specs and files no slot owns are not judged
-      { filename: at("apps/web/src/modules/kernel/read-things.spec.ts"), code: 'import fs from "node:fs"\nexport const r = fs' },
+      // files no slot owns are not judged
       { filename: at("docs/scratch.ts"), code: 'import fs from "node:fs"\nexport const r = fs' },
     ],
     invalid: [

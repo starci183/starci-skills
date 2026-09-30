@@ -19,7 +19,6 @@ import { recommended as brandValuesRecommended, rules as brandValuesRules } from
 import { recommended as clientBoundaryRecommended, rules as clientBoundaryRules } from "./client-boundary.mjs"
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
 import { recommended as classNamesRecommended, rules as classNamesRules } from "./class-names.mjs"
-import { recommended as e2eShapeRecommended, rules as e2eShapeRules, scope as e2eShapeScope } from "./e2e-shape.mjs"
 import { recommended as envOwnerRecommended, rules as envOwnerRules } from "./env-owner.mjs"
 import { recommended as fileLayoutRecommended, rules as fileLayoutRules } from "./file-layout.mjs"
 import { recommended as grammarBoundaryRecommended, rules as grammarBoundaryRules } from "./grammar-boundary.mjs"
@@ -39,7 +38,6 @@ import { recommended as servedLocaleRecommended, rules as servedLocaleRules } fr
 import { recommended as shapeSlotRecommended, rules as shapeSlotRules } from "./shape-slot.mjs"
 import { recommended as sizeBudgetRecommended, rules as sizeBudgetRules } from "./size-and-state-budget.mjs"
 import { recommended as sizeGrowthRecommended, rules as sizeGrowthRules } from "./size-growth.mjs"
-import { recommended as specQualityRecommended, rules as specQualityRules } from "./spec-quality.mjs"
 import { recommended as statusColorsRecommended, rules as statusColorsRules } from "./status-colors.mjs"
 import { recommended as splitRecommended, rules as splitRules } from "./the-split.mjs"
 import { recommended as tokensRecommended, rules as tokensRules } from "./tokens.mjs"
@@ -61,7 +59,6 @@ const CONTRIBUTIONS = [
     rules: classNamesRules,
     recommended: classNamesRecommended,
   },
-  { law: "e2e-shape", rules: e2eShapeRules, recommended: e2eShapeRecommended, scope: e2eShapeScope },
   { law: "env-owner", rules: envOwnerRules, recommended: envOwnerRecommended },
   { law: "file-layout", rules: fileLayoutRules, recommended: fileLayoutRecommended },
   { law: "grammar-boundary", rules: grammarBoundaryRules, recommended: grammarBoundaryRecommended },
@@ -81,7 +78,6 @@ const CONTRIBUTIONS = [
   { law: "shape-slot", rules: shapeSlotRules, recommended: shapeSlotRecommended },
   { law: "size-and-state-budget", rules: sizeBudgetRules, recommended: sizeBudgetRecommended },
   { law: "size-growth", rules: sizeGrowthRules, recommended: sizeGrowthRecommended },
-  { law: "spec-quality", rules: specQualityRules, recommended: specQualityRecommended },
   { law: "status-colors", rules: statusColorsRules, recommended: statusColorsRecommended },
   { law: "the-split", rules: splitRules, recommended: splitRecommended },
   { law: "tokens", rules: tokensRules, recommended: tokensRecommended },
@@ -136,24 +132,6 @@ export const rules = Object.fromEntries(
  */
 export const recommended = Object.fromEntries(
   CONTRIBUTIONS.flatMap((entry) => Object.entries(entry.recommended)),
-)
-
-/** Which tree each law governs: `src` unless the law says otherwise. */
-const scopeOf = (entry) => entry.scope ?? "src"
-
-/**
- * The levels the source rules ask for: every law except the e2e one.
- *
- * The audit compares a printed config of a PRODUCTION probe file with a map, so the map must hold
- * only the rules that reach that file. The e2e rules govern another tree and are absent from it.
- */
-export const sourceRecommended = Object.fromEntries(
-  CONTRIBUTIONS.filter((entry) => scopeOf(entry) === "src").flatMap((entry) => Object.entries(entry.recommended)),
-)
-
-/** The levels the e2e rules ask for; they reach `e2e/**` and `playwright.config.*` only. */
-export const e2eRecommended = Object.fromEntries(
-  CONTRIBUTIONS.filter((entry) => scopeOf(entry) === "e2e").flatMap((entry) => Object.entries(entry.recommended)),
 )
 
 /** Flat-config options that make inline directives ineffective rather than merely forbidden. */
@@ -228,12 +206,12 @@ export const reactHooksRules = (reactHooks) => {
  * The whole flat config of a front end: `export default starciFeConfig({ hfs: loadHfs(import.meta.url) })`.
  *
  * It owns nothing the repository could choose: which files are linted comes from the HFS profile (every app's and every
- * workspace package's `src/`, and the e2e tree), not which rules are on, not their level, not whether an inline comment may
+ * workspace package's `src/`), not which rules are on, not their level, not whether an inline comment may
  * switch one off. NO RULE IS OFF - the factory throws rather than emit a block in which a published rule is missing or
  * below error, so a rule added to this package reaches every repository or the build of this package fails.
  *
  * @param {{ hfs: object }} input - The HFS view of the repository (`loadHfs(import.meta.url)`).
- * @returns {object[]} The flat config: ignores, the typed source block, the e2e block.
+ * @returns {object[]} The flat config: ignores and the typed source block.
  */
 export const starciFeConfig = ({ hfs } = {}) => {
   const published = Object.keys(rules).map((name) => `starci-fe/${name}`)
@@ -246,8 +224,6 @@ export const starciFeConfig = ({ hfs } = {}) => {
     hfs,
     plugin,
     reactHooks,
-    source: { ...sourceRecommended, ...reactHooksRules(reactHooks) },
-    // The escape-hatch fence is a source rule that must also cover the e2e tree.
-    e2e: { ...e2eRecommended, "starci-fe/no-inline-lint-config": "error" },
+    source: { ...recommended, ...reactHooksRules(reactHooks) },
   })
 }

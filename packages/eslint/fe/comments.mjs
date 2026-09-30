@@ -13,11 +13,11 @@
  * The exceptions that remain are placements, not judgements, and that is on purpose: a locale dictionary
  * IS the other language, and a fixture reproducing a real string has to reproduce it exactly. A
  * judgement-based exception would be argued per file forever. For the Vietnamese rule the only placement is the i18n
- * fixtures slot (`fe.e2e-support.i18n`, `e2e/fixtures/i18n/`); a spec is authoring and is judged like any file.
+ * fixtures slot; a spec is authoring and is judged like any file.
  */
 
 import { hasSecondLanguage } from "./runtime/scripts/lib/language.mjs"
-import { fileOf, inSlot, isSpecFile } from "./lib/scope.mjs"
+import { fileOf, inSlot } from "./lib/scope.mjs"
 
 /**
  * Extended pictographs, or a regional-indicator pair.
@@ -33,17 +33,16 @@ export const hasEmoji = (text) =>
 /**
  * Files whose second-language text or emoji is CONTENT rather than authoring, decided by what the file IS.
  *
- * Three kinds only: the locale dictionaries (a `.json` file of an i18n slot, `fe.modules.i18n` or `fe.package.i18n`),
- * which are the product's other language; the e2e support tree (slot `fe.e2e-support`: fixtures and support),
- * and specs, which reproduce real strings and would be testing something else if they translated them. There is no
- * "copy module": a `resources/` folder of strings is copy that skipped the catalogue.
+ * One kind only: the locale dictionaries (a `.json` file of an i18n slot, `fe.modules.i18n` or `fe.package.i18n`),
+ * which are the product's other language. There is no "copy module": a `resources/` folder of strings is copy that
+ * skipped the catalogue.
  *
  * @param {object} context - The ESLint rule context.
  * @returns {boolean} True when the linted file holds content rather than authoring.
  */
 export const isContentFile = (context) => {
   const file = fileOf(context)
-  return isSpecFile(file) || inSlot(context, "fe.e2e-support", "fe.e2e-support.i18n") || (inSlot(context, "fe.modules.i18n", "fe.package.i18n") && file.endsWith(".json"))
+  return inSlot(context, "fe.modules.i18n", "fe.package.i18n") && file.endsWith(".json")
 }
 
 /** Walk every place prose can hide, and hand each to one check. */

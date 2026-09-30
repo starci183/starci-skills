@@ -69,9 +69,6 @@ test("LINT-ESCAPE-1: product source cannot change its own lint policy", () => {
       { filename: SOURCE, code: "// prettier-ignore\nconst value = [1,2]", errors: [{ messageId: "tool" }] },
       { filename: SOURCE, code: "/* stylelint-disable color-no-hex */\nconst value = 1", errors: [{ messageId: "tool" }] },
       { filename: SOURCE, code: "// stylelint-disable-next-line\nconst value = 1", errors: [{ messageId: "tool" }] },
-      // the e2e tree and specs are governed too
-      { filename: at("e2e/course/play.e2e-spec.ts"), code: "// @ts-ignore\nconst value = 1", errors: [{ messageId: "typescript" }] },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "// @ts-ignore\nconst value = 1", errors: [{ messageId: "typescript" }] },
       {
         filename: SOURCE,
         code: "/* eslint-env browser */\nconst value = 1",

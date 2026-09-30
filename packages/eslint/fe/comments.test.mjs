@@ -14,8 +14,6 @@ import { isContentFile, noEmojiInSource, noVietnameseInSource, requireExportJsdo
 const tester = slotTester()
 
 const SRC = at("apps/web/src/components/leaves/Text/index.tsx")
-/** A content file that parses: the e2e fixtures (the dictionaries themselves are `.json`, which the TypeScript parser refuses). */
-const LOCALE = at("e2e/fixtures/copy.ts")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -42,12 +40,10 @@ test("COMMENTS-1: an export opens with a documentation block", () => {
   })
 })
 
-test("COMMENTS-4: no emoji in source, and content files are exempt", () => {
+test("COMMENTS-4: no emoji in source", () => {
   tester.run("no-emoji-in-source", noEmojiInSource, {
     valid: [
       { filename: SRC, code: "// a plain comment\nconst x = 1" },
-      { filename: LOCALE, code: "const t = \"done 🎉\"" },
-      { filename: at("apps/web/src/components/leaves/Text/index.spec.tsx"), code: "const t = \"done 🎉\"" },
     ],
     invalid: [
       { filename: SRC, code: "// shipped 🎉\nconst x = 1", errors: [{ messageId: "emoji" }] },
@@ -103,9 +99,6 @@ test("there is no copy-module exemption: a resources folder is authoring, and th
   assert.equal(content("packages/nivo-i18n/messages/vi.json"), true)
   // code of the i18n module is authoring: only its dictionaries are content
   assert.equal(content("apps/web/src/modules/i18n/request.ts"), false)
-  assert.equal(content("apps/web/src/components/leaves/Text/index.test.tsx"), true)
-  assert.equal(content("e2e/fixtures/copy.ts"), true)
-  assert.equal(content("e2e/fixtures/i18n/copy.ts"), true)
   assert.equal(content("apps/web/src/components/leaves/Text/fixtures/copy.ts"), false)
   assert.equal(rules["no-second-language-in-source"], undefined)
 })

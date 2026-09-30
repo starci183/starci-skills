@@ -16,7 +16,6 @@
  */
 
 import { attribute, attributeValue, calleeName, isFunction, mentions } from "./lib/ast.mjs"
-import { isSpecFile } from "./lib/scope.mjs"
 
 /** `.map(callback)` where the callback is written inline; the call node, else null. */
 const mapCallback = (call) => {
@@ -86,7 +85,6 @@ export const listItemHasKey = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     return {
       CallExpression(call) {
         const callback = mapCallback(call)
@@ -116,7 +114,6 @@ export const noIndexKey = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     const source = context.sourceCode ?? context.getSourceCode()
     return {
       CallExpression(call) {
@@ -170,7 +167,6 @@ export const noInlineLiteralPropInList = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     return {
       JSXAttribute(node) {
         const opening = node.parent

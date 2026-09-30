@@ -23,7 +23,6 @@ const API = "apps/web/src/modules/api/graphql/clients"
 const CLIENT = at(`${API}/create-apollo-client.ts`)
 const LOCALE_LINK = at(`${API}/links/locale.ts`)
 const HTTP_LINK = at(`${API}/links/http.ts`)
-const HTTP_LINK_SPEC = at(`${API}/links/http.test.ts`)
 const HOOK = at("apps/web/src/hooks/swr/useQueryCourseSwr.ts")
 
 test("every rule this law declares is exported under its published name", () => {
@@ -68,11 +67,6 @@ export default chain`,
       // is a chain hiding in a link.
       filename: HTTP_LINK,
       code: `export const createHttpLink = (params) => new HttpLink(resolveHttpLinkOptions(params))`,
-    },
-    {
-      // Its spec asserts about a chain rather than being one.
-      filename: HTTP_LINK_SPEC,
-      code: `test("builds the terminal link", () => { createHttpLink({}) })`,
     },
     {
       // `new HttpLink(...)` is the same terminal link written the other way, and it is attached.

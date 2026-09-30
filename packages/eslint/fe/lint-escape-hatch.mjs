@@ -19,10 +19,10 @@
  * nothing is dead weight that reads as if it did.
  */
 
-import { fileOf, isE2eSource, isProductSource, isSpecFile } from "./lib/scope.mjs"
+import { isProductSource } from "./lib/scope.mjs"
 
-/** Product source, its specs and the e2e tree are governed; canon tests deliberately build forbidden directives. */
-const isGoverned = (context) => isProductSource(context) || isSpecFile(fileOf(context)) || isE2eSource(context)
+/** Product source is governed; canon tests deliberately build forbidden directives. */
+const isGoverned = (context) => isProductSource(context)
 
 /**
  * Any directive that changes ESLint's active rule set inside a source file.

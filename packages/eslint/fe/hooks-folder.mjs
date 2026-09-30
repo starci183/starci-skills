@@ -16,7 +16,7 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
-import { baseName, classOf, fileOf, inSlot, isSpecFile } from "./lib/scope.mjs"
+import { baseName, classOf, fileOf, inSlot } from "./lib/scope.mjs"
 
 /** Names that mark a hook. */
 const isHookName = (name) => /^use[A-Z0-9]/.test(name)
@@ -68,15 +68,14 @@ export const hooksFolderHoldsHooksOnly = {
     // A file directly in `hooks/` is its own root: the slot binds the file name as the `domain`.
     const directlyInHooks = hfsOf(context).relative(file) === found.root
     const name = baseName(file)
-    const spec = isSpecFile(file)
-    const subject = spec ? name.replace(/\.(?:test|spec)\.(?:ts|tsx)$/, ".ts") : name
+    const subject = name
     const domain = found.bindings.domain
     const isHookFile = /^use[A-Z0-9]\w*\.ts$/.test(subject)
     // The slot names the domain's entry (`index.ts`, role `entry`) and its shared helper file (`<domain>.shared.ts`, role `shared`).
     // Both sit directly in the domain folder: a nested `x/index.ts` is a file the slot does not name.
     const directlyInDomain = hfsOf(context).relative(file) === `${found.root}/${name}`
-    const isEntryFile = directlyInDomain && (found.role === "entry" || (spec && subject === "index.ts"))
-    const isSharedFile = directlyInDomain && (found.role === "shared" || (spec && subject === `${domain}.shared.ts`))
+    const isEntryFile = directlyInDomain && (found.role === "entry")
+    const isSharedFile = directlyInDomain && (found.role === "shared")
 
     return {
       Program(program) {
@@ -84,12 +83,12 @@ export const hooksFolderHoldsHooksOnly = {
         if (!isHookFile && !isSharedFile && !isEntryFile) context.report({ node: program, messageId: "notHook", data: { name } })
       },
       ImportDeclaration(node) {
-        if (SERVER_ONLY.test(String(node.source.value)) && !spec) {
+        if (SERVER_ONLY.test(String(node.source.value))) {
           context.report({ node, messageId: "server", data: { source: node.source.value } })
         }
       },
       "Program:exit"(program) {
-        if (spec || directlyInHooks || (!isHookFile && !isSharedFile)) return
+        if (directlyInHooks || (!isHookFile && !isSharedFile)) return
         const exported = program.body
           .filter((node) => node.type === "ExportNamedDeclaration" || node.type === "ExportDefaultDeclaration")
           .flatMap((node) => exportedNames(node).map((exportedName) => ({ node, name: exportedName })))
