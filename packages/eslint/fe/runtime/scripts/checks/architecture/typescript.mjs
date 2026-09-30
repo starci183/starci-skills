@@ -184,7 +184,7 @@ function workspaceMetadata(config) {
     const root = path.join(config.root, ...relative.split('/'));
     const pkg = readJson(path.join(root, 'package.json'));
     const routeRoots = config.frontend.routes.map(item => path.join(config.root, ...item.split('/')));
-    return { root: canonical(root), relative, name: typeof pkg.name === 'string' ? pkg.name : null, exports: pkg.exports,
+    return { root: canonical(root), relative, name: typeof pkg.name === 'string' ? pkg.name : null, exports: pkg.exports, manifest: pkg, workspace: true,
       app: routeRoots.some(route => isInside(root, route))
         || backendAppRoots.some(appRoot => isInside(appRoot, root) || isInside(root, appRoot)) };
   };
@@ -212,18 +212,19 @@ function exportTargetStrings(value) {
   return [];
 }
 
-function packageExported(workspace, specifier, actualTarget) {
-  if (!workspace.name || !sameOrUnder(specifier, workspace.name)) return false;
+/** The package-relative export targets a request (`.` or `./sub`) of a workspace package declares, from exports, else types/main. */
+function exportCandidates(workspace, specifier) {
+  if (!workspace.name || !sameOrUnder(specifier, workspace.name)) return [];
   const request = specifier === workspace.name ? '.' : `.${specifier.slice(workspace.name.length)}`;
   const declaration = workspace.exports;
   let candidates = [];
   if (typeof declaration === 'string' || Array.isArray(declaration)) {
-    if (request !== '.') return false;
+    if (request !== '.') return [];
     candidates = exportTargetStrings(declaration);
   } else if (declaration && typeof declaration === 'object') {
     const keys = Object.keys(declaration);
     if (!keys.some(key => key.startsWith('.'))) {
-      if (request !== '.') return false;
+      if (request !== '.') return [];
       candidates = exportTargetStrings(declaration);
     } else {
       for (const key of keys) {
@@ -232,10 +233,64 @@ function packageExported(workspace, specifier, actualTarget) {
       }
     }
   }
-  return candidates.some(target => {
+  return candidates;
+}
+
+const SOURCE_EXTENSIONS = { '.d.ts': ['.ts', '.tsx'], '.d.mts': ['.mts'], '.d.cts': ['.cts'], '.js': ['.ts', '.tsx'], '.jsx': ['.tsx'], '.mjs': ['.mts'], '.cjs': ['.cts'] };
+
+/** rootDir and outDir of a workspace package's build tsconfig (tsconfig.build.json, else tsconfig.json), extends followed; null when it declares none. */
+function workspaceBuildLayout(ts, workspace) {
+  if (workspace.layout !== undefined) return workspace.layout;
+  workspace.layout = null;
+  for (const name of ['tsconfig.build.json', 'tsconfig.json']) {
+    const file = path.join(workspace.root, name);
+    if (!fs.existsSync(file)) continue;
+    const read = ts.readConfigFile(file, ts.sys.readFile);
+    if (read.error) continue;
+    const { options } = ts.parseJsonConfigFileContent(read.config, ts.sys, workspace.root, undefined, file);
+    if (options.outDir) { workspace.layout = { rootDir: options.rootDir ? path.resolve(options.rootDir) : path.join(workspace.root, 'src'), outDir: path.resolve(options.outDir) }; break; }
+  }
+  return workspace.layout;
+}
+
+/** The source file a built export target (`./dist/sub/index.js`, `.d.ts`) stands for: outDir back to rootDir, else the dist-to-src layout; null when none exists. */
+function sourceOfTarget(ts, workspace, target) {
+  const absolute = path.resolve(workspace.root, target);
+  const layout = workspaceBuildLayout(ts, workspace);
+  const extension = Object.keys(SOURCE_EXTENSIONS).filter(item => absolute.endsWith(item)).sort((a, b) => b.length - a.length)[0];
+  const sourceRoots = [];
+  if (layout && isInside(layout.outDir, absolute)) sourceRoots.push([layout.outDir, layout.rootDir]);
+  const first = slash(path.relative(workspace.root, absolute)).split('/')[0];
+  if (first) sourceRoots.push([path.join(workspace.root, first), path.join(workspace.root, 'src')]);
+  if (!extension) return null;
+  for (const [from, to] of sourceRoots) {
+    const stem = path.join(to, path.relative(from, absolute)).slice(0, -extension.length);
+    for (const candidate of SOURCE_EXTENSIONS[extension]) if (fs.existsSync(stem + candidate)) return canonical(stem + candidate);
+  }
+  return null;
+}
+
+/** The source entry a workspace import resolves to without a build: its export targets mapped back to source, `src/index.ts` for the package root. */
+function workspaceSourceEntry(ts, workspace, specifier) {
+  if (!workspace.workspace || !workspace.name || !sameOrUnder(specifier, workspace.name)) return null;
+  let candidates = exportCandidates(workspace, specifier);
+  if (specifier === workspace.name && !workspace.exports) candidates = [workspace.manifest?.types, workspace.manifest?.typings, workspace.manifest?.module, workspace.manifest?.main].filter(item => typeof item === 'string');
+  for (const target of candidates) {
+    if (!target.startsWith('./') || target.includes('..')) continue;
+    const source = sourceOfTarget(ts, workspace, target);
+    if (source) return source;
+  }
+  if (specifier === workspace.name) {
+    for (const name of ['index.ts', 'index.tsx']) if (fs.existsSync(path.join(workspace.root, 'src', name))) return canonical(path.join(workspace.root, 'src', name));
+  }
+  return null;
+}
+
+function packageExported(ts, workspace, specifier, actualTarget) {
+  return exportCandidates(workspace, specifier).some(target => {
     if (!target.startsWith('./') || target.includes('..')) return false;
     const expected = canonical(path.resolve(workspace.root, target));
-    return expected === canonical(actualTarget);
+    return expected === canonical(actualTarget) || sourceOfTarget(ts, workspace, target) === canonical(actualTarget);
   });
 }
 
@@ -385,7 +440,9 @@ function typeScriptContext(config, loaded, paths) {
       message: `${item.kind} must use a string-literal module name so architecture coverage can resolve its dependency.`,
     });
     for (const reference of references.found) {
-      const resolvedName = resolveTypeScriptModule(ts, reference.specifier, sourceFile.fileName, project.options, host);
+      // A workspace package is read at its source, never at its build: the same import resolves whether or not dist exists.
+      const workspaceTarget = workspaces.filter(item => item.root !== canonical(config.root)).map(item => workspaceSourceEntry(ts, item, reference.specifier)).find(Boolean);
+      const resolvedName = workspaceTarget ?? resolveTypeScriptModule(ts, reference.specifier, sourceFile.fileName, project.options, host);
       if (!resolvedName) {
         const codeLike = !ASSET_EXTENSION.test(reference.specifier);
         const workspaceImport = [...workspaceNames].some(name => sameOrUnder(reference.specifier, name));
@@ -443,7 +500,7 @@ function typeScriptContext(config, loaded, paths) {
         if (!owningWorkspace.app && targetWorkspace.app) {
           errors.push(boundaryViolation(config.root, edge, owningWorkspace, targetWorkspace, 'ARCH_PACKAGE_IMPORTS_APP', 'A reusable workspace package cannot depend on an application workspace.'));
         }
-        if (!packageExported(targetWorkspace, reference.specifier, actualTarget)) {
+        if (!packageExported(ts, targetWorkspace, reference.specifier, actualTarget)) {
           errors.push(boundaryViolation(config.root, edge, owningWorkspace, targetWorkspace, 'ARCH_PACKAGE_EXPORT_BYPASS', 'Cross-package imports must use the target package name and a declared package export.'));
         }
       }
