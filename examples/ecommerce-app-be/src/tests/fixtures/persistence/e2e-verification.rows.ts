@@ -1,3 +1,7 @@
+import type { EntityManager } from "typeorm"
+import type { sql } from "@modules/platform/database"
+import { STOCK_OF } from "./e2e-verification.sql"
+
 /** A persisted person. */
 export interface PersonRow {
     /** The person id. */
@@ -62,4 +66,23 @@ export interface StockRow {
 export interface TableRow {
     /** The table name. */
     table_name: string
+}
+
+/** The statement type the `sql` tag builds. */
+type Statement = ReturnType<typeof sql>
+
+/** Runs a read of the verification statements and answers its rows. */
+export const readRows = <TRow>(manager: EntityManager, statement: Statement, params: ReadonlyArray<string | number>): Promise<Array<TRow>> =>
+    manager.query(statement, [...params])
+
+/** The count a verification statement answers for one id. */
+export const readCount = async (manager: EntityManager, statement: Statement, id: string): Promise<number> => {
+    const rows = await readRows<CountRow>(manager, statement, [id])
+    return rows[0]?.count ?? 0
+}
+
+/** The stock of one product of the order database; zero when the SKU is unknown. */
+export const readStock = async (manager: EntityManager, productId: string): Promise<number> => {
+    const rows = await readRows<StockRow>(manager, STOCK_OF, [productId])
+    return rows[0]?.stock ?? 0
 }

@@ -1,7 +1,11 @@
-import { bootE2eWorld } from "../setup/e2e-world"
-import type { E2EWorld } from "../setup/e2e-world"
-import { present } from "../setup/e2e.error"
-import type { AccountData, BuyerStatusData, CartData, PlaceOrderData } from "../setup/e2e-views.contracts"
+import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
+import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
+import { asBearer, present } from "../../fixtures/bearer.mapper"
+import type { CartData, PlaceOrderData, AccountData, BuyerStatusData } from "../../fixtures/e2e-views.contracts"
+import type { OrderSummaryRow, PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
+import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
+import { ORDER_SUMMARY, ORDER_LINE_COUNT, CART_ITEM_COUNT, PAYMENTS_OF_PERSON, SET_STOCK } from "../../fixtures/persistence/e2e-verification.sql"
+import { useTestWorld } from "../../world/use-test-world"
 
 /**
  * The happy path of the checkout end to end: a visitor registers on identity, signs in, browses the catalog through the
@@ -12,25 +16,18 @@ import type { AccountData, BuyerStatusData, CartData, PlaceOrderData } from "../
  * Run: npm run test:e2e -- checkout/checkout-journey
  */
 describe("checkout journey", () => {
-    let world: E2EWorld
     let personId = ""
 
-    beforeAll(async () => {
-        world = await bootE2eWorld("checkout/checkout-journey")
-        // The stack counts as up only when both services answer their real dependency-checked /health.
-        expect((await world.http("identity").get<{ status: string }>("/health")).body.status).toBe("ok")
-        expect((await world.http("order").get<{ status: string }>("/health")).body.status).toBe("ok")
-    }, 300_000)
+    const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
-    afterAll(async () => {
-        if (personId) await world.auth.deleteAccount(personId)
-        await world.close()
+    beforeAll(async () => {
+        await world.db.order.query(SET_STOCK, ["sku-thermos", 2])
     })
 
     it("register, browse the catalog, add to the cart, place the order, pay, and end with an empty cart", async () => {
         const session = await world.auth.registerBuyer("checkout", "e2e-checkout-pass")
         personId = session.personId
-        const buyer = world.graphql.client("order", session.sessionToken)
+        const buyer = asBearer(world.apps.order.api, session.sessionToken)
 
         // The catalog is read through the cart query: it is the only catalog surface checkout has.
         const browsed = await buyer.read<CartData>("cart")
@@ -64,22 +61,22 @@ describe("checkout journey", () => {
         expect(replayed.data?.placeOrder).toMatchObject({ orderId: order.orderId, paymentId: order.paymentId, replayed: true })
 
         expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
-        expect(await world.database.orderSummary(order.orderId)).toEqual([{ status: "confirmed", total_minor_units: expectedTotal }])
-        expect(await world.database.orderLineCount(order.orderId)).toBe(2)
-        expect(await world.database.paymentsOfPerson(personId)).toEqual([
+        expect(await readRows<OrderSummaryRow>(world.db.order, ORDER_SUMMARY, [order.orderId])).toEqual([{ status: "confirmed", total_minor_units: expectedTotal }])
+        expect(await readCount(world.db.order, ORDER_LINE_COUNT, (order.orderId))).toBe(2)
+        expect(await readRows<PaymentRow>(world.db.order, PAYMENTS_OF_PERSON, [personId])).toEqual([
             expect.objectContaining({ status: "captured", amount_minor_units: expectedTotal }),
         ])
-        expect(await world.database.cartItemCount(personId)).toBe(0)
-        expect(await world.database.stockOf("sku-mug")).toBe(mug.stock - 2)
+        expect(await readCount(world.db.order, CART_ITEM_COUNT, (personId))).toBe(0)
+        expect(await readStock(world.db.order, "sku-mug")).toBe(mug.stock - 2)
 
         // The identity to order contract, live: order answers buyerStatus for the bearer, and identity account reads it.
         const buyerStatus = await buyer.read<BuyerStatusData>("buyerStatus")
         expect(buyerStatus.data?.buyerStatus).toEqual({ personId, hasOrders: true })
-        const account = await world.graphql.client("identity", session.sessionToken).read<AccountData>("account")
+        const account = await asBearer(world.apps.identity.api, session.sessionToken).read<AccountData>("account")
         expect(account.data?.account).toMatchObject({ personId, email: session.email, hasOrders: true })
 
         // Sign-out: the guard consults identity on every request, so the revoked token stops answering on order.
-        const revoked = await world.graphql.client("identity", session.sessionToken).mutate("revokeSession", {
+        const revoked = await asBearer(world.apps.identity.api, session.sessionToken).mutate("revokeSession", {
             variables: { input: { sessionToken: session.sessionToken } },
         })
         expect(revoked.errorCode).toBeNull()

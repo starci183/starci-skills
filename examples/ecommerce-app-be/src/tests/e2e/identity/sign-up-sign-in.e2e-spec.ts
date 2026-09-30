@@ -1,14 +1,12 @@
 import { randomUUID } from "node:crypto"
-import { bootE2eWorld } from "../setup/e2e-world"
-import type { E2EWorld } from "../setup/e2e-world"
-import { present } from "../setup/e2e.error"
-import type {
-    AccountData,
-    RegisterData,
-    RevokeSessionData,
-    SignInData,
-    VerifySessionData,
-} from "../setup/e2e-views.contracts"
+import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
+import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
+import { asBearer, present } from "../../fixtures/bearer.mapper"
+import type { AccountData, RegisterData, SignInData, VerifySessionData, RevokeSessionData } from "../../fixtures/e2e-views.contracts"
+import type { PersonRow, TableRow } from "../../fixtures/persistence/e2e-verification.rows"
+import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
+import { PUBLIC_TABLES, PERSON_BY_ID } from "../../fixtures/persistence/e2e-verification.sql"
+import { useTestWorld } from "../../world/use-test-world"
 
 /**
  * fr.identity.sign-in as one complete journey over the public doors only: register, a refused duplicate and refused wrong
@@ -19,26 +17,13 @@ import type {
  * Run: npm run test:e2e -- identity/sign-up-sign-in
  */
 describe("identity sign-up and sign-in journey", () => {
-    let world: E2EWorld
     const email = `e2e-${randomUUID()}@ecommerce.dev`
     const password = "e2e-journey-pass-1"
 
-    beforeAll(async () => {
-        world = await bootE2eWorld("identity/sign-up-sign-in")
-    }, 300_000)
-
-    afterAll(async () => {
-        await world.close()
-        // Teardown verification is part of the contract: this run containers and volumes must be gone.
-        expect(world.stack.cleanupReport?.clean).toBe(true)
-    })
+    const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
     it("registers a person, issues and verifies a session, then revokes it", async () => {
-        const anonymous = world.graphql.client("identity")
-
-        // Dependency ordering, observed: the stack reached this point with postgres and redis ready and identity
-        // answering /health before order was ever spawned.
-        expect(world.stack.readiness.map((step) => step.label)).toEqual(["postgres", "redis", "identity /health", "order /health"])
+        const anonymous = asBearer(world.apps.identity.api)
 
         const registered = await anonymous.mutate<RegisterData>("register", { variables: { input: { email, password } } })
         expect(registered.errorCode).toBeNull()
@@ -70,7 +55,7 @@ describe("identity sign-up and sign-in journey", () => {
         expect(verified.data?.verifySession.personId).toBe(personId)
 
         // The account view is the cross-service proof: identity reads hasOrders live from order, forwarding the caller token.
-        const caller = world.graphql.client("identity", session.sessionToken)
+        const caller = asBearer(world.apps.identity.api, session.sessionToken)
         const account = await caller.read<AccountData>("account")
         expect(account.errorCode).toBeNull()
         expect(account.data?.account).toEqual({ personId, email, hasOrders: false })
@@ -80,8 +65,11 @@ describe("identity sign-up and sign-in journey", () => {
         expect(denied.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
 
         // Out-of-band verification: the person persisted, and both databases carry their migrated tables.
-        expect(await world.database.personById(personId)).toEqual([{ id: personId, email }])
-        expect(await world.database.tables()).toEqual(expect.arrayContaining(["persons", "products", "orders"]))
+        expect(await readRows<PersonRow>(world.db.identity, PERSON_BY_ID, [personId])).toEqual([{ id: personId, email }])
+        expect(world.fake.redis.size()).toBeGreaterThan(0)
+        const identityTables = await readRows<TableRow>(world.db.identity, PUBLIC_TABLES, [])
+        const orderTables = await readRows<TableRow>(world.db.order, PUBLIC_TABLES, [])
+        expect([...identityTables, ...orderTables].map((row) => row.table_name)).toEqual(expect.arrayContaining(["persons", "products", "orders"]))
 
         const revoked = await caller.mutate<RevokeSessionData>("revokeSession", { variables: { input: { sessionToken: session.sessionToken } } })
         expect(revoked.errorCode).toBeNull()

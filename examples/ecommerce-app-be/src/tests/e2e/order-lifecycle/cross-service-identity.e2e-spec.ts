@@ -1,6 +1,11 @@
-import { bootE2eWorld } from "../setup/e2e-world"
-import type { E2EWorld } from "../setup/e2e-world"
-import type { AccountData, CartData, PlaceOrderData, RevokeSessionData } from "../setup/e2e-views.contracts"
+import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
+import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
+import { asBearer } from "../../fixtures/bearer.mapper"
+import type { CartData, PlaceOrderData, AccountData, RevokeSessionData } from "../../fixtures/e2e-views.contracts"
+import type { OrderRow } from "../../fixtures/persistence/e2e-verification.rows"
+import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
+import { ORDERS_OF_PERSON, SET_STOCK } from "../../fixtures/persistence/e2e-verification.sql"
+import { useTestWorld } from "../../world/use-test-world"
 
 /**
  * The identity to order boundary for real: an order operation authenticates because the auth guard asks identity
@@ -14,25 +19,18 @@ import type { AccountData, CartData, PlaceOrderData, RevokeSessionData } from ".
  * Run: npm run test:e2e -- order-lifecycle/cross-service-identity
  */
 describe("order lifecycle: identity to order boundary", () => {
-    let world: E2EWorld
     const password = "e2e-xservice-pass"
-    const personIds: Array<string> = []
+
+    const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
     beforeAll(async () => {
-        world = await bootE2eWorld("order-lifecycle/cross-service-identity")
-    }, 300_000)
-
-    afterAll(async () => {
-        for (const personId of personIds) await world.auth.deleteAccount(personId)
-        await world.close()
-        expect(world.stack.cleanupReport?.clean).toBe(true)
+        await world.db.order.query(SET_STOCK, ["sku-thermos", 2])
     })
 
     it("a revoked session is refused at the order boundary until re-auth resumes the same buyer", async () => {
         const session = await world.auth.registerBuyer("xsrv", password)
-        personIds.push(session.personId)
-        const identity = world.graphql.client("identity", session.sessionToken)
-        const before = world.graphql.client("order", session.sessionToken)
+        const identity = asBearer(world.apps.identity.api, session.sessionToken)
+        const before = asBearer(world.apps.order.api, session.sessionToken)
 
         // The token is live at the order boundary: the guard just verified it against identity.
         const added = await before.mutate("addCartItem", { variables: { input: { productId: "sku-notebook", quantity: 1 } } })
@@ -49,7 +47,7 @@ describe("order lifecycle: identity to order boundary", () => {
         const resumed = await world.auth.signIn(session.email, password)
         expect(resumed.personId).toBe(session.personId)
         expect(resumed.sessionToken).not.toBe(session.sessionToken)
-        const after = world.graphql.client("order", resumed.sessionToken)
+        const after = asBearer(world.apps.order.api, resumed.sessionToken)
 
         // Resume: the cart line added under the dead session is person-keyed, so it is still there...
         const cart = await after.read<CartData>("cart")
@@ -60,8 +58,8 @@ describe("order lifecycle: identity to order boundary", () => {
         const placed = await after.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey: `${session.personId}-resume` } } })
         expect(placed.errorCode).toBeNull()
         expect(placed.data?.placeOrder.status).toBe("confirmed")
-        expect(await world.database.ordersOfPerson(session.personId)).toEqual([expect.objectContaining({ status: "confirmed" })])
-        const account = await world.graphql.client("identity", resumed.sessionToken).read<AccountData>("account")
+        expect(await readRows<OrderRow>(world.db.order, ORDERS_OF_PERSON, [session.personId])).toEqual([expect.objectContaining({ status: "confirmed" })])
+        const account = await asBearer(world.apps.identity.api, resumed.sessionToken).read<AccountData>("account")
         expect(account.data?.account.hasOrders).toBe(true)
     })
 })

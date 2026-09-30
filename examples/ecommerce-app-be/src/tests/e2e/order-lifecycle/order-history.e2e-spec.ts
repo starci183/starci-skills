@@ -1,7 +1,11 @@
-import { bootE2eWorld } from "../setup/e2e-world"
-import type { E2EWorld } from "../setup/e2e-world"
-import { present } from "../setup/e2e.error"
-import type { AccountData, BuyerStatusData, CartData, PlaceOrderData, CatalogProductView } from "../setup/e2e-views.contracts"
+import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
+import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
+import { asBearer, present } from "../../fixtures/bearer.mapper"
+import type { CatalogProductView, CartData, PlaceOrderData, AccountData, BuyerStatusData } from "../../fixtures/e2e-views.contracts"
+import type { OrderRow, OrderLineRow, PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
+import { readRows, readCount } from "../../fixtures/persistence/e2e-verification.rows"
+import { ORDER_COUNT, ORDERS_OF_PERSON, LINES_OF_ORDER, PAYMENTS_OF_PERSON, PAYMENT_COUNT, SET_STOCK } from "../../fixtures/persistence/e2e-verification.sql"
+import { useTestWorld } from "../../world/use-test-world"
 
 /**
  * The order lifecycle past the first confirmation: one buyer places several orders and the history they produce is
@@ -14,19 +18,12 @@ import type { AccountData, BuyerStatusData, CartData, PlaceOrderData, CatalogPro
  * Run: npm run test:e2e -- order-lifecycle/order-history
  */
 describe("order lifecycle: order history", () => {
-    let world: E2EWorld
     const password = "e2e-history-pass"
-    const personIds: Array<string> = []
+
+    const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
     beforeAll(async () => {
-        world = await bootE2eWorld("order-lifecycle/order-history")
-    }, 300_000)
-
-    afterAll(async () => {
-        for (const personId of personIds) await world.auth.deleteAccount(personId)
-        await world.close()
-        // Teardown verification is part of the contract: this run containers and volumes are gone.
-        expect(world.stack.cleanupReport?.clean).toBe(true)
+        await world.db.order.query(SET_STOCK, ["sku-thermos", 2])
     })
 
     const productOf = (data: CartData | null, id: string): CatalogProductView =>
@@ -34,10 +31,9 @@ describe("order lifecycle: order history", () => {
 
     it("a buyer placing several orders builds a confirmed, paid history both services can read", async () => {
         const session = await world.auth.registerBuyer("hist-a", password)
-        personIds.push(session.personId)
         const { personId } = session
-        const buyer = world.graphql.client("order", session.sessionToken)
-        const identity = world.graphql.client("identity", session.sessionToken)
+        const buyer = asBearer(world.apps.order.api, session.sessionToken)
+        const identity = asBearer(world.apps.identity.api, session.sessionToken)
 
         // Baseline: not a buyer yet, on both sides of the contract.
         expect((await buyer.read<BuyerStatusData>("buyerStatus")).data?.buyerStatus).toEqual({ personId, hasOrders: false })
@@ -72,22 +68,22 @@ describe("order lifecycle: order history", () => {
         expect(secondOrder.paymentId).not.toBe(firstOrder.paymentId)
 
         // list: two orders in creation order, each confirmed and priced as answered.
-        const orders = await world.database.ordersOfPerson(personId)
+        const orders = await readRows<OrderRow>(world.db.order, ORDERS_OF_PERSON, [personId])
         expect(orders).toHaveLength(2)
         expect(orders[0]).toMatchObject({ id: firstOrder.orderId, status: "confirmed", total_minor_units: firstTotal, currency: "USD", idempotency_key: `${personId}-1` })
         expect(orders[1]).toMatchObject({ id: secondOrder.orderId, status: "confirmed", total_minor_units: secondTotal, idempotency_key: `${personId}-2` })
 
         // detail: each order lines carry the catalog price snapshot taken at confirmation.
-        expect(await world.database.linesOfOrder(firstOrder.orderId)).toEqual([
+        expect(await readRows<OrderLineRow>(world.db.order, LINES_OF_ORDER, [firstOrder.orderId])).toEqual([
             { product_id: "sku-mug", quantity: 2, unit_price_minor_units: mug.priceMinorUnits },
         ])
-        expect(await world.database.linesOfOrder(secondOrder.orderId)).toEqual([
+        expect(await readRows<OrderLineRow>(world.db.order, LINES_OF_ORDER, [secondOrder.orderId])).toEqual([
             { product_id: "sku-notebook", quantity: 1, unit_price_minor_units: notebook.priceMinorUnits },
             { product_id: "sku-thermos", quantity: 1, unit_price_minor_units: thermos.priceMinorUnits },
         ])
 
         // ...and each order has exactly one captured payment, keyed by the order id.
-        const payments = await world.database.paymentsOfPerson(personId)
+        const payments = await readRows<PaymentRow>(world.db.order, PAYMENTS_OF_PERSON, [personId])
         expect(payments).toHaveLength(2)
         expect(payments[0]).toMatchObject({ id: firstOrder.paymentId, order_id: firstOrder.orderId, status: "captured", amount_minor_units: firstTotal })
         expect(payments[1]).toMatchObject({ id: secondOrder.paymentId, order_id: secondOrder.orderId, status: "captured", amount_minor_units: secondTotal })
@@ -106,14 +102,13 @@ describe("order lifecycle: order history", () => {
 
     it("a refusal and an idempotent replay never append to order history", async () => {
         const session = await world.auth.registerBuyer("hist-b", password)
-        personIds.push(session.personId)
         const { personId } = session
-        const buyer = world.graphql.client("order", session.sessionToken)
+        const buyer = asBearer(world.apps.order.api, session.sessionToken)
 
         // Refusal 1: an empty cart confirms nothing and records nothing.
         const emptyRefusal = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: {} } })
         expect(emptyRefusal.errorCode).toBe("ORDER_CART_EMPTY")
-        expect(await world.database.orderCount(personId)).toBe(0)
+        expect(await readCount(world.db.order, ORDER_COUNT, (personId))).toBe(0)
 
         // A real order, then the same key again: the key is checked before the (now empty) cart, so the replay returns
         // the first answer rather than degenerating into an empty-cart refusal.
@@ -127,8 +122,8 @@ describe("order lifecycle: order history", () => {
         const replayed = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey: key } } })
         expect(replayed.errorCode).toBeNull()
         expect(replayed.data?.placeOrder).toMatchObject({ orderId: order.orderId, paymentId: order.paymentId, replayed: true })
-        expect(await world.database.orderCount(personId)).toBe(1)
-        expect(await world.database.paymentCount(personId)).toBe(1)
+        expect(await readCount(world.db.order, ORDER_COUNT, (personId))).toBe(1)
+        expect(await readCount(world.db.order, PAYMENT_COUNT, (personId))).toBe(1)
 
         // Refusal 2: beyond stock. Nothing changes: the order count stays 1, the cart keeps its line, the stock did not move.
         const thermos = productOf((await buyer.read<CartData>("cart")).data, "sku-thermos")
@@ -136,7 +131,7 @@ describe("order lifecycle: order history", () => {
         const stockRefusal = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: {} } })
         expect(stockRefusal.errorCode).toBe("ORDER_INSUFFICIENT_STOCK")
         expect(stockRefusal.errors?.[0]?.extensions).toMatchObject({ params: { productId: "sku-thermos" } })
-        expect(await world.database.orderCount(personId)).toBe(1)
+        expect(await readCount(world.db.order, ORDER_COUNT, (personId))).toBe(1)
         const kept = await buyer.read<CartData>("cart")
         expect(kept.data?.cart.items).toEqual([{ productId: "sku-thermos", quantity: thermos.stock + 1 }])
         expect(productOf(kept.data, "sku-thermos").stock).toBe(thermos.stock)

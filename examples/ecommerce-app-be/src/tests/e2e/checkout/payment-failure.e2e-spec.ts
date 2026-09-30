@@ -1,7 +1,12 @@
-import { bootE2eWorld } from "../setup/e2e-world"
-import type { E2EWorld } from "../setup/e2e-world"
-import { present } from "../setup/e2e.error"
-import type { CartData, ClearCartData, PlaceOrderData } from "../setup/e2e-views.contracts"
+import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
+import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
+import { asBearer, present } from "../../fixtures/bearer.mapper"
+import type { CartData, PlaceOrderData, ClearCartData } from "../../fixtures/e2e-views.contracts"
+import type { PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
+import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
+import { ORDER_COUNT, PAYMENTS_OF_PERSON, PAYMENT_COUNT, SET_STOCK } from "../../fixtures/persistence/e2e-verification.sql"
+import type { TestApi } from "../../world/use-test-world"
+import { useTestWorld } from "../../world/use-test-world"
 
 /**
  * The refusal half of the checkout. There is no external PSP and no pending or declined order state: payment capture
@@ -12,24 +17,21 @@ import type { CartData, ClearCartData, PlaceOrderData } from "../setup/e2e-views
  * A refusal is a GraphQL error whose extensions carry the code, the kind and the params (productId, requested,
  * available) that name what was refused.
  */
-describe("payment failure", () => {
-    let world: E2EWorld
-    const personIds: Array<string> = []
+interface FreshBuyer {
+    personId: string
+    buyer: TestApi
+}
 
-    const freshBuyer = async (tag: string): Promise<{ personId: string; buyer: ReturnType<E2EWorld["graphql"]["client"]> }> => {
+describe("payment failure", () => {
+    const freshBuyer = async (tag: string): Promise<FreshBuyer> => {
         const session = await world.auth.registerBuyer(`payment-${tag}`, "e2e-payment-pass")
-        personIds.push(session.personId)
-        return { personId: session.personId, buyer: world.graphql.client("order", session.sessionToken) }
+        return { personId: session.personId, buyer: asBearer(world.apps.order.api, session.sessionToken) }
     }
 
-    beforeAll(async () => {
-        world = await bootE2eWorld("checkout/payment-failure")
-        expect((await world.http("order").get<{ status: string }>("/health")).body.status).toBe("ok")
-    }, 300_000)
+    const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
-    afterAll(async () => {
-        for (const personId of personIds) await world.auth.deleteAccount(personId)
-        await world.close()
+    beforeAll(async () => {
+        await world.db.order.query(SET_STOCK, ["sku-thermos", 2])
     })
 
     it("a refused confirmation rolls back atomically; the corrected retry captures exactly once", async () => {
@@ -52,9 +54,9 @@ describe("payment failure", () => {
 
         // The rollback: cart kept, nothing persisted, stock unmoved. A refusal never half-writes.
         expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([{ productId: "sku-thermos", quantity: stock + 1 }])
-        expect(await world.database.orderCount(personId)).toBe(0)
-        expect(await world.database.paymentCount(personId)).toBe(0)
-        expect(await world.database.stockOf("sku-thermos")).toBe(stock)
+        expect(await readCount(world.db.order, ORDER_COUNT, (personId))).toBe(0)
+        expect(await readCount(world.db.order, PAYMENT_COUNT, (personId))).toBe(0)
+        expect(await readStock(world.db.order, "sku-thermos")).toBe(stock)
 
         // Correct the cart and retry with the same key: this time the confirmation lands.
         await buyer.mutate("clearCart")
@@ -67,11 +69,11 @@ describe("payment failure", () => {
             currency: "USD",
             replayed: false,
         })
-        expect(await world.database.paymentsOfPerson(personId)).toEqual([
+        expect(await readRows<PaymentRow>(world.db.order, PAYMENTS_OF_PERSON, [personId])).toEqual([
             expect.objectContaining({ status: "captured", amount_minor_units: thermos.priceMinorUnits * stock }),
         ])
         expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
-        expect(await world.database.stockOf("sku-thermos")).toBe(0)
+        expect(await readStock(world.db.order, "sku-thermos")).toBe(0)
     })
 
     it("a refused confirmation can be abandoned: clearing the cart leaves no order behind", async () => {
@@ -94,8 +96,8 @@ describe("payment failure", () => {
         expect(empty.errorCode).toBe("ORDER_CART_EMPTY")
         expect(empty.errors?.[0]?.extensions).toMatchObject({ code: "ORDER_CART_EMPTY", kind: "invalid" })
 
-        expect(await world.database.orderCount(personId)).toBe(0)
-        expect(await world.database.paymentCount(personId)).toBe(0)
-        expect(await world.database.stockOf("sku-thermos")).toBe(thermos.stock)
+        expect(await readCount(world.db.order, ORDER_COUNT, (personId))).toBe(0)
+        expect(await readCount(world.db.order, PAYMENT_COUNT, (personId))).toBe(0)
+        expect(await readStock(world.db.order, "sku-thermos")).toBe(thermos.stock)
     })
 })
