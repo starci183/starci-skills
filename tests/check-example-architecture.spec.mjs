@@ -43,12 +43,12 @@ test('a clean example passes and a dirty one fails with its findings counted by 
   assert.equal(dirty.name, 'dirty');
   assert.equal(dirty.status, 'findings');
   assert.equal(dirty.byCode.HFS_EMPTY_DIR, 1, 'the empty directory of the slot check');
-  assert.equal(dirty.byCode.BE_MODULE_NOT_COMPOSED, 1, 'the uncomposed module of the machine');
+  assert.equal(dirty.byCode.BE_FEATURE_NOT_COMPOSED, 1, 'the uncomposed module of the machine');
   assert.equal(dirty.byCode.HFS_UNUSED_FILE, 1, 'and the file nothing imports');
   const text = formatResults(results);
   assert.match(text, /clean: clean/);
   assert.match(text, /dirty: 3 findings/);
-  assert.match(text, /BE_MODULE_NOT_COMPOSED x1/);
+  assert.match(text, /BE_FEATURE_NOT_COMPOSED x1/);
   assert.match(text, /1 of 2 examples not clean/);
 });
 

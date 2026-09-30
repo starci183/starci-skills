@@ -54,7 +54,7 @@ test('BE: a type-only import from the app module does not compose a feature', t 
   assert.equal(hits[0].owner, 'src/features/foo');
 });
 
-test('BE: a capability module reached through a composed feature is composed; an unreached one is BE_MODULE_NOT_COMPOSED', t => {
+test('BE: a capability module reached through a composed feature is composed; an unreached one is BE_FEATURE_NOT_COMPOSED', t => {
   const root = archFixture(t, {
     files: {
       'apps/core/src/app.module.ts': "import { FooModule } from '../../../src/features/foo';\nexport const AppModule = [FooModule];\n",
@@ -67,8 +67,7 @@ test('BE: a capability module reached through a composed feature is composed; an
     },
   });
   const report = runArch(root);
-  assert.deepEqual(findings(report, 'BE_FEATURE_NOT_COMPOSED'), []);
-  const hits = findings(report, 'BE_MODULE_NOT_COMPOSED');
+  const hits = findings(report, 'BE_FEATURE_NOT_COMPOSED');
   assert.equal(hits.length, 1, JSON.stringify(hits));
   assert.equal(hits[0].owner, 'src/modules/integrations/unused');
   assert.equal(hits[0].slot, 'be.integrations');

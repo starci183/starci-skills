@@ -41,7 +41,6 @@ rules:
     verification:
       automated:
         - FE_TRANSPORT_OWNER
-        - FE_FETCH_OUTSIDE_TRANSPORT
       manual: []
     relatedExamples: []
   - id: FE-TRANSPORT-2

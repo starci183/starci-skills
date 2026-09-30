@@ -2,7 +2,7 @@ import { apiGraphqlUrl } from "@/modules/config"
 import type { Result } from "./outcome"
 
 /**
- * The one place raw `fetch` is allowed to appear (FE_FETCH_OUTSIDE_TRANSPORT). Every other module, hook
+ * The one place raw `fetch` is allowed to appear (FE_TRANSPORT_OWNER). Every other module, hook
  * and component reaches the network through the named calls exported from `auth.ts`/`tasks.ts`, which
  * all go through this one GraphQL fetcher - matching nivo-fe's own `modules/api/graphql.ts` shape.
  *

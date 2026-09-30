@@ -10,7 +10,7 @@
  * replaced.
  *
  * The one seam this file touches is the `fetch` call `modules/api/client.ts` owns
- * (FE_FETCH_OUTSIDE_TRANSPORT): the specs borrow that seam, they never substitute an app module.
+ * (FE_TRANSPORT_OWNER): the specs borrow that seam, they never substitute an app module.
  */
 import type { ReactNode } from "react"
 import { render } from "@testing-library/react"

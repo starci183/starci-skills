@@ -266,7 +266,6 @@ rules:
         - FE_SWR_KEY_IDENTITY
         - FE_SWR_MUTATION_RESOURCE_IDENTITY
         - FE_CUSTOM_HOOK_LOCATION
-        - FE_FETCH_OUTSIDE_TRANSPORT
       manual:
         - Confirm the declared identity set includes every domain input that can change the result.
     relatedExamples:

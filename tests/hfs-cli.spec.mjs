@@ -412,7 +412,7 @@ test('the tree checks do not run over an explicit file list (a dry run of specs 
 test('hfs check runs the architecture machine: its violation is a finding under its own code with the Vietnamese why', () => {
   const dir = repoOf(BE, (d) => put(d, 'src/modules/domain/order/a.ts'));
   const result = checkRepository({ repoRoot: dir });
-  const [finding] = only(result, 'BE_MODULE_NOT_COMPOSED');
+  const [finding] = only(result, 'BE_FEATURE_NOT_COMPOSED');
   assert.equal(result.ok, false);
   assert.equal(finding.level, 'error');
   assert.equal(finding.source, 'machine');
@@ -420,7 +420,7 @@ test('hfs check runs the architecture machine: its violation is a finding under 
   assert.match(finding.whyVi, HAS_VIETNAMESE);
   assert.equal(result.machine.status, 'ran');
   assert.ok(result.machine.files > 0);
-  assert.equal(result.counts.byCode.BE_MODULE_NOT_COMPOSED.count, 1);
+  assert.equal(result.counts.byCode.BE_FEATURE_NOT_COMPOSED.count, 1);
 });
 
 test('a clean back end and a clean front end are clean to the machine too', () => {
@@ -524,7 +524,7 @@ test('--fast with the real machine: an uncomposed module already on main is not 
   assert.match(fast.out, /owners src\/features\/orders/);
   const full = await cli(['check', '--repo', dir]);
   assert.equal(full.code, 1);
-  assert.match(full.out, /BE_MODULE_NOT_COMPOSED x1/);
+  assert.match(full.out, /BE_FEATURE_NOT_COMPOSED x1/);
 });
 
 test('HFS_FORMAT: --fast never runs prettier, the full check runs the repository\'s own, and a repository with none is a refusal, never a pass', async () => {
@@ -546,7 +546,7 @@ test('the CLI: machine findings fail the exit code and print with their Vietname
   const text = await cli(['check', '--repo', dir]);
   assert.equal(text.code, 1);
   assert.match(text.out, /architecture machine: ran over \d+ source files/);
-  assert.match(text.out, /BE_MODULE_NOT_COMPOSED x1/);
+  assert.match(text.out, /BE_FEATURE_NOT_COMPOSED x1/);
   assert.match(text.out, HAS_VIETNAMESE);
   const json = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
   assert.equal(json.machine.status, 'ran');
