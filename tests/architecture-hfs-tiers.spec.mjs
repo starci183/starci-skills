@@ -186,3 +186,20 @@ test('stronglyConnected finds only multi-node components', () => {
   const components = stronglyConnected(graph).map(component => [...component].sort());
   assert.deepEqual(components, [['a', 'b', 'c']]);
 });
+
+// A *.builder.ts (slot be.tests.fixtures.builders) arranges data at the schema level and may deep-import persistence entities;
+// no other program file may. (Specs are outside the production program: their deep imports are the eslint rules' business.)
+test('ARCH_OWNER_EXPORT_BYPASS: a builder may deep-import a capability entity, a production file or another fixture may not', t => {
+  const entity = "import { XEntity } from '../../../modules/domain/x/persistence/entities/x.entity';\nexport const rows = [XEntity];\n";
+  const deep = report => findings(report, 'ARCH_OWNER_EXPORT_BYPASS').map(item => item.path);
+  const files = {
+    'src/modules/domain/x/index.ts': 'export const x = 1;\n',
+    'src/modules/domain/x/persistence/entities/x.entity.ts': 'export class XEntity {}\n',
+    'src/tests/fixtures/builders/x.builder.ts': entity,
+  };
+  assert.deepEqual(deep(runArch(archFixture(t, { files }))), []);
+  const bad = { ...files,
+    'src/features/a/index.ts': "import { XEntity } from '../../modules/domain/x/persistence/entities/x.entity';\nexport const a = XEntity;\n",
+    'src/tests/fixtures/other.contracts.ts': entity.replace('../../../', '../../') };
+  assert.deepEqual(deep(runArch(archFixture(t, { files: bad }))).sort(), ['src/features/a/index.ts', 'src/tests/fixtures/other.contracts.ts']);
+});
