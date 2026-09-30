@@ -1,0 +1,51 @@
+{{header}}
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: {{nodeMajor}}
+          cache: npm
+      - run: npm ci
+      - name: hfs check
+        run: npm run hfs:check
+      - name: lint
+        run: npm run lint:check
+      - name: format
+        run: npm run format:check
+      - name: typecheck
+        run: npm run typecheck
+      - name: unit
+        run: npm test -- --coverage --ci
+      - name: build
+        run: npm run build
+      - uses: codecov/codecov-action@v5
+        with:
+          files: coverage/lcov.info
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
+      - uses: SonarSource/sonarqube-scan-action@v7
+        if: env.SONAR_TOKEN != ''
+        env:
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+      - uses: SonarSource/sonarqube-quality-gate-action@v1
+        if: env.SONAR_TOKEN != ''
+        timeout-minutes: 10
+        env:
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}

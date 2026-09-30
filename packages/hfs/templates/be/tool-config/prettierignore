@@ -1,0 +1,7 @@
+{{header}}
+dist/
+coverage/
+node_modules/
+package-lock.json
+.starcistacks/
+.starciwork/

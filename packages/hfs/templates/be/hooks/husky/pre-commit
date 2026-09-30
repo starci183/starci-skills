@@ -1,0 +1,13 @@
+{{header}}
+# Commit gate: types, lint and format of the staged files, the unit specs the staged files touch, work hygiene. Never e2e.
+npm run typecheck
+sources=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.mts' '*.cts' '*.js' '*.mjs' '*.cjs' || true)
+if [ -n "$sources" ]; then
+  npx eslint $sources
+  npx prettier --check $sources
+fi
+specs=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' | grep -v -E '(^|/)e2e/|\.e2e-spec\.ts$' || true)
+if [ -n "$specs" ]; then
+  npm test -- --passWithNoTests --findRelatedTests $specs
+fi
+npx hfs work-hygiene

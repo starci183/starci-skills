@@ -1,0 +1,10 @@
+{
+  "extends": "@starci/tsconfig/be.json",
+  "compilerOptions": {
+    "paths": {
+      "@features/*": ["./src/features/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@tests/*": ["./src/tests/*"]
+    }
+  }
+}

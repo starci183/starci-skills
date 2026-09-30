@@ -1,3 +1,4 @@
+{{header}}
 # End-to-end runs are manual: nothing triggers this workflow but a person dispatching it.
 name: e2e
 
@@ -17,5 +18,6 @@ jobs:
           node-version: {{nodeMajor}}
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - name: e2e
         run: npm run test:e2e

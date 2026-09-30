@@ -1,3 +1,4 @@
+{{header}}
 name: ci
 
 on:
@@ -21,8 +22,6 @@ jobs:
           node-version: {{nodeMajor}}
           cache: npm
       - run: npm ci
-      - name: hfs sync
-        run: npx hfs sync --check
       - name: hfs check
         run: npx hfs check
       - name: lint
