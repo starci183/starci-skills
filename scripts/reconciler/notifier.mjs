@@ -128,13 +128,12 @@ async function languageOf() {
   try { const { loadConfig } = await import('../../engine/config.mjs'); return loadConfig()?.language === 'en' ? 'en' : 'vi'; } catch { return 'vi'; }
 }
 
-/** Everything the digest reads: live workflows' progress (progress-rca.mjs), GC line, violations, owner waits. */
-export async function digestInputs({ env = process.env, now = Date.now() } = {}) {
-  const [{ productRepos, supervisorSettings }, { openLedgerReader }, { workflowView }] = await Promise.all([
-    import('../supervisor/home.mjs'), import('../../engine/ledger-db.mjs'), import('../kernel/progress-rca.mjs')]);
+/** Everything the digest reads: live workflows' progress (progress-rca.mjs), GC line, violations, owner waits. `repos` defaults to config.yaml supervisor.repos. */
+export async function digestInputs({ env = process.env, now = Date.now(), repos = null } = {}) {
+  const [{ productRepos, supervisorSettings }, { openLedgerReader }, { workflowView }, { listDecisions }] = await Promise.all([
+    import('../supervisor/home.mjs'), import('../../engine/ledger-db.mjs'), import('../kernel/progress-rca.mjs'), import('./decisions.mjs')]);
   const progress = [], ownerWaits = [];
-  let repos = [];
-  try { repos = productRepos(supervisorSettings()); } catch { repos = []; }
+  if (repos == null) { try { repos = productRepos(supervisorSettings()); } catch { repos = []; } }
   for (const repo of repos) {
     let db;
     try { db = openLedgerReader(path.join(repo, '.starciwork', 'runtime.sqlite')); } catch { continue; }
@@ -146,8 +145,10 @@ export async function digestInputs({ env = process.env, now = Date.now() } = {})
         } catch { /* one workflow unreadable */ }
       }
       try {
-        for (const r of db.prepare("SELECT workflow_id, kind, summary FROM decision_items WHERE decider='owner' AND status IN ('open','claimed','escalated')").all()) {
-          ownerWaits.push(`${r.workflow_id}: ${clipLine(r.summary ?? r.kind, 160)}`);
+        // listDecisions, not a raw read: it applies the ended-phase join (decisions.mjs ENDED), so a leftover
+        // owner DI of an archived|finished workflow — unresolvable there — never reaches the owner's digest.
+        for (const d of listDecisions(db, { decider: 'owner', now })) {
+          ownerWaits.push(`${d.workflowId}: ${clipLine(d.summary ?? d.kind, 160)}`);
         }
       } catch { /* a ledger without decision_items */ }
     } finally { db.close(); }
