@@ -6,7 +6,12 @@ import { CART_ERROR_KINDS, CartModule, cartEntities, cartMigrations } from "@mod
 import { CatalogModule, catalogEntities, catalogMigrations } from "@modules/domain/catalog"
 import { ORDER_ERROR_KINDS, ORDER_MESSAGES, OrderModule, orderEntities, orderMigrations } from "@modules/domain/order"
 import { PaymentModule, paymentEntities, paymentMigrations } from "@modules/domain/payment"
-import { IDENTITY_API, IDENTITY_API_ERROR_KINDS, IDENTITY_API_MESSAGES, IdentityApiModule } from "@modules/integrations/identity-api"
+import {
+    IDENTITY_API,
+    IDENTITY_API_ERROR_KINDS,
+    IDENTITY_API_MESSAGES,
+    IdentityApiModule,
+} from "@modules/integrations/identity-api"
 import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
@@ -14,7 +19,13 @@ import { DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbeService } from "@mod
 import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
 import { GraphqlModule } from "@modules/platform/graphql"
 import { HTTP_ERROR_KINDS, HTTP_MESSAGES, HttpModule } from "@modules/platform/http"
-import { HTTP_SECURITY_ERROR_KINDS, HTTP_SECURITY_MESSAGES, HttpSecurityModule, OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
+import {
+    HTTP_SECURITY_ERROR_KINDS,
+    HTTP_SECURITY_MESSAGES,
+    HttpSecurityModule,
+    OriginGuard,
+    RateLimitGuard,
+} from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
 import { LoggingModule } from "@modules/platform/logging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
@@ -66,7 +77,12 @@ export class AppModule {
                         {
                             ...options.database,
                             entities: [...catalogEntities, ...cartEntities, ...orderEntities, ...paymentEntities],
-                            migrations: [...catalogMigrations, ...cartMigrations, ...orderMigrations, ...paymentMigrations],
+                            migrations: [
+                                ...catalogMigrations,
+                                ...cartMigrations,
+                                ...orderMigrations,
+                                ...paymentMigrations,
+                            ],
                         },
                     ],
                 }),
@@ -77,7 +93,11 @@ export class AppModule {
                 PaymentModule.register({ isGlobal: true }),
                 OrderModule.register({ isGlobal: true }),
                 IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),
-                ProbesModule.register({ isGlobal: true, service: "order", probes: [DatabaseProbeService, IDENTITY_API] }),
+                ProbesModule.register({
+                    isGlobal: true,
+                    service: "order",
+                    probes: [DatabaseProbeService, IDENTITY_API],
+                }),
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,
                 CheckoutGraphqlModule,

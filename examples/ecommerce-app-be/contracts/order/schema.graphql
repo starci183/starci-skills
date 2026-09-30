@@ -3,60 +3,60 @@
 # ------------------------------------------------------
 
 input AddCartItemInput {
-  productId: ID!
-  quantity: Int!
+    productId: ID!
+    quantity: Int!
 }
 
 type AddCartItemType {
-  item: CartLineType!
+    item: CartLineType!
 }
 
 type BuyerStatusType {
-  hasOrders: Boolean!
-  personId: ID!
+    hasOrders: Boolean!
+    personId: ID!
 }
 
 type CartLineType {
-  productId: ID!
-  quantity: Int!
+    productId: ID!
+    quantity: Int!
 }
 
 type CartType {
-  catalog: [ProductType!]!
-  items: [CartLineType!]!
+    catalog: [ProductType!]!
+    items: [CartLineType!]!
 }
 
 type ClearCartType {
-  cleared: Boolean!
+    cleared: Boolean!
 }
 
 type Mutation {
-  addCartItem(request: AddCartItemInput!): AddCartItemType!
-  clearCart: ClearCartType!
-  placeOrder(request: PlaceOrderInput!): PlaceOrderType!
+    addCartItem(request: AddCartItemInput!): AddCartItemType!
+    clearCart: ClearCartType!
+    placeOrder(request: PlaceOrderInput!): PlaceOrderType!
 }
 
 input PlaceOrderInput {
-  idempotencyKey: String
+    idempotencyKey: String
 }
 
 type PlaceOrderType {
-  currency: String!
-  orderId: ID!
-  paymentId: ID!
-  replayed: Boolean!
-  status: String!
-  totalMinorUnits: Int!
+    currency: String!
+    orderId: ID!
+    paymentId: ID!
+    replayed: Boolean!
+    status: String!
+    totalMinorUnits: Int!
 }
 
 type ProductType {
-  id: ID!
-  name: String!
-  priceMinorUnits: Int!
-  stock: Int!
+    id: ID!
+    name: String!
+    priceMinorUnits: Int!
+    stock: Int!
 }
 
 type Query {
-  buyerStatus: BuyerStatusType!
-  cart: CartType!
+    buyerStatus: BuyerStatusType!
+    cart: CartType!
 }

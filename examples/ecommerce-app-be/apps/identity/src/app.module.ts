@@ -1,7 +1,13 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_FILTER, APP_GUARD } from "@nestjs/core"
-import { ACCOUNT_ERROR_KINDS, ACCOUNT_MESSAGES, AccountModule, accountEntities, accountMigrations } from "@modules/domain/account"
+import {
+    ACCOUNT_ERROR_KINDS,
+    ACCOUNT_MESSAGES,
+    AccountModule,
+    accountEntities,
+    accountMigrations,
+} from "@modules/domain/account"
 import { IDENTITY_ERROR_KINDS, IDENTITY_MESSAGES, AuthGuard, IdentityModule } from "@modules/domain/identity"
 import { SESSION_ERROR_KINDS, SESSION_MESSAGES, SessionModule, SessionService } from "@modules/domain/session"
 import { CACHE, CACHE_ERROR_KINDS, CACHE_MESSAGES, CacheModule } from "@modules/integrations/cache"
@@ -13,7 +19,13 @@ import { DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbeService } from "@mod
 import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
 import { GraphqlModule } from "@modules/platform/graphql"
 import { HTTP_ERROR_KINDS, HTTP_MESSAGES, HttpModule } from "@modules/platform/http"
-import { HTTP_SECURITY_ERROR_KINDS, HTTP_SECURITY_MESSAGES, HttpSecurityModule, OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
+import {
+    HTTP_SECURITY_ERROR_KINDS,
+    HTTP_SECURITY_MESSAGES,
+    HttpSecurityModule,
+    OriginGuard,
+    RateLimitGuard,
+} from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
 import { LoggingModule } from "@modules/platform/logging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"

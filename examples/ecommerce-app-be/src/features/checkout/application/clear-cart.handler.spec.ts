@@ -12,8 +12,14 @@ describe("ClearCartHandler", () => {
     it("clears the cart of the caller through one transaction and confirms", async () => {
         const inner = mockEntityManager()
         const cart = mock<CartService>({ clear: jest.fn().mockResolvedValue(undefined) })
-        const handler = new ClearCartHandler(mock<Logger>(), mockEntityManager({ transaction: fakeTransaction(inner) }), cart)
-        await expect(handler.execute(new ClearCartCommand({ request: {}, principal }))).resolves.toEqual({ cleared: true })
+        const handler = new ClearCartHandler(
+            mock<Logger>(),
+            mockEntityManager({ transaction: fakeTransaction(inner) }),
+            cart,
+        )
+        await expect(handler.execute(new ClearCartCommand({ request: {}, principal }))).resolves.toEqual({
+            cleared: true,
+        })
         expect(cart.clear).toHaveBeenCalledWith({ manager: inner, personId: "p-1" })
     })
 })

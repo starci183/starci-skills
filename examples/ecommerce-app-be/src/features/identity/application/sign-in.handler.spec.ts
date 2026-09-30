@@ -10,8 +10,12 @@ const command = new SignInCommand({ request: { email: "a@example.com", password:
 
 describe("SignInHandler", () => {
     it("starts a session for the person the credentials name", async () => {
-        const accounts = mock<AccountService>({ verifyCredentials: jest.fn().mockResolvedValue({ kind: "ok", value: { personId: "p-1" } }) })
-        const sessions = mock<SessionService>({ issue: jest.fn().mockResolvedValue({ sessionToken: "tok", personId: "p-1" }) })
+        const accounts = mock<AccountService>({
+            verifyCredentials: jest.fn().mockResolvedValue({ kind: "ok", value: { personId: "p-1" } }),
+        })
+        const sessions = mock<SessionService>({
+            issue: jest.fn().mockResolvedValue({ sessionToken: "tok", personId: "p-1" }),
+        })
         await expect(new SignInHandler(mock<Logger>(), accounts, sessions).execute(command)).resolves.toEqual({
             kind: "ok",
             value: { sessionToken: "tok", personId: "p-1" },
@@ -22,7 +26,9 @@ describe("SignInHandler", () => {
 
     it("refuses without starting a session when the credentials are wrong", async () => {
         const accounts = mock<AccountService>({
-            verifyCredentials: jest.fn().mockResolvedValue({ kind: "refused", code: AccountErrorCode.InvalidCredentials }),
+            verifyCredentials: jest
+                .fn()
+                .mockResolvedValue({ kind: "refused", code: AccountErrorCode.InvalidCredentials }),
         })
         const sessions = mock<SessionService>()
         await expect(new SignInHandler(mock<Logger>(), accounts, sessions).execute(command)).resolves.toMatchObject({

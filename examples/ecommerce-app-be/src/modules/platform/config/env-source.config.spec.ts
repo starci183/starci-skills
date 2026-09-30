@@ -25,7 +25,9 @@ describe("EnvSource", () => {
         expect(source({ U: "http://localhost:1" }).url("U")).toBe("http://localhost:1")
         expect(() => source({ U: "nope" }).url("U")).toThrow(new ConfigError({ code: ConfigErrorCode.KeyInvalid }))
         expect(source({ E: "b" }).enum("E", ["a", "b"])).toBe("b")
-        expect(() => source({ E: "c" }).enum("E", ["a", "b"])).toThrow(new ConfigError({ code: ConfigErrorCode.KeyInvalid }))
+        expect(() => source({ E: "c" }).enum("E", ["a", "b"])).toThrow(
+            new ConfigError({ code: ConfigErrorCode.KeyInvalid }),
+        )
         expect(source({ D: "30s" }).duration("D")).toBe(30_000)
         expect(source({ D: "250" }).duration("D")).toBe(250)
     })
@@ -37,7 +39,11 @@ describe("EnvSource", () => {
     })
 
     it("builds a child environment from the declared keys with overrides on top", () => {
-        expect(source({ A: "1", B: undefined, C: "3" }).toChildEnv({ C: "override", D: "4" })).toEqual({ A: "1", C: "override", D: "4" })
+        expect(source({ A: "1", B: undefined, C: "3" }).toChildEnv({ C: "override", D: "4" })).toEqual({
+            A: "1",
+            C: "override",
+            D: "4",
+        })
     })
 
     it("reports whether any key of an optional integration is declared", () => {

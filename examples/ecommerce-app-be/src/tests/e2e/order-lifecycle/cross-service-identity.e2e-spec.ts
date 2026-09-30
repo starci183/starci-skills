@@ -32,10 +32,14 @@ describe("order lifecycle: identity to order boundary", () => {
         const before = world.apps.order.api.bearing(session.sessionToken)
 
         // The token is live at the order boundary: the guard just verified it against identity.
-        const added = await before.mutate("addCartItem", { variables: { input: { productId: "sku-notebook", quantity: 1 } } })
+        const added = await before.mutate("addCartItem", {
+            variables: { input: { productId: "sku-notebook", quantity: 1 } },
+        })
         expect(added.errorCode).toBeNull()
 
-        const revoked = await identity.mutate<RevokeSessionData>("revokeSession", { variables: { input: { sessionToken: session.sessionToken } } })
+        const revoked = await identity.mutate<RevokeSessionData>("revokeSession", {
+            variables: { input: { sessionToken: session.sessionToken } },
+        })
         expect(revoked.data?.revokeSession.revoked).toBe(true)
 
         // The order boundary refuses the dead token: no principal survives the revoke.
@@ -54,10 +58,14 @@ describe("order lifecycle: identity to order boundary", () => {
         expect(cart.data?.cart.items).toEqual([{ productId: "sku-notebook", quantity: 1 }])
 
         // ...and the journey completes under the new session.
-        const placed = await after.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey: `${session.personId}-resume` } } })
+        const placed = await after.mutate<PlaceOrderData>("placeOrder", {
+            variables: { input: { idempotencyKey: `${session.personId}-resume` } },
+        })
         expect(placed.errorCode).toBeNull()
         expect(placed.data?.placeOrder.status).toBe("confirmed")
-        expect(await readRows<OrderRow>(world.db.order, ORDERS_OF_PERSON, [session.personId])).toEqual([expect.objectContaining({ status: "confirmed" })])
+        expect(await readRows<OrderRow>(world.db.order, ORDERS_OF_PERSON, [session.personId])).toEqual([
+            expect.objectContaining({ status: "confirmed" }),
+        ])
         const account = await world.apps.identity.api.bearing(resumed.sessionToken).read<AccountData>("account")
         expect(account.data?.account.hasOrders).toBe(true)
     })

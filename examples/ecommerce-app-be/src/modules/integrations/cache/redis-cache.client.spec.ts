@@ -26,7 +26,14 @@ const cache = (): RedisCacheClient => new RedisCacheClient({ url: new Secret("re
 
 describe("RedisCacheClient", () => {
     beforeEach(() => {
-        for (const command of [mockRedis.get, mockRedis.set, mockRedis.del, mockRedis.ping, mockRedis.quit, mockRedis.connect]) {
+        for (const command of [
+            mockRedis.get,
+            mockRedis.set,
+            mockRedis.del,
+            mockRedis.ping,
+            mockRedis.quit,
+            mockRedis.connect,
+        ]) {
             command.mockReset()
         }
         mockRedis.status = "ready"
@@ -47,7 +54,9 @@ describe("RedisCacheClient", () => {
 
     it("fails as unreadable when the stored value is not JSON", async () => {
         mockRedis.get.mockResolvedValueOnce("{oops")
-        await expect(cache().get({ key: KEY, args: ["a"] })).rejects.toMatchObject({ code: CacheErrorCode.ReplyUnreadable })
+        await expect(cache().get({ key: KEY, args: ["a"] })).rejects.toMatchObject({
+            code: CacheErrorCode.ReplyUnreadable,
+        })
     })
 
     it("removes an entry", async () => {

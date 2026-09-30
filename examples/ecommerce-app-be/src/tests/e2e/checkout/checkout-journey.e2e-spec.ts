@@ -4,7 +4,13 @@ import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData, AccountData, BuyerStatusData } from "../../fixtures/e2e-views.contracts"
 import type { OrderSummaryRow, PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
-import { ORDER_SUMMARY, ORDER_LINE_COUNT, CART_ITEM_COUNT, PAYMENTS_OF_PERSON, SET_STOCK } from "../../fixtures/persistence/e2e-verification.sql"
+import {
+    ORDER_SUMMARY,
+    ORDER_LINE_COUNT,
+    CART_ITEM_COUNT,
+    PAYMENTS_OF_PERSON,
+    SET_STOCK,
+} from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
@@ -34,13 +40,27 @@ describe("checkout journey", () => {
         expect(browsed.errorCode).toBeNull()
         const browsedCart = present(browsed.data, "cart data").cart
         expect(browsedCart.items).toEqual([])
-        const mug = present(browsedCart.catalog.find((product) => product.id === "sku-mug"), "sku-mug")
-        const notebook = present(browsedCart.catalog.find((product) => product.id === "sku-notebook"), "sku-notebook")
+        const mug = present(
+            browsedCart.catalog.find((product) => product.id === "sku-mug"),
+            "sku-mug",
+        )
+        const notebook = present(
+            browsedCart.catalog.find((product) => product.id === "sku-notebook"),
+            "sku-notebook",
+        )
         const expectedTotal = mug.priceMinorUnits * 2 + notebook.priceMinorUnits
 
-        expect((await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-mug", quantity: 2 } } })).errorCode).toBeNull()
-        expect((await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-notebook", quantity: 1 } } })).errorCode).toBeNull()
-        const unknown = await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-ghost", quantity: 1 } } })
+        expect(
+            (await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-mug", quantity: 2 } } }))
+                .errorCode,
+        ).toBeNull()
+        expect(
+            (await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-notebook", quantity: 1 } } }))
+                .errorCode,
+        ).toBeNull()
+        const unknown = await buyer.mutate("addCartItem", {
+            variables: { input: { productId: "sku-ghost", quantity: 1 } },
+        })
         expect(unknown.errorCode).toBe("ORDER_UNKNOWN_PRODUCT")
 
         const filled = await buyer.read<CartData>("cart")
@@ -53,20 +73,31 @@ describe("checkout journey", () => {
         const placed = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey } } })
         expect(placed.errorCode).toBeNull()
         const order = present(placed.data, "placeOrder data").placeOrder
-        expect(order).toMatchObject({ status: "confirmed", totalMinorUnits: expectedTotal, currency: "USD", replayed: false })
+        expect(order).toMatchObject({
+            status: "confirmed",
+            totalMinorUnits: expectedTotal,
+            currency: "USD",
+            replayed: false,
+        })
 
         // Replay with the same key: the first answer again, not a second order or a second capture.
         const replayed = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey } } })
         expect(replayed.errorCode).toBeNull()
-        expect(replayed.data?.placeOrder).toMatchObject({ orderId: order.orderId, paymentId: order.paymentId, replayed: true })
+        expect(replayed.data?.placeOrder).toMatchObject({
+            orderId: order.orderId,
+            paymentId: order.paymentId,
+            replayed: true,
+        })
 
         expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
-        expect(await readRows<OrderSummaryRow>(world.db.order, ORDER_SUMMARY, [order.orderId])).toEqual([{ status: "confirmed", total_minor_units: expectedTotal }])
-        expect(await readCount(world.db.order, ORDER_LINE_COUNT, (order.orderId))).toBe(2)
+        expect(await readRows<OrderSummaryRow>(world.db.order, ORDER_SUMMARY, [order.orderId])).toEqual([
+            { status: "confirmed", total_minor_units: expectedTotal },
+        ])
+        expect(await readCount(world.db.order, ORDER_LINE_COUNT, order.orderId)).toBe(2)
         expect(await readRows<PaymentRow>(world.db.order, PAYMENTS_OF_PERSON, [personId])).toEqual([
             expect.objectContaining({ status: "captured", amount_minor_units: expectedTotal }),
         ])
-        expect(await readCount(world.db.order, CART_ITEM_COUNT, (personId))).toBe(0)
+        expect(await readCount(world.db.order, CART_ITEM_COUNT, personId)).toBe(0)
         expect(await readStock(world.db.order, "sku-mug")).toBe(mug.stock - 2)
 
         // The identity to order contract, live: order answers buyerStatus for the bearer, and identity account reads it.

@@ -35,14 +35,19 @@ export class OrderApiClient {
             })
             const status = answer?.data?.buyerStatus
             if (answer && answer.errorCodes.length > 0) {
-                throw new OrderApiError({ code: OrderApiErrorCode.Unavailable, params: { reason: answer.errorCodes.join(",") } })
+                throw new OrderApiError({
+                    code: OrderApiErrorCode.Unavailable,
+                    params: { reason: answer.errorCodes.join(",") },
+                })
             }
             if (!isRecord(status) || typeof status.personId !== "string" || typeof status.hasOrders !== "boolean") {
                 throw new OrderApiError({ code: OrderApiErrorCode.ContractMismatch })
             }
             return { personId: status.personId, hasOrders: status.hasOrders }
         } catch (cause) {
-            throw cause instanceof OrderApiError ? cause : new OrderApiError({ code: OrderApiErrorCode.Unavailable, cause })
+            throw cause instanceof OrderApiError
+                ? cause
+                : new OrderApiError({ code: OrderApiErrorCode.Unavailable, cause })
         }
     }
 }

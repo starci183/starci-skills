@@ -16,7 +16,10 @@ export class RequestValidationService extends ValidationPipe {
             forbidNonWhitelisted: true,
             transform: true,
             exceptionFactory: (errors: Array<ValidationError>) =>
-                new HttpSecurityError({ code: HttpSecurityErrorCode.RequestInvalid, params: { fields: fieldsOf(errors) } }),
+                new HttpSecurityError({
+                    code: HttpSecurityErrorCode.RequestInvalid,
+                    params: { fields: fieldsOf(errors) },
+                }),
         })
     }
 }

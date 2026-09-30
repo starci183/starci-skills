@@ -12,7 +12,10 @@ async function bootstrap(): Promise<void> {
     const app = await NestFactory.create(AppModule.register(options))
     app.enableShutdownHooks()
     await app.listen(options.port)
-    createJsonLogger(new SystemClockService()).info(LoggingLogEvent.ServerStarted, { service: "identity", port: options.port })
+    createJsonLogger(new SystemClockService()).info(LoggingLogEvent.ServerStarted, {
+        service: "identity",
+        port: options.port,
+    })
 }
 
 bootstrap().catch((error: unknown) => {

@@ -3,7 +3,13 @@ import { PaymentService } from "./payment.service"
 import { PaymentEntity } from "./persistence/entities/payment.entity"
 
 const payment = (): PaymentEntity =>
-    Object.assign(new PaymentEntity(), { id: "pay-1", personId: "p-1", orderId: "o-1", amountMinorUnits: 500, status: "captured" })
+    Object.assign(new PaymentEntity(), {
+        id: "pay-1",
+        personId: "p-1",
+        orderId: "o-1",
+        amountMinorUnits: 500,
+        status: "captured",
+    })
 
 describe("PaymentService", () => {
     it("records a captured payment through the caller manager, keyed by the order", async () => {
@@ -30,7 +36,10 @@ describe("PaymentService", () => {
         const injected = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(payment()) })
         const caller = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null) })
         const service = new PaymentService(injected)
-        await expect(service.findByOrder({ orderId: "o-1" })).resolves.toEqual({ paymentId: "pay-1", amountMinorUnits: 500 })
+        await expect(service.findByOrder({ orderId: "o-1" })).resolves.toEqual({
+            paymentId: "pay-1",
+            amountMinorUnits: 500,
+        })
         await expect(service.findByOrder({ orderId: "o-2", manager: caller })).resolves.toBeNull()
         expect(caller.findOneBy).toHaveBeenCalledWith(PaymentEntity, { orderId: "o-2" })
     })

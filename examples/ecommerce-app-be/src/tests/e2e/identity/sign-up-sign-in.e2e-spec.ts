@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto"
 import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
 import { present } from "../../fixtures/present.mapper"
-import type { AccountData, RegisterData, SignInData, VerifySessionData, RevokeSessionData } from "../../fixtures/e2e-views.contracts"
+import type {
+    AccountData,
+    RegisterData,
+    SignInData,
+    VerifySessionData,
+    RevokeSessionData,
+} from "../../fixtures/e2e-views.contracts"
 import type { PersonRow, TableRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
 import { PUBLIC_TABLES, PERSON_BY_ID } from "../../fixtures/persistence/e2e-verification.sql"
@@ -25,7 +31,9 @@ describe("identity sign-up and sign-in journey", () => {
     it("registers a person, issues and verifies a session, then revokes it", async () => {
         const anonymous = world.apps.identity.api
 
-        const registered = await anonymous.mutate<RegisterData>("register", { variables: { input: { email, password } } })
+        const registered = await anonymous.mutate<RegisterData>("register", {
+            variables: { input: { email, password } },
+        })
         expect(registered.errorCode).toBeNull()
         const personId = present(registered.data, "register data").register.personId
 
@@ -34,12 +42,18 @@ describe("identity sign-up and sign-in journey", () => {
         expect(taken.errors?.[0]?.extensions).toMatchObject({ code: "ACCOUNT_EMAIL_TAKEN", kind: "conflict" })
 
         // A weak password never reaches the account capability: the global validation pipe refuses it by field.
-        const weak = await anonymous.mutate<RegisterData>("register", { variables: { input: { email: `weak-${email}`, password: "short" } } })
+        const weak = await anonymous.mutate<RegisterData>("register", {
+            variables: { input: { email: `weak-${email}`, password: "short" } },
+        })
         expect(weak.errorCode).toBe("HTTP_SECURITY_REQUEST_INVALID")
 
         // The refusal names neither half of the pair: a wrong password and an unknown email are the same answer.
-        const wrongPassword = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password: "not-the-password" } } })
-        const unknownEmail = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email: `ghost-${email}`, password } } })
+        const wrongPassword = await anonymous.mutate<SignInData>("signIn", {
+            variables: { input: { email, password: "not-the-password" } },
+        })
+        const unknownEmail = await anonymous.mutate<SignInData>("signIn", {
+            variables: { input: { email: `ghost-${email}`, password } },
+        })
         expect(wrongPassword.errorCode).toBe("ACCOUNT_INVALID_CREDENTIALS")
         expect(unknownEmail.errorCode).toBe(wrongPassword.errorCode)
         expect(unknownEmail.errorMessage).toBe(wrongPassword.errorMessage)
@@ -50,7 +64,9 @@ describe("identity sign-up and sign-in journey", () => {
         expect(session.personId).toBe(personId)
 
         // verifySession is the handshake the order service uses; it is anonymous by design (AuthHandshake).
-        const verified = await anonymous.read<VerifySessionData>("verifySession", { variables: { input: { sessionToken: session.sessionToken } } })
+        const verified = await anonymous.read<VerifySessionData>("verifySession", {
+            variables: { input: { sessionToken: session.sessionToken } },
+        })
         expect(verified.errorCode).toBeNull()
         expect(verified.data?.verifySession.personId).toBe(personId)
 
@@ -65,17 +81,25 @@ describe("identity sign-up and sign-in journey", () => {
         expect(denied.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
 
         // Out-of-band verification: the person persisted, and both databases carry their migrated tables.
-        expect(await readRows<PersonRow>(world.db.identity, PERSON_BY_ID, [personId])).toEqual([{ id: personId, email }])
+        expect(await readRows<PersonRow>(world.db.identity, PERSON_BY_ID, [personId])).toEqual([
+            { id: personId, email },
+        ])
         expect(world.fake.redis.size()).toBeGreaterThan(0)
         const identityTables = await readRows<TableRow>(world.db.identity, PUBLIC_TABLES, [])
         const orderTables = await readRows<TableRow>(world.db.order, PUBLIC_TABLES, [])
-        expect([...identityTables, ...orderTables].map((row) => row.table_name)).toEqual(expect.arrayContaining(["persons", "products", "orders"]))
+        expect([...identityTables, ...orderTables].map((row) => row.table_name)).toEqual(
+            expect.arrayContaining(["persons", "products", "orders"]),
+        )
 
-        const revoked = await caller.mutate<RevokeSessionData>("revokeSession", { variables: { input: { sessionToken: session.sessionToken } } })
+        const revoked = await caller.mutate<RevokeSessionData>("revokeSession", {
+            variables: { input: { sessionToken: session.sessionToken } },
+        })
         expect(revoked.errorCode).toBeNull()
         expect(revoked.data?.revokeSession.revoked).toBe(true)
 
-        const afterRevoke = await anonymous.read<VerifySessionData>("verifySession", { variables: { input: { sessionToken: session.sessionToken } } })
+        const afterRevoke = await anonymous.read<VerifySessionData>("verifySession", {
+            variables: { input: { sessionToken: session.sessionToken } },
+        })
         expect(afterRevoke.errorCode).toBe("SESSION_INVALID")
         const accountAfter = await caller.read<AccountData>("account")
         expect(accountAfter.errorCode).toBe("IDENTITY_UNAUTHENTICATED")

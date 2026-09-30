@@ -72,8 +72,11 @@ export interface TableRow {
 type Statement = ReturnType<typeof sql>
 
 /** Runs a read of the verification statements and answers its rows. */
-export const readRows = <TRow>(manager: EntityManager, statement: Statement, params: ReadonlyArray<string | number>): Promise<Array<TRow>> =>
-    manager.query(statement, [...params])
+export const readRows = <TRow>(
+    manager: EntityManager,
+    statement: Statement,
+    params: ReadonlyArray<string | number>,
+): Promise<Array<TRow>> => manager.query(statement, [...params])
 
 /** The count a verification statement answers for one id. */
 export const readCount = async (manager: EntityManager, statement: Statement, id: string): Promise<number> => {

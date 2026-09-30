@@ -14,8 +14,15 @@ const build = (logger: Logger = mock<Logger>(), catalog: MessageCatalog = mock<M
 
 describe("ErrorsService", () => {
     it("keeps the code, params and kind of a declared capability error", () => {
-        const description = build().describe(new ErrorsError({ code: ErrorsErrorCode.OperationInvalid, params: { id: "a" } }))
-        expect(description).toEqual({ code: ErrorsErrorCode.OperationInvalid, kind: "invalid", status: 400, params: { id: "a" } })
+        const description = build().describe(
+            new ErrorsError({ code: ErrorsErrorCode.OperationInvalid, params: { id: "a" } }),
+        )
+        expect(description).toEqual({
+            code: ErrorsErrorCode.OperationInvalid,
+            kind: "invalid",
+            status: 400,
+            params: { id: "a" },
+        })
     })
 
     it("masks an undeclared failure as internal and logs the cause", () => {
@@ -32,7 +39,10 @@ describe("ErrorsService", () => {
     })
 
     it("describes a malformed operation as invalid", () => {
-        expect(build().describeInvalidOperation()).toMatchObject({ code: ErrorsErrorCode.OperationInvalid, status: 400 })
+        expect(build().describeInvalidOperation()).toMatchObject({
+            code: ErrorsErrorCode.OperationInvalid,
+            status: 400,
+        })
     })
 
     it("resolves the display text through the catalog under the errors key", () => {

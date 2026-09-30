@@ -34,7 +34,8 @@ export class DatabaseModule extends ConfigurableModuleClass {
                 {
                     provide: DatabaseProbeService,
                     inject: options.connections.map((connection) => getDataSourceToken(connection.name)),
-                    useFactory: (...sources: Array<DataSource>) => new DatabaseProbeService(sources.map((source) => source.manager)),
+                    useFactory: (...sources: Array<DataSource>) =>
+                        new DatabaseProbeService(sources.map((source) => source.manager)),
                 },
             ],
             exports: [DatabaseProbeService],

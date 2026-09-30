@@ -13,11 +13,15 @@ describe("AccountResolver", () => {
         const queryBus = mock<QueryBus>({ execute: jest.fn().mockResolvedValue({ kind: "ok", value: overview }) })
         await expect(new AccountResolver(queryBus).account(principal, "tok")).resolves.toEqual(overview)
         expect(queryBus.execute).toHaveBeenCalledTimes(1)
-        expect(queryBus.execute).toHaveBeenCalledWith(new GetAccountQuery({ request: { sessionToken: "tok" }, principal }))
+        expect(queryBus.execute).toHaveBeenCalledWith(
+            new GetAccountQuery({ request: { sessionToken: "tok" }, principal }),
+        )
     })
 
     it("turns the refusal of an unknown person into the account error", async () => {
-        const queryBus = mock<QueryBus>({ execute: jest.fn().mockResolvedValue({ kind: "refused", code: AccountErrorCode.PersonUnknown }) })
+        const queryBus = mock<QueryBus>({
+            execute: jest.fn().mockResolvedValue({ kind: "refused", code: AccountErrorCode.PersonUnknown }),
+        })
         await expect(new AccountResolver(queryBus).account(principal, "tok")).rejects.toBeInstanceOf(AccountError)
     })
 })

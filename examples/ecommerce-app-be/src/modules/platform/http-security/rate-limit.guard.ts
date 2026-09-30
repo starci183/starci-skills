@@ -21,7 +21,8 @@ export const RateLimit = (tier: RateTier): ReturnType<typeof SetMetadata> => Set
 
 const tierOf = (context: ExecutionContext): RateTier => {
     const declared: RateTier | undefined =
-        Reflect.getMetadata(RATE_TIER_KEY, context.getHandler()) ?? Reflect.getMetadata(RATE_TIER_KEY, context.getClass())
+        Reflect.getMetadata(RATE_TIER_KEY, context.getHandler()) ??
+        Reflect.getMetadata(RATE_TIER_KEY, context.getClass())
     return declared ?? RateTier.Default
 }
 

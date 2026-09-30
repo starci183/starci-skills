@@ -8,7 +8,9 @@ const input = { email: "a@example.com", password: "secret-pass" }
 
 describe("RegisterResolver", () => {
     it("dispatches one register command and answers the new person", async () => {
-        const commandBus = mock<CommandBus>({ execute: jest.fn().mockResolvedValue({ kind: "ok", value: { personId: "p-1" } }) })
+        const commandBus = mock<CommandBus>({
+            execute: jest.fn().mockResolvedValue({ kind: "ok", value: { personId: "p-1" } }),
+        })
         await expect(new RegisterResolver(commandBus).register(input)).resolves.toEqual({ personId: "p-1" })
         expect(commandBus.execute).toHaveBeenCalledTimes(1)
         expect(commandBus.execute).toHaveBeenCalledWith(expect.any(RegisterCommand))

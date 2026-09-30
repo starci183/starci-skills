@@ -16,7 +16,9 @@ describe("CatalogService", () => {
     })
 
     it("keys the requested products by id and reads nothing for an empty request", async () => {
-        const entityManager = mockEntityManager({ find: jest.fn().mockResolvedValue([product("a", 3), product("b", 1)]) })
+        const entityManager = mockEntityManager({
+            find: jest.fn().mockResolvedValue([product("a", 3), product("b", 1)]),
+        })
         const service = new CatalogService(entityManager)
         await expect(service.byIds({ ids: ["a", "b"] })).resolves.toMatchObject({ a: { id: "a" }, b: { id: "b" } })
         await expect(service.byIds({ ids: [] })).resolves.toEqual({})
@@ -25,12 +27,16 @@ describe("CatalogService", () => {
 
     it("reserves stock through the caller manager with a guarded decrement", async () => {
         const manager = mockEntityManager({ decrement: jest.fn().mockResolvedValue({ affected: 1 }) })
-        await expect(new CatalogService(mockEntityManager()).reserveStock({ manager, productId: "a", quantity: 2 })).resolves.toBe(true)
+        await expect(
+            new CatalogService(mockEntityManager()).reserveStock({ manager, productId: "a", quantity: 2 }),
+        ).resolves.toBe(true)
         expect(manager.decrement).toHaveBeenCalledWith(ProductEntity, expect.objectContaining({ id: "a" }), "stock", 2)
     })
 
     it("reports a failed reservation when no row matched", async () => {
         const manager = mockEntityManager({ decrement: jest.fn().mockResolvedValue({ affected: 0 }) })
-        await expect(new CatalogService(mockEntityManager()).reserveStock({ manager, productId: "a", quantity: 9 })).resolves.toBe(false)
+        await expect(
+            new CatalogService(mockEntityManager()).reserveStock({ manager, productId: "a", quantity: 9 }),
+        ).resolves.toBe(false)
     })
 })

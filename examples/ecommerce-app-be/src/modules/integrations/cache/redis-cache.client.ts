@@ -29,7 +29,9 @@ export class RedisCacheClient implements Cache, Probe, OnApplicationShutdown {
 
     /** Stores `value` under the key with the time to live the key declares. */
     async set<TValue>(request: CacheRequest<TValue> & { readonly value: TValue }): Promise<void> {
-        await this.run(() => this.redis.set(cacheKeyText(request), JSON.stringify(request.value), "EX", request.key.ttl.seconds))
+        await this.run(() =>
+            this.redis.set(cacheKeyText(request), JSON.stringify(request.value), "EX", request.key.ttl.seconds),
+        )
     }
 
     /** Removes the entry. */

@@ -24,7 +24,10 @@ export class JsonLoggerService implements Logger {
 
     /** Writes an error line with the cause serialized by name and message. */
     error(event: string, cause: unknown, fields?: LogFields): void {
-        const detail = cause instanceof Error ? { errorName: cause.name, errorMessage: cause.message } : { errorMessage: String(cause) }
+        const detail =
+            cause instanceof Error
+                ? { errorName: cause.name, errorMessage: cause.message }
+                : { errorMessage: String(cause) }
         this.write("error", this.err, event, { ...detail, ...fields })
     }
 

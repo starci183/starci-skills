@@ -11,7 +11,10 @@ describe("parseMigrateAppOptions", () => {
     const options = parseMigrateAppOptions(new EnvSource(environment))
 
     it("lists the identity and order connections, each with the URL of its own database", () => {
-        expect(options.connections.map((connection) => connection.name)).toEqual([IDENTITY_CONNECTION, ORDER_CONNECTION])
+        expect(options.connections.map((connection) => connection.name)).toEqual([
+            IDENTITY_CONNECTION,
+            ORDER_CONNECTION,
+        ])
         expect(options.connections.map((connection) => connection.url.reveal())).toEqual([
             "postgres://localhost:5501/identity",
             "postgres://localhost:5501/order",

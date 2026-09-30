@@ -26,9 +26,15 @@ export class AddCartItemHandler extends ICQRSHandler<AddCartItemCommand, AddCart
     protected override async process(command: AddCartItemCommand): Promise<AddCartItemResult> {
         const { request, principal } = command.params
         const products = await this.catalog.byIds({ ids: [request.productId] })
-        if (!products[request.productId]) return refused(OrderErrorCode.UnknownProduct, { productId: request.productId })
+        if (!products[request.productId])
+            return refused(OrderErrorCode.UnknownProduct, { productId: request.productId })
         const line = await this.entityManager.transaction((manager) =>
-            this.cart.add({ manager, personId: principal.id, productId: request.productId, quantity: request.quantity }),
+            this.cart.add({
+                manager,
+                personId: principal.id,
+                productId: request.productId,
+                quantity: request.quantity,
+            }),
         )
         return ok(line)
     }

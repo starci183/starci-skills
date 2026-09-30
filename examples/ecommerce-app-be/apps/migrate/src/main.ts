@@ -40,9 +40,13 @@ export async function bootstrap(env: EnvSource): Promise<Record<string, Readonly
 
 if (require.main === module) {
     bootstrap(EnvSource.fromProcess())
-        .then((applied) => createJsonLogger(new SystemClockService()).info(LoggingLogEvent.MigrationsApplied, { applied }))
+        .then((applied) =>
+            createJsonLogger(new SystemClockService()).info(LoggingLogEvent.MigrationsApplied, { applied }),
+        )
         .catch((error: unknown) => {
-            createJsonLogger(new SystemClockService()).error(LoggingLogEvent.StartupFailed, error, { service: "migrate" })
+            createJsonLogger(new SystemClockService()).error(LoggingLogEvent.StartupFailed, error, {
+                service: "migrate",
+            })
             process.exit(1)
         })
 }

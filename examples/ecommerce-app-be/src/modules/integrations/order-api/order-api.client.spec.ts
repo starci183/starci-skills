@@ -5,7 +5,8 @@ import { OrderApiClient } from "./order-api.client"
 
 const options = { url: "http://order.test", timeoutMs: 250 }
 
-const answering = (body: unknown): HttpClient => mock<HttpClient>({ request: jest.fn().mockResolvedValue({ status: 200, body }) })
+const answering = (body: unknown): HttpClient =>
+    mock<HttpClient>({ request: jest.fn().mockResolvedValue({ status: 200, body }) })
 
 const clientFor = (http: HttpClient): OrderApiClient => new OrderApiClient(http, options)
 
@@ -24,7 +25,9 @@ describe("OrderApiClient", () => {
 
     it("fails as unavailable when the order service reports an error, never as hasOrders false", async () => {
         const http = answering({ errors: [{ message: "x", extensions: { code: "IDENTITY_API_UNAVAILABLE" } }] })
-        await expect(clientFor(http).getBuyerStatus("tok")).rejects.toMatchObject({ code: OrderApiErrorCode.Unavailable })
+        await expect(clientFor(http).getBuyerStatus("tok")).rejects.toMatchObject({
+            code: OrderApiErrorCode.Unavailable,
+        })
     })
 
     it("fails as a contract mismatch when the answer has no buyer status", async () => {
@@ -39,6 +42,9 @@ describe("OrderApiClient", () => {
     it("fails as unavailable, keeping the cause, when the call itself fails", async () => {
         const cause = new TypeError("fetch failed")
         const http = mock<HttpClient>({ request: jest.fn().mockRejectedValue(cause) })
-        await expect(clientFor(http).getBuyerStatus("tok")).rejects.toMatchObject({ code: OrderApiErrorCode.Unavailable, cause })
+        await expect(clientFor(http).getBuyerStatus("tok")).rejects.toMatchObject({
+            code: OrderApiErrorCode.Unavailable,
+            cause,
+        })
     })
 })

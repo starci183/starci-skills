@@ -4,7 +4,12 @@ import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData, ClearCartData } from "../../fixtures/e2e-views.contracts"
 import type { PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
-import { ORDER_COUNT, PAYMENTS_OF_PERSON, PAYMENT_COUNT, SET_STOCK } from "../../fixtures/persistence/e2e-verification.sql"
+import {
+    ORDER_COUNT,
+    PAYMENTS_OF_PERSON,
+    PAYMENT_COUNT,
+    SET_STOCK,
+} from "../../fixtures/persistence/e2e-verification.sql"
 import type { TestApi } from "../../world/use-test-world"
 import { useTestWorld } from "../../world/use-test-world"
 
@@ -39,9 +44,18 @@ describe("payment failure", () => {
 
         // sku-thermos is seeded at stock 2: asking for one more is a guaranteed refusal.
         const browsed = await buyer.read<CartData>("cart")
-        const thermos = present(browsed.data?.cart.catalog.find((product) => product.id === "sku-thermos"), "sku-thermos")
+        const thermos = present(
+            browsed.data?.cart.catalog.find((product) => product.id === "sku-thermos"),
+            "sku-thermos",
+        )
         const stock = thermos.stock
-        expect((await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-thermos", quantity: stock + 1 } } })).errorCode).toBeNull()
+        expect(
+            (
+                await buyer.mutate("addCartItem", {
+                    variables: { input: { productId: "sku-thermos", quantity: stock + 1 } },
+                })
+            ).errorCode,
+        ).toBeNull()
 
         const idempotencyKey = `e2e-${personId}`
         const refused = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey } } })
@@ -53,14 +67,19 @@ describe("payment failure", () => {
         })
 
         // The rollback: cart kept, nothing persisted, stock unmoved. A refusal never half-writes.
-        expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([{ productId: "sku-thermos", quantity: stock + 1 }])
-        expect(await readCount(world.db.order, ORDER_COUNT, (personId))).toBe(0)
-        expect(await readCount(world.db.order, PAYMENT_COUNT, (personId))).toBe(0)
+        expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([
+            { productId: "sku-thermos", quantity: stock + 1 },
+        ])
+        expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(0)
+        expect(await readCount(world.db.order, PAYMENT_COUNT, personId)).toBe(0)
         expect(await readStock(world.db.order, "sku-thermos")).toBe(stock)
 
         // Correct the cart and retry with the same key: this time the confirmation lands.
         await buyer.mutate("clearCart")
-        expect((await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-thermos", quantity: stock } } })).errorCode).toBeNull()
+        expect(
+            (await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-thermos", quantity: stock } } }))
+                .errorCode,
+        ).toBeNull()
         const retried = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey } } })
         expect(retried.errorCode).toBeNull()
         expect(retried.data?.placeOrder).toMatchObject({
@@ -79,9 +98,14 @@ describe("payment failure", () => {
     it("a refused confirmation can be abandoned: clearing the cart leaves no order behind", async () => {
         const { buyer, personId } = await freshBuyer("cancel")
         const browsed = await buyer.read<CartData>("cart")
-        const thermos = present(browsed.data?.cart.catalog.find((product) => product.id === "sku-thermos"), "sku-thermos")
+        const thermos = present(
+            browsed.data?.cart.catalog.find((product) => product.id === "sku-thermos"),
+            "sku-thermos",
+        )
 
-        await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-thermos", quantity: thermos.stock + 1 } } })
+        await buyer.mutate("addCartItem", {
+            variables: { input: { productId: "sku-thermos", quantity: thermos.stock + 1 } },
+        })
         const refused = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: {} } })
         expect(refused.errorCode).toBe("ORDER_INSUFFICIENT_STOCK")
 
@@ -96,8 +120,8 @@ describe("payment failure", () => {
         expect(empty.errorCode).toBe("ORDER_CART_EMPTY")
         expect(empty.errors?.[0]?.extensions).toMatchObject({ code: "ORDER_CART_EMPTY", kind: "invalid" })
 
-        expect(await readCount(world.db.order, ORDER_COUNT, (personId))).toBe(0)
-        expect(await readCount(world.db.order, PAYMENT_COUNT, (personId))).toBe(0)
+        expect(await readCount(world.db.order, ORDER_COUNT, personId)).toBe(0)
+        expect(await readCount(world.db.order, PAYMENT_COUNT, personId)).toBe(0)
         expect(await readStock(world.db.order, "sku-thermos")).toBe(thermos.stock)
     })
 })

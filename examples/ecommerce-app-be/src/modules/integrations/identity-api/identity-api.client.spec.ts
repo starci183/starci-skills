@@ -32,7 +32,9 @@ describe("IdentityApiClient", () => {
 
         it("fails as unavailable when identity reports another error, such as a rate limit", async () => {
             const http = answering({ errors: [{ message: "x", extensions: { code: "HTTP_SECURITY_RATE_LIMITED" } }] })
-            await expect(clientFor(http).verify("tok")).rejects.toMatchObject({ code: IdentityApiErrorCode.Unavailable })
+            await expect(clientFor(http).verify("tok")).rejects.toMatchObject({
+                code: IdentityApiErrorCode.Unavailable,
+            })
         })
 
         it("fails as a contract mismatch when the body has no session data", async () => {
@@ -47,7 +49,10 @@ describe("IdentityApiClient", () => {
         it("fails as unavailable, keeping the cause, when the call itself fails", async () => {
             const cause = new TypeError("timed out")
             const http = mock<HttpClient>({ request: jest.fn().mockRejectedValue(cause) })
-            await expect(clientFor(http).verify("tok")).rejects.toMatchObject({ code: IdentityApiErrorCode.Unavailable, cause })
+            await expect(clientFor(http).verify("tok")).rejects.toMatchObject({
+                code: IdentityApiErrorCode.Unavailable,
+                cause,
+            })
         })
     })
 
@@ -55,11 +60,17 @@ describe("IdentityApiClient", () => {
         it("resolves when identity answers /health with 200", async () => {
             const http = answering({ status: "ok" })
             await expect(clientFor(http).check()).resolves.toBeUndefined()
-            expect(http.request).toHaveBeenCalledWith({ method: "GET", url: "http://identity.test/health", timeoutMs: 250 })
+            expect(http.request).toHaveBeenCalledWith({
+                method: "GET",
+                url: "http://identity.test/health",
+                timeoutMs: 250,
+            })
         })
 
         it("fails as unavailable on another status and when the call fails", async () => {
-            await expect(clientFor(answering({}, 503)).check()).rejects.toMatchObject({ code: IdentityApiErrorCode.Unavailable })
+            await expect(clientFor(answering({}, 503)).check()).rejects.toMatchObject({
+                code: IdentityApiErrorCode.Unavailable,
+            })
             const http = mock<HttpClient>({ request: jest.fn().mockRejectedValue(new TypeError("fetch failed")) })
             await expect(clientFor(http).check()).rejects.toMatchObject({ code: IdentityApiErrorCode.Unavailable })
         })

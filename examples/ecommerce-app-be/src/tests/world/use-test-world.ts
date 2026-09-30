@@ -5,7 +5,10 @@ import { Test } from "@nestjs/testing"
 import { DataSource } from "typeorm"
 import type { EntityManager } from "typeorm"
 import { createE2EGraphqlTransport } from "@starci-examples/e2e-kit/src/integrations/graphql/e2e-graphql-transport"
-import type { GraphqlCallOptions, GraphqlObserved } from "@starci-examples/e2e-kit/src/integrations/graphql/graphql-envelope"
+import type {
+    GraphqlCallOptions,
+    GraphqlObserved,
+} from "@starci-examples/e2e-kit/src/integrations/graphql/graphql-envelope"
 import { freePorts } from "@starci-examples/e2e-kit/src/platform/free-ports"
 import { pollUntil } from "@starci-examples/e2e-kit/src/platform/poll"
 import { accountEntities } from "@modules/domain/account"
@@ -29,7 +32,8 @@ const DOCUMENTS = {
     revokeSession: "mutation RevokeSession($input: RevokeSessionInput!) { revokeSession(request: $input) { revoked } }",
     account: "query { account { personId email hasOrders } }",
     cart: "query { cart { items { productId quantity } catalog { id name priceMinorUnits stock } } }",
-    addCartItem: "mutation AddCartItem($input: AddCartItemInput!) { addCartItem(request: $input) { item { productId quantity } } }",
+    addCartItem:
+        "mutation AddCartItem($input: AddCartItemInput!) { addCartItem(request: $input) { item { productId quantity } } }",
     clearCart: "mutation { clearCart { cleared } }",
     placeOrder:
         "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(request: $input) { orderId status totalMinorUnits currency paymentId replayed } }",
@@ -148,7 +152,8 @@ const transport = createE2EGraphqlTransport({ documents: DOCUMENTS })
 
 const apiOf = (url: string, token?: string): TestApi => ({
     read: (document, options) => transport.call(url, "query", document, { ...options, token: options?.token ?? token }),
-    mutate: (document, options) => transport.call(url, "mutate", document, { ...options, token: options?.token ?? token }),
+    mutate: (document, options) =>
+        transport.call(url, "mutate", document, { ...options, token: options?.token ?? token }),
     bearing: (bearer) => apiOf(url, bearer),
 })
 
@@ -162,14 +167,20 @@ const authOf = (identity: TestApi): TestAuth => {
         signIn,
         registerBuyer: async (tag, password) => {
             const email = `e2e-${tag}-${randomUUID()}@ecommerce.dev`
-            const registered = await identity.mutate<RegisterData>("register", { variables: { input: { email, password } } })
+            const registered = await identity.mutate<RegisterData>("register", {
+                variables: { input: { email, password } },
+            })
             assert(registered.data !== null, `register for ${email} answered ${registered.errorCode}`)
             return signIn(email, password)
         },
     }
 }
 
-const openDatabase = async (name: string, url: string, entities: DatabaseConnectionOptions["entities"]): Promise<DataSource> => {
+const openDatabase = async (
+    name: string,
+    url: string,
+    entities: DatabaseConnectionOptions["entities"],
+): Promise<DataSource> => {
     const dataSource = new DataSource({ type: "postgres", name, url, entities: [...entities], synchronize: false })
     await dataSource.initialize()
     return dataSource

@@ -27,7 +27,12 @@ describe("ErrorsFilter", () => {
         })
         filter.catch(new TypeError("x"), host)
         expect(status).toHaveBeenCalledWith(404)
-        expect(json).toHaveBeenCalledWith({ code: "SAMPLE_MISSING", kind: "not-found", message: "Not found", params: { id: "a" } })
+        expect(json).toHaveBeenCalledWith({
+            code: "SAMPLE_MISSING",
+            kind: "not-found",
+            message: "Not found",
+            params: { id: "a" },
+        })
         expect(errors.text).toHaveBeenCalledWith("SAMPLE_MISSING", { id: "a" }, "en")
     })
 

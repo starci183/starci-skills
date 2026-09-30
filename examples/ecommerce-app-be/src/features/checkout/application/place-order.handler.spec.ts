@@ -31,9 +31,15 @@ const build = (
     parts: { cart?: CartService; catalog?: CatalogService; orders?: OrderService } = {},
     inner = mockEntityManager(),
 ): Harness => {
-    const cart = parts.cart ?? mock<CartService>({ list: jest.fn().mockResolvedValue([{ productId: "mug", quantity: 2 }]) })
+    const cart =
+        parts.cart ?? mock<CartService>({ list: jest.fn().mockResolvedValue([{ productId: "mug", quantity: 2 }]) })
     const catalog = parts.catalog ?? mock<CatalogService>({ byIds: jest.fn().mockResolvedValue(products) })
-    const orders = parts.orders ?? mock<OrderService>({ findPlaced: jest.fn().mockResolvedValue(null), place: jest.fn().mockResolvedValue(placed) })
+    const orders =
+        parts.orders ??
+        mock<OrderService>({
+            findPlaced: jest.fn().mockResolvedValue(null),
+            place: jest.fn().mockResolvedValue(placed),
+        })
     const entityManager = mockEntityManager({ transaction: fakeTransaction(inner) })
     return { handler: new PlaceOrderHandler(mock<Logger>(), entityManager, cart, catalog, orders), cart, orders, inner }
 }
@@ -59,7 +65,9 @@ describe("PlaceOrderHandler", () => {
         const replay = { ...placed, replayed: true }
         const orders = mock<OrderService>({ findPlaced: jest.fn().mockResolvedValue(replay), place: jest.fn() })
         const { handler, cart } = build({ orders })
-        await expect(handler.execute(new PlaceOrderCommand({ request: { idempotencyKey: "k-1" }, principal }))).resolves.toEqual({
+        await expect(
+            handler.execute(new PlaceOrderCommand({ request: { idempotencyKey: "k-1" }, principal })),
+        ).resolves.toEqual({
             kind: "ok",
             value: replay,
         })

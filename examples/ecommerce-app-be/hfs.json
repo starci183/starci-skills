@@ -2,10 +2,7 @@
   "hfs": 1,
   "profile": "be",
   "project": "ecommerce-app-be",
-  "optionalSlots": [
-    "repo.docs",
-    "be.contract.graphql"
-  ],
+  "optionalSlots": ["repo.docs", "be.contract.graphql"],
   "apps": [
     {
       "name": "identity",

@@ -12,10 +12,7 @@ export class ErrorsModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [
-                ...(base.providers ?? []),
-                { provide: ERRORS_SERVICE, useClass: ErrorsService },
-            ],
+            providers: [...(base.providers ?? []), { provide: ERRORS_SERVICE, useClass: ErrorsService }],
             exports: [ERRORS_SERVICE],
         }
     }

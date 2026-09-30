@@ -18,7 +18,10 @@ export class FetchHttpClient implements HttpClient {
         try {
             return await fetch(request.url, {
                 method: request.method,
-                headers: request.body === undefined ? request.headers : { "content-type": "application/json", ...request.headers },
+                headers:
+                    request.body === undefined
+                        ? request.headers
+                        : { "content-type": "application/json", ...request.headers },
                 body: request.body === undefined ? undefined : JSON.stringify(request.body),
                 signal,
             })

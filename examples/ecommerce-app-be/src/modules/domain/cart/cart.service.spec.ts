@@ -7,9 +7,13 @@ import { CartItemEntity } from "./persistence/entities/cart-item.entity"
 
 describe("CartService", () => {
     it("lists one person cart under the list bound", async () => {
-        const rows = [Object.assign(new CartItemEntity(), { id: "l-1", personId: "p-1", productId: "sku-1", quantity: 2 })]
+        const rows = [
+            Object.assign(new CartItemEntity(), { id: "l-1", personId: "p-1", productId: "sku-1", quantity: 2 }),
+        ]
         const entityManager = mockEntityManager({ find: jest.fn().mockResolvedValue(rows) })
-        await expect(new CartService(entityManager).list({ personId: "p-1" })).resolves.toEqual([{ productId: "sku-1", quantity: 2 }])
+        await expect(new CartService(entityManager).list({ personId: "p-1" })).resolves.toEqual([
+            { productId: "sku-1", quantity: 2 },
+        ])
         expect(entityManager.find).toHaveBeenCalledWith(CartItemEntity, {
             where: { personId: "p-1" },
             order: { productId: "ASC" },
@@ -18,8 +22,15 @@ describe("CartService", () => {
     })
 
     it("adds through the caller manager and answers the merged line", async () => {
-        const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([{ product_id: "sku-1", quantity: 5 }]) })
-        const line = await new CartService(mockEntityManager()).add({ manager, personId: "p-1", productId: "sku-1", quantity: 2 })
+        const manager = mockEntityManager({
+            query: jest.fn().mockResolvedValue([{ product_id: "sku-1", quantity: 5 }]),
+        })
+        const line = await new CartService(mockEntityManager()).add({
+            manager,
+            personId: "p-1",
+            productId: "sku-1",
+            quantity: 2,
+        })
         expect(line).toEqual({ productId: "sku-1", quantity: 5 })
         expect(manager.query).toHaveBeenCalledWith(UPSERT_CART_ITEM, ["p-1", "sku-1", 2])
     })

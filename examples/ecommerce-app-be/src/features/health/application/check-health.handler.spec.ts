@@ -17,7 +17,11 @@ describe("CheckHealthHandler", () => {
     })
 
     it("refuses with the state of each dependency when one is unreachable", async () => {
-        const report: ProbeReport = { service: "demo", checks: { database: "unreachable", cache: "ok" }, healthy: false }
+        const report: ProbeReport = {
+            service: "demo",
+            checks: { database: "unreachable", cache: "ok" },
+            healthy: false,
+        }
         await expect(handlerFor(report).execute(query)).resolves.toEqual({
             kind: "refused",
             code: ProbesErrorCode.DependencyUnavailable,

@@ -15,7 +15,9 @@ describe("GetAccountHandler", () => {
         const accounts = mock<AccountService>({
             getAccount: jest.fn().mockResolvedValue({ kind: "ok", value: { personId: "p-1", email: "a@example.com" } }),
         })
-        const orderApi = mock<OrderApiClient>({ getBuyerStatus: jest.fn().mockResolvedValue({ personId: "p-1", hasOrders: true }) })
+        const orderApi = mock<OrderApiClient>({
+            getBuyerStatus: jest.fn().mockResolvedValue({ personId: "p-1", hasOrders: true }),
+        })
         await expect(new GetAccountHandler(mock<Logger>(), orderApi, accounts).execute(query)).resolves.toEqual({
             kind: "ok",
             value: { personId: "p-1", email: "a@example.com", hasOrders: true },

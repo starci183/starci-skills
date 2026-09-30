@@ -16,8 +16,16 @@ describe("AddCartItemHandler", () => {
         const inner = mockEntityManager()
         const catalog = mock<CatalogService>({ byIds: jest.fn().mockResolvedValue({ mug: { id: "mug" } }) })
         const cart = mock<CartService>({ add: jest.fn().mockResolvedValue({ productId: "mug", quantity: 5 }) })
-        const handler = new AddCartItemHandler(mock<Logger>(), mockEntityManager({ transaction: fakeTransaction(inner) }), catalog, cart)
-        await expect(handler.execute(command)).resolves.toEqual({ kind: "ok", value: { productId: "mug", quantity: 5 } })
+        const handler = new AddCartItemHandler(
+            mock<Logger>(),
+            mockEntityManager({ transaction: fakeTransaction(inner) }),
+            catalog,
+            cart,
+        )
+        await expect(handler.execute(command)).resolves.toEqual({
+            kind: "ok",
+            value: { productId: "mug", quantity: 5 },
+        })
         expect(cart.add).toHaveBeenCalledWith({ manager: inner, personId: "p-1", productId: "mug", quantity: 2 })
     })
 
@@ -25,7 +33,9 @@ describe("AddCartItemHandler", () => {
         const catalog = mock<CatalogService>({ byIds: jest.fn().mockResolvedValue({}) })
         const cart = mock<CartService>()
         const entityManager = mockEntityManager({ transaction: fakeTransaction(mockEntityManager()) })
-        await expect(new AddCartItemHandler(mock<Logger>(), entityManager, catalog, cart).execute(command)).resolves.toEqual({
+        await expect(
+            new AddCartItemHandler(mock<Logger>(), entityManager, catalog, cart).execute(command),
+        ).resolves.toEqual({
             kind: "refused",
             code: OrderErrorCode.UnknownProduct,
             params: { productId: "mug" },

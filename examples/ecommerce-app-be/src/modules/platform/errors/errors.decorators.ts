@@ -12,5 +12,4 @@ export const InjectErrorsOptions = (): TypedParameterDecorator<ErrorsOptions> =>
     injector<ErrorsOptions>(MODULE_OPTIONS_TOKEN)
 
 /** Injects the service that describes failures for the transports. Parameter type: ErrorsService. */
-export const InjectErrorsService = (): TypedParameterDecorator<ErrorsService> =>
-    injector<ErrorsService>(ERRORS_SERVICE)
+export const InjectErrorsService = (): TypedParameterDecorator<ErrorsService> => injector<ErrorsService>(ERRORS_SERVICE)

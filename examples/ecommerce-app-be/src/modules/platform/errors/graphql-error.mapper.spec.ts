@@ -5,7 +5,12 @@ import { ErrorsError, ErrorsErrorCode } from "./errors/errors.error"
 import type { ErrorsService } from "./errors.service"
 import { formatGraphqlError } from "./graphql-error.mapper"
 
-const described: ErrorDescription = { code: ErrorsErrorCode.Internal, kind: "internal", status: 500, params: { id: "a" } }
+const described: ErrorDescription = {
+    code: ErrorsErrorCode.Internal,
+    kind: "internal",
+    status: 500,
+    params: { id: "a" },
+}
 const invalid: ErrorDescription = { code: ErrorsErrorCode.OperationInvalid, kind: "invalid", status: 400, params: {} }
 
 const errorsService = (): ErrorsService =>
@@ -17,7 +22,11 @@ const errorsService = (): ErrorsService =>
 describe("formatGraphqlError", () => {
     it("answers the code, kind and params of a failure thrown by a resolver", () => {
         const original = new ErrorsError({ code: ErrorsErrorCode.Internal })
-        const formatted = formatGraphqlError(errorsService(), { message: "x", path: ["cart"] }, new GraphQLError("x", { originalError: original }))
+        const formatted = formatGraphqlError(
+            errorsService(),
+            { message: "x", path: ["cart"] },
+            new GraphQLError("x", { originalError: original }),
+        )
         expect(formatted).toMatchObject({
             message: ErrorsErrorCode.Internal,
             path: ["cart"],

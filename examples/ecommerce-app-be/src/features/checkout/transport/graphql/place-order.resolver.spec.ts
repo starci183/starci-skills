@@ -9,11 +9,22 @@ const principal: Principal = { id: "p-1", roles: ["member"] }
 
 describe("PlaceOrderResolver", () => {
     it("dispatches one place command carrying the principal and answers the confirmation", async () => {
-        const order = { orderId: "o-1", status: "confirmed", totalMinorUnits: 100, currency: "USD", paymentId: "pay-1", replayed: false }
+        const order = {
+            orderId: "o-1",
+            status: "confirmed",
+            totalMinorUnits: 100,
+            currency: "USD",
+            paymentId: "pay-1",
+            replayed: false,
+        }
         const commandBus = mock<CommandBus>({ execute: jest.fn().mockResolvedValue({ kind: "ok", value: order }) })
-        await expect(new PlaceOrderResolver(commandBus).placeOrder(principal, { idempotencyKey: "k-1" })).resolves.toEqual(order)
+        await expect(
+            new PlaceOrderResolver(commandBus).placeOrder(principal, { idempotencyKey: "k-1" }),
+        ).resolves.toEqual(order)
         expect(commandBus.execute).toHaveBeenCalledTimes(1)
-        expect(commandBus.execute).toHaveBeenCalledWith(new PlaceOrderCommand({ request: { idempotencyKey: "k-1" }, principal }))
+        expect(commandBus.execute).toHaveBeenCalledWith(
+            new PlaceOrderCommand({ request: { idempotencyKey: "k-1" }, principal }),
+        )
     })
 
     it("turns the refusal of an insufficient stock into the order error carrying its params", async () => {

@@ -1,26 +1,29 @@
 # Testing ecommerce-app-be
 
-The unit suite runs in process. It covers capability services, HTTP and GraphQL adapters, and
-both application composition roots. It does not start the dev stack.
+The unit suite runs in process. It covers capability services, GraphQL adapters, guards and both application
+composition roots. It does not start any infrastructure.
 
-| Check | Command |
-| --- | --- |
-| Types | `npm run typecheck` |
-| Lint | `npm run lint:check` |
-| Build | `npm run build` |
-| Unit suite | `npm test` |
-| Coverage | `npm run test:coverage` |
+| Check      | Command              |
+| ---------- | -------------------- |
+| Types      | `npm run typecheck`  |
+| Lint       | `npm run lint:check` |
+| Build      | `npm run build`      |
+| Unit suite | `npm test`           |
+| E2E suite  | `npm run test:e2e`   |
 
-The root `jest.config.js` declares exactly two projects. The `unit` project selects `*.spec.ts` under `apps/` and `src/`. `tsconfig.json` and Jest resolve the root package's feature and module
-public entries; the compiled application workspaces resolve their exports from `dist/`.
+Unit specs sit beside their subject as `<name>.spec.ts`. Everything else lives under `src/tests/`:
 
-The `e2e` project selects `*.e2e-spec.ts` under `src/tests/e2e/` and runs with `npm run test:e2e`
-(`jest --selectProjects e2e --runInBand`; environment code in `src/tests/e2e/setup/`, data in
-`src/tests/fixtures/`). Narrow a run with jest arguments, for example
-`npm run test:e2e -- checkout/checkout-journey` or `npm run test:e2e -- -t "payment"`. Those specs start run-owned Postgres and Redis resources and
-both Nest processes, call the public GraphQL doors (and the /health probes), then clean up.
-They require an available container runtime and are not part of `test:unit`.
+- `src/tests/world/` is the only test infrastructure. `global-setup.ts` starts one Postgres container per connection
+  (identity, order), runs the real `apps/migrate` bootstrap once and applies the dev seeds; `use-test-world.ts` exports
+  `useTestWorld({ apps })`, which boots the real identity and order apps in the spec process, wired to each other over
+  real GraphQL, and returns `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager),
+  `world.fake.<provider>` (a network fake of an external service; Redis today, under `world/fakes/redis/`),
+  `world.auth` and `world.waitFor`. Nothing is overridden in the DI container.
+- `src/tests/fixtures/` holds typed doubles, the response shapes and the SQL constants of out-of-band reads.
+- `src/tests/e2e/<area>/*.e2e-spec.ts` are flow specs: they call the public GraphQL doors and assert persisted state
+  through `world.db`. Narrow a run with jest arguments, for example `npm run test:e2e -- checkout/checkout-journey`.
 
-E2E runs MANUALLY only (owner ruling 2026-09-29): husky, `typecheck`, `lint`/`lint:check`, coverage (`test:coverage`, Codecov, Sonar) and automatic CI never touch `src/tests/e2e/**`. `npm run typecheck:e2e` (`src/tests/e2e/tsconfig.json`), `npm run lint:e2e` and `npm run test:e2e` are run by hand when asked; any e2e CI job is `workflow_dispatch` only.
+E2E needs a container runtime and runs by hand or in the manual e2e workflow; husky, `typecheck`, `lint` and the
+automatic CI never run it.
 
 The dev stack and process instructions are in `.starcistacks/dev/README.md`.

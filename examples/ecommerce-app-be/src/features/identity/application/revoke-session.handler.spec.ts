@@ -33,6 +33,8 @@ describe("RevokeSessionHandler", () => {
 
     it("refuses a token no session answers", async () => {
         const sessions = mock<SessionService>({ verify: jest.fn().mockResolvedValue(null) })
-        await expect(new RevokeSessionHandler(mock<Logger>(), sessions).execute(command)).resolves.toMatchObject({ kind: "refused" })
+        await expect(new RevokeSessionHandler(mock<Logger>(), sessions).execute(command)).resolves.toMatchObject({
+            kind: "refused",
+        })
     })
 })

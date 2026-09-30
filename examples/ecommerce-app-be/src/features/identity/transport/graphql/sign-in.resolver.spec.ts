@@ -11,7 +11,10 @@ describe("SignInResolver", () => {
         const commandBus = mock<CommandBus>({
             execute: jest.fn().mockResolvedValue({ kind: "ok", value: { sessionToken: "tok", personId: "p-1" } }),
         })
-        await expect(new SignInResolver(commandBus).signIn(input)).resolves.toEqual({ sessionToken: "tok", personId: "p-1" })
+        await expect(new SignInResolver(commandBus).signIn(input)).resolves.toEqual({
+            sessionToken: "tok",
+            personId: "p-1",
+        })
         expect(commandBus.execute).toHaveBeenCalledTimes(1)
         expect(commandBus.execute).toHaveBeenCalledWith(expect.any(SignInCommand))
     })

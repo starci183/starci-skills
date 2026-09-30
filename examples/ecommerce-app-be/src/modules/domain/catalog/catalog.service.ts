@@ -25,7 +25,10 @@ export class CatalogService {
     /** The products named by `ids`, keyed by id. */
     async byIds(params: ProductsByIdsParams): Promise<ProductLookup> {
         if (params.ids.length === 0) return {}
-        const rows = await this.entityManager.find(ProductEntity, { where: { id: In([...params.ids]) }, take: LIST_ROWS_MAX })
+        const rows = await this.entityManager.find(ProductEntity, {
+            where: { id: In([...params.ids]) },
+            take: LIST_ROWS_MAX,
+        })
         return Object.fromEntries(rows.map((row) => [row.id, toProductView(row)]))
     }
 

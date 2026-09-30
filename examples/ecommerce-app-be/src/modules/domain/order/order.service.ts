@@ -5,7 +5,14 @@ import { CatalogService } from "@modules/domain/catalog"
 import { PaymentService } from "@modules/domain/payment"
 import { InjectOrderEntityManager } from "@modules/platform/database"
 import { OrderError, OrderErrorCode } from "./errors/order.error"
-import type { BuyerStatus, BuyerStatusParams, FindPlacedOrderParams, FindPlacedOrderResult, PlaceOrderParams, PlacedOrder } from "./order.contracts"
+import type {
+    BuyerStatus,
+    BuyerStatusParams,
+    FindPlacedOrderParams,
+    FindPlacedOrderResult,
+    PlaceOrderParams,
+    PlacedOrder,
+} from "./order.contracts"
 import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 import { toBuyerStatus, toOrderId } from "./persistence/order.rows"
@@ -29,7 +36,10 @@ export class OrderService {
     /** The order an earlier confirmation with the same key produced, marked as a replay, or null. */
     async findPlaced(params: FindPlacedOrderParams): Promise<FindPlacedOrderResult> {
         const manager = params.manager ?? this.entityManager
-        const order = await manager.findOneBy(OrderEntity, { personId: params.personId, idempotencyKey: params.idempotencyKey })
+        const order = await manager.findOneBy(OrderEntity, {
+            personId: params.personId,
+            idempotencyKey: params.idempotencyKey,
+        })
         return order ? this.snapshot(order, manager) : null
     }
 
@@ -45,7 +55,11 @@ export class OrderService {
         const orderId = toOrderId(rows)
         if (orderId === null) return this.replayOf(params)
         for (const line of plan.lines) {
-            const reserved = await this.catalog.reserveStock({ manager, productId: line.productId, quantity: line.quantity })
+            const reserved = await this.catalog.reserveStock({
+                manager,
+                productId: line.productId,
+                quantity: line.quantity,
+            })
             if (!reserved) {
                 throw new OrderError({
                     code: OrderErrorCode.InsufficientStock,
@@ -62,7 +76,12 @@ export class OrderService {
                 unitPriceMinorUnits: line.unitPriceMinorUnits,
             })),
         )
-        const payment = await this.payments.capture({ manager, personId, orderId, amountMinorUnits: plan.totalMinorUnits })
+        const payment = await this.payments.capture({
+            manager,
+            personId,
+            orderId,
+            amountMinorUnits: plan.totalMinorUnits,
+        })
         await this.cart.clear({ manager, personId })
         return {
             orderId,

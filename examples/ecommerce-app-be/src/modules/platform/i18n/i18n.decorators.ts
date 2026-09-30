@@ -18,5 +18,4 @@ export const InjectMessageCatalog = (): TypedParameterDecorator<MessageCatalog> 
     injector<MessageCatalog>(MESSAGE_CATALOG)
 
 /** Injects the RequestLocale port. Parameter type: RequestLocale. */
-export const InjectRequestLocale = (): TypedParameterDecorator<RequestLocale> =>
-    injector<RequestLocale>(REQUEST_LOCALE)
+export const InjectRequestLocale = (): TypedParameterDecorator<RequestLocale> => injector<RequestLocale>(REQUEST_LOCALE)

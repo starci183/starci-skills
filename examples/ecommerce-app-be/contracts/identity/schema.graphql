@@ -3,53 +3,53 @@
 # ------------------------------------------------------
 
 type AccountType {
-  email: String!
-  hasOrders: Boolean!
-  personId: ID!
+    email: String!
+    hasOrders: Boolean!
+    personId: ID!
 }
 
 type Mutation {
-  register(request: RegisterInput!): RegisterType!
-  revokeSession(request: RevokeSessionInput!): RevokeSessionType!
-  signIn(request: SignInInput!): SignInType!
+    register(request: RegisterInput!): RegisterType!
+    revokeSession(request: RevokeSessionInput!): RevokeSessionType!
+    signIn(request: SignInInput!): SignInType!
 }
 
 type Query {
-  account: AccountType!
-  verifySession(request: VerifySessionInput!): VerifySessionType!
+    account: AccountType!
+    verifySession(request: VerifySessionInput!): VerifySessionType!
 }
 
 input RegisterInput {
-  email: String!
-  password: String!
+    email: String!
+    password: String!
 }
 
 type RegisterType {
-  personId: ID!
+    personId: ID!
 }
 
 input RevokeSessionInput {
-  sessionToken: String!
+    sessionToken: String!
 }
 
 type RevokeSessionType {
-  revoked: Boolean!
+    revoked: Boolean!
 }
 
 input SignInInput {
-  email: String!
-  password: String!
+    email: String!
+    password: String!
 }
 
 type SignInType {
-  personId: ID!
-  sessionToken: String!
+    personId: ID!
+    sessionToken: String!
 }
 
 input VerifySessionInput {
-  sessionToken: String!
+    sessionToken: String!
 }
 
 type VerifySessionType {
-  personId: ID!
+    personId: ID!
 }

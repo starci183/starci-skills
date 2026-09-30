@@ -25,7 +25,9 @@ describe("OriginGuard", () => {
     })
 
     it("refuses a state-changing request from another origin", () => {
-        expect(() => guard.canActivate(contextOf("POST", { origin: "https://evil.example" }))).toThrow(HttpSecurityError)
+        expect(() => guard.canActivate(contextOf("POST", { origin: "https://evil.example" }))).toThrow(
+            HttpSecurityError,
+        )
     })
 
     it("lets a request without Origin and Referer through: it is not a browser", () => {

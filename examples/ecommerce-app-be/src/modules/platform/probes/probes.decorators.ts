@@ -16,8 +16,7 @@ export const InjectProbesOptions = (): TypedParameterDecorator<ProbesOptions> =>
     injector<ProbesOptions>(MODULE_OPTIONS_TOKEN)
 
 /** Injects the probes this app reports on. Parameter type: ReadonlyArray of Probe. */
-export const InjectProbes = (): TypedParameterDecorator<ReadonlyArray<Probe>> =>
-    injector<ReadonlyArray<Probe>>(PROBES)
+export const InjectProbes = (): TypedParameterDecorator<ReadonlyArray<Probe>> => injector<ReadonlyArray<Probe>>(PROBES)
 
 /** Injects the probe checker. Parameter type: ProbeCheckerService. */
 export const InjectProbeChecker = (): TypedParameterDecorator<ProbeCheckerService> =>

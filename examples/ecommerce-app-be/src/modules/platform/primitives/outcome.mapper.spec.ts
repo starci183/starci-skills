@@ -12,6 +12,8 @@ describe("unwrapOutcome", () => {
     it("throws the capability error carrying the code and params of a refusal", () => {
         const outcome = refused("SAMPLE_MISSING", { id: "a" })
         expect(() => unwrapOutcome(outcome, SampleError)).toThrow(SampleError)
-        expect(() => unwrapOutcome(outcome, SampleError)).toThrow(expect.objectContaining({ code: "SAMPLE_MISSING", params: { id: "a" } }))
+        expect(() => unwrapOutcome(outcome, SampleError)).toThrow(
+            expect.objectContaining({ code: "SAMPLE_MISSING", params: { id: "a" } }),
+        )
     })
 })

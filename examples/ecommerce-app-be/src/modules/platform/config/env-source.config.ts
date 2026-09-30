@@ -31,14 +31,17 @@ export class EnvSource {
     static fromProcess(): EnvSource {
         const values: Record<string, string | undefined> = { ...process.env }
         for (const [key, path] of Object.entries(process.env)) {
-            if (key.endsWith(FILE_SUFFIX) && path) values[key.slice(0, -FILE_SUFFIX.length)] = readFileSync(path, "utf8").trim()
+            if (key.endsWith(FILE_SUFFIX) && path)
+                values[key.slice(0, -FILE_SUFFIX.length)] = readFileSync(path, "utf8").trim()
         }
         return new EnvSource(values)
     }
 
     /** The environment a child process starts with: every declared key, then `overrides` on top (used by the e2e harness to spawn the apps). */
     toChildEnv(overrides: Readonly<Record<string, string>>): Record<string, string> {
-        const declared = Object.entries(this.values).flatMap(([key, value]) => (value === undefined ? [] : [[key, value] as const]))
+        const declared = Object.entries(this.values).flatMap(([key, value]) =>
+            value === undefined ? [] : [[key, value] as const],
+        )
         return { ...Object.fromEntries(declared), ...overrides }
     }
 
@@ -76,7 +79,8 @@ export class EnvSource {
     bool(key: string, fallback?: boolean): boolean {
         if (!this.has(key) && fallback !== undefined) return fallback
         const value = this.string(key)
-        if (value !== "true" && value !== "false") throw new ConfigError({ code: ConfigErrorCode.KeyInvalid, params: { key } })
+        if (value !== "true" && value !== "false")
+            throw new ConfigError({ code: ConfigErrorCode.KeyInvalid, params: { key } })
         return value === "true"
     }
 
@@ -105,7 +109,8 @@ export class EnvSource {
         if (!this.has(key) && fallback !== undefined) return fallback
         const match = DURATION_PATTERN.exec(this.string(key))
         const unit = DURATION_UNITS[match?.[2] ?? "ms"]
-        if (!match?.[1] || unit === undefined) throw new ConfigError({ code: ConfigErrorCode.KeyInvalid, params: { key } })
+        if (!match?.[1] || unit === undefined)
+            throw new ConfigError({ code: ConfigErrorCode.KeyInvalid, params: { key } })
         return Number(match[1]) * unit
     }
 }

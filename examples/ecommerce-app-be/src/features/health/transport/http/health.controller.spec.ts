@@ -7,7 +7,12 @@ import { HealthController } from "./health.controller"
 describe("HealthController", () => {
     it("dispatches the health query and answers ok with the report of a healthy service", async () => {
         const queryBus = mock<QueryBus>({
-            execute: jest.fn().mockResolvedValue({ kind: "ok", value: { service: "demo", checks: { database: "ok" }, healthy: true } }),
+            execute: jest
+                .fn()
+                .mockResolvedValue({
+                    kind: "ok",
+                    value: { service: "demo", checks: { database: "ok" }, healthy: true },
+                }),
         })
         await expect(new HealthController(queryBus).checkHealth()).resolves.toEqual({
             status: "ok",

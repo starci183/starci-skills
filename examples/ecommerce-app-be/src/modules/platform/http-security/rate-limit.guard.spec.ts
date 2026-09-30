@@ -34,13 +34,20 @@ describe("throttlerOptionsOf", () => {
     })
 
     it("counts a strict door in the strict window only", () => {
-        expect(skipsOf(throttlerOptionsOf(rateLimit), contextOf("1.1.1.1", doorOf(RateTier.Strict)))).toEqual([true, false])
+        expect(skipsOf(throttlerOptionsOf(rateLimit), contextOf("1.1.1.1", doorOf(RateTier.Strict)))).toEqual([
+            true,
+            false,
+        ])
     })
 })
 
 describe("RateLimitGuard", () => {
     const storage = new ThrottlerStorageService()
-    const guard = new RateLimitGuard(throttlerOptionsOf(rateLimit), storage, mock<Reflector>({ getAllAndOverride: jest.fn() }))
+    const guard = new RateLimitGuard(
+        throttlerOptionsOf(rateLimit),
+        storage,
+        mock<Reflector>({ getAllAndOverride: jest.fn() }),
+    )
 
     beforeAll(async () => {
         await guard.onModuleInit()

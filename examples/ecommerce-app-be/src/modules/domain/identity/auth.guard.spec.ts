@@ -50,7 +50,9 @@ describe("AuthGuard", () => {
     it("lets a door marked public through without looking at the request", async () => {
         const verifier = verifierFor("p-1")
         const { context } = requestOfContext({})
-        await expect(new AuthGuard(reflectorOf({ reason: PublicReason.Health }), verifier).canActivate(context)).resolves.toBe(true)
+        await expect(
+            new AuthGuard(reflectorOf({ reason: PublicReason.Health }), verifier).canActivate(context),
+        ).resolves.toBe(true)
         expect(verifier.verify).not.toHaveBeenCalled()
     })
 
@@ -76,6 +78,8 @@ describe("AuthGuard", () => {
     it("refuses an authenticated caller who lacks a required role", async () => {
         const { context } = requestOfContext({ authorization: "Bearer live" })
         const guard = new AuthGuard(reflectorOf({ roles: ["admin"] }), verifierFor("p-1"))
-        await expect(guard.canActivate(context)).rejects.toThrow(new IdentityError({ code: IdentityErrorCode.Forbidden }))
+        await expect(guard.canActivate(context)).rejects.toThrow(
+            new IdentityError({ code: IdentityErrorCode.Forbidden }),
+        )
     })
 })

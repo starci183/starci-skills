@@ -25,7 +25,10 @@ const options: IdentityAppOptions = {
     database: { name: IDENTITY_CONNECTION, url: new Secret("postgres://localhost:0/identity") },
     cache: { url: new Secret("redis://localhost:0/0") },
     orderApi: { url: "http://localhost:0", timeoutMs: 100 },
-    httpSecurity: { allowedOrigins: ["http://localhost:3000"], rateLimit: { windowMs: 1000, defaultLimit: 10, strictLimit: 5 } },
+    httpSecurity: {
+        allowedOrigins: ["http://localhost:3000"],
+        rateLimit: { windowMs: 1000, defaultLimit: 10, strictLimit: 5 },
+    },
 }
 
 const environment: Record<string, string> = {
@@ -41,7 +44,12 @@ describe("identity AppModule", () => {
     const manager = mockEntityManager()
 
     beforeAll(async () => {
-        const dataSource = mock<DataSource>({ isInitialized: false, manager, entityMetadatas: [], options: { type: "postgres", synchronize: false } })
+        const dataSource = mock<DataSource>({
+            isInitialized: false,
+            manager,
+            entityMetadatas: [],
+            options: { type: "postgres", synchronize: false },
+        })
         module = await Test.createTestingModule({ imports: [AppModule.register(options)] })
             .overrideProvider(getDataSourceToken(IDENTITY_CONNECTION))
             .useValue(dataSource)
@@ -71,14 +79,18 @@ describe("identity AppModule", () => {
 
     it("binds the one errors filter of platform/errors app-wide", () => {
         const filters = (AppModule.register(options).providers ?? []).flatMap((provider) =>
-            "provide" in provider && provider.provide === APP_FILTER && "useClass" in provider ? [provider.useClass] : [],
+            "provide" in provider && provider.provide === APP_FILTER && "useClass" in provider
+                ? [provider.useClass]
+                : [],
         )
         expect(filters).toEqual([ErrorsFilter])
     })
 
     it("registers the app guards in order: rate limit, origin, auth", () => {
         const guards = (AppModule.register(options).providers ?? []).flatMap((provider) =>
-            "provide" in provider && provider.provide === APP_GUARD && "useClass" in provider ? [provider.useClass] : [],
+            "provide" in provider && provider.provide === APP_GUARD && "useClass" in provider
+                ? [provider.useClass]
+                : [],
         )
         expect(guards).toEqual([RateLimitGuard, OriginGuard, AuthGuard])
     })
