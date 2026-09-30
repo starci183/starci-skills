@@ -1,13 +1,5 @@
 {
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "noEmit": false
-  },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/**/*.spec.ts",
-    "apps/**/*.spec.ts",
-    "src/tests"
-  ]
+  "extends": ["./tsconfig.json", "@starci/tsconfig/build.json"],
+  "compilerOptions": { "outDir": "./dist" },
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "src/tests"]
 }

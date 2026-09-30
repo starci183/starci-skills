@@ -1,52 +1,11 @@
 {
+  "extends": "@starci/tsconfig/be.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "target": "ES2021",
-    "lib": [
-      "ES2022"
-    ],
-    "declaration": false,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "sourceMap": false,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": false,
-    "skipLibCheck": true,
-    "strict": true,
-    "strictNullChecks": true,
-    "noImplicitAny": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": [
-      "node",
-      "jest"
-    ],
     "paths": {
-      "@features/*": [
-        "./src/features/*"
-      ],
-      "@modules/*": [
-        "./src/modules/*"
-      ],
-      "@tests/*": [
-        "./src/tests/*"
-      ]
+      "@features/*": ["./src/features/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@tests/*": ["./src/tests/*"]
     }
   },
-  "include": [
-    "src",
-    "apps"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/tests/world",
-    "src/tests/integration",
-    "src/tests/e2e",
-    "src/tests/contract"
-  ]
+  "exclude": ["node_modules", "dist", "src/tests/world", "src/tests/integration", "src/tests/e2e", "src/tests/contract"]
 }
