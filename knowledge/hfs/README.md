@@ -436,7 +436,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R22 | `HFS_TS_STRICT` | tsconfig extends `@starci/tsconfig` and lowers no flag; no assertion, `!` or `any` in product source. |
 | R23 | `HFS_CONTRACT_SNAPSHOT_DRIFT` | Contract snapshot equals the emit, the FE copy equals the BE. |
 | R24 | `HFS_ARCH_CONFIG_UNREAD` | The machine reads `hfs.json`; zero files analysed is red. |
-| R25 | `HFS_UNUSED_EXPORT` | No public export without a consumer. |
+| R25 | `HFS_UNUSED_EXPORT` | No public export without a consumer; no source file nothing reaches. |
 
 **Backend**
 
@@ -446,7 +446,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R27 | `ARCH_OWNER_CYCLE` | No owner cycles, type-only included. |
 | R28 | `BE_FEATURE_IMPORTS_FEATURE` | A feature never imports a feature. |
 | R29 | `BE_FEATURE_SHAPE` | Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`. |
-| R30 | `BE_PUBLIC_SURFACE` | Cross-owner imports use `index.ts`; no `export *`; at most 60 exports. |
+| R30 | `BE_PUBLIC_SURFACE` | Cross-owner imports use `index.ts`; no `export *`; no alias re-export; at most 60 exports. |
 | R31 | `BE_FEATURE_NOT_COMPOSED` | Every feature and transport module is composed by an app. |
 | R32 | `BE_APP_COMPOSITION_ONLY` | Apps compose only; the composition spec boots the real module. |
 | R33 | `BE_ENTRYPOINT_ONLY_IN_APPS` | Entrypoints only in `apps/*/src`. |

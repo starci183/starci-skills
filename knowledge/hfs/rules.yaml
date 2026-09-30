@@ -224,9 +224,10 @@ rules:
     law: "No duplicated blocks or twice-defined helpers."
     kinds: [check, design]
     gates: [land, ci, sonar]
-    failureCodes: ["HFS_DUPLICATE_CODE"]
+    failureCodes: ["HFS_DUPLICATE_CODE", "HFS_DUPLICATE_SYMBOL"]
     enforcers:
       - {kind: machine, id: duplicate-code, at: scripts/checks/architecture/clones.mjs}
+      - {kind: machine, id: duplicate-symbol, at: scripts/checks/architecture/symbols.mjs}
       - {kind: sonar, id: duplicated-lines-density, status: planned}
   - id: R22
     code: "HFS_TS_STRICT"
@@ -261,13 +262,13 @@ rules:
       - {kind: machine, id: arch-config-unread, status: planned}
   - id: R25
     code: "HFS_UNUSED_EXPORT"
-    title_vi: "Export công khai không ai dùng"
-    law: "No public export without a consumer."
+    title_vi: "Mã chết: export công khai và tệp không ai dùng"
+    law: "No public export without a consumer; no source file nothing reaches."
     kinds: [check, codemod]
-    gates: [land, ci]
-    failureCodes: ["HFS_UNUSED_EXPORT"]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["HFS_UNUSED_EXPORT", "HFS_UNUSED_FILE"]
     enforcers:
-      - {kind: hfs, id: unused-export, status: planned}
+      - {kind: machine, id: dead-exports, at: scripts/checks/architecture/dead-exports.mjs}
   - id: R26
     code: "BE_TIER_DIRECTION"
     title_vi: "Hướng import giữa các tầng bị cấm"
@@ -294,7 +295,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["BE_FEATURE_IMPORTS_FEATURE"]
     enforcers:
-      - {kind: machine, id: feature-imports-feature, status: planned}
+      - {kind: machine, id: feature-imports-feature, at: scripts/checks/architecture/tiers.mjs}
   - id: R29
     code: "BE_FEATURE_SHAPE"
     title_vi: "Feature sai hình dạng"
@@ -307,14 +308,15 @@ rules:
   - id: R30
     code: "BE_PUBLIC_SURFACE"
     title_vi: "Import sâu qua cổng công khai"
-    law: "Cross-owner imports use `index.ts`; no `export *`; at most 60 exports."
+    law: "Cross-owner imports use `index.ts`; no `export *`; no alias re-export; at most 60 exports."
     kinds: [check, lint, codemod]
     gates: [pre-push, settle, land, ci]
-    failureCodes: ["BE_PUBLIC_SURFACE", "ARCH_OWNER_EXPORT_BYPASS", "ARCH_OWNER_EXPORT_STAR"]
+    failureCodes: ["BE_PUBLIC_SURFACE", "ARCH_OWNER_EXPORT_BYPASS", "ARCH_OWNER_EXPORT_STAR", "HFS_ALIAS_REEXPORT"]
     enforcers:
       - {kind: eslint-be, id: must-deep-module-import}
       - {kind: eslint-be, id: no-folder-reexport}
       - {kind: machine, id: owner-export-bypass, at: scripts/checks/architecture/owners.mjs}
+      - {kind: machine, id: alias-reexport, at: scripts/checks/architecture/symbols.mjs}
       - {kind: machine, id: index-export-count, status: planned}
       - {kind: eslint-be, id: no-relative-capability-escape}
       - {kind: eslint-be, id: no-self-module-alias}

@@ -1,0 +1,35 @@
+id: hfs-machine-redundancy
+effectiveAt: '2026-09-30T18:00:00+07:00'
+summary: >-
+  Lane C0 sub-lane M2 (redundancy audit RED05, RED06, RED07, R28, nested examples). The architecture machine gains three
+  finding codes and one re-homed code, all errors in every gate on both profiles. R25 dead code: HFS_UNUSED_FILE, a
+  production source file no root (an app main.ts or app.module.ts, a route file, a package entry, a source file a framework
+  config names by a relative string literal) reaches through imports, re-exports or type-only imports, beside the
+  HFS_UNUSED_EXPORT that dead-exports.mjs already reports for every non-app owner entry; R25's enforcer is now the machine
+  (dead-exports.mjs) and the planned hfs one is dropped. R21: HFS_DUPLICATE_SYMBOL (symbols.mjs), a name an owner's public
+  entry exports, resolved to its declaring file, that another production file also declares and exports; no allowlist.
+  R30 (catalogued there for both profiles): HFS_ALIAS_REEXPORT (symbols.mjs), any export { X as Y }, export { default as Y }
+  or export * as ns in production source. R28: tiers.mjs reports a backend feature importing another feature as
+  BE_FEATURE_IMPORTS_FEATURE instead of BE_TIER_DIRECTION (the frontend keeps FE_TIER_DIRECTION); R28's machine enforcer is
+  built. Nested examples: hfs.mjs judges HFS_HOOKS_PATH_REDIRECTED and HFS_ROOT_ENTRY_FORBIDDEN against the given
+  repository root; when it is not the Git top level the hooks-path check reports coverage not-applicable and the root-entry
+  check lists only paths under the root (no option, environment variable or allowlist). .prettierignore joins the root
+  entries the machine allows, as slots.yaml repo.tool-config already declares. R25 and R30 law lines (rules.yaml and README
+  section 12) name the new obligations.
+reach: new-legs
+adds:
+  codes:
+    - HFS_UNUSED_FILE
+    - HFS_DUPLICATE_SYMBOL
+    - HFS_ALIAS_REEXPORT
+    - BE_FEATURE_IMPORTS_FEATURE
+paths:
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/contract-changes/hfs-machine-redundancy.yaml
+  - scripts/checks/architecture/dead-exports.mjs
+  - scripts/checks/architecture/symbols.mjs
+  - scripts/checks/architecture/tiers.mjs
+  - scripts/checks/architecture/hfs.mjs
+  - scripts/checks/architecture/index.mjs
