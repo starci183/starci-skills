@@ -95,7 +95,7 @@ test('ui/dist is stale when a ui source is newer than the newest built file, or 
   assert.equal(uiBuildState({ uiDir: ui, fsImpl: tree({ '/x/ui/src/a.tsx': 1 }) }).stale, true);
 });
 
-test('preflight: SQLite version, temp and missing ledgers, a model pin the agent card cannot attest', () => {
+test('preflight: SQLite version, temp and missing ledgers, a model pin the launch cannot honour', () => {
   assert.ok(cmpVersion('3.51.3', '3.51.3') === 0 && cmpVersion('3.50.9', '3.51.3') < 0 && cmpVersion('3.53.4', '3.51.3') > 0);
   assert.equal(sqliteItem('3.51.2').status, 'red');
   assert.equal(sqliteItem('3.53.4').status, 'green');
@@ -113,9 +113,12 @@ test('preflight: SQLite version, temp and missing ledgers, a model pin the agent
   const integrity = ledgerIntegrity([{ name: 'c', file: ok }, { name: 'x', file: gone }, { name: 'r', file: ok, state: 'retired' }, { name: 'bad', file: 'bad.sqlite' }],
     { exists: (f) => f !== gone, check: (f) => (f === 'bad.sqlite' ? { ok: false, result: ['page 3 corrupt'] } : { ok: true, result: ['ok'] }) });
   assert.deepEqual(integrity, { bad: [{ name: 'bad', result: 'page 3 corrupt' }], checked: 2 });
-  const card = (agent) => ({ claude: { modelAttestation: { displayNames: { 'claude-opus-5-5': 'Opus 5.5' } } }, codex: { modelAttestation: { mode: 'launch-flag' } } }[agent] ?? null);
-  const bad = pinProblems([{ where: 'kernel', agent: 'claude', model: 'claude-sonnet-5-5' }, { where: 'k2', agent: 'claude', model: 'claude-opus-5-5' }, { where: 'k3', agent: 'codex', model: 'gpt' }], { card });
-  assert.deepEqual(bad.map((b) => b.where), ['kernel']);
+  // A pinned model is launched with worker-start --model and attested from worker-show: only an agent that takes no
+  // --model (devin: start.modelArgument false) or has no card cannot honour a pin.
+  const card = (agent) => ({ claude: { start: { api: 'orchestration.worker-start' } }, devin: { start: { api: 'orchestration.worker-start', modelArgument: false } } }[agent] ?? null);
+  const bad = pinProblems([{ where: 'kernel', agent: 'devin', model: 'swe-2-max' }, { where: 'k2', agent: 'claude', model: 'claude-opus-5-5' },
+    { where: 'k3', agent: 'devin', model: null }, { where: 'k4', agent: 'qwen', model: 'q' }], { card });
+  assert.deepEqual(bad.map((b) => b.where), ['kernel', 'k4']);
 });
 
 test('the checklist is red when a needed controller is shadow or the engine is safe, and exits green only when every required row is', () => {

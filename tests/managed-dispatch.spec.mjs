@@ -118,7 +118,7 @@ const reportFile=(repo,jobId)=>{
 
 /* ------------------------------------------------ kernel pin precedence */
 
-test('kernel pin precedence: config selects the agent/model for a dedicated Orca terminal',t=>{
+test('kernel pin precedence: config selects the agent/model the Kernel worker starts with',t=>{
   // The fixture pins kernel {agent: codex, model: gpt-6-sol, effort: high}.
   // A plan must resolve routedBy 'config' without ever asking
   // route-model. Ingress may be any human chat surface; Orca still owns a
@@ -131,16 +131,12 @@ test('kernel pin precedence: config selects the agent/model for a dedicated Orca
   assert.equal(plan.agent,'codex','the shipped Kernel agent pin must decide the seat');
   assert.equal(plan.routedBy,'config');
   assert.equal(plan.executionHost,'orca');
-  assert.equal(plan.launch,'terminal');
+  assert.equal(plan.launch,'worker','every Kernel starts through orchestration worker-start');
   assert.equal(plan.model,'gpt-6-sol');
   assert.equal(plan.effort,'high');
   assert.equal(plan.route,undefined,'route-model must not be consulted when the pin decides');
   assert.equal(plan.config?.agent,'codex');
-  assert.match(plan.command??'',/\bcodex\b/i);
-  assert.match(plan.command??'',/(?:^|\s)--model\s+['"]?gpt-6-sol['"]?(?:\s|$)/i);
-  assert.match(plan.command??'',/--ask-for-approval\s+never/);
-  assert.match(plan.command??'',/--sandbox\s+danger-full-access/);
-  assert.match(plan.command??'',/model_reasoning_effort/);
+  assert.equal(plan.command,undefined,'no command is composed: Orca launches the agent');
 });
 
 test('kernel pin precedence: --agent flag beats the config pin',t=>{
@@ -151,7 +147,7 @@ test('kernel pin precedence: --agent flag beats the config pin',t=>{
   const plan=json(r.stdout);
   assert.equal(plan.agent,'devin','an explicit --agent flag is the operator override');
   assert.equal(plan.routedBy,'override');
-  assert.equal(plan.launch,'terminal');
+  assert.equal(plan.launch,'worker');
 });
 
 test('kernel pin precedence: an unavailable explicit pin fails closed instead of silently substituting Devin',t=>{
@@ -581,73 +577,60 @@ test('reconcile converts a fenced effect_unknown prompt stall into the same queu
   assert.equal(state.leases,0);
 });
 
-/* -------------------------------------------- dedicated Kernel terminal */
+/* -------------------------------------------- the Kernel is a worker-start worker */
 
-test('kernel launch: Codex boots in a dedicated Orca terminal and never creates an orchestration run',t=>{
+test('kernel launch: Codex boots as a worker of its own entry Run through worker-start, never a terminal create',t=>{
   const fx=fixture(t);fx.writeConfig(); // shipped pin: codex / gpt-6-sol / high
   const workflowId=defineGoal(fx);
   const r=fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
-  assert.equal(r.status,0,`Kernel terminal launch failed: ${r.stderr||r.stdout}`);
+  assert.equal(r.status,0,`Kernel launch failed: ${r.stderr||r.stdout}`);
   const out=json(r.stdout);
-  assert.equal(out?.agent,'codex');
-  assert.equal(out?.routedBy,'config');
-  assert.equal(out?.executionHost,'orca');
-  assert.equal(out?.launch,'terminal');
-  assert.equal(out?.terminal,'fake-terminal-1');
-  assert.equal(out?.dispatch,undefined);
-  assert.equal(out?.run,undefined);
-  assert.equal(out?.model,'gpt-6-sol');
-  assert.equal(out?.modelAttested,true);
+  assert.deepEqual([out?.agent,out?.routedBy,out?.executionHost,out?.launch],['codex','config','orca','worker']);
+  assert.deepEqual([out?.terminal,out?.dispatch,out?.runId,out?.model,out?.modelAttested],['fake-terminal-1','dispatch-fake-1','run-fake-1','gpt-6-sol',true]);
   const job=jobRow(fx.repo,`kernel-${workflowId}`);
   assert.equal(job?.status,'running');
-  assert.equal(job?.worker_id,'fake-terminal-1','the Kernel job persists its dedicated terminal handle');
-  assert.match(job?.payload_json??'',/"model":\s*"gpt-6-sol"/);
+  assert.equal(job?.worker_id,'fake-terminal-1','the Kernel job persists its worker terminal handle');
+  assert.equal(json(job?.payload_json)?.managed?.dispatchId,'dispatch-fake-1');
   assert.deepEqual(kernelSignal(fx.repo,workflowId),{
-    terminal:'fake-terminal-1',host:'orca',agent:'codex',routedBy:'config',
-    model:'gpt-6-sol',effort:'high',launch:'terminal',modelAttested:true,
+    terminal:'fake-terminal-1',dispatch:'dispatch-fake-1',runId:'run-fake-1',host:'orca',agent:'codex',routedBy:'config',
+    model:'gpt-6-sol',effort:'high',launch:'worker',modelAttested:true,
   });
   const seen=fx.calls();
-  for(const step of ['terminal create','terminal read','terminal send'])
+  for(const step of ['orchestration run-create','orchestration task-create','orchestration worker-start','orchestration dispatch-show','terminal rename','orchestration worker-show'])
     assert.ok(seen.includes(step),`fake orca never saw '${step}' — log: ${seen.join(', ')}`);
-  assert.equal(seen.some(step=>step.startsWith('orchestration ')),false,
-    `Kernel boot must not require run-create/task-create/worker-start — log: ${seen.join(', ')}`);
-  const create=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='terminal create');
-  const command=create?.[create.indexOf('--command')+1]??'';
-  assert.match(command,/\bcodex\b/i);
-  assert.match(command,/(?:^|\s)--model\s+['"]?gpt-6-sol['"]?(?:\s|$)/i);
-  assert.match(command,/--ask-for-approval\s+never/);
-  assert.match(command,/--sandbox\s+danger-full-access/);
-  assert.match(command,/model_reasoning_effort/);
+  assert.equal(seen.includes('terminal create'),false,'the Kernel is never launched with terminal create');
+  const start=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
+  assert.deepEqual([start[start.indexOf('--agent')+1],start[start.indexOf('--model')+1],start[start.indexOf('--effort')+1]],['codex','gpt-6-sol','high']);
 
-  // A second start must not double the seat: the terminal handle is the
-  // persisted, probed Kernel identity.
+  // A second start must not double the seat: the live Dispatch is the Kernel identity.
   const again=fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
   assert.equal(again.status,0,again.stderr);
   assert.equal(json(again.stdout)?.replaced,false);
-  const starts=fx.calls().filter(c=>c==='terminal create').length;
-  assert.equal(starts,1,'a live Kernel terminal must not be duplicated');
+  assert.equal(fx.calls().filter(c=>c==='orchestration worker-start').length,1,'a live Kernel worker must not be duplicated');
 });
 
-test('kernel launch is independent of orchestration run-create launcher context',t=>{
+test('kernel launch fails closed when its entry Run cannot be created, and starts no worker',t=>{
   const fx=fixture(t);fx.writeConfig();
   fx.env.STARCI_FAKE_ORCA_MODE='run-create-error';
   const workflowId=defineGoal(fx);
   const r=fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
-  assert.equal(r.status,0,`Kernel boot must not call run-create: ${r.stderr||r.stdout}`);
-  assert.equal(fx.calls().includes('orchestration run-create'),false);
-  assert.equal(json(r.stdout)?.terminal,'fake-terminal-1');
+  assert.notEqual(r.status,0);
+  assert.equal((json(r.stderr)||json(r.stdout))?.step,'run-create');
+  assert.equal(fx.calls().includes('orchestration worker-start'),false,'no Kernel without its Run');
+  assert.notEqual(jobRow(fx.repo,`kernel-${workflowId}`)?.status,'running');
 });
 
-test('kernel launch fails closed when the terminal does not attest the requested model',t=>{
+test('kernel launch fails closed when the worker does not attest the requested model, and releases it',t=>{
   const fx=fixture(t);fx.writeConfig();
   fx.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL='gpt-6-luna';
   const workflowId=defineGoal(fx);
   const r=fx.run(START_WORKFLOW,'--repo',fx.repo,'--goal',workflowId,'--json');
-  assert.notEqual(r.status,0,'a different rendered model must reject the Kernel boot');
+  assert.notEqual(r.status,0,'a worker running another model must reject the Kernel boot');
   const failure=json(r.stderr)||json(r.stdout);
-  assert.equal(failure?.step,'model-attestation');
+  assert.equal(failure?.step,'attestation');
   assert.equal(failure?.requestedModel,'gpt-6-sol');
-  assert.match(failure?.error??'',/gpt-6-sol|model/i);
+  assert.match(failure?.error??'',/expected agent=codex model=gpt-6-sol, got agent=codex model=gpt-6-luna/);
+  assert.ok(fx.calls().includes('orchestration worker-release'),'the mis-attested worker is released');
   const job=jobRow(fx.repo,`kernel-${workflowId}`);
   assert.notEqual(job?.status,'running','an unattested Kernel must never be recorded running');
 });

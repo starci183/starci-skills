@@ -375,9 +375,9 @@ const guardSettings = (config) => ({
 /**
  * guardLaunch({jobId, workflowId, ledgerRepo, owned, repos, config, shims}) ->
  *   {env, pathPrefix, receipt}
- * env and pathPrefix go into the op launch command (scripts/agent/lib.mjs
- * buildSpawnCommand); receipt rides on the dispatch record. `shims: false`: the
- * launch sets no environment (a managed worker-start agent), so no shim layer.
+ * receipt rides on the dispatch record. Every agent launch is orchestration worker-start, which owns the
+ * worker environment: its callers pass `shims: false` and bind the job guard to the worker terminal instead
+ * (bindGuardTerminal); env and pathPrefix reach no agent.
  */
 export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId, workflowId, ledgerRepo, owned = [], repos = [], config = null, shims = true }) {
   const settings = guardSettings(config);

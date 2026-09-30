@@ -592,7 +592,8 @@ else if (verb === 'orchestration worker-show') {
     out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1', lastHeartbeatAt: state.heartbeatAt ?? null },
       // workerStates[dispatch]: what worker-stop / worker-release left (a seeded Dispatch reads ready).
       worker: { state: state.workerStates?.[arg('dispatch')] ?? 'ready', agent_terminal_handle: 'fake-terminal-1',
-        startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: state.model ?? 'gpt-6-sol' } } } },
+        // STARCI_FAKE_ORCA_EFFECTIVE_MODEL: the model the worker really runs, when it is not the requested one.
+        startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: process.env.STARCI_FAKE_ORCA_EFFECTIVE_MODEL || (state.model ?? 'gpt-6-sol') } } } },
       observation: { exactWorker: true } } });
 }
 else if (verb === 'orchestration worker-stop') {

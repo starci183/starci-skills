@@ -131,7 +131,7 @@ test('api dispatch --model inside the order launches that pool at the kind\'s ti
   for(const target of ['codex-agent','gpt-6-sol']){
     const r=fx.run('dispatch','--repo',fx.repo,'--job','job-decide-codex','--model',target,'--json');
     assert.equal(r.status,0,`${target}: ${r.stderr||r.stdout}`);
-    assert.equal(json(r.stdout)?.spawnCommand?.model,'gpt-6-sol',target);
+    assert.equal(json(r.stdout)?.launch?.model,'gpt-6-sol',target);
   }
   // A job routed to codex-agent and dispatched with --model claude-agent launches Claude's own pin,
   // never the routed Codex model id.

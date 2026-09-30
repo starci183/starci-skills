@@ -145,13 +145,6 @@ const opFixture = (t, extra = {}) => {
   return { dispatch, read, textSends, enterSends, machineFile };
 };
 
-test('dispatch on a host without prompt receipts is refused at send and nothing is typed', (t) => {
-  const fx = opFixture(t, { STARCI_FAKE_ORCA_OLD_HOST: '1' });
-  assert.notEqual(fx.dispatch('job-ps-1').status, 0);
-  const [rejected] = fx.read((db) => db.prepare("SELECT payload_json FROM events WHERE entity_id='job-ps-1' AND kind='dispatch-rejected'").all()).map((e) => json(e.payload_json));
-  assert.equal(rejected?.step, 'send');
-  assert.equal(fx.textSends().length, 0, 'no legacy send runs on a host without prompt receipts');
-});
 
 /* ------------------------------------------------- the host's prompt receipt */
 // Orca 1.4.209 answers a text+Enter prompt sent with --wait-submit with result.send.prompt: turn_started in
@@ -192,23 +185,7 @@ test('receipt: an old host, a permission prompt and a stale incarnation are neve
   assert.equal(deliver(replaced.io).failureKind, TERMINAL_INCARNATION_STALE);
 });
 
-test('dispatch on a receipt host: a lost prompt is re-delivered with --wait-submit and the screen is never polled for Enter', (t) => {
-  const fx = opFixture(t, { STARCI_FAKE_ORCA_PROMPT_RECEIPT: '1', STARCI_FAKE_ORCA_PROMPT_LOST: '1' });
-  const r = fx.dispatch('job-ps-1');
-  assert.equal(r.status, 0, r.stderr || r.stdout);
-  assert.equal(fx.read((db) => db.prepare("SELECT status FROM jobs WHERE job_id='job-ps-1'").get().status), 'running');
-  const sends = fx.textSends();
-  assert.equal(sends.length, 2);
-  assert.ok(sends.every((s) => s.argv.includes('--wait-submit')), 'every prompt send asks the host to observe it');
-  assert.equal(fx.enterSends().length, 0, 'turn_started proved the submit: no Enter-only send');
-});
 
-test('dispatch on a receipt host: a prompt lost twice is refused prompt-delivery-stalled', (t) => {
-  const fx = opFixture(t, { STARCI_FAKE_ORCA_PROMPT_RECEIPT: '1', STARCI_FAKE_ORCA_PROMPT_LOST: '2' });
-  assert.notEqual(fx.dispatch('job-ps-1').status, 0);
-  const [rejected] = fx.read((db) => db.prepare("SELECT payload_json FROM events WHERE entity_id='job-ps-1' AND kind='dispatch-rejected'").all()).map((e) => json(e.payload_json));
-  assert.deepEqual([rejected?.step, rejected?.signal], ['send', PROMPT_DELIVERY_STALLED]);
-});
 
 test('terminal send: terminal_not_writable on a terminal Orca shows writable is a stale incarnation', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-stale-incarnation-'));

@@ -349,16 +349,6 @@ test('guardLaunch puts the shim first and names the job guard file; a layer can 
   assert.deepEqual(guard.owned, [path.resolve(repo, 'src/mine').replace(/\\/g, '/')]);
 });
 
-test('the op launch command puts the guard directory first on the worker PATH', async () => {
-  const { pathPrefixCommand, buildSpawnCommand } = await import('../scripts/agent/lib.mjs');
-  assert.equal(pathPrefixCommand('C:/x/runtime/guards/bin', 'win32'), "$env:PATH='C:/x/runtime/guards/bin;'+$env:PATH;");
-  assert.equal(pathPrefixCommand('/x/runtime/guards/bin', 'posix'), "export PATH='/x/runtime/guards/bin':\"$PATH\";");
-  assert.equal(pathPrefixCommand("bad'dir", 'posix'), null);
-  const built = buildSpawnCommand({ provider: 'codex', model: 'gpt-x', env: { STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-x' }, pathPrefix: path.join(ROOT, 'runtime', 'guards', 'bin') });
-  assert.ok(!built.error, built.error);
-  assert.ok(built.command.includes(path.join(ROOT, 'runtime', 'guards', 'bin')), built.command);
-  assert.ok(built.command.indexOf('STARCI_OP_JOB') < built.command.indexOf('codex'), 'the environment is set before the agent starts');
-});
 
 // nivo inc-d1833bc89c1f: the commit-only (Work debt) packet commits a long owned list with
 // --pathspec-from-file, which the guard refused (COMMIT_NOT_SCOPED), so the batched repair could never
