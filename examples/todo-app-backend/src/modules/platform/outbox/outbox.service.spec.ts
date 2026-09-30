@@ -27,12 +27,6 @@ describe("PostgresOutbox", () => {
         expect(own.query).not.toHaveBeenCalled()
     })
 
-    it("publishes on its own manager", async () => {
-        const own = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
-        await new PostgresOutbox(own, new FakeClock(AT)).publish({ queue: "q", eventId: "e", payload: {}, availableAt: AT })
-        expect(own.query).toHaveBeenCalledWith(INSERT_MESSAGE, expect.any(Array))
-    })
-
     it("maps claimed rows to records and hides them for the visibility window", async () => {
         const own = mockEntityManager({
             query: jest

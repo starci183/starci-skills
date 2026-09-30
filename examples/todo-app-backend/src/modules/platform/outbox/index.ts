@@ -7,13 +7,7 @@ export const outboxEntities = [OutboxMessageEntity]
 /** The migrations of the outbox capability, in the order they run. */
 export const outboxMigrations = [CreateOutboxMessages1758400000002]
 
-export type {
-    BuryMessageParams,
-    ClaimDueParams,
-    OutboxMessage,
-    OutboxRecord,
-    RetryMessageParams,
-} from "./outbox.contracts"
+export type { OutboxMessage, OutboxRecord } from "./outbox.contracts"
 export { InjectOutbox } from "./outbox.decorators"
 export { OutboxModule } from "./outbox.module"
 export type { Outbox } from "./outbox.port"

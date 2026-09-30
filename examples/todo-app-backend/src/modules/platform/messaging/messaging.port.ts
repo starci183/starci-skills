@@ -1,10 +1,4 @@
-import type { ConsumedMessage, PublishedMessage, QueueDefinition } from "./messaging.contracts"
-
-/** Publishes messages that no transaction is behind; a message that must commit with a write goes through the outbox instead. */
-export interface MessagePublisher {
-    /** Stores the message for delivery. */
-    publish<Payload extends object>(message: PublishedMessage<Payload>): Promise<void>
-}
+import type { ConsumedMessage, QueueDefinition } from "./messaging.contracts"
 
 /** One consumer of one queue; a transport class in `transport/message` implements it. */
 export interface MessageConsumer<Payload extends object> {

@@ -7,7 +7,6 @@ export const leaseEntities = [LeaseEntity]
 /** The migrations of the lease capability, in the order they run. */
 export const leaseMigrations = [CreateJobLeases1758400000000]
 
-export type { AcquireLeaseParams, LeaseGrant, ReleaseLeaseParams } from "./lease.contracts"
 export { InjectLease } from "./lease.decorators"
 export { LeaseModule } from "./lease.module"
 export type { Lease } from "./lease.port"

@@ -1,7 +1,5 @@
 export { HTTP_ERROR_KINDS, HttpError, HttpErrorCode } from "./errors/http.error"
 export { HTTP_MESSAGES } from "./errors/http.messages"
-export { callGraphql } from "./graphql-call.mapper"
-export type { GraphqlAnswer } from "./graphql-call.mapper"
 export { InjectHttpClient } from "./http.decorators"
 export { HttpModule } from "./http.module"
 export type { HttpClient } from "./http.port"

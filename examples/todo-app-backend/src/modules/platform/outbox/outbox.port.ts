@@ -11,8 +11,6 @@ import type {
 export interface Outbox {
     /** Writes the message in the transaction of `manager`, so it exists exactly when the change that caused it commits. */
     enqueue(manager: EntityManager, message: OutboxMessage): Promise<void>
-    /** Writes the message on its own, for a message no transaction is behind. */
-    publish(message: OutboxMessage): Promise<void>
     /** Claims the due messages of the given queues for one delivery attempt each. */
     claimDue(params: ClaimDueParams): Promise<Array<OutboxRecord>>
     /** Marks a delivered message as done. */

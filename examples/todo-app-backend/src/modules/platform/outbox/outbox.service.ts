@@ -36,11 +36,6 @@ export class PostgresOutbox implements Outbox {
         ])
     }
 
-    /** Inserts the message on its own connection. */
-    async publish(message: OutboxMessage): Promise<void> {
-        await this.enqueue(this.entityManager, message)
-    }
-
     /** Claims due messages, counting one attempt and hiding them for the visibility window. */
     async claimDue(params: ClaimDueParams): Promise<Array<OutboxRecord>> {
         // An UPDATE ... RETURNING answers the returned rows and the affected count.

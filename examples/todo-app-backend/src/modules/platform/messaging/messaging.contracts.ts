@@ -10,18 +10,6 @@ export interface QueueDefinition<Payload extends object> {
     parse(value: unknown): Payload | null
 }
 
-/** A message to publish. */
-export interface PublishedMessage<Payload extends object> {
-    /** The queue the message goes to. */
-    readonly queue: QueueDefinition<Payload>
-    /** The stable event id; the pair (queue, event id) is unique. */
-    readonly eventId: string
-    /** The payload. */
-    readonly payload: Payload
-    /** The first instant of delivery; now when omitted. */
-    readonly availableAt?: Date
-}
-
 /** A message as a consumer receives it. */
 export interface ConsumedMessage<Payload extends object> {
     /** The stored row id. */

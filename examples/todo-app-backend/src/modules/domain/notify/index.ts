@@ -30,7 +30,6 @@ export {
     NOTIFY_ADMIT_QUEUE,
     NOTIFY_DISPATCH_QUEUE,
     toNotifyAdmitMessage,
-    toNotifyDispatchMessage,
 } from "./notify.mapper"
 export { NotifyModule } from "./notify.module"
 export { NotifyService } from "./notify.service"
