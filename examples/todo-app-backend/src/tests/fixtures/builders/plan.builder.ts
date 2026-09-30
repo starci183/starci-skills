@@ -1,7 +1,5 @@
-import { Secret } from "@modules/platform/config"
 import { builder } from "@starci/jest-preset"
-import type { SepayOptions } from "@modules/integrations/sepay"
-import type { PaymentIntentView, PlanOptions, SubscriptionView, WebhookDeliveryParams } from "@modules/domain/plan"
+import type { PaymentIntentView, SubscriptionView, WebhookDeliveryParams } from "@modules/domain/plan"
 
 /** The instant the plan specs settle and stamp at. */
 export const PLAN_AT = new Date("2026-09-30T10:00:00.000Z")
@@ -29,17 +27,6 @@ export const paymentIntentRow = builder<PaymentIntentView>({
     currency: "VND",
     status: "pending",
     appliedAt: null,
-})
-
-/** The plan options: the paid plan costs 99 000 VND. */
-export const planOptions = builder<PlanOptions>({ paidPriceMinorUnits: 99000, paidCurrency: "VND" })
-
-/** The gateway options the webhook checks its shared secret against. */
-export const sepayOptions = builder<SepayOptions>({
-    baseUrl: "https://sepay.example",
-    apiKey: new Secret("api-key"),
-    webhookSecret: new Secret("shared-secret"),
-    timeoutMs: 1000,
 })
 
 /** One authorised webhook delivery reporting a paid intent. */

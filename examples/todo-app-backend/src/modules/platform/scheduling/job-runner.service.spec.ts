@@ -1,15 +1,18 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeLock, mock } from "@starci/jest-preset"
+import { builder, FakeClock, fakeLock, mock } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { LEASE } from "@modules/platform/lease"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { PLATFORM_AT, schedulingOptions } from "@tests/fixtures/builders/platform.builder"
+import { PLATFORM_AT } from "@tests/fixtures/builders/platform.builder"
 import { SchedulingError, SchedulingErrorCode } from "./errors/scheduling.error"
 import { JobRunner } from "./job-runner.service"
 import { SchedulingLogEvent } from "./scheduling.log-events"
+import type { SchedulingOptions } from "./scheduling.options"
 import type { ScheduledJob } from "./scheduling.port"
 import { SCHEDULING_OPTIONS } from "./scheduling.decorators"
+
+const options = builder<SchedulingOptions>({ tickMs: 1000 })()
 
 const build = async () => {
     const clock = new FakeClock(PLATFORM_AT)
@@ -18,7 +21,7 @@ const build = async () => {
     const moduleRef = await Test.createTestingModule({
         providers: [
             JobRunner,
-            { provide: SCHEDULING_OPTIONS, useValue: schedulingOptions() },
+            { provide: SCHEDULING_OPTIONS, useValue: options },
             { provide: LEASE, useValue: lease },
             { provide: CLOCK, useValue: clock },
             { provide: LOGGER, useValue: logger },

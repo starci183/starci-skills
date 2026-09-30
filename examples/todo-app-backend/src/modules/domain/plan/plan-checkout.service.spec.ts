@@ -1,17 +1,20 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, builder, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import { SEPAY } from "@modules/integrations/sepay"
 import type { SepayClient } from "@modules/integrations/sepay"
 import { CLOCK } from "@modules/platform/clock"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { ok, refused } from "@modules/platform/primitives"
-import { PLAN_AT, PLAN_PERIOD_END, paymentIntentRow, planOptions, subscriptionRow } from "@tests/fixtures/builders/plan.builder"
+import { PLAN_AT, PLAN_PERIOD_END, paymentIntentRow, subscriptionRow } from "@tests/fixtures/builders/plan.builder"
 import { PlanErrorCode } from "./errors/plan.error"
 import { PaymentService } from "./payment.service"
 import { PlanCheckoutService } from "./plan-checkout.service"
 import { PLAN_OPTIONS } from "./plan.decorators"
+import type { PlanOptions } from "./plan.options"
 import { SettlementService } from "./settlement.service"
 import { SubscriptionService } from "./subscription.service"
+
+const options = builder<PlanOptions>({ paidPriceMinorUnits: 99000, paidCurrency: "VND" })()
 
 const build = async () => {
     const own = mockEntityManager()
@@ -25,7 +28,7 @@ const build = async () => {
             PlanCheckoutService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: own },
             { provide: CLOCK, useValue: new FakeClock(PLAN_AT) },
-            { provide: PLAN_OPTIONS, useValue: planOptions() },
+            { provide: PLAN_OPTIONS, useValue: options },
             { provide: SEPAY, useValue: sepay },
             { provide: SubscriptionService, useValue: subscriptions },
             { provide: PaymentService, useValue: payments },

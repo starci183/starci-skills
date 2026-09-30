@@ -1,17 +1,20 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, mock } from "@starci/jest-preset"
+import { builder, FakeClock, mock } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { OUTBOX } from "@modules/platform/outbox"
 import type { Outbox } from "@modules/platform/outbox"
-import { messagingOptions, outboxRecord, PLATFORM_AT } from "@tests/fixtures/builders/platform.builder"
+import { outboxRecord, PLATFORM_AT } from "@tests/fixtures/builders/platform.builder"
 import { MessagingError, MessagingErrorCode } from "./errors/messaging.error"
 import { MessageRunner } from "./message-runner.service"
 import type { ConsumedMessage, QueueDefinition } from "./messaging.contracts"
 import { MessagingLogEvent } from "./messaging.log-events"
+import type { MessagingOptions } from "./messaging.options"
 import type { MessageConsumer } from "./messaging.port"
 import { MESSAGING_OPTIONS } from "./messaging.decorators"
+
+const options = builder<MessagingOptions>({ pollMs: 500, batchSize: 10, visibilityMs: 30_000 })()
 
 const queue: QueueDefinition<object> = {
     name: "audit.append",
@@ -32,7 +35,7 @@ const build = async () => {
     const moduleRef = await Test.createTestingModule({
         providers: [
             MessageRunner,
-            { provide: MESSAGING_OPTIONS, useValue: messagingOptions() },
+            { provide: MESSAGING_OPTIONS, useValue: options },
             { provide: OUTBOX, useValue: outbox },
             { provide: CLOCK, useValue: clock },
             { provide: LOGGER, useValue: logger },

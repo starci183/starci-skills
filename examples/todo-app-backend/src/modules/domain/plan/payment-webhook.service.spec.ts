@@ -1,15 +1,24 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, builder, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import { SEPAY_OPTIONS } from "@modules/integrations/sepay"
+import type { SepayOptions } from "@modules/integrations/sepay"
 import { CLOCK } from "@modules/platform/clock"
+import { Secret } from "@modules/platform/config"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { INBOX } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
 import { ok, refused } from "@modules/platform/primitives"
-import { PLAN_AT, PLAN_PERIOD_END, sepayOptions, webhookDelivery } from "@tests/fixtures/builders/plan.builder"
+import { PLAN_AT, PLAN_PERIOD_END, webhookDelivery } from "@tests/fixtures/builders/plan.builder"
 import { PlanErrorCode } from "./errors/plan.error"
 import { PaymentWebhookService } from "./payment-webhook.service"
 import { SettlementService } from "./settlement.service"
+
+const options = builder<SepayOptions>({
+    baseUrl: "https://sepay.example",
+    apiKey: new Secret("api-key"),
+    webhookSecret: new Secret("shared-secret"),
+    timeoutMs: 1000,
+})()
 
 const build = async () => {
     const own = mockEntityManager()
@@ -22,7 +31,7 @@ const build = async () => {
             { provide: PRIMARY_ENTITY_MANAGER, useValue: own },
             { provide: CLOCK, useValue: new FakeClock(PLAN_AT) },
             { provide: INBOX, useValue: inbox },
-            { provide: SEPAY_OPTIONS, useValue: sepayOptions() },
+            { provide: SEPAY_OPTIONS, useValue: options },
             { provide: SettlementService, useValue: settlement },
         ],
     }).compile()
