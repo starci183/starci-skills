@@ -538,40 +538,51 @@ describe('hfs sync --init', () => {
   const filesUnder = dir => fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/')).sort();
   const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
 
-  it('a back end gets platform config, logging and errors, the health feature and one entrypoint per api app', async t => {
+  it('a back end gets platform config, clock, cqrs, logging and errors, the liveness capability, the health feature and one entrypoint per api app', async t => {
     const { dir, code } = await skeleton(t, BE);
     assert.equal(code, 0);
     const files = filesUnder(dir);
     for (const file of [
-      'apps/core/src/main.ts', 'apps/core/src/app.module.ts', 'apps/core/src/core.options.ts', 'apps/core/src/core.composition.spec.ts',
-      'src/modules/platform/config/env-source.ts', 'src/modules/platform/config/server.config.ts', 'src/modules/platform/config/index.ts',
-      'src/modules/platform/logging/logger.port.ts', 'src/modules/platform/logging/log-id.ts', 'src/modules/platform/logging/logging.module.ts',
-      'src/modules/platform/errors/domain-error.ts', 'src/modules/platform/errors/error.filter.ts',
-      'src/features/system-health/index.ts', 'src/features/system-health/transport/http/live.controller.ts',
+      'apps/core/src/main.ts', 'apps/core/src/app.module.ts', 'apps/core/src/core.options.ts',
+      'src/modules/platform/config/env-source.config.ts', 'src/modules/platform/config/server.config.ts', 'src/modules/platform/config/index.ts',
+      'src/modules/platform/logging/logging.port.ts', 'src/modules/platform/logging/logging.log-events.ts', 'src/modules/platform/logging/logging.module.ts', 'src/modules/platform/logging/json-logger.service.ts',
+      'src/modules/platform/clock/clock.port.ts', 'src/modules/platform/clock/system-clock.service.ts',
+      'src/modules/platform/cqrs/cqrs.handler.ts', 'src/modules/platform/cqrs/cqrs.decorators.ts', 'src/modules/platform/composition/composition.decorators.ts',
+      'src/modules/platform/errors/domain.error.ts', 'src/modules/platform/errors/error.filter.ts',
+      'src/modules/domain/liveness/liveness.service.ts', 'src/modules/domain/liveness/index.ts',
+      'src/features/system-health/index.ts', 'src/features/system-health/application/check-liveness.handler.ts', 'src/features/system-health/transport/http/live.controller.ts',
     ]) assert.ok(files.includes(file), file);
     assert.ok(!files.some(file => file.startsWith('apps/migrate/')), 'only api apps get an entrypoint');
   });
-  it('every behaviour file of the back-end skeleton has a spec beside it', async t => {
+  it('the back-end skeleton follows the unit standard: only services have a spec, each service has one, no composition spec', async t => {
     const { dir } = await skeleton(t, BE);
-    const files = new Set(filesUnder(dir));
-    for (const file of ['env-source', 'server.config', 'json-logger', 'domain-error', 'error.filter'].flatMap(name => [...files].filter(candidate => candidate.endsWith(`/${name}.ts`)))) {
-      assert.ok(files.has(file.replace(/\.ts$/, '.spec.ts')), `${file} has a spec`);
+    const files = filesUnder(dir);
+    const specs = files.filter(file => /\.spec\.ts$/.test(file));
+    assert.deepEqual(specs, files.filter(file => file.endsWith('.service.ts')).map(file => file.replace(/\.ts$/, '.spec.ts')).sort(), 'exactly one spec per service and no other spec');
+    assert.ok(specs.length >= 3);
+    for (const spec of specs) {
+      const text = read(dir, spec);
+      assert.match(text, /Test\.createTestingModule\(\{[\s\S]*?providers: \[/, `${spec} builds its subject with the testing module`);
+      assert.match(text, /moduleRef\.get\(/, spec);
+      assert.doesNotMatch(text, /\bnew [A-Z]\w*Service\(| as |jest\.mock|process\.env|Date\.now|imports:/, `${spec} keeps the unit law`);
     }
-    assert.ok(files.has('src/features/system-health/transport/http/live.controller.spec.ts'));
+    assert.ok(!files.some(file => /composition\.spec|\.controller\.spec|\.handler\.spec|\.module\.spec/.test(file)));
   });
-  it('the back-end skeleton follows HFS: one env reader, an enum-named logger port, the Terminus health shape, per-app options', async t => {
+  it('the back-end skeleton follows HFS: one env reader, an enum-named logger port, a thin door dispatching one query to a thin handler that calls one service, per-app options, no coverage upload', async t => {
     const { dir } = await skeleton(t, BE);
     const sources = filesUnder(dir).filter(file => file.endsWith('.ts') && !file.endsWith('.spec.ts'));
-    assert.deepEqual(sources.filter(file => /process\.env/.test(read(dir, file))), ['src/modules/platform/config/env-source.ts'], 'process.env is read only by platform/config');
-    assert.ok(sources.every(file => !/console\.|new Error\(|synchronize|@Cron/.test(read(dir, file))));
-    assert.match(read(dir, 'src/modules/platform/logging/log-id.ts'), /export enum LogId/);
-    assert.match(read(dir, 'src/modules/platform/logging/logger.port.ts'), /abstract error\(id: LogId/);
-    assert.match(read(dir, 'src/features/system-health/transport/http/live.controller.ts'), /@Get\("live"\)[\s\S]*health\.check\(\[\]\)/);
-    assert.match(read(dir, 'apps/core/src/core.composition.spec.ts'), /toEqual\(\{ status: "ok", info: \{\}, error: \{\}, details: \{\} \}\)/);
+    assert.deepEqual(sources.filter(file => /process\.env/.test(read(dir, file))), ['src/modules/platform/config/env-source.config.ts'], 'process.env is read only by platform/config');
+    assert.ok(sources.every(file => !/console\.|new Error\(|synchronize|@Cron|new Date\(\)|Date\.now/.test(read(dir, file)) || file === 'src/modules/platform/clock/system-clock.service.ts'), 'the ambient clock is read only by platform/clock');
+    assert.match(read(dir, 'src/modules/platform/logging/logging.log-events.ts'), /export enum LoggingLogEvent/);
+    assert.match(read(dir, 'src/modules/platform/logging/logging.port.ts'), /error\(event: string, cause: unknown/);
+    const door = read(dir, 'src/features/system-health/transport/http/live.controller.ts');
+    assert.match(door, /@Get\("live"\)[\s\S]*this\.queryBus\.execute\(new CheckLivenessQuery/);
+    assert.doesNotMatch(door, /EntityManager|HealthCheckService|\bif \(/, 'a door injects the bus only and branches never');
+    assert.match(read(dir, 'src/features/system-health/application/check-liveness.handler.ts'), /return this\.liveness\.check\(\)/);
     assert.match(read(dir, 'apps/core/src/app.module.ts'), /static register\(options: CoreOptions\): DynamicModule/);
     assert.match(read(dir, 'apps/core/src/app.module.ts'), /APP_FILTER/);
     assert.match(read(dir, 'apps/core/src/main.ts'), /EnvSource\.fromProcess\(\)/);
-    assert.doesNotMatch(filesUnder(dir).map(file => read(dir, file)).join('\n'), /\{\{[a-zA-Z]/, 'no template placeholder is left');
+    assert.doesNotMatch(filesUnder(dir).map(file => read(dir, file)).join('\n'), /\{\{[a-zA-Z]|lcov|codecov/i, 'no template placeholder and no coverage upload is left');
   });
   const SHARED = ['fe.package.i18n', 'fe.package.api'];
   const APP_SHELL = ['next.config.ts', 'src/proxy.ts', 'vitest.config.ts', 'src/app/global-error.tsx', 'src/app/globals.css', 'src/app/health/live/route.ts',

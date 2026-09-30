@@ -1,18 +1,17 @@
 import { Controller, Get } from "@nestjs/common"
-import { HealthCheck, HealthCheckResult, HealthCheckService } from "@nestjs/terminus"
+import type { QueryBus } from "@nestjs/cqrs"
+import type { LivenessReport } from "@modules/domain/liveness"
+import { InjectQueryBus } from "@modules/platform/cqrs"
+import { CheckLivenessQuery } from "../../application/check-liveness.query"
 
-/** Liveness probe: answers `{ status, info, error, details }` from process-local state and never touches a dependency. */
 @Controller("health")
+/** Liveness probe: answers the liveness report from process-local state and never touches a dependency. */
 export class LiveController {
-    constructor(
-        /** Terminus executor; it runs no indicator, so a dependency outage never restarts the process. */
-        private readonly health: HealthCheckService,
-    ) {}
+    constructor(@InjectQueryBus() private readonly queryBus: QueryBus) {}
 
     /** Reports the process alive while its event loop still answers requests. */
     @Get("live")
-    @HealthCheck()
-    live(): Promise<HealthCheckResult> {
-        return this.health.check([])
+    live(): Promise<LivenessReport> {
+        return this.queryBus.execute(new CheckLivenessQuery({ request: {} }))
     }
 }

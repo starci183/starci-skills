@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common"
-import { SystemHealthHttpModule } from "./transport/http/system-health-http.module"
+import { CheckLivenessHandler } from "./application/check-liveness.handler"
 
-/** Application module of the health feature: process-local liveness now, readiness with the design that declares dependencies. */
-@Module({ imports: [SystemHealthHttpModule] })
+@Module({ providers: [CheckLivenessHandler] })
+/** Application module of the health feature: the handler of the liveness probe; readiness comes with the design that declares dependencies. */
 export class SystemHealthModule {}

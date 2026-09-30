@@ -1,19 +1,15 @@
-import type { LogId } from "./log-id"
-
 /** The structured data of one log line; values are plain data, never a request, a token or a secret. */
-export type LogPayload = Readonly<Record<string, unknown>>
+export interface LogFields {
+    /** The value logged under `name`. */
+    readonly [name: string]: unknown
+}
 
-/** The logging port: capabilities log through it with an enum identity and a structured payload, never `console`. */
-export abstract class Logger {
-    /** Detail for people debugging one environment. */
-    abstract debug(id: LogId, payload?: LogPayload): void
-
+/** The logging port: owners log through it with an enum member of their own `<owner>.log-events.ts`, never `console`. */
+export interface Logger {
     /** A normal event worth keeping. */
-    abstract info(id: LogId, payload?: LogPayload): void
-
-    /** Something unexpected the app recovered from. */
-    abstract warn(id: LogId, payload?: LogPayload): void
-
-    /** A failure the app could not recover from in place. */
-    abstract error(id: LogId, payload?: LogPayload): void
+    info(event: string, fields?: LogFields): void
+    /** Something unexpected the service recovered from. */
+    warn(event: string, fields?: LogFields): void
+    /** A failure: the cause is serialized by name and message, never dumped whole. */
+    error(event: string, cause: unknown, fields?: LogFields): void
 }

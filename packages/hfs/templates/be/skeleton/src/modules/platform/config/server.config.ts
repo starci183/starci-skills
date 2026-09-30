@@ -1,4 +1,4 @@
-import type { EnvSource } from "./env-source"
+import type { EnvSource } from "./env-source.config"
 import { ConfigError } from "./errors/config.error"
 import type { ServerOptions } from "./server.options"
 
