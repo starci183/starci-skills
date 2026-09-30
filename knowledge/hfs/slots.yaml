@@ -88,8 +88,6 @@ crossApp: apps never import each other; shared code is a packages/<pkg> slot.
 # Parameters the lint factories and checks read per profile (through ruleParams(profile) in scripts/lib/hfs-slots.mjs).
 ruleParams:
   be:
-    # BE_MODULE_SHAPE: the only modules that may be @Global(); directories under src/modules/platform/.
-    globalModules: [src/modules/platform/config/, src/modules/platform/logging/, src/modules/platform/database/]
     # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft.
     fileLines: {soft: 500, hardGrowth: true}
     # R21 HFS_DUPLICATE_CODE: the ONE threshold of duplicate code (the architecture machine reads it here; no other file states it):

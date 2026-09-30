@@ -49,9 +49,8 @@ properties:
       be:
         type: object
         additionalProperties: false
-        required: [globalModules, fileLines, duplicateBlock, infraOwners, suffixes, bannedSuffixes]
+        required: [fileLines, duplicateBlock, infraOwners, suffixes, bannedSuffixes]
         properties:
-          globalModules: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
           fileLines: {$ref: '#/$defs/fileLines'}
           duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
           infraOwners:

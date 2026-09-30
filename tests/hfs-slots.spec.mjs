@@ -375,7 +375,7 @@ test('the failure catalog explains the new codes in Vietnamese', () => {
 test('ruleParams: the parameters the canon lint lanes read', () => {
   const manifest = loadSlotManifest();
   const be = ruleParams(manifest, 'be');
-  assert.deepEqual(be.globalModules, ['src/modules/platform/config/', 'src/modules/platform/logging/', 'src/modules/platform/database/']);
+  assert.equal('globalModules' in be, false, 'the @Global allowlist is retired: no module is global from inside itself');
   assert.deepEqual(be.fileLines, { soft: 500, hardGrowth: true });
   assert.deepEqual(be.duplicateBlock, { lines: 8, tokens: 60 });
   const fe = ruleParams(manifest, 'fe');
@@ -387,9 +387,7 @@ test('ruleParams: the parameters the canon lint lanes read', () => {
   assert.deepEqual(openHfs({ declaration: BE }).ruleParams(), be);
   assert.deepEqual(openHfs({ declaration: FE }).ruleParams(), fe);
   assert.throws(() => { ruleParams(manifest, 'be').fileLines.soft = 1; }, TypeError);
-  // each global module is a directory a slot owns; the FE client module resolves to the api module
-  const openBe = openHfs({ declaration: BE });
-  for (const dir of be.globalModules) assert.equal(openBe.classifyPath(dir).slot, 'be.platform');
+  // the FE client module resolves to the api module
   assert.equal(openHfs({ declaration: FE }).classifyPath(fe.clientModule.replace('<app>', 'web')).slot, 'fe.modules.api');
   // schema and loader agree that ruleParams is required and closed
   for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.clientModule; }, (d) => { delete d.ruleParams.be.duplicateBlock; }, (d) => { d.ruleParams.fe.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }]) {

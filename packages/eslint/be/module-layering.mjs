@@ -11,7 +11,7 @@
  *   - `no-folder-reexport` holds LAYERING-5 / Law 7 and the width of an HFS `index.ts`: no folder
  *     re-export, no `export *`, no `*_STORE` token, no whole `types/` folder, and at most the manifest's
  *     `indexExports` names.
- *   - `@Global()` is not decided here: `global-module-allowlist` (module-shape.mjs) reads the allowlist.
+ *   - `@Global()` is not decided here: `no-global-decorator` (module-shape.mjs) refuses it everywhere.
  *   - `no-relative-capability-escape` holds Law 8 (a relative import may not walk out of its own
  *     capability -- crossing a boundary always goes through the declared public alias).
  *
