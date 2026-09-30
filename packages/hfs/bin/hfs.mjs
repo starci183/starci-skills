@@ -3,8 +3,11 @@
 //   hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]
 //                                            every tracked path has a slot; required files exist; nothing forbidden or
 //                                            tracked-that-must-be-ignored; pins match; every managed file equals its render
-//                                            (sync/managed.mjs); no empty or ghost directory, no untracked
-//                                            entry outside an ignored slot; soft-size backlog (report only); then the whole
+//                                            (sync/managed.mjs, the .gitignore block and sonar-project.properties included); no empty or ghost
+//                                            directory, no untracked entry outside an ignored slot; plaintext secrets, the .starcistacks shape, CI
+//                                            and pre-push canon steps, dependency version skew, the contract snapshot and the test, wire and i18n
+//                                            trees; prettier over every tracked file through the repository's own install (sync/format.mjs; not under
+//                                            --fast, and a repository without prettier is a refusal); soft-size backlog (report only); then the whole
 //                                            architecture machine (tiers, owners, clones, dead exports, module registration, the
 //                                            front-end and back-end source rules), each violation a finding with its why.
 //                                            --fast: only what changed since the merge-base with origin/main (else main; --base
@@ -25,6 +28,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkRepository, explainPath, initRepo, trackedFiles } from '../runtime/scripts/lib/hfs-check.mjs';
 import { HfsSlotsError } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { formatFindings } from '../sync/format.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
@@ -93,8 +97,8 @@ function printExplain(e, out) {
   if (e.code) out(`  ${e.code}: ${e.titleVi}\n  ${e.whyVi}\n`);
 }
 
-/** `presets` is a test seam: the coverage denominators sync would load from the repository's installed preset. */
-export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets } = {}) {
+/** `presets` and `prettier` are test seams: the coverage denominators sync would load from the repository's installed preset, and the repository's own prettier. */
+export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
   const [verb, ...rest] = argv;
   if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report-stylelint'].includes(verb)) { stderr(USAGE); return 2; }
   try {
@@ -103,7 +107,9 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     const repoRoot = path.resolve(opts.repo ?? process.cwd());
     if (verb === 'check') {
       if (opts.positional.length) throw new Error('hfs check takes no path');
-      const extraFindings = await managedFindings({ repoRoot, tracked: trackedFiles(repoRoot), presets });
+      const tracked = trackedFiles(repoRoot);
+      // Managed files, the .gitignore block and sonar against their render (R04, R05, R11, ...), and prettier through the repository's own install (R19, never under --fast).
+      const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...(opts.fast === true ? [] : await formatFindings({ repoRoot, files: tracked, prettier }))];
       const result = checkRepository({ repoRoot, fast: opts.fast === true, base: opts.base, extraFindings });
       if (opts.sonar !== undefined) writeSonarReport({ repoRoot, file: path.resolve(opts.sonar), result });
       if (opts.json) stdout(`${JSON.stringify(result, null, 2)}\n`); else printCheck(result, stdout);

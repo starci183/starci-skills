@@ -3,8 +3,11 @@
 //   HFS_MANAGED_FILE_DRIFT (R05)  a managed file that exists but differs from its render: tsconfig*.json (but see R22),
 //                                 jest.config.js, .prettierrc, .prettierignore, husky hooks, both workflows, sonar and codecov
 //                                 files, and the `scripts` block of package.json (compared as parsed JSON, so key order is
-//                                 not drift). A file that is absent is the slot manifest's finding (HFS_REQUIRED_MISSING);
+//                                 not drift). A file that is absent is the slot manifest's finding (HFS_SLOT_REQUIRED_MISSING);
 //                                 the `.gitignore` block is R04's.
+//   HFS_GITIGNORE_BLOCK_DRIFT (R04)
+//                                 the managed block of `.gitignore` differs from the rendered block, or is not there; the
+//                                 repository's own lines around the block are not judged.
 //   HFS_RULE_OFF_WITHOUT_REPLACEMENT (R17)
 //                                 eslint.config.mjs differs from its render. The render is the one-liner that calls the canon
 //                                 factory, and the factory takes no override, so a rule can be off, warned or redefined
@@ -59,7 +62,7 @@ function driftFindings(repoRoot, targets, profile) {
   const findings = [];
   for (const result of checkTargets(repoRoot, targets)) {
     const target = targets.find(candidate => candidate.path === result.path);
-    if (target.mode === 'block' || !fs.existsSync(path.join(repoRoot, result.path)) || result.status === 'ok') continue;
+    if (!fs.existsSync(path.join(repoRoot, result.path)) || result.status === 'ok') continue;
     if (profile === 'be' && result.path === TS_STRICT_FILE) {
       const flags = tsStrictFindings(fs.readFileSync(path.join(repoRoot, result.path), 'utf8'), target.content);
       if (flags.length) {
@@ -67,9 +70,9 @@ function driftFindings(repoRoot, targets, profile) {
         continue;
       }
     }
-    const code = profile === 'be' && result.path === ESLINT_CONFIG_FILE ? 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' : result.path === SONAR_PROPERTIES_FILE ? 'HFS_SONAR_CONFIG' : 'HFS_MANAGED_FILE_DRIFT';
+    const code = target.mode === 'block' ? 'HFS_GITIGNORE_BLOCK_DRIFT' : profile === 'be' && result.path === ESLINT_CONFIG_FILE ? 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' : result.path === SONAR_PROPERTIES_FILE ? 'HFS_SONAR_CONFIG' : 'HFS_MANAGED_FILE_DRIFT';
     const where = result.difference ? `; line ${result.difference.line} expected ${JSON.stringify(result.difference.expected)}, found ${JSON.stringify(result.difference.actual)}` : '';
-    const what = target.mode === 'scripts' ? 'the scripts block of package.json is not the rendered one' : `${result.path} is not its render${code === 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' ? ', so a rule can be off or redefined in it' : ''}`;
+    const what = target.mode === 'block' ? `the managed block of ${result.path} is ${result.status === 'missing' ? 'missing' : 'not its render'}` : target.mode === 'scripts' ? 'the scripts block of package.json is not the rendered one' : `${result.path} is not its render${code === 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' ? ', so a rule can be off or redefined in it' : ''}`;
     findings.push({ code, level: 'error', path: result.path, mode: target.mode, expectedHash: result.expectedHash, ...(result.actualHash ? { actualHash: result.actualHash } : {}), message: `${what} (expected sha256 ${result.expectedHash.slice(0, 12)}${result.actualHash ? `, found ${result.actualHash.slice(0, 12)}` : ''}${where}); run "npx hfs sync --write"` });
   }
   return findings;
