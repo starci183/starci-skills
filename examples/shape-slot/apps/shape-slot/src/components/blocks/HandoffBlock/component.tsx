@@ -10,11 +10,8 @@ import {
     handoffBlockHeaderClassName,
 } from "./classNames"
 
-/** Shape of the block: each value is exactly one drawing. */
-export type HandoffBlockState = HandoffStatus
-
 /** Shape used while the handoff slot is still loading, so the skeleton has a tree to follow. */
-export const handoffBlockDefaultState: HandoffBlockState = "prepared"
+export const handoffBlockDefaultState: HandoffStatus = "prepared"
 
 /** Localized copy resolved by the connected half. */
 export type HandoffBlockLabels = {
@@ -51,7 +48,7 @@ export type HandoffBlockActions = {
 
 /** Complete input of HandoffBlockBase. */
 export type HandoffBlockBaseProps = {
-    readonly state: HandoffBlockState
+    readonly state: HandoffStatus
     readonly props: HandoffBlockData
     readonly on: HandoffBlockActions
 }

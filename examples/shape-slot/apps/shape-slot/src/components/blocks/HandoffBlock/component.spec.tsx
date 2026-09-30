@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
-import { HandoffBlockBase, type HandoffBlockData, type HandoffBlockState } from "./component"
+import type { HandoffStatus } from "@/modules/types"
+import { HandoffBlockBase, type HandoffBlockData } from "./component"
 
 const slotLabels = { empty: "empty", forbidden: "forbidden", error: "error", retry: "retry" }
 const ready: HandoffBlockData = {
@@ -17,7 +18,7 @@ const on = { requestSend: vi.fn(), retryOrder: vi.fn(), retryHandoff: vi.fn() }
 
 // Audit contract: every shape, then one slot at a time in every status (4 × slots + 1 cases).
 // The Base is pure, so no api is mocked.
-const shapes: ReadonlyArray<HandoffBlockState> = ["prepared", "sent", "returned"]
+const shapes: ReadonlyArray<HandoffStatus> = ["prepared", "sent", "returned"]
 const statuses = [{ isLoading: true }, { isForbidden: true }, { isError: true }, { items: undefined }]
 
 describe("HandoffBlockBase", () => {

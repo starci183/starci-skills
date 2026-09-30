@@ -125,7 +125,8 @@ rules:
     hfsRules: [R02, R55, R65]
     requirement: |
       A split unit (a connected block, and a feature page, layout or overlay) uses index.tsx for the connected X and
-      sibling component.tsx for the pure XBase, its XBaseProps, XState and xDefaultState. Only that index.tsx and the
+      sibling component.tsx for the pure XBase, its XBaseProps and xDefaultState, plus XState when the shape is its own union
+      (a shape that is a domain status is typed with that status, never a second name for it). Only that index.tsx and the
       unit's specs import component.tsx. Pure blocks, composites, branches and leaves use index.tsx only and never gain an
       empty twin. classNames.ts is present only when the unit owns class strings. Budgets: component.tsx 300 lines,
       connected index.tsx 200 lines, at most 6 data hooks and 6 useState per connected unit.

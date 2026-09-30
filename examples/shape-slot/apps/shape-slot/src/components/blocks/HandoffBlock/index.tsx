@@ -3,9 +3,9 @@
 import { useTranslations } from "next-intl"
 import { useQueryHandoffSwr, useQueryOrderSwr } from "@/hooks/sales"
 import { toSlot, useSlotLabels } from "@/hooks/slot"
-import type { SendInput } from "@/modules/types"
+import type { HandoffStatus, SendInput } from "@/modules/types"
 
-import { HandoffBlockBase, handoffBlockDefaultState, type HandoffBlockState } from "./component"
+import { HandoffBlockBase, handoffBlockDefaultState } from "./component"
 
 /** Input of HandoffBlock: atoms (the id) and one action the page listens to. */
 type HandoffBlockProps = {
@@ -22,7 +22,7 @@ export const HandoffBlock = (props: HandoffBlockProps) => {
     const slotLabels = useSlotLabels()
     const order = useQueryOrderSwr({ handoffId: props.handoffId })
     const handoff = useQueryHandoffSwr({ handoffId: props.handoffId })
-    const state: HandoffBlockState = handoff.data?.status ?? handoffBlockDefaultState
+    const state: HandoffStatus = handoff.data?.status ?? handoffBlockDefaultState
 
     return (
         <HandoffBlockBase
