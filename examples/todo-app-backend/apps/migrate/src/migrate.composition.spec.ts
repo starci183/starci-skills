@@ -36,9 +36,10 @@ describe("primaryConnectionOf", () => {
         for (const connection of options.connections) {
             for (const Migration of connection.migrations) {
                 const migration = new Migration()
-                expect(migration.name).toBe(Migration.name)
-                expect(migration.name).toMatch(/\d{13}$/)
-                names.push(migration.name.slice(-13))
+                const name = String(migration.name)
+                expect(name).toBe(Migration.name)
+                expect(name).toMatch(/\d{13}$/)
+                names.push(name.slice(-13))
             }
         }
         expect(new Set(names).size).toBe(names.length)

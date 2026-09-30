@@ -20,11 +20,11 @@ export const BATCH_ROWS = 500
 
 const IDENT_PATTERN = /^[a-z_][a-z0-9_]*$/
 
-function assertSqlText(value: string): asserts value is SqlText {
+function assertSqlText(_value: string): asserts _value is SqlText {
     // The brand is compile-time only; the `sql` tag is the single caller.
 }
 
-function assertSqlIdent(value: string): asserts value is SqlIdent {
+function assertSqlIdent(_value: string): asserts _value is SqlIdent {
     // The brand is compile-time only; `ident` is the single caller, after it checked the name.
 }
 

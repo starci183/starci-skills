@@ -59,7 +59,8 @@ const callerOf = (baseUrl: string, sessionToken?: string): TestCaller => {
             language?: string,
         ): Promise<GraphqlObserved<TData>> => {
             const startedAt = worldClock.now().getTime()
-            const headers = language === undefined ? {} : { "accept-language": language }
+            const headers: Record<string, string> = {}
+            if (language !== undefined) headers["accept-language"] = language
             const response = await http.post<GraphqlWire<TData> | string>(
                 "/graphql",
                 { query: TODO_OPERATIONS[operation], variables: variables ?? {} },

@@ -116,7 +116,8 @@ export class SepayClient {
     }
 
     private failure(operation: SepayOperation, reason: string, status?: number, cause?: unknown): SepayError {
-        const params = status === undefined ? { operation, reason } : { operation, reason, status }
+        const params: Record<string, string | number> = { operation, reason }
+        if (status !== undefined) params.status = status
         return new SepayError({ code: SepayErrorCode.RequestFailed, params, cause })
     }
 }
