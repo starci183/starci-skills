@@ -66,7 +66,7 @@ const NODE_ENTRIES_SKIPPED = new Set(['node_modules', '.git']);
  */
 function ownsGitTopLevel(root) {
   try {
-    const top = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    const top = gitOutput(['rev-parse', '--show-toplevel'], { cwd: root }).trim();
     const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
     return same(fs.realpathSync(path.resolve(top)), fs.realpathSync(path.resolve(root)));
   } catch {
