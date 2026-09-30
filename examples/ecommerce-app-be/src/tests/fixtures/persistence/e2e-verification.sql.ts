@@ -1,16 +1,10 @@
 import { sql } from "@modules/platform/database"
 
-/** Answers while the connection is alive. */
-export const PING_DATABASE = sql`SELECT 1 AS alive`
-
 /** The tables of the public schema ($none): what the migrations created. */
 export const PUBLIC_TABLES = sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name LIMIT 500`
 
 /** One person by id ($1). */
 export const PERSON_BY_ID = sql`SELECT id, email FROM persons WHERE id = $1`
-
-/** Deletes one person by id ($1). */
-export const DELETE_PERSON = sql`DELETE FROM persons WHERE id = $1`
 
 /** The status and total of one order ($1 order id). */
 export const ORDER_SUMMARY = sql`SELECT status, total_minor_units FROM orders WHERE id = $1`
@@ -42,5 +36,5 @@ export const PAYMENT_COUNT = sql`SELECT count(*)::int AS count FROM payments WHE
 /** The stock of one product ($1 SKU). */
 export const STOCK_OF = sql`SELECT stock FROM products WHERE id = $1`
 
-/** How many products the catalog holds. */
-export const PRODUCT_COUNT = sql`SELECT count(*)::int AS count FROM products`
+/** Sets the stock of one product ($1 SKU, $2 units): a spec starts from the stock it relies on. */
+export const SET_STOCK = sql`UPDATE products SET stock = $2 WHERE id = $1`
