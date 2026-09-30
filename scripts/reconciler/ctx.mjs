@@ -5,6 +5,7 @@
 //   ctx.ledgers                 [{ledgerId, repo, file}] (sources.mjs ledgersOf)
 //   ctx.read(ledgerId, fn)      fn(db) over a read-only handle (openLedgerReader); null when the ledger is absent
 //   ctx.status(ledgerId, wf)    the cached `api status --json` value (TTL allocation.reconciler.statusCacheMs, shared)
+//   ctx.statusRead(ledgerId, wf) the same read as {value, failure}: failure names why it gave no value (statusFailureOf)
 //   ctx.api(ledgerId, verb, argv, {timeoutMs})
 //                               `node scripts/kernel/api.mjs <verb> --repo <repo> ...argv --json` as a child with
 //                               STARCI_ACTOR=reconciler/<controller> and STARCI_RECONCILER_EPOCH. In shadow it does NOT
@@ -129,6 +130,26 @@ export function spawnJson(cmd, args, { env = process.env, cwd = SKILL_ROOT, time
   });
 }
 
+/**
+ * Why an `api status --json` child gave no value, or null when it did: {cause, error, code, timedOut, stderrHead}.
+ * cause is 'timeout' | 'spawn' | 'refused' (a typed {ok:false,error} answer, on stdout or on stderr: api.mjs prints
+ * its refusal JSON on stderr and exits 1, e.g. plan-edges-missing) | 'exit' (non-zero, no JSON) | 'no-json' (exit 0,
+ * stdout carried no JSON line). Pure.
+ */
+export function statusFailureOf(r, { timeoutMs = null } = {}) {
+  const value = r?.value && typeof r.value === 'object' ? r.value : null;
+  if (r?.ok && value) return null;
+  const stderr = String(r?.stderr ?? '');
+  const stderrHead = clip(stderr.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !isNodeWarningLine(l)).join(' | '), 300) || null;
+  const refusal = value && value.ok === false ? value : (() => { const j = lastJsonLine(stderr); return j && typeof j === 'object' && j.ok === false ? j : null; })();
+  const base = { code: Number.isInteger(r?.code) ? r.code : null, timedOut: Boolean(r?.timedOut), stderrHead };
+  if (r?.timedOut) return { cause: 'timeout', error: `api status timed out after ${timeoutMs ?? '?'}ms`, ...base };
+  if (r?.error) return { cause: 'spawn', error: clip(`api status did not spawn: ${r.error}`, 300), ...base };
+  if (refusal) return { cause: 'refused', error: clip(`api status refused (exit ${base.code ?? '?'}): ${refusal.error ?? refusal.code ?? 'ok:false'}`, 300), refusal: refusal.code ?? null, ...base };
+  if (base.code !== 0) return { cause: 'exit', error: clip(`api status exited ${base.code ?? '?'}${stderrHead ? `: ${stderrHead}` : ' with no stderr'}`, 300), ...base };
+  return { cause: 'no-json', error: clip(`api status exited 0 with no JSON on stdout${stderrHead ? ` (stderr: ${stderrHead})` : ''}`, 300), ...base };
+}
+
 /** The typed-log kinds a ctx.log row may carry as is; any other kind rides under reconciler.event (or .error). */
 export const CTX_LOG_KINDS = Object.freeze(['reconciler.would', 'reconciler.act', 'reconciler.error', 'reconciler.event', 'invariant.violated', 'invariant.cleared']);
 
@@ -233,15 +254,18 @@ export function createCtx({
       try { return fn(db); } finally { try { db.close(); } catch { /* closed */ } }
     },
     openReader: (file) => reader(file),
-    async status(ledgerId, workflowId) {
+    async status(ledgerId, workflowId) { return (await ctx.statusRead(ledgerId, workflowId)).value; },
+    /** {value, failure}: the value ctx.status answers (null when the read failed) and statusFailureOf's why; cached alike. */
+    async statusRead(ledgerId, workflowId) {
       const l = ledgerOf(ledgerId);
-      if (!l || !workflowId) return null;
+      if (!l || !workflowId) return { value: null, failure: { cause: 'out-of-view', error: `ledger ${ledgerId} not in view or no workflow` } };
       const id = `${ledgerId}\u0000${workflowId}`;
       const hit = shared.statusCache.get(id);
       const ttl = Number(numbers?.statusCacheMs) || 20_000;
       if (hit && now() - hit.at < ttl) return hit.promise;
-      const promise = spawnChild(process.execPath, [API_FILE, 'status', '--repo', l.repo, '--workflow', workflowId, '--json'], { env: childEnv(), timeoutMs: DEFAULT_TIMEOUT_MS })
-        .then((r) => (r.value && typeof r.value === 'object' ? r.value : null));
+      const promise = Promise.resolve(spawnChild(process.execPath, [API_FILE, 'status', '--repo', l.repo, '--workflow', workflowId, '--json'], { env: childEnv(), timeoutMs: DEFAULT_TIMEOUT_MS }))
+        .then((r) => ({ value: r?.value && typeof r.value === 'object' ? r.value : null, failure: statusFailureOf(r, { timeoutMs: DEFAULT_TIMEOUT_MS }) }),
+          (error) => ({ value: null, failure: { cause: 'spawn', error: clip(`api status threw: ${error?.message ?? error}`, 300) } }));
       shared.statusCache.set(id, { at: now(), promise });
       return promise;
     },

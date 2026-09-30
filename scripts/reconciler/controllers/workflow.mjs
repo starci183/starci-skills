@@ -102,10 +102,10 @@ const iso = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : null);
 const firstUntried = (rca) => (rca?.actions ?? []).find((a) => !a.tried) ?? null;
 
 /** One DI (DESIGN §10.3), the ledger's own; lane rc-decisions assigns the id. Pure. */
-export function decisionOf({ kind, subject, decider = 'kernel', ledgerId, workflowId, entity, summary, evidence = [], top = null, now, dueMs, escalatedFrom = null }) {
+export function decisionOf({ kind, subject, decider = 'kernel', ledgerId, workflowId, entity, summary, evidence = [], top = null, now, dueMs, escalatedFrom = null, ledger = null }) {
   return {
     schema: DI_SCHEMA, idempotencyKey: `${kind}:${workflowId}:${subject}${escalatedFrom ? '@supervisor' : ''}`, kind, decider,
-    ledger: decider === 'supervisor' && escalatedFrom ? SUPERVISOR_LEDGER : ledgerId, productLedger: ledgerId, workflowId,
+    ledger: ledger ?? (decider === 'supervisor' && escalatedFrom ? SUPERVISOR_LEDGER : ledgerId), productLedger: ledgerId, workflowId,
     entity: entity ?? { type: 'workflow', id: workflowId },
     summary: clipLine(summary, 300),
     evidence: evidence.filter(Boolean).map((line) => ({ ref: clipLine(line, 400) })),
@@ -203,13 +203,17 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
 
   // ---- api status unreadable: never a progress-stall (the pass holds the last readable status, or judges nothing);
   // statusUnreadablePasses consecutive misses are a runtime defect of the read itself, the Supervisor's, naming the error.
+  // It lands in the SUPERVISOR ledger (like cap-starved / service-quarantined): a product-ledger DI with decider supervisor
+  // never reaches `decisions.mjs supervisor --list` (nivo-backend di-8f93adc4). productLedger/workflowId keep the refs.
   if (unreadable) {
     const held = unreadable.heldAt != null && status ? `holding the status read ${Math.round((now - unreadable.heldAt) / 60_000)}m ago` : 'no readable status held; stall not judged';
     out.lines.push(`STATUS-UNREADABLE ${workflowId}: ${unreadable.misses} consecutive pass(es) since ${iso(unreadable.since)}: ${unreadable.error}; ${held}`);
     if (unreadable.misses >= (s.statusUnreadablePasses ?? 3)) {
-      di({ kind: 'runtime-defect', subject: 'status-unreadable', decider: 'supervisor', entity: { type: 'workflow', id: workflowId },
+      const f = unreadable.failure ?? null;
+      di({ kind: 'runtime-defect', subject: 'status-unreadable', decider: 'supervisor', ledger: SUPERVISOR_LEDGER, entity: { type: 'workflow', id: workflowId },
         summary: `status-unreadable: api status --workflow ${workflowId} failed ${unreadable.misses} consecutive reconciler passes since ${iso(unreadable.since)} (${unreadable.error}); no stall is judged until it reads again`,
-        evidence: [`last error: ${unreadable.error}`, findings.find((f) => f.type === 'STATUS-UNREADABLE')?.line] });
+        evidence: [`last error: ${unreadable.error}`, f ? `cause ${f.cause ?? '?'}; exit ${f.code ?? '-'}; timedOut ${Boolean(f.timedOut)}${f.refusal ? `; refusal ${f.refusal}` : ''}` : null,
+          f?.stderrHead ? `stderr: ${f.stderrHead}` : null, `ledger ${ledgerId} workflow ${workflowId}`, findings.find((x) => x.type === 'STATUS-UNREADABLE')?.line] });
     }
   }
 
@@ -280,13 +284,19 @@ const lastServedAt = (db, workflowId, dispatchId) => Number(db.prepare(
 
 /** Whether an api status value carries a frontier to judge (apiFrontier's ok shape). */
 const readable = (v) => Boolean(v && typeof v === 'object' && v.ok !== false && v.frontier);
-/** One api status read: {value, error}; error names why it is unreadable (a throw, {ok:false,error}, no value). */
+/**
+ * One api status read: {value, error, failure}; error names why it is unreadable (a throw, {ok:false,error}, no value).
+ * Through ctx.statusRead when the ctx has it: failure = the spawn's cause (timeout | spawn | refused | exit | no-json),
+ * exit code and stderr head, so a refusal api.mjs printed on stderr (plan-edges-missing) is named, not 'no value'.
+ */
 async function readStatus(ctx, ledgerId, workflowId) {
   try {
-    const v = await ctx.status(ledgerId, workflowId);
-    if (readable(v)) return { value: v, error: null };
-    return { value: null, error: clipLine(v && typeof v === 'object' ? (v.error ?? (v.ok === false ? 'ok:false with no error' : 'no frontier in the value')) : 'no value (api status timed out, exited non-zero or printed no JSON)', 200) };
-  } catch (error) { return { value: null, error: clipLine(`threw: ${error?.message ?? error}`, 200) }; }
+    const { value: v, failure = null } = typeof ctx.statusRead === 'function' ? await ctx.statusRead(ledgerId, workflowId) : { value: await ctx.status(ledgerId, workflowId) };
+    if (readable(v)) return { value: v, error: null, failure: null };
+    const error = v && typeof v === 'object' ? (v.error ?? (v.ok === false ? 'ok:false with no error' : 'no frontier in the value'))
+      : failure?.error ?? 'no value (api status timed out, exited non-zero or printed no JSON)';
+    return { value: null, error: clipLine(error, 300), failure };
+  } catch (error) { return { value: null, error: clipLine(`threw: ${error?.message ?? error}`, 200), failure: { cause: 'threw' } }; }
 }
 async function safeStatus(ctx, ledgerId, workflowId) { return (await readStatus(ctx, ledgerId, workflowId)).value; }
 
@@ -296,7 +306,7 @@ const heldOf = new WeakMap();
  * evidence of anything (sdi-94355e8e, sdi-76a8404d, sdi-2f13ab61: 'frontier unreadable (status unreadable)' was
  * escalated as a progress-stall while an interface.draw op ran). It counts a miss and, below `passes` consecutive
  * misses, answers the last readable status; from `passes` on it answers null (stall.mjs then judges nothing).
- * Returns {status, unreadable: null | {misses, since, error, heldAt}}. Kept per ctx, like recentlyOpened.
+ * Returns {status, unreadable: null | {misses, since, error, failure, heldAt}}. Kept per ctx, like recentlyOpened.
  */
 function holdStatus(ctx, key, read, now, passes) {
   let m = heldOf.get(ctx);
@@ -306,7 +316,7 @@ function holdStatus(ctx, key, read, now, passes) {
   const next = { ...h, misses: h.misses + 1, since: h.since ?? now };
   m.set(key, next);
   const hold = next.last && next.misses < passes;
-  return { status: hold ? next.last : null, unreadable: { misses: next.misses, since: next.since, error: read.error, heldAt: hold ? next.lastAt : null } };
+  return { status: hold ? next.last : null, unreadable: { misses: next.misses, since: next.since, error: read.error, failure: read.failure ?? null, heldAt: hold ? next.lastAt : null } };
 }
 /** An api status value in the shape stall.mjs frontierOf answers (apiFrontier). */
 const asFrontier = (v) => (v && v.ok !== false && v.frontier ? { ...v, ok: true, frontier: v.frontier ?? {}, workers: v.workers ?? [] } : { ok: false, error: v?.error ?? 'status unreadable' });
