@@ -36,6 +36,12 @@ export class EnvSource {
         return new EnvSource(values)
     }
 
+    /** The environment a child process starts with: every declared key, then `overrides` on top (used by the e2e harness to spawn the apps). */
+    toChildEnv(overrides: Readonly<Record<string, string>>): Record<string, string> {
+        const declared = Object.entries(this.values).flatMap(([key, value]) => (value === undefined ? [] : [[key, value] as const]))
+        return { ...Object.fromEntries(declared), ...overrides }
+    }
+
     /** True when the key is declared and not empty. */
     has(key: string): boolean {
         return Boolean(this.values[key])

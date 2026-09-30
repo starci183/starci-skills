@@ -45,6 +45,10 @@ describe("EnvSource", () => {
         expect(JSON.stringify({ secret })).not.toContain("hunter2")
     })
 
+    it("builds a child environment from the declared keys with overrides on top", () => {
+        expect(source({ A: "1", B: undefined, C: "3" }).toChildEnv({ C: "override", D: "4" })).toEqual({ A: "1", C: "override", D: "4" })
+    })
+
     it("reports whether any key of an optional integration is declared", () => {
         expect(source({ A: "1" }).anyDeclared(["A", "B"])).toBe(true)
         expect(source({}).anyDeclared(["A", "B"])).toBe(false)
