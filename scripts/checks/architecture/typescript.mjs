@@ -286,6 +286,22 @@ function workspaceSourceEntry(ts, workspace, specifier) {
   return null;
 }
 
+/** Every source file the package.json `exports` of a workspace package maps (each non-wildcard subpath, dist back to source): its public entries. */
+export function workspaceExportSources(ts, workspace) {
+  const declaration = workspace.exports;
+  if (!declaration || typeof declaration !== 'object' || Array.isArray(declaration)) return [];
+  const sources = new Set();
+  for (const [key, value] of Object.entries(declaration)) {
+    if (!key.startsWith('.') || key.includes('*')) continue;
+    for (const target of exportTargetStrings(value)) {
+      if (!target.startsWith('./') || target.includes('..')) continue;
+      const source = sourceOfTarget(ts, workspace, target);
+      if (source) sources.add(source);
+    }
+  }
+  return [...sources];
+}
+
 function packageExported(ts, workspace, specifier, actualTarget) {
   return exportCandidates(workspace, specifier).some(target => {
     if (!target.startsWith('./') || target.includes('..')) return false;

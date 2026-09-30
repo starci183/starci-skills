@@ -1,14 +1,20 @@
 import path from 'node:path';
 import { canonical, isInside } from './config.mjs';
-import { relativePath, sourceLocation } from './typescript.mjs';
+import { relativePath, sourceLocation, workspaceExportSources } from './typescript.mjs';
 
 function absolute(root, relative) {
   return canonical(path.resolve(root, ...relative.split('/')));
 }
 
-function ownerDeclarations(config) {
-  return config.owners.map(owner => ({ ...owner, root: absolute(config.root, owner.root), entry: absolute(config.root, owner.entry) }))
-    .sort((a, b) => b.root.length - a.root.length);
+/** The owner's public entries: its declared entry, plus every source file its package.json `exports` maps when the owner is a workspace package. */
+function ownerDeclarations(config, context) {
+  return config.owners.map(owner => {
+    const root = absolute(config.root, owner.root);
+    const entry = absolute(config.root, owner.entry);
+    const workspace = context.workspaces?.find(item => item.root === root);
+    const entries = new Set([entry, ...(workspace ? workspaceExportSources(context.ts, workspace) : [])]);
+    return { ...owner, root, entry, entries };
+  }).sort((a, b) => b.root.length - a.root.length);
 }
 
 function ownerOf(owners, file) {
@@ -24,7 +30,7 @@ function privateOwnerChain(context, owners, edge) {
     if (visited.has(current.file)) continue;
     visited.add(current.file);
     const owner = ownerOf(owners, current.file);
-    if (owner && sourceOwner?.id !== owner.id) return current.file === owner.entry ? null : { owner, chain: current.chain };
+    if (owner && sourceOwner?.id !== owner.id) return owner.entries.has(current.file) ? null : { owner, chain: current.chain };
     for (const candidate of context.edges.get(current.file) ?? []) if (candidate.reexport) {
       queue.push({ file: candidate.to, chain: [...current.chain, candidate.to] });
     }
@@ -46,7 +52,7 @@ function arrangesSchema(config, from, to) {
 /** Enforce explicit same-source owner entries without constraining imports inside one owner. */
 export function checkOwners(config, context) {
   if (!config.owners?.length) return [];
-  const owners = ownerDeclarations(config);
+  const owners = ownerDeclarations(config, context);
   const violations = [];
   const sourceFiles = new Map(context.files.map(file => [canonical(file.fileName), file]));
   for (const owner of owners) {
