@@ -22,13 +22,11 @@ describe("AddCartItemResolver", () => {
 
     it("turns the refusal of an unknown product into the order error", async () => {
         const commandBus = mock<CommandBus>({
-            execute: jest
-                .fn()
-                .mockResolvedValue({
-                    kind: "refused",
-                    code: OrderErrorCode.UnknownProduct,
-                    params: { productId: "ghost" },
-                }),
+            execute: jest.fn().mockResolvedValue({
+                kind: "refused",
+                code: OrderErrorCode.UnknownProduct,
+                params: { productId: "ghost" },
+            }),
         })
         await expect(new AddCartItemResolver(commandBus).addCartItem(principal, input)).rejects.toBeInstanceOf(
             OrderError,
