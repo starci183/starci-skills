@@ -40,6 +40,7 @@ test('a fetch call, globalThis.fetch and a fetch passed as a value outside the c
 test('a local function named fetch and a property named fetch are not the global transport', t => {
   const report = run(t, {
     'apps/web/src/hooks/course/useLocal.ts': "const fetch = (id: string) => id;\nexport const useLocal = () => fetch('1');\n",
+    'apps/web/src/hooks/course/useType.ts': "export type Sender = typeof fetch;\nexport type Sent = ReturnType<typeof globalThis.fetch>;\n",
     'apps/web/src/hooks/course/useProperty.ts': "export const useProperty = (repo: { fetch: () => void }) => repo.fetch();\n",
   });
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));

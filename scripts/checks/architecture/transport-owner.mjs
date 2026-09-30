@@ -37,6 +37,8 @@ export function checkTransportOwner(input) {
       if (node.text !== 'fetch' || kit.importBinding(checker, node)) return false;
       const parent = node.parent;
       if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
+      // A type position (`typeof fetch`, `typeof globalThis.fetch`) names the type of fetch and sends nothing.
+      if (ts.isTypeQueryNode(parent) || ts.isQualifiedName(parent)) return false;
       if ((ts.isPropertyAssignment(parent) || ts.isPropertyDeclaration(parent) || ts.isMethodDeclaration(parent) || ts.isBindingElement(parent) || ts.isParameter(parent) || ts.isVariableDeclaration(parent)) && parent.name === node) return false;
       if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent) || ts.isPropertySignature(parent)) return false;
       const declarations = kit.declarationsOf(checker, node);

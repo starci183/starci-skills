@@ -51,7 +51,7 @@ export function checkPublicSurface(input) {
         if (statement.exportClause && ts.isNamedExports(statement.exportClause)) names += statement.exportClause.elements.length;
         continue;
       }
-      report(file, statement, `${file.rel} holds a statement that is not an export line; the public entry of an owner is only \`export { Name } from './file'\` and \`export type { Name } from './file'\` lines. Move the code into a file of the owner and export its names from here.`, { owner: owner.root });
+      report(file, statement, `${file.rel} holds a statement that is not an export line; the public entry of an owner is only named \`export { Name }\` and \`export type { Name }\` lines that re-export from a file of the owner. Move the code into a file of the owner and export its names from here.`, { owner: owner.root });
     }
     if (budget !== undefined && names > budget) {
       report(file, file.sourceFile, `${file.rel} exports ${names} names, above the budget of ${budget} names for a ${resolver.slot(owner.slot).tier}; an entry that wide is the inside of the owner. Export fewer, narrower contracts or split the owner.`, { owner: owner.root, exports: names, budget });
