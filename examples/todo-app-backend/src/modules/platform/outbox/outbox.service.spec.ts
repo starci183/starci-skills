@@ -35,7 +35,9 @@ describe("PostgresOutbox", () => {
 
     it("maps claimed rows to records and hides them for the visibility window", async () => {
         const own = mockEntityManager({
-            query: jest.fn().mockResolvedValue([{ id: "m1", queue: "q", event_id: "e1", payload: { a: 1 }, attempts: 1 }]),
+            query: jest
+                .fn()
+                .mockResolvedValue([[{ id: "m1", queue: "q", event_id: "e1", payload: { a: 1 }, attempts: 1 }], 1]),
         })
         const records = await new PostgresOutbox(own, new FakeClock(AT)).claimDue({
             at: AT,

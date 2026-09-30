@@ -1,140 +1,77 @@
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
-import {
-    POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/index"
-import {
-    SessionEntity,
-} from "@modules/platform/databases/index"
-import {
-    createFakeEntityManager,
-} from "@modules/platform/databases/index"
-import {
-    SessionService 
-} from "./session.service"
-import {
-    Clock 
-} from "@modules/platform/clock/index"
-import {
-    FakeClock 
-} from "@starci/jest-preset/clock"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { SessionErrorCode } from "./errors/session.error"
+import { SessionEntity } from "./persistence/entities/session.entity"
+import { PURGE_LAPSED_SESSIONS } from "./persistence/session.sql"
+import { SessionService } from "./session.service"
 
-describe("SessionService",
-    () => {
-        let moduleRef: TestingModule
-        let service: SessionService
+const AT = new Date("2026-09-30T10:00:00.000Z")
+const OPTIONS = { ttlDays: 2, adminSubjects: ["boss"] }
 
-        beforeEach(async () => {
-            moduleRef = await Test.createTestingModule({
-                providers: [
-                    {
-                        provide: Clock, useValue: new FakeClock() 
-                    },
-                    SessionService,
-                    AppConfigService,
-                    {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY),
-                        useValue: createFakeEntityManager<SessionEntity>("token"),
-                    },
-                ],
-            }).compile()
-            service = moduleRef.get(SessionService)
-        })
+const row = (expiresAt: Date): SessionEntity => ({
+    token: "t1",
+    personId: "p1",
+    issuedAt: new Date("2026-09-29T10:00:00.000Z"),
+    expiresAt,
+})
 
-        afterEach(async () => {
-            await moduleRef.close()
-        })
-
-        it("t-begin: a malformed email is refused before any write, and a well-formed one passes through",
-            () => {
-                expect(() => service.tBegin("not-an-email")).toThrow(expect.objectContaining({
-                    code: "INVALID_CREDENTIALS_EXCEPTION" 
-                }))
-                expect(() => service.tBegin("person@example.com")).not.toThrow()
-            })
-
-        it("sds.login.session-store: expiry is enforced on read, and the row is deleted on the way out",
-            async () => {
-                const session = await service.tAccept("person-1")
-                jest.spyOn(Date,
-                    "now").mockReturnValue(session.expiresAt.getTime() + 1)
-
-                await expect(service.findActive(session.token)).rejects.toMatchObject({
-                    code: "SESSION_EXPIRED_EXCEPTION" 
-                })
-                await expect(service.findActive(session.token)).rejects.toMatchObject({
-                    code: "SESSION_NOT_FOUND_EXCEPTION" 
-                })
-
-                jest.spyOn(Date,
-                    "now").mockRestore()
-            })
-
-        it("ac.login.session.restores.returning-within-the-window-stays-signed-in: a session within the window is still active",
-            async () => {
-                const session = await service.tAccept("person-1")
-
-                const active = await service.findActive(session.token)
-
-                expect(active.personId).toBe("person-1")
-            })
-
-        it("t-revoke: the row is deleted so the next read of that token finds nothing",
-            async () => {
-                const session = await service.tAccept("person-1")
-
-                await service.tRevoke(session.token)
-
-                await expect(service.findActive(session.token)).rejects.toMatchObject({
-                    code: "SESSION_NOT_FOUND_EXCEPTION" 
-                })
-            })
-
-        it("sds.login.session-store t-accept: a successful sign-in writes one session row with a thirty-day expiry",
-            async () => {
-                const session = await service.tAccept("person-1")
-                const days = Math.round((session.expiresAt.getTime() - session.issuedAt.getTime()) / (24 * 60 * 60 * 1000))
-                expect(days).toBe(30)
-            })
-
-        it("an operation without a session token is refused before any database read",
-            async () => {
-                const entityManager = createFakeEntityManager<SessionEntity>("token")
-                const findOneBySpy = jest.spyOn(entityManager,
-                    "findOneBy")
-                const isolated = await Test.createTestingModule({
-                    providers: [
-                        {
-                            provide: Clock, useValue: new FakeClock() 
-                        },
-                        SessionService,
-                        AppConfigService,
-                        {
-                            provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
-                        },
-                    ],
-                }).compile()
-                const isolatedService = isolated.get(SessionService)
-                try {
-                    await isolatedService.tAccept("person-1") // a real session exists, so a bypass would have something to match.
-
-                    await expect(isolatedService.findActive("")).rejects.toMatchObject({
-                        code: "SESSION_NOT_FOUND_EXCEPTION" 
-                    })
-                    await expect(isolatedService.findActive(undefined as string | undefined as string)).rejects.toMatchObject({
-                        code: "SESSION_NOT_FOUND_EXCEPTION" 
-                    })
-
-                    expect(findOneBySpy).not.toHaveBeenCalled()
-                } finally {
-                    await isolated.close()
-                }
-            })
+describe("SessionService", () => {
+    it("opens a session that lives for the configured days and saves it through the manager it was given", async () => {
+        const own = mockEntityManager()
+        const inTransaction = mockEntityManager({ save: jest.fn().mockImplementation((_target: unknown, entity: object) => entity) })
+        const session = await new SessionService(own, OPTIONS).open({ manager: inTransaction, personId: "p1", at: AT })
+        expect(session.personId).toBe("p1")
+        expect(session.issuedAt).toEqual(AT)
+        expect(session.expiresAt).toEqual(new Date("2026-10-02T10:00:00.000Z"))
+        expect(session.token).toEqual(expect.any(String))
+        expect(inTransaction.save).toHaveBeenCalledWith(SessionEntity, expect.objectContaining({ personId: "p1" }))
+        expect(own.save).not.toHaveBeenCalled()
     })
+
+    it("refuses an empty token before it queries anything", async () => {
+        const manager = mockEntityManager()
+        const outcome = await new SessionService(manager, OPTIONS).find({ token: "", at: AT })
+        expect(outcome).toEqual({ kind: "refused", code: SessionErrorCode.NotFound, params: { reason: "missing-token" } })
+        expect(manager.findOneBy).not.toHaveBeenCalled()
+    })
+
+    it("refuses an unknown token", async () => {
+        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null) })
+        const outcome = await new SessionService(manager, OPTIONS).find({ token: "t1", at: AT })
+        expect(outcome).toMatchObject({ kind: "refused", code: SessionErrorCode.NotFound })
+    })
+
+    it("refuses a lapsed session as expired", async () => {
+        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(row(AT)) })
+        const outcome = await new SessionService(manager, OPTIONS).find({ token: "t1", at: AT })
+        expect(outcome).toMatchObject({ kind: "refused", code: SessionErrorCode.Expired })
+    })
+
+    it("answers the view of a live session", async () => {
+        const later = new Date("2026-10-01T10:00:00.000Z")
+        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(row(later)) })
+        const outcome = await new SessionService(manager, OPTIONS).find({ token: "t1", at: AT })
+        expect(outcome).toEqual({
+            kind: "ok",
+            value: { token: "t1", personId: "p1", issuedAt: new Date("2026-09-29T10:00:00.000Z"), expiresAt: later },
+        })
+    })
+
+    it("revokes by token through the caller manager", async () => {
+        const inTransaction = mockEntityManager({ delete: jest.fn().mockResolvedValue({ affected: 1, raw: [] }) })
+        await new SessionService(mockEntityManager(), OPTIONS).revoke({ manager: inTransaction, token: "t1" })
+        expect(inTransaction.delete).toHaveBeenCalledWith(SessionEntity, "t1")
+    })
+
+    it("purges lapsed sessions and answers how many went", async () => {
+        const inTransaction = mockEntityManager({ query: jest.fn().mockResolvedValue([[{ token: "a" }, { token: "b" }], 2]) })
+        const count = await new SessionService(mockEntityManager(), OPTIONS).purgeLapsed({ manager: inTransaction, at: AT })
+        expect(count).toBe(2)
+        expect(inTransaction.query).toHaveBeenCalledWith(PURGE_LAPSED_SESSIONS, [AT])
+    })
+
+    it("gives an administrator the admin role and everyone else only member", () => {
+        const service = new SessionService(mockEntityManager(), OPTIONS)
+        expect(service.principalOf("boss")).toEqual({ id: "boss", roles: ["member", "admin"] })
+        expect(service.principalOf("p1")).toEqual({ id: "p1", roles: ["member"] })
+    })
+})

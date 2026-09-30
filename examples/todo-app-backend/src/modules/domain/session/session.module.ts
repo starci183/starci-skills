@@ -1,57 +1,19 @@
-import {
-    DynamicModule, Module 
-} from "@nestjs/common"
-import {
-    CqrsModule 
-} from "@nestjs/cqrs"
-import {
-    ConfigurableModuleClass, OPTIONS_TYPE 
-} from "./session.module-definition"
-import {
-    WinstonService,
-} from "@modules/platform/logging/index"
-import {
-    SessionService 
-} from "./session.service"
-import {
-    SignInHandler 
-} from "./sign-in.handler"
-import {
-    SignOutHandler 
-} from "./sign-out.handler"
+import { Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import { AuthGuard } from "./auth.guard"
+import { ConfigurableModuleClass, OPTIONS_TYPE } from "./session.module-definition"
+import { SessionService } from "./session.service"
 
-/**
- * The `session` capability module, under nivo's `modules/domain/<capability>` shape (renamed from the
- * former `modules/domain/session` + two separate `features/sign-in|sign-out` folders). Owns
- * SessionService and the sign-in/sign-out CQRS handlers. `KeycloakModule` is not imported here: it is
- * registered globally from `app.module.ts`, so the `KeycloakClient` the handlers inject resolves
- * ambiently.
- *
- * No `TypeOrmModule.forFeature(...)` here: `SessionService` reaches `SessionEntity` through
- * `@InjectPrimaryEntityManager()`, not a per-entity repository token - this capability has no
- * repository file and declares no persistence wiring of its own. `ConfigModule`/`PlatformEventsModule`
- * are not imported here either: both are registered globally from `app.module.ts`.
- */
-@Module({
-    providers: [
-        SignInHandler,
-        SignOutHandler,
-    ],
-})
-/** Nest module wiring the session capability's providers; the app composition root registers it - other modules never import it. */
+@Module({})
+/** The session capability: the session store, the sign-in rules and the guard that authenticates every door. The app registers AuthGuard itself after the throttler and the origin guard. */
 export class SessionModule extends ConfigurableModuleClass {
-    static register(options: typeof OPTIONS_TYPE = {
-    }): DynamicModule {
+    /** Registers the capability once per app. */
+    static register(options: typeof OPTIONS_TYPE): DynamicModule {
         const base = super.register(options)
         return {
             ...base,
-            imports: [CqrsModule],
-            providers: [
-                ...(base.providers ?? []),
-                SessionService,
-                WinstonService,
-            ],
-            exports: [SessionService],
+            providers: [...(base.providers ?? []), SessionService, AuthGuard],
+            exports: [SessionService, AuthGuard],
         }
     }
 }

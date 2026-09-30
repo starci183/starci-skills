@@ -43,7 +43,8 @@ export class PostgresOutbox implements Outbox {
 
     /** Claims due messages, counting one attempt and hiding them for the visibility window. */
     async claimDue(params: ClaimDueParams): Promise<Array<OutboxRecord>> {
-        const rows: Array<ClaimedMessageRow> = await this.entityManager.query(CLAIM_DUE_MESSAGES, [
+        // An UPDATE ... RETURNING answers the returned rows and the affected count.
+        const [rows]: [Array<ClaimedMessageRow>, number] = await this.entityManager.query(CLAIM_DUE_MESSAGES, [
             params.at,
             params.queues,
             params.limit,
