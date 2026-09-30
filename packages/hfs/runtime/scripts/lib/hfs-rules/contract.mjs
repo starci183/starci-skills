@@ -91,7 +91,7 @@ export function contractEmitFindings({ repoRoot, files, repo, emit }) {
       } catch (error) {
         for (const { artifact } of artifacts) apps.push({ app: app.name, artifact, status: 'emit-failed' });
         const snapshot = `contracts/${app.name}/${SNAPSHOT_OF.graphql}`;
-        findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `contracts/${app.name} cannot be verified: \`hfs emit-contracts\` failed for ${app.name}: ${errorText(error)}`, { app: app.name, reason: 'emit-failed' }));
+        findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `contracts/${app.name} cannot be verified: \`hfs emit-contracts\` failed for ${app.name}: ${errorText(error)}`, { app: app.name, drift: 'emit-failed' }));
         continue;
       }
       for (const { artifact, what } of artifacts) {
@@ -103,7 +103,7 @@ export function contractEmitFindings({ repoRoot, files, repo, emit }) {
             continue;
           }
           apps.push({ app: app.name, artifact, status: 'left-behind' });
-          findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${snapshot} is committed but ${app.name} ${what}; delete it`, { app: app.name, reason: 'left-behind' }));
+          findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${snapshot} is committed but ${app.name} ${what}; delete it`, { app: app.name, drift: 'left-behind' }));
           continue;
         }
         const fresh = contractHash(path.join(scratch, snapshot));
@@ -114,7 +114,7 @@ export function contractEmitFindings({ repoRoot, files, repo, emit }) {
           apps.push({ app: app.name, artifact, status: 'fresh' });
         } else {
           apps.push({ app: app.name, artifact, status: 'stale' });
-          findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${snapshot} (${committed.slice(0, 12)}) differs from what ${app.name} emits now (${String(fresh).slice(0, 12)}); run \`npm run contract:emit\` and commit the result`, { app: app.name, reason: 'stale' }));
+          findings.push(found(CONTRACT_SNAPSHOT_DRIFT, snapshot, `${snapshot} (${committed.slice(0, 12)}) differs from what ${app.name} emits now (${String(fresh).slice(0, 12)}); run \`npm run contract:emit\` and commit the result`, { app: app.name, drift: 'stale' }));
         }
       }
     }

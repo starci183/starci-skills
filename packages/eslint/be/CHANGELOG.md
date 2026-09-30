@@ -73,6 +73,11 @@
 - Changed: `user-copy-through-catalog` (R78) judges error classes by the constructed type extending `Error` (not a `*Error` name) and outbound ports by the receiver's type (declared by an `integrations` owner or `platform/messaging`, not the method names `notify/send/publish`); transport slots come from the slot view.
 - Changed: `http-needs-timeout` receivers are identified by type (`AxiosInstance`, `AxiosStatic`, `HttpService`), not by name. `async-needs-await`, `json-parse-needs-guard`, `sql-only-in-repository` and `migration-down-reversible` ask the slot view instead of a path pattern, and none of the R70/R73/R76/R78/R79/R81 rules exempts specs any more.
 
+## 1.8.0 - 2026-09-30 (hotfix off 1.7.1, branch release/canon-be-1.8)
+
+- Breaking: `sql-only-in-repository` removed; `sql-text-only` (R36) allows raw SQL text only in a `<name>.sql.ts` (including `src/tests/fixtures/builders/<area>.sql.ts`); `.query(...)` elsewhere takes an imported constant; `createQueryBuilder` refused; migrations exempt. 2.0.0 keeps the id with the typed `SqlText` check.
+- New: `no-repository-file`: a `*.repository.ts` file is a finding (2.0.0 refuses the suffix through R89 as well).
+
 ## 1.7.1 - 2026-09-30
 
 - Fixed: eslint no longer fails to start in a product repository with `HFS slot manifest not found at <repo>/knowledge/hfs/slots.yaml`. `lib/slots.mjs` used to look for the manifest at a path above the package (the product repository, or a linked runtime copy that no longer exists). The package now depends on `@starci/hfs` and resolves the manifest and the YAML reader as `@starci/hfs/runtime/knowledge/hfs/slots.yaml` and `@starci/hfs/runtime/engine/yaml.mjs`, so what the canon reads travels with the installed packages. `STARCI_HFS_SLOTS` still overrides the manifest file.
