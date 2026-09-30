@@ -97,8 +97,8 @@ steps:
         (the owner may read it first in a clipped Telegram message) followed by the whole package.
         question.options holds exactly three options, in this order, labelled in owner_language:
         approve - the workflow is done; feedback or bug - the reviewer describes it in the note;
-        question - the reviewer asks it in the note (for vi: \"Duyệt - workflow hoàn tất\", \"Góp ý / báo
-        lỗi - mô tả trong ghi chú\", \"Đặt câu hỏi - ghi trong ghi chú\"). No picks. question.refs names
+        question - the reviewer asks it in the note (for vi, the Vietnamese renderings of \"Approve - workflow complete\", \"Feedback / report
+        a bug - describe it in the note\", \"Ask a question - write it in the note\"). No picks. question.refs names
         the package paths, question.assets any evidence image the test steps point at - a drawing as its
         drawn part (page content, overlay panel alone, layout drawing; desktop and mobile), never its
         composite, which serve-ask would swap for the part anyway - and files lists the package. api report refuses a handover ask of any other shape. The kernel serves it through
@@ -119,9 +119,9 @@ steps:
     action:
       en: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish; modules/kernel/driver-loop.yaml autopilot): the
         handover is the owner's ONE review of everything autopilot decided. When `api survey --deliveries` carries
-        .autopilot (starci/autopilot-bundle@1, \"sổ chờ thầy xem lại\"), the handover ask carries it verbatim as
+        .autopilot (starci/autopilot-bundle@1, \"backlog awaiting the owner's review\"), the handover ask carries it verbatim as
         question.autopilot, lists every provisional acceptance's images in question.assets, and the package opens with
-        that bundle: each provisional drawing and direction (label \"tự nhận tạm\"), each deferred leg and why, each
+        that bundle: each provisional drawing and direction (label \"self-accepted provisionally\"), each deferred leg and why, each
         deferred-to-handover proof with its sandbox/stub path and what real proof is owed, and the autopilot decision
         log. The owner's feedback may name items: per named provisional item the Kernel re-opens only that item (api
         autopilot --reopen) and the draw-feedback loop re-runs it; approve still means only the owner's approve."

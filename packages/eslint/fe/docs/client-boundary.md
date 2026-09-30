@@ -26,9 +26,9 @@ export const Feed = () => null
 
 **Finding code:** `FE_CLIENT_BOUNDARY`
 
-**Vì sao (why):** `"use client"` ở `<file>` (`<slot>` không được là client component).
+**Why:** `"use client"` in `<file>` (`<slot>` must not be a client component).
 
-**Cách sửa:** Đặt `"use client"` ở `index.tsx` của block có tương tác, leaf, hoặc `error.tsx`/`global-error.tsx`; giữ layout và page là server component.
+**Fix:** Put `"use client"` in the `index.tsx` of an interactive block, a leaf, or `error.tsx`/`global-error.tsx`; keep layouts and pages as server components.
 
 ## `starci-fe/client-no-server-import`
 
@@ -50,9 +50,9 @@ import useSWR from "swr"
 
 **Finding code:** `FE_CLIENT_SERVER_IMPORT`
 
-**Vì sao (why):** Client component ở `<file>` nhập mã chỉ tồn tại ở server (`server-only`, `next/headers`, module Node, server reader).
+**Why:** The client component at `<file>` imports code that exists only on the server (`server-only`, `next/headers`, Node modules, a server reader).
 
-**Cách sửa:** Đọc dữ liệu ở server component hoặc server reader rồi truyền xuống bằng props; hoặc dùng SWR gọi client của app.
+**Fix:** Read data in a server component or server reader and pass it down as props; or use SWR calling the app client.
 
 ## `starci-fe/server-module-marks-server-only`
 
@@ -75,9 +75,9 @@ export const readCourses = async () => (await headers()).get("x-locale")
 
 **Finding code:** `FE_SERVER_ONLY_MARK`
 
-**Vì sao (why):** Module `<file>` nhập API chỉ có ở server (`next/headers`, `next/server`, `next-intl/server`, module Node hoặc module đã là server-only) nhưng không mở đầu bằng `import "server-only"`.
+**Why:** Module `<file>` imports server-only APIs (`next/headers`, `next/server`, `next-intl/server`, Node modules or a module that is already server-only) but does not begin with `import "server-only"`.
 
-**Cách sửa:** Đặt `import "server-only"` làm câu lệnh đầu tiên của tệp; tệp route (`page`, `layout`, `route`, `proxy`) là server component sẵn nên không cần.
+**Fix:** Make `import "server-only"` the first statement of the file; route files (`page`, `layout`, `route`, `proxy`) are already server components so they do not need it.
 
 ## `starci-fe/web-storage-only-in-modules`
 
@@ -97,9 +97,9 @@ const draft = useTopUpDraft()
 
 **Finding code:** `FE_STORAGE_OUTSIDE_MODULES`
 
-**Vì sao (why):** `<file>` dùng `localStorage`/`sessionStorage` ngoài `modules/`; storage không có ở server và ném lỗi khi đầy hạn mức.
+**Why:** `<file>` uses `localStorage`/`sessionStorage` outside `modules/`; storage does not exist on the server and throws when the quota is full.
 
-**Cách sửa:** Đặt đọc/ghi sau một hook hoặc module trong `modules/` có bảo vệ (`typeof window`, try/catch) rồi gọi từ block.
+**Fix:** Put reads/writes behind a hook or a guarded module in `modules/` (`typeof window`, try/catch) and call it from a block.
 
 ## `starci-fe/no-dangerous-html`
 
@@ -119,6 +119,6 @@ const draft = useTopUpDraft()
 
 **Finding code:** `FE_DANGEROUS_HTML`
 
-**Vì sao (why):** `dangerouslySetInnerHTML` trên `<tag>` ở `<file>`: chuỗi bất kỳ trở thành HTML chạy được.
+**Why:** `dangerouslySetInnerHTML` on `<tag>` in `<file>`: an arbitrary string becomes executable HTML.
 
-**Cách sửa:** Render nội dung thành phần tử; chỉ `<script>` mang JSON-LD hoặc mã theme từ hằng số của app mới được dùng.
+**Fix:** Render content as elements; only a `<script>` carrying JSON-LD or theme code from an app constant may use it.

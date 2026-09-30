@@ -76,15 +76,41 @@ test("COMMENT-2: every member of an exported enum carries its own doc", () => {
   })
 })
 
+/** Vietnamese text written as escapes, so this test file stays English-only ASCII. */
+const VI_TEXT = "kh\u00E1ch v\u1EEBa chuy\u1EC3n kho\u1EA3n"
+const I18N_FIXTURE = at("src/tests/fixtures/i18n/customer.rows.ts")
+
 test("COMMENT-4: a spec or fixture gets no exemption: Vietnamese is refused wherever it is not a message catalog", () => {
   const SPEC = at("src/features/plan/application/place-order.handler.spec.ts")
   const FIXTURE = at("src/tests/fixtures/database.ts")
   tester.run("no-non-ascii-source", noNonAsciiSource, {
     valid: [],
     invalid: [
-      { filename: SPEC, code: "const reply = { from: \"khách vừa chuyển khoản\" }", errors: [{ messageId: "nonAscii" }] },
-      { filename: FIXTURE, code: "// kiểm tra luồng thanh toán\nconst x = 1", errors: [{ messageId: "nonAscii" }] },
-      { filename: SRC, code: "const reply = \"khách vừa chuyển khoản\"", errors: [{ messageId: "nonAscii" }] },
+      { filename: SPEC, code: `const reply = { from: "${VI_TEXT}" }`, errors: [{ messageId: "nonAscii" }] },
+      { filename: FIXTURE, code: `// ${VI_TEXT}\nconst x = 1`, errors: [{ messageId: "nonAscii" }] },
+      { filename: SRC, code: `const reply = "${VI_TEXT}"`, errors: [{ messageId: "nonAscii" }] },
+      // a test title is prose for the next reader: describe/it/test names are English too
+      { filename: SPEC, code: `describe("${VI_TEXT}", () => { it("${VI_TEXT}", () => {}) })`, errors: [{ messageId: "nonAscii" }] },
+      // an identifier is source prose as well
+      { filename: SRC, code: `const ${"h\u1EA1n"}Cuoi = 1`, errors: [{ messageId: "nonAscii" }] },
+      // a decomposed (NFD) spelling is caught exactly like the precomposed one
+      { filename: SRC, code: `const reply = "${VI_TEXT.normalize("NFD")}"`, errors: [{ messageId: "nonAscii" }] },
+      // a fixtures file OUTSIDE the i18n fixtures slot is not exempt
+      { filename: at("src/tests/fixtures/customer.rows.ts"), code: `export const ROW = "${VI_TEXT}"`, errors: [{ messageId: "nonAscii" }] },
+    ],
+  })
+})
+
+test("COMMENT-4: the i18n fixtures slot is the one test placement that may carry localized text", () => {
+  tester.run("no-non-ascii-source", noNonAsciiSource, {
+    valid: [
+      { filename: I18N_FIXTURE, code: `export const ROW = { name: "${VI_TEXT}" }` },
+      { filename: I18N_FIXTURE, code: `// ${VI_TEXT.normalize("NFD")}\nexport const ROW = 1` },
+      // a loanword with no Vietnamese letter is not a hit (structural detection, not a word list)
+      { filename: SRC, code: "const word = 'naive facade Muller'" },
+    ],
+    invalid: [
+      { filename: SRC, code: `const row = "${VI_TEXT}"`, errors: [{ messageId: "nonAscii" }] },
     ],
   })
 })

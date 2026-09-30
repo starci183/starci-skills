@@ -471,7 +471,7 @@ BE_SCHEMA_OWNER:
 BE_SOURCE_FORM:
   title: "Back-end source file breaks the naming or form canon"
   title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"
-  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji hay tiếng Việt ngoài catalog messages/."
+  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji, và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test ngoài catalog messages/ và slot fixture i18n."
   causes_vi:
     - "Tệp dùng hậu tố bị cấm (use-case, repository, store, util, helper, types, constants)"
     - "Lớp export không kết thúc bằng hậu tố vai trò của tệp và cũng không kết thúc bằng tên port (interface trong *.port.ts hoặc *.contracts.ts) mà nó implements"
@@ -961,6 +961,17 @@ HFS_DEP_VERSION_SKEW:
   causes_vi:
     - "Vi phạm luật R14: Mỗi dependency một version trong workspace; cấm bản sao lồng thứ hai (`apps/*/node_modules/@starci/grammar`)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DOC_NOT_ENGLISH:
+  title: "Document is not English"
+  title_vi: "Tài liệu không viết bằng tiếng Anh"
+  meaning_vi: "Tệp Markdown hoặc YAML trong knowledge/, docs/, src/ hoặc apps/ có chữ cái tiếng Việt (kể cả trong khối mã của Markdown); tài liệu, mẫu và ví dụ phải viết bằng tiếng Anh."
+  causes_vi:
+    - "Viết hoặc dán đoạn tiếng Việt vào tài liệu, mẫu, ví dụ hay lời trích của chủ dự án"
+    - "Đặt dữ liệu YAML có tiếng Việt ngoài slot danh mục thông điệp hoặc slot fixture i18n"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: dịch dòng được nêu sang tiếng Anh. Chỉ dữ liệu YAML trong slot danh mục thông điệp hoặc slot fixture i18n được giữ tiếng khác; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 

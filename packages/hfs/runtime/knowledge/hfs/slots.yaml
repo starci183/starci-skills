@@ -749,9 +749,18 @@ slots:
     presence: optional
     tracked: tracked
     tier: fixtures
-    allows: [database.ts]         # mockEntityManager() and fakeTransaction() (BE-CONVENTION 1.16); other fixtures use role suffixes
+    allows: [database.ts, i18n/]  # mockEntityManager() and fakeTransaction() (BE-CONVENTION 1.16); other fixtures use role suffixes; i18n/ is the one folder that may carry localized text
     tests: unit-beside
     why: typed doubles and data builders; importable by unit specs, integration and e2e; never imports a feature
+  - id: be.tests.fixtures.i18n
+    profiles: [be]
+    path: "src/tests/fixtures/i18n/"
+    presence: optional
+    tracked: tracked
+    tier: fixtures
+    allows: ["<name>.<role>.ts"]   # data files that deliberately carry localized text (a real Vietnamese string a parser or formatter must accept); no specs here
+    tests: none
+    why: the ONLY test-fixture location where Vietnamese or another language may appear in source (LANG_NOT_ENGLISH); placement is the marker, there is no comment pragma
   - id: be.tests.integration
     profiles: [be]
     path: "src/tests/integration/<capability>/*.integration-spec.ts"
@@ -1077,6 +1086,14 @@ slots:
     tracked: tracked
     tier: e2e
     tests: none
+  - id: fe.e2e-support.i18n
+    profiles: [fe]
+    path: "e2e/fixtures/i18n/"
+    presence: optional
+    tracked: tracked
+    tier: e2e
+    tests: none
+    why: the ONLY e2e fixture location where Vietnamese or another language may appear in source (LANG_NOT_ENGLISH); placement is the marker, there is no comment pragma
 
 # Checks that read this manifest (all ship from .claude; none keeps its own path list)
 consumers:

@@ -186,7 +186,7 @@ rules:
     cases:
       - id: case-1
         when: Non-ASCII
-        write: Comments stay ASCII; the source rules for non-ASCII text, AI symbols and emoji fail otherwise; Vietnamese text lives only in `messages/` catalogs.
+        write: Identifiers, string literals, comments and test titles are English; the source rules for Vietnamese letters, AI symbols and emoji fail otherwise; Vietnamese text lives only in `messages/` catalogs and in the `src/tests/fixtures/i18n/` fixtures slot.
       - id: case-2
         when: A suppression
         write: 'A line like `eslint-disable-next-line` fails HFS_INLINE_SUPPRESSION; fix the code.'

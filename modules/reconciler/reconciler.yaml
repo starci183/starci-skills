@@ -73,7 +73,7 @@ concerns:
   sla.report: workflow
 
 # The old loops that yielded per concern (kernel/watchdog loop, resume-all, supervisor tick/watchdog loop,
-# stall-alert) are deleted (owner ruling 2026-09-28 "có lỗi xóa luôn"; modules/kernel/retired-paths.yaml).
+# stall-alert) are deleted (owner ruling 2026-09-28 "delete on any error"; modules/kernel/retired-paths.yaml).
 
 routing:
   source: every ledger's events (sources.mjs), per allocation.reconciler.pollMs; the first run of a ledger starts at MAX(seq), no replay

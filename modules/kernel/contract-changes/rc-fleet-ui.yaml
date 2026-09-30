@@ -2,7 +2,7 @@ id: rc-fleet-ui
 effectiveAt: '2026-09-28T19:00:00+07:00'
 summary: >-
   Reconciler lane G, harness part (D:/starci-tmp/reconciler-design/LANES.md "Lane G", DESIGN.md §17.2, §19, §20),
-  plus the owner's UI redesign of 2026-09-28 ("sửa .claude ux ui cho dễ track chứ giờ loạn thông tin quá"). The
+  plus the owner's UI redesign of 2026-09-28 ("fix the .claude UX/UI so it is easy to track, the information is too chaotic now"). The
   harness (ui/server.mjs, 127.0.0.1:4547, harness.starci.org) now builds ONE snapshot per tick
   (STARCI_STATUS_TICK_MS, default 20 s) and answers every request from it at once; `api status` of each live workflow
   runs in its own background loop and is applied when it returns, so no page waits on the verb. New read-only
@@ -13,8 +13,8 @@ summary: >-
   the Kernel's decision log, RCA clusters and ranked actions, Decision Items, worktrees), GET /api/system (reconciler
   engine, controllers mode / last pass / would vs act rows, services, seats, ledgers, open SLA violations, GC summary,
   op health, the Supervisor's decisions, the land gate), GET /api/nav, GET /api/reconciler/state and GET
-  /api/reconciler/decisions[?workflow] (DIs across ledgers). The navigation is Tình hình, Workflow, Hệ thống, Nhật
-  ký, plus Cần thầy only while an owner item waits; the older pages stay reachable from Hệ thống. /api/snapshot keeps
+  /api/reconciler/decisions[?workflow] (DIs across ledgers). The navigation is Overview, Workflow, System, Log
+  plus Needs owner only while an owner item waits; the older pages stay reachable from System. /api/snapshot keeps
   its shape (each live workflow gains a `fleet` field). No api verb, ledger schema or op contract changes; nothing
   here writes.
 reach: new-legs

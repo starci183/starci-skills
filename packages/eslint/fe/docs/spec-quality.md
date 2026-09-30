@@ -24,9 +24,9 @@ expect(screen.getByRole("button", { name: "Save" })).toBeEnabled()
 
 **Finding code:** `FE_SPEC_QUALITY`
 
-**Vì sao (why):** Spec `<file>` ghim chuỗi class. Spec kiểm hành vi, không kiểm stylesheet.
+**Why:** The spec `<file>` pins class strings. A spec checks behaviour, not the stylesheet.
 
-**Cách sửa:** Assert theo role, tên, trạng thái hoặc chữ hiển thị.
+**Fix:** Assert by role, name, state or visible text.
 
 ## `starci-fe/spec-tests-its-neighbour`
 
@@ -46,9 +46,9 @@ import { Chip } from "./Chip"
 
 **Finding code:** `FE_SPEC_QUALITY`
 
-**Vì sao (why):** Spec `<file>` không import chủ thể nằm cạnh nó.
+**Why:** The spec `<file>` does not import the subject next to it.
 
-**Cách sửa:** Đưa spec về cạnh chủ thể, hoặc test đúng đơn vị nằm cạnh.
+**Fix:** Move the spec next to its subject, or test the unit that sits next to it.
 
 ## `starci-fe/no-barrel-spec`
 
@@ -68,9 +68,9 @@ No `index.spec.ts(x)` beside an `index.ts(x)` that holds only imports and re-exp
 
 **Finding code:** `FE_SPEC_QUALITY`
 
-**Vì sao (why):** Spec `<file>` đặt cạnh một barrel. Barrel không có hành vi để test.
+**Why:** The spec `<file>` sits next to a barrel. A barrel has no behaviour to test.
 
-**Cách sửa:** Xóa spec; test từng đơn vị mà barrel xuất lại, cạnh chính đơn vị đó.
+**Fix:** Delete the spec; test each unit the barrel re-exports, next to that unit itself.
 
 ## `starci-fe/no-double-cast-in-spec`
 
@@ -90,9 +90,9 @@ const x = mock<Course>()
 
 **Finding code:** `FE_SPEC_QUALITY`
 
-**Vì sao (why):** Spec `<file>` ép kiểu hai lần (`as unknown as`).
+**Why:** The spec `<file>` casts twice (`as unknown as`).
 
-**Cách sửa:** Dựng giá trị bằng factory có kiểu (`mock<T>()` hoặc fixture builder).
+**Fix:** Build the value with a typed factory (`mock<T>()` or a fixture builder).
 
 ## `starci-fe/connected-spec-has-axe`
 
@@ -112,9 +112,9 @@ it("a11y", async () => { expect(await axe(container)).toHaveNoViolations() })
 
 **Finding code:** `FE_SPEC_QUALITY`
 
-**Vì sao (why):** Spec `<file>` của màn hình kết nối không có assert axe.
+**Why:** The spec `<file>` for a connected screen has no axe assertion.
 
-**Cách sửa:** Thêm `expect(await axe(container)).toHaveNoViolations()`.
+**Fix:** Add `expect(await axe(container)).toHaveNoViolations()`.
 
 ## `starci-fe/no-mocked-translations`
 
@@ -142,6 +142,6 @@ vi.mock("next-intl/server", async () => {
 
 **Finding code:** `FE_I18N_CATALOG`
 
-**Vì sao (why):** Spec `<file>` giả lập `next-intl`, nên chỉ kiểm khóa chứ không kiểm catalog thật.
+**Why:** The spec `<file>` mocks `next-intl`, so it checks only keys and not the real catalog.
 
-**Cách sửa:** Component client: render trong `NextIntlClientProvider` với `messages/<locale>.json` thật. Helper server (`next-intl/server`): factory của mock dựng translator từ catalog thật (`createTranslator` với `modules/i18n/messages/<locale>.json`).
+**Fix:** Client components: render inside `NextIntlClientProvider` with the real `messages/<locale>.json`. Server helpers (`next-intl/server`): the mock factory builds a translator from the real catalog (`createTranslator` with `modules/i18n/messages/<locale>.json`).

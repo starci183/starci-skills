@@ -622,12 +622,12 @@ function ruleCatalogProblems(d) {
     const at = `rules[${index}]`;
     if (!isPlainObject(r)) { bad.push(`${at} is not a map`); return; }
     const label = typeof r.id === 'string' ? r.id : at;
-    for (const key of Object.keys(r)) if (!['id', 'code', 'title_vi', 'law', 'kinds', 'gates', 'failureCodes', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
+    for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'kinds', 'gates', 'failureCodes', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
     const expectedId = `R${String(index + 1).padStart(2, '0')}`;
     if (!/^R\d{2}$/.test(String(r.id))) bad.push(`${at}.id must be R<two digits>`);
     else if (r.id !== expectedId) bad.push(`${label} is out of order: ${at} must be ${expectedId}`);
     if (!FINDING_CODE.test(String(r.code))) bad.push(`${label}.code must be an UPPER_SNAKE finding code`);
-    for (const key of ['title_vi', 'law']) if (typeof r[key] !== 'string' || !r[key].trim()) bad.push(`${label}.${key} is missing`);
+    if (typeof r.law !== 'string' || !r.law.trim()) bad.push(`${label}.law is missing`);
     if (typeof r.law === 'string' && r.law.includes('\n')) bad.push(`${label}.law must be one line`);
     const enumList = (key, allowed) => {
       if (!Array.isArray(r[key]) || !r[key].length) { bad.push(`${label}.${key} must be a non-empty list`); return []; }

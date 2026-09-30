@@ -49,6 +49,6 @@ A template literal with substitutions is copy when its static parts contain a wo
 
 **Finding code:** `FE_I18N_LITERAL`
 
-**Vì sao (why):** Chữ `"<text>"` ở `<file>:<line>` không đi qua `t()`.
+**Why:** The text `"<text>"` at `<file>:<line>` does not go through `t()`.
 
-**Cách sửa:** Chuyển câu vào `modules/i18n/messages/<locale>.json` và đọc bằng `t("khóa")`; không có ngoại lệ và không có `vn-ok`.
+**Fix:** Move the sentence into `modules/i18n/messages/<locale>.json` and read it with `t("key")`; there is no exception and no `vn-ok`.

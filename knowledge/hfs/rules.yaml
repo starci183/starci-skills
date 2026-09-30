@@ -34,7 +34,6 @@ enforcerKinds:
 rules:
   - id: R01
     code: "HFS_SLOT_UNDECLARED"
-    title_vi: "Đường dẫn không thuộc ô nào"
     law: "Every tracked path matches exactly one slot."
     kinds: [check]
     gates: [pre-push, settle, land, ci]
@@ -44,7 +43,6 @@ rules:
       - {kind: machine, id: repository-tree-layout, at: scripts/checks/architecture/hfs.mjs}
   - id: R02
     code: "HFS_SLOT_REQUIRED_MISSING"
-    title_vi: "Ô thiếu tệp bắt buộc"
     law: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`), or the root README breaks its standard shape (title, description, standard sections in order, Work pointer, live badges only, no private URL)."
     kinds: [check, codemod]
     gates: [settle, land, ci]
@@ -55,7 +53,6 @@ rules:
       - {kind: machine, id: repository-tree-required, at: scripts/checks/architecture/hfs.mjs}
   - id: R03
     code: "HFS_UNTRACKED_ROOT_ENTRY"
-    title_vi: "Mục lạ ở gốc kho"
     law: "No untracked or ignored entry outside an `ignored` slot."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
@@ -64,7 +61,6 @@ rules:
       - {kind: hfs, id: untracked-root-entry, at: scripts/lib/hfs-check.mjs}
   - id: R04
     code: "HFS_GITIGNORE_BLOCK_DRIFT"
-    title_vi: "Khối .gitignore lệch bản render"
     law: "The managed `.gitignore` block equals its render."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
@@ -73,7 +69,6 @@ rules:
       - {kind: hfs, id: gitignore-block-drift, at: packages/hfs/sync/managed.mjs}
   - id: R05
     code: "HFS_MANAGED_FILE_DRIFT"
-    title_vi: "Tệp do .claude quản lý bị lệch"
     law: "A managed file equals its template render."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
@@ -82,7 +77,6 @@ rules:
       - {kind: hfs, id: managed-file-drift, at: packages/hfs/sync/managed.mjs}
   - id: R06
     code: "HFS_PLAINTEXT_SECRET"
-    title_vi: "Bí mật dạng rõ trong kho"
     law: "Secrets exist only as `.starcistacks/<env>/secrets/<slug>.enc`."
     kinds: [check, design]
     gates: [pre-commit, pre-push, land, ci]
@@ -92,7 +86,6 @@ rules:
       - {kind: hfs, id: plaintext-secret-staged, at: packages/hfs/sync/hygiene.mjs}
   - id: R07
     code: "HFS_AGENT_DATA_TRACKED"
-    title_vi: "Dữ liệu của agent bị track"
     law: "`.starciwork` holds product records only."
     kinds: [check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -101,7 +94,6 @@ rules:
       - {kind: work-validate, id: agent-data-tracked, at: scripts/checks/check-example-work.mjs}
   - id: R08
     code: "HFS_WORK_NODE_RETIRED"
-    title_vi: "Còn record work/node đã bỏ"
     law: "Only flat family records, never `work/node`."
     kinds: [check, codemod]
     gates: [settle, land, ci]
@@ -110,7 +102,6 @@ rules:
       - {kind: work-validate, id: work-node-retired, at: scripts/checks/check-example-work.mjs}
   - id: R09
     code: "HFS_IDENTITY_CUSTODY"
-    title_vi: "Bí mật của identity sai chỗ"
     law: "An identity points its secret at `secrets/identity-<slug>.enc`; UAT chooses by role."
     kinds: [check, codemod]
     gates: [settle, land, ci]
@@ -120,7 +111,6 @@ rules:
       - {kind: work-validate, id: identity-custody-role, at: scripts/checks/check-example-work.mjs}
   - id: R10
     code: "HFS_STACKS_SHAPE"
-    title_vi: "Hình dạng .starcistacks sai"
     law: "`.starcistacks` has the standard shape and the host Sonar owner."
     kinds: [check, codemod]
     gates: [settle, land, ci]
@@ -129,7 +119,6 @@ rules:
       - {kind: hfs, id: stacks-shape, at: scripts/lib/hfs-rules/stacks.mjs}
   - id: R11
     code: "HFS_SONAR_CONFIG"
-    title_vi: "Cấu hình Sonar lệch"
     law: "Sonar config is generated, with no host URL and matching coverage exclusions."
     kinds: [check, codemod]
     gates: [land, ci]
@@ -138,7 +127,6 @@ rules:
       - {kind: hfs, id: sonar-config, at: packages/hfs/sync/managed.mjs}
   - id: R12
     code: "HFS_E2E_IN_AUTOMATIC_GATE"
-    title_vi: "e2e chạy trong cổng tự động"
     law: "e2e never joins husky, coverage or automatic CI."
     kinds: [check]
     gates: [pre-push, land, ci]
@@ -147,7 +135,6 @@ rules:
       - {kind: machine, id: e2e-in-automatic-gate, at: scripts/checks/architecture/hfs.mjs}
   - id: R13
     code: "HFS_CI_MISSING_CANON"
-    title_vi: "CI thiếu bước canon"
     law: "CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
@@ -157,7 +144,6 @@ rules:
       - {kind: hfs, id: ci-missing-canon, at: scripts/lib/hfs-rules/pipeline.mjs}
   - id: R14
     code: "HFS_DEP_VERSION_SKEW"
-    title_vi: "Một gói nhiều phiên bản"
     law: "One version per dependency in the workspace, and npm is the only package manager."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
@@ -167,7 +153,6 @@ rules:
       - {kind: machine, id: package-manager, at: scripts/checks/architecture/hfs.mjs}
   - id: R15
     code: "HFS_CANON_PIN_DRIFT"
-    title_vi: "Phiên bản canon lệch bản pin"
     law: "Canon packages and frameworks match `canon-pins.yaml`."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
@@ -176,7 +161,6 @@ rules:
       - {kind: hfs, id: canon-pin-drift, at: scripts/lib/hfs-check.mjs}
   - id: R16
     code: "HFS_TOOL_CONFIG_LOCAL"
-    title_vi: "Kho tự đặt luật cục bộ"
     law: "Configs only call the factories; no local rules."
     kinds: [check, codemod]
     gates: [land, ci]
@@ -186,7 +170,6 @@ rules:
       - {kind: hfs, id: tool-config-forbidden, at: scripts/lib/hfs-check.mjs}
   - id: R17
     code: "HFS_RULE_OFF_WITHOUT_REPLACEMENT"
-    title_vi: "Cấu hình ESLint hoặc stylelint lệch bản render"
     law: "The ESLint configuration (and a front end's stylelint configuration) is the rendered one-liner, so no rule is off, warned or redefined in a repository."
     kinds: [check]
     gates: [land, ci]
@@ -195,7 +178,6 @@ rules:
       - {kind: hfs, id: rule-off-without-replacement, at: packages/hfs/sync/managed.mjs}
   - id: R18
     code: "HFS_INLINE_SUPPRESSION"
-    title_vi: "Tắt luật tại chỗ"
     law: "No inline suppression of any kind."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, land, ci]
@@ -206,7 +188,6 @@ rules:
       - {kind: stylelint, id: no-inline-lint-config}
   - id: R19
     code: "HFS_FORMAT"
-    title_vi: "Chưa format bằng Prettier"
     law: "Prettier is the only formatter."
     kinds: [codemod]
     gates: [pre-commit, pre-push, land, ci]
@@ -215,7 +196,6 @@ rules:
       - {kind: hfs, id: format, at: packages/hfs/sync/format.mjs}
   - id: R20
     code: "HFS_SIZE_GROWTH"
-    title_vi: "Tệp vượt ngân sách còn phình thêm"
     law: "Over-budget files do not grow; new files are inside budget."
     kinds: [check, design]
     gates: [land, ci, sonar]
@@ -227,7 +207,6 @@ rules:
       - {kind: sonar, id: cognitive-complexity, at: knowledge/sonar-gate.yaml}
   - id: R21
     code: "HFS_DUPLICATE_CODE"
-    title_vi: "Mã trùng lặp"
     law: "No duplicated blocks or twice-defined helpers."
     kinds: [check, design]
     gates: [land, ci, sonar]
@@ -239,7 +218,6 @@ rules:
       - {kind: sonar, id: duplicated-lines-density, at: knowledge/sonar-gate.yaml}
   - id: R22
     code: "HFS_TS_STRICT"
-    title_vi: "tsconfig hạ cờ strict"
     law: "tsconfig extends `@starci/tsconfig` and lowers no flag; no assertion, `!` or `any` in product source."
     kinds: [codemod, design, lint]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -252,7 +230,6 @@ rules:
       - {kind: eslint-fe, id: no-double-cast}
   - id: R23
     code: "HFS_CONTRACT_SNAPSHOT_DRIFT"
-    title_vi: "Bản hợp đồng lệch bản thật"
     law: "Contract snapshot equals the emit, the FE copy equals the BE."
     kinds: [check]
     gates: [land, ci]
@@ -261,7 +238,6 @@ rules:
       - {kind: hfs, id: contract-snapshot-drift, at: scripts/lib/hfs-rules/contract.mjs}
   - id: R24
     code: "HFS_ARCH_CONFIG_UNREAD"
-    title_vi: "Máy kiến trúc không đọc được hfs.json"
     law: "The machine reads `hfs.json`; zero files analysed is red."
     kinds: [check]
     gates: [land, ci]
@@ -270,7 +246,6 @@ rules:
       - {kind: machine, id: arch-config-unread, at: scripts/checks/architecture/config-unread.mjs}
   - id: R25
     code: "HFS_UNUSED_EXPORT"
-    title_vi: "Mã chết: export công khai và tệp không ai dùng"
     law: "No public export without a consumer; no source file nothing reaches."
     kinds: [check, codemod]
     gates: [pre-push, settle, land, ci]
@@ -279,7 +254,6 @@ rules:
       - {kind: machine, id: dead-exports, at: scripts/checks/architecture/dead-exports.mjs}
   - id: R26
     code: "BE_TIER_DIRECTION"
-    title_vi: "Hướng import giữa các tầng bị cấm"
     law: "The tier direction matrix; a shared package never imports an app."
     kinds: [check, design]
     gates: [pre-push, settle, land, ci]
@@ -289,7 +263,6 @@ rules:
       - {kind: machine, id: package-imports-app, at: scripts/checks/architecture/typescript.mjs}
   - id: R27
     code: "ARCH_OWNER_CYCLE"
-    title_vi: "Vòng phụ thuộc giữa các owner"
     law: "No owner cycles, type-only included."
     kinds: [check, design]
     gates: [pre-push, settle, land, ci]
@@ -298,7 +271,6 @@ rules:
       - {kind: machine, id: owner-cycle, at: scripts/checks/architecture/tiers.mjs}
   - id: R28
     code: "BE_FEATURE_IMPORTS_FEATURE"
-    title_vi: "Feature import feature khác"
     law: "A feature never imports a feature."
     kinds: [check, design]
     gates: [settle, land, ci]
@@ -307,7 +279,6 @@ rules:
       - {kind: machine, id: feature-imports-feature, at: scripts/checks/architecture/tiers.mjs}
   - id: R29
     code: "BE_FEATURE_SHAPE"
-    title_vi: "Feature sai hình dạng"
     law: "Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`; `application/` never imports `transport/` or a protocol framework."
     kinds: [check, codemod, design]
     gates: [settle, land, ci]
@@ -318,7 +289,6 @@ rules:
       - {kind: machine, id: application-never-imports-transport, at: scripts/checks/architecture/backend.mjs}
   - id: R30
     code: "BE_PUBLIC_SURFACE"
-    title_vi: "Import sâu qua cổng công khai"
     law: "Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export (`export { X as Y }`, `export const Y = X`, `export type Y = X`, `export interface Y extends X {}`: one declaration has one name), at most 60 exports; cross-package imports use the package name and a declared export."
     kinds: [check, lint, codemod]
     gates: [pre-push, settle, land, ci]
@@ -333,7 +303,6 @@ rules:
       - {kind: machine, id: package-export-bypass, at: scripts/checks/architecture/typescript.mjs}
   - id: R31
     code: "BE_FEATURE_NOT_COMPOSED"
-    title_vi: "Feature không được app nào compose"
     law: "Every feature, transport module and capability module is composed by an app."
     kinds: [check, design]
     gates: [land, ci]
@@ -342,7 +311,6 @@ rules:
       - {kind: machine, id: feature-not-composed, at: scripts/checks/architecture/reachability.mjs}
   - id: R32
     code: "BE_APP_COMPOSITION_ONLY"
-    title_vi: "App chứa logic ngoài việc compose"
     law: "Apps compose only; the composition spec boots the real module."
     kinds: [check, codemod]
     gates: [settle, land, ci]
@@ -352,7 +320,6 @@ rules:
       - {kind: machine, id: composition-spec-boots-real-module, at: scripts/checks/architecture/composition-spec.mjs}
   - id: R33
     code: "BE_ENTRYPOINT_ONLY_IN_APPS"
-    title_vi: "Entrypoint nằm ngoài apps"
     law: "Entrypoints only in `apps/*/src`."
     kinds: [check, codemod]
     gates: [land, ci]
@@ -361,7 +328,6 @@ rules:
       - {kind: machine, id: entrypoint-only-in-apps, at: scripts/checks/architecture/entrypoint.mjs}
   - id: R34
     code: "BE_SCHEMA_AUTHORITY"
-    title_vi: "Schema bị định nghĩa lúc chạy"
     law: "Migrations are the only schema authority; `synchronize` is `false`."
     kinds: [lint, codemod, design]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -370,7 +336,6 @@ rules:
       - {kind: eslint-be, id: no-runtime-schema}
   - id: R35
     code: "BE_SCHEMA_OWNER"
-    title_vi: "Entity hoặc migration sai chủ"
     law: "Entities and migrations live in the owning capability's `persistence/`; its `<c>Entities` and `<c>Migrations` are registered under exactly one declared connection, which every `Inject<Conn>EntityManager` of the capability names (no `CONNECTION` alias)."
     kinds: [check, codemod, design]
     gates: [settle, land, ci]
@@ -379,7 +344,6 @@ rules:
       - {kind: machine, id: schema-owner, at: scripts/checks/architecture/schema-owner.mjs}
   - id: R36
     code: "BE_SQL_OUTSIDE_PERSISTENCE"
-    title_vi: "SQL thô ngoài persistence/<name>.sql.ts"
     law: "Raw SQL is `sql`-tagged `SqlText` in `persistence/<name>.sql.ts` of the owning capability; `.query()` takes only `SqlText`; no QueryBuilder."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -389,7 +353,6 @@ rules:
       - {kind: eslint-be, id: no-query-builder}
   - id: R37
     code: "BE_ENTITY_IN_CONTRACT"
-    title_vi: "Entity ORM lộ ra hợp đồng"
     law: "No ORM entity in a contract or transport type."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -398,7 +361,6 @@ rules:
       - {kind: eslint-be, id: no-entity-in-contract}
   - id: R38
     code: "BE_ERROR_HOME"
-    title_vi: "Lỗi đặt sai nhà"
     law: "Errors live in the owning capability's `errors/` and extend `DomainError`."
     kinds: [lint, check, codemod]
     gates: [settle, land, ci]
@@ -410,7 +372,6 @@ rules:
       - {kind: machine, id: error-home, at: scripts/checks/architecture/error-codes.mjs}
   - id: R39
     code: "BE_ERROR_MASKED"
-    title_vi: "Lỗi nội bộ lộ ra client"
     law: "One filter per app; undeclared errors are masked."
     kinds: [check, codemod]
     gates: [land, ci]
@@ -419,7 +380,6 @@ rules:
       - {kind: machine, id: error-masked, at: scripts/checks/architecture/error-masked.mjs}
   - id: R40
     code: "BE_LOGGER_REQUIRED"
-    title_vi: "Catch nuốt lỗi"
     law: "`platform/logging` exists and its `Logger` port is the only logger; every `catch` logs, rethrows or returns a reasoned outcome, and a log call names its event with a member of an owner's `<owner>.log-events.ts` enum."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -431,7 +391,6 @@ rules:
       - {kind: eslint-be, id: no-framework-logger}
   - id: R41
     code: "BE_DEFAULT_DENY"
-    title_vi: "Mặc định không chặn truy cập"
     law: "APP_GUARD plus `@Public({ reason: PublicReason.X })`; no `@UseGuards`; typed bodies; `timingSafeEqual`."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -444,7 +403,6 @@ rules:
       - {kind: machine, id: default-deny-app-guard, at: scripts/checks/architecture/default-deny.mjs}
   - id: R42
     code: "BE_INPUT_BOUNDED"
-    title_vi: "Input không giới hạn"
     law: "Bounded input, cursor-only pagination, depth limits, rate limits; every property of an input class carries the `class-validator` decorators its type calls for."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -454,7 +412,6 @@ rules:
       - {kind: eslint-be, id: no-offset-pagination}
   - id: R43
     code: "BE_CONFIG_OWNER"
-    title_vi: "Đọc process.env ngoài platform/config"
     law: "Only `platform/config` reads `process.env`; config per capability."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -463,7 +420,6 @@ rules:
       - {kind: eslint-be, id: no-direct-env-read}
   - id: R44
     code: "BE_SECRET_DEFAULT"
-    title_vi: "Giá trị mặc định cho bí mật hoặc URL hạ tầng"
     law: "No default for a secret key or infrastructure URL."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, land, ci]
@@ -472,7 +428,6 @@ rules:
       - {kind: eslint-be, id: no-secret-default}
   - id: R45
     code: "BE_MODULE_SHAPE"
-    title_vi: "Module sai hình dạng"
     law: "`@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport; every handler and provider registered exactly once."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -492,7 +447,6 @@ rules:
       - {kind: machine, id: module-registration, at: scripts/checks/architecture/registration.mjs}
   - id: R46
     code: "BE_BACKGROUND_UNOWNED"
-    title_vi: "Việc nền không có ai chạy"
     law: "Every sweep, outbox or retry has a job or consumer run by a worker app."
     kinds: [check, design]
     gates: [land, ci]
@@ -503,6 +457,7 @@ rules:
     code: "BE_TEST_TOPOLOGY"
     title_vi: "Cấu hình test lệch chuẩn"
     law: "One jest config, projects `unit`, `integration`, `e2e` and `contract`, live by folder, `diagnostics: false`; unit specs (`<name>.spec.ts` beside their subject) are governed by the unit-spec rules of lane UT [UT-POINTER: replace this clause with the UT rule ids when lane UT lands; until then `unit-test-colocated` holds the colocation], never by this rule; `src/tests/fixtures/` holds typed doubles and builders; `src/tests/world/` is the ONLY test infrastructure: `global-setup.ts` starts the repository's own stack (`.starcistacks/<env>`, named by `stacks` in `test-world.config.ts` of the test-world library: every service it declares runs REAL, behind toxiproxy, images and versions read from the stack at run time, never spelled in test source) or attaches to a warm one that answers, and runs `apps/migrate` once; `global-teardown.ts` stops only what its setup started; `use-test-world.ts` exports `useTestWorld({ apps } | { modules })` (`world.apps.<name>.api`, `world.db.<connection>`, `world.infra.<service>` with `latency(ms)`, `cut()` and `restore()` on the real service, `world.fake.<provider>`, `world.waitFor`) and `fakes/<provider>/` holds the network-edge fakes (`failNext`, `replayWebhook`, `delay`, payload fixtures) of external SaaS the team does not operate ONLY: a fake of a service the stack declares is refused, except stateless compute that needs special hardware or an external model (GPU inference, a self-hosted embedding model), which `test-world.config.ts` declares in `fakedBy` with a non-empty `reason` (a stateful service, or one with a persistent volume, is never accepted); it alone owns containers, DataSource, migrations and `process.env`; nothing under `src/tests` overrides a provider or DI token; `src/tests/integration/<capability>/*.integration-spec.ts` (`useTestWorld({ modules })`, real database, no HTTP, never `apps`), `src/tests/e2e/<area>/*.e2e-spec.ts` (`useTestWorld({ apps })`, never `modules`) and `src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, run only by `test:contract`, never by `test` or `test:e2e`) agree folder with suffix; an integration or e2e spec passes `useTestWorld` one object literal with plain keys (no variable, spread or computed key) and calls it; the contract layer skips itself only in the world's contract helper when the sandbox config is absent (`sandbox.describe(...)`), and every `fakes/<provider>/` that serves payload fixtures (`payloads/*.json`) has a `contract/<provider>/*.contract-spec.ts` that references those fixtures and asserts `shapeOf(real)` equals `shapeOf(fixture)` (the helper `shapeOf` is named by `ruleParams.be.contractShape` of the slot manifest; fakes the test-world library provides are guarded by the library); no `.test.ts`, `int-spec` or `harness-spec`, no `live/` and no `src/tests/e2e/world`."
+    law: "One jest config, projects `unit`, `integration`, `e2e` and `contract`, live by folder, `diagnostics: false`; unit specs `<name>.spec.ts` sit beside their subject (a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec) and take `mockEntityManager()` and `fakeTransaction()` from `src/tests/fixtures/database.ts`; `src/tests/world/` is the ONLY test infrastructure: `global-setup.ts` starts the repository's own stack (`.starcistacks/<env>`, named by `stacks` in `test-world.config.ts` of the test-world library: every service it declares runs REAL, behind toxiproxy, images and versions read from the stack at run time, never spelled in test source) or attaches to a warm one that answers, and runs `apps/migrate` once; `global-teardown.ts` stops only what its setup started; `use-test-world.ts` exports `useTestWorld({ apps } | { modules })` (`world.apps.<name>.api`, `world.db.<connection>`, `world.infra.<service>` with `latency(ms)`, `cut()` and `restore()` on the real service, `world.fake.<provider>`, `world.waitFor`) and `fakes/<provider>/` holds the network-edge fakes (`failNext`, `replayWebhook`, `delay`, payload fixtures) of external SaaS the team does not operate ONLY: a fake of a service the stack declares is refused, except stateless compute that needs special hardware or an external model (GPU inference, a self-hosted embedding model), which `test-world.config.ts` declares in `fakedBy` with a non-empty `reason` (a stateful service, or one with a persistent volume, is never accepted); it alone owns containers, DataSource, migrations and `process.env`; nothing under `src/tests` overrides a provider or DI token; `src/tests/integration/<capability>/*.integration-spec.ts` (`{ modules }`, real database, no HTTP), `src/tests/e2e/<area>/*.e2e-spec.ts` (`{ apps }`) and `src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped without sandbox config, run only by `test:contract`, never by `test` or `test:e2e`) agree folder with suffix; no `.test.ts`, `int-spec` or `harness-spec`, no `live/` and no `src/tests/e2e/world`."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["BE_TEST_TOPOLOGY", "HFS_TEST_KIND_RETIRED", "BE_CONTRACT_UNGUARDED"]
@@ -519,6 +474,7 @@ rules:
     code: "BE_SPEC_QUALITY"
     title_vi: "Spec đọc mã nguồn hoặc ép kiểu mock"
     law: "No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); a unit spec takes its EntityManager from `mockEntityManager()` or `fakeTransaction()`, never an ad-hoc `jest.fn` object; an e2e enters through transport, waits with `waitFor`, boots through `useTestWorld`, reads persisted state back and reaches no model provider. No spec of any layer skips, focuses or marks a test todo (`skip`, `skipIf`, `runIf`, `todo`, `only`, `xit`, `xdescribe`, `xtest`) and none selects its runner conditionally; the only skip is the contract helper's own, decided in a `be.tests.world` file when the sandbox config is absent."
+    law: "No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); a unit spec takes its EntityManager from `mockEntityManager()` or `fakeTransaction()`, never an ad-hoc `jest.fn` object; an e2e enters through transport, waits with `waitFor`, boots through `useTestWorld`, reads persisted state back and reaches no model provider."
     kinds: [lint, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_SPEC_QUALITY"]
@@ -537,7 +493,6 @@ rules:
       - {kind: eslint-be, id: spec-no-skip}
   - id: R49
     code: "FE_ENV_OWNER"
-    title_vi: "Đọc biến môi trường ngoài modules/config"
     law: "Only `modules/config` reads the environment; no localhost fallback."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -547,7 +502,6 @@ rules:
       - {kind: eslint-fe, id: no-hardcoded-endpoint-fallback}
   - id: R50
     code: "FE_TRANSPORT_OWNER"
-    title_vi: "fetch ngoài client duy nhất"
     law: "One `fetch` per repository, in the transport client: `apps/<app>/src/modules/api/client.ts` of a one-app repository or `packages/<family>-api/src/client.ts` shared by every app; timeout and abort; a client read is SWR whose key carries the identity of its result, and a mutation is tied to its resource."
     kinds: [check, lint, design]
     gates: [settle, land, ci]
@@ -563,7 +517,6 @@ rules:
       - {kind: machine, id: swr-data-lifecycle, at: scripts/checks/architecture/next-data.mjs}
   - id: R51
     code: "FE_HTTP_STATUS_COLLAPSE"
-    title_vi: "Gộp mọi mã HTTP thành một nhánh"
     law: "One `Outcome<T>` union per repository (the api slot's `outcome.ts`); 401 and 403 become `refused`."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -575,7 +528,6 @@ rules:
       - {kind: eslint-fe, id: one-outcome-union}
   - id: R52
     code: "FE_WIRE_GENERATED"
-    title_vi: "Kiểu wire gõ tay"
     law: "Wire types generated from the contract copy."
     kinds: [lint, check, design]
     gates: [settle, land, ci]
@@ -585,7 +537,6 @@ rules:
       - {kind: hfs, id: wire-generated, at: scripts/lib/hfs-rules/frontend.mjs}
   - id: R53
     code: "FE_ERROR_BOUNDARY_MISSING"
-    title_vi: "Thiếu error boundary"
     law: "Global, locale error, not-found and loading boundaries exist."
     kinds: [check, codemod, lint]
     gates: [settle, land, ci]
@@ -595,7 +546,6 @@ rules:
       - {kind: machine, id: error-boundary-missing, at: scripts/checks/architecture/required-files.mjs}
   - id: R54
     code: "FE_ROUTE_FILES_THIN"
-    title_vi: "Tệp route không mỏng"
     law: "Route files mount one owner; Next conventions (`proxy.ts`, metadata)."
     kinds: [check, lint]
     gates: [settle, land, ci]
@@ -607,7 +557,6 @@ rules:
       - {kind: machine, id: route-adapter, at: scripts/checks/architecture/frontend.mjs}
   - id: R55
     code: "FE_CLIENT_BOUNDARY"
-    title_vi: "use client sai chỗ"
     law: "Server first; `\"use client\"` only where allowed."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -621,7 +570,6 @@ rules:
       - {kind: machine, id: client-reaches-server, at: scripts/checks/architecture/client-reaches-server.mjs}
   - id: R56
     code: "FE_HOOKS_ARE_HOOKS"
-    title_vi: "hooks/ chứa thứ không phải hook"
     law: "`hooks/` hold hooks and one shared file per domain; a product hook is defined only there and imported through its index."
     kinds: [check, codemod]
     gates: [settle, land, ci]
@@ -632,7 +580,6 @@ rules:
       - {kind: machine, id: hook-location, at: scripts/checks/architecture/frontend.mjs}
   - id: R57
     code: "FE_OWNER_REACHABLE"
-    title_vi: "Owner không được route nào mount"
     law: "Every owner is mounted; every href resolves to a route."
     kinds: [check, design, lint]
     gates: [settle, land, ci]
@@ -642,7 +589,6 @@ rules:
       - {kind: machine, id: owner-reachable, at: scripts/checks/architecture/reachability.mjs}
   - id: R58
     code: "FE_I18N_LITERAL"
-    title_vi: "Chữ hiển thị không đi qua t()"
     law: "No display text at any tier, no escape comment."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -653,7 +599,6 @@ rules:
       - {kind: eslint-fe, id: no-copy-resolution-below-block}
   - id: R59
     code: "FE_I18N_PLACEMENT"
-    title_vi: "i18n sai chuẩn next-intl"
     law: "`next-intl` with `[locale]`; the next-intl stack is written once per repository: `packages/<family>-i18n` (`createAppI18n`) called by each app's `modules/i18n/index.ts`, or the only app's `modules/i18n/`."
     kinds: [check, codemod, lint]
     gates: [settle, land, ci]
@@ -668,7 +613,6 @@ rules:
       - {kind: hfs, id: i18n-placement, at: scripts/lib/hfs-rules/frontend.mjs}
   - id: R60
     code: "FE_I18N_CATALOG"
-    title_vi: "Catalog ngôn ngữ lệch key"
     law: "Same keys in every catalog, real catalog in specs, `pick` for clients."
     kinds: [check]
     gates: [land, ci]
@@ -678,7 +622,6 @@ rules:
       - {kind: hfs, id: i18n-catalog, at: scripts/lib/hfs-rules/frontend.mjs}
   - id: R61
     code: "FE_STYLE_TOKEN_ONLY"
-    title_vi: "CSS ngoài token"
     law: "Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`). Status colours follow HeroUI soft pairs: every status tone has `--<tone>-soft` and `--<tone>-soft-foreground` in light and dark, the soft foreground reaches 3:1 on its tint and on `--background`, body text 4.5:1, a solid tone is never text below 4.5:1, and text and icons take the soft foreground, never the solid tone."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -706,7 +649,6 @@ rules:
       - {kind: eslint-fe, id: status-text-uses-soft-foreground}
   - id: R62
     code: "FE_NATIVE_FORM_CONTROL"
-    title_vi: "Control form thô"
     law: "No raw form controls, native images or raw structural tags in product tiers; the grammar renders them."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -718,7 +660,6 @@ rules:
       - {kind: eslint-fe, id: image-has-size}
   - id: R63
     code: "FE_PACKAGE_SHAPE"
-    title_vi: "Gói dùng chung sai hình dạng"
     law: "Packages build to `dist` with explicit exports and no dead unit."
     kinds: [check, design]
     gates: [land, ci]
@@ -727,7 +668,6 @@ rules:
       - {kind: machine, id: package-shape, at: scripts/checks/architecture/package-shape.mjs}
   - id: R64
     code: "FE_APP_ISOLATION"
-    title_vi: "App import app khác"
     law: "Apps never import apps; ui-screen declares `app`."
     kinds: [check, codemod]
     gates: [settle, land, ci]
@@ -736,7 +676,6 @@ rules:
       - {kind: machine, id: app-isolation, at: scripts/checks/architecture/tiers.mjs}
   - id: R65
     code: "FE_SIZE_AND_STATE_BUDGET"
-    title_vi: "Vượt ngân sách hook và state"
     law: "Hook and state budgets; no hand-written poll loop; keyed lists; everything an effect starts is released by its cleanup; no swallowed error or console."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -753,7 +692,6 @@ rules:
       - {kind: eslint-fe, id: no-console}
   - id: R66
     code: "FE_E2E_SHAPE"
-    title_vi: "Spec e2e sai hình dạng"
     law: "Playwright shape, three viewports, no environment coupling."
     kinds: [lint, codemod]
     gates: [land, ci]
@@ -768,7 +706,6 @@ rules:
       - {kind: eslint-fe, id: playwright-viewports}
   - id: R67
     code: "FE_SPEC_QUALITY"
-    title_vi: "Spec component kém chất lượng"
     law: "No class pinning, no barrel specs, axe per connected screen."
     kinds: [lint, design]
     gates: [settle, land, ci]
@@ -782,7 +719,6 @@ rules:
       - {kind: eslint-fe, id: unit-test-colocated}
   - id: R68
     code: "BE_SQL_INTERPOLATED"
-    title_vi: "Giá trị chạy lúc chạy bị ghép vào chuỗi SQL"
     law: "SQL text carries no runtime substitution; values are numbered parameters."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -791,7 +727,6 @@ rules:
       - {kind: eslint-be, id: no-interpolated-sql}
   - id: R69
     code: "BE_QUERY_UNBOUNDED"
-    title_vi: "Truy vấn đọc không có giới hạn số dòng"
     law: "A read that can return many rows states `take`, `limit` or `LIMIT`, or pages by cursor."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -800,7 +735,6 @@ rules:
       - {kind: eslint-be, id: query-needs-limit}
   - id: R70
     code: "BE_HTTP_TIMEOUT"
-    title_vi: "Gọi HTTP ra ngoài không có timeout"
     law: "Every outbound `fetch`, axios or HttpService call states a timeout or an abort signal."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -809,7 +743,6 @@ rules:
       - {kind: eslint-be, id: http-needs-timeout}
   - id: R71
     code: "BE_LOG_SECRET"
-    title_vi: "Bí mật hoặc dữ liệu cá nhân bị ghi vào log"
     law: "A `Logger` call carries no `Secret` or `Pii` value and no credential or personal identifier by name; log an id or a masked form."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -818,7 +751,6 @@ rules:
       - {kind: eslint-be, id: no-secret-in-log}
   - id: R72
     code: "BE_TYPE_ESCAPE"
-    title_vi: "Ép kiểu never hoặc khẳng định non-null"
     law: "No type escape in any file, specs included: no `as X` (only `as const`), `<X>y`, `x!` or `any` (the factory turns on the typescript-eslint rules `consistent-type-assertions` with `never`, `no-non-null-assertion` and `no-explicit-any`), no `Function` type, no `eval`."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -827,7 +759,6 @@ rules:
       - {kind: eslint-be, id: no-function-or-eval}
   - id: R73
     code: "BE_ASYNC_NO_AWAIT"
-    title_vi: "Hàm async không có await"
     law: "An `async` function contains an `await`; otherwise it is not `async`."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -836,7 +767,6 @@ rules:
       - {kind: eslint-be, id: async-needs-await}
   - id: R74
     code: "BE_MIGRATION_REVERSIBLE"
-    title_vi: "Migration không có down đảo ngược được"
     law: "Every migration declares a `down()` that reverses its `up()`; never empty, never a bare throw."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -845,7 +775,6 @@ rules:
       - {kind: eslint-be, id: migration-down-reversible}
   - id: R75
     code: "BE_RETURN_TYPE"
-    title_vi: "Handler hoặc phương thức công khai thiếu kiểu trả về"
     law: "Handlers and public methods of an Injectable, Resolver or Controller declare their return type."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -854,7 +783,6 @@ rules:
       - {kind: eslint-be, id: explicit-handler-return-type}
   - id: R76
     code: "BE_JSON_PARSE_UNGUARDED"
-    title_vi: "JSON.parse không nằm trong try"
     law: "`JSON.parse` sits inside a `try` in its own function and fails as a typed outcome."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -863,7 +791,6 @@ rules:
       - {kind: eslint-be, id: json-parse-needs-guard}
   - id: R77
     code: "BE_QUERY_IN_LOOP"
-    title_vi: "Truy vấn chạy trong vòng lặp (N+1)"
     law: "A repository, entity-manager or query-builder read does not run once per element of a loop; read once before the loop by key list."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -872,7 +799,6 @@ rules:
       - {kind: eslint-be, id: no-query-in-loop}
   - id: R78
     code: "BE_USER_COPY_LITERAL"
-    title_vi: "Chữ hiển thị cho người dùng viết thẳng trong mã nguồn"
     law: "A literal exception message, notification text or response copy comes from the per-capability messages catalog through the typed `MessageCatalog` port, not from source."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -881,7 +807,6 @@ rules:
       - {kind: eslint-be, id: user-copy-through-catalog}
   - id: R79
     code: "BE_AMBIENT_CLOCK"
-    title_vi: "Đọc đồng hồ hệ thống trực tiếp"
     law: "`Date.now`, a bare `new Date()`, `performance.now`, `process.hrtime` and `Temporal.Now` are referenced only inside `platform/clock`, specs included; code asks the injected `Clock` port and specs use `FakeClock`."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -890,7 +815,6 @@ rules:
       - {kind: eslint-be, id: no-ambient-clock}
   - id: R80
     code: "BE_INBOX_DEDUPE_MISSING"
-    title_vi: "Thiếu chống trùng lặp qua inbox"
     law: "Every consumer and every `SignedWebhook` handler makes `claim(source, eventId)` on the `Inbox` port its first awaited expression and returns early when the claim answers `false`."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -899,7 +823,6 @@ rules:
       - {kind: eslint-be, id: inbox-dedupe-required}
   - id: R81
     code: "BE_HAND_ROLLED_RETRY"
-    title_vi: "Tự viết vòng lặp thử lại thay vì dùng bộ trợ giúp chung"
     law: "A loop that catches an error and waits before trying again goes through the shared `platform/retry` helper, never a hand-written loop."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -908,7 +831,6 @@ rules:
       - {kind: eslint-be, id: no-hand-rolled-retry}
   - id: R82
     code: "BE_TRANSACTION_EXTERNAL_CALL"
-    title_vi: "Giao dịch cơ sở dữ liệu bao trùm một lệnh gọi ra ngoài"
     law: "No transaction spans an external call; commit first and call out after, or write an outbox message inside the transaction."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -917,7 +839,6 @@ rules:
       - {kind: eslint-be, id: no-external-call-in-transaction}
   - id: R83
     code: "BE_UNNAMED_DATA_ACCESS"
-    title_vi: "Truy cập cơ sở dữ liệu không qua EntityManager dùng chung có tên"
     law: "The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, `apps/migrate` and the test world `src/tests/world`, whose `world.db.<connection>` EntityManager the specs use."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -931,7 +852,6 @@ rules:
       - {kind: eslint-be, id: require-entity-table-name}
   - id: R84
     code: "BE_CONNECTION_DUPLICATE"
-    title_vi: "Một cơ sở dữ liệu có hơn một kết nối hoặc injector"
     law: "One physical database is one connection and one `Inject<Conn>EntityManager()` injector declared once in `platform/database`; `hfs.json` connections, connection files, injectors and module registrations correspond one to one."
     kinds: [lint, check]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -941,7 +861,6 @@ rules:
       - {kind: machine, id: connection-map, at: scripts/checks/architecture/connection-map.mjs}
   - id: R85
     code: "BE_RAW_INJECT"
-    title_vi: "Phụ thuộc hạ tầng không được tiêm qua Inject*()"
     law: "Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -956,7 +875,6 @@ rules:
       - {kind: eslint-be, id: no-string-token}
   - id: R86
     code: "BE_SQL_TABLE_OWNER"
-    title_vi: "SQL ghi bảng của năng lực khác hoặc đọc không giới hạn"
     law: "SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded."
     kinds: [check, design]
     gates: [settle, land, ci]
@@ -965,7 +883,6 @@ rules:
       - {kind: machine, id: sql-owner, at: scripts/checks/architecture/sql-owner.mjs}
   - id: R87
     code: "BE_CQRS_SHAPE"
-    title_vi: "Tầng ứng dụng sai hình CQRS"
     law: "The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`; no use-case classes, forwarder services or in-process events; a message and an injected dependency are `readonly`."
     kinds: [lint, codemod, check]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -980,7 +897,6 @@ rules:
       - {kind: machine, id: readonly-boundary, at: scripts/checks/architecture/contracts.mjs}
   - id: R88
     code: "BE_TRANSPORT_SHAPE"
-    title_vi: "Tầng giao tiếp làm nhiều hơn chuyển lệnh"
     law: "A transport handler maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else, returns no envelope and takes no `GraphQLJSON`."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -995,8 +911,7 @@ rules:
       - {kind: eslint-be, id: em-injection-slots}
   - id: R89
     code: "BE_SOURCE_FORM"
-    title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"
-    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji or Vietnamese outside message catalogs; a public input or output is a named contract, never an inline object type."
+    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_SOURCE_FORM", "BE_PUBLIC_CONTRACT_FORM"]
@@ -1017,7 +932,6 @@ rules:
       - {kind: machine, id: public-contract-form, at: scripts/checks/architecture/contracts.mjs}
   - id: R90
     code: "BE_INFRA_OWNER"
-    title_vi: "Thư viện hạ tầng dùng ngoài năng lực sở hữu"
     law: "Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -1026,14 +940,14 @@ rules:
       - {kind: eslint-be, id: infra-import-owner}
   - id: R91
     code: "FE_SOURCE_FORM"
-    title_vi: "Tệp nguồn FE sai quy ước tên, vị trí hoặc chú thích"
-    law: "Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc and no emoji."
+    law: "Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc, no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside the i18n catalogs and the i18n e2e fixtures slot."
     kinds: [lint, codemod, check]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["FE_SOURCE_FORM", "FE_SOURCE_LAYOUT_INVALID"]
     enforcers:
       - {kind: eslint-fe, id: require-export-jsdoc}
       - {kind: eslint-fe, id: no-emoji-in-source}
+      - {kind: eslint-fe, id: no-vietnamese-in-source}
       - {kind: eslint-fe, id: no-shell-tier}
       - {kind: eslint-fe, id: source-tier-marker-matches-folder}
       - {kind: eslint-fe, id: surface-folder-two-files-only}
@@ -1050,7 +964,6 @@ rules:
       - {kind: machine, id: frontend-source-layout, at: scripts/checks/architecture/frontend.mjs}
   - id: R92
     code: "FE_COMPONENT_API"
-    title_vi: "Component FE sai bề mặt công khai"
     law: "A component exposes the canon surface: typed named props and slots, a presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file; a pure component reaches no hook, router, locale or API."
     kinds: [lint, design, check]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -1077,7 +990,6 @@ rules:
       - {kind: machine, id: component-purity, at: scripts/checks/architecture/frontend.mjs}
   - id: R93
     code: "FE_VENDOR_BOUNDARY"
-    title_vi: "Thư viện giao diện bên ngoài dùng ngoài chủ sở hữu"
     law: "Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner; the Grammar package is imported only through its selected code and style entry and keeps its declared contract."
     kinds: [lint, codemod, check]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -1091,7 +1003,6 @@ rules:
       - {kind: machine, id: grammar-entry, at: scripts/checks/architecture/frontend.mjs}
   - id: R94
     code: "FE_SLOT_FILE_ROLE"
-    title_vi: "Tệp không đúng vai trò trong slot"
     law: "A front-end file is owned by a slot and named by it: a slot that owns a directory (route, feature, components, hooks, api module) holds only the files its `allows` list names, and holds them inside a folder of its own."
     kinds: [check, design]
     gates: [settle, land, ci]
@@ -1100,7 +1011,6 @@ rules:
       - {kind: machine, id: fe-slot-allows, at: scripts/checks/architecture/fe-slot-allows.mjs}
   - id: R95
     code: "BE_OPERATION_CONTRACT"
-    title_vi: "Thao tác có phiên bản không có hợp đồng kiểu"
     law: "A versioned operation is declared once in the app's typed operation table (`OperationContract<Input, Output, RefusalCode>` registered by `defineOperations`): its input and output are closed types (never `any`, `unknown` or `Record<string, unknown>`), its refusal codes a closed union of string literals, and the route that serves the table takes `OperationRequest<Table>` and answers `Promise<OperationReply<Table>>` of that one table."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
@@ -1108,3 +1018,11 @@ rules:
     enforcers:
       - {kind: eslint-be, id: operation-contract-decidable}
       - {kind: eslint-be, id: operation-route-driven-by-table}
+  - id: R96
+    code: "HFS_DOC_NOT_ENGLISH"
+    law: "Every Markdown and YAML document under knowledge/, docs/, src/ and apps/ is English, code fences included; only YAML data in a message-catalog or i18n-fixtures slot may hold another language."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_DOC_NOT_ENGLISH"]
+    enforcers:
+      - {kind: machine, id: doc-language, at: scripts/checks/architecture/doc-language.mjs}

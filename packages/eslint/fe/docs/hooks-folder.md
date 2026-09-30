@@ -24,6 +24,6 @@ export const useCourse = () => 1
 
 **Finding code:** `FE_HOOKS_ARE_HOOKS`
 
-**Vì sao (why):** `<file>` trong `hooks/` không phải React hook. Reader server về `modules/api`, helper về `<domain>.shared.ts`.
+**Why:** `<file>` in `hooks/` is not a React hook. Server readers belong in `modules/api`, helpers in `<domain>.shared.ts`.
 
-**Cách sửa:** Mỗi tệp `use*.ts` một hook; helper dùng chung vào `<domain>.shared.ts`; reader server vào `modules/api/<domain>/read-*.ts`.
+**Fix:** One hook per `use*.ts` file; shared helpers go into `<domain>.shared.ts`; server readers go into `modules/api/<domain>/read-*.ts`.

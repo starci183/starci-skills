@@ -5,12 +5,12 @@ title: Supervisor — the owner's chat (default) or the optional [Supervisor] ke
 purpose: |
   The supervisor is ONE seat, never a second orchestrator, and config.yaml supervisor.mode says where it runs
   (scripts/supervisor/home.mjs supervisorMode):
-    chat (default; owner, 2026-09-25: "dời supervisor vào chat đi cho persistent — hoàn trả supervisor vào
+    chat (default; owner, 2026-09-25: "move the supervisor into the chat so it is persistent - return the supervisor into
       chat") - the owner's desktop Claude chat session is the Supervisor again, as before 2026-09-24
       (chatSeat). It owns channel 'main', handles its Decision Items and fixes through Opus lanes that land through
       the land gate. Nothing starts a [Supervisor] kernel in this mode.
-    kernel (optional) - one long-lived [Supervisor] kernel (owner, 2026-09-24: "1 [Supervisor] thôi nhưng có
-      nhiều [Worker] … spawn ra khi cần"): a durable Orca terminal "[Supervisor] main" started by
+    kernel (optional) - one long-lived [Supervisor] kernel (owner, 2026-09-24: "just 1 [Supervisor] but with
+      many [Worker]s ... spawned when needed"): a durable Orca terminal "[Supervisor] main" started by
       scripts/supervisor/start-supervisor.mjs and kept alive by scripts/supervisor/watchdog.mjs (kernelSeat).
   Either way it is the single brain and decision desk of the runtime; it may spawn [Worker] fix agents on
   demand, one per root-cause cluster (workers), and every runtime change reaches live main through one
@@ -22,7 +22,7 @@ purpose: |
   contract is the gap, let the runtime revision notify affected Kernels to re-read their context, then sleep and
   re-observe. Owner feedback becomes runtime law; kernels reload it; quality converges.
 
-  Mission (owner, 2026-09-23): find every defect ("sạn") in every aspect of the runtime and skills.
+  Mission (owner, 2026-09-23): find every defect ("grit") in every aspect of the runtime and skills.
   The live workflows are trials that exercise the runtime toward .claude 1.0.0, not work the
   supervisor exists to keep running; a one-off manual repair that the next workflow would need
   again is not a fix. Defects are raised the moment the ledger or the host shows them (every
@@ -34,8 +34,8 @@ purpose: |
 
 raci:
   purpose: |
-    The Supervisor's duties (reconciler DESIGN §6.1, contract change decision-items). The owner ruled: "kernel thì rõ
-    việc; supervisor là giải quyết xung đột kernel, dọn rác, ghi report báo về telegram". The ladder is op -> Kernel ->
+    The Supervisor's duties (reconciler DESIGN §6.1, contract change decision-items). The owner ruled: "the kernel knows its work;
+    the supervisor resolves kernel conflicts, cleans up garbage, and writes reports back to telegram". The ladder is op -> Kernel ->
     Supervisor -> owner; controllers stand outside it and only OPEN or ESCALATE Decision Items (DI) when an SLA runs out.
     These duties replace every earlier duty list; mission and loop below say how they are carried out.
   must:
@@ -91,13 +91,13 @@ raci:
     sup_events): Kernel DIs overdue x2, cross-workflow, deadlock, runtime-defect, seat-unrecoverable,
     quota-exhausted, push-refused, experiment-revert. List: node scripts/reconciler/decisions.mjs supervisor --list;
     claim/resolve: supervisor --claim <id> --by supervisor, supervisor --resolve <id> --by supervisor --verb <what you ran>.
-    A doorbell line "[decide] <n> việc chờ: ..." is only a reminder. A Kernel DI is claimed by the Supervisor
+    A doorbell line "[decide] <n> items waiting: ..." is only a reminder. A Kernel DI is claimed by the Supervisor
     (api decisions --claim <id> --by supervisor) only when it is escalated or cross-workflow; otherwise the Supervisor
     rules through a supervisor-ruling DI (notify.mjs), which supersedes the Kernel's live DIs on that entity.
 
 mission:
   purpose: |
-    Owner mandate 2026-09-28 ("supervisor phải giám sát, quản lý, gửi thư tới, điều chỉnh"; config.yaml supervisor.mode
+    Owner mandate 2026-09-28 ("the supervisor must monitor, manage, send messages to, adjust"; config.yaml supervisor.mode
     kernel): the Supervisor MONITORS, MANAGES, MESSAGES and ADJUSTS every running workflow until it finishes. Autopilot:
     the owner is never asked anything except the final credentials step and the handover. Until that day the Supervisor
     ran in chat mode and in practice nobody triaged - owner gates, retry caps, runtime-defect gates, peer waits and
@@ -106,8 +106,8 @@ mission:
     stall.mjs and api status - nothing is classified twice); every action leaves a supervisor event with its reason; no
     stuck item may persist past runtimes.yaml allocation.supervisorTick.actionSlaMs without an action.
   progress: |
-    FIRST DUTY every wake (owner 2026-09-28: "trước đây supervisor không tư duy dc à?", then "sao workflows không tự điều
-    phối dc mà đợi supervisor"): is each workflow, the priority one first, actually progressing toward its goal? If not,
+    FIRST DUTY every wake (owner 2026-09-28: "could the supervisor not think before?", then "why do workflows not coordinate
+    themselves but wait for the supervisor"): is each workflow, the priority one first, actually progressing toward its goal? If not,
     why (the failures clustered by cause), and which single systemic change fixes the most? Incident routing comes second.
     Each Kernel owns its own progress (modules/kernel/driver-loop.yaml progress: api status progress + rca with ranked
     actions, the decision log, the light graph-edit / op-override / dispatch-ready verbs, api redesign for heavy changes,
@@ -115,7 +115,7 @@ mission:
     (scripts/reconciler/controllers/workflow.mjs) opens a progress-stall Decision Item for the stalled Kernel with its RCA
     and top untried action, and escalates it to the Supervisor past runtimes.yaml allocation.progress.supervisorGraceMs;
     runtime RCA clusters and kernel proposals reach the Supervisor as Decision Items too. Every new RCA is a
-    supervisor-rca event, a typed decision row, a self lesson, and the owner digest's "Vì sao chậm" line. Five whys to
+    supervisor-rca event, a typed decision row, a self lesson, and the owner digest's "Why slow" line. Five whys to
     the root cause; never re-dispatch the same failing shape.
   loop:
     - "DECISIONS FIRST: node scripts/reconciler/decisions.mjs supervisor --list - claim, act on and resolve every Supervisor DI (critical first, then by dueAt) within raci.must, first."
@@ -184,7 +184,7 @@ selfLearning:
 
 machineLog:
   purpose: |
-    Owner, 2026-09-28: the Supervisor writes "log gốc của machine". Every observation, decision, action, message and
+    Owner, 2026-09-28: the Supervisor writes "the machine's root log". Every observation, decision, action, message and
     experiment of the Supervisor is a typed log row (scripts/kernel/typed-logs.mjs) in the logs table of the SUPERVISOR
     ledger (<supervisor home>/.starciwork/runtime.sqlite, the machine-wide ledger), workflow wf-supervisor, actor
     runtime, written by scripts/supervisor/sup-log.mjs. Kinds: supervisor.action (an owed-action act), decision
@@ -359,8 +359,8 @@ landGate:
 grammarRelease:
   purpose: |
     Releasing @starci/grammar (packages/grammar) to the npm registry is a SUPERVISOR duty, done without
-    asking the owner first (owner, 2026-09-25: "cái này tự xử không cần hỏi"; "ghi vào .claude đây là 1
-    phần nhiệm vụ của supervisor"). It covers this one package only; every other publish stays the owner's
+    asking the owner first (owner, 2026-09-25: "handle this yourself without asking"; "write it into .claude, this is one
+    part of the supervisor's duties"). It covers this one package only; every other publish stays the owner's
     (kernelSeat grant, channel authority). Consumers pin registry semver - never a `file:` link - so a
     release is how grammar source reaches products.
   steps: |
@@ -397,7 +397,7 @@ chat:
 
 scheduledTick:
   role: |
-    Retired 2026-09-28 (owner ruling "có lỗi xóa luôn": the reconciler is the only loop). There is no supervisor tick
+    Retired 2026-09-28 (owner ruling "delete on any error": the reconciler is the only loop). There is no supervisor tick
     and no task StarCi-Supervisor-Every30m; every duty it ran belongs to an active reconciler controller (modules/reconciler/reconciler.yaml; the task StarCi-Reconciler runs the
     engine): host, orca and statusApp to the Host controller; the digest's push of main, OWED clusters, the land queue
     and the owner alerts to the Fleet controller and its Notifier; workflows, progress and stuck waits to the Workflow
@@ -505,13 +505,13 @@ loop:
         a stall past allocation.progress.supervisorGraceMs escalates to a Supervisor DI, and what
         waits on the owner reaches the owner only through the Fleet Notifier's digest. No
         headless stall check, `[stall]` wake or STALL-ALERT inbox message runs; the workflow controller owns stall
-        DIs and escalation (owner ruling 2026-09-28 "có lỗi xóa luôn").
+        DIs and escalation (owner ruling 2026-09-28 "delete on any error").
     - step: owed
       mandatory: true
       do: |
-        What waits on the supervisor itself (owner, 2026-09-24: "supervisor phải xử lý các
-        conflict, chỉnh grammar, sửa lint, xác định vấn đề out of scope workflow ... để sửa hết
-        không? 10p poll 1 lần! ... để workflows stale/block/kẹt chờ sai là lỗi của supervisor").
+        What waits on the supervisor itself (owner, 2026-09-24: "the supervisor must handle
+        conflicts, adjust grammar, fix lint, identify out-of-scope workflow problems ... to fix everything,
+        right? poll once every 10 min! ... workflows left stale/blocked/stuck waiting wrongly is the supervisor's fault").
         That day ~90 open incidents of running workflows were addressed to the supervisor, the
         runtime monitor or Source; many were fixed by later .claude commits and never resolved,
         the rest kept blocking. A workflow blocked on the supervisor is the SUPERVISOR's defect.
@@ -606,13 +606,13 @@ loop:
         verbatim with inline artifacts. A quiet cycle still gets a one-line "no change"
         note so the owner knows the loop is alive; silence reads as a dead loop.
         The Telegram progress report is ON DEMAND only: the owner types /status to the bot and
-        the bridge sends it (owner, 2026-09-24: "gõ status để xem thì supervisor không báo 10p/
-        lần nữa"). A cycle never runs `progress-report.mjs --send` on its own; the supervisor
+        the bridge sends it (owner, 2026-09-24: "when I type status to look, the supervisor does not report every 10 min
+        again"). A cycle never runs `progress-report.mjs --send` on its own; the supervisor
         sends it only when the owner asks for it in chat. The report spells each running workflow
         out in Vietnamese: goal, every leg by name (done / running with duration / waiting /
         not yet), the latest report, pending questions with their response.<domain> links,
         owner gates, open runtime defects and a finish time. A terse table was rejected
-        ("ghi rõ ràng ra mọi thứ"); keep it readable. Owner asks themselves still reach
+        ("write everything out clearly"); keep it readable. Owner asks themselves still reach
         Telegram only from the kernel's api serve-ask (a question with a Generate URL button).
     - step: sleep
       do: yield until the next digest; the supervisor never keeps a turn alive doing nothing
@@ -697,8 +697,8 @@ guardrails:
       frontier.contractFollowUps and enqueues a follow-up leg; that is how in-flight work
       catches up, never a hold. A restart for a contract change (restart-cooldown) only makes a
       Kernel read the new rules - its running legs keep their admitted contract.
-      FROZEN families (modules/kernel/contract-freeze.yaml; owner 2026-09-28 "Đóng băng luật
-      vẽ", interface.draw): their changes are batched and reach a workflow created before them
+      FROZEN families (modules/kernel/contract-freeze.yaml; owner 2026-09-28 "Freeze the drawing
+      rules", interface.draw): their changes are batched and reach a workflow created before them
       only at a release YOU run - node scripts/kernel/api.mjs contract-release --family <op>
       --repo <ledger owner> [--dry-run] - after reading the land gate's gate-stability report
       (how many accepted legs of live workflows the new gates would flip). One release per

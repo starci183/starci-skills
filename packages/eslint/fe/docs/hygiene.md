@@ -51,9 +51,9 @@ const subscribe = (listener: () => void) => {
 
 **Finding code:** `FE_EFFECT_CLEANUP`
 
-**Vì sao (why):** `<timer>` ở `<file>` chạy ngoài effect hoặc trong effect không có cleanup gọi `clearTimeout`/`clearInterval`.
+**Why:** `<timer>` in `<file>` runs outside an effect, or inside an effect with no cleanup calling `clearTimeout`/`clearInterval`.
 
-**Cách sửa:** Đặt timer trong `useEffect` và trả `() => clearTimeout(id)`; hoặc chuyển vào một hook làm việc đó.
+**Fix:** Put the timer in `useEffect` and return `() => clearTimeout(id)`; or move it into a hook that does so.
 
 ## `starci-fe/no-data-fetch-in-effect`
 
@@ -73,9 +73,9 @@ const { data } = useSWR(key, fetcher)
 
 **Finding code:** `FE_EFFECT_FETCH`
 
-**Vì sao (why):** `useEffect` ở `<file>` tải dữ liệu (`await`, `fetch`, `.then`): không cache, không gộp request, không trạng thái loading/lỗi, không huỷ.
+**Why:** `useEffect` in `<file>` loads data (`await`, `fetch`, `.then`): no cache, no request merging, no loading/error state, no cancellation.
 
-**Cách sửa:** Đọc phía client bằng SWR gọi client của app (`hooks/`), phía route bằng server reader `modules/api/<domain>/read-*.ts`.
+**Fix:** Read on the client with SWR calling the app client (`hooks/`), and on the route side with a server reader `modules/api/<domain>/read-*.ts`.
 
 ## `starci-fe/no-empty-catch`
 
@@ -95,9 +95,9 @@ try { await save() } catch (error) { return { kind: "unavailable", cause: error 
 
 **Finding code:** `FE_SWALLOWED_ERROR`
 
-**Vì sao (why):** `catch` hoặc `.catch` ở `<file>` không làm gì: lỗi biến mất, không thông báo, không dấu vết.
+**Why:** `catch` or `.catch` in `<file>` does nothing: the error vanishes, with no notice and no trace.
 
-**Cách sửa:** Trả một outcome có kiểu mang nguyên nhân, hiển thị trạng thái lỗi, hoặc ném lại.
+**Fix:** Return a typed outcome carrying the cause, show an error state, or rethrow.
 
 ## `starci-fe/no-console`
 
@@ -117,6 +117,6 @@ return { kind: "unavailable", cause: error }
 
 **Finding code:** `FE_CONSOLE_CALL`
 
-**Vì sao (why):** `console.<method>` ở `<file>`: không vào pipeline log nào và lộ chi tiết nội bộ cho người dùng.
+**Why:** `console.<method>` in `<file>`: it enters no log pipeline and exposes internal details to the user.
 
-**Cách sửa:** Trả outcome có kiểu, hiển thị trạng thái lỗi, hoặc để lỗi tới `error.tsx`.
+**Fix:** Return a typed outcome, show an error state, or let the error reach `error.tsx`.

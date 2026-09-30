@@ -28,7 +28,7 @@
  * and spares tokens is worth more than a clever one nobody trusts.
  */
 
-import { SECOND_LANGUAGE_LETTER, isContentFile } from "./comments.mjs"
+import { isContentFile } from "./comments.mjs"
 import { isComponentFile, kindOfFile } from "./lib/scope.mjs"
 
 /** True when a file sits in a component layer that must not resolve copy: every layer but `blocks` receives every word it renders, so it can know no domain and no sentence. */
@@ -203,24 +203,12 @@ export const noHardcodedCopy = {
         "`{{attr}}=\"{{text}}\"` is copy, hardcoded. One reader in another language sees it verbatim - and `{{attr}}` is where copy hides, because it does not read as a sentence when scanning the file. Use `t(\"key\")`.",
       property:
         "`{{key}}: \"{{text}}\"` is copy in an object, so whatever displays this object (a page title, an empty state, a toast) shows it in one language. Use `t(\"key\")`, or build the object where `t` is in scope.",
-      second:
-        "A second-language string in source. Text in another language is content, and content lives in `messages/<locale>.json` behind `t()`; there is no pragma that lets it stay here.",
-      comment:
-        "A second-language comment. Source is English so that every reader can read all of it; the product's other language belongs in the catalogue.",
     },
   },
   create(context) {
     if (isContentFile(context)) return {}
     const source = context.sourceCode || context.getSourceCode()
-    /** Value nodes already reported through their owner (attribute, property), so a string reports once. */
-    const claimed = new WeakSet()
-
     return {
-      Program() {
-        for (const comment of source.getAllComments()) {
-          if (SECOND_LANGUAGE_LETTER.test(comment.value)) context.report({ node: comment, messageId: "comment" })
-        }
-      },
       JSXText(node) {
         const text = String(node.value || "").trim()
         if (hasLetter(text)) context.report({ node, messageId: "text", data: { text } })
@@ -230,12 +218,10 @@ export const noHardcodedCopy = {
         const parent = node.parent
         if (!parent || (parent.type !== "JSXElement" && parent.type !== "JSXFragment")) return
         if (templateHasWord(node.expression)) {
-          claimed.add(node.expression)
           return context.report({ node, messageId: "text", data: { text: source.getText(node.expression) } })
         }
         const text = staticString(node.expression)
         if (text === null || !hasLetter(text.trim())) return
-        claimed.add(node.expression)
         context.report({ node, messageId: "text", data: { text: text.trim() } })
       },
       JSXAttribute(node) {
@@ -248,7 +234,6 @@ export const noHardcodedCopy = {
         const text = template ?? attributeText(node)
         if (text === null) return
         if (strict ? !hasLetter(text.replaceAll("#", " ")) : !looksLikeProse(text)) return
-        claimed.add(value)
         context.report({ node, messageId: "attribute", data: { attr, text: template === null ? text : source.getText(value) } })
       },
       Property(node) {
@@ -259,20 +244,7 @@ export const noHardcodedCopy = {
         if (text === null) return
         // a copy key needs prose; any other key needs a whole sentence: { ready: "Your course is ready" } in a hook is copy
         if (!(COPY_KEYS.has(key) ? looksLikeProse(text) : looksLikeSentence(text))) return
-        claimed.add(node.value)
         context.report({ node, messageId: "property", data: { key, text: template === null ? text : source.getText(node.value) } })
-      },
-      Literal(node) {
-        if (claimed.has(node) || typeof node.value !== "string") return
-        if (SECOND_LANGUAGE_LETTER.test(node.value)) context.report({ node, messageId: "second" })
-      },
-      TemplateElement(node) {
-        if (SECOND_LANGUAGE_LETTER.test((node.value && node.value.cooked) || "")) {
-          context.report({ node, messageId: "second" })
-        }
-      },
-      Identifier(node) {
-        if (SECOND_LANGUAGE_LETTER.test(node.name)) context.report({ node, messageId: "second" })
       },
     }
   },

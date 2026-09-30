@@ -4,7 +4,7 @@ description: >-
   Run the FULL test suites of the runtime (.claude) and of every product repository that has unpushed main commits, fix
   what is red, and only then push main. It is the ONLY place a full suite runs - ops, kernels, lands and .claude upgrades
   run just the specs of their own change. Thin wrapper over .claude/scripts/supervisor/push-git.mjs. Use when the owner
-  says push, "đẩy git", "push main", "chạy full test rồi push", or runs /push-git.
+  says push, "push main", "run full tests then push", or runs /push-git.
 user-invocable: true
 ---
 
@@ -61,7 +61,7 @@ nothing is ahead.
 4. If the push is refused (secret scan, pre-push hook, remote), report the reason as printed; never retry with force
    or `--no-verify`.
 
-5. Report to the owner in Vietnamese, from the printed result: one line "XANH" or "ĐỎ" for the whole run, then per
+5. Report to the owner in Vietnamese, from the printed result: one line "GREEN" or "RED" for the whole run, then per
    repository its verdict, the number of commits pushed, and for each red step the failing files with their first
    failing case (copy them, do not paraphrase), then what happens next (fixers spawned, or nothing to do).
    Say plainly that e2e was not run.

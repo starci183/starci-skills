@@ -836,7 +836,7 @@ BE_SECRET_DEFAULT:
 BE_SOURCE_FORM:
   title: "Back-end source file breaks the naming or form canon"
   title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"
-  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji hay tiếng Việt ngoài catalog messages/."
+  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji, và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test ngoài catalog messages/ và slot fixture i18n."
   causes_vi:
     - "Tệp dùng hậu tố bị cấm (use-case, repository, store, util, helper, types, constants)"
     - "Lớp export không kết thúc bằng hậu tố vai trò của tệp và cũng không kết thúc bằng tên port (interface trong *.port.ts hoặc *.contracts.ts) mà nó implements"
@@ -12597,11 +12597,12 @@ FE_SIZE_AND_STATE_BUDGET:
 FE_SOURCE_FORM:
   title: "Front-end source file breaks the layout, naming or comment canon"
   title_vi: "Tệp nguồn FE sai quy ước tên, vị trí hoặc chú thích"
-  meaning_vi: "Tệp FE phải nằm đúng thư mục tầng với tên cố định, export hàm mũi tên trùng tên thư mục, có JSDoc tiếng Anh và không emoji; luật ESLint nêu trong lời nhắn chỉ rõ phần sai."
+  meaning_vi: "Tệp FE phải nằm đúng thư mục tầng với tên cố định, export hàm mũi tên trùng tên thư mục, có JSDoc tiếng Anh, không emoji và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test (trừ danh mục i18n và slot fixture i18n); luật ESLint nêu trong lời nhắn chỉ rõ phần sai."
   causes_vi:
     - "Tệp đặt sai tầng hoặc thư mục phụ trợ trong components"
     - "Export không khớp tên thư mục"
     - "Thiếu JSDoc hoặc có emoji"
+    - "Có chữ tiếng Việt trong mã nguồn ngoài danh mục i18n hoặc slot fixture i18n"
   nextStep_vi: "Chuyển tệp về đúng thư mục tầng, đổi tên export theo thư mục và thêm JSDoc tiếng Anh. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
@@ -13346,6 +13347,17 @@ BE_UNNAMED_DATA_ACCESS:
     - "constructor(private readonly dataSource: DataSource) {} ngoài module database của platform"
     - "constructor(@InjectRepository(CourseEntity) private readonly repo: Repository<CourseEntity>) {}"
   nextStep_vi: "Nhận EntityManager dùng chung qua tham số constructor với bộ tiêm Inject<Kết nối>EntityManager() của kết nối khai báo trong hfs.json (ví dụ InjectPrimaryEntityManager()) rồi gọi trực tiếp manager.find(Entity, ...), manager.save(Entity, ...); DataSource chỉ do module database của platform dựng; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DOC_NOT_ENGLISH:
+  title: "Document is not English"
+  title_vi: "Tài liệu không viết bằng tiếng Anh"
+  meaning_vi: "Tệp Markdown hoặc YAML trong knowledge/, docs/, src/ hoặc apps/ có chữ cái tiếng Việt (kể cả trong khối mã của Markdown); tài liệu, mẫu và ví dụ phải viết bằng tiếng Anh."
+  causes_vi:
+    - "Viết hoặc dán đoạn tiếng Việt vào tài liệu, mẫu, ví dụ hay lời trích của chủ dự án"
+    - "Đặt dữ liệu YAML có tiếng Việt ngoài slot danh mục thông điệp hoặc slot fixture i18n"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: dịch dòng được nêu sang tiếng Anh. Chỉ dữ liệu YAML trong slot danh mục thông điệp hoặc slot fixture i18n được giữ tiếng khác; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 

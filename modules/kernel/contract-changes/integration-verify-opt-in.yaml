@@ -5,7 +5,7 @@ summary: >-
   provider exchange with real credentials and secrets) belongs with e2e/UAT - manual, explicit, before release - not in
   default chains. The planner (scripts/route/route-plan.mjs, define-goal --plan) adds integration.verify (and the
   provision.ask custody leg before it) only when the goal asks: modules/goal/archetypes.yaml signalMatching.phraseSets
-  gains integrationIntent (integration test, kiểm thử tích hợp, live verification, verify OAuth/SMTP/payment live, ...)
+  gains integrationIntent (integration test, Vietnamese integration-test phrases, live verification, verify OAuth/SMTP/payment live, ...)
   and integrationNegation; without the ask an external-integration prompt ends at impl.X done (backend). The kernel
   side: modules/ops/ops/integration.verify.yaml declares policy.explicitAsk: integration; api enqueue stamps
   payload.explicitAsk from the goal text (scripts/route/explicit-ask.mjs, shared phrase matching in

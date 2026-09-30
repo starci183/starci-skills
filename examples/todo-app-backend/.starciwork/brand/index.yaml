@@ -10,7 +10,7 @@ brand:
     family: common
     tokenVocabulary: core, with imported Tailwind black/white primitives
     ownerRulingsVerbatim: |-
-      - **Mascot: a turtle** (con rùa). A friendly, calm turtle — it suits a product
+      - **Mascot: a turtle**. A friendly, calm turtle — it suits a product
         about keeping tasks steadily moving. It may appear in: the auth split-screen
         illustration panel, empty states, welcome/marketing surfaces, loading idles.
         It must never appear in destructive/danger contexts or inside form controls.
@@ -18,7 +18,7 @@ brand:
         confirms). Danger keeps the grammar token `--starci-core-danger`, do not
         redefine it.
       - **Auth aesthetic**: split-screen — illustration/mascot panel on the LEFT,
-        form on the RIGHT. The owner calls this "thẩm mỹ": the v3 empty-canvas
+        form on the RIGHT. The owner calls this "aesthetics": the v3 empty-canvas
         centered card was wrong.
       - **Real web UX**: sign-in must carry the furniture a real site has — email and
         password fields, a forgot-password link, a create-account link, and policy /
@@ -154,7 +154,7 @@ brand:
       loading belongs to interface.implement.
   mascot:
     name: turtle
-    description: A friendly, calm turtle (con rùa), suited to keeping tasks steadily moving.
+    description: A friendly, calm turtle, suited to keeping tasks steadily moving.
     status: generated-placeholder-pending-owner-asset-acceptance
     allowedIn:
       - auth illustration panel

@@ -5,7 +5,7 @@ describe("withCommonMessages", () => {
     it("lays the app's own copy over the shared common copy per locale", async () => {
         const loaders = withCommonMessages({
             en: async () => ({ default: { app: { title: "Shop" } } }),
-            vi: async () => ({ default: { app: { title: "Cửa hàng" } } }),
+            vi: async () => ({ default: { app: { title: "Shop (second locale)" } } }),
         })
         const en = (await loaders.en()).default
         expect(en.app).toEqual({ title: "Shop" })

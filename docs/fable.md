@@ -2,1213 +2,1299 @@
 
 ## ghost-context
 
-**Định nghĩa.** Một câu trong file canonical chỉ có nghĩa khi người đọc biết trạng thái
-*cũ* của repo. Người đọc mới thấy một phủ định của thứ họ chưa từng thấy, nên không hiểu
-câu đó đang nói gì và tại sao nó đứng ở đầu.
+**Definition.** A sentence in a canonical file only makes sense if the reader knows the
+*old* state of the repo. A new reader sees a negation of something they never saw, so they
+do not understand what the sentence is saying or why it comes first.
 
-**Ví dụ.** `CONTEXT.md:1` mở đầu bằng "StarCi is a **distless** source layout". Chữ
-`distless` chỉ có nghĩa với người biết repo từng build ra `.dist`. Chat mới hoặc dự án
-mới đọc thấy một từ không tồn tại trong tiếng Anh, phủ định một thứ không có trong tree.
+**Example.** `CONTEXT.md:1` opens with "StarCi is a **distless** source layout". The word
+`distless` only means something to someone who knows the repo used to build out a `.dist`.
+A fresh chat or a new project reads a word that does not exist in English, negating
+something that is not in the tree.
 
-**Luật rút ra.** File canonical (`CONTEXT.md`, `README.md`, `modules/**`, `docs/**`) mô tả
-hiện tại bằng câu khẳng định: "this tree is the runtime; `node` reads it directly". Lịch sử
-"từng là gì, nay không còn" đi vào `CHANGELOG.md` hoặc `.experiments/practices/`, không đi
-vào câu đầu của context.
+**Rule derived.** Canonical files (`CONTEXT.md`, `README.md`, `modules/**`, `docs/**`)
+describe the present with affirmative sentences: "this tree is the runtime; `node` reads it
+directly". History ("used to be X, no longer") goes into `CHANGELOG.md` or
+`.experiments/practices/`, never into the first sentence of the context.
 
-**Cách nhận ra.** Từ ghép với `-less`/`no-`/`former`/`legacy`/`không còn` ở vị trí định
-nghĩa, mà thứ bị phủ định không xuất hiện ở đâu khác trong tree.
+**How to spot it.** Compounds with `-less`/`no-`/`former`/`legacy`/`no longer` in a
+definition position, where the negated thing appears nowhere else in the tree.
 
 ## feedback-sediment
 
-**Định nghĩa.** Mỗi lần feedback đắp thêm một lớp luật lên file mà không gỡ hay gộp lớp
-cũ. Sau nhiều lần, file chứa các tầng trầm tích: trên nói A, dưới nói B, dưới nữa nói
-"nếu không phải C thì A và B". Từng câu đều từng đúng ở thời điểm nó được viết; đọc cả
-file thì mâu thuẫn. Người đọc mới không biết tầng nào là luật hiện hành, và LLM đọc nó sẽ
-chọn ngẫu nhiên một tầng hoặc bịa ra một luật dung hoà, tức là hallucinate.
+**Definition.** Each round of feedback piles another layer of rules onto a file without
+removing or merging the older layers. After many rounds the file holds strata of sediment:
+the top says A, below it says B, further below says "if not C then A and B". Each sentence
+was true at the time it was written; read as a whole, the file contradicts itself. A new
+reader cannot tell which layer is the current rule, and an LLM reading it will pick a layer
+at random or invent a compromise rule, that is, hallucinate.
 
-**Ví dụ.** Vai trò của chat trong `CONTEXT.md` có bốn tầng:
+**Example.** The role of chat in `CONTEXT.md` has four layers:
 
-| Tầng | Vị trí | Nói gì |
+| Layer | Location | What it says |
 |---|---|---|
 | A | `CONTEXT.md:3` | "Chat is the trigger only." |
 | B | `CONTEXT.md:3` | "With explicit unattended authority, `watchdog.mjs` owns the five-minute cadence" |
-| C | `CONTEXT.md:5` | Chat chạy supervisor loop: quan sát, vá `.claude`, restart kernel |
+| C | `CONTEXT.md:5` | Chat runs the supervisor loop: observe, patch `.claude`, restart the kernel |
 | D | `CONTEXT.md:33` | "One chat monitors one workflow ... no unattended solo runner and no second control plane" |
 
-A và C mâu thuẫn trực tiếp: trigger-only không thể vá contract và restart kernel. B và D
-mâu thuẫn: có "unattended authority" nhưng "no unattended solo runner". C và D mâu thuẫn:
-một chat giám sát nhiều workflow qua `poll.mjs --workflow <id>...` nhưng "one chat monitors
-one workflow". Mỗi tầng đến từ một lần feedback: watchdog thêm sau, supervisor thêm sau
-nữa, câu D có lẽ viết để chặn một đề xuất cũ về solo runner. Không câu nào bị gỡ.
+A and C contradict directly: trigger-only cannot patch the contract and restart the kernel.
+B and D contradict: there is "unattended authority" but "no unattended solo runner". C and D
+contradict: one chat supervises several workflows via `poll.mjs --workflow <id>...` but "one
+chat monitors one workflow". Each layer comes from one round of feedback: the watchdog was
+added later, the supervisor later still, and sentence D was probably written to block an old
+proposal about a solo runner. No sentence was ever removed.
 
-**Khác với ghost-context.** Ghost-context là một câu tham chiếu quá khứ không còn tồn tại.
-Feedback-sediment là nhiều câu cùng tồn tại ở hiện tại nhưng phủ định nhau.
+**Different from ghost-context.** Ghost-context is one sentence referring to a past that no
+longer exists. Feedback-sediment is many sentences that all exist in the present but negate
+each other.
 
-**Luật rút ra.** Feedback sửa luật thì thay câu cũ, không viết thêm câu mới bên dưới. Một
-khái niệm có một đoạn, đoạn đó là bản mới nhất. Nếu cần điều kiện ("nếu không phải C") thì
-điều kiện nằm trong cùng đoạn với luật mà nó sửa. Lịch sử "trước nói A nay nói B" đi vào
-`.experiments/practices/`, không nằm trong file canonical.
+**Rule derived.** When feedback changes a rule, replace the old sentence; do not write a new
+sentence below it. One concept gets one paragraph, and that paragraph is the latest version.
+If a condition is needed ("if not C"), the condition lives in the same paragraph as the rule
+it modifies. History ("earlier said A, now says B") goes into `.experiments/practices/`, not
+into the canonical file.
 
-**Cách nhận ra.** Cùng một danh từ chủ ngữ (chat, kernel, watchdog, op) xuất hiện với động
-từ "only" / "never" / "no other" ở hai đoạn cách xa nhau. Grep chủ ngữ rồi đặt các câu
-cạnh nhau; nếu phải giải thích "câu này viết trước, câu kia viết sau" là có sediment.
+**How to spot it.** The same subject noun (chat, kernel, watchdog, op) appears with the verb
+"only" / "never" / "no other" in two paragraphs far apart. Grep the subject and put the
+sentences side by side; if you have to explain "this one was written first, that one later",
+there is sediment.
 
-**Nơi cần rà.**
+**Where to sweep.**
 
-- [ ] `CONTEXT.md` chủ ngữ "chat": gộp A/B/C/D thành một đoạn duy nhất về ba vai chat có
-      thể đảm nhận (trigger, workflow-chat monitor, supervisor) và điều kiện của từng vai
-- [ ] `CONTEXT.md` chủ ngữ "kernel" và "watchdog": rà cùng cách
-- [ ] `docs/architecture.md:12` "spawned, not supervised, by chat" so với supervisor
-- [ ] `modules/kernel/driver-loop.yaml` header "chat = goal creator + trigger only" (dòng
-      ~12) so với `modules/supervisor/supervise.yaml`
+- [ ] `CONTEXT.md` subject "chat": merge A/B/C/D into a single paragraph about the three
+      roles a chat can take (trigger, workflow-chat monitor, supervisor) and the condition
+      for each role
+- [ ] `CONTEXT.md` subjects "kernel" and "watchdog": sweep the same way
+- [ ] `docs/architecture.md:12` "spawned, not supervised, by chat" versus the supervisor
+- [ ] `modules/kernel/driver-loop.yaml` header "chat = goal creator + trigger only" (line
+      ~12) versus `modules/supervisor/supervise.yaml`
 
-### Case: `modules/ops/ops/interface.draw.yaml` (360 dòng, 7 commit trong 2 ngày)
+### Case: `modules/ops/ops/interface.draw.yaml` (360 lines, 7 commits in 2 days)
 
-Đọc thử một file bất kỳ, kết quả:
+Reading an arbitrary file, the result:
 
-1. **Câu cụt do vá.** Step 1: "When a screen's direction is genuinely owner-level taste — a
-   novel surface, a brand moment, or materially different layout architectures that all
-   satisfy the accepted requirements." Hết câu, không có mệnh đề chính. Commit `614e67d55`
-   thay vế sau ("the representative set may hold alternative candidates...") bằng luật mới
-   "The default is one candidate per screen" nhưng để nguyên vế điều kiện của luật cũ.
-2. **Câu lặp do chèn.** Step 2 có "Include real product-shaped content:" rồi 5 dòng luật
-   mới, rồi lại "Include real product-shaped content," tiếp câu cũ. Commit `0b0b9e33a` chèn
-   khối mới vào giữa câu cũ thay vì viết lại câu.
-3. **Đầu file nói A, cuối file nói B.** Steps: mặc định một candidate mỗi screen. Khối
-   `business.whenNeeded` cuối file: "When the owner must pick between visual candidates".
-   Commit `614e67d55` sửa steps, không sửa business.
-4. **Một luật, bốn chỗ.** "Không được đoán tên image model" xuất hiện 4 lần (read `profile`,
-   write `designSource`, step 2, proof `imagegen-provenance`). "typed blocker" 4 lần.
-   Luật skeleton 3 lần (step 2, step 3, và ngầm ở step 1). Mỗi lần feedback lại đắp luật
-   vào mọi chỗ đang đọc được, nên sửa một chỗ sẽ lệch ba chỗ còn lại.
-5. **Ghost-context nhẹ.** Read `knowledge` hard-code danh sách rule id của `concepts.yaml`
-   (SURFACE-UNIT-1, LABEL-EXTERNAL-1, ...). Đây là bản sao của authority nằm trong package
-   Grammar; package đổi thì dòng này thành ghost.
+1. **Truncated sentence from patching.** Step 1: "When a screen's direction is genuinely
+   owner-level taste — a novel surface, a brand moment, or materially different layout
+   architectures that all satisfy the accepted requirements." The sentence ends with no main
+   clause. Commit `614e67d55` replaced the latter half ("the representative set may hold
+   alternative candidates...") with a new rule "The default is one candidate per screen" but
+   left the condition clause of the old rule in place.
+2. **Repeated sentence from insertion.** Step 2 has "Include real product-shaped content:"
+   followed by 5 lines of new rules, then "Include real product-shaped content," again,
+   continuing the old sentence. Commit `0b0b9e33a` inserted the new block into the middle of
+   the old sentence instead of rewriting the sentence.
+3. **Top of file says A, bottom says B.** Steps: default one candidate per screen. The
+   `business.whenNeeded` block at the bottom: "When the owner must pick between visual
+   candidates". Commit `614e67d55` fixed steps and did not fix business.
+4. **One rule, four places.** "Do not guess the image model name" appears 4 times (read
+   `profile`, write `designSource`, step 2, proof `imagegen-provenance`). "typed blocker" 4
+   times. The skeleton rule 3 times (step 2, step 3, and implicitly in step 1). Each round of
+   feedback piles the rule into every place that can be read, so fixing one place leaves the
+   other three out of step.
+5. **Mild ghost-context.** Read `knowledge` hard-codes the list of rule ids from
+   `concepts.yaml` (SURFACE-UNIT-1, LABEL-EXTERNAL-1, ...). That is a copy of an authority
+   that lives in the Grammar package; when the package changes, this line becomes a ghost.
 
-Nhận xét chung: file này không sai luật nào, nhưng có ba tầng trầm tích nhìn thấy được bằng
-mắt thường (câu cụt, câu lặp, đầu-cuối lệch) và một tầng chỉ thấy khi đếm (luật lặp 3–4
-lần). Cách sửa không phải thêm câu: viết lại mỗi step thành một đoạn, mỗi luật đứng một
-chỗ, `business` block sinh từ steps hoặc bỏ.
+General remark: this file breaks no rule, but it has three layers of sediment visible to the
+naked eye (truncated sentence, repeated sentence, top-bottom mismatch) and one layer visible
+only by counting (a rule repeated 3–4 times). The fix is not to add sentences: rewrite each
+step as one paragraph, put each rule in one place, and either generate the `business` block
+from steps or drop it.
 
-- [ ] Sửa câu cụt step 1
-- [ ] Gộp hai "Include real product-shaped content" step 2
-- [ ] Đồng bộ `business.whenNeeded` với mặc định một candidate
-- [ ] Mỗi luật một chỗ: model-name, typed-blocker, skeleton
+- [ ] Fix the truncated sentence in step 1
+- [ ] Merge the two "Include real product-shaped content" in step 2
+- [ ] Sync `business.whenNeeded` with the one-candidate default
+- [ ] One place per rule: model-name, typed-blocker, skeleton
 
-**Ai bị rối, rối kiểu gì.**
+**Who gets confused, and how.**
 
-| Người đọc | Đọc block nào | Hậu quả |
+| Reader | Reads which block | Consequence |
 |---|---|---|
-| Agent `[Op]` nhận dispatch | `steps[].action.en` | Gặp câu cụt thì tự đoán mệnh đề chính, thường đoán ra luật cũ vừa bị bỏ |
-| Kernel khi settle | `proofs`, `blockers` | Luật chỉ nằm ở step, không ở proof, nên không có căn cứ fail |
-| Chat sau nhận feedback để vá | cả file | Thấy một luật ở bốn chỗ, không biết chỗ nào gốc, sửa một để ba lệch hoặc thêm chỗ thứ năm. Đây là cơ chế trầm tích tự nhân lên |
-| Người lạ đọc open-source | `business` block vì ngắn | Tin bản tóm tắt cũ, hiểu sai mặc định hiện tại |
+| `[Op]` agent receiving a dispatch | `steps[].action.en` | On a truncated sentence it guesses the main clause, usually guessing the old rule that was just dropped |
+| Kernel at settle | `proofs`, `blockers` | A rule that lives only in a step and not in a proof gives no ground to fail |
+| A later chat receiving feedback to patch | the whole file | Sees one rule in four places, cannot tell which is the origin, fixes one and leaves three out of step, or adds a fifth place. This is how sediment multiplies itself |
+| A stranger reading the open-source repo | the `business` block because it is short | Trusts the old summary, misreads the current default |
 
-**Nguyên tắc sửa.** Mỗi luật có một chỗ "làm" (một step) và tối đa một chỗ "chấm" (một
-proof). Read/write block chỉ mô tả dữ liệu, không chứa luật. Vế điều kiện của luật cũ xoá
-hẳn khi luật mới có điều kiện riêng. `business` block sinh từ steps cùng commit, hoặc bỏ.
+**Fixing principle.** Each rule has one place to "do" (a step) and at most one place to
+"grade" (a proof). Read/write blocks only describe data and hold no rules. The condition
+clause of an old rule is deleted outright when the new rule has its own condition. The
+`business` block is generated from steps in the same commit, or dropped.
 
-**Ví dụ sửa step 1 (câu cụt).**
+**Example fix for step 1 (truncated sentence).**
 
-Trước: `When a screen's direction is genuinely owner-level taste — ... requirements. The
+Before: `When a screen's direction is genuinely owner-level taste — ... requirements. The
 default is one candidate per screen: alternative candidates are generated only when the
 owner explicitly asked ...`
 
-Sau: `Generate one candidate per screen. Generate alternatives only when the owner asked
+After: `Generate one candidate per screen. Generate alternatives only when the owner asked
 for options in the goal, a directive or a prior review note; then park an owner ask so the
 owner picks, keep every candidate as direction, and retain the unchosen ones as evidence.`
 
-**Ví dụ sửa step 2 (câu lặp).**
+**Example fix for step 2 (repeated sentence).**
 
-Trước: `Include real product-shaped content: every visible datum ... non-conformant.
+Before: `Include real product-shaped content: every visible datum ... non-conformant.
 Include real product-shaped content, screen purpose, component regions, ...`
 
-Sau: `Include screen purpose, component regions, state, viewport, accessibility and
+After: `Include screen purpose, component regions, state, viewport, accessibility and
 forbidden treatments. Every visible datum is concrete plausible data derived from the
 accepted business record: numbers, currency, dates, names, statuses, copy. Skeleton or
 shimmer appears only when the directed state is the loading state.`
 
-Step 3 thay đoạn lặp bằng: `Reject any direction that breaks a step-2 rule and regenerate
-within the bounded set.` Luật skeleton thêm vào một proof để kernel chấm được.
+Step 3 replaces the repeated passage with: `Reject any direction that breaks a step-2 rule and regenerate
+within the bounded set.` The skeleton rule adds one proof so the kernel can grade it.
 
-## Quyết định của thầy (2026-09-22)
+## Owner decisions (2026-09-22)
 
-- `.experiments/` giữ nguyên, không promote.
-- Version về nhánh `1.0.0-alpha.N`. `2.0.0` là số của package cũ; tag `v2.x`/`v6.x` cũng vậy.
-- Đang chuẩn bị `1.0.0-alpha.2`. Chủ đề: file canonical nói một điều, một lần
-  (de-sediment, no ghost-context, một danh sách verb).
-- Authority version duy nhất là `package.json`; không tạo file `VERSION`.
+- `.experiments/` stays as is, not promoted.
+- Version goes to the `1.0.0-alpha.N` line. `2.0.0` is the number of the old package; tags `v2.x`/`v6.x` likewise.
+- Preparing `1.0.0-alpha.2`. Theme: canonical files say one thing, once
+  (de-sediment, no ghost-context, one list of verbs).
+- The only version authority is `package.json`; do not create a `VERSION` file.
 
-## op-shape: một op hiện tại là gì, và vì sao response không đồng đều
+## op-shape: what an op is today, and why responses are uneven
 
-Đo trên 35 op trong `modules/ops/ops/` (13.512 dòng, từ 156 đến 1.287 dòng mỗi op).
+Measured over 35 ops in `modules/ops/ops/` (13,512 lines, from 156 to 1,287 lines per op).
 
-**Một op hôm nay, theo đúng những gì máy đọc:**
+**An op today, by exactly what the machine reads:**
 
-| Chiều | Cái gì được type | Cái gì chỉ là prose |
+| Dimension | What is typed | What is only prose |
 |---|---|---|
-| Input | Packet từ `api dispatch`: `op`, `brief` (đường dẫn yaml), `context{workflow, records, owned_paths}`, `constraints{model, budget, lease}` | Mọi tham số nghiệp vụ: số candidate, số round audit, ngưỡng file. Không op nào có key `params`/`inputs` |
-| Context | `reads[]` liệt kê đường dẫn record | `purpose.en` của mỗi read chứa cả luật, không chỉ mô tả dữ liệu |
-| Return | `starci/op-report@1` JSON qua `api report`: `outcome`, `summary` ≤600 ký tự, `files`, `checks`, `open`, `question`, `blocker`. Chỉ cái này được validate (`report-envelope.mjs`) | `writes[]` khai thêm `handoff` (E/response.yaml, 7 op), `matrixHandoff` (E/job-result.yaml, 23 op), và file riêng từng op: draws, flows, apiDelivery, assetManifest, intake, decision, scope, goal, verification |
+| Input | Packet from `api dispatch`: `op`, `brief` (yaml path), `context{workflow, records, owned_paths}`, `constraints{model, budget, lease}` | All business parameters: number of candidates, number of audit rounds, file thresholds. No op has a `params`/`inputs` key |
+| Context | `reads[]` lists record paths | The `purpose.en` of each read holds rules, not just a description of the data |
+| Return | `starci/op-report@1` JSON via `api report`: `outcome`, `summary` ≤600 chars, `files`, `checks`, `open`, `question`, `blocker`. Only this is validated (`report-envelope.mjs`) | `writes[]` additionally declares `handoff` (E/response.yaml, 7 ops), `matrixHandoff` (E/job-result.yaml, 23 ops), and per-op files: draws, flows, apiDelivery, assetManifest, intake, decision, scope, goal, verification |
 
-**Ba nguyên nhân response không đồng đều:**
+**Three causes of uneven responses:**
 
-1. **Không có schema cho op manifest.** 35 op chung 14 key lõi, nhưng 17 op thêm 15 key
-   tự đặt: `commitPolicy`, `qualityPolicy`, `deliveryPolicy`, `assetPolicy`, `modePolicy`,
-   `executionModes`, `proposalAuthority`, `migrationAuthority`, `cutSetAuthority`,
-   `refactorPolicy`, `docsPolicy`, `goalPolicy`, `intakePolicy`, `adHocPolicy`,
-   `canonicalWorkPolicy`... `build-ops-registry.mjs` ghi rõ "fields absent are omitted, never
-   invented", tức là không từ chối gì cả. Chỉ `interface.audit` có spec riêng.
-2. **Tham số nằm trong prose.** "one candidate per screen" (`interface.draw:195`), "five-round
-   loop" (`interface.audit`, lặp 5 lần), "at least two options" (`provision.ask:64`), "more
-   than twelve files, more than eight proof demands, three or more" (`work.author:212`).
-   Owner muốn 3 candidate thì phải viết vào goal, op phải đọc goal prose để tìm. Đó là chỗ
-   hallucinate: agent đọc "owner explicitly asked" và tự quyết thế nào là "asked".
-3. **23 op được bảo viết file không ai đọc.** Grep toàn bộ `scripts/ engine/ skills/`: chỉ
-   `serve-ask.mjs` đọc `draws.yaml`. Không script nào đọc `job-result.yaml` hay
-   `response.yaml`. Agent viết file theo prose mô tả, mỗi agent một kiểu, kernel không
-   validate vì không consume. Đây là nguồn trực tiếp của "op responses không đồng đều".
+1. **No schema for the op manifest.** 35 ops share 14 core keys, but 17 ops add 15
+   self-invented keys: `commitPolicy`, `qualityPolicy`, `deliveryPolicy`, `assetPolicy`,
+   `modePolicy`, `executionModes`, `proposalAuthority`, `migrationAuthority`,
+   `cutSetAuthority`, `refactorPolicy`, `docsPolicy`, `goalPolicy`, `intakePolicy`,
+   `adHocPolicy`, `canonicalWorkPolicy`... `build-ops-registry.mjs` states "fields absent are
+   omitted, never invented", meaning it rejects nothing. Only `interface.audit` has its own
+   spec.
+2. **Parameters live in prose.** "one candidate per screen" (`interface.draw:195`), "five-round
+   loop" (`interface.audit`, repeated 5 times), "at least two options" (`provision.ask:64`),
+   "more than twelve files, more than eight proof demands, three or more" (`work.author:212`).
+   If the owner wants 3 candidates they must write it into the goal, and the op has to read
+   the goal prose to find it. That is where hallucination happens: the agent reads "owner
+   explicitly asked" and decides for itself what counts as "asked".
+3. **23 ops are told to write files nobody reads.** Grep over all of `scripts/ engine/
+   skills/`: only `serve-ask.mjs` reads `draws.yaml`. No script reads `job-result.yaml` or
+   `response.yaml`. Agents write files following the descriptive prose, each in its own way,
+   and the kernel does not validate because it does not consume them. This is the direct
+   source of "uneven op responses".
 
-**Thêm:** `modules/ops/_common.yaml` còn vocabulary "matrix 3 rows × 3 parallel cells",
-"coordinator", "secondary types", "cell" từ mô hình cũ, trong khi `CONTEXT.md` nói một op
-một agent, không fan-out. Ghost-context ngay trong file common mọi op đều đọc.
+**Additionally:** `modules/ops/_common.yaml` still carries the vocabulary "matrix 3 rows × 3
+parallel cells", "coordinator", "secondary types", "cell" from the old model, while
+`CONTEXT.md` says one op, one agent, no fan-out. Ghost-context inside the common file every
+op reads.
 
-**Đề xuất hình dạng một op (`starci/op@1`), cố định, có schema và check:**
+**Proposed shape of an op (`starci/op@1`), fixed, with schema and check:**
 
 ```yaml
 id: interface.draw
-goal: {en: ...}                 # một câu
-params:                         # tham số typed, có default, ai được set
+goal: {en: ...}                 # one sentence
+params:                         # typed parameters, with defaults, and who may set them
   candidatesPerScreen: {type: integer, default: 1, min: 1, max: 3, setBy: owner}
-context:                        # dữ liệu op được đọc; chỉ mô tả, không chứa luật
+context:                        # data the op may read; description only, no rules
   reads: [{id, path, purpose}]
-effects:                        # op được ghi gì
+effects:                        # what the op may write
   writes: [{id, path, schema}]
-steps: [{reads, writes, action}] # luật "làm", mỗi luật một chỗ
-returns:                        # đúng op-report@1 + outputs typed riêng op
+steps: [{reads, writes, action}] # the "do" rules, one place per rule
+returns:                        # exactly op-report@1 + typed per-op outputs
   outputs: {draws: {schema: starci/draws@1}}
-proofs: [{id, requirement}]     # luật "chấm"
+proofs: [{id, requirement}]     # the "grade" rules
 blockers: [{code, condition}]
-policy: {}                      # một map thay cho 15 key tự đặt
+policy: {}                      # one map in place of 15 self-invented keys
 route: {...}
 ```
 
-Bỏ `business` block (sinh từ steps hoặc để registry sinh). Bỏ `handoff`/`matrixHandoff`
-khi không có consumer. Params đi theo đường: goal → `api enqueue --params` → packet →
-op đọc `params.candidatesPerScreen`; api validate params theo schema của op trước khi
-dispatch. Khi đó "gen 2-3 hình" là một giá trị, không phải một câu.
+Drop the `business` block (generate it from steps or let the registry generate it). Drop
+`handoff`/`matrixHandoff` when there is no consumer. Params travel along the path: goal →
+`api enqueue --params` → packet → op reads `params.candidatesPerScreen`; api validates
+params against the op's schema before dispatch. Then "generate 2-3 images" is a value, not a
+sentence.
 
-Bằng chứng kết thúc: `scripts/checks/check-op-manifest.mjs` chạy trên 35 op, từ chối key
-lạ, params không default, writes không schema, và số hard-code trong `action.en` khi op có
-param cùng nghĩa.
+End-state evidence: `scripts/checks/check-op-manifest.mjs` runs over the 35 ops, rejecting
+unknown keys, params without defaults, writes without schema, and numbers hard-coded in
+`action.en` when the op has a param of the same meaning.
 
 - [ ] Schema `starci/op@1`
 - [ ] Check `check-op-manifest.mjs`
 - [ ] `api enqueue --params` + validate + packet.params
-- [ ] Chuyển `interface.draw` sang shape mới làm mẫu (candidatesPerScreen)
-- [ ] Rà `_common.yaml` bỏ vocabulary matrix/cell/coordinator
+- [ ] Move `interface.draw` to the new shape as the model (candidatesPerScreen)
+- [ ] Sweep `_common.yaml` to drop the matrix/cell/coordinator vocabulary
 
-## host-boundary: mọi call tới Orca đi qua scripts, agent không đọc contract
+## host-boundary: every call to Orca goes through scripts, the agent does not read the contract
 
-**Hiện trạng đo được.**
+**Measured state.**
 
-| Câu hỏi | Kết quả |
+| Question | Result |
 |---|---|
-| Script nào spawn `orca` trực tiếp ngoài `scripts/api/orca/`? | Không có. Mọi spawn đi qua `orcaRun()` trong `scripts/api/orca/lib.mjs`. 27 wrapper, mỗi verb một file |
-| Wrapper có đọc `modules/host/orca/calls.yaml` để lắp argv không? | Không. Argv hard-code trong từng wrapper (`['terminal','send','--terminal',...]`) |
-| Có script nào gọi `orca agent-context` để so live schema không? | Không. `providers.mjs` chỉ so YAML với YAML, không chạy orca |
-| `calls.yaml` nói gì về chính nó? | "wrappers build argv only from these entries, verify each command and flag against the live agent-context before the first effect". Cả hai vế đều không có code thực hiện |
-| Ai được bảo phải đọc contract và check live schema? | `CONTEXT.md:31`: agent phải load 7 file `modules/host/orca/*.yaml`, chạy `providers.mjs`, và "the live `orca agent-context --json` signature is checked before effects" |
+| Which scripts spawn `orca` directly outside `scripts/api/orca/`? | None. Every spawn goes through `orcaRun()` in `scripts/api/orca/lib.mjs`. 27 wrappers, one file per verb |
+| Do wrappers read `modules/host/orca/calls.yaml` to assemble argv? | No. Argv is hard-coded in each wrapper (`['terminal','send','--terminal',...]`) |
+| Does any script call `orca agent-context` to compare the live schema? | No. `providers.mjs` only compares YAML with YAML, never runs orca |
+| What does `calls.yaml` say about itself? | "wrappers build argv only from these entries, verify each command and flag against the live agent-context before the first effect". No code implements either half |
+| Who is told to read the contract and check the live schema? | `CONTEXT.md:31`: the agent must load the 7 files `modules/host/orca/*.yaml`, run `providers.mjs`, and "the live `orca agent-context --json` signature is checked before effects" |
 
-Kết luận: ranh giới trong code đã đúng, nhưng prose đẩy việc kiểm tra host lên agent. Agent
-đọc 2.088 dòng contract Orca để "check" một thứ mà script lẽ ra phải check. Đây là nguồn
-hallucinate: agent lắp lệnh `orca` từ `calls.yaml` thay vì gọi wrapper, hoặc "kiểm tra" live
-schema bằng cách tưởng tượng.
+Conclusion: the boundary in code is already right, but the prose pushes host checking up to
+the agent. The agent reads 2,088 lines of Orca contract to "check" something a script should
+check. This is a source of hallucination: the agent assembles `orca` commands from
+`calls.yaml` instead of calling the wrapper, or "checks" the live schema by imagining it.
 
-Hai authority cho một argv: wrapper code (thật) và `calls.yaml` (tự nhận là nguồn). Comment
-trong `worker-start.mjs`/`worker-stop.mjs`/`worker-release.mjs` ghi "calls.yaml classify,
-evaluated in contract order" nhưng là chép tay, không load file.
+Two authorities for one argv: the wrapper code (real) and `calls.yaml` (claims to be the
+source). Comments in `worker-start.mjs`/`worker-stop.mjs`/`worker-release.mjs` say
+"calls.yaml classify, evaluated in contract order" but it is hand-copied, the file is not
+loaded.
 
-Đường thứ ba: `skills/orca-cli/SKILL.md` dạy agent chạy `orca` CLI trực tiếp và
-`orca skills get orca-cli`. Skill này cho chat của người, nhưng nằm cùng cây skill mà kernel
-và op đọc.
+A third path: `skills/orca-cli/SKILL.md` teaches the agent to run the `orca` CLI directly and
+`orca skills get orca-cli`. This skill is for human chat, but sits in the same skill tree
+that the kernel and ops read.
 
-**Luật đề xuất.** Không agent nào (kernel, op, chat, supervisor) chạy `orca` hay đọc
-`modules/host/orca/*`. Kernel gọi `api.mjs`. Chat và supervisor gọi
-`scripts/api/orca/<verb>.mjs` cho các verb đọc và `terminal-send`. Contract Orca là dữ liệu
-cho `lib.mjs`, không phải tài liệu cho agent.
+**Proposed rule.** No agent (kernel, op, chat, supervisor) runs `orca` or reads
+`modules/host/orca/*`. The kernel calls `api.mjs`. Chat and supervisor call
+`scripts/api/orca/<verb>.mjs` for read verbs and `terminal-send`. The Orca contract is data
+for `lib.mjs`, not documentation for agents.
 
-**Việc cụ thể.**
+**Concrete work.**
 
-- [ ] `lib.mjs` load `calls.yaml`: `orcaRun(verb, params)` lắp argv từ `command` + `flags`,
-      từ chối flag không khai. Wrapper thành thin, hết hard-code. Một authority.
-- [ ] `lib.mjs` chạy `agent-context` một lần mỗi process (cache), so `compare: [command,
-      flags]` trước mutation đầu tiên, `onMismatch` dừng như `calls.yaml` đã hứa. `providers.mjs`
-      thêm `--live`.
-- [ ] `CONTEXT.md:31` rút còn một câu: host calls đi qua `scripts/api/orca/`, agent không chạy
-      `orca` và không đọc host contract. Xoá danh sách 7 file và câu check agent-context.
-- [ ] `check-host-boundary.mjs`: đỏ nếu có `spawn*('orca'` ngoài `scripts/api/orca/`, hoặc
-      prose agent-facing (`CONTEXT.md`, `modules/kernel/*`, `modules/ops/*`, `skills/{define-goal,
-      start-kernel,workflow-chat}`) chứa lệnh `orca <verb>` thay vì đường dẫn wrapper.
-- [ ] `skills/orca-cli` tách khỏi load path của kernel/op, hoặc ghi rõ ở đầu: chỉ cho chat của
-      người, kernel và op không đọc.
-- [ ] `modules/host/claude` và `modules/host/codex` rà cùng cách: contract nào không có script
-      đọc thì hoặc có script, hoặc bỏ.
+- [ ] `lib.mjs` loads `calls.yaml`: `orcaRun(verb, params)` assembles argv from `command` +
+      `flags`, rejects undeclared flags. Wrappers become thin, no more hard-coding. One
+      authority.
+- [ ] `lib.mjs` runs `agent-context` once per process (cached), compares `compare: [command,
+      flags]` before the first mutation, `onMismatch` stops as `calls.yaml` already promised.
+      `providers.mjs` gains `--live`.
+- [ ] `CONTEXT.md:31` cut down to one sentence: host calls go through `scripts/api/orca/`, the
+      agent does not run `orca` and does not read the host contract. Delete the list of 7
+      files and the agent-context check sentence.
+- [ ] `check-host-boundary.mjs`: red if any `spawn*('orca'` appears outside
+      `scripts/api/orca/`, or if agent-facing prose (`CONTEXT.md`, `modules/kernel/*`,
+      `modules/ops/*`, `skills/{define-goal,start-kernel,workflow-chat}`) contains an
+      `orca <verb>` command instead of a wrapper path.
+- [ ] `skills/orca-cli` split out of the kernel/op load path, or state at the top: for human
+      chat only, kernel and ops do not read it.
+- [ ] `modules/host/claude` and `modules/host/codex` swept the same way: a contract that no
+      script reads either gets a script, or is dropped.
 
-## supervisor-poll: đối chiếu `DEVIN_POLL_BUG.md` (2026-09-22)
+## supervisor-poll: cross-checking `DEVIN_POLL_BUG.md` (2026-09-22)
 
-Devin giám sát hai workflow AUTH và WSPV qua `poll.mjs`, ghi 7 mục runtime (A1–A7) và 8
-finding sản phẩm (B1–B8). Trò kiểm tra từng mục A với code tại HEAD `6279f4895`.
+Devin supervised two workflows AUTH and WSPV via `poll.mjs`, logging 7 runtime items (A1–A7)
+and 8 product findings (B1–B8). The assistant checked each A item against the code at HEAD
+`6279f4895`.
 
-| Mục | Devin nói | Trò kiểm tra | Nhận định |
+| Item | Devin says | Assistant check | Verdict |
 |---|---|---|---|
-| A1 impl→audit evidence | fixed `e881f0159` | `interface.implement.yaml:174` khai `E/screens/**/*.png + E/runtime.json + E/measurements.json`; audit đọc ở `:104` | Đúng. Nhưng câu hỏi mở của Devin quan trọng hơn fix: producer tự đo `measurements.json` rồi audit tin số đó. Audit phải tự đo bằng Playwright runner đã lock (cơ chế có sẵn ở `uat.assisted.prepare`) |
-| A2 liveness classifier | fixed `6279f4895` | Regex có `esc (?:twice )?to` và braille `[⠀-⣿]…\d` | Đúng |
-| A3 claude worker-start không mở circuit | open | `api.mjs:1011-1081` chỉ ghi circuit khi `authFailure` hoặc nhánh `readiness`; worker-start lỗi rỗng rơi ra ngoài → `providerHealth: null` | Đúng. `runtimes.yaml allocation.cooldownMs` đã là map theo `failureKind`, chỉ cần thêm key `worker-start` (data) và một nhánh trong code |
-| A4 URL ask chết | open | `poll.mjs openAsks()` lấy event `ask-serving` cuối, không probe. **Nhưng** `serve-ask.mjs:568` đã emit `ask-serving-expired` và poll không đọc | Sửa rẻ hơn Devin đề xuất: poll đọc `ask-serving-expired` trước, HTTP probe chỉ cho URL chưa expired. `supervise.yaml:41` đã hứa "relayed only after re-verifying they answer 200", là prose-only contract |
-| A5 ask bị supersede vẫn ASK-OPEN | open | Chỉ có 3 kind: `ask-serving`, `ask-serving-expired`, `ask-answered`. Không có `ask-withdrawn` | Đúng. Kind mới phải vào `serve-ask.mjs` hoặc `api.mjs` khi park ask thay thế, poll đọc |
-| A6 kernel chỉ được watchdog đánh thức | watching | `api report` đã wake kernel sau khi commit row (practice 21/9, Derived 10). Lỗ còn lại là race trong chính turn của kernel: consume report rồi mới quyết định yield | Không đồng ý với phương án (a) poll tự wake: supervisor thành actor liveness thứ hai, trùng watchdog và trái `supervise.yaml never`. Sửa đúng chỗ: kernel chỉ yield sau khi `api status` mới nhất trả về không có frontier actionable. Một dòng trong `driver-loop.yaml` + `kernel-prompt.md` |
-| A7 codex thiếu browser tooling | watching | `interface.draw` đã dùng `route.riskHints: [host-tool-required:image_gen.imagegen]` | Cơ chế có sẵn, chưa áp: `interface.audit` khai `host-tool-required:browser-dom`, agent card khai capability, route-model lọc |
+| A1 impl→audit evidence | fixed `e881f0159` | `interface.implement.yaml:174` declares `E/screens/**/*.png + E/runtime.json + E/measurements.json`; audit reads at `:104` | Correct. But Devin's open question matters more than the fix: the producer measures `measurements.json` itself and then audit trusts those numbers. Audit must measure itself with the locked Playwright runner (mechanism already exists in `uat.assisted.prepare`) |
+| A2 liveness classifier | fixed `6279f4895` | Regex has `esc (?:twice )?to` and braille `[⠀-⣿]…\d` | Correct |
+| A3 claude worker-start does not open the circuit | open | `api.mjs:1011-1081` only writes the circuit on `authFailure` or the `readiness` branch; an empty worker-start error falls through → `providerHealth: null` | Correct. `runtimes.yaml allocation.cooldownMs` is already a map by `failureKind`, only a `worker-start` key (data) and one branch in code are needed |
+| A4 dead ask URL | open | `poll.mjs openAsks()` takes the last `ask-serving` event, no probe. **But** `serve-ask.mjs:568` already emits `ask-serving-expired` and poll does not read it | Cheaper fix than Devin proposed: poll reads `ask-serving-expired` first, HTTP probe only for URLs not yet expired. `supervise.yaml:41` already promises "relayed only after re-verifying they answer 200", a prose-only contract |
+| A5 superseded ask still ASK-OPEN | open | Only 3 kinds: `ask-serving`, `ask-serving-expired`, `ask-answered`. No `ask-withdrawn` | Correct. The new kind must go into `serve-ask.mjs` or `api.mjs` when parking a replacement ask, and poll reads it |
+| A6 kernel only woken by the watchdog | watching | `api report` already wakes the kernel after committing the row (practice 21/9, Derived 10). The remaining hole is a race inside the kernel's own turn: it consumes the report and only then decides to yield | Disagree with option (a) poll wakes it itself: the supervisor becomes a second liveness actor, duplicating the watchdog and against `supervise.yaml never`. The right fix: the kernel yields only after the latest `api status` returns no actionable frontier. One line in `driver-loop.yaml` + `kernel-prompt.md` |
+| A7 codex lacks browser tooling | watching | `interface.draw` already uses `route.riskHints: [host-tool-required:image_gen.imagegen]` | The mechanism exists, not yet applied: `interface.audit` declares `host-tool-required:browser-dom`, the agent card declares the capability, route-model filters |
 
-**Sạn trong chính `poll.mjs` mà Devin chưa thấy.**
+**Grit inside `poll.mjs` itself that Devin did not see.**
 
-- `reportsSince` lấy `LIMIT 30` rồi mới lọc `report_id > since`. Hơn 30 report trong một
-  interval thì report cũ hơn bị bỏ, và `lastReportId` nhảy qua chúng vĩnh viễn. Phải là
-  `WHERE report_id > ?`.
-- Interval 180000 ghi ở ba chỗ: `supervise.yaml:30`, `:31`, `poll.mjs:30`.
-- `poll.mjs` là mechanism nằm dưới `modules/` (đã ghi ở mục host-boundary).
+- `reportsSince` takes `LIMIT 30` and only then filters `report_id > since`. With more than
+  30 reports in one interval the older reports are dropped, and `lastReportId` jumps past
+  them permanently. It must be `WHERE report_id > ?`.
+- The interval 180000 is written in three places: `supervise.yaml:30`, `:31`, `poll.mjs:30`.
+- `poll.mjs` is a mechanism sitting under `modules/` (already noted in the host-boundary
+  section).
 
-**Sạn trong chính file log của Devin.**
+**Grit inside Devin's own log file.**
 
-- Nằm ở `starci-academy-backend/DEVIN_POLL_BUG.md`, ngoài `.claude`. Repo quy định practice
-  log ở `.experiments/practices/YYYY-MM-DD-<slug>.md` với Practiced/Observed/Derived/Open.
-  Để ngoài thì lần supervise sau không đọc được.
-- Mục B (finding sản phẩm) không thuộc file runtime; nó là evidence của audit, thuộc
-  `.starciwork` của dự án. Devin đã tách nhãn đúng, chỉ sai chỗ để.
-- A1 và A6 là hai quyết định thiết kế đang chờ thầy, không phải bug. Cần tách ra khỏi
-  danh sách bug để không bị "fixed" nhầm bằng patch nhỏ.
+- It sits at `starci-academy-backend/DEVIN_POLL_BUG.md`, outside `.claude`. The repo
+  prescribes practice logs at `.experiments/practices/YYYY-MM-DD-<slug>.md` with
+  Practiced/Observed/Derived/Open. Left outside, the next supervise round cannot read it.
+- Section B (product findings) does not belong in a runtime file; it is audit evidence,
+  belonging to the project's `.starciwork`. Devin labelled them correctly, only put them in
+  the wrong place.
+- A1 and A6 are two design decisions waiting on the owner, not bugs. They must be split out
+  of the bug list so they are not wrongly "fixed" by a small patch.
 
-**Việc đề xuất từ vòng này.**
+**Work proposed from this round.**
 
-- [ ] Chuyển `DEVIN_POLL_BUG.md` thành `.experiments/practices/2026-09-22-supervisor-round1.md`
-- [ ] `poll.mjs`: `WHERE report_id > ?`; đọc `ask-serving-expired`; probe URL còn lại
-- [ ] `api.mjs`: worker-start lỗi không phân loại → `failureKind: 'worker-start'`, cooldown từ `runtimes.yaml`
-- [ ] `ask-superseded` event khi park ask thay thế
-- [ ] `driver-loop.yaml` + `kernel-prompt.md`: yield chỉ sau `api status` mới nhất không có việc
-- [ ] `interface.audit` `route.riskHints` + capability trên agent card
-- [ ] Quyết định của thầy: audit tự đo hay tin producer (A1)
+- [ ] Move `DEVIN_POLL_BUG.md` to `.experiments/practices/2026-09-22-supervisor-round1.md`
+- [ ] `poll.mjs`: `WHERE report_id > ?`; read `ask-serving-expired`; probe the remaining URLs
+- [ ] `api.mjs`: unclassified worker-start error → `failureKind: 'worker-start'`, cooldown from `runtimes.yaml`
+- [ ] `ask-superseded` event when parking a replacement ask
+- [ ] `driver-loop.yaml` + `kernel-prompt.md`: yield only after the latest `api status` shows no work
+- [ ] `interface.audit` `route.riskHints` + capability on the agent card
+- [ ] Owner decision: does audit measure itself or trust the producer (A1)
 
-### Bổ sung A7 mới của Devin: dispatch bị reject vẫn chiếm binding
+### Addendum to Devin's new A7: a rejected dispatch still holds the binding
 
-`rejectDispatch` (`api.mjs:1043-1046`) cố ý ghi `payload.managed = {dispatchId: <rejected>,
-rejectedBeforeContract: true}` để reconcile có bằng chứng. Nhưng `explicitReportDispatchIdOf`
-(`api.mjs:2016-2019`) và `reportDispatchIdOf` (`:2011`) đọc `managed.dispatchId` mà không
-nhìn cờ `rejectedBeforeContract`, còn `requireDispatchedReportBinding` (`:2020`) so với
-`contracts.dispatch_id`. Contracts đúng (ctx mới), payload sai (ctx cũ), nên report hợp lệ bị
-từ chối `report-contract-unbound`. Một field mang hai nghĩa: "binding sống" và "bằng chứng
-reject", chỉ phân biệt bằng một cờ mà người đọc không kiểm tra.
+`rejectDispatch` (`api.mjs:1043-1046`) deliberately writes `payload.managed = {dispatchId: <rejected>,
+rejectedBeforeContract: true}` so reconcile has evidence. But `explicitReportDispatchIdOf`
+(`api.mjs:2016-2019`) and `reportDispatchIdOf` (`:2011`) read `managed.dispatchId` without
+looking at the `rejectedBeforeContract` flag, while `requireDispatchedReportBinding` (`:2020`)
+compares against `contracts.dispatch_id`. Contracts are right (new ctx), payload is wrong
+(old ctx), so a valid report is rejected with `report-contract-unbound`. One field carries
+two meanings: "live binding" and "reject evidence", distinguished only by a flag that readers
+do not check.
 
-Không nên xoá binding khi reject như Devin đề xuất: mất bằng chứng cho reconcile (practice
-21/9, Derived 4). Sửa đúng: report binding lấy từ `contracts` row (đã là nguồn thật), và
-dispatch bị reject đi vào `payload.rejectedDispatches[]` thay vì đè `managed.dispatchId`.
+Do not delete the binding on reject as Devin proposed: reconcile loses its evidence
+(practice 21/9, Derived 4). The right fix: the report binding comes from the `contracts` row
+(already the real source), and a rejected dispatch goes into `payload.rejectedDispatches[]`
+instead of overwriting `managed.dispatchId`.
 
-- [ ] `report`/`check`/`settle` lấy dispatch từ `contracts`, không từ `payload.managed`
-- [ ] `rejectDispatch` ghi vào `payload.rejectedDispatches[]`, không đè `managed.dispatchId`
+- [ ] `report`/`check`/`settle` take the dispatch from `contracts`, not from `payload.managed`
+- [ ] `rejectDispatch` writes into `payload.rejectedDispatches[]`, does not overwrite `managed.dispatchId`
 
-## Tổng hợp sạn toàn repo (2026-09-22, HEAD `6279f4895`)
+## Repo-wide grit roundup (2026-09-22, HEAD `6279f4895`)
 
-Bốn agent rà bốn mảng, trò xác minh trực tiếp các mục đánh dấu ✓. Số trong ngoặc là
-file:dòng. Ưu tiên: P0 sai chức năng hoặc lừa người đọc; P1 gây hallucinate hoặc drift;
-P2 vệ sinh.
+Four agents swept four areas, and the assistant verified directly the items marked ✓. Numbers
+in parentheses are file:line. Priority: P0 wrong behavior or misleads the reader; P1 causes
+hallucination or drift; P2 hygiene.
 
-### P0: sai chức năng, hoặc tài liệu hứa mà máy không làm
+### P0: wrong behavior, or docs promise what the machine does not do
 
-1. ✓ CI `todo-app-example.yml:89,166` gọi `node cli/main.mjs`, thư mục `cli/` không tồn tại;
-   `--config architecture.json` cũng không có. Workflow không thể xanh.
-2. ✓ Không workflow nào chạy `npm test`; CI chỉ chạy 1/86 spec. `example-coverage.yml:5` nhắc
-   "root ci.yml" không tồn tại. Trigger `schemas/**` (`:12,18`) là đường dẫn đã bỏ.
-3. ✓ `api.yaml:224-229` khai 5 refusal cho `enqueue` (`workflow-finished`, `unknown-op`,
-   `already-queued`, `empty-paths`, `workflow-unknown`); `cmdEnqueue` không kiểm tra cái nào.
-   Cùng file: `route-refused`, `spawn-failed`, `path-collision`, `path-illegal`,
-   `plan-lineage-missing`, `contested-lease`, `effect-unknown` không xuất hiện trong `.mjs` nào.
-4. `api.yaml:106` "a read never mutates the ledger" nhưng `observe` append events (`:403`).
-5. `supervise.yaml:41` hứa URL ask "relayed only after re-verifying they answer 200";
-   `poll.mjs` không probe (Devin A4).
-6. `calls.yaml:5-9` hứa wrapper lắp argv từ contract và so live agent-context; không code nào
-   làm (mục host-boundary).
-7. `providers.mjs` được `CONTEXT.md:31` gọi là validator fail-closed; với claude/codex nó chỉ
-   kiểm tra file parse được.
+1. ✓ CI `todo-app-example.yml:89,166` calls `node cli/main.mjs`, the `cli/` directory does
+   not exist; `--config architecture.json` does not exist either. The workflow cannot go green.
+2. ✓ No workflow runs `npm test`; CI runs only 1/86 specs. `example-coverage.yml:5` mentions
+   a "root ci.yml" that does not exist. The `schemas/**` trigger (`:12,18`) is a removed path.
+3. ✓ `api.yaml:224-229` declares 5 refusals for `enqueue` (`workflow-finished`, `unknown-op`,
+   `already-queued`, `empty-paths`, `workflow-unknown`); `cmdEnqueue` checks none of them.
+   Same file: `route-refused`, `spawn-failed`, `path-collision`, `path-illegal`,
+   `plan-lineage-missing`, `contested-lease`, `effect-unknown` appear in no `.mjs`.
+4. `api.yaml:106` "a read never mutates the ledger" but `observe` appends events (`:403`).
+5. `supervise.yaml:41` promises ask URLs are "relayed only after re-verifying they answer
+   200"; `poll.mjs` does not probe (Devin A4).
+6. `calls.yaml:5-9` promises wrappers assemble argv from the contract and compare the live
+   agent-context; no code does either (host-boundary section).
+7. `providers.mjs` is called a fail-closed validator by `CONTEXT.md:31`; for claude/codex it
+   only checks that the file parses.
 8. ✓ Private age key `examples/todo-app-backend/.starcistacks/dev/runtime/env/demo.agekey`
-   tracked trong git, CI `live` job decrypt bằng nó. Nếu là demo key cố ý thì ghi rõ; nếu
-   không thì rotate.
-9. `dispatch.yaml:32` và `driver-loop.yaml:618` cite `engine/constants.mjs` cho TTL/limits;
-   file 11 dòng chỉ export `ENGINE_SCHEMA` + `isEnrolled`. TTL thật ở `api.mjs:1095`.
-10. `modules/goal/{anatomy,legality,archetypes,existing}.yaml` ~20 cite tới hàm không tồn tại
-    (`cutOpFor`, `goalPhase`, `reviseGoal`, `openOwnerAsk`, `applyWorkflowAmendment`...).
-11. `selection.yaml:223` cite `model-policy.mjs`, không tồn tại. `driver-loop.yaml:498`,
-    `verdict-contract.yaml:139` cite `init/CLAUDE.md`; `init/` chỉ có `AGENTS.md`.
+   is tracked in git, and the CI `live` job decrypts with it. If it is a deliberate demo key,
+   say so explicitly; if not, rotate it.
+9. `dispatch.yaml:32` and `driver-loop.yaml:618` cite `engine/constants.mjs` for TTL/limits;
+   the 11-line file only exports `ENGINE_SCHEMA` + `isEnrolled`. The real TTL is at
+   `api.mjs:1095`.
+10. `modules/goal/{anatomy,legality,archetypes,existing}.yaml` ~20 cites to functions that do
+    not exist (`cutOpFor`, `goalPhase`, `reviseGoal`, `openOwnerAsk`,
+    `applyWorkflowAmendment`...).
+11. `selection.yaml:223` cites `model-policy.mjs`, which does not exist. `driver-loop.yaml:498`,
+    `verdict-contract.yaml:139` cite `init/CLAUDE.md`; `init/` only has `AGENTS.md`.
 
-### P1: mâu thuẫn contract, hai authority, ghost-context
+### P1: contract contradictions, two authorities, ghost-context
 
-12. Mô hình cũ còn sống: `_common.yaml:95` "3 rows × 3 cells, coordinator, secondary";
+12. Old model still alive: `_common.yaml:95` "3 rows × 3 cells, coordinator, secondary";
     `registry.yaml:15,43` `executionModes.solo` + `levels: [user-coordinator,...]`;
     `host/claude|codex/index.yaml:11,22` solo mode + coordinator roles. `driver-loop.yaml:769`
-    nói "there is no Coordinator". Vocabulary `coordinator` còn trong `api.mjs:1397,1438,1550`.
+    says "there is no Coordinator". The `coordinator` vocabulary is still in
+    `api.mjs:1397,1438,1550`.
 13. Concurrency: `profile-registry.schema.yaml:30` `const: 3`; `runtimes.yaml:21` `20`;
-    `host/claude/*` bốn chỗ `3`; `_common.yaml` `3`.
-14. `driver-loop.yaml:167` `cutExecution` chia một op thành N job song song; `dispatch.yaml:316`
-    và `registry.yaml:41` `fanOutWithinOperation: forbidden`. Cần một câu nói rõ cut khác fan-out.
-15. Verb list api ở 7 chỗ, 7 số khác nhau (README 8, CHANGELOG 8, CONTEXT 13, kernel-prompt 15,
-    docs/cli 14, start-workflow.yaml ~13, api.yaml 17, code 18, `bin/starci.mjs:21` thiếu 5).
-16. Blocker kinds ở 3 chỗ: `report-envelope.mjs:9`, `kinds.yaml:80`, `verdict-contract.yaml:79`,
-    mỗi chỗ một câu "keep in step" trỏ chỗ khác. Outcome list ở 3 chỗ. Effort vocabulary
-    viết 2 lần trong một hàm (`config.mjs:30,38`).
-17. `normalizeOwnedPath` có 2 bản khác semantics: `api.mjs:1096` chấp nhận glob/absolute/`..`,
-    `engine/admission.mjs:12` từ chối. Test giữ bản thứ 3 (`op-ipc.spec.mjs:63`).
-18. `readOwnerConfig()` copy-paste ở `start-workflow.mjs:60` và `route-model.mjs:57`, mỗi bản
-    lại dynamic-import `engine/config.mjs` như bản thứ 3 "preferred".
-19. `workflows.phase` queued→running UPDATE + event trùng nguyên văn `api.mjs:1124` và
-    `start-workflow.mjs:616`.
-20. `jobs.status` không có CHECK; vocabulary chỉ ở `ledger-db.mjs:12` và `api.mjs:72-74`.
-21. `CONTEXT.md:7` ghi enum của `settle` là `done|partial|failed|ask|blocked`; đó là enum của
-    report. `verdict-contract.yaml:60` `settle` là `pass|fail|blocked`.
-22. `CONTEXT.md:43,61,63` mô tả layout `features/<f>/{business,architecture,ui,...}`;
-    `work-layout.yaml:9,12` dùng family `br, ac, fr, nfr, data, journey, decision, sds, ui,
-    impl, uat`. `schemas/index.yaml:495,545,549` gọi cây SRS/SDS vừa "retired/dormant" vừa
-    "current".
-23. `supervise.yaml:26` "never writes the ledger" nhưng bước `kernel-dead` chạy start-workflow
-    (claim inbox row). `CONTEXT.md:5` chat vá `.claude` mid-flight vs `CONTEXT.md:75` runtime
-    maintenance là authority riêng.
-24. Số trong prose: retry ×3/×5/×2 ở 4 chỗ; watchdog 300000 ở 7 chỗ; observe 180000 ở 3 chỗ
-    và trùng số với supervisor poll và một Orca timeout; wedge 10 phút (`kernel-prompt.md:178`)
-    vs stall 5-8 phút (`driver-loop.yaml:667`), không hằng số nào trong code.
-25. Ghost `.json`: 8 profile `registry.json`/`runtimes.json`; `dispatch.yaml:154` `goal-plan.json`;
-    `runtimes.yaml:5,23` `config.json`; ✓ `engine/config.mjs` 6 error string "Invalid
-    config.json" trong khi file là `config.yaml`; `docs/config-format.md:10` liệt kê
-    `config.example.json` không tồn tại.
-26. Ghost khác: `engine/constants.mjs:3` trỏ `bin/starci-skills.mjs`; `runtime-root.mjs:24`
-    hàm tên `readDistJson`; `start-workflow.mjs:101-110` "half-landed lane" merge mọi file
-    trong `scripts/api/orca/`; `ledger-db.mjs:28-32` postmortem viết thành docstring;
-    `.gitignore:29` giữ ignore chỉ để kể một thư mục đã xoá.
-27. Docs vs code: `docs/installation.md:5` Node 20 vs engines 22.13; `:30` cài 6 skill, code
-    cài 2; `docs/cli.md:5` phủ nhận `starci <verb>` mà bin có; `docs/ops.md:9` "31 manifests"
-    thực 35; `docs/ledger-db.md:5` cite `LEDGER_DDL` không còn; `docs/releasing.md:20` dựa vào
-    `prepack` không có; `config.example.yaml:37` `model/runtimes.yaml` sai path;
-    `skills/define-goal:64`, `start-kernel:24`, `workflow-chat:31` mô tả label output
-    (`LEDGER`, `WILL-WRITE`) mà script in khác.
-28. Schema: ~28 `schema:` const dùng trong `modules/` không có trong catalog
-    `schemas/index.yaml`; 2 file stamp const khác `id` (`agent-hierarchy`, `goal-plan`);
-    `verdict-contract.yaml:152` cite `starci/workflow-report@1` không tồn tại;
-    `knowledge/code-examples` hai spelling schema id được alias trong schema.
-29. Ngôn ngữ: tiếng Việt trong `skills/define-goal:30-31,80`, `CONTEXT.md:5`,
+    `host/claude/*` four places `3`; `_common.yaml` `3`.
+14. `driver-loop.yaml:167` `cutExecution` splits one op into N parallel jobs;
+    `dispatch.yaml:316` and `registry.yaml:41` `fanOutWithinOperation: forbidden`. One
+    sentence is needed to say plainly that cut differs from fan-out.
+15. The api verb list in 7 places, 7 different counts (README 8, CHANGELOG 8, CONTEXT 13,
+    kernel-prompt 15, docs/cli 14, start-workflow.yaml ~13, api.yaml 17, code 18,
+    `bin/starci.mjs:21` missing 5).
+16. Blocker kinds in 3 places: `report-envelope.mjs:9`, `kinds.yaml:80`,
+    `verdict-contract.yaml:79`, each with a "keep in step" sentence pointing at the others.
+    Outcome list in 3 places. Effort vocabulary written twice within one function
+    (`config.mjs:30,38`).
+17. `normalizeOwnedPath` has 2 copies with different semantics: `api.mjs:1096` accepts
+    glob/absolute/`..`, `engine/admission.mjs:12` rejects. The test holds a third copy
+    (`op-ipc.spec.mjs:63`).
+18. `readOwnerConfig()` copy-pasted in `start-workflow.mjs:60` and `route-model.mjs:57`, and
+    each copy dynamic-imports `engine/config.mjs` as a third "preferred" copy.
+19. The `workflows.phase` queued→running UPDATE + event is duplicated verbatim at
+    `api.mjs:1124` and `start-workflow.mjs:616`.
+20. `jobs.status` has no CHECK; the vocabulary lives only in `ledger-db.mjs:12` and
+    `api.mjs:72-74`.
+21. `CONTEXT.md:7` writes the `settle` enum as `done|partial|failed|ask|blocked`; that is the
+    enum of report. `verdict-contract.yaml:60` `settle` is `pass|fail|blocked`.
+22. `CONTEXT.md:43,61,63` describes the layout `features/<f>/{business,architecture,ui,...}`;
+    `work-layout.yaml:9,12` uses the families `br, ac, fr, nfr, data, journey, decision, sds,
+    ui, impl, uat`. `schemas/index.yaml:495,545,549` calls the SRS/SDS tree both
+    "retired/dormant" and "current".
+23. `supervise.yaml:26` "never writes the ledger" but the `kernel-dead` step runs
+    start-workflow (claims an inbox row). `CONTEXT.md:5` chat patches `.claude` mid-flight vs
+    `CONTEXT.md:75` runtime maintenance is a separate authority.
+24. Numbers in prose: retry ×3/×5/×2 in 4 places; watchdog 300000 in 7 places; observe
+    180000 in 3 places and collides with the supervisor poll and one Orca timeout; wedge 10
+    minutes (`kernel-prompt.md:178`) vs stall 5-8 minutes (`driver-loop.yaml:667`), no
+    constant in code.
+25. Ghost `.json`: 8 profiles `registry.json`/`runtimes.json`; `dispatch.yaml:154`
+    `goal-plan.json`; `runtimes.yaml:5,23` `config.json`; ✓ `engine/config.mjs` 6 error
+    strings "Invalid config.json" while the file is `config.yaml`;
+    `docs/config-format.md:10` lists a `config.example.json` that does not exist.
+26. Other ghosts: `engine/constants.mjs:3` points at `bin/starci-skills.mjs`;
+    `runtime-root.mjs:24` a function named `readDistJson`; `start-workflow.mjs:101-110`
+    "half-landed lane" merges every file in `scripts/api/orca/`; `ledger-db.mjs:28-32`
+    postmortem written as a docstring; `.gitignore:29` keeps an ignore only to tell of a
+    deleted directory.
+27. Docs vs code: `docs/installation.md:5` Node 20 vs engines 22.13; `:30` installs 6 skills,
+    code installs 2; `docs/cli.md:5` denies `starci <verb>` which the bin has;
+    `docs/ops.md:9` "31 manifests", actually 35; `docs/ledger-db.md:5` cites a `LEDGER_DDL`
+    that no longer exists; `docs/releasing.md:20` relies on a `prepack` that is absent;
+    `config.example.yaml:37` `model/runtimes.yaml` wrong path;
+    `skills/define-goal:64`, `start-kernel:24`, `workflow-chat:31` describe output labels
+    (`LEDGER`, `WILL-WRITE`) that the script prints differently.
+28. Schema: ~28 `schema:` consts used in `modules/` are not in the `schemas/index.yaml`
+    catalog; 2 files stamp a const different from `id` (`agent-hierarchy`, `goal-plan`);
+    `verdict-contract.yaml:152` cites `starci/workflow-report@1` which does not exist;
+    `knowledge/code-examples` two spellings of the schema id aliased inside the schema.
+29. Language: Vietnamese in `skills/define-goal:30-31,80`, `CONTEXT.md:5`,
     `supervise.yaml:8`, `modules/goal/{anatomy,archetypes,legality}`, `verdict-contract:115`,
-    `driver-loop:484`, `knowledge/patterns/be/comment.yaml:234`. `docs/` sạch.
+    `driver-loop:484`, `knowledge/patterns/be/comment.yaml:234`. `docs/` is clean.
 
-### P2: dead code, test, package, vệ sinh
+### P2: dead code, tests, packages, hygiene
 
-30. ✓ 10 wrapper `scripts/api/orca/*` không ai gọi (orch-check/reply/send, run-show/use,
-    task-list/update, worker-abandon/list/read). `scripts/agent/{health,kill,spawn}.mjs` chỉ
-    được `docs/cli.md` nhắc. `admission.mjs` export `ownedPathLeaseRequests`,
-    `retryDisposition`, `deriveRetryLineage` chỉ test dùng. `bias.mjs` export không ai import
-    dù `--routing-bias` có trong define-goal.
-31. ✓ 3 check không ai chạy: `sanitize-orca-fixture`, `probe-reference-conventions`,
-    `spec/assets`. 3 check 28-38 KB chỉ spec của chính nó gọi: `check-work-surfaces`,
-    `check-work-history`, `check-work-replay`. Chỉ 2/28 check được op yaml gọi.
-32. Test: 6 spec chiếm gần hết 272s (`npm-package` 261s vì cpSync 503 MB `packages/`);
-    4 spec hard-skip (`work-record-schemas` ×2, `work-change` ×2); 4 spec giữ scaffold
-    "lane has not landed" đã vô nghĩa; 3 spec chủ yếu `assert.match` trên prose YAML
-    (`progressive-spec-authoring` 57/64, `interface-audit-contract` 65/114); stub Orca thứ hai
-    inline trong `start-workflow-restart.spec` với env var khác helper chung.
-33. Packages: `packages/grammar/reference-renders/` 15 MB PNG tracked, không ai đọc;
-    `packages/package.json` workspaces chỉ `eslint/*`, engines 20.9 vs root 22.13;
-    `fe-kit` chỉ examples dùng. `examples/todo-app-backend/coverage/` tracked
-    dù CONTRIBUTING cấm generated output.
-34. `package.json`: không `check`/`lint`; `tests/` + `scripts/` ship trong tarball;
-    `.experiments/` tracked. `config.yaml` local đã drift so với example (`debug: true`
-    không được document).
-35. `api.mjs` 2248 dòng dưới header "One thin command"; `engine/index.mjs` import
-    `scripts/checks/spec/` ngược tầng; `sleep` trong `orca/lib.mjs` là block đồng bộ.
-36. Missing docs được cite: `docs/kinds.md` (work-layout, check-example-work),
-    `docs/model-catalog.md` (4 profile), `docs/examples/todo-app-grit.md`,
+30. ✓ 10 `scripts/api/orca/*` wrappers nobody calls (orch-check/reply/send, run-show/use,
+    task-list/update, worker-abandon/list/read). `scripts/agent/{health,kill,spawn}.mjs` are
+    only mentioned by `docs/cli.md`. `admission.mjs` exports `ownedPathLeaseRequests`,
+    `retryDisposition`, `deriveRetryLineage` used only by tests. `bias.mjs` has an export
+    nobody imports even though `--routing-bias` is in define-goal.
+31. ✓ 3 checks nobody runs: `sanitize-orca-fixture`, `probe-reference-conventions`,
+    `spec/assets`. 3 checks of 28-38 KB called only by their own spec: `check-work-surfaces`,
+    `check-work-history`, `check-work-replay`. Only 2/28 checks are called by op yaml.
+32. Tests: 6 specs take nearly all of 272s (`npm-package` 261s because of a cpSync of the 503
+    MB `packages/`); 4 specs hard-skip (`work-record-schemas` ×2, `work-change` ×2); 4 specs
+    keep a "lane has not landed" scaffold that is now meaningless; 3 specs mostly
+    `assert.match` on YAML prose (`progressive-spec-authoring` 57/64,
+    `interface-audit-contract` 65/114); a second Orca stub inline in
+    `start-workflow-restart.spec` with a different env var from the shared helper.
+33. Packages: `packages/grammar/reference-renders/` 15 MB of PNG tracked, nobody reads it;
+    `packages/package.json` workspaces only `eslint/*`, engines 20.9 vs root 22.13; `fe-kit`
+    used only by examples. `examples/todo-app-backend/coverage/` tracked even though
+    CONTRIBUTING forbids generated output.
+34. `package.json`: no `check`/`lint`; `tests/` + `scripts/` ship in the tarball;
+    `.experiments/` tracked. The local `config.yaml` has drifted from the example (`debug:
+    true` is not documented).
+35. `api.mjs` 2248 lines under the header "One thin command"; `engine/index.mjs` imports
+    `scripts/checks/spec/` across layers backwards; `sleep` in `orca/lib.mjs` is a
+    synchronous block.
+36. Missing docs that are cited: `docs/kinds.md` (work-layout, check-example-work),
+    `docs/model-catalog.md` (4 profiles), `docs/examples/todo-app-grit.md`,
     `examples/application-stacks/tiny-stateful`, `tests/sds-payload.spec.mjs`.
 
-### Thứ tự đề nghị cho alpha.2
+### Suggested order for alpha.2
 
-1. **Mặt tiền**: P0.1–2 CI (`ci.yml` + sửa hoặc xoá todo-app workflow), P0.8 quyết định key.
-2. **Contract nói thật**: P0.3–7, 9–11. Mỗi refusal hoặc cite hoặc có code, hoặc bị xoá khỏi
-   yaml. Bằng chứng: `check-contract-cites.mjs` đọc mọi `citation:`/`enforcedBy:`/`source:`
-   và grep cái được cite.
-3. **Một authority**: P1.15–20. Verb list, blocker kinds, normalizeOwnedPath, readOwnerConfig.
-4. **Chôn mô hình cũ**: P1.12–14. Xoá coordinator/matrix/solo, chốt concurrency, cut khác fan-out.
-5. **De-sediment CONTEXT.md**: P1.21–23 cộng mục feedback-sediment ở trên.
-6. **Số vào data**: P1.24. Mỗi số một chỗ trong `runtimes.yaml` hoặc `driver-loop.yaml`, code đọc.
-7. P1.25–29 và P2 theo sức.
+1. **Facade**: P0.1–2 CI (`ci.yml` + fix or delete the todo-app workflow), P0.8 decision on
+   the key.
+2. **Contract tells the truth**: P0.3–7, 9–11. Each refusal or cite either has code or is
+   deleted from the yaml. Evidence: `check-contract-cites.mjs` reads every
+   `citation:`/`enforcedBy:`/`source:` and greps for what is cited.
+3. **One authority**: P1.15–20. Verb list, blocker kinds, normalizeOwnedPath,
+   readOwnerConfig.
+4. **Bury the old model**: P1.12–14. Delete coordinator/matrix/solo, settle concurrency, cut
+   differs from fan-out.
+5. **De-sediment CONTEXT.md**: P1.21–23 plus the feedback-sediment section above.
+6. **Numbers into data**: P1.24. Each number in one place in `runtimes.yaml` or
+   `driver-loop.yaml`, code reads it.
+7. P1.25–29 and P2 as capacity allows.
 
 ## alpha.2 lanes (2026-09-22, base `f87a8f34b`)
 
-Nguyên tắc sửa nằm ở `CONTRIBUTING.md` mục "Editing contracts and prose". Mỗi lane một
-worktree, một allowlist, commit trên nhánh riêng, không push. Fable merge theo thứ tự
-A, D, B, C rồi mới cắm E. Devin làm trên `main` trực tiếp theo allowlist riêng.
+The fixing principles are in `CONTRIBUTING.md` under "Editing contracts and prose". Each lane
+gets one worktree, one allowlist, commits on its own branch, no push. Fable merges in the
+order A, D, B, C and only then plugs in E. Devin works directly on `main` under a separate
+allowlist.
 
-| Lane | Ai | Allowlist | Việc |
+| Lane | Who | Allowlist | Work |
 |---|---|---|---|
-| A | Opus | `.github/**`, `package.json` scripts, `.gitignore`, `packages/package.json` engines | `ci.yml`, script `check`, trigger `modules/schemas/**`, ignore coverage |
-| B | Opus | `modules/kernel/**`, `engine/**`, `scripts/kernel/{api,start-workflow,report-envelope,watchdog}.mjs` trừ vùng Devin, `route-model.mjs`, `runtimes.yaml allocation:`, `kinds.yaml blockers` | verb surface + check, refusal thật, observe, cites check, một authority cho list/hàm, số vào data, ghost engine |
-| C | Opus | `modules/models/**` trừ 2 vùng của B, `modules/host/**`, `_common.yaml`, `modules/goal/**`, `modules/schemas/**`, `modules/quality/**`, `providers.mjs` | xoá coordinator/matrix/solo, concurrency một số, dead cites, `.json` ghost, catalog schema + check, host claims |
-| D | Opus | `scripts/api/orca/**` xoá, `scripts/agent/**`, 3 check mồ côi, `tests/**`, `reference-renders`, `examples/**/coverage` | wrapper chết, scaffold test, stub Orca chung, `npm-package.spec` < 60s, untrack coverage |
-| E | Opus, sau B+C | `CONTEXT.md`, `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `docs/**`, `skills/**`, `.experiments/**`, `knowledge/` rename | de-sediment chat/kernel/watchdog, ghost `distless`, verb list cite, docs vs code, tiếng Việt |
-| Devin | Devin | `modules/supervisor/**`, `scripts/kernel/serve-ask.mjs`, `scripts/kernel/api.mjs` chỉ `rejectDispatch`, `reportDispatchIdOf`, `explicitReportDispatchIdOf`, `requireDispatchedReportBinding`, `writeProviderCircuit` và nhánh readiness/auth; `scripts/kernel/terminal-liveness.mjs`; `modules/ops/ops/interface.{implement,audit}.yaml` | A3–A8 trong `DEVIN_POLL_BUG.md`, theo nhận định ở mục supervisor-poll |
+| A | Opus | `.github/**`, `package.json` scripts, `.gitignore`, `packages/package.json` engines | `ci.yml`, `check` script, `modules/schemas/**` trigger, ignore coverage |
+| B | Opus | `modules/kernel/**`, `engine/**`, `scripts/kernel/{api,start-workflow,report-envelope,watchdog}.mjs` except Devin's region, `route-model.mjs`, `runtimes.yaml allocation:`, `kinds.yaml blockers` | verb surface + check, real refusals, observe, cites check, one authority for lists/functions, numbers into data, engine ghosts |
+| C | Opus | `modules/models/**` except B's 2 regions, `modules/host/**`, `_common.yaml`, `modules/goal/**`, `modules/schemas/**`, `modules/quality/**`, `providers.mjs` | delete coordinator/matrix/solo, one concurrency number, dead cites, `.json` ghosts, schema catalog + check, host claims |
+| D | Opus | `scripts/api/orca/**` delete, `scripts/agent/**`, 3 orphan checks, `tests/**`, `reference-renders`, `examples/**/coverage` | dead wrappers, test scaffolds, shared Orca stub, `npm-package.spec` < 60s, untrack coverage |
+| E | Opus, after B+C | `CONTEXT.md`, `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `docs/**`, `skills/**`, `.experiments/**`, `knowledge/` rename | de-sediment chat/kernel/watchdog, ghost `distless`, verb list cite, docs vs code, Vietnamese |
+| Devin | Devin | `modules/supervisor/**`, `scripts/kernel/serve-ask.mjs`, `scripts/kernel/api.mjs` only `rejectDispatch`, `reportDispatchIdOf`, `explicitReportDispatchIdOf`, `requireDispatchedReportBinding`, `writeProviderCircuit` and the readiness/auth branch; `scripts/kernel/terminal-liveness.mjs`; `modules/ops/ops/interface.{implement,audit}.yaml` | A3–A8 in `DEVIN_POLL_BUG.md`, following the verdicts in the supervisor-poll section |
 
-**Nhắn Devin (thầy chuyển giúp):**
+**Message to Devin (relayed by the owner):**
 
-1. Đọc `CONTRIBUTING.md` mục "Editing contracts and prose" trước khi sửa tiếp.
-2. Commit `1cc1f19ed` thêm câu "stale form URLs ... relayed only after re-verifying they answer
-   200" vào `supervise.yaml` nhưng `poll.mjs` không probe. Hoặc probe, hoặc bỏ câu. Cùng commit
-   câu "only the watchdog wakes them" sai: `api report` wake kernel sau khi commit row
-   (`op-ipc.spec`). Sửa câu.
-3. Commit `e881f0159` nhét luật vào `writes[].content` và ghép ba path bằng `+` trong một
-   trường `path`. Luật vào `steps[].action`, mỗi path một entry hoặc một glob.
-4. A7: không xoá `managed.dispatchId` khi reject. Report binding lấy từ bảng `contracts`;
-   dispatch bị reject vào `payload.rejectedDispatches[]`.
-5. A6: không cho `poll.mjs` wake kernel. Sửa ở kernel: yield chỉ sau `api status` mới nhất
-   không có frontier actionable.
-6. `DEVIN_POLL_BUG.md` chuyển vào `.claude/.experiments/practices/2026-09-22-supervisor-round1.md`
-   theo format Practiced/Observed/Derived/Open; mục B đưa vào `.starciwork` của dự án.
-7. `poll.mjs`: `reportsSince` phải `WHERE report_id > ?`, không `LIMIT 30` rồi lọc.
+1. Read `CONTRIBUTING.md` under "Editing contracts and prose" before editing further.
+2. Commit `1cc1f19ed` added the sentence "stale form URLs ... relayed only after re-verifying
+   they answer 200" to `supervise.yaml` but `poll.mjs` does not probe. Either probe, or drop
+   the sentence. The same commit's sentence "only the watchdog wakes them" is wrong: `api
+   report` wakes the kernel after committing the row (`op-ipc.spec`). Fix the sentence.
+3. Commit `e881f0159` stuffed a rule into `writes[].content` and joined three paths with `+`
+   inside one `path` field. Rules go into `steps[].action`, one entry per path or one glob.
+4. A7: do not delete `managed.dispatchId` on reject. The report binding comes from the
+   `contracts` table; a rejected dispatch goes into `payload.rejectedDispatches[]`.
+5. A6: do not let `poll.mjs` wake the kernel. Fix it in the kernel: yield only after the
+   latest `api status` has no actionable frontier.
+6. Move `DEVIN_POLL_BUG.md` into `.claude/.experiments/practices/2026-09-22-supervisor-round1.md`
+   in the Practiced/Observed/Derived/Open format; put section B into the project's
+   `.starciwork`.
+7. `poll.mjs`: `reportsSince` must use `WHERE report_id > ?`, not `LIMIT 30` and then filter.
 
-**Gate chờ thầy:** `demo.agekey` demo hay rotate; `todo-app-example.yml` sửa hay xoá; agent
-được sửa record `examples/` không; A1 audit tự đo hay tin producer.
+**Gates waiting on the owner:** is `demo.agekey` a demo or must it be rotated; fix or delete
+`todo-app-example.yml`; may agents edit `examples/` records; A1 does audit measure itself or
+trust the producer.
 
-## Quyết định của Fable (2026-09-22, thầy uỷ quyền toàn bộ cho tới khi ra `1.0.0-alpha.2`)
+## Fable's decisions (2026-09-22, the owner delegated everything until `1.0.0-alpha.2` ships)
 
-1. **`demo.agekey`: giữ, là demo cố ý.** Key chỉ mở env demo của example `todo-app-backend`
-   và CI `live` job cần nó để chạy không secret. Điều kiện: mọi thứ mã hoá bằng key này là
-   giá trị demo, không có credential thật; `examples/todo-app-backend/README.md` và header
-   workflow ghi một câu "demo key, committed on purpose, encrypts demo values only". Nếu sau
-   này example cần secret thật thì key đi vào GitHub secret và rotate, không phải bây giờ.
-2. **`todo-app-example.yml`: sửa cho chạy được bằng script hiện có, bước nào không có script
-   thì xoá.** `node cli/main.mjs architecture check` thay bằng
+1. **`demo.agekey`: keep, it is a deliberate demo.** The key only opens the demo env of the
+   `todo-app-backend` example and the CI `live` job needs it to run without secrets.
+   Condition: everything encrypted with this key is a demo value, no real credential;
+   `examples/todo-app-backend/README.md` and the workflow header carry one sentence "demo
+   key, committed on purpose, encrypts demo values only". If the example later needs a real
+   secret, the key moves into a GitHub secret and is rotated, not now.
+2. **`todo-app-example.yml`: fix it to run with existing scripts, delete any step that has no
+   script.** `node cli/main.mjs architecture check` is replaced by
    `node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root examples/<app> --all`
-   và check architecture tương đương trong `scripts/checks/` nếu example có config; không có
-   thì bước đó bị xoá. Không giữ `if: false`: bước hoặc chạy, hoặc không tồn tại. Workflow
-   phải xanh trên tree hiện tại trước khi merge.
-3. **Agent được sửa `examples/`.** Checker và schema dưới `modules/schemas/` là authority;
-   record trong example phải khớp schema, không phải ngược lại. Evidence sinh lại bằng script
-   sở hữu (`scripts/example/*`), không sửa tay. `tests/work-change.spec.mjs` và
-   `tests/work-record-schemas.spec.mjs` bỏ skip: viết 8 schema còn thiếu từ record thật, sửa
-   record cho khớp, hoặc sửa checker nếu checker mới là cái lệch so với `work-layout.yaml`.
-4. **A1: audit tự đo.** `interface.audit` đo DOM/computed-style bằng Playwright runner đã lock
-   (cơ chế của `uat.assisted.prepare`), qua `E/screens` + origin đang serve ghi trong
-   `E/runtime.json` của producer. `E/measurements.json` của producer là self-report, audit có
-   thể so chiếu nhưng không bao giờ là proof. Áp trước audit round 2. Vùng này thuộc allowlist
-   Devin; nếu Devin chưa làm khi lane B, C, D merge xong thì lane G làm.
+   and the equivalent architecture check in `scripts/checks/` if the example has config;
+   otherwise the step is deleted. Do not keep `if: false`: a step either runs or does not
+   exist. The workflow must be green on the current tree before merging.
+3. **Agents may edit `examples/`.** The checkers and schemas under `modules/schemas/` are the
+   authority; records in the example must match the schema, not the other way round.
+   Evidence is regenerated by the owning script (`scripts/example/*`), not edited by hand.
+   `tests/work-change.spec.mjs` and `tests/work-record-schemas.spec.mjs` drop their skips:
+   write the 8 missing schemas from real records, fix records to match, or fix the checker if
+   the checker is what deviates from `work-layout.yaml`.
+4. **A1: audit measures itself.** `interface.audit` measures DOM/computed-style with the
+   locked Playwright runner (the `uat.assisted.prepare` mechanism), through `E/screens` + the
+   serving origin recorded in the producer's `E/runtime.json`. The producer's
+   `E/measurements.json` is self-report; audit may cross-check it but it is never proof.
+   Applies before audit round 2. This area is in Devin's allowlist; if Devin has not done it
+   by the time lanes B, C, D have merged, lane G does it.
 
-**Phạm vi `1.0.0-alpha.2`: mọi drift đã tìm thấy trong file này, không để lại gì.** Thầy chốt
-2026-09-22: "tất cả các drift trò tìm thấy". Lane theo phụ thuộc:
+**Scope of `1.0.0-alpha.2`: every drift found in this file, nothing left behind.** The owner
+decided on 2026-09-22: "all the drifts you found". Lanes by dependency:
 
-| Lane | Chờ | Việc |
+| Lane | Waits on | Work |
 |---|---|---|
-| E prose | B, C | mục feedback-sediment + ghost-context + P1.21–23, 25–29 phần docs/skills/CONTEXT |
-| F2 examples | C | 8 schema thiếu từ record thật, bỏ 4 skip, evidence sinh lại bằng script |
-| G supervisor | Devin | những mục Devin chưa landed khi B, C, D xong: poll.mjs sang scripts/supervisor, `WHERE report_id > ?`, ask-serving-expired, ask-superseded, worker-start failureKind, A7 contracts binding, A1 audit tự đo, riskHints |
-| H op-shape | B, C | schema `starci/op@1`, `check-op-manifest.mjs`, `params` typed + `api enqueue --params` + packet.params, bỏ handoff/matrixHandoff không consumer, bỏ `business` block, migrate 35 op, sửa case interface.draw |
-| I host-boundary | C, D | `lib.mjs` đọc `calls.yaml`, live `agent-context` một lần mỗi process, `providers.mjs --live`, `check-host-boundary.mjs`, `orca-cli` skill tách khỏi load path kernel |
-| J quality-bar | C | QUALITY-BAR nhóm Evidence thành check (`done` → artifact tồn tại + digest khớp), tick checkbox bằng tên check |
+| E prose | B, C | feedback-sediment section + ghost-context + P1.21–23, 25–29 docs/skills/CONTEXT part |
+| F2 examples | C | 8 missing schemas from real records, drop 4 skips, evidence regenerated by script |
+| G supervisor | Devin | items Devin has not landed when B, C, D finish: poll.mjs moves to scripts/supervisor, `WHERE report_id > ?`, ask-serving-expired, ask-superseded, worker-start failureKind, A7 contracts binding, A1 audit measures itself, riskHints |
+| H op-shape | B, C | schema `starci/op@1`, `check-op-manifest.mjs`, typed `params` + `api enqueue --params` + packet.params, drop handoff/matrixHandoff without consumer, drop the `business` block, migrate 35 ops, fix the interface.draw case |
+| I host-boundary | C, D | `lib.mjs` reads `calls.yaml`, live `agent-context` once per process, `providers.mjs --live`, `check-host-boundary.mjs`, `orca-cli` skill split from the kernel load path |
+| J quality-bar | C | QUALITY-BAR Evidence group becomes a check (`done` → artifact exists + digest matches), tick checkboxes by check name |
 
-**Điều kiện ra alpha.2:** `npm run check` xanh, `npm test` không skip nào ngoài PowerShell
-7, CI `ci.yml` và `todo-app-example.yml` xanh trên `main`, CHANGELOG mục alpha.2 liệt kê
-đúng những gì đã landed, tag `v1.0.0-alpha.2` sau khi thầy xem diff.
+**Exit conditions for alpha.2:** `npm run check` green, `npm test` with no skip other than
+PowerShell 7, CI `ci.yml` and `todo-app-example.yml` green on `main`, the CHANGELOG alpha.2
+entry lists exactly what landed, tag `v1.0.0-alpha.2` after the owner reviews the diff.
 
-### Lane J landed: `check-evidence-binding.mjs` và ba lỗ schema cho F2/C
+### Lane J landed: `check-evidence-binding.mjs` and three schema holes for F2/C
 
-Check chạy trên example thật: todo-app-backend 122 `EVIDENCE_DIGEST_MISMATCH` (61 record) +
-25 `ASSERTED_NOT_OBSERVED`; ecommerce-app-be 385 mismatch (10 record) + 2. Đây là drift thật,
-evidence cũ hơn source. F2 sinh lại bằng `scripts/example/example-evidence.mjs`, không sửa tay.
+The check runs on real examples: todo-app-backend 122 `EVIDENCE_DIGEST_MISMATCH` (61
+records) + 25 `ASSERTED_NOT_OBSERVED`; ecommerce-app-be 385 mismatches (10 records) + 2. This
+is real drift, evidence older than source. F2 regenerates it with
+`scripts/example/example-evidence.mjs`, not by hand.
 
-Lỗ schema (C/F2 phải đóng trước khi F2 bỏ skip):
+Schema holes (C/F2 must close them before F2 drops the skips):
 
-1. `codeDigest` là field mà cả example tree và `scripts/example/example-ownership.mjs` dùng,
-   nhưng không schema nào dưới `modules/schemas/` khai. `work-evidence.schema.yaml` là
-   `additionalProperties: false` nên mọi `evidence.yaml` trong example fail chính schema của nó.
-2. `work-evidence.schema.yaml` require `provenance.servedVersions[].{repository,commit,artifact}`;
-   0 record nào có. Field require mà không ai dùng thì hoặc bỏ require, hoặc example sai.
-3. `work-implementation.schema.yaml` require `directory`, `files`, `revision`, `verification`;
-   `work-layout.yaml` nói gate từ chối `directory`/`files` và dùng `owners[]`. Schema và
-   layout phủ nhau; `work-layout.yaml` là authority, schema sửa theo.
-4. `work-ui-screen.schema.yaml` không có viewport/breakpoint/theme/assets; `work-uat-flow.schema.yaml`
-   không có video/recording/failure-path. Hai bullet QUALITY-BAR §5 chưa check được vì không
-   có field để đọc. F2 thêm field khi viết 8 schema thiếu.
+1. `codeDigest` is a field that both the example tree and `scripts/example/example-ownership.mjs`
+   use, but no schema under `modules/schemas/` declares it. `work-evidence.schema.yaml` is
+   `additionalProperties: false` so every `evidence.yaml` in the example fails its own schema.
+2. `work-evidence.schema.yaml` requires `provenance.servedVersions[].{repository,commit,artifact}`;
+   0 records have it. A required field nobody uses means either drop the requirement or the
+   example is wrong.
+3. `work-implementation.schema.yaml` requires `directory`, `files`, `revision`, `verification`;
+   `work-layout.yaml` says the gate rejects `directory`/`files` and uses `owners[]`. Schema
+   and layout overlap; `work-layout.yaml` is the authority, the schema follows.
+4. `work-ui-screen.schema.yaml` has no viewport/breakpoint/theme/assets;
+   `work-uat-flow.schema.yaml` has no video/recording/failure-path. Two QUALITY-BAR §5
+   bullets cannot be checked yet because there is no field to read. F2 adds fields when
+   writing the 8 missing schemas.
 
-Check chưa vào `npm run check`: lane I hoặc lane cuối wire vào `package.json` `check`.
+The check is not yet in `npm run check`: lane I or the final lane wires it into the
+`package.json` `check`.
 
-### Lane F1 landed: `todo-app-example.yml` chạy đúng những gì có
+### Lane F1 landed: `todo-app-example.yml` runs exactly what exists
 
-Bốn job `records`, `backend`, `frontend`, `live`; job `uat` cũ (npm ci vào thư mục không có
-manifest, artifact glob không ai ghi) gộp vào `live`. Demo key mở 10 file `.enc`, tất cả là
-cụm chữ thường ngắn, không vendor prefix, không DSN. Quyết định 1 đứng.
+Four jobs `records`, `backend`, `frontend`, `live`; the old `uat` job (npm ci into a
+directory without a manifest, an artifact glob nobody writes) is merged into `live`. The demo
+key opens 10 `.enc` files, all short lowercase phrases, no vendor prefix, no DSN. Decision 1
+stands.
 
-Hai bước còn đỏ trên tree hiện tại, để nguyên vì là drift thật:
+Two steps are still red on the current tree, left alone because they are real drift:
 
-- `check-example-work.mjs` từ chối 207 record (180 todo-app-backend, 27 ecommerce) vì
-  `recordDigest`/`codeDigest` stale. F2 sinh lại bằng `scripts/example/*`.
-- `check-scoped-lint.mjs` cả hai profile trả `ARCH_CONFIG_INVALID` vì `package.json` của
-  example khai `file:../../packages/{e2e,fe}-kit` nằm ngoài `--root`. Cần check hiểu dependency
-  path ngoài root khi nó nằm trong cùng repo (`scripts/checks/check-scoped-lint.mjs`, giao F2).
-  Profile `next` thêm `CANON_VERSION_MISMATCH`: `modules/models/code-patterns.yaml:456` pin
-  fe canon `3.0.2`, `packages/eslint/fe/package.json:3` là `3.1.0` (lane C).
-- `modules/ops/ops/uat.verify.yaml:165` khai evidence dưới `E/`; harness thật
-  `examples/todo-app-frontend/e2e/lib/paths.ts:36` ghi `runs/<runId>/...` không có `E/` (lane H
-  khi migrate op).
-- 18 `.webm` UAT tracked dưới `.starciwork/**/videos/`: là evidence sinh bằng runner, giữ.
+- `check-example-work.mjs` rejects 207 records (180 todo-app-backend, 27 ecommerce) because
+  `recordDigest`/`codeDigest` are stale. F2 regenerates them with `scripts/example/*`.
+- `check-scoped-lint.mjs` for both profiles returns `ARCH_CONFIG_INVALID` because the
+  example's `package.json` declares `file:../../packages/{e2e,fe}-kit` which lies outside
+  `--root`. The check needs to understand a dependency path outside root when it is inside
+  the same repo (`scripts/checks/check-scoped-lint.mjs`, assigned to F2). Profile `next` adds
+  `CANON_VERSION_MISMATCH`: `modules/models/code-patterns.yaml:456` pins fe canon `3.0.2`,
+  `packages/eslint/fe/package.json:3` is `3.1.0` (lane C).
+- `modules/ops/ops/uat.verify.yaml:165` declares evidence under `E/`; the real harness
+  `examples/todo-app-frontend/e2e/lib/paths.ts:36` writes `runs/<runId>/...` without `E/`
+  (lane H when migrating ops).
+- 18 `.webm` UAT files tracked under `.starciwork/**/videos/`: runner-generated evidence,
+  keep.
 
-### Lane D landed: 10 wrapper, 3 CLI shell, 2 check mồ côi xoá; stub Orca chung; coverage untracked
+### Lane D landed: 10 wrappers, 3 CLI shells, 2 orphan checks deleted; shared Orca stub; coverage untracked
 
-Giữ lại có lý do: `terminal-list` (workflow-chat skill gọi), `bias.mjs` (`--routing-bias` sống
-end-to-end qua define-goal → goal row → `cmdRoute`), `probe-reference-conventions.mjs`
-(knowledge cite), `reference-renders/` (interface.audit và QUALITY-BAR cite).
+Kept with reasons: `terminal-list` (the workflow-chat skill calls it), `bias.mjs`
+(`--routing-bias` is alive end-to-end via define-goal → goal row → `cmdRoute`),
+`probe-reference-conventions.mjs` (cited by knowledge), `reference-renders/` (cited by
+interface.audit and QUALITY-BAR).
 
-Việc rơi sang lane khác:
+Work that falls to other lanes:
 
-- C: `calls.yaml` còn 10 entry không có wrapper (`run-use:60`, `run-show:66`, `task-update:79`,
-  `task-list:85`, `worker-read:144`, `worker-list:150`, `worker-abandon:174`, `check:199`,
-  `send:206`, `reply:212`) và `:34` nói reconcile đọc `task-list`/`worker-list` trong khi chỉ
-  `worker-show` có code. Xoá entry hoặc ghi rõ "not issued by StarCi".
-- E: `docs/cli.md:56,59,60` và `docs/host-contract.md:111` trỏ `scripts/agent/{spawn,health,kill}.mjs` đã xoá.
-- B: `engine/ledger-db.mjs:296` comment nhắc `sleep` đã đổi tên `sleepSync`.
-- H: `interface.implement.yaml:268-283` khai shape asset-manifest mà validator `spec/assets.mjs`
-  (đã xoá, chưa ai gọi) từng check; giờ contract không có executable. Cho nó một check hoặc
-  hạ claim.
-- F2: 4 file critique trong `examples/*/.starciwork/_derived/` mang stamp path cũ, sinh lại.
-- Chưa ai wire: `check-work-{surfaces,history,replay}` chỉ spec của chính nó gọi. Chỉ 2/24
-  check được op gọi. H quyết định khi migrate op (proofs cite check nào).
-- `probe-reference-conventions.mjs` cần `eslint` + `@typescript-eslint/parser` không có trong
-  tree; Fable quyết: giữ như external-only workflow, header ghi rõ, không thêm devDependency.
+- C: `calls.yaml` still has 10 entries without wrappers (`run-use:60`, `run-show:66`,
+  `task-update:79`, `task-list:85`, `worker-read:144`, `worker-list:150`,
+  `worker-abandon:174`, `check:199`, `send:206`, `reply:212`) and `:34` says reconcile reads
+  `task-list`/`worker-list` while only `worker-show` has code. Delete the entries or state
+  plainly "not issued by StarCi".
+- E: `docs/cli.md:56,59,60` and `docs/host-contract.md:111` point at the deleted
+  `scripts/agent/{spawn,health,kill}.mjs`.
+- B: the comment at `engine/ledger-db.mjs:296` mentions `sleep`, which was renamed
+  `sleepSync`.
+- H: `interface.implement.yaml:268-283` declares the asset-manifest shape that the validator
+  `spec/assets.mjs` (deleted, never called) used to check; now the contract has no
+  executable. Give it a check or lower the claim.
+- F2: 4 critique files in `examples/*/.starciwork/_derived/` carry the old path stamp,
+  regenerate.
+- Nobody has wired: `check-work-{surfaces,history,replay}` are called only by their own spec.
+  Only 2/24 checks are called by ops. H decides when migrating ops (which check the proofs
+  cite).
+- `probe-reference-conventions.mjs` needs `eslint` + `@typescript-eslint/parser`, which are
+  not in the tree; Fable decides: keep as an external-only workflow, say so in the header, do
+  not add a devDependency.
 
-Lưu ý cho mọi lane: worktree không có `config.yaml` (untracked) nên `goal-entry.spec` ×2
-và `json-exceptions.spec` fail trong worktree, không fail trên `main`. Đó không phải regression.
+Note for every lane: the worktree has no `config.yaml` (untracked) so `goal-entry.spec` ×2
+and `json-exceptions.spec` fail in the worktree but not on `main`. That is not a regression.
 
-### Lane C landed: mô hình cũ đã chôn, một số concurrency, catalog schema có check
+### Lane C landed: old model buried, one concurrency number, schema catalog with check
 
-`registry.yaml` một `executionModel`; `host/claude|codex` còn một `index.yaml` thật mỗi host;
-`_common.yaml` hết matrix/cell; `runtimes.<pool>.maxParallel` là số duy nhất được code enforce;
-~25 cite hàm ma trong `modules/goal/` đã thành luật do yaml tự sở hữu; `.json` ghost hết;
-`check-schema-catalog.mjs` phủ 54 stamp; `json-exceptions.spec` xanh lại (đỏ từ trước vì 4
-path storybook không có trên đĩa).
+`registry.yaml` has one `executionModel`; `host/claude|codex` keep one real `index.yaml` per
+host; `_common.yaml` is free of matrix/cell; `runtimes.<pool>.maxParallel` is the only number
+the code enforces; ~25 ghost function cites in `modules/goal/` became rules the yaml owns
+itself; the `.json` ghosts are gone; `check-schema-catalog.mjs` covers 54 stamps;
+`json-exceptions.spec` is green again (it was red before because 4 storybook paths do not
+exist on disk).
 
-Việc rơi sang lane khác:
+Work that falls to other lanes:
 
-- B: `driver-loop.yaml:289` cite `maxParallelOps` không ai enforce, hoặc enforce hoặc bỏ cite;
-  `driver-loop.yaml:484`, `verdict-contract.yaml:115` còn `cấn cấn`; `engine/config.mjs` 6
-  string `config.json` (đã trong brief B).
-- H: ~15 op còn `reads: matrix` / `writes: matrixHandoff`, giữ vocabulary matrix sống qua
-  registry sinh ra. Bỏ khi migrate op-shape.
-- `maxParallelOps: 20` giữ tạm vì B cite; sau khi B quyết, C hoặc H xoá.
+- B: `driver-loop.yaml:289` cites `maxParallelOps` which nobody enforces, either enforce it or
+  drop the cite; `driver-loop.yaml:484`, `verdict-contract.yaml:115` still carry a leftover
+  Vietnamese phrase; `engine/config.mjs` 6 `config.json` strings (already in B's brief).
+- H: ~15 ops still have `reads: matrix` / `writes: matrixHandoff`, keeping the matrix
+  vocabulary alive through the generated registry. Drop when migrating op-shape.
+- `maxParallelOps: 20` kept temporarily because B cites it; after B decides, C or H deletes
+  it.
 
-### Lane B landed: kernel contracts nói thật, một authority cho verb, list, hàm, số
+### Lane B landed: kernel contracts tell the truth, one authority for verbs, lists, functions, numbers
 
-18 verb ở mọi bề mặt + `check-api-surface.mjs`; refusal chỉ còn cái code in ra (`empty-paths`,
-`unknown-op`, `workflow-finished` implement có spec; 3 refusal ma xoá; 5 đổi tên theo string
-thật); `observe` chuyển sang nhóm write trong `api.yaml`; `check-contract-cites.mjs` phủ
-`modules/kernel`; blocker kinds/outcomes/effort/job status mỗi cái một chỗ;
-`normalizeOwnedPath`, `readOwnerConfig`, phase transition mỗi cái một implementation; số vào
-`runtimes.yaml allocation.*`; ghost engine/kernel hết. Fable wire ba check mới vào
-`npm run check` (`check-api-surface`, `check-contract-cites`, `check-schema-catalog`).
+18 verbs on every surface + `check-api-surface.mjs`; refusals only remain what the code
+prints (`empty-paths`, `unknown-op`, `workflow-finished` implemented with specs; 3 ghost
+refusals deleted; 5 renamed to the real strings); `observe` moved to the write group in
+`api.yaml`; `check-contract-cites.mjs` covers `modules/kernel`; blocker kinds/outcomes/
+effort/job status each in one place; `normalizeOwnedPath`, `readOwnerConfig`, phase
+transition each one implementation; numbers into `runtimes.yaml allocation.*`; engine/kernel
+ghosts gone. Fable wires three new checks into `npm run check` (`check-api-surface`,
+`check-contract-cites`, `check-schema-catalog`).
 
-Quyết định của Fable trên các điểm B để mở:
+Fable's decisions on the points B left open:
 
-- `already-queued` bỏ vì `cutExecution` cố ý enqueue N job cùng op; fence thật là path lease.
-  Không thêm refusal cut-aware trong alpha.2.
-- Không thêm `CHECK(status IN ...)` vào `jobs`; `JOB_STATUSES` trong `ledger-db.mjs` là vocabulary.
-- `readDistJson` đổi tên: lane cuối (K) làm cùng `check-scoped-lint.mjs:7,186`.
-- Refusal của `report` (`report-contract-unbound`, `report-dispatch-unbound`,
-  `report-job-not-active`) document sau khi Devin/G sửa A7.
+- `already-queued` dropped because `cutExecution` deliberately enqueues N jobs of the same
+  op; the real fence is the path lease. No cut-aware refusal is added in alpha.2.
+- No `CHECK(status IN ...)` is added to `jobs`; `JOB_STATUSES` in `ledger-db.mjs` is the
+  vocabulary.
+- `readDistJson` rename: the last lane (K) does it together with
+  `check-scoped-lint.mjs:7,186`.
+- The refusals of `report` (`report-contract-unbound`, `report-dispatch-unbound`,
+  `report-job-not-active`) are documented after Devin/G fixes A7.
 
-Việc rơi sang lane khác:
+Work that falls to other lanes:
 
-- E: `README.md:17` 8 verb; `docs/ledger-db.md:149-153`, `docs/host-contract.md:131`,
-  `docs/workflow-kernel.md:89` còn tên refusal đã xoá; `docs/examples/todo-app-standard.md:111,194`
-  path `scripts/example-evidence.mjs`; `runtimes.yaml:5,23` "config.json"; bare filename trong
-  `citation:` ở `modules/goal/anatomy.yaml:344`, `legality.yaml:310-425`,
-  `modules/schemas/relationships.yaml:46-137` (E hoặc H, chạy
+- E: `README.md:17` 8 verbs; `docs/ledger-db.md:149-153`, `docs/host-contract.md:131`,
+  `docs/workflow-kernel.md:89` still carry deleted refusal names;
+  `docs/examples/todo-app-standard.md:111,194` path `scripts/example-evidence.mjs`;
+  `runtimes.yaml:5,23` "config.json"; bare filenames in `citation:` at
+  `modules/goal/anatomy.yaml:344`, `legality.yaml:310-425`,
+  `modules/schemas/relationships.yaml:46-137` (E or H, run
   `node scripts/checks/check-contract-cites.mjs --scan modules --scan docs --scan CONTEXT.md --scan skills`).
-- C đã xử lý: `selection.yaml` model-policy cites, profiles model-catalog, `work-layout.yaml:38`,
-  `schemas/index.yaml:520`.
+- C already handled: `selection.yaml` model-policy cites, profiles model-catalog,
+  `work-layout.yaml:38`, `schemas/index.yaml:520`.
 
-### Lane I landed: host boundary thực thi
+### Lane I landed: host boundary enforced
 
-`lib.mjs` đọc `calls.yaml` để lắp argv, live `agent-context` chạy một lần mỗi process trước
-mutation đầu tiên, `providers.mjs --live`, `check-host-boundary.mjs` vào `npm run check`,
-ba skill orca-cli/orchestration/computer-use ghi rõ "for the owner's chat only". 8 entry
-`calls.yaml` không có wrapper đã xoá; `check` và `send` giữ vì recipes cần, ghi rõ thiếu wrapper.
-Fable xoá fallback `orca account list` inline trong `scripts/api/quota/orca-account.mjs`.
+`lib.mjs` reads `calls.yaml` to assemble argv, live `agent-context` runs once per process
+before the first mutation, `providers.mjs --live`, `check-host-boundary.mjs` is in `npm run
+check`, and the three skills orca-cli/orchestration/computer-use state "for the owner's chat
+only". 8 `calls.yaml` entries without wrappers deleted; `check` and `send` kept because
+recipes need them, with the missing wrapper stated. Fable deletes the inline `orca account
+list` fallback in `scripts/api/quota/orca-account.mjs`.
 
-### Lane E landed: prose nói một điều, một lần
+### Lane E landed: prose says one thing, once
 
-`CONTEXT.md` 38 đoạn → 29, chín mâu thuẫn gỡ (chat ba vai, watchdog liveness-only, settle enum,
-work layout cite, host boundary một câu). README/CONTRIBUTING/CHANGELOG cite authority; docs
-khớp code; skills nêu người đọc và label đúng script in; `.experiments` S* row là layout thật.
+`CONTEXT.md` 38 paragraphs → 29, nine contradictions removed (chat three roles, watchdog
+liveness-only, settle enum, work layout cite, host boundary in one sentence).
+README/CONTRIBUTING/CHANGELOG cite the authority; docs match the code; skills name the reader
+and the labels exactly as the script prints them; `.experiments` S* row is the real layout.
 
-Còn lại cho lane chốt K (sau H, G, F2):
+Remaining for the closing lane K (after H, G, F2):
 
-- 16 cite bare filename cần path đầy đủ: `modules/goal/anatomy.yaml:345`,
+- 16 bare-filename cites need full paths: `modules/goal/anatomy.yaml:345`,
   `modules/goal/legality.yaml:313,326,352,415,422,429`,
   `modules/schemas/relationships.yaml:46,49,52,55,55,58,61,64,137`.
 - `config.example.yaml:37` `model/runtimes.yaml` → `modules/models/runtimes.yaml`.
-- `scripts/example/example-render-proof.mjs:9` cite `docs/examples/todo-app-grit.md`;
-  `scripts/checks/check-example-work.mjs:484,504` cite `docs/kinds.md` (F2 có thể đã sửa).
+- `scripts/example/example-render-proof.mjs:9` cites `docs/examples/todo-app-grit.md`;
+  `scripts/checks/check-example-work.mjs:484,504` cite `docs/kinds.md` (F2 may have fixed it).
 - `.gitignore:2` `/.dist*/` ghost.
-- `readDistJson` đổi tên + `check-scoped-lint.mjs:7,186`.
-- `check-contract-cites --scan modules --scan docs --scan CONTEXT.md --scan skills` phải sạch;
-  wire scan rộng này vào `npm run check` thay vì chỉ `modules/kernel`.
-- `check-evidence-binding.mjs` và `check-op-manifest.mjs` (H) vào `npm run check`.
+- `readDistJson` rename + `check-scoped-lint.mjs:7,186`.
+- `check-contract-cites --scan modules --scan docs --scan CONTEXT.md --scan skills` must be
+  clean; wire this wide scan into `npm run check` instead of only `modules/kernel`.
+- `check-evidence-binding.mjs` and `check-op-manifest.mjs` (H) into `npm run check`.
 
-### Lane H landed: `starci/op@1`, params typed, 36 op migrated
+### Lane H landed: `starci/op@1`, typed params, 36 ops migrated
 
-619 finding → 0; catalog 13.522 → 10.829 dòng; `business`/`handoff`/`matrixHandoff` hết;
+619 findings → 0; catalog 13,522 → 10,829 lines; `business`/`handoff`/`matrixHandoff` gone;
 params: `interface.draw.candidatesPerScreen=1` (owner, max 3), `interface.audit.maxRounds=5`,
 `provision.ask.minOptions=2`, `work.author.{maxFiles=12,maxProofDemands=8,componentsTriggeringCut=3}`,
-`*.decide.readingsStated=3`. A1 audit tự đo landed. Hai corruption ngầm được sửa: blocker
-`AUDIT_SCOPE_INCOMPLETE`/`AUDIT_INPUT_CHANGED` từng parse thành key `null`; `uat.verify` path `E/`.
+`*.decide.readingsStated=3`. A1 audit measures itself landed. Two silent corruptions fixed:
+blockers `AUDIT_SCOPE_INCOMPLETE`/`AUDIT_INPUT_CHANGED` used to parse into a `null` key;
+`uat.verify` `E/` path.
 
-## orca-hierarchy: vì sao sidebar Orca lộn xộn (2026-09-23, ledger nivo-backend)
+## orca-hierarchy: why the Orca sidebar is a mess (2026-09-23, ledger nivo-backend)
 
-Thầy thấy trong Orca: hai `[Kernel] wf-nivo-workspace-provision`, hai `[Op] interface.implement`
-gpt-5.6-luna 18h nằm ở gốc, op "Idle" dưới một kernel. Đối chiếu:
+The owner sees in Orca: two `[Kernel] wf-nivo-workspace-provision`, two `[Op] interface.implement`
+gpt-5.6-luna 18h sitting at the root, an "Idle" op under one kernel. Cross-check:
 
-| Sidebar | Ledger/Orca thật | Nguyên nhân |
+| Sidebar | Real ledger/Orca | Cause |
 |---|---|---|
-| 2 kernel WSPV | signal `kernel` trỏ `term_d2f101cf`; terminal `term_aef50872` "Kernel orchestration…" vẫn sống, không có trong signal; kernel job đang ở attempt 4 | Restart kernel (watchdog/supervisor `start-workflow --goal`) tạo terminal mới nhưng không đóng terminal cũ |
-| `[Op] interface.audit - Idle` dưới kernel | job `interface.audit a4` **failed** 15:52, dispatch `ctx_23ab4762` bị reject ở worker-start (chính là A7 của Devin), terminal `term_b6fa4c43` vẫn mở | `rejectDispatch` giải phóng lease nhưng không đóng terminal đã tạo |
-| 2 `[Op] interface.implement` luna 18h ở gốc, có tick | `interface.implement a19` succeeded qua managed worker codex `ctx_427183f`; các Task managed cũ | Settle chỉ `worker-stop` + `worker-release`, không xoá Task; Task thuộc Run bind với terminal kernel **cũ**, kernel restart có terminal mới nên Task rơi ra gốc |
-| Tiêu đề "devin.exe: Kernel orchestration for…" | `[Kernel] <wf>` chỉ áp lên Task display name | Rename terminal chỉ có cho managed worker, không cho terminal Devin |
+| 2 WSPV kernels | signal `kernel` points at `term_d2f101cf`; terminal `term_aef50872` "Kernel orchestration…" is still alive and not in the signal; the kernel job is at attempt 4 | A kernel restart (watchdog/supervisor `start-workflow --goal`) creates a new terminal but does not close the old one |
+| `[Op] interface.audit - Idle` under a kernel | job `interface.audit a4` **failed** 15:52, dispatch `ctx_23ab4762` was rejected at worker-start (exactly Devin's A7), terminal `term_b6fa4c43` still open | `rejectDispatch` releases the lease but does not close the terminal it created |
+| 2 `[Op] interface.implement` luna 18h at root, ticked | `interface.implement a19` succeeded via managed worker codex `ctx_427183f`; the old managed Tasks | Settle only does `worker-stop` + `worker-release`, does not delete the Task; the Task belongs to a Run bound to the **old** kernel terminal, the restarted kernel has a new terminal so the Task falls out to the root |
+| Title "devin.exe: Kernel orchestration for…" | `[Kernel] <wf>` is applied only to the Task display name | Terminal rename exists only for managed workers, not for Devin terminals |
 
-`api hierarchy` của ledger thì đúng: mọi op đều `parent = agent:kernel:<wf>`. Cái sai là cây
-Orca (Run → Task → terminal) không được đồng bộ khi kernel restart và khi job kết thúc.
+The ledger's `api hierarchy` is right: every op has `parent = agent:kernel:<wf>`. What is
+wrong is the Orca tree (Run → Task → terminal), which is not synchronized on kernel restart
+and when a job ends.
 
-**Luật:** một workflow có đúng một terminal kernel sống; job kết thúc (settle, reject, finish)
-không để lại terminal hay Task sống; Run của workflow luôn bind với terminal kernel hiện tại.
+**Rule:** a workflow has exactly one live kernel terminal; a finished job (settle, reject,
+finish) leaves no live terminal or Task behind; the workflow's Run is always bound to the
+current kernel terminal.
 
-**Lane L (sau G, vì cùng đụng `rejectDispatch` và settle):**
+**Lane L (after G, since both touch `rejectDispatch` and settle):**
 
-- [ ] `start-workflow.mjs` restart: đóng terminal kernel cũ (`terminal-close`) trước khi ghi signal
-      mới; nếu đóng không được thì incident, không im lặng
-- [ ] `rejectDispatch`: terminal/worker đã tạo thì đóng (`terminal-close` hoặc `worker-stop` +
-      `worker-release`) trong cùng transaction reject
-- [ ] settle/finish: đóng terminal cho mọi adapter, và với managed worker thì Task về trạng thái
-      done/archived qua wrapper có contract (khôi phục `task-update.mjs` mà lane D xoá vì chưa ai
-      gọi; giờ có người gọi)
-- [ ] Kernel restart: Run của workflow re-bind với terminal kernel mới (khôi phục `run-use.mjs`
-      nếu Orca cần lệnh đó), để Task mới nằm dưới kernel mới
-- [ ] Terminal Devin/command-terminal: đặt title `[Kernel] <wf>` / `[Op] <op> a<n>` ngay khi tạo
-      (`terminal-create --title`) thay vì để provider tự đặt
-- [ ] `check`: một check đọc ledger + `terminal-list` và báo terminal sống không thuộc job
-      sống nào (`ORPHAN_TERMINAL`), workflow có >1 terminal kernel (`DUPLICATE_KERNEL`)
-- [ ] Practice entry cho vòng này
+- [ ] `start-workflow.mjs` restart: close the old kernel terminal (`terminal-close`) before
+      writing the new signal; if closing fails it is an incident, not silent
+- [ ] `rejectDispatch`: a terminal/worker that was already created is closed (`terminal-close`
+      or `worker-stop` + `worker-release`) in the same reject transaction
+- [ ] settle/finish: close the terminal for every adapter, and for a managed worker move the
+      Task to done/archived through a wrapper that has a contract (restore `task-update.mjs`
+      which lane D deleted because nobody called it; now someone does)
+- [ ] Kernel restart: the workflow's Run re-binds to the new kernel terminal (restore
+      `run-use.mjs` if Orca needs that command), so new Tasks sit under the new kernel
+- [ ] Devin/command-terminal terminals: set the title `[Kernel] <wf>` / `[Op] <op> a<n>` at
+      creation (`terminal-create --title`) instead of letting the provider choose
+- [ ] `check`: a check that reads the ledger + `terminal-list` and reports a live terminal
+      belonging to no live job (`ORPHAN_TERMINAL`), a workflow with >1 kernel terminal
+      (`DUPLICATE_KERNEL`)
+- [ ] Practice entry for this round
 
-**Root cause chính xác (đọc code 2026-09-23):**
+**Exact root cause (from reading code 2026-09-23):**
 
-1. `scripts/kernel/start-workflow.mjs:563-565`: restart kernel `UPDATE jobs SET payload_json=?`
-   thay **toàn bộ** payload của kernel job, nên `orca.runId` mất. Dispatch kế tiếp gọi
-   `ensureWorkflowRun` (`api.mjs:1465`), không thấy runId, `run-create` một Run **mới** bind
-   với terminal kernel mới. Task cũ ở Run cũ, Task mới ở Run mới: đó là hai cây trong sidebar.
-2. `start-workflow.mjs:438-455`: kernel stale chỉ được `releaseManagedWorker` khi là managed
-   dispatch; kernel Devin (`launch: terminal`) không bao giờ bị `terminal-close`. Signal bị xoá,
-   job bị đánh `stopped`, nhưng terminal sống tiếp.
-3. `createOperationTask` (`api.mjs:1506`) tạo Task với `run` + `from`, không dùng flag `parent`
-   mà `task-create` có. Cây Orca suy từ Run, nên (1) là đủ để vỡ.
+1. `scripts/kernel/start-workflow.mjs:563-565`: a kernel restart `UPDATE jobs SET payload_json=?`
+   replaces the **entire** payload of the kernel job, so `orca.runId` is lost. The next
+   dispatch calls `ensureWorkflowRun` (`api.mjs:1465`), does not see a runId, and
+   `run-create`s a **new** Run bound to the new kernel terminal. Old Tasks in the old Run,
+   new Tasks in the new Run: those are the two trees in the sidebar.
+2. `start-workflow.mjs:438-455`: a stale kernel is `releaseManagedWorker`d only when it is a
+   managed dispatch; a Devin kernel (`launch: terminal`) is never `terminal-close`d. The
+   signal is deleted, the job is marked `stopped`, but the terminal lives on.
+3. `createOperationTask` (`api.mjs:1506`) creates the Task with `run` + `from`, without the
+   `parent` flag that `task-create` has. The Orca tree is derived from the Run, so (1) is
+   enough to break it.
 
-`.claude` **có** enforce lúc tạo: mọi op là một Task trong Run của workflow, `from` terminal
-kernel, và ledger `hierarchy` là nguồn quan hệ. `.claude` **không** enforce liên tục: restart
-không giữ Run, không đóng terminal cũ; reject không đóng terminal; settle không dọn Task; không
-check nào so ledger với `terminal-list`. Lane L sửa đúng ba điểm này: giữ `orca.runId` qua
-restart (merge payload thay vì thay), đóng terminal kernel cũ mọi adapter, và check.
+`.claude` **does** enforce at creation: every op is a Task in the workflow's Run, `from` the
+kernel terminal, and the ledger `hierarchy` is the source of relations. `.claude` does
+**not** enforce continuously: restart does not keep the Run and does not close the old
+terminal; reject does not close the terminal; settle does not clean up the Task; no check
+compares the ledger with `terminal-list`. Lane L fixes exactly these three points: keep
+`orca.runId` across restart (merge the payload instead of replacing), close the old kernel
+terminal for every adapter, and the check.
 
-## parallel-gear: số agent song song theo cỡ task, owner vặn một nút (2026-09-23)
+## parallel-gear: number of parallel agents by task size, the owner turns one knob (2026-09-23)
 
-Ý thầy: task dài 3 agent, siêu dài 6; vặn lên thì 5 và 10. Owner chỉ chỉnh một thứ.
+The owner's idea: a long task gets 3 agents, a very long one 6; turn the knob up and it is 5
+and 10. The owner adjusts only one thing.
 
-**Hiện trạng.** `config.yaml budgets.maxOps` chỉ được validate, không ai enforce. Số thật là
-`runtimes.<pool>.maxParallel`. `api estimate` tính slice từ `allocation.slicing` theo cửa sổ
-15–30 phút, không theo lớp cỡ. Owner không có nút nào.
+**Current state.** `config.yaml budgets.maxOps` is only validated, nobody enforces it. The
+real number is `runtimes.<pool>.maxParallel`. `api estimate` computes slices from
+`allocation.slicing` by a 15–30 minute window, not by size class. The owner has no knob.
 
-**Thiết kế.**
+**Design.**
 
 ```yaml
 # config.yaml (owner)
 parallel:
-  gear: 1          # 1 = thường, 2 = cao; mở rộng được, không đổi tên
+  gear: 1          # 1 = normal, 2 = high; extensible, never renamed
 budgets:
-  maxOps: 8        # trần op đang chạy của một workflow, giờ enforce thật
+  maxOps: 8        # ceiling on running ops of one workflow, now really enforced
 
 # modules/models/runtimes.yaml (runtime data)
 allocation:
   slicing:
-    size:                                   # lớp cỡ theo closure đo được
+    size:                                   # size classes by measured closure
       l:  {from: {files: 12, assertions: 40},  agents: {1: 3, 2: 5}}
       xl: {from: {files: 40, assertions: 150}, agents: {1: 6, 2: 10}}
 ```
 
-- `api estimate` trả `size: s|m|l|xl`, `agentsRequested` (từ bảng × gear), `agentsAchievable`
-  (số slice path-disjoint thực tế cắt được) và `reason` khi achievable < requested.
-- Task `s`/`m` luôn 1 agent. Bảng chỉ áp cho `l`, `xl`.
-- Trần cứng vẫn là `runtimes.<pool>.maxParallel` + slot provider + `budgets.maxOps`. Gear
-  không nới trần; thiếu slot thì slice còn lại queued và `api status` nói vì sao.
-- Ngưỡng `from` lấy từ số liệu thật: closure của các job implement/refactor trong ledger
-  nivo (đọc bản copy, read-only), không đoán.
-- `api status` thêm `queuedBecause` cho mỗi job queued: `pool-full`, `path-lease`,
+- `api estimate` returns `size: s|m|l|xl`, `agentsRequested` (from the table × gear),
+  `agentsAchievable` (the number of path-disjoint slices that can actually be cut) and
+  `reason` when achievable < requested.
+- `s`/`m` tasks are always 1 agent. The table applies only to `l`, `xl`.
+- The hard ceiling is still `runtimes.<pool>.maxParallel` + provider slots +
+  `budgets.maxOps`. Gear does not raise the ceiling; when slots run short the remaining
+  slices stay queued and `api status` says why.
+- The `from` thresholds come from real data: the closure of implement/refactor jobs in the
+  nivo ledger (read a copy, read-only), not guessed.
+- `api status` adds `queuedBecause` for each queued job: `pool-full`, `path-lease`,
   `dependency`, `circuit-open`, `max-ops`.
 
-Lane M (Opus) làm việc này.
+Lane M (Opus) does this.
 
-### Lane F2 landed: 8 schema, 4 skip bỏ, evidence replay, boundary `file:` sửa
+### Lane F2 landed: 8 schemas, 4 skips dropped, evidence replay, `file:` boundary fixed
 
-Record bị từ chối 292 → 2 (hai `accounts.yaml` chứa credential literal của ecommerce, để
-nguyên). Schema là cái lệch, không phải record, trừ 23 input sửa tay có liệt kê trong report.
-`check-scoped-lint` profile `next` giờ chạy thật: 108 `ARCHITECTURE_VIOLATION` thật trong
-`todo-app-frontend`, trước đây bị `ARCH_CONFIG_INVALID` che. 10 manifest ui/brand từng
-claim pass giờ fail thật vì `verify-*.mjs` của chúng trước không load nổi.
+Rejected records 292 → 2 (two `accounts.yaml` in ecommerce containing literal credentials,
+left as is). The schema was what deviated, not the records, except 23 hand-edited inputs
+listed in the report. `check-scoped-lint` profile `next` now really runs: 108 real
+`ARCHITECTURE_VIOLATION` in `todo-app-frontend`, previously masked by `ARCH_CONFIG_INVALID`.
+10 ui/brand manifests that used to claim pass now really fail because their `verify-*.mjs`
+previously could not even load.
 
-**Còn đỏ, và vì sao:**
+**Still red, and why:**
 
-- `check-example-work` còn 88 record stale digest; 58 evidence cần Docker (Postgres/Keycloak,
-  compose, SePay sandbox) để replay. Máy này Docker Desktop tắt. → Thầy bật Docker Desktop, trò
-  cắm lane F3 replay nốt. Không có bước này thì job `records` của `todo-app-example.yml` đỏ.
-- 26 `ASSERTED_NOT_OBSERVED` đều là `work/gap@1`: gap là record authored-by-nature, cần thêm
-  vào `AUTHORED_BY_NATURE` của `check-evidence-binding.mjs` (lane K).
-- `examples/todo-app-backend/architecture.json`: 8/10 owner entry trỏ barrel `<module>/index.ts`
-  không tồn tại và bị chính rule `import-owner-entry` cấm. Contract của example tự mâu
-  thuẫn; lane K sửa owner entries theo rule.
-- `CANON_VERSION_MISMATCH`: `code-patterns.yaml:456` pin fe canon 3.0.2 vs `packages/eslint/fe`
+- `check-example-work` still has 88 records with stale digests; 58 evidence records need
+  Docker (Postgres/Keycloak, compose, SePay sandbox) to replay. On this machine Docker
+  Desktop is off. → The owner turns on Docker Desktop, the assistant plugs in lane F3 to
+  finish the replay. Without this step the `records` job of `todo-app-example.yml` stays red.
+- The 26 `ASSERTED_NOT_OBSERVED` are all `work/gap@1`: a gap is an authored-by-nature record,
+  it needs to be added to `AUTHORED_BY_NATURE` in `check-evidence-binding.mjs` (lane K).
+- `examples/todo-app-backend/architecture.json`: 8/10 owner entries point at a barrel
+  `<module>/index.ts` that does not exist and is forbidden by the `import-owner-entry` rule
+  itself. The example's contract contradicts itself; lane K fixes the owner entries to
+  follow the rule.
+- `CANON_VERSION_MISMATCH`: `code-patterns.yaml:456` pins fe canon 3.0.2 vs `packages/eslint/fe`
   3.1.0 (lane K).
 
-### Lane L landed: cây Orca theo ledger liên tục
+### Lane L landed: the Orca tree follows the ledger continuously
 
-Run sống qua restart (payload merge thay vì thay), terminal kernel cũ đóng trước khi ghi signal
-mới, Task có `parent` và title `[Op] <op> a<n> · <wf>` ngay khi tạo, reject/settle/finish đóng
-terminal, worker và Task (`task-update --status done`, wrapper khôi phục), `check-orca-tree.mjs`
-báo `DUPLICATE_KERNEL`/`ORPHAN_TERMINAL`/`DEAD_KERNEL`/`TASK_OUTSIDE_RUN` mỗi vòng poll. Luật ở
-`modules/kernel/start-workflow.yaml orcaTree.rule`. Còn mở: Orca không có verb archive Task;
-`TASK_OUTSIDE_RUN` chỉ báo, không reparent được.
+The Run survives restart (payload merge instead of replace), the old kernel terminal is
+closed before the new signal is written, Tasks have `parent` and title `[Op] <op> a<n> · <wf>`
+at creation, reject/settle/finish close the terminal, worker and Task (`task-update --status
+done`, wrapper restored), `check-orca-tree.mjs` reports
+`DUPLICATE_KERNEL`/`ORPHAN_TERMINAL`/`DEAD_KERNEL`/`TASK_OUTSIDE_RUN` every poll round. The
+rule is at `modules/kernel/start-workflow.yaml orcaTree.rule`. Still open: Orca has no verb
+to archive a Task; `TASK_OUTSIDE_RUN` only reports, it cannot reparent.
 
-## Model catalog (thầy chốt 2026-09-23)
+## Model catalog (owner finalized 2026-09-23)
 
-Bỏ hẳn `gpt-6-astra`, Claude Fable (pool `claude-fable`, `fable-astra`), mọi `gpt-5.6-*`,
-`claude-opus-5`. Catalog chỉ còn:
+Drop entirely `gpt-6-astra`, Claude Fable (pool `claude-fable`, `fable-astra`), every
+`gpt-5.6-*`, `claude-opus-5`. The catalog keeps only:
 
-| Model | Id | Giá in/out per MTok | Nguồn |
+| Model | Id | Price in/out per MTok | Source |
 |---|---|---|---|
-| GPT‑6 Sol | `gpt-6-sol` | $2 / $10 | thầy, 2026-09-23 |
-| GPT‑6 Luna | `gpt-6-luna` | $0.10 / $0.50 | thầy, 2026-09-23 |
-| Claude Opus 5.5 | `claude-opus-5-5` | $4 / $20 | platform.claude.com models overview; 1M ctx, 128K out, adaptive thinking luôn bật, effort mặc định API `medium` |
+| GPT‑6 Sol | `gpt-6-sol` | $2 / $10 | owner, 2026-09-23 |
+| GPT‑6 Luna | `gpt-6-luna` | $0.10 / $0.50 | owner, 2026-09-23 |
+| Claude Opus 5.5 | `claude-opus-5-5` | $4 / $20 | platform.claude.com models overview; 1M ctx, 128K out, adaptive thinking always on, API default effort `medium` |
 
-Codex pool: easy/medium `gpt-6-luna`, hard/insane `gpt-6-sol`. Claude pool mọi tier
-`claude-opus-5-5`. Devin giữ nguyên. Catalog không lưu giá. Lane N làm, kèm danh sách key
-trong `config.yaml` local của thầy cần đổi.
+Codex pool: easy/medium `gpt-6-luna`, hard/insane `gpt-6-sol`. Claude pool every tier
+`claude-opus-5-5`. Devin unchanged. The catalog does not store prices. Lane N does this,
+together with the list of keys in the owner's local `config.yaml` that need changing.
 
 ## supervisor night log 2026-09-23
 
-Supervisor: phiên "Nâng cấp .claude context", poll 10 phút (`config.yaml supervisor.pollIntervalMs`),
-theo `modules/supervisor/supervise.yaml`. Hai workflow: AUTH `wf-nivo-app-auth-mub1d7gs`,
+Supervisor: the session "Upgrade .claude context", poll every 10 minutes (`config.yaml supervisor.pollIntervalMs`),
+following `modules/supervisor/supervise.yaml`. Two workflows: AUTH `wf-nivo-app-auth-mub1d7gs`,
 WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 
-- 03:05 WSPV kernel báo mọi dispatch chết ở `task-create`. Nguyên nhân: lane L truyền terminal
-  handle vào `--parent`, Orca chỉ nhận task id; fake Orca chấp nhận nên suite xanh. Vá
-  `3861d7723`, fake Orca giờ từ chối parent không phải task, `calls.yaml` ghi kiểu giá trị. Báo
-  kernel qua `terminal-send`; kernel dispatch lại, audit round 2 bắt đầu báo `done` lúc 20:11.
-- 03:08 `supervisor.pollIntervalMs` vào config (`e749d0c76`); lane M merge (`93536d4b5`).
-- 03:12 `queuedBecause` báo sai: leg intake `request.analyze` chưa từng có job bị coi là chặn
-  mọi job, `actionable` vẫn true. Vá `bd1647a4b`: leg trước chỉ chặn khi có job đang chờ/chạy;
-  `readyOperations` chỉ đếm job `ready`. Lộ ra lỗi thật ở WSPV: 4 cell audit song song cùng giữ
-  path `.starciwork/kernel-evidence/<wf>` nên path lease xếp chúng thành hàng (mở, xem dưới).
-- 03:14 Một phiên khác replace mù `gpt-5.6`→`gpt-6` và ghi output `interface.draw` thẳng vào cây
-  `main`; commit của trò cuốn nhầm rename, đã tách lại. Thay đổi lạ được stash (stash@{0}, không
-  xoá). 03:17 phiên đó commit `43ddc335a` giữa lúc trò giải conflict merge lane N: nội dung đúng
-  (lane N + phần giải conflict), message sai ("astra, Fable unchanged"). Đã nhắn phiên
-  "Starci backend prompt batching".
-- 03:20 Lane N vào `main`: catalog chỉ còn `gpt-6-sol`, `gpt-6-luna`, `claude-opus-5-5`.
-  `config.yaml` của thầy đổi pool `fable-astra`/`opus-sol` → `sol-opus`, validate OK. Spec
-  pool-full của lane M sửa sang `claude-agent` (`9be80cf96`).
+- 03:05 WSPV kernel reports every dispatch dying at `task-create`. Cause: lane L passed a terminal
+  handle into `--parent`, Orca only accepts a task id; the fake Orca accepted it so the suite was green. Patched
+  `3861d7723`, the fake Orca now rejects a non-task parent, `calls.yaml` records the value type. Told the
+  kernel via `terminal-send`; the kernel re-dispatched, audit round 2 started and reported `done` at 20:11.
+- 03:08 `supervisor.pollIntervalMs` into config (`e749d0c76`); lane M merged (`93536d4b5`).
+- 03:12 `queuedBecause` reported wrongly: the intake leg `request.analyze` that never had a job was treated as blocking
+  every job, `actionable` stayed true. Patched `bd1647a4b`: a previous leg only blocks when it has a waiting/running job;
+  `readyOperations` counts only `ready` jobs. This exposed a real bug in WSPV: 4 parallel audit cells all hold the same
+  path `.starciwork/kernel-evidence/<wf>` so the path lease queues them (open, see below).
+- 03:14 Another session blindly replaced `gpt-5.6`→`gpt-6` and wrote `interface.draw` output straight into the `main`
+  tree; the supervisor's commit swept in the rename by mistake, and was split apart again. The stray change was stashed
+  (stash@{0}, not deleted). 03:17 that session committed `43ddc335a` while the supervisor was resolving the lane N merge
+  conflict: the content is right (lane N + the conflict resolution), the message is wrong ("astra, Fable unchanged").
+  Messaged the session "Starci backend prompt batching".
+- 03:20 Lane N enters `main`: the catalog only keeps `gpt-6-sol`, `gpt-6-luna`, `claude-opus-5-5`.
+  The owner's `config.yaml` changes pools `fable-astra`/`opus-sol` → `sol-opus`, validate OK. Lane M's pool-full
+  spec fixed to `claude-agent` (`9be80cf96`).
 
-- 03:30 Vá `path-kernel-custody` (`1f69780ec`): enqueue từ chối owned path trong
-  `kernel-evidence|kernel-strays|kernel-approvals`. Digest gộp `TASK_OUTSIDE_RUN` (`c7cee13da`).
-  Phiên draw xác nhận `43ddc335a` là của nó (commit nhầm cả index); nó sẽ tự land ui records
-  bằng `git commit --only`. Phiên fork mở lane archetype spec-foundation/greenfield-scaffold,
-  supervisor sẽ merge.
+- 03:30 Patched `path-kernel-custody` (`1f69780ec`): enqueue rejects owned paths inside
+  `kernel-evidence|kernel-strays|kernel-approvals`. Digest merges `TASK_OUTSIDE_RUN` (`c7cee13da`).
+  The draw session confirmed `43ddc335a` is its own (it committed the whole index by mistake); it will land the ui records
+  itself with `git commit --only`. The fork session opened the archetype lane spec-foundation/greenfield-scaffold,
+  the supervisor will merge.
 
-- 03:50 Thầy uỷ quyền: "thầy ngủ trò tự duyệt, miễn dậy xong workflows". Supervisor trả lời ask
-  giao diện/direction thay thầy, ghi rõ trong note của receipt là trả lời theo uỷ quyền, kèm lý do.
-  Không làm: UAT có người (đăng nhập, OAuth consent của thầy), chốt nhà cung cấp thanh toán
-  (`decision.workspace-provision.payment-provider-shortlist` còn open). Vá thêm: ask theo ngôn
-  ngữ thầy + mỗi lựa chọn có hình (`759b02af0`), runner UAT spawn npx trên Windows (`ca21ddb89`,
-  `cc3d29d93`), watchdog `--repair` + chỉ wake khi actionable (`e21a2e77d`).
+- 03:50 The owner delegates: "I'm going to sleep, you approve on your own, as long as the workflows are done when I
+  wake up". The supervisor answers UI/direction asks in the owner's place, stating in the receipt note that the answer
+  is given under delegation, with the reason. Not done: human UAT (login, the owner's OAuth consent), choosing the payment
+  provider (`decision.workspace-provision.payment-provider-shortlist` is still open). Additional patches: asks in the
+  owner's language + each option with an image (`759b02af0`), the UAT runner spawning npx on Windows (`ca21ddb89`,
+  `cc3d29d93`), watchdog `--repair` + wake only when actionable (`e21a2e77d`).
 
-- 04:00 Theo uỷ quyền, supervisor trả lời ask login AUTH `ctx_1db4e4509029`: Desktop A + Mobile A
-  (bố cục chia đôi, form phẳng; mobile cùng họ phẳng), lý do ghi trong note receipt. Kernel AUTH
-  chạy tiếp implement a12 → audit a3. WSPV đang soạn lại ask checkout-review tiếng Việt có hình.
-  F3 xong (53/65 replay, 19 fail thật) nhưng giữ chưa merge vì phiên draw chưa land ui records
-  cùng file. F3 báo hai lỗi script: `example-derive.mjs:215` bỏ qua outcome evidence (record fail
-  vẫn derive `done`), `check-example-work.mjs:557` cho qua record `done` có evidence fail.
+- 04:00 Under delegation, the supervisor answered the AUTH login ask `ctx_1db4e4509029`: Desktop A + Mobile A
+  (split layout, flat form; mobile in the same flat family), reason recorded in the receipt note. The AUTH kernel
+  continues with implement a12 → audit a3. WSPV is rewriting the checkout-review ask in Vietnamese with images.
+  F3 finished (53/65 replays, 19 real failures) but is held from merging because the draw session has not yet landed the
+  ui records in the same files. F3 reported two script bugs: `example-derive.mjs:215` ignores the outcome of evidence (a
+  failing record still derives `done`), `check-example-work.mjs:557` lets through a `done` record whose evidence fails.
 
-- 04:10 Ask WSPV mới `ctx_8cc8fa06b8bd` đúng chuẩn (tiếng Việt, 4 chỗ lệch, mỗi hướng có hình và chi
-  phí). Supervisor chọn A (giữ như sản phẩm thật): không hiển thị điều chưa có thật; A không chốt
-  nhà cung cấp thanh toán. Thống kê từ 21/9 09:27: AUTH 24 succeeded / 23 failed (13 blocked,
-  10 verdict fail); WSPV 39 / 54 (24 blocked, 30 verdict fail). Blocked là chỗ lãng phí cần đào.
+- 04:10 The new WSPV ask `ctx_8cc8fa06b8bd` is up to standard (Vietnamese, 4 mismatch points, each direction with an image
+  and a cost). The supervisor chose A (keep it like a real product): do not display what does not really exist; A does not
+  commit to a payment provider. Statistics since 21/9 09:27: AUTH 24 succeeded / 23 failed (13 blocked,
+  10 verdict fail); WSPV 39 / 54 (24 blocked, 30 verdict fail). Blocked is where the waste is, worth digging into.
 
-- 04:40 Thầy chốt: chạy trên `main` mặc định, worktree chỉ khi prompt yêu cầu (`3557748a4`). Xoá worktree
-  accounting (đã nằm trong main); commit WIP refactor 206 file vào nhánh của nó (`bab51287`), không merge.
-  Thầy yêu cầu hai workflow mới (3 module + AgentOS; Collab chat nhóm): plan in chuỗi sai vì thiếu
-  archetype full-stack; phiên fork thêm `feature-build-fullstack` trong lane archetype, chưa persist goal.
-  Lane P (4 vá lãng phí) đang chạy trong worktree vì sửa api.mjs kernel đang chạy. `check-orca-tree` bỏ
-  qua terminal của ledger khác (`0c434ed88`).
+- 04:40 The owner decided: run on `main` by default, worktree only when the prompt asks for it (`3557748a4`). Deleted the accounting
+  worktree (already in main); committed the 206-file WIP refactor to its own branch (`bab51287`), not merged.
+  The owner asked for two new workflows (3 modules + AgentOS; Collab group chat): the plan printed the wrong chain because
+  the full-stack archetype is missing; the fork session adds `feature-build-fullstack` in the archetype lane, goal not yet persisted.
+  Lane P (4 waste patches) is running in a worktree because it edits the api.mjs of a running kernel. `check-orca-tree` skips
+  terminals of other ledgers (`0c434ed88`).
 
-- 04:45 Thầy gõ `ok` cho hai goal mới (nivo-modules-agentos, nivo-collab-group-chat), có điều kiện: chỉ
-  persist + start-kernel khi plan lập lại in đúng chuỗi `request.analyze > scope.define > business.decide >
+- 04:45 The owner typed `ok` for the two new goals (nivo-modules-agentos, nivo-collab-group-chat), conditionally: persist +
+  start-kernel only when the re-planned plan prints exactly the chain `request.analyze > scope.define > business.decide >
   architecture.decide > interface.draw > work.author > backend.implement > interface.implement >
-  interface.audit > e2e.verify > uat.verify > review.verify` (brand.decide chỉ khi chưa có brand đã duyệt).
-  Lệch thì không persist, để sáng.
+  interface.audit > e2e.verify > uat.verify > review.verify` (brand.decide only when there is no approved brand yet).
+  If it deviates, do not persist, leave it for the morning.
 
-- 05:05 Merge lane archetype của phiên fork (`533f76be1`). Plan lại hai goal: prompt gốc khớp nhầm
-  spec-foundation (5 leg, không implement) vì cụm "đóng SRS/SDS còn thiếu"; prompt modules khớp nhầm refactor
-  vì tên nhánh WIP. Diễn đạt lại (giữ ý, bỏ hai cụm gây nhầm) thì cả hai ra 13 leg full-stack, nhưng có
-  `brand.decide` trong khi nivo đã có brand duyệt (rev 1, 21/9) → trái điều kiện của thầy, KHÔNG persist.
-  Phiên fork sửa cả hai lỗi planner (ưu tiên spec-foundation, điều kiện brand) trong nhánh mới.
-  Prompt đã diễn đạt lại dùng để persist: bỏ "SRS/SDS còn thiếu" → "chốt nốt quyết định nghiệp vụ và kiến
-  trúc"; bỏ câu nhánh refactor WIP khỏi prompt modules (WIP chỉ tham khảo, ghi ở đây).
+- 05:05 Merged the fork session's archetype lane (`533f76be1`). Re-planned both goals: the original prompt wrongly matched
+  spec-foundation (5 legs, no implement) because of the phrase "close the missing SRS/SDS"; the modules prompt wrongly matched
+  refactor because of the WIP branch name. Reworded (keeping the meaning, dropping the two confusing phrases) both come out as 13
+  full-stack legs, but with `brand.decide` while nivo already has an approved brand (rev 1, 21/9) → against the owner's condition, NOT persisted.
+  The fork session fixes both planner bugs (spec-foundation priority, the brand condition) in a new branch.
+  The reworded prompt used to persist: drop "missing SRS/SDS" → "finish the remaining business decisions and the
+  architecture"; drop the WIP refactor branch sentence from the modules prompt (WIP is reference only, noted here).
 
-- 05:20 Lane Q (routing theo độ khó của phiên fork) xanh nhưng HOÃN merge tới sáng: nó đổi route của mọi op
-  cho hai kernel đang chạy; việc suy nghĩ sẽ thử claude-agent trước, mà Claude Code trên máy chưa xong
-  onboarding (probe quota vẫn báo ok, không thấy màn onboarding) → mỗi dispatch think bị readiness từ
-  chối, nghỉ 5 phút, rồi vẫn sang codex; implement medium chuyển sang pool khác giữa các vòng sửa
-  audit. Sáng: thầy xong onboarding Claude Code → merge lane Q (trial merge chỉ conflict
-  tests/config.spec.mjs) → thầy quyết pin kernel.
+- 05:20 Lane Q (difficulty-based routing from the fork session) is green but MERGE is DEFERRED until morning: it changes the route of every op
+  for the two running kernels; thinking work would try claude-agent first, but Claude Code on this machine has not finished
+  onboarding (the quota probe still says ok, it does not see the onboarding screen) → every think dispatch is
+  refused by readiness, rests 5 minutes, and then still goes to codex; a medium implement moves to a different pool between
+  audit repair rounds. Morning: the owner finishes Claude Code onboarding → merge lane Q (trial merge only conflicts
+  in tests/config.spec.mjs) → the owner decides whether to pin the kernel.
 
-- 05:40 Thầy cho merge luôn: lane Q (`6342c1e1d`) và planner fix (`5ea28d7d2`) vào main. Plan lại ra đúng 12 leg,
-  brand ghi assumed → persist theo ok của thầy: `wf-nivo-modules-agentos-mud6zg6y`,
-  `wf-nivo-collab-group-chat-mud6zgff`. Kernel Collab chạy (devin). Kernel modules: devin chết ngay 2 lần
-  ("prompt was not consumed", terminal exited trống) — nghi trần phiên Devin vì app Devin desktop của thầy còn
-  ~24 process từ 20h; codex 2 lần "Timed out waiting for terminal handle" phía Orca. Chưa chạy. Lane P xong
-  (4 vá, replay không đổi job nào) nhưng đụng lane Q ở 6 file routing → agent lane P đang merge main vào nhánh.
+- 05:40 The owner said merge now: lane Q (`6342c1e1d`) and the planner fix (`5ea28d7d2`) into main. Re-planning gives exactly 12 legs,
+  brand recorded as assumed → persisted per the owner's ok: `wf-nivo-modules-agentos-mud6zg6y`,
+  `wf-nivo-collab-group-chat-mud6zgff`. The Collab kernel is running (devin). Modules kernel: devin died right away twice
+  ("prompt was not consumed", terminal exited empty) — suspect the Devin session ceiling because the owner's Devin desktop app still has
+  ~24 processes from 20h; codex twice "Timed out waiting for terminal handle" on the Orca side. Not running yet. Lane P finished
+  (4 patches, replay changed no job) but collides with lane Q in 6 routing files → the lane P agent is merging main into its branch.
 
-- 06:00 Thầy tắt app Devin desktop (36 → 10 process devin) → kernel modules boot ngay trên devin
-  (`term_b33015f6`). Watchdog `--repair` cho hai workflow mới. Merge lane P (`1aacfc3c5`, gộp với lane Q):
-  audit và draw route sang codex (agent có trình duyệt/ImageGen trong nhóm think). Phiên fork báo Orca
-  không tạo được terminal Codex tương tác từ ~21:45 giờ Orca (mọi repo) → audit/draw sẽ không dispatch
-  được tới khi Orca hết kẹt; đã báo 4 kernel giữ job codex ở queued, một incident, không retry vòng.
-  Lane Q2 (kernel theo nhóm) conflict với lane P → phiên fork merge main vào Q2.
+- 06:00 The owner shut down the Devin desktop app (36 → 10 devin processes) → the modules kernel boots right away on devin
+  (`term_b33015f6`). Watchdog `--repair` for the two new workflows. Merged lane P (`1aacfc3c5`, combined with lane Q):
+  audit and draw route to codex (the agent with a browser/ImageGen in the think group). The fork session reports Orca
+  cannot create an interactive Codex terminal since ~21:45 Orca time (every repo) → audit/draw cannot be dispatched
+  until Orca is unstuck; told the 4 kernels to keep codex jobs queued, one incident, no retry loop.
+  Lane Q2 (kernel by group) conflicts with lane P → the fork session merges main into Q2.
 
-- 06:05 tick: WSPV implement a27 done, 1 implement đang chạy, 1 ask chờ re-enqueue. Modules: scope.define a1
-  done, frontier orphaned-frontier (kernel sắp suy leg kế). Collab: scope.define a1 blocked, a2 done. AUTH: kernel
-  đang đọc report draw a5 để serve lại ask login (unserved > 1h). Không vá gì.
+- 06:05 tick: WSPV implement a27 done, 1 implement running, 1 ask waiting for re-enqueue. Modules: scope.define a1
+  done, frontier orphaned-frontier (the kernel is about to derive the next leg). Collab: scope.define a1 blocked, a2 done. AUTH: the kernel
+  is reading the draw a5 report to re-serve the login ask (unserved > 1h). No patch.
 
-- 06:15 Merge lane Q2 (`6dd4bdd20`): kernel không ghim tự chọn trong nhóm Claude Opus 5.5 → GPT-6 Sol theo quota,
-  boot tự chuyển thành viên khi launch hỏng không để lại gì. config.example ship nhóm; config.yaml của thầy vẫn
-  ghim devin/swe-2-max, load OK. check + 63 spec xanh.
+- 06:15 Merged lane Q2 (`6dd4bdd20`): an unpinned kernel self-selects within the group Claude Opus 5.5 → GPT-6 Sol by quota,
+  boot automatically switches member when a launch fails without leaving anything behind. config.example ships the group; the owner's config.yaml still
+  pins devin/swe-2-max, loads OK. check + 63 specs green.
 
-- 06:30 tick: Modules chạy 6 cut business.decide song song; Collab scope.define xong (a3). Ask login AUTH live nhưng
-  form hiện 4 nhóm radio mua workspace của WSPV: serve-ask lấy draws.yaml mới nhất toàn cây khi report chỉ liệt kê
-  draws.yaml. Supervisor trả lời Desktop B + Mobile B theo uỷ quyền (bỏ trống 4 nhóm lạc đề, ghi lý do). Vá
-  serve-ask (`c2e4564cb`): ảnh lấy từ draws.yaml của report, bỏ fallback toàn cục, có options thì không suy picks.
-  Merge lane P3 của phiên fork (`f68c490be`): baseline ghim phiên bản toolchain nest/next.
+- 06:30 tick: Modules runs 6 business.decide cuts in parallel; Collab scope.define done (a3). The AUTH login ask is live but the
+  form shows 4 radio groups for buying a workspace from WSPV: serve-ask took the newest draws.yaml of the whole tree when the report only listed
+  draws.yaml. The supervisor answered Desktop B + Mobile B under delegation (left the 4 off-topic groups blank, reason recorded). Patched
+  serve-ask (`c2e4564cb`): images come from the report's draws.yaml, dropped the global fallback, when options exist do not infer picks.
+  Merged the fork session's lane P3 (`f68c490be`): the baseline pins the nest/next toolchain versions.
 
-- 06:45 tick: Modules 6 cut business.decide (3 partial, 1 done); Collab business.decide 2 done 1 partial, 9 job ready;
-  AUTH interface.draw đang chạy trên gpt-6-sol (worker-start managed vẫn chạy được, chỉ terminal Codex tương tác
-  hỏng); WSPV implement a29 partial. 8 lần claude bị từ chối ở worker-start trong 50 phút (onboarding) → circuit 2
-  phút reset → vòng lặp. Vá backoff (`7a8281413`): mở lại cùng lỗi trong 1h thì nghỉ x5, tối đa 1h.
+- 06:45 tick: Modules 6 business.decide cuts (3 partial, 1 done); Collab business.decide 2 done 1 partial, 9 jobs ready;
+  AUTH interface.draw running on gpt-6-sol (managed worker-start still works, only the interactive Codex terminal
+  is broken); WSPV implement a29 partial. 8 times claude was refused at worker-start in 50 minutes (onboarding) → the circuit resets after 2
+  minutes → loop. Patched backoff (`7a8281413`): reopening on the same error within 1h rests x5, up to 1h.
 
 - 06:55 tick: AUTH interface.draw a6 done (direction B+B). Collab business.decide 6 done, 1 partial, 1 blocked,
-  transition-ready. Modules 3 job ready. Watchdog đúng việc: thấy active thì không đụng, AUTH báo idle-waiting khi
-  frontier không actionable. Không vá gì.
+  transition-ready. Modules 3 jobs ready. The watchdog does the right thing: sees active and does not touch it, AUTH reports idle-waiting when the
+  frontier is not actionable. No patch.
 
-- 07:00 Phiên fork báo Orca tạo lại được terminal Codex tương tác từ ~22:30 giờ Orca; đã báo 4 kernel nivo thôi giữ
-  job Codex. Phiên fork mở lane P4: baseline Nest/Next qua được check-scoped-lint (layout module + architecture
-  config, canon một authority).
+- 07:00 The fork session reports Orca can create interactive Codex terminals again since ~22:30 Orca time; told the 4 nivo kernels to stop holding
+  Codex jobs. The fork session opens lane P4: the Nest/Next baseline passes check-scoped-lint (module layout + architecture
+  config, canon has one authority).
 
-- 07:15 AUTH bị watchdog đánh thức lặp: kernel ghi "[owner-gate-pending]" bằng văn xuôi, status vẫn báo 2 cut
-  integration.verify là ready. Vá `6b6f0579f`: `api incident --kind owner-gate --holds` giữ job (queuedBecause
-  owner-gate, route/dispatch từ chối), `--resolve` đóng incident (cũng là verb resolve còn thiếu). Kernel AUTH đã
-  chuyển sang gate có cấu trúc (inc-4f9f44eb513a), actionable=false. Collab kẹt ở hộp thoại hỏi của Devin CLI;
-  watchdog gõ lời đánh thức vào ô "Other" vì con trỏ ❭ giống prompt. Vá `134fee6a0`: gate agent-question-dialog
-  + kernel-prompt cấm hỏi owner qua dialog. Trò Esc hộp thoại, trả lời 3 quyết định Collab theo ủy quyền:
-  read-scope shared-office-read, safe-mode mandatory-category-gate, quality-targets ngưỡng tạm 2s/5s/3s p95.
-  Mâu thuẫn scope.define (ghi work/node@1) với work-layout (cấm work/node mới) giao cho một lane nền.
+- 07:15 AUTH is repeatedly woken by the watchdog: the kernel writes "[owner-gate-pending]" in prose, while status still reports 2 cuts of
+  integration.verify as ready. Patched `6b6f0579f`: `api incident --kind owner-gate --holds` holds the job (queuedBecause
+  owner-gate, route/dispatch refuse), `--resolve` closes the incident (also the missing resolve verb). The AUTH kernel has
+  moved to a structured gate (inc-4f9f44eb513a), actionable=false. Collab is stuck at a question dialog of the Devin CLI;
+  the watchdog typed its wake-up text into the "Other" box because the ❭ cursor looks like a prompt. Patched `134fee6a0`: gate agent-question-dialog
+  + kernel-prompt forbids asking the owner via dialog. The supervisor pressed Esc on the dialog, answered 3 Collab decisions under delegation:
+  read-scope shared-office-read, safe-mode mandatory-category-gate, quality-targets provisional thresholds 2s/5s/3s p95.
+  The contradiction between scope.define (writes work/node@1) and work-layout (forbids new work/node) is assigned to a background lane.
 
-- 07:35 Lane nền xong `b3469b05d`: scope.define ghi scope lên bản ghi feature (extensions.work3.scope), bỏ
-  work/node@1; spec scope-define-layout. Trò thêm `034fbe6bb`: business.decide giữ nguyên scope khi viết lại
-  overview. Báo kernel Modules về bản ghi work/node lạc ở features/project-overview/scope. Collab: 6 slice
-  business.decide done với câu trả lời ủy quyền. WSPV audit vòng 3 blocked vì bằng chứng lệch revision
-  (aae8d15 vs 02b3c0d) và hash accessibility tính trên JSON thu gọn; lỗi op (runtime.json do op tự viết),
-  kernel đang xử lý. Backlog: workspace.manage vẫn ghi "setup scope record" gốc (work/node@1) và _common.yaml
-  vẫn nói bản ghi gốc mang work/node@1; kinds.yaml còn work/node@1 cho workspace.manage và scope.finish.
+- 07:35 The background lane finished `b3469b05d`: scope.define writes scope onto the feature record (extensions.work3.scope), dropped
+  work/node@1; spec scope-define-layout. The supervisor added `034fbe6bb`: business.decide keeps scope intact when rewriting the
+  overview. Told the Modules kernel about the stray work/node record at features/project-overview/scope. Collab: 6 business.decide slices
+  done with the delegated answers. WSPV audit round 3 blocked because the evidence is out of step with the revision
+  (aae8d15 vs 02b3c0d) and the accessibility hash is computed on compacted JSON; op fault (runtime.json is written by the op itself),
+  the kernel is handling it. Backlog: workspace.manage still writes the root "setup scope record" (work/node@1) and _common.yaml
+  still says the root record carries work/node@1; kinds.yaml still has work/node@1 for workspace.manage and scope.finish.
 
-- 07:45 Merge lane P4 `a26456e6d`: baseline Nest/Next qua check-scoped-lint, typecheck, test, build và boot.
-  Đã review 4 thay đổi checker: settingMatches chỉ nhận đúng defaultOptions, bỏ spec khỏi NEST-FEATURE-FILE-SHAPE,
-  cho phép transports rỗng, và export default định danh được tính là subject. Sau merge: check xanh, spec 31/31.
-  Yêu cầu fork đặt test e2e baseline (~4.5 phút, cài package) sau cờ env, chạy ở checklist release.
+- 07:45 Merged lane P4 `a26456e6d`: the Nest/Next baseline passes check-scoped-lint, typecheck, test, build and boot.
+  Reviewed 4 checker changes: settingMatches only accepts exactly defaultOptions, drop spec from NEST-FEATURE-FILE-SHAPE,
+  allow empty transports, and a named export default counts as a subject. After merge: check green, specs 31/31.
+  Asked the fork to put the baseline e2e test (~4.5 minutes, installs packages) behind an env flag, run in the release checklist.
 
-- 08:00 Trả lời ask Modules (business.decide a8, tuyến công khai Sales) theo ủy quyền: phương án 1, đăng ký
-  thao tác Sales có phiên bản trong Shared, giữ ý nghĩa đã duyệt; kernel đã được đánh thức. Câu hỏi hiện "Ch?n
-  tuy?n": 7 report business.decide bị PowerShell ghi bằng code page cũ, còn bản ghi yaml thì nguyên vẹn. Vá
-  `d3932b804`: api report từ chối văn xuôi mất ký tự non-ASCII, packet dặn ghi report.json dạng UTF-8. Merge
-  `lane-p4/e2e-flag` (test e2e baseline chỉ chạy khi STARCI_E2E_BASELINE=1). Fork báo gap stale-input (job đã
-  settle không bị đánh dấu cũ khi file knowledge đầu vào đổi digest); giao fork làm lane P5.
+- 08:00 Answered the Modules ask (business.decide a8, public Sales route) under delegation: option 1, register the
+  versioned Sales operations in Shared, keeping the approved meaning; the kernel was woken. The question shows "Ch?n
+  tuy?n" (garbled "Select route"): 7 business.decide reports were written by PowerShell in the old code page, while the yaml records are intact.
+  Patched `d3932b804`: api report rejects prose that lost non-ASCII characters, the packet instructs to write report.json as UTF-8. Merged
+  `lane-p4/e2e-flag` (the baseline e2e test only runs when STARCI_E2E_BASELINE=1). The fork reports a stale-input gap (a job that has
+  settled is not marked stale when a knowledge input file changes digest); assigned the fork to do lane P5.
 
-- 08:10 Yên. Collab architecture.decide 8 slice done; WSPV implement a31 done, kernel đang xử lý (transition-ready);
-  Modules business.decide a10 partial, chờ op; AUTH owner-gate 4 + dependency 3, idle-waiting đúng. Không vá gì.
+- 08:10 Quiet. Collab architecture.decide 8 slices done; WSPV implement a31 done, kernel handling it (transition-ready);
+  Modules business.decide a10 partial, waiting for an op; AUTH owner-gate 4 + dependency 3, idle-waiting correctly. No patch.
 
-- 08:25 WSPV transition-ready 13 phút mà kernel báo active: câu tóm tắt "Running now:" của kernel bị đọc như spinner,
-  nên wake theo report và watchdog đều bỏ qua. Vá `667195c4c` (từ trạng thái + ":"/"now" là văn xuôi) + spec; đã đánh
-  thức WSPV, kernel đang chạy. Modules đã tiêu thụ báo cáo, chạy 7 op song song và dọn bản ghi scope lạc. AUTH, Collab chờ đúng.
+- 08:25 WSPV transition-ready for 13 minutes while the kernel reports active: the kernel's summary sentence "Running now:" was read as a spinner,
+  so both wake-on-report and the watchdog skipped it. Patched `667195c4c` (status word + ":"/"now" is prose) + spec; woke
+  WSPV, the kernel is running. Modules has consumed the report, is running 7 ops in parallel and cleaned up the stray scope record. AUTH, Collab wait correctly.
 
-- 08:35 Yên. Collab sang interface.draw (worker active). Modules 7 op chạy, scope.define a2 done (dọn scope lạc).
-  WSPV kernel active, 1 job leased đang dispatch. AUTH chờ owner-gate. Watchdog: 3 idle-waiting, 1 active. Không vá gì.
+- 08:35 Quiet. Collab moves to interface.draw (worker active). Modules 7 ops running, scope.define a2 done (stray scope cleaned).
+  WSPV kernel active, 1 leased job dispatching. AUTH waits on owner-gate. Watchdog: 3 idle-waiting, 1 active. No patch.
 
-- 08:50 Fork báo work-record-schemas đỏ trên main: lỗi của trò ở b3469b05d (object scope mở). Vá `2e6a0630e`: đóng
-  request/nodes/deps/exclusions/openQuestions theo shape Collab+Login (cả hai validate), scope.define nêu đúng tên trường;
-  project-overview (Modules) và public-website còn shape tự chế, không bị gate chặn. Merge lane P5 `5da28577c`
-  (stale-input: digest input luật ghi trong contracts.context_json, không DDL; dòng cũ không bao giờ stale). Check xanh,
-  82/82 spec; status live trên ledger nivo chạy, staleInput rỗng.
+- 08:50 The fork reports work-record-schemas red on main: the supervisor's own bug in b3469b05d (an open scope object). Patched `2e6a0630e`: closed
+  request/nodes/deps/exclusions/openQuestions to the Collab+Login shape (both validate), scope.define names the fields correctly;
+  project-overview (Modules) and public-website still have a self-made shape, not blocked by the gate. Merged lane P5 `5da28577c`
+  (stale-input: the rule's input digest is recorded in contracts.context_json, no DDL; old rows are never stale). Check green,
+  82/82 specs; status live on the nivo ledger works, staleInput is empty.
 
-- 09:05 Modules architecture.decide: 3 slice done, 3 blocked vì quyết định SRS còn mở (accounting intake/budget/tax-estimation,
-  5 quyết định chatbot, instance-management shell-api-authentication); kernel đang xử lý, có thể thành ask ở vòng sau
-  (tax-estimation có thể mang tính pháp lý, sẽ hoãn cho thầy). WSPV audit a25 blocked do ảnh tablet sai viewport (op-defect).
-  Collab interface.draw a1 done. Context kernel Devin 62-69%, theo dõi. Không vá gì.
+- 09:05 Modules architecture.decide: 3 slices done, 3 blocked because SRS decisions are still open (accounting intake/budget/tax-estimation,
+  5 chatbot decisions, instance-management shell-api-authentication); the kernel is handling it, may become an ask in the next round
+  (tax-estimation may have a legal dimension, will be deferred to the owner). WSPV audit a25 blocked because the tablet image has the wrong viewport (op-defect).
+  Collab interface.draw a1 done. Devin kernel context 62-69%, watching. No patch.
 
-- 09:20 Hai gap hợp đồng. (1) provision.ask Modules hỏi qua tin nhắn orchestration Orca, chờ 10 phút rồi blocked:
-  hợp đồng chỉ nói "chờ". Vá `0171b19af`: op nộp report outcome ask (serve-ask phục vụ), không chờ trong lượt; đã báo
-  kernel Modules chạy lại ask shell-api-authentication. (2) work.author Collab chạy trước backend.implement nhưng đòi
-  nguồn/test đã tồn tại (a1, a3 blocked); giao lane nền thêm planned mode, đã báo kernel Collab không lặp retry.
-  Kernel Modules đã tự compact (context 24%).
+- 09:20 Two contract gaps. (1) The Modules provision.ask asked via an Orca orchestration message, waited 10 minutes and then blocked:
+  the contract only says "wait". Patched `0171b19af`: the op submits a report with outcome ask (serve-ask serves it), does not wait within the turn; told the
+  Modules kernel to re-run the shell-api-authentication ask. (2) Collab work.author ran before backend.implement but demands
+  source/tests that already exist (a1, a3 blocked); assigned a background lane to add planned mode, told the Collab kernel not to loop retries.
+  The Modules kernel compacted itself (context 24%).
 
-- 09:30 Lane planned mode xong `57273647a`: work.author trên feature greenfield lấy owner theo thiết kế (bản ghi todo), check
-  dùng runner có thật + đường dẫn test mà op implement phải tạo, tài khoản vai trò là identity resource có blockers
-  (không đổi schema). Validator đã khớp work-layout, không cần sửa. Check xanh, spec 126/126. Đã báo kernel Collab.
+- 09:30 The planned mode lane finished `57273647a`: work.author on a greenfield feature takes its owner from the design (a todo record), check
+  uses a real runner + the test path that the implement op must create, role accounts are an identity resource with blockers
+  (no schema change). The validator already matches work-layout, no fix needed. Check green, specs 126/126. Told the Collab kernel.
 
-- 09:45 Modules đã hỏi owner theo kênh mới (4 ask). Lỗi: serve-ask supersede theo op id, nên ask Accounting xoá luôn
-  ask Chatbot và Shell đang mở. Vá `76aaa2164` (supersede chỉ khi cùng params.subject/question.refs) và `52e9f12d6` (poll hiện
-  ask phục vụ lại). Kernel đã phục vụ lại hai ask đó. Trả lời theo ủy quyền: Accounting 4 lựa chọn đề xuất; Chatbot 4 đề xuất,
-  riêng giới hạn vận hành chọn cấu hình theo từng cài đặt (không bịa số); Shell: cookie HttpOnly + Bearer cho Core. Để thầy:
-  ước tính thuế Accounting (a12) và ask WSPV checkout A/B/C (VNPAY/SePay; audit a28 đã chỉ ra đúng câu trả lời A trước đây của
-  trò chạm vào nhóm payment-provider bị loại). Merge lane P6 `505fc60d2` (brand.decide có điều kiện cho spec-foundation).
+- 09:45 Modules asked the owner through the new channel (4 asks). Bug: serve-ask supersedes by op id, so the Accounting ask also deleted
+  the open Chatbot and Shell asks. Patched `76aaa2164` (supersede only when the same params.subject/question.refs) and `52e9f12d6` (poll shows
+  served asks again). The kernel re-served those two asks. Answered under delegation: Accounting 4 proposed options; Chatbot 4 proposed,
+  with the operating limit alone choosing a per-installation configuration (no invented numbers); Shell: HttpOnly cookie + Bearer for Core. Left for the owner:
+  the Accounting tax estimate (a12) and the WSPV checkout ask A/B/C (VNPAY/SePay; audit a28 pointed out that the supervisor's earlier answer A
+  touched the excluded payment-provider group). Merged lane P6 `505fc60d2` (conditional brand.decide for spec-foundation).
 
-- 07:45 (giờ thật) Sửa nhãn giờ: các dòng ghi 08:00 đến 09:45 ở trên thực ra chạy trong khoảng 07:05 đến 07:30 +07; trò đã
-  ghi sai giờ. Vòng này: Collab work.author a5/a6 blocked vì owned_paths chỉ có features/collab/uat, planned mode chưa có slot
-  environment/fixture, và a5 lại hỏi qua Orca ask thread. Vá `a9d886062`: _common.yaml một kênh hỏi owner cho mọi op; work.author
-  thêm slot environment/fixture, kernel cấp thư mục slot. Modules chờ "ba ask" dù hai đã trả lời: wake lúc nộp gặp kernel active
-  nên bị bỏ, và status awaitingOwner chỉ hiện attempt mới nhất của op. Vá `9945ae813` (theo subject/cut). Đã đánh thức Modules,
-  báo Collab thư mục slot.
+- 07:45 (real time) Fixing the time labels: the lines stamped 08:00 through 09:45 above actually ran between 07:05 and 07:30 +07; the supervisor
+  wrote the wrong times. This round: Collab work.author a5/a6 blocked because owned_paths only has features/collab/uat, planned mode has no environment/fixture
+  slot yet, and a5 again asked via the Orca ask thread. Patched `a9d886062`: _common.yaml one channel to ask the owner for every op; work.author
+  gains an environment/fixture slot, the kernel grants the slot directory. Modules waits for "three asks" although two were answered: the wake at submission met an active kernel
+  and was dropped, and status awaitingOwner only shows the latest attempt of an op. Patched `9945ae813` (by subject/cut). Woke Modules,
+  told Collab the slot directory.
 
-- 07:45 Tiến triển, không vá. Collab work.author a7 done (UAT slice sau vá slot), 7 job ready đang dispatch. Modules nhận
-  ba câu trả lời, architecture.decide a7 done, kernel active. WSPV implement repair-round5 đang chụp lại ảnh; ask thanh toán chờ
-  thầy. AUTH chờ owner-gate. Status Modules hiện đủ 3 provision.ask answered (vá 9945ae813 chạy đúng trên ledger thật).
+- 07:45 Progress, no patch. Collab work.author a7 done (UAT slice after the slot patch), 7 jobs ready dispatching. Modules received
+  the three answers, architecture.decide a7 done, kernel active. WSPV implement repair-round5 is re-capturing images; the payment ask waits for
+  the owner. AUTH waits on owner-gate. Modules status shows all 3 provision.ask answered (patch 9945ae813 works correctly on the real ledger).
 
-- 07:55 Collab giữ 7 job backend.implement sau job composition "trong đầu" kernel; status báo ready nên watchdog đánh thức
-  mỗi 5 phút vô ích. Vá `d5218813a`: enqueue --after ghi thứ tự vào ledger, status coi job có --after hoặc seam cut chưa xong là
-  dependency; kernel-prompt dặn dùng. 7 job hiện tại đã enqueue trước vá nên vẫn bị đánh thức tới khi composition xong. WSPV
-  implement a34 done. Fork báo gap: settle cho pass khi owned paths chưa commit/push dù commitPolicy đòi main-line; giao fork làm P7.
+- 07:55 Collab holds 7 backend.implement jobs behind a composition job "in the kernel's head"; status reports ready so the watchdog wakes
+  it every 5 minutes for nothing. Patched `d5218813a`: enqueue --after records the ordering in the ledger, status treats a job with --after or an unfinished cut seam
+  as a dependency; kernel-prompt instructs to use it. The 7 current jobs were enqueued before the patch so they are still woken until composition finishes. WSPV
+  implement a34 done. The fork reports a gap: settle passes when owned paths are not committed/pushed even though commitPolicy demands main-line; assigned the fork to do P7.
 
-- 08:05 Modules architecture.decide a8 blocked: hợp đồng revise đòi extensions.work3.decisionLog nhưng 16 schema flat đóng
-  work3 chỉ cho integrations; thêm mâu thuẫn "sửa deployment record" với "cấm sửa bản ghi legacy". Giao lane nền; báo kernel
-  Modules giữ slice. Sửa phạm vi P7 của fork: ops nivo khai báo push:false (nivo-backend đi trước origin 198 commit), nên
-  landed-check chỉ đòi owned paths sạch và commit có trong HEAD local; origin chỉ khi push:true.
+- 08:05 Modules architecture.decide a8 blocked: the revise contract demands extensions.work3.decisionLog but the 16 flat schemas close
+  work3 to only integrations; plus the contradiction "edit the deployment record" versus "do not edit legacy records". Assigned a background lane; told the kernel
+  Modules to hold the slice. Fixed the fork's P7 scope: nivo ops declare push:false (nivo-backend is 198 commits ahead of origin), so
+  the landed-check only demands clean owned paths and a commit present in local HEAD; origin only when push:true.
 
-- 08:20 Lane xong `09c3af799`: decisionLog (đóng, rev/at/gap/chosen/why/alternatives?) thêm vào extensions.work3 của 16 schema
-  flat; phát hiện 15/16 schema chưa hề nối extensions vào properties (cả integrations mà business.decide đang ghi cũng bị từ
-  chối). Luật legacy: phần chỉ nằm trong work/node cũ được sửa ở bản ghi flat tương ứng (rev 1 = chép lại, rev 2 = sửa,
-  change.reason nêu bản legacy bị thay). Check xanh, spec 104/104. Đã báo kernel Modules chạy lại a8.
+- 08:20 The lane finished `09c3af799`: decisionLog (closed, rev/at/gap/chosen/why/alternatives?) added to extensions.work3 of the 16
+  flat schemas; found that 15/16 schemas never wired extensions into properties (even the integrations that business.decide is writing were
+  rejected). Legacy rule: parts that live only in the old work/node are edited in the corresponding flat record (rev 1 = copy over, rev 2 = edit,
+  change.reason names the legacy version being replaced). Check green, specs 104/104. Told the Modules kernel to re-run a8.
 
-- 08:15 Không vá. WSPV audit a29/a31 failed vì lỗi thật (loading co/nhảy kích thước; 21 trạng thái thiếu dải chu kỳ
-  thanh toán và gia hạn), a30 blocked vì route ma trận (/purchases/:id vs /provisioning) mâu thuẫn trong bản ghi: op-defect,
-  kernel lo qua vòng sửa implement. Modules đang chạy lại a8 (leased). Collab chờ composition. AUTH chờ owner-gate.
+- 08:15 No patch. WSPV audit a29/a31 failed for real bugs (loading shrinks/jumps in size; 21 states lacking the payment
+  cycle and renewal strip), a30 blocked because the matrix route (/purchases/:id vs /provisioning) contradicts itself in the records: op-defect,
+  the kernel handles it via the implement repair round. Modules is re-running a8 (leased). Collab waits on composition. AUTH waits on owner-gate.
 
-- 08:25 P7 xanh nhưng chưa merge: 23/25 report implement gần đây của nivo thiếu head, nên settle pass sẽ bị từ chối hàng loạt.
-  Yêu cầu fork: envelope đòi head cho op có commitPolicy (lỗi lúc report, worker còn sống sửa được) + luật chuyển tiếp ở settle
-  (report cũ thiếu head: bỏ kiểm tra ancestor, vẫn đòi owned paths sạch). Scaffold/content/workspace commit "khi được phép" mà
-  không có commitPolicy: đưa vào danh sách buổi sáng (quyết định quyền push).
+- 08:25 P7 green but not merged: 23/25 of nivo's recent implement reports lack head, so a passing settle would be rejected en masse.
+  Asked the fork: the envelope demands head for ops with commitPolicy (error at report time, while the worker is alive and can fix it) + a transition rule at settle
+  (an old report lacking head: skip the ancestor check, still demand clean owned paths). Scaffold/content/workspace commit "when allowed" without
+  a commitPolicy: put on the morning list (push authority decision).
 
-- 08:25 Không vá. Modules architecture.decide a9 (Shell, chạy lại sau 09c3af799) done: vá decisionLog chạy đúng trên việc thật.
-  WSPV kernel đang sửa theo audit. Collab composition vẫn active (worker còn output). AUTH chờ owner-gate. P7 chờ fork bổ sung.
+- 08:25 No patch. Modules architecture.decide a9 (Shell, re-run after 09c3af799) done: the decisionLog patch works on real work.
+  The WSPV kernel is fixing per the audit. Collab composition still active (the worker still has output). AUTH waits on owner-gate. P7 waits on the fork to add to it.
 
-- 08:35 Modules chỉ còn S1 Accounting chờ ask thuế của thầy, nhưng status báo orphaned-frontier (ask a12 mất lineage vì a13
-  sau đó) nên watchdog đánh thức mỗi 5 phút. Vá `0213b58fb`: ask chưa trả lời luôn nằm trong awaitingOwner; không còn op mở +
-  có ask chờ = frontier awaiting-owner, không actionable. Live: Modules awaiting-owner, liệt kê ctx_596b59ca7bd4.
+- 08:35 Modules only has S1 Accounting waiting on the owner's tax ask, but status reports orphaned-frontier (ask a12 lost lineage because of a13
+  afterwards) so the watchdog wakes every 5 minutes. Patched `0213b58fb`: an unanswered ask is always in awaitingOwner; an open op no longer + a
+  waiting ask = frontier awaiting-owner, not actionable. Live: Modules awaiting-owner, lists ctx_596b59ca7bd4.
 
-- 08:50 Worker composition Collab treo 60 phút trên `... | xargs grep` đọc stdin; spinner làm nó trông active. Vá `45841bcc5`:
-  liveness wedged (lượt > 30 phút, lệnh shell vẫn No output yet), frontier worker-wedged + wedgedJobs; live đúng. Kernel Collab đã
-  dispatch lại composition. Merge P7 `71853d655` (report op commit phải có head; settle pass đòi owned paths sạch; report cũ thiếu
-  head chỉ kiểm owned paths). Check xanh, 86/86. Báo kernel WSPV và Collab nhắc hai worker đang chạy ghi head.
+- 08:50 The Collab composition worker hung for 60 minutes on `... | xargs grep` reading stdin; the spinner made it look active. Patched `45841bcc5`:
+  liveness wedged (turn > 30 minutes, shell command still No output yet), frontier worker-wedged + wedgedJobs; live is correct. The Collab kernel
+  re-dispatched composition. Merged P7 `71853d655` (an op commit report must have head; a passing settle demands clean owned paths; old reports lacking
+  head only check owned paths). Check green, 86/86. Told the WSPV and Collab kernels, reminding the two running workers to write head.
 
-- 09:05 WSPV kẹt: tin nhắn head của trò tới giữa lượt, Devin xếp hàng đợi và prompt idle chờ Enter; kernel đã consume report
-  implement a35 (có head) nhưng chưa settle, frontier báo engaged nên không ai đánh thức. Trò bấm Enter, kernel chạy lại. Vá
-  `febe53d87`: frontier settle-ready (report đã consume, job còn running) actionable + settleReadyJobs; liveness queued-input
-  (chỉ khi idle), watchdog và wake của api/serve-ask bấm Enter. Live: WSPV settle-ready đúng a35. Collab backend.implement a1
-  partial (composition), kernel đang xử lý.
+- 09:05 WSPV stuck: the supervisor's head message arrived mid-turn, Devin queued it and the idle prompt waits for Enter; the kernel had consumed the report
+  implement a35 (with head) but had not settled, the frontier says engaged so nobody wakes it. The supervisor pressed Enter, the kernel ran again. Patched
+  `febe53d87`: frontier settle-ready (report consumed, job still running) actionable + settleReadyJobs; liveness queued-input
+  (only when idle), the watchdog and the wake of api/serve-ask press Enter. Live: WSPV settle-ready correctly a35. Collab backend.implement a1
+  partial (composition), the kernel is handling it.
 
-- 09:15 WSPV đã settle a35 và chạy tiếp (Enter đã gỡ kẹt). Collab composition xong (a9), kernel chạy 7 slice backend.implement
-  theo đúng dependsOn của bản ghi impl (gần như một chuỗi), nhưng status báo ready nên watchdog đánh thức vô ích. Vá `3b2767b26`:
-  status đọc dependsOn của bản ghi Work trong owned_paths; owner đã succeeded thì giải phóng. Live: 6 slice dependency, không
+- 09:15 WSPV settled a35 and moved on (Enter cleared the jam). Collab composition done (a9), the kernel runs 7 backend.implement slices
+  following the dependsOn of the impl record (almost a chain), but status reports ready so the watchdog wakes it for nothing. Patched `3b2767b26`:
+  status reads dependsOn of the Work record in owned_paths; when the owner has succeeded it is released. Live: 6 slices dependency, not
   actionable.
 
-- 09:20 Fork báo 3 lỗi. (1) của trò: workspace.manage prepare vẫn ghi bản ghi scope gốc .starciwork/<scope>/index.yaml mà
-  layout cấm, nên dự án mới (Mia Mia) không bắt đầu được spec-foundation; giao lane nền (đích hợp lệ, schema đóng, spec bắt ghi
-  gốc). (2) lineage retry của cut sai và (3) kernel báo active 3.7 giờ vì dòng spinner cũ: fork làm lane P8. Nivo không dính (3).
+- 09:20 The fork reports 3 bugs. (1) the supervisor's: workspace.manage prepare still writes the root scope record .starciwork/<scope>/index.yaml which the
+  layout forbids, so a new project (Mia Mia) cannot start spec-foundation; assigned a background lane (valid target, closed schema, the spec mandates writing the
+  root). (2) the cut's retry lineage is wrong and (3) the kernel reports active for 3.7 hours because of an old spinner line: the fork does lane P8. Nivo is not affected by (3).
 
-- 09:40 Lane xong `3edefde1b`: workspace.manage prepare/import/stacks ghi setup lên catalog gốc .starciwork/index.yaml tại
-  extensions.work3.setup.<workflow>.<mode> (schema đóng, dùng lại các trường của scope); evidence ở .starciwork/evidence/<wf>.<mode>/;
-  spec từ chối mọi manifest ghi bản ghi gốc ngoài layout. Check xanh, 46/46 (lane: 155 pass). Đã gửi fork các bước cho kernel Mia
-  Mia. Còn mở: node fields của scope.finish vẫn liệt kê state/blocker/completion.
+- 09:40 The lane finished `3edefde1b`: workspace.manage prepare/import/stacks write setup to the root catalog .starciwork/index.yaml at
+  extensions.work3.setup.<workflow>.<mode> (closed schema, reusing the fields of scope); evidence at .starciwork/evidence/<wf>.<mode>/;
+  the spec rejects any manifest writing a root record outside the layout. Check green, 46/46 (lane: 155 pass). Sent the fork the steps for the Mia
+  Mia kernel. Still open: the node fields of scope.finish still list state/blocker/completion.
 
-- 09:40 Không vá. WSPV audit a32 done, a33 failed, kernel đang xử lý (transition-ready). Collab 6 slice dependency theo
-  dependsOn, watchdog idle-waiting (vá 3b2767b26 chạy đúng). Modules awaiting-owner (thuế). AUTH owner-gate. Ủy quyền hết 10:00;
-  hai ask còn mở (WSPV thanh toán, Modules thuế) đều thuộc nhóm để thầy quyết.
+- 09:40 No patch. WSPV audit a32 done, a33 failed, the kernel is handling it (transition-ready). Collab 6 slices dependency per
+  dependsOn, watchdog idle-waiting (patch 3b2767b26 works correctly). Modules awaiting-owner (tax). AUTH owner-gate. Delegation ends 10:00;
+  the two remaining open asks (WSPV payment, Modules tax) both belong to the group left for the owner to decide.
 
-- 09:50 WSPV yield dưới tiêu đề " Running (codex):" bị đọc thành spinner, 2 report audit chờ 20 phút. Vá `36be1bf2c` (dòng có từ
-  trạng thái kết thúc bằng ":" là văn xuôi); đã đánh thức WSPV. Phát hiện: kernel WSPV sửa owned_paths trong payload job (ghi thẳng
-  ledger, tự khai trong inc-f3f8d80df3dc) vì landed-check của P7 tìm đường dẫn frontend trong nivo-backend; giao fork P7b (resolve
-  theo repo đích). Kernel cũng commit 94MB evidence vào nivo-backend với ALLOW_SECRET_SCAN=1: đưa vào danh sách buổi sáng.
+- 09:50 A WSPV yield under the heading " Running (codex):" was read as a spinner, 2 audit reports waited 20 minutes. Patched `36be1bf2c` (a line with a
+  status word ending in ":" is prose); woke WSPV. Found: the WSPV kernel edited owned_paths in the job payload (wrote straight into the
+  ledger, self-declared in inc-f3f8d80df3dc) because P7's landed-check looks for frontend paths in nivo-backend; assigned the fork P7b (resolve
+  by target repo). The kernel also committed 94MB of evidence into nivo-backend with ALLOW_SECRET_SCAN=1: put on the morning list.
 
-- 09:55 Không vá. WSPV đã xử lý a32/a33 sau khi được đánh thức (vá 36be1bf2c đúng), một worker audit đang chạy. Collab 6 slice
-  dependency, membership chạy. Modules awaiting-owner (thuế). AUTH owner-gate. Ủy quyền hết 10:00: từ đây trò không trả lời ask
-  thay thầy nữa. Chờ fork: P7b (landed-check theo repo đích) và P8 (lineage retry cut, spinner cũ).
+- 09:55 No patch. WSPV handled a32/a33 after being woken (patch 36be1bf2c correct), one audit worker is running. Collab 6 slices
+  dependency, membership running. Modules awaiting-owner (tax). AUTH owner-gate. Delegation ends 10:00: from here the supervisor no longer answers asks
+  in the owner's place. Waiting on the fork: P7b (landed-check by target repo) and P8 (cut retry lineage, old spinner).
 
-- 10:03 Ủy quyền đã hết, không trả lời ask. Collab membership xong (a10 done sau a2 partial), còn 5 slice dependency. WSPV một
-  worker audit đang chạy. Modules awaiting-owner. AUTH owner-gate. Không vá.
+- 10:03 Delegation has ended, no asks answered. Collab membership done (a10 done after a2 partial), 5 slices dependency remain. WSPV one
+  audit worker running. Modules awaiting-owner. AUTH owner-gate. No patch.
 
-- 10:13 Yên, không vá. WSPV worker audit active (có output), Collab slice conversation đang chạy, 5 dependency. Modules và
-  AUTH chờ thầy.
+- 10:13 Quiet, no patch. WSPV audit worker active (has output), Collab slice conversation running, 5 dependency. Modules and
+  AUTH wait for the owner.
 
-- 10:23 Yên. WSPV worker interface.implement (ab51c9eaa9) nghĩ 35 phút nhưng lệnh đã xong và đang ra chữ: không treo.
-  Collab slice kế tiếp chạy. Modules, AUTH chờ thầy. Không vá.
+- 10:23 Quiet. The WSPV worker interface.implement (ab51c9eaa9) has been thinking for 35 minutes but the command has finished and text is coming out: not hung.
+  The next Collab slice runs. Modules, AUTH wait for the owner. No patch.
 
-- 10:33 Yên. Collab backend.implement a3 (conversation) done, còn 4 slice dependency. WSPV worker implement vẫn active.
-  Modules, AUTH chờ thầy. Không vá.
+- 10:33 Quiet. Collab backend.implement a3 (conversation) done, 4 slices dependency remain. The WSPV implement worker is still active.
+  Modules, AUTH wait for the owner. No patch.
 
-- 10:45 Kernel Collab bị báo active dù đã yield: dòng ngắt bắt đầu bằng "running." chữ thường khớp regex không phân biệt
-  hoa thường. Vá `ddda061f1`: từ trạng thái phân biệt hoa thường. Live: cả 4 kernel turn-idle đúng. Collab 3/8
-  slice backend.implement pass, routing đang chạy.
+- 10:45 The Collab kernel was reported active although it had yielded: the interrupt line begins with lowercase "running." which matched a case-insensitive
+  regex. Patched `ddda061f1`: status words are case-sensitive. Live: all 4 kernels correctly turn-idle. Collab 3/8
+  backend.implement slices pass, routing running.
 
-- 10:58 Phát hiện gốc: watchdog là tiến trình chạy lâu, nạp terminal-liveness một lần lúc khởi động (03:37-05:18), nên mọi
-  vá classifier trong đêm không tới watchdog (Collab bị báo active). Vá `9270d970e`: vòng lặp chạy mỗi nhịp bằng một tiến trình con
-  --once mới. Đã dừng và khởi động lại 4 watchdog nivo (log nối tiếp), cả 4 báo idle-waiting đúng. Báo fork khởi động lại 4 watchdog
-  starci-next và mia-mia.
+- 10:58 Root cause found: the watchdog is a long-lived process that loads terminal-liveness once at startup (03:37-05:18), so every
+  classifier patch overnight never reached the watchdog (Collab was reported active). Patched `9270d970e`: the loop runs every beat as a fresh child
+  process with --once. Stopped and restarted the 4 nivo watchdogs (log appended), all 4 correctly report idle-waiting. Told the fork to restart the 4 watchdogs
+  of starci-next and mia-mia.
 
-- 11:03 Yên. 4 watchdog mới chạy đúng (idle-waiting, không lỗi). Collab backend.implement a4 (routing) done, 4/8 pass, tasks
-  đang chạy, còn 3 dependency. WSPV worker implement active. Modules, AUTH chờ thầy. Không vá.
+- 11:03 Quiet. The 4 new watchdogs run correctly (idle-waiting, no errors). Collab backend.implement a4 (routing) done, 4/8 pass, tasks
+  running, 3 dependency remain. The WSPV implement worker is active. Modules, AUTH wait for the owner. No patch.
 
-- 11:13 Yên. WSPV interface.implement a37 done, kernel active đang settle (settle-ready đúng). Collab tasks đang chạy (4/8
-  pass). Modules, AUTH chờ thầy. Không vá.
+- 11:13 Quiet. WSPV interface.implement a37 done, kernel active and settling (settle-ready correct). Collab tasks running (4/8
+  pass). Modules, AUTH wait for the owner. No patch.
 
-- 11:25 Form ask thuế của Modules hết ttl 4 giờ (dead) trong khi kernel awaiting-owner: thầy bấm vào link chết, không ai phục
-  vụ lại. Vá `b2c0ce8ab`: ask chờ mà không có form sống = askReserveDispatches, frontier ask-reserve actionable. Đã báo kernel
-  Modules phục vụ lại ctx_596b59ca7bd4. Form thanh toán WSPV vẫn sống (phục vụ ~07:26, hết ~11:26); bản vá sẽ bắt khi nó hết hạn.
+- 11:25 The Modules tax ask form expired its 4-hour ttl (dead) while the kernel is awaiting-owner: the owner would click a dead link and nobody
+  re-serves it. Patched `b2c0ce8ab`: a waiting ask with no live form = askReserveDispatches, frontier ask-reserve actionable. Told the
+  Modules kernel to re-serve ctx_596b59ca7bd4. The WSPV payment form is still alive (served ~07:26, expires ~11:26); the patch will catch it when it expires.
 
-- 11:35 ask-reserve chạy đúng: Modules đã phục vụ lại ask thuế (http://127.0.0.1:6970/a-2e190e5a4ba7e57e62, ttl mới 4 giờ),
-  quay về awaiting-owner. Form thanh toán WSPV hết hạn đúng dự đoán, frontier liệt kê ctx_b77ce6a3b9a7, watchdog đã đánh thức
-  kernel WSPV. WSPV audit a34 failed (kernel lo). Nhiễu: watchdog Modules một lần kernel-failed-screen thoáng qua, màn hình hiện
-  không khớp mẫu lỗi, không restart.
+- 11:35 ask-reserve works correctly: Modules re-served the tax ask (http://127.0.0.1:6970/a-2e190e5a4ba7e57e62, new 4-hour ttl),
+  back to awaiting-owner. The WSPV payment form expired exactly as predicted, the frontier lists ctx_b77ce6a3b9a7, and the watchdog woke
+  the WSPV kernel. WSPV audit a34 failed (kernel handles it). Noise: the Modules watchdog saw a momentary kernel-failed-screen once, the screen displayed
+  did not match the failure pattern, no restart.
 
-- 11:45 Kernel WSPV bị đánh thức 2 lần vì form thanh toán hết hạn nhưng vẫn dẫn link chết: status dạng text không in reason hay
-  askReserveDispatches. Vá `e4faf58ff`: text in reason và dòng ask-reserve kèm lệnh serve-ask; driver-loop nói link chết là việc, không
-  phải chờ owner. Đã báo WSPV phục vụ lại. Collab tasks done (a5), approval và notification chạy song song, còn gateway.
+- 11:45 The WSPV kernel was woken twice because the payment form expired yet it still handed out a dead link: the text-form status prints neither reason nor
+  askReserveDispatches. Patched `e4faf58ff`: text prints the reason and an ask-reserve line with the serve-ask command; driver-loop says a dead link is work, not
+  waiting on the owner. Told WSPV to re-serve. Collab tasks done (a5), approval and notification running in parallel, gateway remains.
 
-- 11:53 WSPV đã phục vụ lại ask thanh toán: http://127.0.0.1:6969/a-a5b6a272f6c5354503 (vá e4faf58ff có tác dụng). Hai ask sống,
-  không còn reserve. Collab approval và notification chạy song song, còn gateway. Không vá.
+- 11:53 WSPV re-served the payment ask: http://127.0.0.1:6969/a-a5b6a272f6c5354503 (patch e4faf58ff took effect). Two asks live,
+  no reserve left. Collab approval and notification run in parallel, gateway remains. No patch.
 
-- 12:03 Yên. WSPV interface.implement a38 done và đã settle (rail height), 1 job ready kernel đang dispatch. Collab approval
-  và notification chạy, còn gateway. Modules, AUTH chờ thầy; hai ask sống. Không vá.
+- 12:03 Quiet. WSPV interface.implement a38 done and settled (rail height), 1 job ready and the kernel is dispatching. Collab approval
+  and notification running, gateway remains. Modules, AUTH wait for the owner; two asks live. No patch.
 
-- 12:13 Collab approval (a6) done, 6/8 pass; gateway ready (dependsOn không gồm notification), watchdog đã đánh thức kernel để
-  dispatch song song với notification: record-deps (3b2767b26) chỉ ra song song đúng. WSPV audit chạy lại đang chạy. Không vá.
+- 12:13 Collab approval (a6) done, 6/8 pass; gateway ready (dependsOn does not include notification), the watchdog woke the kernel to
+  dispatch in parallel with notification: record-deps (3b2767b26) shows the parallelism is right. WSPV audit re-run is running. No patch.
 
-- 12:23 Collab notification (a7) done, 7/8 pass, gateway đang chạy. WSPV audit a35 failed nhưng hội tụ: F10, F12, F11 đã đóng
-  qua a33-a35, chỉ còn F3 ("Provisioning order" hiện mã mua hàng thay vì mã đơn cấp phát riêng, có thể backend chưa có mã này).
-  Kernel lo. Không vá.
+- 12:23 Collab notification (a7) done, 7/8 pass, gateway running. WSPV audit a35 failed but converging: F10, F12, F11 closed
+  through a33-a35, only F3 remains ("Provisioning order" shows the purchase code instead of the separate provisioning order code, perhaps the backend does not have this code yet).
+  The kernel handles it. No patch.
 
-- 12:33 Yên. Collab gateway đang chạy (7/8). WSPV worker sửa F3 đang chạy. Modules, AUTH chờ thầy; hai ask sống. Không vá.
+- 12:33 Quiet. Collab gateway running (7/8). The WSPV worker fixing F3 is running. Modules, AUTH wait for the owner; two asks live. No patch.
 
-- 12:43 Yên. Collab gateway và WSPV worker F3 vẫn active có output. Modules, AUTH chờ thầy. Không vá.
+- 12:43 Quiet. Collab gateway and the WSPV F3 worker are still active with output. Modules, AUTH wait for the owner. No patch.
 
-- 12:53 Yên. Collab gateway và WSPV worker F3 chạy khoảng 40 phút, vẫn có output, không wedged. Modules, AUTH chờ thầy. Không vá.
+- 12:53 Quiet. Collab gateway and the WSPV F3 worker have run about 40 minutes, still have output, not wedged. Modules, AUTH wait for the owner. No patch.
 
-- 12:55 Fork: đã chuyển bước 3edefde1b cho kernel Mia Mia; thầy đã chọn offset-pop trước cho Mia Mia base-repos; 4 watchdog
-  starci-next và mia-mia đã khởi động lại trên main (re-exec mỗi nhịp). P8 xanh nhưng đang merge main (giữ các hành vi liveness đêm
-  qua), thêm api reconcile --retry-lineage cho job queued chưa dispatch. P7b đang làm (landed-check theo repo đích).
+- 12:55 Fork: handed step 3edefde1b to the Mia Mia kernel; the owner chose offset-pop first for Mia Mia base-repos; the 4 watchdogs
+  of starci-next and mia-mia restarted on main (re-exec every beat). P8 green but merging main (keeping last night's liveness
+  behaviors), adds api reconcile --retry-lineage for queued jobs not yet dispatched. P7b in progress (landed-check by target repo).
 
-- 13:30 Thầy dậy, thấy sidebar nivo loạn (op mất tên, worker nằm ngoài, 58 agent) và chọn "xóa hết và restart", kernel
-  mặc định Opus 5.5. Đã làm: snapshot 4 goal; dừng 4 watchdog; settle blocked 12 job mở; api finish 4 workflow; đóng mọi
-  terminal nivo; đóng 160 task Orca (run-use terminal tạm vào từng run cũ, task-update completed); đang giải phóng 341 worker
-  (abandon + release). Gốc rễ tìm ra và vá: settle/finish đóng Task bằng "done" mà Orca chỉ nhận completed nên chưa bao
-  giờ đóng được (`8f2623030`); CLI ghi đè tên terminal, watchdog đặt lại [Kernel]/[Op] (`705cda9ef`); supervisor thêm kiểm
-  tra hình thức TITLE_DRIFT, STRAY_TERMINAL và bước form mỗi vòng (`36ee7fe11`). config.yaml kernel = claude/opus-5-5.
-  Merge P8 `fab36d654`, P7b `d1cb38455`, R `12a1ddb74`.
+- 13:30 The owner woke up, saw the nivo sidebar in chaos (ops lost their names, workers sitting outside, 58 agents) and chose "delete everything and restart", kernel
+  default Opus 5.5. Done: snapshot of the 4 goals; stopped 4 watchdogs; settled 12 open jobs as blocked; api finish for 4 workflows; closed every
+  nivo terminal; closed 160 Orca tasks (run-use a temporary terminal into each old run, task-update completed); releasing 341 workers
+  (abandon + release) in progress. Root causes found and patched: settle/finish closed the Task with "done" while Orca only accepts completed so it
+  never closed (`8f2623030`); the CLI overwrites the terminal name, the watchdog resets [Kernel]/[Op] (`705cda9ef`); the supervisor adds formal
+  checks TITLE_DRIFT, STRAY_TERMINAL and a form step every round (`36ee7fe11`). config.yaml kernel = claude/opus-5-5.
+  Merged P8 `fab36d654`, P7b `d1cb38455`, R `12a1ddb74`.
 
-- 13:55 Test đầy đủ sau merge: 1208 pass, 0 fail, 4 skip. Đã tạo lại 4 workflow (chuỗi như đã duyệt, AUTH/WSPV bỏ brand vì
-  brand đã xong): wf-nivo-app-auth-mudqjob3, wf-nivo-workspace-provision-mudqjokb, wf-nivo-modules-agentos-mudqjov6,
-  wf-nivo-collab-group-chat-mudqjp5g. Kernel Claude Opus 5.5 không khởi động được (Orca hết giờ chờ handle) vì Claude Code
-  chưa onboarding (~/.claude.json thiếu hasCompletedOnboarding); cần thầy chạy claude một lần. 242 bản ghi worker Orca giữ
-  lại (identity_unproven) không giải phóng được bằng CLI; chỉ orchestration reset (toàn cục) xóa được.
+- 13:55 Full tests after merge: 1208 pass, 0 fail, 4 skip. Re-created 4 workflows (chain as approved, AUTH/WSPV skip brand because
+  brand is done): wf-nivo-app-auth-mudqjob3, wf-nivo-workspace-provision-mudqjokb, wf-nivo-modules-agentos-mudqjov6,
+  wf-nivo-collab-group-chat-mudqjp5g. The Claude Opus 5.5 kernel could not start (Orca timed out waiting for the handle) because Claude Code
+  has not onboarded (~/.claude.json lacks hasCompletedOnboarding); the owner needs to run claude once. 242 Orca worker records kept
+  (identity_unproven) cannot be released via the CLI; only an orchestration reset (global) can delete them.
 
-- 13:44 Chờ thầy onboarding Claude Code (hasCompletedOnboarding vẫn chưa có). 4 workflow mới queued, chưa kernel, chưa watchdog.
-  Hai worker cũ nộp report muộn (Collab backend.implement a8 done 05:59, WSPV interface.implement a39 done 06:01) vào workflow đã finish:
-  code của chúng đã commit trong repo, workflow mới sẽ khảo sát lại.
+- 13:44 Waiting for the owner to onboard Claude Code (hasCompletedOnboarding is still missing). 4 new workflows queued, no kernel, no watchdog yet.
+  Two old workers submitted reports late (Collab backend.implement a8 done 05:59, WSPV interface.implement a39 done 06:01) into workflows that had finished:
+  their code is committed in the repo, the new workflows will survey it again.
 
-- 14:00 Fork báo lane R lỗi: terminal create hết giờ chờ handle nhưng terminal vẫn được tạo và bị bỏ lại (R2 đang sửa: adopt-or-close,
-  paste kẹt). Nivo dính y hệt: 3 terminal claude mồ côi đứng ở màn onboarding; đã đóng. Giữ nivo tới khi R2 xong và thầy onboarding.
-  TITLE_DRIFT: tên bị CLI ghi đè liên tục (OSC mỗi lượt), đổi tên 5 phút không thắng; đề xuất CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
-  trong card claude, Codex/Devin đổi tên sau attest và mỗi lần wake. Lane S (fork) sửa bản ghi repository resource cho Mia Mia.
+- 14:00 The fork reports lane R is broken: terminal create times out waiting for the handle but the terminal is still created and left behind (R2 is fixing: adopt-or-close,
+  stuck paste). Nivo is hit identically: 3 orphan claude terminals sitting at the onboarding screen; closed. Holding nivo until R2 is done and the owner onboards.
+  TITLE_DRIFT: the name is continuously overwritten by the CLI (OSC every turn), renaming every 5 minutes does not win; proposed CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
+  in the claude card, Codex/Devin rename after attest and at every wake. Lane S (fork) fixes the repository resource record for Mia Mia.
 
-- 13:53 Vẫn chờ: thầy chưa onboarding Claude Code, R2 chưa về. 4 workflow nivo queued, không terminal nivo nào. Không vá.
+- 13:53 Still waiting: the owner has not onboarded Claude Code, R2 has not returned. 4 nivo workflows queued, no nivo terminals. No patch.
 
-- 14:05 Thầy chỉnh: supervisor là poll trong chat, chế độ debug, không có thân xác trong Orca. Trò đã sai khi tạo terminal
-  [Supervisor] cleanup/probe; đã đóng, ghi luật chat-only-debug-mode vào supervise.yaml (`0c9f04b3c`); fork đã theo. Reset --tasks
-  theo lệnh thầy: Orca về 0 task, 0 worker. Merge lane S `6b9d6d565` (repository ở workspace.yaml, không ở _resources); kernel Mia
-  Mia chạy lại prepare. Còn chờ: thầy hoàn tất bước chọn giao diện của Claude Code, và lane R2.
+- 14:05 The owner adjusted: the supervisor is a poll in chat, debug mode, with no body in Orca. The supervisor was wrong to create the terminals
+  [Supervisor] cleanup/probe; closed them, wrote the rule chat-only-debug-mode into supervise.yaml (`0c9f04b3c`); the fork followed. Reset --tasks
+  on the owner's command: Orca back to 0 tasks, 0 workers. Merged lane S `6b9d6d565` (repository in workspace.yaml, not in _resources); the Mia
+  Mia kernel re-runs prepare. Still waiting: the owner completing the theme selection step of Claude Code, and lane R2.
 
-- 14:15 Thầy hoàn tất onboarding Claude Code (hasCompletedOnboarding=true). Khởi động kernel Collab vẫn lỗi create: Orca hết giờ
-  chờ handle, lần này không để lại terminal. Lane R không đổi phần tạo terminal, nên lỗi ở phía Orca với TUI agent tương tác
-  (cmd và claude --version tạo được; claude --model ... thì không), cùng dấu hiệu sự cố Codex 21:45 tối qua. Đã gửi dữ kiện
-  cho R2 (fork). 4 workflow nivo chờ R2.
+- 14:15 The owner completed Claude Code onboarding (hasCompletedOnboarding=true). Starting the Collab kernel still fails at create: Orca timed out
+  waiting for the handle, this time without leaving a terminal. Lane R did not change the terminal-creation part, so the fault is on the Orca side with interactive agent TUIs
+  (cmd and claude --version can be created; claude --model ... cannot), the same symptom as the Codex incident at 21:45 last night. Sent the facts
+  to R2 (fork). 4 nivo workflows wait on R2.
 
-- 14:03 Vẫn chờ R2 (nhánh chưa có commit mới). 4 workflow nivo queued, không kernel. Không vá.
+- 14:03 Still waiting on R2 (branch has no new commit). 4 nivo workflows queued, no kernel. No patch.
 
-- 14:13 Vẫn chờ R2. 4 workflow nivo queued. Không vá.
+- 14:13 Still waiting on R2. 4 nivo workflows queued. No patch.
 
-- 14:45 Thầy restart Orca, khoán 8 workflow (nivo 4, miamia 2, starci-next 2). Merge R2 `f24853dd4` (Orca đẩy lệnh claude/codex qua
-  đường UI chờ 10s; thêm tiền tố launch). Vá khởi động Claude: readiness tìm ❯ ở mọi dòng `25f74a785`; attestation theo tên
-  hiển thị "Opus 5.5" `5d110d360`; spinner ✶ của Claude là active `58fc42a60`. 4 kernel nivo lên Opus 5.5 + 4 watchdog. Nhận bàn
-  giao 4 workflow của fork (watchdog của trò, fork đã tắt của họ); đóng 6 terminal lạc. Vá: workspace.manage cutSetAuthority
-  `c3ae4687a` (Mia Mia prepare kẹt CATALOG_DIRTY); owner-gate không job = awaiting-owner `680d1c0b0`; scaffold cutSetAuthority.
-  Chờ thầy: brand + grammar cho StarCi Next FE (inc-d456b748085a); brand Mia Mia đi theo mm-work.
+- 14:45 The owner restarted Orca, sweeping up 8 workflows (nivo 4, miamia 2, starci-next 2). Merged R2 `f24853dd4` (Orca pushes the claude/codex command through the
+  UI path waiting 10s; adds a launch prefix). Patched Claude startup: readiness looks for ❯ on every line `25f74a785`; attestation by the
+  display name "Opus 5.5" `5d110d360`; Claude's ✶ spinner is active `58fc42a60`. 4 nivo kernels up on Opus 5.5 + 4 watchdogs. Took over the
+  4 workflows from the fork (the supervisor's watchdog, the fork turned off theirs); closed 6 stray terminals. Patched: workspace.manage cutSetAuthority
+  `c3ae4687a` (Mia Mia prepare stuck at CATALOG_DIRTY); owner-gate with no job = awaiting-owner `680d1c0b0`; scaffold cutSetAuthority.
+  Waiting on the owner: brand + grammar for StarCi Next FE (inc-d456b748085a); the Mia Mia brand follows mm-work.
 
-- 14:40 Yên, 8 workflow: 4 nivo worker đầu tiên đang chạy; sn-work và mm-work worker chạy lại sau vá; sn-base chờ thầy (brand,
-  grammar); mm-base giữ 2 job frontend sau owner-gate chờ brand. Không vá.
+- 14:40 Quiet, 8 workflows: the first 4 nivo workers are running; sn-work and mm-work workers re-run after the patch; sn-base waits on the owner (brand,
+  grammar); mm-base holds 2 frontend jobs behind an owner-gate waiting for brand. No patch.
 
-- 14:45 Tiến triển: nivo AUTH, WSPV, Modules xong scope.define, kernel đang dispatch bước kế; sn-work workspace.manage done (vá R2
-  có tác dụng), chờ settle; mm-work prepare qua slice 1 (cutSetAuthority có tác dụng). Đóng lại terminal nền lạc term_6e3ea4dd (orphaned).
+- 14:45 Progress: nivo AUTH, WSPV, Modules finished scope.define, the kernels are dispatching the next step; sn-work workspace.manage done (the R2 patch
+  took effect), waiting on settle; mm-work prepare passed slice 1 (cutSetAuthority took effect). Closed again the stray background terminal term_6e3ea4dd (orphaned).
 
-- 14:50 Thầy quyết: StarCi Next FE dùng grammar core, brand mặc định như dashboard và subscriptions của StarCi Academy. Đã chuyển
-  nguyên văn cho kernel sn-base kèm nguồn tham chiếu starci-academy-fe (dashboard, subscriptions, globals.css, theme-context) để ghi
-  bản ghi brand, resolve inc-d456b748085a và chạy tiếp interface.scaffold.
+- 14:50 The owner decided: StarCi Next FE uses the grammar core, the default brand like the dashboard and subscriptions of StarCi Academy. Relayed
+  verbatim to the sn-base kernel with the reference sources starci-academy-fe (dashboard, subscriptions, globals.css, theme-context) to record the
+  brand record, resolve inc-d456b748085a and continue interface.scaffold.
 
-### Vì sao job hỏng (đào 2026-09-23 04:20, 79 job failed của AUTH + WSPV từ 21/9)
+### Why jobs fail (dug 2026-09-23 04:20, 79 failed jobs of AUTH + WSPV since 21/9)
 
-| Nhóm | Số | Bản chất | Hướng vá |
+| Group | Count | Nature | Patch direction |
 |---|---|---|---|
-| Audit/e2e/integration fail thật | ~20 | vòng chất lượng bắt lỗi sản phẩm | giữ |
-| Chết không report | 27 | hạ tầng: dispatch reject, worker chết, đêm nay lỗi `--parent` | đã vá `--parent`, rejectDispatch đóng terminal (L) |
-| Ask bị tính failed | ~16 | outcome `ask` settle thành blocked, đốt attempt, thổi phồng tỉ lệ hỏng | ask là trạng thái chờ: settle `awaiting-owner`, không tốn attempt |
-| Dispatch khi điều kiện chưa đủ | ~7 | SRS/SDS todo, record audit chưa có, lineage draw chưa có | `api dispatch` kiểm `route.prerequisites` trước khi spawn |
-| `provision.ask` không nói rõ hỏi gì | 5 | kernel gọi op hỏi mà không đưa câu hỏi → `QUESTION_UNCLEAR` | enqueue `provision.ask` bắt buộc params câu hỏi có cấu trúc |
-| Sai công cụ theo provider | 3 | ImageGen/trình duyệt giao cho agent không có | route lọc `riskHints host-tool-required` theo capability agent card |
-| Sai owned path | 1 | | |
+| Audit/e2e/integration real failures | ~20 | the quality loop catching product bugs | keep |
+| Died without report | 27 | infrastructure: dispatch reject, worker died, tonight's `--parent` bug | patched `--parent`, rejectDispatch closes the terminal (L) |
+| Asks counted as failed | ~16 | outcome `ask` settles as blocked, burns an attempt, inflates the failure rate | an ask is a waiting state: settle `awaiting-owner`, costs no attempt |
+| Dispatch when conditions are not met | ~7 | SRS/SDS todo, audit record missing, draw lineage missing | `api dispatch` checks `route.prerequisites` before spawn |
+| `provision.ask` does not say what it asks | 5 | the kernel calls the ask op without giving the question → `QUESTION_UNCLEAR` | enqueue `provision.ask` requires structured question params |
+| Wrong tool per provider | 3 | ImageGen/browser assigned to an agent that lacks them | route filters `riskHints host-tool-required` by agent card capability |
+| Wrong owned path | 1 | | |
 
-Phát hiện lớn nhất: quyền uỷ nhiệm của thầy không tồn tại trong runtime, nên op draw AUTH a5 từ
-chối câu trả lời A+A của supervisor. Vá `dab1859b8`: `config.yaml delegation` (asks, until,
-excludes), packet mang `owner_delegation`, serve-ask ghi `answeredBy`. Op cũng cảnh báo Desktop A
-có nguy cơ trái anatomy Grammar; supervisor sẽ chọn B+B khi ask mới lên để audit sau không fail cứng.
+The biggest finding: the owner's delegation does not exist in the runtime, so the AUTH draw op a5 rejected the
+supervisor's answer A+A. Patched `dab1859b8`: `config.yaml delegation` (asks, until,
+excludes), the packet carries `owner_delegation`, serve-ask records `answeredBy`. The op also warned that Desktop A
+risks violating the Grammar anatomy; the supervisor will choose B+B when the new ask comes up so the later audit does not hard-fail.
 
-Mở:
-- AUTH chờ hai gate của thầy: chọn direction login (form `ctx_1db4e4509029` đã `dead`, cần
-  kernel re-serve khi thầy dậy) và chạy assisted OAuth run-04 (Docker đã bật; cần `npm run
-  dev:env`, API :3068, FE :3067, rồi skill `run-assisted-uat`).
-- ORPHAN_TERMINAL `term_b6fa4c43` (audit a4 failed trước lane L) vẫn mở.
-- `owner-gate` chưa là một `queuedBecause`: job chờ thầy vẫn hiện `ready`.
+Open:
+- AUTH waits on two gates from the owner: choose the login direction (form `ctx_1db4e4509029` is `dead`, needs the
+  kernel to re-serve when the owner wakes) and run assisted OAuth run-04 (Docker is on; needs `npm run
+  dev:env`, API :3068, FE :3067, then the skill `run-assisted-uat`).
+- ORPHAN_TERMINAL `term_b6fa4c43` (audit a4 failed before lane L) is still open.
+- `owner-gate` is not yet a `queuedBecause`: a job waiting on the owner still shows `ready`.

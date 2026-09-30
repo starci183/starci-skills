@@ -90,8 +90,8 @@ allocation:
   #   brand (brand.decide; owner ruling 2026-09-27 draw-devin-brand-claude): Claude Opus decides the brand and its
   #     direction, GPT-6 Sol is the fallback when the Claude pool cannot serve; Codex is also the cross-family second
   #     opinion on think work.
-  #   review (owner decision 2026-09-25 review-hands, amending the think order above: "codex/claude chỉ là
-  #     quyết định thôi (tức là đưa ra chiến lược), review thì phải cho tay chân làm"): every verify kind -
+  #   review (owner decision 2026-09-25 review-hands, amending the think order above: "codex/claude only
+  #     decide (that is, set the strategy), review must be done by the hands"): every verify kind -
   #     review.verify, handover.review, security.verify, goal.validate, uat.assisted.verify, interface.audit and
   #     the hands-on e2e/integration/perf/uat verify kinds - and work.author walk the review order: Devin,
   #     then Opus and Sol as overflow only (overflowByOrder.review). The cross-family rule sends a review of
@@ -300,8 +300,8 @@ allocation:
   # signature naming a file it changed, or an op success rate lower by successDrop -> revert due); at most
   # dailyAutoLandCap autonomous landings in 24 h; an owner-feedback lesson weighs ownerWeight (a self-derived one 1).
   supervisorLearning: {minRepeats: 2, measureMs: 21600000, dailyAutoLandCap: 8, ownerWeight: 3, successDrop: 0.1}
-  # progress (scripts/kernel/progress-rca.mjs; owner 2026-09-28 "trước đây supervisor không tư duy dc à?" and "sao
-  # workflows không tự điều phối dc mà đợi supervisor"): the outcome SLA each Kernel reads first on every wake (api status
+  # progress (scripts/kernel/progress-rca.mjs; owner 2026-09-28 "could the supervisor not think before?" and "why do
+  # workflows not coordinate themselves but wait for the supervisor"): the outcome SLA each Kernel reads first on every wake (api status
   # progress + rca) and the Supervisor backstops. units/h over windowMs (only units that passed their gates), ETA over
   # etaWindowMs. A priority workflow (highest ramThrottle.priorities weight) below minUnitsPerHour.priority for graceMs,
   # or holding queued-ready work while running < its allowed parallelism, is a progress stall: the Kernel acts on the
@@ -373,7 +373,7 @@ allocation:
   # waiterPriority (scripts/kernel/waiter-priority.mjs): a queued job that has blocked another
   # workflow this long earns its Kernel one heads-up per newly waiting workflow.
   waiterPriority: {blockingHeadsUpMs: 900000}
-  # cutSeam (scripts/kernel/cut-seam.mjs; owner ruling 2026-09-28 "seam không làm nghẽn cả chuỗi"): a cut
+  # cutSeam (scripts/kernel/cut-seam.mjs; owner ruling 2026-09-28 "a seam must not block the whole chain"): a cut
   # sibling ordinal waits on its seam at most maxSiblingWaitMs (30 min), then runs on a stub and owes one
   # cut-seam-reconcile once the seam lands; a published seam interface, a seam whose latest attempt
   # settled failed/blocked, or recutAfterFailures failed seam attempts release it at once (and owe a re-cut).
@@ -499,8 +499,8 @@ allocation:
     laneGraceMs: 86400000
     logMaxAgeMs: 1209600000
     gitIndexLockStaleMs: 300000
-    # gc: the Supervisor's garbage collection (scripts/supervisor/gc.mjs, every tick; owner 2026-09-28 "phải có dọn
-    # rác chứ"). An idle bare shell or an unregistered runtime terminal of a live workflow is closed only once it has
+    # gc: the Supervisor's garbage collection (scripts/supervisor/gc.mjs, every tick; owner 2026-09-28 "there must be
+    # garbage collection"). An idle bare shell or an unregistered runtime terminal of a live workflow is closed only once it has
     # been seen for gcMinAgeMs (a dispatch binds its terminal well within that); a merged lane worktree only once idle
     # for gcLaneGraceMs. GC never purges an ended workflow: housekeeping does (Q6: 30 days, zipped and verified first).
     gcMinAgeMs: 600000
@@ -521,8 +521,8 @@ allocation:
   # resources: the host-floor guards the provider-health / admission path reads. Below minFreeDiskGb
   # `api dispatch --spawn` refuses host-resources-low until there is room again - measured on the
   # drive that holds %TEMP% and the repos. RAM goes through the RAM-aware, priority-aware throttle
-  # (scripts/lib/ram-throttle.mjs; owner ruling 2026-09-28 "Trần song song theo RAM thật: RAM còn dưới 15%
-  # thì giảm số op chạy song song, tránh treo máy làm op chết giữa chừng"): at every dispatch the effective cap
+  # (scripts/lib/ram-throttle.mjs; owner ruling 2026-09-28 "Parallelism ceiling follows real RAM: free RAM below 15%
+  # then reduce the number of parallel ops, avoid freezing the machine and killing ops mid-run"): at every dispatch the effective cap
   # is min(maxParallelOps, running + the ops that fit in free RAM above hardFloorPct of total), counted across
   # every ledger of the host, and never above maxParallelOps. minFreeRamPct is the heavy floor: below it no NEW
   # heavy op (opRam class heavy: Playwright / render / test / implement) starts from a workflow below the top

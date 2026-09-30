@@ -3,7 +3,7 @@
 # Read by scripts/kernel/product-worktree.mjs productSettings(), scripts/kernel/product-land.mjs, api product-land and
 # scripts/kernel/api-status/imports.mjs. Every value has the same default in code.
 
-# The isolation of an op whose brief sets no policy.isolation (owner 2026-09-28 "mỗi op 1 worktree": one model for
+# The isolation of an op whose brief sets no policy.isolation (owner 2026-09-28 "one worktree per op": one model for
 # every workflow). `worktree` applies to every op whose policy.commitPolicy COMMITS and whose owned paths land in one
 # bound product repository (scripts/kernel/product-worktree.mjs isolationOf / planIsolation). Kept on the shared tree:
 #   - Work-owner (ledger repo) only ops - scope.define, business.decide, brand.decide, architecture.decide,
