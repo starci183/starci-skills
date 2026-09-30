@@ -1,12 +1,11 @@
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
 import type { ProbeChecker } from "./probe-checker.service"
-import { MODULE_OPTIONS_TOKEN } from "./probes.module-definition"
 import type { ProbesOptions } from "./probes.options"
 import type { Probe } from "./probes.port"
 
 /** Token of the probes options, exported so a spec can provide it. */
-export const PROBES_OPTIONS = MODULE_OPTIONS_TOKEN
+export const PROBES_OPTIONS: unique symbol = Symbol("platform.probes.options")
 
 /** Token of the ProbeChecker. */
 export const PROBE_CHECKER: unique symbol = Symbol("platform.probes.checker")

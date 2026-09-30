@@ -1,8 +1,10 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { TypeOrmModule } from "@nestjs/typeorm"
+import { getEntityManagerToken, TypeOrmModule } from "@nestjs/typeorm"
 import { DATABASE_PROBE, DatabaseProbe } from "./database-probe.service"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
+import { PRIMARY_ENTITY_MANAGER } from "./primary.decorators"
+import { PRIMARY_CONNECTION } from "./primary.connection"
 
 @Module({})
 /**
@@ -28,8 +30,12 @@ export class DatabaseModule extends ConfigurableModuleClass {
                     }),
                 ),
             ],
-            providers: [...(base.providers ?? []), { provide: DATABASE_PROBE, useClass: DatabaseProbe }],
-            exports: [DATABASE_PROBE],
+            providers: [
+                ...(base.providers ?? []),
+                { provide: DATABASE_PROBE, useClass: DatabaseProbe },
+                { provide: PRIMARY_ENTITY_MANAGER, useExisting: getEntityManagerToken(PRIMARY_CONNECTION) },
+            ],
+            exports: [DATABASE_PROBE, PRIMARY_ENTITY_MANAGER],
         }
     }
 }

@@ -19,7 +19,7 @@ import {
     signOutInput,
 } from "@tests/fixtures/builders/identity.builder"
 import { IdentityErrorCode } from "./errors/identity.error"
-import { MODULE_OPTIONS_TOKEN } from "./identity.module-definition"
+import { IDENTITY_OPTIONS } from "./identity.decorators"
 import { SessionEntity } from "./persistence/entities/session.entity"
 import { PURGE_LAPSED_SESSIONS } from "./persistence/session.sql"
 import { SessionService } from "./session.service"
@@ -41,7 +41,7 @@ const build = async (entityManager: MockEntityManager = mockEntityManager()) => 
         providers: [
             SessionService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: transaction.em },
-            { provide: MODULE_OPTIONS_TOKEN, useValue: OPTIONS },
+            { provide: IDENTITY_OPTIONS, useValue: OPTIONS },
             { provide: CLOCK, useValue: clock },
             { provide: OUTBOX, useValue: outbox },
             { provide: KEYCLOAK, useValue: keycloak },

@@ -1,11 +1,10 @@
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
-import { MODULE_OPTIONS_TOKEN } from "./messaging.module-definition"
 import type { MessagingOptions } from "./messaging.options"
 import type { ConsumerRegistry } from "./messaging.port"
 
 /** Token of the messaging options, exported so a spec can provide it. */
-export const MESSAGING_OPTIONS = MODULE_OPTIONS_TOKEN
+export const MESSAGING_OPTIONS: unique symbol = Symbol("platform.messaging.options")
 
 /** Token of the consumer registry. */
 export const CONSUMER_REGISTRY: unique symbol = Symbol("platform.messaging.consumer-registry")

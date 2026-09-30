@@ -1,11 +1,10 @@
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
-import { MODULE_OPTIONS_TOKEN } from "./i18n.module-definition"
 import type { I18nOptions } from "./i18n.options"
 import type { MessageCatalog, RequestLocale } from "./i18n.port"
 
 /** Token of the i18n options, exported so a spec can provide it. */
-export const I18N_OPTIONS = MODULE_OPTIONS_TOKEN
+export const I18N_OPTIONS: unique symbol = Symbol("platform.i18n.options")
 
 /** Token of the MessageCatalog port. */
 export const MESSAGE_CATALOG: unique symbol = Symbol("platform.i18n.message-catalog")
