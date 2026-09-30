@@ -1,14 +1,20 @@
-"use client"
-
 import { Button, Heading, PageContainer, SectionHeader, SurfaceCard, Text } from "@starci/grammar/common"
-import { CatalogueTile, DuckMascot, formatPrice } from "@ecommerce/shared"
-import type { TeaserProduct } from "../../../modules/catalog"
+import { CatalogueTile, DuckMascot } from "@ecommerce/ui"
 import { landingPageClassNames } from "./classNames"
 
 /** One pillar of the "why Northwind" strip, with its sentence already resolved. */
 export type LandingPillar = {
     readonly title: string
     readonly copy: string
+}
+
+/** One teaser product with its copy and price already resolved. */
+export type LandingTeaserProduct = {
+    readonly id: string
+    readonly name: string
+    readonly blurb: string
+    /** The price formatted in the reader's language. */
+    readonly price: string
 }
 
 /** The landing page's resolved inputs: every string and link arrived already settled. */
@@ -26,7 +32,7 @@ export type LandingPageProps = {
         readonly viewFull: string
         readonly pillarsTitle: string
         readonly pillars: ReadonlyArray<LandingPillar>
-        readonly teaser: ReadonlyArray<TeaserProduct>
+        readonly teaser: ReadonlyArray<LandingTeaserProduct>
         /** The shop origin with the locale already joined, for the cross-app hand-off links. */
         readonly shopHref: string
     }
@@ -42,7 +48,7 @@ export type LandingPageProps = {
  */
 export const LandingPageBase = (props: LandingPageProps) => (
     <PageContainer measure="product" className={landingPageClassNames.page}>
-        <section className={landingPageClassNames.hero}>
+        <div className={landingPageClassNames.hero}>
             <DuckMascot size={96} aria-hidden />
             <Heading level={1} scale="display">
                 {props.props.heroTitle}
@@ -60,9 +66,9 @@ export const LandingPageBase = (props: LandingPageProps) => (
                     {props.props.seePicks}
                 </Button>
             </div>
-        </section>
+        </div>
 
-        <section id="catalogue" className={landingPageClassNames.section} aria-labelledby="catalogue-heading">
+        <div id="catalogue" role="region" className={landingPageClassNames.section} aria-labelledby="catalogue-heading">
             <SectionHeader
                 id="catalogue-heading"
                 title={props.props.catalogueTitle}
@@ -76,17 +82,12 @@ export const LandingPageBase = (props: LandingPageProps) => (
             />
             <div className={landingPageClassNames.grid}>
                 {props.props.teaser.map((product) => (
-                    <CatalogueTile
-                        key={product.id}
-                        name={product.name}
-                        price={formatPrice(product.priceCents, product.currency)}
-                        blurb={product.blurb}
-                    />
+                    <CatalogueTile key={product.id} name={product.name} price={product.price} blurb={product.blurb} />
                 ))}
             </div>
-        </section>
+        </div>
 
-        <section id="about" aria-labelledby="about-heading">
+        <div id="about" role="region" aria-labelledby="about-heading">
             <SectionHeader id="about-heading" title={props.props.pillarsTitle} level={2} />
             <div className={landingPageClassNames.grid}>
                 {props.props.pillars.map((pillar) => (
@@ -97,6 +98,6 @@ export const LandingPageBase = (props: LandingPageProps) => (
                     </SurfaceCard>
                 ))}
             </div>
-        </section>
+        </div>
     </PageContainer>
 )

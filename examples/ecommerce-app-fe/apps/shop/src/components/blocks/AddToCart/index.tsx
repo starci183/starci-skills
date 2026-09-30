@@ -5,7 +5,10 @@ import { AddToCartControlBase } from "./component"
 import type { AddToCartControlBaseProps } from "./component"
 
 /** The add-to-cart control's resolved inputs: the product it adds and every string it can render. */
-type AddToCartControlProps = Pick<AddToCartControlBaseProps["props"], "addLabel" | "addingLabel" | "inCartLabel" | "refusedLabel"> & {
+type AddToCartControlProps = Pick<
+    AddToCartControlBaseProps["props"],
+    "addLabel" | "addingLabel" | "inCartLabel" | "refusedLabel"
+> & {
     /** The catalog product id one press adds one of. */
     readonly productId: string
 }

@@ -1,8 +1,8 @@
 import "server-only"
+import { isRecord, parseList, parseOutcome, requestGraphql, type Outcome } from "@ecommerce/api"
 import { ORDER_API_URL } from "../config"
-import { formatPrice } from "@ecommerce/shared"
-import { postGraphql, type GraphqlResult } from "../api"
-import type { LineItemRow } from "../types"
+import type { LineItemRow } from "@ecommerce/ui"
+import { DOCUMENTS } from "./__generated__/documents"
 
 /** One cart line as the order service's `cart` query answers it. */
 export type CartLine = {
@@ -25,32 +25,49 @@ export type CartView = {
 }
 
 /** What a read answers when there is no session to read under: the order service's own refusal, without asking it. */
-const SIGNED_OUT = { ok: false, reason: "no signed-in session", code: "SESSION_INVALID" } as const
+const SIGNED_OUT: Outcome<never> = { kind: "refused", code: "SESSION_INVALID" }
 
-const CART_QUERY = `query ShopCart {
-    cart {
-        items { productId quantity }
-        catalog { id name priceMinorUnits stock }
-    }
-}`
+/** One cart line of the wire, or `null` when the row is not that shape. */
+const toCartLine = (row: unknown): CartLine | null =>
+    isRecord(row) && typeof row.productId === "string" && typeof row.quantity === "number"
+        ? { productId: row.productId, quantity: row.quantity }
+        : null
 
-const ADD_CART_ITEM_MUTATION = `mutation ShopAddCartItem($input: AddCartItemInput!) {
-    addCartItem(request: $input) { item { productId quantity } }
-}`
+/** One catalog row of the wire, or `null` when the row is not that shape. */
+const toCatalogProduct = (row: unknown): CatalogProduct | null =>
+    isRecord(row) &&
+    typeof row.id === "string" &&
+    typeof row.name === "string" &&
+    typeof row.priceMinorUnits === "number" &&
+    typeof row.stock === "number"
+        ? { id: row.id, name: row.name, priceMinorUnits: row.priceMinorUnits, stock: row.stock }
+        : null
 
-const CLEAR_CART_MUTATION = `mutation ShopClearCart {
-    clearCart { cleared }
-}`
+/** The cart view of a `cart` payload, or `null` when the payload is not that shape. */
+const toCartView = (data: unknown): CartView | null => {
+    if (!isRecord(data)) return null
+    const items = parseList(data.items, toCartLine)
+    const catalog = parseList(data.catalog, toCatalogProduct)
+    return items === null || catalog === null ? null : { items, catalog }
+}
+
+/** The line an `addCartItem` payload answers with, or `null` when the payload is not that shape. */
+const toAddedLine = (data: unknown): CartLine | null => (isRecord(data) ? toCartLine(data.item) : null)
+
+/** Whether a `clearCart` payload says the cart is empty. */
+const toCleared = (data: unknown): boolean | null =>
+    isRecord(data) && typeof data.cleared === "boolean" ? data.cleared : null
 
 /**
  * Read the signed-in person's cart through the order service's session-guarded `cart` query - the
  * only cart door the backend serves, and also the only door the catalog is read through.
  */
-export const fetchCart = async (sessionToken: string | null): Promise<GraphqlResult<CartView>> => {
+export const fetchCart = async (sessionToken: string | null): Promise<Outcome<CartView>> => {
     if (sessionToken === null) return SIGNED_OUT
-    const result = await postGraphql<{ cart: CartView }>(
-        ORDER_API_URL, CART_QUERY, undefined, sessionToken)
-    return result.ok ? { ok: true, data: result.data.cart } : result
+    return parseOutcome(
+        await requestGraphql({ baseUrl: ORDER_API_URL, document: DOCUMENTS.ShopCart, token: sessionToken }),
+        toCartView,
+    )
 }
 
 /**
@@ -61,21 +78,26 @@ export const addCartItem = async (
     sessionToken: string,
     productId: string,
     quantity: number,
-): Promise<GraphqlResult<CartLine>> => {
-    const result = await postGraphql<{ addCartItem: { item: CartLine } }>(
-        ORDER_API_URL, ADD_CART_ITEM_MUTATION, { input: { productId, quantity } }, sessionToken)
-    return result.ok ? { ok: true, data: result.data.addCartItem.item } : result
-}
+): Promise<Outcome<CartLine>> =>
+    parseOutcome(
+        await requestGraphql({
+            baseUrl: ORDER_API_URL,
+            document: DOCUMENTS.ShopAddCartItem,
+            variables: { input: { productId, quantity } },
+            token: sessionToken,
+        }),
+        toAddedLine,
+    )
 
 /**
  * Empty the person's cart. This is the only removal the service exposes - there is no per-line
  * delete door, so "remove" in this product means clearing the cart, not editing a line.
  */
-export const clearCart = async (sessionToken: string): Promise<GraphqlResult<{ cleared: boolean }>> => {
-    const result = await postGraphql<{ clearCart: { cleared: boolean } }>(
-        ORDER_API_URL, CLEAR_CART_MUTATION, undefined, sessionToken)
-    return result.ok ? { ok: true, data: result.data.clearCart } : result
-}
+export const clearCart = async (sessionToken: string): Promise<Outcome<boolean>> =>
+    parseOutcome(
+        await requestGraphql({ baseUrl: ORDER_API_URL, document: DOCUMENTS.ShopClearCart, token: sessionToken }),
+        toCleared,
+    )
 
 /** The cart rendered for a page: one row per line, the formatted total, and each product's name for refusal copy. */
 export type CartSummary = {
@@ -84,15 +106,17 @@ export type CartSummary = {
     readonly productNames: Readonly<Record<string, string>>
 }
 
-/** What a cart the service could not read shows: no rows, a zero total, no names. */
-const EMPTY_CART_SUMMARY: CartSummary = { rows: [], total: formatPrice(0, "USD"), productNames: {} }
+/** The page's own words and number format: one line's quantity label, and a minor-unit amount as display text. */
+export type CartLabels = {
+    readonly quantity: (count: number) => string
+    readonly price: (minorUnits: number) => string
+}
 
 /**
  * Join the cart's lines with the catalog snapshot for their name and price. A line the catalog no
- * longer knows renders under its product id with no line total, honestly unnamed. `quantityLabel`
- * is the page's own copy for one line's quantity.
+ * longer knows renders under its product id with no line total, honestly unnamed.
  */
-export const summarizeCart = (view: CartView, quantityLabel: (count: number) => string): CartSummary => {
+export const summarizeCart = (view: CartView, labels: CartLabels): CartSummary => {
     const lineMinorUnits = (line: CartLine): number | null => {
         const product = view.catalog.find((entry) => entry.id === line.productId)
         return product ? product.priceMinorUnits * line.quantity : null
@@ -104,23 +128,29 @@ export const summarizeCart = (view: CartView, quantityLabel: (count: number) => 
             return {
                 productId: line.productId,
                 name: view.catalog.find((entry) => entry.id === line.productId)?.name ?? line.productId,
-                quantityLabel: quantityLabel(line.quantity),
-                lineTotal: minorUnits === null ? "—" : formatPrice(minorUnits, "USD"),
+                quantityLabel: labels.quantity(line.quantity),
+                lineTotal: minorUnits === null ? "—" : labels.price(minorUnits),
             }
         }),
-        total: formatPrice(total, "USD"),
+        total: labels.price(total),
         productNames: Object.fromEntries(view.catalog.map((product) => [product.id, product.name])),
     }
 }
 
 /** One page's read of the cart: the service's answer beside its summary (empty when the cart could not be read). */
 export type CartRead = {
-    readonly result: GraphqlResult<CartView>
+    readonly outcome: Outcome<CartView>
     readonly summary: CartSummary
 }
 
 /** Read the signed-in person's cart and summarize it for a page; `null` is an anonymous visitor. */
-export const readCart = async (sessionToken: string | null, quantityLabel: (count: number) => string): Promise<CartRead> => {
-    const result = await fetchCart(sessionToken)
-    return { result, summary: result.ok ? summarizeCart(result.data, quantityLabel) : EMPTY_CART_SUMMARY }
+export const readCart = async (sessionToken: string | null, labels: CartLabels): Promise<CartRead> => {
+    const outcome = await fetchCart(sessionToken)
+    return {
+        outcome,
+        summary:
+            outcome.kind === "ok"
+                ? summarizeCart(outcome.data, labels)
+                : { rows: [], total: labels.price(0), productNames: {} },
+    }
 }

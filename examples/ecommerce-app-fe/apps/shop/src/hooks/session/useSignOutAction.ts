@@ -1,16 +1,16 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
-import { closeSession } from "../../modules/api"
-import { useRouter } from "../../modules/i18n"
+import { callDoor } from "../../modules/doors"
+import { useLocaleRouter } from "../navigation"
 
 /** Owns the sign-out press and refreshes the server account view after the session door answers. */
 export const useSignOutAction = () => {
     const t = useTranslations("shop.account.auth")
-    const router = useRouter()
+    const router = useLocaleRouter()
     const [working, setWorking] = useState(false)
     const onSignOut = async () => {
         setWorking(true)
-        await closeSession()
+        await callDoor("session", "DELETE")
         router.refresh()
         setWorking(false)
     }

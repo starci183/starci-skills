@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { useLocale, useTranslations } from "next-intl"
-import { openSession } from "../../modules/api"
-import { useRouter } from "../../modules/i18n"
-import { ROUTES } from "../../modules/routes"
+import type { Outcome } from "@ecommerce/api"
+import { callDoor } from "../../modules/doors"
+import { SHOP_ROUTES } from "../../modules/routes"
+import { useLocaleRouter } from "../navigation"
 
 type Mode = "sign-in" | "register"
 type FormState = "ready" | "refused" | "working"
@@ -11,28 +12,27 @@ type FormState = "ready" | "refused" | "working"
 export const useSessionForm = () => {
     const t = useTranslations("shop.account.auth")
     const locale = useLocale()
-    const router = useRouter()
+    const router = useLocaleRouter()
     const [mode, setMode] = useState<Mode>("sign-in")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [working, setWorking] = useState(false)
     const [refusal, setRefusal] = useState<string | null>(null)
 
-    const refusalCopy = (code: string | undefined, reason: string): string => {
-        if (code === "INVALID_CREDENTIALS") return t("refusal")
-        if (code === "EMAIL_TAKEN") return t("taken")
-        if (code === "REQUEST_INVALID") return t("invalid")
-        if (code === "IDENTITY_UNAVAILABLE") return t("unavailable", { reason })
-        return reason
+    /** The sentence a refused answer owes the reader: the door's stable code picks the copy, never a server sentence. */
+    const refusalCopy = (outcome: Exclude<Outcome<unknown>, { readonly kind: "ok" }>): string => {
+        if (outcome.kind === "refused") return t("refusal")
+        if (outcome.kind === "invalid") return outcome.code === "EMAIL_TAKEN" ? t("taken") : t("invalid")
+        return t("unavailable")
     }
 
     const onSubmit = async () => {
         setWorking(true)
         setRefusal(null)
-        const result = await openSession(mode, email, password)
+        const outcome = await callDoor("session", "POST", { mode, email, password })
         setWorking(false)
-        if (!result.ok) {
-            setRefusal(refusalCopy(result.code, result.reason))
+        if (outcome.kind !== "ok") {
+            setRefusal(refusalCopy(outcome))
             return
         }
         router.refresh()
@@ -52,7 +52,7 @@ export const useSessionForm = () => {
             email,
             password,
             refusal,
-            browseHref: `/${locale}${ROUTES.browse}`,
+            browseHref: `/${locale}${SHOP_ROUTES.browse}`,
             copy: {
                 title: mode === "sign-in" ? t("signInTitle") : t("registerTitle"),
                 intro: mode === "sign-in" ? t("signInIntro") : t("registerIntro"),

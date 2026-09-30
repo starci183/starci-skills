@@ -1,29 +1,23 @@
-"use client"
-
 import type { ReactNode } from "react"
-import { GrammarRoot, TextAction } from "@starci/grammar/common"
-import { DisplayControls } from "@starci-examples/fe-kit/theme/leaves/DisplayControls"
-import { shopLayoutClassNames } from "./classNames"
+import { DisplayControls, SiteShell } from "@ecommerce/ui"
+import { ShopNav } from "../../../components/blocks/ShopNav"
 
-/** One resolved section link: the prefixed href, its label and the current-route marker. */
-export type ShopNavLink = {
-    readonly href: string
-    readonly label: string
-    readonly isCurrent: boolean
-}
-
-/** The shop chrome's resolved inputs: every string, href and the theme answer already settled. */
-export type ShopLayoutProps = {
+/** The shop chrome's resolved inputs: the brand, its home link and the display controls' words already settled. */
+export type ShopLayoutBaseProps = {
     /** Whole-screen situations this surface settles; the chrome has no alternatives. */
     readonly state: "ready"
     /** The data payload for whatever state is showing. */
     readonly props: {
-        /** The resolved theme GrammarRoot should paint (`system` until the reader has chosen). */
-        readonly theme: "light" | "dark" | "system"
         readonly brand: string
-        readonly navLabel: string
         readonly homeHref: string
-        readonly links: ReadonlyArray<ShopNavLink>
+        /** The display controls' words, resolved here because the leaf that draws them resolves none. */
+        readonly display: {
+            readonly label: string
+            readonly locale: string
+            readonly toLight: string
+            readonly toDark: string
+            readonly localeNames: { readonly en: string; readonly vi: string }
+        }
     }
     /** What the surface reports upward; the chrome is read-only. */
     readonly on: Record<never, never>
@@ -32,38 +26,16 @@ export type ShopLayoutProps = {
 }
 
 /**
- * The authenticated-app chrome: Grammar's Common boundary carrying the brand theme, the top bar
- * with the wordmark, the section nav (`isCurrent` is TextAction's real current-marker) and the
- * display controls, then the routed page body.
+ * The authenticated-app chrome: the shared shell carrying the wordmark, the section nav and the display
+ * controls, then the routed page body in the shell's main landmark.
  */
-export const ShopLayoutBase = (props: ShopLayoutProps) => {
-    return (
-        <GrammarRoot theme={props.props.theme} className={shopLayoutClassNames.frame}>
-            <header className={shopLayoutClassNames.header}>
-                <div className={shopLayoutClassNames.bar}>
-                    <a href={props.props.homeHref} className={shopLayoutClassNames.wordmark}>
-                        {props.props.brand}
-                    </a>
-                    <span className={shopLayoutClassNames.controls}>
-                        <nav className={shopLayoutClassNames.nav} aria-label={props.props.navLabel}>
-                            {props.props.links.map((link) => (
-                                <TextAction
-                                    key={link.href}
-                                    href={link.href}
-                                    appearance="route"
-                                    isCurrent={link.isCurrent}
-                                >
-                                    {link.label}
-                                </TextAction>
-                            ))}
-                        </nav>
-                        <DisplayControls />
-                    </span>
-                </div>
-            </header>
-            <main className={shopLayoutClassNames.main}>
-                {props.children}
-            </main>
-        </GrammarRoot>
-    )
-}
+export const ShopLayoutBase = (props: ShopLayoutBaseProps) => (
+    <SiteShell
+        brand={props.props.brand}
+        homeHref={props.props.homeHref}
+        navigation={<ShopNav />}
+        actions={<DisplayControls {...props.props.display} />}
+    >
+        {props.children}
+    </SiteShell>
+)

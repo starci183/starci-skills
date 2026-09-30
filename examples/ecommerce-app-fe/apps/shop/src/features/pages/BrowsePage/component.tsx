@@ -1,13 +1,19 @@
-"use client"
-
 import { SectionHeader, Text } from "@starci/grammar/common"
-import { CatalogueTile, formatPrice, StateBlock, SlotView, type Slot } from "@ecommerce/shared"
-import type { Product } from "../../../modules/services"
+import { CatalogueTile, StateBlock, SlotView, type Slot } from "@ecommerce/ui"
 import { browsePageClassNames } from "./classNames"
 import { AddToCartControl } from "../../../components/blocks/AddToCart"
 
 /** The screen situations a catalogue read can settle. */
 export type BrowsePageState = "signedOut" | "browse"
+
+/** One product as the browse grid draws it: its price already formatted in the reader's language. */
+export type BrowseProduct = {
+    readonly id: string
+    readonly name: string
+    readonly price: string
+    readonly stock: number
+    readonly imageUrl?: string
+}
 
 /** The browse page's resolved inputs: every string and the product payload already settled. */
 export type BrowsePageProps = {
@@ -17,7 +23,7 @@ export type BrowsePageProps = {
     readonly props: {
         readonly title: string
         readonly description: string
-        readonly productsSlot: Slot<ReadonlyArray<Product>>
+        readonly productsSlot: Slot<ReadonlyArray<BrowseProduct>>
         readonly stockLabel: string
         readonly addToCart: string
         readonly addingToCart: string
@@ -45,10 +51,7 @@ export const BrowsePageBase = (props: BrowsePageProps) => {
         return (
             <>
                 <SectionHeader title={props.props.title} description={props.props.description} level={1} />
-                <StateBlock
-                    title={props.props.signedOutTitle}
-                    description={props.props.signedOutDescription}
-                />
+                <StateBlock title={props.props.signedOutTitle} description={props.props.signedOutDescription} />
             </>
         )
     }
@@ -66,27 +69,29 @@ export const BrowsePageBase = (props: BrowsePageProps) => {
                     errorDescription: props.props.unreachableDescription,
                 }}
             >
-                {(products) => <div className={browsePageClassNames.grid}>
-                    {products.map((product) => (
-                        <CatalogueTile
-                            key={product.id}
-                            name={product.name}
-                            price={formatPrice(product.priceCents, product.currency)}
-                            imageUrl={product.imageUrl}
-                        >
-                            <Text as="p" size="sm" tone="muted">
-                                {props.props.stockLabel.replace("{count}", String(product.stock))}
-                            </Text>
-                            <AddToCartControl
-                                productId={product.id}
-                                addLabel={props.props.addToCart}
-                                addingLabel={props.props.addingToCart}
-                                inCartLabel={props.props.inCartLabel}
-                                refusedLabel={props.props.addRefused}
-                            />
-                        </CatalogueTile>
-                    ))}
-                </div>}
+                {(products) => (
+                    <div className={browsePageClassNames.grid}>
+                        {products.map((product) => (
+                            <CatalogueTile
+                                key={product.id}
+                                name={product.name}
+                                price={product.price}
+                                imageUrl={product.imageUrl}
+                            >
+                                <Text as="p" size="sm" tone="muted">
+                                    {props.props.stockLabel.replace("{count}", String(product.stock))}
+                                </Text>
+                                <AddToCartControl
+                                    productId={product.id}
+                                    addLabel={props.props.addToCart}
+                                    addingLabel={props.props.addingToCart}
+                                    inCartLabel={props.props.inCartLabel}
+                                    refusedLabel={props.props.addRefused}
+                                />
+                            </CatalogueTile>
+                        ))}
+                    </div>
+                )}
             </SlotView>
         </>
     )

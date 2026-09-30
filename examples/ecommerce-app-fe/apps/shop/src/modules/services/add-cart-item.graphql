@@ -1,0 +1,8 @@
+mutation ShopAddCartItem($input: AddCartItemInput!) {
+    addCartItem(request: $input) {
+        item {
+            productId
+            quantity
+        }
+    }
+}

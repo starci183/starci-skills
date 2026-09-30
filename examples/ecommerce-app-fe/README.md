@@ -7,16 +7,16 @@ Two Next.js ecommerce applications share one npm workspace and UI package.
 The frontend half of the ecommerce example, shaped like `nivo-fe`: one repo, npm workspaces, one deployable
 Next.js app per `apps/*` site. Two apps:
 
-| app | package | what it is |
-| --- | --- | --- |
-| `apps/landing` | `@ecommerce/landing` | Public marketing site + catalogue teaser |
-| `apps/shop` | `@ecommerce/shop` | Authenticated shop: browse, cart, checkout, account |
+| app            | package              | what it is                                          |
+| -------------- | -------------------- | --------------------------------------------------- |
+| `apps/landing` | `@ecommerce/landing` | Public marketing site + catalogue teaser            |
+| `apps/shop`    | `@ecommerce/shop`    | Authenticated shop: browse, cart, checkout, account |
 
 The apps are real, runnable Next.js builds on `@starci/grammar` primitives (the same Common family
 todo-app-frontend consumes): grammar's `GrammarRoot` boundary wraps each app's client shell, and every
 surface maps to a real grammar component (`SurfaceCard`, `SurfaceListCard`, `EmptyNotice`, `Button`,
 `TextAction`, `SectionHeader`, `MediaFrame`, `Badge`) or is honestly an app-owned layout. Brand tokens come
-from `packages/shared/src/modules/theme/brand-tokens.css` (teal `#0D9488`, Inter via `@fontsource-variable/inter`,
+from each app's `src/modules/brand/brand.css` (teal `#0D9488`; the grammar publishes no font token, so the brand's Inter is not carried,
 the on-primary ink chosen because white on teal measures 3.74:1 — under the brand record's 4.5:1 floor).
 The friendly-duck mascot (its direction is a brand record asset at
 `../ecommerce-app-be/.starciwork/brand/assets/duck.prompt.txt`) appears on welcome and genuine empty
@@ -33,7 +33,11 @@ Next.js, React, TypeScript, npm workspaces, `@starci/grammar`.
 ## Repository layout
 
 - `apps/landing/src`: public marketing app; `apps/shop/src`: authenticated shop app.
-- `packages/shared`: shared UI and runtime configuration package.
+- `packages/ecommerce-api`: the wire client, the `Outcome` union and the backend projection reader.
+- `packages/ecommerce-i18n`: locales, routing, navigation and the server glue (request config, proxy, locale segment).
+- `packages/ecommerce-ui`: the shared composites and leaves both apps draw (shells, notices, tiles, display controls).
+  Each package is built to its own `dist` and consumed by package name; build the packages before linting with
+  `npm run build --workspace packages/ecommerce-api --workspace packages/ecommerce-i18n --workspace packages/ecommerce-ui`.
 - `scripts/`: repository tooling. A front end has no tests.
 - The paired backend owns `.starciwork` and `.starcistacks` for this product.
 
@@ -51,7 +55,7 @@ and its own README states the FE lane's ports are "declared here, consumed there
 in this repository:
 
 - `scripts/serve.mjs` resolves the listener port and spawns `next dev`/`next start -p` per app.
-- `packages/shared/src/modules/config/projection.ts` resolves the file for both apps' service base URLs;
+- `packages/ecommerce-api/src/projection.ts` resolves the file for both apps' service base URLs;
   each app's `src/modules/config` module applies its own environment overrides.
 - Resolution order (same shape as the BE's `findMetadataFile`): `ECOMMERCE_APP_BE_METADATA` names the
   file outright, else the walk searches each ancestor for `ecommerce-app-be/.starcistacks/dev/infra/metadata.json`.

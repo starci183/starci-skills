@@ -1,0 +1,36 @@
+/*
+ * ecommerce-app brand layer - the frontend lane's owned token file.
+ *
+ * Authored truth: examples/ecommerce-app-be/.starciwork/brand/index.yaml rev 1
+ *   colour.primary   #0D9488 (teal)
+ *   colour.surface   #FFFFFF
+ *   typography.sans  Inter
+ *   mascot           friendly duck - empty states, welcome surfaces, auth illustration; never danger
+ *
+ * Contrast, measured not assumed (WCAG sRGB luminance):
+ *   #FFFFFF on #0D9488 = 3.74:1 - under the record's 4.5:1 floor, so white is never text on primary.
+ *   #051817 on #0D9488 = 4.88:1 - the on-primary ink below.
+ * HeroUI derives --accent-hover/--accent-soft/--accent-soft-foreground from --accent automatically, so
+ * setting --accent + --accent-foreground re-skins the whole vendor ladder without inventing hues. One block
+ * serves both themes: the accent is the same in light and in dark. The info tone follows the accent, so its
+ * soft pair - the tint and the ink of a status shown as text, an icon or a dot - is written per theme.
+ * typography.sans (Inter) is not carried here: the grammar publishes no font token, so the brand layer cannot set one.
+ */
+:root,
+.light,
+.dark {
+    --starci-core-accent: #0d9488;
+    --accent: var(--starci-core-accent);
+    --accent-foreground: #051817;
+}
+
+:root,
+.light {
+    --info-soft: #ccf3ef;
+    --info-soft-foreground: #0b5c54;
+}
+
+.dark {
+    --info-soft: #0d3b37;
+    --info-soft-foreground: #7fe0d4;
+}

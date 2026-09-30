@@ -1,0 +1,7 @@
+query Account($request: AccountRequest!) {
+    account(request: $request) {
+        personId
+        email
+        hasOrders
+    }
+}

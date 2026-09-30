@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server"
-import type { Slot } from "@ecommerce/shared"
-import type { Result } from "../../../modules/api"
+import type { Outcome } from "@ecommerce/api"
+import { collectionSlot, type Slot } from "@ecommerce/ui"
 import { IDENTITY_API_URL } from "../../../modules/config"
 import { fetchCurrentUser, type CurrentUser } from "../../../modules/services"
 import { AccountPageBase } from "./component"
@@ -14,14 +14,12 @@ type AccountPageProps = Record<never, never>
  * when the identity service cannot say, and - for a verified person - the buyer/non-buyer split the
  * account query's `hasOrders` flag is the whole of.
  */
-const accountPageStateOf = (who: Result<CurrentUser | null>): AccountPageState => {
-    if (who.ok && who.data === null) return "signedOut"
-    return "account"
-}
+const accountPageStateOf = (who: Outcome<CurrentUser | null>): AccountPageState =>
+    who.kind === "ok" && who.data === null ? "signedOut" : "account"
 
 /** Identity and order-history status for the page's one data slot. */
-const ordersSlotOf = (who: Result<CurrentUser | null>): Slot<true> => {
-    if (!who.ok || who.data === null) return { status: "error" }
+const ordersSlotOf = (who: Outcome<CurrentUser | null>): Slot<true> => {
+    if (who.kind !== "ok" || who.data === null) return { status: "error" }
     return who.data.hasOrders ? { status: "ready", items: true } : { status: "empty" }
 }
 
@@ -34,15 +32,13 @@ const ordersSlotOf = (who: Result<CurrentUser | null>): Slot<true> => {
  */
 export const AccountPage = async (props: AccountPageProps) => {
     void props
-    const [t, who] = await Promise.all([
-        getTranslations("shop.account"),
-        fetchCurrentUser(),
-    ])
-    const accountLine = !who.ok
-        ? t("unreachable", { url: IDENTITY_API_URL, reason: who.reason })
-        : who.data === null
-            ? t("anonymous")
-            : t("signedInAs", { email: who.data.email })
+    const [t, who] = await Promise.all([getTranslations("shop.account"), fetchCurrentUser()])
+    const accountLine =
+        who.kind !== "ok"
+            ? t("unreachable", { url: IDENTITY_API_URL })
+            : who.data === null
+              ? t("anonymous")
+              : t("signedInAs", { email: who.data.email })
     return (
         <AccountPageBase
             state={accountPageStateOf(who)}
@@ -55,9 +51,8 @@ export const AccountPage = async (props: AccountPageProps) => {
                 ordersSignedOutTitle: t("ordersSignedOut.title"),
                 ordersSignedOutDescription: t("ordersSignedOut.description"),
                 ordersUnreachableTitle: t("ordersUnreachable.title"),
-                ordersUnreachableDescription: who.ok
-                    ? ""
-                    : t("ordersUnreachable.description", { url: IDENTITY_API_URL, reason: who.reason }),
+                ordersUnreachableDescription:
+                    who.kind === "ok" ? "" : t("ordersUnreachable.description", { url: IDENTITY_API_URL }),
                 ordersEmptyTitle: t("ordersEmpty.title"),
                 ordersEmptyDescription: t("ordersEmpty.description"),
                 ordersBuyerTitle: t("ordersBuyer.title"),

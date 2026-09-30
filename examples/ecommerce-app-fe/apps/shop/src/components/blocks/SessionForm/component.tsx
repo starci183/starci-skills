@@ -1,7 +1,4 @@
-"use client"
-
-import type { FormEvent } from "react"
-import { Button, Input, SectionHeader, Text, TextAction } from "@starci/grammar/common"
+import { Button, Form, Input, SectionHeader, Text, TextAction } from "@starci/grammar/common"
 import { sessionFormClassNames } from "./classNames"
 
 /** Which credential act the form is submitting: an existing pair, or a fresh registration. */
@@ -67,40 +64,38 @@ export type SessionFormProps = {
 export const SessionFormBase = (props: SessionFormProps) => {
     const isWorking = props.state === "working"
     const disabled = isWorking || !(props.props.email && props.props.password)
-    const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault()
-        props.on.onSubmit()
-    }
     return (
         <div className={sessionFormClassNames.frame}>
             <SectionHeader title={props.props.copy.title} description={props.props.copy.intro} level={2} />
-            <form onSubmit={onSubmit} data-state={props.state} className={sessionFormClassNames.fields}>
-                <Input
-                    id="session-email"
-                    name="email"
-                    label={props.props.copy.emailLabel}
-                    kind="email"
-                    value={props.props.email}
-                    isDisabled={isWorking}
-                    isRequired
-                    onValueChange={props.on.onEmailChange}
-                />
-                <Input
-                    id="session-password"
-                    name="password"
-                    label={props.props.copy.passwordLabel}
-                    kind={props.props.mode === "register" ? "newPassword" : "password"}
-                    value={props.props.password}
-                    hint={props.props.copy.passwordHint ?? undefined}
-                    isDisabled={isWorking}
-                    isRequired
-                    onValueChange={props.on.onPasswordChange}
-                />
-                {props.state === "refused" ? <Text live="assertive">{props.props.refusal}</Text> : null}
-                <Button type="submit" variant="primary" width="fill" isDisabled={disabled} isPending={isWorking}>
-                    {isWorking ? props.props.copy.submitting : props.props.copy.submit}
-                </Button>
-            </form>
+            <Form label={props.props.copy.title} onSubmit={props.on.onSubmit}>
+                <div data-state={props.state} className={sessionFormClassNames.fields}>
+                    <Input
+                        id="session-email"
+                        name="email"
+                        label={props.props.copy.emailLabel}
+                        kind="email"
+                        value={props.props.email}
+                        isDisabled={isWorking}
+                        isRequired
+                        onValueChange={props.on.onEmailChange}
+                    />
+                    <Input
+                        id="session-password"
+                        name="password"
+                        label={props.props.copy.passwordLabel}
+                        kind={props.props.mode === "register" ? "newPassword" : "password"}
+                        value={props.props.password}
+                        hint={props.props.copy.passwordHint ?? undefined}
+                        isDisabled={isWorking}
+                        isRequired
+                        onValueChange={props.on.onPasswordChange}
+                    />
+                    {props.state === "refused" ? <Text live="assertive">{props.props.refusal}</Text> : null}
+                    <Button type="submit" variant="primary" width="fill" isDisabled={disabled} isPending={isWorking}>
+                        {isWorking ? props.props.copy.submitting : props.props.copy.submit}
+                    </Button>
+                </div>
+            </Form>
             <div className={sessionFormClassNames.foot}>
                 <TextAction onPress={props.on.onSwitchMode} isDisabled={isWorking}>
                     {props.props.copy.switchMode}

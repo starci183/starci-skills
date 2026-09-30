@@ -1,48 +1,33 @@
-"use client"
-
 import type { ReactNode } from "react"
-import { useLocale, useTranslations } from "next-intl"
-import { usePathname } from "../../../modules/i18n"
-import { useTheme } from "@starci-examples/fe-kit/theme/theme-context"
-import { ROUTES } from "../../../modules/routes"
+import { getLocale, getTranslations } from "next-intl/server"
+import { SHOP_ROUTES } from "../../../modules/routes"
 import { ShopLayoutBase } from "./component"
 
 /** Framework-layout boundary input: the routed page body and nothing else. */
 type ShopLayoutProps = { readonly content: ReactNode }
 
-/** The primary sections, in bar order; the labels live in the dictionary, the paths in ROUTES. */
-const LINKS = [
-    { href: ROUTES.browse, key: "browse" },
-    { href: ROUTES.cart, key: "cart" },
-    { href: ROUTES.checkout, key: "checkout" },
-    { href: ROUTES.account, key: "account" },
-] as const
-
 /**
- * The connected shop chrome. Everything the frame says and links to is resolved here - the chrome
- * copy from the shared dictionary, the locale-prefixed section links, the active-route marker, and
- * the theme answer GrammarRoot should paint - then the pure twin draws it. `usePathname` comes
- * from the i18n navigation, NOT `next/navigation`: the locale-aware helper returns the locale-free
- * path, so `isCurrent` keeps matching the locale-free `href` it always compared against.
+ * The shop chrome, resolved on the server: the brand copy and the locale-prefixed home link. The section
+ * links and their active-route marker need the current path, so the nav is its own connected block; the
+ * pure twin places it beside the display controls.
  */
-export const ShopLayout = (props: ShopLayoutProps) => {
-    const t = useTranslations("shop.nav")
-    const locale = useLocale()
-    const pathname = usePathname()
-    const { resolvedTheme } = useTheme()
+export const ShopLayout = async (props: ShopLayoutProps) => {
+    const t = await getTranslations("shop.nav")
+    const tDisplay = await getTranslations("shop.display")
+    const locale = await getLocale()
     return (
         <ShopLayoutBase
             state="ready"
             props={{
-                theme: resolvedTheme ?? "system",
                 brand: t("brand"),
-                navLabel: t("label"),
-                homeHref: `/${locale}${ROUTES.browse}`,
-                links: LINKS.map((link) => ({
-                    href: `/${locale}${link.href}`,
-                    label: t(link.key),
-                    isCurrent: pathname === link.href || pathname.startsWith(`${link.href}/`),
-                })),
+                homeHref: `/${locale}${SHOP_ROUTES.browse}`,
+                display: {
+                    label: tDisplay("label"),
+                    locale,
+                    toLight: tDisplay("theme.toLight"),
+                    toDark: tDisplay("theme.toDark"),
+                    localeNames: { en: tDisplay("locale.en"), vi: tDisplay("locale.vi") },
+                },
             }}
             on={{}}
         >

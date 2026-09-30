@@ -1,0 +1,30 @@
+{
+  "name": "@ecommerce/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit --pretty false"
+  },
+  "dependencies": {
+    "@ecommerce/i18n": "0.1.0",
+    "@heroui/react": "3.2.6",
+    "@starci/grammar": "0.7.2",
+    "next": "16.1.6",
+    "next-intl": "4.13.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "@types/react": "^19.0.0",
+    "typescript": "5.9.3"
+  }
+}

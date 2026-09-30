@@ -1,9 +1,8 @@
-import { getLocale, getTranslations } from "next-intl/server"
-import { collectionSlot } from "@ecommerce/shared"
-import type { GraphqlResult } from "../../../modules/api"
-import { ORDER_API_URL } from "../../../modules/config"
-import { ROUTES } from "../../../modules/routes"
-import { readCart, type CartView } from "../../../modules/services"
+import { getFormatter, getLocale, getTranslations } from "next-intl/server"
+import type { Outcome } from "@ecommerce/api"
+import { cartPageCopy, readPageCart } from "../../../modules/cartcopy"
+import { SHOP_ROUTES } from "../../../modules/routes"
+import type { CartView } from "../../../modules/services"
 import { readSessionToken } from "../../../modules/session"
 import { CartPageBase } from "./component"
 import type { CartPageState } from "./component"
@@ -12,9 +11,8 @@ import type { CartPageState } from "./component"
 type CartPageProps = Record<never, never>
 
 /** The screen situation a cart read settles: gate, refusal, genuine empty, or the lines. */
-const cartPageStateOf = (result: GraphqlResult<CartView>): CartPageState => {
-    return !result.ok && result.code === "SESSION_INVALID" ? "signedOut" : "cart"
-}
+const cartPageStateOf = (outcome: Outcome<CartView>): CartPageState =>
+    outcome.kind === "refused" ? "signedOut" : "cart"
 
 /**
  * The connected cart page. The cart read happens here on the server - the order service's
@@ -24,38 +22,28 @@ const cartPageStateOf = (result: GraphqlResult<CartView>): CartPageState => {
  */
 export const CartPage = async (props: CartPageProps) => {
     void props
-    const [t, locale, sessionToken] = await Promise.all([
+    const [t, locale, format, sessionToken] = await Promise.all([
         getTranslations("shop.cart"),
         getLocale(),
+        getFormatter(),
         readSessionToken(),
     ])
-    const { result, summary } = await readCart(sessionToken, (count) => t("lineQuantity", { count }))
+    const read = await readPageCart(sessionToken, t, format)
+    const { outcome, summary } = read
     return (
         <CartPageBase
-            state={cartPageStateOf(result)}
+            state={cartPageStateOf(outcome)}
             props={{
-                title: t("title"),
-                description: t("description"),
+                ...cartPageCopy(t, locale, read),
                 linesTitle: t("linesTitle"),
                 cartTotal: summary.total,
-                linesSlot: collectionSlot(result.ok ? summary.rows : null),
                 clearLabel: t("clearLabel"),
                 clearingLabel: t("clearingLabel"),
                 clearRefused: t("clearRefused"),
                 checkoutCta: t("checkoutCta"),
-                checkoutHref: `/${locale}${ROUTES.checkout}`,
-                emptyTitle: t("empty.title"),
-                emptyDescription: t("empty.description"),
+                checkoutHref: `/${locale}${SHOP_ROUTES.checkout}`,
                 backToBrowse: t("backToBrowse"),
-                browseHref: `/${locale}${ROUTES.browse}`,
-                accountCta: t("accountCta"),
-                accountHref: `/${locale}${ROUTES.account}`,
-                signedOutTitle: t("signedOut.title"),
-                signedOutDescription: t("signedOut.description"),
-                unreachableTitle: t("unreachable.title"),
-                unreachableDescription: result.ok
-                    ? ""
-                    : t("unreachable.description", { url: ORDER_API_URL, reason: result.reason }),
+                browseHref: `/${locale}${SHOP_ROUTES.browse}`,
             }}
             on={{}}
         />

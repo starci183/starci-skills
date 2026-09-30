@@ -1,4 +1,4 @@
-import { getLocale, getTranslations } from "next-intl/server"
+import { getFormatter, getLocale, getTranslations } from "next-intl/server"
 import { CATALOG } from "../../../modules/catalog"
 import { SHOP_URL } from "../../../modules/config"
 import { LandingPageBase } from "./component"
@@ -14,15 +14,16 @@ type LandingPageProps = Record<never, never>
 
 /**
  * The connected landing page. Everything the screen says and links to is resolved here on the
- * server - the catalogue slice, the shop origin (a server-only read), and every sentence from the
- * shared dictionary - so the pure twin renders from a fixture with no dictionary, no request and
- * no provider. The locale joins the shop hand-off URL so the reader keeps their language across
- * the origin change.
+ * server - the catalogue slice with its prices formatted in the reader's language, the shop origin
+ * (a server-only read), and every sentence from the shared dictionary - so the pure twin renders
+ * from a fixture with no dictionary, no request and no provider. The locale joins the shop hand-off
+ * URL so the reader keeps their language across the origin change.
  */
 export const LandingPage = async (props: LandingPageProps) => {
     void props
     const t = await getTranslations("landing")
     const locale = await getLocale()
+    const format = await getFormatter()
     return (
         <LandingPageBase
             state="ready"
@@ -39,7 +40,12 @@ export const LandingPage = async (props: LandingPageProps) => {
                     title: t(`pillars.${id}.title`),
                     copy: t(`pillars.${id}.copy`),
                 })),
-                teaser: CATALOG.slice(0, TEASER_COUNT),
+                teaser: CATALOG.slice(0, TEASER_COUNT).map((product) => ({
+                    id: product.id,
+                    name: t(`catalogue.products.${product.id}.name`),
+                    blurb: t(`catalogue.products.${product.id}.blurb`),
+                    price: format.number(product.priceCents / 100, { style: "currency", currency: product.currency }),
+                })),
                 shopHref: `${SHOP_URL}/${locale}`,
             }}
             on={{}}

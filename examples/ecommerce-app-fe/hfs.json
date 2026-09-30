@@ -3,8 +3,14 @@
   "profile": "fe",
   "project": "ecommerce-app-fe",
   "apps": [
-    { "name": "landing", "kind": "next" },
-    { "name": "shop", "kind": "next" }
+    {
+      "name": "landing",
+      "kind": "next"
+    },
+    {
+      "name": "shop",
+      "kind": "next"
+    }
   ],
-  "optionalSlots": ["repo.packages"]
+  "optionalSlots": ["fe.package.api", "fe.package.i18n", "fe.package.ui"]
 }

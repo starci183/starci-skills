@@ -1,59 +1,22 @@
-/** A single sellable item. Kept deliberately small: the landing teaser only needs a name, a price and a blurb. */
-export type TeaserProduct = {
-  readonly id: string;
-  readonly name: string;
-  readonly blurb: string;
-  /** Minor currency units (cents) so prices never round through a float. */
-  readonly priceCents: number;
-  /** ISO 4217 code every amount on this page is billed in. */
-  readonly currency: string;
-};
+/** A single teaser item: its identity and its price. The name and the blurb are catalogue copy under `landing.catalogue.products.<id>`. */
+type TeaserProduct = {
+    readonly id: string
+    /** Minor currency units (cents) so prices never round through a float. */
+    readonly priceCents: number
+    /** ISO 4217 code every amount on this page is billed in. */
+    readonly currency: string
+}
 
 /**
- * Editorial sample catalogue for the public teaser. The real catalogue is served by the `order` API that the
- * shop browses; the landing intentionally ships static copy so it renders without any backend running.
+ * Editorial sample catalogue for the public teaser, in display order. The real catalogue is served by the
+ * `order` API that the shop browses; the landing intentionally ships static data so it renders without any
+ * backend running.
  */
-export const CATALOG: ReadonlyArray<TeaserProduct> = [
-    {
-        id: "aurelis-desk-lamp",
-        name: "Aurelis Desk Lamp",
-        blurb: "Warm, dimmable light with a weighted brass base.",
-        priceCents: 8900,
-        currency: "USD",
-    },
-    {
-        id: "meridian-carry-tote",
-        name: "Meridian Carry Tote",
-        blurb: "Waxed canvas, laptop sleeve, carries a week of errands.",
-        priceCents: 14500,
-        currency: "USD",
-    },
-    {
-        id: "northwind-pour-over",
-        name: "Northwind Pour-Over Set",
-        blurb: "Borosilicate carafe and a stainless steel filter that never needs paper.",
-        priceCents: 6200,
-        currency: "USD",
-    },
-    {
-        id: "kestrel-field-jacket",
-        name: "Kestrel Field Jacket",
-        blurb: "Weatherproofed cotton with pockets that actually close.",
-        priceCents: 23000,
-        currency: "USD",
-    },
-    {
-        id: "solstice-notebook",
-        name: "Solstice Notebook",
-        blurb: "Lay-flat binding, 120gsm pages, dot grid.",
-        priceCents: 2400,
-        currency: "USD",
-    },
-    {
-        id: "harbor-speaker",
-        name: "Harbor Field Speaker",
-        blurb: "Two-day battery and a lanyard you can clip to a pack.",
-        priceCents: 11800,
-        currency: "USD",
-    },
-]
+export const CATALOG = [
+    { id: "aurelisDeskLamp", priceCents: 8900, currency: "USD" },
+    { id: "meridianCarryTote", priceCents: 14500, currency: "USD" },
+    { id: "northwindPourOver", priceCents: 6200, currency: "USD" },
+    { id: "kestrelFieldJacket", priceCents: 23000, currency: "USD" },
+    { id: "solsticeNotebook", priceCents: 2400, currency: "USD" },
+    { id: "harborSpeaker", priceCents: 11800, currency: "USD" },
+] as const satisfies ReadonlyArray<TeaserProduct>

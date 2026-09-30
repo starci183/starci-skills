@@ -1,19 +1,23 @@
-"use client"
-
 import type { ReactNode } from "react"
-import { Button, GrammarRoot, TextAction } from "@starci/grammar/common"
-import { DisplayControls } from "@starci-examples/fe-kit/theme/leaves/DisplayControls"
+import { Button, Footer, Text, TextAction } from "@starci/grammar/common"
+import { DisplayControls, SiteShell } from "@ecommerce/ui"
 import { siteLayoutClassNames } from "./classNames"
 
-/** The site chrome's resolved inputs: every string, href and the theme answer already settled. */
-export type SiteLayoutProps = {
+/** The site chrome's resolved inputs: every string and href already settled. */
+export type SiteLayoutBaseProps = {
     /** Whole-screen situations this surface settles; the chrome has no alternatives. */
     readonly state: "ready"
     /** The data payload for whatever state is showing. */
     readonly props: {
-        /** The resolved theme GrammarRoot should paint (`system` until the reader has chosen). */
-        readonly theme: "light" | "dark" | "system"
         readonly brand: string
+        /** The display controls' words, resolved here because the leaf that draws them resolves none. */
+        readonly display: {
+            readonly label: string
+            readonly locale: string
+            readonly toLight: string
+            readonly toDark: string
+            readonly localeNames: { readonly en: string; readonly vi: string }
+        }
         readonly navLabel: string
         readonly catalogue: string
         readonly about: string
@@ -33,45 +37,43 @@ export type SiteLayoutProps = {
 }
 
 /**
- * The document chrome every landing route mounts under: Grammar's Common boundary carrying the
- * brand theme, the top bar with the wordmark and section links, the routed body, then the footer
- * that repeats the hand-off to the shop so it is reachable from the foot of any page.
+ * The document chrome every landing route mounts under: the shared shell carrying the wordmark and section
+ * links, the routed body, then the footer that repeats the hand-off to the shop so it is reachable from
+ * the foot of any page.
  */
-export const SiteLayoutBase = (props: SiteLayoutProps) => {
-    return (
-        <GrammarRoot theme={props.props.theme} className={siteLayoutClassNames.frame}>
-            <header className={siteLayoutClassNames.header}>
-                <div className={siteLayoutClassNames.bar}>
-                    <span className={siteLayoutClassNames.wordmark}>
-                        <TextAction href={props.props.homeHref}>
-                            {props.props.brand}
-                        </TextAction>
-                    </span>
-                    <nav className={siteLayoutClassNames.nav} aria-label={props.props.navLabel}>
-                        <TextAction href={props.props.catalogueHref} appearance="muted">
-                            {props.props.catalogue}
-                        </TextAction>
-                        <TextAction href={props.props.aboutHref} appearance="muted">
-                            {props.props.about}
-                        </TextAction>
-                        <DisplayControls />
-                        <Button href={props.props.shopHref} variant="primary" size="sm">
-                            {props.props.enterShop}
-                        </Button>
-                    </nav>
-                </div>
-            </header>
-            <main className={siteLayoutClassNames.main}>
-                {props.children}
-            </main>
-            <footer className={siteLayoutClassNames.footer}>
-                <div className={siteLayoutClassNames.bar}>
-                    <span>{props.props.tagline}</span>
+export const SiteLayoutBase = (props: SiteLayoutBaseProps) => (
+    <SiteShell
+        brand={props.props.brand}
+        homeHref={props.props.homeHref}
+        navigation={
+            <div role="navigation" aria-label={props.props.navLabel} className={siteLayoutClassNames.nav}>
+                <TextAction href={props.props.catalogueHref} appearance="muted">
+                    {props.props.catalogue}
+                </TextAction>
+                <TextAction href={props.props.aboutHref} appearance="muted">
+                    {props.props.about}
+                </TextAction>
+            </div>
+        }
+        actions={
+            <div className={siteLayoutClassNames.actions}>
+                <DisplayControls {...props.props.display} />
+                <Button href={props.props.shopHref} variant="primary" size="sm">
+                    {props.props.enterShop}
+                </Button>
+            </div>
+        }
+        footer={
+            <Footer
+                brand={<Text as="span">{props.props.tagline}</Text>}
+                legal={
                     <TextAction href={props.props.shopHref} appearance="route">
                         {props.props.shopCta}
                     </TextAction>
-                </div>
-            </footer>
-        </GrammarRoot>
-    )
-}
+                }
+            />
+        }
+    >
+        {props.children}
+    </SiteShell>
+)

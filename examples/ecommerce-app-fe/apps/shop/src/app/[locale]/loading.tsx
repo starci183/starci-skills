@@ -1,3 +1,6 @@
-import { LocaleLoading } from "@ecommerce/shared"
+import { ShopLoadingPage } from "../../features/pages/ShopLoadingPage"
 
-export default LocaleLoading
+/** The locale segment's loading slot: it mounts the loading page and nothing else. */
+const Loading = () => <ShopLoadingPage />
+
+export default Loading

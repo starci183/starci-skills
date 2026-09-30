@@ -1,10 +1,9 @@
-import { getLocale, getTranslations } from "next-intl/server"
-import { collectionSlot } from "@ecommerce/shared"
-import type { GraphqlResult } from "../../../modules/api"
+import { getFormatter, getLocale, getTranslations } from "next-intl/server"
+import type { Outcome } from "@ecommerce/api"
 import { checkoutAttemptKey } from "../../../modules/checkout"
-import { ORDER_API_URL } from "../../../modules/config"
-import { ROUTES } from "../../../modules/routes"
-import { readCart, type CartView } from "../../../modules/services"
+import { cartPageCopy, readPageCart } from "../../../modules/cartcopy"
+import { SHOP_ROUTES } from "../../../modules/routes"
+import type { CartView } from "../../../modules/services"
 import { readSessionToken } from "../../../modules/session"
 import { CheckoutPageBase } from "./component"
 import type { CheckoutPageState } from "./component"
@@ -13,35 +12,31 @@ import type { CheckoutPageState } from "./component"
 type CheckoutPageProps = Record<never, never>
 
 /** The screen situation a checkout read settles: gate, refusal, empty cart, or the summary. */
-const checkoutPageStateOf = (result: GraphqlResult<CartView>): CheckoutPageState => {
-    return !result.ok && result.code === "SESSION_INVALID" ? "signedOut" : "checkout"
-}
+const checkoutPageStateOf = (outcome: Outcome<CartView>): CheckoutPageState =>
+    outcome.kind === "refused" ? "signedOut" : "checkout"
 
 /**
  * The connected checkout page. The cart read happens here on the server - the same session-guarded
- * `cart` query the cart page uses - and the rendered confirmation's idempotency key is digested
- * from the person and the lines at this render, so pressing confirm again replays rather than
- * double-orders. Every sentence and both prefixed hrefs resolve before the pure twin sees a prop.
+ * `cart` query the cart page uses - and the rendered confirmation carries a fresh idempotency key minted
+ * at this render, so pressing confirm again replays rather than double-orders. Every sentence, every
+ * amount and both prefixed hrefs resolve before the pure twin sees a prop.
  */
 export const CheckoutPage = async (props: CheckoutPageProps) => {
     void props
-    const [t, locale, sessionToken] = await Promise.all([
-        getTranslations("shop.checkout"),
-        getLocale(),
-        readSessionToken(),
-    ])
-    const { result, summary } = await readCart(sessionToken, (count) => t("lineQuantity", { count }))
-    const attemptKey = sessionToken ? checkoutAttemptKey() : ""
+    const sessionToken = await readSessionToken()
+    const t = await getTranslations("shop.checkout")
+    const locale = await getLocale()
+    const format = await getFormatter()
+    const read = await readPageCart(sessionToken, t, format)
+    const { outcome, summary } = read
     return (
         <CheckoutPageBase
-            state={checkoutPageStateOf(result)}
+            state={checkoutPageStateOf(outcome)}
             props={{
-                title: t("title"),
-                description: t("description"),
+                ...cartPageCopy(t, locale, read),
                 summaryTitle: t("summaryTitle"),
                 orderTotal: summary.total,
-                linesSlot: collectionSlot(result.ok ? summary.rows : null),
-                attemptKey,
+                attemptKey: sessionToken ? checkoutAttemptKey() : "",
                 productNames: summary.productNames,
                 confirmLabel: t("confirmCta"),
                 confirmingLabel: t("confirmingCta"),
@@ -53,18 +48,10 @@ export const CheckoutPage = async (props: CheckoutPageProps) => {
                 refusedUnknownProduct: t.raw("refused.unknownProduct"),
                 refusedSession: t("refused.sessionInvalid"),
                 refusedGeneric: t.raw("refused.generic"),
-                emptyTitle: t("empty.title"),
-                emptyDescription: t("empty.description"),
-                signedOutTitle: t("signedOut.title"),
-                signedOutDescription: t("signedOut.description"),
-                unreachableTitle: t("unreachable.title"),
-                unreachableDescription: result.ok
-                    ? ""
-                    : t("unreachable.description", { url: ORDER_API_URL, reason: result.reason }),
                 browseCta: t("browseCta"),
                 accountCta: t("accountCta"),
-                browseHref: `/${locale}${ROUTES.browse}`,
-                accountHref: `/${locale}${ROUTES.account}`,
+                browseHref: `/${locale}${SHOP_ROUTES.browse}`,
+                accountHref: `/${locale}${SHOP_ROUTES.account}`,
             }}
             on={{}}
         />

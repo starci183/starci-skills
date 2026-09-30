@@ -1,0 +1,14 @@
+query ShopCart {
+    cart {
+        items {
+            productId
+            quantity
+        }
+        catalog {
+            id
+            name
+            priceMinorUnits
+            stock
+        }
+    }
+}

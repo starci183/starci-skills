@@ -3,8 +3,8 @@
 node_modules/
 dist/
 coverage/
+reports/
 test-results/
-playwright-report/
 *.tsbuildinfo
 .scannerwork/
 .turbo/
@@ -35,6 +35,3 @@ nul
 .next/
 next-env.d.ts
 # <<< hfs sync <<<
-
-# Agent output, regenerate-on-demand: scripts/capture*.mjs writes here.
-captures/

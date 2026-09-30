@@ -1,6 +1,6 @@
-import { getTranslations } from "next-intl/server"
-import { collectionSlot } from "@ecommerce/shared"
-import type { GraphqlResult } from "../../../modules/api"
+import { getFormatter, getTranslations } from "next-intl/server"
+import type { Outcome } from "@ecommerce/api"
+import { collectionSlot } from "@ecommerce/ui"
 import { ORDER_API_URL } from "../../../modules/config"
 import { fetchProducts, type Product } from "../../../modules/services"
 import { readSessionToken } from "../../../modules/session"
@@ -15,28 +15,45 @@ type BrowsePageProps = Record<never, never>
  * query, so a dead or absent token is the signed-out gate, a transport failure is the refusal, and
  * a reachable service with zero rows is the genuine empty.
  */
-const browsePageStateOf = (result: GraphqlResult<ReadonlyArray<Product>>): BrowsePageState => {
-    return !result.ok && result.code === "SESSION_INVALID" ? "signedOut" : "browse"
-}
+const browsePageStateOf = (outcome: Outcome<ReadonlyArray<Product>>): BrowsePageState =>
+    outcome.kind === "refused" ? "signedOut" : "browse"
 
 /**
  * The connected browse page. The catalogue read happens here on the server (the order service's
  * data, not build-time content), and every sentence - including the refusal with the service URL
- * and reason interpolated - is resolved before the pure twin sees a prop.
+ * interpolated - and every price in the reader's language is resolved before the pure twin sees a prop.
  */
 export const BrowsePage = async (props: BrowsePageProps) => {
     void props
-    const [t, sessionToken] = await Promise.all([getTranslations("shop.browse"), readSessionToken()])
-    const result = await fetchProducts(sessionToken)
+    const [t, format, sessionToken] = await Promise.all([
+        getTranslations("shop.browse"),
+        getFormatter(),
+        readSessionToken(),
+    ])
+    const outcome = await fetchProducts(sessionToken)
     return (
         <BrowsePageBase
-            state={browsePageStateOf(result)}
+            state={browsePageStateOf(outcome)}
             props={{
                 title: t("title"),
-                description: result.ok && result.data.length > 0
-                    ? t("descriptionCount", { count: result.data.length })
-                    : t("description"),
-                productsSlot: collectionSlot(result.ok ? result.data : null),
+                description:
+                    outcome.kind === "ok" && outcome.data.length > 0
+                        ? t("descriptionCount", { count: outcome.data.length })
+                        : t("description"),
+                productsSlot: collectionSlot(
+                    outcome.kind === "ok"
+                        ? outcome.data.map((product) => ({
+                              id: product.id,
+                              name: product.name,
+                              price: format.number(product.priceCents / 100, {
+                                  style: "currency",
+                                  currency: product.currency,
+                              }),
+                              stock: product.stock,
+                              imageUrl: product.imageUrl,
+                          }))
+                        : null,
+                ),
                 stockLabel: t.raw("stockLabel"),
                 addToCart: t("addToCart"),
                 addingToCart: t("addingToCart"),
@@ -45,9 +62,8 @@ export const BrowsePage = async (props: BrowsePageProps) => {
                 signedOutTitle: t("signedOut.title"),
                 signedOutDescription: t("signedOut.description"),
                 unreachableTitle: t("unreachable.title"),
-                unreachableDescription: result.ok
-                    ? ""
-                    : t("unreachable.description", { url: ORDER_API_URL, reason: result.reason }),
+                unreachableDescription:
+                    outcome.kind === "ok" ? "" : t("unreachable.description", { url: ORDER_API_URL }),
                 emptyTitle: t("empty.title"),
                 emptyDescription: t("empty.description"),
             }}

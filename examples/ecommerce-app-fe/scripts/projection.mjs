@@ -16,56 +16,56 @@
  *
  * A missing or malformed projection throws naming the env var; nothing here invents a number.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync } from "node:fs"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
-export const METADATA_FILE_ENV = 'ECOMMERCE_APP_BE_METADATA';
+export const METADATA_FILE_ENV = "ECOMMERCE_APP_BE_METADATA"
 /** The sibling repository directory the projection is searched under. */
-const SIBLING_REPO_DIR = 'ecommerce-app-be';
-const PROJECTION_REL = ['.starcistacks', 'dev', 'infra', 'metadata.json'];
-const REQUIRED_PORT_KEYS = ['identityApi', 'orderApi', 'landing', 'shop'];
+const SIBLING_REPO_DIR = "ecommerce-app-be"
+const PROJECTION_REL = [".starcistacks", "dev", "infra", "metadata.json"]
+const REQUIRED_PORT_KEYS = ["identityApi", "orderApi", "landing", "shop"]
 
-const repoRoot = () => resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = () => resolve(dirname(fileURLToPath(import.meta.url)), "..")
 
 export const findMetadataFile = (startDir = repoRoot()) => {
-  const fromEnv = process.env[METADATA_FILE_ENV];
-  if (fromEnv) {
-    if (!existsSync(fromEnv)) {
-      throw new Error(`${METADATA_FILE_ENV} points at ${fromEnv}, which does not exist.`);
+    const fromEnv = process.env[METADATA_FILE_ENV]
+    if (fromEnv) {
+        if (!existsSync(fromEnv)) {
+            throw new Error(`${METADATA_FILE_ENV} points at ${fromEnv}, which does not exist.`)
+        }
+        return resolve(fromEnv)
     }
-    return resolve(fromEnv);
-  }
-  let dir = resolve(startDir);
-  for (;;) {
-    const candidate = join(dir, SIBLING_REPO_DIR, ...PROJECTION_REL);
-    if (existsSync(candidate)) return candidate;
-    const parent = dirname(dir);
-    if (parent === dir) {
-      throw new Error(
-        `no ${SIBLING_REPO_DIR}/${PROJECTION_REL.join('/')} found from ${startDir} upward; set ${METADATA_FILE_ENV} to its path.`,
-      );
+    let dir = resolve(startDir)
+    for (;;) {
+        const candidate = join(dir, SIBLING_REPO_DIR, ...PROJECTION_REL)
+        if (existsSync(candidate)) return candidate
+        const parent = dirname(dir)
+        if (parent === dir) {
+            throw new Error(
+                `no ${SIBLING_REPO_DIR}/${PROJECTION_REL.join("/")} found from ${startDir} upward; set ${METADATA_FILE_ENV} to its path.`,
+            )
+        }
+        dir = parent
     }
-    dir = parent;
-  }
-};
+}
 
 /**
  * Read the resolved `ports` map the frontend consumes. Throws unless every key this lane serves
  * or calls is a number - a partial projection is a broken projection, not a reason to guess.
  */
 export const readPorts = (startDir) => {
-  const file = findMetadataFile(startDir);
-  let parsed;
-  try {
-    parsed = JSON.parse(readFileSync(file, 'utf8'));
-  } catch {
-    throw new Error(`${file} is not readable JSON.`);
-  }
-  const ports = parsed?.ports;
-  const missing = REQUIRED_PORT_KEYS.filter((key) => typeof ports?.[key] !== 'number');
-  if (missing.length > 0) {
-    throw new Error(`${file} does not carry the resolved ports this app reads (${missing.join(', ')}).`);
-  }
-  return ports;
-};
+    const file = findMetadataFile(startDir)
+    let parsed
+    try {
+        parsed = JSON.parse(readFileSync(file, "utf8"))
+    } catch {
+        throw new Error(`${file} is not readable JSON.`)
+    }
+    const ports = parsed?.ports
+    const missing = REQUIRED_PORT_KEYS.filter((key) => typeof ports?.[key] !== "number")
+    if (missing.length > 0) {
+        throw new Error(`${file} does not carry the resolved ports this app reads (${missing.join(", ")}).`)
+    }
+    return ports
+}

@@ -24,7 +24,33 @@
     "catalogue": {
       "title": "This season’s picks",
       "description": "A curated slice of the catalogue - the full feed lives in the shop.",
-      "viewFull": "View the full catalogue →"
+      "viewFull": "View the full catalogue →",
+      "products": {
+        "aurelisDeskLamp": {
+          "name": "Aurelis Desk Lamp",
+          "blurb": "Warm, dimmable light with a weighted brass base."
+        },
+        "meridianCarryTote": {
+          "name": "Meridian Carry Tote",
+          "blurb": "Waxed canvas, laptop sleeve, carries a week of errands."
+        },
+        "northwindPourOver": {
+          "name": "Northwind Pour-Over Set",
+          "blurb": "Borosilicate carafe and a stainless steel filter that never needs paper."
+        },
+        "kestrelFieldJacket": {
+          "name": "Kestrel Field Jacket",
+          "blurb": "Weatherproofed cotton with pockets that actually close."
+        },
+        "solsticeNotebook": {
+          "name": "Solstice Notebook",
+          "blurb": "Lay-flat binding, 120gsm pages, dot grid."
+        },
+        "harborSpeaker": {
+          "name": "Harbor Field Speaker",
+          "blurb": "Two-day battery and a lanyard you can clip to a pack."
+        }
+      }
     },
     "pillars": {
       "title": "Why Northwind",
@@ -39,6 +65,34 @@
       "carbonNeutral": {
         "title": "Carbon-neutral delivery",
         "copy": "Offset on every parcel, measured and reported each quarter."
+      }
+    },
+    "display": {
+      "label": "Display and language",
+      "theme": {
+        "toLight": "Switch to light",
+        "toDark": "Switch to dark"
+      },
+      "locale": {
+        "en": "English",
+        "vi": "Tiếng Việt"
+      }
+    },
+    "loading": {
+      "message": "Loading"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "home": "Back to the home page"
+    },
+    "errors": {
+      "page": {
+        "title": "Something went wrong",
+        "retry": "Try again"
+      },
+      "global": {
+        "title": "A serious error occurred",
+        "retry": "Try again"
       }
     }
   }

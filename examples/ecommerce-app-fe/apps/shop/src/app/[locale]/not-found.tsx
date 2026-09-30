@@ -1,3 +1,6 @@
-import { LocaleNotFound } from "@ecommerce/shared"
+import { ShopNotFoundPage } from "../../features/pages/ShopNotFoundPage"
 
-export default LocaleNotFound
+/** The locale segment's not-found slot: it mounts the not-found page and nothing else. */
+const NotFound = () => <ShopNotFoundPage />
+
+export default NotFound

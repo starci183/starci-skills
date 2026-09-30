@@ -1,11 +1,15 @@
-"use client"
-
-import { Button, SectionHeader } from "@starci/grammar/common"
-import { StateBlock, SlotView, type Slot } from "@ecommerce/shared"
+import { Button } from "@starci/grammar/common"
+import {
+    GatedHeader,
+    LineItemsCard,
+    SlotView,
+    type GateNoticeProps,
+    type LineItemRow,
+    type Slot,
+    type SlotLabels,
+} from "@ecommerce/ui"
 import { checkoutPageClassNames } from "./classNames"
-import { ConfirmOrderControl } from "../../../components/blocks/ConfirmOrder"
-import { LineItemsCard } from "../../../components/composites/LineItemsCard"
-import type { LineItemRow } from "../../../modules/types"
+import { ConfirmOrder } from "../../../components/blocks/ConfirmOrder"
 
 /** The screen situations a checkout read can settle. */
 export type CheckoutPageState = "signedOut" | "checkout"
@@ -34,12 +38,8 @@ export type CheckoutPageProps = {
         readonly refusedUnknownProduct: string
         readonly refusedSession: string
         readonly refusedGeneric: string
-        readonly emptyTitle: string
-        readonly emptyDescription: string
-        readonly signedOutTitle: string
-        readonly signedOutDescription: string
-        readonly unreachableTitle: string
-        readonly unreachableDescription: string
+        readonly gate: GateNoticeProps | null
+        readonly slotLabels: SlotLabels
         readonly browseCta: string
         readonly accountCta: string
         readonly browseHref: string
@@ -57,7 +57,7 @@ export type CheckoutPageProps = {
  */
 export const CheckoutPageBase = (props: CheckoutPageProps) => {
     const confirm = (
-        <ConfirmOrderControl
+        <ConfirmOrder
             attemptKey={props.props.attemptKey}
             productNames={props.props.productNames}
             confirmLabel={props.props.confirmLabel}
@@ -76,17 +76,7 @@ export const CheckoutPageBase = (props: CheckoutPageProps) => {
     )
     return (
         <>
-            <SectionHeader title={props.props.title} description={props.props.description} level={1} />
-            {props.state === "signedOut" ? (
-                <StateBlock
-                    title={props.props.signedOutTitle}
-                    description={props.props.signedOutDescription}
-                >
-                    <Button href={props.props.accountHref} variant="secondary" size="sm">
-                        {props.props.accountCta}
-                    </Button>
-                </StateBlock>
-            ) : null}
+            <GatedHeader title={props.props.title} description={props.props.description} gate={props.props.gate} />
             {props.state === "checkout" ? (
                 <SlotView
                     slot={props.props.linesSlot}
@@ -94,22 +84,21 @@ export const CheckoutPageBase = (props: CheckoutPageProps) => {
                     emptyAction={
                         <div className={checkoutPageClassNames.actions}>
                             {confirm}
-                            <Button href={props.props.browseHref} variant="secondary" size="sm">{props.props.browseCta}</Button>
+                            <Button href={props.props.browseHref} variant="secondary" size="sm">
+                                {props.props.browseCta}
+                            </Button>
                         </div>
                     }
-                    labels={{
-                        emptyTitle: props.props.emptyTitle,
-                        emptyDescription: props.props.emptyDescription,
-                        errorTitle: props.props.unreachableTitle,
-                        errorDescription: props.props.unreachableDescription,
-                    }}
+                    labels={props.props.slotLabels}
                 >
                     {(lines) => (
                         <>
-                            <LineItemsCard label={props.props.summaryTitle} total={props.props.orderTotal} lines={lines} />
-                            <div className={checkoutPageClassNames.actions}>
-                                {confirm}
-                            </div>
+                            <LineItemsCard
+                                label={props.props.summaryTitle}
+                                total={props.props.orderTotal}
+                                lines={lines}
+                            />
+                            <div className={checkoutPageClassNames.actions}>{confirm}</div>
                         </>
                     )}
                 </SlotView>

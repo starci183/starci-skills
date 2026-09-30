@@ -1,5 +1,10 @@
 "use client"
 
-import { LocaleErrorBoundary } from "@ecommerce/shared"
+import { ShopErrorPage } from "../../features/pages/ShopErrorPage"
 
-export default LocaleErrorBoundary
+type ErrorProps = { readonly reset: () => void }
+
+/** The locale segment's error boundary slot: it mounts the error page and hands it the segment's retry. */
+const Error = (props: ErrorProps) => <ShopErrorPage onRetry={props.reset} />
+
+export default Error

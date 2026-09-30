@@ -1,12 +1,12 @@
 import "server-only"
+import type { Outcome } from "@ecommerce/api"
 import { fetchCart } from "./cart"
-import type { GraphqlResult } from "../api"
 
 /**
  * A catalogue row as the shop renders it. The order service serves catalog data on the
  * session-guarded `cart` query's catalog snapshot - there is no public product list - so a browse
  * read is a signed-in read. `imageUrl` stays optional on purpose: the service serves none and the
- * tile renders a neutral glyph instead of a broken <img>.
+ * tile renders a neutral glyph instead of a broken image.
  */
 export type Product = {
     readonly id: string
@@ -22,14 +22,12 @@ export type Product = {
  * rides beside the cart lines. Prices arrive in minor units and `placeOrder` totals answer in
  * USD, which is the currency every row renders.
  */
-export const fetchProducts = async (
-    sessionToken: string | null,
-): Promise<GraphqlResult<ReadonlyArray<Product>>> => {
-    const result = await fetchCart(sessionToken)
-    if (!result.ok) return result
+export const fetchProducts = async (sessionToken: string | null): Promise<Outcome<ReadonlyArray<Product>>> => {
+    const outcome = await fetchCart(sessionToken)
+    if (outcome.kind !== "ok") return outcome
     return {
-        ok: true,
-        data: result.data.catalog.map((product) => ({
+        kind: "ok",
+        data: outcome.data.catalog.map((product) => ({
             id: product.id,
             name: product.name,
             priceCents: product.priceMinorUnits,

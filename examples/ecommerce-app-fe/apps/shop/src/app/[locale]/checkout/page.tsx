@@ -1,14 +1,13 @@
 import { CheckoutPage } from "../../../features/pages/CheckoutPage"
+import { pageMetadata } from "../../../modules/meta"
 
-/**
- * Server-rendered on every request: the checkout summary is the order service's session-guarded
- * `cart` read, not build-time content, so a build must never bake it (and must never reach the
- * network). `force-dynamic` keeps `next build` from prerendering the fetch while the service is
- * (legitimately) not up. The confirmation itself rides the page's server action to `placeOrder`.
- */
+/** Server-rendered on every request: the page's data is the order and identity services', never build-time content. */
 export const dynamic = "force-dynamic"
 
-/** Mount the connected checkout page and nothing else; the page owns the read. */
+/** The document title of this page, from the catalog of the requested locale. */
+export const generateMetadata = () => pageMetadata("shop.checkout")
+
+/** Mount the connected page and nothing else; the page owns its reads. */
 const Page = () => <CheckoutPage />
 
 export default Page

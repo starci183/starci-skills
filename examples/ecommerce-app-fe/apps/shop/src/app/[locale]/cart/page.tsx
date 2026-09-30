@@ -1,13 +1,13 @@
 import { CartPage } from "../../../features/pages/CartPage"
+import { pageMetadata } from "../../../modules/meta"
 
-/**
- * Server-rendered on every request: the cart is the order service's session-guarded `cart` read
- * (the `northwind-session` cookie, modules/session), not build-time content - `force-dynamic`
- * keeps `next build` from prerendering the fetch while the service is (legitimately) not up. No
- * client-side cart store is kept.
- */
+/** Server-rendered on every request: the page's data is the order and identity services', never build-time content. */
 export const dynamic = "force-dynamic"
 
+/** The document title of this page, from the catalog of the requested locale. */
+export const generateMetadata = () => pageMetadata("shop.cart")
+
+/** Mount the connected page and nothing else; the page owns its reads. */
 const Page = () => <CartPage />
 
 export default Page

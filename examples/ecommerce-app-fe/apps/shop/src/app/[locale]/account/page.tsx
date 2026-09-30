@@ -1,13 +1,13 @@
 import { AccountPage } from "../../../features/pages/AccountPage"
+import { pageMetadata } from "../../../modules/meta"
 
-/**
- * Server-rendered on every request: identity and orders are the services' data, so a build must
- * never bake them (and must never reach the network). `force-dynamic` keeps `next build` from
- * prerendering the reads while the services are (legitimately) not up.
- */
+/** Server-rendered on every request: the page's data is the order and identity services', never build-time content. */
 export const dynamic = "force-dynamic"
 
-/** Mount the connected account page and nothing else; the page owns the reads. */
+/** The document title of this page, from the catalog of the requested locale. */
+export const generateMetadata = () => pageMetadata("shop.account")
+
+/** Mount the connected page and nothing else; the page owns its reads. */
 const Page = () => <AccountPage />
 
 export default Page

@@ -1,21 +1,21 @@
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { clearCartAction } from "../../modules/server-actions"
+import { callDoor } from "../../modules/doors"
+import { useLocaleRouter } from "../navigation"
 
 /**
- * Owns the cart's clear press: it runs the real `clearCart` mutation and refreshes the server
- * render so the page re-reads the now-empty cart; a refusal is named inline and nothing is
- * pretended empty.
+ * Owns the cart's clear press: it runs the real `clearCart` mutation through the shop's cart door and
+ * refreshes the server render so the page re-reads the now-empty cart; a refusal is named inline and
+ * nothing is pretended empty.
  */
 export const useClearCart = () => {
-    const router = useRouter()
+    const router = useLocaleRouter()
     const [refused, setRefused] = useState(false)
     const [pending, setPending] = useState(false)
     const onPress = () => {
         setPending(true)
-        void clearCartAction().then((outcome) => {
+        void callDoor("cart", "DELETE").then((outcome) => {
             setPending(false)
-            if (outcome.ok) {
+            if (outcome.kind === "ok") {
                 setRefused(false)
                 router.refresh()
             } else {

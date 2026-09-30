@@ -24,7 +24,33 @@
     "catalogue": {
       "title": "Lựa chọn mùa này",
       "description": "Một phần danh mục được tuyển chọn - toàn bộ nguồn dữ liệu nằm trong cửa hàng.",
-      "viewFull": "Xem toàn bộ danh mục →"
+      "viewFull": "Xem toàn bộ danh mục →",
+      "products": {
+        "aurelisDeskLamp": {
+          "name": "Đèn bàn Aurelis",
+          "blurb": "Ánh sáng ấm, chỉnh được độ sáng, đế đồng thau nặng."
+        },
+        "meridianCarryTote": {
+          "name": "Túi tote Meridian",
+          "blurb": "Vải canvas tráng sáp, ngăn đựng laptop, đủ cho cả tuần việc vặt."
+        },
+        "northwindPourOver": {
+          "name": "Bộ pha cà phê Northwind",
+          "blurb": "Bình thủy tinh borosilicate và phin thép không gỉ, không cần giấy lọc."
+        },
+        "kestrelFieldJacket": {
+          "name": "Áo khoác Kestrel",
+          "blurb": "Cotton chống thời tiết, túi nào cũng cài được."
+        },
+        "solsticeNotebook": {
+          "name": "Sổ Solstice",
+          "blurb": "Gáy mở phẳng, giấy 120gsm, kẻ chấm."
+        },
+        "harborSpeaker": {
+          "name": "Loa dã ngoại Harbor",
+          "blurb": "Pin hai ngày và dây đeo để móc vào ba lô."
+        }
+      }
     },
     "pillars": {
       "title": "Vì sao chọn Northwind",
@@ -39,6 +65,34 @@
       "carbonNeutral": {
         "title": "Giao hàng trung hòa carbon",
         "copy": "Bù trừ phát thải cho mỗi kiện hàng, đo lường và công khai mỗi quý."
+      }
+    },
+    "display": {
+      "label": "Hiển thị và ngôn ngữ",
+      "theme": {
+        "toLight": "Chuyển sang sáng",
+        "toDark": "Chuyển sang tối"
+      },
+      "locale": {
+        "en": "English",
+        "vi": "Tiếng Việt"
+      }
+    },
+    "loading": {
+      "message": "Đang tải"
+    },
+    "notFound": {
+      "title": "Không tìm thấy trang",
+      "home": "Về trang chủ"
+    },
+    "errors": {
+      "page": {
+        "title": "Đã xảy ra lỗi",
+        "retry": "Thử lại"
+      },
+      "global": {
+        "title": "Đã xảy ra lỗi nghiêm trọng",
+        "retry": "Thử lại"
       }
     }
   }

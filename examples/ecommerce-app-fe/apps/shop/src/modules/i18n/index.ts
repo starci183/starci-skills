@@ -1,3 +1,2 @@
-/** Public entry of the i18n module: the routing table and the locale-aware navigation. */
-export { usePathname, useRouter } from "./navigation"
-export { routing } from "./routing"
+/** The catalogue namespace of the shop app's own title and description. */
+export const SHOP_NAMESPACE = "app.shop"

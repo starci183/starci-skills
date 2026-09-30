@@ -1,5 +1,10 @@
 "use client"
 
-import { GlobalErrorBoundary } from "@ecommerce/shared"
+import { LandingGlobalErrorPage } from "../features/pages/LandingGlobalErrorPage"
 
-export default GlobalErrorBoundary
+type GlobalErrorProps = { readonly reset: () => void }
+
+/** The last-resort error boundary slot: it mounts the global error page and hands it the retry. */
+const GlobalError = (props: GlobalErrorProps) => <LandingGlobalErrorPage onRetry={props.reset} />
+
+export default GlobalError

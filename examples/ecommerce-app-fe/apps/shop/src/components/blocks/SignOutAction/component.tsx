@@ -1,5 +1,3 @@
-"use client"
-
 import { Button } from "@starci/grammar/common"
 
 /** The pure sign-out action's resolved inputs: the one label and the one press. */

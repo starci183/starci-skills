@@ -4,14 +4,19 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node ../../scripts/serve.mjs shop dev --webpack",
-    "build": "next build --webpack",
+    "codegen": "node ../../scripts/codegen-documents.mjs src/modules/services/__generated__/documents.ts",
+    "predev": "npm run codegen",
+    "dev": "node ../../scripts/serve.mjs shop dev",
+    "prebuild": "npm run codegen",
+    "build": "next build",
     "start": "node ../../scripts/serve.mjs shop start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pretypecheck": "npm run codegen"
   },
   "dependencies": {
-    "@ecommerce/shared": "file:../../packages/shared",
-    "@fontsource-variable/inter": "^5.3.0",
+    "@ecommerce/api": "0.1.0",
+    "@ecommerce/i18n": "0.1.0",
+    "@ecommerce/ui": "0.1.0",
     "@heroui/react": "3.2.6",
     "@heroui/styles": "3.2.6",
     "@starci/grammar": "0.7.2",

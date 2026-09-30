@@ -1,14 +1,13 @@
 import { BrowsePage } from "../../../features/pages/BrowsePage"
+import { pageMetadata } from "../../../modules/meta"
 
-/**
- * Server-rendered on every request: the catalogue is the order service's data, not build-time
- * content, so a build must never bake it (and must never reach the network). `force-dynamic` keeps
- * `next build` from prerendering this fetch while the service is (legitimately) not up. The result
- * - payload or refusal - crosses into the page verbatim.
- */
+/** Server-rendered on every request: the page's data is the order and identity services', never build-time content. */
 export const dynamic = "force-dynamic"
 
-/** Mount the connected browse page and nothing else; the page owns the read. */
+/** The document title of this page, from the catalog of the requested locale. */
+export const generateMetadata = () => pageMetadata("shop.browse")
+
+/** Mount the connected page and nothing else; the page owns its reads. */
 const Page = () => <BrowsePage />
 
 export default Page

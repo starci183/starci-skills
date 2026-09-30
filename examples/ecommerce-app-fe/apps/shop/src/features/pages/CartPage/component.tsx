@@ -1,11 +1,15 @@
-"use client"
-
-import { Button, SectionHeader } from "@starci/grammar/common"
-import { StateBlock, SlotView, type Slot } from "@ecommerce/shared"
+import { Button } from "@starci/grammar/common"
+import {
+    GatedHeader,
+    LineItemsCard,
+    SlotView,
+    type GateNoticeProps,
+    type LineItemRow,
+    type Slot,
+    type SlotLabels,
+} from "@ecommerce/ui"
 import { cartPageClassNames } from "./classNames"
 import { ClearCartControl } from "../../../components/blocks/ClearCart"
-import { LineItemsCard } from "../../../components/composites/LineItemsCard"
-import type { LineItemRow } from "../../../modules/types"
 
 /** The screen situations a cart read can settle. */
 export type CartPageState = "signedOut" | "cart"
@@ -26,16 +30,10 @@ export type CartPageProps = {
         readonly clearRefused: string
         readonly checkoutCta: string
         readonly checkoutHref: string
-        readonly emptyTitle: string
-        readonly emptyDescription: string
         readonly backToBrowse: string
         readonly browseHref: string
-        readonly accountCta: string
-        readonly accountHref: string
-        readonly signedOutTitle: string
-        readonly signedOutDescription: string
-        readonly unreachableTitle: string
-        readonly unreachableDescription: string
+        readonly gate: GateNoticeProps | null
+        readonly slotLabels: SlotLabels
     }
     /** What the surface reports upward; the cart's write rides the clear control. */
     readonly on: Record<never, never>
@@ -48,28 +46,17 @@ export type CartPageProps = {
  */
 export const CartPageBase = (props: CartPageProps) => (
     <>
-        <SectionHeader title={props.props.title} description={props.props.description} level={1} />
-        {props.state === "signedOut" ? (
-            <StateBlock
-                title={props.props.signedOutTitle}
-                description={props.props.signedOutDescription}
-            >
-                <Button href={props.props.accountHref} variant="secondary" size="sm">
-                    {props.props.accountCta}
-                </Button>
-            </StateBlock>
-        ) : null}
+        <GatedHeader title={props.props.title} description={props.props.description} gate={props.props.gate} />
         {props.state === "cart" ? (
             <SlotView
                 slot={props.props.linesSlot}
                 emptyMascot
-                emptyAction={<Button href={props.props.browseHref} variant="secondary" size="sm">{props.props.backToBrowse}</Button>}
-                labels={{
-                    emptyTitle: props.props.emptyTitle,
-                    emptyDescription: props.props.emptyDescription,
-                    errorTitle: props.props.unreachableTitle,
-                    errorDescription: props.props.unreachableDescription,
-                }}
+                emptyAction={
+                    <Button href={props.props.browseHref} variant="secondary" size="sm">
+                        {props.props.backToBrowse}
+                    </Button>
+                }
+                labels={props.props.slotLabels}
             >
                 {(lines) => (
                     <>

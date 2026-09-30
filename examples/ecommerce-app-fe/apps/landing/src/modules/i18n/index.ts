@@ -1,2 +1,2 @@
-/** Public entry of the i18n module: the routing table the proxy and the locale layout read. */
-export { routing } from "./routing"
+/** The catalogue namespace of the landing app's own title and description. */
+export const LANDING_NAMESPACE = "app.landing"

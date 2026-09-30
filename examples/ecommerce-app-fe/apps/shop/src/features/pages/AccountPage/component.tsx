@@ -1,7 +1,5 @@
-"use client"
-
 import { Heading, SectionHeader, Text } from "@starci/grammar/common"
-import { DuckMascot, StateBlock, SlotView, type Slot } from "@ecommerce/shared"
+import { DuckMascot, StateBlock, SlotView, type Slot } from "@ecommerce/ui"
 import { SessionForm } from "../../../components/blocks/SessionForm"
 import { SignOutAction } from "../../../components/blocks/SignOutAction"
 import { accountPageClassNames } from "./classNames"
@@ -56,7 +54,9 @@ export const AccountPageBase = (props: AccountPageProps) => (
             title={props.props.title}
             description={props.props.accountLine}
             level={1}
-            action={props.state === "account" && props.props.ordersSlot.status !== "error" ? <SignOutAction /> : undefined}
+            action={
+                props.state === "account" && props.props.ordersSlot.status !== "error" ? <SignOutAction /> : undefined
+            }
         />
         {props.state === "signedOut" ? (
             <div className={accountPageClassNames.authSplit}>
@@ -69,7 +69,9 @@ export const AccountPageBase = (props: AccountPageProps) => (
                     </Text>
                     <DuckMascot size={128} aria-hidden />
                 </div>
-                <div className={accountPageClassNames.authForm}><SessionForm /></div>
+                <div className={accountPageClassNames.authForm}>
+                    <SessionForm />
+                </div>
             </div>
         ) : null}
         <div className={accountPageClassNames.orders}>
@@ -91,7 +93,12 @@ export const AccountPageBase = (props: AccountPageProps) => (
                         errorDescription: props.props.ordersUnreachableDescription,
                     }}
                 >
-                    {() => <StateBlock title={props.props.ordersBuyerTitle} description={props.props.ordersBuyerDescription} />}
+                    {() => (
+                        <StateBlock
+                            title={props.props.ordersBuyerTitle}
+                            description={props.props.ordersBuyerDescription}
+                        />
+                    )}
                 </SlotView>
             ) : null}
         </div>
