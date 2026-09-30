@@ -17,7 +17,7 @@ const ajv = new Ajv2020({ strict: false, allErrors: true, logger: false });
 const validateManifestSchema = ajv.compile(readSchema('hfs-slots.schema.yaml'));
 const validateRepoSchema = ajv.compile(readSchema('hfs-repo.schema.yaml'));
 
-const BE = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: ['primary', 'agentos'] };
+const BE = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] };
 const FE = { hfs: 1, profile: 'fe', project: 'nivo', apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }], optionalSlots: ['repo.packages', 'fe.package.ui'] };
 
 const refusal = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code, `expected ${code}`);
@@ -69,7 +69,8 @@ test('hfs.json: schema and loader agree', () => {
   const manifest = loadSlotManifest();
   const bad = {
     'missing hfs': { ...BE, hfs: undefined },
-    'fe with connections': { ...FE, connections: ['primary'] },
+    'fe with connections': { ...FE, connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }] },
+    'connection as a bare string': { ...BE, connections: ['primary'] },
     'no apps': { ...BE, apps: [] },
     'unknown key': { ...BE, owners: ['x'] },
     'bad project name': { ...BE, project: 'Nivo Backend' },
@@ -82,6 +83,12 @@ test('hfs.json: schema and loader agree', () => {
     assert.equal(validateRepoSchema(JSON.parse(JSON.stringify(declaration))), false, `schema accepted: ${name}`);
     refusal(() => resolveRepoDeclaration(manifest, declaration), 'HFS_DECLARATION_INVALID');
   }
+  // semantic only (the schema cannot state them): one name per database, env keys disjoint across connections
+  for (const connections of [
+    [{ name: 'primary', envPrefix: 'A_DB' }, { name: 'primary', envPrefix: 'B_DB' }],
+    [{ name: 'order', envPrefix: 'ORDER' }, { name: 'order-archive', envPrefix: 'ORDER_ARCHIVE' }],
+  ]) refusal(() => resolveRepoDeclaration(manifest, { ...BE, connections }), 'HFS_DECLARATION_INVALID');
+  assert.deepEqual(resolveRepoDeclaration(manifest, BE).connections, BE.connections);
 });
 
 test('a declaration is checked against the manifest', () => {

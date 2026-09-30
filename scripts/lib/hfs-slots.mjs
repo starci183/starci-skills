@@ -30,6 +30,7 @@ export class HfsSlotsError extends Error {
 
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 const NAME = /^[a-z][a-z0-9-]*$/;
+const ENV_PREFIX = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
 const SLOT_ID = /^(repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$/;
 const PRESENCE = ['required', 'optional', 'opt-in', 'forbidden'];
 const TRACKED = ['tracked', 'ignored', 'external'];
@@ -257,10 +258,15 @@ function declarationShapeProblems(d) {
     if (!isMap(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`apps[${i}] must be {name, kind}`);
   });
   if (d.stacks !== undefined && (d.profile !== 'fe' || typeof d.stacks !== 'string' || !d.stacks || /^([a-zA-Z]:)?[\/]/.test(d.stacks))) bad.push('stacks is front end only and must be a relative path to the sibling back-end repository');
-  for (const key of ['optionalSlots', 'connections']) {
-    if (d[key] === undefined) continue;
-    const pattern = key === 'optionalSlots' ? SLOT_ID : NAME;
-    if (!Array.isArray(d[key]) || !d[key].every((v) => pattern.test(String(v))) || new Set(d[key]).size !== d[key].length) bad.push(`${key} must be a unique list of ${key === 'optionalSlots' ? 'slot ids' : 'connection names'}`);
+  if (d.optionalSlots !== undefined && (!Array.isArray(d.optionalSlots) || !d.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(d.optionalSlots).size !== d.optionalSlots.length)) bad.push('optionalSlots must be a unique list of slot ids');
+  if (d.connections !== undefined) {
+    // One physical database = one entry (R84): {name, envPrefix}; names and env prefixes unique, no prefix inside another's keys.
+    const list = Array.isArray(d.connections) ? d.connections : null;
+    if (!list || !list.every((c) => isMap(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && Object.keys(c).length === 2)) bad.push('connections must be a list of {name: kebab-case database name, envPrefix: UPPER_SNAKE prefix of its env keys}');
+    else {
+      if (new Set(list.map((c) => c.name)).size !== list.length) bad.push('connections names must be unique');
+      for (const a of list) for (const b of list) if (a !== b && `${b.envPrefix}_`.startsWith(`${a.envPrefix}_`)) bad.push(`connections ${a.name} and ${b.name} share env keys (${a.envPrefix}_ covers ${b.envPrefix}_)`);
+    }
   }
   if (d.profile === 'fe' && d.connections !== undefined) bad.push('connections belong to a backend repository');
   return bad;
@@ -305,7 +311,7 @@ export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLA
     project: declaration.project,
     apps: Object.freeze(declaration.apps.map((a) => Object.freeze({ name: a.name, kind: a.kind }))),
     optionalSlots: Object.freeze([...(declaration.optionalSlots ?? [])]),
-    connections: Object.freeze([...connections]),
+    connections: Object.freeze(connections.map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix }))),
     manifestVersion: manifest.version,
   });
 }

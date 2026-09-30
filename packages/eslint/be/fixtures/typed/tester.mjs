@@ -19,7 +19,7 @@ export const BE_DECLARATION = Object.freeze({
     profile: "be",
     project: "fixture",
     apps: [{ name: "api", kind: "api" }, { name: "migrate", kind: "migrate" }],
-    connections: ["primary"],
+    connections: [{ name: "primary", envPrefix: "PRIMARY_DB" }],
 })
 
 /** The HFS view of the fixture repository. */

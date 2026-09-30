@@ -37,8 +37,18 @@ properties:
   connections:
     type: array
     uniqueItems: true
-    description: Backend only. Named databases; each is the CONNECTION tag of a be.persistence slot and gets one migrate run.
-    items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+    description: >-
+      Backend only. One entry per physical database (R84): its logical name (the CONNECTION tag of a be.persistence slot,
+      the <conn> of platform/database/<conn>.{connection,config,decorators}.ts, one migrate run) and the prefix of the env
+      keys its <conn>.config.ts reads. Names and prefixes are unique and no prefix covers another's keys (checked by
+      scripts/lib/hfs-slots.mjs).
+    items:
+      type: object
+      additionalProperties: false
+      required: [name, envPrefix]
+      properties:
+        name: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+        envPrefix: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'}
   stacks:
     type: string
     minLength: 1

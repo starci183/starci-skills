@@ -13,7 +13,10 @@
     }
   ],
   "connections": [
-    "postgresql-primary"
+    {
+      "name": "primary",
+      "envPrefix": "PRIMARY_DB"
+    }
   ],
   "optionalSlots": [
     "repo.docs"
