@@ -1,25 +1,44 @@
-import { FakeClock } from "@starci/jest-preset/clock"
-import { mockEntityManager } from "@tests/fixtures/database"
+import { Test } from "@nestjs/testing"
+import { FakeClock, mockEntityManager } from "@starci/jest-preset"
+import { CLOCK } from "@modules/platform/clock"
+import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { PostgresInbox } from "./inbox.service"
 import { CLAIM_EVENT, RELEASE_EVENT } from "./persistence/inbox.sql"
 
-const AT = new Date("2026-09-30T10:00:00.000Z")
+const AT = "2026-05-01T10:00:00.000Z"
+
+const build = async (manager: ReturnType<typeof mockEntityManager>) => {
+    const clock = new FakeClock(AT)
+    const moduleRef = await Test.createTestingModule({
+        providers: [PostgresInbox, { provide: PRIMARY_ENTITY_MANAGER, useValue: manager }, { provide: CLOCK, useValue: clock }],
+    }).compile()
+    return moduleRef.get(PostgresInbox)
+}
 
 describe("PostgresInbox", () => {
-    it("answers true when the insert wins", async () => {
-        const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([{ event_id: "e1" }]) })
-        await expect(new PostgresInbox(manager, new FakeClock(AT)).claim("audit.append", "e1")).resolves.toBe(true)
-        expect(manager.query).toHaveBeenCalledWith(CLAIM_EVENT, ["audit.append", "e1", AT])
+    describe("claim", () => {
+        it("answers true for the first claim, stamped with the clock", async () => {
+            const manager = mockEntityManager({ query: [CLAIM_EVENT, [{ event_id: "e-1" }]] })
+            const inbox = await build(manager)
+
+            await expect(inbox.claim("payments", "e-1")).resolves.toBe(true)
+            expect(manager.query).toHaveBeenCalledWith(CLAIM_EVENT, ["payments", "e-1", new FakeClock(AT).now()])
+        })
+
+        it("answers false when the event was claimed before", async () => {
+            const inbox = await build(mockEntityManager({ query: [CLAIM_EVENT, []] }))
+
+            await expect(inbox.claim("payments", "e-1")).resolves.toBe(false)
+        })
     })
 
-    it("answers false when the event was claimed before", async () => {
-        const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
-        await expect(new PostgresInbox(manager, new FakeClock(AT)).claim("audit.append", "e1")).resolves.toBe(false)
-    })
+    describe("release", () => {
+        it("deletes the claim of the event", async () => {
+            const manager = mockEntityManager({ query: [RELEASE_EVENT, []] })
+            const inbox = await build(manager)
 
-    it("deletes the claim on release", async () => {
-        const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
-        await new PostgresInbox(manager, new FakeClock(AT)).release("audit.append", "e1")
-        expect(manager.query).toHaveBeenCalledWith(RELEASE_EVENT, ["audit.append", "e1"])
+            await expect(inbox.release("payments", "e-1")).resolves.toBeUndefined()
+            expect(manager.query).toHaveBeenCalledWith(RELEASE_EVENT, ["payments", "e-1"])
+        })
     })
 })

@@ -1,51 +1,82 @@
-import { Writable } from "node:stream"
-import { FakeClock } from "@starci/jest-preset/clock"
+import type { Writable } from "node:stream"
+import { FakeClock, mock } from "@starci/jest-preset"
 import { createJsonLogger } from "./json-logger.service"
-import { LoggingLogEvent } from "./logging.log-events"
 
-interface Sink {
-    readonly stream: Writable
-    lines(): Array<unknown>
-}
+const AT = "2026-05-01T10:00:00.000Z"
 
-const parseLine = (line: string): unknown => {
-    try {
-        return JSON.parse(line)
-    } catch (error) {
-        return error
-    }
-}
-
-const sink = (): Sink => {
-    const chunks: Array<string> = []
-    const stream = new Writable({
-        write(chunk: Buffer, _encoding, done) {
-            chunks.push(chunk.toString())
-            done()
-        },
-    })
-    return { stream, lines: () => chunks.join("").split("\n").filter(Boolean).map(parseLine) }
+const build = () => {
+    const clock = new FakeClock(AT)
+    const out = mock<Writable>()
+    const err = mock<Writable>()
+    return { logger: createJsonLogger(clock, out, err), out, err }
 }
 
 describe("createJsonLogger", () => {
-    it("stamps info lines with the clock and writes them to the out stream", () => {
-        const out = sink()
-        const err = sink()
-        createJsonLogger(new FakeClock("2026-01-01T00:00:00.000Z"), out.stream, err.stream).info(LoggingLogEvent.ServerStarted, { id: 1 })
-        expect(out.lines()).toEqual([{ level: "info", event: LoggingLogEvent.ServerStarted, time: "2026-01-01T00:00:00.000Z", id: 1 }])
-        expect(err.lines()).toEqual([])
+    describe("info", () => {
+        it("writes one JSON line to the out stream, stamped with the clock", () => {
+            const { logger, out, err } = build()
+
+            logger.info("task.created", { taskId: "t-1" })
+
+            expect(out.write).toHaveBeenCalledWith(`{"level":"info","event":"task.created","time":"${AT}","taskId":"t-1"}\n`)
+            expect(err.write).not.toHaveBeenCalled()
+        })
+
+        it("writes a line without fields", () => {
+            const { logger, out } = build()
+
+            logger.info("tick")
+
+            expect(out.write).toHaveBeenCalledWith(`{"level":"info","event":"tick","time":"${AT}"}\n`)
+        })
     })
 
-    it("writes warn and error lines to the err stream and serializes the cause by name and message", () => {
-        const out = sink()
-        const err = sink()
-        const logger = createJsonLogger(new FakeClock("2026-01-01T00:00:00.000Z"), out.stream, err.stream)
-        logger.warn(LoggingLogEvent.WorkerStarted)
-        logger.error(LoggingLogEvent.StartupFailed, new TypeError("boom"), { id: 2 })
-        expect(err.lines()).toEqual([
-            { level: "warn", event: LoggingLogEvent.WorkerStarted, time: "2026-01-01T00:00:00.000Z" },
-            { level: "error", event: LoggingLogEvent.StartupFailed, time: "2026-01-01T00:00:00.000Z", errorName: "TypeError", errorMessage: "boom", id: 2 },
-        ])
-        expect(out.lines()).toEqual([])
+    describe("warn", () => {
+        it("writes one JSON line to the err stream", () => {
+            const { logger, out, err } = build()
+
+            logger.warn("probe.failed", { dependency: "database" })
+
+            expect(err.write).toHaveBeenCalledWith(`{"level":"warn","event":"probe.failed","time":"${AT}","dependency":"database"}\n`)
+            expect(out.write).not.toHaveBeenCalled()
+        })
+    })
+
+    describe("error", () => {
+        it("serializes an Error cause by name and message, next to the fields", () => {
+            const { logger, err } = build()
+
+            logger.error("job.failed", new TypeError("boom"), { job: "digest" })
+
+            expect(err.write).toHaveBeenCalledWith(
+                `{"level":"error","event":"job.failed","time":"${AT}","errorName":"TypeError","errorMessage":"boom","job":"digest"}\n`,
+            )
+        })
+
+        it("serializes a cause that is not an Error as its text", () => {
+            const { logger, err } = build()
+
+            logger.error("job.failed", "plain failure")
+
+            expect(err.write).toHaveBeenCalledWith(`{"level":"error","event":"job.failed","time":"${AT}","errorMessage":"plain failure"}\n`)
+        })
+    })
+
+    describe("default streams", () => {
+        afterEach(() => {
+            jest.restoreAllMocks()
+        })
+
+        it("writes info to stdout and errors to stderr when no stream is handed in", () => {
+            const stdout = jest.spyOn(process.stdout, "write").mockReturnValue(true)
+            const stderr = jest.spyOn(process.stderr, "write").mockReturnValue(true)
+            const logger = createJsonLogger(new FakeClock(AT))
+
+            logger.info("up")
+            logger.warn("slow")
+
+            expect(stdout).toHaveBeenCalledTimes(1)
+            expect(stderr).toHaveBeenCalledTimes(1)
+        })
     })
 })

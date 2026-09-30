@@ -1,24 +1,55 @@
+import { Test } from "@nestjs/testing"
 import { MetricsRegistry } from "./metrics-registry.service"
 
+const build = async () => {
+    const moduleRef = await Test.createTestingModule({ providers: [MetricsRegistry] }).compile()
+    return moduleRef.get(MetricsRegistry)
+}
+
 describe("MetricsRegistry", () => {
-    it("counts requests per label set and sums their durations", () => {
-        const registry = new MetricsRegistry()
-        registry.recordRequest("GET", "/health", 200, 5)
-        registry.recordRequest("GET", "/health", 200, 7)
-        registry.recordRequest("POST", "/graphql", 200, 30)
-        const text = registry.renderPrometheus()
-        expect(text).toContain('http_requests_total{method="GET",route="/health",status="200"} 2')
-        expect(text).toContain('http_request_duration_ms_sum{method="GET",route="/health",status="200"} 12')
-        expect(text).toContain('http_request_duration_ms_count{method="POST",route="/graphql",status="200"} 1')
-    })
+    describe("render", () => {
+        it("renders only the headers before any request is recorded", async () => {
+            const metrics = await build()
 
-    it("renders only the headers when nothing was recorded", () => {
-        expect(new MetricsRegistry().renderPrometheus()).toContain("# TYPE http_requests_total counter")
-    })
+            expect(metrics.render().exposition.split("\n")).toEqual([
+                "# HELP http_requests_total HTTP requests the api has served, by method, route and status.",
+                "# TYPE http_requests_total counter",
+                "# HELP http_request_duration_ms Time serving HTTP requests, in milliseconds.",
+                "# TYPE http_request_duration_ms summary",
+                "",
+            ])
+        })
 
-    it("escapes quotes, backslashes and newlines in label values", () => {
-        const registry = new MetricsRegistry()
-        registry.recordRequest("GET", 'a"b\\c\nd', 200, 1)
-        expect(registry.renderPrometheus()).toContain('route="a\\"b\\\\c\\nd"')
+        it("counts and sums the requests of one label set", async () => {
+            const metrics = await build()
+            metrics.recordRequest("GET", "/health", 200, 5)
+            metrics.recordRequest("GET", "/health", 200, 7)
+
+            const { exposition } = metrics.render()
+
+            expect(exposition).toContain('http_requests_total{method="GET",route="/health",status="200"} 2\n')
+            expect(exposition).toContain('http_request_duration_ms_sum{method="GET",route="/health",status="200"} 12\n')
+            expect(exposition).toContain('http_request_duration_ms_count{method="GET",route="/health",status="200"} 2\n')
+        })
+
+        it("keeps a separate series per method, route and status, sorted by label set", async () => {
+            const metrics = await build()
+            metrics.recordRequest("POST", "/graphql", 200, 1)
+            metrics.recordRequest("GET", "/health", 503, 2)
+
+            const lines = metrics.render().exposition.split("\n")
+
+            expect(lines.filter((line) => line.startsWith("http_requests_total{"))).toEqual([
+                'http_requests_total{method="GET",route="/health",status="503"} 1',
+                'http_requests_total{method="POST",route="/graphql",status="200"} 1',
+            ])
+        })
+
+        it("escapes quotes, backslashes and newlines in a label value", async () => {
+            const metrics = await build()
+            metrics.recordRequest("GET", 'a"b\\c\nd', 200, 1)
+
+            expect(metrics.render().exposition).toContain('route="a\\"b\\\\c\\nd"')
+        })
     })
 })

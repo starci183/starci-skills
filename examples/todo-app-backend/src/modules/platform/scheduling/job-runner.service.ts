@@ -17,12 +17,15 @@ import type { JobRegistry, ScheduledJob } from "./scheduling.port"
 
 const MINUTE_MS = 60_000
 
+type Timing =
+    /** A cron job: the parsed expression. */
+    | { readonly cron: CronFields }
+    /** An interval job: the pause between two runs. */
+    | { readonly everyMs: number }
+
 interface Entry {
     readonly job: ScheduledJob
-    /** The parsed expression of a cron job, null for an interval job. */
-    readonly cron: CronFields | null
-    /** The pause of an interval job, null for a cron job. */
-    readonly everyMs: number | null
+    readonly timing: Timing
     /** How long the lease of one run stays valid: the interval, or one minute for cron. */
     readonly ttlMs: number
     /** The tick key of the last run this process attempted: the minute of a cron job, the instant of an interval job. */
@@ -56,10 +59,16 @@ export class JobRunner implements JobRegistry, OnApplicationBootstrap, OnApplica
             if (cron === null) {
                 throw new SchedulingError({ code: SchedulingErrorCode.CronInvalid, params: { job: job.name } })
             }
-            this.entries.push({ job, cron, everyMs: null, ttlMs: MINUTE_MS, lastKey: null, running: false })
+            this.entries.push({ job, timing: { cron }, ttlMs: MINUTE_MS, lastKey: null, running: false })
             return
         }
-        this.entries.push({ job, cron: null, everyMs: job.schedule.everyMs, ttlMs: job.schedule.everyMs, lastKey: null, running: false })
+        this.entries.push({
+            job,
+            timing: { everyMs: job.schedule.everyMs },
+            ttlMs: job.schedule.everyMs,
+            lastKey: null,
+            running: false,
+        })
     }
 
     /** Starts ticking when at least one job is registered. */
@@ -91,12 +100,12 @@ export class JobRunner implements JobRegistry, OnApplicationBootstrap, OnApplica
     }
 
     private keyOf(entry: Entry, at: Date): number | null {
-        if (entry.cron === null) {
+        if ("everyMs" in entry.timing) {
             const key = at.getTime()
-            return entry.lastKey === null || key - entry.lastKey >= (entry.everyMs ?? 0) ? key : null
+            return entry.lastKey === null || key - entry.lastKey >= entry.timing.everyMs ? key : null
         }
         const key = Math.floor(at.getTime() / MINUTE_MS)
-        return key !== entry.lastKey && cronMatches(entry.cron, at) ? key : null
+        return key !== entry.lastKey && cronMatches(entry.timing.cron, at) ? key : null
     }
 
     private async runIfDue(entry: Entry, at: Date): Promise<void> {

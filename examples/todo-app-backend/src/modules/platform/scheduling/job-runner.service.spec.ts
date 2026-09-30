@@ -1,81 +1,224 @@
-import { FakeClock } from "@starci/jest-preset/clock"
-import { mock } from "@starci/jest-preset/mock"
-import type { Lease } from "@modules/platform/lease"
+import { Test } from "@nestjs/testing"
+import { builder, FakeClock, fakeLock, mock } from "@starci/jest-preset"
+import { CLOCK } from "@modules/platform/clock"
+import { LEASE } from "@modules/platform/lease"
+import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import { SchedulingError } from "./errors/scheduling.error"
+import { SchedulingError, SchedulingErrorCode } from "./errors/scheduling.error"
 import { JobRunner } from "./job-runner.service"
 import { SchedulingLogEvent } from "./scheduling.log-events"
+import type { SchedulingOptions } from "./scheduling.options"
 import type { ScheduledJob } from "./scheduling.port"
+import { SCHEDULING_OPTIONS } from "./scheduling.decorators"
 
-const AT = new Date("2026-09-30T10:05:00.000Z")
+const AT = "2026-05-01T10:00:00.000Z"
+const options = builder<SchedulingOptions>({ tickMs: 1000 })
 
-interface Rig {
-    readonly runner: JobRunner
-    readonly lease: Lease
-    readonly logger: Logger
-}
-
-const build = (grant: boolean): Rig => {
-    const lease = mock<Lease>({
-        acquire: jest.fn().mockResolvedValue(grant ? { name: "job", holder: "h", fence: 7 } : null),
-    })
+const build = async () => {
+    const clock = new FakeClock(AT)
+    const lease = fakeLock(clock)
     const logger = mock<Logger>()
-    return { runner: new JobRunner({ tickMs: 1_000 }, lease, new FakeClock(AT), logger), lease, logger }
+    const moduleRef = await Test.createTestingModule({
+        providers: [
+            JobRunner,
+            { provide: SCHEDULING_OPTIONS, useValue: options() },
+            { provide: LEASE, useValue: lease },
+            { provide: CLOCK, useValue: clock },
+            { provide: LOGGER, useValue: logger },
+        ],
+    }).compile()
+    return { runner: moduleRef.get(JobRunner), clock, lease, logger }
 }
 
-const cronJob = (run: jest.Mock): ScheduledJob => ({ name: "job", schedule: { cron: "*/5 * * * *" }, run })
+const jobOf = (name: string, schedule: ScheduledJob["schedule"], run: ScheduledJob["run"] = () => Promise.resolve()): ScheduledJob => ({
+    name,
+    schedule,
+    run: jest.fn(run),
+})
+
+const gate = () => {
+    let open: () => void = () => undefined
+    const promise = new Promise<void>((resolve) => {
+        open = () => resolve()
+    })
+    return { promise, open: () => open() }
+}
+
+const flush = () => new Promise<void>((resolve) => setImmediate(resolve))
 
 describe("JobRunner", () => {
-    it("runs a cron job on a minute the expression admits and leases it for one minute", async () => {
-        const { runner, lease } = build(true)
-        const run = jest.fn().mockResolvedValue(undefined)
-        runner.add(cronJob(run))
-        await runner.tick(AT)
-        expect(lease.acquire).toHaveBeenCalledWith({ name: "job", holder: expect.any(String), ttlMs: 60_000, at: AT })
-        expect(run).toHaveBeenCalledWith(AT)
+    afterEach(() => {
+        jest.useRealTimers()
     })
 
-    it("does not run a cron job twice in the same minute", async () => {
-        const { runner } = build(true)
-        const run = jest.fn().mockResolvedValue(undefined)
-        runner.add(cronJob(run))
-        await runner.tick(AT)
-        await runner.tick(new Date(AT.getTime() + 20_000))
-        expect(run).toHaveBeenCalledTimes(1)
-    })
+    describe("add", () => {
+        it("refuses a cron expression that does not parse, naming the job", async () => {
+            const { runner } = await build()
 
-    it("skips the run when another replica holds the lease", async () => {
-        const { runner } = build(false)
-        const run = jest.fn()
-        runner.add(cronJob(run))
-        await runner.tick(AT)
-        expect(run).not.toHaveBeenCalled()
-    })
+            const failure = (() => {
+                try {
+                    runner.add(jobOf("digest", { cron: "not a cron" }))
+                    return null
+                } catch (error) {
+                    return error
+                }
+            })()
 
-    it("runs an interval job once per interval and leases it for the interval", async () => {
-        const { runner, lease } = build(true)
-        const run = jest.fn().mockResolvedValue(undefined)
-        runner.add({ name: "job", schedule: { everyMs: 30_000 }, run })
-        await runner.tick(AT)
-        await runner.tick(new Date(AT.getTime() + 10_000))
-        await runner.tick(new Date(AT.getTime() + 30_000))
-        expect(run).toHaveBeenCalledTimes(2)
-        expect(lease.acquire).toHaveBeenCalledWith(expect.objectContaining({ ttlMs: 30_000 }))
-    })
-
-    it("logs a failing run and gives the lease back", async () => {
-        const { runner, lease, logger } = build(true)
-        runner.add(cronJob(jest.fn().mockRejectedValue(new TypeError("boom"))))
-        await runner.tick(AT)
-        expect(logger.error).toHaveBeenCalledWith(SchedulingLogEvent.JobFailed, expect.any(TypeError), {
-            job: "job",
-            fence: 7,
+            expect(failure).toBeInstanceOf(SchedulingError)
+            expect(failure).toMatchObject({ code: SchedulingErrorCode.CronInvalid, params: { job: "digest" } })
         })
-        expect(lease.release).toHaveBeenCalledWith({ grant: { name: "job", holder: "h", fence: 7 } })
     })
 
-    it("refuses a job whose cron expression does not parse", () => {
-        const { runner } = build(true)
-        expect(() => runner.add({ name: "bad", schedule: { cron: "nope" }, run: jest.fn() })).toThrow(SchedulingError)
+    describe("tick", () => {
+        it("runs a cron job in the minute its expression admits, once per minute", async () => {
+            const { runner } = await build()
+            const job = jobOf("digest", { cron: "0 10 * * *" })
+            runner.add(job)
+
+            await runner.tick(new Date(AT))
+            await runner.tick(new Date("2026-05-01T10:00:30.000Z"))
+
+            expect(job.run).toHaveBeenCalledTimes(1)
+            expect(job.run).toHaveBeenCalledWith(new Date(AT))
+        })
+
+        it("skips a cron job in a minute its expression does not admit", async () => {
+            const { runner } = await build()
+            const job = jobOf("digest", { cron: "5 10 * * *" })
+            runner.add(job)
+
+            await runner.tick(new Date(AT))
+
+            expect(job.run).not.toHaveBeenCalled()
+        })
+
+        it("runs an interval job at the first tick and again once the interval passed", async () => {
+            const { runner } = await build()
+            const job = jobOf("purge", { everyMs: 60_000 })
+            runner.add(job)
+
+            await runner.tick(new Date(AT))
+            await runner.tick(new Date("2026-05-01T10:00:59.999Z"))
+            expect(job.run).toHaveBeenCalledTimes(1)
+
+            await runner.tick(new Date("2026-05-01T10:01:00.000Z"))
+            expect(job.run).toHaveBeenCalledTimes(2)
+        })
+
+        it("does not run a job whose lease another replica holds", async () => {
+            const { runner, lease, logger } = await build()
+            const job = jobOf("purge", { everyMs: 60_000 })
+            runner.add(job)
+            await lease.acquire({ name: "purge", holder: "other-replica", ttlMs: 60_000 })
+
+            await runner.tick(new Date(AT))
+
+            expect(job.run).not.toHaveBeenCalled()
+            expect(logger.info).not.toHaveBeenCalled()
+        })
+
+        it("takes the lease for the run and logs the completed job with its fence and duration", async () => {
+            const { runner, clock, lease, logger } = await build()
+            runner.add(
+                jobOf("purge", { everyMs: 60_000 }, () => {
+                    clock.advance(5)
+                    return Promise.resolve()
+                }),
+            )
+
+            await runner.tick(new Date(AT))
+
+            expect(lease.isHeld("purge")).toBe(true)
+            expect(lease.fenceOf("purge")).toBe(1)
+            expect(logger.info).toHaveBeenCalledWith(SchedulingLogEvent.JobCompleted, { job: "purge", fence: 1, durationMs: 5 })
+        })
+
+        it("logs a failed job, releases its lease and runs it again at the next due tick", async () => {
+            const { runner, lease, logger } = await build()
+            const failure = new Error("boom")
+            const job = jobOf("purge", { everyMs: 1000 }, () => Promise.reject(failure))
+            runner.add(job)
+
+            await runner.tick(new Date(AT))
+
+            expect(logger.error).toHaveBeenCalledWith(SchedulingLogEvent.JobFailed, failure, { job: "purge", fence: 1 })
+            expect(lease.isHeld("purge")).toBe(false)
+
+            await runner.tick(new Date("2026-05-01T10:00:01.000Z"))
+            expect(job.run).toHaveBeenCalledTimes(2)
+        })
+
+        it("never overlaps a job with itself in this process", async () => {
+            const { runner } = await build()
+            const running = gate()
+            const job = jobOf("purge", { everyMs: 1000 }, () => running.promise)
+            runner.add(job)
+
+            const first = runner.tick(new Date(AT))
+            await flush()
+            await runner.tick(new Date("2026-05-01T10:00:02.000Z"))
+            running.open()
+            await first
+
+            expect(job.run).toHaveBeenCalledTimes(1)
+        })
+    })
+
+    describe("lifecycle", () => {
+        it("never ticks when no job is registered", async () => {
+            jest.useFakeTimers()
+            const { runner } = await build()
+
+            runner.onApplicationBootstrap()
+
+            expect(jest.getTimerCount()).toBe(0)
+        })
+
+        it("ticks every tick interval with the instant of the clock while jobs are registered", async () => {
+            jest.useFakeTimers()
+            const { runner, clock } = await build()
+            const job = jobOf("purge", { everyMs: 1000 })
+            runner.add(job)
+
+            runner.onApplicationBootstrap()
+            await jest.advanceTimersByTimeAsync(1000)
+            clock.advance(1000)
+            await jest.advanceTimersByTimeAsync(1000)
+
+            expect(job.run).toHaveBeenCalledTimes(2)
+            expect(job.run).toHaveBeenLastCalledWith(new Date("2026-05-01T10:00:01.000Z"))
+        })
+
+        it("stops ticking on shutdown", async () => {
+            jest.useFakeTimers()
+            const { runner } = await build()
+            runner.add(jobOf("purge", { everyMs: 1000 }))
+            runner.onApplicationBootstrap()
+
+            runner.onApplicationShutdown()
+
+            expect(jest.getTimerCount()).toBe(0)
+        })
+
+        it("does not schedule another tick when shutdown arrives while a tick runs", async () => {
+            jest.useFakeTimers()
+            const { runner } = await build()
+            const running = gate()
+            runner.add(jobOf("purge", { everyMs: 1000 }, () => running.promise))
+            runner.onApplicationBootstrap()
+            await jest.advanceTimersByTimeAsync(1000)
+
+            runner.onApplicationShutdown()
+            running.open()
+            await jest.advanceTimersByTimeAsync(0)
+
+            expect(jest.getTimerCount()).toBe(0)
+        })
+
+        it("shuts down cleanly when it never started", async () => {
+            const { runner } = await build()
+
+            expect(runner.onApplicationShutdown()).toBeUndefined()
+        })
     })
 })

@@ -18,6 +18,6 @@ export class RenderMetricsHandler extends ICQRSHandler<RenderMetricsQuery, Rende
     }
 
     protected override process(): Promise<RenderMetricsResult> {
-        return Promise.resolve({ exposition: this.metrics.renderPrometheus() })
+        return Promise.resolve(this.metrics.render())
     }
 }

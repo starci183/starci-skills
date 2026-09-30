@@ -5,6 +5,9 @@ import { MODULE_OPTIONS_TOKEN } from "./probes.module-definition"
 import type { ProbesOptions } from "./probes.options"
 import type { Probe } from "./probes.port"
 
+/** Token of the probes options, exported so a spec can provide it. */
+export const PROBES_OPTIONS = MODULE_OPTIONS_TOKEN
+
 /** Token of the ProbeChecker. */
 export const PROBE_CHECKER: unique symbol = Symbol("platform.probes.checker")
 
@@ -13,7 +16,7 @@ export const PROBES: unique symbol = Symbol("platform.probes.probes")
 
 /** Injects the options of the probes capability. Parameter type: ProbesOptions. */
 export const InjectProbesOptions = (): TypedParameterDecorator<ProbesOptions> =>
-    injector<ProbesOptions>(MODULE_OPTIONS_TOKEN)
+    injector<ProbesOptions>(PROBES_OPTIONS)
 
 /** Injects the probes this app reports on. Parameter type: ReadonlyArray of Probe. */
 export const InjectProbes = (): TypedParameterDecorator<ReadonlyArray<Probe>> =>
