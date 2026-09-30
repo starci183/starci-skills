@@ -1,0 +1,875 @@
+# HFS slot manifest (owner-approved 2026-09-29, decisions 1-10 in the owner decisions record).
+# The one place that says what may exist in a StarCi product repository and where. Every tracked path of every
+# repository must match exactly one slot. Checks, lint factories, the architecture machine, templates and the why
+# catalog READ this file through scripts/lib/hfs-slots.mjs; none of them hardcodes a path.
+# Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
+schema: starci/hfs-slots@1
+version: 1.0.0
+
+versioning:
+  # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 1).
+  patch: wording, why text, examples; no check result can change.
+  minor: >-
+    add a slot (always presence optional or opt-in), add an app kind or protocol slot, add a rule at severity warn,
+    tighten a budget that no pinned repo currently exceeds. A minor never changes an existing slot's path,
+    presence, imports or tests. Every repo pinned to the same MAJOR stays green without edits.
+  major: >-
+    change or remove an existing slot, make an optional slot required, promote a rule warn to error, change the
+    direction matrix. Needs owner approval and a migration lane per repo. There is no compatibility window: the old
+    MAJOR is refused the day the new one lands (owner ruling: no backward compatibility).
+  retire: >-
+    a slot is never edited in place; it gets retiredIn (a major) and a successor slot id. After that major a
+    path matching a retired slot is HFS_SLOT_RETIRED (error).
+  pins: knowledge/hfs/canon-pins.yaml carries the exact versions of every @starci/* package and framework this MAJOR supports.
+
+# Field meaning, per slot.
+#   id          stable name, never changes meaning inside a major.
+#   profiles    be, fe, or both: the repository profiles the slot exists in.
+#   path        pattern. <name> is one path segment (bound to the variable name), * and ? stay inside a segment,
+#               ** spans directories, {a,b} alternates. A pattern ending in / is a directory: it owns everything
+#               below it, except what a more specific slot owns. Otherwise it names files.
+#   presence    required | optional | opt-in (legal only when hfs.json lists it or declares an app of its kind) | forbidden.
+#               A slot is optional in the sense of the requirements list when its presence is not required.
+#   tracked     tracked (committed) | ignored (may exist, must be gitignored) | external (must not exist in the tree;
+#               goesTo says where it lives).
+#   tier        node of the import direction matrix (tiers below); none = takes no part in import checks;
+#               inherit = the tier of the enclosing owner.
+#   owner       true when every directory matching the slot is an owner: the unit cross-owner imports and cycles use.
+#   requires    files or directories that must exist inside each instance; <var> is replaced by the bound name,
+#               a leading / means repository root; a trailing / means directory.
+#   requiredInstances  variable -> names that must exist as instances (config, logging ... of platform).
+#   minInstances       at least this many instances (one feature, one api app).
+#   requiredWhen       connections: required only when hfs.json declares a database connection.
+#   allows / forbids   names inside the instance; the loader exposes them, slot-check enforces them.
+#   tests       unit-beside | e2e | none.
+#   budget      size budgets (lines per file, files per slot, exports).
+#   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
+#   managedBy   template id that hfs sync renders; a difference is HFS_MANAGED_FILE_DRIFT.
+#   rules       rule ids (the catalog lands with knowledge/hfs/rules.yaml).
+#   since / retiredIn / successor   lifecycle.
+presenceValues: [required, optional, opt-in, forbidden]
+trackedValues: [tracked, ignored, external]
+testValues: [unit-beside, e2e, none]
+
+appKinds:
+  be: [api, worker, migrate, cli]
+  fe: [next]
+
+# ---------------------------------------------------------------------------------------------------------
+# Tiers and the dependency direction matrix (owner granularity; type-only imports count; no cycles anywhere)
+# mayImport lists the tiers a file of that tier may import. Importing inside the same owner is always allowed.
+# ---------------------------------------------------------------------------------------------------------
+tiers:
+  be:
+    app:          {mayImport: [feature, domain, platform, integrations, package]}
+    feature:      {mayImport: [domain, platform, integrations, package]}          # never another feature
+    domain:       {mayImport: [domain, platform, integrations, package], acyclic: true}
+    integrations: {mayImport: [platform, package]}
+    platform:     {mayImport: [platform, package], acyclic: true}
+    e2e:          {mayImport: [e2e, app, feature, domain, platform, integrations, fixtures, package]}
+    fixtures:     {mayImport: [domain, platform, integrations, package]}          # public contracts only
+    package:      {mayImport: [package]}
+  fe:
+    route:        {mayImport: [feature, foundation, modules, transport, package]} # app/** adapters
+    feature:      {mayImport: [components, hooks, foundation, modules, transport, package]}
+    # A component never reaches data: config, routes, i18n and types are foundation; every other module and the api
+    # transport are reached through a hook (owner decision 2026-09-29).
+    components:   {mayImport: [components, hooks, foundation, package], lowerLayerOnly: true} # blocks, composites, branches, leaves
+    # Across domains a hook is imported only through the other domain's public index (hooks/<domain>/index.ts), never deep.
+    hooks:        {mayImport: [hooks, foundation, modules, transport, package]}
+    foundation:   {mayImport: [foundation, package], acyclic: true}               # modules/{config,i18n,routes,types}
+    modules:      {mayImport: [foundation, modules, transport, package], acyclic: true}
+    transport:    {mayImport: [foundation, modules, package]}                     # modules/api: the one fetch
+    e2e:          {mayImport: [e2e, package]}                                     # black box: no app source
+    package:      {mayImport: [package]}
+crossOwner: every import across owners targets the owner's public entry (index.ts or index.tsx); never export *.
+crossApp: apps never import each other; shared code is a packages/<pkg> slot.
+
+# Parameters the lint factories and checks read per profile (through ruleParams(profile) in scripts/lib/hfs-slots.mjs).
+ruleParams:
+  be:
+    # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft.
+    fileLines: {soft: 500, hardGrowth: true}
+    # R21 HFS_DUPLICATE_CODE: the ONE threshold of duplicate code (the architecture machine reads it here; no other file states it):
+    # a token-normalised block of at least `lines` source lines and `tokens` tokens that appears twice.
+    duplicateBlock: {lines: 8, tokens: 60}
+    # R90 BE_INFRA_OWNER: raw infrastructure library (a module specifier or a global reference) -> the platform or
+    # integration capabilities allowed to import it; [] means nowhere in a back end. A specifier also covers its subpaths.
+    infraOwners:
+      fetch: [platform/http]
+      axios: [platform/http]
+      got: [platform/http]
+      undici: [platform/http]
+      "node:http": [platform/http]
+      "node:https": [platform/http]
+      http: [platform/http]
+      https: [platform/http]
+      cache-manager: [integrations/cache, integrations/redis]
+      redis: [integrations/cache, integrations/redis]
+      ioredis: [integrations/cache, integrations/redis]
+      bullmq: [platform/messaging]
+      "@nestjs/bullmq": [platform/messaging]
+      kafkajs: [platform/messaging]
+      "@nestjs/schedule": [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      setInterval: [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      setTimeout: [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      "node:timers": [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      "node:timers/promises": [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      winston: [platform/logging]
+      dayjs: [platform/clock, platform/primitives]
+      moment: [platform/clock, platform/primitives]
+      date-fns-tz: [platform/clock, platform/primitives]
+      "@nestjs/config": []
+      dotenv: []
+      "@nestjs/event-emitter": []
+    # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
+    # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
+    # only names outside it.
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, e2e-spec, global-setup]
+    bannedSuffixes: [use-case, repository, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
+  fe:
+    # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
+    fileLines: {soft: 500, hardGrowth: true}
+    # FE_TRANSPORT_OWNER: the one module per app that may call fetch.
+    clientModule: "apps/<app>/src/modules/api/client.ts"
+    duplicateBlock: {lines: 8, tokens: 60}
+
+slots:
+
+  # ----- repository root (both profiles) ---------------------------------------------------------------
+  - id: repo.readme
+    profiles: [be, fe]
+    path: README.md
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_README_*]
+  - id: repo.declaration
+    profiles: [be, fe]
+    path: hfs.json
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_ARCH_CONFIG_UNREAD]
+  - id: repo.package-manifest
+    profiles: [be, fe]
+    path: "{package.json,package-lock.json}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT]
+  - id: repo.git-meta
+    profiles: [be, fe]
+    path: "{.gitignore,.gitattributes}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: gitignore-base
+    rules: [HFS_GITIGNORE_BLOCK_DRIFT]
+  - id: repo.tool-config
+    profiles: [be, fe]
+    path: "{tsconfig.json,eslint.config.mjs,.editorconfig,.nvmrc,.prettierignore}"
+    presence: required     # each file is a thin extends of a canon package
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: tool-config
+    rules: [HFS_TOOL_CONFIG_LOCAL, HFS_MANAGED_FILE_DRIFT, HFS_TS_STRICT]
+  - id: repo.tool-config-optional
+    profiles: [be, fe]
+    path: "{tsconfig.build.json,tsconfig.e2e.json,.npmrc,jest.config.e2e.js}"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: tool-config
+    rules: [HFS_TOOL_CONFIG_LOCAL, HFS_MANAGED_FILE_DRIFT]
+  - id: be.tool-config
+    profiles: [be]
+    path: "{nest-cli.json,jest.config.js}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: tool-config
+    rules: [HFS_TOOL_CONFIG_LOCAL, HFS_MANAGED_FILE_DRIFT]
+  - id: fe.tool-config
+    profiles: [fe]
+    path: "{vitest.config.ts,vitest.setup.ts,playwright.config.ts,turbo.json}"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: tool-config
+    rules: [HFS_TOOL_CONFIG_LOCAL, HFS_MANAGED_FILE_DRIFT]
+  - id: repo.quality-config
+    profiles: [be, fe]
+    path: "{sonar-project.properties,codecov.yml}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: quality-config
+    rules: [HFS_SONAR_CONFIG, HFS_MANAGED_FILE_DRIFT]
+  - id: repo.hooks
+    profiles: [be, fe]
+    path: ".husky/{pre-commit,pre-push}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: husky
+    rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
+  - id: repo.ci
+    profiles: [be, fe]
+    path: ".github/workflows/ci.yml"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: ci-workflows
+    rules: [HFS_CI_E2E_AUTOMATIC, HFS_CI_MISSING_CANON, HFS_MANAGED_FILE_DRIFT]
+  - id: repo.ci-e2e
+    profiles: [be, fe]
+    path: ".github/workflows/e2e.yml"
+    presence: optional     # on: workflow_dispatch only
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: ci-workflows
+    rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
+  - id: repo.github-meta
+    profiles: [be, fe]
+    path: ".github/{CODEOWNERS,pull_request_template.md,ISSUE_TEMPLATE/**,dependabot.yml}"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: repo.scripts
+    profiles: [be, fe]
+    path: "scripts/<name>.mjs"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_SCRIPT_ONE_OFF]     # one-off codemods and fix-* scripts are agent output, not tooling
+  - id: repo.docs
+    profiles: [be, fe]
+    path: "docs/{adr,runbooks,guides}/**/*.md"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_ROOT_MARKDOWN_FORBIDDEN]
+  - id: repo.docs-media
+    profiles: [be, fe]
+    path: "docs/**/*.{png,svg,webp}"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    budget: {bytes: 512000}
+  - id: repo.packages
+    profiles: [be, fe]
+    path: "packages/<pkg>/"
+    presence: opt-in
+    tracked: tracked
+    tier: package
+    owner: true
+    requires: [package.json, src/index.ts, tsconfig.json]
+    tests: unit-beside
+    rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
+  - id: repo.app-image
+    profiles: [be, fe]
+    path: "apps/<app>/Dockerfile"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: repo.dockerignore
+    profiles: [be, fe]
+    path: .dockerignore
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+
+  # ----- never tracked: build output the tools need in place ---------------------------------------------
+  - id: repo.build-output
+    profiles: [be, fe]
+    path: "{**/node_modules/,dist/,apps/*/dist/,packages/*/dist/,.next/,apps/*/.next/,coverage/,test-results/,playwright-report/,**/next-env.d.ts,**/*.tsbuildinfo}"
+    presence: optional
+    tracked: ignored
+    tier: none
+    tests: none
+  - id: repo.generated
+    profiles: [be, fe]
+    path: "{**/__generated__/,apps/*/src/schema.gql}"
+    presence: optional
+    tracked: ignored
+    tier: none
+    tests: none
+    why: produced by `npm run codegen` (prebuild and pretypecheck); never committed
+
+  # ----- never in the working tree: caches, scratch, agent output ----------------------------------------
+  - id: repo.tool-cache
+    profiles: [be, fe]
+    path: "{.eslintcache,.turbo/,.scannerwork/,.sonar/,.jest-cache/,.cache/,.tools/}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "${STARCI_CACHE_HOME:-%LOCALAPPDATA%/StarCi/cache}/<repo>/<tool>/ (the canon presets set eslint --cache-location, jest cacheDirectory, turbo cacheDir, sonar.working.directory)"
+  - id: repo.agent-output
+    profiles: [be, fe]
+    path: "{report*.json,*.tmp.json,%*%,nul,.qwen*,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "agent scratchpad or the StarCi blob store (%LOCALAPPDATA%/StarCi/blobs), cited by {name, sha256}"
+    rules: [HFS_UNTRACKED_ROOT_ENTRY, HFS_AGENT_DATA_TRACKED]
+  - id: repo.worktrees
+    profiles: [be, fe]
+    path: "{.worktrees/,worktrees/,.starciwork/worktrees/}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "D:/starci-lanes/<project>/<lane>/ (outside every repository)"
+  - id: repo.plaintext-env
+    profiles: [be, fe]
+    path: "{.env,.env.*,.secrets/,**/*.pem,**/*.key}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: ".starcistacks/<env>/secrets/<slug>.enc (BE repo); decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
+    rules: [HFS_PLAINTEXT_SECRET]
+  - id: be.root-e2e
+    profiles: [be]
+    path: "e2e/"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "src/tests/e2e/ for specs; operational probes move to scripts/ or are deleted"
+
+  # ----- contract snapshots (the committed machine-emitted files, because they are a cross-repo interface) --
+  - id: be.contract.graphql
+    profiles: [be]
+    path: "contracts/<app>/schema.graphql"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    why: emitted by `npm run contract:emit`; CI fails when the emitted file differs (a contract, not a build artefact)
+    rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
+  - id: be.contract.openapi
+    profiles: [be]
+    path: "contracts/<app>/openapi.json"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
+  - id: fe.contract.copy
+    profiles: [fe]
+    path: "apps/<app>/src/modules/api/contract/<be-app>.{graphql,json}"
+    presence: opt-in
+    tracked: tracked
+    tier: none
+    tests: none
+    why: byte copy of the BE snapshot, refreshed by `npm run contract:pull`; the land gate compares hashes
+    rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
+
+  # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
+  - id: be.app.api
+    profiles: [be]
+    path: "apps/<app>/src/"
+    appKind: api
+    presence: required            # at least one api app
+    tracked: tracked
+    tier: app
+    owner: true
+    minInstances: 1
+    requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
+    allows: [main.ts, app.module.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
+    tests: unit-beside            # the composition spec boots the REAL AppModule with stubbed options
+    budget: {app.module.ts: 250, main.ts: 80}
+    rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED]
+  - id: be.app.worker
+    profiles: [be]
+    path: "apps/<app>/src/"
+    appKind: worker               # composes transport/schedule and transport/message modules only
+    presence: opt-in
+    tracked: tracked
+    tier: app
+    owner: true
+    requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
+    tests: unit-beside
+    rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED]
+  - id: be.app.migrate
+    profiles: [be]
+    path: "apps/<app>/src/"
+    appKind: migrate              # the ONLY process that runs migrations (one run per connection, before api/worker start)
+    presence: required
+    requiredWhen: connections     # required as soon as hfs.json declares a connection
+    tracked: tracked
+    tier: app
+    owner: true
+    requires: [main.ts, "<app>.composition.spec.ts"]
+    tests: unit-beside
+    rules: [BE_SCHEMA_AUTHORITY, BE_ENTRYPOINT_ONLY_IN_APPS]
+  - id: be.app.cli
+    profiles: [be]
+    path: "apps/<app>/src/"
+    appKind: cli
+    presence: opt-in
+    tracked: tracked
+    tier: app
+    owner: true
+    requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
+    tests: unit-beside
+
+  # ----- BE: features ------------------------------------------------------------------------------------
+  - id: be.feature
+    profiles: [be]
+    path: "src/features/<feature>/"
+    presence: required
+    tracked: tracked
+    tier: feature
+    owner: true
+    minInstances: 1
+    requires: [index.ts, "<feature>.module.ts", application/]
+    allows: [index.ts, "<feature>.module.ts", application/, transport/, messages/]   # nothing else at feature root
+    tests: unit-beside
+    budget: {files: 250, indexExports: 60}   # a feature above 250 source files must be split by product capability
+    rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
+  - id: be.feature.application
+    profiles: [be]
+    path: "src/features/<feature>/application/"
+    presence: required
+    tracked: tracked
+    tier: feature
+    allows: ["<action>.{command,query,handler,contracts}.ts", "*.spec.ts"]
+    forbids: [graphql/, http/, message/, schedule/, transport/]   # no protocol names under application/
+    tests: unit-beside
+    rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]
+  - id: be.feature.application.support
+    profiles: [be]
+    path: "src/features/<feature>/application/support/"
+    presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
+    tracked: tracked
+    tier: feature                 # feature tier: another feature cannot import it (features never import features)
+    allows: ["<name>.<role>.ts", "*.spec.ts"]     # <role> from ruleParams.be.suffixes; no <name>.types.ts
+    forbids: [graphql/, http/, message/, schedule/, transport/]
+    tests: unit-beside            # a <name>.spec.ts beside every <name>.ts
+    rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_FEATURE_IMPORTS_FEATURE]
+    since: 1.0.0
+  - id: be.transport.http
+    profiles: [be]
+    path: "src/features/<feature>/transport/http/"
+    presence: optional
+    tracked: tracked
+    tier: feature
+    requires: ["<feature>-http.module.ts"]
+    allows: ["<action>.controller.ts", "dto/<action>.{request,response}.ts", "<action>.mapper.ts", "*.spec.ts"]
+    tests: unit-beside
+    rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
+  - id: be.transport.graphql
+    profiles: [be]
+    path: "src/features/<feature>/transport/graphql/"
+    presence: optional
+    tracked: tracked
+    tier: feature
+    requires: ["<feature>-graphql.module.ts"]
+    allows: ["<action>.resolver.ts", "dto/<action>.{input,type,args}.ts", "<action>.mapper.ts", "*.spec.ts"]
+    tests: unit-beside
+    rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
+  - id: be.transport.message
+    profiles: [be]
+    path: "src/features/<feature>/transport/message/"
+    presence: opt-in              # queue worker: consumed only by a worker app
+    tracked: tracked
+    tier: feature
+    requires: ["<feature>-message.module.ts"]
+    allows: ["<event>.consumer.ts", "<event>.message.ts", "*.spec.ts"]
+    tests: unit-beside
+    rules: [BE_BACKGROUND_UNOWNED]
+  - id: be.transport.schedule
+    profiles: [be]
+    path: "src/features/<feature>/transport/schedule/"
+    presence: opt-in              # cron job, sweep or outbox publisher: consumed only by a worker app
+    tracked: tracked
+    tier: feature
+    requires: ["<feature>-schedule.module.ts"]
+    allows: ["<job>.job.ts", "*.spec.ts"]
+    tests: unit-beside
+    rules: [BE_BACKGROUND_UNOWNED]
+  - id: be.transport.websocket
+    profiles: [be]
+    path: "src/features/<feature>/transport/websocket/"
+    presence: opt-in
+    tracked: tracked
+    tier: feature
+    requires: ["<feature>-websocket.module.ts"]
+    allows: ["<channel>.gateway.ts", "dto/*.ts", "*.spec.ts"]
+    tests: unit-beside
+    since: 1.0.0
+  - id: be.feature.transport.cli
+    profiles: [be]
+    path: "src/features/<feature>/transport/cli/"
+    presence: opt-in              # a command line entry: dispatches one command or query, composed by an app of kind cli
+    tracked: tracked
+    tier: feature
+    requires: ["<feature>-cli.module.ts"]
+    allows: ["<name>.cli.ts", "dto/*.ts", "*.spec.ts"]     # .cli.ts: .command.ts is a CQRS message (HFS delta 3)
+    tests: unit-beside
+    rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_FEATURE_NOT_COMPOSED, BE_ENTRYPOINT_ONLY_IN_APPS]
+    since: 1.0.0
+
+  # ----- BE: modules (three tiers, closed set) -----------------------------------------------------------
+  - id: be.domain
+    profiles: [be]
+    path: "src/modules/domain/<capability>/"
+    presence: optional
+    tracked: tracked
+    tier: domain
+    owner: true
+    requires: [index.ts]
+    allows: ["<capability>.module.ts", "<capability>.config.ts", "<capability>.options.ts", errors/, messages/, persistence/, policies/, "*.service.ts", "*.contracts.ts", "*.spec.ts"]
+    forbids: [testing/, exceptions/, utils/, helpers/, shared/]
+    tests: unit-beside
+    budget: {indexExports: 60}
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_ERROR_HOME, BE_CONFIG_OWNER]
+  - id: be.errors
+    profiles: [be]
+    path: "src/modules/{domain,integrations}/<capability>/errors/"
+    presence: optional
+    tracked: tracked
+    tier: inherit
+    allows: ["<capability>.error.ts", "<name>.error.ts", "*.spec.ts"]   # one family per capability, extends platform/errors DomainError
+    tests: unit-beside
+    rules: [BE_ERROR_HOME]
+  - id: be.domain.messages
+    profiles: [be]
+    path: "src/modules/{domain,integrations}/<capability>/messages/"
+    presence: optional            # a capability that raises no user-facing text carries none
+    tracked: tracked
+    tier: inherit
+    allows: ["<capability>.messages.ts", "*.spec.ts"]   # one keyed catalog per capability, vi and en, read through the platform/i18n MessageCatalog port
+    tests: unit-beside
+    rules: [BE_USER_COPY_LITERAL]
+    since: 1.0.0
+  - id: be.feature.messages
+    profiles: [be]
+    path: "src/features/<feature>/messages/"
+    presence: optional
+    tracked: tracked
+    tier: feature
+    allows: ["<feature>.messages.ts", "*.spec.ts"]   # one keyed catalog per feature, vi and en, read through the platform/i18n MessageCatalog port
+    tests: unit-beside
+    rules: [BE_USER_COPY_LITERAL]
+    since: 1.0.0
+  - id: be.persistence
+    profiles: [be]
+    path: "src/modules/{domain,platform}/<capability>/persistence/"
+    presence: optional
+    tracked: tracked
+    tier: inherit
+    requires: [connection.ts]     # export const CONNECTION = "<name from hfs.json connections>"
+    allows: ["entities/<table>.entity.ts", "migrations/<epochMs13>-<kebab-name>.ts", "<name>.sql.ts", "<name>.rows.ts", connection.ts, "*.spec.ts"]
+    forbids: [index.ts, "<name>.repository.ts"]
+    tests: unit-beside
+    rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE]
+  - id: be.platform
+    profiles: [be]
+    path: "src/modules/platform/<capability>/"
+    presence: required
+    tracked: tracked
+    tier: platform
+    owner: true
+    # config = EnvSource reader only; logging = LoggerPort + adapter; errors = DomainError base + one filter + GraphQL
+    # formatError with masking; primitives = isRecord, hashing, ids, cookies; clock = the injected Clock port
+    # (now()), with a FakeClock test double from @starci/jest-preset; i18n = the MessageCatalog port, a keyed
+    # lookup with named interpolation over the vi/en catalogs a capability or feature carries in its messages/,
+    # resolved through the RequestLocale provider (request: stored user preference, else Accept-Language, else
+    # vi; non-request: recipient's stored preference, else vi - see knowledge/patterns/be/messages.yaml);
+    # database when a connection exists.
+    requiredInstances: {capability: [config, logging, errors, primitives, clock, i18n]}
+    requires: [index.ts]
+    forbids: [common/, utils/, shared/, testing/]   # primitives live in platform/primitives
+    tests: unit-beside
+    rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE]
+  - id: be.integrations
+    profiles: [be]
+    path: "src/modules/integrations/<provider>/"
+    presence: optional
+    tracked: tracked
+    tier: integrations
+    owner: true
+    requires: [index.ts, "<provider>.config.ts"]
+    tests: unit-beside
+    rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT]
+  - id: be.integrations.model
+    profiles: [be]
+    path: "src/modules/integrations/<provider>/model/"
+    presence: opt-in
+    tracked: tracked
+    tier: integrations
+    tests: unit-beside
+    why: an ML or LLM model client is an integration; weights and datasets are never in git
+
+  # ----- BE: tests ---------------------------------------------------------------------------------------
+  - id: be.tests.e2e
+    profiles: [be]
+    path: "src/tests/e2e/<area>/*.e2e-spec.ts"
+    presence: optional
+    tracked: tracked
+    tier: e2e
+    tests: e2e
+    rules: [HFS_CI_E2E_AUTOMATIC, BE_TEST_TOPOLOGY, BE_E2E_FLOW]
+  - id: be.tests.e2e-live
+    profiles: [be]
+    path: "src/tests/e2e/live/<area>/*.e2e-spec.ts"
+    presence: opt-in
+    tracked: tracked
+    tier: e2e
+    tests: e2e
+    why: run only by test:e2e:live (E2E_LIVE=1); excluded from plain test:e2e by folder, never by file name
+  - id: be.tests.e2e-setup
+    profiles: [be]
+    path: "src/tests/e2e/setup/"
+    presence: optional
+    tracked: tracked
+    tier: e2e
+    tests: none
+    why: boots the REAL AppModule and overrides providers; no per-lane hand-assembled modules
+  - id: be.tests.fixtures
+    profiles: [be]
+    path: "src/tests/fixtures/"
+    presence: optional
+    tracked: tracked
+    tier: fixtures
+    allows: [database.ts]         # mockEntityManager() and fakeTransaction() (BE-CONVENTION 1.16); other fixtures use role suffixes
+    tests: unit-beside
+    why: typed data builders and typed mock<T>() doubles; importable by unit specs and e2e; never imports a feature
+
+  # ----- BE: work and stacks -----------------------------------------------------------------------------
+  - id: be.starciwork
+    profiles: [be]
+    path: ".starciwork/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    requires: [.gitignore, workspace.yaml, features/index.yaml]
+    allows: [workspace.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml",
+             "features/<feature>/<family>/<name>/index.yaml", "features/<feature>/br/<rule>/ac/<name>/index.yaml",
+             "features/<feature>/ui/<name>/assets/<approved-file>", "features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml",
+             "features/<feature>/uat/<name>/{seed,cleanup}.sql", "_resources/{identities,environments,fixtures}/<slug>/resource.yaml"]
+    forbids: [evidence/, logs/, reports/, captures/, runs/, "kernel-*/", "*.sqlite*", _derived/, "work/node records"]
+    rules: [HFS_AGENT_DATA_TRACKED, HFS_WORK_NODE_RETIRED, HFS_IDENTITY_CUSTODY]
+  - id: be.starcistacks
+    profiles: [be]
+    path: ".starcistacks/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    requires: [application-stacks.yaml]
+    allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform}/**",
+             "<env>/runtime/{config,env}/**", "<env>/runtime/env/KEYS.md", "<env>/secrets/<slug>.enc", "<env>/seeds/**"]
+    forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
+    rules: [HFS_STACKS_SHAPE, HFS_PLAINTEXT_SECRET, HFS_IDENTITY_CUSTODY]
+  - id: be.sops
+    profiles: [be]
+    path: .sops.yaml
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: sops-policy
+
+  # ----- FE: apps ----------------------------------------------------------------------------------------
+  - id: fe.app.next
+    profiles: [fe]
+    path: "apps/<app>/{package.json,next.config.ts,tsconfig.json,postcss.config.mjs}"
+    appKind: next
+    presence: required
+    tracked: tracked
+    tier: none
+    minInstances: 1
+    requires: [package.json, next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/, src/modules/api/,
+               "src/app/global-error.tsx", "src/app/[locale]/layout.tsx", "src/app/[locale]/error.tsx", "src/app/[locale]/not-found.tsx", "src/app/[locale]/loading.tsx"]
+    tests: none
+    rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS]
+  - id: fe.app-optional
+    profiles: [fe]
+    path: "apps/<app>/{vitest.config.ts,public/}"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: fe.route
+    profiles: [fe]
+    path: "apps/<app>/src/app/"
+    presence: required
+    tracked: tracked
+    tier: route
+    allows: ["[locale]/**/{page,layout,template,loading,error,not-found}.tsx", "[locale]/**/route.ts", global-error.tsx, "page.tsx (redirect only)",
+             "health/{live,ready}/route.ts", globals.css, "icon.*", robots.ts, sitemap.ts]
+    tests: none
+    rules: [FE_ROUTE_FILES_THIN, FE_CLIENT_BOUNDARY, FE_OWNER_REACHABLE]
+  - id: fe.source-root-pinned
+    profiles: [fe]
+    path: "apps/<app>/src/{proxy.ts,instrumentation.ts,instrumentation-client.ts}"
+    presence: optional
+    tracked: tracked
+    tier: route
+    tests: none
+    rules: [FE_NEXT_CONVENTIONS]   # middleware.ts is refused on Next >= 16
+  - id: fe.feature
+    profiles: [fe]
+    path: "apps/<app>/src/features/{pages,layouts,overlays}/<name>/"
+    presence: required
+    tracked: tracked
+    tier: feature
+    owner: true
+    requires: [index.tsx]
+    allows: [index.tsx, component.tsx, classNames.ts, "*.spec.tsx", "*.spec.ts"]
+    tests: unit-beside
+    budget: {component.tsx: 300, index.tsx: 200}
+    rules: [FE_SIZE_BUDGET, FE_OWNER_REACHABLE, FE_I18N_LITERAL]
+  - id: fe.components
+    profiles: [fe]
+    path: "apps/<app>/src/components/{blocks,composites,branches,leaves}/<name>/"
+    presence: optional
+    tracked: tracked
+    tier: components
+    owner: true
+    layers: [blocks, composites, branches, leaves]   # a layer imports only the layers after it
+    requires: [index.tsx]
+    allows: [index.tsx, component.tsx, classNames.ts, "*.spec.tsx", "*.spec.ts"]
+    tests: unit-beside
+    budget: {component.tsx: 300, index.tsx: 200, dataHooks: 6, useState: 6}
+    rules: [FE_CONNECTED_BLOCK_RENDER_PAIR, FE_I18N_LITERAL, FE_NATIVE_FORM_CONTROL, FE_CLIENT_BOUNDARY]
+  - id: fe.hooks
+    profiles: [fe]
+    path: "apps/<app>/src/hooks/<domain>/"
+    presence: optional
+    tracked: tracked
+    tier: hooks
+    owner: true                   # a domain is an owner: other domains import it through index.ts only
+    requires: [index.ts]
+    allows: [index.ts, "use<name>.ts", "<domain>.shared.ts", "*.spec.ts"]   # React hooks only; <domain>.shared.ts = sanctioned non-hook helpers
+    tests: unit-beside
+    budget: {file: 200}
+    rules: [FE_HOOKS_ARE_HOOKS, FE_DATA_FRESHNESS]
+  - id: fe.modules
+    profiles: [fe]
+    path: "apps/<app>/src/modules/<capability>/"
+    presence: required
+    tracked: tracked
+    tier: modules
+    owner: true
+    requiredInstances: {capability: [api, config, i18n, routes]}
+    requires: [index.ts]
+    tests: unit-beside
+    budget: {file: 400}
+    rules: [FE_ENV_OWNER, FE_TRANSPORT_OWNER]
+  - id: fe.modules.api
+    profiles: [fe]
+    path: "apps/<app>/src/modules/api/"
+    presence: required
+    tracked: tracked
+    tier: transport
+    requires: [index.ts, client.ts, outcome.ts]      # client.ts is the only fetch; outcome.ts the only result vocabulary
+    allows: [client.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/*.graphql", "<domain>/<domain>.mapper.ts", contract/, __generated__/, "*.spec.ts"]
+    tests: unit-beside
+    rules: [FE_TRANSPORT_OWNER, FE_HTTP_STATUS_COLLAPSE, FE_WIRE_GENERATED]
+  - id: fe.modules.config
+    profiles: [fe]
+    path: "apps/<app>/src/modules/config/"
+    presence: required
+    tracked: tracked
+    tier: foundation
+    tests: unit-beside
+    why: the only reader of process.env and NEXT_PUBLIC_*; fails fast, no localhost fallback
+  - id: fe.modules.i18n
+    profiles: [fe]
+    path: "apps/<app>/src/modules/i18n/"
+    presence: required
+    tracked: tracked
+    tier: foundation
+    requires: [config.ts, routing.ts, navigation.ts, request.ts, messages/]
+    tests: unit-beside
+    rules: [FE_I18N_PLACEMENT, FE_I18N_CATALOG]
+  - id: fe.modules.brand
+    profiles: [fe]
+    path: "apps/<app>/src/modules/brand/brand.css"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    why: the ONLY app file that may hold colour values; sets grammar brand tokens only, light and dark
+    rules: [FE_STYLE_TOKEN_ONLY]
+  - id: fe.modules.routes
+    profiles: [fe]
+    path: "apps/<app>/src/modules/routes/"
+    presence: required
+    tracked: tracked
+    tier: foundation
+    tests: unit-beside
+    why: every href builder; FE_HREF_RESOLVES checks each against app/
+  - id: fe.modules.types
+    profiles: [fe]
+    path: "apps/<app>/src/modules/types/"
+    presence: optional
+    tracked: tracked
+    tier: foundation
+    tests: unit-beside
+    why: shared types with no runtime behaviour; a component may import them
+  - id: fe.package.ui
+    profiles: [fe]
+    path: "packages/<family>-ui/"
+    presence: opt-in
+    tracked: tracked
+    tier: package
+    owner: true
+    requires: [package.json, src/index.ts, tsconfig.json]
+    tests: unit-beside
+    why: built to dist with explicit named exports; only composites, branches and leaves; no unused export; no colour literal
+    rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT, FE_STYLE_TOKEN_ONLY]
+  - id: fe.e2e
+    profiles: [fe]
+    path: "e2e/<area>/*.e2e-spec.ts"
+    presence: optional
+    tracked: tracked
+    tier: e2e
+    tests: e2e
+    requires: [/playwright.config.ts, /tsconfig.e2e.json]
+    rules: [FE_E2E_SHAPE, HFS_CI_E2E_AUTOMATIC]
+  - id: fe.e2e-support
+    profiles: [fe]
+    path: "e2e/{support,fixtures}/"
+    presence: optional
+    tracked: tracked
+    tier: e2e
+    tests: none
+
+# Checks that read this manifest (all ship from .claude; none keeps its own path list)
+consumers:
+  - scripts/lib/hfs-slots.mjs                  # the loader every consumer below goes through
+  - scripts/checks/hfs/slot-check.mjs          # HFS_SLOT_* / tracked / external / managed drift
+  - scripts/checks/architecture.mjs            # tiers, direction matrix, cycles, reachability
+  - packages/eslint/be starciBeConfig({hfs})   # file globs for rules come from slots
+  - packages/eslint/fe starciFeConfig({hfs})
+  - packages/stylelint-canon                   # colour and brand allowances from fe.modules.brand
+  - scripts/hfs/sync.mjs                       # renders managedBy templates
+  - modules/kernel/failure-codes.yaml          # every rule id listed above has a Vietnamese why

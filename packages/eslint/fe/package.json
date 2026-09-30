@@ -13,6 +13,7 @@
     "*.mjs",
     "lib/*.mjs",
     "docs/*.md",
+    "runtime/**",
     "*.ts",
     "!*.test.mjs",
     "CHANGELOG.md",

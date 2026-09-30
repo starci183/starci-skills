@@ -1,0 +1,21 @@
+id: hfs-owed-misc
+effectiveAt: '2026-09-30T21:00:00+07:00'
+summary: >-
+  Lane C0 owed enforcers: R07 HFS_AGENT_DATA_TRACKED, R08 HFS_WORK_NODE_RETIRED and R09 HFS_IDENTITY_CUSTODY are enforced by
+  `starci validate` under their catalog codes (STARCIWORK_AGENT_DATA and WORK_NODE_RETIRED are renamed, one name per finding;
+  work-validate now runs the .starciwork product boundary, an identity must seal at identity-<slug>.enc and a flow selects
+  a role its identity presents). Stylelint enforcers are catalogued (R61, R18) and held by the parity gate like eslint ones;
+  eslint-fe file-size-growth (R20) ports the BE ratchet, its budget read from ruleParams.fe.fileLines.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-owed-misc.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/schemas/work-layout.yaml
+  - modules/schemas/stacks-layout.yaml
+  - modules/ops/_common.yaml
+  - modules/ops/ops/architecture.decide.yaml
+  - modules/ops/ops/business.decide.yaml
+  - modules/ops/ops/workspace.manage.yaml
+  - knowledge/hfs/rules.yaml
+  - scripts/checks/check-hfs-rules.mjs
+  - packages/hfs/scripts/sync-runtime.mjs

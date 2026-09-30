@@ -217,7 +217,7 @@ rules:
     failureCodes: ["HFS_SIZE_GROWTH"]
     enforcers:
       - {kind: eslint-be, id: file-size-growth}
-      - {kind: eslint-fe, id: file-size-growth, status: planned}
+      - {kind: eslint-fe, id: file-size-growth}
       - {kind: hfs, id: size-growth, status: planned}
       - {kind: sonar, id: cognitive-complexity, status: planned}
   - id: R21

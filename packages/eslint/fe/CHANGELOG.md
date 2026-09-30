@@ -6,6 +6,7 @@
   `no-vendor-icon-outside-icon-leaf` (icon law); one obligation has one rule (redundancy RED20). The copy in
   `vendor-boundary.mjs` is gone; `no-vendor-icon-outside-icon-leaf` is unchanged.
 - `no-internal-starci-href` gained its RuleTester cases.
+- New law `size-growth` (R20 `HFS_SIZE_GROWTH`): `file-size-growth` refuses a new source file over the line budget and an existing file over it that is longer than at the parent commit. The budget is `ruleParams.fe.fileLines` of the slot manifest, read through `lib/params.mjs` from the package's own `runtime/` copy (`packages/hfs/scripts/sync-runtime.mjs` keeps it equal to the runtime's); the rule takes no option.
 - Every rule is catalogued under an HFS rule id (R91 FE_SOURCE_FORM, R92 FE_COMPONENT_API, R93 FE_VENDOR_BOUNDARY added).
 
 ## 5.1.2 - 2026-09-30

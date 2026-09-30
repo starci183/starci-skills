@@ -301,4 +301,9 @@ export const why = {
     vi: "`switch` trên `kind` ở `<file>` có nhánh `ok` nhưng thiếu một trong refused, invalid, not-found, unavailable.",
     fixVi: "Viết đủ năm nhánh của `Outcome<T>`, mỗi nhánh một màn; không dựa vào `default`.",
   },
+  "file-size-growth": {
+    code: "HFS_SIZE_GROWTH",
+    vi: "`<file>` vượt ngân sách dòng: file mới đã dài quá mức, hoặc file cũ dài hơn bản ở commit cha. Mỗi file phải nhỏ để một người đọc hết và một bài test phủ hết.",
+    fixVi: "Tách phần mới sang file riêng theo trách nhiệm; một file đã vượt ngân sách chỉ được giữ nguyên hoặc ngắn lại.",
+  },
 }

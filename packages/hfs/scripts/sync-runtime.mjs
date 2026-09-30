@@ -6,6 +6,7 @@
 //                                imports (computed from the import graph, not listed), plus the failure-code catalog slice
 //                                holding exactly the codes `hfs check` can emit (its own and the machine's rule id lists)
 //   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots and hfs.json)
+//   packages/eslint/fe/runtime   what @starci/eslint-canon-fe reads through lib/params.mjs (the manifest's ruleParams.fe)
 //   node packages/hfs/scripts/sync-runtime.mjs [--check]     --check exits 1 when a copy differs (npm run check runs it)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,6 +50,7 @@ export const CATALOG = 'modules/kernel/failure-codes.yaml';
 export const BUNDLES = Object.freeze({
   'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml'])].sort()), catalog: true }),
   'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...SLOT_FILES]), catalog: false }),
+  'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...SLOT_FILES]), catalog: false }),
 });
 
 /** The catalog entries for `codes`, in the catalog's own text, keyed by top-level line. */
