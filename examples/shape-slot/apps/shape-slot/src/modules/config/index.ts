@@ -1,5 +1,5 @@
 /** Configuration of the shape-slot app, read once from the environment; a missing value fails at load, there is no fallback. */
-export type AppConfig = {
+type AppConfig = {
     /** Origin-relative or absolute base of the sales API. */
     readonly apiBaseUrl: string
     /** Milliseconds after which a request is abandoned. */

@@ -43,8 +43,7 @@
     }
   },
   "notFound": {
-    "title": "Không tìm thấy trang",
-    "home": "Về trang chủ"
+    "title": "Không tìm thấy trang"
   },
   "loading": {
     "label": "Đang tải"

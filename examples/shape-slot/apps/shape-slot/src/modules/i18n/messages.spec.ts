@@ -18,7 +18,6 @@ describe("messages/vi.json", () => {
                 "errors.page.retry",
                 "errors.page.title",
                 "loading.label",
-                "notFound.home",
                 "notFound.title",
             ]),
         )

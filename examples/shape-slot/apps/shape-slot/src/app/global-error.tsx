@@ -1,7 +1,6 @@
 "use client"
 
-import { DEFAULT_LOCALE } from "../modules/i18n/config"
-import messages from "../modules/i18n/messages/vi.json"
+import { DEFAULT_LOCALE, GLOBAL_ERROR_MESSAGES } from "@/modules/i18n"
 
 interface GlobalErrorProps {
     readonly reset: () => void
@@ -12,9 +11,9 @@ const GlobalError = ({ reset }: GlobalErrorProps) => (
     <html lang={DEFAULT_LOCALE}>
         <body>
             <main role="alert">
-                <h1>{messages.errors.global.title}</h1>
+                <h1>{GLOBAL_ERROR_MESSAGES.title}</h1>
                 <button type="button" onClick={reset}>
-                    {messages.errors.global.retry}
+                    {GLOBAL_ERROR_MESSAGES.retry}
                 </button>
             </main>
         </body>
