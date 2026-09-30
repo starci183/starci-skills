@@ -18,9 +18,14 @@
  * compose: specs stay refused and reach infrastructure through `useTestWorld(...)`.
  *
  * `no-framework-logger` (R40) and `no-ambient-clock` (R79) judge Nest `Logger` and `Date`; the table holds neither.
+ *
+ * `http-client-only-in-integrations` holds the port half of the same law: the `HttpClient` port of `platform/http` (found
+ * by the receiver's TYPE) is called only in an `integrations` owner, `platform/http` itself and the test world, so an
+ * identity provider's token or admin endpoint, a mailer API or any other remote is spoken to by one integration only.
  */
 import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { moduleReferences } from "./lib/import-source.mjs"
+import { isOwnedType } from "./lib/ports.mjs"
 
 /** The owner id of a file: the last two segments of its owner root (`platform/http`), or null when no owner holds it. */
 const ownerIdOf = (hfs, filename) => {
@@ -85,12 +90,46 @@ export const infraImportOwner = {
     },
 }
 
+/** The `HttpClient` port of `platform/http`: the one outbound HTTP door, judged by the receiver's TYPE. */
+const isHttpClient = (context, node) => isOwnedType(context, node, { name: "HttpClient", capability: "http", tier: "platform" })
+
+/**
+ * A provider is spoken to only by its integration (BE-INFRA-3): a call on the `HttpClient` port is made only in an
+ * `integrations` owner, in `platform/http` itself and in the test world. A domain service, a feature or another platform
+ * capability that calls an identity provider's token or admin endpoint, a mailer API or any other remote over HTTP holds a
+ * second copy of that provider's protocol, credentials and failure mapping; it calls the integration's public API instead.
+ */
+export const httpClientOnlyInIntegrations = {
+    meta: {
+        type: "problem",
+        docs: { description: "The `HttpClient` port of `platform/http` is called only by an `integrations` owner (and `platform/http`, the test world)." },
+        schema: [],
+        messages: {
+            foreign: "`{{call}}` calls the `HttpClient` port of `platform/http` outside an integration. A provider (identity provider, mailer, payment, another service) is spoken to only by its `integrations/<provider>` client; call that integration's public API here.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        const file = context.filename
+        if (hfs.tierOf(file) === "integrations" || ownerIdOf(hfs, file) === "platform/http" || inTestWorld(hfs, file)) return {}
+        return {
+            CallExpression(node) {
+                const callee = node.callee
+                if (callee.type !== "MemberExpression" || !isHttpClient(context, callee.object)) return
+                context.report({ node, messageId: "foreign", data: { call: context.sourceCode.getText(callee) } })
+            },
+        }
+    },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "infra-import-owner": infraImportOwner,
+    "http-client-only-in-integrations": httpClientOnlyInIntegrations,
 }
 
 /** Every rule of this law at `error`. */
 export const recommended = {
     "starci-be/infra-import-owner": "error",
+    "starci-be/http-client-only-in-integrations": "error",
 }

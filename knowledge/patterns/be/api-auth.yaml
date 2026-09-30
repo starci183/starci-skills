@@ -144,6 +144,7 @@ rules:
         - BE_INPUT_BOUNDED
       manual:
         - Confirm the chosen bounds against the accepted contract.
+        - Confirm the strict tier's limits fit the handshake (sign-in, sign-up, reset, callback) traffic.
     relatedExamples: []
   - id: BE-AUTH-6
     title: Pagination is by cursor

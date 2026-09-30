@@ -10,8 +10,8 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { at, fixtureHfs } from "./fixtures/typed/tester.mjs"
-import { infraImportOwner, rules } from "./infra-owner.mjs"
+import { at, fixtureHfs, typedTester } from "./fixtures/typed/tester.mjs"
+import { httpClientOnlyInIntegrations, infraImportOwner, rules } from "./infra-owner.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
@@ -115,6 +115,40 @@ export { axios }`, errors: [{ messageId: "foreign" }] },
             { filename: CONFIG, code: `import { ConfigModule } from "@nestjs/config"\nexport { ConfigModule }`, errors: [{ messageId: "nowhere" }] },
             { filename: CONFIG, code: `import "dotenv/config"`, errors: [{ messageId: "nowhere" }] },
             { filename: DOMAIN, code: `import { EventEmitter2 } from "@nestjs/event-emitter"\nexport { EventEmitter2 }`, errors: [{ messageId: "nowhere" }] },
+        ],
+    })
+})
+
+const typedRules = typedTester()
+const PORT = [
+    'import { HttpClient } from "@modules/platform/http/http.client"',
+    'import { HttpClient as Lookalike } from "@modules/domain/order/http.client"',
+    "declare const http: HttpClient",
+    "declare const local: Lookalike",
+    "",
+].join("\n")
+
+test("R90: the HttpClient port of platform/http is called only by an integration", () => {
+    typedRules.run("http-client-only-in-integrations", httpClientOnlyInIntegrations, {
+        valid: [
+            { filename: at("src/modules/integrations/keycloak/keycloak.client.ts"), code: `${PORT}export const token = () => http.get("https://idp/realms/r/protocol/openid-connect/token")` },
+            { filename: at("src/modules/integrations/mailer/mailer.client.ts"), code: `${PORT}export class MailerClient { constructor(private readonly client: HttpClient) {}\n send() { return this.client.get("https://mail/send") } }` },
+            // the owner of the port and the test world compose it
+            { filename: at("src/modules/platform/http/fetch-http-client.client.ts"), code: `${PORT}export const probe = () => http.get("https://x")` },
+            { filename: at("src/tests/world/kit/e2e-http-client.ts"), code: `${PORT}export const call = () => http.get("http://localhost:3000/graphql")` },
+            // a lookalike type of the same name is not the port
+            { filename: at("src/modules/domain/order/order.service.ts"), code: `${PORT}export const read = () => local.get("x")` },
+            // holding the type is not calling it
+            { filename: at("src/modules/domain/order/order.service.ts"), code: `${PORT}export type Door = HttpClient` },
+        ],
+        invalid: [
+            // a domain service calling an identity provider's admin endpoint directly
+            { filename: at("src/modules/domain/order/order.service.ts"), code: `${PORT}export class OrderService { constructor(private readonly http: HttpClient) {}\n user() { return this.http.get("https://idp/admin/realms/r/users") } }`, errors: [{ messageId: "foreign" }] },
+            // a renamed receiver is still the port
+            { filename: at("src/modules/domain/order/order.service.ts"), code: `${PORT}const door = http\nexport const read = () => door.get("x")`, errors: [{ messageId: "foreign" }] },
+            // another platform capability and a feature are not integrations
+            { filename: at("src/modules/platform/cache/cache.service.ts"), code: `${PORT}export const warm = () => http.get("x")`, errors: [{ messageId: "foreign" }] },
+            { filename: at("src/features/plan/application/plan.handler.ts"), code: `${PORT}export const read = () => http.get("x")`, errors: [{ messageId: "foreign" }] },
         ],
     })
 })

@@ -17,14 +17,15 @@
  *     to an `EnvSource` reader, a `??`/`||` fallback on such a value, and a string literal default (`""`, `"localhost"`,
  *     `"127.0.0.1"`, `"0.0.0.0"`, `http(s)://...`) given to any reader that returns one. The TYPE decides; no key name is
  *     matched. A missing value must stop the boot, naming the key.
- *   - `secret-compare-timing-safe` refuses `===` and `!==` on a secret-named identifier. A secret compares with
+ *   - `secret-compare-timing-safe` refuses `===` and `!==` on a value typed by the `Secret` brand of `platform/config` (or
+ *     read out of one, `secret.reveal()`) and on a secret-named identifier. A secret compares with
  *     `timingSafeEqual`, because the length of the matching prefix is a measurable side channel.
  *
  * No test lane is exempt: a spec builds its `EnvSource` from a literal record and never touches the process environment.
  */
 import ts from "typescript"
 import { keyName, staticText, walk, wordsOf } from "./lib/ast.mjs"
-import { isOwnedBy, originsOf } from "./lib/declared.mjs"
+import { isOwnedBy, isOwnedType, originsOf } from "./lib/declared.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isDeclarationFile, normalizePath } from "./lib/path.mjs"
 import { originsOfType, typed } from "./lib/types.mjs"
@@ -263,7 +264,7 @@ export const noSecretDefault = {
     },
 }
 
-const SECRET_COMPARE_WORDS = new Set(["secret", "password", "passwd", "passphrase", "token", "signature", "hmac", "credential", "credentials", "apikey"])
+const SECRET_COMPARE_WORDS = new Set(["secret", "password", "passwd", "passphrase", "token", "signature", "hmac", "credential", "credentials", "apikey", "authorization"])
 const KEY_PREFIXES = new Set(["api", "secret", "private", "access", "signing", "encryption", "master", "auth", "jwt", "session"])
 const NOT_A_VALUE_WORDS = new Set(["type", "kind", "length", "count", "ttl", "name", "prefix", "header", "scheme", "field", "path", "regex", "pattern"])
 
@@ -277,7 +278,12 @@ const operandName = (node) => {
 /** Words before the last one that make a token a counter or a cursor, not a credential. */
 const NOT_A_CREDENTIAL_QUALIFIERS = new Set(["fencing", "idempotency", "cursor", "page", "next", "continuation", "pagination", "sync", "csrf"])
 
-const isSecretName = (name) => {
+/**
+ * Whether a value's own name says it IS a credential: its last word is one (`password`, `accessToken`, `clientSecret`,
+ * `signingKey`), unless the name is an UPPER_SNAKE constant naming a key or a counter or cursor qualifies it. Shared by the
+ * comparison rule here and the error rule of R71.
+ */
+export const isCredentialName = (name) => {
     // an UPPER_SNAKE name is a constant naming a key, not the value it names
     if (/^[A-Z][A-Z0-9_]*$/.test(name)) return false
     const words = wordsOf(name)
@@ -292,11 +298,17 @@ const isPresenceOperand = (node) =>
     (node.type === "Identifier" && node.name === "undefined") ||
     (node.type === "UnaryExpression" && node.operator === "typeof")
 
+/** A value typed by the `Secret` brand of `platform/config`, or read out of one (`secret.reveal()`, `secret.value`): the TYPE says it is a secret. */
+const isSecretValue = (context, node) => {
+    const holder = node.type === "CallExpression" && node.callee.type === "MemberExpression" ? node.callee.object : node.type === "MemberExpression" ? node.object : null
+    return isOwnedType(context, node, "Secret", "platform", "config") || (holder !== null && isOwnedType(context, holder, "Secret", "platform", "config"))
+}
+
 /** A secret is compared with `timingSafeEqual`, never with an equality operator. */
 export const secretCompareTimingSafe = {
     meta: {
         type: "problem",
-        docs: { description: "A secret-named value is compared with `timingSafeEqual`, not `===` or `!==`." },
+        docs: { description: "A `Secret`-typed or secret-named value is compared with `timingSafeEqual`, not `===` or `!==`." },
         schema: [],
         messages: {
             compare: "`{{name}}` is a secret compared with `{{operator}}`. Compare secrets with `crypto.timingSafeEqual` on equal-length buffers so the comparison time does not leak the match.",
@@ -310,8 +322,12 @@ export const secretCompareTimingSafe = {
                 if (!["===", "!==", "==", "!="].includes(node.operator)) return
                 if (isPresenceOperand(node.left) || isPresenceOperand(node.right)) return
                 for (const side of [node.left, node.right]) {
+                    if (isSecretValue(context, side)) {
+                        context.report({ node, messageId: "compare", data: { name: context.sourceCode.getText(side), operator: node.operator } })
+                        return
+                    }
                     const name = operandName(side)
-                    if (name && isSecretName(name)) {
+                    if (name && isCredentialName(name)) {
                         context.report({ node, messageId: "compare", data: { name, operator: node.operator } })
                         return
                     }

@@ -1,0 +1,12 @@
+id: be-auth-surface-checks
+effectiveAt: '2026-10-01T12:00:00+07:00'
+summary: "Lane AUTHCHK closes three non-business gaps of the authentication surface with new eslint-be rules (error). First, auth-door-strict-rate-tier (R42 BE_INPUT_BOUNDED): a door opened for PublicReason.AuthHandshake or PublicReason.SignedWebhook carries RateTier.Strict of platform/http-security on the method or its class. Second, http-client-only-in-integrations (R90 BE_INFRA_OWNER): the HttpClient port of platform/http is called only in an integrations owner, platform/http and the test world. Third, no-secret-in-error (R71 BE_LOG_SECRET): a constructed error carries no Secret-typed value and no text value named like a credential. In addition, secret-compare-timing-safe (R41) also refuses an equality on a Secret-typed value or one read out of it, and its credential words gain `authorization`. The R42, R71 and R90 laws gain one sentence each; BE_INPUT_BOUNDED, BE_LOG_SECRET and BE_INFRA_OWNER gain one causes_vi line each. No finding code is added."
+paths:
+  - packages/eslint/be/input-bounds.mjs
+  - packages/eslint/be/infra-owner.mjs
+  - packages/eslint/be/log-safety.mjs
+  - packages/eslint/be/config-owner.mjs
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - modules/kernel/failure-codes.yaml
+reach: new-legs

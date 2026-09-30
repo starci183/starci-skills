@@ -12363,6 +12363,7 @@ BE_INPUT_BOUNDED:
   causes_vi:
     - "Thuộc tính của lớp input không có decorator class-validator nào, hoặc thiếu ràng buộc mà kiểu của nó đòi hỏi"
     - "skip hoặc offset trong tùy chọn find*, OFFSET trong câu SQL, hoặc trường page, pageNumber, offset trong DTO"
+    - "Cửa mở bằng PublicReason.AuthHandshake hoặc PublicReason.SignedWebhook (đăng nhập, đăng ký, đặt lại mật khẩu, callback, webhook) không có @RateLimit(RateTier.Strict) của platform/http-security trên phương thức hay lớp của nó"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
@@ -13153,6 +13154,7 @@ BE_LOG_SECRET:
     - "Ghi một giá trị kiểu Secret hoặc Pii, dù đặt tên là gì"
     - "Ghi token hoặc mật khẩu vào log để gỡ lỗi"
     - "Ghi email hoặc số điện thoại vào thông điệp lỗi"
+    - "Tạo một lỗi (lớp kế thừa Error, kể cả DomainError) mang giá trị kiểu Secret hoặc chuỗi có tên là thông tin xác thực (token, mật khẩu, authorization, clientSecret) trong thông điệp hay params"
   nextStep_vi: "Ghi id của chủ sở hữu, độ dài, cờ có hay không, hoặc dạng đã che qua mask(...), không ghi giá trị thật. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -13270,6 +13272,7 @@ BE_INFRA_OWNER:
     - "Gọi fetch thẳng trong client tích hợp"
     - "Hẹn giờ bằng setTimeout trong service"
     - "Dùng dayjs trong miền"
+    - "Gọi cổng HttpClient của platform/http ngoài một năng lực integrations, ví dụ service miền gọi thẳng endpoint token hay admin của Keycloak hoặc API gửi thư"
   nextStep_vi: "Gọi qua cổng của năng lực sở hữu (HttpClient, Cache, MessagePublisher, Clock, Logger) được tiêm bằng Inject*(). Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding

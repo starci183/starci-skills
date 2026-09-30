@@ -10,10 +10,15 @@
  *   - `no-offset-pagination` refuses offset paging: `skip`/`offset` in the options of a `find*` on an `EntityManager`,
  *     an `OFFSET` keyword in an `sql` template (or a static string given to `.query`), and `page`/`pageNumber`/`offset`
  *     properties on a transport `dto` class. Pagination is cursor-only: unstable under writes and unbounded in cost otherwise.
+ *   - `auth-door-strict-rate-tier` holds the rate-limit sentence of BE-CONVENTION 1.7: a door opened for
+ *     `PublicReason.AuthHandshake` or `PublicReason.SignedWebhook` (the member of the `PublicReason` enum of
+ *     `domain/identity`, read from the `reason` of the opening decorator by its TYPE) also carries a decorator whose
+ *     argument is `RateTier.Strict` of `platform/http-security`, on the method or on its class. A sign-in, sign-up,
+ *     password-reset or callback door on the default tier is the brute-force path the strict tier exists for.
  */
 import ts from "typescript"
 import { decoratorName, keyName, staticText } from "./lib/ast.mjs"
-import { importsFrom, presentParts, typeOf } from "./lib/declared.mjs"
+import { importsFrom, isOwnedEnumMember, partsOf, presentParts, typeOf } from "./lib/declared.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { normalizePath } from "./lib/path.mjs"
 import { isPackageType, typed } from "./lib/types.mjs"
@@ -171,14 +176,71 @@ export const noOffsetPagination = {
     },
 }
 
+/** The `PublicReason` members whose doors are the brute-force and forgery paths: they owe the strict tier. */
+const STRICT_REASONS = new Set(["AuthHandshake", "SignedWebhook"])
+
+/** The member names of an enum-typed value, when every part of its type is a member of the owned enum; else []. */
+const ownedMembers = (context, node, enumName, tier, capability) =>
+    isOwnedEnumMember(context, node, enumName, tier, capability) ? partsOf(typeOf(context, node)).map((part) => part.getSymbol()?.name ?? "") : []
+
+/** The arguments of a decorator call (`@X(a, b)`), or [] for a bare `@X`. */
+const argumentsOf = (decorator) => (decorator.expression.type === "CallExpression" ? decorator.expression.arguments : [])
+
+/** The `reason` value of an opening decorator's options object (`@Public({ reason })`), or null. */
+const reasonOf = (decorator) => {
+    const options = argumentsOf(decorator)[0]
+    if (options?.type !== "ObjectExpression") return null
+    const property = options.properties.find((item) => item.type === "Property" && !item.computed && keyName(item.key) === "reason")
+    return property ? property.value : null
+}
+
+/** A door opened for a handshake or a webhook is on the strict rate-limit tier. */
+export const authDoorStrictRateTier = {
+    meta: {
+        type: "problem",
+        docs: { description: "A door opened for `PublicReason.AuthHandshake` or `PublicReason.SignedWebhook` carries `RateTier.Strict` of `platform/http-security`." },
+        schema: [],
+        messages: {
+            strict: "This door is open for `PublicReason.{{reason}}` but is not on the strict rate-limit tier. Add `@RateLimit(RateTier.Strict)` (`RateTier` of `platform/http-security`) to the method or its class: a handshake or webhook door on the default tier is an open brute-force path.",
+        },
+    },
+    create(context) {
+        const isStrict = (decorator) => argumentsOf(decorator).some((argument) => {
+            const members = ownedMembers(context, argument, "RateTier", "platform", "http-security")
+            return members.length > 0 && members.every((name) => name === "Strict")
+        })
+        const judge = (target, enclosing) => {
+            for (const decorator of target.decorators ?? []) {
+                const reason = reasonOf(decorator)
+                if (reason === null) continue
+                const opened = ownedMembers(context, reason, "PublicReason", "domain", "identity").find((name) => STRICT_REASONS.has(name))
+                if (opened === undefined) continue
+                if ([...(target.decorators ?? []), ...(enclosing?.decorators ?? [])].some(isStrict)) continue
+                context.report({ node: decorator, messageId: "strict", data: { reason: opened } })
+            }
+        }
+        return {
+            ClassDeclaration(node) {
+                judge(node, null)
+            },
+            MethodDefinition(node) {
+                const owner = node.parent?.parent
+                judge(node, owner?.type === "ClassDeclaration" || owner?.type === "ClassExpression" ? owner : null)
+            },
+        }
+    },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "input-bounded": inputBounded,
     "no-offset-pagination": noOffsetPagination,
+    "auth-door-strict-rate-tier": authDoorStrictRateTier,
 }
 
-/** Both start at error: no baseline exists, and the repositories' fix lanes clear the debt. */
+/** All start at error: no baseline exists, and the repositories' fix lanes clear the debt. */
 export const recommended = {
     "starci-be/input-bounded": "error",
     "starci-be/no-offset-pagination": "error",
+    "starci-be/auth-door-strict-rate-tier": "error",
 }

@@ -14,8 +14,14 @@
  *
  * A log line outlives the request, is copied to a vendor, and is read by people who never had the credential or the
  * consent. Log an id, a count, or a masked form instead.
+ *
+ * `no-secret-in-error` (R71) holds the same line for an error: a constructed error (its TYPE derives from `Error`) carries
+ * no `Secret` value and no text value named like a credential, because its message and params reach the same logs.
  */
-import { wordsOf } from "./lib/ast.mjs"
+import ts from "typescript"
+import { isCredentialName } from "./config-owner.mjs"
+import { keyName, wordsOf } from "./lib/ast.mjs"
+import { derivesFromBuiltinError, presentParts, typeOf } from "./lib/declared.mjs"
 import { isLoggerCall, isOwnedType } from "./lib/ports.mjs"
 import { isDeclarationFile } from "./lib/path.mjs"
 
@@ -205,12 +211,93 @@ export const noSecretInLog = {
   },
 }
 
+const STRINGY = ts.TypeFlags.String | ts.TypeFlags.StringLiteral | ts.TypeFlags.TemplateLiteral
+
+/** Whether a node's type is text (a string, with `null`/`undefined` removed): the shape a raw credential travels in. */
+const isText = (context, node) => {
+  const parts = presentParts(typeOf(context, node))
+  return parts.length > 0 && parts.every((part) => (part.flags & STRINGY) && !(part.flags & ts.TypeFlags.EnumLiteral))
+}
+
+/** The last name a value expression ends in (`token`, `request.headers.authorization`), or null. */
+const ownNameOf = (node) => {
+  if (node.type === "Identifier") return node.name
+  if (node.type === "MemberExpression" && !node.computed && node.property.type === "Identifier") return node.property.name
+  return null
+}
+
+/** The `key: value` pairs of an argument tree whose value is text, so a key can name what the value is (`{ token: raw }`). */
+const textPropertiesIn = (context, node, found = []) => {
+  if (node?.type === "ObjectExpression") {
+    for (const property of node.properties) {
+      if (property.type !== "Property" || property.computed || isHidingCall(property.value)) continue
+      const key = keyName(property.key)
+      if (key && isText(context, property.value)) found.push({ name: key, node: property.key })
+      textPropertiesIn(context, property.value, found)
+    }
+  } else if (node?.type === "ArrayExpression") node.elements.forEach((element) => textPropertiesIn(context, element, found))
+  return found
+}
+
+/**
+ * An error carries no secret. `no-secret-in-error` (R71) judges every `new X(...)` whose constructed TYPE derives from the
+ * language `Error` (a `DomainError` family, a library error, `Error` itself): no argument holds a value typed by the
+ * `Secret` brand of `platform/config` or read out of one, and no text value (a `string`) whose own name, or the key it is
+ * given under, says it is a credential (the same last-word test `secret-compare-timing-safe` uses: `password`,
+ * `accessToken`, `clientSecret`, `signingKey`). An error's message and params reach the error filter, the log line of the
+ * failure, the tracing vendor and, for a declared error, the client. Personal identifiers are not judged here: an error
+ * may name the account it refused.
+ */
+export const noSecretInError = {
+  meta: {
+    type: "problem",
+    docs: { description: "A constructed error carries no `Secret` value and no text value named like a credential." },
+    schema: [],
+    messages: {
+      secretType:
+        "`{{name}}` is a `Secret` (or is read out of one) and is put into an error. An error's message and params reach logs, tracing and sometimes the client. Name the failure with its code and pass an id or a masked form (`mask(...)`), never the value.",
+      secret:
+        "`{{name}}` reads as a credential and is put into an error. An error's message and params reach logs, tracing and sometimes the client. Name the failure with its code and pass an id or a masked form (`mask(...)`), never the value.",
+    },
+  },
+  create(context) {
+    const filename = context.filename || context.getFilename()
+    if (isDeclarationFile(filename)) return {}
+    const sourceCode = context.sourceCode || context.getSourceCode()
+    return {
+      NewExpression(node) {
+        if (node.arguments.length === 0 || !derivesFromBuiltinError(context, typeOf(context, node))) return
+        const reported = new Set()
+        const report = (at, messageId, name) => {
+          if (reported.has(at)) return
+          reported.add(at)
+          context.report({ node: at, messageId, data: { name } })
+        }
+        for (const argument of node.arguments) {
+          for (const value of valuesIn(argument)) {
+            if (isSecretType(context, value)) report(value, "secretType", sourceCode.getText(value))
+            else {
+              const name = ownNameOf(value)
+              if (name !== null && isCredentialName(name) && isText(context, value)) report(value, "secret", name)
+            }
+          }
+          for (const { name, node: at } of textPropertiesIn(context, argument)) {
+            if (isCredentialName(name)) report(at, "secret", name)
+          }
+        }
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-secret-in-log": noSecretInLog,
+  "no-secret-in-error": noSecretInError,
 }
 
-/** Starts at error: no baseline exists, and the repositories' fix lanes clear the debt. */
+/** Both start at error: no baseline exists, and the repositories' fix lanes clear the debt. */
 export const recommended = {
   "starci-be/no-secret-in-log": "error",
+  "starci-be/no-secret-in-error": "error",
 }

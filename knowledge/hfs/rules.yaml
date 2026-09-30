@@ -412,13 +412,14 @@ rules:
       - {kind: eslint-be, id: default-deny-app-guard}
   - id: R42
     code: "BE_INPUT_BOUNDED"
-    law: "Bounded input, cursor-only pagination, depth limits, rate limits; every property of an input class carries the `class-validator` decorators its type calls for."
+    law: "Bounded input, cursor-only pagination, depth limits, rate limits; every property of an input class carries the `class-validator` decorators its type calls for; a door opened for `PublicReason.AuthHandshake` or `PublicReason.SignedWebhook` carries `RateTier.Strict` of `platform/http-security`."
     kinds: [lint, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_INPUT_BOUNDED"]
     enforcers:
       - {kind: eslint-be, id: input-bounded}
       - {kind: eslint-be, id: no-offset-pagination}
+      - {kind: eslint-be, id: auth-door-strict-rate-tier}
   - id: R43
     code: "BE_CONFIG_OWNER"
     law: "Only `platform/config` reads `process.env`; config per capability."
@@ -729,12 +730,13 @@ rules:
       - {kind: eslint-be, id: http-needs-timeout}
   - id: R71
     code: "BE_LOG_SECRET"
-    law: "A `Logger` call carries no `Secret` or `Pii` value and no credential or personal identifier by name; log an id or a masked form."
+    law: "A `Logger` call carries no `Secret` or `Pii` value and no credential or personal identifier by name; log an id or a masked form. A constructed error carries no `Secret` value and no text value named like a credential."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_LOG_SECRET"]
     enforcers:
       - {kind: eslint-be, id: no-secret-in-log}
+      - {kind: eslint-be, id: no-secret-in-error}
   - id: R72
     code: "BE_TYPE_ESCAPE"
     law: "No type escape in any file, specs included: no `as X` (only `as const`), `<X>y`, `x!` or `any` (the factory turns on the typescript-eslint rules `consistent-type-assertions` with `never`, `no-non-null-assertion` and `no-explicit-any`), no `Function` type, no `eval`."
@@ -921,12 +923,13 @@ rules:
       - {kind: eslint-be, id: public-contract-form}
   - id: R90
     code: "BE_INFRA_OWNER"
-    law: "Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability."
+    law: "Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability, and the `HttpClient` port of `platform/http` is called only by an `integrations` capability."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_INFRA_OWNER"]
     enforcers:
       - {kind: eslint-be, id: infra-import-owner}
+      - {kind: eslint-be, id: http-client-only-in-integrations}
   - id: R91
     code: "FE_SOURCE_FORM"
     law: "Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc, no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside the i18n catalogs and the i18n e2e fixtures slot."

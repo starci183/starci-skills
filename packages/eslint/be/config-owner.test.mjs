@@ -125,6 +125,9 @@ test("a secret is compared with timingSafeEqual, never an equality operator", ()
             { filename: SERVICE, code: "if (status.key === OPENCLAW_GATEWAY_PASSWORD) {}" },
             // a content digest is an integrity fingerprint, not a secret
             { filename: SERVICE, code: "if (existing.contentDigest === input.contentDigest) {}" },
+            // a Secret compared for presence, and a value that is not read out of a Secret
+            { filename: SERVICE, code: `${CFG}if (maybeSecret === undefined) {}` },
+            { filename: SERVICE, code: `${CFG}if (url === other) {}` },
         ],
         invalid: [
             { filename: SERVICE, code: "if (token === expected) {}", errors: [{ messageId: "compare" }] },
@@ -132,7 +135,11 @@ test("a secret is compared with timingSafeEqual, never an equality operator", ()
             { filename: SERVICE, code: "if (req.headers.webhookSecret == secret) {}", errors: [{ messageId: "compare" }] },
             { filename: SERVICE, code: "if (expected === apiKey) {}", errors: [{ messageId: "compare" }] },
             { filename: SERVICE, code: "if (dto.password === user.password) {}", errors: [{ messageId: "compare" }] },
+            { filename: SERVICE, code: "if (request.headers.authorization === `Bearer ${expected}`) {}", errors: [{ messageId: "compare" }] },
             { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "if (token === expected) {}", errors: [{ messageId: "compare" }] },
+            // by TYPE: the Secret brand of platform/config, or a value read out of it, whatever it is called
+            { filename: SERVICE, code: `${CFG}if (secret.reveal() === provided) {}`, errors: [{ messageId: "compare" }] },
+            { filename: SERVICE, code: `${CFG}const expectedValue = secret\nif (incoming !== expectedValue) {}`, errors: [{ messageId: "compare" }] },
         ],
     })
 })

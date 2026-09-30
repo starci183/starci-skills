@@ -87,6 +87,7 @@ rules:
         - BE_TIER_DIRECTION
         - BE_ERROR_HOME
         - BE_RAW_INJECT
+        - BE_INFRA_OWNER
       manual: []
     relatedExamples: []
   - id: BE-INFRA-4

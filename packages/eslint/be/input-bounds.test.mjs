@@ -8,7 +8,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"
-import { inputBounded, noOffsetPagination, rules } from "./input-bounds.mjs"
+import { authDoorStrictRateTier, inputBounded, noOffsetPagination, rules } from "./input-bounds.mjs"
 
 const tester = typedTester()
 const REQUEST = at("src/features/plan/transport/http/dto/create-plan.request.ts")
@@ -106,6 +106,44 @@ test("R42: reads page by cursor, never by offset", () => {
             { filename: ARGS, code: "export class ListPlansArgs { pageNumber!: number; offset!: number }", errors: [{ messageId: "field" }, { messageId: "field" }] },
             // a spec is not exempt
             { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: `${EM}em.find(Plan, { skip: 1 })`, errors: [{ messageId: "option" }] },
+        ],
+    })
+})
+
+const DOORS = [
+    "import { Public, PublicReason } from \"@modules/domain/identity\"",
+    "import { RateLimit, RateTier, Tier } from \"@modules/platform/http-security\"",
+    "declare const Throttle: (tier: Tier) => MethodDecorator",
+    "",
+].join("\n")
+const RESOLVER = at("src/features/identity/transport/graphql/sign-in.resolver.ts")
+const WEBHOOK = at("src/features/payment/transport/http/payos-webhook.controller.ts")
+
+test("R42: a handshake or webhook door is on the strict rate-limit tier", () => {
+    tester.run("auth-door-strict-rate-tier", authDoorStrictRateTier, {
+        valid: [
+            { filename: RESOLVER, code: `${DOORS}class R { @Public({ reason: PublicReason.AuthHandshake }) @RateLimit(RateTier.Strict) signIn() {} }` },
+            { filename: WEBHOOK, code: `${DOORS}class C { @RateLimit(RateTier.Strict) @Public({ reason: PublicReason.SignedWebhook }) receive() {} }` },
+            // the tier on the class covers its methods
+            { filename: RESOLVER, code: `${DOORS}@RateLimit(RateTier.Strict) class R { @Public({ reason: PublicReason.AuthHandshake }) signIn() {} @Public({ reason: PublicReason.AuthHandshake }) signUp() {} }` },
+            // a class opened for a handshake, strict on the class
+            { filename: RESOLVER, code: `${DOORS}@Public({ reason: PublicReason.AuthHandshake }) @RateLimit(RateTier.Strict) class R { signIn() {} }` },
+            // a health door and a closed door owe no strict tier
+            { filename: RESOLVER, code: `${DOORS}class R { @Public({ reason: PublicReason.Health }) live() {} me() {} }` },
+            // a string reason is public-needs-reason's finding, not this one's
+            { filename: RESOLVER, code: `${DOORS}class R { @Public({ reason: 'auth-handshake' }) signIn() {} }` },
+        ],
+        invalid: [
+            { filename: RESOLVER, code: `${DOORS}class R { @Public({ reason: PublicReason.AuthHandshake }) signIn() {} }`, errors: [{ messageId: "strict", data: { reason: "AuthHandshake" } }] },
+            { filename: WEBHOOK, code: `${DOORS}class C { @Public({ reason: PublicReason.SignedWebhook }) receive() {} }`, errors: [{ messageId: "strict", data: { reason: "SignedWebhook" } }] },
+            // the default tier is not the strict tier
+            { filename: RESOLVER, code: `${DOORS}class R { @Public({ reason: PublicReason.AuthHandshake }) @RateLimit(RateTier.Default) signIn() {} }`, errors: [{ messageId: "strict" }] },
+            // a lookalike enum member named Strict is not RateTier.Strict of platform/http-security
+            { filename: RESOLVER, code: `${DOORS}class R { @Public({ reason: PublicReason.AuthHandshake }) @Throttle(Tier.Strict) signIn() {} }`, errors: [{ messageId: "strict" }] },
+            // strict on another method does not cover this one
+            { filename: RESOLVER, code: `${DOORS}class R { @Public({ reason: PublicReason.AuthHandshake }) @RateLimit(RateTier.Strict) signIn() {} @Public({ reason: PublicReason.AuthHandshake }) signUp() {} }`, errors: [{ messageId: "strict" }] },
+            // an opened class without the tier
+            { filename: RESOLVER, code: `${DOORS}@Public({ reason: PublicReason.AuthHandshake }) class R { signIn() {} }`, errors: [{ messageId: "strict" }] },
         ],
     })
 })

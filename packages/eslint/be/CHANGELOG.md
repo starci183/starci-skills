@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- New (lane AUTHCHK): `auth-door-strict-rate-tier` (R42). A door opened for `PublicReason.AuthHandshake` or `PublicReason.SignedWebhook` (the reason's TYPE is the member of `PublicReason` of `domain/identity`) carries a decorator whose argument is `RateTier.Strict` of `platform/http-security`, on the method or on its class. BE-CONVENTION 1.7 made this a MUST, and nothing checked it until now.
+- New (lane AUTHCHK): `http-client-only-in-integrations` (R90). A call on the `HttpClient` port of `platform/http` (judged by the receiver's type) is made only in an `integrations` owner, in `platform/http` and in the test world. A domain service that calls an identity provider's token or admin endpoint, or a mailer API, directly is refused (BE-INFRA-3).
+- New (lane AUTHCHK): `no-secret-in-error` (R71). A `new X(...)` whose type derives from `Error` carries no value typed by the `Secret` brand, nor one read out of it. It also carries no text value whose own name, or whose key, says it is a credential. The name test is the one `secret-compare-timing-safe` uses, now exported as `isCredentialName`. Personal identifiers are not judged.
+- Changed (lane AUTHCHK): `secret-compare-timing-safe` (R41) also refuses an equality on a value typed by the `Secret` brand of `platform/config`, or read out of one (`secret.reveal() === x`), whatever it is called. Its credential words gain `authorization`.
 - Fixed (lane AUTHCHK): `config-parsed-in-main` (R43) is back. The merge `9958cce38` (merge main into lane/ut-int, round 2) resolved `config-owner.mjs` and its test to the blob from before the rule existed. That dropped the rule, the test world's `process.env` allowance and the removal of the name-based `envConfig()` check, together with its catalog enforcer, README row, failure-code text, code-patterns id and contract change `hfs-be-config-parsed-in-main`. The rule and its fixture files are restored exactly as `d5f11c337` left them.
 
 ## 2.1.2 - 2026-10-01
