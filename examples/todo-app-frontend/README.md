@@ -27,7 +27,7 @@ Next.js, React, TypeScript, npm workspaces; UI primitives come from
 
 ## Development
 
-Run `npm ci`, then `npm run typecheck`, `npm run lint:check` and `npm run build`. The GraphQL documents are
+Run `npm install`, then `npm run typecheck`, `npm run lint` and `npm run build`. The GraphQL documents are
 `.graphql` files next to the module that sends them; `npm run codegen` (run before build, typecheck and lint)
 turns them into the ignored `apps/web/src/modules/api/__generated__/documents.ts` the transport client reads.
 
@@ -37,8 +37,8 @@ The app reads one environment variable, `NEXT_PUBLIC_API_GRAPHQL_URL` (the backe
 ## Running the checks
 
 ```sh
-npm ci
-npm run typecheck && npm run lint:check && npm run hfs:check && npm run build
+npm install
+npm run typecheck && npm run lint && npm run build
 ```
 
 The theme, the locale-aware navigation and the next-intl stack live in the app itself (`modules/theme`,

@@ -5,13 +5,13 @@ Only services are unit tested. Every business rule lives in a `*.service.ts` fil
 its input and calls one method of one service, a resolver or controller dispatches one bus message, so nothing is left in
 them to test. The apps only compose; the e2e world proves they boot.
 
-| Check      | Command              |
-| ---------- | -------------------- |
-| Types      | `npm run typecheck`  |
-| Lint       | `npm run lint` |
-| Build      | `npm run build`      |
-| Unit suite | `npm test`           |
-| E2E suite  | `npm run test:e2e`   |
+| Check      | Command             |
+| ---------- | ------------------- |
+| Types      | `npm run typecheck` |
+| Lint       | `npm run lint`      |
+| Build      | `npm run build`     |
+| Unit suite | `npm test`          |
+| E2E suite  | `npm run test:e2e`  |
 
 ## Unit suite
 

@@ -13,14 +13,10 @@
     "codegen": "npm run codegen --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run codegen --silent && eslint . --fix --max-warnings=0 && stylelint \"{apps,packages}/*/src/**/*.css\" --fix",
-    "lint:check": "npm run codegen --silent && eslint . --max-warnings=0 && stylelint \"{apps,packages}/*/src/**/*.css\"",
-    "lint:report": "eslint . --format json --output-file reports/eslint.json",
-    "lint:report:css": "stylelint \"{apps,packages}/*/src/**/*.css\" --formatter json --output-file reports/stylelint.json",
+    "lint": "npm run codegen --silent && hfs lint --stylelint \"{apps,packages}/*/src/**/*.css\"",
+    "lint:fix": "npm run codegen --silent && hfs lint --fix --stylelint \"{apps,packages}/*/src/**/*.css\"",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "hfs:check": "hfs check",
-    "hfs:report": "hfs check --sonar reports/hfs.sonar.json"
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@starci/eslint-canon-fe": "7.0.0",
