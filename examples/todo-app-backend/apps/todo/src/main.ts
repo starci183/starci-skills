@@ -1,30 +1,22 @@
 import "reflect-metadata"
-import {
-    NestFactory 
-} from "@nestjs/core"
-import {
-    ValidationPipe 
-} from "@nestjs/common"
-import {
-    AppModule 
-} from "./app.module"
-import {
-    AppConfigService,
-} from "@modules/platform/config/index"
+import { NestFactory } from "@nestjs/core"
+import { SystemClock } from "@modules/platform/clock"
+import { EnvSource } from "@modules/platform/config"
+import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
+import { AppModule } from "./app.module"
+import { parseTodoAppOptions } from "./todo.options"
 
-
+/** Reads the environment once, builds the todo api from it and listens. */
 async function bootstrap(): Promise<void> {
-    const app = await NestFactory.create(AppModule)
-    const config = app.get(AppConfigService)
-    app.enableCors({
-        origin: config.getCorsOrigin() 
-    })
-    // GraphQL input classes (SignInInput, CreateTaskInput, ...) carry class-validator decorators; this is
-    // what actually enforces them, the same way Nest's ValidationPipe enforced the former REST DTOs.
-    app.useGlobalPipes(new ValidationPipe({
-        whitelist: true, transform: true 
-    }))
-    await app.listen(config.getPort())
+    const options = parseTodoAppOptions(EnvSource.fromProcess())
+    const app = await NestFactory.create(AppModule.register(options))
+    app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
+    app.enableShutdownHooks()
+    await app.listen(options.port)
+    createJsonLogger(new SystemClock()).info(LoggingLogEvent.ServerStarted, { service: "todo", port: options.port })
 }
 
-void bootstrap()
+bootstrap().catch((error: unknown) => {
+    createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "todo" })
+    process.exit(1)
+})

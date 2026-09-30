@@ -1,72 +1,76 @@
-import {
-    Module 
-} from "@nestjs/common"
-import {
-    ApolloDriver 
-} from "@nestjs/apollo"
-import type {
-    ApolloDriverConfig 
-} from "@nestjs/apollo"
-import {
-    GraphQLModule as NestGraphQLModule 
-} from "@nestjs/graphql"
-import {
-    GraphQLFormattedError 
-} from "graphql"
-import {
-    DomainError,
-} from "@modules/platform/errors/index"
-import {
-    isRecord,
-} from "@modules/platform/primitives/index"
+import { Module } from "@nestjs/common"
+import { TodoModule } from "../../todo.module"
+import { AcceptInvitationResolver } from "./accept-invitation.resolver"
+import { AttachUploadResolver } from "./attach-upload.resolver"
+import { AuditLogResolver } from "./audit-log.resolver"
+import { CompleteErasureResolver } from "./complete-erasure.resolver"
+import { CompleteOccurrenceResolver } from "./complete-occurrence.resolver"
+import { CompleteTaskResolver } from "./complete-task.resolver"
+import { CreateTaskResolver } from "./create-task.resolver"
+import { CreateUploadIntentResolver } from "./create-upload-intent.resolver"
+import { DeleteTaskResolver } from "./delete-task.resolver"
+import { DeleteUploadResolver } from "./delete-upload.resolver"
+import { DowngradePlanResolver } from "./downgrade-plan.resolver"
+import { EditRecurrenceResolver } from "./edit-recurrence.resolver"
+import { EndRecurrenceResolver } from "./end-recurrence.resolver"
+import { ExportMyDataResolver } from "./export-my-data.resolver"
+import { InviteResolver } from "./invite.resolver"
+import { ListCollaboratorsResolver } from "./list-collaborators.resolver"
+import { ListTasksResolver } from "./list-tasks.resolver"
+import { MakeRecurringResolver } from "./make-recurring.resolver"
+import { NotificationPreferencesResolver } from "./notification-preferences.resolver"
+import { PlanUsageResolver } from "./plan-usage.resolver"
+import { ReconcilePaymentResolver } from "./reconcile-payment.resolver"
+import { ReopenTaskResolver } from "./reopen-task.resolver"
+import { RequestErasureResolver } from "./request-erasure.resolver"
+import { RevokeCollaboratorResolver } from "./revoke-collaborator.resolver"
+import { SignInResolver } from "./sign-in.resolver"
+import { SignOutResolver } from "./sign-out.resolver"
+import { SkipOccurrenceResolver } from "./skip-occurrence.resolver"
+import { TaskCountsResolver } from "./task-counts.resolver"
+import { TaskUploadsResolver } from "./task-uploads.resolver"
+import { UnsubscribeResolver } from "./unsubscribe.resolver"
+import { UpcomingOccurrencesResolver } from "./upcoming-occurrences.resolver"
+import { UpdateNotificationPreferencesResolver } from "./update-notification-preferences.resolver"
+import { UpgradePlanResolver } from "./upgrade-plan.resolver"
 
-import {
-    QUERY_MODULES 
-} from "./queries"
-import {
-    MUTATION_MODULES 
-} from "./mutations"
-
-interface GraphqlContextShape { req: unknown; res: unknown }
-
-/**
- * Code-first Apollo GraphQL API + all operation modules - the same pattern nivo's own
- * `features/expert/graphql/graphql.module.ts` uses (`ApolloDriver`, `autoSchemaFile: true`,
- * `sortSchema: true`, one `context` closure exposing `req`/`res`). `formatError` reads an
- * `DomainError`'s stable `code` back out of Apollo's error envelope onto `extensions.code`, so a
- * GraphQL error carries the same machine-readable code every REST error response used to carry in its
- * body minus the `_EXCEPTION` transport suffix - clients keyed on `TASK_FORBIDDEN`/`SESSION_EXPIRED`/etc. still see that code, just relocated.
- */
 @Module({
-    imports: [
-        NestGraphQLModule.forRoot<ApolloDriverConfig>({
-            driver: ApolloDriver,
-            autoSchemaFile: true,
-            sortSchema: true,
-            path: "/graphql",
-            playground: false,
-            introspection: true,
-            context: (ctx: GraphqlContextShape) => ({
-                req: ctx.req, res: ctx.res 
-            }),
-            formatError: (formatted: GraphQLFormattedError, error: unknown): GraphQLFormattedError => {
-                const original = isRecord(error) && "originalError" in error
-                    ? error.originalError
-                    : undefined
-                if (original instanceof DomainError) {
-                    return {
-                        ...formatted, message: original.message, extensions: {
-                            ...formatted.extensions, code: original.code.replace(/_EXCEPTION$/,
-                                "") 
-                        } 
-                    }
-                }
-                return formatted
-            },
-        }),
-        ...QUERY_MODULES,
-        ...MUTATION_MODULES,
+    imports: [TodoModule],
+    providers: [
+        AcceptInvitationResolver,
+        AttachUploadResolver,
+        AuditLogResolver,
+        CompleteErasureResolver,
+        CompleteOccurrenceResolver,
+        CompleteTaskResolver,
+        CreateTaskResolver,
+        CreateUploadIntentResolver,
+        DeleteTaskResolver,
+        DeleteUploadResolver,
+        DowngradePlanResolver,
+        EditRecurrenceResolver,
+        EndRecurrenceResolver,
+        ExportMyDataResolver,
+        InviteResolver,
+        ListCollaboratorsResolver,
+        ListTasksResolver,
+        MakeRecurringResolver,
+        NotificationPreferencesResolver,
+        PlanUsageResolver,
+        ReconcilePaymentResolver,
+        ReopenTaskResolver,
+        RequestErasureResolver,
+        RevokeCollaboratorResolver,
+        SignInResolver,
+        SignOutResolver,
+        SkipOccurrenceResolver,
+        TaskCountsResolver,
+        TaskUploadsResolver,
+        UnsubscribeResolver,
+        UpcomingOccurrencesResolver,
+        UpdateNotificationPreferencesResolver,
+        UpgradePlanResolver,
     ],
 })
-/** Composition for the todo GraphQL API: code-first Apollo plus every query and mutation module; the formatError closure above is what carries DomainError codes onto extensions.code. */
+/** The GraphQL transport of the todo feature: one module for every resolver. */
 export class TodoGraphqlModule {}

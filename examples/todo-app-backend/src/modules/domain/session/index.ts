@@ -13,6 +13,7 @@ export { SESSION_ERROR_KINDS, SessionError, SessionErrorCode } from "./errors/se
 export { SESSION_MESSAGES } from "./messages/session.messages"
 export { parseSessionConfig } from "./session.config"
 export { PublicReason } from "./session.contracts"
+export type { SessionOptions } from "./session.options"
 export type { PublicMetadata, SessionView } from "./session.contracts"
 export { CurrentPrincipal, Public, Roles } from "./session.decorators"
 export { SessionModule } from "./session.module"

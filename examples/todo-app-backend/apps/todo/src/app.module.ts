@@ -1,117 +1,163 @@
+import { Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import { APP_GUARD } from "@nestjs/core"
+import { AUDIT_ERROR_KINDS, AUDIT_MESSAGES, AuditModule, auditEntities, auditMigrations } from "@modules/domain/audit"
+import { NOTIFY_ERROR_KINDS, NOTIFY_MESSAGES, NotifyModule, notifyEntities, notifyMigrations } from "@modules/domain/notify"
+import { PLAN_ERROR_KINDS, PLAN_MESSAGES, PlanModule, planEntities, planMigrations } from "@modules/domain/plan"
+import { RECUR_ERROR_KINDS, RECUR_MESSAGES, RecurModule, recurEntities, recurMigrations } from "@modules/domain/recur"
 import {
-    Module 
-} from "@nestjs/common"
-import {
-    ClockModule,
-} from "@modules/platform/clock/index"
-import {
-    ConfigModule,
-} from "@modules/platform/config/index"
-import {
-    PlatformEventsModule,
-} from "@modules/platform/events/index"
-import {
-    PostgresqlPrimaryModule,
-} from "@modules/platform/databases/index"
-import {
-    KeycloakModule,
-} from "@modules/integrations/keycloak/index"
-import {
-    SepayModule,
-} from "@modules/integrations/sepay/index"
-import {
-    NotifySmtpModule,
-} from "@modules/integrations/notify-smtp/index"
-import {
-    NotifyQueueModule,
-} from "@modules/integrations/notify-queue/index"
-import {
-    UploadModule,
-} from "@modules/integrations/upload/index"
-import {
-    ObservabilityModule,
-} from "@modules/platform/observability/index"
-import {
+    AuthGuard,
+    SESSION_ERROR_KINDS,
+    SESSION_MESSAGES,
     SessionModule,
-} from "@modules/domain/session/index"
+    sessionEntities,
+    sessionMigrations,
+} from "@modules/domain/session"
+import { SHARE_ERROR_KINDS, SHARE_MESSAGES, ShareModule, shareEntities, shareMigrations } from "@modules/domain/share"
+import { TASK_ERROR_KINDS, TASK_MESSAGES, TaskModule, taskEntities, taskMigrations } from "@modules/domain/task"
+import { UPLOAD_ERROR_KINDS, UPLOAD_MESSAGES, UploadModule, uploadEntities, uploadMigrations } from "@modules/domain/upload"
+import { KEYCLOAK_ERROR_KINDS, KEYCLOAK_MESSAGES, KeycloakModule } from "@modules/integrations/keycloak"
+import { NOTIFY_SMTP_ERROR_KINDS, NOTIFY_SMTP_MESSAGES, NotifySmtpModule } from "@modules/integrations/notify-smtp"
+import { SEPAY_ERROR_KINDS, SEPAY_MESSAGES, SepayModule } from "@modules/integrations/sepay"
+import { UPLOAD_STORAGE_ERROR_KINDS, UPLOAD_STORAGE_MESSAGES, UploadStorageModule } from "@modules/integrations/upload"
+import { ClockModule } from "@modules/platform/clock"
+import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
+import { CqrsModule } from "@modules/platform/cqrs"
+import { DATABASE_ERROR_KINDS, DATABASE_PROBE, DatabaseModule } from "@modules/platform/database"
+import { ERRORS_MESSAGES, ErrorsModule } from "@modules/platform/errors"
+import { GraphqlModule } from "@modules/platform/graphql"
+import { HTTP_ERROR_KINDS, HTTP_MESSAGES, HttpModule } from "@modules/platform/http"
 import {
-    TaskModule,
-} from "@modules/domain/task/index"
-import {
-    ShareModule,
-} from "@modules/domain/share/index"
-import {
-    RecurModule,
-} from "@modules/domain/recur/index"
-import {
-    NotifyModule,
-} from "@modules/domain/notify/index"
-import {
-    AuditModule,
-} from "@modules/domain/audit/index"
-import {
-    PlanModule,
-} from "@modules/domain/plan/index"
-import {
-    TodoModule
-} from "@features/todo/index"
+    HTTP_SECURITY_ERROR_KINDS,
+    HTTP_SECURITY_MESSAGES,
+    HttpSecurityModule,
+    OriginGuard,
+    RateLimitGuard,
+} from "@modules/platform/http-security"
+import { I18nModule } from "@modules/platform/i18n"
+import { InboxModule, inboxEntities, inboxMigrations } from "@modules/platform/inbox"
+import { LoggingModule } from "@modules/platform/logging"
+import { ObservabilityModule } from "@modules/platform/observability"
+import { OutboxModule, outboxEntities, outboxMigrations } from "@modules/platform/outbox"
+import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
+import { HealthHttpModule } from "@features/health"
+import { TodoGraphqlModule, TodoHttpModule } from "@features/todo"
+import type { TodoAppOptions } from "./todo.options"
 
-/**
- * Composition only, under nivo's shape: capability modules (`domain/session`, `domain/task`) and
- * the one owned database module are registered here; the GraphQL transport (`TodoGraphqlModule`) and the
- * one surviving HTTP door (`HealthModule`) are the only feature-level composition. `ConfigModule`,
- * `PlatformEventsModule`, `ClockModule` and `SessionModule` are registered globally: `AppConfigService` and
- * `PlatformEventBus` are genuinely app-wide (every capability and integration needs one or the other),
- * and `SessionService` is needed by five separate GraphQL action modules for the same
- * `Authorization: Bearer <token>` -> actor lookup (see `application/session-actor.adapter.ts`'s comment) - each capability module that
- * used to import them explicitly (`keycloak.module.ts`, `primary.module.ts`, `task.module.ts`,
- * `session.module.ts`) now relies on that global registration instead. Nothing else here needs to be
- * global, since `@nestjs/cqrs`'s `CqrsModule` and the primary database's own `TypeOrmCoreModule` are
- * already app-wide by the vendor's own design.
- */
-@Module({
-    imports: [
-        ClockModule.register({
-            isGlobal: true
-        }),
-        ConfigModule.register({
-            isGlobal: true 
-        }),
-        PlatformEventsModule.register({
-            isGlobal: true 
-        }),
-        PostgresqlPrimaryModule.register({
-            isGlobal: true 
-        }),
-        SessionModule.register({
-            isGlobal: true 
-        }),
-        KeycloakModule.register({
-            isGlobal: true 
-        }),
-        SepayModule.register({
-            isGlobal: true 
-        }),
-        NotifySmtpModule.register({
-            isGlobal: true 
-        }),
-        NotifyQueueModule.register({
-            isGlobal: true 
-        }),
-        UploadModule.register({
-            isGlobal: true 
-        }),
-        ObservabilityModule.register({
-            isGlobal: true 
-        }),
-        TaskModule.register(),
-        ShareModule.register(),
-        RecurModule.register(),
-        NotifyModule.register(),
-        AuditModule.register(),
-        PlanModule.register(),
-        TodoModule,
-    ],
-})
-/** Root composition module: registers every owned capability and global integration once. */
-export class AppModule {}
+@Module({})
+/** The composition root of the todo api: every capability is registered once, app-wide, and the three guards run in a fixed order. */
+export class AppModule {
+    /** Builds the todo api from its parsed options. */
+    static register(options: TodoAppOptions): DynamicModule {
+        return {
+            module: AppModule,
+            imports: [
+                ClockModule.register({ isGlobal: true }),
+                LoggingModule.register({ isGlobal: true }),
+                I18nModule.register({
+                    isGlobal: true,
+                    bundles: [
+                        ERRORS_MESSAGES,
+                        HTTP_MESSAGES,
+                        HTTP_SECURITY_MESSAGES,
+                        PROBES_MESSAGES,
+                        SESSION_MESSAGES,
+                        TASK_MESSAGES,
+                        SHARE_MESSAGES,
+                        PLAN_MESSAGES,
+                        RECUR_MESSAGES,
+                        NOTIFY_MESSAGES,
+                        AUDIT_MESSAGES,
+                        UPLOAD_MESSAGES,
+                        KEYCLOAK_MESSAGES,
+                        SEPAY_MESSAGES,
+                        NOTIFY_SMTP_MESSAGES,
+                        UPLOAD_STORAGE_MESSAGES,
+                    ],
+                }),
+                ErrorsModule.register({
+                    isGlobal: true,
+                    kinds: [
+                        CONFIG_ERROR_KINDS,
+                        DATABASE_ERROR_KINDS,
+                        HTTP_ERROR_KINDS,
+                        HTTP_SECURITY_ERROR_KINDS,
+                        PROBES_ERROR_KINDS,
+                        SESSION_ERROR_KINDS,
+                        TASK_ERROR_KINDS,
+                        SHARE_ERROR_KINDS,
+                        PLAN_ERROR_KINDS,
+                        RECUR_ERROR_KINDS,
+                        NOTIFY_ERROR_KINDS,
+                        AUDIT_ERROR_KINDS,
+                        UPLOAD_ERROR_KINDS,
+                        KEYCLOAK_ERROR_KINDS,
+                        SEPAY_ERROR_KINDS,
+                        NOTIFY_SMTP_ERROR_KINDS,
+                        UPLOAD_STORAGE_ERROR_KINDS,
+                    ],
+                }),
+                CqrsModule.register({ isGlobal: true }),
+                HttpSecurityModule.register({ isGlobal: true, ...options.httpSecurity }),
+                DatabaseModule.register({
+                    isGlobal: true,
+                    connections: [
+                        {
+                            ...options.database,
+                            entities: [
+                                ...sessionEntities,
+                                ...taskEntities,
+                                ...shareEntities,
+                                ...planEntities,
+                                ...recurEntities,
+                                ...notifyEntities,
+                                ...auditEntities,
+                                ...uploadEntities,
+                                ...inboxEntities,
+                                ...outboxEntities,
+                            ],
+                            migrations: [
+                                ...sessionMigrations,
+                                ...taskMigrations,
+                                ...shareMigrations,
+                                ...planMigrations,
+                                ...recurMigrations,
+                                ...notifyMigrations,
+                                ...auditMigrations,
+                                ...uploadMigrations,
+                                ...inboxMigrations,
+                                ...outboxMigrations,
+                            ],
+                        },
+                    ],
+                }),
+                HttpModule.register({ isGlobal: true }),
+                OutboxModule.register({ isGlobal: true }),
+                InboxModule.register({ isGlobal: true }),
+                KeycloakModule.register({ isGlobal: true, ...options.keycloak }),
+                SepayModule.register({ isGlobal: true, ...options.sepay }),
+                NotifySmtpModule.register({ isGlobal: true, ...options.notifySmtp }),
+                UploadStorageModule.register({ isGlobal: true, ...options.uploadStorage }),
+                SessionModule.register({ isGlobal: true, ...options.session }),
+                TaskModule.register({ isGlobal: true }),
+                ShareModule.register({ isGlobal: true }),
+                PlanModule.register({ isGlobal: true, ...options.plan }),
+                RecurModule.register({ isGlobal: true, ...options.recur }),
+                NotifyModule.register({ isGlobal: true }),
+                AuditModule.register({ isGlobal: true }),
+                UploadModule.register({ isGlobal: true, ...options.upload }),
+                ObservabilityModule.register({ isGlobal: true }),
+                ProbesModule.register({ isGlobal: true, service: "todo", probes: [DATABASE_PROBE] }),
+                GraphqlModule.register({ isGlobal: true }),
+                HealthHttpModule,
+                TodoGraphqlModule,
+                TodoHttpModule,
+            ],
+            providers: [
+                { provide: APP_GUARD, useClass: RateLimitGuard },
+                { provide: APP_GUARD, useClass: OriginGuard },
+                { provide: APP_GUARD, useClass: AuthGuard },
+            ],
+        }
+    }
+}

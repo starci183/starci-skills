@@ -1,490 +1,106 @@
-import {
-    Global, Injectable, Module 
-} from "@nestjs/common"
-import {
-    Test 
-} from "@nestjs/testing"
-import {
-    INestApplication 
-} from "@nestjs/common"
-import {
-    CqrsModule 
-} from "@nestjs/cqrs"
-import request from "supertest"
-import {
-    TodoGraphqlModule,
-} from "@features/todo/index"
-import {
-    PlatformEventsModule,
-} from "@modules/platform/events/index"
+import "reflect-metadata"
+import { APP_GUARD } from "@nestjs/core"
+import { CommandBus } from "@nestjs/cqrs"
+import { Test } from "@nestjs/testing"
+import type { TestingModule } from "@nestjs/testing"
+import { getDataSourceToken, getEntityManagerToken } from "@nestjs/typeorm"
+import type { DataSource } from "typeorm"
+import { mock } from "@starci/jest-preset/mock"
+import { PlanService } from "@modules/domain/plan"
+import { AuthGuard, SessionService } from "@modules/domain/session"
+import { TaskService } from "@modules/domain/task"
+import { ConfigError, EnvSource, Secret } from "@modules/platform/config"
+import { PRIMARY_CONNECTION } from "@modules/platform/database"
+import { ERRORS_SERVICE } from "@modules/platform/errors"
+import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
+import { LOGGER } from "@modules/platform/logging"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { AppModule } from "./app.module"
+import { parseTodoAppOptions } from "./todo.options"
+import type { TodoAppOptions } from "./todo.options"
 
-import {
-    InvalidCredentialsException,
-} from "@modules/domain/session/index"
-import {
-    SessionNotFoundException,
-} from "@modules/domain/session/index"
-import {
-    SessionRecord,
-} from "@modules/domain/session/index"
-import {
-    SessionService,
-} from "@modules/domain/session/index"
-import {
-    SignInHandler,
-} from "@modules/domain/session/index"
-import {
-    SignOutHandler,
-} from "@modules/domain/session/index"
-
-import {
-    CompleteTaskHandler,
-} from "@modules/domain/task/index"
-import {
-    CreateTaskHandler,
-} from "@modules/domain/task/index"
-import {
-    DeleteTaskHandler,
-} from "@modules/domain/task/index"
-import {
-    ListTasksHandler,
-} from "@modules/domain/task/index"
-import {
-    ReopenTaskHandler,
-} from "@modules/domain/task/index"
-import {
-    TaskCreationPolicyRegistry,
-} from "@modules/domain/task/index"
-import {
-    TaskForbiddenException,
-} from "@modules/domain/task/index"
-import {
-    TaskNotFoundException,
-} from "@modules/domain/task/index"
-import {
-    TaskRecord,
-} from "@modules/domain/task/index"
-import {
-    TaskService,
-} from "@modules/domain/task/index"
-import {
-    TaskTitleRequiredException,
-} from "@modules/domain/task/index"
-
-import {
-    KeycloakClient,
-} from "@modules/integrations/keycloak/index"
-import {
-    KeycloakInvalidCredentialsException,
-} from "@modules/integrations/keycloak/index"
-import {
-    WinstonService,
-} from "@modules/platform/logging/index"
-import type {
-    KeycloakSignInResult,
-} from "@modules/integrations/keycloak/index"
-import {
-    Clock 
-} from "@modules/platform/clock/index"
-import {
-    FakeClock 
-} from "@starci/jest-preset/clock"
-import {
-    timingSafeEqual 
-} from "node:crypto"
-
-/** Compares two secrets in constant time, the way production code must. */
-const sameSecret = (given: string, expected: string): boolean =>
-    given.length === expected.length && timingSafeEqual(Buffer.from(given),
-        Buffer.from(expected))
-
-
-const DEMO_EMAIL = "demo@todo.dev"
-const DEMO_PASSWORD = "todo-demo-pass"
-const DEMO_SUBJECT = "demo-subject"
-
-/**
- * Stands in for the real Keycloak direct access grant round-trip: this is the fake boundary step 6 asks
- * for, so the boot test can drive the whole route sequence without a live Keycloak. It does not extend
- * KeycloakClient - a subclass with its own zero-argument constructor still inherits its parent's
- * @Injectable design:paramtypes metadata through the prototype chain, which would make Nest try to
- * resolve AppConfigService for a class that no longer needs it.
- */
-@Injectable()
-class FakeKeycloakClient {
-    async signIn(email: string, password: string): Promise<KeycloakSignInResult> {
-        if (email.toLowerCase() !== DEMO_EMAIL || !sameSecret(password,
-            DEMO_PASSWORD)) {
-            throw new KeycloakInvalidCredentialsException({
-            })
-        }
-        return {
-            subject: DEMO_SUBJECT 
-        }
-    }
-
-    async notifySignOut(): Promise<void> {
-    // Best-effort in production; a no-op here is exactly as observable.
-    }
+const options: TodoAppOptions = {
+    port: 0,
+    database: { name: PRIMARY_CONNECTION, url: new Secret("postgres://localhost:0/todo") },
+    httpSecurity: { allowedOrigins: ["http://localhost:3000"], rateLimit: { windowMs: 1000, defaultLimit: 10, strictLimit: 5 } },
+    session: { ttlDays: 1, adminSubjects: [] },
+    keycloak: { tokenUrl: "http://localhost:0/token", clientId: "todo-api", timeoutMs: 100 },
+    sepay: { baseUrl: "http://localhost:0", apiKey: new Secret("k"), webhookSecret: new Secret("w"), timeoutMs: 100 },
+    plan: { paidPriceMinorUnits: 99000, paidCurrency: "VND" },
+    recur: { tickCron: "*/5 * * * *" },
+    upload: { maxBytes: 1024, allowedMimes: ["text/plain"], presignTtlMs: 1000, signingSecret: new Secret("s") },
+    uploadStorage: { directory: "/tmp/todo-uploads" },
+    notifySmtp: { host: "localhost", port: 0, from: "todo@example.test", connectTimeoutMs: 100, commandTimeoutMs: 100 },
 }
 
-class FakeSessionService {
-    private readonly byToken = new Map<string, SessionRecord>()
-
-    tBegin(email: string): void {
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            throw new InvalidCredentialsException({
-            })
-        }
-    }
-
-    async tAccept(personId: string): Promise<SessionRecord> {
-        const record = new SessionRecord(`token-${this.byToken.size + 1}`,
-            personId,
-            new Date(),
-            new Date(Date.now() + 86_400_000))
-        this.byToken.set(record.token,
-            record)
-        return record
-    }
-
-    tRefuse(): void {}
-
-    async tRevoke(token: string): Promise<void> {
-        this.byToken.delete(token)
-    }
-
-    async findActive(token: string): Promise<SessionRecord> {
-        if (!token) {
-            throw new SessionNotFoundException({
-            })
-        }
-        const record = this.byToken.get(token)
-        if (!record) {
-            throw new SessionNotFoundException({
-            })
-        }
-        return record
-    }
+const environment: Record<string, string> = {
+    PORT: "3001",
+    PRIMARY_DB_URL: "postgres://localhost:5501/todo",
+    HTTP_SECURITY_ALLOWED_ORIGINS: "http://localhost:3000",
+    KEYCLOAK_TOKEN_URL: "http://localhost:8089/token",
+    KEYCLOAK_CLIENT_ID: "todo-api",
+    SEPAY_BASE_URL: "http://localhost:0",
+    SEPAY_API_KEY: "k",
+    SEPAY_WEBHOOK_SECRET: "w",
+    UPLOAD_DIR: "/tmp/todo-uploads",
+    UPLOAD_SIGNING_SECRET: "s",
+    SMTP_HOST: "localhost",
+    SMTP_PORT: "1025",
+    SMTP_FROM: "todo@example.test",
 }
 
-class FakeTaskService {
-    private readonly byId = new Map<string, TaskRecord>()
-    private seq = 0
+describe("todo AppModule", () => {
+    let module: TestingModule
+    const manager = mockEntityManager()
 
-    async create(owner: string, title: string): Promise<TaskRecord> {
-        const trimmed = title.trim()
-        if (!trimmed) {
-            throw new TaskTitleRequiredException({
-            })
-        }
-        const record = new TaskRecord(`task-${++this.seq}`,
-            owner,
-            trimmed,
-            false,
-            null)
-        this.byId.set(record.id,
-            record)
-        return record
-    }
-
-    async findById(id: string): Promise<TaskRecord> {
-        const record = this.byId.get(id)
-        if (!record) {
-            throw new TaskNotFoundException({
-            })
-        }
-        return record
-    }
-
-    async listOwnedBy(owner: string): Promise<Array<TaskRecord>> {
-        return [...this.byId.values()].filter(record => record.owner === owner)
-    }
-
-    private assertOwner(record: TaskRecord, actorId: string): void {
-        if (record.owner !== actorId) {
-            throw new TaskForbiddenException({
-            })
-        }
-    }
-
-    async complete(id: string, actorId: string): Promise<TaskRecord> {
-        const record = await this.findById(id)
-        this.assertOwner(record,
-            actorId)
-        if (!record.complete) {
-            record.complete = true
-            record.completedAt = new Date()
-        }
-        return record
-    }
-
-    async reopen(id: string, actorId: string): Promise<TaskRecord> {
-        const record = await this.findById(id)
-        this.assertOwner(record,
-            actorId)
-        record.complete = false
-        record.completedAt = null
-        return record
-    }
-
-    async delete(id: string, actorId: string): Promise<TaskRecord> {
-        const record = await this.findById(id)
-        this.assertOwner(record,
-            actorId)
-        this.byId.delete(id)
-        return record
-    }
-}
-
-/**
- * Fakes only the Keycloak boundary; SessionService, the real SignIn/SignOutHandler and PlatformEventBus
- * are all real, in-process code - the same boundary choice the former REST-transport boot test made
- * ("fakes at exactly the two boundaries this example cannot prove in a unit test process: Keycloak and
- * Postgres"). `@Global()` so the five GraphQL task resolvers, which never import SessionModule
- * themselves and rely on the app's one global registration (see `session-context.ts`), can still resolve
- * `SessionService` here.
- *
- * WHY THIS TEST BUILDS ITS OWN ROOT MODULE INSTEAD OF `AppModule` + `overrideModule`: NestJS's
- * `TestingModuleBuilder.overrideModule()` matches an import-array entry by strict reference equality
- * against the *entry itself* (`@nestjs/core/scanner.js`'s `getOverrideModuleByModule`), but a dynamic
- * module import (`SessionModule.register(...)`, `TaskModule.register()`, `PostgresqlPrimaryModule
- * .register()`) puts the whole `DynamicModule` object in that slot, not the bare class - so
- * `.overrideModule(SessionModule)` never matches and the *real* module (with its real
- * `TypeOrmModule.forFeature`/`forRootAsync` calls) still loads, which is exactly what produced the
- * "Unable to connect to the database" retries and the missing-repository DI errors this file used to
- * fail with. Composing a small test-only root module out of the real GraphQL transport
- * (`TodoGraphqlModule`, unchanged) plus these two fake capability modules sidesteps that limitation
- * entirely, and is the same shape nivo's own capability specs use (construct the collaborators
- * directly; see `sign-in.service.spec.ts`) rather than booting the full app for a unit boundary test.
- */
-@Global()
-@Module({
-    imports: [CqrsModule,
-        PlatformEventsModule.register()],
-    providers: [
-        {
-            provide: Clock, useValue: new FakeClock() 
-        },
-        {
-            provide: SessionService, useClass: FakeSessionService 
-        },
-        {
-            provide: KeycloakClient, useClass: FakeKeycloakClient 
-        },
-        SignInHandler,
-        SignOutHandler,
-        WinstonService,
-    ],
-    exports: [SessionService],
-})
-class FakeSessionModule {}
-
-@Module({
-    imports: [CqrsModule,
-        PlatformEventsModule.register()],
-    providers: [
-        {
-            provide: Clock, useValue: new FakeClock() 
-        },
-        {
-            provide: TaskService, useClass: FakeTaskService 
-        },
-        TaskCreationPolicyRegistry,
-        CreateTaskHandler,
-        CompleteTaskHandler,
-        ReopenTaskHandler,
-        DeleteTaskHandler,
-        ListTasksHandler,
-    ],
-    exports: [TaskService,
-        TaskCreationPolicyRegistry],
-})
-class FakeTaskModule {}
-
-@Module({
-    imports: [FakeSessionModule,
-        FakeTaskModule,
-        TodoGraphqlModule] 
-})
-class TestAppModule {}
-
-/**
- * fr.task.create/complete/reopen/delete/list plus br.login.password.sign-in and fr.login.sign-out, driven
- * end to end through the real GraphQL transport (`TodoGraphqlModule`, unchanged from what `AppModule`
- * composes) and the real CQRS handlers - against fakes at exactly the two boundaries this example cannot
- * prove in a unit test process: Keycloak and Postgres. This is the same route sequence the live proof
- * drives against the real stack, now speaking GraphQL instead of REST.
- */
-describe("todo composition",
-    () => {
-        let app: INestApplication
-
-        const graphql = (query: string, variables?: Record<string, unknown>, sessionToken?: string) => {
-            const req = request(app.getHttpServer()).post("/graphql").send({
-                query, variables 
-            })
-            return sessionToken ? req.set("authorization",
-                `Bearer ${sessionToken}`) : req
-        }
-
-        beforeAll(async () => {
-            const moduleRef = await Test.createTestingModule({
-                imports: [TestAppModule] 
-            }).compile()
-            app = moduleRef.createNestApplication()
-            app.enableCors({
-                origin: "http://localhost:3000" 
-            })
-            await app.init()
-        })
-
-        afterAll(async () => {
-            await app.close()
-        })
-
-        it("refuses sign-in with the wrong password and with an unknown email identically",
-            async () => {
-                const query = "mutation SignIn($input: SignInInput!) { signIn(request: $input) { sessionToken personId } }"
-                const wrongPassword = await graphql(query,
-                    {
-                        input: {
-                            email: DEMO_EMAIL, password: "not-it" 
-                        } 
-                    })
-                const unknownEmail = await graphql(query,
-                    {
-                        input: {
-                            email: "nobody@todo.dev", password: "anything" 
-                        } 
-                    })
-
-                expect(wrongPassword.status).toBe(200)
-                expect(wrongPassword.body.errors[0].extensions.code).toBe("INVALID_CREDENTIALS")
-                expect(wrongPassword.body).toEqual(unknownEmail.body)
-            })
-
-        it("drives sign-in, the full task lifecycle, and sign-out through the real GraphQL operations",
-            async () => {
-                const signIn = await graphql(
-                    "mutation SignIn($input: SignInInput!) { signIn(request: $input) { sessionToken personId } }",
-                    {
-                        input: {
-                            email: DEMO_EMAIL, password: DEMO_PASSWORD 
-                        } 
-                    },
-                )
-                expect(signIn.body.errors).toBeUndefined()
-                const token = signIn.body.data.signIn.sessionToken as string
-                expect(token).toEqual(expect.any(String))
-
-                const create = await graphql(
-                    "mutation CreateTask($input: CreateTaskInput!) { createTask(request: $input) { taskId title } }",
-                    {
-                        input: {
-                            title: "Prove the boot path" 
-                        } 
-                    },
-                    token,
-                )
-                expect(create.body.errors).toBeUndefined()
-                const taskId = create.body.data.createTask.taskId as string
-
-                const list1 = await graphql("query { tasks { taskId title complete } }",
-                    undefined,
-                    token)
-                expect(list1.body.data.tasks).toHaveLength(1)
-                expect(list1.body.data.tasks[0].complete).toBe(false)
-
-                const complete1 = await graphql(
-                    "mutation CompleteTask($id: ID!) { completeTask(request: {id: $id}) { taskId complete } }",
-                    {
-                        id: taskId 
-                    },
-                    token,
-                )
-                expect(complete1.body.data.completeTask.complete).toBe(true)
-
-                const complete2 = await graphql(
-                    "mutation CompleteTask($id: ID!) { completeTask(request: {id: $id}) { taskId complete } }",
-                    {
-                        id: taskId 
-                    },
-                    token,
-                )
-                expect(complete2.body.data.completeTask.complete).toBe(true)
-
-                const reopen = await graphql("mutation ReopenTask($id: ID!) { reopenTask(request: {id: $id}) { taskId complete } }",
-                    {
-                        id: taskId 
-                    },
-                    token)
-                expect(reopen.body.data.reopenTask.complete).toBe(false)
-
-                const del = await graphql("mutation DeleteTask($id: ID!) { deleteTask(request: {id: $id}) { deleted } }",
-                    {
-                        id: taskId 
-                    },
-                    token)
-                expect(del.body.data.deleteTask.deleted).toBe(true)
-
-                const list2 = await graphql("query { tasks { taskId title complete } }",
-                    undefined,
-                    token)
-                expect(list2.body.data.tasks).toHaveLength(0)
-
-                const signOut = await graphql(
-                    "mutation SignOut($input: SignOutInput!) { signOut(request: $input) { signedOut } }",
-                    {
-                        input: {
-                            sessionToken: token 
-                        } 
-                    },
-                )
-                expect(signOut.body.data.signOut.signedOut).toBe(true)
-
-                const afterSignOut = await graphql("query { tasks { taskId title complete } }",
-                    undefined,
-                    token)
-                expect(afterSignOut.body.errors[0].extensions.code).toBe("SESSION_NOT_FOUND")
-            })
-
-        it("refuses an unauthenticated tasks query before any data is returned, with no Authorization header at all",
-            async () => {
-                const noHeader = await graphql("query { tasks { taskId title complete } }")
-
-                expect(noHeader.body.data == null).toBe(true)
-                expect(noHeader.body.errors[0].extensions.code).toBe("SESSION_NOT_FOUND")
-            })
-
-        it("refuses a task mutation carrying a malformed Authorization header (no \"Bearer \" prefix) the same way",
-            async () => {
-                const malformed = await request(app.getHttpServer())
-                    .post("/graphql")
-                    .set("authorization",
-                        "not-a-bearer-token")
-                    .send({
-                        query: "mutation CreateTask($input: CreateTaskInput!) { createTask(request: $input) { taskId } }",
-                        variables: {
-                            input: {
-                                title: "should never be created" 
-                            } 
-                        },
-                    })
-
-                expect(malformed.body.data == null).toBe(true)
-                expect(malformed.body.errors[0].extensions.code).toBe("SESSION_NOT_FOUND")
-            })
-
-        it("answers a cross-origin preflight with Access-Control-Allow-Origin for http://localhost:3000",
-            async () => {
-                const response = await request(app.getHttpServer())
-                    .options("/graphql")
-                    .set("Origin",
-                        "http://localhost:3000")
-                    .set("Access-Control-Request-Method",
-                        "POST")
-
-                expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:3000")
-            })
+    beforeAll(async () => {
+        const dataSource = mock<DataSource>({ isInitialized: false, manager, entityMetadatas: [], options: { type: "postgres" } })
+        module = await Test.createTestingModule({ imports: [AppModule.register(options)] })
+            .overrideProvider(getDataSourceToken(PRIMARY_CONNECTION))
+            .useValue(dataSource)
+            .compile()
     })
+
+    afterAll(async () => {
+        await module.close()
+    })
+
+    it("compiles the real root module with the database doubled", () => {
+        expect(module).toBeDefined()
+    })
+
+    it("resolves the capabilities and the platform ports the doors depend on", () => {
+        for (const token of [SessionService, TaskService, PlanService]) {
+            expect(module.get(token)).toBeInstanceOf(token)
+        }
+        expect(module.get(CommandBus)).toBeInstanceOf(CommandBus)
+        expect(module.get(ERRORS_SERVICE)).toBeDefined()
+        expect(module.get(LOGGER)).toBeDefined()
+    })
+
+    it("binds the one primary EntityManager to the connection double", () => {
+        expect(module.get(getEntityManagerToken(PRIMARY_CONNECTION))).toBe(manager)
+    })
+
+    it("registers the app guards in order: rate limit, origin, auth", () => {
+        const guards = (AppModule.register(options).providers ?? []).flatMap((provider) =>
+            "provide" in provider && provider.provide === APP_GUARD && "useClass" in provider ? [provider.useClass] : [],
+        )
+        expect(guards).toEqual([RateLimitGuard, OriginGuard, AuthGuard])
+    })
+})
+
+describe("parseTodoAppOptions", () => {
+    it("reads the port, the primary database and every capability from the environment", () => {
+        const parsed = parseTodoAppOptions(new EnvSource(environment))
+        expect(parsed.port).toBe(3001)
+        expect(parsed.database.name).toBe(PRIMARY_CONNECTION)
+        expect(parsed.database.url.reveal()).toBe("postgres://localhost:5501/todo")
+        expect(parsed.httpSecurity.allowedOrigins).toEqual(["http://localhost:3000"])
+        expect(parsed.keycloak.clientId).toBe("todo-api")
+    })
+
+    it("stops the boot when a required key is missing", () => {
+        expect(() => parseTodoAppOptions(new EnvSource({}))).toThrow(ConfigError)
+    })
+})
