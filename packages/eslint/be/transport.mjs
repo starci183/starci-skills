@@ -133,6 +133,8 @@ export const transportIsThin = {
         }
         return {
             ClassDeclaration(node) {
+                // A Nest module class (`@Module`) wires the door into the container (registers consumers and jobs); it is not a door.
+                if ((node.decorators ?? node.parent?.decorators ?? []).some((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", "Module"))) return
                 const locales = new Set()
                 const classify = (name, annotation) => {
                     const kind = name === null ? null : injectedKind(context, annotation)

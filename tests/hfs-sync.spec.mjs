@@ -19,13 +19,12 @@ import { hygieneFindings, runWorkHygiene } from '../packages/hfs/sync/hygiene.mj
 const ROOT = path.resolve(import.meta.dirname, '..');
 const require = createRequire(import.meta.url);
 const jestPreset = require('../packages/jest-preset/index.cjs');
-const vitestPreset = await import('../packages/vitest-preset/index.mjs');
 
 const BE = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] };
 const FE = { hfs: 1, profile: 'fe', project: 'nivo', apps: [{ name: 'app', kind: 'web' }, { name: 'admin', kind: 'web' }] };
 const PRESETS = {
   be: { sonarExclusions: jestPreset.sonarExclusions() },
-  fe: { sonarExclusions: vitestPreset.sonarExclusions() },
+  fe: null,   // a front end has no test runner, so no preset
 };
 const rendered = hfs => Object.fromEntries(renderTargets(hfs, PRESETS[hfs.profile]).map(target => [target.path, target.content]));
 
@@ -71,7 +70,7 @@ describe('hfs.json validation', () => {
 describe('the generated file set', () => {
   it('a back end owns its tool configuration, package scripts, hooks, workflows, quality files and .starciwork/.gitignore; a front end owns its tool configuration, package scripts, hooks, workflows and quality files', () => {
     assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'src/tests/tsconfig.json', 'tsconfig.build.json', 'tsconfig.json']);
-    assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', 'eslint.config.mjs', 'package.json', 'sonar-project.properties', 'stylelint.config.mjs', 'tsconfig.e2e.json', 'tsconfig.json', 'vitest.config.ts']);
+    assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', 'eslint.config.mjs', 'package.json', 'sonar-project.properties', 'stylelint.config.mjs', 'tsconfig.json']);
   });
   it('the file list is the managedBy slots of the manifest, not code: each listed file is a literal path of a slot naming managedBy', () => {
     const manifest = loadSlotManifest();
@@ -81,14 +80,15 @@ describe('the generated file set', () => {
       assert.deepEqual(Object.keys(rendered(hfs)).filter(file => !listed.includes(file)).sort(), hfs.profile === 'be' ? ['.gitignore', '.starciwork/.gitignore'] : ['.gitignore'], 'only the block of a shared file and the file inside the .starciwork directory slot are unlisted');
     }
   });
-  it('a front end renders the three one-line configurations exactly, and its tsconfigs are the two presets', () => {
+  it('a front end renders the two one-line configurations exactly, and its tsconfig is the one preset', () => {
     const files = rendered(FE);
     assert.equal(files['eslint.config.mjs'], 'import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"\n\nexport default starciFeConfig({ hfs: loadHfs(import.meta.url) })\n');
     assert.equal(files['stylelint.config.mjs'], 'import { loadAppTokens, starciStylelintConfig } from "@starci/stylelint-canon"\n\nexport default starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })\n');
-    assert.match(files['vitest.config.ts'], /export default defineConfig\(starciVitestWorkspace\(\{ rootDir: import\.meta\.dirname \}\)\)/);
+    for (const gone of ['vitest.config.ts', 'codecov.yml', 'tsconfig.e2e.json', '.github/workflows/e2e.yml']) assert.equal(files[gone], undefined, `${gone} is not rendered for a front end: it has no tests`);
     assert.equal(files['.prettierrc'], '"@starci/prettier-config"\n');
-    assert.deepEqual(JSON.parse(files['tsconfig.json']), { extends: '@starci/tsconfig/next.json', exclude: ['node_modules', 'e2e', 'playwright.config.ts'] });
-    assert.deepEqual(JSON.parse(files['tsconfig.e2e.json']), { extends: '@starci/tsconfig/e2e.json', include: ['e2e/**/*.ts', 'playwright.config.ts'], exclude: ['node_modules'] });
+    assert.deepEqual(JSON.parse(files['tsconfig.json']), { extends: '@starci/tsconfig/next.json', exclude: ['node_modules'] });
+    assert.equal(files['tsconfig.e2e.json'], undefined, 'the front-end e2e config is not rendered while the front-end test standard is pending');
+    assert.equal(files['.github/workflows/e2e.yml'], undefined, 'there is no front-end e2e workflow');
   });
   it('a slot that names managedBy for a file with no template, or with a glob path, is refused', () => {
     const slot = (path, managedBy = 'tool-config') => ({ ...loadSlotManifest(), slots: [{ id: 'x', profiles: ['be'], path, managedBy }] });
@@ -107,20 +107,20 @@ describe('.husky/pre-commit', () => {
     for (const step of ['npm run typecheck', 'npx eslint $sources', 'npx prettier --check $sources', 'npm run test:affected -- --findRelatedTests $specs', 'npx hfs work-hygiene']) assert.ok(hook.includes(step), step);
     assert.doesNotMatch(hook, /lint-staged|test:(e2e|integration|contract)|typecheck:tests|selectProjects (e2e|integration|contract)|playwright/);
   });
-  it('front end runs staged eslint, stylelint and prettier (no lint-staged), vitest related, has no work hygiene, and never e2e', () => {
+  it('front end runs staged eslint, stylelint and prettier (no lint-staged), has no work hygiene and no test step', () => {
     const hook = rendered(FE)['.husky/pre-commit'];
-    for (const step of ['npm run typecheck', 'npx eslint --max-warnings=0 --no-warn-ignored $sources', 'npx stylelint $styles', 'npx prettier --check --ignore-unknown $formatted', 'npx vitest related --run']) assert.ok(hook.includes(step), step);
-    assert.doesNotMatch(hook, /lint-staged|work-hygiene|test:e2e|playwright/);
+    for (const step of ['npm run typecheck', 'npx eslint --max-warnings=0 --no-warn-ignored $sources', 'npx stylelint $styles', 'npx prettier --check --ignore-unknown $formatted']) assert.ok(hook.includes(step), step);
+    assert.doesNotMatch(hook, /lint-staged|work-hygiene|vitest|jest|playwright|test:/);
   });
 });
 
 describe('.husky/pre-push', () => {
   const PUSH_STEPS = {
     be: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm run test:affected -- --changedSince=origin/main'],
-    fe: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm run test:affected'],
+    fe: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast'],
   };
   for (const hfs of [BE, FE]) {
-    it(`${hfs.profile} runs typecheck, lint, hfs check --fast and the affected unit specs, and never e2e`, () => {
+    it(`${hfs.profile} runs typecheck, lint and hfs check --fast, and never e2e`, () => {
       const hook = rendered(hfs)['.husky/pre-push'];
       for (const step of PUSH_STEPS[hfs.profile]) assert.ok(hook.includes(step), step);
       assert.doesNotMatch(hook, /test:(e2e|integration|contract)|typecheck:tests|playwright/);
@@ -129,7 +129,7 @@ describe('.husky/pre-push', () => {
   for (const hfs of [BE, FE]) {
     it(`a ${hfs.profile} hook and workflow call only scripts the managed package.json defines`, () => {
       const scripts = ['', rendered(hfs)['package.json']].join('\n');
-      for (const hook of ['.husky/pre-commit', '.husky/pre-push', '.github/workflows/ci.yml', '.github/workflows/e2e.yml']) {
+      for (const hook of ['.husky/pre-commit', '.husky/pre-push', '.github/workflows/ci.yml', ...(hfs.profile === 'be' ? ['.github/workflows/e2e.yml'] : [])]) {
         for (const [, name] of rendered(hfs)[hook].matchAll(/npm run ([\w:-]+)/g)) assert.ok(scripts.includes(`\n${name}: `), `${hook} runs npm run ${name}`);
       }
     });
@@ -149,7 +149,7 @@ describe('.husky/pre-push', () => {
 describe('.github/workflows', () => {
   const CI_STEPS = {
     be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run build', 'npm ci'],
-    fe: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm run test:ci', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run lint:report:css', 'npx hfs report stylelint reports/stylelint.json reports/stylelint.sonar.json', 'npm run build', 'npm ci'],
+    fe: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run lint:report:css', 'npx hfs report stylelint reports/stylelint.json reports/stylelint.sonar.json', 'npm run build', 'npm ci'],
   };
   for (const hfs of [BE, FE]) {
     it(`${hfs.profile} ci.yml runs lint, typecheck, unit, hfs check and sonar, with no e2e`, () => {
@@ -167,18 +167,17 @@ describe('.github/workflows', () => {
       assert.ok(!uses.some(use => use.startsWith('codecov/')), 'no coverage upload: Sonar and CI hold no coverage');
       assert.equal(doc.permissions['id-token'], undefined);
       assert.doesNotMatch(text, /lcov|codecov|--coverage/);
+      if (hfs.profile === 'fe') assert.doesNotMatch(text, /test:ci|vitest/);
       assert.doesNotMatch(text, /e2e/);
       assert.match(text, /node-version: 22/);
     });
-    it(`${hfs.profile} e2e.yml is dispatched by hand only`, () => {
-      const doc = parseYaml(rendered(hfs)['.github/workflows/e2e.yml']);
-      assert.deepEqual(Object.keys(doc.on), ['workflow_dispatch']);
-      assert.ok(doc.jobs.e2e.steps.some(step => step.run === 'npm run test:e2e'));
-    });
   }
-  it('only the front end installs a browser for e2e', () => {
-    assert.match(rendered(FE)['.github/workflows/e2e.yml'], /playwright install/);
+  it('only the back end has an e2e workflow: dispatched by hand, running test:e2e, installing no browser', () => {
+    const doc = parseYaml(rendered(BE)['.github/workflows/e2e.yml']);
+    assert.deepEqual(Object.keys(doc.on), ['workflow_dispatch']);
+    assert.ok(doc.jobs.e2e.steps.some(step => step.run === 'npm run test:e2e'));
     assert.doesNotMatch(rendered(BE)['.github/workflows/e2e.yml'], /playwright/);
+    assert.equal(rendered(FE)['.github/workflows/e2e.yml'], undefined);
   });
 });
 
@@ -208,12 +207,11 @@ describe('sonar-project.properties', () => {
     assert.equal(be['sonar.projectKey'], 'nivo-backend');
     assert.equal(be['sonar.sources'], 'apps,src');
     const fe = properties(rendered(FE)['sonar-project.properties']);
-    assert.equal(fe['sonar.exclusions'], vitestPreset.sonarExclusions());
-    assert.deepEqual(Object.keys(fe).filter(key => /coverage|lcov/i.test(key)), []);
+    assert.equal(fe['sonar.exclusions'], '**/.next/**,**/node_modules/**,**/src/messages/**');
+    for (const key of ['sonar.tests', 'sonar.test.inclusions', 'sonar.coverage.exclusions', 'sonar.javascript.lcov.reportPaths']) assert.ok(!(key in fe), `${key}: a front end has no tests and no coverage`);
     assert.equal(fe['sonar.projectKey'], 'nivo-fe');
     assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json');
     assert.equal(fe['sonar.sources'], 'apps', 'no package slot: the sources are the apps');
-    assert.equal(fe['sonar.tests'], 'apps');
     // One import path for every linter (hfs report): Sonar's own ESLint import is not used, it drops issues on files outside sonar.sources.
     assert.ok(!('sonar.eslint.reportPaths' in fe) && !('sonar.eslint.reportPaths' in be));
     assert.equal(fe['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json,reports/eslint.sonar.json,reports/stylelint.sonar.json');
@@ -291,11 +289,11 @@ describe('.starciwork/.gitignore', () => {
 });
 
 describe('loading the presets a repository installs', () => {
-  it('resolves both presets from the repository node_modules', async t => {
+  it('resolves the back end preset from the repository node_modules, and a front end has none', async t => {
     const dir = repo(t, BE);
-    for (const name of ['jest-preset', 'vitest-preset']) fs.cpSync(path.join(ROOT, 'packages', name), path.join(dir, 'node_modules', '@starci', name), { recursive: true });
+    fs.cpSync(path.join(ROOT, 'packages', 'jest-preset'), path.join(dir, 'node_modules', '@starci', 'jest-preset'), { recursive: true });
     assert.deepEqual(await loadPresets(dir, 'be'), PRESETS.be);
-    assert.deepEqual(await loadPresets(dir, 'fe'), PRESETS.fe);
+    assert.equal(await loadPresets(dir, 'fe'), null);
   });
   it('names the missing preset and the command that installs it', async t => {
     await assert.rejects(loadPresets(repo(t, BE), 'be'), /HFS_SYNC_PRESET_MISSING.*@starci\/jest-preset.*canon-pins\.yaml/);
@@ -444,36 +442,33 @@ describe('the package.json scripts of a back end', () => {
 
 describe('the package.json scripts of a front end', () => {
   const scripts = hfs => renderTargets(hfs, PRESETS.fe).find(target => target.path === 'package.json').scripts;
-  it('are one lint gate over eslint (apps, packages and e2e in one run) and stylelint, plus the fixed scripts and dev/start per app', () => {
-    assert.deepEqual(Object.keys(scripts(FE)).sort(), ['build', 'codegen', 'dev:admin', 'dev:app', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'lint:report:css', 'prepare', 'start:admin', 'start:app', 'test', 'test:affected', 'test:ci', 'test:e2e', 'typecheck', 'typecheck:e2e']);
+  it('are one lint gate over eslint and stylelint, plus the fixed scripts and dev/start per app', () => {
+    assert.deepEqual(Object.keys(scripts(FE)).sort(), ['build', 'codegen', 'dev:admin', 'dev:app', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'lint:report:css', 'prepare', 'start:admin', 'start:app', 'typecheck']);
     const lint = scripts(FE)['lint:check'];
     assert.match(lint, /eslint \. --max-warnings=0/);
     assert.match(lint, /stylelint "\{apps,packages\}\/\*\/src\/\*\*\/\*\.css"/);
     assert.doesNotMatch(lint, /--ignore-pattern/, 'no path is hidden from the lint run');
-    assert.ok(!('lint:e2e' in scripts(FE)), 'e2e/ is linted by the same eslint run: there is no second lint script');
+    assert.ok(!('lint:e2e' in scripts(FE)), 'there is no second lint script');
     assert.equal(scripts(FE)['dev:app'], 'npm run dev --workspace apps/app');
   });
-  it('run e2e only through test:e2e, never through a gate script, and call no repository-local checker', () => {
+  it('carry no test script and call no repository-local checker: a front end has no tests', () => {
     const all = scripts(FE);
     for (const [name, command] of Object.entries(all)) {
-      if (name !== 'test:e2e') assert.doesNotMatch(command, /playwright|test:e2e/, name);
+      assert.doesNotMatch(command, /vitest|jest|playwright|test:e2e|typecheck:e2e|tsconfig\.e2e/, `${name} runs a test tool`);
+      assert.doesNotMatch(name, /^test/, `${name} is a test script`);
       assert.doesNotMatch(command, /scripts\/|contract-check|check-i18n-catalog|check-fe-architecture/, `${name} calls a repository-local checker`);
     }
-    assert.equal(all['test:e2e'], 'npm run typecheck:e2e && playwright test');
   });
-  it('lint, test and the report scripts are one command each for the two linters', () => {
+  it('lint and the report scripts are one command each for the two linters', () => {
     const all = scripts(FE);
     assert.equal(all['lint:report'], 'eslint . --format json --output-file reports/eslint.json');
     assert.equal(all['lint:report:css'], 'stylelint "{apps,packages}/*/src/**/*.css" --formatter json --output-file reports/stylelint.json');
-    assert.equal(all.test, 'npm run codegen --silent && vitest run');
-    assert.equal(all['test:ci'], 'npm run codegen --silent && vitest run');
   });
   it('the sources and the tsconfig paths include packages/ exactly when hfs.json opts into a package slot', () => {
     const properties = hfs => Object.fromEntries(rendered(hfs)['sonar-project.properties'].split('\n').filter(line => line && !line.startsWith('#')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
     for (const slots of [['repo.packages'], ['fe.package.ui'], ['fe.package.api', 'fe.package.i18n']]) {
       const fe = properties({ ...FE, optionalSlots: slots });
       assert.equal(fe['sonar.sources'], 'apps,packages', slots.join());
-      assert.equal(fe['sonar.tests'], 'apps,packages');
       assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json,packages/*/tsconfig.json');
     }
     for (const slots of [undefined, [], ['fe.route']]) {
@@ -585,14 +580,14 @@ describe('hfs sync --init', () => {
     assert.doesNotMatch(filesUnder(dir).map(file => read(dir, file)).join('\n'), /\{\{[a-zA-Z]|lcov|codecov/i, 'no template placeholder and no coverage upload is left');
   });
   const SHARED = ['fe.package.i18n', 'fe.package.api'];
-  const APP_SHELL = ['next.config.ts', 'src/proxy.ts', 'vitest.config.ts', 'src/app/global-error.tsx', 'src/app/globals.css', 'src/app/health/live/route.ts',
+  const APP_SHELL = ['next.config.ts', 'src/proxy.ts', 'src/app/global-error.tsx', 'src/app/globals.css', 'src/app/health/live/route.ts',
     'src/app/[locale]/layout.tsx', 'src/app/[locale]/page.tsx', 'src/app/[locale]/error.tsx', 'src/app/[locale]/not-found.tsx',
     'src/modules/i18n/index.ts', 'src/modules/i18n/request.ts', 'src/modules/i18n/messages/vi.json', 'src/modules/api/index.ts'];
   it('a one-app front end keeps the next-intl stack and the one API client in the app: vi default, as-needed prefix, proxy.ts, error boundaries and the health route', async t => {
     const one = { ...FE, apps: [{ name: 'app', kind: 'web' }] };
     const { dir } = await skeleton(t, one);
     const files = filesUnder(dir);
-    for (const file of [...APP_SHELL, 'src/modules/i18n/config.ts', 'src/modules/i18n/routing.ts', 'src/modules/i18n/navigation.ts', 'src/modules/api/client.ts', 'src/modules/api/outcome.ts', 'src/modules/api/client.spec.ts']) {
+    for (const file of [...APP_SHELL, 'src/modules/i18n/config.ts', 'src/modules/i18n/routing.ts', 'src/modules/i18n/navigation.ts', 'src/modules/api/client.ts', 'src/modules/api/outcome.ts']) {
       assert.ok(files.includes(`apps/app/${file}`), `apps/app/${file}`);
     }
     assert.ok(!files.some(file => file.startsWith('packages/')), 'no shared package for one app');
@@ -624,8 +619,8 @@ describe('hfs sync --init', () => {
       assert.match(read(dir, `apps/${app}/src/proxy.ts`), /createProxy\(routing\)/);
       assert.match(read(dir, `apps/${app}/next.config.ts`), /transpilePackages: \["@nivo\/i18n", "@nivo\/api"\]/);
     }
-    for (const file of ['package.json', 'tsconfig.json', 'vitest.config.ts', 'src/index.ts', 'src/app.ts', 'src/app.spec.ts', 'src/proxy.ts', 'src/proxy.spec.ts', 'src/request.ts', 'src/request.spec.ts']) assert.ok(files.includes(`packages/nivo-i18n/${file}`), `packages/nivo-i18n/${file}`);
-    for (const file of ['package.json', 'tsconfig.json', 'vitest.config.ts', 'src/index.ts', 'src/client.ts', 'src/client.spec.ts', 'src/outcome.ts']) assert.ok(files.includes(`packages/nivo-api/${file}`), `packages/nivo-api/${file}`);
+    for (const file of ['package.json', 'tsconfig.json', 'src/index.ts', 'src/app.ts', 'src/proxy.ts', 'src/request.ts']) assert.ok(files.includes(`packages/nivo-i18n/${file}`), `packages/nivo-i18n/${file}`);
+    for (const file of ['package.json', 'tsconfig.json', 'src/index.ts', 'src/client.ts', 'src/outcome.ts']) assert.ok(files.includes(`packages/nivo-api/${file}`), `packages/nivo-api/${file}`);
     assert.equal(JSON.parse(read(dir, 'packages/nivo-i18n/package.json')).name, '@nivo/i18n');
     assert.equal(JSON.parse(read(dir, 'packages/nivo-api/package.json')).name, '@nivo/api');
     const single = await skeleton(t, { ...FE, apps: [{ name: 'app', kind: 'web' }] });

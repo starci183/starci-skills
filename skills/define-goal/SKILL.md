@@ -28,7 +28,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    project binding (routing: `.workspaces/projects/<project>/work.json`). Get the
    owner's prompt and an optional short `--title`; ask if missing. Propose a
    human name for the workflow in Vietnamese, `<Product> · <what it does>`, at
-   most 48 characters (e.g. `Nivo · Đăng nhập & xác thực`), and pass it as
+   most 48 characters (e.g. `Nivo · Sign-in & authentication`), and pass it as
    `--display-name`; without one the planner derives it from the goal text and
    the product name (it shows as `name:`). The name is a label only — the
    `workflowId` stays the key, and `api rename` changes the name later.

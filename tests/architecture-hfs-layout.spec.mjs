@@ -13,7 +13,7 @@ const ROOT_FE = {
   'eslint.config.mjs': 'export default [];\n', 'package-lock.json': '{}\n', 'README.md': '# fixture\n', 'sonar-project.properties': 'sonar.projectKey=x\n',
 };
 const APP_FE = Object.fromEntries(['package.json', 'next.config.ts', 'tsconfig.json', 'postcss.config.mjs'].map(name => [`apps/web/${name}`, name.endsWith('.json') ? '{}\n' : 'export default {};\n']));
-const ROOT_BE = { ...ROOT_FE, '.sops.yaml': 'creation_rules: []\n', '.starcistacks/.keep': '', '.starciwork/.keep': '', 'jest.config.js': 'module.exports = {};\n', 'nest-cli.json': '{}\n' };
+const ROOT_BE = { ...ROOT_FE, 'codecov.yml': 'coverage: {}\n', '.sops.yaml': 'creation_rules: []\n', '.starcistacks/.keep': '', '.starciwork/.keep': '', 'jest.config.js': 'module.exports = {};\n', 'nest-cli.json': '{}\n' };
 const run = (t, profile, files) => runArch(archFixture(t, { profile, files }));
 const ids = (report, id) => findings(report, id).map(item => item.path).sort();
 
@@ -37,6 +37,12 @@ test('HFS_ROOT_ENTRY_MISSING: a repository without the required root entries nam
   assert.ok(ids(bare, 'HFS_ROOT_ENTRY_MISSING').includes('eslint.config.mjs'));
   assert.ok(ids(bare, 'HFS_ROOT_ENTRY_MISSING').includes('README.md'));
   assert.deepEqual(ids(run(t, 'fe', { ...ROOT_FE, ...APP_FE }), 'HFS_ROOT_ENTRY_MISSING'), []);
+});
+
+test('HFS_ROOT_ENTRY_FORBIDDEN: a front-end root entry that is a test file or directory is FE_NO_TESTS, not a second finding; another stray entry is a finding, and a back end keeps its jest config', t => {
+  const fe = run(t, 'fe', { ...ROOT_FE, ...APP_FE, 'vitest.config.ts': 'export default {};\n', 'playwright.config.ts': 'export default {};\n', 'e2e/flows/a.ts': 'export {};\n', 'stray.txt': 'x\n' });
+  assert.deepEqual(ids(fe, 'HFS_ROOT_ENTRY_FORBIDDEN'), ['stray.txt']);
+  assert.deepEqual(ids(run(t, 'be', { ...ROOT_BE, 'stray.txt': 'x\n' }), 'HFS_ROOT_ENTRY_FORBIDDEN'), ['stray.txt']);
 });
 
 test('HFS_ROOT_SRC_FORBIDDEN_FE: a front-end repository with a root src/ tree is a finding; a back end may have one', t => {

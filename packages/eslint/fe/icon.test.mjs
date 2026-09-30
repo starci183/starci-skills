@@ -30,7 +30,6 @@ const SCRIPT = at("scripts/build.ts")
 const PACKAGE_ICON_LEAF = at("packages/nivo-ui/src/leaves/Icon/index.tsx")
 const NOT_A_LEAF = at("apps/web/src/modules/components/leaves/Icon/index.tsx")
 const ICON_BLOCK = at(`${R}/blocks/dashboard/Icon/index.tsx`)
-const SPEC = at(`${R}/leaves/SeeMoreLink/index.spec.tsx`)
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -50,8 +49,6 @@ test("ICON-6: the icon leaf owns the library, and a subpath does not walk around
       { filename: SCRIPT, code: "import { X } from \"lucide-react\"" },
       // the icon leaf of the shared package owns the map there too
       { filename: PACKAGE_ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
-      // a spec is not product source
-      { filename: SPEC, code: "import { Star } from \"lucide-react\"" },
     ],
     invalid: [
       // a file called like the icon leaf that no leaf slot owns is not the icon leaf, and neither is a block called Icon
@@ -139,8 +136,7 @@ test("ICON-1: a glyph size off both steps is a third step", () => {
     valid: [
       { filename: OTHER_LEAF, code: "const C = \"size-4 shrink-0\"" },
       { filename: OTHER_LEAF, code: "const C = \"size-5 shrink-0\"" },
-      // a spec is not product source, and a script is not either
-      { filename: SPEC, code: "const C = \"size-3.5\"" },
+      // a script is not product source
       { filename: SCRIPT, code: "const C = \"size-[13px]\"" },
       { filename: BLOCK, code: "const E = () => <div className=\"size-8 rounded-lg\" />" },
       // a spacing utility that merely looks similar is not this rule's business

@@ -27,6 +27,6 @@ No class that paints text, an icon or a text decoration with a solid status tone
 
 **Finding code:** `FE_STYLE_TOKEN_ONLY`
 
-**Vì sao (why):** `<file>` tô chữ hoặc icon bằng tông trạng thái đặc (`<what>`, ví dụ `text-success`). Tông đặc là màu nền; dùng làm màu chữ nó đọc dưới 4.5:1 trên nền trang.
+**Why:** `<file>` colours text or an icon with a solid status tone (`<what>`, for example `text-success`). A solid tone is a background colour; used as a text colour it reads below 4.5:1 on the page background.
 
-**Cách sửa:** Đổi thành cặp mềm: `text-<tông>-soft-foreground` (kèm `bg-<tông>-soft` nếu nằm trên nền nhạt); tông đặc chỉ dùng với `bg-<tông>` và `text-<tông>-foreground`.
+**Fix:** Change to the soft pair: `text-<tone>-soft-foreground` (with `bg-<tone>-soft` if it sits on a light background); solid tones are used only with `bg-<tone>` and `text-<tone>-foreground`.

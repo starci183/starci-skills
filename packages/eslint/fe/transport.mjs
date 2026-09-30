@@ -8,7 +8,7 @@
  * defects the three halves prevent were measured on real apps: seven transports and six result
  * shapes in one repository, and in another a client that folded every non-2xx into "could not
  * read", so the state a real backend produces for a signed-out reader - 401, which must become
- * `refused` and send the reader to sign in - was unreachable, while the e2e double hid it by
+ * `refused` and send the reader to sign in - was unreachable, while a test double hid it by
  * answering 200.
  *
  * WHAT THESE RULES CANNOT SEE. They read one file at a time, so they cannot tell that a client's
@@ -19,7 +19,7 @@
 
 import ts from "typescript"
 import { hfsOf } from "./lib/hfs.mjs"
-import { globalReferences, isApiClient, isOutcomeModule, isSpecFile, slotOfFile } from "./lib/scope.mjs"
+import { globalReferences, isApiClient, isOutcomeModule, slotOfFile } from "./lib/scope.mjs"
 import { typed } from "./lib/types.mjs"
 
 /** Packages that send an HTTP request: a second transport is a second owner. Matched on the module specifier, never on a file name. */
@@ -118,7 +118,6 @@ export const fetchOnlyInApiClient = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (isSpecFile(filename)) return {}
     const client = isApiClient(context)
     const library = (node, source) => {
       if (typeof source === "string" && isTransportLibrary(source)) context.report({ node, messageId: "library", data: { name: source } })
@@ -224,7 +223,7 @@ export const noSharedTransportState = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (!isTransportFile(context) || isSpecFile(filename)) return {}
+    if (!isTransportFile(context)) return {}
     const check = (node) => {
       const declaration = node.type === "VariableDeclaration" ? node : node.declaration
       if (!declaration || declaration.type !== "VariableDeclaration" || declaration.kind === "const") return
@@ -492,7 +491,6 @@ export const noHttpStatusCollapse = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     const source = context.sourceCode || context.getSourceCode()
     return {
       IfStatement(node) {
@@ -578,7 +576,6 @@ export const noHandTypedWire = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (isSpecFile(filename)) return {}
     const source = context.sourceCode ?? context.getSourceCode()
     /** Local names of the type imports that resolve into a `__generated__/` directory. */
     const generated = new Set()
@@ -650,7 +647,6 @@ export const outcomeKindsExhaustive = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     return {
       SwitchStatement(node) {
         const subject = node.discriminant
@@ -704,7 +700,7 @@ export const oneOutcomeUnion = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename()) || isOutcomeModule(context)) return {}
+    if (isOutcomeModule(context)) return {}
     const { checker, toTs } = typed(context)
     return {
       TSTypeAliasDeclaration(node) {

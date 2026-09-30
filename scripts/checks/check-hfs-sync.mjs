@@ -12,7 +12,7 @@
 //                               the managed-file findings of `hfs check`, one source (packages/hfs/sync/managed.mjs)
 //   HFS_SYNC_DRIFT              printed by `hfs sync --check`, the hash view of the same drift (listed so the catalog knows its emitter)
 //   HFS_SYNC_HFS_INVALID        hfs.json is missing or invalid
-//   HFS_SYNC_PRESET_MISSING     the jest/vitest preset the coverage exclusions come from is not installed
+//   HFS_SYNC_PRESET_MISSING     the jest preset the back end's coverage exclusions come from is not installed
 //   HFS_SYNC_SONAR_KEY          the stack declaration names two Sonar keys for the repository
 //   HFS_SYNC_TEMPLATE_VARIABLE  a template names a variable sync does not provide (runtime defect)
 //   HFS_SYNC_TEMPLATE_MISSING   a managedBy slot lists a file no template renders (runtime defect)

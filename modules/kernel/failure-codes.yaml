@@ -807,11 +807,15 @@ BE_READONLY_BOUNDARY:
 BE_SCHEMA_AUTHORITY:
   title: "Schema defined at runtime"
   title_vi: "Schema được định nghĩa lúc chạy"
-  meaning_vi: "Một tệp để tiến trình đang chạy quyết định schema: một đối tượng tùy chọn của DataSource hoặc TypeORM không ghi literal synchronize: false, synchronize khác false, gọi dataSource.synchronize(), có khóa migrationsRun (cấm dưới mọi dạng), chuỗi DDL (CREATE/ALTER/DROP TABLE, INDEX, TYPE...) ngoài persistence/migrations/, hoặc tìm entity và migration bằng glob. Schema chỉ đổi bằng migration do apps/migrate chạy."
+  meaning_vi: "Một tệp để tiến trình đang chạy quyết định schema: một đối tượng tùy chọn của DataSource hoặc TypeORM không ghi literal synchronize: false, synchronize khác false, gọi dataSource.synchronize() hoặc dropDatabase(), có khóa migrationsRun (cấm dưới mọi dạng), gọi runMigrations() ngoài apps/migrate và test world, dropSchema khác false, dựng schema bằng createSchemaBuilder()/build(), khóa synchronize trong tùy chọn của @Entity, hook onModuleInit/onApplicationBootstrap ghi dữ liệu qua EntityManager hoặc DataSource (seed chỉ chạy trong apps/migrate), chuỗi DDL (CREATE/ALTER/DROP TABLE, INDEX, TYPE, SCHEMA, EXTENSION, TRIGGER, FUNCTION, ADD/DROP CONSTRAINT...) ngoài persistence/migrations/, hoặc tìm entity và migration bằng glob. Schema chỉ đổi bằng migration do apps/migrate chạy."
   causes_vi:
     - "new DataSource({ type: 'postgres' }) không ghi synchronize: false"
     - "synchronize: true, hoặc đọc từ biến môi trường"
     - "Chuỗi DDL trong .query ngoài migration"
+    - "dropSchema: true, hoặc dataSource.createSchemaBuilder().build() lúc chạy"
+    - "@Entity({ synchronize: false }): công tắc riêng cho từng entity"
+    - "onModuleInit ghi dữ liệu bằng entityManager.save/insert/query INSERT: seed lúc khởi động ở mọi tiến trình"
+    - "dataSource.runMigrations() gọi ngoài apps/migrate"
     - "entities hoặc migrations khai bằng đường dẫn có ký tự *"
   nextStep_vi: "Viết một migration trong persistence/migrations/ của capability sở hữu bảng và liệt kê entity, migration tường minh; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
@@ -832,7 +836,7 @@ BE_SECRET_DEFAULT:
 BE_SOURCE_FORM:
   title: "Back-end source file breaks the naming or form canon"
   title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"
-  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji hay tiếng Việt ngoài catalog messages/."
+  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji, và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test ngoài catalog messages/ và slot fixture i18n."
   causes_vi:
     - "Tệp dùng hậu tố bị cấm (use-case, repository, store, util, helper, types, constants)"
     - "Lớp export không kết thúc bằng hậu tố vai trò của tệp và cũng không kết thúc bằng tên port (interface trong *.port.ts hoặc *.contracts.ts) mà nó implements"
@@ -848,10 +852,11 @@ BE_SOURCE_FORM:
 BE_SPEC_QUALITY:
   title: "Spec reads source, or an e2e breaks its flow shape"
   title_vi: "Spec đọc mã nguồn hoặc e2e phá dạng luồng"
-  meaning_vi: "Một spec đọc mã nguồn của repo bằng fs để kiểm tra chữ, một spec chỉ khẳng định lời gọi thay vì kết quả, hoặc một e2e đi vòng qua transport, ngủ theo thời lượng, rẽ nhánh trong bước, tự dựng module, gọi nhà cung cấp mô hình hay không đọc lại trạng thái đã lưu. Ép kiểu (as, x!) trong spec do các luật mượn của typescript-eslint chặn, cùng mã BE_TYPE_ESCAPE."
+  meaning_vi: "Một spec đọc mã nguồn của repo bằng fs để kiểm tra chữ, một spec chỉ khẳng định lời gọi thay vì kết quả, hoặc một e2e đi vòng qua transport, ngủ theo thời lượng, rẽ nhánh trong bước, tự dựng module, gọi nhà cung cấp mô hình hay không đọc lại trạng thái đã lưu. Ép kiểu (as, x!) trong spec do các luật mượn của typescript-eslint chặn, cùng mã BE_TYPE_ESCAPE. Một spec của bất kỳ tầng nào bỏ qua hoặc đánh dấu test (skip, skipIf, runIf, todo, only, xit, xdescribe, xtest) hay chọn runner theo điều kiện cũng bị chặn; việc bỏ qua duy nhất là của contract helper trong world khi thiếu cấu hình sandbox."
   causes_vi:
     - "readFileSync hay readdirSync trên mã nguồn hoặc __dirname trong spec"
     - "Spec chỉ có toHaveBeenCalled*, không khẳng định kết quả hay trạng thái"
+    - "`it.skip`, `describe.skip`, `xit`, `it.todo`, `.skipIf`/`.runIf` hoặc `(cond ? describe : describe.skip)` trong spec; hãy viết test thật hoặc xóa nó, còn việc bỏ qua khi thiếu sandbox nằm trong contract helper của world (`sandbox.describe(...)`)"
     - "e2e gọi CommandBus, QueryBus hay handler trực tiếp; dùng sleep thay cho waitFor; tự gọi Test.createTestingModule; import SDK của nhà cung cấp mô hình; không đọc lại dòng đã lưu qua EntityManager"
     - "Spec đơn vị của service có providers khác với phụ thuộc constructor: thừa nhà cung cấp, thiếu nhà cung cấp, service không đứng đầu, token không suy ra được hoặc nhà cung cấp không phải lớp hay { provide, useValue }"
   nextStep_vi: "Chuyển luật kiến trúc sang lint hoặc bộ kiểm tra; khẳng định kết quả hoặc trạng thái; e2e vào bằng transport thật, chờ bằng waitFor và dựng thế giới ở src/tests/e2e/setup. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
@@ -2609,28 +2614,6 @@ FE_SOURCE_NAME_SHAPE:
   owner: other-op:interface.implement
   kind: check-finding
 
-FE_SPEC_NO_SNAPSHOT:
-  title: "Spec uses snapshot matcher"
-  title_vi: "Bài kiểm thử dùng so sánh snapshot"
-  meaning_vi: "Tệp spec dùng matcher snapshot, điều không được phép."
-  causes_vi:
-    - "Dùng toMatchSnapshot hoặc tương tự"
-    - "Chưa viết khẳng định hành vi thật"
-  nextStep_vi: "Op test.author thay bằng khẳng định hành vi rõ ràng rồi chạy lại."
-  owner: other-op:test.author
-  kind: check-finding
-
-FE_SPEC_SUBJECT_AND_DESCRIBE:
-  title: "Spec subject or describe is wrong"
-  title_vi: "Bài kiểm thử sai đối tượng hoặc tên khối describe"
-  meaning_vi: "Tệp spec không gắn đúng đối tượng cùng thư mục, hoặc khối describe cấp đầu không gọi tên đối tượng thật được export."
-  causes_vi:
-    - "Tên describe không khớp với export của đối tượng"
-    - "Spec không nằm cạnh đối tượng cần kiểm"
-  nextStep_vi: "Op test.author sửa tên khối describe hoặc vị trí spec cho đúng."
-  owner: other-op:test.author
-  kind: check-finding
-
 FE_STYLE_SOURCE_UNRESOLVED:
   title: "Tailwind @source path does not resolve"
   title_vi: "Đường dẫn @source của Tailwind không tồn tại"
@@ -3276,7 +3259,7 @@ HFS_SYNC_DRIFT:
   causes_vi:
     - "Tệp được sửa tay thay vì sửa mẫu"
     - "hfs.json đổi (app, profile) mà chưa chạy hfs sync --write"
-    - "Preset jest hoặc vitest đổi danh sách loại trừ độ phủ"
+    - "Preset jest đổi danh sách loại trừ độ phủ"
   nextStep_vi: "Chạy npx hfs sync --write để sinh lại tệp; nếu cần khác mẫu thì đổi mẫu trong .claude, không sửa tay. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -3296,11 +3279,11 @@ HFS_SYNC_HFS_INVALID:
 HFS_SYNC_PRESET_MISSING:
   title: "Coverage preset not installed"
   title_vi: "Chưa cài preset độ phủ"
-  meaning_vi: "hfs sync lấy danh sách loại trừ độ phủ từ @starci/jest-preset (back end) hoặc @starci/vitest-preset (front end) nhưng repository chưa cài preset đó."
+  meaning_vi: "hfs sync lấy danh sách loại trừ độ phủ từ @starci/jest-preset của back end (front end không có test nên không có preset) nhưng repository chưa cài preset đó."
   causes_vi:
-    - "Chưa khai báo preset độ phủ của phía be hoặc fe trong package.json"
+    - "Chưa khai báo preset độ phủ của back end trong package.json"
     - "node_modules chưa được cài sau khi khai báo"
-  nextStep_vi: "Đặt @starci/jest-preset (be) hoặc @starci/vitest-preset (fe) về đúng phiên bản chính xác trong knowledge/hfs/canon-pins.yaml, cài lại rồi chạy lại hfs sync. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  nextStep_vi: "Đặt @starci/jest-preset về đúng phiên bản chính xác trong knowledge/hfs/canon-pins.yaml, cài lại rồi chạy lại hfs sync. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
@@ -11978,7 +11961,7 @@ HFS_MANAGED_FILE_DRIFT:
   title_vi: "Tệp do .claude quản lý bị lệch"
   meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `hfs sync --write`, không sửa tay."
   causes_vi:
-    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js hoặc vitest.config.ts, .prettierrc, .prettierignore, husky, workflows, sonar, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
+    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -12038,7 +12021,7 @@ HFS_SONAR_CONFIG:
   title_vi: "Cấu hình Sonar lệch"
   meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Sonar phải đọc đúng cấu hình sinh ra, không nhập báo cáo độ phủ."
   causes_vi:
-    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest/vitest, không nhập lcov hay `sonar.coverage.*`, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, không nhập lcov hay `sonar.coverage.*`, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
     - "Khối `services.sonar.qualityGate` của khai báo stack phải gọi đúng cổng chất lượng duy nhất của `knowledge/sonar-gate.yaml`; repo không tự ghi ngưỡng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
@@ -12067,7 +12050,7 @@ HFS_DEP_VERSION_SKEW:
 HFS_TOOL_CONFIG_LOCAL:
   title: "Configs only call the factories; no local rules"
   title_vi: "Kho tự đặt luật cục bộ"
-  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` hay `stylelint.config.*` thứ hai, cấu hình prettier/vitest/jest/lint-staged khác), tệp tự định nghĩa luật ESLint hoặc plugin stylelint, khóa cấu hình công cụ trong `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), hoặc lệnh chạy eslint/stylelint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`, `--ignore-pattern`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
+  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` hay `stylelint.config.*` thứ hai, cấu hình prettier/lint-staged khác), tệp tự định nghĩa luật ESLint hoặc plugin stylelint, khóa cấu hình công cụ trong `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), hoặc lệnh chạy eslint/stylelint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`, `--ignore-pattern`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
   causes_vi:
     - "Vi phạm luật R16: Cấu hình của repo chỉ gọi factory của `.claude`; cấm tệp cấu hình công cụ khác, tệp luật cục bộ (vd một tệp eslint-local trong thư mục scripts) và cờ dòng lệnh đổi hoặc tắt cấu hình trong hook, workflow, script."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -12178,7 +12161,7 @@ HFS_CONTRACT_SNAPSHOT_DRIFT:
   title_vi: "Bản hợp đồng lệch bản thật"
   meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `npm run contract:emit` (BE) / `contract:pull` (FE) rồi commit kết quả. Nếu emit không chạy được thì finding nêu nguyên văn lỗi của emit; không bao giờ bỏ qua âm thầm."
   causes_vi:
-    - "Vi phạm luật R23: BE: `contracts/<app>/schema.graphql` phải bằng bản `hfs emit-contracts` phát ra ngay lúc kiểm tra (đồ thị module đọc từ mã nguồn, không cần env, DB hay mạng); chỉ chạy ở lượt kiểm tra đầy đủ, `--fast` bỏ qua và nói rõ trong phần coverage. FE: `modules/api/contract/*` bằng bản BE (so hash)."
+    - "Vi phạm luật R23: BE: `contracts/<app>/schema.graphql` và `contracts/<app>/openapi.json` (sinh từ bảng thao tác có kiểu `apps/<app>/src/operations.ts`) phải bằng bản `hfs emit-contracts` phát ra ngay lúc kiểm tra (đồ thị module đọc từ mã nguồn, không cần env, DB hay mạng); chỉ chạy ở lượt kiểm tra đầy đủ, `--fast` bỏ qua và nói rõ trong phần coverage. FE: `modules/api/contract/*` bằng bản BE (so hash)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -12346,6 +12329,17 @@ BE_TEST_TOPOLOGY:
     - "Vi phạm luật R47: một `jest.config.js` (preset `@starci/jest-preset`) với bốn project `unit`, `integration`, `e2e`, `contract`; thư mục và hậu tố spec luôn khớp nhau; `diagnostics: false` + `isolatedModules: true`; `test:integration`, `test:e2e`, `test:contract` = `typecheck:tests && jest --selectProjects <tên>`; `src/tests/world/` là nơi duy nhất dựng hạ tầng test và chỉ chứa `global-setup.ts`, `global-teardown.ts`, `use-test-world.ts`, `fakes/` và file gốc có hậu tố vai trò (kể cả `test-world.config.ts`)."
     - "Vi phạm luật R47 về stack thật: mọi dịch vụ khai trong `.starcistacks/<env>` (Postgres, Redis, Keycloak, mail host, k3s...) chạy THẬT trong world qua toxiproxy, world đọc dịch vụ và phiên bản image từ stack lúc chạy; `fakes/<provider>/` chỉ giả SaaS bên ngoài mà đội không vận hành. Ngoại lệ duy nhất: dịch vụ stateless cần phần cứng đặc biệt hoặc model bên ngoài (GPU inference, embedding tự host) được giả khi `test-world.config.ts` khai trong `fakedBy` với `reason` không rỗng; dịch vụ có trạng thái (database, cache, identity, storage, mail, queue, search hoặc có volume bền) không bao giờ được giả, và mục `fakedBy` trỏ tới dịch vụ hoặc thư mục fake không tồn tại bị coi là cũ."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_CONTRACT_UNGUARDED:
+  title: "A fake serves payload fixtures that no sandbox contract spec compares with the real provider"
+  title_vi: "Fixture của fake chưa có contract spec bảo vệ"
+  meaning_vi: "Thư mục `src/tests/world/fakes/<provider>/` có fixture payload (`payloads/*.json`) nhưng không có `src/tests/contract/<provider>/*.contract-spec.ts` nào vừa tham chiếu fixture của nhà cung cấp đó vừa khẳng định `shapeOf(real)` bằng `shapeOf(fixture)`: `<detail>`."
+  causes_vi:
+    - "Fake có fixture payload nhưng chưa có thư mục contract/<provider>/ hay spec nào"
+    - "Contract spec có nhưng không so hình dạng (shapeOf) của payload thật với fixture, hoặc không đọc fixture của đúng nhà cung cấp, hoặc tự định nghĩa shapeOf thay vì import từ world"
+  nextStep_vi: "Thêm `src/tests/contract/<provider>/<provider>.contract-spec.ts` dùng contract helper của world (`sandbox.describe(...)`, tự bỏ qua khi thiếu cấu hình sandbox) và khẳng định `expect(shapeOf(thật)).toEqual(shapeOf(fixture))`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -12539,22 +12533,13 @@ FE_SIZE_AND_STATE_BUDGET:
 FE_SOURCE_FORM:
   title: "Front-end source file breaks the layout, naming or comment canon"
   title_vi: "Tệp nguồn FE sai quy ước tên, vị trí hoặc chú thích"
-  meaning_vi: "Tệp FE phải nằm đúng thư mục tầng với tên cố định, export hàm mũi tên trùng tên thư mục, có JSDoc tiếng Anh và không emoji; luật ESLint nêu trong lời nhắn chỉ rõ phần sai."
+  meaning_vi: "Tệp FE phải nằm đúng thư mục tầng với tên cố định, export hàm mũi tên trùng tên thư mục, có JSDoc tiếng Anh, không emoji và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test (trừ danh mục i18n và slot fixture i18n); luật ESLint nêu trong lời nhắn chỉ rõ phần sai."
   causes_vi:
     - "Tệp đặt sai tầng hoặc thư mục phụ trợ trong components"
     - "Export không khớp tên thư mục"
     - "Thiếu JSDoc hoặc có emoji"
+    - "Có chữ tiếng Việt trong mã nguồn ngoài danh mục i18n hoặc slot fixture i18n"
   nextStep_vi: "Chuyển tệp về đúng thư mục tầng, đổi tên export theo thư mục và thêm JSDoc tiếng Anh. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không thêm ngoại lệ."
-  owner: op-retry
-  kind: check-finding
-
-FE_E2E_SHAPE:
-  title: "Playwright shape, three viewports, no environment coupling"
-  title_vi: "Spec e2e sai hình dạng"
-  meaning_vi: "Spec e2e `<file>` lệch khuôn Playwright của HFS: `<what>` (vị trí, đường dẫn tuyệt đối, docker, ghi sang kho khác, test.skip vì thiếu môi trường, helper không có kiểu, hoặc thiếu một trong ba viewport)."
-  causes_vi:
-    - "Vi phạm luật R66: Playwright, `e2e/<area>/*.e2e-spec.ts`; project viewport 1440x900, 768x1024, 390x844; không đường dẫn tuyệt đối, không docker, không ghi sang repo khác; không `test.skip` vì thiếu môi trường; helper có kiểu."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
@@ -12565,16 +12550,6 @@ HFS_HOOKS_PATH_REDIRECTED:
   causes_vi:
     - "Vi phạm luật R13: pre-push chạy typecheck và lint, và không clone nào được đổi `core.hooksPath` để né husky; giá trị duy nhất được phép là `.husky` hoặc `.husky/_` do chính husky đặt."
   nextStep_vi: "Gỡ cấu hình bằng `git config --local --unset core.hooksPath` rồi commit lại qua hook; không dùng `--no-verify` và không đổi đường dẫn hook để né kiểm tra."
-  owner: op-retry
-  kind: check-finding
-
-FE_SPEC_QUALITY:
-  title: "No class pinning, no barrel specs, axe per connected screen"
-  title_vi: "Spec component kém chất lượng"
-  meaning_vi: "Spec `<file>` vi phạm chất lượng spec của HFS: `<what>` (ghim chuỗi class, không chỉ test chủ thể bên cạnh, spec cho barrel, ép kiểu qua unknown, hoặc màn connected thiếu assert axe)."
-  causes_vi:
-    - "Vi phạm luật R67: Không pin chuỗi class trong spec component; spec chỉ test đúng chủ thể bên cạnh; không spec cho barrel; không `as unknown as`; mỗi màn connected có một assert axe."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -13291,6 +13266,17 @@ BE_UNNAMED_DATA_ACCESS:
   owner: op-retry
   kind: check-finding
 
+HFS_DOC_NOT_ENGLISH:
+  title: "Document is not English"
+  title_vi: "Tài liệu không viết bằng tiếng Anh"
+  meaning_vi: "Tệp Markdown hoặc YAML trong knowledge/, docs/, src/ hoặc apps/ có chữ cái tiếng Việt (kể cả trong khối mã của Markdown); tài liệu, mẫu và ví dụ phải viết bằng tiếng Anh."
+  causes_vi:
+    - "Viết hoặc dán đoạn tiếng Việt vào tài liệu, mẫu, ví dụ hay lời trích của chủ dự án"
+    - "Đặt dữ liệu YAML có tiếng Việt ngoài slot danh mục thông điệp hoặc slot fixture i18n"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: dịch dòng được nêu sang tiếng Anh. Chỉ dữ liệu YAML trong slot danh mục thông điệp hoặc slot fixture i18n được giữ tiếng khác; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
 FE_SLOT_FILE_ROLE:
   title: "A front-end file is owned by a slot and named by it"
   title_vi: "Tệp không đúng vai trò trong slot"
@@ -13298,5 +13284,29 @@ FE_SLOT_FILE_ROLE:
   causes_vi:
     - "Vi phạm luật R94: mỗi slot thư mục của front end (route, feature, components, hooks, modules/api) chỉ chứa các tệp mà `allows` của nó gọi tên, và chứa chúng trong thư mục riêng; tệp không slot nào sở hữu là HFS_PATH_NO_SLOT."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: đổi tên tệp về vai trò được phép hoặc chuyển nó về slot đúng; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
+BE_OPERATION_CONTRACT:
+  title: "A versioned operation has no typed contract"
+  title_vi: "Thao tác có phiên bản không có hợp đồng kiểu"
+  meaning_vi: "Mỗi thao tác `<tên>@<phiên bản>` của một app được khai báo đúng một lần trong bảng thao tác có kiểu `apps/<app>/src/operations.ts` (`OperationContract<Input, Output, RefusalCode>` đăng ký bằng `defineOperations`). Bộ kiểm tra thấy đầu vào hoặc đầu ra là `any`, `unknown`, `Record<string, unknown>`, kiểu generic chưa gán, hàm hoặc `Date`; mã từ chối không phải hợp các chuỗi literal đóng; hoặc route phục vụ bảng không nhận `OperationRequest<Table>` và trả `Promise<OperationReply<Table>>` của cùng một bảng."
+  causes_vi:
+    - "Đầu vào hoặc kết quả của thao tác khai báo là `unknown` nên client phải tự gõ kiểu tay"
+    - "Mã từ chối khai báo là `string` thay vì hợp các literal như `\"DENIED\" | \"INVALID\"`"
+    - "Route nhận `@Body() body: unknown` hoặc chỉ dùng một nửa `OperationRequest` / `OperationReply`"
+  nextStep_vi: "Khai báo kiểu có tên, đóng cho đầu vào và đầu ra của từng thao tác, liệt kê mã từ chối bằng hợp literal, và cho route nhận `OperationRequest<typeof OPERATIONS>` và trả `Promise<OperationReply<typeof OPERATIONS>>`; chạy `npm run contract:emit` để sinh `contracts/<app>/openapi.json`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục BE-OPERATIONS-1; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_NO_TESTS:
+  title: "Front end holds a test file, test tooling or a test dependency"
+  title_vi: "Front end có tệp test, công cụ test hoặc thư viện test"
+  meaning_vi: "Chuẩn của front end là không có test: repository có spec, e2e, cấu hình vitest, Playwright hay jest, script test, hoặc khai báo thư viện chạy test, dựng môi trường test, testing-library, axe trong package.json."
+  causes_vi:
+    - "Viết spec hoặc e2e cho component, hook hay trang"
+    - "Thêm vitest, Playwright, jest, testing-library hoặc axe vào package.json"
+    - "Thêm script test hoặc cấu hình test vào repository front end"
+  nextStep_vi: "Xóa tệp, cấu hình, script và thư viện test đó; front end không có ngoại lệ, kể cả thư mục scripts/. Kiểm tra giao diện bằng lint, typecheck và hfs check."
   owner: op-retry
   kind: check-finding

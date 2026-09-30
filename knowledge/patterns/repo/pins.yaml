@@ -23,7 +23,7 @@ rules:
     kind: mandatory
     hfsRules: [R15]
     requirement: |
-      `@starci/*`, TypeScript, Nest, Next, React, Prettier, ESLint, stylelint, Jest, Vitest and Playwright are at the exact
+      `@starci/*`, TypeScript, Nest, Next, React, Prettier, ESLint, stylelint, Jest (back end) are at the exact
       version in `canon-pins.yaml` for the repository's major. Dependencies are pinned exactly (no range) in `package.json`.
       Raising a version is a change to `canon-pins.yaml` in `.claude` first; `hfs sync` then raises the repositories.
     rationale: |
@@ -62,7 +62,7 @@ rules:
     hfsRules: [R15, R13]
     requirement: |
       Every `@starci/*` package (grammar, eslint-canon-be, eslint-canon-fe, stylelint-canon, tsconfig, prettier-config,
-      jest-preset, vitest-preset, playwright-preset, hfs) is a published npm package: a product repository declares the exact pinned
+      jest-preset, hfs) is a published npm package: a product repository declares the exact pinned
       version from `knowledge/hfs/canon-pins.yaml` (`"0.7.2"`, never a range, never `file:`) in the root and every workspace
       package.json and installs it from the npm registry. There is no other way to obtain a @starci package.
     rationale: |

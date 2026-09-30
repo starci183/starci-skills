@@ -23,7 +23,7 @@ autopilot:
     older than supervisorGateTimeoutMs defers what it holds (autopilot-deferred); a spent budget opens one
     supervisor-gate holding ['*']; the owner's handover credential checklist answer supersedes the credential
     asks it supplied (autopilot-credentials-supplied). --bundle prints the final review bundle
-    (starci/autopilot-bundle@1, "sổ chờ thầy xem lại"; also in api survey --deliveries .autopilot). --checklist
+    (starci/autopilot-bundle@1, "backlog awaiting the owner's review"; also in api survey --deliveries .autopilot). --checklist
     prints the ONE end-of-flow credential question (provision.ask subject handover-credentials). --set records a
     per-workflow override (autopilot-configured). --defer-to-handover records an owner-only need without an ask.
     --release puts a deferred ask back in the owner's queue (end of flow). --defer-leg is the Supervisor deferring a

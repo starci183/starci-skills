@@ -32,7 +32,7 @@ Additive (minor), plus one fix (owner, 2026-09-28, StarCi Next `SignInBase#signe
 
 ## 0.6.0 - 2026-09-27
 
-Additive (minor). Owner ruling 2026-09-27 ("thêm hết"): every grammar gap the real-component prototype
+Additive (minor). Owner ruling 2026-09-27 ("add all of it"): every grammar gap the real-component prototype
 (`ModuleLedgerBase.draw.tsx`, lane draw-real-components) had to work around is now a grammar piece. No existing
 prop, default, class or token changed meaning; one renderer is new; 28 renderers gain root attributes.
 
@@ -238,7 +238,7 @@ secondary surface).
 ## 0.4.13
 
 Fix only. A live audit measured the conversation region of `ChatWorkspace` - the node stamped
-`MEASURE-7 OVERFLOW-3` and named "Tin nhắn thiết lập" - rendering `overflow: auto auto` on every
+`MEASURE-7 OVERFLOW-3` and named "Setup message" - rendering `overflow: auto auto` on every
 capture. OVERFLOW-3 promises one scrolling axis and a second axis left clipped or visible on purpose;
 both axes scrolled. This is the defect 0.4.11 repaired on `HorizontalScrollRegion`, on the sibling
 region nobody had measured yet.

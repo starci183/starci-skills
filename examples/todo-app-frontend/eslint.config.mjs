@@ -2,7 +2,7 @@
  * StarCi's React/TypeScript canon is published as @starci/eslint-canon-fe; this repository owns
  * only which globs the law applies to. Mirrors the reference config at
  * starci-academy-fe/eslint.config.mjs, with every block scoped to APP_GLOBS - this example tree
- * also holds out-of-lane scratch (scripts/ harnesses, e2e/) that lint must not govern.
+ * also holds out-of-lane scratch (scripts/ harnesses) that lint must not govern.
  */
 import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"
 

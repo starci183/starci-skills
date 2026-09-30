@@ -5,7 +5,7 @@ description: >-
   chat while workflows run: a continuous read-only core watch, a read-only diagnosis playbook, a fix loop through
   disjoint Claude Sonnet lanes landed through the gate, hard rules and the known failure signatures. Kernels and the
   Supervisor seat run the workflows; this chat only fixes the core. Use when the owner says claude-debug, "debug
-  core", "giám sát core", "sửa core khi workflow chạy", or runs /claude-debug. Owner-facing replies in Vietnamese.
+  core", "monitor core", "fix core while a workflow runs", or runs /claude-debug. Owner-facing replies in Vietnamese.
 user-invocable: true
 ---
 

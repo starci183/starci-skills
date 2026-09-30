@@ -13,13 +13,11 @@ import tsParser from "@typescript-eslint/parser"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import plugin, {
-  e2eRecommended,
   linterOptions,
   reactHooksRules,
   recommended,
   ruleOwners,
   rules,
-  sourceRecommended,
   starciFeConfig,
   why,
 } from "./index.mjs"
@@ -31,16 +29,14 @@ const hfs = hfsFromDeclaration(FE, ROOT)
 const config = starciFeConfig({ hfs })
 const [ignores, ...single] = config
 
-test("the factory returns an ignore block, a typed source block and an e2e block, all from the HFS profile", () => {
-  assert.equal(config.length, 3)
+test("the factory returns an ignore block and a typed source block, all from the HFS profile", () => {
+  assert.equal(config.length, 2)
   assert.ok(ignores.ignores.includes("**/__generated__/**"))
   assert.deepEqual(single[0].files, ["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"])
   assert.ok(!single[0].files.some((glob) => glob.startsWith("packages/ui/")), "no package is named literally")
   assert.equal(single[0].languageOptions.parserOptions.projectService, true, "the source is linted with types")
   assert.equal(single[0].languageOptions.parserOptions.tsconfigRootDir, ROOT)
   assert.equal(single[0].settings.starci.hfs, hfs, "every rule reads the slot view")
-  assert.ok(single[1].files.includes("e2e/**/*.{ts,tsx}"))
-  assert.ok(single[1].files.includes("playwright.config.ts"))
   assert.throws(() => starciFeConfig({}), /loadHfs/)
   assert.throws(() => starciFeConfig(), /loadHfs/)
   const be = hfsFromDeclaration({ hfs: 1, profile: "be", project: "x", apps: [{ name: "api", kind: "api" }] }, ROOT)
@@ -48,7 +44,7 @@ test("the factory returns an ignore block, a typed source block and an e2e block
 })
 
 test("every published rule is enabled at error - no rule is off, none is a warning", () => {
-  const enabled = { ...single[0].rules, ...single[1].rules }
+  const enabled = single[0].rules
   for (const name of Object.keys(rules)) {
     assert.equal(enabled[`starci-fe/${name}`], "error", `starci-fe/${name} is not an error in the factory's blocks`)
   }
@@ -62,18 +58,9 @@ test("no rule in either block is off, warn or a numeric level below error", () =
   }
 })
 
-test("the source block carries the source rules and the hooks rules; the e2e block carries the e2e rules", () => {
-  for (const name of Object.keys(sourceRecommended)) assert.equal(single[0].rules[name], "error")
-  for (const name of Object.keys(e2eRecommended)) {
-    assert.equal(single[1].rules[name], "error")
-    assert.equal(single[0].rules[name], undefined, `${name} governs e2e only and must not reach src`)
-  }
-  assert.equal(single[1].rules["starci-fe/no-inline-lint-config"], "error")
-  assert.deepEqual(
-    Object.keys(recommended).sort(),
-    [...Object.keys(sourceRecommended), ...Object.keys(e2eRecommended)].sort(),
-    "recommended is the union of the two trees",
-  )
+test("the source block carries every published rule and the hooks rules", () => {
+  for (const name of Object.keys(recommended)) assert.equal(single[0].rules[name], "error")
+  assert.deepEqual(Object.keys(recommended).sort(), Object.keys(single[0].rules).filter((name) => name.startsWith("starci-fe/")).sort(), "the block holds the canon rules and nothing else of the plugin")
 })
 
 test("the React Hooks rules are on, including the effect and ref rules, all at error", () => {
@@ -139,8 +126,6 @@ const CATALOGUED_LAWS = [
   "brand-values",
   "native-controls",
   "size-and-state-budget",
-  "e2e-shape",
-  "spec-quality",
   "lint-escape-hatch",
   "type-safety",
   "lists",
@@ -193,8 +178,6 @@ test("the codes are the catalogue's codes for R18, R22, R49-R52, R55, R56, R58, 
     "FE_STYLE_TOKEN_ONLY",
     "FE_NATIVE_FORM_CONTROL",
     "FE_SIZE_AND_STATE_BUDGET",
-    "FE_E2E_SHAPE",
-    "FE_SPEC_QUALITY",
     "HFS_INLINE_SUPPRESSION",
     "FE_TYPE_ESCAPE",
     "FE_LIST_KEY",

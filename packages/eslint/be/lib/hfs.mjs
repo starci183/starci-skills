@@ -46,3 +46,16 @@ export const hfsOf = (context) => {
     }
     return hfs
 }
+
+/**
+ * Whether a file belongs to the test world: the slot `be.tests.world` or one of its sub-slots (`be.tests.world.kit`, the world's
+ * inlined helpers). The world and its helpers form one test composition root.
+ *
+ * @param {object} hfs - The HFS view of the repository.
+ * @param {string} file - A file path.
+ * @returns {boolean} True for a file of the test world family.
+ */
+export const inTestWorld = (hfs, file) => {
+    const slot = hfs.slotOf(file)
+    return slot === "be.tests.world" || (typeof slot === "string" && slot.startsWith("be.tests.world."))
+}

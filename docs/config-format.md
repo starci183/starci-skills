@@ -192,7 +192,7 @@ covers product unit tests in workflows (jest, vitest, coverage gates, Sonar cove
 also writes or updates the specs of that code and runs only those - the specs of the changed or added source and the
 specs that import it - plus typecheck, lint, canon-scan and the build, scoped as usual, never the repository's whole
 unit suite; `unit.verify` is the op that runs the whole unit suite (`npm run test:unit`), dispatched only when the goal
-or the owner asks for it ("full unit", "chạy toàn bộ unit"), never by default. `specs.e2e` (default off) covers product
+or the owner asks for it ("full unit", or its Vietnamese phrase for running the whole unit suite), never by default. `specs.e2e` (default off) covers product
 e2e (e2e.verify, Playwright and `*.e2e-spec.*` specs): it runs only when the goal or the owner asks, and `e2e.verify`
 then runs the full e2e suite. `false` for either family switches that class off for the workflow. uat.verify is neither:
 it is owner-deferred separately until credentials. The switches are read per call

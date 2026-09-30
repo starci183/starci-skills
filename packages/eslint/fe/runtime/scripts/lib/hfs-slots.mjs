@@ -150,7 +150,8 @@ function manifestShapeProblems(m) {
   const rp = m.ruleParams;
   if (!isPlainObject(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isPlainObject(rp[p]))) bad.push('ruleParams must be a map with be and fe');
   else {
-    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 6) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, suffixes and bannedSuffixes');
+    if (!fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 7) bad.push('ruleParams.be needs fileLines {soft, hardGrowth}, duplicateBlock {lines >= 2, tokens >= 1}, infraOwners, specDoubles, suffixes, bannedSuffixes and contractShape {helper}');
+    if (!isPlainObject(rp.be.contractShape) || Object.keys(rp.be.contractShape).length !== 1 || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(rp.be.contractShape.helper))) bad.push('ruleParams.be.contractShape must be {helper: <identifier>}');
     const owners = rp.be.infraOwners;
     const ownerId = /^(platform|integrations)\/[a-z][a-z0-9-]*$/;
     if (!isPlainObject(owners) || !Object.keys(owners).length || !Object.entries(owners).every(([key, list]) => key && Array.isArray(list) && list.every((o) => ownerId.test(String(o))) && new Set(list).size === list.length)) bad.push('ruleParams.be.infraOwners must map a non-empty specifier to a list of unique platform/<capability> or integrations/<provider> owners ([] means nowhere)');
@@ -627,12 +628,12 @@ function ruleCatalogProblems(d) {
     const at = `rules[${index}]`;
     if (!isPlainObject(r)) { bad.push(`${at} is not a map`); return; }
     const label = typeof r.id === 'string' ? r.id : at;
-    for (const key of Object.keys(r)) if (!['id', 'code', 'title_vi', 'law', 'kinds', 'gates', 'failureCodes', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
-    const expectedId = `R${String(index + 1).padStart(2, '0')}`;
+    for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'kinds', 'gates', 'failureCodes', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
+    // A retired rule leaves its id unused for good (never reused), so ids only have to increase.
     if (!/^R\d{2}$/.test(String(r.id))) bad.push(`${at}.id must be R<two digits>`);
-    else if (r.id !== expectedId) bad.push(`${label} is out of order: ${at} must be ${expectedId}`);
+    else if (index > 0 && typeof d.rules[index - 1]?.id === 'string' && r.id <= d.rules[index - 1].id) bad.push(`${label} is out of order: ids must increase, and ${d.rules[index - 1].id} comes before it`);
     if (!FINDING_CODE.test(String(r.code))) bad.push(`${label}.code must be an UPPER_SNAKE finding code`);
-    for (const key of ['title_vi', 'law']) if (typeof r[key] !== 'string' || !r[key].trim()) bad.push(`${label}.${key} is missing`);
+    if (typeof r.law !== 'string' || !r.law.trim()) bad.push(`${label}.law is missing`);
     if (typeof r.law === 'string' && r.law.includes('\n')) bad.push(`${label}.law must be one line`);
     const enumList = (key, allowed) => {
       if (!Array.isArray(r[key]) || !r[key].length) { bad.push(`${label}.${key} must be a non-empty list`); return []; }

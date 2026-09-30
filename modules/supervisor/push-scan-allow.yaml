@@ -35,7 +35,7 @@ entries:
     introducedIn: fc45f6936754228499836c334ab995e9afe0b2db
     until: 42eb3f382ec7902d38dc7aa60a5fa991627d72f1
     approvedBy: owner
-    approval: "owner chat 2026-09-28: 'đừng chặn pass tests' (ruling push-scan-test-secrets-encrypted)"
+    approval: "owner chat 2026-09-28: 'do not block passing tests' (ruling push-scan-test-secrets-encrypted)"
     at: 2026-09-28
   - repo: nivo-backend
     file: .starciwork/features/login/operations/interface-audit-session-controls/E/probe-round-4.mjs

@@ -16,8 +16,8 @@ export const GENERATED_SEGMENTS = new Set(['.next', '.turbo', '.vercel', '.outpu
 export function isGeneratedPath(root, fileName) {
   return slash(path.relative(root, fileName)).split('/').slice(0, -1).some(segment => GENERATED_SEGMENTS.has(segment));
 }
-// A `<tool>.config.*` or `<tool>.setup.*` module beside a package manifest (next.config.ts, vitest.config.ts,
-// vitest.setup.ts) is build tooling a broad `**/*.ts` include pulls in; a `*.config.ts` inside a source tree
+// A `<tool>.config.*` or `<tool>.setup.*` module beside a package manifest (next.config.ts,
+// postcss.config.mjs) is build tooling a broad `**/*.ts` include pulls in; a `*.config.ts` inside a source tree
 // (src/config/database.config.ts) has no manifest beside it and stays source. The architecture program still
 // reads tooling modules (a profile may declare one as source); check-scoped-lint does not make one a canon
 // lint subject unless the profile's sourceGlobs name it.

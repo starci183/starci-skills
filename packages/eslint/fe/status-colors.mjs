@@ -20,7 +20,6 @@
  */
 
 import { attributeValue } from "./lib/ast.mjs"
-import { isSpecFile } from "./lib/scope.mjs"
 import { STATUS_TONES } from "./lib/status-tones.generated.mjs"
 
 /** The utility families that paint text, an icon or a text decoration. */
@@ -106,7 +105,6 @@ export const statusTextUsesSoftForeground = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     // A `classes` entry inside a constant is reached twice (as part of the constant, and as the entry): one finding per string.
     const seen = new Set()
     const check = (root) => {

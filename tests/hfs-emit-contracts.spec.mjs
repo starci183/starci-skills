@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { aliasTarget, aliasesOf, apiApps, appModulePath, snapshotPath, snapshotText } from '../packages/hfs/emit/contracts.mjs';
 import { createGraphReader } from '../packages/hfs/emit/static-graph.mjs';
+import { openApiText, readOperations } from '../packages/hfs/emit/operations.mjs';
 import { contractEmitFindings, CONTRACT_SNAPSHOT_DRIFT } from '../scripts/lib/hfs-rules/contract.mjs';
 
 // `hfs emit-contracts`: the pure parts (packages/hfs/emit/contracts.mjs), the static module-graph reader that decides what an app
@@ -265,74 +266,189 @@ test('static graph: what cannot be decided is an error naming the module, never 
 // ------------------------------------------------------------------------------------------------ the committed snapshot is current
 
 const SNAPSHOT = 'contracts/core/schema.graphql';
-const withRepo = (committed, body) => {
+const OPENAPI = 'contracts/core/openapi.json';
+const withRepo = (committed, body, committedOpenapi = null) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-contract-emit-'));
   try {
-    if (committed !== null) {
-      fs.mkdirSync(path.join(dir, 'contracts', 'core'), { recursive: true });
-      fs.writeFileSync(path.join(dir, SNAPSHOT), committed);
-    }
+    fs.mkdirSync(path.join(dir, 'contracts', 'core'), { recursive: true });
+    if (committed !== null) fs.writeFileSync(path.join(dir, SNAPSHOT), committed);
+    if (committedOpenapi !== null) fs.writeFileSync(path.join(dir, OPENAPI), committedOpenapi);
     return body(dir);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 };
-const emitting = (text) => ({ declaration, outDir }) => {
+/** A fake emit: `graphql` and `openapi` are the texts the app emits now, null when it emits none. */
+const emitting = (graphql, openapi = null) => ({ declaration, outDir }) => {
   const [app] = declaration.apps;
-  if (text === null) return { written: [], skipped: [app.name] };
-  fs.mkdirSync(path.join(outDir, 'contracts', app.name), { recursive: true });
-  fs.writeFileSync(path.join(outDir, snapshotPath(app.name)), text);
-  return { written: [snapshotPath(app.name)], skipped: [] };
+  const written = [];
+  for (const [text, relative] of [[graphql, snapshotPath(app.name)], [openapi, `contracts/${app.name}/openapi.json`]]) {
+    if (text === null) continue;
+    fs.mkdirSync(path.join(outDir, 'contracts', app.name), { recursive: true });
+    fs.writeFileSync(path.join(outDir, relative), text);
+    written.push(relative);
+  }
+  return { written, skipped: written.length ? [] : [app.name] };
 };
 const BE_REPO = { profile: 'be', apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }] };
+const GQL_OLD = 'type Query {\n  a: Int\n}\n';
+const GQL_NEW = 'type Query {\n  a: Int\n  b: Int\n}\n';
 
 test('HFS_CONTRACT_SNAPSHOT_DRIFT: a committed snapshot equal to what the app emits now is fresh (line endings folded)', () => {
   withRepo('type Query {\r\n  a: Int\r\n}\r\n', (dir) => {
-    const result = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT], repo: BE_REPO, emit: emitting('type Query {\n  a: Int\n}\n') });
+    const result = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT], repo: BE_REPO, emit: emitting(GQL_OLD) });
     assert.deepEqual(result.findings, []);
-    assert.deepEqual(result.apps, [{ app: 'core', status: 'fresh' }]);
+    assert.deepEqual(result.apps, [{ app: 'core', artifact: 'schema.graphql', status: 'fresh' }]);
   });
 });
 
 test('HFS_CONTRACT_SNAPSHOT_DRIFT: a stale committed snapshot names both hashes and npm run contract:emit', () => {
-  withRepo('type Query {\n  a: Int\n}\n', (dir) => {
-    const result = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT], repo: BE_REPO, emit: emitting('type Query {\n  a: Int\n  b: Int\n}\n') });
+  withRepo(GQL_OLD, (dir) => {
+    const result = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT], repo: BE_REPO, emit: emitting(GQL_NEW) });
     assert.equal(result.findings.length, 1);
     const [finding] = result.findings;
     assert.equal(finding.code, CONTRACT_SNAPSHOT_DRIFT);
     assert.equal(finding.path, SNAPSHOT);
     assert.match(finding.message, /\([0-9a-f]{12}\) differs from what core emits now \([0-9a-f]{12}\)/);
     assert.match(finding.message, /npm run contract:emit/);
-    assert.deepEqual(result.apps, [{ app: 'core', status: 'stale' }]);
+    assert.deepEqual(result.apps, [{ app: 'core', artifact: 'schema.graphql', status: 'stale' }]);
   });
 });
 
+test('HFS_CONTRACT_SNAPSHOT_DRIFT: openapi.json is judged like the schema: fresh, stale, and left behind when the operation table is gone', () => {
+  withRepo(GQL_OLD, (dir) => {
+    const fresh = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT, OPENAPI], repo: BE_REPO, emit: emitting(GQL_OLD, '{"openapi":"3.1.0"}\n') });
+    assert.deepEqual(fresh.apps.map((a) => `${a.artifact}:${a.status}`), ['schema.graphql:fresh', 'openapi.json:not-committed']);
+  }, null);
+  withRepo(GQL_OLD, (dir) => {
+    const fresh = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT, OPENAPI], repo: BE_REPO, emit: emitting(GQL_OLD, '{"openapi":"3.1.0"}\r\n') });
+    assert.deepEqual(fresh.findings, []);
+    assert.deepEqual(fresh.apps.map((a) => `${a.artifact}:${a.status}`), ['schema.graphql:fresh', 'openapi.json:fresh']);
+    const stale = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT, OPENAPI], repo: BE_REPO, emit: emitting(GQL_OLD, '{"openapi":"3.1.1"}\n') });
+    assert.equal(stale.findings.length, 1);
+    assert.equal(stale.findings[0].path, OPENAPI);
+    assert.match(stale.findings[0].message, /\([0-9a-f]{12}\) differs from what core emits now/);
+    const gone = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT, OPENAPI], repo: BE_REPO, emit: emitting(GQL_OLD, null) });
+    assert.equal(gone.findings.length, 1);
+    assert.match(gone.findings[0].message, /declares no operations any more; delete it/);
+  }, '{"openapi":"3.1.0"}\n');
+});
+
 test('HFS_CONTRACT_SNAPSHOT_DRIFT: an emit that cannot run is a finding with its error, never a silent skip', () => {
-  withRepo('type Query {\n  a: Int\n}\n', (dir) => {
-    const emit = () => { throw new Error('hfs emit-contracts: core failed (exit 1): Cannot find module typescript'); };
+  withRepo(GQL_OLD, (dir) => {
+    const emit = () => { throw new Error('hfs emit-contracts: core failed (exit 1): operation sales.policy@1: input: unknown'); };
     const result = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT], repo: BE_REPO, emit });
     assert.equal(result.findings.length, 1);
     assert.equal(result.findings[0].code, CONTRACT_SNAPSHOT_DRIFT);
-    assert.match(result.findings[0].message, /cannot be verified.*Cannot find module typescript/);
-    assert.deepEqual(result.apps, [{ app: 'core', status: 'emit-failed' }]);
+    assert.match(result.findings[0].message, /cannot be verified.*operation sales\.policy@1: input: unknown/);
+    assert.deepEqual(result.apps.map((a) => a.status), ['emit-failed', 'emit-failed']);
   });
 });
 
 test('HFS_CONTRACT_SNAPSHOT_DRIFT: a snapshot left behind by an app that serves no GraphQL is refused; an uncommitted one is the static rule\'s finding', () => {
-  withRepo('type Query {\n  a: Int\n}\n', (dir) => {
+  withRepo(GQL_OLD, (dir) => {
     const stale = contractEmitFindings({ repoRoot: dir, files: [SNAPSHOT], repo: BE_REPO, emit: emitting(null) });
     assert.match(stale.findings[0].message, /serves no GraphQL any more/);
   });
   withRepo(null, (dir) => {
     const none = contractEmitFindings({ repoRoot: dir, files: [], repo: BE_REPO, emit: emitting(null) });
     assert.deepEqual(none.findings, []);
-    const uncommitted = contractEmitFindings({ repoRoot: dir, files: [], repo: BE_REPO, emit: emitting('type Query {\n  a: Int\n}\n') });
+    const uncommitted = contractEmitFindings({ repoRoot: dir, files: [], repo: BE_REPO, emit: emitting(GQL_OLD) });
     assert.deepEqual(uncommitted.findings, []);
-    assert.deepEqual(uncommitted.apps, [{ app: 'core', status: 'not-committed' }]);
+    assert.deepEqual(uncommitted.apps, [{ app: 'core', artifact: 'schema.graphql', status: 'not-committed' }]);
   });
 });
 
 test('the emit check judges a back end only', () => {
   const result = contractEmitFindings({ repoRoot: os.tmpdir(), files: [], repo: { profile: 'fe', apps: [{ name: 'web', kind: 'next' }] }, emit: () => { throw new Error('never called'); } });
   assert.deepEqual(result, { findings: [], apps: [] });
+});
+
+// ------------------------------------------------------------------------------------------------ the typed operation table
+
+const CANON = fs.readFileSync(path.join(import.meta.dirname, '..', 'packages', 'eslint', 'be', 'fixtures', 'typed', 'src', 'modules', 'platform', 'operations', 'operation-contract.ts'), 'utf8');
+const ROOT_DIR = path.join(os.tmpdir(), 'hfs-operations-virtual');
+const operationsProgram = (tableText, extra = {}) => {
+  const files = new Map([[path.join(ROOT_DIR, 'contract.ts'), CANON], [path.join(ROOT_DIR, 'operations.ts'), tableText], ...Object.entries(extra).map(([name, text]) => [path.join(ROOT_DIR, name), text])]);
+  const options = { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, moduleResolution: ts.ModuleResolutionKind.Node10, strict: true, skipLibCheck: true, noEmit: true, types: [] };
+  const host = ts.createCompilerHost(options);
+  const { fileExists, readFile, getSourceFile } = host;
+  host.fileExists = (file) => files.has(path.normalize(file)) || fileExists(file);
+  host.readFile = (file) => files.get(path.normalize(file)) ?? readFile(file);
+  const { directoryExists } = host;
+  host.directoryExists = (directory) => path.normalize(directory) === path.normalize(ROOT_DIR) || (directoryExists ? directoryExists(directory) : false);
+  host.getSourceFile = (file, ...rest) => (files.has(path.normalize(file)) ? ts.createSourceFile(file, files.get(path.normalize(file)), rest[0]) : getSourceFile(file, ...rest));
+  return ts.createProgram({ rootNames: [path.join(ROOT_DIR, 'operations.ts')], options, host });
+};
+const readTable = (tableText, extra) => readOperations({ ts, program: operationsProgram(tableText, extra), file: path.join(ROOT_DIR, 'operations.ts') });
+const TYPES = `
+export interface PolicyInput { readonly installationId: string; readonly requestId?: string }
+export interface Rule { readonly name: string; readonly limit: number | null; readonly tags: ReadonlyArray<string>; readonly parent?: Rule }
+export interface PolicyValue { readonly revision: number; readonly rules: ReadonlyArray<Rule>; readonly status: "set" | "unset"; readonly extras: Readonly<Record<string, string>> }
+`;
+const HEAD = `import { defineOperations, mutation, query } from './contract';\n${TYPES}\n`;
+
+test('operations: a typed table becomes OpenAPI 3.1 with x-operation, a oneOf over success and refusal, components and sorted keys', () => {
+  const { operations, components } = readTable(`${HEAD}export const OPERATIONS = defineOperations({
+  "sales.policy@1": query<PolicyInput, PolicyValue, "DENIED" | "INVALID">(),
+  "sales.close@1": mutation<PolicyInput, PolicyValue>(),
+});\n`);
+  assert.deepEqual(operations.map((operation) => [operation.id, operation.kind, operation.refusal]), [['sales.close@1', 'mutation', []], ['sales.policy@1', 'query', ['DENIED', 'INVALID']]]);
+  const document = JSON.parse(openApiText({ app: 'core', operations, components }));
+  assert.equal(document.openapi, '3.1.0');
+  assert.deepEqual(document['x-operations'], [{ id: 'sales.close@1', kind: 'mutation' }, { id: 'sales.policy@1', kind: 'query' }]);
+  const post = document.paths['/operations'].post;
+  assert.deepEqual(post.requestBody.content['application/json'].schema.oneOf.map((ref) => ref.$ref), ['#/components/schemas/Operation.sales.close.v1.Request', '#/components/schemas/Operation.sales.policy.v1.Request']);
+  const request = document.components.schemas['Operation.sales.policy.v1.Request'];
+  assert.equal(request['x-operation'], 'sales.policy@1');
+  assert.deepEqual(request.required, ['input', 'operation', 'requestId']);
+  assert.deepEqual(request.properties.operation, { const: 'sales.policy@1' });
+  assert.deepEqual(request.properties.input, { $ref: '#/components/schemas/PolicyInput' });
+  const reply = document.components.schemas['Operation.sales.policy.v1.Reply'];
+  assert.deepEqual(reply.properties.outcome.oneOf[1].properties.code, { enum: ['DENIED', 'INVALID'], type: 'string' });
+  assert.equal(document.components.schemas['Operation.sales.close.v1.Reply'].properties.outcome.properties.kind.const, 'ok');
+  assert.deepEqual(document.components.schemas.PolicyInput, { properties: { installationId: { type: 'string' }, requestId: { type: 'string' } }, required: ['installationId'], type: 'object' });
+  assert.deepEqual(document.components.schemas.Rule.properties.parent, { $ref: '#/components/schemas/Rule' }, 'a recursive type is a component, once');
+  assert.deepEqual(document.components.schemas.Rule.properties.limit, { anyOf: [{ type: 'null' }, { type: 'number' }] });
+  assert.deepEqual(document.components.schemas.PolicyValue.properties.status, { enum: ['set', 'unset'], type: 'string' });
+  assert.deepEqual(document.components.schemas.PolicyValue.properties.extras, { additionalProperties: { type: 'string' }, type: 'object' });
+});
+
+test('operations: the printed text is deterministic (declaration order does not matter) with sorted keys and one final newline', () => {
+  const a = readTable(`${HEAD}export const OPERATIONS = defineOperations({ "b.op@1": query<PolicyInput, PolicyValue>(), "a.op@2": mutation<PolicyInput, PolicyValue>() });\n`);
+  const b = readTable(`${HEAD}export const OPERATIONS = defineOperations({ "a.op@2": mutation<PolicyInput, PolicyValue>(), "b.op@1": query<PolicyInput, PolicyValue>() });\n`);
+  const textA = openApiText({ app: 'core', ...a });
+  assert.equal(textA, openApiText({ app: 'core', ...b }));
+  assert.ok(textA.endsWith('}\n') && !textA.endsWith('\n\n'));
+  const keys = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? [Object.keys(value), ...Object.values(value).flatMap(keys)] : Array.isArray(value) ? value.flatMap(keys) : []);
+  for (const list of keys(JSON.parse(textA))) assert.deepEqual(list, [...list].sort());
+});
+
+test('operations: what the checker cannot express is an error naming the operation, never {}', () => {
+  const failing = (declaration, types = '') => () => readTable(`import { defineOperations, query } from './contract';\n${types}\nexport const OPERATIONS = defineOperations({ ${declaration} });\n`);
+  assert.throws(failing('"a.op@1": query<{ readonly x: unknown }, { readonly ok: boolean }>()'), /operation a\.op@1: input\.x: unknown/);
+  assert.throws(failing('"a.op@1": query<{ readonly x: string }, Record<string, unknown>>()'), /operation a\.op@1: output\[key\]: unknown/);
+  assert.throws(failing('"a.op@1": query<{ readonly x: string }, { readonly at: any }>()'), /output\.at: any/);
+  assert.throws(failing('"a.op@1": query<{ readonly at: Date }, { readonly ok: boolean }>()'), /input\.at: Date is not a JSON value/);
+  assert.throws(failing('"a.op@1": query<object, { readonly ok: boolean }>()'), /input: object with no declared members/);
+  assert.throws(failing('"a.op@1": query<{}, { readonly ok: boolean }>()'), /input: an object type with no members/);
+  assert.throws(failing('"a.op@1": query<{ readonly f: () => void }, { readonly ok: boolean }>()'), /input\.f: a function/);
+  assert.throws(failing('"a.op@1": query<{ readonly x: string }, { readonly ok: boolean }, string>()'), /refusal must be a closed union of string literals, found string/);
+  assert.throws(failing('"a.op@1": query<{ readonly x: bigint }, { readonly ok: boolean }>()'), /input\.x: bigint/);
+  assert.throws(failing('"a.op@one": query<{ readonly x: string }, { readonly ok: boolean }>()'), /the key must be/);
+  assert.throws(failing('"a.op@0": query<{ readonly x: string }, { readonly ok: boolean }>()'), /the key must be/);
+  assert.throws(() => readTable('export const NOT_OPERATIONS = 1;\n'), /does not export OPERATIONS/);
+  assert.throws(() => readTable(`import { defineOperations } from './contract';\nexport const OPERATIONS = defineOperations({});\n`), /declares no operation/);
+});
+
+test('operations: an app without an operation table has no file in the program; unions of literals and tuples are expressed', () => {
+  assert.equal(readOperations({ ts, program: operationsProgram('export {};\n'), file: path.join(ROOT_DIR, 'absent.ts') }), null);
+  const { components } = readTable(`import { defineOperations, query } from './contract';
+export interface Mixed { readonly pair: readonly [string, number]; readonly flag: boolean; readonly either: "a" | 1 | true; readonly maybe?: string | null }
+export const OPERATIONS = defineOperations({ "a.op@1": query<Mixed, Mixed>() });\n`);
+  assert.deepEqual(components.Mixed.properties.pair, { maxItems: 2, minItems: 2, prefixItems: [{ type: 'string' }, { type: 'number' }], type: 'array' });
+  assert.deepEqual(components.Mixed.properties.flag, { type: 'boolean' });
+  assert.deepEqual(components.Mixed.properties.either, { enum: [1, 'a', true] });
+  assert.deepEqual(components.Mixed.properties.maybe, { anyOf: [{ type: 'null' }, { type: 'string' }] });
+  assert.deepEqual(components.Mixed.required, ['either', 'flag', 'pair']);
 });

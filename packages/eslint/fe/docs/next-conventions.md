@@ -24,9 +24,9 @@ export function proxy(request) { return request }
 
 **Finding code:** `FE_NEXT_CONVENTIONS`
 
-**Vì sao (why):** `<file>` dùng tên `middleware`. Từ Next 16 bộ chặn request là `proxy.ts` và xuất `proxy`.
+**Why:** `<file>` uses the name `middleware`. Since Next 16 the request interceptor is `proxy.ts` and exports `proxy`.
 
-**Cách sửa:** Đổi tên tệp thành `proxy.ts` và đổi export thành `proxy`.
+**Fix:** Rename the file to `proxy.ts` and rename the export to `proxy`.
 
 ## `starci-fe/locale-segment-is-locale`
 
@@ -46,9 +46,9 @@ export default function Page() {}
 
 **Finding code:** `FE_I18N_PLACEMENT`
 
-**Vì sao (why):** Tệp `<file>` nằm dưới segment ngôn ngữ không phải `[locale]`. Chỉ có một mẫu: `next-intl`, `[locale]`, mặc định `vi`.
+**Why:** The file `<file>` sits under a language segment that is not `[locale]`. There is only one pattern: `next-intl`, `[locale]`, default `vi`.
 
-**Cách sửa:** Đổi tên thư mục segment thành `[locale]`.
+**Fix:** Rename the segment directory to `[locale]`.
 
 ## `starci-fe/no-second-i18n-stack`
 
@@ -68,9 +68,9 @@ import { useTranslations } from "next-intl"
 
 **Finding code:** `FE_I18N_PLACEMENT`
 
-**Vì sao (why):** `<file>` nhập một thư viện i18n thứ hai. App chỉ dùng `next-intl` qua `modules/i18n`.
+**Why:** `<file>` imports a second i18n library. The app uses only `next-intl` through `modules/i18n`.
 
-**Cách sửa:** Chuyển sang `next-intl`; xóa thư viện còn lại.
+**Fix:** Switch to `next-intl`; remove the other library.
 
 ## `starci-fe/html-lang-from-locale`
 
@@ -90,9 +90,9 @@ import { useTranslations } from "next-intl"
 
 **Finding code:** `FE_I18N_LITERAL`
 
-**Vì sao (why):** `<html lang>` ở `<file>` là chữ cứng. Thuộc tính `lang` phải lấy từ segment `[locale]`.
+**Why:** `<html lang>` in `<file>` is hardcoded. The `lang` attribute must come from the `[locale]` segment.
 
-**Cách sửa:** Dùng `lang={locale}` từ tham số của layout `[locale]`.
+**Fix:** Use `lang={locale}` from the parameters of the `[locale]` layout.
 
 ## `starci-fe/page-exports-metadata`
 
@@ -113,9 +113,9 @@ export default function Page() { return <CoursesPage /> }
 
 **Finding code:** `FE_PAGE_METADATA_MISSING`
 
-**Vì sao (why):** `<file>` là `page.tsx` nhưng không export `metadata` hoặc `generateMetadata`; mọi trang trong nhánh mang cùng một tiêu đề.
+**Why:** `<file>` is a `page.tsx` but does not export `metadata` or `generateMetadata`; every page in the branch carries the same title.
 
-**Cách sửa:** Export `metadata` (hoặc `generateMetadata` khi tiêu đề lấy từ dữ liệu) với tiêu đề và mô tả lấy từ catalog thông điệp.
+**Fix:** Export `metadata` (or `generateMetadata` when the title comes from data) with the title and description taken from the message catalog.
 
 ## `starci-fe/no-null-suspense-fallback`
 
@@ -135,9 +135,9 @@ export default function Page() { return <CoursesPage /> }
 
 **Finding code:** `FE_SUSPENSE_NULL_FALLBACK`
 
-**Vì sao (why):** `<Suspense>` ở `<file>` có `fallback` rỗng: người dùng thấy khoảng trống thay vì trạng thái đang tải.
+**Why:** `<Suspense>` in `<file>` has an empty `fallback`: the user sees a blank space instead of a loading state.
 
-**Cách sửa:** Truyền skeleton (trạng thái loading) của đúng thứ đang tải làm `fallback`.
+**Fix:** Pass the skeleton (loading state) of exactly what is loading as the `fallback`.
 
 ## `starci-fe/navigation-from-intl`
 
@@ -157,9 +157,9 @@ import { useRouter } from "@/modules/i18n/navigation"
 
 **Finding code:** `FE_I18N_NAVIGATION`
 
-**Vì sao (why):** `<file>` nhập `Link`, `useRouter`, `usePathname` hoặc `redirect` từ Next, không biết locale: đường dẫn mất tiền tố `[locale]`.
+**Why:** `<file>` imports `Link`, `useRouter`, `usePathname` or `redirect` from Next, which is unaware of the locale: paths lose the `[locale]` prefix.
 
-**Cách sửa:** Nhập từ `modules/i18n/navigation`, được next-intl dựng từ `routing.ts`.
+**Fix:** Import from `modules/i18n/navigation`, which next-intl builds from `routing.ts`.
 
 ## `starci-fe/no-native-anchor`
 
@@ -179,9 +179,9 @@ An internal link is `Link` from `modules/i18n/navigation`; an external `_blank` 
 
 **Finding code:** `FE_I18N_NAVIGATION`
 
-**Vì sao (why):** `<a>` ở `<file>` trỏ route nội bộ (tải lại cả trang, mất locale, mất prefetch) hoặc mở tab mới mà không có `rel`.
+**Why:** `<a>` in `<file>` points at an internal route (reloads the whole page, loses the locale, loses prefetch) or opens a new tab without `rel`.
 
-**Cách sửa:** Dùng `Link` từ `modules/i18n/navigation` với href dựng bởi `modules/routes`; liên kết `_blank` thêm `rel="noopener noreferrer"`.
+**Fix:** Use `Link` from `modules/i18n/navigation` with an href built by `modules/routes`; for `_blank` links add `rel="noopener noreferrer"`.
 
 ## `starci-fe/no-hardcoded-route`
 
@@ -201,9 +201,9 @@ router.push(routes.newWorkspace())
 
 **Finding code:** `FE_ROUTE_HARDCODED`
 
-**Vì sao (why):** `<file>` viết thẳng đường dẫn route ở nơi gọi; route đổi chỗ thì bản sao trỏ vào 404.
+**Why:** `<file>` writes a route path directly at the call site; when the route moves, the copy points at a 404.
 
-**Cách sửa:** Dựng href bằng hàm của `modules/routes` và dùng đúng hàm đó ở mọi nơi.
+**Fix:** Build the href with a function from `modules/routes` and use that same function everywhere.
 
 ## `starci-fe/i18n-stack-in-one-module`
 
@@ -227,6 +227,6 @@ export const i18n = createAppI18n({ locales: ["vi"] })
 
 **Finding code:** `FE_I18N_PLACEMENT`
 
-**Vì sao (why):** `<file>` tự dựng một tầng của stack next-intl (`defineRouting`, `createNavigation`, `getRequestConfig`, `createMiddleware`). Stack chỉ được viết một lần cho cả repo.
+**Why:** `<file>` builds a layer of the next-intl stack itself (`defineRouting`, `createNavigation`, `getRequestConfig`, `createMiddleware`). The stack may be written only once per repo.
 
-**Cách sửa:** Gọi factory `createAppI18n` của gói i18n dùng chung trong `modules/i18n/index.ts` và nhập kết quả; repo một app thì chỉ viết stack trong `modules/i18n` của app đó.
+**Fix:** Call the `createAppI18n` factory of the shared i18n package in `modules/i18n/index.ts` and import the result; in a single-app repo, write the stack only in that app's `modules/i18n`.

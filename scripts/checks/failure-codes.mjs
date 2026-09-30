@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { FAILURE_CODE_VIETNAMESE_FIELDS } from '../lib/language.mjs';
 import { isMain } from './common.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -116,7 +117,8 @@ export function emittedCodes(base = root) {
   return [...found.values()].sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
 }
 
-const FIELDS = ['title', 'title_vi', 'meaning_vi', 'nextStep_vi', 'owner', 'kind'];
+// The entry's scalar fields. Its Vietnamese fields (FAILURE_CODE_VIETNAMESE_FIELDS) are the one declared exception of the English-only document law (HFS_DOC_NOT_ENGLISH); causes_vi is their list companion.
+const FIELDS = ['title', ...FAILURE_CODE_VIETNAMESE_FIELDS.filter((field) => field !== 'causes_vi'), 'owner', 'kind'];
 export const CODE_KINDS = Object.freeze(['check-finding', 'settle-reason', 'dispatch-refusal', 'blocker', 'check-status', 'verb-refusal', 'runtime-fault', 'input-invalid']);
 
 /** Read the catalog: a flat map code -> entry. */

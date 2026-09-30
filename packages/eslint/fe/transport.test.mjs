@@ -38,7 +38,6 @@ const PKG_TRANSPORT = at("packages/nivo-api/src/transport.ts")
 const READER = at("apps/web/src/modules/api/course/read-course.ts")
 const CONTRACT = at("apps/web/src/modules/api/contract/types.ts")
 const HOOK = at("apps/web/src/hooks/course/useCourse.ts")
-const SPEC = at("apps/web/src/modules/api/client.test.ts")
 
 test("every rule this law declares is a rule", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -54,8 +53,6 @@ test("FE-TRANSPORT-1: fetch is reached in the api client slot and nowhere else",
       // the client may build a Request or beacon: it owns every request
       { filename: CLIENT, code: "const r = new Request(url, { signal })\nnavigator.sendBeacon(url, body)" },
       { filename: HOOK, code: "const r = await client.get(url)" },
-      { filename: SPEC, code: "const r = await fetch(url)" },
-      { filename: at("apps/web/src/modules/api/client.spec.ts"), code: "globalThis.fetch = vi.fn()" },
       // a property that merely has the name is not the global
       { filename: HOOK, code: "const r = await api.fetch(url)" },
       // a binding of the file's own is not the global
@@ -147,7 +144,6 @@ test("FE-TRANSPORT-3: no module-level mutable state in the API layer", () => {
       { filename: at("packages/nivo-ui/src/leaves/Menu/component.tsx"), code: "let count = 0" },
       { filename: CONTRACT, code: "let x = 1" },
       { filename: at("apps/web/src/modules/api/__generated__/graphql.ts"), code: "let x = 1" },
-      { filename: SPEC, code: "let calls = 0" },
       // a folder named api below another module is not the API layer
       { filename: at("apps/web/src/modules/config/api/state.ts"), code: "let x = 1" },
     ],
@@ -250,7 +246,6 @@ test("FE-STATUS-1: a failed response is not one branch and not null", () => {
       { filename: CLIENT, code: "const x = res.ok ? await res.json() : toOutcome(res)" },
       // an unrelated null return is not a status collapse
       { filename: HOOK, code: "if (!user) return null" },
-      { filename: SPEC, code: "if (!res.ok) return null" },
     ],
     invalid: [
       { filename: CLIENT, code: "if (!res.ok) return null", errors: [{ messageId: "empty" }] },
@@ -280,7 +275,6 @@ test("FE-WIRE-1: a response body is narrowed from unknown or typed by a generate
       { filename: CLIENT, code: "export type LoginPayload = { email: string }" },
       { filename: READER, code: "const n = value as number" },
       { filename: READER, code: "const label = \"select the query text\"" },
-      { filename: SPEC, code: "const x = (await res.json()) as Course" },
       // live (starci-next-fe): `as unknown` is the sanctioned narrowing entry
       { filename: READER, code: "const body = (await response.json()) as unknown" },
       { filename: READER, code: "const body: unknown = await response.json()" },
@@ -319,10 +313,6 @@ test("TRANSPORT-7: a switch over an Outcome names every kind", () => {
       // a switch over some other discriminant is not an Outcome
       { filename: HOOK, code: "switch (shape.kind) { case 'circle': return 1; case 'square': return 2 }" },
       { filename: HOOK, code: "switch (state) { case 'ok': return 1 }" },
-      {
-        filename: at("apps/web/src/hooks/course/useCourse.test.ts"),
-        code: "switch (outcome.kind) { case 'ok': return a }",
-      },
     ],
     invalid: [
       {
@@ -372,8 +362,6 @@ test("FE-OUTCOME-1: a result union is declared once, in the outcome slot", () =>
       { filename: HOOK, code: "export type Maybe = { ok: true } | null" },
       { filename: HOOK, code: "export type Row = { ok: true; a: 1 }" },
       { filename: HOOK, code: "export interface Reply { ok: boolean }" },
-      // a spec asserts about shapes; it is not product source
-      { filename: SPEC, code: "type Local = { ok: true } | { ok: false }" },
     ],
     invalid: [
       { filename: HOOK, code: "export type SignOutOutcome = { ok: true } | { ok: false; kind: \"refused\" }", errors: [{ messageId: "second" }] },

@@ -24,9 +24,9 @@ Use the grammar's renderers; never a bare select, input, textarea or button.
 
 **Finding code:** `FE_NATIVE_FORM_CONTROL`
 
-**Vì sao (why):** `<tag>` thô ở `<file>`. Dùng renderer của grammar.
+**Why:** Raw `<tag>` in `<file>`. Use the grammar renderer.
 
-**Cách sửa:** Thay bằng thành phần của grammar; nếu chưa có, thêm vào grammar thay vì vẽ tại chỗ.
+**Fix:** Replace it with a grammar component; if none exists, add it to the grammar instead of drawing it in place.
 
 ## `starci-fe/no-native-img`
 
@@ -46,9 +46,9 @@ Use `next/image`, never a bare `<img>` (catalogue R62, sub-check `FE_NATIVE_IMAG
 
 **Finding code:** `FE_NATIVE_IMAGE`
 
-**Vì sao (why):** `<img>` thô ở `<file>`: tải ảnh gốc, không giữ chỗ nên trang nhảy khi ảnh tải xong.
+**Why:** Raw `<img>` in `<file>`: it loads the original image and reserves no space, so the page jumps when the image loads.
 
-**Cách sửa:** Dùng `Image` của `next/image` với `width` và `height` (hoặc `fill` và `sizes`) và `alt` từ catalog.
+**Fix:** Use `Image` from `next/image` with `width` and `height` (or `fill` and `sizes`) and `alt` from the catalog.
 
 ## `starci-fe/image-has-size`
 
@@ -68,6 +68,6 @@ Use `next/image`, never a bare `<img>` (catalogue R62, sub-check `FE_NATIVE_IMAG
 
 **Finding code:** `FE_NATIVE_IMAGE`
 
-**Vì sao (why):** `Image` ở `<file>` thiếu `width` và `height` (hoặc `fill` mà thiếu `sizes`): trình duyệt không giữ chỗ được.
+**Why:** `Image` in `<file>` lacks `width` and `height` (or has `fill` without `sizes`): the browser cannot reserve space.
 
-**Cách sửa:** Cho đủ `width` và `height`, hoặc `fill` trong khung có kích thước kèm `sizes`.
+**Fix:** Provide both `width` and `height`, or `fill` inside a sized frame together with `sizes`.

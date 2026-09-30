@@ -131,7 +131,7 @@ steps:
     action:
       en: Write the manifest first - hfs.json and package.json with the pinned engines and dependencies;
         then run `hfs sync --write`, which generates the tool configuration (tsconfig.json, tsconfig.build.json,
-        tsconfig.e2e.json, eslint.config.mjs, jest.config.js, .prettierrc, .prettierignore), the package.json scripts, husky,
+        src/tests/tsconfig.json, eslint.config.mjs, jest.config.js, .prettierrc, .prettierignore), the package.json scripts, husky,
         .github/workflows/ci.yml and e2e.yml, .gitignore, sonar-project.properties and
         .starciwork/.gitignore, and `hfs check` must report no managed-file finding -
         a generated file is never hand-written or edited, and a value `hfs sync` does not carry is a named gap in the

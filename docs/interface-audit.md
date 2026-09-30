@@ -111,7 +111,7 @@ prominent symbol enters an accepted draw, and again when the implementation is a
 8. Is its realization medium truthful: rich authored imagery as `raster-asset`, simple system/action meaning as
    installed Grammar or repository-native `code-native` iconography?
 
-A stack of coins, checklist or pencil can be readable yet still fail `symbol.fit` because it is clichéd,
+A stack of coins, checklist or pencil can be readable yet still fail `symbol.fit` because it is cliched,
 childlike or too generic for an enterprise system. A set can also fail `symbol.family` when each image uses a
 different camera, plinth, material language, lighting or density. A label does not rescue either failure.
 

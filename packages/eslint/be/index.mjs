@@ -37,10 +37,12 @@ import { recommended as moduleLayeringRecommended, rules as moduleLayeringRules 
 import { recommended as moduleShapeRecommended, rules as moduleShapeRules } from "./module-shape.mjs"
 import { recommended as namingRecommended, rules as namingRules } from "./naming.mjs"
 import { recommended as observabilityRecommended, rules as observabilityRules } from "./observability.mjs"
+import { recommended as operationsRecommended, rules as operationsRules } from "./operations.mjs"
 import { recommended as querySafetyRecommended, rules as querySafetyRules } from "./query-safety.mjs"
 import { recommended as resilienceRecommended, rules as resilienceRules } from "./resilience.mjs"
 import { recommended as schemaAuthorityRecommended, rules as schemaAuthorityRules } from "./schema-authority.mjs"
 import { recommended as sizeBudgetRecommended, rules as sizeBudgetRules } from "./size-budget.mjs"
+import { recommended as specNoSkipRecommended, rules as specNoSkipRules } from "./spec-no-skip.mjs"
 import { recommended as specQualityRecommended, rules as specQualityRules } from "./spec-quality.mjs"
 import { recommended as suppressionRecommended, rules as suppressionRules } from "./suppression.mjs"
 import { recommended as temporalRecommended, rules as temporalRules } from "./temporal.mjs"
@@ -73,10 +75,12 @@ const CONTRIBUTIONS = [
     { law: "module-shape", rules: moduleShapeRules, recommended: moduleShapeRecommended },
     { law: "naming", rules: namingRules, recommended: namingRecommended },
     { law: "observability", rules: observabilityRules, recommended: observabilityRecommended },
+    { law: "operations", rules: operationsRules, recommended: operationsRecommended },
     { law: "query-safety", rules: querySafetyRules, recommended: querySafetyRecommended },
     { law: "resilience", rules: resilienceRules, recommended: resilienceRecommended },
     { law: "schema-authority", rules: schemaAuthorityRules, recommended: schemaAuthorityRecommended },
     { law: "size-budget", rules: sizeBudgetRules, recommended: sizeBudgetRecommended },
+    { law: "spec-no-skip", rules: specNoSkipRules, recommended: specNoSkipRecommended },
     { law: "spec-quality", rules: specQualityRules, recommended: specQualityRecommended },
     { law: "suppression", rules: suppressionRules, recommended: suppressionRecommended },
     { law: "temporal", rules: temporalRules, recommended: temporalRecommended },

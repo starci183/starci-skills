@@ -75,13 +75,13 @@ status:
       wakes ask for one full re-read and an ack; nothing is gated for it. Every Kernel wake carries the same
       `Runtime rev <short-sha>` sentence (wake-delivery.mjs withWakeIdentity, before the seat identity)
     autopilot: >-
-      {on, source, ruling?, provisional[{dispatchId, opId, jobId, class, record, receiptPath, label: 'tự nhận tạm', at}],
+      {on, source, ruling?, provisional[{dispatchId, opId, jobId, class, record, receiptPath, label: 'self-accepted provisionally', at}],
       deferred[{jobId, opId, reason, incidentId?, since}], deferredToHandover[{key, dispatchId?, jobId?, opId, deferClass:
       credential|real-money|shared-system|owner-decision|review, classes[], fields{files, vars}, stubPath, owed, record?,
       reason?}], supervisorGates[{incidentId, opId, holds[], since}], budget{used, caps, exceeded[]}, checklist?{due, jobId,
       items}, sweep?} (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish;
       runtimes.yaml allocation.autopilot). Status runs the autopilot sweep before projecting (api autopilot --sweep). Under
-      autopilot: legs[].color adds green-provisional (label "tự nhận tạm": green resting on a provisional acceptance) and
+      autopilot: legs[].color adds green-provisional (label "self-accepted provisionally": green resting on a provisional acceptance) and
       deferred; queued[].queuedBecause adds supervisor-gate, deferred and deferred-to-handover (a live proof waiting for
       the handover credential checklist); awaitingOwner[].answer adds deferred-to-handover (waits on nobody); frontier
       state supervisor-wait (not actionable) when only supervisor gates hold what is left

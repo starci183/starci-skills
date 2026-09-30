@@ -5,7 +5,7 @@ contract-release:
     every live workflows row (archived_at null, phase not finished) or --workflow; their contract-release events,
     jobs and contracts rows
   writes: >-
-    Owner ruling 2026-09-28 ("Đóng băng luật vẽ"): the release point of a frozen op family. Per workflow whose
+    Owner ruling 2026-09-28 ("Freeze the drawing rules"): the release point of a frozen op family. Per workflow whose
     family changes are still frozen (batched, landed after the workflow was created, never released there): one
     contract-release event {family, batch, changes[], by, reason, runtimeSha, owedBefore, owedAfter, restamped[],
     dropped[]} (entity contract/<family>). After it a new leg carries the released changes (dispatch withholds

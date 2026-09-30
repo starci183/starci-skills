@@ -8,7 +8,6 @@
   },
   "include": [
     "next-env.d.ts",
-    "../../vitest.setup.ts",
     "../../packages/shared/src/**/*.d.ts",
     "../../packages/shared/src/**/*.ts",
     "../../packages/shared/src/**/*.tsx",

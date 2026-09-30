@@ -62,6 +62,9 @@ test("a DomainError subclass is declared only in errors/<capability>.error.ts of
             { filename: at("src/tests/world/test-world.error.ts"), code: `${ERR_HEAD}export class TestWorldError extends DomainError<PlanErrorCode> {}` },
             // the declaration of DomainError itself
             { filename: at("src/modules/platform/errors/domain-error.ts"), code: "export abstract class DomainError<C extends string> extends Error { readonly code!: C }" },
+            // a spec-local sample subclass of the base is a test double, not an error family
+            { filename: at("src/modules/platform/primitives/outcome.mapper.spec.ts"), code: `${ERR_HEAD}class SampleError extends DomainError<PlanErrorCode> {}
+export {}` },
             // a class that is not an error
             { filename: SERVICE, code: "class PlanService {}" },
             // a class named ...Error that is not an Error subtype is not judged by its name
@@ -77,6 +80,10 @@ test("a DomainError subclass is declared only in errors/<capability>.error.ts of
             { filename: at("src/tests/world/kit/poll.ts"), code: `${ERR_HEAD}export class TestWorldError extends DomainError<PlanErrorCode> {}`, errors: [{ messageId: "place" }] },
             { filename: at("src/tests/world/fakes/x/test-world.error.ts"), code: `${ERR_HEAD}export class TestWorldError extends DomainError<PlanErrorCode> {}`, errors: [{ messageId: "place" }] },
             { filename: at("src/tests/e2e/flows/x.e2e-spec.ts"), code: `${ERR_HEAD}class TestWorldError extends DomainError<PlanErrorCode> {}`, errors: [{ messageId: "place" }] },
+            // in a unit spec the sample class stays local: exported, it is a second error family
+            { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: `${ERR_HEAD}export class SampleError extends DomainError<PlanErrorCode> {}`, errors: [{ messageId: "place" }] },
+            { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: `${ERR_HEAD}class SampleError extends DomainError<PlanErrorCode> {}
+export { SampleError }`, errors: [{ messageId: "place" }] },
             // right folder, wrong file name for the owner
             {
                 filename: at("src/modules/domain/plan/errors/other.error.ts"),

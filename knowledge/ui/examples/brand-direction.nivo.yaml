@@ -432,22 +432,22 @@ direction:
         - Badge
       tones:
         success:
-          - Đang chạy
-          - Thành công
-          - Đã cấp phát
-          - Đã xác minh
+          - Running
+          - Succeeded
+          - Provisioned
+          - Verified
         warning:
-          - Cần chú ý
-          - Thiếu khả năng
-          - Sắp hết hạn
+          - Needs attention
+          - Missing capability
+          - Expiring soon
         danger:
-          - Lỗi
-          - Thất bại
-          - Đã dừng
+          - Error
+          - Failed
+          - Stopped
         neutral:
-          - Bản nháp
-          - Chưa cấp phát
-          - Đang tắt
+          - Draft
+          - Not provisioned
+          - Off
       never:
         - an info tone (not published)
         - a badge on version, region, owner or counts
@@ -461,7 +461,7 @@ direction:
         short stub; the capability ratio is the segmented Meter (owner's stated choice 2026-09-27, DNA
         `Meter segments` since grammar 0.5.2) whose h-1 (4px) track's equal segments divide that full
         width with small gaps;
-        capability names as neutral Badges beneath; an off capability reads "<tên> · đang tắt"
+        capability names as neutral Badges beneath; an off capability reads "<name> · off"
       never:
         - Progress for a ratio
         - a hand-made bar
@@ -502,7 +502,7 @@ direction:
         - identity - neutral IconTile md, name, muted version, overflow
         - capability - the meter
         - activity - metrics, value 16/24 semibold over a muted unit
-        - action - muted update time, outline Mở with an end arrow, ghost Cấu hình
+        - action - muted update time, outline Open with an end arrow, ghost Configure
       rules:
         - at most three hairlines
         - equal-height peers
@@ -543,7 +543,7 @@ direction:
       proposals:
         - component: SurfaceCard
           variant: artworkBand
-          summary: The ink artwork band - accepted by the owner 2026-09-27 ("thêm hết") and implemented in
+          summary: The ink artwork band - accepted by the owner 2026-09-27 ("add all of it") and implemented in
             @starci/grammar 0.6.0 as SurfaceCard treatment="ink" with the artwork slot
           status: accepted
         - component: OrbitMotif
@@ -576,9 +576,9 @@ direction:
       - Responsibility
       - Evidence
     translate:
-      Runtime: Môi trường chạy
-      capability: khả năng
-      installation: bản cài đặt
+      Runtime: Execution environment
+      capability: ability
+      installation: installed copy
     oneNamePerObject: true
     noInternalIds:
       - workspace slugs
@@ -588,11 +588,11 @@ direction:
       - facet names
       - enum values
     time:
-      inCard: 09:58, 26 thg 9
-      pageSource: Xác minh lúc 10:00, 26 thg 9, 2026 (GMT+7)
+      inCard: 09:58, Sep 26
+      pageSource: Verified at 10:00, Sep 26, 2026 (GMT+7)
       relative: a supplement only, never alone
     sentences: one idea - what happened, then what to do; no exclamation marks, no emoji, no superlatives
-    claims: only receiver-confirmed results are Thành công
+    claims: only receiver-confirmed results are Succeeded
   antiPatterns:
     - id: A1
       seen: r1
@@ -836,13 +836,13 @@ direction:
       status: ruled
       ruling: "black - the brand ink #040d1c is the main colour (accent: primary buttons, meters, emphasis);
         red #e3001f only for artwork/mascot and danger"
-      receipt: "owner, desktop chat 2026-09-27 - 'chốt' on 'chốt màu chủ đạo đen vào brand Nivo' (owner-rulings.yaml
+      receipt: "owner, desktop chat 2026-09-27 - 'lock it' on 'lock the main black colour into the Nivo brand' (owner-rulings.yaml
         nivo-main-colour-ink). Owed: nivo-fe binds --nivo-accent to #040d1c with accent-foreground #fff, and
         brand.decide records it in the Nivo brand record colour section"
   conflicts:
     - id: D1
-      topic: a red per-card Mở
-      resolution: TASTE-5 case-1 wins over ACCENT-1 case-4 - Mở is outline; an owner ruling is needed to
+      topic: a red per-card Open
+      resolution: TASTE-5 case-1 wins over ACCENT-1 case-4 - Open is outline; an owner ruling is needed to
         change it
     - id: D2
       topic: mobile primary reach

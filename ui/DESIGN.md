@@ -1,6 +1,6 @@
 # StarCi Operations Center — visual language
 
-The interface is a read-only operations product. It keeps the operational story visible and gives technical detail a consistent home in **Nâng cao**. HeroUI v3 supplies the interactive primitives (Button, Card, Chip, Input, ProgressBar, Modal and Table); the shared `components/ui` adapters keep the product's density and semantic status system. The blue logo in `public/logos/starci-next-blue.png` is based on the StarCiNext mark. The visual direction reference is `D:/starci-tmp/hfs/f4-handover/ui-purify/visual-direction.png`; its example data is illustrative only.
+The interface is a read-only operations product. It keeps the operational story visible and gives technical detail a consistent home in its "Advanced" section (Vietnamese label). HeroUI v3 supplies the interactive primitives (Button, Card, Chip, Input, ProgressBar, Modal and Table); the shared `components/ui` adapters keep the product's density and semantic status system. The blue logo in `public/logos/starci-next-blue.png` is based on the StarCiNext mark. The visual direction reference is `D:/starci-tmp/hfs/f4-handover/ui-purify/visual-direction.png`; its example data is illustrative only.
 
 ## Tokens
 
@@ -15,7 +15,7 @@ The interface is a read-only operations product. It keeps the operational story 
 
 - **Page header:** optional quiet breadcrumb, one title, one descriptive line, then actions or facts. One primary status pill is enough in a header; related counts appear as plain secondary text.
 - **Card:** one surface and one solid border. Inner groups use spacing or a hairline. A nested card is flattened.
-- **Nâng cao:** inline uses a solid top hairline; standalone card uses one outer surface. Its summary is a compact preview, never an extra status chip.
+- **Advanced (Vietnamese label):** inline uses a solid top hairline; standalone card uses one outer surface. Its summary is a compact preview, never an extra status chip.
 - **Status pill:** small dot, short label, semantic ink and soft background. Every other fact in a row is quiet text.
 - **Table/list:** 44px header, 48px body rows, neutral header surface, no zebra fill, subtle hover, tabular numerals, truncation with title where needed. Mobile lists stack label and value without page overflow; long prose uses a full-width field.
 - **Drawer:** one bounded surface; header and body have consistent padding. Inner sections are separated by space, not more borders.

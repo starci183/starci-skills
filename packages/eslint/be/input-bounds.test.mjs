@@ -18,7 +18,7 @@ const SERVICE = at("src/modules/domain/plan/plan.service.ts")
 const SPEC = at("src/features/plan/transport/http/dto/create-plan.request.spec.ts")
 
 const IMPORTS =
-    "import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, ValidateNested } from 'class-validator'\nimport { Type } from 'class-transformer'\nenum Tier { Free = 'free', Paid = 'paid' }\ninterface Address { street: string }\n"
+    "import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min, ValidateNested } from 'class-validator'\nimport { Type } from 'class-transformer'\nenum Tier { Free = 'free', Paid = 'paid' }\ninterface Address { street: string }\n"
 
 test("every rule this law declares is exported under its published name", () => {
     for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -35,6 +35,8 @@ test("R42: every property of an input class is validated and bounded by its type
             { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @IsOptional() @IsEnum(Tier) tier?: Tier }` },
             { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @IsArray() @ArrayMaxSize(10) ids!: Array<number> }` },
             { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @ValidateNested() @Type(() => Address) address!: Address }` },
+            // a closed set of literals is bounded by its membership validator, no length bound is owed
+            { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @IsIn(["paid", "failed"]) status!: "paid" | "failed" }` },
             // a validator imported under an alias still counts
             { filename: REQUEST, code: "import { IsString as Str, MaxLength as Max } from 'class-validator'\nexport class CreatePlanRequest { @Str() @Max(5) name!: string }" },
             // a GraphQL input or args class in a dto folder
@@ -58,6 +60,9 @@ test("R42: every property of an input class is validated and bounded by its type
             // the type decides, not the field name: `title`, `code` and `description` all owe a bound
             { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @IsString() title!: string; @IsString() code!: string; @IsString() description!: string }`, errors: [{ messageId: "string" }, { messageId: "string" }, { messageId: "string" }] },
             { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @IsOptional() @IsString() name?: string }`, errors: [{ messageId: "string" }] },
+            // membership bounds a literal set only: a free string with @IsIn, or a literal set with only @IsString, stays open
+            { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @IsIn(["a", "b"]) name!: string }`, errors: [{ messageId: "string" }] },
+            { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @IsString() status!: "paid" | "failed" }`, errors: [{ messageId: "string" }] },
             { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @IsString() @MaxLength(5) tier!: Tier }`, errors: [{ messageId: "enum" }] },
             { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @IsArray() ids!: Array<number> }`, errors: [{ messageId: "array" }] },
             { filename: REQUEST, code: `${IMPORTS}export class CreatePlanRequest { @IsArray() ids!: ReadonlyArray<string> }`, errors: [{ messageId: "array" }] },

@@ -19,11 +19,11 @@ Key order is reading order: `headline` is the first key.
 
 ```json
 {
-  "headline": "Op báo xong nhưng runtime chạy lại check starci-validate-strict-scope-record thì đỏ (TARGET_MISSING).",
+  "headline": "The op reported done, but the runtime re-ran the check starci-validate-strict-scope-record and it is red (TARGET_MISSING).",
   "state": "failed",
-  "cause": "Thư mục tạm của op (starci-job-scratch) đã bị xóa khi op nộp report, nên lúc runtime chạy lại đường dẫn đó không còn. Đường dẫn cần kiểm tra không tồn tại: ...",
-  "disagreement": "Op khai check starci-validate-strict-scope-record thoát 0 (xanh) khi chạy trong thư mục làm việc của nó; runtime chạy lại sau khi report được nộp thì thoát 1: ...",
-  "next": "Kernel sẽ giao lại op (lần 3/5, tuyến rejected-report-retries 1/2).",
+  "cause": "The op's temporary directory (starci-job-scratch) was deleted when the op submitted its report, so when the runtime re-ran the check that path no longer existed. The path to validate does not exist: ...",
+  "disagreement": "The op stated that the check starci-validate-strict-scope-record exited 0 (green) when run in its working directory; the runtime re-ran it after the report was submitted and it exited 1: ...",
+  "next": "The Kernel will re-dispatch the op (attempt 3/5, rejected-report-retries route 1/2).",
   "owner": "op-retry",
   "codes": ["TARGET_MISSING"],
   "refs": [
@@ -56,9 +56,9 @@ A flat map keyed by code (UPPER_SNAKE finding codes, kebab-case reasons, and the
 ```yaml
 TARGET_MISSING:
   title: "Validation target does not exist"      # English
-  title_vi: "Đường dẫn cần kiểm tra không tồn tại"
-  meaning_vi: "Lệnh kiểm tra được chỉ vào một tệp hoặc thư mục không có."
-  causes_vi: ["Sai đường dẫn", "..."]             # non-empty list
+  title_vi: "The path to validate does not exist"
+  meaning_vi: "The validation command points at a file or directory that does not exist."
+  causes_vi: ["Wrong path", "..."]             # non-empty list
   nextStep_vi: "..."                              # what the runtime/Kernel does or what must happen
   owner: op-retry                                 # op-retry | other-op:<op> | runtime-core | supervisor | owner
   kind: input-invalid   # check-finding | settle-reason | dispatch-refusal | blocker | check-status | verb-refusal | runtime-fault | input-invalid
@@ -89,7 +89,7 @@ goes to `scripts/checks/failure-codes.not-codes` with the reason.
    - `dispatch-rejected` (lane/orphan-attempt): the attempt ends `end_state='requeued'` (nothing ran) or `'effect-unknown'` (a
      worker may have started); its `settle_json` carries `{reason:'dispatch-rejected', step, signal, detail}`.
      `v_attempt_state.native` is `rejected` for requeued + settle reason dispatch-rejected (a plain requeue after a dead worker
-     stays `requeued`, `effect-unknown` stays as is); `v_op_history.ui = 'rejected'` (neutral, "Bị từ chối khi giao"). The why `state` is `dispatch-rejected` (`requeued` for an
+     stays `requeued`, `effect-unknown` stays as is); `v_op_history.ui = 'rejected'` (neutral, a Vietnamese "rejected on delivery" label). The why `state` is `dispatch-rejected` (`requeued` for an
      unknown effect); `next` says it is not counted.
    The two ui values are computed by the view: `v_op_history.ui` is `awaiting-owner` / `rejected` for those two natives and
    `ui_state_map` for every other one (`ui_states` is unchanged). Migration 0004 (`0004-attempt-why`, user_version 4, run by
@@ -99,10 +99,10 @@ goes to `scripts/checks/failure-codes.not-codes` with the reason.
    `kernel-proposal` (entity_type `kernel-proposal`, payload `{id, title, evidence, files, tier, status}`). Reader:
    `kernelNotesOf(ledgerDbOrHandle, workflowId, {limit})` returns `[{kind:'decision'|'proposal', id, at, status, headline, ...}]`,
    oldest first (decision status `open|kept|reverted`). `api status` returns it as `kernelNotes[]`.
-5. **Does `dispatch-rejected` count against `work_units.tries` ("lần n/5")? No.** `work_units.tries` counts JOBS of the
+5. **Does `dispatch-rejected` count against `work_units.tries` (the Vietnamese "attempt n/5" display)? No.** `work_units.tries` counts JOBS of the
    unit (`jobs.try_no`), never attempts; a refused launch keeps its job (it goes back to `ready`) and opens no new job, so
    `tries` does not move. The `dispatches` counter is given back by lane/orphan-attempt's `endRejectedAttempt`. `why.next`
-   for this state says "Không tính vào số lần thử". A retry N/budget in a why is `try_no + 1` over `work_units.try_budget`.
+   for this state says, in Vietnamese, that it is not counted toward the attempts. A retry N/budget in a why is `try_no + 1` over `work_units.try_budget`.
 
 ## Read surface
 

@@ -6,6 +6,9 @@ const tester = typedTester()
 const SERVICE = at("src/modules/domain/order/order.service.ts")
 const SPEC = at("src/modules/domain/order/order.service.spec.ts")
 const MIGRATION = at("src/modules/domain/order/persistence/migrations/1770000000000-create-order.ts")
+const EM = 'import type { EntityManager } from "typeorm"\n'
+const MIGRATE_APP = at("apps/migrate/src/migrate.ts")
+const WORLD_SETUP = at("src/tests/world/global-setup.ts")
 const PERSISTED = at("src/modules/domain/order/persistence/order.sql.ts")
 const TYPEORM = 'import { DataSource } from "typeorm"\nimport type { DataSourceOptions } from "typeorm"\nimport { TypeOrmModule } from "@nestjs/typeorm"\ndeclare const options: DataSourceOptions\ndeclare const dataSource: DataSource\n'
 
@@ -16,6 +19,23 @@ test("the schema is decided by migrations, never by the running process", () => 
             { filename: SERVICE, code: `${TYPEORM}const module = TypeOrmModule.forRoot({ type: "postgres", synchronize: false })` },
             { filename: SERVICE, code: `${TYPEORM}const module = TypeOrmModule.forRootAsync({ useFactory: () => ({ type: "postgres", synchronize: false }) })` },
             { filename: SERVICE, code: "const options = { entities: [PlanEntity], migrations: [CreatePlan] }" },
+            // a typed double of a DataSource overrides operations by key: `synchronize` there is a method, not the config flag
+            { filename: SERVICE, code: `${TYPEORM}declare function mock<T>(overrides?: Partial<T>): T
+const ds = mock<DataSource>({ manager: undefined, synchronize: undefined, dropDatabase: undefined })` },
+            { filename: SERVICE, code: `${TYPEORM}declare function mock<T>(overrides?: Partial<T>): T
+const ds = mock<DataSource>({ manager: undefined })` },
+            // migrations run in apps/migrate and in the test world that runs its bootstrap
+            { filename: MIGRATE_APP, code: `${TYPEORM}await dataSource.runMigrations()` },
+            { filename: WORLD_SETUP, code: `${TYPEORM}await dataSource.runMigrations()` },
+            // entity options without the switch, dropSchema stated false, a schema read
+            { filename: SERVICE, code: `import { Entity } from "typeorm"\n@Entity({ name: "plan" })\nexport class PlanEntity {}\n@Entity("plan_item")\nexport class PlanItemEntity {}` },
+            { filename: SERVICE, code: `${TYPEORM}const ds = new DataSource({ type: "postgres", synchronize: false, dropSchema: false })` },
+            // a lifecycle hook that only reads, and one that writes inside apps/migrate (the seeding home)
+            { filename: SERVICE, code: `${TYPEORM}${EM}export class Probe { constructor(private readonly manager: EntityManager) {} async onModuleInit(): Promise<void> { await this.manager.query("SELECT 1"); await this.manager.find(class A {}) } }` },
+            { filename: MIGRATE_APP, code: `${TYPEORM}${EM}export class Seeder { constructor(private readonly manager: EntityManager) {} async onModuleInit(): Promise<void> { await this.manager.save({}) } }` },
+            // a write outside a lifecycle hook is a handler's business, and a save on a value that is not typeorm's manager is not a row write
+            { filename: SERVICE, code: `${TYPEORM}${EM}export class Svc { constructor(private readonly manager: EntityManager) {} async place(): Promise<void> { await this.manager.save({}) } }` },
+            { filename: SERVICE, code: `export class Store { save(): void {} }\nexport class Boot { constructor(private readonly store: Store) {} onModuleInit(): void { this.store.save() } }` },
             // DDL is written in migrations, whatever the case of the keywords
             { filename: MIGRATION, code: "await queryRunner.query('CREATE TABLE plan (id uuid primary key)')" },
             { filename: MIGRATION, code: "await queryRunner.query(`ALTER TABLE plan ADD COLUMN x int`)" },
@@ -36,6 +56,28 @@ test("the schema is decided by migrations, never by the running process", () => 
             { filename: SERVICE, code: "const options = { synchronize: env.DB_SYNC === 'true' }", errors: [{ messageId: "synchronize" }] },
             { filename: SERVICE, code: "const synchronize = false; const o = { synchronize }", errors: [{ messageId: "synchronize" }] },
             { filename: SERVICE, code: `${TYPEORM}await dataSource.synchronize()`, errors: [{ messageId: "synchronizeCall" }] },
+            { filename: SERVICE, code: `${TYPEORM}await dataSource.dropDatabase()`, errors: [{ messageId: "synchronizeCall" }] },
+            // a typed options object stays refused when it turns synchronize on, and a DataSource double is only exempt by its contextual type
+            { filename: SERVICE, code: `${TYPEORM}declare const options: DataSourceOptions
+const o: DataSourceOptions = { type: "postgres", synchronize: true }`, errors: [{ messageId: "synchronize" }] },
+            // migrations run in apps/migrate only
+            { filename: SERVICE, code: `${TYPEORM}await dataSource.runMigrations()`, errors: [{ messageId: "runMigrations" }] },
+            { filename: SERVICE, code: `${TYPEORM}await dataSource.undoLastMigration()`, errors: [{ messageId: "runMigrations" }] },
+            { filename: SPEC, code: `${TYPEORM}await dataSource.runMigrations()`, errors: [{ messageId: "runMigrations" }] },
+            // dropSchema is refused unless it is the literal false
+            { filename: SERVICE, code: `${TYPEORM}const ds = new DataSource({ type: "postgres", synchronize: false, dropSchema: true })`, errors: [{ messageId: "dropSchema" }] },
+            { filename: SERVICE, code: `${TYPEORM}const module = TypeOrmModule.forRoot({ type: "postgres", synchronize: false, dropSchema: process.env.DROP === "1" })`, errors: [{ messageId: "dropSchema" }] },
+            // a schema builder builds the schema from metadata at runtime, resolved by its type
+            { filename: SERVICE, code: `${TYPEORM}const builder = dataSource.createSchemaBuilder()\nawait builder.build()`, errors: [{ messageId: "schemaBuilder" }, { messageId: "schemaBuilder" }] },
+            { filename: SERVICE, code: `${TYPEORM}import type { SchemaBuilder } from "typeorm"\ndeclare const other: SchemaBuilder\nawait other.log()`, errors: [{ messageId: "schemaBuilder" }] },
+            // a per-entity synchronize switch, on or off, is a second authority
+            { filename: SERVICE, code: `import { Entity } from "typeorm"\n@Entity({ name: "plan", synchronize: false })\nexport class PlanEntity {}`, errors: [{ messageId: "entitySynchronize" }] },
+            { filename: SERVICE, code: `import { Entity } from "typeorm"\n@Entity({ synchronize: true })\nexport class PlanEntity {}`, errors: [{ messageId: "entitySynchronize" }] },
+            // a lifecycle hook that writes rows seeds at boot: directly, through a method of the class, through a transaction, through INSERT text
+            { filename: SERVICE, code: `${TYPEORM}${EM}export class Seed { constructor(private readonly manager: EntityManager) {} async onModuleInit(): Promise<void> { await this.manager.save({}) } }`, errors: [{ messageId: "bootSeed" }] },
+            { filename: SERVICE, code: `${TYPEORM}${EM}export class Seed { constructor(private readonly manager: EntityManager) {} async onApplicationBootstrap(): Promise<void> { await this.load() } private async load(): Promise<void> { await this.manager.insert(class A {}, {}) } }`, errors: [{ messageId: "bootSeed" }] },
+            { filename: SERVICE, code: `${TYPEORM}export class Seed { constructor(private readonly ds: DataSource) {} async onModuleInit(): Promise<void> { await this.ds.transaction(async (tx) => { await tx.upsert(class A {}, {}, ["id"]) }) } }`, errors: [{ messageId: "bootSeed" }] },
+            { filename: SERVICE, code: `${TYPEORM}${EM}export class Seed { constructor(private readonly manager: EntityManager) {} async onModuleInit(): Promise<void> { await this.manager.query("INSERT INTO plan (id) VALUES (1)") } }`, errors: [{ messageId: "bootSeed" }] },
             // migrationsRun is banned in every form, false included
             { filename: SERVICE, code: "const options = { migrationsRun: true }", errors: [{ messageId: "migrationsRun" }] },
             { filename: SERVICE, code: "const options = { migrationsRun: false }", errors: [{ messageId: "migrationsRun" }] },
@@ -47,6 +89,15 @@ test("the schema is decided by migrations, never by the running process", () => 
             { filename: PERSISTED, code: "await this.manager.query('DROP TABLE plan')", errors: [{ messageId: "ddl" }] },
             { filename: SPEC, code: "await manager.query('DROP TABLE plan')", errors: [{ messageId: "ddl" }] },
             { filename: at("src/tests/fixtures/database.ts"), code: "await manager.query('CREATE SCHEMA test')", errors: [{ messageId: "ddl" }] },
+            // DDL beyond tables, in any SQL text outside a migration
+            { filename: SERVICE, code: "await manager.query('CREATE SCHEMA IF NOT EXISTS audit')", errors: [{ messageId: "ddl" }] },
+            { filename: SERVICE, code: "await manager.query(`ALTER TYPE plan_kind ADD VALUE 'gold'`)", errors: [{ messageId: "ddl" }] },
+            { filename: SERVICE, code: "await manager.query('CREATE EXTENSION IF NOT EXISTS pgcrypto')", errors: [{ messageId: "ddl" }] },
+            { filename: SERVICE, code: "const s = 'DROP INDEX plan_x'", errors: [{ messageId: "ddl" }] },
+            { filename: SERVICE, code: "const s = 'CREATE TRIGGER t BEFORE UPDATE ON plan FOR EACH ROW EXECUTE FUNCTION f()'", errors: [{ messageId: "ddl" }] },
+            { filename: SERVICE, code: "const s = 'CREATE OR REPLACE FUNCTION f() RETURNS trigger AS $$ BEGIN RETURN NEW; END $$ LANGUAGE plpgsql'", errors: [{ messageId: "ddl" }] },
+            { filename: SERVICE, code: "const s = 'ALTER TABLE plan ADD CONSTRAINT plan_x UNIQUE (x)'", errors: [{ messageId: "ddl" }] },
+            { filename: SERVICE, code: "const s = 'ALTER TABLE plan DROP CONSTRAINT plan_x'", errors: [{ messageId: "ddl" }] },
             // globs
             { filename: SERVICE, code: "const o = { entities: [__dirname + '/**/*.entity.ts'] }", errors: [{ messageId: "glob" }] },
             { filename: SERVICE, code: "const o = { migrations: ['dist/migrations/*.js'] }", errors: [{ messageId: "glob" }] },

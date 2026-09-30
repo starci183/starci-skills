@@ -29,7 +29,6 @@ test("FORMAT-1: numbers, money and dates go through the next-intl formatter", ()
       { filename: at("apps/web/src/modules/i18n/request.ts"), code: "const f = new Intl.NumberFormat(locale)" },
       // the i18n module of another app is the same slot
       { filename: at("apps/admin/src/modules/i18n/request.ts"), code: "const f = new Intl.NumberFormat(locale)" },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "const s = value.toLocaleString('en-US')" },
     ],
     invalid: [
       // a folder named i18n outside the module slot is not the i18n module

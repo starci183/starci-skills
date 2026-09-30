@@ -16,7 +16,7 @@
  */
 
 import ts from "typescript"
-import { classifyImport, fileOf, isProductSource, isSpecFile, kindOfFile, roleOfFile, slotOfFile, tierOfFile } from "./lib/scope.mjs"
+import { classifyImport, fileOf, isProductSource, kindOfFile, roleOfFile, slotOfFile, tierOfFile } from "./lib/scope.mjs"
 import { typed } from "./lib/types.mjs"
 
 /** The route roles that are client-only by the framework's own rule: `error` and `global-error`. */
@@ -65,7 +65,7 @@ export const useClientOnlyAtBoundary = {
     },
   },
   create(context) {
-    if (isSpecFile(fileOf(context)) || isBoundary(context)) return {}
+    if (isBoundary(context)) return {}
     const slot = routeFill(context)
     return {
       Program(program) {
@@ -114,7 +114,6 @@ export const clientNoServerImport = {
     },
   },
   create(context) {
-    if (isSpecFile(fileOf(context))) return {}
     let client = false
     return {
       Program(program) {
@@ -172,7 +171,6 @@ export const serverModuleMarksServerOnly = {
     },
   },
   create(context) {
-    if (isSpecFile(fileOf(context))) return {}
     const slot = slotOfFile(context)
     if (!slot || ROUTE_FILE_SLOTS.has(slot)) return {}
     // A block or a page is a server or client COMPONENT, not a server module: whether client code reaches the server through it is
@@ -263,7 +261,6 @@ export const noDangerousHtml = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     return {
       JSXAttribute(node) {
         if (node.name.type !== "JSXIdentifier" || node.name.name !== "dangerouslySetInnerHTML") return

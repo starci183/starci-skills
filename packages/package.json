@@ -12,7 +12,7 @@
     "test:fe": "npm test --workspace @starci/eslint-canon-fe",
     "test:be": "npm test --workspace @starci/eslint-canon-be",
     "test:stylelint": "node --test stylelint/*.test.mjs",
-    "test:presets": "node --test tsconfig/*.test.mjs prettier-config/*.test.mjs jest-preset/*.test.mjs vitest-preset/*.test.mjs playwright-preset/*.test.mjs"
+    "test:presets": "node --test tsconfig/*.test.mjs prettier-config/*.test.mjs jest-preset/*.test.mjs"
   },
   "engines": {
     "node": ">=22.13.0"

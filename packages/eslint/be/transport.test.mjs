@@ -65,12 +65,21 @@ test("transport-is-thin: a door injects only the bus, dispatches exactly once an
             { filename: RESOLVER, code: `${BUS}import { toCommand, toView } from "./place.mapper"\n@Resolver() export class R { constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {} @Mutation(() => String) async place(input: string) { const command = toCommand(input); return toView(await this.commandBus.execute(command)) } }` },
             // unwrapOutcome of platform/primitives, resolved by its symbol, sits between the bus and the mapper\n            { filename: RESOLVER, code: `${BUS}import { toView } from "./place.mapper"\n@Resolver() export class R { constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {} @Mutation(() => String) async place() { return toView(unwrapOutcome(await this.commandBus.execute(new Place()), Error)) } }` },\n            // a class with no handler method is not a door (a guard, an interceptor, a plain provider)
             { filename: at(`${T}/http/session.guard.ts`), code: `${BUS}export class G { canActivate(x: number) { if (x > 1) { return true } return x ? Date.now() > 1 : false } }` },
+            // a Nest module wires consumers and jobs into a registry at startup: it is not a door
+            { filename: CONSUMER, code: `${BUS}import { Module } from "@nestjs/common"
+import type { OnModuleInit } from "@nestjs/common"
+interface Registry { add(x: object): void }
+@Module({})
+export class PlanMessageModule implements OnModuleInit { constructor(private readonly registry: Registry) {} onModuleInit(): void { this.registry.add({}) } }` },
             // a DTO class carries decorated fields and no injection
             { filename: DTO, code: `import { Field } from "@nestjs/graphql"\nexport class PlaceInput { @Field() name!: string }` },
             // outside the transport slots the rule is silent
             { filename: DOMAIN, code: `${BUS}export class S { constructor(private readonly em: EntityManager) {} go() { return 1 } }` },
         ],
         invalid: [
+            // the exemption is the Module decorator only: an undecorated class that registers at startup is a consumer with no dispatch
+            { filename: CONSUMER, code: `${BUS}interface Registry { add(x: object): void }
+export class PlanMessageModule { constructor(private readonly registry: Registry) {} onModuleInit(): void { this.registry.add({}) } }`, errors: [{ messageId: "injects" }, { messageId: "none" }, { messageId: "call" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly orders: OrderService, private readonly bus: CommandBus) {} @Mutation(() => String) place() { return this.bus.execute(new Place()) } }`, errors: [{ messageId: "injects" }] },
             { filename: RESOLVER, code: `${BUS}@Resolver() export class R { constructor(private readonly em: EntityManager, private readonly bus: CommandBus) {} @Mutation(() => String) place() { return this.bus.execute(new Place()) } }`, errors: [{ messageId: "injects" }] },
             // property injection

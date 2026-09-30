@@ -5,7 +5,7 @@ description: >-
   engine with its operational controller profile, the harness UI (rebuilt when its sources are newer), tunnels and
   connectors, the Supervisor seat and the Kernel seat of every already-running workflow. It never defines or starts a
   new workflow. Thin wrapper over .claude/scripts/reconciler/start.mjs. Use when the owner or supervisor says start,
-  "khởi động", "bật hết", after a reboot or an Orca restart, or runs /start.
+  "boot up", "turn everything on", after a reboot or an Orca restart, or runs /start.
 user-invocable: true
 ---
 
@@ -45,7 +45,7 @@ Executable: `.claude/scripts/reconciler/start.mjs` (also `node .claude/scripts/r
 3. If Orca is not running, tell the owner, in Vietnamese, to open Orca and run `/start` again. Never launch Orca or any
    other GUI app yourself.
 
-4. Report to the owner in Vietnamese, from the checklist, in this shape: one line "XANH" or "ĐỎ" for the whole host, then
+4. Report to the owner in Vietnamese, from the checklist, in this shape: one line "GREEN" or "RED" for the whole host, then
    every RED row with its one-line fix (copy `fix:`), then the WARN rows in a few words, then the leader and its
    heartbeat age, the mode of each controller, the services (harness UI local and public, tunnel, Telegram, ask gateway),
    the Supervisor seat and every Kernel seat that is not live. Dead op workers are the Job controller's to recover; only

@@ -1,8 +1,8 @@
 id: supervisor-gc
 effectiveAt: '2026-09-28T13:00:00+07:00'
 summary: >-
-  Garbage collection and verified closes (owner 2026-09-28: "sao supervisor không xóa worker, và op đầy rác thế!!!
-  phải có dọn rác chứ"). Ownership: a Kernel closes its own op workers at settle, and the settle receipt's
+  Garbage collection and verified closes (owner 2026-09-28: "why does the supervisor not delete workers, and ops are full of garbage!!!
+  there must be garbage collection"). Ownership: a Kernel closes its own op workers at settle, and the settle receipt's
   terminalClosed now carries `verified` (a terminal still connected after the close is closed again and read back
   through scripts/lib/close-verify.mjs; ok is false until it is proven gone). api finish and api archive close the
   Kernel terminal through closeSelfSafe: inline and verified from another terminal, from the Kernel's own terminal

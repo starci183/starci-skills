@@ -11,8 +11,6 @@ import { NEXT_RESERVED_EXPORTS } from '../../lib/next-contract.mjs';
 export const NEXT_SCRIPT_RULES = Object.freeze([
   'FE_READONLY_PROPS_CONTRACT',
   'FE_SOURCE_NAME_SHAPE',
-  'FE_SPEC_SUBJECT_AND_DESCRIBE',
-  'FE_SPEC_NO_SNAPSHOT',
   'FE_RETURN_TYPE_PROFILE',
   'FE_CLOSED_VOCABULARY_SHAPE',
   'FE_CONTRACT_NAME_SHAPE',
@@ -20,7 +18,6 @@ export const NEXT_SCRIPT_RULES = Object.freeze([
 
 const SOURCE_FILE = /\.(?:ts|tsx)$/i;
 const DECLARATION_FILE = /\.d\.(?:ts|tsx)$/i;
-const SPEC_FILE = /\.spec\.(?:ts|tsx)$/i;
 const NEXT_ROUTE_FILE = /(?:^|\/)app\/(?:.*\/)?(?:default|error|global-error|layout|loading|not-found|page|route|template)\.(?:ts|tsx)$/i;
 const NEXT_HANDLER_EXPORTS = new Set(['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT']);
 const CONTRACT_SUFFIXES = Object.freeze(['Actions', 'Data', 'Labels', 'Mode', 'Props', 'State']);
@@ -218,61 +215,36 @@ function bindingNames(ts, name) {
   return [];
 }
 
-// The describe-able surface of a spec subject:
-//   names    every accepted describe name (static named exports, destructured `export const { A, B } = f()` names,
-//            re-exported names, and the local name of the default export);
-//   own      the subject's OWN statically named exports (no re-export `export { x } from`, no default);
-//   hasDefault / defaultName   the default export and, when it has one, its local name.
-function subjectSurface(ts, source) {
-  const names = new Set();
-  const own = new Set();
-  let hasDefault = false;
-  let defaultName = null;
-  for (const statement of source.statements) {
-    if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
-      hasDefault = true;
-      // `const X = ...; export default X` is how a Next convention file (layout, page) names its one subject.
-      if (ts.isIdentifier(statement.expression)) defaultName = statement.expression.text;
-      continue;
-    }
-    if (ts.isExportDeclaration(statement)) {
-      if (!statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue;
-      for (const element of statement.exportClause.elements) {
-        if (element.name.text === 'default') {
-          hasDefault = true;
-          if (!statement.moduleSpecifier) defaultName = (element.propertyName ?? element.name).text;
-          continue;
-        }
-        names.add(element.name.text);
-        if (!statement.moduleSpecifier && !statement.isTypeOnly && !element.isTypeOnly) own.add(element.name.text);
-      }
-      continue;
-    }
-    if (!exported(ts, statement)) continue;
-    const isDefault = Boolean(ts.getModifiers(statement)?.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword));
-    const statementNames = ts.isVariableStatement(statement)
-      ? statement.declarationList.declarations.flatMap(declaration => bindingNames(ts, declaration.name))
-      : declarationNames(ts, statement);
-    if (isDefault) {
-      hasDefault = true;
-      defaultName = statementNames[0] ?? null;
-      continue;
-    }
-    for (const name of statementNames) { names.add(name); own.add(name); }
-  }
-  if (defaultName) names.add(defaultName);
-  return { names, own, hasDefault, defaultName };
+function importDeclaration(ts, node) {
+  for (let current = node; current; current = current.parent) if (ts.isImportDeclaration(current)) return current;
+  return null;
 }
 
-// Ruling (a): a cross-operation spec may name its describe after the subject MODULE - the file stem
-// ('console.interactions') or the module path relative to src ('modules/api/console').
-function subjectModuleTitles(subjectPath) {
-  const withoutExtension = subjectPath.replace(/\.(?:ts|tsx)$/i, '');
-  const titles = new Set([path.posix.basename(withoutExtension)]);
-  const segments = withoutExtension.split('/');
-  const src = segments.lastIndexOf('src');
-  if (src >= 0 && src < segments.length - 1) titles.add(segments.slice(src + 1).join('/'));
-  return titles;
+function importedBinding(ts, checker, expression, exportedName, moduleName) {
+  if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)) {
+    const namespace = checker.getSymbolAtLocation(expression.expression);
+    const declarations = namespace?.getDeclarations?.() ?? [];
+    return expression.name.text === exportedName && declarations.some(declaration => {
+      const statement = importDeclaration(ts, declaration);
+      return (ts.isNamespaceImport(declaration) || (ts.isImportClause(declaration) && declaration.name === expression.expression))
+        && statement?.moduleSpecifier.text === moduleName;
+    });
+  }
+  if (!ts.isIdentifier(expression)) return false;
+  const symbol = checker.getSymbolAtLocation(expression);
+  if (!symbol) return expression.text === exportedName;
+  const declarations = symbol.getDeclarations?.() ?? [];
+  if (declarations.length > 0 && declarations.every(declaration => declaration.getSourceFile().isDeclarationFile)) return expression.text === exportedName;
+  return declarations.some(declaration => {
+    const statement = importDeclaration(ts, declaration);
+    return ts.isImportSpecifier(declaration) && (declaration.propertyName?.text ?? declaration.name.text) === exportedName
+      && statement?.moduleSpecifier.text === moduleName;
+  });
+}
+
+function reactComponentWrapper(ts, checker, node) {
+  if (!(ts.isArrowFunction(node) || ts.isFunctionExpression(node)) || !ts.isCallExpression(node.parent)) return false;
+  return ['forwardRef', 'memo'].some(name => importedBinding(ts, checker, node.parent.expression, name, 'react'));
 }
 
 function isFunctionInitializer(ts, initializer) {
@@ -321,200 +293,6 @@ function checkSourceNames(ts, source, relative, violations, mandated = null) {
         message: `Frozen module value ${name} must use UPPER_SNAKE; class-name role exports remain …ClassName/…ClassNames.` });
     }
   }
-}
-
-function siblingSubject(repository, relative) {
-  const stem = relative.replace(/\.spec\.(ts|tsx)$/i, '');
-  for (const extension of ['.ts', '.tsx']) {
-    const candidate = `${stem}${extension}`;
-    if (fs.existsSync(path.join(repository, ...candidate.split('/')))) return candidate;
-  }
-  return null;
-}
-
-function importDeclaration(ts, node) {
-  for (let current = node; current; current = current.parent) if (ts.isImportDeclaration(current)) return current;
-  return null;
-}
-
-function importedBinding(ts, checker, expression, exportedName, moduleName = 'vitest') {
-  if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)) {
-    const namespace = checker.getSymbolAtLocation(expression.expression);
-    const declarations = namespace?.getDeclarations?.() ?? [];
-    return expression.name.text === exportedName && declarations.some(declaration => {
-      const statement = importDeclaration(ts, declaration);
-      return (ts.isNamespaceImport(declaration) || (ts.isImportClause(declaration) && declaration.name === expression.expression))
-        && statement?.moduleSpecifier.text === moduleName;
-    });
-  }
-  if (!ts.isIdentifier(expression)) return false;
-  const symbol = checker.getSymbolAtLocation(expression);
-  if (!symbol) return expression.text === exportedName;
-  const declarations = symbol.getDeclarations?.() ?? [];
-  if (declarations.length > 0 && declarations.every(declaration => declaration.getSourceFile().isDeclarationFile)) return expression.text === exportedName;
-  return declarations.some(declaration => {
-    const statement = importDeclaration(ts, declaration);
-    return ts.isImportSpecifier(declaration) && (declaration.propertyName?.text ?? declaration.name.text) === exportedName
-      && statement?.moduleSpecifier.text === moduleName;
-  });
-}
-
-function reactComponentWrapper(ts, checker, node) {
-  if (!(ts.isArrowFunction(node) || ts.isFunctionExpression(node)) || !ts.isCallExpression(node.parent)) return false;
-  return ['forwardRef', 'memo'].some(name => importedBinding(ts, checker, node.parent.expression, name, 'react'));
-}
-
-function describeInvocation(ts, checker, call) {
-  if (importedBinding(ts, checker, call.expression, 'describe')) return call.arguments[0] ?? null;
-  if (ts.isPropertyAccessExpression(call.expression) && ['only', 'skip', 'todo'].includes(call.expression.name.text)
-    && importedBinding(ts, checker, call.expression.expression, 'describe')) return call.arguments[0] ?? null;
-  if (ts.isCallExpression(call.expression) && ts.isPropertyAccessExpression(call.expression.expression)
-    && call.expression.expression.name.text === 'each'
-    && importedBinding(ts, checker, call.expression.expression.expression, 'describe')) return call.arguments[0] ?? null;
-  return undefined;
-}
-
-function describeCalls(ts, checker, source) {
-  const calls = [];
-  for (const statement of source.statements) {
-    if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression)) continue;
-    const call = statement.expression;
-    const title = describeInvocation(ts, checker, call);
-    if (title !== undefined) calls.push({ call, title });
-  }
-  return calls;
-}
-
-function describeName(ts, node) {
-  if (ts.isStringLiteralLike(node)) return node.text;
-  if (ts.isPropertyAccessExpression(node) && node.name.text === 'name' && ts.isIdentifier(node.expression)) return node.expression.text;
-  return null;
-}
-
-const TEST_MODIFIERS = new Set(['concurrent', 'fails', 'only', 'sequential', 'skip', 'todo']);
-const TEST_TABLES = new Set(['each', 'for', 'runIf', 'skipIf']);
-
-// An it/test block bound to Vitest, with its modifier and table forms (it.only, test.each(rows)(...), it.skipIf(c)(...)).
-function testInvocation(ts, checker, call) {
-  let callee = call.expression;
-  if (ts.isCallExpression(callee) && ts.isPropertyAccessExpression(callee.expression) && TEST_TABLES.has(callee.expression.name.text)) {
-    callee = callee.expression.expression;
-  }
-  while (ts.isPropertyAccessExpression(callee) && TEST_MODIFIERS.has(callee.name.text)) callee = callee.expression;
-  return ['it', 'test'].some(name => importedBinding(ts, checker, callee, name));
-}
-
-function valueSymbol(ts, checker, symbol) {
-  const target = unalias(ts, checker, symbol);
-  return Boolean(target && (target.flags & ts.SymbolFlags.Value) !== 0);
-}
-
-// The distinct value exports of the subject module that the it/test blocks under one describe reference -
-// through named imports (by exported name), the default import ('default') or a namespace import (ns.name).
-function exercisedSubjectExports(ts, checker, call, subject) {
-  const subjectFile = canonicalFile(subject.fileName);
-  const fromSubject = new Map();
-  const importsSubject = statement => {
-    if (!fromSubject.has(statement)) {
-      const moduleSymbol = checker.getSymbolAtLocation(statement.moduleSpecifier);
-      const file = moduleSymbol?.valueDeclaration ?? moduleSymbol?.declarations?.[0];
-      fromSubject.set(statement, Boolean(file && ts.isSourceFile(file) && canonicalFile(file.fileName) === subjectFile));
-    }
-    return fromSubject.get(statement);
-  };
-  const exercised = new Set();
-  const record = identifier => {
-    const parent = identifier.parent;
-    const symbol = parent && ts.isShorthandPropertyAssignment(parent) && parent.name === identifier
-      ? checker.getShorthandAssignmentValueSymbol(parent) : checker.getSymbolAtLocation(identifier);
-    for (const declaration of symbol?.getDeclarations?.() ?? []) {
-      const statement = importDeclaration(ts, declaration);
-      if (!statement || statement.importClause?.isTypeOnly || !importsSubject(statement)) continue;
-      if (ts.isImportSpecifier(declaration) && !declaration.isTypeOnly && valueSymbol(ts, checker, symbol)) {
-        exercised.add((declaration.propertyName ?? declaration.name).text);
-      } else if (ts.isImportClause(declaration) && valueSymbol(ts, checker, symbol)) {
-        exercised.add('default');
-      } else if (ts.isNamespaceImport(declaration) && parent && ts.isPropertyAccessExpression(parent) && parent.expression === identifier
-        && valueSymbol(ts, checker, checker.getSymbolAtLocation(parent.name))) {
-        exercised.add(parent.name.text);
-      }
-    }
-  };
-  const visitIdentifiers = node => {
-    if (ts.isIdentifier(node)) record(node);
-    ts.forEachChild(node, visitIdentifiers);
-  };
-  const visitTests = node => {
-    if (ts.isCallExpression(node) && testInvocation(ts, checker, node)) {
-      for (const argument of node.arguments) visitIdentifiers(argument);
-      return;
-    }
-    ts.forEachChild(node, visitTests);
-  };
-  for (const argument of call.arguments.slice(1)) visitTests(argument);
-  return exercised;
-}
-
-function checkSpecSubject(ts, checker, parsed, source, relative, repository, violations, errors) {
-  if (!SPEC_FILE.test(relative)) return;
-  const subjectPath = siblingSubject(repository, relative);
-  if (!subjectPath || !parsed.has(subjectPath)) {
-    errors.push({ ruleId: 'FE_SPEC_SUBJECT_AND_DESCRIBE', path: relative,
-      message: 'The collocated subject source is missing from the exact checked file set.' });
-    return;
-  }
-  const subject = parsed.get(subjectPath);
-  const surface = subjectSurface(ts, subject);
-  if (surface.names.size === 0 && !surface.hasDefault) {
-    errors.push({ ruleId: 'FE_SPEC_SUBJECT_AND_DESCRIBE', path: relative,
-      message: `The subject ${subjectPath} has no statically named or default export for describe coverage.` });
-    return;
-  }
-  const moduleTitles = subjectModuleTitles(subjectPath);
-  const stem = path.posix.basename(subjectPath).replace(/\.(?:ts|tsx)$/i, '');
-  // Ruling (b): a subject with no own static named export is described by its file stem or its default export's local name.
-  const defaultOnly = surface.own.size === 0;
-  const calls = describeCalls(ts, checker, source);
-  if (calls.length === 0) {
-    violations.push({ ruleId: 'FE_SPEC_SUBJECT_AND_DESCRIBE', path: relative, line: 1, column: 1,
-      message: 'A behavior spec has a top-level describe for its exported subject.' });
-  }
-  for (const { call, title } of calls) {
-    const name = title ? describeName(ts, title) : null;
-    if (name !== null && surface.names.has(name)) continue;
-    if (name !== null && defaultOnly && (name === stem || name === surface.defaultName)) continue;
-    // Ruling (a): it-blocks that exercise two or more subject exports may name the subject module instead.
-    if (name !== null && moduleTitles.has(name) && exercisedSubjectExports(ts, checker, call, subject).size >= 2) continue;
-    const accepted = [...surface.names].sort().join(', ');
-    const modules = [...moduleTitles].map(value => `'${value}'`).join(' or ');
-    const fallback = defaultOnly ? `the file stem '${stem}'${surface.defaultName ? ` or the default export ${surface.defaultName}` : ''}` : null;
-    violations.push({ ruleId: 'FE_SPEC_SUBJECT_AND_DESCRIBE', path: relative, ...location(source, call),
-      message: `Top-level describe names one subject export (${accepted || 'none'})${fallback ? `, ${fallback}` : ''}, `
-        + `or - when its it-blocks exercise two or more subject exports - the subject module ${modules}.` });
-  }
-}
-
-function expectRoot(ts, checker, expression) {
-  let current = expression;
-  while (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) current = current.expression;
-  return ts.isCallExpression(current) && importedBinding(ts, checker, current.expression, 'expect');
-}
-
-
-function checkSnapshots(ts, checker, source, relative, violations, errors) {
-  const snapshotMatchers = new Set(['toMatchSnapshot', 'toMatchInlineSnapshot', 'toThrowErrorMatchingSnapshot', 'toThrowErrorMatchingInlineSnapshot']);
-  const visit = node => {
-    if (ts.isCallExpression(node) && (ts.isPropertyAccessExpression(node.expression) || ts.isElementAccessExpression(node.expression))
-      && expectRoot(ts, checker, node.expression.expression)) {
-      const matcher = propertyName(ts, node.expression);
-      if (matcher === null) errors.push({ ruleId: 'FE_SPEC_NO_SNAPSHOT', path: relative, ...location(source, node.expression),
-        message: 'A computed expect matcher prevents complete snapshot-rule coverage.' });
-      else if (snapshotMatchers.has(matcher)) violations.push({ ruleId: 'FE_SPEC_NO_SNAPSHOT', path: relative, ...location(source, node),
-        message: 'Behavior specs do not use snapshot matchers.' });
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
 }
 
 function declarationIdentifier(ts, node) {
@@ -1187,7 +965,6 @@ export function checkNextPatterns({ root, files, ruleIds, contextFiles } = {}) {
       'Readonly coverage resolves selected imported aliases, interfaces, inheritance, cycles and the built-in Readonly/ReadonlyArray types; generic, computed, any/unknown and unselected shapes fail unavailable.',
       'Every selected source is bound to a canonical architecture TypeScript project or an explicit package fallback; uncovered and compiler-conflicting overlaps fail unavailable.',
       'Source naming covers hook/module basenames and syntactically literal frozen inventories; it does not infer domain roles from arbitrary expressions.',
-      'Spec checks cover collocated selected subjects, statically bound top-level Vitest describe forms and statically named expect snapshot matchers; unsupported dynamic forms fail coverage.',
       'Return roles cover resolved named components, hooks, async utilities and primitive helpers; overloads and any/unknown returns fail unavailable.',
       'Owner and nonconventional closed-vocabulary roles come only from package.json#starci.codePatterns.next; invalid or uncovered declarations fail unavailable.',
       'Behavior-title meaning, actual network reach, translated-copy ownership and legitimate class proof remain semantic or behavioral evidence obligations.',
@@ -1233,20 +1010,18 @@ export function checkNextPatterns({ root, files, ruleIds, contextFiles } = {}) {
   const seenClosedDeclarations = new Set();
   for (const [relative, source] of parsed) {
     const checker = checkerByRelative.get(relative);
-    if (requested.has('FE_READONLY_PROPS_CONTRACT') && !SPEC_FILE.test(relative)) checkReadonlyProps(compiler.ts, checker, source, relative,
+    if (requested.has('FE_READONLY_PROPS_CONTRACT')) checkReadonlyProps(compiler.ts, checker, source, relative,
       selectedByFile, result.violations, result.errors);
-    if (requested.has('FE_SOURCE_NAME_SHAPE') && !SPEC_FILE.test(relative)) {
+    if (requested.has('FE_SOURCE_NAME_SHAPE')) {
       let mandated = null;
       try { mandated = frameworkMandatedExports(source.fileName); } catch (error) {
         result.errors.push({ ruleId: 'FE_SOURCE_NAME_SHAPE', path: relative, message: String(error.message ?? error) });
       }
       checkSourceNames(compiler.ts, source, relative, result.violations, mandated);
     }
-    if (requested.has('FE_SPEC_SUBJECT_AND_DESCRIBE')) checkSpecSubject(compiler.ts, checker, parsed, source, relative, repository, result.violations, result.errors);
-    if (requested.has('FE_SPEC_NO_SNAPSHOT') && SPEC_FILE.test(relative)) checkSnapshots(compiler.ts, checker, source, relative, result.violations, result.errors);
-    if (requested.has('FE_RETURN_TYPE_PROFILE') && !SPEC_FILE.test(relative)) checkReturnProfile(compiler.ts, checker, source, relative,
+    if (requested.has('FE_RETURN_TYPE_PROFILE')) checkReturnProfile(compiler.ts, checker, source, relative,
       ownerNames.get(path.posix.dirname(relative)) ?? new Set(), result.violations, result.errors);
-    if (requested.has('FE_CLOSED_VOCABULARY_SHAPE') && !SPEC_FILE.test(relative)) {
+    if (requested.has('FE_CLOSED_VOCABULARY_SHAPE')) {
       checkClosedVocabularies(compiler.ts, checker, source, relative,
         contract.closedVocabularies, selectedFiles, exportedTypes, seenClosedDeclarations, result.violations, result.errors);
     }

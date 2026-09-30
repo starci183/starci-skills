@@ -25,6 +25,6 @@ const c = "#ff0000"
 
 **Finding code:** `FE_STYLE_TOKEN_ONLY`
 
-**Vì sao (why):** `<file>` dùng giá trị màu/độ dài thô (`<what>`). Màu và khoảng cách chỉ đến từ token grammar; màu thương hiệu chỉ ở `brand.css`.
+**Why:** `<file>` uses a raw colour/length value (`<what>`). Colours and spacing come only from grammar tokens; brand colours live only in `brand.css`.
 
-**Cách sửa:** Dùng lớp hoặc biến token của grammar; giá trị màu chỉ khai trong `modules/brand/brand.css`.
+**Fix:** Use a grammar token class or variable; colour values are declared only in `modules/brand/brand.css`.

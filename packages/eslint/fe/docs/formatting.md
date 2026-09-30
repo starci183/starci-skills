@@ -25,6 +25,6 @@ const format = useFormatter()
 
 **Finding code:** `FE_I18N_FORMATTER`
 
-**Vì sao (why):** `<file>` định dạng số, tiền hoặc ngày bằng `toLocale*String`, `new Intl.*`, `toFixed`, ký hiệu tiền dán vào template hoặc thư viện ngày, thay vì formatter của next-intl.
+**Why:** `<file>` formats a number, money or date with `toLocale*String`, `new Intl.*`, `toFixed`, a currency symbol pasted into a template, or a date library, instead of the next-intl formatter.
 
-**Cách sửa:** Dùng `useFormatter()` (hoặc `getFormatter()` ở server): `number(...)`, `dateTime(...)`, `relativeTime(...)`.
+**Fix:** Use `useFormatter()` (or `getFormatter()` on the server): `number(...)`, `dateTime(...)`, `relativeTime(...)`.

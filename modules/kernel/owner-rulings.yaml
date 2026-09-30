@@ -50,7 +50,7 @@ rulings:
     enforcedBy: [scripts/checks/grammar-geometry.mjs]
   - id: grammar-gaps-0.6.0
     date: '2026-09-27'
-    ruling: "thêm hết - add every grammar gap the real-component prototype found: the ink artwork band with the orbit motif, the unlabelled Divider, the DescriptionList stat strip, the Alert action icon, asset-slot props on Image/MediaFrame, the SectionHeader count and source meta, the off TagGroup chip, the quiet (ghost) IconButton, the PinnedActionBar, and data-component on every grammar root (@starci/grammar 0.6.0)."
+    ruling: "add them all - add every grammar gap the real-component prototype found: the ink artwork band with the orbit motif, the unlabelled Divider, the DescriptionList stat strip, the Alert action icon, asset-slot props on Image/MediaFrame, the SectionHeader count and source meta, the off TagGroup chip, the quiet (ghost) IconButton, the PinnedActionBar, and data-component on every grammar root (@starci/grammar 0.6.0)."
     enforcedBy: [packages/grammar/CHANGELOG.md, knowledge/grammars/starci/DNA.yaml, knowledge/ui/examples/brand-direction.nivo.yaml]
   - id: secondary-input-contrast-accepted
     date: '2026-09-27'
@@ -64,7 +64,7 @@ rulings:
     date: '2026-09-27'
     ruling: The Nivo main colour is ink black #040d1c, not red; red is for artwork and danger only.
     enforcedBy: [knowledge/ui/examples/brand-direction.nivo.yaml]
-    confirmed: '2026-09-27 - owner answered "chốt" in the desktop chat; pendingRulings main-colour is ruled'
+    confirmed: '2026-09-27 - owner answered "settled" in the desktop chat; pendingRulings main-colour is ruled'
   - id: one-version-owner-review
     date: '2026-09-27'
     ruling: ONE careful version per shape reaches the owner, reviewed on Telegram; feedback redraws until golden.
@@ -79,7 +79,7 @@ rulings:
     enforcedBy: [scripts/checks/draw-rationale.mjs, scripts/work/draw-render.mjs]
   - id: supervisor-mission
     date: '2026-09-28'
-    ruling: "The [Supervisor] monitors, manages, messages and adjusts every workflow to the finish on autopilot ('giám sát, quản lý, gửi thư tới, điều chỉnh'): it acts on every stuck item itself (resolve --by supervisor, lane fixes, notices, re-plan dispositions, archive), and asks the owner nothing but the final credentials step and the handover; the owner gets only a periodic digest."
+    ruling: "The [Supervisor] monitors, manages, messages and adjusts every workflow to the finish on autopilot ('monitor, manage, send messages to, adjust'): it acts on every stuck item itself (resolve --by supervisor, lane fixes, notices, re-plan dispositions, archive), and asks the owner nothing but the final credentials step and the handover; the owner gets only a periodic digest."
     enforcedBy: [modules/supervisor/supervise.yaml, modules/supervisor/supervisor-prompt.md, scripts/supervisor/actions.mjs, scripts/supervisor/tick.mjs]
   - id: supervisor-self-learning
     date: '2026-09-28'
@@ -91,7 +91,7 @@ rulings:
     enforcedBy: [scripts/supervisor/sup-log.mjs, ui/supervisor.mjs, ui/CONTRACT.md]
   - id: ram-aware-concurrency
     date: '2026-09-28'
-    ruling: 'Parallelism follows real RAM ("Trần song song theo RAM thật"): below 10% free RAM fewer ops run in parallel - no new heavy op below the top priority (resume above 15%), below 2.5% no new heavy op at all (resume above 5%), fit floor 2.5% (lowered 2026-09-28: "15→10, 10→2.5") - so the host never freezes and kills ops mid-run; maxParallelOps 20 stays the ceiling and running ops are never stopped.'
+    ruling: 'Parallelism follows real RAM ("Parallelism ceiling follows real RAM"): below 10% free RAM fewer ops run in parallel - no new heavy op below the top priority (resume above 15%), below 2.5% no new heavy op at all (resume above 5%), fit floor 2.5% (lowered 2026-09-28: "15→10, 10→2.5") - so the host never freezes and kills ops mid-run; maxParallelOps 20 stays the ceiling and running ops are never stopped.'
     enforcedBy: [scripts/lib/ram-throttle.mjs, scripts/kernel/api.mjs, scripts/supervisor/land.mjs, modules/models/runtimes.yaml]
   - id: fe-canon-first
     date: '2026-09-28'
@@ -99,11 +99,11 @@ rulings:
     enforcedBy: [modules/models/runtimes.yaml, scripts/lib/ram-throttle.mjs, scripts/supervisor/ram-cap.mjs]
   - id: autopilot-run-to-finish
     date: '2026-09-28'
-    ruling: "Run to the finish in one go; don't stop to ask the owner - not even UX/UI review. Machine-gated drawings and directions are accepted provisionally (by autopilot, never golden), runtime/process gates and retry caps go to the Supervisor, credentials/real money/shared external systems are deferred to handover on sandbox/stub paths with ONE end-of-flow credential checklist (\"hạn chế provision ask\"), and the owner reviews everything once at handover; ugly UX/UI is re-run in one batch."
+    ruling: "Run to the finish in one go; don't stop to ask the owner - not even UX/UI review. Machine-gated drawings and directions are accepted provisionally (by autopilot, never golden), runtime/process gates and retry caps go to the Supervisor, credentials/real money/shared external systems are deferred to handover on sandbox/stub paths with ONE end-of-flow credential checklist (\"limit provision asks\"), and the owner reviews everything once at handover; ugly UX/UI is re-run in one batch."
     enforcedBy: [scripts/kernel/autopilot.mjs, modules/models/runtimes.yaml, scripts/kernel/api.mjs, scripts/work/draw-review.mjs, scripts/work/brand-direction.mjs, scripts/checks/brand.mjs]
   - id: grammar-publish-auto-approve
     date: '2026-09-28'
-    ruling: "Publishing @starci/grammar to npm needs no owner approval (\"lần sau đừng xin duyệt nữa ... auto approve\"): after a grammar change lands, bump the semver (additive → minor, fix → patch), date the CHANGELOG entry, land, build and publish, then tell the owner in the digest. Credentials stay the owner's: publishing uses the npm login the owner already holds; never create, enter or rotate a token."
+    ruling: "Publishing @starci/grammar to npm needs no owner approval (\"next time do not ask for approval any more ... auto approve\"): after a grammar change lands, bump the semver (additive → minor, fix → patch), date the CHANGELOG entry, land, build and publish, then tell the owner in the digest. Credentials stay the owner's: publishing uses the npm login the owner already holds; never create, enter or rotate a token."
     enforcedBy: [packages/grammar/package.json, packages/grammar/CHANGELOG.md, scripts/supervisor/lessons.mjs]
   - id: settle-runtime-service
     date: '2026-09-28'
@@ -111,16 +111,16 @@ rulings:
     enforcedBy: [scripts/reconcile/job-settle.mjs, scripts/kernel/watchdog.mjs, scripts/kernel/api-verbs/settle-tail.mjs, scripts/kernel/kernel-authority.mjs, scripts/supervisor/tick.mjs]
   - id: push-scan-test-secrets-encrypted
     date: '2026-09-28'
-    ruling: "Test credentials follow the product repository's .starcistacks + sops convention and a plaintext password is never pushed (\"đừng chặn pass tests\", \"secret test encrypt thành enc\"): a disposable credential is generated per run; one that must stay stable lives at .starcistacks/<stack>/secrets/test/<name>, plaintext git-ignored, stored with the repo's own stack-secret.mjs set so only the sops .enc twin is committed, and read with testSecret() (scripts/lib/test-secrets.mjs). The push secret scan stays strict - a plaintext test password still refuses the push, naming that path and command - passes a .enc only when it is a sops envelope, and refuses any plaintext under .starcistacks/<stack>/secrets/; a literal already committed is let through once by a push-scan-allow entry pinned to its file, pattern and historical range."
+    ruling: "Test credentials follow the product repository's .starcistacks + sops convention and a plaintext password is never pushed (\"do not block passing tests\", \"encrypt test secrets into enc\"): a disposable credential is generated per run; one that must stay stable lives at .starcistacks/<stack>/secrets/test/<name>, plaintext git-ignored, stored with the repo's own stack-secret.mjs set so only the sops .enc twin is committed, and read with testSecret() (scripts/lib/test-secrets.mjs). The push secret scan stays strict - a plaintext test password still refuses the push, naming that path and command - passes a .enc only when it is a sops envelope, and refuses any plaintext under .starcistacks/<stack>/secrets/; a literal already committed is let through once by a push-scan-allow entry pinned to its file, pattern and historical range."
     enforcedBy: [scripts/lib/test-secrets.mjs, scripts/lib/secret-patterns.mjs, scripts/supervisor/push-mains.mjs, modules/supervisor/push-scan-allow.yaml, modules/ops/_common.yaml]
   - id: evidence-in-db-and-blobs
     date: '2026-09-28'
     ruling: "All agent and runtime metadata leaves product git: attempts, models, reports, checks, logs, evidence, captures and renders live in SQL plus the external sha256 blob store, whose rows carry file_uri and /api/blob/<sha256> links. .starciwork retains important product content only: Work records, SRS/SDS, UI specifications and brand. Start the final canonical schema fresh after verified archival of old stores; no legacy data migration or read fallback. The host machine.sqlite owns machine and fleet state; no third DB is added."
-    confirmed: '2026-09-28 owner chat: "ok làm đi, 10 agent sol"; owner final storage principle and CLEAN-SLATE ruling in D:/starci-tmp/evidence-db'
+    confirmed: '2026-09-28 owner chat: "ok do it, 10 agent sol"; owner final storage principle and CLEAN-SLATE ruling in D:/starci-tmp/evidence-db'
     enforcedBy: [modules/schemas/work-layout.yaml, modules/kernel/contract-changes/evidence-db-blobs.yaml, engine/evidence.sql, scripts/lib/artifact-store.mjs]
   - id: provider-qwen-removed
     date: '2026-09-29'
-    ruling: "The Qwen provider is removed from the runtime with no backward compatibility (\"xóa qwen đi quá lỏ!! không mua nữa đâu, devin codex claude đủ r\"): only claude, codex and devin remain, and a config.yaml that still names qwen is refused with \"Qwen đã bị gỡ; dùng claude, codex hoặc devin\"."
+    ruling: "The Qwen provider is removed from the runtime with no backward compatibility (\"remove qwen, it is far too lame!! not buying it any more, devin codex claude are enough\"): only claude, codex and devin remain, and a config.yaml that still names qwen is refused with \"Qwen has been removed; use claude, codex or devin\"."
     enforcedBy: [modules/models/runtimes.yaml, modules/models/registry.yaml, engine/config.mjs, modules/kernel/contract-changes/provider-qwen-removed.yaml]
   - id: one-pattern-no-legacy
     date: '2026-09-30'

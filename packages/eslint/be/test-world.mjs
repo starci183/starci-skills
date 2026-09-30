@@ -136,6 +136,12 @@ export const testsNoOverride = {
     },
 }
 
+/** The name of a property key written as an identifier or a literal (`{ apps }`, `{ "apps": ... }`, `{ ["apps"]: ... }`); null for any computed expression. */
+const plainKey = (property) => {
+    if (property.key.type === "Literal") return String(property.key.value)
+    return property.key.type === "Identifier" && !property.computed ? property.key.name : null
+}
+
 /** The world an integration spec (`{ modules }`) or an e2e spec (`{ apps }`) asks for; every such spec asks for one; the retired name `useE2eWorld` exists nowhere. */
 export const testWorldShape = {
     meta: {
@@ -145,6 +151,7 @@ export const testWorldShape = {
         messages: {
             modules: "An integration spec tests one capability module on the real database with no HTTP: call `useTestWorld({ modules: [...] })`, not `apps`.",
             apps: "An e2e spec boots applications: call `useTestWorld({ apps: {...} })`, not `modules`.",
+            literal: "The options of `useTestWorld(...)` must be one object literal with plain keys: a variable, a spread or a computed key hides whether the spec asks for `modules` or `apps`.",
             missing: "This spec never calls `useTestWorld(...)`: integration and e2e specs run inside the one test world.",
             retired: "`useE2eWorld` is the retired name of `useTestWorld`; there is one name, no alias.",
         },
@@ -165,7 +172,13 @@ export const testWorldShape = {
                 if (node.callee.type !== "Identifier" || node.callee.name !== "useTestWorld") return
                 seen = true
                 const options = node.arguments[0]
-                const keys = options?.type === "ObjectExpression" ? options.properties.filter((p) => p.type === "Property").map((p) => p.key.name ?? p.key.value) : []
+                if (options?.type !== "ObjectExpression") return context.report({ node, messageId: "literal" })
+                const keys = []
+                for (const property of options.properties) {
+                    const key = property.type === "Property" ? plainKey(property) : null
+                    if (key === null) return context.report({ node: property, messageId: "literal" })
+                    keys.push(key)
+                }
                 if (!keys.includes(wants) || keys.includes(wants === "modules" ? "apps" : "modules")) context.report({ node, messageId: wants })
             },
             "Program:exit"(node) {

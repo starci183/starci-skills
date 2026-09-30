@@ -221,6 +221,9 @@ test("injector-type-match: T of the injector is the parameter's type", () => {
             { filename: SERVICE, code: `import { InjectFoo, FooClient } from "@modules/integrations/foo"\nexport class S { constructor(@InjectFoo() foo: FooClient) {} }` },
             // a decorator that is not an injector is not compared
             { filename: SERVICE, code: `${CLOCK}const Marker = (): ParameterDecorator => () => undefined\nexport class S { constructor(@Marker() private readonly clock: Clock) {} }` },
+            // a language global augmented by @types/node is not infrastructure
+            { filename: HANDLER, code: `/// <reference types="node" />
+export class H { constructor(private readonly names: ReadonlyArray<string>) {} }` },
             // not a constructor
             { filename: SERVICE, code: `${CLOCK}${LOGGER}export class S { run(@InjectClock() logger: Logger): void { logger.info("x") } }` },
         ],
@@ -235,42 +238,80 @@ test("injector-type-match: T of the injector is the parameter's type", () => {
 
 test("infra-needs-injector: class injection only for domain services and the same owner", () => {
     const EM = `import type { EntityManager } from "typeorm"\n`
+    const INJ = `import { Injectable } from "@nestjs/common"
+`
     const CACHE = `import { CacheService } from "@modules/platform/cache"\n`
     tester.run("infra-needs-injector", infraNeedsInjector, {
         valid: [
             // a domain service injected by class, from a feature (valid)
-            { filename: HANDLER, code: `import { OrderService } from "@modules/domain/order"\nexport class H { constructor(private readonly orderService: OrderService) {} }` },
+            { filename: HANDLER, code: `${INJ}import { OrderService } from "@modules/domain/order"\n@Injectable()
+export class H { constructor(private readonly orderService: OrderService) {} }` },
             // an injected clock
-            { filename: HANDLER, code: `${CLOCK}export class H { constructor(@InjectClock() private readonly clock: Clock) {} }` },
+            { filename: HANDLER, code: `${INJ}${CLOCK}@Injectable()
+export class H { constructor(@InjectClock() private readonly clock: Clock) {} }` },
             // a raw @Inject still counts as an injector for THIS rule (injector-only reports it)
-            { filename: HANDLER, code: `${COMMON}${EM}const T: unique symbol = Symbol("shop.em")\nexport class H { constructor(@Inject(T) private readonly em: EntityManager) {} }` },
+            { filename: HANDLER, code: `${INJ}${COMMON}${EM}const T: unique symbol = Symbol("shop.em")\n@Injectable()
+export class H { constructor(@Inject(T) private readonly em: EntityManager) {} }` },
             // primitives, lib types and the class's own types
-            { filename: HANDLER, code: `class Local { ping(): boolean { return true } }\nexport class H { constructor(private readonly name: string, private readonly ids: Array<number>, private readonly at: Date, private readonly local: Local) {} }` },
+            { filename: HANDLER, code: `${INJ}class Local { ping(): boolean { return true } }\n@Injectable()
+export class H { constructor(private readonly name: string, private readonly ids: Array<number>, private readonly at: Date, private readonly local: Local) {} }` },
             // a class of the same owner, even a platform one
-            { filename: at("src/modules/platform/cache/cache.warmer.ts"), code: `import { CacheService } from "./cache.service"\nexport class Warmer { constructor(private readonly cache: CacheService) {} }` },
-            // a CQRS message carries its params as data; it is built with new, never injected\n            { filename: at("src/features/plan/application/place-order.command.ts"), code: `import { Command } from "@nestjs/cqrs"\nimport type { ExecuteParams } from "@modules/platform/cqrs"\nexport class PlaceOrderCommand extends Command<string> { constructor(readonly params: ExecuteParams<{ id: string }>) { super() } }` },\n            // not a constructor
-            { filename: HANDLER, code: `${EM}export class H { run(em: EntityManager): EntityManager { return em } }` },
+            { filename: at("src/modules/platform/cache/cache.warmer.ts"), code: `${INJ}import { CacheService } from "./cache.service"\n@Injectable()
+export class Warmer { constructor(private readonly cache: CacheService) {} }` },
+            // a CQRS message carries its params and is never DI-constructed (no Nest class decorator, no decorated parameter)
+            { filename: HANDLER, code: `import { Command, Query } from "@nestjs/cqrs"
+import type { EntityManager } from "typeorm"
+export class AddCommand extends Command<number> { constructor(readonly params: EntityManager) { super() } }
+export class GetQuery extends Query<number> { constructor(readonly params: EntityManager) { super() } }` },
+            // a plain class is not built by the container: a factory-built adapter, a test fake, a socket wrapper
+            { filename: HANDLER, code: `import type { Writable } from "node:stream"
+import type { Clock } from "@modules/platform/clock"
+export class Adapter { constructor(private readonly clock: Clock, private readonly out: Writable, private readonly items: Array<string>) {} }` },
+            // not a constructor
+            { filename: HANDLER, code: `${INJ}${EM}@Injectable()
+export class H { run(em: EntityManager): EntityManager { return em } }` },
         ],
         invalid: [
-            // the same parameter on a class that is not a message is a dependency\n            { filename: HANDLER, code: `import type { ExecuteParams } from "@modules/platform/cqrs"\nexport class H { constructor(readonly params: ExecuteParams<{ id: string }>) {} }`, errors: [{ messageId: "missing" }] },\n            // renamed receivers do not matter: the TYPE is infrastructure
-            { filename: HANDLER, code: `${EM}export class H { constructor(private readonly em: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
-            { filename: HANDLER, code: `${EM}export class H { constructor(manager: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
-            { filename: HANDLER, code: `${EM}export class H { constructor(private readonly repo: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
+            // renamed receivers do not matter: the TYPE is infrastructure
+            { filename: HANDLER, code: `${INJ}${EM}@Injectable()
+export class H { constructor(private readonly em: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: HANDLER, code: `${INJ}${EM}@Injectable()
+export class H { constructor(manager: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: HANDLER, code: `${INJ}${EM}@Injectable()
+export class H { constructor(private readonly repo: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
             // a platform service injected by class
-            { filename: HANDLER, code: `${CACHE}export class H { constructor(private readonly cache: CacheService) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: HANDLER, code: `${INJ}${CACHE}@Injectable()
+export class H { constructor(private readonly cache: CacheService) {} }`, errors: [{ messageId: "missing" }] },
             // a platform port
-            { filename: HANDLER, code: `${LOGGER}export class H { constructor(private readonly logger: Logger) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: HANDLER, code: `${INJ}${LOGGER}@Injectable()
+export class H { constructor(private readonly logger: Logger) {} }`, errors: [{ messageId: "missing" }] },
+            // a Nest class decorator makes a class container-built, whatever it is named or extends
+            { filename: HANDLER, code: `import { Controller } from "@nestjs/common"
+${EM}@Controller()
+export class C { constructor(private readonly em: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: HANDLER, code: `import { Resolver } from "@nestjs/graphql"
+${EM}@Resolver()
+export class R { constructor(private readonly em: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
+            // one decorated parameter makes TypeScript emit the parameter metadata: the un-injected one is resolved by the container
+            { filename: HANDLER, code: `${CLOCK}${EM}export class H { constructor(@InjectClock() private readonly clock: Clock, private readonly em: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
+            // a local decorator that is not from Nest does not make a class container-built
             // an integrations type
-            { filename: HANDLER, code: `import type { FooClient } from "@modules/integrations/foo"\nexport class H { constructor(private readonly foo: FooClient) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: HANDLER, code: `${INJ}import type { FooClient } from "@modules/integrations/foo"\n@Injectable()
+export class H { constructor(private readonly foo: FooClient) {} }`, errors: [{ messageId: "missing" }] },
             // a package type
-            { filename: HANDLER, code: `import type { CommandBus } from "@nestjs/cqrs"\nexport class H { constructor(private readonly commandBus: CommandBus) {} }`, errors: [{ messageId: "missing" }] },
-            { filename: HANDLER, code: `import type { S3 } from "nestjs-s3"\nexport class H { constructor(private readonly s3: S3) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: HANDLER, code: `${INJ}import type { CommandBus } from "@nestjs/cqrs"\n@Injectable()
+export class H { constructor(private readonly commandBus: CommandBus) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: HANDLER, code: `${INJ}import type { S3 } from "nestjs-s3"\n@Injectable()
+export class H { constructor(private readonly s3: S3) {} }`, errors: [{ messageId: "missing" }] },
             // domain code is not exempt from injecting infrastructure
-            { filename: SERVICE, code: `${CACHE}export class S { constructor(private readonly cache: CacheService) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: SERVICE, code: `${INJ}${CACHE}@Injectable()
+export class S { constructor(private readonly cache: CacheService) {} }`, errors: [{ messageId: "missing" }] },
             // specs are not exempt
-            { filename: SPEC, code: `import type { CommandBus } from "@nestjs/cqrs"\nexport class Probe { constructor(private readonly commandBus: CommandBus) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: SPEC, code: `${INJ}import type { CommandBus } from "@nestjs/cqrs"\n@Injectable()
+export class Probe { constructor(private readonly commandBus: CommandBus) {} }`, errors: [{ messageId: "missing" }] },
             // a decorator that is not an injector does not help
-            { filename: HANDLER, code: `${EM}const Marker = (): ParameterDecorator => () => undefined\nexport class H { constructor(@Marker() private readonly em: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
+            { filename: HANDLER, code: `${INJ}${EM}const Marker = (): ParameterDecorator => () => undefined\n@Injectable()
+export class H { constructor(@Marker() private readonly em: EntityManager) {} }`, errors: [{ messageId: "missing" }] },
         ],
     })
 })
@@ -319,6 +360,13 @@ test("no-string-token: a token is a class or a unique symbol", () => {
         valid: [
             { filename: SERVICE, code: `const T: unique symbol = Symbol("order.thing")\nexport const providers = [{ provide: T, useValue: 1 }]` },
             { filename: SERVICE, code: `import { OrderService } from "@modules/domain/order"\nexport const providers = [{ provide: OrderService, useClass: OrderService }]` },
+            // Nest framework tokens exported by @nestjs/core (default-deny itself requires APP_GUARD)
+            { filename: SERVICE, code: `import { APP_GUARD, APP_FILTER, APP_PIPE, APP_INTERCEPTOR } from "@nestjs/core"
+export const providers = [{ provide: APP_GUARD, useClass: Object }, { provide: APP_FILTER, useClass: Object }, { provide: APP_PIPE, useClass: Object }, { provide: APP_INTERCEPTOR, useClass: Object }]` },
+            { filename: SERVICE, code: `import { APP_GUARD as GUARD } from "@nestjs/core"
+export const providers = [{ provide: GUARD, useClass: Object }]` },
+            { filename: SERVICE, code: `import * as core from "@nestjs/core"
+export const providers = [{ provide: core.APP_GUARD, useClass: Object }]` },
             // a connection name constant is fine
             { filename: SERVICE, code: `import { getEntityManagerToken } from "@nestjs/typeorm"\nconst PRIMARY_CONNECTION = "primary"\nexport const token = getEntityManagerToken(PRIMARY_CONNECTION)` },
             // the literal lives in the connection file
@@ -330,6 +378,9 @@ test("no-string-token: a token is a class or a unique symbol", () => {
         invalid: [
             { filename: SERVICE, code: `${COMMON}export class S { constructor(@Inject("X") private readonly x: string) {} }`, errors: [{ messageId: "string" }] },
             { filename: SERVICE, code: `${COMMON}export class S { constructor(@Inject(\`X\`) private readonly x: string) {} }`, errors: [{ messageId: "string" }] },
+            // a local constant named like a Nest token is still a string
+            { filename: SERVICE, code: `const APP_GUARD = "APP_GUARD"
+export const providers = [{ provide: APP_GUARD, useClass: Object }]`, errors: [{ messageId: "string" }] },
             // a string constant is still a string
             { filename: SERVICE, code: `${COMMON}const TOKEN = "X"\nexport class S { constructor(@Inject(TOKEN) private readonly x: string) {} }`, errors: [{ messageId: "string" }] },
             { filename: SERVICE, code: `import { Inject as I } from "@nestjs/common"\nexport class S { constructor(@I("X") private readonly x: string) {} }`, errors: [{ messageId: "string" }] },

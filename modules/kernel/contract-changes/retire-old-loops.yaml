@@ -1,7 +1,7 @@
 id: retire-old-loops
 effectiveAt: '2026-09-28T20:00:00+07:00'
 summary: >-
-  Owner ruling 2026-09-28 "có lỗi xóa luôn": with all seven reconciler controllers active (job, host, gc, resource,
+  Owner ruling 2026-09-28 "delete on any error": with all seven reconciler controllers active (job, host, gc, resource,
   workflow, fleet, learning), the old loops they replaced are deleted, not kept as reconcilerOwns fallbacks; rollback
   is git revert. modules/kernel/retired-paths.yaml lists every deleted file with the controller that replaced it, and
   scripts/checks/check-contract-cites.mjs accepts a retired path only as history (a contract-change entry,

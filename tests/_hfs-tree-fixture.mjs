@@ -14,6 +14,7 @@ const COMMON = {
   'sonar-project.properties': 'sonar.projectKey=fixture\n',
 };
 const BACKEND = {
+  'codecov.yml': 'coverage: {}\n',
   '.sops.yaml': 'creation_rules: []\n',
   '.starcistacks/application-stacks.yaml': 'environments: []\n',
   '.starciwork/.gitignore': 'runtime.sqlite\n',

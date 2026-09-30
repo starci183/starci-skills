@@ -5,17 +5,12 @@
     "codegen": "npm run codegen --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "typecheck:e2e": "tsc -p tsconfig.e2e.json --pretty false",
     "lint": "npm run codegen --silent && eslint . --fix --max-warnings=0 && stylelint \"{{styleGlob}}\" --fix",
     "lint:check": "npm run codegen --silent && eslint . --max-warnings=0 && stylelint \"{{styleGlob}}\"",
     "lint:report": "eslint . --format json --output-file reports/eslint.json",
     "lint:report:css": "stylelint \"{{styleGlob}}\" --formatter json --output-file reports/stylelint.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run codegen --silent && vitest run",
-    "test:ci": "npm run codegen --silent && vitest run",
-    "test:affected": "npm run codegen --silent && vitest run --changed origin/main --passWithNoTests",
-    "test:e2e": "npm run typecheck:e2e && playwright test",
     "hfs:check": "hfs check",
     "hfs:report": "hfs check --sonar reports/hfs.sonar.json"
   }

@@ -20,31 +20,35 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - uses: actions/checkout@v4
-        with:
-          repository: starci183/starci-skills
-          path: .starci-runtime
-      - run: echo "STARCI_HOME=$GITHUB_WORKSPACE/.starci-runtime" >> "$GITHUB_ENV"
-      - run: node "$STARCI_HOME/bin/starci.mjs" link --side fe
       - run: npm ci
-      - name: hfs sync
-        run: npx hfs sync --check
       - name: hfs check
-        run: npx hfs check
+        run: npm run hfs:report
       - name: lint
         run: npm run lint:check
+      - name: eslint report
+        if: ${{ !cancelled() }}
+        run: npm run lint:report
+      - name: eslint sonar import
+        if: ${{ !cancelled() }}
+        run: npx hfs report eslint reports/eslint.json reports/eslint.sonar.json
+      - name: stylelint report
+        if: ${{ !cancelled() }}
+        run: npm run lint:report:css
+      - name: stylelint sonar import
+        if: ${{ !cancelled() }}
+        run: npx hfs report stylelint reports/stylelint.json reports/stylelint.sonar.json
+      - name: format
+        run: npm run format:check
       - name: typecheck
         run: npm run typecheck
-      - name: unit
-        run: npm run test:ci
       - name: build
         run: npm run build
       - uses: SonarSource/sonarqube-scan-action@v7
-        if: env.SONAR_TOKEN != ''
+        if: ${{ !cancelled() && env.SONAR_TOKEN != '' }}
         env:
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
       - uses: SonarSource/sonarqube-quality-gate-action@v1
-        if: env.SONAR_TOKEN != ''
+        if: ${{ !cancelled() && env.SONAR_TOKEN != '' }}
         timeout-minutes: 10
         env:
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}

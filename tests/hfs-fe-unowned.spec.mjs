@@ -27,10 +27,11 @@ test('a clean front-end tree has no unowned, unnamed or retired file', () => {
   assert.deepEqual(result.findings, []);
 });
 
-test('a misplaced e2e spec and a file directly in src/ are HFS_SLOT_UNDECLARED errors', () => {
+test('a file directly in src/ is a HFS_SLOT_UNDECLARED error, and a test file anywhere is FE_NO_TESTS and not an undeclared slot', () => {
   const result = checkRepository({ repoRoot: repoOf((dir) => { put(dir, 'e2e/course/play.spec.ts'); put(dir, 'apps/web/src/x.ts'); }) });
   assert.equal(result.ok, false);
-  assert.deepEqual(errorsOf(result, 'HFS_SLOT_UNDECLARED').sort(), ['apps/web/src/x.ts', 'e2e/course/play.spec.ts']);
+  assert.deepEqual(errorsOf(result, 'HFS_SLOT_UNDECLARED').sort(), ['apps/web/src/x.ts']);
+  assert.deepEqual(errorsOf(result, 'FE_NO_TESTS').sort(), ['e2e/course/play.spec.ts']);
 });
 
 test('apps/web/src/modules/hooks/x.ts is owned by fe.modules (a capability may carry any name) and is judged as a module, not as a hook', () => {

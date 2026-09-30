@@ -62,7 +62,7 @@ const staticText = (value) => {
 
 /** Walk every place a class string can be written: markup, a constant, or an entry's array. */
 const classTextVisitors = (context, report) => {
-  // Product source is a file of a product tier (a slot says so); tooling, config, e2e and specs are out of scope.
+  // Product source is a file of a product tier (a slot says so); tooling and config are out of scope.
   if (!isProductSource(context)) return {}
   return {
     JSXAttribute(node) {

@@ -16,7 +16,6 @@ const tester = slotTester()
 
 const BLOCK = at("apps/web/src/components/blocks/DailyQuest/component.tsx")
 const TWIN = at("apps/web/src/components/blocks/DailyQuestSkeleton/index.tsx")
-const TWIN_TEST = at("apps/web/src/components/blocks/DailyQuestSkeleton/index.test.tsx")
 const HOOK = at("apps/web/src/hooks/swr/useX.ts")
 
 test("every rule this law declares is exported under its published name", () => {
@@ -29,8 +28,6 @@ test("LOADING-1: no component exists to mirror another one's shape", () => {
   tester.run("no-resting-twin-component", noRestingTwinComponent, {
     valid: [
       { filename: BLOCK, code: "export const X = () => null" },
-      // a twin's own test may exist while the twin is being folded back in
-      { filename: TWIN_TEST, code: "export const X = () => null" },
       // outside the component tree there is no shape to mirror
       { filename: HOOK, code: "export const X = () => null" },
       // a folder named components inside a module is no component owner, whatever it is called

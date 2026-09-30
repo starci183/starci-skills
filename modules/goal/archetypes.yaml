@@ -12,8 +12,8 @@ schema: starci/module-goal-archetypes@1
 signalMatching:
   normalization: >-
     The prompt and every phrase are Unicode NFC-normalized, lower-cased and
-    whitespace-collapsed. Diacritics are kept: Vietnamese "chậm" (slow) never
-    matches "chấm" (grade), and an unaccented spelling matches only when it is
+    whitespace-collapsed. Diacritics are kept: Vietnamese words that differ only by accents (for example the words for "slow" and "grade") never
+    match each other, and an unaccented spelling matches only when it is
     listed as its own phrase.
   phrase: >-
     A phrase hits where no letter, mark, digit or underscore touches either of
@@ -201,7 +201,7 @@ archetypes:
     signals:
       note: >-
         "refactor X", "clean up X", "rename/restructure X without changing
-        behaviour", "dọn nợ X theo chuẩn starci" — a behaviour-invariant change
+        behaviour", "clean up debt X to the starci standard" (in Vietnamese) — a behaviour-invariant change
         to existing delivered code. A canon-conformance request ($canonIntent)
         is this archetype with code.refactor params.canonFamilies: canon-scan
         measures the findings and cuts the slices, and review.verify lint
@@ -222,7 +222,7 @@ archetypes:
   - id: unit-verify
     signals:
       note: >-
-        "run the full unit suite", "chạy toàn bộ unit" - an explicit ask for the product repository's whole unit run
+        "run the full unit suite", "run the whole unit suite" (in Vietnamese) - an explicit ask for the product repository's whole unit run
         (unit.verify). A code-writing op's own scoped specs are never this ask, and no other request plans this leg.
       phrases: [full unit, full unit suite, whole unit suite, entire unit suite, all unit tests, run all unit, toàn bộ unit, tất cả unit test, chạy toàn bộ unit]
 
