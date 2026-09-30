@@ -1,254 +1,264 @@
 /**
- * The rules that hold `data-access.md`.
+ * The rules that hold `data-access.md` and the persistence half of the back-end convention (R82, R83).
  *
- * The first three read a constructor parameter or a decorator, all exact - there is no heuristic
- * here and no judgement to get wrong, which is why all three can be switched on without a burn-down
- * in a codebase that already follows them.
+ * The database is reached one way: the shared TypeORM `EntityManager`, injected through the named injector of a declared
+ * connection (`Inject<Pascal(connection)>EntityManager`), called directly. Every rule here identifies its receiver by its
+ * TypeScript type (`isPackageType(..., "typeorm")`) and every path question goes through the HFS slot view: no variable
+ * name, no path regular expression, no spec exemption.
  *
- * The next two hold a narrower, exact slice of DATA-4 (Rule 5) and DATA-5 (Rule 6) - the slice of
- * each that a single file settles on its own, with no call graph and no knowledge of intent needed.
- *
- * `no-outer-manager-in-transaction` catches the one shape of DATA-4 a parser can see: a
- * `this.<field>.transaction(async (tx) => ...)` callback whose body reaches for `this.<field>`
- * again instead of `tx`. That field held the manager from BEFORE the transaction opened, so a call
- * through it runs and commits on its own - the exact "half of it was written" bug DATA-4 names. What
- * it does NOT see, and cannot: whether a HELPER defined in another file was handed `tx` by ITS
- * caller. That still needs the call graph and stays undecidable, same as the law says.
- *
- * `no-eager-relation` catches the one shape of DATA-5 a parser can see: `eager: true` written on a
- * relation decorator. What it does NOT see: whether a call site correctly asked for a relation it
- * needed. That still needs to know what the answer is for and stays undecidable, same as the law
- * says.
- *
- * Both remaining gaps are read by a person; a rule that guessed at either would fire on correct
- * code, which is how a correct rule gets disabled.
- *
- * `no-external-call-in-transaction` (R82 `BE_TRANSACTION_EXTERNAL_CALL`) refuses `fetch`, an HTTP
- * client call or any method of a `*Client`/`*Sdk` receiver written inside `.transaction(async (tx) =>
- * ...)`. Holding the transaction open for as long as the external call takes means a failure after
- * partial commit, or a success the rollback then reverses with no way back; the fix is to commit
- * first and call out after, or to write an outbox message inside the transaction instead.
- *
- * `named-entity-manager-only` (R83 `BE_UNNAMED_DATA_ACCESS`) holds the one way a use case reaches the
- * database: the shared `EntityManager` injected through a named injector and called directly. It refuses a bare
- * `@InjectEntityManager()`, any `.getRepository(...)` call, and an injected `DataSource` outside the platform
- * database module and `apps/migrate`. `no-injected-repository` refuses `@InjectRepository` and `Repository<T>` in the same spirit.
+ * - `must-inject-entity-manager` - a constructor parameter typed `EntityManager` carries the named injector of a declared
+ *   connection. A lookalike (`InjectFooEntityManager`) or a bare `InjectEntityManager()` is not one.
+ * - `named-entity-manager-only` - no property injection of an `EntityManager`, `DataSource` or `QueryRunner`; a
+ *   `DataSource` or `QueryRunner` is injected only in the platform database capability and the migrate app; no
+ *   `getRepository(...)` on a manager or data source.
+ * - `no-injected-repository` - no `@InjectRepository`, no `Repository<T>` type, no `TypeOrmModule.forFeature`.
+ * - `require-entity-table-name` - `@Entity()` names its table.
+ * - `no-outer-manager-in-transaction` - inside `<manager>.transaction(async (tx) => ...)` every call uses `tx`; any other
+ *   value typed `EntityManager` that was declared outside the callback is refused.
+ * - `no-eager-relation` - a relation decorator carries no `eager: true`.
+ * - `no-external-call-in-transaction` (R82) - inside a transaction callback, no call through a receiver typed from
+ *   `integrations/**`, `HttpClient` or `MessagePublisher`, and no `fetch`.
  */
 
 import { walk } from "./lib/ast.mjs"
-import { normalizePath } from "./lib/path.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import {
+    declaredInjectorNames,
+    inDatabaseCapability,
+    inMigrateApp,
+    infraTypeOf,
+    injectionSites,
+} from "./lib/persistence.mjs"
+import { isPackageType, typeOrigins } from "./lib/types.mjs"
 
-/** A parameter property (`private readonly x: T`) wraps the parameter it declares. */
-const unwrapParam = (param) => (param.type === "TSParameterProperty" ? param.parameter : param)
+/** The `typeorm` repository types no class receives. */
+const REPOSITORY_TYPES = ["Repository", "TreeRepository", "MongoRepository"]
 
-/** The type name a parameter is annotated with, or null. */
-const paramTypeName = (param) => {
-  const annotation = param.typeAnnotation && param.typeAnnotation.typeAnnotation
-  if (!annotation || annotation.type !== "TSTypeReference" || annotation.typeName.type !== "Identifier") return null
-  return annotation.typeName.name
-}
+// -- R83: the injector ---------------------------------------------------------------------------------
 
-/** Decorator names on a parameter, including ones carried by the parameter property wrapping it. */
-const paramDecorators = (original) => {
-  const carriers = [original]
-  if (original.type === "TSParameterProperty") carriers.push(original.parameter)
-  const names = []
-  for (const carrier of carriers) {
-    for (const decorator of carrier.decorators || []) {
-      const expression = decorator.expression
-      if (expression.type === "CallExpression" && expression.callee.type === "Identifier") {
-        names.push(expression.callee.name)
-      } else if (expression.type === "Identifier") {
-        names.push(expression.name)
-      }
-    }
-  }
-  return names
-}
-
-/** Every parameter of a constructor definition. */
-const constructorParams = (node) =>
-  node.kind === "constructor" && node.value && node.value.params ? node.value.params : []
-
-/** Repository types that bind a handle to one entity. */
-const REPOSITORY_TYPES = /^(?:Repository|TreeRepository|MongoRepository)$/
-
-/** The house decorator family that names a datasource. */
-const NAMES_DATASOURCE = /^Inject\w*EntityManager$/
-
-// -- DATA-1 ----------------------------------------------------------------------------------------
-
-/** An injected manager names the datasource it belongs to. */
+/** A constructor parameter typed `EntityManager` carries the named injector of a declared connection. */
 export const mustInjectEntityManager = {
-  meta: {
-    type: "problem",
-    docs: { description: "An injected `EntityManager` names its datasource through a decorator." },
-    schema: [],
-    messages: {
-      undecorated:
-        "`EntityManager` is injected without an `@Inject*EntityManager()` decorator. The type alone does not say WHICH datasource this is, and this application has more than one - so this reads correctly while pointing at the wrong database. Name the connection at the injection site.",
+    meta: {
+        type: "problem",
+        docs: { description: "An injected `EntityManager` carries the named injector of a declared connection." },
+        schema: [],
+        messages: {
+            undecorated:
+                "`EntityManager` is injected without a named injector. The type alone does not say WHICH database this is; only `{{expected}}` names a declared connection (from `hfs.json`), and a lookalike or a bare `InjectEntityManager()` names none. Inject it with the injector of the connection this class reads.",
+        },
     },
-  },
-  create(context) {
-    return {
-      MethodDefinition(node) {
-        for (const original of constructorParams(node)) {
-          const param = unwrapParam(original)
-          if (paramTypeName(param) !== "EntityManager") continue
-          if (paramDecorators(original).some((name) => NAMES_DATASOURCE.test(name))) continue
-          context.report({ node: param, messageId: "undecorated" })
-        }
-      },
-    }
-  },
+    create(context) {
+        const hfs = hfsOf(context)
+        const expected = declaredInjectorNames(hfs)
+        return injectionSites(({ node, kind, decorators, annotation }) => {
+            if (kind !== "param" || !annotation || infraTypeOf(context, annotation) !== "EntityManager") return
+            if (decorators.some((name) => expected.includes(name))) return
+            context.report({ node, messageId: "undecorated", data: { expected: expected.join("` or `") || "no injector (declare the connection in hfs.json)" } })
+        })
+    },
 }
 
-// -- DATA-2 ----------------------------------------------------------------------------------------
+/** The shared manager is injected by name, as a constructor parameter, and called directly. */
+export const namedEntityManagerOnly = {
+    meta: {
+        type: "problem",
+        docs: {
+            description:
+                "No property injection of an `EntityManager`, `DataSource` or `QueryRunner`; a `DataSource` or `QueryRunner` only in the platform database capability and the migrate app; no `getRepository`.",
+        },
+        schema: [],
+        messages: {
+            property:
+                "`{{type}}` is injected as a class property. Property injection hides the dependency from the constructor and from the composition spec. Receive the named-injector `EntityManager` as a constructor parameter.",
+            infra:
+                "`{{type}}` is injected here. A `DataSource` or `QueryRunner` is built and held only by the platform database capability and the migrate app; everything else injects the shared `EntityManager` through its named injector and calls it directly.",
+            getRepository:
+                "`.getRepository(...)` binds a handle to ONE entity and hides which connection it came from. Call the shared manager directly: `manager.find(Entity, ...)`, `manager.save(Entity, ...)`, `tx.insert(Entity, ...)`.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        const filename = context.filename || context.getFilename()
+        const mayHoldConnections = inDatabaseCapability(hfs, filename) || inMigrateApp(hfs, filename)
+        return {
+            ...injectionSites(({ node, kind, annotation }) => {
+                if (!annotation) return
+                const type = infraTypeOf(context, annotation)
+                if (!type) return
+                if (kind === "property") context.report({ node, messageId: "property", data: { type } })
+                else if (type !== "EntityManager" && !mayHoldConnections) context.report({ node, messageId: "infra", data: { type } })
+            }),
+            CallExpression(node) {
+                const callee = node.callee
+                if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return
+                if (callee.property.name !== "getRepository") return
+                if (infraTypeOf(context, callee.object)) context.report({ node, messageId: "getRepository" })
+            },
+        }
+    },
+}
+
+// -- R83: repositories ---------------------------------------------------------------------------------
+
+/** Whether a type reference sits on a parameter or property already reported through its `@InjectRepository` decorator. */
+const carriesInjectRepository = (node) => {
+    for (let owner = node.parent; owner && owner.type !== "ClassBody"; owner = owner.parent) {
+        const decorated = (owner.decorators ?? []).some((decorator) => decorator.expression.type === "CallExpression" && decorator.expression.callee.name === "InjectRepository")
+        if (decorated) return true
+    }
+    return false
+}
 
 /** Persistence never arrives as a repository. */
 export const noInjectedRepository = {
-  meta: {
-    type: "problem",
-    docs: { description: "Persistence goes through the shared `EntityManager`, never an injected repository." },
-    schema: [],
-    messages: {
-      repo:
-        "Inject the shared EntityManager with the named injector and call it directly. A repository is bound to ONE entity, so it cannot carry a transaction into a second table - and a use case that grows a second write then has to be rewritten rather than extended.",
+    meta: {
+        type: "problem",
+        docs: { description: "Persistence goes through the shared `EntityManager`, never a repository." },
+        schema: [],
+        messages: {
+            repo:
+                "Inject the shared EntityManager with the named injector and call it directly. A repository is bound to ONE entity, so it cannot carry a transaction into a second table - and a use case that grows a second write then has to be rewritten rather than extended.",
+            forFeature:
+                "`TypeOrmModule.forFeature(...)` registers repositories, and this back end has none. Register the entities once on the connection in the platform database capability and call the shared EntityManager.",
+        },
     },
-  },
-  create(context) {
-    return {
-      // `@InjectRepository(...)` is refused wherever it is written: a constructor parameter, a property, a method parameter.
-      Decorator(node) {
-        const expression = node.expression
-        if (expression.type === "CallExpression" && expression.callee.type === "Identifier" && expression.callee.name === "InjectRepository") {
-          context.report({ node, messageId: "repo" })
+    create(context) {
+        return {
+            Decorator(node) {
+                const expression = node.expression
+                if (expression.type === "CallExpression" && expression.callee.type === "Identifier" && expression.callee.name === "InjectRepository") {
+                    context.report({ node, messageId: "repo" })
+                }
+            },
+            TSTypeReference(node) {
+                if (!REPOSITORY_TYPES.some((name) => isPackageType(context, node, name, "typeorm"))) return
+                if (!carriesInjectRepository(node)) context.report({ node, messageId: "repo" })
+            },
+            CallExpression(node) {
+                const callee = node.callee
+                if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return
+                if (callee.property.name === "forFeature" && isPackageType(context, callee.object, "TypeOrmModule", "@nestjs/typeorm")) {
+                    context.report({ node, messageId: "forFeature" })
+                }
+            },
         }
-      },
-      MethodDefinition(node) {
-        for (const original of constructorParams(node)) {
-          const param = unwrapParam(original)
-          // A decorated parameter is reported once, by the Decorator visitor.
-          if (paramDecorators(original).includes("InjectRepository")) continue
-          if (REPOSITORY_TYPES.test(paramTypeName(param) || "")) context.report({ node: param, messageId: "repo" })
-        }
-      },
-    }
-  },
+    },
 }
 
 // -- DATA-3 ----------------------------------------------------------------------------------------
 
 /** An entity names its table, so a class rename cannot become a dropped table. */
 export const requireEntityTableName = {
-  meta: {
-    type: "problem",
-    docs: { description: "`@Entity()` names its table explicitly." },
-    schema: [],
-    messages: {
-      inferred:
-        "`@Entity()` here lets the ORM infer the table name from the class name, so renaming the class renames the table - which `synchronize` performs as a DROP and CREATE rather than a migration. A class rename is a refactor; a dropped table is an outage. Name the table.",
+    meta: {
+        type: "problem",
+        docs: { description: "`@Entity()` names its table explicitly." },
+        schema: [],
+        messages: {
+            inferred:
+                "`@Entity()` here lets the ORM infer the table name from the class name, so renaming the class renames the table - which `synchronize` performs as a DROP and CREATE rather than a migration. A class rename is a refactor; a dropped table is an outage. Name the table.",
+        },
     },
-  },
-  create(context) {
-    /** Both `@Entity("t")` and `@Entity({ name: "t" })` name the table. */
-    const isTableName = (argument) =>
-      (argument.type === "Literal" && typeof argument.value === "string") || argument.type === "TemplateLiteral"
-    return {
-      Decorator(node) {
-        const expression = node.expression
-        if (expression.type !== "CallExpression") return
-        if (expression.callee.type !== "Identifier" || expression.callee.name !== "Entity") return
-        // The options form is not a stylistic variant to discourage: it is the ONLY form that can
-        // also carry a schema qualifier, so rejecting it would push an author to delete the schema
-        // to satisfy the rule - a worse outcome than the inferred name this exists to prevent.
-        const named = expression.arguments.some(
-          (argument) =>
-            isTableName(argument)
-            || (argument.type === "ObjectExpression"
-              && argument.properties.some(
-                (property) =>
-                  property.type === "Property"
-                  && !property.computed
-                  && (property.key.name === "name" || property.key.value === "name")
-                  && isTableName(property.value),
-              )),
-        )
-        if (!named) context.report({ node, messageId: "inferred" })
-      },
-    }
-  },
+    create(context) {
+        /** Both `@Entity("t")` and `@Entity({ name: "t" })` name the table. */
+        const isTableName = (argument) =>
+            (argument.type === "Literal" && typeof argument.value === "string") || argument.type === "TemplateLiteral"
+        return {
+            Decorator(node) {
+                const expression = node.expression
+                if (expression.type !== "CallExpression") return
+                if (expression.callee.type !== "Identifier" || expression.callee.name !== "Entity") return
+                // The options form is not a stylistic variant to discourage: it is the ONLY form that can
+                // also carry a schema qualifier, so rejecting it would push an author to delete the schema
+                // to satisfy the rule - a worse outcome than the inferred name this exists to prevent.
+                const named = expression.arguments.some(
+                    (argument) =>
+                        isTableName(argument)
+                        || (argument.type === "ObjectExpression"
+                            && argument.properties.some(
+                                (property) =>
+                                    property.type === "Property"
+                                    && !property.computed
+                                    && (property.key.name === "name" || property.key.value === "name")
+                                    && isTableName(property.value),
+                            )),
+                )
+                if (!named) context.report({ node, messageId: "inferred" })
+            },
+        }
+    },
 }
 
-// -- DATA-4 (Rule 5) --------------------------------------------------------------------------------
+// -- transactions ----------------------------------------------------------------------------------
 
-/** Node types that rebind `this` - a `this.<field>` read past one of these belongs to a different call. */
-const REBINDS_THIS = /^(?:FunctionDeclaration|FunctionExpression|ClassDeclaration|ClassExpression)$/
-
-/** Walk every descendant of `node` that still runs under the SAME `this`, calling `visit` on each. */
-const walkPreservingThis = (node, visit) => {
-  if (!node || typeof node.type !== "string") return
-  visit(node)
-  for (const key of Object.keys(node)) {
-    if (key === "parent") continue
-    const value = node[key]
-    if (Array.isArray(value)) {
-      for (const child of value) {
-        if (child && typeof child.type === "string" && !REBINDS_THIS.test(child.type)) walkPreservingThis(child, visit)
-      }
-    } else if (value && typeof value.type === "string" && !REBINDS_THIS.test(value.type)) {
-      walkPreservingThis(value, visit)
-    }
-  }
+/** The callback of a `.transaction(...)` call on a manager or data source, or null. */
+const transactionCallback = (context, node) => {
+    const callee = node.callee
+    if (callee.type !== "MemberExpression" || callee.computed) return null
+    if (callee.property.type !== "Identifier" || callee.property.name !== "transaction") return null
+    const receiver = infraTypeOf(context, callee.object)
+    if (receiver !== "EntityManager" && receiver !== "DataSource") return null
+    const callback = node.arguments[node.arguments.length - 1]
+    return callback && (callback.type === "ArrowFunctionExpression" || callback.type === "FunctionExpression") ? callback : null
 }
 
-/** Everything inside a transaction receives the transactional manager, not the outer injected one. */
+/** The variable an identifier resolves to, looking outward from the identifier's own scope. */
+const resolveVariable = (sourceCode, node) => {
+    for (let scope = sourceCode.getScope(node); scope; scope = scope.upper) {
+        const variable = scope.set.get(node.name)
+        if (variable) return variable
+    }
+    return null
+}
+
+/** The leftmost expression of a member chain: `this.deps.em` gives the `this`. */
+const rootOf = (expression) => {
+    let current = expression
+    while (current.type === "MemberExpression" || current.type === "TSNonNullExpression") current = current.type === "MemberExpression" ? current.object : current.expression
+    return current
+}
+
+/** Whether an identifier position reads a value (a property name, a key or a type name does not). */
+const readsValue = (node) => {
+    const parent = node.parent
+    if (parent.type === "MemberExpression" && parent.property === node && !parent.computed) return false
+    if (parent.type === "Property" && parent.key === node && !parent.computed && !parent.shorthand) return false
+    return !parent.type.startsWith("TS")
+}
+
+/** Everything inside a transaction receives the transactional manager, not one declared outside it. */
 export const noOuterManagerInTransaction = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Inside `this.<field>.transaction(async (tx) => ...)`, every call uses `tx` - never `this.<field>` again (data-access.md DATA-4, Rule 5).",
+    meta: {
+        type: "problem",
+        docs: { description: "Inside `<manager>.transaction(async (tx) => ...)`, every call uses `tx`, never another `EntityManager` declared outside the callback." },
+        schema: [],
+        messages: {
+            outerManager:
+                "`{{name}}` is an EntityManager from OUTSIDE this transaction callback. A call through it runs and commits on its own, which is how half a write survives a rollback. Use the manager the callback received.",
+        },
     },
-    schema: [],
-    messages: {
-      outerManager:
-        "This is inside `this.{{field}}.transaction(...)`, but it reaches for `this.{{field}}` again instead of `{{param}}`, the manager the callback received. `this.{{field}}` is the manager from BEFORE the transaction opened - a call through it runs and commits on its own, which is how half a write survives a rollback. Use `{{param}}`.",
+    create(context) {
+        const sourceCode = context.sourceCode || context.getSourceCode()
+        /** Whether the value written at `node` was declared outside the callback spanning `range`. */
+        const declaredOutside = (node, range) => {
+            const root = rootOf(node)
+            if (root.type === "ThisExpression") return true
+            if (root.type !== "Identifier") return false
+            const variable = resolveVariable(sourceCode, root)
+            const declaration = variable?.defs[0]?.name
+            return Boolean(declaration) && (declaration.range[0] < range[0] || declaration.range[1] > range[1])
+        }
+        return {
+            CallExpression(node) {
+                const callback = transactionCallback(context, node)
+                if (!callback) return
+                walk(callback.body, (child) => {
+                    const isReference = child.type === "MemberExpression" || (child.type === "Identifier" && readsValue(child))
+                    if (!isReference || infraTypeOf(context, child) !== "EntityManager") return
+                    if (declaredOutside(child, callback.range)) context.report({ node: child, messageId: "outerManager", data: { name: sourceCode.getText(child) } })
+                })
+            },
+        }
     },
-  },
-  create(context) {
-    return {
-      CallExpression(node) {
-        const callee = node.callee
-        if (callee.type !== "MemberExpression" || callee.computed) return
-        if (callee.property.type !== "Identifier" || callee.property.name !== "transaction") return
-        const object = callee.object
-        if (object.type !== "MemberExpression" || object.computed) return
-        if (object.object.type !== "ThisExpression") return
-        if (object.property.type !== "Identifier") return
-        const field = object.property.name
-        // Only the arrow-function callback is covered. A plain `function (tx) {}` callback does not
-        // inherit `this` from the enclosing method at all - TypeORM invokes it with no receiver, so
-        // `this.<field>` inside one throws rather than silently escaping the transaction, and this
-        // rule exists for the silent case.
-        const callback = node.arguments[0]
-        if (!callback || callback.type !== "ArrowFunctionExpression") return
-        const param = callback.params[0]
-        const paramName = param && param.type === "Identifier" ? param.name : "the transactional manager"
-        walkPreservingThis(callback.body, (descendant) => {
-          if (
-            descendant.type === "MemberExpression"
-            && !descendant.computed
-            && descendant.object.type === "ThisExpression"
-            && descendant.property.type === "Identifier"
-            && descendant.property.name === field
-          ) {
-            context.report({ node: descendant, messageId: "outerManager", data: { field, param: paramName } })
-          }
-        })
-      },
-    }
-  },
 }
 
 // -- DATA-5 (Rule 6) --------------------------------------------------------------------------------
@@ -258,195 +268,114 @@ const RELATION_DECORATORS = /^(?:ManyToOne|OneToOne|OneToMany|ManyToMany)$/
 
 /** A relation is asked for by the call site that needs it; the entity grants no relation eagerly. */
 export const noEagerRelation = {
-  meta: {
-    type: "problem",
-    docs: {
-      description: "A relation decorator carries no `eager: true` (data-access.md DATA-5, Rule 6).",
+    meta: {
+        type: "problem",
+        docs: {
+            description: "A relation decorator carries no `eager: true` (data-access.md DATA-5, Rule 6).",
+        },
+        schema: [],
+        messages: {
+            eager:
+                "`@{{decorator}}(..., { eager: true })` grants this relation to every caller whether it asked for it or not, so a query that wants one column now pays for the whole tree. State the relation in the `relations` the call site writes, and drop `eager` here.",
+        },
     },
-    schema: [],
-    messages: {
-      eager:
-        "`@{{decorator}}(..., { eager: true })` grants this relation to every caller whether it asked for it or not, so a query that wants one column now pays for the whole tree. State the relation in the `relations` the call site writes, and drop `eager` here.",
-    },
-  },
-  create(context) {
-    return {
-      Decorator(node) {
-        const expression = node.expression
-        if (expression.type !== "CallExpression") return
-        if (expression.callee.type !== "Identifier" || !RELATION_DECORATORS.test(expression.callee.name)) return
-        for (const argument of expression.arguments) {
-          if (argument.type !== "ObjectExpression") continue
-          const eagerProperty = argument.properties.find(
-            (property) =>
-              property.type === "Property"
-              && !property.computed
-              && (property.key.name === "eager" || property.key.value === "eager"),
-          )
-          if (!eagerProperty) continue
-          if (eagerProperty.value.type === "Literal" && eagerProperty.value.value === true) {
-            context.report({ node, messageId: "eager", data: { decorator: expression.callee.name } })
-          }
+    create(context) {
+        return {
+            Decorator(node) {
+                const expression = node.expression
+                if (expression.type !== "CallExpression") return
+                if (expression.callee.type !== "Identifier" || !RELATION_DECORATORS.test(expression.callee.name)) return
+                for (const argument of expression.arguments) {
+                    if (argument.type !== "ObjectExpression") continue
+                    const eagerProperty = argument.properties.find(
+                        (property) =>
+                            property.type === "Property"
+                            && !property.computed
+                            && (property.key.name === "eager" || property.key.value === "eager"),
+                    )
+                    if (!eagerProperty) continue
+                    if (eagerProperty.value.type === "Literal" && eagerProperty.value.value === true) {
+                        context.report({ node, messageId: "eager", data: { decorator: expression.callee.name } })
+                    }
+                }
+            },
         }
-      },
+    },
+}
+
+// -- R82 ---------------------------------------------------------------------------------------------
+
+/** The platform types whose calls leave the process. */
+const PLATFORM_EXTERNAL_TYPES = new Set(["HttpClient", "MessagePublisher"])
+
+/** Every receiver of a call chain, outermost first: `this.stripe.charges.create()` gives `this.stripe.charges`, `this.stripe`, `this`. */
+const receiversOf = (callee) => {
+    const receivers = []
+    let current = callee.type === "MemberExpression" ? callee.object : null
+    while (current) {
+        receivers.push(current)
+        if (current.type === "MemberExpression") current = current.object
+        else if (current.type === "CallExpression") current = current.callee.type === "MemberExpression" ? current.callee.object : null
+        else if (current.type === "TSNonNullExpression") current = current.expression
+        else current = null
     }
-  },
-}
-
-// -- DATA-6 (R82) ------------------------------------------------------------------------------------
-
-const HTTP_RECEIVER = /^(?:axios|http|httpService|httpClient|axiosInstance)$/
-const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "head", "request"])
-/** A receiver named for an integration client or SDK: `stripeClient`, `this.paymentSdk`. */
-const EXTERNAL_RECEIVER = /(?:Client|Sdk)$/
-
-const calleeMethodName = (callee) =>
-  callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" ? callee.property.name : null
-
-const calleeReceiverName = (callee) => {
-  if (callee.type !== "MemberExpression") return null
-  const object = callee.object
-  if (object.type === "Identifier") return object.name
-  if (object.type === "MemberExpression" && !object.computed && object.property.type === "Identifier") return object.property.name
-  return null
-}
-
-/** Whether `node` is a call this law treats as reaching an external system: `fetch`, an HTTP client, or any method of a `*Client`/`*Sdk`. */
-const isExternalCall = (node) => {
-  if (node.type !== "CallExpression") return false
-  const { callee } = node
-  if (callee.type === "Identifier" && callee.name === "fetch") return true
-  const method = calleeMethodName(callee)
-  const receiver = calleeReceiverName(callee)
-  if (!method || !receiver) return false
-  if (HTTP_RECEIVER.test(receiver) && HTTP_METHODS.has(method)) return true
-  return EXTERNAL_RECEIVER.test(receiver)
-}
-
-/** A short label for a reported call: `stripeClient.charge`, `fetch`. */
-const describeCall = (node) => {
-  const { callee } = node
-  if (callee.type === "Identifier") return callee.name
-  const method = calleeMethodName(callee) ?? "?"
-  const receiver = calleeReceiverName(callee) ?? "?"
-  return `${receiver}.${method}`
+    return receivers
 }
 
 /** No transaction spans an external call: commit first, then call out (or write an outbox message inside the transaction). */
 export const noExternalCallInTransaction = {
-  meta: {
-    type: "problem",
-    docs: {
-      description: "An HTTP or SDK call does not run inside `.transaction(async (tx) => ...)`.",
+    meta: {
+        type: "problem",
+        docs: { description: "An HTTP, SDK or publish call does not run inside `<manager>.transaction(async (tx) => ...)`." },
+        schema: [],
+        messages: {
+            external:
+                "`{{call}}` runs inside `.transaction(...)`. A database transaction held open for as long as an external call takes means: the call fails after the transaction already did its work and now has to be undone by hand, or the call succeeds and the transaction then rolls back, and the two systems disagree with no way back. Commit the transaction, then make the call - or write an outbox message inside the transaction and let a worker deliver it after commit.",
+        },
     },
-    schema: [],
-    messages: {
-      external:
-        "`{{call}}` runs inside `.transaction(...)`. A database transaction held open for as long as an external call takes means: the call fails after the transaction already did its work and now has to be undone by hand, or the call succeeds and the transaction then rolls back, and the two systems disagree with no way back. Commit the transaction, then make the call - or write an outbox message inside the transaction and let a worker deliver it after commit.",
-    },
-  },
-  create(context) {
-    return {
-      CallExpression(node) {
-        const callee = node.callee
-        if (callee.type !== "MemberExpression" || callee.computed) return
-        if (callee.property.type !== "Identifier" || callee.property.name !== "transaction") return
-        const callback = node.arguments[0]
-        if (!callback || (callback.type !== "ArrowFunctionExpression" && callback.type !== "FunctionExpression")) return
-        walk(callback.body, (child) => {
-          if (isExternalCall(child)) context.report({ node: child, messageId: "external", data: { call: describeCall(child) } })
-        })
-      },
-    }
-  },
-}
-
-// -- DATA-7 (R83) ------------------------------------------------------------------------------------
-
-/** Files that build the connections: the platform database module and the migrate app. */
-const CONNECTION_BUILDER = /(?:^|\/)(?:platform\/(?:databases?|db|datasource|typeorm)|apps\/migrate)\//
-
-/** The one way a use case reaches the database: the shared `EntityManager`, named, then called directly. */
-export const namedEntityManagerOnly = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "The shared EntityManager is injected through a named injector and called directly; no bare `@InjectEntityManager()`, no `getRepository`, no injected `DataSource` (data-access.md DATA-7, R83).",
-    },
-    schema: [],
-    messages: {
-      unnamed:
-        "`@InjectEntityManager()` names no connection, and this application registers more than one - so it points at whichever is default. Inject the shared EntityManager with the named injector (`InjectPrimaryEntityManager()`, `InjectAgentOsEntityManager()`, `InjectExpertAcademyEntityManager()`, or `@InjectEntityManager(<CONNECTION_TOKEN>)`) and call it directly.",
-      getRepository:
-        "`.getRepository(...)` binds a handle to ONE entity and hides which connection it came from. Inject the shared EntityManager with the named injector and call it directly: `manager.find(Entity, ...)`, `manager.save(Entity, ...)`, `tx.insert(Entity, ...)`.",
-      dataSource:
-        "`DataSource` is injected here to reach the database. Inject the shared EntityManager with the named injector and call it directly; a `DataSource` is built only by the platform database module.",
-    },
-  },
-  create(context) {
-    const filename = normalizePath(context.filename || context.getFilename())
-    if (/\.d\.[cm]?ts$/.test(filename) || /\.(?:spec|test)\.[cm]?[jt]sx?$/.test(filename)) return {}
-    const mayBuildConnections = CONNECTION_BUILDER.test(filename)
-    return {
-      Decorator(node) {
-        const expression = node.expression
-        if (expression.type !== "CallExpression" || expression.callee.type !== "Identifier") return
-        if (expression.callee.name === "InjectEntityManager" && expression.arguments.length === 0) {
-          context.report({ node, messageId: "unnamed" })
+    create(context) {
+        const hfs = hfsOf(context)
+        const sourceCode = context.sourceCode || context.getSourceCode()
+        /** Whether a value's type is declared in `integrations/**` or is the platform `HttpClient` / `MessagePublisher`. */
+        const isExternalReceiver = (node) =>
+            typeOrigins(context, node).some(
+                (origin) => hfs.tierOf(origin.file) === "integrations" || (PLATFORM_EXTERNAL_TYPES.has(origin.name) && hfs.slotOf(origin.file) === "be.platform"),
+            )
+        return {
+            CallExpression(node) {
+                const callback = transactionCallback(context, node)
+                if (!callback) return
+                walk(callback.body, (child) => {
+                    if (child.type !== "CallExpression") return
+                    const { callee } = child
+                    const globalFetch = callee.type === "Identifier" && callee.name === "fetch" && !resolveVariable(sourceCode, callee)?.defs.length
+                    if (globalFetch || receiversOf(callee).some(isExternalReceiver)) {
+                        context.report({ node: child, messageId: "external", data: { call: sourceCode.getText(callee).slice(0, 60) } })
+                    }
+                })
+            },
         }
-      },
-      CallExpression(node) {
-        const callee = node.callee
-        if (callee.type !== "MemberExpression" || callee.computed) return
-        if (callee.property.type === "Identifier" && callee.property.name === "getRepository") {
-          context.report({ node, messageId: "getRepository" })
-        }
-      },
-      MethodDefinition(node) {
-        if (mayBuildConnections) return
-        for (const original of constructorParams(node)) {
-          const param = unwrapParam(original)
-          const byType = paramTypeName(param) === "DataSource"
-          const byDecorator = paramDecorators(original).some((name) => name === "InjectDataSource" || name === "InjectConnection")
-          if (byType || byDecorator) context.report({ node: param, messageId: "dataSource" })
-        }
-      },
-    }
-  },
+    },
 }
 
 /** The rules this law contributes to the plugin. */
 export const rules = {
-  "must-inject-entity-manager": mustInjectEntityManager,
-  "no-injected-repository": noInjectedRepository,
-  "require-entity-table-name": requireEntityTableName,
-  "no-outer-manager-in-transaction": noOuterManagerInTransaction,
-  "no-eager-relation": noEagerRelation,
-  "no-external-call-in-transaction": noExternalCallInTransaction,
-  "named-entity-manager-only": namedEntityManagerOnly,
+    "must-inject-entity-manager": mustInjectEntityManager,
+    "no-injected-repository": noInjectedRepository,
+    "require-entity-table-name": requireEntityTableName,
+    "no-outer-manager-in-transaction": noOuterManagerInTransaction,
+    "no-eager-relation": noEagerRelation,
+    "no-external-call-in-transaction": noExternalCallInTransaction,
+    "named-entity-manager-only": namedEntityManagerOnly,
 }
 
-/**
- * The level this law asks for, as the plugin's own opinion.
- *
- * All five measured against the reference repository (`src/**`) before shipping. The original three
- * measured at zero debt and ship at `error`. `no-outer-manager-in-transaction` also measured zero -
- * every `.transaction(async (tx) => ...)` callback in the reference repository already uses only the
- * parameter it was handed - and ships at `error`. `no-eager-relation` also measured zero - no entity
- * in the reference repository declares `eager: true` - and ships at `error` as well; a repository
- * adopting these into a tree that is not already clean measures first and lands anything above zero
- * at `warn` with the count beside it.
- */
+/** Every rule of this law ships at `error`; a repository is fixed before it adopts the plugin, never given a weaker level. */
 export const recommended = {
-  "starci-be/must-inject-entity-manager": "error",
-  "starci-be/no-injected-repository": "error",
-  "starci-be/require-entity-table-name": "error",
-  "starci-be/no-outer-manager-in-transaction": "error",
-  "starci-be/no-eager-relation": "error",
-  "starci-be/no-external-call-in-transaction": "error",
-  "starci-be/named-entity-manager-only": "error",
+    "starci-be/must-inject-entity-manager": "error",
+    "starci-be/no-injected-repository": "error",
+    "starci-be/require-entity-table-name": "error",
+    "starci-be/no-outer-manager-in-transaction": "error",
+    "starci-be/no-eager-relation": "error",
+    "starci-be/no-external-call-in-transaction": "error",
+    "starci-be/named-entity-manager-only": "error",
 }
-
-/** Path helper shared with the other backend law modules. */
-export { normalizePath }
