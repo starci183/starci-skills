@@ -46,8 +46,7 @@ import { startAgent, loadAdapter } from '../agent/lib.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { closeAndVerify } from '../lib/close-verify.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
-import { workerStop } from '../api/orca/worker-stop.mjs';
-import { workerRelease } from '../api/orca/worker-release.mjs';
+import { stopAndRelease } from '../lib/close-verify.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
 import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
@@ -422,13 +421,12 @@ function refuseClosedGoal(goal, wf) {
 const EXIT_HOST_UNAVAILABLE = 75;
 const EXIT_KERNEL_ALIVE = 3;
 
-// Best-effort settlement of a managed dispatch (stale kernel replacement or a
-// failed launch with residual effects): worker-stop then worker-release,
-// matching calls.yaml's settle-dispatch recovery. Never throws.
-function releaseManagedWorker(dispatchId) {
-  if (!dispatchId) return;
-  try { workerStop({ dispatch: dispatchId }); } catch { /* best-effort */ }
-  try { workerRelease({ dispatch: dispatchId }); } catch { /* best-effort */ }
+// Settlement of a stale Kernel's Dispatch: worker-stop then worker-release (calls.yaml settle-dispatch), recorded as
+// the seat's terminalClosed receipt - release is what closes a worker's terminal. A refused release is the
+// kernel-stale-terminal-unclosed residue, never silence. Never throws.
+function releaseManagedWorker(dispatchId, handle = null) {
+  const released = stopAndRelease(dispatchId);
+  return { handle, dispatch: dispatchId, ok: released.ok, ...(released.ok ? {} : { error: released.release.error ?? released.stop.error ?? 'worker-release refused' }) };
 }
 
 // A stale command-terminal kernel (launch: terminal — the Devin/Codex
@@ -564,7 +562,7 @@ try {
     // A stale Kernel may still hold a live Orca worker — settle the exact old Dispatch (stop + release) before the
     // seat is cleared so the replacement never runs beside a zombie. A terminal-launched Kernel (legacy seat) is
     // retired once: its terminal is closed BEFORE the new one is recorded — one workflow, one Kernel.
-    if (priorHealth.value?.dispatch) releaseManagedWorker(priorHealth.value.dispatch);
+    if (priorHealth.value?.dispatch) staleKernel.terminalClosed = releaseManagedWorker(priorHealth.value.dispatch, staleKernel.terminal);
     else if (priorHealth.legacy && staleKernel.terminal) {
       staleKernel.retiredTerminalLaunch = true;
       staleKernel.terminalClosed = closeStaleKernelTerminal(staleKernel.terminal);

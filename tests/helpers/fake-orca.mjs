@@ -579,6 +579,9 @@ else if (verb === 'orchestration worker-start') {
     state: 'ready', stage: 'ready',
     launch: { effective: { agent: arg('agent'), model: arg('model'), effort: arg('effort') } } } });
 }
+// state.lostDispatches: Dispatches a restarted host no longer knows (after a reboot).
+else if (verb === 'orchestration worker-show' && (state.lostDispatches || []).includes(arg('dispatch')))
+  fail({ ok: false, error: { code: 'dispatch_not_found', message: 'Dispatch ' + arg('dispatch') + ' was not found.' } });
 else if (verb === 'orchestration worker-show') {
   if (mode === 'prompt-stalled')
     out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1', last_failure: 'agent_prompt_stalled' },
