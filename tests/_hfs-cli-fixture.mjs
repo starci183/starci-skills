@@ -7,9 +7,17 @@ import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '..
 export const BE = { hfs: 1, profile: 'be', project: 'demo', apps: [{ name: 'core', kind: 'api' }] };
 export const FE = { hfs: 1, profile: 'fe', project: 'demo', apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }] };
 
-/** A clean product repository for `declaration`: every path the manifest requires, plus one BE feature. Not yet a Git repository. */
-export function writeCleanRepo(declaration, { declare = true } = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-cli-'));
+const readmeOf = (name, profile) => [`# ${name}`, '', 'A demo repository for the hfs check specs.', '', '## Overview', '', 'Demo.', '', '## Stack', '', 'TypeScript.', '', '## Repository layout', '', 'apps and src.', '',
+  '## Development', '', '```sh', 'npm ci', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm run test:unit', '```', '', ...(profile === 'be' ? ['## Work', '', 'Records live in `.starciwork`.', ''] : [])].join('\n');
+
+/**
+ * A clean product repository for `declaration`: every path the manifest requires, plus one BE feature, clean to the whole
+ * check (the README, the tsconfig and, for a back end, the composition the machine wants). Not yet a Git repository.
+ * `into` places it as <into>/<name> instead of a fresh temporary directory (its README names the directory).
+ */
+export function writeCleanRepo(declaration, { declare = true, into, name = 'demo' } = {}) {
+  const dir = into ? path.join(into, name) : fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-cli-'));
+  fs.mkdirSync(dir, { recursive: true });
   const manifest = loadSlotManifest();
   const resolver = createSlotResolver(manifest, resolveRepoDeclaration(manifest, declaration));
   const put = (relative, text = '') => {
@@ -24,14 +32,29 @@ export function writeCleanRepo(declaration, { declare = true } = {}) {
     put('src/features/orders/index.ts', 'export {};\n');
     put('src/features/orders/orders.module.ts', 'export {};\n');
     put('src/features/orders/application/place-order.use-case.ts', 'export {};\n');
+    // The machine judges reachability: the app composes the feature and every required module, so a clean repository is clean to it too.
+    const owners = ['src/features/orders/index.ts', ...resolver.requiredPaths().paths.map((entry) => entry.path).filter((p) => /^src\/modules\/[^/]+\/[^/]+\/index\.ts$/.test(p))];
+    fs.writeFileSync(path.join(dir, 'apps/core/src/main.ts'), owners.map((file) => `import '../../../${file.replace(/\.ts$/, '')}';`).join('\n') + '\n');
   }
+  fs.writeFileSync(path.join(dir, 'tsconfig.json'), `${JSON.stringify({ compilerOptions: { strict: true, module: 'commonjs', target: 'es2022', skipLibCheck: true }, include: ['src', 'apps'] }, null, 2)}\n`);
+  fs.writeFileSync(path.join(dir, 'README.md'), readmeOf(path.basename(dir), declaration.profile));
   if (declare) fs.writeFileSync(path.join(dir, 'hfs.json'), `${JSON.stringify(declaration, null, 2)}\n`);
+  else fs.rmSync(path.join(dir, 'hfs.json'), { force: true });
+  return dir;
+}
+
+/** Makes the repository's own `typescript` resolvable (the machine loads TypeScript from the checked repository) without tracking it. */
+export function installTypeScript(dir) {
+  const target = path.join(dir, 'node_modules', 'typescript');
+  fs.mkdirSync(target, { recursive: true });
+  fs.writeFileSync(path.join(target, 'package.json'), '{"name":"typescript","main":"index.js"}\n');
+  fs.writeFileSync(path.join(target, 'index.js'), `module.exports = require(${JSON.stringify(path.resolve(import.meta.dirname, '..', 'node_modules', 'typescript'))});\n`);
   return dir;
 }
 
 export function gitAdd(dir) {
   execFileSync('git', ['-C', dir, 'init', '-q'], { stdio: 'ignore' });
-  execFileSync('git', ['-C', dir, 'add', '-A', '-f'], { stdio: 'ignore' });
+  execFileSync('git', ['-C', dir, 'add', '-A', '-f', '--', '.', ':!node_modules'], { stdio: 'ignore' });
   return dir;
 }
 

@@ -4,11 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../engine/yaml.mjs';
-import { CHECK_CODES, checkRepo, explainPath, initRepo, readWhy } from '../scripts/lib/hfs-check.mjs';
+import { ALL_CHECK_CODES, CHECK_CODES, checkRepo, checkRepository, explainPath, initRepo, readWhy } from '../scripts/lib/hfs-check.mjs';
+import { ARCHITECTURE_RULE_IDS } from '../scripts/checks/architecture/index.mjs';
 import { HfsSlotsError } from '../scripts/lib/hfs-slots.mjs';
 import { main } from '../packages/hfs/bin/hfs.mjs';
-import { driftOfRuntime } from '../packages/hfs/scripts/sync-runtime.mjs';
-import { BE, FE, cleanup, gitAdd, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { BUNDLES, driftOfRuntime, importClosure } from '../packages/hfs/scripts/sync-runtime.mjs';
+import { BE, FE, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const pins = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins;
@@ -17,7 +18,7 @@ const repoOf = (declaration, mutate, options) => {
   const dir = writeCleanRepo(declaration, options);
   made.push(dir);
   if (mutate) mutate(dir);
-  return gitAdd(dir);
+  return installTypeScript(gitAdd(dir));
 };
 test.after(() => cleanup(made));
 
@@ -264,7 +265,7 @@ test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json 
 });
 
 test('the CLI: report-only backlog leaves the exit code 0; explain and init print what they found', async () => {
-  const dir = repoOf(BE, (d) => put(d, 'apps/core/src/big.ts', 'export {};\n'.repeat(600)));
+  const dir = repoOf(BE, (d) => put(d, 'src/features/orders/application/big.ts', 'export {};\n'.repeat(600)));
   assert.equal((await cli(['check', '--repo', dir])).code, 0);
 
   const explained = await cli(['explain', 'src/features/orders/index.ts', '--repo', dir]);
@@ -291,4 +292,222 @@ test('the packaged entry point runs from a fresh process with no runtime checkou
   const run = spawnSync(process.execPath, [path.join(root, 'packages/hfs/bin/hfs.mjs'), 'check', '--repo', dir, '--json'], { encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   assert.equal(JSON.parse(run.stdout).ok, true);
+});
+
+// ------------------------------------------------------------------------------------------------ the tree (R03)
+
+const git = (dir, ...args) => spawnSync('git', ['-C', dir, '-c', 'user.name=spec', '-c', 'user.email=spec@example.test', ...args], { encoding: 'utf8' });
+const mkdir = (dir, relative) => fs.mkdirSync(path.join(dir, ...relative.split('/')), { recursive: true });
+const NO_FINDINGS_MACHINE = () => ({ ok: true, files: 0, kinds: [], violations: [], errors: [] });
+/** A committed repository on `main` with a `topic` branch checked out: what a lane looks like before its first change. */
+const branched = (mutate) => {
+  const dir = repoOf(BE, mutate);
+  git(dir, 'commit', '-qm', 'base');
+  git(dir, 'branch', '-M', 'main');
+  git(dir, 'checkout', '-qb', 'topic');
+  return dir;
+};
+
+test('an empty directory is HFS_EMPTY_DIR: the topmost one, however many empty directories sit below it', () => {
+  const dir = repoOf(BE, (d) => { mkdir(d, 'src/modules/business/a/b'); mkdir(d, 'src/modules/business/c'); });
+  const found = only(checkRepo({ repoRoot: dir }), 'HFS_EMPTY_DIR');
+  assert.deepEqual(found.map((f) => [f.path, f.below]), [['src/modules/business', 3]]);
+  assert.equal(found[0].level, 'error');
+});
+
+test('a directory holding only empty directories is empty; one file anywhere below makes the whole chain not empty', () => {
+  const dir = repoOf(BE, (d) => { mkdir(d, 'src/modules/x/y/z'); put(d, 'src/modules/kept/deep/er/file.ts'); });
+  assert.deepEqual(only(checkRepo({ repoRoot: dir }), 'HFS_EMPTY_DIR').map((f) => f.path), ['src/modules/x']);
+});
+
+test('empty directories inside .git, node_modules and an ignored slot are not reported', () => {
+  const dir = repoOf(BE, (d) => { mkdir(d, 'dist/empty'); mkdir(d, 'node_modules/pkg/empty'); mkdir(d, 'coverage/lcov'); });
+  const result = checkRepo({ repoRoot: dir });
+  assert.deepEqual(only(result, 'HFS_EMPTY_DIR'), []);
+  assert.deepEqual(only(result, 'HFS_GHOST_TREE'), []);
+});
+
+test('HFS_GHOST_TREE: an empty directory beside a sibling within two edits of its name (business / bussiness)', () => {
+  const dir = repoOf(BE, (d) => { put(d, 'src/modules/business/a.ts'); mkdir(d, 'src/modules/bussiness'); mkdir(d, 'src/modules/platform-extras'); });
+  const result = checkRepo({ repoRoot: dir });
+  const ghosts = only(result, 'HFS_GHOST_TREE');
+  assert.equal(ghosts.length, 1, 'platform-extras is far from every sibling');
+  assert.deepEqual([ghosts[0].path, ghosts[0].of, ghosts[0].distance], ['src/modules/bussiness', 'src/modules/business', 1]);
+  assert.ok(only(result, 'HFS_EMPTY_DIR').some((f) => f.path === 'src/modules/bussiness'), 'the ghost is also an empty directory');
+});
+
+test('two lookalike siblings that both hold files are not a ghost tree; three edits apart are not lookalikes', () => {
+  const dir = repoOf(BE, (d) => { put(d, 'src/modules/order/a.ts'); put(d, 'src/modules/ordr/a.ts'); mkdir(d, 'src/modules/orderXYZ'); });
+  assert.deepEqual(only(checkRepo({ repoRoot: dir }), 'HFS_GHOST_TREE'), []);
+});
+
+test('HFS_UNTRACKED_ROOT_ENTRY: an entry git neither tracks nor ignores; one in an ignored slot or ignored by git is not reported', () => {
+  const dir = repoOf(BE);
+  put(dir, 'nul');
+  put(dir, 'scratch/notes.txt');
+  put(dir, 'dist/main.js');
+  put(dir, '.gitignore', 'ignored-by-git.txt\n');
+  put(dir, 'ignored-by-git.txt');
+  const result = checkRepo({ repoRoot: dir });
+  assert.deepEqual(only(result, 'HFS_UNTRACKED_ROOT_ENTRY').map((f) => f.path).sort(), ['nul', 'scratch']);
+  assert.equal(result.ok, false);
+});
+
+test('the tree checks do not run over an explicit file list (a dry run of specs and previews)', () => {
+  const dir = repoOf(BE, (d) => mkdir(d, 'src/modules/business'));
+  const result = checkRepo({ repoRoot: dir, files: ['hfs.json'], declaration: BE });
+  assert.deepEqual(only(result, 'HFS_EMPTY_DIR'), []);
+});
+
+// ------------------------------------------------------------------------------------- the machine inside hfs check
+
+test('hfs check runs the architecture machine: its violation is a finding under its own code with the Vietnamese why', () => {
+  const dir = repoOf(BE, (d) => put(d, 'src/modules/domain/order/a.ts'));
+  const result = checkRepository({ repoRoot: dir });
+  const [finding] = only(result, 'BE_MODULE_NOT_COMPOSED');
+  assert.equal(result.ok, false);
+  assert.equal(finding.level, 'error');
+  assert.equal(finding.source, 'machine');
+  assert.equal(finding.path, 'src/modules/domain/order/a.ts');
+  assert.match(finding.whyVi, HAS_VIETNAMESE);
+  assert.equal(result.machine.status, 'ran');
+  assert.ok(result.machine.files > 0);
+  assert.equal(result.counts.byCode.BE_MODULE_NOT_COMPOSED.count, 1);
+});
+
+test('a clean back end and a clean front end are clean to the machine too', () => {
+  for (const declaration of [BE, FE]) {
+    const result = checkRepository({ repoRoot: repoOf(declaration) });
+    assert.deepEqual(result.findings, [], declaration.profile);
+    assert.equal(result.machine.status, 'ran');
+  }
+});
+
+test('machine errors and violations merge as findings with path, line and message; a code without a catalog entry is a refusal', () => {
+  const dir = repoOf(BE);
+  const machine = () => ({
+    ok: false, files: 4, kinds: ['backend'],
+    violations: [{ ruleId: 'BE_TIER_DIRECTION', path: 'src/features/orders/index.ts', line: 3, column: 1, message: 'goes the wrong way' }],
+    errors: [{ ruleId: 'ARCH_TYPESCRIPT_MISSING', message: 'install TypeScript' }],
+  });
+  const result = checkRepository({ repoRoot: dir, machine });
+  assert.deepEqual(codesOf(result).sort(), ['ARCH_TYPESCRIPT_MISSING', 'BE_TIER_DIRECTION']);
+  assert.equal(only(result, 'BE_TIER_DIRECTION')[0].message, 'src/features/orders/index.ts:3: goes the wrong way');
+  assert.equal(only(result, 'BE_TIER_DIRECTION')[0].line, 3);
+  assert.match(only(result, 'ARCH_TYPESCRIPT_MISSING')[0].whyVi, HAS_VIETNAMESE);
+  const unknown = () => ({ ok: false, files: 0, kinds: [], violations: [{ ruleId: 'BE_NOT_IN_ANY_CATALOG', message: 'x' }], errors: [] });
+  assert.throws(() => checkRepository({ repoRoot: dir, machine: unknown }), (error) => error instanceof HfsSlotsError && /BE_NOT_IN_ANY_CATALOG/.test(error.message));
+});
+
+test('a machine that throws is one ARCH_EXECUTION_UNAVAILABLE finding, never a pass; an invalid hfs.json skips the machine', () => {
+  const dir = repoOf(BE);
+  const result = checkRepository({ repoRoot: dir, machine: () => { throw new Error('boom'); } });
+  assert.deepEqual(codesOf(result), ['ARCH_EXECUTION_UNAVAILABLE']);
+  assert.equal(result.ok, false);
+  const undeclared = checkRepository({ repoRoot: repoOf(BE, null, { declare: false }), machine: () => { throw new Error('must not run'); } });
+  assert.deepEqual(codesOf(undeclared), ['HFS_DECLARATION_INVALID']);
+  assert.equal(undeclared.machine.status, 'skipped');
+});
+
+test('a repository without TypeScript installed fails the check with ARCH_TYPESCRIPT_MISSING, never passes', () => {
+  const dir = gitAdd(writeCleanRepo(BE));
+  made.push(dir);
+  const result = checkRepository({ repoRoot: dir });
+  assert.equal(result.ok, false);
+  assert.ok(codesOf(result).includes('ARCH_TYPESCRIPT_MISSING'));
+});
+
+// --------------------------------------------------------------------------------------------------- --fast
+
+test('--fast without a merge-base is a refusal that names the fix, never a silent full pass', async () => {
+  const dir = repoOf(BE);
+  const refused = await cli(['check', '--repo', dir, '--fast']);
+  assert.equal(refused.code, 2);
+  assert.match(refused.err, /merge-base/);
+  assert.match(refused.err, /git fetch origin main|--base/);
+  assert.equal(refused.out, '');
+  const unknownBase = await cli(['check', '--repo', branched(), '--fast', '--base', 'no-such-ref']);
+  assert.equal(unknownBase.code, 2);
+  assert.match(unknownBase.err, /--base no-such-ref/);
+});
+
+test('--fast judges the changed owners only: the machine gets their paths and skips clones and dead exports; nothing changed skips the machine', () => {
+  const dir = branched();
+  const calls = [];
+  const machine = (input) => { calls.push(input); return { ok: true, files: 3, kinds: ['backend'], violations: [], errors: [] }; };
+  const none = checkRepository({ repoRoot: dir, fast: true, machine });
+  assert.equal(calls.length, 0);
+  assert.equal(none.machine.status, 'skipped');
+  assert.equal(none.fast.changed, 0);
+
+  put(dir, 'src/features/orders/application/place-order.use-case.ts', 'export const placed = 1;\n');
+  const changed = checkRepository({ repoRoot: dir, fast: true, machine });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].paths, ['src/features/orders']);
+  assert.equal(calls[0].fast, true);
+  assert.match(calls[0].base, /^[0-9a-f]{40}$/);
+  assert.equal(changed.fast.changed, 1);
+  assert.deepEqual(changed.machine.paths, ['src/features/orders']);
+});
+
+test('--fast: slot checks run on the changed paths only, and the tree checks do not run', async () => {
+  const dir = branched((d) => put(d, 'src/stray/old.ts'));
+  put(dir, 'src/stray/new.ts');
+  mkdir(dir, 'src/modules/business');
+  git(dir, 'add', '-A', '--', '.', ':!node_modules');
+  const fast = checkRepository({ repoRoot: dir, fast: true, machine: NO_FINDINGS_MACHINE });
+  assert.deepEqual(only(fast, 'HFS_PATH_NO_SLOT').map((f) => f.path), ['src/stray/new.ts'], 'the stray file already on main is not this change');
+  assert.deepEqual(only(fast, 'HFS_EMPTY_DIR'), []);
+  const full = checkRepository({ repoRoot: dir, machine: NO_FINDINGS_MACHINE });
+  assert.deepEqual(only(full, 'HFS_PATH_NO_SLOT').map((f) => f.path).sort(), ['src/stray/new.ts', 'src/stray/old.ts']);
+  assert.deepEqual(only(full, 'HFS_EMPTY_DIR').map((f) => f.path), ['src/modules/business']);
+
+  const cliFast = await cli(['check', '--repo', dir, '--fast', '--json']);
+  assert.equal(cliFast.code, 1);
+  assert.equal(JSON.parse(cliFast.out).fast.changed, 1);
+});
+
+test('--fast with the real machine: an uncomposed module already on main is not judged, a full check reports it', async () => {
+  const dir = branched((d) => { put(d, 'src/modules/domain/order/a.ts'); put(d, 'src/modules/domain/order/index.ts'); });
+  put(dir, 'src/features/orders/application/place-order.use-case.ts', 'export const placed = 1;\n');
+  const fast = await cli(['check', '--repo', dir, '--fast']);
+  assert.equal(fast.code, 0, fast.out);
+  assert.match(fast.out, /--fast/);
+  assert.match(fast.out, /owners src\/features\/orders/);
+  const full = await cli(['check', '--repo', dir]);
+  assert.equal(full.code, 1);
+  assert.match(full.out, /BE_MODULE_NOT_COMPOSED x1/);
+});
+
+test('the CLI: machine findings fail the exit code and print with their Vietnamese why', async () => {
+  const dir = repoOf(BE, (d) => put(d, 'src/modules/domain/order/a.ts'));
+  const text = await cli(['check', '--repo', dir]);
+  assert.equal(text.code, 1);
+  assert.match(text.out, /architecture machine: ran over \d+ source files/);
+  assert.match(text.out, /BE_MODULE_NOT_COMPOSED x1/);
+  assert.match(text.out, HAS_VIETNAMESE);
+  const json = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
+  assert.equal(json.machine.status, 'ran');
+});
+
+// --------------------------------------------------------------------------------------------- the bundle
+
+test('the package bundle carries the machine, the files it imports and a why for every code the machine can emit', () => {
+  const files = BUNDLES['packages/hfs/runtime'].files;
+  assert.ok(files.includes('scripts/checks/architecture.mjs'));
+  assert.ok(files.includes('scripts/checks/architecture/index.mjs'));
+  assert.ok(files.includes('scripts/lib/hfs-tree.mjs'));
+  assert.ok(files.includes('knowledge/patterns/fe/folder.yaml'), 'the framework-pinned knowledge the front-end rules read');
+  for (const file of importClosure(['scripts/checks/architecture.mjs', 'scripts/lib/hfs-check.mjs'])) assert.ok(files.includes(file), `${file} is imported by the check but not bundled`);
+  const slice = parseYaml(fs.readFileSync(path.join(root, 'packages/hfs/runtime/modules/kernel/failure-codes.yaml'), 'utf8'));
+  assert.deepEqual(Object.keys(slice).sort(), [...ALL_CHECK_CODES].sort());
+  for (const code of ARCHITECTURE_RULE_IDS) assert.match(slice[code].title_vi, HAS_VIETNAMESE, code);
+  assert.ok(CHECK_CODES.every((code) => ALL_CHECK_CODES.includes(code)));
+});
+
+test('the bundled machine is the runtime machine: the copies are byte-identical (no second implementation)', () => {
+  const same = (text) => text.replace(/\r\n/g, '\n');
+  for (const file of BUNDLES['packages/hfs/runtime'].files.filter((f) => f.startsWith('scripts/checks/'))) {
+    assert.equal(same(fs.readFileSync(path.join(root, 'packages/hfs/runtime', file), 'utf8')), same(fs.readFileSync(path.join(root, file), 'utf8')), file);
+  }
 });

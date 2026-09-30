@@ -2,18 +2,22 @@
 
 The HFS command line of a StarCi product repository. It is installed from the npm registry at the exact version in `knowledge/hfs/canon-pins.yaml` (see [`packages/README.md`](../README.md)),
 and it is self-contained: `runtime/` carries the slot manifest, the canon pins, the Vietnamese why
-catalog slice and the loader, so it runs where there is no runtime checkout.
+catalog slice, the loader and the architecture machine with every file it imports, so it runs where there is no runtime
+checkout. The machine loads `typescript` from the repository it checks (never its own copy), so run `npm ci` first.
 
 ```sh
-npx hfs check   [--repo <dir>] [--json]       # exit 1 on any error-level finding
+npx hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>]   # exit 1 on any error-level finding
 npx hfs init    [--repo <dir>] [--stdout]     # write a starter hfs.json (never overwrites); --stdout only prints
 npx hfs explain <path> [--repo <dir>] [--json]
 npx hfs sync (--check | --write) [--root <dir>]   # generated files: husky, CI, .gitignore block, sonar, codecov (sync/, templates/)
 npx hfs work-hygiene                              # pre-commit guard for staged .starciwork / .starcistacks paths
 ```
 
-`hfs check` reads the repository's `hfs.json` and the tracked paths (`git ls-files`), and reports, each with a why code and its
-Vietnamese text (`modules/kernel/failure-codes.yaml`):
+`hfs check` reads the repository's `hfs.json` and the tracked paths (`git ls-files`), checks the work tree, and then runs the
+whole architecture machine over the repository. Every finding carries a why code and its Vietnamese text
+(`modules/kernel/failure-codes.yaml`).
+
+Its own checks:
 
 | Code | Level | Meaning |
 |---|---|---|
@@ -26,16 +30,36 @@ Vietnamese text (`modules/kernel/failure-codes.yaml`):
 | `HFS_MIN_INSTANCES` | error | fewer instances of a slot than `minInstances` |
 | `HFS_CANON_PIN_DRIFT` | error | a dependency not at the exact version of `knowledge/hfs/canon-pins.yaml` |
 | `HFS_SIZE_SOFT_BACKLOG` | info | a source file over `ruleParams.fileLines.soft`; report only, never fails |
+| `HFS_EMPTY_DIR` | error | a directory with no file below it (git tracks none), outside `.git`, `node_modules` and `ignored` slots; the topmost one is reported |
+| `HFS_GHOST_TREE` | error | an empty directory beside a sibling whose name is within two edits of its own (`business` / `bussiness`) |
+| `HFS_UNTRACKED_ROOT_ENTRY` | error | an entry git neither tracks nor ignores (`git ls-files -o --exclude-standard`), outside an `ignored` slot |
 
-Exit codes: 0 clean, 1 an error finding, 2 a refusal (not a Git work tree, bad flag). The command never writes to the repository
+The architecture machine (`scripts/checks/architecture.mjs` of the runtime, the same code bundled here): tiers and import
+direction, owner public API, cycles, module registration and composition, clones, dead exports, required files, size growth,
+the source-shape, contract-form and front-end rules, and the repository-tree rules. Each violation and each error is one
+finding under the machine's own rule id (`BE_TIER_DIRECTION`, `HFS_UNUSED_EXPORT`, `ARCH_OWNER_EXPORT_BYPASS`, ...). A
+repository without `typescript` installed fails with `ARCH_TYPESCRIPT_MISSING`; the check never passes because it could not run.
+
+`--fast` (the template pre-push hook runs `npx hfs check --fast`) judges only what changed since the merge-base of `HEAD` with
+`origin/main` (else `main`; `--base <ref>` names another ref): the slot and pin checks on the changed paths, the machine on the owners
+of the changed source files without clones and dead exports, and no file-system tree checks. The required-file and minimum-instance
+checks still cover the whole tree. With no merge-base `--fast` is a refusal (exit 2) that names the fix, never a silent full
+pass. Without `--fast`, `--base <ref>` is the base of the size-growth check.
+
+Exit codes: 0 clean, 1 an error finding, 2 a refusal (not a Git work tree, bad flag, `--fast` with no merge-base). The command never writes to the repository
 except `hfs init`, which writes `hfs.json` only when none exists.
 
 ## Maintaining the bundle
 
-`runtime/` is a byte copy of the runtime files listed in `scripts/sync-runtime.mjs` (plus the catalog slice of the codes the
-check can emit). After changing `scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-slots.mjs`, `knowledge/hfs/slots.yaml`,
-`knowledge/hfs/canon-pins.yaml` or the catalog entries of those codes, run `node packages/hfs/scripts/sync-runtime.mjs`;
+`runtime/` is a byte copy of the slot loader files, the pins, and the import closure of `scripts/lib/hfs-check.mjs` and
+`scripts/checks/architecture.mjs` (computed by `scripts/sync-runtime.mjs`, so a new import of the machine is bundled without
+editing a list), plus the catalog slice of every code `hfs check` can emit: its own and the machine's (`ARCHITECTURE_RULE_IDS`,
+derived from the machine's rule id lists). After changing any of those files, `knowledge/hfs/slots.yaml`,
+`knowledge/hfs/canon-pins.yaml`, `knowledge/patterns/fe/folder.yaml` or the catalog entries of those codes, run `node packages/hfs/scripts/sync-runtime.mjs`;
 `tests/hfs-cli.spec.mjs` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
+
+The examples gate `node scripts/checks/check-example-architecture.mjs` runs this CLI (full check) on every `examples/*` directory
+with an `hfs.json` and fails on any error-level finding (it is heavy: run it once, by hand).
 
 ## Serving knowledge to other packages
 
