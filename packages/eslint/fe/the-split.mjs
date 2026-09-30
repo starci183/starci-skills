@@ -7,21 +7,21 @@
  * neither. So this rule guards the boundary from the side where a machine can see it, and the other
  * side stays a matter for review.
  *
- * The scope is the filename. `component.tsx` is the drawing half by convention across every tier
- * that splits, so the convention does the scoping and the rule needs no configuration.
+ * The scope is the slot. The role `drawing` of a component owner is the drawing half in every tier
+ * that splits, so the slot does the scoping and the rule needs no configuration.
  */
 
-import { normalizePath } from "./lib/path.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { fileOf, inSlot, kindOfFile, roleOfFile } from "./lib/scope.mjs"
 
-/** The drawing half, named by the convention every split surface follows. */
-const isDrawingHalf = (filename) => /(?:^|\/)component\.tsx$/.test(normalizePath(filename))
+/** The drawing half: the file the slot gives the role `drawing` (`component.tsx` of a component, feature or shared-package owner). */
+const isDrawingHalf = (context) => roleOfFile(context) === "drawing"
 
-/** A connected block entrypoint and the public name its folder fixes. */
-const connectedBlock = (filename) => {
-  const match = normalizePath(filename).match(
-    /\/src\/components\/blocks\/(?:[^/]+\/)*([A-Z][A-Za-z0-9]*)\/index\.tsx$/,
-  )
-  return match ? match[1] : null
+/** A connected block entrypoint (the `entry` of a block owner) and the public name its folder fixes. */
+const connectedBlock = (context) => {
+  if (!inSlot(context, "fe.components") || kindOfFile(context) !== "blocks" || roleOfFile(context) !== "entry") return null
+  const name = hfsOf(context).relative(fileOf(context)).split("/").slice(-2)[0]
+  return /^[A-Z][A-Za-z0-9]*$/.test(name) ? name : null
 }
 
 /**
@@ -47,7 +47,7 @@ export const presentationalPurity = {
     },
   },
   create(context) {
-    if (!isDrawingHalf(context.filename || context.getFilename())) return {}
+    if (!isDrawingHalf(context)) return {}
     return {
       CallExpression(node) {
         const callee = node.callee
@@ -79,7 +79,7 @@ export const connectedBlockHasPresentationalTwin = {
     },
   },
   create(context) {
-    const block = connectedBlock(context.filename || context.getFilename())
+    const block = connectedBlock(context)
     if (!block) return {}
 
     const twin = `${block}Base`

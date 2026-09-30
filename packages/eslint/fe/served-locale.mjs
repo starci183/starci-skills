@@ -18,8 +18,8 @@
  * unconditionally satisfies both and is wrong. That case is a review question and LOCALE-2 is where
  * it is argued; pretending otherwise would be the rule claiming a guarantee it does not have.
  *
- * WHY THE FIRST RULE KEYS ON THE TERMINAL LINK RATHER THAN ON THE FILE PATH. A repository may name
- * its client folder anything, and a path pattern that guessed wrong would either miss the real chain
+ * WHY THE FIRST RULE KEYS ON THE TERMINAL LINK RATHER THAN ON THE SLOT. A repository may name
+ * its client folder anything below `modules/api`, and a pattern that guessed wrong would either miss the real chain
  * or fire on every helper beside it. The chain is identifiable by what it does: it builds the link
  * that talks to the network.
  *
@@ -31,17 +31,36 @@
  * link; a chain is assembled elsewhere, which is where the locale belongs.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalize = (filename) => String(filename || "").replace(/\\/g, "/")
+import { hfsOf } from "./lib/hfs.mjs"
+import { fileOf, inSlot, isSpecFile, stem } from "./lib/scope.mjs"
+
+/** The slots that hold transport: the app's `modules/api` and the shared api package. Neither slot names its links, see the note on `linkFileName`. */
+const TRANSPORT_SLOTS = ["fe.modules.api", "fe.package.api"]
+
+/**
+ * The name of the file when it sits directly in a `links/` folder of a transport slot, else null.
+ *
+ * NO SLOT NAMES A LINK. `fe.modules.api` and `fe.package.api` own their whole tree, so the transport slots decide WHERE a
+ * link may be (a transport file) and the folder called `links` is the one fact left to the rule; the manifest would
+ * carry it as a role (`locale-link: links/locale.ts`) and this function would ask for that role instead.
+ */
+const linkFileName = (context) => {
+  if (!inSlot(context, ...TRANSPORT_SLOTS)) return null
+  const parts = hfsOf(context).relative(fileOf(context)).split("/")
+  return parts.at(-2) === "links" ? parts.at(-1) : null
+}
 
 /**
  * The link file that owns the locale header.
  *
- * This is the ONE file allowed to write it, and it is recognised by path rather than by content:
- * the point of the second rule is that the header appears in one place, so that place has to be
- * named somewhere, and a name is what the law and the rule can both refer to.
+ * This is the ONE file allowed to write it: the `locale` link of a transport slot. The point of the second rule is that
+ * the header appears in one place, so that place has to be named somewhere, and a name is what the law and the rule can
+ * both refer to.
  */
-export const isLocaleLinkFile = (filename) => /\/links\/locale\.[cm]?tsx?$/.test(normalize(filename))
+const isLocaleLinkFile = (context) => {
+  const name = linkFileName(context)
+  return name !== null && stem(name) === "locale"
+}
 
 /**
  * One link's own implementation, rather than a chain of them.
@@ -55,10 +74,7 @@ export const isLocaleLinkFile = (filename) => /\/links\/locale\.[cm]?tsx?$/.test
  * A file under `links/` is one link. A chain is assembled somewhere else, which is exactly where the
  * locale belongs.
  */
-export const isLinkImplementationFile = (filename) => /\/links\/[^/]+$/.test(normalize(filename))
-
-/** A spec or test file - it asserts about production shapes rather than being one. */
-export const isTestFile = (filename) => /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(normalize(filename))
+const isLinkImplementationFile = (context) => linkFileName(context) !== null
 
 /** The header a request declares its language in. */
 export const LOCALE_HEADER = "x-locale"
@@ -105,11 +121,10 @@ export const rules = {
       },
     },
     create(context) {
-      const filename = context.filename || context.getFilename()
       // A single link's implementation is not a chain - `links/http.ts` constructs the terminal link
       // because defining it IS its job, and there is no correct way to attach a locale there. A
       // spec asserts about a chain rather than being one.
-      if (isLinkImplementationFile(filename) || isTestFile(filename)) return {}
+      if (isLinkImplementationFile(context) || isSpecFile(fileOf(context))) return {}
       let terminalNode = null
       let attachesLocale = false
       const note = (node) => {
@@ -144,8 +159,7 @@ export const rules = {
       },
     },
     create(context) {
-      const filename = context.filename || context.getFilename()
-      if (isLocaleLinkFile(filename)) return {}
+      if (isLocaleLinkFile(context)) return {}
       return {
         Property(node) {
           if (propertyKeyOf(node) === LOCALE_HEADER) {

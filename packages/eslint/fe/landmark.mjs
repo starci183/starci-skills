@@ -5,17 +5,6 @@
  * application may pass children through layouts and pages normally.
  */
 
-const normalize = (filename) => String(filename || "").replace(/\\/g, "/")
-
-/** Whether a file is a Next route layout. */
-export const isRouteLayoutFile = (filename) => /\/app\/(?:.*\/)?layout\.tsx$/.test(normalize(filename))
-
-/** Whether a file is a Next route entry. */
-export const isRouteFile = (filename) => /\/app\/(?:.*\/)?(?:layout|page)\.tsx$/.test(normalize(filename))
-
-/** Whether a file owns a page component. */
-export const isPageTierFile = (filename) => /\/src\/components\/pages\//.test(normalize(filename))
-
 /** Named branch owners that may provide landmark semantics. */
 export const LANDMARK_BRANCHES = new Set(["Main"])
 

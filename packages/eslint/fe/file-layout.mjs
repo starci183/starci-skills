@@ -6,34 +6,58 @@
  * a constants folder, a utils folder and three hand-copied resting shapes, at which point the
  * screen is a second codebase with its own private vocabulary that nobody else can reuse.
  *
- * Every rule here reads the PATH rather than the contents, which is what makes them cheap and
- * exact. The cost of that choice is stated where it bites: a path rule cannot tell a component from
- * a helper, only a folder from a folder, so each rule below names the destination it sends things
- * to rather than merely refusing.
+ * Every rule here asks the HFS slot view where the file sits (slot, layer kind, role, tier) rather than
+ * reading the contents, which is what makes them cheap and exact. The cost of that choice is stated where it
+ * bites: a slot cannot tell a component from a helper, only a folder from a folder, so each rule below names the
+ * destination it sends things to rather than merely refusing.
  */
 
-import { normalizePath } from "./lib/path.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { classOf, fileOf, inSlot, isComponentFile, isSpecFile, kindOfFile, roleOfFile, tierOfFile } from "./lib/scope.mjs"
 
-/** Tiers whose folder holds exactly the two halves of one surface. */
-// `features/` is the current root for route-facing surfaces (knowledge FE-FOLDER-1); `components/` is the
-// earlier Academy layout, still accepted so existing trees stay valid.
-const TWO_FILE_TIERS = /\/src\/(?:components|features)\/(pages|layouts)\/([^/]+)\/(.+)$/
-
-/** Overlays carry a feature category between the tier and the surface. */
-const TWO_FILE_TIERS_WITH_CATEGORY = /\/src\/(?:components|features)\/(overlays)\/[^/]+\/([^/]+)\/(.+)$/
-
-/** The two halves, and the twin test of each, are the whole of what a surface folder may hold. */
-const ALLOWED_IN_SURFACE_FOLDER = /^(?:component|index|classNames)(?:\.spec)?\.tsx?$/
-
-/** Folders that are not component code, whatever they are nested inside. */
-const NON_COMPONENT_FOLDERS = /\/src\/components\/.*\/(constants|utils|types|hooks)\//
-
-/** Whether the path sits in ONE surface folder, and what that folder is named. */
-const surfaceFolder = (filename) => {
-  const file = normalizePath(filename)
-  const hit = file.match(TWO_FILE_TIERS) || file.match(TWO_FILE_TIERS_WITH_CATEGORY)
-  return hit ? { tier: hit[1], name: hit[2], rest: hit[3] } : null
+/** The path segments of the linted file below the folder of its owner (the slot's `root`), directories only. */
+const dirsBelowRoot = (context) => {
+  const { root } = classOf(context)
+  const relative = hfsOf(context).relative(fileOf(context))
+  return relative.slice(root.length + 1).split("/").slice(0, -1)
 }
+
+/** The folder segment that sits where a component layer folder is expected but is not one, or null: `components/shells/`, `src/shells/`. */
+const unknownLayerFolder = (context) => {
+  const hfs = hfsOf(context)
+  const file = fileOf(context)
+  const found = hfs.classify(file)
+  const relative = hfs.relative(file)
+  if (found.status === "no-slot" && found.nearest?.slot === "fe.components") {
+    const prefix = found.nearest.matchedPrefix
+    return relative.startsWith(`${prefix}/`) ? (relative.slice(prefix.length + 1).split("/")[0] ?? null) : null
+  }
+  if (found.slot === "fe.package.ui" && !found.kind) {
+    const [folder, layer, ...rest] = relative.slice(found.root.length + 1).split("/")
+    return folder === "src" && rest.length > 0 ? layer : null
+  }
+  return null
+}
+
+/** Folders whose contents are not component code, whatever they are nested inside. */
+const NON_COMPONENT_FOLDERS = new Set(["constants", "utils", "types", "hooks"])
+
+/**
+ * The surface folder a feature-kind file sits in: its kind (`pages`, `layouts`, `overlays`), the surface name and the
+ * file's path inside it. A page or layout owner IS the surface folder; an overlay owner is its category and the
+ * surface is the folder below it.
+ */
+const surfaceFolder = (context) => {
+  if (!inSlot(context, "fe.feature")) return null
+  const { kind, bindings, root } = classOf(context)
+  const below = hfsOf(context).relative(fileOf(context)).slice(root.length + 1).split("/")
+  if (kind === "overlays") return below.length > 1 ? { tier: kind, name: below[0], rest: below.slice(1).join("/") } : null
+  return { tier: kind, name: bindings.name, rest: below.join("/") }
+}
+
+/** A file a surface folder may hold: one of the slot's roles (entry, drawing, styles) or a `.spec.` twin, directly in the folder. */
+const belongsInSurfaceFolder = (context, folder) =>
+  !folder.rest.includes("/") && (roleOfFile(context) !== null || (isSpecFile(folder.rest) && folder.rest.includes(".spec.")))
 
 // -- FILE-2 --------------------------------------------------------------------------------------
 
@@ -49,8 +73,8 @@ export const surfaceFolderTwoFilesOnly = {
     },
   },
   create(context) {
-    const folder = surfaceFolder(context.filename || context.getFilename())
-    if (!folder || ALLOWED_IN_SURFACE_FOLDER.test(folder.rest)) return {}
+    const folder = surfaceFolder(context)
+    if (!folder || belongsInSurfaceFolder(context, folder)) return {}
     return {
       Program(node) {
         context.report({ node, messageId: "extra", data: folder })
@@ -69,15 +93,19 @@ export const noHelperFolderInComponents = {
     schema: [],
     messages: {
       helper:
-        "`{{kind}}/` under `src/components/**` - this is not component code, so it does not live in the component tree. A fetch is a `hooks/`, a pure function is a `modules/utils/`, a shape is a `modules/types/`, copy or a config map is a `resources/`. Left here it stays invisible to everyone who would have reused it, so the second author writes it again and the two drift.",
+        "`{{kind}}/` under a component owner - this is not component code, so it does not live in the component tree. A fetch is a `hooks/`, a pure function is a `modules/utils/`, a shape is a `modules/types/`, copy or a config map is a `resources/`. Left here it stays invisible to everyone who would have reused it, so the second author writes it again and the two drift.",
     },
   },
   create(context) {
-    const hit = normalizePath(context.filename || context.getFilename()).match(NON_COMPONENT_FOLDERS)
-    if (!hit) return {}
+    if (!isComponentFile(context)) return {}
+    const dirs = dirsBelowRoot(context)
+    // a package owner sits at the package root, so its `src/<layer>/<name>` prefix is not part of the owner
+    const inside = inSlot(context, "fe.package.ui") ? dirs.slice(3) : dirs
+    const folder = inside.find((name) => NON_COMPONENT_FOLDERS.has(name))
+    if (!folder) return {}
     return {
       Program(node) {
-        context.report({ node, messageId: "helper", data: { kind: hit[1] } })
+        context.report({ node, messageId: "helper", data: { kind: folder } })
       },
     }
   },
@@ -97,9 +125,9 @@ export const exportMatchesFolder = {
     },
   },
   create(context) {
-    const hit = normalizePath(context.filename || context.getFilename()).match(/\/([A-Z][A-Za-z0-9]*)\/index\.tsx?$/)
-    if (!hit) return {}
-    const folder = hit[1]
+    if (roleOfFile(context) !== "entry" || kindOfFile(context) === null) return {}
+    const folder = hfsOf(context).relative(fileOf(context)).split("/").slice(-2)[0]
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(folder)) return {}
     const names = new Set()
     const belongsToFamily = (name) =>
       name === folder || (name.startsWith(folder) && name.length > folder.length && /^[A-Z]/.test(name.slice(folder.length)))
@@ -161,18 +189,28 @@ export const noRuntimeNamespace = {
 
 // -- FILE-5 --------------------------------------------------------------------------------------
 
-/** Tiers that know a feature, and therefore belong to the app that owns it. */
-const FEATURE_TIERS = /\/packages\/[^/]+\/src\/(blocks|overlays|pages|layouts)\//
+/**
+ * Whether the repository declares the shared UI package (slot `fe.package.ui` is opt-in): the classification of a file
+ * of the package's own root is `owned` only then.
+ */
+const uiPackageDeclared = (hfs) => {
+  const root = hfs.slot("fe.package.ui").path.replace(/<[^>]+>/g, "probe").replace(/\/$/, "")
+  return hfs.classify(`${root}/package.json`).status === "owned"
+}
 
-/** Tiers that know no feature, and therefore belong to the shared package. */
-const VOCABULARY_TIERS = /\/apps\/[^/]+\/src\/(?:components\/)?(leaves|composites|branches)\//
+/** The layer folders that know a feature: those a component owner or a feature owner has and the shared package does not. */
+const featureTiers = (hfs) => {
+  const shared = new Set(hfs.slot("fe.package.ui").kinds)
+  return new Set([...hfs.slot("fe.components").layers, ...hfs.slot("fe.feature").kinds].filter((name) => !shared.has(name)))
+}
 
 /**
  * In a monorepo, the shared package stops below the block.
  *
- * WHY A PATH RULE IS ENOUGH HERE. The feature line is already drawn by the tier name: a leaf knows
+ * WHY THE SLOT IS ENOUGH HERE. The feature line is already drawn by the layer: a leaf knows
  * no domain and a block is a domain sentence, so which side of the workspace each belongs on
- * follows from the folder it is already in. Nothing needs to read the file.
+ * follows from the layer the slot reports. The layers a shared package may hold are the `kinds` of
+ * `fe.package.ui`; an app holds the shared ones only when the repository declares that package.
  *
  * WHAT IT COST TO LEARN. A shared package carried one `blocks/FleetRow/` while its own header
  * insisted that "a block carries feature meaning and therefore belongs to the app that owns the
@@ -195,16 +233,18 @@ export const monorepoTierBelongsToItsSide = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    const inPackage = file.match(FEATURE_TIERS)
-    const inApp = file.match(VOCABULARY_TIERS)
+    const hfs = hfsOf(context)
+    const folder = unknownLayerFolder(context)
+    const inPackage = inSlot(context, "fe.package.ui") && folder !== null && featureTiers(hfs).has(folder) ? folder : null
+    const tier = kindOfFile(context)
+    const inApp = inSlot(context, "fe.components") && tier !== null && hfs.slot("fe.package.ui").kinds.includes(tier) && uiPackageDeclared(hfs) ? tier : null
     return {
       Program(node) {
         if (inPackage) {
-          context.report({ node, messageId: "featureInPackage", data: { tier: inPackage[1] } })
+          context.report({ node, messageId: "featureInPackage", data: { tier: inPackage } })
           return
         }
-        if (inApp) context.report({ node, messageId: "vocabularyInApp", data: { tier: inApp[1] } })
+        if (inApp) context.report({ node, messageId: "vocabularyInApp", data: { tier: inApp } })
       },
     }
   },
@@ -212,24 +252,18 @@ export const monorepoTierBelongsToItsSide = {
 
 // -- FILE-6 --------------------------------------------------------------------------------------
 
-/** Anything under a routing tree, in either workspace shape. */
-const ROUTE_TREE = /\/src\/app\/(.+)$/
-
 /**
- * What a routing tree is allowed to contain.
- *
- * Next decides these names, not this law: `page`, `layout`, `template`, `loading`, `error`,
- * `not-found`, `global-error`, `default`, `route`, `sitemap`, `robots`, `manifest`, `opengraph-image`
- * and `icon` are framework slots. Two more are admitted because the root layout mounts them and
- * there is nowhere else they could go: `providers`, the client boundary above every route, and
- * `globals`, the stylesheet the document imports. Everything else in that folder is a file somebody
- * put there.
+ * The file names of an app's routing tree that no slot role names: Next's own `default`, its metadata files, and the
+ * two files the root layout mounts (`providers`, `globals`). The route slots themselves (`page`, `layout`, `template`,
+ * `loading`, `error`, `not-found`, `global-error`, `route`) are the roles of slot `fe.route`.
  */
-const ROUTE_TREE_FILES =
-  /^(?:page|layout|template|loading|error|not-found|global-error|default|route|providers|globals|middleware|sitemap|robots|manifest|opengraph-image|twitter-image|apple-icon|icon|favicon)(?:\.[a-z-]+)?\.(?:tsx?|jsx?|css|json)$/
+const ROUTE_TREE_EXTRA_FILES = new Set(["default", "providers", "globals", "middleware", "sitemap", "robots", "manifest", "opengraph-image", "twitter-image", "apple-icon", "icon", "favicon"])
 
 /** `app/api/**` is server code, not a screen; `_private/**` is Next's own opt-out folder. */
-const ROUTE_TREE_EXEMPT = /^(?:api\/|_)/
+const routeTreeExempt = (rest) => rest[0] === "api" || rest[0].startsWith("_")
+
+/** The stem of a route-tree file name: `sitemap.ts` -> `sitemap`, `icon.svg` -> `icon`, `opengraph-image.alt.txt` -> `opengraph-image`. */
+const routeStem = (basename) => basename.split(".")[0]
 
 /**
  * A test sitting beside the thing it tests.
@@ -241,10 +275,9 @@ const ROUTE_TREE_EXEMPT = /^(?:api\/|_)/
  *
  * The name is deliberately not required to match `page` or `layout`. A route's tests split by
  * CONCERN - what the screen renders, who may reach it, where the boundary sits - and forcing them
- * into one `page.spec.tsx` would buy nothing but a longer file.
+ * into one `page.spec.tsx` would buy nothing but a longer file. A spec is named `.spec.` by the slot
+ * definitions themselves, so that stays a file-name test.
  */
-const ROUTE_TREE_TEST = /\.spec\.(?:tsx?|jsx?)$/
-
 /**
  * A file under `app/` names which page renders at which URL, and does nothing else.
  *
@@ -254,9 +287,9 @@ const ROUTE_TREE_TEST = /\.spec\.(?:tsx?|jsx?)$/
  * typecheck, four sealed screenshots and an approval, and arrived at the edge of a production write
  * with every gate green - because every gate was reading rules, and this one was only prose.
  *
- * WHY IT READS THE FILENAME AND NOT THE CONTENTS. "Drawing" is not a property this can measure: a
+ * WHY IT READS THE SLOT AND NOT THE CONTENTS. "Drawing" is not a property this can measure: a
  * route that mounts one component and a route that arranges six both return JSX. What CAN be
- * measured exactly is whether a file in the routing tree is one of the framework's own slots. A page
+ * measured exactly is whether a file in the routing tree (slot `fe.route`) is one of the framework's own slots. A page
  * owner is a component, a component has a name, and a named component belongs in the tier that
  * groups it with its siblings - `components/pages/<Name>/`, where the next author looks for it.
  *
@@ -266,7 +299,7 @@ const ROUTE_TREE_TEST = /\.spec\.(?:tsx?|jsx?)$/
 export const routeTreeHoldsRoutesOnly = {
   meta: {
     type: "problem",
-    docs: { description: "`src/app/**` holds framework route files only; a page owner lives in `features/pages/<Name>/` (or the earlier `components/pages/<Name>/`)." },
+    docs: { description: "`src/app/**` holds framework route files only; a page owner lives in `features/pages/<Name>/`." },
     schema: [],
     messages: {
       stray:
@@ -274,14 +307,12 @@ export const routeTreeHoldsRoutesOnly = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    const hit = file.match(ROUTE_TREE)
-    if (!hit) return {}
-    const rest = hit[1]
-    if (ROUTE_TREE_EXEMPT.test(rest)) return {}
+    if (!inSlot(context, "fe.route")) return {}
+    const rest = hfsOf(context).relative(fileOf(context)).slice(classOf(context).root.length + 1)
     const basename = rest.slice(rest.lastIndexOf("/") + 1)
-    if (ROUTE_TREE_TEST.test(basename)) return {}
-    if (ROUTE_TREE_FILES.test(basename)) return {}
+    if (routeTreeExempt(rest.split("/"))) return {}
+    if (isSpecFile(basename) && basename.includes(".spec.")) return {}
+    if (roleOfFile(context) !== null || ROUTE_TREE_EXTRA_FILES.has(routeStem(basename))) return {}
     return {
       Program(node) {
         context.report({ node, messageId: "stray", data: { rest, basename } })
@@ -289,9 +320,6 @@ export const routeTreeHoldsRoutesOnly = {
     }
   },
 }
-
-/** The rules this law contributes to the plugin. */
-const TIER_PATH = /\/(?:src\/components|src\/features|packages\/[^/]+\/src|apps\/[^/]+\/src\/(?:components\/|features\/)?)\/(leaves|composites|branches|blocks|layouts|overlays|pages)\//
 
 function propertyName(node) {
   if (node.key?.type === "Identifier") return node.key.name
@@ -311,8 +339,8 @@ export const sourceTierMarkerMatchesFolder = {
     },
   },
   create(context) {
-    const hit = normalizePath(context.filename || context.getFilename()).match(TIER_PATH)
-    if (!hit) return {}
+    const tier = kindOfFile(context)
+    if (tier === null) return {}
     const expected = {
       blocks: "block",
       branches: "branch",
@@ -321,7 +349,7 @@ export const sourceTierMarkerMatchesFolder = {
       leaves: "leaf",
       overlays: "overlay",
       pages: "page",
-    }[hit[1]]
+    }[tier]
     return {
       ExportNamedDeclaration(node) {
         const declaration = node.declaration
@@ -335,15 +363,13 @@ export const sourceTierMarkerMatchesFolder = {
             property.type === "Property" && !property.computed && propertyName(property) === "shape")
           const shape = shapeProperty?.value?.type === "Literal" ? shapeProperty.value.value : null
           if (typeof shape === "string" && shape !== expected) {
-            context.report({ node: shapeProperty.value, messageId: "mismatch", data: { tier: hit[1], shape } })
+            context.report({ node: shapeProperty.value, messageId: "mismatch", data: { tier, shape } })
           }
         }
       },
     }
   },
 }
-
-const SHELL_TIER = /\/(?:src\/components|packages\/[^/]+\/src|apps\/[^/]+\/src\/(?:components\/)?)\/shells\//
 
 /** `shells/` no longer exists; vendor mechanics are closed named branches. */
 export const noShellTier = {
@@ -357,15 +383,12 @@ export const noShellTier = {
     },
   },
   create(context) {
-    if (!SHELL_TIER.test(normalizePath(context.filename || context.getFilename()))) return {}
+    if (unknownLayerFolder(context) !== "shells") return {}
     return { Program(node) { context.report({ node, messageId: "shell" }) } }
   },
 }
 
 // -- FILE-9 --------------------------------------------------------------------------------------
-
-const UNIT_TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/
-const SEPARATE_FRONTEND_TEST_TREE = /\/(?:src\/tests|tests?\/unit|e2e)(?:\/|$)/
 
 /** Frontend units are `.spec.` twins beside the source they exercise. */
 export const unitTestColocated = {
@@ -379,13 +402,13 @@ export const unitTestColocated = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    const match = file.match(UNIT_TEST_FILE)
-    if (!match) return {}
+    const file = fileOf(context)
+    if (!isSpecFile(file)) return {}
+    const name = file.slice(Math.max(file.lastIndexOf("/"), file.lastIndexOf("\\")) + 1)
     return {
       Program(node) {
-        if (match[1] === "test") context.report({ node, messageId: "suffix", data: { name: file.slice(file.lastIndexOf("/") + 1) } })
-        if (SEPARATE_FRONTEND_TEST_TREE.test(file)) context.report({ node, messageId: "bucket", data: { path: file } })
+        if (name.includes(".test.")) context.report({ node, messageId: "suffix", data: { name } })
+        if (tierOfFile(context) === "e2e") context.report({ node, messageId: "bucket", data: { path: hfsOf(context).relative(file) } })
       },
     }
   },
@@ -416,10 +439,6 @@ const ROUTE_SLOT_NAME = {
   "not-found": "NotFound",
 }
 
-const ROUTE_SLOT_FILE = new RegExp(
-  `^(?:${Object.keys(ROUTE_SLOT_NAME).join("|")})(?:\\.[a-z-]+)?\\.tsx$`,
-)
-
 export const routeSlotFixedName = {
   meta: {
     type: "problem",
@@ -435,14 +454,11 @@ export const routeSlotFixedName = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    const hit = file.match(ROUTE_TREE)
-    if (!hit) return {}
-    const basename = hit[1].slice(hit[1].lastIndexOf("/") + 1)
-    if (ROUTE_TREE_TEST.test(basename)) return {}
-    const slot = basename.match(ROUTE_SLOT_FILE)
-    if (!slot) return {}
-    const expected = ROUTE_SLOT_NAME[slot[0].split(".")[0]]
+    if (!inSlot(context, "fe.route")) return {}
+    const expected = ROUTE_SLOT_NAME[roleOfFile(context)]
+    if (!expected) return {}
+    const file = hfsOf(context).relative(fileOf(context))
+    const basename = file.slice(file.lastIndexOf("/") + 1)
     let seen = false
     const report = (node, actual) =>
       context.report({

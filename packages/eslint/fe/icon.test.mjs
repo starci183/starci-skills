@@ -9,8 +9,7 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import {
   heroiconsIsTheGlyphVendor,
   noDecorativeIconInMetricCell,
@@ -19,21 +18,20 @@ import {
   rules,
 } from "./icon.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const R = "D:/repo/src/components"
-const ICON_LEAF = `${R}/leaves/Icon/index.tsx`
-const ICON_LEAF_BRANDS = `${R}/leaves/Icon/brands.tsx`
-const OTHER_LEAF = `${R}/leaves/SeeMoreLink/index.tsx`
-const BLOCK = `${R}/blocks/dashboard/DailyQuest/component.tsx`
-const METRIC_CELL = `${R}/composites/LabelledProgressRow/index.tsx`
+const R = "apps/web/src/components"
+const ICON_LEAF = at(`${R}/leaves/Icon/index.tsx`)
+const ICON_LEAF_BRANDS = at(`${R}/leaves/Icon/brands.tsx`)
+const OTHER_LEAF = at(`${R}/leaves/SeeMoreLink/index.tsx`)
+const BLOCK = at(`${R}/blocks/dashboard/DailyQuest/component.tsx`)
+const METRIC_CELL = at(`${R}/composites/LabelledProgressRow/index.tsx`)
+const SCRIPT = at("scripts/build.ts")
+const PACKAGE_ICON_LEAF = at("packages/nivo-ui/src/leaves/Icon/index.tsx")
+const NOT_A_LEAF = at("apps/web/src/modules/components/leaves/Icon/index.tsx")
+const ICON_BLOCK = at(`${R}/blocks/dashboard/Icon/index.tsx`)
+const SPEC = at(`${R}/leaves/SeeMoreLink/index.spec.tsx`)
+
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
     assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -49,9 +47,16 @@ test("ICON-6: the icon leaf owns the library, and a subpath does not walk around
       { filename: OTHER_LEAF, code: "import { Icon } from \"@/components/leaves/Icon\"" },
       { filename: BLOCK, code: "import { Link as HeroLink } from \"@heroui/react\"" },
       // tooling is out of scope
-      { filename: "D:/repo/scripts/build.ts", code: "import { X } from \"lucide-react\"" },
+      { filename: SCRIPT, code: "import { X } from \"lucide-react\"" },
+      // the icon leaf of the shared package owns the map there too
+      { filename: PACKAGE_ICON_LEAF, code: "import { FireIcon } from \"@heroicons/react/24/outline\"" },
+      // a spec is not product source
+      { filename: SPEC, code: "import { Star } from \"lucide-react\"" },
     ],
     invalid: [
+      // a file called like the icon leaf that no leaf slot owns is not the icon leaf, and neither is a block called Icon
+      { filename: NOT_A_LEAF, code: "import { Star } from \"lucide-react\"", errors: [{ messageId: "vendor" }] },
+      { filename: ICON_BLOCK, code: "import { Star } from \"lucide-react\"", errors: [{ messageId: "vendor" }] },
       {
         // the exact escape these rules were written for
         filename: OTHER_LEAF,
@@ -92,7 +97,7 @@ test("ICON-7: upstream Heroicons plus the custom-only StarCi extension are the w
       { filename: ICON_LEAF, code: "import { MindMapIcon } from \"@starci/heroicons/24/outline\"" },
       { filename: ICON_LEAF, code: "import { MindMapIcon } from \"@starci/heroicons/16/solid\"" },
       { filename: ICON_LEAF_BRANDS, code: "import type { SVGProps } from \"react\"" },
-      { filename: "D:/repo/scripts/build.ts", code: "import { X } from \"lucide-react\"" },
+      { filename: SCRIPT, code: "import { X } from \"lucide-react\"" },
     ],
     invalid: [
       {
@@ -134,6 +139,9 @@ test("ICON-1: a glyph size off both steps is a third step", () => {
     valid: [
       { filename: OTHER_LEAF, code: "const C = \"size-4 shrink-0\"" },
       { filename: OTHER_LEAF, code: "const C = \"size-5 shrink-0\"" },
+      // a spec is not product source, and a script is not either
+      { filename: SPEC, code: "const C = \"size-3.5\"" },
+      { filename: SCRIPT, code: "const C = \"size-[13px]\"" },
       { filename: BLOCK, code: "const E = () => <div className=\"size-8 rounded-lg\" />" },
       // a spacing utility that merely looks similar is not this rule's business
       { filename: BLOCK, code: "const C = \"gap-2 p-4\"" },
@@ -161,12 +169,19 @@ test("ICON-10: a repeated metric cell does not invent a decorative feature glyph
         filename: METRIC_CELL,
         code: "const Row = () => <div><Text props={{ content: 'Content' }} /></div>",
       },
+      // a leaf called like the metric cell is not the metric cell
+      { filename: at(`${R}/leaves/LabelledProgressRow/index.tsx`), code: "const Row = () => <Icon props={{ name: 'course' }} />" },
       {
         filename: BLOCK,
         code: "const Entry = () => <Icon props={{ name: 'course' }} />",
       },
     ],
     invalid: [
+      {
+        filename: at("packages/nivo-ui/src/composites/LabelledProgressRow/index.tsx"),
+        code: "const Row = () => <div><Icon props={{ name: 'course' }} /></div>",
+        errors: [{ messageId: "decorative" }],
+      },
       {
         filename: METRIC_CELL,
         code: "const Row = () => <div><Icon props={{ name: 'course' }} /><Text /></div>",

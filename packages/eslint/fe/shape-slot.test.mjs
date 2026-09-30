@@ -9,8 +9,7 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import {
   baseImportPair,
   basePropsAtom,
@@ -19,23 +18,16 @@ import {
   slotStatusThroughSlotView,
 } from "./shape-slot.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const BLOCK = "D:/repo/src/components/blocks/sales/HandoffBlock/component.tsx"
-const BLOCK_INDEX = "D:/repo/src/components/blocks/sales/HandoffBlock/index.tsx"
-const BLOCK_SPEC = "D:/repo/src/components/blocks/sales/HandoffBlock/component.spec.tsx"
-const LAYOUT = "D:/repo/src/components/layouts/WorkspaceLayout/component.tsx"
-const PAGE = "D:/repo/src/components/pages/OperatePage/component.tsx"
-const OVERLAY = "D:/repo/src/components/overlays/sales/SendOverlay/component.tsx"
-const FEATURE_PAGE = "D:/repo/src/features/pages/OperatePage/component.tsx"
-const COMPOSITE = "D:/repo/src/components/composites/SlotView/index.tsx"
+const BLOCK = at("apps/web/src/components/blocks/sales/HandoffBlock/component.tsx")
+const BLOCK_INDEX = at("apps/web/src/components/blocks/sales/HandoffBlock/index.tsx")
+const BLOCK_SPEC = at("apps/web/src/components/blocks/sales/HandoffBlock/component.spec.tsx")
+const LAYOUT = at("apps/web/src/features/layouts/WorkspaceLayout/component.tsx")
+const PAGE = at("apps/web/src/features/pages/OperatePage/component.tsx")
+const OVERLAY = at("apps/web/src/features/overlays/sales/SendOverlay/component.tsx")
+const FEATURE_PAGE = PAGE
+const COMPOSITE = at("apps/web/src/components/composites/SlotView/index.tsx")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -64,6 +56,15 @@ test("a pure half takes state, atom props and on actions", () => {
       {
         filename: COMPOSITE,
         code: "export const SlotView = (props: { children: (data: string) => ReactNode }) => <div />",
+      },
+      // a `component.tsx` that no split tier owns is not a pure half: a shared-package leaf and a folder named like a tier
+      {
+        filename: at("packages/nivo-ui/src/leaves/Badge/component.tsx"),
+        code: "export type BadgeBaseProps = { readonly state: \"a\"; readonly props: { readonly icon: ReactNode }; readonly on: {} }",
+      },
+      {
+        filename: at("apps/web/src/modules/components/blocks/Card/component.tsx"),
+        code: "export type CardBaseProps = { readonly state: \"a\"; readonly props: { readonly icon: ReactNode }; readonly on: {} }",
       },
     ],
     invalid: [
@@ -110,6 +111,9 @@ test("only the sibling index reaches the pure half, and it never re-exports XBas
       { filename: BLOCK_SPEC, code: "import { HandoffBlockBase } from \"./component\"" },
       { filename: BLOCK_INDEX, code: "export type { HandoffBlockState } from \"./component\"" },
       { filename: PAGE, code: "import { HandoffBlock } from \"@/components/blocks/sales/HandoffBlock\"" },
+      // a sibling `./component` outside a split tier is an ordinary module
+      { filename: at("apps/web/src/modules/utils/index.ts"), code: "import { x } from \"./component\"" },
+      { filename: at("apps/web/src/modules/components/blocks/Card/index.tsx"), code: "import { CardBase } from \"./component\"; export { CardBase }" },
     ],
     invalid: [
       { filename: PAGE, code: "import { HandoffBlockBase } from \"@/components/blocks/sales/HandoffBlock/component\"", errors: [{ messageId: "reach" }] },
@@ -125,6 +129,9 @@ test("a shape union never lists a data status or open/closed", () => {
       { filename: BLOCK, code: "export type HandoffBlockState = \"prepared\" | \"sent\" | \"returned\"" },
       { filename: OVERLAY, code: "export type SendOverlayState = \"form\" | \"confirm\"" },
       { filename: BLOCK_INDEX, code: "export type HandoffBlockState = \"pending\" | \"ready\"" },
+      // a `component.tsx` outside every split tier names no drawn shapes
+      { filename: at("packages/nivo-ui/src/leaves/Badge/component.tsx"), code: "export type BadgeState = \"pending\" | \"ready\"" },
+      { filename: at("apps/web/src/modules/components/blocks/Card/component.tsx"), code: "export type CardState = \"pending\"" },
     ],
     invalid: [
       { filename: BLOCK, code: "export type ExampleBlockState = \"pending\" | \"ready\" | \"failed\"", errors: [{ messageId: "status" }, { messageId: "status" }] },
@@ -140,6 +147,8 @@ test("a block's pure half renders data status only through SlotView", () => {
       { filename: BLOCK, code: "export const X = (props: P) => <SlotView slot={props.props.order}>{(o) => <p>{o.code}</p>}</SlotView>" },
       { filename: BLOCK, code: "export const X = (props: P) => (props.state === \"sent\" ? <p /> : null)" },
       { filename: COMPOSITE, code: "export const SlotView = (props: P) => (props.slot.isLoading ? <p /> : null)" },
+      // a shared-package drawing half is not a block's pure half
+      { filename: at("packages/nivo-ui/src/leaves/Badge/component.tsx"), code: "export const X = (props: P) => (props.props.isLoading ? <Spinner /> : <p />)" },
       { filename: BLOCK_INDEX, code: "const state = query.isLoading ? \"a\" : \"b\"" },
     ],
     invalid: [

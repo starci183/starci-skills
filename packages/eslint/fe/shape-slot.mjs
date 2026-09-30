@@ -19,18 +19,21 @@
  * never wrong, beyond it.
  */
 
-import { normalizePath } from "./lib/path.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { fileOf, inSlot, isSpecFile, kindOfFile, roleOfFile } from "./lib/scope.mjs"
 
-/** The pure half of a split tier, and which tier it is. */
-const pureHalf = (filename) => {
-  const match = normalizePath(filename).match(
-    /\/src\/(?:components|features)\/(blocks|pages|layouts|overlays)\/(?:[^/]+\/)*[A-Z][A-Za-z0-9]*\/component\.tsx$/,
-  )
-  return match ? match[1] : null
-}
+/** The layers and feature kinds that split into a connected `index.tsx` and a pure `component.tsx`; a shared package's layers never split. */
+const SPLIT_KINDS = new Set(["blocks", "pages", "layouts", "overlays"])
 
-/** Specs render the pure half from fixtures; that is the point of it. */
-const isSpec = (filename) => /\.(spec|test)\.[cm]?[jt]sx?$/.test(normalizePath(filename))
+/** The folder name of the linted file: the surface a `component.tsx` or `index.tsx` belongs to. */
+const surfaceName = (context) => hfsOf(context).relative(fileOf(context)).split("/").slice(-2)[0]
+
+/** Whether the linted file sits in a component or feature owner of a split kind. */
+const inSplitTier = (context) => inSlot(context, "fe.components", "fe.feature") && SPLIT_KINDS.has(kindOfFile(context))
+
+/** The pure half of a split tier (the drawing role of a surface folder), and which tier it is. */
+const pureHalf = (context) =>
+  inSplitTier(context) && roleOfFile(context) === "drawing" && /^[A-Z][A-Za-z0-9]*$/.test(surfaceName(context)) ? kindOfFile(context) : null
 
 /** Type names that carry a rendered tree rather than data. */
 const NON_ATOM_TYPE = /^(?:ReactNode|ReactElement|ReactPortal|JSX\.Element|Element|ComponentType|FC|FunctionComponent|ElementType|ComponentProps|RenderFunction)$/
@@ -94,7 +97,7 @@ export const basePropsAtom = {
     },
   },
   create(context) {
-    const tier = pureHalf(context.filename || context.getFilename())
+    const tier = pureHalf(context)
     if (!tier) return {}
     let types = new Map()
 
@@ -202,11 +205,9 @@ export const baseImportPair = {
     },
   },
   create(context) {
-    const filename = normalizePath(context.filename || context.getFilename())
-    const base = filename.split("/").pop() || ""
-    const isOwnIndex = base === "index.tsx"
-    const spec = isSpec(filename)
-    const inTier = /\/src\/(?:components|features)\/(blocks|pages|layouts|overlays)\//.test(filename)
+    const isOwnIndex = roleOfFile(context) === "entry"
+    const spec = isSpecFile(fileOf(context))
+    const inTier = inSplitTier(context)
     const reachesPure = (source) => /(?:^|\/)component(?:\.tsx)?$/.test(source)
 
     const check = (node, source) => {
@@ -260,7 +261,7 @@ export const noDataStatusShape = {
     },
   },
   create(context) {
-    if (!pureHalf(context.filename || context.getFilename())) return {}
+    if (!pureHalf(context)) return {}
     const check = (name, node) => {
       const members = node?.type === "TSUnionType" ? node.types : [node]
       for (const member of members) {
@@ -308,7 +309,7 @@ export const slotStatusThroughSlotView = {
     },
   },
   create(context) {
-    if (pureHalf(context.filename || context.getFilename()) !== "blocks") return {}
+    if (pureHalf(context) !== "blocks") return {}
     const check = (node, test) => {
       const flag = statusFlagOf(test)
       if (flag) context.report({ node, messageId: "branch", data: { flag } })

@@ -12,13 +12,14 @@
  * generalises on its own, and the gap between them is exactly where a third step gets invented.
  */
 
-import { normalizePath } from "./lib/path.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { fileOf, isComponentFile, isProductSource, kindOfFile, roleOfFile } from "./lib/scope.mjs"
 
-/** The one module allowed to name a glyph from a library. */
-const ICON_MODULE_RELATIVE = "leaves/Icon/index.tsx"
+/** The one module allowed to name a glyph from a library: the entry of the leaf owner named `Icon`. */
+const ICON_LEAF = { kind: "leaves", owner: "Icon" }
 
-/** Repeated goal / metric cells are text-led in the legacy reference. */
-const LABELLED_PROGRESS_ROW_RELATIVE = "composites/LabelledProgressRow/index.tsx"
+/** Repeated goal / metric cells are text-led in the legacy reference: the entry of the composite owner named `LabelledProgressRow`. */
+const LABELLED_PROGRESS_ROW = { kind: "composites", owner: "LabelledProgressRow" }
 
 /**
  * Package roots that ship glyphs.
@@ -58,15 +59,19 @@ const HEROICON_PACKAGES = new Set([
  */
 export const REACTION_ASSET_NAMES = new Set(["like", "love", "haha", "wow", "sad", "angry"])
 
+/**
+ * True when the file is the entry (slot role `entry`) of the component owner named `owner` in the layer `kind`.
+ * The slot says which layer and which role; the owner's own folder name is the one fact it cannot say, so it is compared.
+ */
+const isEntryOf = (context, { kind, owner }) =>
+  isComponentFile(context) && kindOfFile(context) === kind && roleOfFile(context) === "entry" &&
+  hfsOf(context).relative(fileOf(context)).split("/").slice(-2)[0] === owner
+
 /** True when this file is the icon leaf, which owns the meaning-to-glyph map. */
-const isIconLeafFile = (filename) => normalizePath(filename).endsWith(`/${ICON_MODULE_RELATIVE}`)
+const isIconLeafFile = (context) => isEntryOf(context, ICON_LEAF)
 
 /** True for the reusable repeated metric cell whose reference contains no decorative glyph. */
-const isLabelledProgressRowFile = (filename) =>
-  normalizePath(filename).endsWith(`/${LABELLED_PROGRESS_ROW_RELATIVE}`)
-
-/** Product source under `src/`; tooling and config are out of scope. */
-const isSourceFile = (filename) => normalizePath(filename).includes("/src/")
+const isLabelledProgressRowFile = (context) => isEntryOf(context, LABELLED_PROGRESS_ROW)
 
 /** True when an import source resolves into a glyph library, subpaths included. */
 const isGlyphImport = (source) => {
@@ -108,13 +113,12 @@ export const noVendorIconOutsideIconLeaf = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (!isSourceFile(file) || isIconLeafFile(file)) return {}
+    if (!isProductSource(context) || isIconLeafFile(context)) return {}
     return {
       ImportDeclaration(node) {
         const source = node.source && node.source.value
         if (!isGlyphImport(source)) return
-        context.report({ node, messageId: "vendor", data: { source, leaf: ICON_MODULE_RELATIVE } })
+        context.report({ node, messageId: "vendor", data: { source, leaf: `${ICON_LEAF.kind}/${ICON_LEAF.owner}/index.tsx` } })
       },
     }
   },
@@ -134,8 +138,7 @@ export const heroiconsIsTheGlyphVendor = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (!isSourceFile(file)) return {}
+    if (!isProductSource(context)) return {}
     return {
       ImportDeclaration(node) {
         const source = node.source && node.source.value
@@ -160,8 +163,7 @@ export const noOffScaleGlyphSize = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (!isSourceFile(file)) return {}
+    if (!isProductSource(context)) return {}
     const scan = (node, text) => {
       if (!text) return
       const hit = text.match(OFF_SCALE_GLYPH)
@@ -193,8 +195,7 @@ export const noDecorativeIconInMetricCell = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (!isLabelledProgressRowFile(file)) return {}
+    if (!isLabelledProgressRowFile(context)) return {}
     return {
       JSXOpeningElement(node) {
         if (node.name?.type === "JSXIdentifier" && node.name.name === "Icon") {

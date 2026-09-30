@@ -14,24 +14,17 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
-import { LOCALE_HEADER, isLinkImplementationFile, isLocaleLinkFile, isTestFile, rules } from "./served-locale.mjs"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
+import { LOCALE_HEADER, rules } from "./served-locale.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const CLIENT = "D:/repo/src/modules/api/graphql/clients/create-apollo-client.ts"
-const LOCALE_LINK = "D:/repo/src/modules/api/graphql/clients/links/locale.ts"
-const HTTP_LINK = "D:/repo/src/modules/api/graphql/clients/links/http.ts"
-const HTTP_LINK_SPEC = "D:/repo/src/modules/api/graphql/clients/links/http.test.ts"
-const HOOK = "D:/repo/src/hooks/swr/useQueryCourseSwr.ts"
+const API = "apps/web/src/modules/api/graphql/clients"
+const CLIENT = at(`${API}/create-apollo-client.ts`)
+const LOCALE_LINK = at(`${API}/links/locale.ts`)
+const HTTP_LINK = at(`${API}/links/http.ts`)
+const HTTP_LINK_SPEC = at(`${API}/links/http.test.ts`)
+const HOOK = at("apps/web/src/hooks/swr/useQueryCourseSwr.ts")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -40,24 +33,8 @@ test("every rule this law declares is exported under its published name", () => 
   }
 })
 
-test("the locale link file is recognised on both slash styles", () => {
-  assert.equal(isLocaleLinkFile(LOCALE_LINK), true)
-  assert.equal(isLocaleLinkFile("D:\\repo\\src\\api\\clients\\links\\locale.ts"), true)
-  assert.equal(isLocaleLinkFile("D:/repo/src/api/clients/links/bearer.ts"), false)
-  assert.equal(isLocaleLinkFile("D:/repo/src/i18n/locale.ts"), false)
-})
-
 test("the header this law is about is the one the server reads", () => {
   assert.equal(LOCALE_HEADER, "x-locale")
-})
-
-test("a single link's implementation is not a chain, and a spec is not production", () => {
-  assert.equal(isLinkImplementationFile(HTTP_LINK), true)
-  assert.equal(isLinkImplementationFile(LOCALE_LINK), true)
-  assert.equal(isLinkImplementationFile(CLIENT), false)
-  assert.equal(isTestFile(HTTP_LINK_SPEC), true)
-  assert.equal(isTestFile("D:/repo/src/a/b.spec.tsx"), true)
-  assert.equal(isTestFile(CLIENT), false)
 })
 
 tester.run("api-client-attaches-the-locale", rules["api-client-attaches-the-locale"], {
@@ -76,7 +53,7 @@ export default chain`,
     {
       // A file that builds no terminal link has nothing to attach a locale to. Firing here would
       // push the locale link into every helper, which is the opposite of one place owning it.
-      filename: "D:/repo/src/modules/api/graphql/clients/links/retry.ts",
+      filename: at(`${API}/links/retry.ts`),
       code: `export const createRetryLink = () => new RetryLink({})`,
     },
     {
@@ -103,8 +80,19 @@ export default chain`,
       code: `const chain = () => [createAttachLocaleLink({}), new HttpLink({})]
 export default chain`,
     },
+    {
+      // The shared api package keeps its own links, and its link implementation is not a chain either.
+      filename: at("packages/nivo-api/src/links/http.ts"),
+      code: `export const createHttpLink = (params) => new HttpLink(params)`,
+    },
   ],
   invalid: [
+    {
+      // A `links` folder outside the transport slots is no link implementation: a chain assembled there is judged as a chain.
+      filename: at("apps/web/src/modules/utils/links/http.ts"),
+      code: `export const chain = () => [createHttpLink({})]`,
+      errors: [{ messageId: "missing" }],
+    },
     {
       // The chain is complete, authenticated, retried - and mute about language.
       filename: CLIENT,
@@ -140,8 +128,28 @@ export default headers`,
       code: `const headers = { authorization: "Bearer x" }
 export default headers`,
     },
+    {
+      // The shared api package has its own locale link, the one place there.
+      filename: at("packages/nivo-api/src/links/locale.ts"),
+      code: `const headers = { "x-locale": locale }
+export default headers`,
+    },
   ],
   invalid: [
+    {
+      // A file called like the locale link outside the transport slots is not it.
+      filename: at("apps/web/src/hooks/swr/links/locale.ts"),
+      code: `const headers = { "x-locale": "vi" }
+export default headers`,
+      errors: [{ messageId: "elsewhere" }],
+    },
+    {
+      // Nor is another link of the same folder, or the client file that assembles them.
+      filename: at(`${API}/links/retry.ts`),
+      code: `const headers = { "x-locale": "vi" }
+export default headers`,
+      errors: [{ messageId: "elsewhere" }],
+    },
     {
       // A hook answering the same question the link already answers.
       filename: HOOK,

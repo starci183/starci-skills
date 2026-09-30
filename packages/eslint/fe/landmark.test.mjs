@@ -1,11 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { isPageTierFile, isRouteFile, isRouteLayoutFile, LANDMARK_BRANCHES, rules } from "./landmark.mjs"
+import { LANDMARK_BRANCHES, rules } from "./landmark.mjs"
 
-test("landmark helpers recognize route and page ownership", () => {
-  assert.equal(isRouteLayoutFile("D:/repo/src/app/en/layout.tsx"), true)
-  assert.equal(isRouteFile("D:/repo/src/app/en/dashboard/page.tsx"), true)
-  assert.equal(isPageTierFile("D:/repo/src/components/pages/Dashboard/component.tsx"), true)
+test("landmark ownership stays with the named branch and declares no rule", () => {
   assert.equal(LANDMARK_BRANCHES.has("Main"), true)
   assert.deepEqual(rules, {})
 })

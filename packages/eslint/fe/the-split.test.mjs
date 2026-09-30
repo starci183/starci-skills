@@ -3,28 +3,22 @@
  *
  *   node --test the-split.test.mjs
  *
- * The scope is a filename, so the cases that matter are the ones just outside it: the connected
+ * The scope is a slot role, so the cases that matter are the ones just outside it: the connected
  * half is SUPPOSED to reach for the world, and a rule that widened to every file in a surface
  * folder would forbid the thing it exists to relocate.
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import { connectedBlockHasPresentationalTwin, presentationalPurity, rules } from "./the-split.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const DRAWING = "D:/repo/src/components/blocks/dashboard/DailyQuest/component.tsx"
-const CONNECTED = "D:/repo/src/components/blocks/dashboard/DailyQuest/index.tsx"
-const HOOK = "D:/repo/src/hooks/swr/useQueryMyDailyQuestSwr.ts"
+const DRAWING = at("apps/web/src/components/blocks/dashboard/DailyQuest/component.tsx")
+const CONNECTED = at("apps/web/src/components/blocks/dashboard/DailyQuest/index.tsx")
+const HOOK = at("apps/web/src/hooks/swr/useQueryMyDailyQuestSwr.ts")
+const NOT_A_BLOCK = at("apps/web/src/modules/components/blocks/DailyQuest/index.tsx")
+const NOT_A_DRAWING = at("apps/web/src/modules/components/blocks/DailyQuest/component.tsx")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -45,12 +39,19 @@ test("SPLIT-1: the drawing half receives everything and asks for nothing", () =>
       { filename: HOOK, code: "const data = useSWR(key, fetcher)" },
       // a call that merely looks similar is not reaching for anything
       { filename: DRAWING, code: "const rows = useMemo(() => build(input), [input])" },
+      // a `component.tsx` that no slot owns is not a drawing half
+      { filename: NOT_A_DRAWING, code: "const q = useQueryMyDailyQuestSwr()" },
+      // the pure half is not the drawing role of another owner's entry
+      { filename: at("apps/web/src/components/blocks/dashboard/DailyQuest/classNames.ts"), code: "const t = useTranslations(\"quest\")" },
     ],
     invalid: [
       { filename: DRAWING, code: "const q = useQueryMyDailyQuestSwr()", errors: [{ messageId: "reaches" }] },
       { filename: DRAWING, code: "const t = useTranslations(\"quest\")", errors: [{ messageId: "reaches" }] },
       { filename: DRAWING, code: "const l = useLocale()", errors: [{ messageId: "reaches" }] },
       { filename: DRAWING, code: "const r = queryResolveRoute({ request })", errors: [{ messageId: "reaches" }] },
+      // every owner that splits has a drawing half: a feature page and a shared-package leaf too
+      { filename: at("apps/web/src/features/pages/Home/component.tsx"), code: "const l = useLocale()", errors: [{ messageId: "reaches" }] },
+      { filename: at("packages/nivo-ui/src/leaves/Badge/component.tsx"), code: "const l = useLocale()", errors: [{ messageId: "reaches" }] },
     ],
   })
 })
@@ -73,6 +74,9 @@ test("SPLIT-5: a connected block renders only its exact pure twin", () => {
         filename: CONNECTED,
         code: "export const DailyQuest = ({ props }) => <QuestRows props={props} />",
       },
+      // an `index.tsx` that no block owns is not a connected block, whatever its folder is called
+      { filename: NOT_A_BLOCK, code: "import { useTranslations } from \"next-intl\"; export const DailyQuest = () => <StatRow label={useTranslations(\"q\")(\"l\")} />" },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: "export const Home = () => <StatRow label={useTranslations(\"q\")(\"l\")} />" },
     ],
     invalid: [
       {
