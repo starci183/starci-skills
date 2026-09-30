@@ -1,5 +1,9 @@
 # Changelog
 
+## 7.1.2 - 2026-10-01
+
+- Fixed: the bundled machine no longer crashes on a local export list (shared with eslint-canon-be 2.1.2).
+
 ## 7.1.1 - 2026-10-01
 
 - Fixed: every rule failed to load in product repositories ("the managed package-scripts template ... cannot be found next to the runtime"): the bundled runtime now carries the data files the architecture machine reads beside its code (the managed package-scripts templates, canon-pins and the Sonar gate). A new runtime spec, `tests/canon-packed-load.spec.mjs`, installs each canon from its packed tarball into a real HFS repository and requires every rule to load.

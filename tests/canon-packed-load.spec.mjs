@@ -51,6 +51,8 @@ for (const [label, declaration, dir, name, entry, file] of [
   test(`the packed ${name} loads every rule and lints a file of a ${label} repository`, { skip: DEPS ? false : `no local install carries ${NEEDED.join(', ')}; install an FE example to run this check` }, async () => {
     const repo = gitAdd(installTypeScript(writeCleanRepo(declaration)));
     made.push(repo);
+    // a local export list (`export { x }`, no module specifier) once crashed the backend machine inside the lint rules
+    if (label === 'be') fs.appendFileSync(path.join(repo, 'src/modules/platform/config/index.ts'), 'const localValue = 1;\nexport { localValue };\n');
     const canon = installPacked(repo, dir, name);
     const plugin = await import(pathToFileURL(path.join(canon, 'index.mjs')).href);
     assert.equal(typeof plugin[entry], 'function', `${name} exports ${entry}`);
