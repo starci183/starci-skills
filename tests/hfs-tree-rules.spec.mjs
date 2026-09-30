@@ -283,6 +283,14 @@ test('FE_I18N_PLACEMENT: no next-intl, no proxy.ts, a middleware.ts, a route fil
 test('FE_I18N_PLACEMENT: next-intl with proxy.ts, [locale] routes, health probes and the root redirect page are clean', () => {
   const result = checkRepo({ repoRoot: repoOf(FE, (dir) => { put(dir, 'apps/web/src/app/[locale]/settings/page.tsx'); put(dir, 'apps/web/src/app/page.tsx'); }) });
   assert.deepEqual(only(result, 'FE_I18N_PLACEMENT'), []);
+  const shared = checkRepo({ repoRoot: repoOf({ ...FE, optionalSlots: ['repo.packages'] }, (dir) => {
+    put(dir, 'apps/web/package.json', json({ name: '@demo/web', private: true }));
+    put(dir, 'apps/admin/package.json', json({ name: '@demo/admin', private: true }));
+    put(dir, 'packages/demo-i18n/package.json', json({ name: '@demo/i18n', private: true, dependencies: { 'next-intl': '4.13.6' } }));
+    put(dir, 'packages/demo-i18n/src/index.ts');
+    put(dir, 'packages/demo-i18n/tsconfig.json', '{}');
+  }) });
+  assert.deepEqual(only(shared, 'FE_I18N_PLACEMENT'), [], 'the next-intl stack written once, in the shared i18n package');
 });
 
 // ------------------------------------------------------------------------------------------------ R60 FE_I18N_CATALOG

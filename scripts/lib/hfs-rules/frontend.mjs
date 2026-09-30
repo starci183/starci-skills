@@ -2,7 +2,8 @@
 //   FE_WIRE_GENERATED (R52)     wire types come from the contract copy: an app that keeps `modules/api/contract/*` declares the
 //                               `codegen` script and runs it before `build` and `typecheck` (prebuild, pretypecheck), and its
 //                               generated types on disk (`modules/api/__generated__/`, never tracked) are not older than the copy
-//   FE_I18N_PLACEMENT (R59)     next-intl with the `[locale]` segment: `next-intl` is a dependency, every route file sits under
+//   FE_I18N_PLACEMENT (R59)     next-intl with the `[locale]` segment: `next-intl` is a dependency (of the app, the root or the shared
+//                               i18n package under `packages/`), every route file sits under
 //                               `src/app/[locale]/` (the root redirect page, global-error and health probes excepted), locale
 //                               routing is `src/proxy.ts` and never `middleware.ts`, and the default locale's catalog `vi.json` exists
 //   FE_I18N_CATALOG (R60)       every `modules/i18n/messages/<locale>.json` has the same key set
@@ -75,7 +76,9 @@ function placementFindings({ repoRoot, app, tracked }) {
   const findings = [];
   const declares = (file) => { const pkg = readJson(repoRoot, file); return pkg ? ['dependencies', 'devDependencies'].some((section) => pkg[section]?.['next-intl'] !== undefined) : false; };
   const manifest = `${base}/package.json`;
-  if (tracked.includes(manifest) && !declares(manifest) && !declares('package.json')) findings.push(found(I18N_PLACEMENT, manifest, `${app} does not depend on next-intl; every app uses next-intl with the [locale] segment`, { app }));
+  // The next-intl stack is written once per repository: in the app, or in the shared `packages/<family>-i18n` the apps call.
+  const shared = tracked.filter((file) => /^packages\/[^/]+\/package\.json$/.test(file));
+  if (tracked.includes(manifest) && ![manifest, 'package.json', ...shared].some(declares)) findings.push(found(I18N_PLACEMENT, manifest, `${app} does not depend on next-intl (nor does the root or a shared package); every app uses next-intl with the [locale] segment`, { app }));
   if (!tracked.includes(`${base}/src/proxy.ts`)) findings.push(found(I18N_PLACEMENT, `${base}/src/proxy.ts`, `${app} has no src/proxy.ts; locale routing lives in proxy.ts`, { app }));
   for (const file of tracked.filter((f) => new RegExp(`^${base}/src/middleware\.[cm]?[jt]s$`).test(f))) findings.push(found(I18N_PLACEMENT, file, `${file} is a middleware file; Next 16 routes through src/proxy.ts`, { app }));
   const appDir = `${base}/src/app/`;
