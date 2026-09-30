@@ -18,7 +18,9 @@
  * socket), so the loop in a component is always the wrong one.
  */
 
+import { functionOf, isFn } from "./lib/bindings.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
+import { isPromiseValued } from "./lib/types.mjs"
 import { fileOf, isSpecFile, roleOfFile, slotOfFile } from "./lib/scope.mjs"
 
 /**
@@ -167,17 +169,55 @@ const isIntervalCall = (node) => {
   )
 }
 
-/** No hand-written polling loop in a component or hook. */
+/** The function node a timer runs: the inline callback, or the same-file function a name stands for. */
+const timerCallback = (context, node) => functionOf(context, node.arguments[0])
+
+/**
+ * True when running `fn` reads data: a call in its body (outside nested functions) whose value is a promise - `fetch`, the
+ * transport client, a reader, SWR's `mutate()`/revalidation, anything awaited - or an `await`. A tick that only reads the time or
+ * sets state (a shared clock, a countdown, an animation step) is not a refresh mechanism.
+ */
+const readsData = (context, fn, seen = new Set()) => {
+  if (!fn || seen.has(fn)) return false
+  seen.add(fn)
+  let found = false
+  const visit = (current) => {
+    if (found || !current || typeof current.type !== "string") return
+    if (current !== fn && isFn(current)) return
+    if (current.type === "AwaitExpression") { found = true; return }
+    if (current.type === "CallExpression") {
+      if (isPromiseValued(context, current)) { found = true; return }
+      const local = functionOf(context, current.callee)
+      if (local && readsData(context, local, seen)) { found = true; return }
+    }
+    for (const [key, child] of Object.entries(current)) {
+      if (key === "parent") continue
+      if (Array.isArray(child)) child.forEach(visit)
+      else if (child && typeof child.type === "string") visit(child)
+    }
+  }
+  visit(fn.body)
+  return found
+}
+
+/**
+ * No hand-written polling loop in a component or hook.
+ *
+ * A timer is polling when what it runs READS DATA (see `readsData`, decided by the type of each call, not by a name): a
+ * `setInterval`, or a `setTimeout` whose callback schedules the enclosing function again. The FE convention names no shared clock
+ * owner (knowledge/hfs/README.md section 6: "one refresh mechanism per resource, poll or socket"), so a timer that only ticks time
+ * or state - nivo-fe `useNow`, a one-minute clock behind `useSyncExternalStore` - is not a second refresh mechanism.
+ */
 export const noHandRolledPolling = {
   meta: {
     type: "problem",
-    docs: { description: "No `setInterval` and no self-scheduling `setTimeout`: one refresh mechanism per resource." },
+    docs: { description: "No `setInterval` and no self-scheduling `setTimeout` that reads data: one refresh mechanism per resource." },
     schema: [],
     messages: {
       interval:
-        "A `setInterval` loop. This is a second refresh mechanism beside the data hook's own; two mechanisms per resource means double requests and a spinner that never settles. Refresh through the data hook (`refreshInterval`) or a socket, not a timer in the component.",
+        "A `setInterval` loop that reads data. This is a second refresh mechanism beside the data hook's own; two mechanisms per resource means double requests and a spinner that never settles. Refresh through the data hook (`refreshInterval`) or a socket, not a timer in the component.",
       timeout:
-        "A `setTimeout` that schedules its own next run is a polling loop written by hand. Refresh through the data hook (`refreshInterval`) or a socket.",
+        "A `setTimeout` that schedules its own next run and reads data is a polling loop written by hand. Refresh through the data hook (`refreshInterval`) or a socket.",
     },
   },
   create(context) {
@@ -185,19 +225,29 @@ export const noHandRolledPolling = {
     const source = context.sourceCode || context.getSourceCode()
     return {
       CallExpression(node) {
-        if (isIntervalCall(node)) return context.report({ node, messageId: "interval" })
+        if (isIntervalCall(node)) {
+          if (readsData(context, timerCallback(context, node))) context.report({ node, messageId: "interval" })
+          return
+        }
         const callee = node.callee
         if (callee.type !== "Identifier" || callee.name !== "setTimeout") return
         const callback = node.arguments[0]
         if (!callback || (callback.type !== "ArrowFunctionExpression" && callback.type !== "FunctionExpression")) return
-        // The enclosing named function: does the timer's own callback call it again?
-        const owner = source.getAncestors(node).reverse().find((ancestor) =>
-          ["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"].includes(ancestor.type) && functionName(ancestor),
-        )
-        const name = owner ? functionName(owner) : null
-        if (!name) return
-        const calls = new RegExp(`\\b${name}\\s*\\(`).test(source.getText(callback))
-        if (calls) context.report({ node, messageId: "timeout" })
+        // The enclosing function: does the timer's own callback call it again (the same binding, not the same spelling)?
+        const owner = source.getAncestors(node).reverse().find((ancestor) => isFn(ancestor))
+        if (!owner) return
+        let again = false
+        const visit = (current) => {
+          if (again || !current || typeof current.type !== "string") return
+          if (current.type === "CallExpression" && functionOf(context, current.callee) === owner) { again = true; return }
+          for (const [key, child] of Object.entries(current)) {
+            if (key === "parent") continue
+            if (Array.isArray(child)) child.forEach(visit)
+            else if (child && typeof child.type === "string") visit(child)
+          }
+        }
+        visit(callback.body)
+        if (again && (readsData(context, callback) || readsData(context, owner))) context.report({ node, messageId: "timeout" })
       },
     }
   },

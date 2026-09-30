@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { at, fixtureHfs, slotTester } from "./fixtures/typed/tester.mjs"
+import { at, fixtureHfs, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
 import {
   componentLineBudget,
   noHandRolledPolling,
@@ -102,18 +102,30 @@ test("BUDGET-2: a unit holds at most six state hooks and six data hooks", () => 
 })
 
 test("BUDGET-3: no hand-rolled polling loop", () => {
-  tester.run("no-hand-rolled-polling", noHandRolledPolling, {
+  typedTester().run("no-hand-rolled-polling", noHandRolledPolling, {
     valid: [
-      { filename: BLOCK, code: "const E = () => { const d = useQueryFeedSwr({ refreshInterval: 5000 }); return d }" },
+      { filename: BLOCK, code: "declare const useQueryFeedSwr: (o: object) => unknown\nconst E = () => { const d = useQueryFeedSwr({ refreshInterval: 5000 }); return d }" },
       // a one-shot delay is not a loop
-      { filename: BLOCK, code: "const E = () => { useEffect(() => { const t = setTimeout(() => setOpen(false), 300); return () => clearTimeout(t) }, []) }" },
+      { filename: BLOCK, code: "import { useEffect } from \"react\"\ndeclare const setOpen: (v: boolean) => void\nconst E = () => { useEffect(() => { const t = setTimeout(() => setOpen(false), 300); return () => clearTimeout(t) }, []) }" },
       { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "setInterval(() => 1, 10)" },
+      // a shared clock ticking the time for labels reads no data (nivo-fe apps/app/src/hooks/time/useNow.ts)
+      {
+        filename: at("apps/web/src/hooks/time/useNow.ts"),
+        code: "import { useSyncExternalStore } from \"react\"\nconst listeners = new Set<() => void>()\nlet instant: number | null = null\nlet timer: ReturnType<typeof setInterval> | undefined\nconst tick = () => {\n  instant = Date.now()\n  for (const listener of listeners) listener()\n}\nconst subscribe = (listener: () => void): (() => void) => {\n  listeners.add(listener)\n  if (timer === undefined) timer = setInterval(tick, 60_000)\n  return () => { listeners.delete(listener); if (listeners.size === 0 && timer !== undefined) { clearInterval(timer); timer = undefined } }\n}\nexport const useNow = (): number | null => useSyncExternalStore(subscribe, () => instant ?? Date.now())",
+      },
+      // a countdown that only sets state
+      { filename: HOOK, code: "import { useEffect, useState } from \"react\"\nexport const useCountdown = () => { const [n, setN] = useState(10); useEffect(() => { const t = setInterval(() => setN((v) => v - 1), 1000); return () => clearInterval(t) }, []); return n }" },
+      // a self-scheduling animation step that reads no data
+      { filename: HOOK, code: "declare const step: () => void\nfunction frame() { setTimeout(() => { step(); frame() }, 16) }" },
     ],
     invalid: [
-      { filename: BLOCK, code: "const E = () => { useEffect(() => { const t = setInterval(load, 5000); return () => clearInterval(t) }, []) }", errors: [{ messageId: "interval" }] },
-      { filename: BLOCK, code: "const t = window.setInterval(load, 5000)", errors: [{ messageId: "interval" }] },
-      { filename: HOOK, code: "function poll() { setTimeout(() => { load(); poll() }, 3000) }", errors: [{ messageId: "timeout" }] },
-      { filename: HOOK, code: "const poll = () => { setTimeout(function () { poll() }, 3000) }", errors: [{ messageId: "timeout" }] },
+      // the callback fetches, directly or through a same-file function
+      { filename: BLOCK, code: "import { useEffect } from \"react\"\nconst load = async () => { await fetch(\"/feed\") }\nconst E = () => { useEffect(() => { const t = setInterval(load, 5000); return () => clearInterval(t) }, []) }", errors: [{ messageId: "interval" }] },
+      { filename: BLOCK, code: "declare const load: () => Promise<void>\nconst t = window.setInterval(() => { void load() }, 5000)", errors: [{ messageId: "interval" }] },
+      // SWR's mutate is a revalidation: a timer that calls it is a second refresh mechanism
+      { filename: HOOK, code: "import useSWR from \"swr\"\nexport const useFeed = () => { const { mutate } = useSWR(\"/feed\"); setInterval(() => { void mutate() }, 4000) }", errors: [{ messageId: "interval" }] },
+      { filename: HOOK, code: "declare const load: () => Promise<void>\nfunction poll() { setTimeout(() => { void load(); poll() }, 3000) }", errors: [{ messageId: "timeout" }] },
+      { filename: HOOK, code: "const poll = async () => { await fetch(\"/x\"); setTimeout(function () { poll() }, 3000) }", errors: [{ messageId: "timeout" }] },
     ],
   })
 })

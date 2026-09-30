@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.0.1 - 2026-09-30
+
+- **Fix: `no-hand-rolled-polling` refused a shared clock.** A timer is polling only when what it runs reads data - a call whose
+  value is a promise (`fetch`, the transport client, a reader, SWR's `mutate()`), an `await`, or a same-file function that does -
+  decided by type, not by name. nivo-fe `useNow` (a one-minute tick behind `useSyncExternalStore`) and a state countdown pass; a
+  timer that fetches or revalidates is still refused. The self-scheduling `setTimeout` check follows the enclosing function's
+  binding, not its spelling. The FE convention names no shared clock owner, so no clock rule is added.
+
 ## 6.0.0 - 2026-09-30
 
 - **Census fixes (starci-next-fe main, lane F0):** `one-outcome-union` treats a `kind` union as a result union only with an `ok`
