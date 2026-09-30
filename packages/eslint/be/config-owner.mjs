@@ -6,7 +6,8 @@
  *     `platform/config`. Everything else receives typed options from `<capability>.config.ts`. `process.env` in any form
  *     (member access, destructuring, `Reflect.get(process, "env")`, an `env` import of `node:process`), an import of
  *     `@nestjs/config` or `dotenv`, and a `process.cwd()` path joined into `src` or
- *     `.starcistacks` are refused everywhere else. A config getter that reads `process.env` itself is caught here at its
+ *     `.starcistacks` are refused everywhere else. The test world (slot `be.tests.world`) may read and write `process.env`:
+ *     it hands the run state file path to the jest workers. A config getter that reads `process.env` itself is caught here at its
  *     definition.
  *   - `config-parsed-in-main` keeps the parsing of configuration in `main.ts`: a call of a function exported by a
  *     `<capability>.config.ts` (or of a function returning a `<capability>.options.ts` type, at module scope) is refused
@@ -28,6 +29,9 @@ import { hfsOf } from "./lib/hfs.mjs"
 import { isDeclarationFile, normalizePath } from "./lib/path.mjs"
 import { originsOfType, typed } from "./lib/types.mjs"
 
+/** The test composition root (slot `be.tests.world`): it composes app options like `main.ts` and hands run state to jest workers through the environment. */
+const isTestWorld = (hfs, file) => hfs.slotOf(file) === "be.tests.world"
+
 const PROCESS_MODULES = new Set(["process", "node:process"])
 
 /** `@nestjs/config`, `dotenv` and their subpaths. */
@@ -44,7 +48,7 @@ const isGlobalProcess = (node) =>
 /** True when the property of a member expression spells `env`. */
 const spellsEnv = (node) => (node.computed ? staticText(node.property) === "env" : keyName(node.property) === "env")
 
-/** Only the file that declares `EnvSource` reads the process environment. */
+/** Only the file that declares `EnvSource` (and the test world) reads the process environment. */
 export const noDirectEnvRead = {
     meta: {
         type: "problem",
@@ -72,8 +76,9 @@ export const noDirectEnvRead = {
         }
         const isProcess = (node) => (node.type === "Identifier" && processNames.has(node.name) && !isLocal(node)) || isGlobalProcess(node)
         const isEnvSourceFile = () => inConfigOwner && declaresEnvSource
+        const inWorld = isTestWorld(hfs, filename)
         const reportEnv = (node) => {
-            if (!isEnvSourceFile()) context.report({ node, messageId: "env" })
+            if (!isEnvSourceFile() && !inWorld) context.report({ node, messageId: "env" })
         }
         const reportSource = (node, source) => {
             if (isConfigPackage(source)) context.report({ node, messageId: "package", data: { source } })
@@ -177,7 +182,7 @@ export const configParsedInMain = {
         const hfs = hfsOf(context)
         const slot = hfs.slotOf(filename) ?? ""
         const isEntry = slot.startsWith("be.app.") && baseOf(filename) === "main.ts"
-        const isWorld = slot === "be.tests.world"
+        const isWorld = isTestWorld(hfs, filename)
         const isOwnSpec = baseOf(filename).endsWith(CONFIG_SPEC_SUFFIX)
         if (isEntry || isWorld || isOwnSpec) return {}
         const { checker, toTs } = typed(context)

@@ -30,8 +30,12 @@ test("the process environment is read only by the file that declares EnvSource i
             { filename: at("src/modules/domain/plan/plan.service.spec.ts"), code: "const env = { PLAN_URL: 'http://plan' }\nexport const url = env.PLAN_URL" },
             // a different process object is not the process
             { filename: SERVICE, code: "const process = { env: { X: 1 } }; export const x = process.env" },
+            // the test world writes the run state path for the jest workers
+            { filename: at("src/tests/world/global-setup.ts"), code: "process.env.TEST_WORLD_STATE_FILE = '/tmp/state.json'\nexport const path = process.env.TEST_WORLD_STATE_FILE" },
         ],
         invalid: [
+            { filename: at("src/tests/e2e/plan.e2e-spec.ts"), code: "process.env.TEST_WORLD_STATE_FILE = '/tmp/state.json'", errors: [{ messageId: "env" }] },
+            { filename: at("src/features/plan/application/plan.handler.ts"), code: "process.env.TEST_WORLD_STATE_FILE = '/tmp/state.json'", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const url = process.env.PLAN_URL", errors: [{ messageId: "env" }] },
             { filename: CONFIG, code: "const env = process.env", errors: [{ messageId: "env" }] },
             { filename: SERVICE, code: "const x = process['env']", errors: [{ messageId: "env" }] },
