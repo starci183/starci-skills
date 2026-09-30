@@ -194,10 +194,10 @@ test('pins of the other side are not judged, and every package.json of a workspa
 });
 
 test('the soft-size backlog is reported and never fails the check', () => {
-  const result = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, 'apps/core/src/big.ts', 'export {};\n'.repeat(650))) });
+  const result = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, 'apps/core/src/big.options.ts', 'export {};\n'.repeat(650))) });
   const [finding] = only(result, 'HFS_SIZE_SOFT_BACKLOG');
   assert.equal(finding.level, 'info');
-  assert.equal(finding.path, 'apps/core/src/big.ts');
+  assert.equal(finding.path, 'apps/core/src/big.options.ts');
   assert.equal(finding.soft, 500);
   assert.ok(finding.lines > 500);
   assert.equal(result.ok, true);
@@ -322,7 +322,7 @@ test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json 
 });
 
 test('the CLI: report-only backlog leaves the exit code 0; explain and init print what they found', async () => {
-  const dir = repoOf(BE, (d) => put(d, 'src/features/orders/application/place-order.use-case.ts', 'export {};\n'.repeat(600)));
+  const dir = repoOf(BE, (d) => put(d, 'src/features/orders/application/place-order.handler.ts', 'export {};\n'.repeat(600)));
   assert.equal((await cli(['check', '--repo', dir])).code, 0);
 
   const explained = await cli(['explain', 'src/features/orders/index.ts', '--repo', dir]);
@@ -507,7 +507,8 @@ test('--fast judges the changed owners only: the machine gets their paths and sk
   assert.equal(none.machine.status, 'skipped');
   assert.equal(none.fast.changed, 0);
 
-  put(dir, 'src/features/orders/application/place-order.use-case.ts', 'export const placed = 1;\n');
+  put(dir, 'src/features/orders/application/place-order.query.ts', 'export const placed = 1;\n');
+  git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
   const changed = checkRepository({ repoRoot: dir, fast: true, machine });
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].paths, ['src/features/orders']);
@@ -536,7 +537,8 @@ test('--fast: slot checks run on the changed paths only, and the tree checks do 
 
 test('--fast with the real machine: an uncomposed module already on main is not judged, a full check reports it', async () => {
   const dir = branched((d) => { put(d, 'src/modules/domain/order/a.ts'); put(d, 'src/modules/domain/order/index.ts'); });
-  put(dir, 'src/features/orders/application/place-order.use-case.ts', 'export const placed = 1;\n');
+  put(dir, 'src/features/orders/application/place-order.query.ts', 'export const placed = 1;\n');
+  git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
   const fast = await cli(['check', '--repo', dir, '--fast']);
   assert.equal(fast.code, 0, fast.out);
   assert.match(fast.out, /--fast/);
@@ -586,7 +588,8 @@ export const OPERATIONS = defineOperations({ 'shop.total@1': query<Ask, Answer, 
 
 test('HFS_FORMAT: --fast never runs prettier, the full check runs the repository\'s own, and a repository with none is a refusal, never a pass', async () => {
   const dir = branched();
-  put(dir, 'src/features/orders/application/place-order.use-case.ts', 'export const placed = 1;\n');
+  put(dir, 'src/features/orders/application/place-order.query.ts', 'export const placed = 1;\n');
+  git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
   let calls = 0;
   const counting = { ...FORMATTED, check: async () => { calls += 1; return true; } };
   await cli(['check', '--repo', dir, '--fast'], { prettier: counting });
