@@ -7,7 +7,6 @@
       }
     ],
     "incremental": true,
-    "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
     "paths": {
       "@/*": [
         "./src/*"

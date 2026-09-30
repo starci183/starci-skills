@@ -4,6 +4,6 @@
     "allowJs": false,
     "baseUrl": "."
   },
-  "include": ["vitest.setup.ts", "apps/*/src/**/*.ts", "apps/*/src/**/*.tsx", "apps/*/next-env.d.ts"],
+  "include": ["apps/*/src/**/*.ts", "apps/*/src/**/*.tsx", "apps/*/next-env.d.ts"],
   "exclude": ["node_modules", "apps/*/node_modules", "apps/*/.next"]
 }

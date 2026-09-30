@@ -17,8 +17,6 @@
     "baseUrl": "."
   },
   "include": [
-    "vitest.config.ts",
-    "vitest.setup.ts",
     "packages/shared/src/**/*.d.ts",
     "packages/shared/src/**/*.ts",
     "packages/shared/src/**/*.tsx",
