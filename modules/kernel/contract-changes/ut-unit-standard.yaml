@@ -1,0 +1,45 @@
+id: ut-unit-standard
+effectiveAt: '2026-10-01T12:00:00+07:00'
+summary: >-
+  Owner-locked unit test standard for backend repositories (lane UT). Only `*.service.ts` files are unit-tested, each by one
+  colocated `<name>.service.spec.ts`; twin specs for handlers, resolvers, controllers, consumers, mappers, entities, guards
+  and modules, and composition specs, are no longer a unit kind, and pure helpers are covered through their services. A
+  spec builds its service with `Test.createTestingModule({ providers })` (no `new`, no `imports`, no `overrideProvider`),
+  provides exactly the constructor dependencies (every `Inject*()` token exported), and takes every double from
+  `@starci/jest-preset` (`mockEntityManager`, `fakeTransaction`, `fakeCache`, `fakeLock`, `recordingOutbox`, `FakeClock`,
+  `fakeIds`, `mock<T>()`, `builder`, the Outcome matchers); no casts, no ambient clock, no `jest.mock`, no `process.env`.
+  The prerequisite is thin transport: handlers, resolvers, controllers and consumers only map input, call exactly one
+  service method (or dispatch exactly one bus message) and return the result. Coverage is collected from
+  `src/**/*.service.ts` only at per-file 100 (`test` runs `--coverage`, `importHelpers` and `tslib`); Sonar no longer depends
+  on coverage (no lcov, no coverage exclusions, no coverage upload). `@starci/jest-preset` 2.0.0 ships the kit and drops
+  `sonarCoverageExclusions()`. knowledge/patterns/be/test.yaml BE-TEST-1 to BE-TEST-15 replace the old rules
+  (`mockEntityManager()` from `src/tests/fixtures/database.ts`, the twin-spec, direct-construction and composition-spec
+  rules and the Codecov/Sonar coverage-denominator rule are gone); the R47, R48, R87 and R88 law text and README rows state
+  the standard; BE-CONVENTION 1.5, 1.6 and 1.16 are rewritten. Adds no failure code; the enforcers of the standard are
+  added by the rule and machine-check sub-lanes of lane UT.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/ut-unit-standard.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/be/test.yaml
+  - knowledge/patterns/be/architecture-check.yaml
+  - knowledge/patterns/be/background.yaml
+  - knowledge/patterns/be/cqrs.yaml
+  - knowledge/patterns/be/folder.yaml
+  - knowledge/patterns/be/function.yaml
+  - knowledge/patterns/be/idempotency.yaml
+  - knowledge/patterns/be/imports.yaml
+  - knowledge/patterns/be/index.yaml
+  - knowledge/patterns/be/injection.yaml
+  - knowledge/patterns/be/naming.yaml
+  - knowledge/patterns/be/persistence.yaml
+  - knowledge/patterns/repo/folder.yaml
+  - knowledge/patterns/repo/tooling.yaml
+  - knowledge/patterns/enforcement.yaml
+  - knowledge/patterns/scan-coverage.yaml
+  - packages/jest-preset/README.md
+  - packages/jest-preset/CHANGELOG.md
+  - docs/backend-source-pattern.md
+  - docs/nest-test-code-check.md
+  - docs/source-layout.md
