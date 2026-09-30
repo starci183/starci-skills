@@ -157,6 +157,9 @@ const resolvedSourceFile = (context, specifier) => {
 }
 
 /** A module that uses a server-only API, or imports a module that is itself server-only, opens with `import "server-only"`. */
+/** Component tiers: a component is judged by where client code reaches it, not by a marker. */
+const COMPONENT_TIERS = new Set(["components", "feature"])
+
 export const serverModuleMarksServerOnly = {
   meta: {
     type: "problem",
@@ -171,6 +174,10 @@ export const serverModuleMarksServerOnly = {
     if (isSpecFile(fileOf(context))) return {}
     const slot = slotOfFile(context)
     if (!slot || ROUTE_FILE_SLOTS.has(slot)) return {}
+    // A block or a page is a server or client COMPONENT, not a server module: whether client code reaches the server through it is
+    // the machine's multi-hop question (FE_CLIENT_REACHES_SERVER). The marker belongs to the modules that hold server work.
+    if (COMPONENT_TIERS.has(tierOfFile(context))) return {}
+    const reader = roleOfFile(context) === "reader"
     let client = false
     let marked = false
     const uses = []
@@ -196,6 +203,8 @@ export const serverModuleMarksServerOnly = {
       "Program:exit"() {
         // a "use client" file that imports the server is client-no-server-import's finding, not a missing marker
         if (client || marked) return
+        // A server reader (`read-*.ts`, role `reader` of the api slot) is server-only by its role, whatever it imports.
+        if (reader && uses.length === 0) context.report({ node: context.sourceCode.ast, messageId: "mark", data: { what: "the request (it is a server reader)" } })
         for (const use of uses) context.report({ node: use.node, messageId: "mark", data: { what: use.what } })
       },
     }

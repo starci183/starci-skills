@@ -189,6 +189,8 @@ test("FE-TRANSPORT-4: the client maps a 401 and a 403 status to refused", () => 
       { filename: CLIENT, code: "export const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  return res.status === 401 || res.status === 403 ? { ok: false, kind: \"refused\" } : { ok: true }\n}" },
       { filename: CLIENT, code: "export const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  const { status } = res\n  if (status === 401 || status === 403) return { ok: false, kind: \"refused\" }\n  return { ok: true }\n}" },
       { filename: CLIENT, code: "export const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  const code = res.status\n  if (code === 401 || code === 403) return { ok: false, kind: \"refused\" }\n  return { ok: true }\n}" },
+      // the Outcome constructor named by its kind: starci-next-fe `failed("refused", { status, code })`
+      { filename: CLIENT, code: "export const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  if (res.status === 401 || res.status === 403) return failed(\"refused\", { status: res.status })\n  return { ok: true }\n}" },
       // a module with no fetch owes no mapping, and a file that is not the client is not judged
       { filename: CLIENT, code: "export const x = 1" },
       { filename: HOOK, code: "fetch(u)" },
@@ -356,6 +358,9 @@ test("FE-OUTCOME-1: a result union is declared once, in the outcome slot", () =>
       { filename: HOOK, code: "export type Field = { type: \"text\"; value: string } | { type: \"number\"; value: number }" },
       // a `kind` union whose values are not result kinds (tree nodes, menu items)
       { filename: HOOK, code: "export type Node = { kind: \"folder\"; children: string[] } | { kind: \"file\"; size: number }" },
+      // a view a mapper derives from the Outcome (no `ok` arm) is a screen state: starci-next-fe LessonViewerView, StudyStepView
+      { filename: at("apps/web/src/modules/api/learn-content/learn-content.mapper.ts"), code: "export type LessonViewerView = { kind: \"ready\"; lesson: string } | { kind: \"not-found\"; sectionHref: string } | { kind: \"unavailable\"; retryHref: string }" },
+      { filename: HOOK, code: "export type StudyStepView = { kind: \"saved\" } | { kind: \"refused\"; code: string } | { kind: \"not-found\" }" },
       // an `ok` that is a plain boolean flag on each member is not a true/false discriminant
       { filename: HOOK, code: "export type Flagged = { ok: boolean; a: 1 } | { ok: boolean; b: 2 }" },
       // not a union of objects, or not a union at all
@@ -373,7 +378,7 @@ test("FE-OUTCOME-1: a result union is declared once, in the outcome slot", () =>
       { filename: HOOK, code: "type Reply = { ok: true } | { ok: false }", errors: [{ messageId: "second" }] },
       // the discriminant is `kind` in the Outcome vocabulary
       { filename: HOOK, code: "export type Save = { kind: \"ok\"; id: string } | { kind: \"refused\" } | { kind: \"invalid\"; field: string }", errors: [{ messageId: "second" }] },
-      { filename: HOOK, code: "export type Read = { kind: \"unavailable\" } | { kind: \"not-found\" }", errors: [{ messageId: "second" }] },
+      { filename: HOOK, code: "export type Read = { kind: \"ok\"; value: string } | { kind: \"unavailable\" } | { kind: \"not-found\" }", errors: [{ messageId: "second" }] },
       // members declared apart and joined: the checker resolves them
       { filename: HOOK, code: "type Won = { ok: true; id: string }\ntype Lost = { ok: false; kind: \"invalid\" }\nexport type Attempt = Won | Lost", errors: [{ messageId: "second" }] },
       // an intersection member is still an object type

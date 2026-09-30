@@ -159,6 +159,12 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
       { filename: at("apps/web/src/app/[locale]/page.tsx"), code: 'import { headers } from "next/headers"\nexport default async function Page() { await headers(); return null }' },
       { filename: at("apps/web/src/app/[locale]/api/x/route.ts"), code: 'import { NextResponse } from "next/server"\nexport const GET = () => NextResponse.json({})' },
       { filename: at("apps/web/src/proxy.ts"), code: 'import { NextResponse } from "next/server"\nexport const proxy = () => NextResponse.next()' },
+      // a server COMPONENT (feature page, connected block) is judged by reachability (FE_CLIENT_REACHES_SERVER), not by a marker:
+      // starci-next-fe components/blocks/LearnContentSections/index.tsx imports a marked reader and needs no marker of its own
+      { filename: FEATURE, code: 'import { getTranslations } from "next-intl/server"\nexport default async function Home() { await getTranslations(); return null }' },
+      { filename: at("apps/web/src/components/blocks/Sections/index.tsx"), code: 'import { readMarked } from "../../../modules/marked/read-marked"\nexport const Sections = async () => { await readMarked(); return null }' },
+      // a marked reader passes
+      { filename: at("apps/web/src/modules/api/course/read-course.ts"), code: MARKED + 'import { get } from "../client"\nexport const readCourse = () => get("/course")' },
       // a client file is client-no-server-import's business
       { filename: HOOK, code: '"use client"\nimport { headers } from "next/headers"\nexport const useX = () => headers' },
       // specs and files no slot owns are not judged
@@ -179,8 +185,8 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
       { filename: HOOK, code: 'import { readMarked } from "../../modules/marked/read-marked"\nexport const useX = () => readMarked()', errors: [{ messageId: "mark" }] },
       { filename: MODULE, code: 'export { readMarked } from "../marked/read-marked"', errors: [{ messageId: "mark" }] },
       { filename: MODULE, code: 'export * from "../marked/read-marked"', errors: [{ messageId: "mark" }] },
-      // a server component below the route files marks itself too
-      { filename: FEATURE, code: 'import { getTranslations } from "next-intl/server"\nexport default async function Home() { await getTranslations(); return null }', errors: [{ messageId: "mark" }] },
+      // a server reader is server-only by its role, even when it imports only the client
+      { filename: at("apps/web/src/modules/api/course/read-course.ts"), code: 'import { get } from "../client"\nexport const readCourse = () => get("/course")', errors: [{ messageId: "mark" }] },
       // one report per server import
       { filename: MODULE, code: 'import { headers } from "next/headers"\nimport fs from "node:fs"\nexport const r = [headers, fs]', errors: [{ messageId: "mark" }, { messageId: "mark" }] },
     ],

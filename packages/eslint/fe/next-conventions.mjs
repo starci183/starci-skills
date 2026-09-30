@@ -398,10 +398,14 @@ export const i18nStackInOneModule = {
     const slot = slotOfFile(context)
     const single = hfs.apps.length === 1
     if (slot === "fe.package.i18n" || (slot === "fe.modules.i18n" && single)) return {}
+    const proxy = single && slot === "fe.source-root-pinned" && roleOfFile(context) === "proxy"
     const where = single ? "in the app's `modules/i18n`" : "in the i18n package (`packages/<family>-i18n`, exported as `createAppI18n`) that every app's `modules/i18n` calls"
     return {
       CallExpression(node) {
         const factory = stackFactoryOf(context, node.callee)
+        // In a one-app repository the proxy (role `proxy`) mounts the locale middleware built from the one routing; a shared repository
+        // builds it in the i18n package and the proxy re-exports it.
+        if (factory?.name === "createMiddleware" && proxy) return
         if (factory) context.report({ node, messageId: "stack", data: { name: factory.name, where } })
       },
     }

@@ -87,7 +87,7 @@ function placementFindings({ repoRoot, app, tracked }) {
   const appDir = `${base}/src/app/`;
   for (const file of tracked.filter((f) => f.startsWith(appDir) && ROUTE_FILE.test(f))) {
     const rel = file.slice(appDir.length);
-    if (rel.startsWith('[locale]/') || rel.startsWith('health/') || rel === 'page.tsx') continue;
+    if (rel.startsWith('[locale]/') || rel.startsWith('health/') || ['page.tsx', 'not-found.tsx', 'layout.tsx'].includes(rel)) continue;  // next-intl's root not-found and its layout
     findings.push(found(I18N_PLACEMENT, file, `${file} is a route file outside the [locale] segment; every page, layout and boundary sits under src/app/[locale]/`, { app }));
   }
   const messages = `${base}/src/modules/i18n/messages/`;

@@ -2,6 +2,13 @@
 
 ## 6.0.0 - unreleased (lanes C0, F0)
 
+- **Census fixes (starci-next-fe main, lane F0):** `one-outcome-union` treats a `kind` union as a result union only with an `ok`
+  arm beside a failure kind (a mapper's view union - `LessonViewerView`, `StudyStepView` - is a screen state);
+  `client-maps-auth-to-refused` accepts the Outcome constructor named by its kind (`failed("refused", ...)`);
+  `i18n-stack-in-one-module` lets the proxy of a one-app repository build the locale middleware; `server-module-marks-server-only`
+  requires the marker of server modules and of every server reader (role `reader`), not of components (reachability is
+  FE_CLIENT_REACHES_SERVER's); `route-tree-holds-routes-only` admits next-intl's root `not-found.tsx` and its root `layout.tsx`.
+
 - **Every law scopes by slot, never by folder regex (lane F0-H).** The path predicates of `class-names`, `props-and-slots`,
   `vendor-boundary`, `loading`, `type-safety`, `typography`, `brand-values`, `formatting`, `comments`, `hygiene`, `translation`,
   `lint-escape-hatch`, `client-boundary`, `file-layout`, `shape-slot`, `the-split`, `landmark`, `icon`, `served-locale`, `e2e-shape`,

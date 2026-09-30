@@ -275,12 +275,14 @@ test("FE-NEXT-10: the next-intl stack is written once per repository", () => {
       { filename: at("apps/web/src/modules/i18n/routing.ts"), code: ROUTING },
       { filename: at("apps/web/src/modules/i18n/navigation.ts"), code: NAVIGATION },
       { filename: PACKAGE, code: REQUEST },
+      // the proxy mounts the locale middleware built from the one routing (starci-next-fe apps/web/src/proxy.ts)
+      { filename: at("apps/web/src/proxy.ts"), code: MIDDLEWARE },
     ],
     invalid: [
-      // still one place: not a hook, a feature or the proxy
+      // still one place: not a hook or a feature; and the proxy builds only the middleware, never the routing
       { filename: at("apps/web/src/hooks/lesson/useLesson.ts"), code: NAVIGATION, errors: [{ messageId: "stack" }] },
       { filename: at("apps/web/src/features/pages/home/component.tsx"), code: REQUEST, errors: [{ messageId: "stack" }] },
-      { filename: at("apps/web/src/proxy.ts"), code: MIDDLEWARE, errors: [{ messageId: "stack" }] },
+      { filename: at("apps/web/src/proxy.ts"), code: ROUTING, errors: [{ messageId: "stack" }] },
     ],
   })
 })

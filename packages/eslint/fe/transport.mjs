@@ -339,7 +339,7 @@ const codesOf = (context, test) => {
   return null
 }
 
-/** True when a subtree builds an object whose `kind` is the literal `"refused"`. */
+/** True when a subtree builds an outcome of kind `"refused"`: an object whose `kind` is that literal, or a call whose first argument is it. */
 const buildsRefused = (node) => {
   let found = false
   const visit = (current) => {
@@ -350,6 +350,8 @@ const buildsRefused = (node) => {
       const value = unwrap(current.value)
       if (named && value?.type === "Literal" && value.value === "refused") found = true
     }
+    // A constructor of the Outcome vocabulary named by its kind: `failed("refused", { ... })`.
+    if (current.type === "CallExpression" && current.arguments[0]?.type === "Literal" && current.arguments[0].value === "refused") found = true
     for (const [name, child] of Object.entries(current)) {
       if (name === "parent") continue
       if (Array.isArray(child)) child.forEach(visit)
@@ -667,8 +669,9 @@ const literalsOf = (checker, type, name, location) => {
  * A result union is declared once per repository: `Outcome<T>` in the `fe.transport.outcome` / `fe.package.api.outcome` file.
  *
  * A union type alias is a result union when its members are object types that ALL carry the same literal-typed discriminant, in the
- * result vocabulary: `ok` (both `true` and `false` among the members) or `kind` (at least one literal of the Outcome vocabulary:
- * ok, refused, forbidden, invalid, not-found, unavailable). The check reads the resolved members through the checker, so
+ * result vocabulary: `ok` (both `true` and `false` among the members) or `kind` (a member of kind `"ok"` beside at least one failure
+ * kind of the Outcome vocabulary: refused, forbidden, invalid, not-found, unavailable). A view union that a mapper derives from an
+ * Outcome (`{ kind: "ready" } | { kind: "not-found" }`, no `ok` arm) is a screen state, not a second result vocabulary. The check reads the resolved members through the checker, so
  * `Ok<T> | Failure` and an intersection are seen as what they are, and no name (`*Outcome`, `*Result`) decides anything.
  * A UI state union (`{ status: "idle" } | { status: "saving" }`, `{ type: ... }`, a `kind` of menu items) is not result
  * vocabulary and passes. An alias that only composes the one union (`type Read = Outcome<Course>`, `Extract<Outcome<T>, ...>`) is not
@@ -706,7 +709,7 @@ export const oneOutcomeUnion = {
           const isResult =
             discriminant === "ok"
               ? values.every((entry) => entry.length === 1) && flat.includes(true) && flat.includes(false)
-              : flat.some((value) => RESULT_KINDS.has(value))
+              : flat.includes("ok") && flat.some((value) => value !== "ok" && RESULT_KINDS.has(value))
           if (isResult) {
             context.report({ node: node.id, messageId: "second", data: { name: node.id.name, discriminant: `\`${discriminant}\` discriminant` } })
             return

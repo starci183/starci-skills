@@ -78,6 +78,9 @@ test("FILE-6: the routing tree holds route files and nothing else", () => {
       { filename: at(`${L}/provisioning/loading.tsx`), code: "export default () => null" },
       { filename: at(`${L}/not-found.tsx`), code: "export default () => null" },
       { filename: at(`${A}/global-error.tsx`), code: "export default () => null" },
+      // next-intl: a request outside every locale renders the root not-found, inside a root layout that returns its children
+      { filename: at(`${A}/not-found.tsx`), code: "export default () => null" },
+      { filename: at(`${A}/layout.tsx`), code: "export default ({ children }) => children" },
       { filename: at(`${A}/opengraph-image.tsx`), code: "export default () => null" },
       // Server code and the Next opt-out folder are not screens and are not this rule business.
       { filename: at(`${A}/api/health/route.ts`), code: "export const GET = () => null" },
@@ -101,8 +104,9 @@ test("FILE-6: the routing tree holds route files and nothing else", () => {
       { filename: at("apps/web/src/modules/app/helper.ts"), code: "export const t = 1" },
     ],
     invalid: [
-      // a root layout and a segment that is not [locale] are not what the route slot names
-      { filename: at(`${A}/layout.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
+      // a root error/loading boundary and a segment that is not [locale] are not what the route slot names
+      { filename: at(`${A}/error.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
+      { filename: at(`${A}/loading.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
       { filename: at(`${A}/[lang]/page.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
       { filename: at(`${L}/dashboard/access.test.tsx`), code: "export const t = 1", errors: [{ messageId: "stray" }] },
       // The exact file this rule was written for: it built, linted, typechecked and was approved.
