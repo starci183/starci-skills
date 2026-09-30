@@ -73,6 +73,10 @@ ops:
   - id: backend.implement
     family: backend
     goal: Implement one selected backend outcome and prove its declared contract on actual code.
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
     completionProfile: implementation
@@ -86,11 +90,14 @@ ops:
       - architecture
       - repo
       - profile
+      - op-loop
     writes:
       - node
       - source
       - evidence
       - apiDelivery
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - implementation
@@ -114,6 +121,10 @@ ops:
     family: backend
     goal: Create one new backend source tree in the bound repository and prove its declared toolchain
       contract on the actual scaffold.
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
     completionProfile: implementation
@@ -129,10 +140,13 @@ ops:
       - conventions
       - stacks
       - profile
+      - op-loop
     writes:
       - node
       - source
       - evidence
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - implementation
@@ -254,6 +268,9 @@ ops:
     goal: Restructure one selected slice of code under a proven behavior invariant - the same regression
       check run before and after the change - never a behavior edit disguised as a refactor.
     params:
+      gateRounds:
+        default: 5
+        setBy: owner
       canonFamilies:
         default: ""
         setBy: owner
@@ -282,10 +299,13 @@ ops:
       - machines
       - canon
       - profile
+      - op-loop
     writes:
       - node
       - source
       - evidence
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - implementation
@@ -400,6 +420,10 @@ ops:
     family: e2e
     goal: Prove one selected delivered slice through its public API on a real stack the suite starts
       itself, with one scenario per assertion and the listed checks run verbatim.
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
     completionProfile: implementation
@@ -417,10 +441,13 @@ ops:
       - effects
       - profile
       - workflow
+      - op-loop
     writes:
       - node
       - source
       - evidence
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - implementation
@@ -474,6 +501,10 @@ ops:
     goal: Grow the installed design grammar by one semantic unit the product needs and no composition of
       existing contracts renders, publish it from the grammar's own repository and record it in the
       canon.
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
     completionProfile: implementation
@@ -487,10 +518,13 @@ ops:
       - repo
       - consumer
       - profile
+      - op-loop
     writes:
       - node
       - source
       - evidence
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - implementation
@@ -543,6 +577,10 @@ ops:
     goal: Runs only on explicit request or before release (owner ruling 2026-09-29, live verification
       belongs with e2e/UAT and never in a default chain; a leg the goal did not ask for settles
       deferred).
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - integration
     completionProfile: integration
@@ -561,9 +599,12 @@ ops:
       - effects
       - profile
       - workflow
+      - op-loop
     writes:
       - node
       - evidence
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - integration
@@ -747,6 +788,10 @@ ops:
     goal: Implement one selected frontend creation, refinement or defect repair by reconciling the full
       draws image array, business intent, architecture and current source, then verify the actual
       rendered resul
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
     completionProfile: implementation
@@ -768,6 +813,7 @@ ops:
       - workflow
       - profile
       - assetSources
+      - op-loop
     writes:
       - node
       - source
@@ -777,6 +823,8 @@ ops:
       - flows
       - assetManifest
       - realizationCheck
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - implementation
@@ -799,6 +847,10 @@ ops:
     family: interface
     goal: Create one new interface source tree in the bound repository and prove it renders — build
       green plus a captured first shell.
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
     completionProfile: implementation
@@ -815,12 +867,15 @@ ops:
       - repo
       - conventions
       - profile
+      - op-loop
     writes:
       - node
       - source
       - evidence
       - firstRender
       - shellNode
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - implementation
@@ -883,6 +938,10 @@ ops:
     family: package
     goal: Create one new package or library module at the declared path and prove its public contract
       surface — the package builds and a real consumer import resolves.
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
     completionProfile: implementation
@@ -895,10 +954,13 @@ ops:
       - repo
       - conventions
       - profile
+      - op-loop
     writes:
       - node
       - source
       - evidence
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - implementation
@@ -1257,6 +1319,10 @@ ops:
     family: task
     goal: Analyze one request into a bounded, evidence-grounded workflow selection without performing
       effects.
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - operations
     completionProfile: operations
@@ -1265,8 +1331,11 @@ ops:
       - repo
       - targetSystem
       - profile
+      - op-loop
     writes:
       - evidence
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - operations
@@ -1287,6 +1356,10 @@ ops:
     goal: "Author the test files one bounded slice needs - inside a test-paths-only allowlist - and
       prove they are collected by the real runner; the pass/fail judgement of the product belongs to
       the verify ops, "
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
     completionProfile: implementation
@@ -1300,10 +1373,13 @@ ops:
       - suite
       - conventions
       - profile
+      - op-loop
     writes:
       - node
       - source
       - evidence
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - implementation
@@ -1469,6 +1545,10 @@ ops:
     goal: Run the product repository's FULL unit suite (npm run test:unit) against the delivered source
       and report the observed result - never a subset presented as the whole suite, never a repaired
       product.
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
     completionProfile: implementation
@@ -1480,9 +1560,12 @@ ops:
       - repo
       - request
       - profile
+      - op-loop
     writes:
       - node
       - evidence
+      - read-digest
+      - gate-proof
     route:
       nodeKinds:
         - implementation

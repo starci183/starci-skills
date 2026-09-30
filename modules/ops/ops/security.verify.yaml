@@ -45,7 +45,7 @@ reads:
       en: Read the declared responsibility boundaries and enforcement rules the inspection measures
         against - secret/public value separation, denial handling, ownership boundaries.
   - id: machines
-    path: scripts/checks/check-scoped-lint.mjs + scripts/checks/code-patterns/*.mjs +
+    path: scripts/checks/gate.mjs + scripts/checks/code-patterns/*.mjs +
       scripts/checks/architecture/*.mjs
     purpose:
       en: When the selected inspection includes boundary or enforcement checks, read the sealed machines'

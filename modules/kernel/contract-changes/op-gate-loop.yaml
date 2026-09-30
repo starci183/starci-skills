@@ -1,0 +1,30 @@
+id: op-gate-loop
+effectiveAt: '2026-10-01T06:00:00+07:00'
+summary: "Every code-writing op runs one fixed loop (owner 2026-10-01): READ (scripts/checks/read-digest.mjs records the pattern files of each touched file kind from knowledge/op-gate.yaml, the matching example files and the hfs explain slot map, each with its sha256) -> CODE -> scripts/checks/gate.mjs (hfs lint --changed at the app root, root codegen and the dist-exposing workspace builds, tsc per owning tsconfig after the stale tsbuildinfo is deleted, the slice's tests with --maxWorkers=2; only findings new against the op's base block, measured read-only from git objects) -> FIX, at most params.gateRounds (5) rounds -> REPORT with gate.json and read-digest.json attached. api settle re-reads both (scripts/kernel/gate-settle.mjs, runtime check op-gate) and refuses a done with no gate JSON (op-gate-proof-missing), a tool that could not run (op-gate-tool-failed), a new finding (op-gate-new-findings), no READ digest (op-read-digest-missing) or a digest naming no pattern file for a touched kind (op-read-digest-no-pattern). The Kernel lands an op straight into main with the same gate (land-gate-red / land-gate-unavailable) and the merge guard (land-merge-dropped-main: a merge commit whose recorded tree takes the lane side over a main-side change, recomputed with git merge-tree), pushes main, deletes the op worktree and branch; a failed op keeps its commits on preserved/<op>. check-scoped-lint and its base-tree helpers are deleted. A leg admitted earlier settles without the loop"
+reach: new-legs
+ops: [backend.scaffold, backend.implement, interface.scaffold, interface.implement, package.scaffold, code.refactor, test.author, unit.verify, integration.verify, e2e.verify, grammar.update, task.execute]
+adds:
+  checks:
+    - op-gate
+  codes:
+    - op-gate-proof-missing
+    - op-gate-tool-failed
+    - op-gate-new-findings
+    - op-read-digest-missing
+    - op-read-digest-no-pattern
+    - land-gate-red
+    - land-gate-unavailable
+    - land-merge-dropped-main
+paths:
+  - knowledge/op-gate.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/ops/_common.yaml
+  - modules/ops/registry.yaml
+  - modules/schemas/op.schema.yaml
+  - scripts/checks/gate.mjs
+  - scripts/checks/read-digest.mjs
+  - scripts/kernel/gate-settle.mjs
+  - scripts/kernel/product-worktree.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/api-verbs/settle.mjs
+  - scripts/kernel/op-prompt.mjs
