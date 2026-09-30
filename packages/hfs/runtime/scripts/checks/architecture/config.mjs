@@ -113,7 +113,10 @@ function workspaceDirectories(root) {
         candidates = next;
       }
       if (!candidates.length) throw Error(`Workspace pattern matched no package directories: ${normalized}.`);
-      for (const candidate of candidates) admit(candidate, `workspace ${normalized}`, true);
+      // npm expands a `*` segment to the directories that hold a package.json and skips the rest (an empty or untracked folder is
+      // HFS_EMPTY_DIR / HFS_SLOT_UNDECLARED, never a reason to analyse nothing); a literal workspace path must resolve.
+      const wildcard = segments.includes('*');
+      for (const candidate of candidates) admit(candidate, `workspace ${normalized}`, !wildcard);
     }
     for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
       for (const [name, value] of Object.entries(pkg?.[section] ?? {})) {
