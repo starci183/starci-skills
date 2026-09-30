@@ -1,0 +1,22 @@
+id: hfs-be-injection
+effectiveAt: '2026-09-30T18:00:00+07:00'
+summary: >-
+  Lane C0 rule sub-lane RB (BE-CONVENTION 1.3, 2.3, 3.2 R85): new eslint-canon-be law `injection` ships the seven R85
+  enforcers at error, type-aware and without a spec exemption: injector-only (raw Inject(, InjectEntityManager(,
+  InjectDataSource(, InjectQueue(, InjectRepository( and any package Inject* called only in <owner>.decorators.ts at an
+  owner root; raw @Inject decorator, property injection and non-constructor injector are findings), injector-shape
+  (zero-arg, TypedParameterDecorator<T>, injector<T>(token), JSDoc, unique symbol tokens, provide: class or unique
+  symbol), injector-type-match (T equals the parameter annotation), infra-needs-injector (platform/integrations/package
+  typed constructor parameters carry an injector), no-module-ref, no-forward-ref, no-string-token. The rules.yaml
+  enforcers of R85 lose `status: planned`. No new failure code: BE_RAW_INJECT already exists.
+reach: new-legs
+adds:
+  codes: []
+paths:
+  - modules/kernel/contract-changes/hfs-be-injection.yaml
+  - knowledge/hfs/rules.yaml
+  - packages/eslint/be/index.mjs
+  - packages/eslint/be/injection.mjs
+  - packages/eslint/be/injection.test.mjs
+  - packages/eslint/be/README.md
+  - packages/eslint/be/CHANGELOG.md

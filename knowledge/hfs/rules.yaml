@@ -905,13 +905,13 @@ rules:
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_RAW_INJECT"]
     enforcers:
-      - {kind: eslint-be, id: injector-only, status: planned}
-      - {kind: eslint-be, id: injector-shape, status: planned}
-      - {kind: eslint-be, id: injector-type-match, status: planned}
-      - {kind: eslint-be, id: infra-needs-injector, status: planned}
-      - {kind: eslint-be, id: no-module-ref, status: planned}
-      - {kind: eslint-be, id: no-forward-ref, status: planned}
-      - {kind: eslint-be, id: no-string-token, status: planned}
+      - {kind: eslint-be, id: injector-only}
+      - {kind: eslint-be, id: injector-shape}
+      - {kind: eslint-be, id: injector-type-match}
+      - {kind: eslint-be, id: infra-needs-injector}
+      - {kind: eslint-be, id: no-module-ref}
+      - {kind: eslint-be, id: no-forward-ref}
+      - {kind: eslint-be, id: no-string-token}
   - id: R86
     code: "BE_SQL_TABLE_OWNER"
     title_vi: "SQL ghi bảng của năng lực khác hoặc đọc không giới hạn"
