@@ -5,6 +5,9 @@
  * schema VERSION, whether an exported function is a bare verb, and whether a `.module.ts` file's
  * OWN static factory borrows a vendor dynamic-module's exact name instead of this tree's `register`.
  *
+ * `no-default-export` (BE-CONVENTION 1.15, R89) is the form rule beside them: named exports only, with one Jest
+ * `*.global-setup.ts` in slot `be.tests.e2e-setup` as the single default export.
+ *
  * A FOURTH RULE WAS WRITTEN AND DELETED, and the deletion is the useful part. It demanded that a
  * file name spell out the class it declares, and measured 616 offenders in 4430 files -- because
  * the convention is the opposite of what it assumed: the PATH carries the role and the scope
@@ -27,6 +30,7 @@
  * that. Those are read by a person, which is why the law states them with the scars attached.
  */
 
+import { hfsOf } from "./lib/hfs.mjs"
 import { normalizePath } from "./lib/path.mjs"
 
 /** A schema generation baked into an identifier. */
@@ -196,24 +200,52 @@ export const noBareVerbExport = {
   },
 }
 
+// -- no-default-export -------------------------------------------------------------------------------------------
+
+/** The one file kind that may default-export: a Jest global setup, whose API is a default function. */
+const isGlobalSetup = (context) => hfsOf(context).slotOf(context.filename) === "be.tests.e2e-setup" && normalizePath(context.filename).endsWith(".global-setup.ts")
+
+/** Named exports only: a default export has no name to grep, rename or import-check. */
+export const noDefaultExport = {
+  meta: {
+    type: "problem",
+    docs: { description: "TypeScript source uses named exports only; the Jest global setup is the one exception." },
+    schema: [],
+    messages: {
+      default:
+        "A default export has no name of its own: every importer picks one, renames and greps stop working, and the file cannot be found by what it exports. Use a named export. (The only default export is a Jest global setup, `*.global-setup.ts` in the e2e setup folder, whose API requires it.)",
+    },
+  },
+  create(context) {
+    if (!/\.[cm]?ts$/.test(normalizePath(context.filename))) return {}
+    if (isGlobalSetup(context)) return {}
+    const isDefault = (name) => name && ((name.type === "Identifier" && name.name === "default") || (name.type === "Literal" && name.value === "default"))
+    return {
+      ExportDefaultDeclaration(node) {
+        context.report({ node, messageId: "default" })
+      },
+      TSExportAssignment(node) {
+        context.report({ node, messageId: "default" })
+      },
+      ExportSpecifier(node) {
+        if (isDefault(node.exported) || (node.parent.source && isDefault(node.local))) context.report({ node, messageId: "default" })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-version-in-name": noVersionInName,
   "no-bare-verb-export": noBareVerbExport,
   "no-vendor-module-factory-name": noVendorModuleFactoryName,
+  "no-default-export": noDefaultExport,
 }
 
-/**
- * The level this law asks for, as the plugin's own opinion.
- *
- * MEASURE THESE BEFORE SWITCHING THEM ON. Unlike the other backend laws, naming rules land on a
- * mature tree with real debt: a repository that has been running for a while will have file names
- * that drifted from their exports and methods carrying a schema generation. Land above zero at
- * `warn` with the count and burn it down -- a naming rule at `error` on day one blocks every commit
- * that touches an old file, which teaches people to disable it.
- */
+/** Every rule of this law at `error`. */
 export const recommended = {
   "starci-be/no-version-in-name": "error",
   "starci-be/no-bare-verb-export": "error",
   "starci-be/no-vendor-module-factory-name": "error",
+  "starci-be/no-default-export": "error",
 }

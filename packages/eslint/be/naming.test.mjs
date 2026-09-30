@@ -12,7 +12,8 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { noBareVerbExport, noVendorModuleFactoryName, noVersionInName, rules } from "./naming.mjs"
+import { noBareVerbExport, noDefaultExport, noVendorModuleFactoryName, noVersionInName, rules } from "./naming.mjs"
+import { at, fixtureHfs } from "./fixtures/typed/tester.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -140,6 +141,38 @@ test("NAME-5: an exported function names its object", () => {
       { code: "export const generate = () => null", errors: [{ messageId: "bareVerb" }] },
       { code: "export function parse() { return null }", errors: [{ messageId: "bareVerb" }] },
       { code: "export const run = async () => null", errors: [{ messageId: "bareVerb" }] },
+    ],
+  })
+})
+
+test("R89: named exports only; the Jest global setup of the e2e setup folder is the one default export", () => {
+  const slotTester = new RuleTester({
+    languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
+    settings: { starci: { hfs: fixtureHfs() } },
+  })
+  const SERVICE = at("src/modules/domain/order/order.service.ts")
+  const SETUP = at("src/tests/e2e/setup/database.global-setup.ts")
+  slotTester.run("no-default-export", noDefaultExport, {
+    valid: [
+      { filename: SERVICE, code: "export const answer = 42\nexport class OrderService {}" },
+      { filename: SERVICE, code: "const a = 1\nexport { a as first }" },
+      // the Jest API for a global setup is a default function
+      { filename: SETUP, code: "export default async function setup() {}" },
+      // a JavaScript tool config is not TypeScript source (the managed eslint.config.mjs default-exports by design)
+      { filename: at("eslint.config.mjs"), code: "export default []" },
+    ],
+    invalid: [
+      { filename: SERVICE, code: "export default class OrderService {}", errors: [{ messageId: "default" }] },
+      { filename: SERVICE, code: "const a = 1\nexport default a", errors: [{ messageId: "default" }] },
+      { filename: SERVICE, code: "const a = 1\nexport { a as default }", errors: [{ messageId: "default" }] },
+      { filename: SERVICE, code: "export { default } from \"./other\"", errors: [{ messageId: "default" }] },
+      { filename: SERVICE, code: "export { default as Other } from \"./other\"", errors: [{ messageId: "default" }] },
+      { filename: SERVICE, code: "const a = 1\nexport = a", errors: [{ messageId: "default" }] },
+      // a global-setup name outside the setup folder, and a setup-folder file that is not a global setup
+      { filename: at("src/modules/domain/order/database.global-setup.ts"), code: "export default async function setup() {}", errors: [{ messageId: "default" }] },
+      { filename: at("src/tests/e2e/setup/e2e-world.ts"), code: "export default {}", errors: [{ messageId: "default" }] },
+      // a spec is not exempt
+      { filename: at("src/modules/domain/order/order.service.spec.ts"), code: "export default {}", errors: [{ messageId: "default" }] },
     ],
   })
 })

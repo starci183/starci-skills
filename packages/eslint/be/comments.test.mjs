@@ -12,6 +12,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
+import { at, fixtureHfs } from "./fixtures/typed/tester.mjs"
 import {
   noNonAsciiSource,
   noRestatedNameJsdoc,
@@ -26,10 +27,12 @@ const tester = new RuleTester({
     ecmaVersion: 2022,
     sourceType: "module",
   },
+  settings: { starci: { hfs: fixtureHfs() } },
 })
 
-const SRC = "D:/repo/src/modules/bussiness/user/user.service.ts"
-const MESSAGES = "D:/repo/src/messages/vi.ts"
+const SRC = at("src/modules/domain/user/user.service.ts")
+const MESSAGES = at("src/modules/domain/user/messages/user.messages.ts")
+const FEATURE_MESSAGES = at("src/features/plan/messages/plan.messages.ts")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -72,34 +75,15 @@ test("COMMENT-2: every member of an exported enum carries its own doc", () => {
   })
 })
 
-test("COMMENT-4: a fixture lane keeps its data and still gives up its prose", () => {
-  const FIXTURE = "/repo/src/tests/e2e/support-ticket.e2e-spec.ts"
+test("COMMENT-4: a spec or fixture gets no exemption: Vietnamese is refused wherever it is not a message catalog", () => {
+  const SPEC = at("src/features/plan/application/place-order.handler.spec.ts")
+  const FIXTURE = at("src/tests/fixtures/database.ts")
   tester.run("no-non-ascii-source", noNonAsciiSource, {
-    valid: [
-      // the sentence a real customer types IS the thing under test - translating it would test a
-      // system nobody uses
-      {
-        filename: FIXTURE,
-        code: "const message = \"Anh chuyen roi nhe, em nhan duoc chua?\".replace(\"a\", \"ă\")",
-      },
-      {
-        filename: FIXTURE,
-        code: "const reply = { from: \"khách vừa chuyển khoản\" }",
-      },
-    ],
+    valid: [],
     invalid: [
-      // a comment in a spec is prose like anywhere else: the next reader still cannot follow it
-      {
-        filename: FIXTURE,
-        code: "// kiểm tra luồng thanh toán\nconst x = 1",
-        errors: [{ messageId: "nonAscii" }],
-      },
-      // and outside a fixture lane, a string is prose again
-      {
-        filename: "/repo/src/modules/billing/charge.service.ts",
-        code: "const reply = \"khách vừa chuyển khoản\"",
-        errors: [{ messageId: "nonAscii" }],
-      },
+      { filename: SPEC, code: "const reply = { from: \"khách vừa chuyển khoản\" }", errors: [{ messageId: "nonAscii" }] },
+      { filename: FIXTURE, code: "// kiểm tra luồng thanh toán\nconst x = 1", errors: [{ messageId: "nonAscii" }] },
+      { filename: SRC, code: "const reply = \"khách vừa chuyển khoản\"", errors: [{ messageId: "nonAscii" }] },
     ],
   })
 })
@@ -108,7 +92,8 @@ test("COMMENT-4: source prose is English and no marker exempts a line", () => {
   tester.run("no-non-ascii-source", noNonAsciiSource, {
     valid: [
       { filename: SRC, code: "const greeting = 'hello'" },
-      // locale files are product copy, not source prose
+      // a message catalog (slot be.domain.messages or be.feature.messages) is product copy, not source prose
+      { filename: FEATURE_MESSAGES, code: "// b\u1ea3n d\u1ecbch\nexport const vi = { hello: 'Xin ch\u00e0o' }" },
       { filename: MESSAGES, code: "export const vi = { hello: 'Xin ch\u00e0o' }" },
     ],
     invalid: [

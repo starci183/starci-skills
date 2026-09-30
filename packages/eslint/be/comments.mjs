@@ -9,7 +9,8 @@
  *   - `require-enum-member-jsdoc` can check that a doc EXISTS and never that it states a
  *     consequence. That half is read by a person, and the rule says so rather than pretending.
  *   - `no-non-ascii-source` takes no exemption marker: HFS removed `vn-ok`, so text a program depends on
- *     lives in a locale or data file, and a fixture lane is exempt for strings only (see the rule).
+ *     lives in a message catalog (slot be.domain.messages or be.feature.messages), the only place Vietnamese may appear. Specs
+ *     and fixtures get no exemption.
  *   - `no-restated-name-jsdoc` (law 7) holds the decidable slice of law 3 - a doc block whose only
  *     content is the declared name re-spelled in words teaches nothing beyond the import line, so it
  *     is COMMENT-3's violation wearing COMMENT-1's shape. It fires only on an exact match between the
@@ -18,7 +19,10 @@
  *     decidable and stays a human read.
  */
 
-import { normalizePath } from "./lib/path.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+
+/** The slots of the per-owner message catalogs: the only source files that may hold Vietnamese. */
+const CATALOG_SLOTS = new Set(["be.domain.messages", "be.feature.messages"])
 
 /**
  * The character classes this refuses, and why it is NOT simply "ASCII only".
@@ -168,41 +172,14 @@ export const noNonAsciiSource = {
   },
   create(context) {
     const sourceCode = context.sourceCode || context.getSourceCode()
-    const file = normalizePath(context.filename || context.getFilename())
-    // locale files are wholly product copy; policing them would be policing the product
-    if (/\/(?:messages|locales|i18n)\//.test(file)) return {}
-
-    /*
-     * IN A TEST LANE, A STRING IS A FIXTURE AND A COMMENT IS STILL PROSE.
-     *
-     * The rule's own reason draws this line already: prose in a second language leaves half the
-     * reasoning unavailable to a reader, while "text the program MATCHES on or EMITS is data rather
-     * than prose". A spec that feeds an agent the sentence a real customer would type - "khach vua
-     * chuyen khoan" - is feeding it data, and translating it would test a system nobody uses.
-     *
-     * Measured before it was written: of 92 findings in one back end, 89 were fixture strings and 3
-     * were comments. Marking all 92 would have put an exemption on every line of every
-     * conversation fixture, which is noise; the whole lane is exempt for strings instead.
-     *
-     * The exemption is for STRINGS ONLY. A Vietnamese comment in a spec is the same problem it is
-     * anywhere else - the next reader still cannot follow the reasoning - so it is still refused.
-     */
-    const fixtureLane = /\.spec\.ts$|-spec\.ts$|\/src\/tests\//.test(file)
-    const commentLines = fixtureLane
-      ? new Set(sourceCode.getAllComments().flatMap((comment) => {
-        const span = []
-        for (let line = comment.loc.start.line; line <= comment.loc.end.line; line += 1) span.push(line)
-        return span
-      }))
-      : null
+    // a message catalog is product copy in two languages; every other file is prose for the next reader
+    if (CATALOG_SLOTS.has(hfsOf(context).slotOf(context.filename))) return {}
 
     return {
       "Program:exit"(node) {
         const lines = sourceCode.getLines()
         for (let index = 0; index < lines.length; index += 1) {
           const line = lines[index]
-          // in a fixture lane only prose is policed; the data the fixture feeds is the point of it
-          if (commentLines && !commentLines.has(index + 1)) continue
           const offence = offenceIn(line)
           if (offence === null) continue
           context.report({
