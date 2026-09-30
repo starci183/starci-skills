@@ -1,0 +1,38 @@
+id: hfs-be-sweep-1
+effectiveAt: '2026-09-30T18:00:00+07:00'
+summary: >-
+  Lane C0 sub-lane RE1 (BE-CONVENTION 1.16, 1.17, 3.1 principles 2 and 3): the type-safety, spec-quality, testing,
+  e2e-flow, suppression and size-budget laws of @starci/eslint-canon-be 2.0.0 (unreleased) ask the HFS slot view and
+  the file basename role instead of testing a path, identify receivers by TypeScript type instead of by variable
+  name, and exempt no spec or test lane. R72 BE_TYPE_ESCAPE: the four canon rules that restated the borrowed
+  consistent-type-assertions (never) and no-non-null-assertion (no-never-cast, no-non-null-assertion, no-double-cast,
+  no-unguarded-unknown-cast) are deleted, the factory's borrowed rules hold every file including specs, and the new
+  no-function-or-eval refuses the Function type and eval. R48 BE_SPEC_QUALITY: spec-typed-doubles (a cast, covered by
+  the borrowed rule) and harness-calls-provider-directly (the harness spec kind no longer exists) are deleted; the e2e
+  rules recognise a bus, an actor, a wait and a state read by type and slot. R47 BE_TEST_TOPOLOGY: unit-test-colocated
+  requires a twin spec for a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper, a
+  subject beside every spec, and refuses .test.ts, int-spec and harness-spec files. R18 HFS_INLINE_SUPPRESSION also
+  refuses eslint-env, /* global */, istanbul/c8/v8 ignore, NOSONAR, sonar-disable and prettier-ignore, and finds a
+  @ts- directive anywhere in a comment. R20 HFS_SIZE_GROWTH: file-size-growth takes no option (max and recorded are
+  gone). The catalog laws of R47, R48 and R72 and their README rows changed identically; the Vietnamese text of
+  BE_SPEC_QUALITY, BE_TYPE_ESCAPE, HFS_INLINE_SUPPRESSION and HFS_SIZE_GROWTH follows, with no numeric threshold.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-be-sweep-1.yaml
+  - modules/kernel/failure-codes.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - packages/eslint/be/README.md
+  - packages/eslint/be/CHANGELOG.md
+  - packages/eslint/be/type-safety.mjs
+  - packages/eslint/be/type-safety.test.mjs
+  - packages/eslint/be/spec-quality.mjs
+  - packages/eslint/be/spec-quality.test.mjs
+  - packages/eslint/be/testing.mjs
+  - packages/eslint/be/testing.test.mjs
+  - packages/eslint/be/e2e-flow.mjs
+  - packages/eslint/be/e2e-flow.test.mjs
+  - packages/eslint/be/suppression.mjs
+  - packages/eslint/be/suppression.test.mjs
+  - packages/eslint/be/size-budget.mjs
+  - packages/eslint/be/size-budget.test.mjs

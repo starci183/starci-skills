@@ -485,7 +485,7 @@ rules:
   - id: R47
     code: "BE_TEST_TOPOLOGY"
     title_vi: "Cấu hình test lệch chuẩn"
-    law: "One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`."
+    law: "One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["BE_TEST_TOPOLOGY"]
@@ -495,19 +495,17 @@ rules:
   - id: R48
     code: "BE_SPEC_QUALITY"
     title_vi: "Spec đọc mã nguồn hoặc ép kiểu mock"
-    law: "No source-reading specs, no cast doubles; `lint:e2e` is green."
+    law: "No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); an e2e enters through transport, waits with `waitFor`, boots through `src/tests/e2e/setup`, reads persisted state back and reaches no model provider."
     kinds: [lint, design]
     gates: [settle, land, ci]
     failureCodes: ["BE_SPEC_QUALITY"]
     enforcers:
       - {kind: eslint-be, id: spec-no-source-read}
-      - {kind: eslint-be, id: spec-typed-doubles}
       - {kind: eslint-be, id: e2e-uses-production-transport}
       - {kind: eslint-be, id: no-branch-in-flow-step}
       - {kind: eslint-be, id: no-sleep-in-flow}
       - {kind: eslint-be, id: no-wiring-in-flow-spec}
       - {kind: eslint-be, id: e2e-asserts-persisted-state}
-      - {kind: eslint-be, id: harness-calls-provider-directly}
       - {kind: eslint-be, id: no-api-shaped-e2e-filename}
       - {kind: eslint-be, id: no-call-only-spec}
       - {kind: eslint-be, id: no-marker-model-stub}
@@ -776,15 +774,12 @@ rules:
   - id: R72
     code: "BE_TYPE_ESCAPE"
     title_vi: "Ép kiểu never hoặc khẳng định non-null"
-    law: "No `as never` and no `x!` outside the test lanes."
+    law: "No type escape in any file, specs included: no `as X` (only `as const`), `<X>y`, `x!` or `any` (the factory turns on the typescript-eslint rules `consistent-type-assertions` with `never`, `no-non-null-assertion` and `no-explicit-any`), no `Function` type, no `eval`."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_TYPE_ESCAPE"]
     enforcers:
-      - {kind: eslint-be, id: no-never-cast}
-      - {kind: eslint-be, id: no-non-null-assertion}
-      - {kind: eslint-be, id: no-double-cast}
-      - {kind: eslint-be, id: no-unguarded-unknown-cast}
+      - {kind: eslint-be, id: no-function-or-eval}
   - id: R73
     code: "BE_ASYNC_NO_AWAIT"
     title_vi: "Hàm async không có await"

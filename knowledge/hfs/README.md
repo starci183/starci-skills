@@ -463,13 +463,13 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R44 | `BE_SECRET_DEFAULT` | No default for a secret key or infrastructure URL. |
 | R45 | `BE_MODULE_SHAPE` | `@Global` only on config, logging, database; typed options; one module per transport. |
 | R46 | `BE_BACKGROUND_UNOWNED` | Every sweep, outbox or retry has a job or consumer run by a worker app. |
-| R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`. |
-| R48 | `BE_SPEC_QUALITY` | No source-reading specs, no cast doubles; `lint:e2e` is green. |
+| R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`. |
+| R48 | `BE_SPEC_QUALITY` | No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); an e2e enters through transport, waits with `waitFor`, boots through `src/tests/e2e/setup`, reads persisted state back and reaches no model provider. |
 | R68 | `BE_SQL_INTERPOLATED` | SQL text carries no runtime substitution; values are numbered parameters. |
 | R69 | `BE_QUERY_UNBOUNDED` | A read that can return many rows states `take`, `limit` or `LIMIT`, or pages by cursor. |
 | R70 | `BE_HTTP_TIMEOUT` | Every outbound `fetch`, axios or HttpService call states a timeout or an abort signal. |
 | R71 | `BE_LOG_SECRET` | A logger call carries no credential and no personal identifier by name; log an id or a masked form. |
-| R72 | `BE_TYPE_ESCAPE` | No `as never` and no `x!` outside the test lanes. |
+| R72 | `BE_TYPE_ESCAPE` | No type escape in any file, specs included: no `as X` (only `as const`), `<X>y`, `x!` or `any` (the factory turns on the typescript-eslint rules `consistent-type-assertions` with `never`, `no-non-null-assertion` and `no-explicit-any`), no `Function` type, no `eval`. |
 | R73 | `BE_ASYNC_NO_AWAIT` | An `async` function contains an `await`; otherwise it is not `async`. |
 | R74 | `BE_MIGRATION_REVERSIBLE` | Every migration declares a `down()` that reverses its `up()`; never empty, never a bare throw. |
 | R75 | `BE_RETURN_TYPE` | Handlers and public methods of an Injectable, Resolver or Controller declare their return type. |

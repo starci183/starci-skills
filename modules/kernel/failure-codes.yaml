@@ -805,13 +805,14 @@ BE_SOURCE_NAME_INVALID:
   kind: check-finding
 
 BE_SPEC_QUALITY:
-  title: "Spec reads source or casts a double"
-  title_vi: "Spec đọc mã nguồn hoặc ép kiểu double"
-  meaning_vi: "Một spec đọc mã nguồn của repo bằng fs để kiểm tra chữ, hoặc dựng double của dependency bằng as never hay as unknown as thay vì mock<T>() có kiểu."
+  title: "Spec reads source, or an e2e breaks its flow shape"
+  title_vi: "Spec đọc mã nguồn hoặc e2e phá dạng luồng"
+  meaning_vi: "Một spec đọc mã nguồn của repo bằng fs để kiểm tra chữ, một spec chỉ khẳng định lời gọi thay vì kết quả, hoặc một e2e đi vòng qua transport, ngủ theo thời lượng, rẽ nhánh trong bước, tự dựng module, gọi nhà cung cấp mô hình hay không đọc lại trạng thái đã lưu. Ép kiểu (as, x!) trong spec do các luật mượn của typescript-eslint chặn, cùng mã BE_TYPE_ESCAPE."
   causes_vi:
-    - "readFileSync hay readdirSync trên src/, apps/ hoặc __dirname trong spec"
-    - "as never hoặc as unknown as X trong spec hay tệp fixtures"
-  nextStep_vi: "Chuyển luật kiến trúc sang lint hoặc bộ kiểm tra, và dùng mock<T>() cho double; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+    - "readFileSync hay readdirSync trên mã nguồn hoặc __dirname trong spec"
+    - "Spec chỉ có toHaveBeenCalled*, không khẳng định kết quả hay trạng thái"
+    - "e2e gọi CommandBus, QueryBus hay handler trực tiếp; dùng sleep thay cho waitFor; tự gọi Test.createTestingModule; import SDK của nhà cung cấp mô hình; không đọc lại dòng đã lưu qua EntityManager"
+  nextStep_vi: "Chuyển luật kiến trúc sang lint hoặc bộ kiểm tra; khẳng định kết quả hoặc trạng thái; e2e vào bằng transport thật, chờ bằng waitFor và dựng thế giới ở src/tests/e2e/setup. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -2992,10 +2993,11 @@ HFS_INIT_UNDETECTED:
 HFS_INLINE_SUPPRESSION:
   title: "Inline lint or type suppression"
   title_vi: "Chú thích tắt luật tại chỗ"
-  meaning_vi: "Có chú thích eslint-disable, eslint-enable, stylelint-disable, @ts-ignore, @ts-expect-error, @ts-nocheck hoặc vn-ok trong mã. HFS không cho tắt luật hay bỏ kiểm tra kiểu tại chỗ."
+  meaning_vi: "Có chú thích tắt luật hoặc miễn trừ trong mã: eslint-disable, eslint-enable, eslint-env, /* global */, stylelint-disable, @ts-ignore, @ts-expect-error, @ts-nocheck (ở bất kỳ vị trí nào trong chú thích), istanbul, c8 hay v8 ignore, NOSONAR, sonar-disable, prettier-ignore hoặc vn-ok. HFS không cho tắt luật, bỏ kiểm tra kiểu, giấu độ phủ hay giấu phát hiện Sonar tại chỗ."
   causes_vi:
     - "eslint-disable hoặc stylelint-disable (dòng, dòng kế tiếp hoặc cả tệp) để qua một luật"
     - "@ts-ignore hoặc @ts-expect-error để qua lỗi kiểu"
+    - "istanbul, c8 hay v8 ignore để giấu mã khỏi độ phủ; NOSONAR hay sonar-disable để giấu phát hiện; prettier-ignore để bỏ định dạng"
     - "vn-ok để miễn luật ngôn ngữ"
   nextStep_vi: "Sửa mã cho đúng luật, hoặc đề xuất đổi luật trong canon; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
@@ -3227,12 +3229,12 @@ HFS_ROOT_SRC_FORBIDDEN_FE:
 HFS_SIZE_GROWTH:
   title: "Source file over the size budget grew"
   title_vi: "Tệp mã nguồn vượt hạn mức dòng vẫn tiếp tục dài thêm"
-  meaning_vi: "Một tệp mã nguồn đã dài hơn hạn mức mềm (500 dòng) nhưng lại dài thêm so với phiên bản gốc của nhánh, hoặc một tệp mới tạo đã vượt hạn mức ngay từ đầu. Tệp quá dài khó đọc, khó sửa và là nơi lỗi dễ ẩn; quy tắc này cho phép tệp cũ đang quá dài được giữ nguyên hoặc thu nhỏ dần, nhưng không cho phép nó phình thêm."
+  meaning_vi: "Một tệp mã nguồn đã dài hơn hạn mức mềm của ruleParams.fileLines nhưng lại dài thêm so với phiên bản gốc của nhánh, hoặc một tệp mới tạo đã vượt hạn mức ngay từ đầu. Tệp quá dài khó đọc, khó sửa và là nơi lỗi dễ ẩn; quy tắc này cho phép tệp cũ đang quá dài được giữ nguyên hoặc thu nhỏ dần, nhưng không cho phép nó phình thêm."
   causes_vi:
-    - "Op thêm mã mới vào một tệp vốn đã quá 500 dòng thay vì tách phần mới sang tệp khác"
-    - "Một tệp đang dưới 500 dòng được thêm mã cho đến khi vượt hạn mức"
-    - "Một tệp mới tạo dài hơn 500 dòng, hoặc một tệp bị di chuyển sang đường dẫn mới nên bị coi là tệp mới"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tách phần mã mới (hoặc bớt phần cũ) sang tệp riêng đúng ô của nó, sao cho tệp không dài hơn phiên bản gốc và tệp mới không quá 500 dòng."
+    - "Op thêm mã mới vào một tệp vốn đã quá hạn mức thay vì tách phần mới sang tệp khác"
+    - "Một tệp đang dưới hạn mức được thêm mã cho đến khi vượt hạn mức"
+    - "Một tệp mới tạo dài hơn hạn mức, hoặc một tệp bị di chuyển sang đường dẫn mới nên bị coi là tệp mới"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tách phần mã mới (hoặc bớt phần cũ) sang tệp riêng đúng ô của nó, sao cho tệp không dài hơn phiên bản gốc và tệp mới nằm trong hạn mức."
   owner: op-retry
   kind: check-finding
 
@@ -13071,13 +13073,14 @@ BE_LOG_SECRET:
   kind: check-finding
 
 BE_TYPE_ESCAPE:
-  title: "Cast to never or non-null assertion"
-  title_vi: "Ép kiểu never hoặc khẳng định non-null"
-  meaning_vi: "Có x as never hoặc x! trong mã sản phẩm, nên trình biên dịch ngừng kiểm tra một giá trị mà thực tế có thể sai kiểu hoặc vắng mặt."
+  title: "Type escape: cast, non-null assertion, any, Function or eval"
+  title_vi: "Thoát kiểu: ép kiểu, non-null, any, Function hoặc eval"
+  meaning_vi: "Có x as T (kể cả as never, as unknown as T), <T>x, x!, any, kiểu Function hoặc eval trong bất kỳ tệp nào, kể cả spec, nên trình biên dịch ngừng kiểm tra một giá trị mà thực tế có thể sai kiểu hoặc vắng mặt. Ép kiểu, x! và any do các luật mượn của typescript-eslint mà nhà máy cấu hình bật; Function và eval do luật no-function-or-eval của canon chặn."
   causes_vi:
-    - "as never để lọt kiểm tra tham số"
+    - "as never hoặc as unknown as X để lọt kiểm tra tham số, trong mã sản phẩm hay trong spec"
     - "x! thay cho việc kiểm tra tồn tại"
-  nextStep_vi: "Cho giá trị đúng kiểu tham số cần, thu hẹp bằng guard trả về hoặc ném lỗi có kiểu, hoặc sửa chữ ký để sự vắng mặt không thể xảy ra. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+    - "Kiểu Function, eval hoặc new Function thay cho chữ ký có kiểu"
+  nextStep_vi: "Cho giá trị đúng kiểu tham số cần (mock<T>() cho double trong spec), thu hẹp bằng guard trả về hoặc ném lỗi có kiểu, hoặc sửa chữ ký để sự vắng mặt không thể xảy ra. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 

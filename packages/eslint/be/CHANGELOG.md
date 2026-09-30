@@ -14,6 +14,14 @@
   (`typeOrigins`, `isPackageType`) for the type-aware rules.
 - Removed: the SAB-only `cdc` and `event-delivery` laws (`projection-listener-contract`, `no-dynamic-projection-group-id`,
   `projection-recompute-must-upsert`, `nats-bridge-delivery-contract`, `no-call-site-transport-override`).
+- Breaking (slot sweep, RE1): `type-safety`, `spec-quality`, `testing`, `e2e-flow`, `suppression` and `size-budget` ask the slot view (`hfsOf(context)`) and the file's basename role instead of a path pattern. No rule of these laws exempts a spec or a test lane.
+- Removed: `no-never-cast`, `no-non-null-assertion`, `no-double-cast`, `no-unguarded-unknown-cast` (R72) and `spec-typed-doubles` (R48): the borrowed `consistent-type-assertions` (`never`) and `no-non-null-assertion` the factory turns on state exactly the same obligation for every file, specs included. One obligation, one rule.
+- New: `no-function-or-eval` (R72: the `Function` type, `eval` and `new Function`, the type escapes the borrowed rules do not cover).
+- Removed: `harness-calls-provider-directly` (R48; a `harness` spec kind no longer exists, BE-CONVENTION 1.16).
+- Changed: `unit-test-colocated` (R47) requires a twin `.spec.ts` beside a handler, domain service, consumer, job, guard, mapper, policy, client and `*.rows.ts` (by slot and basename role), a subject beside every spec, and refuses `.test.ts`, `.int-spec.ts` and `.harness-spec.ts`.
+- Changed: `e2e-asserts-persisted-state` recognises a state read by the TYPE of the receiver (a typeorm `EntityManager`, `DataSource` or `QueryRunner`), not by a variable name; `e2e-uses-production-transport` recognises a bus by its `@nestjs/cqrs` type and an actor by the file (`*.handler.ts`, `*.consumer.ts`, `*.job.ts`) that declares its type; `no-sleep-in-flow` recognises a wait by its shape (a timer, or a `Promise<void>` call given one number); `no-wiring-in-flow-spec` recognises `Test` by its `@nestjs/testing` import; `no-model-call-in-e2e` and `no-marker-model-stub` ask the slot (`be.tests.e2e-live`, `be.tests.fixtures`, `be.tests.e2e-setup`).
+- Changed: `no-inline-suppression` (R18) also refuses `eslint-env`, `/* global */`, `istanbul`/`c8`/`v8 ignore`, `NOSONAR`, `sonar-disable` and `prettier-ignore`, and finds a `@ts-` directive anywhere in a comment.
+- Changed: `file-size-growth` (R20) takes no option: the `max` and `recorded` options are gone, the budget is `ruleParams.be.fileLines`, the baseline is git. A spec, a fixture and an e2e file are governed like any source file; a migration and a declaration file are not.
 - Dependencies: `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` ^8.70; peer `typescript` >=5.9; node >=22.13.
   The 1.7.1 dependency on `@starci/hfs` (and its sibling-workspace fallback) is gone: the package carries its own
   manifest copy in `runtime/`, one resolution path, no fallback.
