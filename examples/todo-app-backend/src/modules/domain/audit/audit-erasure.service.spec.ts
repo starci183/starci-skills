@@ -4,6 +4,15 @@ import type { MockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { OUTBOX } from "@modules/platform/outbox"
+import {
+    AUDIT_AT,
+    AUDIT_LATER,
+    auditErasureRow,
+    completeOwnErasureInput,
+    erasureStepInput,
+    requestErasureInput,
+    requestOwnErasureInput,
+} from "@tests/fixtures/builders/audit.builder"
 import { AUDIT_APPEND_QUEUE } from "./audit-append.policy"
 import { AuditErasureService } from "./audit-erasure.service"
 import { AuditKeystoreService } from "./audit-keystore.service"
@@ -11,21 +20,9 @@ import { AuditAction, SYSTEM_ACTOR_ID } from "./audit.contracts"
 import { AuditErrorCode } from "./errors/audit.error"
 import { AuditErasureRequestEntity } from "./persistence/entities/audit-erasure-request.entity"
 
-const AT = new Date("2026-09-30T10:00:00.000Z")
-const LATER = new Date("2026-09-30T11:00:00.000Z")
+const AT = new Date(AUDIT_AT)
+const LATER = new Date(AUDIT_LATER)
 const KEY = Buffer.alloc(32, 3)
-
-const row = (overrides: Partial<AuditErasureRequestEntity> = {}): AuditErasureRequestEntity => ({
-    requestId: "r1",
-    personId: "p1",
-    state: "requested",
-    requestedAt: AT,
-    verifiedAt: null,
-    refusedAt: null,
-    executingAt: null,
-    completedAt: null,
-    ...overrides,
-})
 
 const build = async (em: MockEntityManager = mockEntityManager()) => {
     const clock = new FakeClock(LATER)
@@ -53,17 +50,17 @@ const keyDestroyed = (keystore: ReturnType<typeof mock<AuditKeystoreService>>): 
 describe("AuditErasureService", () => {
     describe("request", () => {
         it("opens a request for the caller and verifies it at once", async () => {
-            const stored = row()
+            const stored = auditErasureRow()
             const { service } = await build()
             const manager = mockEntityManager({
                 save: [
                     [AuditErasureRequestEntity, stored],
-                    [AuditErasureRequestEntity, row({ state: "verified", verifiedAt: LATER })],
+                    [AuditErasureRequestEntity, auditErasureRow({ state: "verified", verifiedAt: LATER })],
                 ],
                 findOne: [AuditErasureRequestEntity, stored],
             })
 
-            await expect(service.request({ manager, personId: "p1", at: LATER })).resolves.toSucceedWith({
+            await expect(service.request({ manager, ...requestErasureInput() })).resolves.toSucceedWith({
                 requestId: "r1",
                 personId: "p1",
                 state: "verified",
@@ -96,16 +93,16 @@ describe("AuditErasureService", () => {
         it("refuses the request when a stranger confirms it and touches no key", async () => {
             const { service, keystore } = await build()
             const manager = mockEntityManager({
-                findOne: [AuditErasureRequestEntity, row()],
-                save: [AuditErasureRequestEntity, row({ state: "refused", refusedAt: LATER })],
+                findOne: [AuditErasureRequestEntity, auditErasureRow()],
+                save: [AuditErasureRequestEntity, auditErasureRow({ state: "refused", refusedAt: LATER })],
             })
 
-            await expect(service.confirm({ manager, requestId: "r1", callerId: "mallory", at: LATER })).resolves.toBeRefused({
+            await expect(service.confirm({ manager, ...erasureStepInput({ callerId: "mallory" }) })).resolves.toBeRefused({
                 code: AuditErrorCode.ErasureRequestForbidden,
                 params: { requestId: "r1" },
             })
 
-            expect(manager.save).toHaveBeenCalledWith(AuditErasureRequestEntity, { ...row(), refusedAt: LATER, state: "refused" })
+            expect(manager.save).toHaveBeenCalledWith(AuditErasureRequestEntity, { ...auditErasureRow(), refusedAt: LATER, state: "refused" })
             expect(keystore.destroyKey).not.toHaveBeenCalled()
         })
 
@@ -113,7 +110,7 @@ describe("AuditErasureService", () => {
             const { service } = await build()
             const manager = mockEntityManager({ findOne: [AuditErasureRequestEntity, null] })
 
-            await expect(service.confirm({ manager, requestId: "nope", callerId: "p1", at: LATER })).resolves.toBeRefused({
+            await expect(service.confirm({ manager, ...erasureStepInput({ requestId: "nope" }) })).resolves.toBeRefused({
                 code: AuditErrorCode.ErasureRequestNotFound,
                 params: { requestId: "nope" },
             })
@@ -127,9 +124,9 @@ describe("AuditErasureService", () => {
 
         it("refuses a request that is no longer requested without writing", async () => {
             const { service } = await build()
-            const manager = mockEntityManager({ findOne: [AuditErasureRequestEntity, row({ state: "verified" })] })
+            const manager = mockEntityManager({ findOne: [AuditErasureRequestEntity, auditErasureRow({ state: "verified" })] })
 
-            await expect(service.confirm({ manager, requestId: "r1", callerId: "p1", at: LATER })).resolves.toBeRefused({
+            await expect(service.confirm({ manager, ...erasureStepInput() })).resolves.toBeRefused({
                 code: AuditErrorCode.ErasureRequestInvalidState,
                 params: { requestId: "r1", state: "verified", expected: "requested" },
             })
@@ -139,7 +136,7 @@ describe("AuditErasureService", () => {
     })
 
     describe("execute", () => {
-        const verified = row({ state: "verified", verifiedAt: AT })
+        const verified = auditErasureRow({ state: "verified", verifiedAt: AT })
 
         it("destroys the subject key, confirms nothing is readable, then completes and drops the person id", async () => {
             const { service, keystore } = await build()
@@ -147,13 +144,13 @@ describe("AuditErasureService", () => {
             const manager = mockEntityManager({
                 findOne: [AuditErasureRequestEntity, verified],
                 save: [
-                    [AuditErasureRequestEntity, row({ state: "executing", executingAt: LATER })],
-                    [AuditErasureRequestEntity, row({ state: "complete", personId: null, completedAt: LATER, executingAt: LATER })],
+                    [AuditErasureRequestEntity, auditErasureRow({ state: "executing", executingAt: LATER })],
+                    [AuditErasureRequestEntity, auditErasureRow({ state: "complete", personId: null, completedAt: LATER, executingAt: LATER })],
                 ],
             })
 
-            await expect(service.execute({ manager, requestId: "r1", callerId: "p1", at: LATER })).resolves.toSucceedWith(
-                row({ state: "complete", personId: null, completedAt: LATER, executingAt: LATER }),
+            await expect(service.execute({ manager, ...erasureStepInput() })).resolves.toSucceedWith(
+                auditErasureRow({ state: "complete", personId: null, completedAt: LATER, executingAt: LATER }),
             )
 
             expect(keystore.getKeyIdForPerson).toHaveBeenCalledWith({ personId: "p1", manager })
@@ -179,11 +176,11 @@ describe("AuditErasureService", () => {
             keystore.destroyKey.mockResolvedValue(undefined)
             const manager = mockEntityManager({
                 findOne: [AuditErasureRequestEntity, verified],
-                save: [AuditErasureRequestEntity, row({ state: "complete", personId: null })],
+                save: [AuditErasureRequestEntity, auditErasureRow({ state: "complete", personId: null })],
             })
 
-            await expect(service.execute({ manager, requestId: "r1", callerId: "p1", at: LATER })).resolves.toSucceedWith(
-                row({ state: "complete", personId: null }),
+            await expect(service.execute({ manager, ...erasureStepInput() })).resolves.toSucceedWith(
+                auditErasureRow({ state: "complete", personId: null }),
             )
 
             expect(keystore.getKeyMaterials).not.toHaveBeenCalled()
@@ -194,11 +191,11 @@ describe("AuditErasureService", () => {
             keystore.getKeyIdForPerson.mockResolvedValue(null)
             keystore.destroyKey.mockResolvedValue(undefined)
             const manager = mockEntityManager({
-                findOne: [AuditErasureRequestEntity, row({ state: "verified", personId: null })],
-                save: [AuditErasureRequestEntity, row({ state: "complete", personId: null })],
+                findOne: [AuditErasureRequestEntity, auditErasureRow({ state: "verified", personId: null })],
+                save: [AuditErasureRequestEntity, auditErasureRow({ state: "complete", personId: null })],
             })
 
-            await service.execute({ manager, requestId: "r1", callerId: "p1", at: LATER })
+            await service.execute({ manager, ...erasureStepInput() })
 
             expect(keystore.destroyKey).toHaveBeenCalledWith({ manager, personId: "p1" })
         })
@@ -210,10 +207,10 @@ describe("AuditErasureService", () => {
             keystore.getKeyMaterials.mockResolvedValue(new Map([["k1", KEY]]))
             const manager = mockEntityManager({
                 findOne: [AuditErasureRequestEntity, verified],
-                save: [AuditErasureRequestEntity, row({ state: "executing" })],
+                save: [AuditErasureRequestEntity, auditErasureRow({ state: "executing" })],
             })
 
-            await expect(service.execute({ manager, requestId: "r1", callerId: "p1", at: LATER })).resolves.toBeRefused({
+            await expect(service.execute({ manager, ...erasureStepInput() })).resolves.toBeRefused({
                 code: AuditErrorCode.ErasureNotConfirmed,
                 params: { requestId: "r1" },
             })
@@ -225,7 +222,7 @@ describe("AuditErasureService", () => {
             const { service, keystore } = await build()
             const manager = mockEntityManager({ findOne: [AuditErasureRequestEntity, verified] })
 
-            await expect(service.execute({ manager, requestId: "r1", callerId: "mallory", at: LATER })).resolves.toBeRefused({
+            await expect(service.execute({ manager, ...erasureStepInput({ callerId: "mallory" }) })).resolves.toBeRefused({
                 code: AuditErrorCode.ErasureRequestForbidden,
                 params: { requestId: "r1" },
             })
@@ -238,7 +235,7 @@ describe("AuditErasureService", () => {
             const { service } = await build()
             const manager = mockEntityManager({ findOne: [AuditErasureRequestEntity, null] })
 
-            await expect(service.execute({ manager, requestId: "nope", callerId: "p1", at: LATER })).resolves.toBeRefused({
+            await expect(service.execute({ manager, ...erasureStepInput({ requestId: "nope" }) })).resolves.toBeRefused({
                 code: AuditErrorCode.ErasureRequestNotFound,
                 params: { requestId: "nope" },
             })
@@ -246,9 +243,9 @@ describe("AuditErasureService", () => {
 
         it.each(["requested", "refused", "executing"])("refuses a request in state %s and destroys nothing", async (state) => {
             const { service, keystore } = await build()
-            const manager = mockEntityManager({ findOne: [AuditErasureRequestEntity, row({ state })] })
+            const manager = mockEntityManager({ findOne: [AuditErasureRequestEntity, auditErasureRow({ state })] })
 
-            await expect(service.execute({ manager, requestId: "r1", callerId: "p1", at: LATER })).resolves.toBeRefused({
+            await expect(service.execute({ manager, ...erasureStepInput() })).resolves.toBeRefused({
                 code: AuditErrorCode.ErasureRequestInvalidState,
                 params: { requestId: "r1", state, expected: "verified" },
             })
@@ -258,9 +255,9 @@ describe("AuditErasureService", () => {
 
         it("refuses a request that already completed", async () => {
             const { service } = await build()
-            const manager = mockEntityManager({ findOne: [AuditErasureRequestEntity, row({ state: "complete", personId: null })] })
+            const manager = mockEntityManager({ findOne: [AuditErasureRequestEntity, auditErasureRow({ state: "complete", personId: null })] })
 
-            await expect(service.execute({ manager, requestId: "r1", callerId: "p1", at: LATER })).resolves.toBeRefused({
+            await expect(service.execute({ manager, ...erasureStepInput() })).resolves.toBeRefused({
                 code: AuditErrorCode.ErasureRequestInvalidState,
                 params: { requestId: "r1", state: "complete", expected: "verified" },
             })
@@ -271,15 +268,15 @@ describe("AuditErasureService", () => {
         it("opens the request and queues the erasure-requested line naming the request and the system actor, in one transaction", async () => {
             const em = mockEntityManager({
                 save: [
-                    [AuditErasureRequestEntity, row()],
-                    [AuditErasureRequestEntity, row({ state: "verified", verifiedAt: LATER })],
+                    [AuditErasureRequestEntity, auditErasureRow()],
+                    [AuditErasureRequestEntity, auditErasureRow({ state: "verified", verifiedAt: LATER })],
                 ],
-                findOne: [AuditErasureRequestEntity, row()],
+                findOne: [AuditErasureRequestEntity, auditErasureRow()],
             })
             const { service, outbox } = await build(em)
             const tx = fakeTransaction(em)
 
-            await expect(service.requestForCaller({ personId: "p1" })).resolves.toSucceedWith({
+            await expect(service.requestForCaller(requestOwnErasureInput())).resolves.toSucceedWith({
                 requestId: "r1",
                 state: "verified",
             })
@@ -303,13 +300,13 @@ describe("AuditErasureService", () => {
 
         it("returns a refusal and queues no line", async () => {
             const em = mockEntityManager({
-                save: [AuditErasureRequestEntity, row({ personId: "someone-else" })],
-                findOne: [AuditErasureRequestEntity, row({ personId: "someone-else" })],
+                save: [AuditErasureRequestEntity, auditErasureRow({ personId: "someone-else" })],
+                findOne: [AuditErasureRequestEntity, auditErasureRow({ personId: "someone-else" })],
             })
             const { service, outbox } = await build(em)
             fakeTransaction(em)
 
-            await expect(service.requestForCaller({ personId: "p1" })).resolves.toBeRefused(
+            await expect(service.requestForCaller(requestOwnErasureInput())).resolves.toBeRefused(
                 AuditErrorCode.ErasureRequestForbidden,
             )
 
@@ -320,15 +317,15 @@ describe("AuditErasureService", () => {
     describe("completeForCaller", () => {
         it("completes the request and queues the erasure-completed line naming the request and the system actor, in one transaction", async () => {
             const em = mockEntityManager({
-                findOne: [AuditErasureRequestEntity, row({ state: "verified" })],
-                save: [AuditErasureRequestEntity, row({ state: "complete", personId: null })],
+                findOne: [AuditErasureRequestEntity, auditErasureRow({ state: "verified" })],
+                save: [AuditErasureRequestEntity, auditErasureRow({ state: "complete", personId: null })],
             })
             const { service, outbox, keystore } = await build(em)
             const tx = fakeTransaction(em)
             keystore.getKeyIdForPerson.mockResolvedValue(null)
             keystore.destroyKey.mockResolvedValue(undefined)
 
-            await expect(service.completeForCaller({ requestId: "r1", callerId: "p1" })).resolves.toSucceedWith({
+            await expect(service.completeForCaller(completeOwnErasureInput())).resolves.toSucceedWith({
                 requestId: "r1",
                 state: "complete",
             })
@@ -355,7 +352,7 @@ describe("AuditErasureService", () => {
             const { service, outbox } = await build(em)
             fakeTransaction(em)
 
-            await expect(service.completeForCaller({ requestId: "nope", callerId: "p1" })).resolves.toBeRefused(
+            await expect(service.completeForCaller(completeOwnErasureInput({ requestId: "nope" }))).resolves.toBeRefused(
                 AuditErrorCode.ErasureRequestNotFound,
             )
 

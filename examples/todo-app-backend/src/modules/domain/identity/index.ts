@@ -4,6 +4,8 @@ export { IDENTITY_ERROR_KINDS, IdentityError, IdentityErrorCode } from "./errors
 export { IDENTITY_MESSAGES } from "./messages/identity.messages"
 export { parseIdentityConfig } from "./identity.config"
 export { PublicReason } from "./identity.contracts"
+export type { FindSessionParams, PurgeSessionsParams, SignInParams, SignOutParams } from "./identity.contracts"
+export type { SessionEntity as SessionRow } from "./persistence/entities/session.entity"
 export type { IdentityOptions } from "./identity.options"
 export { CurrentPrincipal, Public } from "./identity.decorators"
 export { IdentityModule } from "./identity.module"

@@ -6,6 +6,7 @@ import { INBOX } from "@modules/platform/inbox"
 import type { Inbox } from "@modules/platform/inbox"
 import { MoreThan } from "typeorm"
 import { GENESIS_HASH, hashLine } from "./audit-chain.policy"
+import { AUDIT_AT, appendDeliveredInput, appendLineInput, auditLogLineRow, readAuditLogInput } from "@tests/fixtures/builders/audit.builder"
 import { AuditKeystoreService } from "./audit-keystore.service"
 import { AuditLogService } from "./audit-log.service"
 import { AuditAction } from "./audit.contracts"
@@ -13,18 +14,9 @@ import { AuditErrorCode } from "./errors/audit.error"
 import { LOCK_AUDIT_CHAIN } from "./persistence/audit.sql"
 import { AuditLogLineEntity } from "./persistence/entities/audit-log-line.entity"
 
-const AT = new Date("2026-09-30T10:00:00.000Z")
+const AT = new Date(AUDIT_AT)
 const KEY = Buffer.alloc(32, 7)
-const SAVED_LINE: AuditLogLineEntity = {
-    id: "9",
-    at: AT,
-    action: "task.completed",
-    target: "t1",
-    keyId: "k1",
-    actor: "sealed-p1",
-    prevHash: GENESIS_HASH,
-    hash: "h9",
-}
+const SAVED_LINE = auditLogLineRow({ id: "9", action: "task.completed", hash: "h9" })
 
 const build = async (em: MockEntityManager = mockEntityManager()) => {
     const keystore = mock<AuditKeystoreService>()
@@ -47,7 +39,7 @@ const chainOf = (count: number, from = 1, start = GENESIS_HASH): Array<AuditLogL
     for (let position = 0; position < count; position += 1) {
         const line = { prevHash, at: AT, action: "task.created", target: `t${from + position}`, keyId: "k1", actor: "sealed" }
         const hash = hashLine(line)
-        rows.push({ id: String(from + position), ...line, hash })
+        rows.push(auditLogLineRow({ id: String(from + position), ...line, hash }))
         prevHash = hash
     }
     return rows
@@ -55,16 +47,9 @@ const chainOf = (count: number, from = 1, start = GENESIS_HASH): Array<AuditLogL
 
 /** Rows as stored, whose actor is `sealed:<person>`; the keystore double opens them for key k1 only. */
 const sealedRows = (actors: ReadonlyArray<string>, keyId = "k1"): Array<AuditLogLineEntity> =>
-    actors.map((actor, index) => ({
-        id: String(index + 1),
-        at: AT,
-        action: "task.created",
-        target: `t${index}`,
-        keyId,
-        actor: `sealed:${actor}`,
-        prevHash: GENESIS_HASH,
-        hash: "h",
-    }))
+    actors.map((actor, index) =>
+        auditLogLineRow({ id: String(index + 1), target: `t${index}`, keyId, actor: `sealed:${actor}`, hash: "h" }),
+    )
 
 const opensSealedActors = (keystore: ReturnType<typeof mock<AuditKeystoreService>>): void => {
     keystore.unseal.mockImplementation((_key, sealed) =>
@@ -92,7 +77,7 @@ describe("AuditLogService", () => {
             keystore.seal.mockReturnValue("sealed-p1")
 
             await expect(
-                service.append({ manager, actorId: "p1", action: AuditAction.TaskCompleted, target: "t1", at: AT }),
+                service.append({ manager, ...appendLineInput() }),
             ).resolves.toEqual({ lineId: "9" })
 
             const line = { prevHash: lastHash, at: AT, action: "task.completed", target: "t1", keyId: "k1", actor: "sealed-p1" }
@@ -109,7 +94,7 @@ describe("AuditLogService", () => {
             keystore.getOrCreateKey.mockResolvedValue({ keyId: "k1", key: KEY })
             keystore.seal.mockReturnValue("sealed-p1")
 
-            await service.append({ manager, actorId: "p1", action: AuditAction.SignedIn, target: null, at: AT })
+            await service.append({ manager, ...appendLineInput({ action: AuditAction.SignedIn, target: null }) })
 
             const line = { prevHash: GENESIS_HASH, at: AT, action: "login.signed-in", target: null, keyId: "k1", actor: "sealed-p1" }
             expect(manager.save).toHaveBeenCalledWith(AuditLogLineEntity, { ...line, hash: hashLine(line) })
@@ -124,13 +109,7 @@ describe("AuditLogService", () => {
                 save: [AuditLogLineEntity, SAVED_LINE],
             })
 
-        const delivered = {
-            eventId: "e1",
-            actorId: "p1",
-            action: AuditAction.TaskCompleted,
-            target: "t1",
-            at: AT,
-        }
+        const delivered = appendDeliveredInput()
 
         it("claims the event, then appends the line in its own committed transaction", async () => {
             const { service, em, keystore, inbox } = await build(appendEmFor())
@@ -332,7 +311,7 @@ describe("AuditLogService", () => {
         it("refuses a reader without an identity before any line is touched", async () => {
             const { service, em, keystore } = await build()
 
-            await expect(service.readAs({ principalId: "", roles: ["admin"], action: null, target: null })).resolves.toBeRefused(
+            await expect(service.readAs(readAuditLogInput({ principalId: "", roles: ["admin"] }))).resolves.toBeRefused(
                 AuditErrorCode.OperatorRoleNotAuthorized,
             )
 
@@ -346,7 +325,7 @@ describe("AuditLogService", () => {
             opensSealedActors(keystore)
 
             await expect(
-                service.readAs({ principalId: "boss", roles: ["admin"], action: "task.created", target: "t1" }),
+                service.readAs(readAuditLogInput({ principalId: "boss", roles: ["admin"], action: "task.created", target: "t1" })),
             ).resolves.toSucceedWith({
                 lines: [
                     { at: AT, action: "task.created", target: "t0" },
@@ -368,7 +347,7 @@ describe("AuditLogService", () => {
             opensSealedActors(keystore)
 
             await expect(
-                service.readAs({ principalId: "p1", roles: [], action: "task.deleted", target: "other" }),
+                service.readAs(readAuditLogInput({ action: "task.deleted", target: "other" })),
             ).resolves.toSucceedWith({ lines: [{ at: AT, action: "task.created", target: "t0" }] })
 
             expect(keystore.getKeyIdForPerson).toHaveBeenCalledWith({ personId: "p1" })

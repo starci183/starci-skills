@@ -3,17 +3,11 @@ import { Test } from "@nestjs/testing"
 import { mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { AUDIT_AT, auditKeyRow } from "@tests/fixtures/builders/audit.builder"
 import { AuditKeystoreService } from "./audit-keystore.service"
 import { AuditKeyEntity } from "./persistence/entities/audit-key.entity"
 
-const AT = new Date("2026-09-30T10:00:00.000Z")
-
-const keyRow = (keyId: string, key: Buffer): AuditKeyEntity => ({
-    personId: "p1",
-    keyId,
-    key: key.toString("base64"),
-    createdAt: AT,
-})
+const AT = new Date(AUDIT_AT)
 
 const build = async (own: MockEntityManager = mockEntityManager()) => {
     const moduleRef = await Test.createTestingModule({
@@ -28,7 +22,7 @@ describe("AuditKeystoreService", () => {
             const { service, own } = await build()
             const manager = mockEntityManager({
                 findOneBy: [AuditKeyEntity, null],
-                save: [AuditKeyEntity, keyRow("k-new", Buffer.alloc(32))],
+                save: [AuditKeyEntity, auditKeyRow({ keyId: "k-new" })],
             })
 
             const minted = await service.getOrCreateKey({ manager, personId: "p1", at: AT })
@@ -47,7 +41,7 @@ describe("AuditKeystoreService", () => {
         it("returns the stored key on later calls without writing", async () => {
             const { service } = await build()
             const key = randomBytes(32)
-            const manager = mockEntityManager({ findOneBy: [AuditKeyEntity, keyRow("k1", key)] })
+            const manager = mockEntityManager({ findOneBy: [AuditKeyEntity, auditKeyRow({ key: key.toString("base64") })] })
 
             await expect(service.getOrCreateKey({ manager, personId: "p1", at: AT })).resolves.toEqual({ keyId: "k1", key })
 
@@ -57,7 +51,7 @@ describe("AuditKeystoreService", () => {
 
     describe("getKeyIdForPerson", () => {
         it("reads the key id through its own manager and never creates a key", async () => {
-            const { service, own } = await build(mockEntityManager({ findOneBy: [AuditKeyEntity, keyRow("k1", Buffer.alloc(32))] }))
+            const { service, own } = await build(mockEntityManager({ findOneBy: [AuditKeyEntity, auditKeyRow()] }))
 
             await expect(service.getKeyIdForPerson({ personId: "p1" })).resolves.toBe("k1")
 
@@ -79,7 +73,7 @@ describe("AuditKeystoreService", () => {
     describe("getKeyMaterials", () => {
         it("loads the material of the key ids that still exist in one bounded read", async () => {
             const key = randomBytes(32)
-            const { service, own } = await build(mockEntityManager({ find: [AuditKeyEntity, [keyRow("k1", key)]] }))
+            const { service, own } = await build(mockEntityManager({ find: [AuditKeyEntity, [auditKeyRow({ key: key.toString("base64") })]] }))
 
             const materials = await service.getKeyMaterials({ keyIds: ["k1", "gone"] })
 
@@ -103,7 +97,7 @@ describe("AuditKeystoreService", () => {
         it("reads through the manager it is handed", async () => {
             const key = randomBytes(32)
             const { service, own } = await build()
-            const inner = mockEntityManager({ find: [AuditKeyEntity, [keyRow("k1", key)]] })
+            const inner = mockEntityManager({ find: [AuditKeyEntity, [auditKeyRow({ key: key.toString("base64") })]] })
 
             const materials = await service.getKeyMaterials({ keyIds: ["k1"], manager: inner })
 

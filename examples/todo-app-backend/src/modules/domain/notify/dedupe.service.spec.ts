@@ -3,32 +3,13 @@ import { Test } from "@nestjs/testing"
 import { mockEntityManager } from "@starci/jest-preset"
 import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { IsNull } from "typeorm"
+import { NOTIFY_AT, dedupeAdmitInput, notificationRow } from "@tests/fixtures/builders/notify.builder"
 import { DedupeService } from "./dedupe.service"
 import { NotifyNotificationEntity } from "./persistence/entities/notification.entity"
 import { INSERT_NOTIFICATION_IF_ABSENT } from "./persistence/notify.sql"
 
-const AT = new Date("2026-09-30T10:00:00.000Z")
+const AT = new Date(NOTIFY_AT)
 const KEY = createHash("sha256").update("task-complete:evt-1:p1").digest("hex")
-
-const row = (overrides: Partial<NotifyNotificationEntity> = {}): NotifyNotificationEntity =>
-    Object.assign(new NotifyNotificationEntity(), {
-        id: KEY,
-        kind: "task-complete",
-        recipientId: "p1",
-        payload: { taskId: "t1" },
-        digestGroupId: "w1",
-        createdAt: AT,
-        ...overrides,
-    })
-
-const admitParams = (manager: ReturnType<typeof mockEntityManager>) => ({
-    manager,
-    kind: "task-complete",
-    sourceEventId: "evt-1",
-    recipientId: "p1",
-    payload: { taskId: "t1" },
-    at: AT,
-})
 
 const build = async (stored = mockEntityManager()) => {
     const moduleRef = await Test.createTestingModule({
@@ -43,7 +24,7 @@ describe("DedupeService", () => {
             const { service } = await build()
             const manager = mockEntityManager({ query: [INSERT_NOTIFICATION_IF_ABSENT, [{ id: KEY }]] })
 
-            const result = await service.admit(admitParams(manager))
+            const result = await service.admit({ manager, ...dedupeAdmitInput() })
 
             expect(result).toEqual({
                 isNew: true,
@@ -70,10 +51,10 @@ describe("DedupeService", () => {
             const { service } = await build()
             const manager = mockEntityManager({
                 query: [INSERT_NOTIFICATION_IF_ABSENT, []],
-                findOneBy: [NotifyNotificationEntity, row()],
+                findOneBy: [NotifyNotificationEntity, notificationRow({ id: KEY })],
             })
 
-            const result = await service.admit(admitParams(manager))
+            const result = await service.admit({ manager, ...dedupeAdmitInput() })
 
             expect(result.isNew).toBe(false)
             expect(result.notification).toEqual({
@@ -94,7 +75,7 @@ describe("DedupeService", () => {
                 findOneBy: [NotifyNotificationEntity, null],
             })
 
-            const result = await service.admit(admitParams(manager))
+            const result = await service.admit({ manager, ...dedupeAdmitInput() })
 
             expect(result.isNew).toBe(false)
             expect(result.notification.digestGroupId).toBeNull()
@@ -105,8 +86,8 @@ describe("DedupeService", () => {
             const { service } = await build()
             const manager = mockEntityManager({ query: [INSERT_NOTIFICATION_IF_ABSENT, [{ id: "x" }]] })
 
-            const first = await service.admit(admitParams(manager))
-            const second = await service.admit({ ...admitParams(manager), sourceEventId: "evt-2" })
+            const first = await service.admit({ manager, ...dedupeAdmitInput() })
+            const second = await service.admit({ manager, ...dedupeAdmitInput({ sourceEventId: "evt-2" }) })
 
             expect(first.notification.id).not.toBe(second.notification.id)
         })
@@ -115,7 +96,7 @@ describe("DedupeService", () => {
     describe("findByDigestGroup", () => {
         it("reads the group in admission order, at most the list maximum", async () => {
             const stored = mockEntityManager({
-                find: [NotifyNotificationEntity, [row({ id: "n1" }), row({ id: "n2", payload: { taskId: "t2" } })]],
+                find: [NotifyNotificationEntity, [notificationRow({ id: "n1" }), notificationRow({ id: "n2", payload: { taskId: "t2" } })]],
             })
             const { service } = await build(stored)
 
