@@ -36,6 +36,7 @@ import path from 'node:path';
 import { inspectLedger, projectsRootFor } from '../../engine/ledger-db.mjs';
 import { isUnderTempDir, machineFileFor, readMachine, starciLocalRoot, withMachine } from '../../engine/machine-db.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
+import { safeRemoveTree } from './safe-remove.mjs';
 
 export const ORPHAN_LEDGER_CODE = 'LEDGER_ORPHAN_STATE_ROOT';
 export const LEGACY_WORK_SQLITE_CODE = 'LEDGER_LEGACY_WORK_SQLITE';
@@ -216,8 +217,16 @@ export function archiveOrphanLedger(finding, { env = process.env, now = Date.now
   fs.mkdirSync(path.dirname(to), { recursive: true });
   try { fs.renameSync(from, to); } catch (error) {
     if (error?.code !== 'EXDEV') throw error;
+    // A cross-device move copies first; the source goes only after the copy is verified to hold the same top-level
+    // entries (moves, never deletes), and removal goes through safeRemoveTree — the one runtime tree delete, which
+    // unlinks links and never descends into one (nivo-fe inc-c8fbf76aa499).
     fs.cpSync(from, to, { recursive: true });
-    fs.rmSync(from, { recursive: true, force: true });
+    const wanted = fs.readdirSync(from).sort();
+    const copied = fs.readdirSync(to).sort();
+    if (wanted.length !== copied.length || wanted.some((name, i) => name !== copied[i]))
+      throw Error(`orphan ledger archive copy did not verify: ${to} holds [${copied.join(', ')}], expected [${wanted.join(', ')}]`);
+    const removed = safeRemoveTree(from);
+    if (!removed.ok) throw Error(`orphan ledger source was not fully removed after a verified copy (${from}): ${removed.errors.map((e) => `${e.code} ${e.message}`).join('; ')}`);
   }
   withMachine((m) => m.setLedgerState(finding.ledgerId, 'retired', { reason: `orphan ledger archived (${finding.reason})` }), { env });
   return { moved: true, from, to };
