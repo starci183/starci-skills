@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, screen, waitFor } from "@testing-library/react"
 import { TasksPage } from "@/features/pages/TasksPage"
-import { renderJourney, resetJourneyWorld, seedSession, serveGraphQL } from "@/modules/journey"
+import { renderJourney, resetJourneyWorld, seedSession, serveGraphQL } from "@/modules/journey/harness"
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }))
 
@@ -136,7 +136,7 @@ describe("ui.task.list journey: the served tasks screen over the real transport"
         await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(1))
 
         expect(screen.getByRole("link", { name: "Share" })).toHaveAttribute("href", "/tasks/t-1/share")
-        expect(screen.getByRole("link", { name: "Schedule" })).toHaveAttribute("href", "/tasks/t-1/schedule")
+        expect(screen.getByRole("link", { name: "Schedule" })).toHaveAttribute("href", "/recur?task=Water%20the%20plants")
     })
 
     it("fr.login.session: a read the backend refuses for a dead session shows the session sentence and hides the work", async () => {

@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { useCollaborators, useInviteCollaborator, useRevokeCollaborator, useTaskTitle } from "@/hooks/share"
 import { useSignOut } from "@/hooks/auth"
-import type { ShareRole } from "@/modules/api"
+import type { ShareRole } from "@/modules/types"
 import { ShareInviteView, type ShareInviteState } from "./component"
 
 const EMAIL_FIELD_CODES = new Set(["SHARE_INVALID_EMAIL", "SHARE_INVITATION_ALREADY_EXISTS"])
@@ -14,7 +14,7 @@ const codeOf = (error: unknown): string | null =>
     error instanceof Error && error.cause instanceof Error ? error.cause.message : null
 
 /** ShareInviteBlock's only external input: the task this screen shares, from the route's own params. */
-export type ShareInviteBlockProps = {
+type ShareInviteBlockProps = {
   readonly taskId: string;
 };
 

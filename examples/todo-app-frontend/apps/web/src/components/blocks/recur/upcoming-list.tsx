@@ -1,6 +1,6 @@
 import type { useTranslations } from "next-intl"
 import { EmptyNotice, Heading, StaticStateRow } from "@starci/grammar/common"
-import type { MaterialisedOccurrence, UpcomingOccurrences } from "./schedule-screen"
+import type { MaterialisedOccurrence, UpcomingOccurrences } from "@/modules/types"
 import { UPCOMING_LIST_ROWS_CLASS_NAME, UPCOMING_LIST_SECTION_CLASS_NAME } from "./classNames"
 
 /**

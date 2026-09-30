@@ -1,13 +1,16 @@
 import { describe, expect, it, vi } from "vitest"
 import { render as renderBase, screen } from "@testing-library/react"
-import { NextIntlClientProvider } from "next-intl"
+import { NextIntlClientProvider, useTranslations } from "next-intl"
 import type { ReactNode } from "react"
 import messages from "@/modules/i18n/messages/en.json"
-import {
-    type RecurRule,
-    type ScheduleScreenViewProps,
-} from "./schedule-screen"
-import { ScheduleScreenView } from "./index"
+import type { RecurRule } from "@/modules/types"
+import { ScheduleScreenViewBase, type ScheduleScreenViewProps } from "./schedule-screen"
+
+/** The pure view resolves nothing itself; the spec hands it the translator the connected block would. */
+const ScheduleScreenView = (props: ScheduleScreenViewProps) => {
+    const t = useTranslations("recur")
+    return <ScheduleScreenViewBase {...props} t={t} />
+}
 
 const noop = () => {}
 

@@ -7,7 +7,7 @@ import { TextAction, type TextActionAppearance } from "@starci/grammar/common"
  * link role stay the platform's. If the app later routes internal links through the client router,
  * it changes here once.
  */
-export type PlanRoutedActionProps = {
+type PlanRoutedActionProps = {
   readonly route: string;
   readonly appearance?: TextActionAppearance;
   readonly isCurrent?: boolean;

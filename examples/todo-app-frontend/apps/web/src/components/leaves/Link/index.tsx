@@ -3,7 +3,7 @@
 import { TextAction } from "@starci/grammar/common"
 
 /** The public props of the one routed-navigation leaf. */
-export type LinkProps = {
+type LinkProps = {
   /** The in-app destination this link routes to; always an owned route path. */
   readonly to: string;
   /** The TextAction appearances the leaf forwards verbatim; kept in-repo so the contract is checkable. */

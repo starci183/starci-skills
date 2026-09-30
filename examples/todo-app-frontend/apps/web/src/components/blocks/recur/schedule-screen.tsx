@@ -17,6 +17,7 @@ import {
     UNDER_CONTROL_CLASS_NAME,
 } from "./classNames"
 import { ROUTES } from "@/modules/routes"
+import type { RecurFrequency, RecurRule, ScheduleField, ScheduleRefusal, UpcomingOccurrences } from "@/modules/types"
 
 /**
  * ui.recur.schedule states: no-rule, active, ended, refused. Every branch below is one of those
@@ -31,44 +32,6 @@ export type ScheduleState = "no-rule" | "active" | "ended" | "refused";
 
 /** The one beside-it inventory the ScheduleState closed vocabulary is checked against. */
 export const SCHEDULE_STATES: ReadonlyArray<ScheduleState> = ["no-rule", "active", "ended", "refused"] as const
-
-/** data.recur.rule.frequency's three values, in the direction's radio order. */
-export type RecurFrequency = "every-weekday" | "every-n-days" | "monthly-day";
-
-/** The fields the refused state can name; 'form' is the whole submission, not one input. */
-export type ScheduleField = "n" | "dayOfMonth" | "time" | "timeZone" | "startDate" | "form";
-
-/** A refused submission: which field needs attention and the sentence that says why. */
-export type ScheduleRefusal = {
-  readonly field: ScheduleField;
-  readonly message: string;
-};
-
-/** The rule this screen created and may end; endedAt is null while the rule is active. */
-export type RecurRule = {
-  readonly ruleId: string;
-  readonly title: string;
-  readonly frequency: RecurFrequency;
-  readonly n: number | null;
-  readonly dayOfMonth: number | null;
-  readonly time: string;
-  readonly timeZone: string;
-  readonly startDate: string;
-  readonly endedAt: string | null;
-};
-
-/** One materialised occurrence row from upcomingOccurrences. */
-export type MaterialisedOccurrence = {
-  readonly occurrenceId: string;
-  readonly localDate: string;
-  readonly status: string;
-};
-
-/** fr.recur.see-upcoming's read shape: stored rows plus a live-computed preview. */
-export type UpcomingOccurrences = {
-  readonly materialised: ReadonlyArray<MaterialisedOccurrence>;
-  readonly previewDates: ReadonlyArray<string>;
-};
 
 /** The three frequencies' dictionary keys, in the direction's radio order. */
 const FREQUENCY_OPTIONS: ReadonlyArray<{ readonly value: RecurFrequency; readonly labelKey: string }> = [

@@ -2,18 +2,10 @@ import { describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 
 const mocks = vi.hoisted(() => ({
-    push: vi.fn(),
-    clearToken: vi.fn(),
-    signOut: vi.fn(() => Promise.resolve(true)),
+    signOut: vi.fn(),
 }))
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }))
-vi.mock("@/hooks/auth", () => ({ useSessionToken: () => "session-token" }))
-vi.mock("@/modules/session", () => ({ clearToken: mocks.clearToken }))
-vi.mock("@/modules/api", async (importOriginal) => ({
-    ...(await importOriginal<typeof import("@/modules/api")>()),
-    signOut: mocks.signOut,
-}))
+vi.mock("@/hooks/auth", () => ({ useSignOut: () => mocks.signOut }))
 vi.mock("@/components/blocks/task-list", () => ({ TaskListBlock: () => <div data-testid="task-list-block" /> }))
 
 import { TasksPage } from "./index"
@@ -56,12 +48,10 @@ describe("TasksPage", () => {
         expect(screen.getByRole("main")).toHaveAccessibleName("The task list and its create form")
     })
 
-    it("ui.task.list: Sign out clears the session and lands on sign-in", () => {
+    it("ui.task.list: Sign out runs the one sign-out action", () => {
         render(withIntl(<TasksPage />))
         screen.getAllByRole("button", { name: "Sign out" })[0].click()
-        expect(mocks.clearToken).toHaveBeenCalled()
-        expect(mocks.signOut).toHaveBeenCalledWith("session-token")
-        expect(mocks.push).toHaveBeenCalledWith("/sign-in")
+        expect(mocks.signOut).toHaveBeenCalledTimes(1)
     })
 
     it("ui.task.list: the footer carries the recorded legal destinations", () => {

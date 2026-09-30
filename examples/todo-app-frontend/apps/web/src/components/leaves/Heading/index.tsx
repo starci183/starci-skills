@@ -11,7 +11,7 @@ import { Heading as GrammarHeading } from "@starci/grammar/common"
  * (React Aria) that a Server Component cannot import directly; the feature pages that mount this
  * leaf stay Server Components and render it as a Client Component, same as any other route.
  */
-export type HeadingProps = {
+type HeadingProps = {
   readonly level: 1 | 2 | 3 | 4;
   readonly children: string;
 };

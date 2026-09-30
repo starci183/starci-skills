@@ -12,7 +12,7 @@ import {
     type Wire,
     type WireReply,
     type WireRoute,
-} from "@/modules/journey"
+} from "@/modules/journey/harness"
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }))
 

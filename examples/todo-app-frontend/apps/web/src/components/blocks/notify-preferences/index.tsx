@@ -1,54 +1,24 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
-import useSWR from "swr"
-import { useSessionToken } from "@/hooks/auth"
-import { clearToken } from "@/modules/session"
-import { endSession, readNotificationPreferences, unsubscribeFromEmail, updateNotificationPreferences } from "@/modules/notify"
+import { useSignOut } from "@/hooks/auth"
+import { useNotifyPreferences } from "@/hooks/notify"
+import { useAccountShellCopy } from "@/hooks/shell"
 import { NotifyPreferencesView, type NotifyPreferencesState } from "./component"
 
-/** NotifyPreferencesBlock takes no external props; the query, mutations and draft state are its own. */
-export type NotifyPreferencesBlockProps = Record<never, never>
-
 /**
- * The connected owner of ui.notify.preferences: it owns the notificationPreferences read, the
- * updateNotificationPreferences and unsubscribe writes, and the unsaved toggle draft, resolves the
- * one state NotifyPreferencesView renders, and hands every render path to the pure view in
- * ./component.tsx. The toggle edits a draft only - `updateNotificationPreferences` persists it, and
- * a refused save drops the draft so the control shows the pre-save value the record demands. It
- * lives in the notify-preferences block beside its pure render.
+ * The connected owner of ui.notify.preferences: it reads the preference, its writes and the unsaved
+ * toggle draft from `useNotifyPreferences`, resolves the one state NotifyPreferencesView renders, and
+ * hands every render path to the pure view in ./component.tsx. It lives in the notify-preferences block
+ * beside its pure render.
  */
-export const NotifyPreferencesBlock = (props: NotifyPreferencesBlockProps) => {
-    void props
+export const NotifyPreferencesBlock = () => {
     const t = useTranslations("notify.preferences")
-    const tShell = useTranslations("shell")
-    const token = useSessionToken()
-    const router = useRouter()
-    const [hydrated, setHydrated] = useState(false)
-    const [draft, setDraft] = useState<boolean | null>(null)
-    const [saveRefusal, setSaveRefusal] = useState<string | null>(null)
-    const [pending, setPending] = useState<"save" | "unsubscribe" | null>(null)
+    const shellCopy = useAccountShellCopy("notify.preferences")
+    const onSignOut = useSignOut()
+    const { subscribed, refusal: refusalKey, pending, toggle, save, unsubscribe } = useNotifyPreferences()
 
-    // The session store settles on mount; until then the signed-out reading cannot be told from the
-    // first client frame, so only the mounted value may decide a session refusal.
-    useEffect(() => setHydrated(true), [])
-
-    const preferencesQuery = useSWR(
-        token ? (["notification-preferences", token] as const) : null,
-        ([, activeToken]) => readNotificationPreferences(activeToken),
-    )
-
-    const server = preferencesQuery.data
-    const subscribed = server === undefined ? null : (draft ?? !server.unsubscribed)
-    const refusal =
-    saveRefusal ??
-    (hydrated && token === null
-        ? t("sessionEnded")
-        : preferencesQuery.error !== undefined && server === undefined
-            ? t("loadRefusal")
-            : null)
+    const refusal = refusalKey === null ? null : t(refusalKey)
 
     const state: NotifyPreferencesState =
     pending === "save"
@@ -61,48 +31,6 @@ export const NotifyPreferencesBlock = (props: NotifyPreferencesBlockProps) => {
                     ? "subscribed"
                     : "unsubscribed"
 
-    const onToggle = () => {
-        if (server === undefined || pending !== null) return
-        setDraft(current => !(current ?? !server.unsubscribed))
-    }
-
-    const onSave = async () => {
-        if (token === null || subscribed === null || pending !== null) return
-        setPending("save")
-        setSaveRefusal(null)
-        try {
-            const saved = await updateNotificationPreferences(token, !subscribed)
-            void preferencesQuery.mutate(saved)
-            setDraft(null)
-        } catch {
-            setDraft(null)
-            setSaveRefusal(t("saveRefusal"))
-        } finally {
-            setPending(null)
-        }
-    }
-
-    const onUnsubscribe = async () => {
-        if (token === null || pending !== null) return
-        setPending("unsubscribe")
-        setSaveRefusal(null)
-        try {
-            await unsubscribeFromEmail(token)
-            void preferencesQuery.mutate(current => (current === undefined ? current : { ...current, unsubscribed: true }))
-            setDraft(null)
-        } catch {
-            setSaveRefusal(t("saveRefusal"))
-        } finally {
-            setPending(null)
-        }
-    }
-
-    const onSignOut = async () => {
-        if (token !== null) await endSession(token)
-        clearToken()
-        router.push("/sign-in")
-    }
-
     return (
         <NotifyPreferencesView
             state={state}
@@ -110,24 +38,7 @@ export const NotifyPreferencesBlock = (props: NotifyPreferencesBlockProps) => {
             refusal={refusal}
             pending={pending}
             copy={{
-                brand: tShell("brand"),
-                accountName: tShell("accountName"),
-                signOut: tShell("signOut"),
-                navLabel: tShell("navPrimary"),
-                destinations: {
-                    tasks: tShell("destinations.tasks"),
-                    notifications: tShell("destinations.notifications"),
-                    plan: tShell("destinations.plan"),
-                    privacy: tShell("destinations.privacy"),
-                },
-                legal: {
-                    privacyPolicy: tShell("legal.privacyPolicy"),
-                    terms: tShell("legal.terms"),
-                },
-                backToTasks: tShell("backToTasks"),
-                breadcrumbLabel: tShell("breadcrumb"),
-                mainLabel: t("mainLabel"),
-                breadcrumb: t("breadcrumb"),
+                ...shellCopy,
                 heading: t("heading"),
                 tagline: t("tagline"),
                 digestHeading: t("digestHeading"),
@@ -142,9 +53,9 @@ export const NotifyPreferencesBlock = (props: NotifyPreferencesBlockProps) => {
                 unsubscribe: t("unsubscribe"),
                 unsubscribeHint: t("unsubscribeHint"),
             }}
-            onToggle={onToggle}
-            onSave={onSave}
-            onUnsubscribe={onUnsubscribe}
+            onToggle={toggle}
+            onSave={save}
+            onUnsubscribe={unsubscribe}
             onSignOut={onSignOut}
         />
     )

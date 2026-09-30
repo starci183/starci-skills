@@ -1,6 +1,6 @@
 import type { FormEvent } from "react"
 import { Badge, Button, Input, PageContainer, SurfaceCard, Text, TextAction, WorkspaceShell } from "@starci/grammar/common"
-import type { Collaborator, ShareRole } from "@/modules/api"
+import type { Collaborator, ShareRole } from "@/modules/types"
 import { Heading } from "@/components/leaves/Heading"
 import { Link } from "@/components/leaves/Link"
 import {

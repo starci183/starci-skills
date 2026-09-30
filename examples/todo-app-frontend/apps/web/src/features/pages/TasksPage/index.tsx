@@ -1,14 +1,36 @@
+"use client"
+
+import { useTranslations } from "next-intl"
+import { useSignOut } from "@/hooks/auth"
 import { TasksPageBase } from "./component"
 
-/** The public props of the tasks route: the route hands it nothing. */
-export type TasksPageProps = Record<never, never>
+/** The task screen's connected entry: it resolves the copy and the sign-out action the shell draws. */
+export const TasksPage = () => {
+    const t = useTranslations("shell")
+    const tTasks = useTranslations("tasks")
+    const onSignOut = useSignOut()
 
-/**
- * The tasks route's connected half. The screen it mounts is session-gated - it renders nothing
- * until a token exists in the browser - so the page's whole situation space is "ready": the
- * loading a reader watches for belongs to the feature, not to this surface.
- */
-export const TasksPage = (props: TasksPageProps) => {
-    void props
-    return <TasksPageBase state="ready" props={{}} on={{}} />
+    return <TasksPageBase
+        onSignOut={onSignOut}
+        copy={{
+            brand: t("brand"),
+            navPrimary: t("navPrimary"),
+            navLegal: t("navLegal"),
+            accountName: t("accountName"),
+            signOut: t("signOut"),
+            destinations: {
+                tasks: t("destinations.tasks"),
+                notifications: t("destinations.notifications"),
+                plan: t("destinations.plan"),
+                privacy: t("destinations.privacy"),
+            },
+            legal: {
+                privacyPolicy: t("legal.privacyPolicy"),
+                terms: t("legal.terms"),
+            },
+            mainLabel: tTasks("mainLabel"),
+            heading: tTasks("heading"),
+            tagline: tTasks("tagline"),
+        }}
+    />
 }

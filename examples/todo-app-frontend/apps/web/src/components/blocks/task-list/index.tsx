@@ -5,16 +5,12 @@ import { useTranslations } from "next-intl"
 import { useTasks, useCreateTask, useSetTaskComplete, useDeleteTask } from "@/hooks/task"
 import { TaskListView } from "./component"
 
-/** TaskListBlock takes no external props; the query, mutations and draft state are entirely its own. */
-export type TaskListBlockProps = Record<never, never>
-
 /**
  * The connected owner of ui.task.list: it owns the tasks query, the three mutations and the new-task
  * draft as intrinsic form state, resolves the one state TaskListView renders, and hands every render path
  * to the pure TaskListView in ./component.tsx, resolved from the `tasks` message namespace.
  */
-export const TaskListBlock = (props: TaskListBlockProps) => {
-    void props
+export const TaskListBlock = () => {
     const t = useTranslations("tasks")
     const [newTitle, setNewTitle] = useState("")
     const tasksQuery = useTasks()

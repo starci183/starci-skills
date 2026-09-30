@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 import { TaskListView } from "./component"
-import type { Task } from "@/modules/api"
+import type { Task } from "@/modules/types"
 
 const noop = () => {}
 
@@ -72,7 +72,7 @@ describe("TaskListView", () => {
         const tasks: Array<Task> = [{ id: "task-7", title: "Buy milk", complete: false }]
         render(<TaskListView {...baseProps} state="one-task" tasks={tasks} refusal={null} />)
         expect(screen.getByRole("link", { name: "Share" })).toHaveAttribute("href", "/tasks/task-7/share")
-        expect(screen.getByRole("link", { name: "Schedule" })).toHaveAttribute("href", "/tasks/task-7/schedule")
+        expect(screen.getByRole("link", { name: "Schedule" })).toHaveAttribute("href", "/recur?task=Buy%20milk")
     })
 
     it("ui.task.list: Delete asks an inline confirmation naming the task before calling onDelete", () => {

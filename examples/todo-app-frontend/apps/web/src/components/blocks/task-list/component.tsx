@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import type { FormEvent } from "react"
 import { Button, Input, MediaFrame, SectionHeader, Text, TextAction } from "@starci/grammar/common"
-import type { Task } from "@/modules/api"
+import { ROUTES } from "@/modules/routes"
+import type { Task } from "@/modules/types"
 import turtleMaster from "./turtle-master.png"
 import {
     TASK_LIST_BODY_CLASS_NAME,
@@ -191,7 +192,7 @@ export const TaskListView = (props: TaskListViewProps) => {
                                                             <TextAction appearance="inline" href={`/tasks/${task.id}/share`}>
                                                                 {copy.share}
                                                             </TextAction>
-                                                            <TextAction appearance="inline" href={`/tasks/${task.id}/schedule`}>
+                                                            <TextAction appearance="inline" href={`${ROUTES.recur}?task=${encodeURIComponent(task.title)}`}>
                                                                 {copy.schedule}
                                                             </TextAction>
                                                             <span className={TASK_LIST_DANGER_SCOPE_CLASS_NAME}>

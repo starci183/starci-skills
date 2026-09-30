@@ -1,18 +1,5 @@
-import { ScheduleScreenViewBase, type ScheduleScreenViewBaseProps } from "./schedule-screen"
 import { RecurWorkspaceBase, type RecurWorkspaceBaseProps } from "./workspace"
 
-type ScheduleBlockViewProps = ScheduleScreenViewBaseProps
-type RecurWorkspaceViewProps = RecurWorkspaceBaseProps
-type ScheduleScreenViewViewProps = ScheduleScreenViewBaseProps
-
-/** Draw the settled schedule state handed down by the recurrence owner. */
-export const ScheduleBlockView = (props: ScheduleBlockViewProps) =>
-    <ScheduleScreenViewBase {...props} />
-
-/** Draw the recurrence workspace from copy and actions the owner resolved. */
-export const RecurWorkspaceView = (props: RecurWorkspaceViewProps) =>
+/** Draw the recurrence workspace, and the schedule screen inside it, from what the owner resolved. */
+export const RecurWorkspaceView = (props: RecurWorkspaceBaseProps) =>
     <RecurWorkspaceBase {...props} />
-
-/** Draw the schedule state for the existing direct view entry. */
-export const ScheduleScreenViewView = (props: ScheduleScreenViewViewProps) =>
-    <ScheduleScreenViewBase {...props} />

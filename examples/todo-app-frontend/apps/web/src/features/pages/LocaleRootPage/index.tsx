@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { LocaleRootPageBase } from "./component"
 
 /** The public props of the locale root route: the route hands it nothing. */
-export type LocaleRootPageProps = { readonly lang: string }
+type LocaleRootPageProps = { readonly lang: string }
 
 /**
  * The `[locale]` root's connected half. It owns no UI of its own: a reader landing on `/en` or `/vi`

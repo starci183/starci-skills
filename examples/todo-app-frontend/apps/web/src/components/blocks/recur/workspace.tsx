@@ -4,7 +4,7 @@ import type { useTranslations } from "next-intl"
 import { PageContainer, Text, TextAction, WorkspaceShell } from "@starci/grammar/common"
 import { ROUTES } from "@/modules/routes"
 import { Heading } from "@/components/leaves/Heading"
-import { ScheduleBlock } from "./index"
+import { ScheduleScreenViewBase, type ScheduleScreenViewProps } from "./schedule-screen"
 import {
     ACCOUNT_GROUP_CLASS_NAME,
     ACCOUNT_SEPARATOR_CLASS_NAME,
@@ -81,11 +81,17 @@ const AccountPresenceBase = ({ t, ...props }: AccountPresenceBaseProps) => (
 )
 
 /** Resolved copy and actions for the pure recurrence workspace. */
-export type RecurWorkspaceBaseProps = RecurWorkspaceProps & { readonly t: RecurT; readonly tShell: ShellT; readonly onSignOut: () => void }
+export type RecurWorkspaceBaseProps = RecurWorkspaceProps & {
+  readonly t: RecurT;
+  readonly tShell: ShellT;
+  readonly onSignOut: () => void;
+  /** The schedule screen the owner resolved: state, draft, refusal and every intent. */
+  readonly schedule: ScheduleScreenViewProps;
+}
 
 /** Draw the complete recurrence shell from resolved copy and actions. */
 export const RecurWorkspaceBase = (props: RecurWorkspaceBaseProps) => {
-    const { taskTitle, t, tShell, onSignOut } = props
+    const { taskTitle, t, tShell, onSignOut, schedule } = props
     const header = (
         <div className={HEADER_BAR_CLASS_NAME}>
             <PageContainer measure="product" className={HEADER_INNER_CLASS_NAME}>
@@ -139,7 +145,7 @@ export const RecurWorkspaceBase = (props: RecurWorkspaceBaseProps) => {
                     </TextAction>
                 </span>
             </div>
-            <ScheduleBlock taskTitle={taskTitle} />
+            <ScheduleScreenViewBase {...schedule} t={t} />
             <footer className={FOOTER_CLASS_NAME}>
                 <span className={LINK_UNDERLINE_CLASS_NAME}>
                     <TextAction appearance="inline" href={ROUTES.privacyPolicy}>

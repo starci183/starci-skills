@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, screen, waitFor } from "@testing-library/react"
 import { PlanUsagePage } from "@/features/pages/PlanUsagePage"
-import { renderJourney, resetJourneyWorld, seedSession, serveGraphQL, type Wire, type WireReply, type WireRoute } from "@/modules/journey"
+import { renderJourney, resetJourneyWorld, seedSession, serveGraphQL, type Wire, type WireReply, type WireRoute } from "@/modules/journey/harness"
 
 const mocks = vi.hoisted(() => ({ push: vi.fn(), assign: vi.fn() }))
 

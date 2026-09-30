@@ -1,15 +1,9 @@
 "use client"
 
-import useSWR from "swr"
-import useSWRMutation from "swr/mutation"
 import { useTranslations } from "next-intl"
-import { useSessionToken } from "@/hooks/auth"
-import { clearToken, endRemoteSession } from "@/modules/session"
-import { readPlanUsage, startPlanCheckout } from "@/modules/plan"
+import { useSignOut } from "@/hooks/auth"
+import { usePlanUsage } from "@/hooks/plan"
 import { UsageScreenView, type UsageScreenViewState } from "./component"
-
-/** PlanUsageScreen takes no external props; the query, the checkout mutation and the session are its own. */
-export type PlanUsageScreenProps = Record<never, never>
 
 /**
  * The connected owner of ui.plan.usage (the feature-entry and block halves this lane's write ceiling
@@ -20,22 +14,14 @@ export type PlanUsageScreenProps = Record<never, never>
  * Every word that view draws - including the sentences that carry this reader's own numbers - is
  * resolved here from the `plan` and `shell` namespaces.
  */
-export const PlanUsageScreen = (props: PlanUsageScreenProps) => {
-    void props
+export const PlanUsageScreen = () => {
     const t = useTranslations("plan")
     const tShell = useTranslations("shell")
-    const token = useSessionToken()
-    const usageQuery = useSWR(
-        token ? (["plan-usage", token] as const) : null,
-        ([, activeToken]) => readPlanUsage(activeToken),
-    )
-    const upgrade = useSWRMutation(
-        token ? (["plan-upgrade", token] as const) : null,
-        ([, activeToken]) => startPlanCheckout(activeToken),
-    )
+    const onSignOut = useSignOut()
+    const { signedIn, usageQuery, upgrade } = usePlanUsage()
 
     const usage = usageQuery.data
-    const state: UsageScreenViewState = !token || usageQuery.error
+    const state: UsageScreenViewState = !signedIn || usageQuery.error
         ? "refused"
         : usage === undefined
             ? "loading"
@@ -53,18 +39,13 @@ export const PlanUsageScreen = (props: PlanUsageScreenProps) => {
         }).catch(() => undefined)
     }
 
-    const onSignOut = () => {
-        if (token) void endRemoteSession(token)
-        clearToken()
-    }
-
     return (
         <UsageScreenView
             state={state}
             plan={usage?.plan ?? null}
             activeCount={usage?.activeCount ?? 0}
             cap={usage?.cap ?? null}
-            readRefusal={usageQuery.error || !token ? t("sessionEnded") : null}
+            readRefusal={usageQuery.error || !signedIn ? t("sessionEnded") : null}
             upgradeRefusal={upgrade.error ? t("checkoutRefusal") : null}
             isUpgrading={upgrade.isMutating}
             copy={{
