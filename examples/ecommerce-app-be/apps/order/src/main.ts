@@ -1,43 +1,21 @@
 import "reflect-metadata"
-import {
-    ValidationPipe 
-} from "@nestjs/common"
-import {
-    NestFactory 
-} from "@nestjs/core"
-import {
-    AppModule 
-} from "./app.module"
-import {
-    AppConfigService 
-} from "ecommerce-app-be/modules/platform/config/order"
-import {
-    LogId, Logger, createJsonLogger 
-} from "ecommerce-app-be/modules/platform/logging"
-import {
-    SystemClock 
-} from "ecommerce-app-be/modules/platform/clock"
+import { NestFactory } from "@nestjs/core"
+import { SystemClock } from "@modules/platform/clock"
+import { EnvSource } from "@modules/platform/config"
+import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
+import { AppModule } from "./app.module"
+import { parseOrderAppOptions } from "./order.options"
 
-/** Boots the api: the global validation pipe, then the listener on the configured port. */
+/** Reads the environment once, builds the order api from it and listens. */
 async function bootstrap(): Promise<void> {
-    const app = await NestFactory.create(AppModule)
-    const config = app.get(AppConfigService)
-    // The GraphQL input classes carry class-validator decorators; this pipe is what enforces them.
-    app.useGlobalPipes(new ValidationPipe({
-        whitelist: true, transform: true 
-    }))
-    await app.listen(config.getPort())
-    app.get(Logger).info(LogId.ServerStarted,
-        {
-            service: "order", port: config.getPort() 
-        })
+    const options = parseOrderAppOptions(EnvSource.fromProcess())
+    const app = await NestFactory.create(AppModule.register(options))
+    app.enableShutdownHooks()
+    await app.listen(options.port)
+    createJsonLogger(new SystemClock()).info(LoggingLogEvent.ServerStarted, { service: "order", port: options.port })
 }
 
 bootstrap().catch((error: unknown) => {
-    const logger = createJsonLogger(new SystemClock())
-    logger.error(LogId.StartupFailed,
-        {
-            service: "order", message: error instanceof Error ? error.message : String(error) 
-        })
+    createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "order" })
     process.exit(1)
 })

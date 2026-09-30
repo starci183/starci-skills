@@ -1,76 +1,87 @@
-import {
-    Module 
-} from "@nestjs/common"
-import {
-    ClockModule 
-} from "ecommerce-app-be/modules/platform/clock"
-import {
-    LoggingModule 
-} from "ecommerce-app-be/modules/platform/logging"
-import {
-    ConfigModule 
-} from "ecommerce-app-be/modules/platform/config/identity"
-import {
-    PostgresqlPrimaryModule 
-} from "ecommerce-app-be/modules/platform/databases/postgresql/identity"
-import {
-    RedisPrimaryModule 
-} from "ecommerce-app-be/modules/platform/caches/redis/primary"
-import {
-    AccountModule 
-} from "ecommerce-app-be/modules/domain/account"
-import {
-    SessionModule 
-} from "ecommerce-app-be/modules/domain/session"
-import {
-    OrderModule 
-} from "ecommerce-app-be/modules/integrations/order"
-import {
-    IdentityModule 
-} from "ecommerce-app-be/features/identity"
-import {
-    IdentityGraphqlModule 
-} from "ecommerce-app-be/features/identity"
+import { Module } from "@nestjs/common"
+import type { DynamicModule } from "@nestjs/common"
+import { APP_GUARD } from "@nestjs/core"
+import { ACCOUNT_ERROR_KINDS, ACCOUNT_MESSAGES, AccountModule, accountEntities, accountMigrations } from "@modules/domain/account"
+import { AUTH_ERROR_KINDS, AUTH_MESSAGES, AuthGuard, AuthModule } from "@modules/domain/auth"
+import { SESSION_ERROR_KINDS, SESSION_MESSAGES, SessionModule, SessionService } from "@modules/domain/session"
+import { CACHE, CACHE_ERROR_KINDS, CACHE_MESSAGES, CacheModule } from "@modules/integrations/cache"
+import { ORDER_API_ERROR_KINDS, ORDER_API_MESSAGES, OrderApiModule } from "@modules/integrations/order-api"
+import { ClockModule } from "@modules/platform/clock"
+import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
+import { CqrsModule } from "@modules/platform/cqrs"
+import { DATABASE_ERROR_KINDS, DATABASE_PROBE, DatabaseModule } from "@modules/platform/database"
+import { ERRORS_MESSAGES, ErrorsModule } from "@modules/platform/errors"
+import { GraphqlModule } from "@modules/platform/graphql"
+import { HTTP_ERROR_KINDS, HTTP_MESSAGES, HttpModule } from "@modules/platform/http"
+import { HTTP_SECURITY_ERROR_KINDS, HTTP_SECURITY_MESSAGES, HttpSecurityModule, OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
+import { I18nModule } from "@modules/platform/i18n"
+import { LoggingModule } from "@modules/platform/logging"
+import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
+import { HealthHttpModule } from "@features/health"
+import { IdentityGraphqlModule } from "@features/identity"
+import type { IdentityAppOptions } from "./identity.options"
 
-@Module({
-    imports: [
-        ClockModule.register({
-            isGlobal: true 
-        }),
-        LoggingModule,
-        ConfigModule.register({
-            isGlobal: true 
-        }),
-        PostgresqlPrimaryModule.register({
-            isGlobal: true 
-        }),
-        RedisPrimaryModule.register({
-            isGlobal: true 
-        }),
-        AccountModule.register({
-            isGlobal: true 
-        }),
-        SessionModule.register({
-            isGlobal: true 
-        }),
-        OrderModule.register({
-            isGlobal: true 
-        }),
-        IdentityModule,
-        IdentityGraphqlModule,
-    ],
-})
-/**
- * Composition only, in nivo's monorepo shape: each deployable under apps/<service> has its own
- * root module, and this one wires the identity service - the platform modules (config, the
- * shared Postgres for persons, Redis for sessions), the capability modules (account, session),
- * the HTTP client that consumes contract.checkout.order-for-identity (integrations/order), the
- * feature that exposes the justified HTTP doors (features/identity) and the canonical GraphQL
- * transport for the user-facing API (features/identity/transport/graphql). Every capability and platform
- * module is registered `isGlobal: true` HERE - whether a capability is app-wide is a fact about
- * this application, so the root declares it and the modules never declare it about themselves.
- * That is what lets the feature module mount its doors without importing a single capability:
- * AppConfigService, the primary EntityManager, RedisPrimaryClient, AccountService,
- * SessionService and OrderApiClient all resolve app-wide.
- */
-export class AppModule {}
+@Module({})
+/** The composition root of the identity api: every capability is registered once, app-wide, and the three guards run in a fixed order. */
+export class AppModule {
+    /** Builds the identity api from its parsed options. */
+    static register(options: IdentityAppOptions): DynamicModule {
+        return {
+            module: AppModule,
+            imports: [
+                ClockModule.register({ isGlobal: true }),
+                LoggingModule.register({ isGlobal: true }),
+                I18nModule.register({
+                    isGlobal: true,
+                    bundles: [
+                        ERRORS_MESSAGES,
+                        HTTP_MESSAGES,
+                        HTTP_SECURITY_MESSAGES,
+                        PROBES_MESSAGES,
+                        CACHE_MESSAGES,
+                        ORDER_API_MESSAGES,
+                        ACCOUNT_MESSAGES,
+                        SESSION_MESSAGES,
+                        AUTH_MESSAGES,
+                    ],
+                }),
+                ErrorsModule.register({
+                    isGlobal: true,
+                    kinds: [
+                        CONFIG_ERROR_KINDS,
+                        DATABASE_ERROR_KINDS,
+                        HTTP_ERROR_KINDS,
+                        HTTP_SECURITY_ERROR_KINDS,
+                        PROBES_ERROR_KINDS,
+                        CACHE_ERROR_KINDS,
+                        ORDER_API_ERROR_KINDS,
+                        ACCOUNT_ERROR_KINDS,
+                        SESSION_ERROR_KINDS,
+                        AUTH_ERROR_KINDS,
+                    ],
+                }),
+                CqrsModule.register({ isGlobal: true }),
+                HttpSecurityModule.register({ isGlobal: true, ...options.httpSecurity }),
+                DatabaseModule.register({
+                    isGlobal: true,
+                    connections: [{ ...options.database, entities: accountEntities, migrations: accountMigrations }],
+                }),
+                CacheModule.register({ isGlobal: true, ...options.cache }),
+                HttpModule.register({ isGlobal: true }),
+                OrderApiModule.register({ isGlobal: true, ...options.orderApi }),
+                AccountModule.register({ isGlobal: true }),
+                SessionModule.register({ isGlobal: true }),
+                AuthModule.register({ isGlobal: true, verifier: SessionService }),
+                ProbesModule.register({ isGlobal: true, service: "identity", probes: [DATABASE_PROBE, CACHE] }),
+                GraphqlModule.register({ isGlobal: true }),
+                HealthHttpModule,
+                IdentityGraphqlModule,
+            ],
+            providers: [
+                { provide: APP_GUARD, useClass: RateLimitGuard },
+                { provide: APP_GUARD, useClass: OriginGuard },
+                { provide: APP_GUARD, useClass: AuthGuard },
+            ],
+        }
+    }
+}

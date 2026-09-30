@@ -3,6 +3,5 @@ export type { DomainErrorInit, ErrorDescription, ErrorKind, ErrorKindTable, Erro
 export { DomainError } from "./domain.error"
 export { formatGraphqlError } from "./graphql-error.mapper"
 export { ErrorsModule } from "./errors.module"
-export { ERRORS_ERROR_KINDS } from "./errors.error"
 export { ERRORS_MESSAGES } from "./errors.messages"
 export type { ErrorsService } from "./errors.service"

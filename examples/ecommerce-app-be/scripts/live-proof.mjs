@@ -3,34 +3,24 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * scripts/live-proof.mjs - the executable answer to the question this example exists to survive:
- * does the migrated layout actually RUN at nivo-shape on a second repo? It walks the full checkout
- * flow against the two services started on the host (see .starcistacks/dev/README.md `up`),
- * exercising exactly the seams the records claim:
+ * scripts/live-proof.mjs - walks the checkout flow against the two services started on the host (see
+ * .starcistacks/dev/README.md `up`), through the public GraphQL doors only:
  *
- *   identity: register (demo door), sign-in (fr.identity.sign-in), /health with real dependencies
- *   order:    session verification against identity over real HTTP (sds.checkout.order-flow),
- *             cart upsert, confirmation (t-stock/t-pay/t-confirm), the idempotency replay, the
- *             insufficient-stock refusal, the empty-cart refusal, the unauthenticated refusals
- *   contract: order-for-identity - GET /accounts/:personId on identity answering hasOrders, which
- *             identity can only know by asking order over real HTTP. Nothing is shared between
- *             the two services but the database *names*, and even those are disjoint schemas.
+ *   identity: register, signIn (a wrong pair and an unknown email refuse alike), /health with real dependencies
+ *   order:    the bearer token is verified against identity over real GraphQL, cart upsert, confirmation,
+ *             the idempotency replay, the insufficient-stock and empty-cart refusals, the unauthenticated refusal
+ *   contract: identity `account` answers hasOrders, which identity can only know by asking order's `buyerStatus`
+ *             with the caller's own bearer token.
  *
- * Every number (port, total, stock) is derived from metadata.json or the catalog the migrations
- * seeded - nothing here is a fixture, and any refusal exits non-zero naming its step.
- * Run with --expect-down against a stopped stack to see the honest negative first.
+ * The catalog comes from `.starcistacks/dev/seeds/order-catalog.sql`, applied once after `npm run migrate`. Ports
+ * are read from `.starcistacks/dev/infra/metadata.json`. Any refusal exits non-zero naming its step; run with
+ * --expect-down against a stopped stack to see the honest negative first.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '..');
-
-function loadPorts() {
-  const file = join(repoRoot, '.starcistacks', 'dev', 'infra', 'metadata.json');
-  if (!existsSync(file)) throw new Error(`no metadata.json at ${file}`);
-  return JSON.parse(readFileSync(file, 'utf8')).ports;
-}
-
-const ports = loadPorts();
+const metadata = join(resolve(here, '..'), '.starcistacks', 'dev', 'infra', 'metadata.json');
+if (!existsSync(metadata)) throw new Error(`no metadata.json at ${metadata}`);
+const { ports } = JSON.parse(readFileSync(metadata, 'utf8'));
 const IDENTITY = `http://127.0.0.1:${ports.identityApi}`;
 const ORDER = `http://127.0.0.1:${ports.orderApi}`;
 
@@ -53,196 +43,169 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function okStatus(status) {
-  return status === 200 || status === 201;
-}
-
-async function http(base, method, path, { body, token, headers } = {}) {
-  const response = await fetch(`${base}${path}`, {
-    method,
-    headers: {
-      ...(body ? { 'content-type': 'application/json' } : {}),
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+/** One GraphQL call; answers the data and the first error (code and params), or the HTTP status of a non-GraphQL answer. */
+async function gql(base, query, variables, token) {
+  const response = await fetch(`${base}/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ query, variables }),
     signal: AbortSignal.timeout(5000),
   });
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch {
-    /* empty or non-JSON answers are legal for refusals */
-  }
-  return { status: response.status, payload };
+  const payload = await response.json().catch(() => null);
+  const error = payload?.errors?.[0];
+  return { status: response.status, data: payload?.data ?? null, code: error?.extensions?.code ?? null, params: error?.extensions?.params ?? {} };
 }
 
-async function addLine(token, productId, quantity) {
-  const added = await http(ORDER, 'POST', '/cart/items', { token, body: { productId, quantity } });
-  assert(added.status === 200 || added.status === 201, `add ${productId} x${quantity} answered ${added.status}`);
-  return added.payload.item;
+async function health(base) {
+  const response = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5000) });
+  return { status: response.status, payload: await response.json().catch(() => null) };
 }
+
+const REGISTER = 'mutation ($input: RegisterInput!) { register(input: $input) { personId } }';
+const SIGN_IN = 'mutation ($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }';
+const ACCOUNT = '{ account { personId email hasOrders } }';
+const CART = '{ cart { items { productId quantity } catalog { id name priceMinorUnits stock } } }';
+const ADD = 'mutation ($input: AddCartItemInput!) { addCartItem(input: $input) { item { productId quantity } } }';
+const CLEAR = 'mutation { clearCart { cleared } }';
+const PLACE = 'mutation ($input: PlaceOrderInput!) { placeOrder(input: $input) { orderId status totalMinorUnits currency paymentId replayed } }';
 
 async function cartLines(token, lines) {
-  await http(ORDER, 'DELETE', '/cart', { token });
-  for (const line of lines) await addLine(token, line.productId, line.quantity);
+  await gql(ORDER, CLEAR, {}, token);
+  for (const line of lines) {
+    const added = await gql(ORDER, ADD, { input: line }, token);
+    assert(added.data?.addCartItem, `add ${line.productId} x${line.quantity} answered ${added.code ?? added.status}`);
+  }
 }
 
-const email = `proof-${Date.now()}@ecommerce.dev`;
-const password = 'live-proof-password';
-const run = process.argv.slice(2);
+async function newBuyer(tag, password) {
+  const email = `proof-${tag}-${Date.now()}@ecommerce.dev`;
+  const registered = await gql(IDENTITY, REGISTER, { input: { email, password } });
+  assert(registered.data?.register, `register answered ${registered.code ?? registered.status}`);
+  const signedIn = await gql(IDENTITY, SIGN_IN, { input: { email, password } });
+  assert(signedIn.data?.signIn, `signIn answered ${signedIn.code ?? signedIn.status}`);
+  return { email, personId: registered.data.register.personId, token: signedIn.data.signIn.sessionToken };
+}
 
-if (run.includes('--expect-down')) {
+const password = 'live-proof-password';
+
+if (process.argv.slice(2).includes('--expect-down')) {
   // The honest negative: against a down stack every door must refuse, not hang or fake ok.
   let reached = 0;
   for (const base of [IDENTITY, ORDER]) {
     try {
-      const { status } = await http(base, 'GET', '/health');
-      if (status === 200) reached += 1;
+      if ((await health(base)).status === 200) reached += 1;
     } catch {
       /* refused - expected */
     }
   }
-  if (reached === 0) {
-    console.log('OK down-stack: both services refuse, no answer was faked');
-    process.exitCode = 0;
-  } else {
-    console.log(`FAIL down-stack: ${reached} service(s) answered while the stack was supposed to be down`);
-    process.exitCode = 1;
-  }
+  console.log(reached === 0 ? 'OK down-stack: both services refuse, no answer was faked' : `FAIL down-stack: ${reached} service(s) answered`);
+  process.exitCode = reached === 0 ? 0 : 1;
 } else {
-  await step('health: identity answers ok with real Postgres+Redis behind it', async () => {
-    const { status, payload } = await http(IDENTITY, 'GET', '/health');
+  await step('health: identity answers ok with real Postgres and Redis behind it', async () => {
+    const { status, payload } = await health(IDENTITY);
     assert(status === 200 && payload?.status === 'ok', `identity /health answered ${status} ${JSON.stringify(payload)}`);
     return JSON.stringify(payload.checks);
   });
 
   await step('health: order answers ok and its identity check is a real HTTP call', async () => {
-    const { status, payload } = await http(ORDER, 'GET', '/health');
+    const { status, payload } = await health(ORDER);
     assert(status === 200 && payload?.status === 'ok', `order /health answered ${status} ${JSON.stringify(payload)}`);
     return JSON.stringify(payload.checks);
   });
 
-  let personId = '';
-  let sessionToken = '';
-  await step('ac.identity.sign-in.known-pair-issues-a-session-token on the wire', async () => {
-    const registered = await http(IDENTITY, 'POST', '/auth/register', { body: { email, password } });
-    assert(okStatus(registered.status), `register answered ${registered.status}`);
-    personId = registered.payload.personId;
-    const signedIn = await http(IDENTITY, 'POST', '/auth/sign-in', { body: { email, password } });
-    assert(okStatus(signedIn.status), `sign-in answered ${signedIn.status}`);
-    sessionToken = signedIn.payload.sessionToken;
-    assert(typeof sessionToken === 'string' && sessionToken.length > 20, 'no session token came back');
-    return personId;
+  let buyer;
+  await step('identity: register then signIn issues a session token', async () => {
+    buyer = await newBuyer('main', password);
+    assert(typeof buyer.token === 'string' && buyer.token.length > 20, 'no session token came back');
+    return buyer.personId;
   });
 
-  await step('ac.identity.sign-in.wrong-pair-is-refused-alike on the wire', async () => {
-    const wrongPassword = await http(IDENTITY, 'POST', '/auth/sign-in', { body: { email, password: 'not-the-password' } });
-    const unknownEmail = await http(IDENTITY, 'POST', '/auth/sign-in', { body: { email: `ghost-${Date.now()}@ecommerce.dev`, password } });
-    assert(wrongPassword.status === 401 && unknownEmail.status === 401, `refusals were ${wrongPassword.status}/${unknownEmail.status}`);
-    assert(JSON.stringify(wrongPassword.payload) === JSON.stringify(unknownEmail.payload), 'the two refusals were distinguishable');
+  await step('identity: a wrong password and an unknown email are refused alike', async () => {
+    const wrongPassword = await gql(IDENTITY, SIGN_IN, { input: { email: buyer.email, password: 'not-the-password' } });
+    const unknownEmail = await gql(IDENTITY, SIGN_IN, { input: { email: `ghost-${Date.now()}@ecommerce.dev`, password } });
+    assert(wrongPassword.code === 'ACCOUNT_INVALID_CREDENTIALS' && unknownEmail.code === wrongPassword.code, `refusals were ${wrongPassword.code}/${unknownEmail.code}`);
   });
 
-  await step('contract.checkout.order-for-identity: a fresh person has no orders (identity asks order over HTTP)', async () => {
-    const before = await http(IDENTITY, 'GET', `/accounts/${personId}`);
-    assert(before.status === 200, `accounts answered ${before.status}`);
-    assert(before.payload.hasOrders === false, `fresh person came back a buyer: ${JSON.stringify(before.payload)}`);
+  await step('contract: a fresh person has no orders (identity asks order with the caller token)', async () => {
+    const before = await gql(IDENTITY, ACCOUNT, {}, buyer.token);
+    assert(before.data?.account?.hasOrders === false, `fresh person came back ${JSON.stringify(before.data)} ${before.code ?? ''}`);
   });
 
-  await step('sds.checkout.order-flow: an unauthenticated cart read is refused at the door', async () => {
-    const { status, payload } = await http(ORDER, 'GET', '/cart');
-    assert(status === 401 && payload?.code === 'SESSION_INVALID', `cart without a token answered ${status} ${JSON.stringify(payload)}`);
-    const bad = await http(ORDER, 'GET', '/cart', { token: 'not-a-live-session' });
-    assert(bad.status === 401, `wrong token answered ${bad.status}`);
+  await step('order: a cart read without a live session is refused at the door', async () => {
+    const anonymous = await gql(ORDER, CART, {});
+    assert(anonymous.code === 'AUTH_UNAUTHENTICATED', `cart without a token answered ${anonymous.code ?? anonymous.status}`);
+    const dead = await gql(ORDER, CART, {}, 'not-a-live-session');
+    assert(dead.code === 'AUTH_UNAUTHENTICATED', `wrong token answered ${dead.code ?? dead.status}`);
   });
 
-  await step('sds.checkout.order-flow: the live session verifies through identity and the cart opens', async () => {
-    const good = await http(ORDER, 'GET', '/cart', { token: sessionToken });
-    assert(good.status === 200, `live token answered ${good.status}`);
-    assert(Array.isArray(good.payload.catalog) && good.payload.catalog.length === 3, 'the seeded catalog did not arrive');
-    return `catalog: ${good.payload.catalog.map((p) => `${p.id}=${p.stock}`).join(' ')}`;
+  await step('order: the live session verifies through identity and the cart opens', async () => {
+    const good = await gql(ORDER, CART, {}, buyer.token);
+    assert(good.data?.cart?.catalog?.length === 3, `the seeded catalog did not arrive: ${good.code ?? JSON.stringify(good.data)}`);
+    return `catalog: ${good.data.cart.catalog.map((p) => `${p.id}=${p.stock}`).join(' ')}`;
   });
 
-  await step('fr.checkout.place-order: adding the same product twice accumulates one line', async () => {
-    await cartLines(sessionToken, [{ productId: 'sku-mug', quantity: 2 }]);
-    const again = await addLine(sessionToken, 'sku-mug', 1);
-    assert(again.quantity === 3, `upsert did not accumulate: ${JSON.stringify(again)}`);
+  await step('order: adding the same product twice accumulates one line', async () => {
+    await cartLines(buyer.token, [{ productId: 'sku-mug', quantity: 2 }]);
+    const again = await gql(ORDER, ADD, { input: { productId: 'sku-mug', quantity: 1 } }, buyer.token);
+    assert(again.data?.addCartItem?.item?.quantity === 3, `upsert did not accumulate: ${JSON.stringify(again.data)}`);
   });
 
-  await step('ac.checkout.place-order.empty-cart-is-refused', async () => {
-    await http(ORDER, 'DELETE', '/cart', { token: sessionToken });
-    const refused = await http(ORDER, 'POST', '/orders', { token: sessionToken });
-    assert(refused.status === 400 && refused.payload?.code === 'CHECKOUT_REFUSED' && refused.payload.reason === 'cart-empty',
-      `empty confirmation answered ${refused.status} ${JSON.stringify(refused.payload)}`);
+  await step('order: an empty cart is refused by name', async () => {
+    await gql(ORDER, CLEAR, {}, buyer.token);
+    const refused = await gql(ORDER, PLACE, { input: {} }, buyer.token);
+    assert(refused.code === 'ORDER_CART_EMPTY', `empty confirmation answered ${refused.code ?? refused.status}`);
   });
 
-  await step('ac.checkout.place-order.stock-is-checked-at-confirmation: a beyond-stock line refuses by name and changes nothing', async () => {
-    const before = await http(ORDER, 'GET', '/cart', { token: sessionToken });
-    const stockBefore = Object.fromEntries(before.payload.catalog.map((p) => [p.id, p.stock]));
-    await cartLines(sessionToken, [{ productId: 'sku-mug', quantity: 2 }, { productId: 'sku-thermos', quantity: 1000 }]);
-    const refused = await http(ORDER, 'POST', '/orders', { token: sessionToken });
-    assert(refused.status === 409 && refused.payload?.reason === 'insufficient-stock' && refused.payload.productId === 'sku-thermos',
-      `beyond-stock confirmation answered ${refused.status} ${JSON.stringify(refused.payload)}`);
-    const cart = await http(ORDER, 'GET', '/cart', { token: sessionToken });
-    assert(cart.payload.items.some((line) => line.productId === 'sku-thermos'), 'the refused cart lost its line');
+  await step('order: a beyond-stock line refuses by name, keeps the cart and moves no stock', async () => {
+    const before = await gql(ORDER, CART, {}, buyer.token);
+    const stockBefore = Object.fromEntries(before.data.cart.catalog.map((p) => [p.id, p.stock]));
+    await cartLines(buyer.token, [{ productId: 'sku-mug', quantity: 2 }, { productId: 'sku-thermos', quantity: 1000 }]);
+    const refused = await gql(ORDER, PLACE, { input: {} }, buyer.token);
+    assert(refused.code === 'ORDER_INSUFFICIENT_STOCK' && refused.params.productId === 'sku-thermos', `beyond-stock confirmation answered ${refused.code} ${JSON.stringify(refused.params)}`);
+    const cart = await gql(ORDER, CART, {}, buyer.token);
+    assert(cart.data.cart.items.some((line) => line.productId === 'sku-thermos'), 'the refused cart lost its line');
     for (const [id, stock] of Object.entries(stockBefore)) {
-      const now = cart.payload.catalog.find((p) => p.id === id).stock;
+      const now = cart.data.cart.catalog.find((p) => p.id === id).stock;
       assert(now === stock, `the refused confirmation moved stock for ${id}: ${stock} -> ${now}`);
     }
   });
 
   let orderId = '';
-  let expectedTotal = 0;
-  await step('sds.checkout.order-flow t-confirm: the confirmation writes order, payment and stock, and clears the cart', async () => {
-    const before = await http(ORDER, 'GET', '/cart', { token: sessionToken });
-    const mug = before.payload.catalog.find((p) => p.id === 'sku-mug');
-    expectedTotal = mug.priceMinorUnits * 2;
-    await cartLines(sessionToken, [{ productId: 'sku-mug', quantity: 2 }]);
-    const placed = await http(ORDER, 'POST', '/orders', { token: sessionToken, headers: { 'idempotency-key': 'live-proof-key-1' } });
-    assert(okStatus(placed.status), `confirmation answered ${placed.status} ${JSON.stringify(placed.payload)}`);
-    assert(placed.payload.status === 'confirmed', `confirmation answered ${placed.payload.status}`);
-    assert(placed.payload.totalMinorUnits === expectedTotal, `total ${placed.payload.totalMinorUnits} != ${expectedTotal}`);
-    assert(placed.payload.replayed === false, 'a first confirmation must not present itself as a replay');
-    assert(typeof placed.payload.paymentId === 'string' && placed.payload.paymentId.length > 10, 'no payment was captured');
-    orderId = placed.payload.orderId;
-    const after = await http(ORDER, 'GET', '/cart', { token: sessionToken });
-    assert(after.payload.items.length === 0, 'the confirmed cart was not cleared');
-    const mugNow = after.payload.catalog.find((p) => p.id === 'sku-mug').stock;
+  await step('order: the confirmation writes order, payment and stock, and clears the cart', async () => {
+    const before = await gql(ORDER, CART, {}, buyer.token);
+    const mug = before.data.cart.catalog.find((p) => p.id === 'sku-mug');
+    await cartLines(buyer.token, [{ productId: 'sku-mug', quantity: 2 }]);
+    const placed = await gql(ORDER, PLACE, { input: { idempotencyKey: 'live-proof-key-1' } }, buyer.token);
+    const order = placed.data?.placeOrder;
+    assert(order?.status === 'confirmed', `confirmation answered ${placed.code ?? JSON.stringify(placed.data)}`);
+    assert(order.totalMinorUnits === mug.priceMinorUnits * 2, `total ${order.totalMinorUnits} != ${mug.priceMinorUnits * 2}`);
+    assert(order.replayed === false && typeof order.paymentId === 'string', 'a first confirmation must not be a replay and must capture a payment');
+    orderId = order.orderId;
+    const after = await gql(ORDER, CART, {}, buyer.token);
+    assert(after.data.cart.items.length === 0, 'the confirmed cart was not cleared');
+    const mugNow = after.data.cart.catalog.find((p) => p.id === 'sku-mug').stock;
     assert(mugNow === mug.stock - 2, `stock did not move: ${mug.stock} -> ${mugNow}`);
-    return `order ${orderId}, total ${expectedTotal}`;
+    return `order ${orderId}`;
   });
 
-  await step('sds.checkout.order-flow: a replayed Idempotency-Key returns the first answer, not a second order', async () => {
-    const replay = await http(ORDER, 'POST', '/orders', { token: sessionToken, headers: { 'idempotency-key': 'live-proof-key-1' } });
-    assert(okStatus(replay.status), `replay answered ${replay.status}`);
-    assert(replay.payload.orderId === orderId, 'the replay returned a different order');
-    assert(replay.payload.replayed === true, 'the replay did not present itself as a replay');
+  await step('order: a replayed idempotency key returns the first answer, not a second order', async () => {
+    const replay = await gql(ORDER, PLACE, { input: { idempotencyKey: 'live-proof-key-1' } }, buyer.token);
+    assert(replay.data?.placeOrder?.orderId === orderId && replay.data.placeOrder.replayed === true, `replay answered ${JSON.stringify(replay.data)}`);
   });
 
-  await step('br.checkout.place-order: the same Idempotency-Key belongs to a person, not to the whole catalog', async () => {
-    // A second, fresh person reusing this run's key gets their own first answer - never the first
-    // person's order. This is what makes the proof repeatable against the same dev database.
-    const otherEmail = `proof-other-${Date.now()}@ecommerce.dev`;
-    const registered = await http(IDENTITY, 'POST', '/auth/register', { body: { email: otherEmail, password } });
-    assert(okStatus(registered.status), `register (other person) answered ${registered.status}`);
-    const signedIn = await http(IDENTITY, 'POST', '/auth/sign-in', { body: { email: otherEmail, password } });
-    assert(okStatus(signedIn.status), `sign-in (other person) answered ${signedIn.status}`);
-    const otherToken = signedIn.payload.sessionToken;
-    await cartLines(otherToken, [{ productId: 'sku-notebook', quantity: 1 }]);
-    const placed = await http(ORDER, 'POST', '/orders', { token: otherToken, headers: { 'idempotency-key': 'live-proof-key-1' } });
-    assert(okStatus(placed.status), `other person's confirmation answered ${placed.status} ${JSON.stringify(placed.payload)}`);
-    assert(placed.payload.replayed === false, "the other person's first confirmation came back as someone else's replay");
-    assert(placed.payload.orderId !== orderId, 'the shared key string returned the first person\'s order');
-    return `other order ${placed.payload.orderId}`;
+  await step('order: the same idempotency key belongs to a person, not to the whole catalog', async () => {
+    const other = await newBuyer('other', password);
+    await cartLines(other.token, [{ productId: 'sku-notebook', quantity: 1 }]);
+    const placed = await gql(ORDER, PLACE, { input: { idempotencyKey: 'live-proof-key-1' } }, other.token);
+    assert(placed.data?.placeOrder?.replayed === false && placed.data.placeOrder.orderId !== orderId, "the other person's first confirmation came back as someone else's replay");
+    return `other order ${placed.data.placeOrder.orderId}`;
   });
 
-  await step('ac.checkout.place-order.becomes-a-buyer: identity learns the person has orders', async () => {
-    const after = await http(IDENTITY, 'GET', `/accounts/${personId}`);
-    assert(after.status === 200, `accounts answered ${after.status}`);
-    assert(after.payload.hasOrders === true, `the buyer is not a buyer: ${JSON.stringify(after.payload)}`);
+  await step('contract: identity learns the person is a buyer', async () => {
+    const after = await gql(IDENTITY, ACCOUNT, {}, buyer.token);
+    assert(after.data?.account?.hasOrders === true, `the buyer is not a buyer: ${JSON.stringify(after.data)}`);
   });
 
-  const passed = steps.length - failures;
-  console.log(`\nlive-proof: ${passed}/${steps.length} steps passed`);
+  console.log(`\nlive-proof: ${steps.length - failures}/${steps.length} steps passed`);
   process.exitCode = failures === 0 ? 0 : 1;
 }

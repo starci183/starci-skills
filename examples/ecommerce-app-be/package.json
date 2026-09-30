@@ -2,17 +2,7 @@
   "name": "ecommerce-app-be",
   "version": "1.0.0",
   "private": true,
-  "description": "Ecommerce app backend: a NestJS monorepo with identity and order services. Ports come from .starcistacks/dev/infra/metadata.json.",
-  "exports": {
-    "./features/*": {
-      "types": "./src/features/*/index.ts",
-      "default": "./dist/src/features/*/index.js"
-    },
-    "./modules/*": {
-      "types": "./src/modules/*/index.ts",
-      "default": "./dist/src/modules/*/index.js"
-    }
-  },
+  "description": "Ecommerce app backend: a NestJS monorepo with identity and order services. Runtime values come from the environment (.starcistacks/dev/runtime/env/KEYS.md).",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint:check": "npm run lint",

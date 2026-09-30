@@ -26,7 +26,6 @@ export class DatabaseModule extends ConfigurableModuleClass {
                         url: connection.url.reveal(),
                         entities: [...connection.entities],
                         synchronize: false,
-                        migrationsRun: false,
                         retryAttempts: 2,
                     }),
                 ),

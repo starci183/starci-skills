@@ -1,165 +1,93 @@
 import "reflect-metadata"
-import {
-    APP_GUARD, APP_INTERCEPTOR 
-} from "@nestjs/core"
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getDataSourceToken, getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    DataSource, EntityManager 
-} from "typeorm"
-import {
-    mock 
-} from "@starci/jest-preset/mock"
-import {
-    AppModule 
-} from "./app.module"
-import {
-    Logger 
-} from "@modules/platform/logging"
-import {
-    Clock, SystemClock 
-} from "@modules/platform/clock/index"
-import {
-    OrderConfigService 
-} from "@modules/platform/config/index"
-import {
-    OrderPostgresPrimaryClient, ORDER_POSTGRESQL 
-} from "@modules/platform/databases/index"
-import {
-    CartService 
-} from "@modules/domain/cart/index"
-import {
-    CatalogService 
-} from "@modules/domain/catalog/index"
-import {
-    CheckoutPolicy, OrderService 
-} from "@modules/domain/order/index"
-import {
-    PaymentService 
-} from "@modules/domain/payment/index"
-import {
-    IdentityApiClient 
-} from "@modules/integrations/identity/index"
-import {
-    SessionGuard, BuyerController, HealthController, CartResolver, AddCartItemResolver, ClearCartResolver, PlaceOrderResolver 
-} from "@features/checkout/index"
+import { APP_GUARD } from "@nestjs/core"
+import { CommandBus } from "@nestjs/cqrs"
+import { Test } from "@nestjs/testing"
+import type { TestingModule } from "@nestjs/testing"
+import { getDataSourceToken, getEntityManagerToken } from "@nestjs/typeorm"
+import type { DataSource } from "typeorm"
+import { mock } from "@starci/jest-preset/mock"
+import { AuthGuard } from "@modules/domain/auth"
+import { CartService } from "@modules/domain/cart"
+import { CatalogService } from "@modules/domain/catalog"
+import { OrderService } from "@modules/domain/order"
+import { PaymentService } from "@modules/domain/payment"
+import { ConfigError, EnvSource, Secret } from "@modules/platform/config"
+import { ORDER_CONNECTION } from "@modules/platform/database"
+import { ERRORS_SERVICE } from "@modules/platform/errors"
+import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
+import { LOGGER } from "@modules/platform/logging"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { AppModule } from "./app.module"
+import { parseOrderAppOptions } from "./order.options"
+import type { OrderAppOptions } from "./order.options"
 
-/**
- * The order deployable's DI smoke, sibling of apps/identity's: AppModule must compile with the
- * platform boundary (the named Postgres connection, the metadata/env config) doubled, and every
- * capability service, the identity integration client, the session guard and all transport
- * doors must resolve. This is the test that catches a DI misconfig before behavior specs run.
- */
-function postgresBoundary(): { dataSource: DataSource; manager: EntityManager } {
-    const manager = mock<EntityManager>({
-        findOneBy: jest.fn(), save: jest.fn() 
-    })
-    const dataSource = mock<DataSource>({
-        isInitialized: false,
-        entityMetadatas: [],
-        options: {
-            type: "postgres" 
-        },
-        manager,
-        getRepository: jest.fn(),
-        query: jest.fn(),
-        destroy: jest.fn(),
-    })
-    return {
-        dataSource, manager 
-    }
+const options: OrderAppOptions = {
+    port: 0,
+    database: { name: ORDER_CONNECTION, url: new Secret("postgres://localhost:0/order") },
+    identityApi: { url: "http://localhost:0", timeoutMs: 100 },
+    httpSecurity: { allowedOrigins: ["http://localhost:3000"], rateLimit: { windowMs: 1000, defaultLimit: 10, strictLimit: 5 } },
 }
 
-function configBoundary(): OrderConfigService {
-    return mock<OrderConfigService>({
-        getProject: () => "ecommerce-app-be",
-        getPort: () => 0,
-        getDatabaseUrl: () => "postgres://postgres@localhost:0/ecommerce",
-        getIdentityApiBaseUrl: () => "http://localhost:0",
-    })
+const environment: Record<string, string> = {
+    ORDER_API_PORT: "6070",
+    ORDER_DB_URL: "postgres://localhost:5501/order",
+    IDENTITY_API_URL: "http://localhost:5070",
+    IDENTITY_API_TIMEOUT: "5s",
+    HTTP_SECURITY_ALLOWED_ORIGINS: "http://localhost:3000",
 }
 
-describe("order AppModule - module boot",
-    () => {
-        let module: TestingModule
-        let postgres: ReturnType<typeof postgresBoundary>
-        const config = configBoundary()
+describe("order AppModule", () => {
+    let module: TestingModule
+    const manager = mockEntityManager()
 
-        beforeAll(async () => {
-            postgres = postgresBoundary()
-            module = await Test.createTestingModule({
-                imports: [AppModule] 
-            })
-                .overrideProvider(getDataSourceToken(ORDER_POSTGRESQL))
-                .useValue(postgres.dataSource)
-            // forRootAsync's options carry no `name`, so shutdown would look up the default DataSource
-            // token and throw; naming the options double keeps module.close() honest.
-                .overrideProvider("TypeOrmModuleOptions")
-                .useValue({
-                    name: ORDER_POSTGRESQL, type: "postgres" 
-                })
-                .overrideProvider(OrderConfigService)
-                .useValue(config)
-                .compile()
-        })
-
-        afterAll(async () => {
-            await module.close()
-        })
-
-        it("compiles the root module with the platform boundary doubled",
-            () => {
-                expect(module).toBeDefined()
-            })
-
-        it("resolves the capability services, the platform client and the identity integration client",
-            () => {
-                for (const token of [
-                    CartService,
-                    CatalogService,
-                    OrderService,
-                    CheckoutPolicy,
-                    PaymentService,
-                    OrderPostgresPrimaryClient,
-                    IdentityApiClient,
-                ]) {
-                    expect(module.get(token)).toBeDefined()
-                }
-            })
-
-        it("resolves the session guard, every justified REST controller and every GraphQL resolver",
-            () => {
-                for (const token of [SessionGuard,
-                    BuyerController,
-                    HealthController,
-                    CartResolver,
-                    AddCartItemResolver,
-                    ClearCartResolver,
-                    PlaceOrderResolver]) {
-                    expect(module.get(token)).toBeDefined()
-                }
-            })
-
-        it("binds the named TypeORM connection and its EntityManager to the doubled DataSource",
-            () => {
-                expect(module.get(getDataSourceToken(ORDER_POSTGRESQL))).toBe(postgres.dataSource)
-                expect(module.get(getEntityManagerToken(ORDER_POSTGRESQL))).toBe(postgres.manager)
-            })
-
-        it("resolves the global config provider as the boundary double",
-            () => {
-                expect(module.get(OrderConfigService)).toBe(config)
-                expect(module.get(Logger)).toBeInstanceOf(Logger)
-                expect(module.get(Clock)).toBeInstanceOf(SystemClock)
-            })
-
-        it("registers no global guard or interceptor - session enforcement lives at the resolver doors",
-            () => {
-                expect(() => module.get(APP_GUARD)).toThrow()
-                expect(() => module.get(APP_INTERCEPTOR)).toThrow()
-            })
+    beforeAll(async () => {
+        const dataSource = mock<DataSource>({ isInitialized: false, manager, entityMetadatas: [], options: { type: "postgres" } })
+        module = await Test.createTestingModule({ imports: [AppModule.register(options)] })
+            .overrideProvider(getDataSourceToken(ORDER_CONNECTION))
+            .useValue(dataSource)
+            .compile()
     })
+
+    afterAll(async () => {
+        await module.close()
+    })
+
+    it("compiles the real root module with the database doubled", () => {
+        expect(module).toBeDefined()
+    })
+
+    it("resolves the capabilities and the platform ports the doors depend on", () => {
+        for (const token of [CatalogService, CartService, PaymentService, OrderService]) {
+            expect(module.get(token)).toBeInstanceOf(token)
+        }
+        expect(module.get(CommandBus)).toBeInstanceOf(CommandBus)
+        expect(module.get(ERRORS_SERVICE)).toBeDefined()
+        expect(module.get(LOGGER)).toBeDefined()
+    })
+
+    it("binds the one order EntityManager to the connection double", () => {
+        expect(module.get(getEntityManagerToken(ORDER_CONNECTION))).toBe(manager)
+    })
+
+    it("registers the app guards in order: rate limit, origin, auth", () => {
+        const guards = (AppModule.register(options).providers ?? []).flatMap((provider) =>
+            "provide" in provider && provider.provide === APP_GUARD && "useClass" in provider ? [provider.useClass] : [],
+        )
+        expect(guards).toEqual([RateLimitGuard, OriginGuard, AuthGuard])
+    })
+})
+
+describe("parseOrderAppOptions", () => {
+    it("reads the port, the order database, the identity api and the http security from the environment", () => {
+        const parsed = parseOrderAppOptions(new EnvSource(environment))
+        expect(parsed.port).toBe(6070)
+        expect(parsed.database.name).toBe(ORDER_CONNECTION)
+        expect(parsed.database.url.reveal()).toBe("postgres://localhost:5501/order")
+        expect(parsed.identityApi).toEqual({ url: "http://localhost:5070", timeoutMs: 5000 })
+        expect(parsed.httpSecurity.allowedOrigins).toEqual(["http://localhost:3000"])
+    })
+
+    it("stops the boot when a required key is missing", () => {
+        expect(() => parseOrderAppOptions(new EnvSource({}))).toThrow(ConfigError)
+    })
+})

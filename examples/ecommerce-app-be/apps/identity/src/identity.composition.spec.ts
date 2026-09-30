@@ -1,167 +1,96 @@
 import "reflect-metadata"
-import {
-    APP_GUARD, APP_INTERCEPTOR 
-} from "@nestjs/core"
-import {
-    Test, TestingModule 
-} from "@nestjs/testing"
-import {
-    getDataSourceToken, getEntityManagerToken 
-} from "@nestjs/typeorm"
-import {
-    DataSource, EntityManager 
-} from "typeorm"
-import {
-    mock 
-} from "@starci/jest-preset/mock"
-import {
-    AppModule 
-} from "./app.module"
-import {
-    Logger 
-} from "@modules/platform/logging"
-import {
-    Clock, SystemClock 
-} from "@modules/platform/clock/index"
-import {
-    IdentityConfigService 
-} from "@modules/platform/config/index"
-import {
-    IdentityPostgresPrimaryClient, IDENTITY_POSTGRESQL 
-} from "@modules/platform/databases/index"
-import {
-    RedisPrimaryClient 
-} from "@modules/platform/caches/index"
-import {
-    AccountService 
-} from "@modules/domain/account/index"
-import {
-    SessionRepository, SessionService 
-} from "@modules/domain/session/index"
-import {
-    OrderApiClient 
-} from "@modules/integrations/order/index"
-import {
-    HealthController, SessionController, AccountResolver, RegisterResolver, SignInResolver 
-} from "@features/identity/index"
+import { APP_GUARD } from "@nestjs/core"
+import { CommandBus } from "@nestjs/cqrs"
+import { Test } from "@nestjs/testing"
+import type { TestingModule } from "@nestjs/testing"
+import { getDataSourceToken, getEntityManagerToken } from "@nestjs/typeorm"
+import type { DataSource } from "typeorm"
+import { mock } from "@starci/jest-preset/mock"
+import { AccountService } from "@modules/domain/account"
+import { AuthGuard } from "@modules/domain/auth"
+import { SessionService } from "@modules/domain/session"
+import { CACHE } from "@modules/integrations/cache"
+import type { Cache } from "@modules/integrations/cache"
+import { ConfigError, EnvSource, Secret } from "@modules/platform/config"
+import { ERRORS_SERVICE } from "@modules/platform/errors"
+import { IDENTITY_CONNECTION } from "@modules/platform/database"
+import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
+import { LOGGER } from "@modules/platform/logging"
+import { mockEntityManager } from "@tests/fixtures/database"
+import { AppModule } from "./app.module"
+import { parseIdentityAppOptions } from "./identity.options"
+import type { IdentityAppOptions } from "./identity.options"
 
-/**
- * The identity deployable's DI smoke: AppModule must compile with the platform boundary - the
- * named Postgres connection, the Redis session store, the metadata/env config - replaced by
- * doubles, and every capability service, integration client and transport door must resolve.
- * A missing export, a wrong connection name or a provider declared nowhere fails here before
- * any behavior spec runs.
- */
-function postgresBoundary(): { dataSource: DataSource; manager: EntityManager } {
-    const manager = mock<EntityManager>({
-        findOneBy: jest.fn(), save: jest.fn() 
-    })
-    const dataSource = mock<DataSource>({
-        isInitialized: false,
-        entityMetadatas: [],
-        options: {
-            type: "postgres" 
-        },
-        manager,
-        getRepository: jest.fn(),
-        query: jest.fn(),
-        destroy: jest.fn(),
-    })
-    return {
-        dataSource, manager 
-    }
+const options: IdentityAppOptions = {
+    port: 0,
+    database: { name: IDENTITY_CONNECTION, url: new Secret("postgres://localhost:0/identity") },
+    cache: { url: new Secret("redis://localhost:0/0") },
+    orderApi: { url: "http://localhost:0", timeoutMs: 100 },
+    httpSecurity: { allowedOrigins: ["http://localhost:3000"], rateLimit: { windowMs: 1000, defaultLimit: 10, strictLimit: 5 } },
 }
 
-function configBoundary(): IdentityConfigService {
-    return mock<IdentityConfigService>({
-        getProject: () => "ecommerce-app-be",
-        getPort: () => 0,
-        getDatabaseUrl: () => "postgres://postgres@localhost:0/ecommerce",
-        getRedisUrl: () => "redis://localhost:0/0",
-        getOrderApiBaseUrl: () => "http://localhost:0",
-        getSessionTtlSeconds: () => 3600,
-    })
+const environment: Record<string, string> = {
+    IDENTITY_API_PORT: "5070",
+    IDENTITY_DB_URL: "postgres://localhost:5501/identity",
+    CACHE_REDIS_URL: "redis://localhost:6448/0",
+    ORDER_API_URL: "http://localhost:6070",
+    HTTP_SECURITY_ALLOWED_ORIGINS: "http://localhost:3000, http://localhost:4000",
 }
 
-function redisBoundary(): RedisPrimaryClient {
-    return mock<RedisPrimaryClient>()
-}
+describe("identity AppModule", () => {
+    let module: TestingModule
+    const manager = mockEntityManager()
 
-describe("identity AppModule - module boot",
-    () => {
-        let module: TestingModule
-        let postgres: ReturnType<typeof postgresBoundary>
-        const config = configBoundary()
-        const redis = redisBoundary()
-
-        beforeAll(async () => {
-            postgres = postgresBoundary()
-            module = await Test.createTestingModule({
-                imports: [AppModule] 
-            })
-                .overrideProvider(getDataSourceToken(IDENTITY_POSTGRESQL))
-                .useValue(postgres.dataSource)
-            // forRootAsync's options carry no `name`, so shutdown would look up the default DataSource
-            // token and throw; naming the options double keeps module.close() honest.
-                .overrideProvider("TypeOrmModuleOptions")
-                .useValue({
-                    name: IDENTITY_POSTGRESQL, type: "postgres" 
-                })
-                .overrideProvider(RedisPrimaryClient)
-                .useValue(redis)
-                .overrideProvider(IdentityConfigService)
-                .useValue(config)
-                .compile()
-        })
-
-        afterAll(async () => {
-            await module.close()
-        })
-
-        it("compiles the root module with the platform boundary doubled",
-            () => {
-                expect(module).toBeDefined()
-            })
-
-        it("resolves the capability services, the platform client and the order integration client",
-            () => {
-                for (const token of [AccountService,
-                    SessionService,
-                    SessionRepository,
-                    IdentityPostgresPrimaryClient,
-                    OrderApiClient]) {
-                    expect(module.get(token)).toBeDefined()
-                }
-            })
-
-        it("resolves every justified REST controller and every GraphQL resolver",
-            () => {
-                for (const token of [SessionController,
-                    HealthController,
-                    RegisterResolver,
-                    SignInResolver,
-                    AccountResolver]) {
-                    expect(module.get(token)).toBeDefined()
-                }
-            })
-
-        it("binds the named TypeORM connection and its EntityManager to the doubled DataSource",
-            () => {
-                expect(module.get(getDataSourceToken(IDENTITY_POSTGRESQL))).toBe(postgres.dataSource)
-                expect(module.get(getEntityManagerToken(IDENTITY_POSTGRESQL))).toBe(postgres.manager)
-            })
-
-        it("resolves the global platform providers as the boundary doubles",
-            () => {
-                expect(module.get(IdentityConfigService)).toBe(config)
-                expect(module.get(RedisPrimaryClient)).toBe(redis)
-                expect(module.get(Logger)).toBeInstanceOf(Logger)
-                expect(module.get(Clock)).toBeInstanceOf(SystemClock)
-            })
-
-        it("registers no global guard or interceptor - every identity door is intentionally open",
-            () => {
-                expect(() => module.get(APP_GUARD)).toThrow()
-                expect(() => module.get(APP_INTERCEPTOR)).toThrow()
-            })
+    beforeAll(async () => {
+        const dataSource = mock<DataSource>({ isInitialized: false, manager, entityMetadatas: [], options: { type: "postgres" } })
+        module = await Test.createTestingModule({ imports: [AppModule.register(options)] })
+            .overrideProvider(getDataSourceToken(IDENTITY_CONNECTION))
+            .useValue(dataSource)
+            .overrideProvider(CACHE)
+            .useValue(mock<Cache>())
+            .compile()
     })
+
+    afterAll(async () => {
+        await module.close()
+    })
+
+    it("compiles the real root module with the database and the cache doubled", () => {
+        expect(module).toBeDefined()
+    })
+
+    it("resolves the capabilities and the platform ports the doors depend on", () => {
+        expect(module.get(AccountService)).toBeInstanceOf(AccountService)
+        expect(module.get(SessionService)).toBeInstanceOf(SessionService)
+        expect(module.get(CommandBus)).toBeInstanceOf(CommandBus)
+        expect(module.get(ERRORS_SERVICE)).toBeDefined()
+        expect(module.get(LOGGER)).toBeDefined()
+    })
+
+    it("binds the one identity EntityManager to the connection double", () => {
+        expect(module.get(getEntityManagerToken(IDENTITY_CONNECTION))).toBe(manager)
+    })
+
+    it("registers the app guards in order: rate limit, origin, auth", () => {
+        const guards = (AppModule.register(options).providers ?? []).flatMap((provider) =>
+            "provide" in provider && provider.provide === APP_GUARD && "useClass" in provider ? [provider.useClass] : [],
+        )
+        expect(guards).toEqual([RateLimitGuard, OriginGuard, AuthGuard])
+    })
+})
+
+describe("parseIdentityAppOptions", () => {
+    it("reads the port, the identity database, the cache, the order api and the http security from the environment", () => {
+        const parsed = parseIdentityAppOptions(new EnvSource(environment))
+        expect(parsed.port).toBe(5070)
+        expect(parsed.database.name).toBe(IDENTITY_CONNECTION)
+        expect(parsed.database.url.reveal()).toBe("postgres://localhost:5501/identity")
+        expect(parsed.cache.url.reveal()).toBe("redis://localhost:6448/0")
+        expect(parsed.orderApi).toEqual({ url: "http://localhost:6070", timeoutMs: 3000 })
+        expect(parsed.httpSecurity.allowedOrigins).toEqual(["http://localhost:3000", "http://localhost:4000"])
+    })
+
+    it("stops the boot when a required key is missing", () => {
+        expect(() => parseIdentityAppOptions(new EnvSource({}))).toThrow(ConfigError)
+    })
+})
