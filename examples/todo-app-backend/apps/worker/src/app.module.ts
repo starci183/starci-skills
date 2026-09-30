@@ -4,7 +4,7 @@ import { AuditModule, auditEntities } from "@modules/domain/audit"
 import { NOTIFY_MESSAGES, NotifyModule, notifyEntities } from "@modules/domain/notify"
 import { PlanModule, planEntities } from "@modules/domain/plan"
 import { RecurModule, recurEntities } from "@modules/domain/recur"
-import { SessionModule, sessionEntities } from "@modules/domain/session"
+import { IdentityModule, identityEntities } from "@modules/domain/identity"
 import { ShareModule, shareEntities } from "@modules/domain/share"
 import { TaskModule, taskEntities } from "@modules/domain/task"
 import { UploadModule, uploadEntities } from "@modules/domain/upload"
@@ -44,7 +44,7 @@ export class AppModule {
                         {
                             ...options.database,
                             entities: [
-                                ...sessionEntities,
+                                ...identityEntities,
                                 ...taskEntities,
                                 ...shareEntities,
                                 ...planEntities,
@@ -70,7 +70,7 @@ export class AppModule {
                 SepayModule.register({ isGlobal: true, ...options.sepay }),
                 NotifySmtpModule.register({ isGlobal: true, ...options.notifySmtp }),
                 UploadStorageModule.register({ isGlobal: true, ...options.uploadStorage }),
-                SessionModule.register({ isGlobal: true, ...options.session }),
+                IdentityModule.register({ isGlobal: true, ...options.session }),
                 TaskModule.register({ isGlobal: true }),
                 ShareModule.register({ isGlobal: true }),
                 PlanModule.register({ isGlobal: true, ...options.plan }),

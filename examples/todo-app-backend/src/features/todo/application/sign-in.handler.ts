@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { CommandHandler } from "@nestjs/cqrs"
 import { AuditAction, toAuditAppendMessage } from "@modules/domain/audit"
-import { SessionErrorCode, SessionService, isPlausibleEmail } from "@modules/domain/session"
+import { IdentityErrorCode, SessionService, isPlausibleEmail } from "@modules/domain/identity"
 import { InjectKeycloak, KeycloakError, KeycloakErrorCode } from "@modules/integrations/keycloak"
 import type { KeycloakClient } from "@modules/integrations/keycloak"
 import { InjectClock } from "@modules/platform/clock"
@@ -20,10 +20,10 @@ import type { SignInResult } from "./sign-in.contracts"
 /** How each provider failure is told to the caller: the refusal stays uniform, an outage is its own answer. */
 const REFUSAL_OF: Record<
     KeycloakErrorCode,
-    SessionErrorCode.InvalidCredentials | SessionErrorCode.ProviderUnavailable
+    IdentityErrorCode.InvalidCredentials | IdentityErrorCode.ProviderUnavailable
 > = {
-    [KeycloakErrorCode.InvalidCredentials]: SessionErrorCode.InvalidCredentials,
-    [KeycloakErrorCode.ProviderUnavailable]: SessionErrorCode.ProviderUnavailable,
+    [KeycloakErrorCode.InvalidCredentials]: IdentityErrorCode.InvalidCredentials,
+    [KeycloakErrorCode.ProviderUnavailable]: IdentityErrorCode.ProviderUnavailable,
 }
 
 @CommandHandler(SignInCommand)
@@ -46,7 +46,7 @@ export class SignInHandler extends ICQRSHandler<SignInCommand, SignInResult> {
 
     protected override async process(command: SignInCommand): Promise<SignInResult> {
         const { email, password } = command.params.request
-        if (!isPlausibleEmail(email)) return refused(SessionErrorCode.InvalidCredentials)
+        if (!isPlausibleEmail(email)) return refused(IdentityErrorCode.InvalidCredentials)
         let personId: string
         try {
             personId = (await this.keycloak.signIn({ email, password })).subject

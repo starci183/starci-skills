@@ -24,7 +24,7 @@ import { auditEntities } from "@modules/domain/audit"
 import { notifyEntities } from "@modules/domain/notify"
 import { planEntities } from "@modules/domain/plan"
 import { recurEntities } from "@modules/domain/recur"
-import { sessionEntities } from "@modules/domain/session"
+import { identityEntities } from "@modules/domain/identity"
 import { shareEntities } from "@modules/domain/share"
 import { taskEntities } from "@modules/domain/task"
 import { uploadEntities } from "@modules/domain/upload"
@@ -66,7 +66,7 @@ const NEST_LOGGER = ["error", "warn"] as const
 
 /** Every entity of the connection: the modules world opens the same schema the apps use. */
 const ALL_ENTITIES = [
-    ...sessionEntities,
+    ...identityEntities,
     ...taskEntities,
     ...shareEntities,
     ...planEntities,

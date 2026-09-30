@@ -1,6 +1,6 @@
 import type { QueryBus } from "@nestjs/cqrs"
 import { Args, Query, Resolver } from "@nestjs/graphql"
-import { CurrentPrincipal } from "@modules/domain/session"
+import { CurrentPrincipal } from "@modules/domain/identity"
 import { UploadError } from "@modules/domain/upload"
 import { InjectQueryBus } from "@modules/platform/cqrs"
 import type { Principal } from "@modules/platform/cqrs"

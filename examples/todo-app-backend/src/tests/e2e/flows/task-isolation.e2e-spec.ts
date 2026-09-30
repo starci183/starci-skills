@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { SessionErrorCode } from "@modules/domain/session"
+import { IdentityErrorCode } from "@modules/domain/identity"
 import { TaskErrorCode } from "@modules/domain/task"
 import { SESSIONS_BY_TOKENS, TASK_BY_ID } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { SessionRow, TaskRow } from "@tests/fixtures/persistence/e2e-verification.rows"
@@ -82,7 +82,7 @@ describe("task isolation (e2e)", () => {
         // The journey ends clean: both sessions signed out, both tokens dead at the door and in the store.
         await api.graphql<SignOutData>("signOut", { input: { sessionToken: alice.sessionToken } })
         await api.graphql<SignOutData>("signOut", { input: { sessionToken: bob.sessionToken } })
-        expect((await alice.caller.graphql<TasksData>("tasks")).errorCode).toBe(SessionErrorCode.NotFound)
+        expect((await alice.caller.graphql<TasksData>("tasks")).errorCode).toBe(IdentityErrorCode.NotFound)
         const remaining: Array<SessionRow> = await world.db.primary.query(SESSIONS_BY_TOKENS, [[alice.sessionToken, bob.sessionToken]])
         expect(remaining).toEqual([])
     })

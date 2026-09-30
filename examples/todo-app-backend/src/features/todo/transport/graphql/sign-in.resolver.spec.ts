@@ -1,6 +1,6 @@
 import type { CommandBus } from "@nestjs/cqrs"
 import { mock } from "@starci/jest-preset/mock"
-import { SessionError, SessionErrorCode } from "@modules/domain/session"
+import { IdentityError, IdentityErrorCode } from "@modules/domain/identity"
 import { SignInCommand } from "../../application/sign-in.command"
 import { SignInResolver } from "./sign-in.resolver"
 
@@ -19,19 +19,19 @@ describe("SignInResolver", () => {
 
     it("turns the refusal of the credentials into the session error", async () => {
         const commandBus = mock<CommandBus>({
-            execute: jest.fn().mockResolvedValue({ kind: "refused", code: SessionErrorCode.InvalidCredentials }),
+            execute: jest.fn().mockResolvedValue({ kind: "refused", code: IdentityErrorCode.InvalidCredentials }),
         })
         const call = new SignInResolver(commandBus).signIn(input)
-        await expect(call).rejects.toBeInstanceOf(SessionError)
-        await expect(call).rejects.toMatchObject({ code: SessionErrorCode.InvalidCredentials })
+        await expect(call).rejects.toBeInstanceOf(IdentityError)
+        await expect(call).rejects.toMatchObject({ code: IdentityErrorCode.InvalidCredentials })
     })
 
     it("turns an outage of the identity provider into the session error", async () => {
         const commandBus = mock<CommandBus>({
-            execute: jest.fn().mockResolvedValue({ kind: "refused", code: SessionErrorCode.ProviderUnavailable }),
+            execute: jest.fn().mockResolvedValue({ kind: "refused", code: IdentityErrorCode.ProviderUnavailable }),
         })
         await expect(new SignInResolver(commandBus).signIn(input)).rejects.toMatchObject({
-            code: SessionErrorCode.ProviderUnavailable,
+            code: IdentityErrorCode.ProviderUnavailable,
         })
     })
 })

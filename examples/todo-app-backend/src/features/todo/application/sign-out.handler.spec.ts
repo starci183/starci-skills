@@ -1,8 +1,8 @@
 import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { AuditAction } from "@modules/domain/audit"
-import { SessionErrorCode } from "@modules/domain/session"
-import type { SessionService, SessionView } from "@modules/domain/session"
+import { IdentityErrorCode } from "@modules/domain/identity"
+import type { SessionService, SessionView } from "@modules/domain/identity"
 import { KeycloakLogEvent } from "@modules/integrations/keycloak"
 import type { KeycloakClient } from "@modules/integrations/keycloak"
 import type { Logger } from "@modules/platform/logging"
@@ -84,7 +84,7 @@ describe("SignOutHandler", () => {
     })
 
     it("refuses a token that names no live session and revokes, audits and notifies nothing", async () => {
-        for (const code of [SessionErrorCode.NotFound, SessionErrorCode.Expired]) {
+        for (const code of [IdentityErrorCode.NotFound, IdentityErrorCode.Expired]) {
             const { handler, sessions, keycloak, outbox } = build({ found: { kind: "refused", code } })
             const result = await handler.execute(command)
             expect(result).toEqual({ kind: "refused", code })

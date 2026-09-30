@@ -1,5 +1,5 @@
 import { mockEntityManager } from "@tests/fixtures/database"
-import { SessionErrorCode } from "./errors/session.error"
+import { IdentityErrorCode } from "./errors/identity.error"
 import { SessionEntity } from "./persistence/entities/session.entity"
 import { PURGE_LAPSED_SESSIONS } from "./persistence/session.sql"
 import { SessionService } from "./session.service"
@@ -30,20 +30,20 @@ describe("SessionService", () => {
     it("refuses an empty token before it queries anything", async () => {
         const manager = mockEntityManager()
         const outcome = await new SessionService(manager, OPTIONS).find({ token: "", at: AT })
-        expect(outcome).toEqual({ kind: "refused", code: SessionErrorCode.NotFound, params: { reason: "missing-token" } })
+        expect(outcome).toEqual({ kind: "refused", code: IdentityErrorCode.NotFound, params: { reason: "missing-token" } })
         expect(manager.findOneBy).not.toHaveBeenCalled()
     })
 
     it("refuses an unknown token", async () => {
         const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null) })
         const outcome = await new SessionService(manager, OPTIONS).find({ token: "t1", at: AT })
-        expect(outcome).toMatchObject({ kind: "refused", code: SessionErrorCode.NotFound })
+        expect(outcome).toMatchObject({ kind: "refused", code: IdentityErrorCode.NotFound })
     })
 
     it("refuses a lapsed session as expired", async () => {
         const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(row(AT)) })
         const outcome = await new SessionService(manager, OPTIONS).find({ token: "t1", at: AT })
-        expect(outcome).toMatchObject({ kind: "refused", code: SessionErrorCode.Expired })
+        expect(outcome).toMatchObject({ kind: "refused", code: IdentityErrorCode.Expired })
     })
 
     it("answers the view of a live session", async () => {

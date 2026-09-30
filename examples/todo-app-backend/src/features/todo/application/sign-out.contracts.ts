@@ -1,4 +1,4 @@
-import type { SessionErrorCode } from "@modules/domain/session"
+import type { IdentityErrorCode } from "@modules/domain/identity"
 import type { Outcome } from "@modules/platform/primitives"
 
 /** What signing out takes: the token of the session to end. */
@@ -14,4 +14,4 @@ export interface SignedOut {
 }
 
 /** The confirmation, or the refusal that names why no live session matched the token. */
-export type SignOutResult = Outcome<SignedOut, SessionErrorCode.NotFound | SessionErrorCode.Expired>
+export type SignOutResult = Outcome<SignedOut, IdentityErrorCode.NotFound | IdentityErrorCode.Expired>

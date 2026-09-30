@@ -1,7 +1,7 @@
 import type { QueryBus } from "@nestjs/cqrs"
 import { Args, Query, Resolver } from "@nestjs/graphql"
 import { AuditError } from "@modules/domain/audit"
-import { CurrentPrincipal } from "@modules/domain/session"
+import { CurrentPrincipal } from "@modules/domain/identity"
 import { InjectQueryBus } from "@modules/platform/cqrs"
 import type { Principal } from "@modules/platform/cqrs"
 import { unwrapOutcome } from "@modules/platform/primitives"

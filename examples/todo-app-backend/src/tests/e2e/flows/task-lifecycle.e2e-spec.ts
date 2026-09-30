@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { SessionErrorCode } from "@modules/domain/session"
+import { IdentityErrorCode } from "@modules/domain/identity"
 import { TaskErrorCode } from "@modules/domain/task"
 import { SESSION_COUNT_BY_TOKEN, TASK_BY_ID } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { CountRow, TaskRow } from "@tests/fixtures/persistence/e2e-verification.rows"
@@ -89,7 +89,7 @@ describe("task lifecycle (e2e)", () => {
         expect(signedOut.errors).toBeNull()
         expect(signedOut.data?.signOut.signedOut).toBe(true)
         const after = await caller.graphql<TasksData>("tasks")
-        expect(after.errorCode).toBe(SessionErrorCode.NotFound)
+        expect(after.errorCode).toBe(IdentityErrorCode.NotFound)
         expect(after.data).toBeNull()
         expect(await sessionCount()).toBe(0)
     })

@@ -8,9 +8,9 @@ import type { Role } from "@modules/platform/cqrs"
 import { requestOf } from "@modules/platform/http-security"
 import { unwrapOutcome } from "@modules/platform/primitives"
 import { bearerTokenOf } from "./bearer-token.mapper"
-import { SessionError, SessionErrorCode } from "./errors/session.error"
-import type { PublicMetadata } from "./session.contracts"
-import { PUBLIC_KEY, ROLES_KEY } from "./session.decorators"
+import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
+import type { PublicMetadata } from "./identity.contracts"
+import { PUBLIC_KEY, ROLES_KEY } from "./identity.decorators"
 import { SessionService } from "./session.service"
 
 @Injectable()
@@ -31,11 +31,11 @@ export class AuthGuard implements CanActivate {
         if (this.reflector.getAllAndOverride<PublicMetadata | undefined>(PUBLIC_KEY, targets)) return true
         const request = requestOf(context)
         const token = bearerTokenOf(request.headers.authorization) ?? ""
-        const session = unwrapOutcome(await this.sessions.find({ token, at: this.clock.now() }), SessionError)
+        const session = unwrapOutcome(await this.sessions.find({ token, at: this.clock.now() }), IdentityError)
         const principal = this.sessions.principalOf(session.personId)
         const required = this.reflector.getAllAndOverride<ReadonlyArray<Role> | undefined>(ROLES_KEY, targets) ?? []
         if (!required.every((role) => principal.roles.includes(role))) {
-            throw new SessionError({ code: SessionErrorCode.Forbidden })
+            throw new IdentityError({ code: IdentityErrorCode.Forbidden })
         }
         request.principal = principal
         return true

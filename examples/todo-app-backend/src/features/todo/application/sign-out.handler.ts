@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { CommandHandler } from "@nestjs/cqrs"
 import { AuditAction, toAuditAppendMessage } from "@modules/domain/audit"
-import { SessionService } from "@modules/domain/session"
+import { SessionService } from "@modules/domain/identity"
 import { InjectKeycloak, KeycloakLogEvent } from "@modules/integrations/keycloak"
 import type { KeycloakClient } from "@modules/integrations/keycloak"
 import { InjectClock } from "@modules/platform/clock"

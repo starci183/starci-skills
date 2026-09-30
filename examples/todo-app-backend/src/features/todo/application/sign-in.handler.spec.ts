@@ -1,8 +1,8 @@
 import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { AuditAction } from "@modules/domain/audit"
-import { SessionErrorCode } from "@modules/domain/session"
-import type { SessionService, SessionView } from "@modules/domain/session"
+import { IdentityErrorCode } from "@modules/domain/identity"
+import type { SessionService, SessionView } from "@modules/domain/identity"
 import { KeycloakError, KeycloakErrorCode } from "@modules/integrations/keycloak"
 import type { KeycloakClient } from "@modules/integrations/keycloak"
 import type { Logger } from "@modules/platform/logging"
@@ -75,7 +75,7 @@ describe("SignInHandler", () => {
         const { handler, sessions, outbox } = build(refusal)
         const wrongPassword = await handler.execute(command("person@example.com", "wrong"))
         const unknownEmail = await handler.execute(command("nobody@example.com", "anything"))
-        expect(wrongPassword).toEqual({ kind: "refused", code: SessionErrorCode.InvalidCredentials })
+        expect(wrongPassword).toEqual({ kind: "refused", code: IdentityErrorCode.InvalidCredentials })
         expect(unknownEmail).toEqual(wrongPassword)
         expect(sessions.open).not.toHaveBeenCalled()
         expect(outbox.enqueue).not.toHaveBeenCalled()
@@ -84,7 +84,7 @@ describe("SignInHandler", () => {
     it("refuses an email that is not shaped like one without calling the provider", async () => {
         const { handler, keycloak } = build()
         const result = await handler.execute(command("not-an-email"))
-        expect(result).toMatchObject({ kind: "refused", code: SessionErrorCode.InvalidCredentials })
+        expect(result).toMatchObject({ kind: "refused", code: IdentityErrorCode.InvalidCredentials })
         expect(keycloak.signIn).not.toHaveBeenCalled()
     })
 
@@ -92,7 +92,7 @@ describe("SignInHandler", () => {
         const outage = jest.fn().mockRejectedValue(new KeycloakError({ code: KeycloakErrorCode.ProviderUnavailable }))
         const { handler, sessions, outbox } = build(outage)
         const result = await handler.execute(command())
-        expect(result).toMatchObject({ kind: "refused", code: SessionErrorCode.ProviderUnavailable })
+        expect(result).toMatchObject({ kind: "refused", code: IdentityErrorCode.ProviderUnavailable })
         expect(sessions.open).not.toHaveBeenCalled()
         expect(outbox.enqueue).not.toHaveBeenCalled()
     })

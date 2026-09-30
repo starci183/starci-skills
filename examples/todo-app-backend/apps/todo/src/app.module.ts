@@ -7,12 +7,12 @@ import { PLAN_ERROR_KINDS, PLAN_MESSAGES, PlanModule, planEntities, planMigratio
 import { RECUR_ERROR_KINDS, RECUR_MESSAGES, RecurModule, recurEntities, recurMigrations } from "@modules/domain/recur"
 import {
     AuthGuard,
-    SESSION_ERROR_KINDS,
-    SESSION_MESSAGES,
-    SessionModule,
-    sessionEntities,
-    sessionMigrations,
-} from "@modules/domain/session"
+    IDENTITY_ERROR_KINDS,
+    IDENTITY_MESSAGES,
+    IdentityModule,
+    identityEntities,
+    identityMigrations,
+} from "@modules/domain/identity"
 import { SHARE_ERROR_KINDS, SHARE_MESSAGES, ShareModule, shareEntities, shareMigrations } from "@modules/domain/share"
 import { TASK_ERROR_KINDS, TASK_MESSAGES, TaskModule, taskEntities, taskMigrations } from "@modules/domain/task"
 import { UPLOAD_ERROR_KINDS, UPLOAD_MESSAGES, UploadModule, uploadEntities, uploadMigrations } from "@modules/domain/upload"
@@ -61,7 +61,7 @@ export class AppModule {
                         HTTP_MESSAGES,
                         HTTP_SECURITY_MESSAGES,
                         PROBES_MESSAGES,
-                        SESSION_MESSAGES,
+                        IDENTITY_MESSAGES,
                         TASK_MESSAGES,
                         SHARE_MESSAGES,
                         PLAN_MESSAGES,
@@ -83,7 +83,7 @@ export class AppModule {
                         HTTP_ERROR_KINDS,
                         HTTP_SECURITY_ERROR_KINDS,
                         PROBES_ERROR_KINDS,
-                        SESSION_ERROR_KINDS,
+                        IDENTITY_ERROR_KINDS,
                         TASK_ERROR_KINDS,
                         SHARE_ERROR_KINDS,
                         PLAN_ERROR_KINDS,
@@ -105,7 +105,7 @@ export class AppModule {
                         {
                             ...options.database,
                             entities: [
-                                ...sessionEntities,
+                                ...identityEntities,
                                 ...taskEntities,
                                 ...shareEntities,
                                 ...planEntities,
@@ -117,7 +117,7 @@ export class AppModule {
                                 ...outboxEntities,
                             ],
                             migrations: [
-                                ...sessionMigrations,
+                                ...identityMigrations,
                                 ...taskMigrations,
                                 ...shareMigrations,
                                 ...planMigrations,
@@ -138,7 +138,7 @@ export class AppModule {
                 SepayModule.register({ isGlobal: true, ...options.sepay }),
                 NotifySmtpModule.register({ isGlobal: true, ...options.notifySmtp }),
                 UploadStorageModule.register({ isGlobal: true, ...options.uploadStorage }),
-                SessionModule.register({ isGlobal: true, ...options.session }),
+                IdentityModule.register({ isGlobal: true, ...options.session }),
                 TaskModule.register({ isGlobal: true }),
                 ShareModule.register({ isGlobal: true }),
                 PlanModule.register({ isGlobal: true, ...options.plan }),

@@ -1,6 +1,6 @@
 import type { CommandBus } from "@nestjs/cqrs"
 import { Args, Mutation, Resolver } from "@nestjs/graphql"
-import { Public, PublicReason, SessionError } from "@modules/domain/session"
+import { Public, PublicReason, IdentityError } from "@modules/domain/identity"
 import { InjectCommandBus } from "@modules/platform/cqrs"
 import { RateLimit, RateTier } from "@modules/platform/http-security"
 import { unwrapOutcome } from "@modules/platform/primitives"
@@ -23,6 +23,6 @@ export class SignInResolver {
     @RateLimit(RateTier.Strict)
     async signIn(@Args("request") input: SignInInput): Promise<SignInType> {
         const outcome = await this.commandBus.execute(new SignInCommand({ request: toSignInRequest(input) }))
-        return toSignInType(unwrapOutcome(outcome, SessionError))
+        return toSignInType(unwrapOutcome(outcome, IdentityError))
     }
 }

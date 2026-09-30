@@ -14,7 +14,7 @@ import {
 } from "@nestjs/common"
 import type { CommandBus, QueryBus } from "@nestjs/cqrs"
 import type { Request, Response } from "express"
-import { CurrentPrincipal, Public, PublicReason } from "@modules/domain/session"
+import { CurrentPrincipal, Public, PublicReason } from "@modules/domain/identity"
 import { UPLOAD_TOKEN_HEADER, UploadError } from "@modules/domain/upload"
 import { InjectCommandBus, InjectQueryBus } from "@modules/platform/cqrs"
 import type { Principal } from "@modules/platform/cqrs"

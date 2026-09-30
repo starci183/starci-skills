@@ -1,4 +1,4 @@
-import type { SessionErrorCode } from "@modules/domain/session"
+import type { IdentityErrorCode } from "@modules/domain/identity"
 import type { Outcome } from "@modules/platform/primitives"
 
 /** What signing in takes: the credential pair. */
@@ -20,5 +20,5 @@ export interface SignedIn {
 /** The opened session, or the uniform refusal of the credentials, or the outage of the identity provider. */
 export type SignInResult = Outcome<
     SignedIn,
-    SessionErrorCode.InvalidCredentials | SessionErrorCode.ProviderUnavailable
+    IdentityErrorCode.InvalidCredentials | IdentityErrorCode.ProviderUnavailable
 >

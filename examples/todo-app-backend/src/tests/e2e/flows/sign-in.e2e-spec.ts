@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { SessionErrorCode } from "@modules/domain/session"
+import { IdentityErrorCode } from "@modules/domain/identity"
 import { SESSION_BY_TOKEN } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { SessionRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import type { CreateTaskData, SignInData, TasksData } from "@tests/fixtures/views/e2e-views.contracts"
@@ -62,29 +62,29 @@ describe("auth/sign-in", () => {
 
         // Every door but the public ones is default-deny: without a live session the call is refused.
         const denied = await api.graphql<TasksData>("tasks")
-        expect(denied.errorCode).toBe(SessionErrorCode.NotFound)
+        expect(denied.errorCode).toBe(IdentityErrorCode.NotFound)
         expect(denied.data).toBeNull()
 
         // A wrong pair is refused without naming which half: an unknown email and a wrong password are the identical refusal.
         const wrongPassword = await api.graphql<SignInData>("signIn", { input: { email, password: WRONG_PASSWORD } })
         const unknownEmail = await api.graphql<SignInData>("signIn", { input: { email: `nobody-${randomUUID()}@todo.dev`, password: "whatever" } })
-        expect(wrongPassword.errorCode).toBe(SessionErrorCode.InvalidCredentials)
-        expect(unknownEmail.errorCode).toBe(SessionErrorCode.InvalidCredentials)
+        expect(wrongPassword.errorCode).toBe(IdentityErrorCode.InvalidCredentials)
+        expect(unknownEmail.errorCode).toBe(IdentityErrorCode.InvalidCredentials)
         expect(wrongPassword.data).toBeNull()
         expect(JSON.stringify(unknownEmail.errors)).toBe(JSON.stringify(wrongPassword.errors))
 
         // The display text follows the caller language (default vi); the code never changes.
         const english = await api.graphql<SignInData>("signIn", { input: { email, password: WRONG_PASSWORD } }, "en")
         const vietnamese = await api.graphql<SignInData>("signIn", { input: { email, password: WRONG_PASSWORD } })
-        expect(english.errorCode).toBe(SessionErrorCode.InvalidCredentials)
+        expect(english.errorCode).toBe(IdentityErrorCode.InvalidCredentials)
         expect(english.errorMessage).toBe("The email or password is incorrect.")
-        expect(vietnamese.errorCode).toBe(SessionErrorCode.InvalidCredentials)
+        expect(vietnamese.errorCode).toBe(IdentityErrorCode.InvalidCredentials)
         expect(vietnamese.errorMessage).not.toBe(english.errorMessage)
 
         // An identity provider that never answers runs the client into its own deadline: a declared refusal, and the door recovers.
         await world.fake.keycloak.failNext({ timeout: true })
         const silent = await api.graphql<SignInData>("signIn", { input: { email, password } })
-        expect(silent.errorCode).toBe(SessionErrorCode.ProviderUnavailable)
+        expect(silent.errorCode).toBe(IdentityErrorCode.ProviderUnavailable)
         expect((await api.signIn(email, password)).personId).toBe(personId)
     })
 })

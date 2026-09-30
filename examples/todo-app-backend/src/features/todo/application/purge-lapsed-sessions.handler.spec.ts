@@ -1,5 +1,5 @@
 import { mock } from "@starci/jest-preset/mock"
-import type { SessionService } from "@modules/domain/session"
+import type { SessionService } from "@modules/domain/identity"
 import type { Logger } from "@modules/platform/logging"
 import { fakeTransaction, mockEntityManager } from "@tests/fixtures/database"
 import { PurgeLapsedSessionsCommand } from "./purge-lapsed-sessions.command"

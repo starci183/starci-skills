@@ -2,8 +2,8 @@ import { parsePlanConfig } from "@modules/domain/plan"
 import type { PlanOptions } from "@modules/domain/plan"
 import { parseRecurConfig } from "@modules/domain/recur"
 import type { RecurOptions } from "@modules/domain/recur"
-import { parseSessionConfig } from "@modules/domain/session"
-import type { SessionOptions } from "@modules/domain/session"
+import { parseIdentityConfig } from "@modules/domain/identity"
+import type { IdentityOptions } from "@modules/domain/identity"
 import { parseUploadConfig } from "@modules/domain/upload"
 import type { UploadOptions } from "@modules/domain/upload"
 import { parseKeycloakConfig } from "@modules/integrations/keycloak"
@@ -29,7 +29,7 @@ export interface TodoAppOptions {
     /** The origin allowlist and rate limits. */
     readonly httpSecurity: HttpSecurityOptions
     /** Session lifetime and the administrator roster. */
-    readonly session: SessionOptions
+    readonly session: IdentityOptions
     /** The identity provider. */
     readonly keycloak: KeycloakOptions
     /** The payment gateway. */
@@ -51,7 +51,7 @@ export const parseTodoAppOptions = (env: EnvSource): TodoAppOptions => ({
     port: env.int("PORT"),
     database: parsePrimaryDatabaseConfig(env),
     httpSecurity: parseHttpSecurityConfig(env),
-    session: parseSessionConfig(env),
+    session: parseIdentityConfig(env),
     keycloak: parseKeycloakConfig(env),
     sepay: parseSepayConfig(env),
     plan: parsePlanConfig(env),

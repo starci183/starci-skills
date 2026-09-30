@@ -1,5 +1,5 @@
 import { CommandHandler } from "@nestjs/cqrs"
-import { SessionService } from "@modules/domain/session"
+import { SessionService } from "@modules/domain/identity"
 import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectPrimaryEntityManager } from "@modules/platform/database"
 import { InjectLogger } from "@modules/platform/logging"

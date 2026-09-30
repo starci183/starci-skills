@@ -1,6 +1,6 @@
 import type { QueryBus } from "@nestjs/cqrs"
 import { Query, Resolver } from "@nestjs/graphql"
-import { CurrentPrincipal } from "@modules/domain/session"
+import { CurrentPrincipal } from "@modules/domain/identity"
 import { InjectQueryBus } from "@modules/platform/cqrs"
 import type { Principal } from "@modules/platform/cqrs"
 import { PlanUsageQuery } from "../../application/plan-usage.query"

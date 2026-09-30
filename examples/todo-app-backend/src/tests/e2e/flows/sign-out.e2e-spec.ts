@@ -1,4 +1,4 @@
-import { SessionErrorCode } from "@modules/domain/session"
+import { IdentityErrorCode } from "@modules/domain/identity"
 import { SESSION_COUNT_BY_TOKEN } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { CountRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import type { SignOutData, TasksData } from "@tests/fixtures/views/e2e-views.contracts"
@@ -38,13 +38,13 @@ describe("session sign-out (e2e)", () => {
         expect(notices[0]?.body).toContain("sign-out")
 
         const refused = await person.caller.graphql<TasksData>("tasks")
-        expect(refused.errorCode).toBe(SessionErrorCode.NotFound)
+        expect(refused.errorCode).toBe(IdentityErrorCode.NotFound)
         expect(refused.data).toBeNull()
         expect(await sessionCount(person.sessionToken)).toBe(0)
 
         // Revocation is not idempotent at the door: signOut on a dead token is the same refusal a forged or expired one gets.
         const again = await api.graphql<SignOutData>("signOut", { input: { sessionToken: person.sessionToken } })
-        expect(again.errorCode).toBe(SessionErrorCode.NotFound)
+        expect(again.errorCode).toBe(IdentityErrorCode.NotFound)
 
         const recovered = await api.signIn(person.email, person.password)
         expect(recovered.personId).toBe(person.personId)

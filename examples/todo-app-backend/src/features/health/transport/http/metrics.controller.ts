@@ -1,6 +1,6 @@
 import { Controller, Get, Header } from "@nestjs/common"
 import type { QueryBus } from "@nestjs/cqrs"
-import { Public, PublicReason } from "@modules/domain/session"
+import { Public, PublicReason } from "@modules/domain/identity"
 import { InjectQueryBus } from "@modules/platform/cqrs"
 import { RenderMetricsQuery } from "../../application/render-metrics.query"
 

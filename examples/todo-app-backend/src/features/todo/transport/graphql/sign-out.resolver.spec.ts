@@ -1,6 +1,6 @@
 import type { CommandBus } from "@nestjs/cqrs"
 import { mock } from "@starci/jest-preset/mock"
-import { SessionError, SessionErrorCode } from "@modules/domain/session"
+import { IdentityError, IdentityErrorCode } from "@modules/domain/identity"
 import { SignOutCommand } from "../../application/sign-out.command"
 import { SignOutResolver } from "./sign-out.resolver"
 
@@ -17,10 +17,10 @@ describe("SignOutResolver", () => {
 
     it("turns the refusal of a token that names no live session into the session error", async () => {
         const commandBus = mock<CommandBus>({
-            execute: jest.fn().mockResolvedValue({ kind: "refused", code: SessionErrorCode.NotFound }),
+            execute: jest.fn().mockResolvedValue({ kind: "refused", code: IdentityErrorCode.NotFound }),
         })
         const call = new SignOutResolver(commandBus).signOut({ sessionToken: "no-such-token" })
-        await expect(call).rejects.toBeInstanceOf(SessionError)
-        await expect(call).rejects.toMatchObject({ code: SessionErrorCode.NotFound })
+        await expect(call).rejects.toBeInstanceOf(IdentityError)
+        await expect(call).rejects.toMatchObject({ code: IdentityErrorCode.NotFound })
     })
 })

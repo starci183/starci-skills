@@ -1,4 +1,4 @@
-import type { SessionView } from "../session.contracts"
+import type { SessionView } from "../identity.contracts"
 import type { SessionEntity } from "./entities/session.entity"
 
 /** Maps a session row to the view callers get. */

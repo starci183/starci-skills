@@ -1,7 +1,7 @@
 import type { CommandBus } from "@nestjs/cqrs"
 import { Args, Mutation, Resolver } from "@nestjs/graphql"
 import { PlanError } from "@modules/domain/plan"
-import { CurrentPrincipal } from "@modules/domain/session"
+import { CurrentPrincipal } from "@modules/domain/identity"
 import { InjectCommandBus } from "@modules/platform/cqrs"
 import type { Principal } from "@modules/platform/cqrs"
 import { unwrapOutcome } from "@modules/platform/primitives"

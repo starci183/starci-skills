@@ -2,7 +2,7 @@ import { auditEntities, auditMigrations } from "@modules/domain/audit"
 import { notifyEntities, notifyMigrations } from "@modules/domain/notify"
 import { planEntities, planMigrations } from "@modules/domain/plan"
 import { recurEntities, recurMigrations } from "@modules/domain/recur"
-import { sessionEntities, sessionMigrations } from "@modules/domain/session"
+import { identityEntities, identityMigrations } from "@modules/domain/identity"
 import { shareEntities, shareMigrations } from "@modules/domain/share"
 import { taskEntities, taskMigrations } from "@modules/domain/task"
 import { uploadEntities, uploadMigrations } from "@modules/domain/upload"
@@ -25,7 +25,7 @@ export const parseMigrateAppOptions = (env: EnvSource): MigrateAppOptions => ({
         {
             ...parsePrimaryDatabaseConfig(env),
             entities: [
-                ...sessionEntities,
+                ...identityEntities,
                 ...taskEntities,
                 ...shareEntities,
                 ...planEntities,
@@ -38,7 +38,7 @@ export const parseMigrateAppOptions = (env: EnvSource): MigrateAppOptions => ({
                 ...outboxEntities,
             ],
             migrations: [
-                ...sessionMigrations,
+                ...identityMigrations,
                 ...taskMigrations,
                 ...shareMigrations,
                 ...planMigrations,

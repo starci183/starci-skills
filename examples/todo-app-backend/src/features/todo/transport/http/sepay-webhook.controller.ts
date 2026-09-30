@@ -1,7 +1,7 @@
 import { Body, Controller, Headers, HttpCode, HttpStatus, Post } from "@nestjs/common"
 import type { CommandBus } from "@nestjs/cqrs"
 import { PlanError } from "@modules/domain/plan"
-import { Public, PublicReason } from "@modules/domain/session"
+import { Public, PublicReason } from "@modules/domain/identity"
 import { InjectSepayOptions, isWebhookAuthorized } from "@modules/integrations/sepay"
 import type { SepayOptions } from "@modules/integrations/sepay"
 import { InjectCommandBus } from "@modules/platform/cqrs"

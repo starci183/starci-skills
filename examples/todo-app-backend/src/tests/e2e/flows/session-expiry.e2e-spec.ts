@@ -1,4 +1,4 @@
-import { SessionErrorCode } from "@modules/domain/session"
+import { IdentityErrorCode } from "@modules/domain/identity"
 import { EXPIRE_SESSION } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { TasksData } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
@@ -25,7 +25,7 @@ describe("session expiry (e2e)", () => {
         expect(touched).toBe(1)
 
         const expired = await person.caller.graphql<TasksData>("tasks")
-        expect(expired.errorCode).toBe(SessionErrorCode.Expired)
+        expect(expired.errorCode).toBe(IdentityErrorCode.Expired)
         expect(expired.data).toBeNull()
 
         const recovered = await api.signIn(person.email, person.password)

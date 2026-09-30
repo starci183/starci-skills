@@ -1,6 +1,6 @@
 import { Controller, Get } from "@nestjs/common"
 import type { QueryBus } from "@nestjs/cqrs"
-import { PublicReason, Public } from "@modules/domain/session"
+import { PublicReason, Public } from "@modules/domain/identity"
 import { InjectQueryBus } from "@modules/platform/cqrs"
 import { unwrapOutcome } from "@modules/platform/primitives"
 import { ProbesError } from "@modules/platform/probes"

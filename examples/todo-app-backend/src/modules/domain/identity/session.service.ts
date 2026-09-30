@@ -5,7 +5,7 @@ import { InjectPrimaryEntityManager } from "@modules/platform/database"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
-import { SessionErrorCode } from "./errors/session.error"
+import { IdentityErrorCode } from "./errors/identity.error"
 import { SessionEntity } from "./persistence/entities/session.entity"
 import { PURGE_LAPSED_SESSIONS } from "./persistence/session.sql"
 import { toSessionView } from "./persistence/session.rows"
@@ -15,9 +15,9 @@ import type {
     PurgeSessionsParams,
     RevokeSessionParams,
     SessionView,
-} from "./session.contracts"
-import { InjectSessionOptions } from "./session.decorators"
-import type { SessionOptions } from "./session.options"
+} from "./identity.contracts"
+import { InjectIdentityOptions } from "./identity.decorators"
+import type { IdentityOptions } from "./identity.options"
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 
@@ -29,7 +29,7 @@ const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 export class SessionService {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-        @InjectSessionOptions() private readonly options: SessionOptions,
+        @InjectIdentityOptions() private readonly options: IdentityOptions,
     ) {}
 
     /** Opens a session for a person, valid for the configured number of days. */
@@ -48,11 +48,11 @@ export class SessionService {
      * The live session behind a token. An empty token is refused before any query: TypeORM drops an undefined
      * criterion from the WHERE clause, so a lookup on it would match an arbitrary row.
      */
-    async find(params: FindSessionParams): Promise<Outcome<SessionView, SessionErrorCode.NotFound | SessionErrorCode.Expired>> {
-        if (!params.token) return refused(SessionErrorCode.NotFound, { reason: "missing-token" })
+    async find(params: FindSessionParams): Promise<Outcome<SessionView, IdentityErrorCode.NotFound | IdentityErrorCode.Expired>> {
+        if (!params.token) return refused(IdentityErrorCode.NotFound, { reason: "missing-token" })
         const row = await this.entityManager.findOneBy(SessionEntity, { token: params.token })
-        if (!row) return refused(SessionErrorCode.NotFound)
-        if (row.expiresAt.getTime() <= params.at.getTime()) return refused(SessionErrorCode.Expired)
+        if (!row) return refused(IdentityErrorCode.NotFound)
+        if (row.expiresAt.getTime() <= params.at.getTime()) return refused(IdentityErrorCode.Expired)
         return ok(toSessionView(row))
     }
 

@@ -5,9 +5,9 @@ import type { Request } from "express"
 import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { AuthGuard } from "./auth.guard"
-import { SessionError, SessionErrorCode } from "./errors/session.error"
-import { PublicReason } from "./session.contracts"
-import { PUBLIC_KEY, ROLES_KEY } from "./session.decorators"
+import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
+import { PublicReason } from "./identity.contracts"
+import { PUBLIC_KEY, ROLES_KEY } from "./identity.decorators"
 import type { SessionService } from "./session.service"
 
 const AT = new Date("2026-09-30T10:00:00.000Z")
@@ -59,23 +59,23 @@ describe("AuthGuard", () => {
 
     it("refuses a request without a bearer token as not found, never as a lookup of an undefined token", async () => {
         const { guard, context, sessions } = build({})
-        jest.mocked(sessions.find).mockResolvedValue({ kind: "refused", code: SessionErrorCode.NotFound })
-        await expect(guard.canActivate(context)).rejects.toThrow(SessionError)
+        jest.mocked(sessions.find).mockResolvedValue({ kind: "refused", code: IdentityErrorCode.NotFound })
+        await expect(guard.canActivate(context)).rejects.toThrow(IdentityError)
         expect(sessions.find).toHaveBeenCalledWith({ token: "", at: AT })
     })
 
     it("turns a refusal of the store into the session error", async () => {
         const { guard, context, sessions } = build({}, "Bearer t1")
-        jest.mocked(sessions.find).mockResolvedValue({ kind: "refused", code: SessionErrorCode.Expired })
-        await expect(guard.canActivate(context)).rejects.toMatchObject({ code: SessionErrorCode.Expired })
+        jest.mocked(sessions.find).mockResolvedValue({ kind: "refused", code: IdentityErrorCode.Expired })
+        await expect(guard.canActivate(context)).rejects.toMatchObject({ code: IdentityErrorCode.Expired })
     })
 
     it("refuses a caller that lacks a required role", async () => {
         const { guard, context } = build({ roles: ["admin"] }, "Bearer t1")
-        await expect(guard.canActivate(context)).rejects.toMatchObject({ code: SessionErrorCode.Forbidden })
+        await expect(guard.canActivate(context)).rejects.toMatchObject({ code: IdentityErrorCode.Forbidden })
     })
 
     it("uses the roles metadata key", () => {
-        expect(ROLES_KEY).toBe("domain.session.roles")
+        expect(ROLES_KEY).toBe("domain.identity.roles")
     })
 })

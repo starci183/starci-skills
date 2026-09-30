@@ -7,7 +7,7 @@ import { AuditModule } from "@modules/domain/audit"
 import { NOTIFY_MESSAGES, NotifyModule } from "@modules/domain/notify"
 import { PlanModule } from "@modules/domain/plan"
 import { RecurModule } from "@modules/domain/recur"
-import { SessionModule } from "@modules/domain/session"
+import { IdentityModule } from "@modules/domain/identity"
 import { ShareModule } from "@modules/domain/share"
 import { TaskModule } from "@modules/domain/task"
 import { UploadModule } from "@modules/domain/upload"
@@ -31,7 +31,7 @@ export const TODO_CAPABILITY_MODULES: ReadonlyArray<TestModuleFactory> = [
     (options) => SepayModule.register({ isGlobal: true, ...options.sepay }),
     (options) => NotifySmtpModule.register({ isGlobal: true, ...options.notifySmtp }),
     (options) => UploadStorageModule.register({ isGlobal: true, ...options.uploadStorage }),
-    (options) => SessionModule.register({ isGlobal: true, ...options.session }),
+    (options) => IdentityModule.register({ isGlobal: true, ...options.session }),
     () => TaskModule.register({ isGlobal: true }),
     () => ShareModule.register({ isGlobal: true }),
     (options) => PlanModule.register({ isGlobal: true, ...options.plan }),
