@@ -3,7 +3,7 @@
  * hands its coordinates to the spec workers through a state file.
  *  1. the network-edge fakes of every third party (identity provider, mail host, payment gateway) and their control server;
  *  2. one Postgres container through `docker run`, named by the run, published on a loopback port the OS allocated;
- *  3. `apps/migrate` `bootstrap(env)` once against it: the only place that creates the schema;
+ *  3. `apps/migrate` `bootstrap(options)` once against it: the only place that creates the schema;
  *  4. a run-owned upload directory.
  * A failure removes whatever was started before it is rethrown: jest does not call the teardown after a failed setup.
  */
@@ -15,7 +15,9 @@ import { freePorts } from "@tests/world/kit/free-ports"
 import { retryUntil } from "@tests/world/kit/readiness"
 import { runToken, secret } from "@tests/world/kit/run-tokens"
 import { EnvSource } from "@modules/platform/config"
+import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
 import { bootstrap } from "../../../apps/migrate/src/main"
+import { primaryConnectionOf } from "../../../apps/migrate/src/migrate.options"
 import { postgresAccepts, removeContainer, runPostgres } from "./docker.client"
 import { FakesHost } from "./fakes/fakes-host.service"
 import { writeWorldState } from "./test-world-state.service"
@@ -49,7 +51,7 @@ export default async function globalSetup(): Promise<void> {
         await retryUntil("postgres accepts connections", DATABASE_READY_DEADLINE_MS, () =>
             Promise.resolve(postgresAccepts(databaseContainer, DATABASE_USER, DATABASE_NAME)),
         )
-        await bootstrap(new EnvSource({ PRIMARY_DB_URL: databaseUrl }))
+        await bootstrap({ connections: [primaryConnectionOf(parsePrimaryDatabaseConfig(new EnvSource({ PRIMARY_DB_URL: databaseUrl })))] })
         writeWorldState({
             runId,
             databaseContainer,

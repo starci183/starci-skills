@@ -2,9 +2,11 @@ import "reflect-metadata"
 import { DataSource } from "typeorm"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
+import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
 import type { DatabaseConnectionOptions } from "@modules/platform/database"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
-import { parseMigrateAppOptions } from "./migrate.options"
+import { primaryConnectionOf } from "./migrate.options"
+import type { MigrateAppOptions } from "./migrate.options"
 
 /** Applies the pending migrations of one connection and answers the names it ran; each connection keeps its own ledger table. */
 async function migrate(connection: DatabaseConnectionOptions): Promise<ReadonlyArray<string>> {
@@ -25,9 +27,8 @@ async function migrate(connection: DatabaseConnectionOptions): Promise<ReadonlyA
     }
 }
 
-/** Migrates every connection of `env` in turn and answers the migration names each one ran; the e2e world calls it once against its containers. */
-export async function bootstrap(env: EnvSource): Promise<Readonly<Record<string, ReadonlyArray<string>>>> {
-    const options = parseMigrateAppOptions(env)
+/** Migrates every connection of the options in turn and answers the migration names each one ran; the e2e world calls it once against its containers. */
+export async function bootstrap(options: MigrateAppOptions): Promise<Readonly<Record<string, ReadonlyArray<string>>>> {
     const applied: Record<string, ReadonlyArray<string>> = {}
     for (const connection of options.connections) {
         applied[connection.name] = await migrate(connection)
@@ -37,7 +38,7 @@ export async function bootstrap(env: EnvSource): Promise<Readonly<Record<string,
 
 /** The one process that changes a schema: migrates every connection and exits; the api and the worker start after it. */
 if (require.main === module) {
-    bootstrap(EnvSource.fromProcess())
+    bootstrap({ connections: [primaryConnectionOf(parsePrimaryDatabaseConfig(EnvSource.fromProcess()))] })
         .then((applied) => createJsonLogger(new SystemClock()).info(LoggingLogEvent.MigrationsApplied, { applied }))
         .catch((error: unknown) => {
             createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "migrate" })

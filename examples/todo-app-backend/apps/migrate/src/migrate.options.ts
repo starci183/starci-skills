@@ -6,9 +6,7 @@ import { identityEntities, identityMigrations } from "@modules/domain/identity"
 import { shareEntities, shareMigrations } from "@modules/domain/share"
 import { taskEntities, taskMigrations } from "@modules/domain/task"
 import { uploadEntities, uploadMigrations } from "@modules/domain/upload"
-import type { EnvSource } from "@modules/platform/config"
-import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
-import type { DatabaseConnectionOptions } from "@modules/platform/database"
+import type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "@modules/platform/database"
 import { inboxEntities, inboxMigrations } from "@modules/platform/inbox"
 import { leaseEntities, leaseMigrations } from "@modules/platform/lease"
 import { outboxEntities, outboxMigrations } from "@modules/platform/outbox"
@@ -19,37 +17,33 @@ export interface MigrateAppOptions {
     readonly connections: ReadonlyArray<DatabaseConnectionOptions>
 }
 
-/** Parses the migrate options from the environment. */
-export const parseMigrateAppOptions = (env: EnvSource): MigrateAppOptions => ({
-    connections: [
-        {
-            ...parsePrimaryDatabaseConfig(env),
-            entities: [
-                ...identityEntities,
-                ...taskEntities,
-                ...shareEntities,
-                ...planEntities,
-                ...recurEntities,
-                ...notifyEntities,
-                ...auditEntities,
-                ...uploadEntities,
-                ...leaseEntities,
-                ...inboxEntities,
-                ...outboxEntities,
-            ],
-            migrations: [
-                ...identityMigrations,
-                ...taskMigrations,
-                ...shareMigrations,
-                ...planMigrations,
-                ...recurMigrations,
-                ...notifyMigrations,
-                ...auditMigrations,
-                ...uploadMigrations,
-                ...leaseMigrations,
-                ...inboxMigrations,
-                ...outboxMigrations,
-            ],
-        },
+/** The primary connection with the entities and migrations of every owner of its tables. */
+export const primaryConnectionOf = (database: DatabaseConnectionConfig): DatabaseConnectionOptions => ({
+    ...database,
+    entities: [
+        ...identityEntities,
+        ...taskEntities,
+        ...shareEntities,
+        ...planEntities,
+        ...recurEntities,
+        ...notifyEntities,
+        ...auditEntities,
+        ...uploadEntities,
+        ...leaseEntities,
+        ...inboxEntities,
+        ...outboxEntities,
+    ],
+    migrations: [
+        ...identityMigrations,
+        ...taskMigrations,
+        ...shareMigrations,
+        ...planMigrations,
+        ...recurMigrations,
+        ...notifyMigrations,
+        ...auditMigrations,
+        ...uploadMigrations,
+        ...leaseMigrations,
+        ...inboxMigrations,
+        ...outboxMigrations,
     ],
 })

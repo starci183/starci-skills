@@ -4,11 +4,34 @@ import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
-import { parseTodoAppOptions } from "./todo.options"
+import { parseIdentityConfig } from "@modules/domain/identity"
+import { parsePlanConfig } from "@modules/domain/plan"
+import { parseRecurConfig } from "@modules/domain/recur"
+import { parseUploadConfig } from "@modules/domain/upload"
+import { parseKeycloakConfig } from "@modules/integrations/keycloak"
+import { parseNotifySmtpConfig } from "@modules/integrations/notify-smtp"
+import { parseSepayConfig } from "@modules/integrations/sepay"
+import { parseUploadStorageConfig } from "@modules/integrations/upload"
+import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
+import { parseHttpSecurityConfig } from "@modules/platform/http-security"
+import type { TodoAppOptions } from "./todo.options"
 
 /** Reads the environment once, builds the todo api from it and listens. */
 async function bootstrap(): Promise<void> {
-    const options = parseTodoAppOptions(EnvSource.fromProcess())
+    const env = EnvSource.fromProcess()
+    const options: TodoAppOptions = {
+        port: env.int("PORT"),
+        database: parsePrimaryDatabaseConfig(env),
+        httpSecurity: parseHttpSecurityConfig(env),
+        identity: parseIdentityConfig(env),
+        keycloak: parseKeycloakConfig(env),
+        sepay: parseSepayConfig(env),
+        plan: parsePlanConfig(env),
+        recur: parseRecurConfig(env),
+        upload: parseUploadConfig(env),
+        uploadStorage: parseUploadStorageConfig(env),
+        notifySmtp: parseNotifySmtpConfig(env),
+    }
     const app = await NestFactory.create(AppModule.register(options))
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     app.enableShutdownHooks()

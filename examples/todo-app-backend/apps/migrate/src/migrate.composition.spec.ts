@@ -1,11 +1,10 @@
-import { EnvSource } from "@modules/platform/config"
+import { Secret } from "@modules/platform/config"
 import { PRIMARY_CONNECTION } from "@modules/platform/database"
-import { parseMigrateAppOptions } from "./migrate.options"
+import { primaryConnectionOf } from "./migrate.options"
 
-const environment: Record<string, string> = { PRIMARY_DB_URL: "postgres://localhost:5501/todo" }
 
-describe("parseMigrateAppOptions", () => {
-    const options = parseMigrateAppOptions(new EnvSource(environment))
+describe("primaryConnectionOf", () => {
+    const options = { connections: [primaryConnectionOf({ name: PRIMARY_CONNECTION, url: new Secret("postgres://localhost:5501/todo") })] }
 
     it("lists the primary connection with the URL of its database", () => {
         expect(options.connections.map((connection) => connection.name)).toEqual([PRIMARY_CONNECTION])

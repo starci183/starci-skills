@@ -5,19 +5,18 @@ import { getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { mock } from "@starci/jest-preset/mock"
 import { TaskService } from "@modules/domain/task"
-import { EnvSource, Secret } from "@modules/platform/config"
+import { Secret } from "@modules/platform/config"
 import { DATABASE_PROBE, PRIMARY_CONNECTION } from "@modules/platform/database"
 import type { Probe } from "@modules/platform/probes"
 import { mockEntityManager } from "@tests/fixtures/database"
 import { AppModule } from "./app.module"
 import type { WorkerAppOptions } from "./worker.options"
-import { parseWorkerAppOptions } from "./worker.options"
 
 const options: WorkerAppOptions = {
     database: { name: PRIMARY_CONNECTION, url: new Secret("postgres://localhost:0/todo") },
     scheduling: { tickMs: 1000 },
     messaging: { pollMs: 1000, batchSize: 10, visibilityMs: 60_000 },
-    session: { ttlDays: 1, adminSubjects: [] },
+    identity: { ttlDays: 1, adminSubjects: [] },
     keycloak: { tokenUrl: "http://localhost:0/token", clientId: "todo-api", timeoutMs: 100 },
     sepay: { baseUrl: "http://localhost:0", apiKey: new Secret("k"), webhookSecret: new Secret("w"), timeoutMs: 100 },
     plan: { paidPriceMinorUnits: 99000, paidCurrency: "VND" },
@@ -50,11 +49,5 @@ describe("worker AppModule", () => {
     it("binds the one primary EntityManager to the connection double", async () => {
         await module.get<Probe>(DATABASE_PROBE).check()
         expect(manager.query).toHaveBeenCalledTimes(1)
-    })
-})
-
-describe("parseWorkerAppOptions", () => {
-    it("stops the boot when a required key is missing", () => {
-        expect(() => parseWorkerAppOptions(new EnvSource({}))).toThrow("CONFIG_KEY_MISSING")
     })
 })

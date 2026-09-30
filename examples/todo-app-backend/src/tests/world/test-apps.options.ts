@@ -1,5 +1,5 @@
 /**
- * The typed options the test world hands to the real apps: what `parseTodoAppOptions` / `parseWorkerAppOptions` would read
+ * The typed options the test world hands to the real apps: what the `main.ts` of each app would parse
  * from the environment of a deployment, built as objects from the coordinates of the run. Everything third-party points
  * at a fake at the network edge; rate limits are high, the job tick and the queue poll are short, the session lives a day.
  */
@@ -24,7 +24,7 @@ export const testOptions = (state: TestWorldState): TestOptions => ({
         allowedOrigins: ["http://localhost:4069"],
         rateLimit: { windowMs: 60_000, defaultLimit: RATE_LIMIT_HIGH, strictLimit: RATE_LIMIT_HIGH },
     },
-    session: { ttlDays: 1, adminSubjects: [] },
+    identity: { ttlDays: 1, adminSubjects: [] },
     keycloak: { tokenUrl: state.keycloakTokenUrl, clientId: state.keycloakClientId, timeoutMs: CALL_DEADLINE_MS },
     sepay: {
         baseUrl: state.sepayBaseUrl,

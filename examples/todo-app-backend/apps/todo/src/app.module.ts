@@ -138,7 +138,7 @@ export class AppModule {
                 SepayModule.register({ isGlobal: true, ...options.sepay }),
                 NotifySmtpModule.register({ isGlobal: true, ...options.notifySmtp }),
                 UploadStorageModule.register({ isGlobal: true, ...options.uploadStorage }),
-                IdentityModule.register({ isGlobal: true, ...options.session }),
+                IdentityModule.register({ isGlobal: true, ...options.identity }),
                 TaskModule.register({ isGlobal: true }),
                 ShareModule.register({ isGlobal: true }),
                 PlanModule.register({ isGlobal: true, ...options.plan }),

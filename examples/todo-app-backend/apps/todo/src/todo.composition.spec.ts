@@ -9,7 +9,7 @@ import { mock } from "@starci/jest-preset/mock"
 import { SubscriptionService } from "@modules/domain/plan"
 import { AuthGuard, SessionService } from "@modules/domain/identity"
 import { TaskService } from "@modules/domain/task"
-import { EnvSource, Secret } from "@modules/platform/config"
+import { Secret } from "@modules/platform/config"
 import { DATABASE_PROBE, PRIMARY_CONNECTION } from "@modules/platform/database"
 import { ERRORS_SERVICE, ErrorsFilter } from "@modules/platform/errors"
 import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
@@ -17,13 +17,12 @@ import type { Probe } from "@modules/platform/probes"
 import { mockEntityManager } from "@tests/fixtures/database"
 import { AppModule } from "./app.module"
 import type { TodoAppOptions } from "./todo.options"
-import { parseTodoAppOptions } from "./todo.options"
 
 const options: TodoAppOptions = {
     port: 0,
     database: { name: PRIMARY_CONNECTION, url: new Secret("postgres://localhost:0/todo") },
     httpSecurity: { allowedOrigins: ["http://localhost:3000"], rateLimit: { windowMs: 1000, defaultLimit: 10, strictLimit: 5 } },
-    session: { ttlDays: 1, adminSubjects: [] },
+    identity: { ttlDays: 1, adminSubjects: [] },
     keycloak: { tokenUrl: "http://localhost:0/token", clientId: "todo-api", timeoutMs: 100 },
     sepay: { baseUrl: "http://localhost:0", apiKey: new Secret("k"), webhookSecret: new Secret("w"), timeoutMs: 100 },
     plan: { paidPriceMinorUnits: 99000, paidCurrency: "VND" },
@@ -96,18 +95,3 @@ const environment: Record<string, string> = {
     SMTP_PORT: "1025",
     SMTP_FROM: "todo@example.test",
 }
-
-describe("parseTodoAppOptions", () => {
-    it("reads the port, the primary database and every capability from the environment", () => {
-        const parsed = parseTodoAppOptions(new EnvSource(environment))
-        expect(parsed.port).toBe(3001)
-        expect(parsed.database.name).toBe(PRIMARY_CONNECTION)
-        expect(parsed.database.url.reveal()).toBe("postgres://localhost:5501/todo")
-        expect(parsed.httpSecurity.allowedOrigins).toEqual(["http://localhost:3000"])
-        expect(parsed.keycloak.clientId).toBe("todo-api")
-    })
-
-    it("stops the boot when a required key is missing", () => {
-        expect(() => parseTodoAppOptions(new EnvSource({}))).toThrow("CONFIG_KEY_MISSING")
-    })
-})
