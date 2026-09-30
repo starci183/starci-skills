@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.1 - 2026-10-01
+
+- **Fix: `starci/brand-layer-shape` refused the brand typeface.** The vocabulary now knows `--font-sans` (the grammar 0.8.0 reads it
+  on the core root) next to `--font-mono`, so a brand layer that sets `--font-sans: "Inter Variable", ...` in light and dark passes every
+  rule; an unknown font token (`--font-display`) and a font token with one theme only are still findings. The `--starci-font-sans`
+  and `--starci-font-mono` names left the vocabulary with the grammar. `vocabulary.generated.mjs` regenerated (`npm run vocabulary`).
+
 ## 2.0.0 - 2026-09-30
 
 - **New rule `starci/status-contrast`** (R61 `FE_STYLE_TOKEN_ONLY`; the config runs fourteen rules): the brand layer's status colours

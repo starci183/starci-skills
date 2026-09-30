@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { FILES, lintRule } from "./testing.mjs"
+import { FILES, lint, lintRule } from "./testing.mjs"
 
 const rule = (code, file = FILES.brand) => lintRule("brand-layer-shape", code, file)
 
@@ -111,4 +111,31 @@ test("accepts the soft pair of every status tone, info included", async () => {
   const tones = ["success", "warning", "danger", "info"]
   const block = tones.flatMap((tone) => [`--${tone}-soft: #eee;`, `--${tone}-soft-foreground: #111;`, `--${tone}-soft-hover: #ddd;`]).join(" ")
   assert.deepEqual(await rule(`:root { ${block} } .dark { ${block} }`), [])
+})
+
+test("accepts the font tokens the grammar reads, in both themes", async () => {
+  const code = `
+:root { --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif; --font-mono: ui-monospace, Menlo, monospace; }
+.dark { --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif; --font-mono: ui-monospace, Menlo, monospace; }
+`
+  assert.deepEqual(await rule(code), [])
+})
+
+test("a font token with one theme only is still refused, and an unknown font token is not a grammar token", async () => {
+  const half = await rule(':root { --font-sans: "Inter", sans-serif; } .dark { --accent: #000; } :root { --accent: #fff; }')
+  assert.equal(half.length, 1)
+  assert.match(half[0].text, /--font-sans.*no dark value/)
+  const foreign = await rule(':root { --font-display: "Inter", serif; } .dark { --font-display: "Inter", serif; }')
+  assert.deepEqual(foreign.filter((warning) => /not a token the grammar publishes/.test(warning.text)).length, 2)
+  assert.match(foreign[0].text, /--font-display.*not a token the grammar publishes/)
+})
+
+test("no rule of the canon refuses a brand layer that sets the font tokens", async () => {
+  const code = `
+:root { --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif; }
+.dark { --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif; }
+:root { --info-soft: #ccf3ef; --info-soft-foreground: #0b5c54; }
+.dark { --info-soft: #0d3b37; --info-soft-foreground: #7fe0d4; }
+`
+  assert.deepEqual((await lint(code, FILES.brand)).map((warning) => `${warning.rule}: ${warning.text}`), [])
 })
