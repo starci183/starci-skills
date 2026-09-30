@@ -24,9 +24,9 @@ const r = await client.get(url)
 
 **Finding code:** `FE_TRANSPORT_OWNER`
 
-**Vì sao (why):** `fetch` (hoặc `Request`, `EventSource`, `sendBeacon`, thư viện HTTP khác) ở `<file>` nằm ngoài client duy nhất (`modules/api/client.ts`, hoặc `src/client.ts` của gói api dùng chung). Mỗi repo chỉ có đúng một đường truyền.
+**Why:** `fetch` (or `Request`, `EventSource`, `sendBeacon`, another HTTP library) in `<file>` is outside the single client (`modules/api/client.ts`, or `src/client.ts` of the shared api package). Each repo has exactly one transport path.
 
-**Cách sửa:** Gọi client của repo và nhận `Outcome<T>`; không tự gọi `fetch`.
+**Fix:** Call the repo's client and receive `Outcome<T>`; do not call `fetch` yourself.
 
 ## `starci-fe/client-fetch-has-signal`
 
@@ -46,9 +46,9 @@ fetch(url, { method: "GET", signal: AbortSignal.timeout(8000) })
 
 **Finding code:** `FE_TRANSPORT_OWNER`
 
-**Vì sao (why):** `fetch` ở `<file>` không có `signal`. Client bắt buộc có timeout và `AbortSignal`.
+**Why:** `fetch` in `<file>` has no `signal`. The client must have a timeout and an `AbortSignal`.
 
-**Cách sửa:** Truyền `signal` (`AbortSignal.timeout(...)` kết hợp với tín hiệu của người gọi).
+**Fix:** Pass a `signal` (`AbortSignal.timeout(...)` combined with the caller's signal).
 
 ## `starci-fe/no-shared-transport-state`
 
@@ -68,9 +68,9 @@ export const request = (token: string) => token
 
 **Finding code:** `FE_TRANSPORT_OWNER`
 
-**Vì sao (why):** `<file>` giữ trạng thái dùng chung dạng `let`/`var` trong tầng API. Token và locale không được nằm trong singleton.
+**Why:** `<file>` keeps shared `let`/`var` state in the API layer. Tokens and locale must not live in a singleton.
 
-**Cách sửa:** Truyền credential và locale bằng tham số hoặc context.
+**Fix:** Pass credentials and locale as parameters or context.
 
 ## `starci-fe/client-maps-auth-to-refused`
 
@@ -91,9 +91,9 @@ if (r.status === 401 || r.status === 403) return { ok: false, kind: "refused" }
 
 **Finding code:** `FE_HTTP_STATUS_COLLAPSE`
 
-**Vì sao (why):** Client ở `<file>` không có nhánh so sánh `response.status` với 401 và 403 rồi trả `{ kind: "refused" }`, nên trạng thái "cần đăng nhập" không bao giờ đạt được.
+**Why:** The client in `<file>` has no branch comparing `response.status` with 401 and 403 and returning `{ kind: "refused" }`, so the "sign-in required" state can never be reached.
 
-**Cách sửa:** Thêm nhánh `response.status === 401 || response.status === 403` trả `{ ok: false, kind: "refused" }` ngay trong client.
+**Fix:** Add a branch `response.status === 401 || response.status === 403` returning `{ ok: false, kind: "refused" }` inside the client.
 
 ## `starci-fe/no-http-status-collapse`
 
@@ -113,9 +113,9 @@ if (!res.ok) return toOutcome(res.status)
 
 **Finding code:** `FE_HTTP_STATUS_COLLAPSE`
 
-**Vì sao (why):** `<file>` gộp mọi mã HTTP thành một nhánh (hoặc trả null khi phản hồi lỗi). 401/403 phải thành `refused`.
+**Why:** `<file>` collapses every HTTP code into one branch (or returns null on an error response). 401/403 must become `refused`.
 
-**Cách sửa:** Trả `Outcome` theo mã: `refused` (401/403), `not-found`, `invalid`, `unavailable`; không trả nguyên văn lỗi của server làm lý do.
+**Fix:** Return an `Outcome` by code: `refused` (401/403), `not-found`, `invalid`, `unavailable`; do not return the server's raw error as the reason.
 
 ## `starci-fe/no-hand-typed-wire`
 
@@ -137,9 +137,9 @@ const x: CourseQuery = parse(raw)
 
 **Finding code:** `FE_WIRE_GENERATED`
 
-**Vì sao (why):** `<file>` tự gõ kiểu wire hoặc ép kiểu phản hồi. Dùng kiểu sinh từ `contract/`.
+**Why:** `<file>` hand-types a wire type or casts a response. Use types generated from `contract/`.
 
-**Cách sửa:** Chạy codegen từ bản sao hợp đồng ở `modules/api/contract/` và nhập kiểu sinh ra; đưa tài liệu GraphQL vào tệp `.graphql`.
+**Fix:** Run codegen from the contract copy at `modules/api/contract/` and import the generated types; put GraphQL documents in `.graphql` files.
 
 ## `starci-fe/outcome-kinds-exhaustive`
 
@@ -165,9 +165,9 @@ switch (outcome.kind) {
 
 **Finding code:** `FE_OUTCOME_KIND_UNHANDLED`
 
-**Vì sao (why):** `switch` trên `kind` ở `<file>` có nhánh `ok` nhưng thiếu một trong refused, invalid, not-found, unavailable.
+**Why:** The `switch` on `kind` in `<file>` has an `ok` branch but lacks one of refused, invalid, not-found, unavailable.
 
-**Cách sửa:** Viết đủ năm nhánh của `Outcome<T>`, mỗi nhánh một màn; không dựa vào `default`.
+**Fix:** Write all five branches of `Outcome<T>`, one screen per branch; do not rely on `default`.
 
 ## `starci-fe/one-outcome-union`
 
@@ -190,6 +190,6 @@ export type InviteOutcome = Outcome<{ id: string }>
 
 **Finding code:** `FE_HTTP_STATUS_COLLAPSE`
 
-**Vì sao (why):** `<file>` khai báo thêm một union kết quả (`ok` hoặc `kind`) ngoài `outcome.ts`. Repo chỉ có một `Outcome<T>`.
+**Why:** `<file>` declares another result union (`ok` or `kind`) outside `outcome.ts`. A repo has only one `Outcome<T>`.
 
-**Cách sửa:** Dùng `Outcome<T>` của `modules/api/outcome.ts` (hoặc gói api dùng chung); thêm chi tiết nghiệp vụ qua tham số thứ hai thay vì khai báo union mới.
+**Fix:** Use `Outcome<T>` from `modules/api/outcome.ts` (or the shared api package); add business detail through a second parameter instead of declaring a new union.

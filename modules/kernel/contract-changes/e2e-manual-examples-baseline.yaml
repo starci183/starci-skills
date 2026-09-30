@@ -6,7 +6,7 @@ summary: >-
   tsconfig.e2e.json backs a manual typecheck:e2e (frontend examples point it at their existing e2e/tsconfig.json);
   the backend examples' lint, lint:check and lint:fix skip the e2e tree (lint:e2e is the manual check); the
   baseline's lint scripts and staged lint (--ignore-pattern for src/tests/e2e/** and e2e/**) do the same, and its
-  typecheck:e2e and lint:e2e scripts are the manual checks. In the runtime's own CI the example-coverage and
+  typecheck:e2e and lint:e2e scripts are the manual checks. In the runtime's own CI the example-unit and
   todo-app-example jobs select the jest unit project only (a bare `npx jest` also ran the e2e project), and the
   live stack + Playwright UAT job moves to its own workflow_dispatch-only file, todo-app-live-e2e.yml. The example
   READMEs and TESTING.md state that e2e is manual. Adds no check or finding code.
@@ -15,7 +15,7 @@ paths:
   - modules/kernel/contract-changes/e2e-manual-examples-baseline.yaml
   - knowledge/repository-baseline.yaml
   - tests/repository-baseline.spec.mjs
-  - .github/workflows/example-coverage.yml
+  - .github/workflows/example-unit.yml
   - .github/workflows/todo-app-example.yml
   - .github/workflows/todo-app-live-e2e.yml
   - examples/ecommerce-app-be/package.json

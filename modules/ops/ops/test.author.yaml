@@ -50,11 +50,10 @@ reads:
       en: Inspect the existing test harness - its runner, naming convention, fixtures, helpers, lifecycle
         hooks and the tests it already owns.
   - id: conventions
-    path: knowledge/patterns/fe/test.yaml + knowledge/patterns/be/test.yaml +
-      knowledge/coding-reference.yaml
+    path: knowledge/patterns/be/test.yaml + knowledge/coding-reference.yaml
     purpose:
       en: Read the adopted test conventions - naming, structure, fixture and assertion shape - for the
-        selected repository's side of the stack.
+        back end; a front end has no tests, so this op never applies to one.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
     purpose:

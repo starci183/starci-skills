@@ -1,5 +1,7 @@
 /**
- * `hfs emit-contracts`: writes `contracts/<app>/schema.graphql` for every api app of hfs.json that serves GraphQL.
+ * `hfs emit-contracts`: writes `contracts/<app>/schema.graphql` for every api app of hfs.json that serves GraphQL, and
+ * `contracts/<app>/openapi.json` for every api app whose `apps/<app>/src/operations.ts` exports the typed operation table
+ * `OPERATIONS` (operations.mjs: OpenAPI 3.1 read from the TypeScript checker; nothing is executed).
  *
  * The snapshot is `printSchema(lexicographicSortSchema(schema))`, nothing else, so it is deterministic and never carries a
  * generator banner. It needs no environment, no database and no network, and never boots the app.
@@ -18,10 +20,12 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { openapiPath } from './operations.mjs';
 
 /** The stderr prefix of a dependency the worker could not load and stood in for. */
 export const STAND_IN = 'stand-in ';
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'schema-worker.mjs');
+const OPERATIONS_WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'operations-worker.mjs');
 
 /** The repository-relative path of an app's root module. */
 export const appModulePath = (app) => `apps/${app}/src/app.module.ts`;
@@ -48,18 +52,27 @@ export const apiApps = (declaration) => (declaration.apps ?? []).filter((app) =>
 /** The text written to a snapshot file: the printed schema and one final newline. Pure. */
 export const snapshotText = (printed) => `${printed.replace(/\n+$/, '')}\n`;
 
-/** Runs the worker of one app; answers `{ printed, standIns }`, or null when the app composes no GraphQL server. */
-function emitApp(repoRoot, app) {
-  const result = spawnSync(process.execPath, [WORKER, repoRoot, app], { encoding: 'utf8', cwd: repoRoot, env: { PATH: process.env.PATH ?? '' }, maxBuffer: 256 * 1024 * 1024 });
-  if (result.status === 3) return null;
+/** Runs one worker of one app; answers its stdout, or null when the app has nothing of that kind (exit 3). */
+function runWorker(worker, repoRoot, app) {
+  const result = spawnSync(process.execPath, [worker, repoRoot, app], { encoding: 'utf8', cwd: repoRoot, env: { PATH: process.env.PATH ?? '' }, maxBuffer: 256 * 1024 * 1024 });
+  if (result.status === 3) return { text: null, lines: [] };
   const lines = (result.stderr ?? '').split(/\r?\n/).filter(Boolean);
   if (result.status !== 0) throw new Error(`hfs emit-contracts: ${app} failed (exit ${result.status}): ${(lines.join('\n') || result.stdout).trim()}`);
-  return { printed: result.stdout, standIns: lines.filter((line) => line.startsWith(STAND_IN)) };
+  return { text: result.stdout, lines: lines.filter((line) => line.startsWith(STAND_IN)) };
+}
+
+/** Emits the GraphQL schema and the operations of one app: `{ graphql, openapi, standIns }`, each text or null. */
+function emitApp(repoRoot, app) {
+  const graphql = runWorker(WORKER, repoRoot, app);
+  const operations = runWorker(OPERATIONS_WORKER, repoRoot, app);
+  return { graphql: graphql.text, openapi: operations.text, standIns: [...graphql.lines, ...operations.lines] };
 }
 
 /**
- * Writes the snapshot of every api app that serves GraphQL; answers `{ written: [paths], skipped: [apps], standIns: { app: [lines] } }`.
- * `declaration` is the parsed hfs.json. `outDir` (absolute) redirects the snapshots to another root, keeping their relative paths.
+ * Writes the snapshots of every api app: `contracts/<app>/schema.graphql` when it serves GraphQL and `contracts/<app>/openapi.json`
+ * when it has an operation table. Answers `{ written: [paths], skipped: [apps], standIns: { app: [lines] } }`, `skipped` being the
+ * apps with neither. `declaration` is the parsed hfs.json. `outDir` (absolute) redirects the snapshots to another root, keeping
+ * their relative paths.
  */
 export function emitContracts({ repoRoot, declaration, outDir = repoRoot }) {
   const written = [];
@@ -67,14 +80,17 @@ export function emitContracts({ repoRoot, declaration, outDir = repoRoot }) {
   const standIns = {};
   for (const app of apiApps(declaration)) {
     const emitted = emitApp(repoRoot, app);
-    if (emitted === null) {
+    if (emitted.graphql === null && emitted.openapi === null) {
       skipped.push(app);
       continue;
     }
-    const target = path.join(outDir, snapshotPath(app));
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, snapshotText(emitted.printed));
-    written.push(snapshotPath(app));
+    for (const [text, relative] of [[emitted.graphql, snapshotPath(app)], [emitted.openapi, openapiPath(app)]]) {
+      if (text === null) continue;
+      const target = path.join(outDir, relative);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, snapshotText(text));
+      written.push(relative);
+    }
     if (emitted.standIns.length) standIns[app] = emitted.standIns;
   }
   return { written, skipped, standIns };

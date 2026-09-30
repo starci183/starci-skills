@@ -328,7 +328,7 @@ sections:
       - "Delivery and quality services are declared, never inferred (owner ruling 2026-09-24): the
         repository's stack declaration (.starcistacks/application-stacks.yaml, or the
         backend declaration whose sources list the repository; the runtime source host's for a shared
-        server) states in its `services` block each of sonar, codecov, container-registry, analytics
+        server) states in its `services` block each of sonar, container-registry, analytics
         and error-tracking the code or CI uses - provider, mode local|hosted|disabled, host, the stack
         that runs it, project keys, credentials as custody references with the variable the tool reads,
         how GitHub CI gets them (ci.wiring) and ownerAction. Before an operation names, asks for or
@@ -508,8 +508,8 @@ sections:
         scan refuses a plaintext test password in any file."
   - title: Bounded finish and blockers
     blocks:
-      - "A missing credential never stops building (owner ruling 2026-09-23: \"creds không có thì
-        vẫn code, để dumb string vào, uat không làm thôi\" - asking for a credential does not mean
+      - "A missing credential never stops building (owner ruling 2026-09-23: \"if there are no creds,
+        keep coding, put in a dumb string, just skip uat\" - asking for a credential does not mean
         not doing the work). Code reads the value from its declared env var or custody key exactly
         as it will in production; where the build, unit tests or a local run need a value, the op
         writes an obviously fake placeholder (`placeholder-<VAR_NAME>`, never a plausible-looking
@@ -521,7 +521,7 @@ sections:
       - "Quality-service credentials are the runtime's, never the owner's (owner ruling 2026-09-24):
         Sonar runs through scripts/checks/sonar-local.mjs against the local SonarQube the stack
         declaration names, which resolves or mints the project and its token from the source stack
-        custody; Codecov uploads use OIDC. No op asks the owner for a SONAR_TOKEN, a Sonar host or
+        custody. No op asks the owner for a SONAR_TOKEN, a Sonar host or
         a GitHub secret/variable; the CI secret wiring is an optional follow-up recorded as such."
       - "Open items are unfinished work, never notes about the environment or another leg
         (inc-00026c808d40). `partial` is a retry: the kernel settles it fail and dispatches this op
@@ -576,7 +576,7 @@ sections:
       - "What an op does when a class is off is its brief's policy.specsToggle (scripts/kernel/spec-deferral.mjs):
         defer-leg - the leg is never dispatched; the kernel settles it deferred with no attempt spent and the
         legs behind it proceed. skip - the op runs without writing or running that class of test and demands
-        no coverage of it; Sonar still runs with --no-coverage, so bugs, smells and security findings still
+        no coverage of it; Sonar still runs, so bugs, smells and security findings still
         gate. not-counted - a review or handover gate does not count an absent test or coverage of that class
         (api coverage drops that requiresProof kind from must-haves). The dispatch prompt prints a `specs:`
         line naming the classes that are off; it overrides every test, coverage and e2e step, proof and

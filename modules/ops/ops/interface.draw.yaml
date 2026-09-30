@@ -24,7 +24,7 @@ params:
         How many alternative directions to draw for one screen. Owner ruling 2026-09-27 - ONE version per
         shape, drawn carefully - the draw loop and its critic still run, but only the loop's single best round
         reaches the owner; above the default only when the owner sets it. Every drawing files its draw-review
-        ask and only the owner accepts it (on Telegram - an album of the drawn parts, a reply 'ok'/'duyệt' accepts,
+        ask and only the owner accepts it (on Telegram - an album of the drawn parts, a reply 'ok' or an equivalent approval word accepts,
         anything else is feedback and a redraw).
 nodeKinds: [ui]
 completionProfile: ui
@@ -362,7 +362,7 @@ steps:
         accepted business record — numbers, currency amounts, dates, names, statuses and copy — never
         lorem text, blurred stand-ins, skeleton or shimmer. A status line sits alone at the top of its
         card or as a neutral grey band, never beside a field label.
-        DRAW WITH THE REAL GRAMMAR COMPONENTS (owner ruling 2026-09-27, 'chốt'): the deliverable per shape is
+        DRAW WITH THE REAL GRAMMAR COMPONENTS (owner ruling 2026-09-27, 'settled'): the deliverable per shape is
         `<XBase>.draw.tsx` - the shape-slot XBase (examples/shape-slot: it takes {state, props, on}, props are
         atoms, local helper components allowed, exported as <XBase>) composing ONLY @starci/grammar[/<family>]
         exports with their real props and closed variants (Alert, Meter segments, Badge, Button variant,
@@ -547,7 +547,7 @@ steps:
         desktop and mobile light shape parts and question.review the record and the part digests the owner is
         shown. Rule (owner rulings 2026-09-27): every drawing is the owner's to accept, never answered
         automatically; the owner reviews it on Telegram - the desktop and mobile images as an album with the
-        shape, the round and the notes it answers - and replies 'ok'/'duyệt' to accept (add 'golden' to make it
+        shape, the round and the notes it answers - and replies 'ok' or an equivalent approval word to accept (add 'golden' to make it
         the archetype's reference) or anything else as feedback (a reply to a single image is a note on that image);
         the form (Generate URL) takes a note per image and a golden box too; drawOwnerRulingOf reads from the job's
         ledger lineage whether the owner asked for this drawing (question.ownerRequested), and either way only
@@ -662,7 +662,7 @@ proofs:
       en: Every prominent symbol has an explicit concept-to-form argument, alternate-reading check,
         audience-maturity check, non-generic rationale, sibling distinction, coherent family
         grammar, reduced-scale legibility proof and justified raster-asset or code-native
-        realization. A readable but childish, clichéd or semantically interchangeable symbol does
+        realization. A readable but childish, cliched or semantically interchangeable symbol does
         not pass merely because its label explains it.
   - id: shell-conformance
     requirement:

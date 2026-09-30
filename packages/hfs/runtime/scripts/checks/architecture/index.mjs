@@ -30,6 +30,7 @@ import { checkFeatureShape, FEATURE_SHAPE_RULE_IDS } from './feature-shape.mjs';
 import { checkTestWorldFiles, TEST_WORLD_FILES_RULE_IDS } from './test-world-files.mjs';
 import { checkUnitSpecProviders, UNIT_SPEC_PROVIDERS_RULE_IDS } from './unit-spec-providers.mjs';
 import { checkInjectionTokenExported, INJECTION_TOKEN_EXPORTED_RULE_IDS } from './injection-token-exported.mjs';
+import { checkContractFixtureGuard, CONTRACT_FIXTURE_GUARD_RULE_IDS } from './contract-fixture-guard.mjs';
 import { checkSchemaOwner, SCHEMA_OWNER_RULE_IDS } from './schema-owner.mjs';
 import { checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS } from './module-per-transport.mjs';
 import { checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS } from './background-unowned.mjs';
@@ -40,6 +41,7 @@ import { checkClientReachesServer, CLIENT_REACHES_SERVER_RULE_IDS } from './clie
 import { checkCrossAppDuplicate, CROSS_APP_DUPLICATE_RULE_IDS } from './cross-app-duplicate.mjs';
 import { checkPackageShape, PACKAGE_SHAPE_RULE_IDS } from './package-shape.mjs';
 import { checkFeSlotAllows, FE_SLOT_ALLOWS_RULE_IDS } from './fe-slot-allows.mjs';
+import { checkDocLanguage, DOC_LANGUAGE_RULE_IDS } from './doc-language.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -68,6 +70,7 @@ const BACKEND_MACHINE = {
   modulePerTransport: [checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS],
   backgroundUnowned: [checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS],
   testWorldFiles: [checkTestWorldFiles, TEST_WORLD_FILES_RULE_IDS],
+  contractFixtureGuard: [checkContractFixtureGuard, CONTRACT_FIXTURE_GUARD_RULE_IDS],
 };
 
 // The frontend repository machine (R21, R50, R54, R55, R56, R63, R94): same shape, run for a front-end repository only.
@@ -135,7 +138,7 @@ export const ERROR_RULE_IDS = Object.freeze([
 /** Every code the machine can emit, derived from the rule id lists of its checks (`hfs check` ships exactly these why entries). */
 export const ARCHITECTURE_RULE_IDS = Object.freeze([...new Set([
   ...COMMON_RULE_IDS, ...BACKEND_RULE_IDS, ...FRONTEND_RULE_IDS, ...HFS_RULE_IDS, ...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS,
-  ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS,
+  ...DEAD_EXPORT_RULE_IDS, ...DOC_LANGUAGE_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS,
   ...REGISTRATION_RULE_IDS, ...SWR_DATA_RULE_IDS, ...SYMBOL_RULE_IDS, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID, PUBLIC_CONTRACT_RULE_ID,
   READONLY_BOUNDARY_RULE_ID, ...ERROR_RULE_IDS, ...CONFIG_UNREAD_RULE_IDS, ...Object.values(BACKEND_MACHINE).flatMap(([, ids]) => ids), ...Object.values(FRONTEND_MACHINE).flatMap(([, ids]) => ids),
 ])].sort());
@@ -212,12 +215,12 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   }
   // HFS machine: the slot-driven graph checks read the whole program, also when the caller asked for one path.
   const hfsContext = paths.length ? buildTypeScriptContext(config, injectedTypeScript) : context;
-  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, sizeGrowth: null, clones: null, symbols: null };
+  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, sizeGrowth: null, clones: null, symbols: null, docLanguage: null };
   if (hfsContext.program) {
     const graph = buildHfsGraph(config, hfsContext);
     const input = { config, context: hfsContext, graph, base };
     const runs = { tiers: () => checkTiers(graph), reachability: () => checkReachability(input), deadExports: () => checkDeadExports(input),
-      requiredFiles: () => checkRequiredFiles(input), sizeGrowth: () => checkSizeGrowth(input), clones: () => checkClones(input), symbols: () => checkSymbols(input) };
+      requiredFiles: () => checkRequiredFiles(input), sizeGrowth: () => checkSizeGrowth(input), clones: () => checkClones(input), symbols: () => checkSymbols(input), docLanguage: () => checkDocLanguage(input) };
     if (graph.profile === 'be') for (const [name, [check]] of Object.entries(BACKEND_MACHINE)) runs[name] = () => check(input);
     if (graph.profile === 'fe') for (const [name, [check]] of Object.entries(FRONTEND_MACHINE)) runs[name] = () => check(input);
     if (fast) { delete runs.deadExports; delete runs.clones; delete runs.symbols; }
@@ -264,6 +267,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     ...(hfsChecks.sizeGrowth?.status === 'checked' ? SIZE_GROWTH_RULE_IDS : []),
     ...(hfsChecks.clones?.status === 'checked' ? CLONE_RULE_IDS : []),
     ...(hfsChecks.symbols?.status === 'checked' ? SYMBOL_RULE_IDS : []),
+    ...(hfsChecks.docLanguage?.status === 'checked' ? DOC_LANGUAGE_RULE_IDS : []),
     ...CONFIG_UNREAD_RULE_IDS,
     ...Object.entries({ ...BACKEND_MACHINE, ...FRONTEND_MACHINE }).flatMap(([name, [, ids]]) => (hfsChecks[name]?.status === 'checked' ? ids : [])),
     ...(frontendChecked ? FRONTEND_RULE_IDS : []),

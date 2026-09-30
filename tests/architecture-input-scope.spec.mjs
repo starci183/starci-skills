@@ -150,7 +150,7 @@ test('real broad TypeScript programs retain explicit configuration roles without
   // HFS backend tree: the repository root holds only the allowlisted entries and every app is an apps/<app>/ composition.
   for(const [file,text] of Object.entries({'.gitattributes':'* text=auto eol=lf\n','.github/workflows/check.yml':'name: check\n','.gitignore':'node_modules/\n',
     '.husky/pre-commit':'exit 0\n','.sops.yaml':'creation_rules: []\n','.starcistacks/application-stacks.yaml':'environments: []\n','.starciwork/.gitignore':'runtime.sqlite\n',
-    'README.md':hfsReadme(f.root),'codecov.yml':'coverage: {}\n','eslint.config.mjs':'export default [];\n','nest-cli.json':'{}\n','package-lock.json':'{}\n',
+    'README.md':hfsReadme(f.root),'eslint.config.mjs':'export default [];\n','nest-cli.json':'{}\n','package-lock.json':'{}\n',
     'sonar-project.properties':'sonar.projectKey=fixture\n','apps/api/package.json':'{"name":"@fixture/api","private":true}\n','apps/api/src/app.module.ts':APP_MODULE,...COMPLETE_TREE}))f.write(file,text);
   f.write('package.json',JSON.stringify({private:true}));
   f.write('hfs.json',JSON.stringify({hfs:1,profile:'be',project:'fixture',apps:[{name:'api',kind:'api'}]}));

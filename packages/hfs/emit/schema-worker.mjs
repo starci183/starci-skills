@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aliasTarget, aliasesOf, appModulePath } from './contracts.mjs';
+import { compilerOptionsOf } from './compiler.mjs';
 import { createGraphReader } from './static-graph.mjs';
 
 const [rootArgument, app] = process.argv.slice(2);
@@ -34,7 +35,14 @@ const host = {
     return found;
   },
 };
-const composition = createGraphReader({ ts, host }).compose(path.join(repoRoot, appModulePath(app)));
+let composition;
+try {
+  composition = createGraphReader({ ts, host }).compose(path.join(repoRoot, appModulePath(app)));
+} catch (error) {
+  process.stderr.write(`${error.message}
+`);
+  process.exit(1);
+}
 if (composition === null) process.exit(3);
 require('reflect-metadata');
 
@@ -52,23 +60,8 @@ Module._resolveFilename = function resolve(request, ...rest) {
 // The code is compiled the way `tsc` compiles it (a Program over the resolver files and what they import), not file by file:
 // `emitDecoratorMetadata` writes the type of a decorated property from the type checker (`facet: Facet` with a string-literal
 // union is `String`), which a per-file transpile cannot know and which decides GraphQL field types.
-const configDiagnostic = (diagnostic) => {
-  throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, ' '));
-};
-const parsed = ts.getParsedCommandLineOfConfigFile(path.join(repoRoot, 'tsconfig.json'), {}, { ...ts.sys, onUnRecoverableConfigFileDiagnostic: configDiagnostic });
-// Nest's code-first schema needs both decorator switches; a configuration that cannot be read completely (an `extends` package that
-// is not installed here) falls back to what a Nest project compiles with and is reported like a stand-in.
-for (const error of parsed.errors) process.stderr.write(`stand-in tsconfig.json (${ts.flattenDiagnosticMessageText(error.messageText, ' ')}): compiler options fall back to the Nest defaults
-`);
-const options = {
-  target: ts.ScriptTarget.ES2022,
-  module: ts.ModuleKind.CommonJS,
-  esModuleInterop: true,
-  ...parsed.options,
-  experimentalDecorators: true,
-  emitDecoratorMetadata: true,
-  declaration: false, declarationMap: false, sourceMap: false, inlineSourceMap: false, incremental: false, composite: false, tsBuildInfoFile: undefined, noEmit: false, noEmitOnError: false, outDir: undefined, rootDir: undefined,
-};
+const options = compilerOptionsOf(ts, repoRoot, (message) => process.stderr.write(`stand-in ${message}
+`));
 const roots = [...composition.resolvers, ...composition.scalars, ...composition.include].map(({ file }) => file);
 const program = ts.createProgram({ rootNames: [...new Set(roots)], options });
 const compile = (filename) => {
@@ -100,9 +93,11 @@ const classOf = ({ file, name }) => {
   return exported;
 };
 
-const graphql = require('@nestjs/graphql');
+// The packages of the repository under emission, resolved from it (never from hfs, which declares none of them).
+const FROM_REPOSITORY = { nestGraphql: '@nestjs/graphql', nestCore: '@nestjs/core', graphql: 'graphql' };
+const graphql = require(FROM_REPOSITORY.nestGraphql);
 // the constants and the scalar factory are internals of the package: reached by file, its `exports` map hides them
-const graphqlDist = path.dirname(require.resolve('@nestjs/graphql'));
+const graphqlDist = path.dirname(require.resolve(FROM_REPOSITORY.nestGraphql));
 const { SCALAR_NAME_METADATA, SCALAR_TYPE_METADATA } = require(path.join(graphqlDist, 'graphql.constants.js'));
 const { createScalarType } = require(path.join(graphqlDist, 'utils', 'scalar-types.utils.js'));
 
@@ -113,9 +108,9 @@ const scalarsMap = composition.scalars.map(classOf).map((cls) => {
 });
 const includeModules = composition.include.map(classOf);
 
-const { NestFactory } = require('@nestjs/core');
+const { NestFactory } = require(FROM_REPOSITORY.nestCore);
 const { GraphQLSchemaBuilderModule, GraphQLSchemaFactory } = graphql;
-const { lexicographicSortSchema, printSchema } = require('graphql');
+const { lexicographicSortSchema, printSchema } = require(FROM_REPOSITORY.graphql);
 const context = await NestFactory.createApplicationContext(GraphQLSchemaBuilderModule, { logger: false });
 const schema = await context.get(GraphQLSchemaFactory).create(resolvers, { scalarsMap, includeModules });
 process.stdout.write(printSchema(lexicographicSortSchema(schema)));

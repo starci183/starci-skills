@@ -24,7 +24,6 @@ function fixture(t,files){
   write('.gitignore','node_modules/\n');
   write('.husky/pre-commit','exit 0\n');
   write('README.md',hfsReadme(root));
-  write('codecov.yml','coverage: {}\n');
   write('eslint.config.mjs','export default [];\n');
   write('package-lock.json','{}\n');
   write('sonar-project.properties','sonar.projectKey=fixture\n');

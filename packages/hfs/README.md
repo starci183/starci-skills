@@ -9,11 +9,22 @@ checkout. The machine loads `typescript` from the repository it checks (never it
 npx hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]   # exit 1 on any error-level finding
 npx hfs report <eslint|stylelint> <in> <out> [--repo <dir>]   # a linter's json -> Sonar Generic Issue Import (see Sonar)
 npx hfs init    [--repo <dir>] [--stdout]     # write a starter hfs.json (never overwrites); --stdout only prints
-npx hfs emit-contracts [--repo <dir>]         # write contracts/<app>/schema.graphql of every api app that serves GraphQL (the managed script contract:emit)
+npx hfs emit-contracts [--repo <dir>]         # write contracts/<app>/schema.graphql of every api app that serves GraphQL and contracts/<app>/openapi.json of every api app with a typed operation table (the managed script contract:emit)
 npx hfs explain <path> [--repo <dir>] [--json]
 npx hfs sync (--check | --write) [--root <dir>]   # generated files: the managedBy slots of slots.yaml, the .gitignore block (sync/, templates/)
 npx hfs work-hygiene                              # pre-commit guard for staged .starciwork / .starcistacks paths
+npx hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]   # a back-end service and its unit spec skeleton
+npx hfs new spec <file>.service.ts [--repo <dir>]                                                              # the spec skeleton of an existing service
 ```
+
+## Creating a service
+
+Only `*.service.ts` files are unit-tested (unit test standard), each with exactly one colocated `<name>.service.spec.ts`. `hfs new` is the one way they come into being together:
+
+- `hfs new service src/modules/domain/commission commission --inject InjectPrimaryEntityManager=@modules/platform/database:EntityManager --inject InjectClock=@modules/platform/clock:Clock` writes `commission.service.ts` (the class, `@Injectable()`, the constructor with the given `@Inject*()` parameters) and `commission.service.spec.ts`. `--inject` is `<Decorator>=<module>:<Type>` for a custom `@Inject*()` decorator (its token is the UPPER_SNAKE of the name, `PRIMARY_ENTITY_MANAGER`, exported from the same module) or `<Class>=<module>` for a class-typed dependency. The directory must belong to a slot of the manifest that owns the file (a service lives in `src/modules/{domain,platform,integrations}/<capability>/`), and `hfs new` never overwrites.
+- `hfs new spec src/modules/domain/member/member-profile.service.ts` writes only the spec of a service you wrote by hand. It reads the constructor with the repository's own TypeScript compiler API, so `npm ci` comes first.
+
+The spec skeleton is `Test.createTestingModule({ providers: [Service, { provide: TOKEN, useValue: double }, ...] }).compile()` and `moduleRef.get(Service)`, with one provider per constructor dependency and nothing else, every double imported from `@starci/jest-preset` (the root), and one placeholder `it` per public method. The double of a token comes from `ruleParams.be.specDoubles` of the slot manifest, the table the lint law `spec-infra-double-from-kit` holds a spec to (`*_ENTITY_MANAGER` -> `mockEntityManager()`, `CLOCK` -> `new FakeClock(...)`, `OUTBOX` -> `recordingOutbox()`, `CACHE` -> `fakeCache(clock)`, lock, lease, fence and hold -> `fakeLock(clock)`, ids -> `fakeIds()`, `*_OPTIONS` -> a literal to fill in, everything else and every class -> `mock<T>()`), so the skeleton satisfies the law by construction: no cast, no `new` of the service, no ambient clock. A back end only (a front end has no services); the files are written for prettier (print width 120).
 
 `hfs check` reads the repository's `hfs.json` and the tracked paths (`git ls-files`), checks the work tree, and then runs the
 whole architecture machine over the repository. Every finding carries a why code and its Vietnamese text
@@ -32,9 +43,9 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `HFS_MIN_INSTANCES` | error | fewer instances of a slot than `minInstances` |
 | `HFS_CANON_PIN_DRIFT` | error | a dependency not at the exact version of `knowledge/hfs/canon-pins.yaml` |
 | `HFS_SIZE_SOFT_BACKLOG` | info | a source file over `ruleParams.fileLines.soft`; report only, never fails |
-| `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, codecov, `tsconfig.build.json`, `src/tests/tsconfig.json` (back end; a front end keeps `tsconfig.e2e.json`), `jest.config.js` (back end), `vitest.config.ts` (front end), `.prettierrc`, `.prettierignore`, the `scripts` block of `package.json`, compared as parsed JSON) |
+| `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, `tsconfig.build.json`, `src/tests/tsconfig.json` (back end), `jest.config.js` (back end), `.prettierrc`, `.prettierignore`, the `scripts` block of `package.json`, compared as parsed JSON) |
 | `HFS_RULE_OFF_WITHOUT_REPLACEMENT` | error | `eslint.config.mjs`, or a front end's `stylelint.config.mjs`, differs from its one-line render, so a rule could be off, warned or redefined in it |
-| `HFS_TOOL_CONFIG_LOCAL` | error | a repository holds a tool config outside the managed set (`.eslintrc*`, `.eslintignore`, a second `eslint.config.*` or `stylelint.config.*`, another prettier, vitest, jest or lint-staged config), a file that defines an ESLint rule or a stylelint plugin, a tool configuration key in a `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), or a script that runs eslint, stylelint or prettier with a flag that swaps the configuration |
+| `HFS_TOOL_CONFIG_LOCAL` | error | a repository holds a tool config outside the managed set (`.eslintrc*`, `.eslintignore`, a second `eslint.config.*` or `stylelint.config.*`, another prettier or lint-staged config, or a jest config in a back end that is not the one root file), a file that defines an ESLint rule or a stylelint plugin, a tool configuration key in a `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), or a script that runs eslint, stylelint or prettier with a flag that swaps the configuration |
 | `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render (no host URL; the ESLint report and HFS import paths), or the stack declaration names another quality gate than the one of `knowledge/sonar-gate.yaml` |
 | `HFS_TS_STRICT` | error | the root `tsconfig.json` sets, lowers or adds anything but `extends` the preset (`be.json`, `next.json`), the template's `exclude` and (back end) the three `paths`; the finding names the flag |
 | `HFS_EMPTY_DIR` | error | a directory with no file below it (git tracks none), outside `.git`, `node_modules` and `ignored` slots; the topmost one is reported |
@@ -49,17 +60,18 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `FE_WIRE_GENERATED` | error | a contract copy with no `codegen` script wired before `build` and `typecheck`, or generated types older than the copy (R52) |
 | `FE_I18N_PLACEMENT` | error | no `next-intl`, no `src/proxy.ts`, a `middleware.ts`, a route file outside `[locale]`, no `vi.json` catalog (R59) |
 | `FE_I18N_CATALOG` | error | a locale catalog lacking a key another locale has (R60) |
+| `FE_NO_TESTS` | error | a front end holds a `*.spec.*`, `*.test.*` or `*-spec.*` file, an `e2e/`, `__tests__/`, `__mocks__/` or `test-support/` directory, a vitest, Playwright, jest or Cypress file, a test script, or a test dependency in a `package.json`; no exception (R97; `scripts/lib/hfs-rules/fe-no-tests.mjs`) |
 | `HFS_GITIGNORE_BLOCK_DRIFT` | error | the managed `.gitignore` block differs from its render (R04; `sync/managed.mjs`) |
-| `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render: no `sonar.host.url`, the coverage exclusions of the installed jest / vitest preset (R11; `sync/managed.mjs`) |
+| `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render: no `sonar.host.url`, the `sonar.exclusions` of the installed jest preset, no coverage import (R11; `sync/managed.mjs`) |
 | `HFS_FORMAT` | error | a tracked file the repository's own prettier would change (R19; `sync/format.mjs`, not under `--fast`) |
 | `HFS_FORMAT_TOOL_MISSING` | refusal (exit 2) | prettier is not installed in the repository; the format check is never skipped |
 
 The managed files are judged by `sync/managed.mjs` and `sync/ts-strict.mjs` (the package renders the templates; the runtime copy does not). The list of managed
 files is the `managedBy` slots of `slots.yaml`; `hfs sync --write` renders them and `hfs check` compares them, so a hand edit and a forgotten `sync` are the same finding.
 Each finding is reported once: the eslint and stylelint one-liners under R17, `tsconfig.json` under R22 when it names a flag, a workflow or hook that lost a canon step under R13 (or R19 for the format step), everything else under R05.
-A front end is rendered by the same mechanism as a back end: `tsconfig.json`, `tsconfig.e2e.json`, `eslint.config.mjs`, `stylelint.config.mjs`, `vitest.config.ts`, `.prettierrc`, `.prettierignore`, the hooks, the workflows, the Sonar and codecov files
-and the `scripts` block (`lint:check` is the one lint gate, ESLint over apps, packages and `e2e/` plus stylelint; `test:e2e` is the only script that runs Playwright). `vitest.setup.ts`, `playwright.config.ts` and `turbo.json` stay the repository's own
-(`fe.tool-config-repo`): they carry the repository's setup, web servers and ports, which no preset can render, and per-app `vitest.config.ts` files carry aliases and plugins.
+A front end is rendered by the same mechanism as a back end: `tsconfig.json`, `eslint.config.mjs`, `stylelint.config.mjs`, `.prettierrc`, `.prettierignore`, the hooks, the workflow, the Sonar file
+and the `scripts` block (`lint:check` is the one lint gate, ESLint over the repository plus stylelint; a front end has no test script, no test configuration and no e2e or coverage file: it has no tests, and `FE_NO_TESTS` (R97) refuses any spec, e2e file, test tool, test script or test dependency, `scripts/` included). `turbo.json` stays the repository's own
+(`fe.tool-config-repo`): it carries the repository's task graph, which no preset can render.
 
 The architecture machine (`scripts/checks/architecture.mjs` of the runtime, the same code bundled here): tiers and import
 direction, owner public API, cycles, module registration and composition, clones, dead exports, required files, size growth,
@@ -99,10 +111,12 @@ The managed `sonar-project.properties` carries `sonar.externalIssuesReportPaths`
 reaches Sonar while the job stays failed. There is no `continue-on-error`. Both profiles run `npm run hfs:report`, `npm run lint:report` (a front end also `npm run lint:report:css`) and `npx hfs report <linter> <in> <out>` for each. The duplicate-block threshold (`ruleParams.<profile>.duplicateBlock`) has no Sonar property for TypeScript (SonarJS detects
 clones with its own token rule), so the machine enforces it (R21) and its findings are imported like every other.
 
-The gate is `knowledge/sonar-gate.yaml`, the one declaration: the new-code conditions and an `overall` part (0 open issues on the whole code,
+The gate is `knowledge/sonar-gate.yaml`, the one declaration: the new-code conditions (duplication, blocker and critical issues, hotspots; no coverage condition) and an `overall` part (0 open issues on the whole code,
 duplicated lines density, cognitive complexity through the S3776 rule). A SonarQube gate condition cannot filter by engine, so the condition counts every
 open issue, imported or native; that is stricter than the three imports alone and is intended. `hfs check` reports `HFS_SONAR_CONFIG` (R11) when the
 properties file is not its render or the stack declaration names another gate. R20 and R21 have their Sonar enforcers as conditions of that file.
+
+Sonar does not depend on coverage: the managed properties file has no `sonar.*.lcov.reportPaths` and no `sonar.coverage.*`, the gate has no coverage condition, and the managed CI workflow uploads no coverage anywhere (no Codecov). A back end's unit coverage is the runner's: the managed `test` script is `jest --selectProjects unit --coverage`, which fails below the per-file 100 threshold on `src/**/*.service.ts`.
 
 ## Maintaining the bundle
 

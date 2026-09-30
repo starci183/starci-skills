@@ -7,8 +7,12 @@
  *     schema: a DataSource / TypeORM options object (an object literal whose contextual TYPE is a `typeorm` or
  *     `@nestjs/typeorm` options type) with no literal `synchronize: false`; a `synchronize` that is anything but
  *     the literal `false`; `new DataSource(<not an object literal>)` whose options cannot be read; a
- *     `dataSource.synchronize()` call; the `migrationsRun` option in any form; a DDL statement in any string outside the
- *     migrations of `persistence/`; and an entity or migration glob. Only `apps/migrate` runs migrations.
+ *     `dataSource.synchronize()` or `.dropDatabase()` call; the `migrationsRun` option in any form and a `runMigrations()` /
+ *     `undoLastMigration()` call outside `apps/migrate` and the test world; `dropSchema` set to anything but `false`; a schema
+ *     builder (`createSchemaBuilder()`, `.build()` of typeorm's `SchemaBuilder`); a `synchronize` key in the options of typeorm's
+ *     `@Entity` (a per-entity switch is a second authority); a lifecycle hook (`onModuleInit`, `onApplicationBootstrap`) that
+ *     writes rows through an `EntityManager` or `DataSource` (seeding runs in `apps/migrate`); a DDL statement in any string
+ *     outside the migrations of `persistence/`; and an entity or migration glob. Only `apps/migrate` runs migrations and seeds.
  *   - `no-entity-in-contract` (R37 `BE_ENTITY_IN_CONTRACT`) keeps ORM entities out of the types that cross a boundary:
  *     any type whose declaration carries `@Entity` (from `typeorm`), reached through the type arguments and properties of
  *     a transport signature, the `execute` of a handler, or a `*.contracts.ts`, `*.command.ts` or `*.query.ts` file; and
@@ -19,16 +23,37 @@
  */
 import ts from "typescript"
 import { keyName, walk } from "./lib/ast.mjs"
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { baseName, isMigrationFile, packageOfFile } from "./lib/ports.mjs"
 import { isPackageType, typed } from "./lib/types.mjs"
 import { isDeclarationFile } from "./lib/path.mjs"
 
 /** Schema-changing statements: `CREATE|ALTER|DROP` of a structure, `TRUNCATE TABLE`, `ADD|DROP COLUMN`. */
-const DDL = /\b(?:(?:CREATE|ALTER|DROP)\s+(?:OR\s+REPLACE\s+)?(?:UNIQUE\s+)?(?:TEMP(?:ORARY)?\s+)?(?:TABLE|INDEX|TYPE|SCHEMA|VIEW|MATERIALIZED\s+VIEW|SEQUENCE|EXTENSION|DATABASE|TRIGGER|FUNCTION|DOMAIN)|TRUNCATE\s+TABLE|(?:ADD|DROP)\s+COLUMN)\b/i
+const DDL = /\b(?:(?:CREATE|ALTER|DROP)\s+(?:OR\s+REPLACE\s+)?(?:UNIQUE\s+)?(?:TEMP(?:ORARY)?\s+)?(?:TABLE|INDEX|TYPE|SCHEMA|VIEW|MATERIALIZED\s+VIEW|SEQUENCE|EXTENSION|DATABASE|TRIGGER|FUNCTION|PROCEDURE|DOMAIN|POLICY|PUBLICATION|COLLATION|ROLE)|TRUNCATE\s+TABLE|(?:ADD|DROP)\s+(?:COLUMN|CONSTRAINT))\b/i
 
 /** The packages whose option types describe a DataSource. */
 const OPTION_PACKAGES = new Set(["typeorm", "@nestjs/typeorm"])
+
+/** The DataSource operations that change the schema at runtime. */
+const SCHEMA_OPERATIONS = new Set(["synchronize", "dropDatabase"])
+
+/** The DataSource operations that run migrations: allowed only in `apps/migrate` and the test world that runs its bootstrap. */
+const MIGRATION_RUNNERS = new Set(["runMigrations", "undoLastMigration"])
+
+/** The typeorm types whose methods write rows. */
+const WRITER_TYPES = ["EntityManager", "DataSource", "QueryRunner"]
+
+/** The typeorm schema builder types. */
+const SCHEMA_BUILDER_TYPES = ["SchemaBuilder", "RdbmsSchemaBuilder"]
+
+/** The writes of an `EntityManager` that need no SQL text to be recognised. */
+const WRITE_METHODS = new Set(["insert", "save", "upsert", "update", "delete", "remove", "softRemove", "softDelete", "recover", "increment", "decrement", "clear"])
+
+/** A statement that writes rows. */
+const WRITE_SQL = /\b(?:INSERT\s+INTO|UPDATE\s+\S+\s+SET|DELETE\s+FROM|MERGE\s+INTO)\b/i
+
+/** The Nest lifecycle hooks that run at boot in every process that composes the provider. */
+const BOOT_HOOKS = new Set(["onModuleInit", "onApplicationBootstrap"])
 
 const isFalse = (node) => node?.type === "Literal" && node.value === false
 
@@ -45,14 +70,64 @@ const stringsUnder = (node) => {
 /** The non-union, non-intersection constituents of a TypeScript type. */
 const leavesOf = (type) => (type.isUnionOrIntersection() ? type.types.flatMap(leavesOf) : [type])
 
-/** Whether an object literal is contextually a DataSource options object: its expected type has a `synchronize` member declared by `typeorm`. */
-const isOptionsObject = (context, node) => {
+/** The `synchronize` members that typeorm declares on the contextual type of an object literal, as TypeScript declarations. */
+const synchronizeMembers = (context, node) => {
     const { checker, toTs } = typed(context)
     const tsNode = toTs(node)
     const expected = tsNode ? checker.getContextualType(tsNode) : undefined
-    if (!expected) return false
-    return leavesOf(expected).some((part) => (checker.getPropertyOfType(part, "synchronize")?.declarations ?? [])
-        .some((declaration) => OPTION_PACKAGES.has(packageOfFile(declaration.getSourceFile().fileName))))
+    if (!expected) return []
+    return leavesOf(expected)
+        .flatMap((part) => checker.getPropertyOfType(part, "synchronize")?.declarations ?? [])
+        .filter((declaration) => OPTION_PACKAGES.has(packageOfFile(declaration.getSourceFile().fileName)))
+}
+
+/** A `synchronize` declared as a method is the DataSource operation, not the options flag. */
+const isMethod = (declaration) => ts.isMethodSignature(declaration) || ts.isMethodDeclaration(declaration)
+
+/** A `synchronize` declared on typeorm's `EntityOptions` is the per-entity switch, not the connection's. */
+const isEntityOption = (declaration) => ts.isInterfaceDeclaration(declaration.parent) && declaration.parent.name.text === "EntityOptions"
+
+/** Whether an object literal is contextually a DataSource options object: its expected type has a `synchronize` option (a property, not the `synchronize()` method, not an entity's) declared by `typeorm`. */
+const isOptionsObject = (context, node) => synchronizeMembers(context, node).some((declaration) => !isMethod(declaration) && !isEntityOption(declaration))
+
+/** Whether an object literal is the options of typeorm's `@Entity(...)`. */
+const isEntityOptions = (context, node) => synchronizeMembers(context, node).some(isEntityOption)
+
+/** Whether an object literal is contextually a DataSource (or a partial of one) whose `synchronize` is the method: its keys are overrides of operations, not configuration. */
+const isOperationsObject = (context, node) => {
+    const members = synchronizeMembers(context, node)
+    return members.length > 0 && members.every(isMethod)
+}
+
+/** Whether a file is `apps/migrate` (slot `be.app.migrate`) or the test world that runs its bootstrap: the only places that run migrations and seed. */
+const isMigrationHost = (hfs, filename) => hfs.slotOf(filename) === "be.app.migrate" || inTestWorld(hfs, filename)
+
+/** The SQL text of a call argument: a literal, a template, or the quasis of a tagged template. */
+const sqlTextOf = (argument) => (argument ? stringsUnder(argument).join(" ") : "")
+
+/**
+ * The first call under a lifecycle hook that writes rows: an `EntityManager`/`DataSource`/`QueryRunner` write method, a `.query(...)` whose
+ * text writes, or a call of another method of the same class (`this.seed()`) that does.
+ */
+const bootWriteOf = (context, method, klass, visited) => {
+    let found = null
+    walk(method.value.body, (node) => {
+        if (found || node.type !== "CallExpression") return
+        const callee = node.callee
+        if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return
+        const name = callee.property.name
+        if (callee.object.type === "ThisExpression") {
+            const target = klass.body.body.find((member) => member.type === "MethodDefinition" && member.kind === "method" && !member.computed && keyName(member.key) === name)
+            if (target && !visited.has(target)) {
+                visited.add(target)
+                found = bootWriteOf(context, target, klass, visited)
+            }
+            return
+        }
+        if (!WRITER_TYPES.some((type) => isPackageType(context, callee.object, type, "typeorm"))) return
+        if (WRITE_METHODS.has(name) || (name === "query" && WRITE_SQL.test(sqlTextOf(node.arguments[0])))) found = node
+    })
+    return found
 }
 
 /** Whether an object literal has a property called `name`. */
@@ -68,8 +143,13 @@ export const noRuntimeSchema = {
             synchronize: "`synchronize` is set to something other than the literal `false`. The schema changes by migration only; a boot-time ORM diff decides it otherwise.",
             synchronizeMissing: "This DataSource options object does not state `synchronize: false`. Write the literal `false` in every options object, so what the connection may do to the schema is readable where it is built.",
             optionsNotLiteral: "`new DataSource(...)` is given options that are not an object literal, so `synchronize: false` cannot be seen. Pass the options as an object literal that states `synchronize: false`.",
-            synchronizeCall: "`.synchronize()` builds the schema at runtime. Write a migration and let `apps/migrate` run it.",
+            synchronizeCall: "`.{{name}}()` changes the schema at runtime. Write a migration and let `apps/migrate` run it.",
             migrationsRun: "`migrationsRun` is banned. Only `apps/migrate` runs migrations, once per connection, before api and worker start.",
+            runMigrations: "`.{{name}}()` runs migrations outside `apps/migrate`. Only `apps/migrate` (and the test world, which runs its bootstrap) runs them, once per connection, before api and worker start.",
+            dropSchema: "`dropSchema` is set to something other than the literal `false`. A connection never drops the schema it opens; a migration changes it.",
+            schemaBuilder: "`{{name}}` builds or logs the schema from the entity metadata at runtime. The schema changes by migration only.",
+            entitySynchronize: "`synchronize` is set in the options of `@Entity`. A per-entity switch is a second schema authority next to the connection's literal `false`; delete the key.",
+            bootSeed: "`{{hook}}` writes rows (`{{call}}`), so every process that composes this provider seeds at boot. Seeding runs in `apps/migrate` only, once per connection.",
             ddl: "A schema-changing statement (`CREATE|ALTER|DROP ...`) outside `persistence/migrations/`. Schema-changing SQL belongs in a migration.",
             glob: "`{{key}}` is found by glob. List the entities and migrations explicitly from each capability's `index.ts` so what runs is what was reviewed.",
         },
@@ -77,15 +157,29 @@ export const noRuntimeSchema = {
     create(context) {
         const filename = context.filename || context.getFilename()
         if (isDeclarationFile(filename)) return {}
-        const migration = isMigrationFile(hfsOf(context), filename)
+        const hfs = hfsOf(context)
+        const migration = isMigrationFile(hfs, filename)
+        const migrationHost = isMigrationHost(hfs, filename)
         return {
             ObjectExpression(node) {
                 if (isOptionsObject(context, node) && !hasKey(node, "synchronize")) context.report({ node, messageId: "synchronizeMissing" })
             },
+            MethodDefinition(node) {
+                if (node.kind !== "method" || node.computed || !BOOT_HOOKS.has(keyName(node.key) ?? "") || migrationHost) return
+                const klass = node.parent?.parent
+                if (klass?.type !== "ClassDeclaration" && klass?.type !== "ClassExpression") return
+                const write = bootWriteOf(context, node, klass, new Set([node]))
+                if (write) context.report({ node: write, messageId: "bootSeed", data: { hook: keyName(node.key), call: context.sourceCode.getText(write.callee) } })
+            },
             Property(node) {
                 if (node.computed) return
                 const key = keyName(node.key)
-                if (key === "synchronize" && !isFalse(node.value)) {
+                if (key === "synchronize" && node.parent?.type === "ObjectExpression" && isEntityOptions(context, node.parent)) {
+                    context.report({ node, messageId: "entitySynchronize" })
+                } else if (key === "dropSchema" && !isFalse(node.value)) {
+                    context.report({ node, messageId: "dropSchema" })
+                } else if (key === "synchronize" && !isFalse(node.value)) {
+                    if (node.parent?.type === "ObjectExpression" && isOperationsObject(context, node.parent)) return
                     context.report({ node, messageId: "synchronize" })
                 } else if (key === "migrationsRun") {
                     context.report({ node, messageId: "migrationsRun" })
@@ -100,8 +194,17 @@ export const noRuntimeSchema = {
             },
             CallExpression(node) {
                 const callee = node.callee
-                if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier" || callee.property.name !== "synchronize") return
-                if (isPackageType(context, callee.object, "DataSource", "typeorm")) context.report({ node, messageId: "synchronizeCall" })
+                if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return
+                const name = callee.property.name
+                if (SCHEMA_OPERATIONS.has(name)) {
+                    if (isPackageType(context, callee.object, "DataSource", "typeorm")) context.report({ node, messageId: "synchronizeCall", data: { name } })
+                } else if (MIGRATION_RUNNERS.has(name)) {
+                    if (!migrationHost && isPackageType(context, callee.object, "DataSource", "typeorm")) context.report({ node, messageId: "runMigrations", data: { name } })
+                } else if (name === "createSchemaBuilder") {
+                    if (isPackageType(context, callee.object, "DataSource", "typeorm")) context.report({ node, messageId: "schemaBuilder", data: { name: "createSchemaBuilder()" } })
+                } else if (name === "build" || name === "log") {
+                    if (SCHEMA_BUILDER_TYPES.some((type) => isPackageType(context, callee.object, type, "typeorm"))) context.report({ node, messageId: "schemaBuilder", data: { name: `${name}()` } })
+                }
             },
             Literal(node) {
                 if (!migration && typeof node.value === "string" && DDL.test(node.value)) context.report({ node, messageId: "ddl" })

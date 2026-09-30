@@ -100,19 +100,15 @@ writes:
         `SLICE_PREEXISTING_FINDINGS` note (slice.preexisting, slice.counts) owed to code.refactor and
         measured by review.verify's --all run, never an open item and never a block. Write the
         scoped-lint JSON under STARCI_JOB_SCRATCH with --compact and attach it at api report (the slice verdict, counts and the slice's findings; the
-        full repository inventory is 20-30 MB per attempt and is never evidence). Coverage for the
-        slice is this attempt's own slice run, into a job-private directory outside the checkout so
-        a peer's test:ci in the shared checkout cannot overwrite it: the repository's jest with the
-        unit-project flags its test:ci uses, `--ci --coverage --coverageReporters=lcovonly
-        --coverageDirectory=<STARCI_JOB_SCRATCH>/coverage --collectCoverageFrom=<owned source
-        path>/**` over the slice's test paths (a repository coverageThreshold judged over only the
-        slice is a note, never this gate - the Sonar slice verdict is). The repository's full
+        full repository inventory is 20-30 MB per attempt and is never evidence). Unit coverage is the
+        runner's: the unit project (`npm test`, jest with `--coverage`) fails below its per-file 100
+        threshold on `*.service.ts`; Sonar imports no coverage. The repository's full
         test:ci is never an attempt's run (owner 2026-09-29): this op writes or updates the unit specs of the source it adds or changes and runs only those and the specs that import it; the whole unit suite is unit.verify's or /push-git's
         (CONTEXT.md useful verification). Run Sonar only through
         `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <absolute repository root>
-        --wait --isolate --lcov <that directory>/lcov.info --base <source commit recorded before
+        --wait --isolate --base <source commit recorded before
         this slice's first edit> --paths <owned paths, comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log
-        <STARCI_JOB_SCRATCH>/checks/sonar.txt` right after that coverage run in this same attempt; attach both files at api report (--isolate analyses only the
+        <STARCI_JOB_SCRATCH>/checks/sonar.txt` in this same attempt; attach both files at api report (--isolate analyses only the
         slice in a throwaway project: minutes, where a whole nivo-backend analysis took 17-40
         minutes for a 1-5 file slice): it scans against the local SonarQube the
         stack declaration names (default the source host's dev stack), takes the project key, host
@@ -121,15 +117,14 @@ writes:
         dashboard URL; never run a bare scanner or supply a token by hand. The Sonar proof is this
         slice's own: outcome pass means no open blocker or critical issue and no to-review security hotspot on a line
         the slice changed, its duplicated share of the changed lines within the duplication
-        threshold and its changed lines meeting the new-coverage threshold - the numbers are
+        threshold - the numbers are
         knowledge/sonar-gate.yaml's alone. The gate is enforced at settle: the runtime re-reads the
         attached sonar.json and refuses a done without outcome pass (sonar-gate-red, sonar-scan-refused,
         sonar-proof-missing); a scan that could not run (outcome blocked, unavailable true: server
         down, custody missing) is reported blocked, never done - the runtime records the explicit
         sonar-unavailable why and tells the Supervisor. The
         whole-project quality gate and debt outside the slice are recorded as projectGate, a note,
-        never a block and never an open item. A stale or missing lcov (older than the head commit
-        or a slice file) is refused before the scan: run the slice coverage again and rescan. Scanner
+        never a block and never an open item. Scanner
         submission alone is not pass. Fix scoped failures and rerun affected checks. A
         helper outcome blocked (server down, custody missing), a missing runner or coverage target
         is blocked/not-run, never pass and never an owner credential ask; do not move this
@@ -288,8 +283,7 @@ proofs:
         plus coverage from unit runs only and Sonar. Evidence records command, environment, tested
         source tree/full commit, exit and counts for each gate. No e2e suite, e2e typecheck or e2e
         coverage runs here (E2E is manual only, e2e.verify). Sonar passes only as the sonar-local.mjs
-        attached sonar.json summary with scope slice and outcome pass for the tested commit, scanned after
-        a fresh coverage run of the same attempt; the whole-project gate is a note, never a
+        attached sonar.json summary with scope slice and outcome pass for the tested commit; the whole-project gate is a note, never a
         block. Scanner submission
         without the processed server result, a missing runner/dependency, or any not-run required
         gate is blocked rather than pass.
@@ -341,8 +335,6 @@ policy:
     sonarProjectGate: note-never-block
     sonarEnforcement: settle-refuses-done-without-pass-unavailable-is-explicit
     sonarAnalysis: isolated-slice
-    coverageFreshness: lcov-from-this-attempt-newer-than-head
-    coverageScope: slice-run-into-job-private-directory
     fullSuite: cut-set-closing-pass-or-release-checkpoint
     repoWideRedOutsideSlice: record-failing-with-rootCause-never-partial
     missingRunner: blocked

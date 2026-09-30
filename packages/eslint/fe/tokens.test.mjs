@@ -138,9 +138,6 @@ test("TOKEN-9: a class naming a theme token is dead unless the theme defines it"
       { filename: `${THEMED}/scripts/report.mjs`, code: 'const M = "max-w-app-xl"' },
       // A file under a src folder that no product slot owns is not product source (the old `/src/` test judged it).
       { filename: `${THEMED}/apps/web/src/lib/x.ts`, code: 'const M = "max-w-app-xl"' },
-      // The e2e tree is not product source, and a spec asserts about class names rather than declaring them.
-      { filename: `${THEMED}/e2e/support/view.ts`, code: 'const M = "max-w-app-xl"' },
-      { filename: `${THEMED}/apps/web/src/features/pages/Reader/component.spec.tsx`, code: 'const M = "max-w-app-xl"' },
     ],
     invalid: [
       // another app has its own stylesheet: this one's token does not resolve there

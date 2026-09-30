@@ -68,7 +68,7 @@ provenance:
     and title in the tone's soft-foreground); the `SectionHeader` title is on the type scale - FONT-4 20/28 for
     level 1, FONT-3 16/24 for levels 2-6, weight 600 (was clamp(20px..28px) / 700), its eyebrow weight 600, and
     the header wraps its action below the copy at a narrow width.
-    Added in 0.6.0 (2026-09-27; owner ruling "thêm hết", the draw-real-components gaps; additive):
+    Added in 0.6.0 (2026-09-27; owner ruling "add all of it", the draw-real-components gaps; additive):
     `SurfaceCard` `treatment` "surface" | "ink" (the one signature band on the brand ink - Core `--accent`, Offset
     Pop its ink and canvas - re-binding foreground (from the ink's own lightness), muted, separator, plate and the
     soft tone foregrounds so children stay AA on any accent), with `artwork` (a decorative, aria-hidden slot that bleeds off the

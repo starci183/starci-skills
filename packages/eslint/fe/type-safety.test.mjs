@@ -16,7 +16,6 @@ import { noDoubleCast, noExplicitAny, noNonNullAssertion, noTypeAssertion, rules
 const tester = slotTester()
 
 const SOURCE = at("apps/web/src/modules/api/client.ts")
-const TEST = at("apps/web/src/modules/api/client.test.ts")
 const TOOLING = at("apps/web/next.config.ts")
 
 test("every rule this law declares is exported under its published name", () => {
@@ -33,8 +32,6 @@ test("TYPE-SAFETY-1: a cast through unknown erases what the compiler knew", () =
       // narrowing FROM unknown is the shape this rule is asking for
       { filename: SOURCE, code: "const answer: unknown = parse(text)" },
       { filename: SOURCE, code: "const n = value as unknown" },
-      // a test builds values the types forbid, because that is what it is proving
-      { filename: TEST, code: "return operation as unknown as ApolloLink.Operation" },
       // tooling and config sit in no product tier
       { filename: TOOLING, code: "const n = value as unknown as Config" },
     ],
@@ -62,8 +59,6 @@ test("TYPE-SAFETY-2: an assertion is a claim the compiler cannot check", () => {
       { filename: SOURCE, code: "const row = isRow(payload) ? payload : null" },
       // the outer half of a cast through unknown is no-double-cast's finding, not a second one here
       { filename: SOURCE, code: "const row = payload as unknown as ResumeRow" },
-      // a test builds values the types forbid
-      { filename: TEST, code: "const row = payload as ResumeRow" },
       { filename: TOOLING, code: "const row = payload as ResumeRow" },
     ],
     invalid: [
@@ -87,7 +82,6 @@ test("TYPE-SAFETY-3: a non-null assertion proves nothing", () => {
     valid: [
       { filename: SOURCE, code: "const first = rows[0] ?? fallback" },
       { filename: SOURCE, code: "if (row) use(row.id)" },
-      { filename: TEST, code: "const first = rows[0]!" },
     ],
     invalid: [
       { filename: SOURCE, code: "const first = rows[0]!", errors: [{ messageId: "bang" }] },
@@ -102,7 +96,6 @@ test("TYPE-SAFETY-4: any turns checking off", () => {
     valid: [
       { filename: SOURCE, code: "const x: unknown = 1" },
       { filename: SOURCE, code: "const anything = 1" },
-      { filename: TEST, code: "const x: any = 1" },
     ],
     invalid: [
       { filename: SOURCE, code: "const x: any = 1", errors: [{ messageId: "any" }] },

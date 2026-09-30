@@ -9,7 +9,7 @@
  *   - `require-enum-member-jsdoc` can check that a doc EXISTS and never that it states a
  *     consequence. That half is read by a person, and the rule says so rather than pretending.
  *   - `no-non-ascii-source` takes no exemption marker: HFS removed `vn-ok`, so text a program depends on
- *     lives in a message catalog (slot be.domain.messages or be.feature.messages), the only place Vietnamese may appear. Specs
+ *     lives in a message catalog (slot be.domain.messages, of any module tier, or be.feature.messages), the only place Vietnamese may appear. Specs
  *     and fixtures get no exemption.
  *   - `no-restated-name-jsdoc` (law 7) holds the decidable slice of law 3 - a doc block whose only
  *     content is the declared name re-spelled in words teaches nothing beyond the import line, so it
@@ -20,6 +20,7 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
+import { hasSecondLanguage } from "./runtime/scripts/lib/language.mjs"
 
 /** The slots of the per-owner message catalogs: the only source files that may hold Vietnamese. */
 const CATALOG_SLOTS = new Set(["be.domain.messages", "be.feature.messages"])
@@ -44,13 +45,19 @@ const CATALOG_SLOTS = new Set(["be.domain.messages", "be.feature.messages"])
  *
  * Typographic punctuation is none of those and stays.
  */
-const VIETNAMESE_LETTER = /[À-ÃÈ-ÊÌÍÒ-ÕÙÚÝà-ãè-êìíò-õùúýĂăĐđĨĩŨũƠơƯưẠ-ỿ]/
+const VIETNAMESE_LETTER_NOTE = "detected by scripts/lib/language.mjs (`hasSecondLanguage`), structural on characters and folded to NFC so a decomposed spelling is caught too"
 
 /** Emoji and pictographs. */
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{1F000}-\u{1F0FF}\u{2600}-\u{27BF}\u{FE0F}\u{1F1E6}-\u{1F1FF}]/u
 
 /** Ornamental marks that stand in for a word. */
 const ORNAMENT = /[✅❌✔✖✗✘⭐⬆⬇➡⬅]/
+
+/**
+ * The fixtures slot that may carry localized text: a test data file that reproduces a real localized string. Placement is
+ * the whole marker (there is no pragma), and specs never live there, so a test title is never exempt.
+ */
+const FIXTURE_SLOTS = new Set(["be.tests.fixtures.i18n"])
 
 /** The Vietnamese language's own name, which is a label rather than prose. */
 const ENDONYM = /Tiếng Việt/
@@ -66,8 +73,8 @@ const DOCUMENTED_KINDS = new Set([
 
 /** What a line offends with, or null. */
 const offenceIn = (line) => {
-  const withoutEndonym = line.replace(ENDONYM, "")
-  if (VIETNAMESE_LETTER.test(withoutEndonym)) return "a Vietnamese letter"
+  const withoutEndonym = line.normalize("NFC").replace(ENDONYM, "")
+  if (hasSecondLanguage(withoutEndonym)) return "a Vietnamese letter"
   if (EMOJI.test(withoutEndonym)) return "an emoji"
   if (ORNAMENT.test(withoutEndonym)) return "an ornamental symbol"
   return null
@@ -173,7 +180,8 @@ export const noNonAsciiSource = {
   create(context) {
     const sourceCode = context.sourceCode || context.getSourceCode()
     // a message catalog is product copy in two languages; every other file is prose for the next reader
-    if (CATALOG_SLOTS.has(hfsOf(context).slotOf(context.filename))) return {}
+    const slot = hfsOf(context).slotOf(context.filename)
+    if (CATALOG_SLOTS.has(slot) || FIXTURE_SLOTS.has(slot)) return {}
 
     return {
       "Program:exit"(node) {

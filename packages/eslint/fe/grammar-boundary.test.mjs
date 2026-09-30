@@ -63,9 +63,6 @@ test("FE-GRAMMAR-1: page structure and text are grammar components, not raw tags
       // the renderers themselves draw raw tags
       { filename: at("packages/nivo-ui/src/leaves/Note/component.tsx"), code: raw("p") },
       { filename: at("packages/nivo-ui/src/composites/Panel/index.tsx"), code: raw("section") },
-      // a spec renders raw HTML as its harness
-      { filename: at("apps/web/src/features/pages/home/component.spec.tsx"), code: raw("section") },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: raw("ul") },
       // a file no slot owns is not judged here
       { filename: at("scripts/render.tsx"), code: raw("p") },
     ],

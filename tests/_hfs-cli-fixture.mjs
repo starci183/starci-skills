@@ -7,11 +7,10 @@ import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '..
 import { renderTargets, writeTargets } from '../packages/hfs/sync/index.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index.cjs');
-const vitestPreset = await import('../packages/vitest-preset/index.mjs');
-/** The coverage denominators `hfs sync` would load from the preset a repository installs, per profile. */
+/** The Sonar exclusions `hfs sync` would load from the preset a repository installs, per profile (a front end has no test runner, so none). */
 export const PRESETS = {
-  be: { sonarExclusions: jestPreset.sonarExclusions(), sonarCoverageExclusions: jestPreset.sonarCoverageExclusions() },
-  fe: { sonarExclusions: vitestPreset.sonarExclusions(), sonarCoverageExclusions: vitestPreset.sonarCoverageExclusions() },
+  be: { sonarExclusions: jestPreset.sonarExclusions() },
+  fe: null,
 };
 
 export const BE = { hfs: 1, profile: 'be', project: 'demo', apps: [{ name: 'core', kind: 'api' }] };
@@ -20,7 +19,7 @@ export const FE = { hfs: 1, profile: 'fe', project: 'demo', apps: [{ name: 'web'
 /** The repository's `prettier` for a spec that is not about formatting: it judges every file formatted. */
 export const FORMATTED = Object.freeze({ getFileInfo: async () => ({ ignored: false, inferredParser: 'babel' }), resolveConfig: async () => null, check: async () => true });
 /** application-stacks.yaml as the standard shape wants it: a Sonar owned by the host. */
-export const STACKS_DECLARATION = ['schema: starci/application-stacks@1', 'services:', '  sonar:', '    provider: sonarqube', '    mode: local', '    stack:', '      owner: host', '      root: .claude/ext/sonar', '      environment: dev', ''].join('\n');
+export const STACKS_DECLARATION = ['schema: starci/application-stacks@1', 'services:', '  sonar:', '    provider: sonarqube', '    mode: local', '    stack:', '      owner: host', '      root: .claude/ext/sonar', '      environment: dev', '    qualityGate: starci-new-code', ''].join('\n');
 
 const readmeOf = (name, profile) => [`# ${name}`, '', 'A demo repository for the hfs check specs.', '', '## Overview', '', 'Demo.', '', '## Stack', '', 'TypeScript.', '', '## Repository layout', '', 'apps and src.', '',
   '## Development', '', '```sh', 'npm ci', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm test', '```', '', ...(profile === 'be' ? ['## Work', '', 'Records live in `.starciwork`.', ''] : [])].join('\n');
@@ -97,10 +96,8 @@ export function cleanup(dirs) {
   for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });
 }
 
-/** Installs the coverage presets `hfs sync` and `hfs check` load from the checked repository (a fresh process has no injected presets), without tracking them. */
+/** Installs the coverage preset `hfs sync` and `hfs check` load from a checked back-end repository (a fresh process has no injected presets), without tracking it. */
 export function installPresets(dir) {
-  for (const name of ['jest-preset', 'vitest-preset']) {
-    fs.cpSync(path.resolve(import.meta.dirname, '..', 'packages', name), path.join(dir, 'node_modules', '@starci', name), { recursive: true });
-  }
+  fs.cpSync(path.resolve(import.meta.dirname, '..', 'packages', 'jest-preset'), path.join(dir, 'node_modules', '@starci', 'jest-preset'), { recursive: true });
   return dir;
 }

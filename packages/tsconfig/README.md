@@ -5,7 +5,7 @@ Five TypeScript configs, all strict, all with `noImplicitAny`. Install it from t
 | File | For | Adds to `base.json` |
 |---|---|---|
 | `base.json` | anything | `strict`, `noImplicitAny`, `strictNullChecks`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `isolatedModules`, `esModuleInterop`, `resolveJsonModule`, `skipLibCheck` |
-| `be.json` | back end | `noUncheckedIndexedAccess`, `noImplicitReturns`, `noUnusedLocals`, `noUnusedParameters`, `allowJs: false`, decorators, decorator metadata and `importHelpers` (`tslib`), `nodenext` module and resolution (CommonJS output, since a back end has no `"type": "module"`), ES2023, `noEmit` |
+| `be.json` | back end | `noUncheckedIndexedAccess`, `noImplicitReturns`, `noUnusedLocals`, `noUnusedParameters`, `allowJs: false`, decorators and decorator metadata, `nodenext` module and resolution (CommonJS output, since a back end has no `"type": "module"`), ES2023, `noEmit` |
 | `build.json` | back-end emit | `be.json` with `noEmit: false` |
 | `next.json` | front-end app | `esnext` + `bundler`, `react-jsx`, DOM libs, `noEmit`, the `next` plugin |
 | `e2e.json` | e2e typecheck overlay | `noEmit`, no incremental, no declarations |

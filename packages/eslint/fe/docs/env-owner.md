@@ -25,9 +25,9 @@ const url = config.apiUrl
 
 **Finding code:** `FE_ENV_OWNER`
 
-**Vì sao (why):** `<file>` đọc biến môi trường. Chỉ `modules/config` được đọc env.
+**Why:** `<file>` reads environment variables. Only `modules/config` may read env.
 
-**Cách sửa:** Đọc giá trị từ export có kiểu của `modules/config` thay vì `process.env`.
+**Fix:** Read the value from a typed export of `modules/config` instead of `process.env`.
 
 ## `starci-fe/no-hardcoded-endpoint-fallback`
 
@@ -47,6 +47,6 @@ const url = process.env.API_URL
 
 **Finding code:** `FE_ENV_OWNER`
 
-**Vì sao (why):** `<file>` có giá trị dự phòng cứng cho địa chỉ hoặc bí mật (`?? "http://localhost…"`). Thiếu biến ở production phải ném lỗi khi nạp cấu hình, không được lặng lẽ trỏ về máy dev.
+**Why:** `<file>` has a hard fallback value for an address or secret (`?? "http://localhost…"`). A missing variable in production must throw when the configuration loads, never silently point at a dev machine.
 
-**Cách sửa:** Xóa giá trị dự phòng; để `modules/config` ném lỗi khi thiếu biến ở production.
+**Fix:** Remove the fallback; let `modules/config` throw when a variable is missing in production.

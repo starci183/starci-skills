@@ -12,7 +12,7 @@
  * shape that makes it provable: one reader, and no literal fallback next to it.
  */
 
-import { isConfigModule, isSpecFile } from "./lib/scope.mjs"
+import { isConfigModule } from "./lib/scope.mjs"
 
 /** `process.env`, or `import.meta.env`. */
 const isEnvObject = (node) => {
@@ -67,7 +67,7 @@ export const noEnvOutsideConfig = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (isConfigModule(context) || isSpecFile(filename)) return {}
+    if (isConfigModule(context)) return {}
     return {
       MemberExpression(node) {
         if (isEnvObject(node)) context.report({ node, messageId: "env" })
@@ -101,7 +101,6 @@ export const noHardcodedEndpointFallback = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     return {
       LogicalExpression(node) {
         if (node.operator !== "??" && node.operator !== "||") return

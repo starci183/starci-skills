@@ -9,7 +9,7 @@
  * consumer's node_modules sits above .claude/packages/fe-kit - so this script junctions
  * the needed packages into ./node_modules, pointing at one consumer's installed tree.
  * In a consumer build the bundler's own resolve.alias additionally pins these names to
- * that consumer's copies, so the junctions are what eslint/tsc/vitest see and never the
+ * that consumer's copies, so the junctions are what eslint/tsc see and never the
  * copy an app bundle actually links.
  *
  * Usage: node scripts/link-peers.mjs [consumer]

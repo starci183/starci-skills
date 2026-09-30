@@ -70,8 +70,24 @@ test("R47: integration asks for { modules }, e2e for { apps }; useE2eWorld does 
         valid: [
             { filename: INTEGRATION, code: `${world}export const world = useTestWorld({ modules: [] })` },
             { filename: E2E, code: `${world}export const world = useTestWorld({ apps: { order: {} } })` },
+            { filename: INTEGRATION, code: `${world}const modules = []
+export const world = useTestWorld({ modules })` },
+            { filename: E2E, code: `${world}export const world = useTestWorld({ "apps": { order: {} } })` },
         ],
         invalid: [
+            { filename: INTEGRATION, code: `${world}const spec = { modules: [] }
+export const world = useTestWorld(spec)`, errors: [{ messageId: "literal" }] },
+            { filename: INTEGRATION, code: `${world}declare const extra: object
+export const world = useTestWorld({ modules: [], ...extra })`, errors: [{ messageId: "literal" }] },
+            { filename: INTEGRATION, code: `${world}declare const apps: string
+export const world = useTestWorld({ modules: [], [apps]: {} })`, errors: [{ messageId: "literal" }] },
+            { filename: INTEGRATION, code: `${world}export const world = useTestWorld({ modules: [], ["apps"]: {} })`, errors: [{ messageId: "modules" }] },
+            { filename: INTEGRATION, code: `${world}export const world = useTestWorld({})`, errors: [{ messageId: "modules" }] },
+            { filename: INTEGRATION, code: `${world}export const world = useTestWorld()`, errors: [{ messageId: "literal" }] },
+            { filename: INTEGRATION, code: `${world}export const world = useTestWorld({ apps: {} })
+export const again = useTestWorld({ modules: [] })`, errors: [{ messageId: "modules" }] },
+            { filename: E2E, code: `${world}const alias = useTestWorld
+export const world = alias({ apps: {} })`, errors: [{ messageId: "missing" }] },
             { filename: INTEGRATION, code: `${world}export const world = useTestWorld({ apps: { order: {} } })`, errors: [{ messageId: "modules" }] },
             { filename: E2E, code: `${world}export const world = useTestWorld({ modules: [] })`, errors: [{ messageId: "apps" }] },
             { filename: E2E, code: "export const nothing = 1", errors: [{ messageId: "missing" }] },

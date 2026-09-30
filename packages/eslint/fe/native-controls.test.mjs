@@ -32,7 +32,6 @@ test("NATIVE-1: no bare select, input, textarea or button in product source", ()
       // a component that merely has a native name as a member is not the element
       { filename: BLOCK, code: "const E = () => <Form.Input />" },
       { filename: BLOCK, code: "const E = () => <div><span /></div>" },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: "const E = () => <button />" },
     ],
     invalid: [
       { filename: BLOCK, code: "const E = () => <button onClick={go} />", errors: [{ messageId: "native" }] },
@@ -49,7 +48,6 @@ test("NATIVE-2: no bare img in product source", () => {
     valid: [
       { filename: BLOCK, code: "const E = () => <Image src={src} alt={t('a')} width={40} height={40} />" },
       { filename: BLOCK, code: "const E = () => <picture />" },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: "const E = () => <img />" },
     ],
     invalid: [
       { filename: BLOCK, code: "const E = () => <img src={src} alt={t('a')} />", errors: [{ messageId: "img" }] },
@@ -67,7 +65,6 @@ test("NATIVE-3: a next/image reserves its space", () => {
       { filename: BLOCK, code: IMPORT + "const E = () => <Image {...props} />" },
       { filename: BLOCK, code: "const E = () => <Image src={s} />" },
       { filename: BLOCK, code: "import { Image } from '@starci/grammar'\nconst E = () => <Image src={s} />" },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: IMPORT + "const E = () => <Image src={s} />" },
     ],
     invalid: [
       { filename: BLOCK, code: IMPORT + "const E = () => <Image src={s} alt='' />", errors: [{ messageId: "size" }] },

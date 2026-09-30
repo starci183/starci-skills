@@ -39,10 +39,6 @@ test("BRAND-1: no raw colour, hex or px value outside brand.css", () => {
       { filename: BLOCK, code: "const s = \"step2px\"" },
       // Tailwind arbitrary px belongs to no-arbitrary-value
       { filename: BLOCK, code: "const c = \"w-[12px]\"" },
-      // specs may assert on raw values
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "const c = \"#ff0000\"" },
-      // e2e fixtures reproduce real values
-      { filename: at("e2e/fixtures/theme.ts"), code: "const c = \"#ff0000\"" },
     ],
     invalid: [
       { filename: at("packages/nivo-ui/src/leaves/Badge/index.tsx"), code: "const c = \"#ff0000\"", errors: [{ messageId: "color" }] },

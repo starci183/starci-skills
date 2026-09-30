@@ -26,8 +26,8 @@ test('the shipped catalog is 1.0.0, validates against its JSON schema and loads 
   assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
   const catalog = loadRuleCatalog({ manifest: loadSlotManifest() });
   assert.equal(catalog.major, 1);
-  assert.equal(catalog.rules.length, Number(catalog.rules.at(-1).id.slice(1)), 'ids run from R01 without gaps');
-  catalog.rules.forEach((rule, index) => assert.equal(rule.id, `R${String(index + 1).padStart(2, '0')}`));
+  assert.deepEqual(catalog.rules.map((r) => r.id), [...catalog.rules.map((r) => r.id)].sort(), 'ids increase; a retired rule leaves its id unused, so there may be gaps');
+  assert.equal(new Set(catalog.rules.map((r) => r.id)).size, catalog.rules.length);
   for (const rule of catalog.rules) {
     assert.ok(rule.enforcers.length > 0, `${rule.id} has an enforcer`);
     assert.equal(rule.failureCodes[0], rule.code);
@@ -89,7 +89,8 @@ test('schema and loader agree on a broken catalog', () => {
 });
 
 test('the loader also refuses what only semantics can see', () => {
-  refusal(load((d) => { d.rules[1].id = 'R05'; }), 'HFS_RULES_INVALID');
+  refusal(load((d) => { d.rules[1].id = 'R01'; }), 'HFS_RULES_INVALID');   // ids only increase: a repeat or a step back is refused
+  assert.doesNotThrow(load((d) => { d.rules.splice(1, 1); }));             // a retired rule leaves a gap in the ids, which is fine
   refusal(load((d) => { d.rules[1].failureCodes = [d.rules[1].code, d.rules[0].code]; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].failureCodes = ['HFS_SOMETHING_ELSE']; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].gates = ['pre-push', 'settle']; }), 'HFS_RULES_INVALID');

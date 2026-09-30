@@ -96,7 +96,7 @@ jobs:
         working-directory: .
         run: node scripts/checks/check-scoped-lint.mjs --profile nest --root examples/todo-app-backend --all
 
-  # 3) todo-app-frontend: type-check, unit tests, lint, production build and the scoped-lint gate.
+  # 3) todo-app-frontend: type-check, lint, production build and the scoped-lint gate (a front end has no tests).
   frontend:
     name: frontend
     runs-on: ubuntu-latest
@@ -120,16 +120,13 @@ jobs:
 
       # packages/fe-kit ships as source behind the `@fe-kit/*` alias, and nothing resolves its peers
       # (react, next, next-intl, @starci/grammar and their types) from packages/fe-kit upward. This
-      # junctions them onto this app's installed copies, which is what tsc, eslint, vitest and next read.
+      # junctions them onto this app's installed copies, which is what tsc, eslint and next read.
       - name: Link fe-kit peers to this app's install
         working-directory: .
         run: node packages/fe-kit/scripts/link-peers.mjs todo-app-frontend
 
       - name: Type-check (no emit)
         run: npx tsc --noEmit
-
-      - name: Unit tests
-        run: npx vitest run
 
       - name: Lint
         run: npx eslint .

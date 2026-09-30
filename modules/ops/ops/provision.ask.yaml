@@ -74,7 +74,7 @@ steps:
         value itself. A quality-service credential is never a provision: a SonarQube token or host,
         a Sonar project, and the GitHub secret or variable that would carry them into CI are
         resolved, created or minted by scripts/checks/sonar-local.mjs from the stack declaration and
-        the source stack custody (owner ruling 2026-09-24), and Codecov uploads use OIDC - such an
+        the source stack custody (owner ruling 2026-09-24) - such an
         ask is refused with RUNTIME_OWNED_CREDENTIAL."
   - reads:
       - question
@@ -128,7 +128,7 @@ steps:
       - environment
     writes: [report]
     action:
-      en: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish, \"hạn chế provision ask\"; modules/kernel/
+      en: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish, \"limit provision asks\"; modules/kernel/
         driver-loop.yaml autopilot): mid-flow this op is not planned - api enqueue refuses it and a credential, real-
         money or shared-system need is recorded deferred-to-handover while the build proceeds on sandbox, test stubs
         and placeholders. The one run under autopilot is the end-of-flow credential checklist (params.subject
@@ -170,8 +170,7 @@ blockers:
         it.
   - code: RUNTIME_OWNED_CREDENTIAL
     condition:
-      en: The ask names a SonarQube token, host or project, or a GitHub secret/variable for Sonar or
-        Codecov CI. The runtime owns these - the asking operation is sent back to run
+      en: The ask names a SonarQube token, host or project, or a GitHub secret/variable for Sonar CI. The runtime owns these - the asking operation is sent back to run
         scripts/checks/sonar-local.mjs (status, ensure-project --with-token, scan), and a custody or
         server gap it reports is repaired in the source stack, never asked of the owner. Wiring the
         CI secret is an optional follow-up, not an owner provision.

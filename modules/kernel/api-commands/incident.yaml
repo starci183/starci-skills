@@ -94,8 +94,8 @@ incident:
     kernel; for an owner-gate / owner-gate-pending the default is owner). It needs
     a VERIFIED owner answer when its --detail claims an owner decision (owner
     confirmed / approved / accepted / ruled / answered, owner's approval, "Owner
-    answer relayed", Vietnamese owner đã / chủ dự án xác nhận / thầy duyệt / được
-    owner duyệt / xác nhận của chủ sở hữu, accented or not) or it resolves as the
+    answer relayed", the Vietnamese equivalents of owner confirmed / project owner confirmed / teacher approved /
+    owner approved / owner confirmation, accented or not) or it resolves as the
     owner: --owner-answer <dispatchId> (or an ask id cited in --detail) names an
     ask whose ask-answered event AND starci/ask-answer@1 receipt both say
     answeredBy owner - the check handover.mjs makes for the handover approval.
@@ -111,7 +111,7 @@ incident:
     api status carries two lints, each key present only when non-empty:
     frontier.ownerGatesNotOwnerWork [{incidentId, kind, marker, detail}] - an open
     owner-gate whose own text says it is not the owner's step (RUNTIME LIMIT,
-    runtime defect, deferred settle, "không phải việc owner", waits on the
+    runtime defect, deferred settle, "not the owner's job", waits on the
     supervisor; nivo inc-1d6e73af51cc, inc-c85f3b0c1603). The gate is the only
     mechanism that holds jobs, so the raise is not refused; the runtime defect itself
     goes to the supervisor as --kind source-runtime-defect and the gate resolves

@@ -63,6 +63,10 @@ test("infra-import-owner: each raw library is used only by its owner", () => {
             { filename: at("src/modules/platform/primitives/time.ts"), code: `import moment from "moment"\nexport { moment }` },
             { filename: CACHE, code: `import { caching } from "cache-manager"\nimport { createClient } from "redis"\nexport { caching, createClient }` },
             { filename: REDIS, code: `import Redis from "ioredis"\nexport { Redis }` },
+            // the world's inlined helpers (slot be.tests.world.kit) belong to the same composition root: raw client, timers
+            { filename: at("src/tests/world/kit/e2e-http-client.ts"), code: `import axios from "axios"
+export { axios }` },
+            { filename: at("src/tests/world/kit/poll.ts"), code: `export const wait = () => new Promise((resolve) => setTimeout(resolve, 5))` },
             // a local binding that shadows a global name is not the global
             { filename: DOMAIN, code: `export const f = (fetch: (x: string) => number) => fetch("a")` },
             { filename: DOMAIN, code: `const setTimeout = (fn: () => void) => fn()\nexport const g = () => setTimeout(() => 1)` },
@@ -102,6 +106,8 @@ export { axios }`, errors: [{ messageId: "foreign" }] },
             { filename: FEATURE, code: `export const ping = () => fetch("/health")`, errors: [{ messageId: "foreign" }] },
             // the world owns only what the table gives an owner: a library owned by nobody is refused there too
             { filename: E2E, code: `import "dotenv/config"`, errors: [{ messageId: "nowhere" }] },
+            // the kit is not a way around the table: a library owned by nobody stays refused there
+            { filename: at("src/tests/world/kit/env.ts"), code: `import "dotenv/config"`, errors: [{ messageId: "nowhere" }] },
             // nowhere: not even the capability that would seem to own it
             { filename: CONFIG, code: `import { ConfigModule } from "@nestjs/config"\nexport { ConfigModule }`, errors: [{ messageId: "nowhere" }] },
             { filename: CONFIG, code: `import "dotenv/config"`, errors: [{ messageId: "nowhere" }] },

@@ -6,7 +6,7 @@
  * nothing else, wraps nothing in an envelope and accepts no free-form JSON.
  *
  * Scope comes from the HFS slot view (`be.transport.*`, `be.transport.http`); what a receiver is comes from its TYPE
- * (`CommandBus`, `QueryBus`, `RequestLocale`, `Inbox` are judged by where they are declared); what a decorator is comes
+ * (`CommandBus`, `QueryBus`, `RequestLocale` are judged by where they are declared); what a decorator is comes
  * from the import that binds it. No rule tests a directory spelled in a path pattern or a variable name.
  */
 import ts from "typescript"
@@ -57,7 +57,7 @@ const isAllowedInjection = (context, hfs, slot, annotation) => {
     return origins.some((origin) => {
         if ((origin.name === "CommandBus" || origin.name === "QueryBus") && origin.module === "@nestjs/cqrs") return true
         if (origin.name === "RequestLocale" && slot === HTTP_SLOT && declaredByCapability(hfs, origin.file, "i18n")) return true
-        return origin.name === "Inbox" && (slot === HTTP_SLOT || slot === "be.transport.message") && declaredByCapability(hfs, origin.file, "inbox")
+        return false
     })
 }
 
@@ -86,27 +86,12 @@ const dispatchesOf = (context, method) => {
 /** Statements and expressions that are a decision or a repetition: none of them belongs in a door. */
 const DECISION_NODES = new Set(["IfStatement", "SwitchStatement", "ConditionalExpression", "LogicalExpression", "ForStatement", "ForInStatement", "ForOfStatement", "WhileStatement", "DoWhileStatement", "TryStatement", "ThrowStatement"])
 
-/** What an injected type is to a door: `bus`, `inbox`, `locale`, or null. */
+/** What an injected type is to a door: `bus`, `locale`, or null. */
 const injectedKind = (context, annotation) => {
     const origins = typeOrigins(context, annotation)
     if (origins.some((origin) => (origin.name === "CommandBus" || origin.name === "QueryBus") && origin.module === "@nestjs/cqrs")) return "bus"
-    if (origins.some((origin) => origin.name === "Inbox" && origin.module === null)) return "inbox"
     if (origins.some((origin) => origin.name === "RequestLocale" && origin.module === null)) return "locale"
     return null
-}
-
-/** True when an `if` is the one guard R80 demands: `if (!(await this.inbox.claim(...))) return`, or the same on a stored claim answer. */
-const isClaimGuard = (statement, claimed) => {
-    if (statement.type !== "IfStatement" || statement.alternate) return false
-    const consequent = statement.consequent.type === "BlockStatement" && statement.consequent.body.length === 1 ? statement.consequent.body[0] : statement.consequent
-    if (consequent.type !== "ReturnStatement" || consequent.argument) return false
-    let test = statement.test
-    if (test.type === "UnaryExpression" && test.operator === "!") test = test.argument
-    else if (test.type === "BinaryExpression" && test.operator === "===" && test.right.type === "Literal" && test.right.value === false) test = test.left
-    else return false
-    if (test.type === "AwaitExpression") test = test.argument
-    if (test.type === "Identifier") return claimed.has(test.name)
-    return test.type === "CallExpression" && test.callee.type === "MemberExpression" && test.callee.property.name === "claim"
 }
 
 /** True for `this.<name>` where name is one of `names`. */
@@ -119,11 +104,11 @@ export const transportIsThin = {
         docs: { description: "A transport class injects only `CommandBus`/`QueryBus`, and every handler method maps its input, dispatches exactly one command or query and returns the result: no decision, no loop, no other call." },
         schema: [],
         messages: {
-            injects: "`{{what}}` is injected into a transport class. A door maps its input and dispatches: it injects only `CommandBus` and `QueryBus` (plus `RequestLocale` in a REST door and the `Inbox` of a consumer). Move whatever this needs into a service and dispatch a command or query; an `EntityManager` never reaches a door.",
+            injects: "`{{what}}` is injected into a transport class. A door maps its input and dispatches: it injects only `CommandBus` and `QueryBus` (plus `RequestLocale` in a REST door). Move whatever this needs into a service and dispatch a command or query; an `EntityManager` never reaches a door.",
             none: "`{{name}}` never dispatches. A transport handler calls `execute(new <Message>(...))` on the injected bus exactly once; anything it does instead belongs in a handler.",
             many: "`{{name}}` dispatches {{count}} times. A transport handler dispatches exactly one command or query; a second dispatch is orchestration that belongs in the handler of one message.",
-            branch: "`{{what}}` is a decision or a loop in a door. A transport method only maps its input, dispatches one message and returns the result; a branch here is business logic that no unit spec covers. Move it into the service the handler calls. (The one `if` a door may hold is the inbox guard `if (!(await this.inbox.claim(source, id))) return`.)",
-            call: "`{{what}}` is a call a door does not make. A door calls the injected bus (`execute`), the inbox claim of a consumer, and pure mapper functions imported from a `*.mapper.ts`; everything else is logic that belongs in a service.",
+            branch: "`{{what}}` is a decision or a loop in a door. A transport method only maps its input, dispatches one message and returns the result; a branch here is business logic that no unit spec covers. Move it into the service the handler calls. The inbox claim of a delivery is made by the service the handler calls.",
+            call: "`{{what}}` is a call a door does not make. A door calls the injected bus (`execute`), `unwrapOutcome` of `platform/primitives`, and pure mapper functions imported from a `*.mapper.ts`; everything else is logic that belongs in a service.",
             noReturn: "`{{name}}` dispatches but never returns the result. A resolver or controller action returns what the bus answered (mapped by a pure mapper function if it must change shape).",
         },
     },
@@ -137,14 +122,23 @@ export const transportIsThin = {
             const found = importOf(context, callee)
             return found !== null && /(?:^|\/)[^/]+\.mapper(?:\.[cm]?[jt]s)?$/.test(found.source.replace(/\\/g, "/"))
         }
+        /** `unwrapOutcome` of `platform/primitives`, resolved by the symbol the name binds to, not by its spelling. */
+        const isUnwrapOutcome = (callee) => {
+            if (callee.type !== "Identifier") return false
+            const { checker, toTs } = typed(context)
+            const tsNode = toTs(callee)
+            let symbol = tsNode && checker.getSymbolAtLocation(tsNode)
+            if (symbol && (symbol.flags & ts.SymbolFlags.Alias) !== 0) symbol = checker.getAliasedSymbol(symbol)
+            return symbol?.getName() === "unwrapOutcome" && (symbol.getDeclarations() ?? []).some((declaration) => declaredByCapability(hfs, declaration.getSourceFile().fileName, "primitives"))
+        }
         return {
             ClassDeclaration(node) {
-                const inboxes = new Set()
+                // A Nest module class (`@Module`) wires the door into the container (registers consumers and jobs); it is not a door.
+                if ((node.decorators ?? node.parent?.decorators ?? []).some((decorator) => isImportedFrom(context, decoratorCallee(decorator), "@nestjs/common", "Module"))) return
                 const locales = new Set()
                 const classify = (name, annotation) => {
                     const kind = name === null ? null : injectedKind(context, annotation)
-                    if (kind === "inbox") inboxes.add(name)
-                    else if (kind === "locale") locales.add(name)
+                    if (kind === "locale") locales.add(name)
                 }
                 const constructor = node.body.body.find((member) => member.type === "MethodDefinition" && member.kind === "constructor")
                 for (const original of constructor?.value.params ?? []) {
@@ -163,28 +157,18 @@ export const transportIsThin = {
                 if (handlers.length === 0) return
                 for (const method of node.body.body) {
                     if (method.type !== "MethodDefinition" || method.kind !== "method" || !method.value.body) continue
-                    const claimed = new Set()
-                    for (const statement of method.value.body.body) {
-                        if (statement.type !== "VariableDeclaration") continue
-                        for (const declarator of statement.declarations) {
-                            const init = declarator.init?.type === "AwaitExpression" ? declarator.init.argument : declarator.init
-                            if (declarator.id.type === "Identifier" && init?.type === "CallExpression" && init.callee.type === "MemberExpression" && init.callee.property.name === "claim" && isThisMember(init.callee.object, inboxes)) claimed.add(declarator.id.name)
-                        }
-                    }
-                    const guards = method.value.body.body.filter((statement) => isClaimGuard(statement, claimed))
-                    const insideGuard = (child) => guards.some((guard) => guard.range[0] <= child.range[0] && child.range[1] <= guard.range[1])
                     walk(method.value.body, (child) => {
                         if (DECISION_NODES.has(child.type)) {
-                            if (!insideGuard(child)) context.report({ node: child, messageId: "branch", data: { what: child.type === "LogicalExpression" ? child.operator : child.type.replace(/(Statement|Expression)$/, "").toLowerCase() } })
+                            context.report({ node: child, messageId: "branch", data: { what: child.type === "LogicalExpression" ? child.operator : child.type.replace(/(Statement|Expression)$/, "").toLowerCase() } })
                             return
                         }
                         if (child.type !== "CallExpression") return
                         const callee = child.callee
                         const member = callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" ? callee : null
                         const allowed = (member !== null && member.property.name === "execute" && isBus(context, member.object))
-                            || (member !== null && member.property.name === "claim" && isThisMember(member.object, inboxes))
                             || (member !== null && isThisMember(member.object, locales))
                             || isMapper(callee)
+                            || isUnwrapOutcome(callee)
                         if (!allowed) context.report({ node: child, messageId: "call", data: { what: sourceCode.getText(callee) } })
                     })
                 }

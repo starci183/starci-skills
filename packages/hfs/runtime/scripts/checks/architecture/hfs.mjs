@@ -5,6 +5,7 @@ import { gitOutput } from '../../lib/git.mjs';
 import { repositoryName } from '../../lib/repo-identity.mjs';
 import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, openHfs } from '../../lib/hfs-slots.mjs';
+import { isFeTestPath } from '../../lib/hfs-rules/fe-no-tests.mjs';
 
 /**
  * HFS repository-tree check (knowledge/hfs/README.md): every StarCi repository is an
@@ -41,7 +42,7 @@ export const HFS_RULE_IDS = [
 ];
 
 const REQUIRED_COMMON = ['.gitattributes', '.github', '.gitignore', '.husky', 'hfs.json',
-  'codecov.yml', 'eslint.config.mjs', 'package-lock.json', 'package.json', 'README.md',
+  'eslint.config.mjs', 'package-lock.json', 'package.json', 'README.md',
   'sonar-project.properties', 'tsconfig.json'];
 const REQUIRED_BACKEND = ['.sops.yaml', '.starcistacks', '.starciwork', 'jest.config.js', 'nest-cli.json', 'src'];
 const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb']);
@@ -305,7 +306,7 @@ export function checkRepoPresentation({ root, runtime = false, tree = treeView(r
 // Owner ruling 2026-09-29 (layout 2026-09-30): integration, e2e and contract run MANUALLY only. No hook, default typecheck,
 // coverage run or automatic CI trigger may include those trees or run those projects. Linting the e2e files is not running them: ESLint reads them
 // as syntax in the one repository-wide lint run (the factory's e2e block), so no `lint:e2e` command exists to judge.
-const E2E_COMMAND = /\btest:(?:e2e|integration|contract)\b|\btypecheck:(?:e2e|tests)\b|\bplaywright\s+test\b|--selectProjects\s+(?:e2e|integration|contract)\b|src\/tests\/(?:world|integration|e2e|contract)\b|jest[^\n|&;]*(?:e2e|integration|contract)/u;
+const E2E_COMMAND = /\btest:(?:e2e|integration|contract)\b|\btypecheck:tests\b|--selectProjects\s+(?:e2e|integration|contract)\b|src\/tests\/(?:world|integration|e2e|contract)\b|jest[^\n|&;]*(?:e2e|integration|contract)/u;
 const UNIT_RUN_SCRIPTS = ['test', 'test:unit', 'test:ci', 'test:affected', 'test:coverage', 'test:cov'];
 // An --ignore-pattern names the e2e tree to keep it OUT of a command; it is not a run of e2e.
 const runsE2e = text => E2E_COMMAND.test(String(text).replace(/--ignore-pattern[= ]+(?:"[^"]*"|'[^']*'|\S+)/gu, ''));
@@ -332,7 +333,7 @@ function hooksPathNotRedirected({ root, finding }) {
   return { status: 'checked' };
 }
 
-function e2eInAutomaticGate({ root, tree, backend, frontend, finding }) {
+function e2eInAutomaticGate({ root, tree, backend, finding }) {
   const rule = 'HFS_E2E_IN_AUTOMATIC_GATE';
   let pkg = null;
   try { pkg = JSON.parse(readText(root, 'package.json') ?? ''); } catch { /* the package checks own invalid JSON */ }
@@ -368,21 +369,18 @@ function e2eInAutomaticGate({ root, tree, backend, frontend, finding }) {
     if (/collectCoverageFrom/u.test(jestConfig) && !/!src\/tests\/(?:\*\*|e2e)/u.test(jestConfig))
       finding(rule, 'jest.config.js', 'collectCoverageFrom must exclude src/tests/** so no integration, e2e or contract file counts toward coverage.');
   }
-  // 3. The default tsconfig excludes the e2e tree.
+  // 3. A back end's default tsconfig excludes the world, integration, e2e and contract trees.
   const tsconfigText = readText(root, 'tsconfig.json');
   let tsconfig = null;
   try { tsconfig = tsconfigText === null ? null : JSON.parse(tsconfigText); } catch { /* the typecheck itself owns parsing */ }
   if (tsconfig) {
     const excludedText = JSON.stringify(tsconfig.exclude ?? []);
-    const excludesE2e = /e2e/u.test(excludedText);
     const excludesTestTrees = ['world', 'integration', 'e2e', 'contract'].every(tree => excludedText.includes(`src/tests/${tree}`));
     const defaultAll = tsconfig.include === undefined && tsconfig.files === undefined;
     const files = tree.files();
     if (backend && files.some(file => /^src\/tests\/(?:world|integration|e2e|contract)\/.+\.[cm]?tsx?$/u.test(file)) && !excludesTestTrees &&
         (defaultAll || JSON.stringify(tsconfig.include ?? []).includes('src')))
       finding(rule, 'tsconfig.json', 'The default tsconfig includes src/tests/{world,integration,e2e,contract}/**. Exclude those trees and check them with src/tests/tsconfig.json (typecheck:tests).');
-    if (frontend && !backend && files.some(file => /^e2e\/.+\.[cm]?tsx?$/u.test(file)) && defaultAll && !excludesE2e)
-      finding(rule, 'tsconfig.json', 'The root tsconfig includes e2e/**. Exclude it and check it with tsconfig.e2e.json.');
   }
   // 4. A workflow that starts on push or pull_request never runs e2e.
   for (const file of tree.files().filter(entry => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(entry))) {
@@ -415,6 +413,7 @@ export function checkHfs(config) {
       if (entry === '.starcistacks') { finding('HFS_STACKS_IN_FE', entry, 'A frontend repository must not hold .starcistacks; stack declarations live in the backend repository.'); continue; }
       if (entry === 'src') { finding('HFS_ROOT_SRC_FORBIDDEN_FE', entry, 'A frontend repository keeps source only under apps/<app>/src; the root src/ tree must move.'); continue; }
     }
+    if (frontend && !backend && (isFeTestPath(entry) || isFeTestPath(`${entry}/x`))) continue;   // a test entry of a front end is FE_NO_TESTS's, the one finding of that path
     if (!allowed.has(entry)) {
       finding('HFS_ROOT_ENTRY_FORBIDDEN', entry, `Root entry ${entry} is not in the HFS ${backend ? 'backend' : 'frontend'} allowlist.`);
     }
@@ -471,7 +470,7 @@ export function checkHfs(config) {
     }
   }
 
-  // Retired test kinds and folders, on both profiles: int-spec and harness-spec are gone, so are src/tests/harness and
+  // Retired test kinds and folders: int-spec and harness-spec are gone, so are src/tests/harness and
   // live/; a backend spec sits by its kind (beside its subject, or under src/tests/{integration,e2e,contract}/).
   for (const file of tree.files()) {
     if (RETIRED_TEST_SUFFIX.test(file))
@@ -480,13 +479,9 @@ export function checkHfs(config) {
       finding('HFS_TEST_KIND_RETIRED', file, `${file} sits in a retired test folder. Unit specs sit beside their subject, flows go under src/tests/e2e/<area>/ and test infrastructure under src/tests/world/.`);
     else if (backend && /^src\/tests\//u.test(file) && EXTRA_TEST_CONFIG.test(file))
       finding('HFS_TEST_KIND_RETIRED', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
-    else if (frontend && file !== 'playwright.config.ts' && /(?:^|\/)playwright[^/]*\.config\.[cm]?[jt]s$/u.test(file))
-      finding('HFS_TEST_KIND_RETIRED', file, `${file} is a second Playwright config. One root playwright.config.ts runs every e2e spec.`);
-    else if (frontend && /^e2e\/.+\.(?:spec|test)\.[cm]?[jt]sx?$/u.test(file))
-      finding('HFS_TEST_KIND_RETIRED', file, `${file} is a Playwright spec that is not named *.e2e-spec.ts.`);
   }
 
-  e2eInAutomaticGate({ root: config.root, tree, backend, frontend, finding });
+  e2eInAutomaticGate({ root: config.root, tree, backend, finding });
   const hooksPath = hooksPathNotRedirected({ root: config.root, finding });
 
   return {

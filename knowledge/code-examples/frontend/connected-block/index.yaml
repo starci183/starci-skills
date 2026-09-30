@@ -33,10 +33,6 @@ files:
     role: Pure renderer; { state, props, on } of atoms; state is a shape; data status only through SlotView.
   - path: classNames.ts
     role: Owns unit class strings; component.tsx never inlines className literals.
-  - path: index.spec.tsx
-    role: Proves the shape never follows the data status and that 403 is its own slot status.
-  - path: component.spec.tsx
-    role: Renders every shape plus slot statuses; asserts command onPress versus destination href.
 entrypoint: index.tsx
 adapt:
   - Replace Example* names with the target block name and folder under blocks/<domain>/.
@@ -52,8 +48,6 @@ dependencies:
     - "@starci/grammar"
     - react
     - next-intl
-    - vitest
-    - "@testing-library/react"
   assumptions: |
     Illustrative Next.js client-block shape. Grammar symbols Button, Heading, Text
     and SurfaceCard were verified against starci-academy-fe packages/grammar
@@ -64,23 +58,17 @@ verification:
   syntax: true
   typecheck: true
   lint: true
-  tests:
-    - index.spec.tsx
-    - component.spec.tsx
   limitations: |
     Verified 2026-09-27 by dropping these files into examples/shape-slot as
     apps/shape-slot/src/components/blocks/ExampleBlock (with stub @/hooks and
     @/i18n/navigation seams): tsc clean, @starci/eslint-canon-fe clean including
-    the shape-slot rules, vitest green. Mock-only connected mapping is not
-    browser UAT.
+    the shape-slot rules. Mock-only connected mapping is not browser UAT.
 provenance:
   sources:
     - starci-academy-fe/src/components/blocks/commerce/CartBlock/index.tsx
     - starci-academy-fe/src/components/blocks/commerce/CartBlock/component.tsx
     - starci-academy-fe/src/components/blocks/commerce/CartBlock/classNames.ts
-    - starci-academy-fe/src/components/blocks/commerce/CartBlock/index.spec.tsx
     - starci-academy-fe/src/components/blocks/auth/AccountMenu/component.tsx
-    - starci-academy-fe/src/components/blocks/auth/AccountMenu/component.spec.tsx
     - starci-academy-fe/packages/grammar/src/common/renderers.ts
     - starci-academy-fe/packages/grammar/src/core/primitive/Button/index.tsx
     - starci-academy-fe/packages/grammar/package.json

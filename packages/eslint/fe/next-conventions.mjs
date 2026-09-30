@@ -13,7 +13,7 @@
 
 import { attribute, attributeValue, calleeName, leadingTextOf, stringOf } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
-import { baseName, classOf, fileOf, inSlot, isSpecFile, roleOfFile, slotOfFile, stem } from "./lib/scope.mjs"
+import { baseName, classOf, fileOf, inSlot, roleOfFile, slotOfFile, stem } from "./lib/scope.mjs"
 
 /** Another i18n stack: a second place that decides which language a reader sees. */
 const OTHER_I18N = /^(?:react-i18next|i18next|next-i18next|react-intl|next-translate|@lingui\/.+|typesafe-i18n|rosetta)$/
@@ -35,7 +35,6 @@ export const noMiddlewareFile = {
   },
   create(context) {
     const file = fileOf(context)
-    if (isSpecFile(file)) return {}
     // The retired name has a slot of its own (`fe.source-root-retired`, forbidden); the interceptor is the `proxy` role of `fe.source-root-pinned`.
     if (inSlot(context, "fe.source-root-retired")) {
       return { Program: (node) => context.report({ node, messageId: "file", data: { name: baseName(file) } }) }
@@ -189,7 +188,6 @@ export const noNullSuspenseFallback = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     return {
       JSXOpeningElement(node) {
         const name = node.name
@@ -235,7 +233,7 @@ export const navigationFromIntl = {
     },
   },
   create(context) {
-    if (isSpecFile(fileOf(context)) || isNavigationOwner(context)) return {}
+    if (isNavigationOwner(context)) return {}
     return {
       ImportDeclaration(node) {
         if (node.importKind === "type") return
@@ -271,7 +269,6 @@ export const noNativeAnchor = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     return {
       JSXOpeningElement(node) {
         if (node.name.type !== "JSXIdentifier" || node.name.name !== "a") return
@@ -309,7 +306,7 @@ export const noHardcodedRoute = {
     },
   },
   create(context) {
-    if (isSpecFile(fileOf(context)) || isRoutesModule(context)) return {}
+    if (isRoutesModule(context)) return {}
     const source = context.sourceCode ?? context.getSourceCode()
     const report = (node, text) => context.report({ node, messageId: "route", data: { path: text } })
     return {
@@ -393,7 +390,6 @@ export const i18nStackInOneModule = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     const hfs = hfsOf(context)
     const slot = slotOfFile(context)
     const single = hfs.apps.length === 1

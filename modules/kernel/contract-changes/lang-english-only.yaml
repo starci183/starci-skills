@@ -1,0 +1,38 @@
+id: lang-english-only
+effectiveAt: '2026-09-30T20:00:00+07:00'
+summary: >-
+  Lane C0 sub-lane LANG (owner rule: everything is English, no Vietnamese anywhere except i18n catalogues and fixtures that
+  deliberately carry localized text). BE `no-non-ascii-source` (R89) folds to NFC and exempts the new slot
+  be.tests.fixtures.i18n; the new eslint-fe rule `no-vietnamese-in-source` (R91) covers identifiers, strings, template text,
+  JSX text, comments and test titles including specs (its job is removed from `no-hardcoded-copy`), exempting only the new
+  slot fe.e2e-support.i18n. New rule R96 HFS_DOC_NOT_ENGLISH: the architecture machine's `doc-language` check reads every
+  Markdown and YAML document under knowledge/, docs/, src/ and apps/ (code fences included; catalogue YAML in a
+  localized-text slot is the only exception), and the runtime's own `npm run check` runs the same law
+  (scripts/checks/check-doc-language.mjs) with declared field-level exceptions (scripts/lib/language.mjs DECLARED_VIETNAMESE_FIELDS): the Vietnamese operator fields of
+  modules/kernel/failure-codes.yaml, the `vi` field of modules/ops/_labels.yaml and the phrase-list keys of
+  modules/goal/archetypes.yaml (lead decision). The rule catalog drops the redundant `title_vi` of every rule
+  (the failure-code entry carries it). The runtime documents, patterns and examples are translated to English.
+reach: new-legs
+adds:
+  codes: [HFS_DOC_NOT_ENGLISH]
+paths:
+  - modules/kernel/contract-changes/lang-english-only.yaml
+  - knowledge/hfs/README.md
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/patterns/be/comment.yaml
+  - knowledge/patterns/fe/comment.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/schemas/hfs-rules.schema.yaml
+  - package.json
+  - packages/eslint/be/comments.mjs
+  - packages/eslint/fe/comments.mjs
+  - packages/eslint/fe/translation.mjs
+  - packages/hfs/scripts/sync-runtime.mjs
+  - scripts/checks/architecture/doc-language.mjs
+  - scripts/checks/architecture/index.mjs
+  - scripts/checks/check-doc-language.mjs
+  - scripts/checks/failure-codes.mjs
+  - scripts/lib/hfs-slots.mjs
+  - scripts/lib/language.mjs
+  - tests/architecture-doc-language.spec.mjs

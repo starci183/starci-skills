@@ -27,9 +27,9 @@ reads:
     path: CONTEXT.md (fixed stack) + packages/hfs/templates (the files `hfs sync` generates) + packages/ (the shared presets)
     purpose:
       en: The Next.js stack every project uses and the toolchain a new frontend repository carries from
-        its first commit — configs that are thin calls into the @starci presets (tsconfig, prettier, vitest,
-        playwright, canon lint), and the files that cannot extend, which `hfs sync` generates from hfs.json -
-        husky, the ci and e2e workflows, .gitignore, sonar-project.properties and codecov.yml.
+        its first commit — configs that are thin calls into the @starci presets (tsconfig, prettier, canon
+        lint), and the files that cannot extend, which `hfs sync` generates from hfs.json - husky, the ci
+        workflow, .gitignore and sonar-project.properties. A frontend has no tests, so no test config or runner.
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml
     purpose:
@@ -151,9 +151,9 @@ steps:
     writes: [source]
     action:
       en: Write the manifest and toolchain first - hfs.json, package.json with the pinned engines and
-        scripts, and the config stubs that extend the @starci presets (tsconfig, prettier, vitest, canon
-        eslint); then run `hfs sync --write`, which generates husky, .github/workflows/ci.yml and e2e.yml,
-        .gitignore, sonar-project.properties and codecov.yml, and `hfs sync --check` must pass - a generated
+        scripts, and the config stubs that extend the @starci presets (tsconfig, prettier, canon
+        eslint); then run `hfs sync --write`, which generates husky, .github/workflows/ci.yml,
+        .gitignore and sonar-project.properties, and `hfs sync --check` must pass - a generated
         file is never hand-written or edited, and a value `hfs sync` does not carry is a named gap in the
         scaffold evidence, never an improvised choice - then the declared layout, then the first source tree by running `hfs sync --init` (packages/hfs/templates/fe/skeleton, never
         overwriting) - per app next.config.ts with next-intl, src/proxy.ts, the [locale] segment (vi default, prefix
@@ -209,8 +209,8 @@ proofs:
         observed hook and CI output is recorded.
   - id: services-declared
     requirement:
-      en: The ci.yml, codecov.yml and sonar-project.properties the baseline writes take the Sonar project key
-        and host, the Codecov project and the CI secret/variable names from the stack declaration's services
+      en: The ci.yml and sonar-project.properties the baseline writes take the Sonar project key
+        and host and the CI secret/variable names from the stack declaration's services
         block (the repository's own .starcistacks, or the backend declaration whose sources list it), and
         `node scripts/checks/check-starcistacks.mjs <repo> --new` reports no refusal. When that declaration
         is outside this op's owned paths, the check runs without --new and its STACKS_SERVICES_MISSING /

@@ -71,8 +71,13 @@ test('starciJestConfig is unit + integration + e2e + contract, ts-jest, diagnost
     const [name, options] = project.transform[String.raw`^.+\.ts$`];
     assert.equal(name, 'ts-jest');
     assert.equal(options.diagnostics, false);
-    assert.equal('isolatedModules' in options, false, 'the deprecated ts-jest option is not set; @starci/tsconfig carries it');
+    assert.equal('isolatedModules' in options, false, 'the deprecated ts-jest option is not set; the tsconfig carries it');
   }
+  // The unit project overlays compiler options over the repository tsconfig; the other projects use the file as it is.
+  const [, unit] = config.projects[0].transform[String.raw`^.+\.ts$`];
+  assert.deepEqual(unit.tsconfig, { isolatedModules: false, importHelpers: true });
+  assert.deepEqual(preset.UNIT_COMPILER_OPTIONS, { isolatedModules: false, importHelpers: true });
+  for (const project of config.projects.slice(1)) assert.equal(typeof project.transform[String.raw`^.+\.ts$`][1].tsconfig, 'string');
   assert.equal(new RegExp(String.raw`^.+\.ts$`).test('a.ts'), true);
   assert.equal(new RegExp(String.raw`^.+\.ts$`).test('a.tsx'), false);
 });
@@ -118,7 +123,7 @@ test('each test kind is its own project, matched by folder and suffix together; 
     assert.equal(byName[name].globalTeardown, '<rootDir>/src/tests/world/global-teardown.ts', name);
     assert.equal('setupFilesAfterEnv' in byName[name], false, name);
   }
-  assert.equal(byName.unit.transform[String.raw`^.+\.ts$`][1].tsconfig, 'tsconfig.json');
+  assert.deepEqual(byName.unit.transform[String.raw`^.+\.ts$`][1].tsconfig, { isolatedModules: false, importHelpers: true });
   assert.equal('globalSetup' in byName.unit, false, 'unit specs need no world');
   assert.deepEqual(preset.TEST_KIND_FOLDERS, ['world', 'integration', 'e2e', 'contract']);
 });

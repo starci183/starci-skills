@@ -8,6 +8,6 @@ if [ -n "$sources" ]; then
 fi
 specs=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' | grep -v -E '(^|/)src/tests/(world|integration|e2e|contract)/|\.(integration|e2e|contract)-spec\.ts$' || true)
 if [ -n "$specs" ]; then
-  npm test -- --passWithNoTests --findRelatedTests $specs
+  npm run test:affected -- --findRelatedTests $specs
 fi
 npx hfs work-hygiene

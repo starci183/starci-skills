@@ -28,44 +28,44 @@ settle:
     (scripts/kernel/settle-landed.mjs foreignLandedPaths, conventions.sharedCheckout)
   reads: >-
     the job row (complete identity + lease_token); the reports row for the
-    job''s dispatch_id â€” the kernel consumed it earlier via
+    job''s dispatch_id - the kernel consumed it earlier via
     `api consume-report`; the report file; the ops declared checks; the
     checks row the kernel''s re-run recorded
   writes: >-
     jobs.status -> succeeded|failed|awaiting_owner + result_json {verdict,...} (a blocked
     verdict settles failed; the typed blocker rides the report; a blocked
-    verdict on a filed `ask` report settles awaiting_owner with verdict awaiting-owner â€”
+    verdict on a filed `ask` report settles awaiting_owner with verdict awaiting-owner -
     verdict-contract.yaml retryAccounting.ownerWait); the
     reports row''s
-    consumed_at is set â€” consumption the kernel did not mark via
+    consumed_at is set - consumption the kernel did not mark via
     `api consume-report` is enforced by settle itself, so a report is
-    never settled unconsumed; lease and budget_reservation rows released â€”
+    never settled unconsumed; lease and budget_reservation rows released -
     a
     settle frees the slot; the worker terminal is closed (terminal-close for
     a command terminal, worker-stop + worker-release for a managed worker)
     and the op's Orca Task is closed with `task-update --status done`,
-    recorded as taskClosed on the receipt and the job payload â€” a settled op
+    recorded as taskClosed on the receipt and the job payload - a settled op
     leaves no live terminal, worker or open Task
     (modules/kernel/start-workflow.yaml orcaTree is the rule);
     events 'op-settled' {verdict}; the settled op's agent session files may
     then move under runtimes.yaml allocation.housekeeping.archiveRoot keeping
-    their relative path â€” a move, never a delete, and never the live kernel's
+    their relative path - a move, never a delete, and never the live kernel's
     own session or one whose terminal is still open (the per-op session
     release at settle). Worker-visible only as 'the session transcript may
     live under archiveRoot after settle'
   validates: >-
-    The reports ROW is the durable verdict â€” filed by `api report`,
+    The reports ROW is the durable verdict - filed by `api report`,
     integrated by `api consume-report`; the done-marker/message is only
     the wake-up and the file is the bound artifact
     (modules/kernel/verdict-contract.yaml envelope). validateOpReport runs
     starci/op-report@1 at filing (`api report`; alpha.3: the reports row of the
     job's attempt is the ONLY report, a --report path is ignored with a warning): outcome's payload present, files inside the job's
     owned_paths, identity bound to the job. `pass` records only after the declared checks
-    re-ran green (`api check` row) â€”
+    re-ran green (`api check` row) -
     evidence is bytes on disk, never words in a summary
     (verdict-contract.yaml accepts). A filed envelope's outcome normally
-    agrees with the verdict (passâ†”done, failâ†”failed|partial,
-    blockedâ†”blocked|ask). The report is a worker claim, not authority: a
+    agrees with the verdict (pass<->done, fail<->failed|partial,
+    blocked<->blocked|ask). The report is a worker claim, not authority: a
     recorded red Kernel check may overrule `done` to `fail`, settle the
     attempt and release its worker. Any other contradiction refuses
     'verdict-outcome-mismatch'; a dispatch with
@@ -78,7 +78,7 @@ settle:
     was never dispatched is refused job-not-dispatched (reconcile --drop).
   landed: >-
     A `pass` for an op whose manifest policy.commitPolicy commits (a mode
-    other than none â€” scoped-local-commit today) owes a landed proof, run
+    other than none - scoped-local-commit today) owes a landed proof, run
     before anything is written (scripts/kernel/settle-landed.mjs). Each
     owned path resolves against its target repository
     (scripts/kernel/target-repo.mjs ownedPathPlacements), first match wins:
@@ -92,7 +92,7 @@ settle:
     proven there. `git status --porcelain -- <owned_paths>` must be empty
     (each owned path a `:(literal)` pathspec, so src/app/[id] never reads as a glob),
     and the filed done report's `head` must name a commit that exists and
-    is HEAD or an ancestor of it â€” a checkout ahead of origin passes. A done
+    is HEAD or an ancestor of it - a checkout ahead of origin passes. A done
     report without `head` is refused with `missing: head` under every
     commit policy (landed.headCheck is `verified`). Only
     when commitPolicy.push is true does settle also run `git fetch origin
@@ -192,18 +192,18 @@ settle:
     - cut-checks-missing: 'a cut pass lacks green cut-slice-postcondition + cut-regression-inventory, or the pass that CLOSES its cut set additionally lacks full-regression-final. The closing pass is the one that leaves no other ordinal of {op, cut id} open - every other ordinal''s latest job already settled succeeded - whichever ordinal settles last; ordinal === total is not the rule (inc-751dd1ac4492: ordinals settle out of order once the seam passes). The error names which case applies'
     - verdict-outcome-mismatch: 'the filed envelope outcome contradicts the verdict and no red Kernel check proves a done claim false'
     - 'handover-not-approved: a handover.review pass without the owner''s approve receipt for the latest handover ask, with a delegated (non-owner) answer, or with a business settle after that ask was filed (settle.handover); nothing is written and the job keeps its status'
-    - job-settled: 'job already settled â€” a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again â€” it is not a settled status)'
+    - job-settled: 'job already settled - a duplicate settle is refused, never double-counted (an effect_unknown job MAY settle again - it is not a settled status)'
     - 'report-job-not-active / report-dispatch-unbound / report-contract-unbound: a `pass` verdict re-proves the report binding first, exactly as `report` binding declares'
     - 'not-landed (field `reason`): a pass the landed proof refuses. Prints {ok:false, jobId, op, reason:"not-landed", detail:{repo, dirty:[<owned path with uncommitted or untracked changes, prefixed <checkout>: when several repositories are checked>], repos:[{repo, role, paths, dirty}], head, headCheck, localHead, missing:[head (pushing policy only) | commit:<sha> | ancestor-of-HEAD:<sha> | origin/<branch>:<sha>], branch?, originHead?}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to commit its own paths (and push, when its policy pushes), then settles again (driver-loop.yaml enqueue.cutExecution). A dirty file last written before the job''s admission and named by no file of its report is debris the job found, never counted dirty: detail.debris / debrisCount (and repos[].debris) list it, a pass settles over it, and api reconcile --job <id> --debris [--commit] is its sanctioned home - no DEFERRED SETTLE owner gate waits on it'
-    - 'landed-unverifiable (field `reason`): the landed proof could not read git â€” a status that failed, a detached HEAD with no report branch, a fetch of origin/<branch> that failed on a pushing policy, or an owned path / payload.repository naming a repository the binding cannot resolve (step repository, detail.unresolved). Prints {ok:false, jobId, op, reason:"landed-unverifiable", detail:{repo, step:repository|status|branch|fetch|push-gate, error, ...}} and exits 1; never a silent pass'
+    - 'landed-unverifiable (field `reason`): the landed proof could not read git - a status that failed, a detached HEAD with no report branch, a fetch of origin/<branch> that failed on a pushing policy, or an owned path / payload.repository naming a repository the binding cannot resolve (step repository, detail.unresolved). Prints {ok:false, jobId, op, reason:"landed-unverifiable", detail:{repo, step:repository|status|branch|fetch|push-gate, error, ...}} and exits 1; never a silent pass'
     - 'push-gate-red (field `reason`): the landed proof passed but the files the job changed break the target repository''s own push-gate lint (settle.landed push gate). Prints {ok:false, jobId, op, reason:"push-gate-red", hint, detail:{...landed, pushGate:{repo, source, commands, changed, linted, errorCount, warningCount, maxWarnings?, findings:[{file, line, rule, severity, message}]}}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the owning slice to fix the findings in its own files (never by disabling a rule) and commit, then settles again. A push-gate lint that cannot run (the repository''s eslint missing, a crash, a timeout) is landed-unverifiable with step push-gate'
     - 'draw-not-accepted (field `reason`): an interface.draw pass admitted after contract change draw-adopt-gate whose bound assets - the files it wrote and every one it adopted, inherited or found already there, and every live drawing of each ui record they belong to - fail the draw acceptance (scripts/checks/draw-acceptance.mjs): DRAW_ASSET_NOT_TOKEN_RENDERED (no draw-render receipt, or image-gen provenance: generation.tool image_gen.imagegen on a drawing, a draws entry not provenance.tool draw-render, an imagegen-provenance assertion, a ui-mockup prompt), DATA_STATUS_DRAWN, DRAW_NOT_SHAPES (no ui.shapes, a drawing of no shape, a draws or selected-matrix entry naming a screen and no XBase#state), DRAW_NOT_REDRAWN (nothing token-rendered and no recipe-rendered record: adopted or reused evidence alone), and scripts/checks/draw-quality.mjs per bound record - SHAPE_DUPLICATE (two states of one XBase one status band apart), DRAW_SCOPE_FULL_PAGE, DRAW_ACTION_MISSING, DRAW_COPY_INTERNAL, DRAW_BADGE_UNTONED, DRAW_SCORE_BELOW, DRAW_NOT_OWNER_ACCEPTED (codes a contract change added after the leg was admitted are dropped as suspects). Prints {ok:false, jobId, op, reason:"draw-not-accepted", codes, findings:[{code, path, detail}] (first 50), findingCount, records} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the draw to redraw through draw-render, or settles it fail'
     - 'draw-metrics-failed (field `reason`): an interface.draw pass admitted after contract change draw-loop-dna whose draw acceptance holds, but whose live parts fail when the RUNTIME re-renders each from its render source and re-runs every machine metric itself (scripts/work/draw-loop-settle.mjs, scripts/work/draw-loop.mjs verifyRecordParts): the capture, the DNA gate (draw-dna.mjs), the taste metrics (draw-taste.mjs), copy/badges/actions, the brand palette, grammar geometry, the ui-proof score and (contract change draw-devin-rationale) the decision evidence - rationale.json, data-why, every measured value covered, resolvable rule ids, a redline per part (scripts/checks/draw-rationale.mjs DRAW_RATIONALE_MISSING) - DRAW_METRICS_FAILED, or DRAW_METRICS_UNVERIFIED when a metric cannot run (fail closed). Prints {ok:false, jobId, op, reason:"draw-metrics-failed", codes, findings (first 50), findingCount, records, loops:[{loop, best, outcome}]} and exits 1; the draw is blocked with these remaining failures and its best round, never passed. A settled interface.draw job of any verdict also records one grammar-proposal-filed event per grammar proposal it carries (scripts/work/grammar-proposal.mjs; status proposed, never accepted by the runtime) and its receipt lists them as grammarProposals'
     - 'work-hygiene-red (field `reason`): a pass admitted after contract change work-hygiene-gate that changed files under .starciwork/ or .starcistacks/ (the files its report names plus every file its commits changed since its base) whose files fail scripts/checks/work-hygiene.mjs, the check the product repo pre-commit hook also runs: WORK_YAML_UNPARSEABLE (engine/yaml.mjs cannot read it), WORK_VALIDATE_REFUSED (work-validate --strict of the record directory, judged on the changed files only), WORK_SECRET_FILE, WORK_SECRET_PATTERN, WORK_SECRET_LITERAL, WORK_ACCOUNT_LITERAL (a non-.enc file carries a secret or a literal login). Prints {ok:false, jobId, op, reason:"work-hygiene-red", codes, findings:[{code, file, line, detail}] (first 50), findingCount, files} and exits 1; nothing is written and the job keeps its status. The op fixes the files and commits, then the Kernel settles again'
     - 'PROOF_MEDIA_MISSING (field `reason`): a pass whose files lack the visual proof its op owes (settle.proofMedia). Prints {ok:false, jobId, op, reason:"PROOF_MEDIA_MISSING", missing:[image (n/min) | video], detail:{images, videos, traces, browserRan, owes}} and exits 1; nothing is written and the job keeps its status. The Kernel re-dispatches the op to capture the screenshots (and its browser video) into its evidence and name them in report.files'
     # a verdict outside pass|fail|blocked is a usage error (exit 2), not a typed refusal
-  usedBy: 'drive.settle â€” last step of the op lifecycle: consume-report -> check re-runs -> api check -> settle; a refused settle is a routed verdict (usually retry), never silent loss'
+  usedBy: 'drive.settle - last step of the op lifecycle: consume-report -> check re-runs -> api check -> settle; a refused settle is a routed verdict (usually retry), never silent loss'
 
 # --------------------------------------------------------------------------
-# INCIDENT â€” the fingerprinted escalation record.
+# INCIDENT - the fingerprinted escalation record.
 # --------------------------------------------------------------------------

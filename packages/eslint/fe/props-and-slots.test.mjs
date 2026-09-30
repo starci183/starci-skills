@@ -40,7 +40,6 @@ test("exported React components use one props parameter with the matching type",
       // a folder named components inside a module is no component owner; a package branch is one
       { filename: NOT_A_COMPONENT, code: "export const SurfaceCard = ({ children }: SurfaceCardProps) => <div>{children}</div>" },
       { filename: COMPONENT, code: "export const GenericCard = <T,>(props: GenericCardProps<T>) => <div>{props.value}</div>" },
-      { filename: at("apps/web/src/components/branches/SurfaceCard/component.test.tsx"), code: "export const SurfaceCard = () => <div />" },
     ],
     invalid: [
       { filename: COMPONENT, code: "export const SurfaceCard = ({ children }: SurfaceCardProps) => <div>{children}</div>", errors: [{ messageId: "parameter" }] },
@@ -91,8 +90,6 @@ test("styling ownership rules keep internal CSS doors closed", () => {
   tester.run("no-css-door-type-laundering", noCssDoorTypeLaundering, {
     valid: [
       { filename: COMPONENT, code: "type Props = Pick<Base, 'tone'>" },
-      // a spec is no product source
-      { filename: at("apps/web/src/components/branches/SurfaceCard/index.spec.tsx"), code: "type Props = Omit<Base, 'className'>" },
     ],
     invalid: [{ filename: at("apps/web/src/hooks/lesson/useLesson.ts"), code: "type Props = Omit<Base, 'style'>", errors: [{ messageId: "utility" }] }, { filename: COMPONENT, code: "type Props = Omit<Base, 'className'>", errors: [{ messageId: "utility" }] }],
   })

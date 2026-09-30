@@ -32,6 +32,7 @@ const tester = new RuleTester({
 
 const SRC = at("src/modules/domain/user/user.service.ts")
 const MESSAGES = at("src/modules/domain/user/messages/user.messages.ts")
+const PLATFORM_MESSAGES = at("src/modules/platform/errors/messages/errors.messages.ts")
 const FEATURE_MESSAGES = at("src/features/plan/messages/plan.messages.ts")
 
 test("every rule this law declares is exported under its published name", () => {
@@ -75,17 +76,45 @@ test("COMMENT-2: every member of an exported enum carries its own doc", () => {
   })
 })
 
+/** Vietnamese text written as escapes, so this test file stays English-only ASCII. */
+const VI_TEXT = "kh\u00E1ch v\u1EEBa chuy\u1EC3n kho\u1EA3n"
+const I18N_FIXTURE = at("src/tests/fixtures/i18n/customer.rows.ts")
+
 test("COMMENT-4: a spec or fixture gets no exemption: Vietnamese is refused wherever it is not a message catalog", () => {
   const SPEC = at("src/features/plan/application/place-order.handler.spec.ts")
   const FIXTURE = at("src/tests/fixtures/database.ts")
   tester.run("no-non-ascii-source", noNonAsciiSource, {
     valid: [],
     invalid: [
-      { filename: SPEC, code: "const reply = { from: \"khách vừa chuyển khoản\" }", errors: [{ messageId: "nonAscii" }] },
+      { filename: SPEC, code: `const reply = { from: "${VI_TEXT}" }`, errors: [{ messageId: "nonAscii" }] },
+      { filename: FIXTURE, code: `// ${VI_TEXT}\nconst x = 1`, errors: [{ messageId: "nonAscii" }] },
+      { filename: SRC, code: `const reply = "${VI_TEXT}"`, errors: [{ messageId: "nonAscii" }] },
       // a Vietnamese test name is a finding, in a service spec too
-      { filename: at("src/modules/domain/order/order.service.spec.ts"), code: "describe('OrderService', () => {\n  it('từ chối đơn trùng', () => {})\n})", errors: [{ messageId: "nonAscii" }] },
-      { filename: FIXTURE, code: "// kiểm tra luồng thanh toán\nconst x = 1", errors: [{ messageId: "nonAscii" }] },
-      { filename: SRC, code: "const reply = \"khách vừa chuyển khoản\"", errors: [{ messageId: "nonAscii" }] },
+      { filename: at("src/modules/domain/order/order.service.spec.ts"), code: `describe("OrderService", () => {
+  it("${VI_TEXT}", () => {})
+})`, errors: [{ messageId: "nonAscii" }] },
+      // a test title is prose for the next reader: describe/it/test names are English too
+      { filename: SPEC, code: `describe("${VI_TEXT}", () => { it("${VI_TEXT}", () => {}) })`, errors: [{ messageId: "nonAscii" }] },
+      // an identifier is source prose as well
+      { filename: SRC, code: `const ${"h\u1EA1n"}Cuoi = 1`, errors: [{ messageId: "nonAscii" }] },
+      // a decomposed (NFD) spelling is caught exactly like the precomposed one
+      { filename: SRC, code: `const reply = "${VI_TEXT.normalize("NFD")}"`, errors: [{ messageId: "nonAscii" }] },
+      // a fixtures file OUTSIDE the i18n fixtures slot is not exempt
+      { filename: at("src/tests/fixtures/customer.rows.ts"), code: `export const ROW = "${VI_TEXT}"`, errors: [{ messageId: "nonAscii" }] },
+    ],
+  })
+})
+
+test("COMMENT-4: the i18n fixtures slot is the one test placement that may carry localized text", () => {
+  tester.run("no-non-ascii-source", noNonAsciiSource, {
+    valid: [
+      { filename: I18N_FIXTURE, code: `export const ROW = { name: "${VI_TEXT}" }` },
+      { filename: I18N_FIXTURE, code: `// ${VI_TEXT.normalize("NFD")}\nexport const ROW = 1` },
+      // a loanword with no Vietnamese letter is not a hit (structural detection, not a word list)
+      { filename: SRC, code: "const word = 'naive facade Muller'" },
+    ],
+    invalid: [
+      { filename: SRC, code: `const row = "${VI_TEXT}"`, errors: [{ messageId: "nonAscii" }] },
     ],
   })
 })
@@ -97,8 +126,12 @@ test("COMMENT-4: source prose is English and no marker exempts a line", () => {
       // a message catalog (slot be.domain.messages or be.feature.messages) is product copy, not source prose
       { filename: FEATURE_MESSAGES, code: "// b\u1ea3n d\u1ecbch\nexport const vi = { hello: 'Xin ch\u00e0o' }" },
       { filename: MESSAGES, code: "export const vi = { hello: 'Xin ch\u00e0o' }" },
+      // a platform capability owns its catalog too (BE-CONVENTION 1.15, 1.18)
+      { filename: PLATFORM_MESSAGES, code: "export const vi = { hello: 'Xin ch\u00e0o' }" },
     ],
     invalid: [
+      // platform source outside its messages/ catalog is still English only
+      { filename: at("src/modules/platform/errors/errors.service.ts"), code: "export const vi = { hello: 'Xin ch\u00e0o' }", errors: [{ messageId: "nonAscii" }] },
       {
         filename: SRC,
         code: "// Ki\u1ec3m tra ng\u01b0\u1eddi d\u00f9ng\nconst x = 1",

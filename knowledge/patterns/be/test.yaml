@@ -531,9 +531,9 @@ rules:
     requirement: |-
       ts-jest runs with `diagnostics: false` in every project (`isolatedModules: true` comes from `@starci/tsconfig`); types are checked once, by `typecheck`
       and `typecheck:tests`. The unit project collects coverage from `src/**/*.service.ts` ONLY (`src/tests`, `dist` and `coverage` excluded), with a per-file threshold of 100 for lines, branches, functions and statements. `test` runs the unit project
-      with `--coverage` and fails below the threshold. The TypeScript config the unit project uses sets `importHelpers: true`
-      (`@starci/tsconfig` `be.json`) and the repository lists `tslib` in its dependencies, so decorator helpers are not inlined
-      into the file and branch counts measure only source. The managed jest config and preset render all of this; a repository
+      with `--coverage` and fails below the threshold. The unit project overlays `isolatedModules: false` and `importHelpers: true`
+      on the repository tsconfig and the repository lists `tslib` in its devDependencies, so neither the `design:paramtypes`
+      guards TypeScript emits under isolated modules nor inlined decorator helpers add branches: counts measure only source. The managed jest config and preset render all of this; a repository
       never edits the coverage settings, and no file carries an inline coverage ignore.
     rationale: |-
       Services are the only place decisions live (BE-TEST-7), so a per-file 100 on exactly those files is a meaningful bar. A

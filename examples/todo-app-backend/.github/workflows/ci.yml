@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   ci:
@@ -37,15 +36,9 @@ jobs:
       - name: typecheck
         run: npm run typecheck
       - name: unit
-        run: npm test -- --coverage --ci
+        run: npm test -- --ci
       - name: build
         run: npm run build
-      - uses: codecov/codecov-action@v5
-        with:
-          files: coverage/lcov.info
-          disable_search: true
-          fail_ci_if_error: true
-          use_oidc: true
       - uses: SonarSource/sonarqube-scan-action@v7
         if: ${{ !cancelled() && env.SONAR_TOKEN != '' }}
         env:

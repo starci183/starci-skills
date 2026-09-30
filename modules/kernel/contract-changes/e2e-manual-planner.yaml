@@ -6,8 +6,8 @@ summary: >-
   default. feature-build-backend and feature-build-fullstack now target impl.X done (backend) and
   feature-build-with-ui and feature-build-fullstack target ui.X audited; review.verify and handover.review still
   close the chain. An explicit ask adds the proof variable to a build or verify scope: modules/goal/archetypes.yaml
-  signalMatching.phraseSets gains e2eIntent (e2e, end-to-end tests/verification, kiểm thử e2e, ...), uatIntent (uat,
-  acceptance tests, nghiệm thu, ...) and proofNegation (no/without/skip e2e or uat, không e2e, ...); a negation
+  signalMatching.phraseSets gains e2eIntent (e2e, end-to-end tests/verification, Vietnamese e2e-test phrases, ...), uatIntent (uat,
+  acceptance tests, Vietnamese acceptance phrases, ...) and proofNegation (no/without/skip e2e or uat, Vietnamese no-e2e phrases, ...); a negation
   cancels the ask, and a specification, scaffold, canonicalization or assisted-UAT prompt that merely names e2e or
   UAT never gains the leg. Assisted UAT keeps its own archetypes. Adds no check or finding code.
 reach: new-legs

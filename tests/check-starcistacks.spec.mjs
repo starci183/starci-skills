@@ -24,9 +24,9 @@ const sonarEntry = (repo, extra = {}) => ({ provider: 'sonarqube', mode: 'local'
   credentials: [{ id: 'analysis', env: 'SONAR_TOKEN', custody: { repository: 'src-host', path: '.starcistacks/dev/runtime/files/sonarqube-analysis-token.txt' } }],
   ci: { wiring: 'required', secrets: [{ name: 'SONAR_TOKEN', credential: 'analysis' }], vars: [{ name: 'SONAR_HOST_URL', value: 'https://sonar.example.org' }] },
   qualityGate: 'starci-new-code', ownerAction: 'none', ...extra });
-const codecovEntry = (repo, extra = {}) => ({ provider: 'codecov', mode: 'hosted', host: { public: 'https://app.codecov.io' }, auth: 'oidc',
+const sentryEntry = (repo, extra = {}) => ({ provider: 'sentry', mode: 'hosted', host: { public: 'https://sentry.io' }, auth: 'oidc',
   projects: [{ repository: repo, key: `gh/org/${repo}` }], credentials: [], ci: { wiring: 'required', permissions: ['id-token: write'], secrets: [], vars: [] }, ownerAction: 'none', ...extra });
-const CI = 'jobs:\n  ci:\n    steps:\n      - uses: codecov/codecov-action@v5\n        with: {use_oidc: true}\n      - uses: SonarSource/sonarqube-scan-action@v7\n        env:\n          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}\n          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}\n';
+const CI = 'jobs:\n  ci:\n    steps:\n      - uses: getsentry/action-release@v1\n        with: {environment: ci}\n      - uses: SonarSource/sonarqube-scan-action@v7\n        env:\n          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}\n          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}\n';
 
 function workspace(t, { services, sourceServices, ci = CI, props = null } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starcistacks-'));
@@ -61,7 +61,7 @@ test('an existing repository without a services block gets suspects and a planne
   const result = checkStarciStacks(product);
   assert.equal(result.ok, true);
   assert.ok(codes(result, 'suspect').includes('STACKS_SERVICES_MISSING'));
-  assert.ok(codes(result, 'suspect').includes('STACKS_SERVICE_UNDECLARED'), 'codecov is called by CI and declared nowhere');
+  assert.ok(codes(result, 'suspect').includes('STACKS_SERVICE_UNDECLARED'), 'sentry is called by CI and declared nowhere');
   assert.ok(!codes(result).some((code) => code === 'STACKS_SERVICE_UNDECLARED' && result.findings.find((f) => f.code === code).message.includes('call sonar')), 'sonar is covered by the source host');
   assert.equal(result.followUp.op, 'workspace.manage');
 });
@@ -74,7 +74,7 @@ test('a new repository (--new) is refused until it declares its services', (t) =
 });
 
 test('a complete declaration passes with nothing to report about its services', (t) => {
-  const { product } = workspace(t, { services: { sonar: sonarEntry('product'), codecov: codecovEntry('product') }, props: 'sonar.projectKey=product\nsonar.host.url=https://sonar.example.org\n' });
+  const { product } = workspace(t, { services: { sonar: sonarEntry('product'), 'error-tracking': sentryEntry('product') }, props: 'sonar.projectKey=product\nsonar.host.url=https://sonar.example.org\n' });
   const result = checkStarciStacks(product, { newRepo: true });
   assert.deepEqual(result.refused, []);
   assert.deepEqual(result.suspect, []);
@@ -84,19 +84,19 @@ test('a complete declaration passes with nothing to report about its services', 
 test('unknown, ambiguous and contradictory service declarations are refused', (t) => {
   const { product } = workspace(t, { services: {
     sonar: sonarEntry('product', { stack: undefined, host: { public: 'https://sonar.example.org' } }),
-    codecov: codecovEntry('product', { mode: 'disabled', reason: 'not used' }),
+    'error-tracking': sentryEntry('product', { mode: 'disabled', reason: 'not used' }),
     'status-page': { provider: 'x', mode: 'hosted', ci: { wiring: 'not-used' }, ownerAction: 'none' },
   } });
   const refused = codes(checkStarciStacks(product), 'refuse');
   assert.ok(refused.includes('STACKS_SERVICE_UNKNOWN'));
   assert.ok(refused.includes('STACKS_SERVICE_AMBIGUOUS'), 'a local sonar without stack or host.local');
-  assert.ok(refused.includes('STACKS_CI_CONTRADICTION'), 'codecov disabled while CI calls it');
+  assert.ok(refused.includes('STACKS_CI_CONTRADICTION'), 'error-tracking disabled while CI calls it');
 });
 
 test('custody that is missing, or an owner action for what custody holds, is refused', (t) => {
   const { product, host } = workspace(t, { services: {
     sonar: sonarEntry('product', { ownerAction: { needed: 'a Sonar token', reason: 'asked before' } }),
-    codecov: codecovEntry('product', { auth: 'token', credentials: [{ id: 'upload', env: 'CODECOV_TOKEN', custody: { repository: 'src-host', path: '.starcistacks/dev/runtime/files/codecov-token.key' } }] }),
+    'error-tracking': sentryEntry('product', { auth: 'token', credentials: [{ id: 'upload', env: 'SENTRY_AUTH_TOKEN', custody: { repository: 'src-host', path: '.starcistacks/dev/runtime/files/sentry-token.key' } }] }),
   } });
   assert.ok(fs.existsSync(path.join(host, '.starcistacks')));
   const refused = codes(checkStarciStacks(product), 'refuse');
@@ -105,7 +105,7 @@ test('custody that is missing, or an owner action for what custody holds, is ref
 });
 
 test('a leg admitted before the change reads the new codes as suspects', (t) => {
-  const { product } = workspace(t, { services: { sonar: sonarEntry('product', { provider: 'sonarqube-x' }), codecov: codecovEntry('product') } });
+  const { product } = workspace(t, { services: { sonar: sonarEntry('product', { provider: 'sonarqube-x' }), 'error-tracking': sentryEntry('product') } });
   const strict = checkStarciStacks(product);
   assert.ok(codes(strict, 'refuse').includes('STACKS_PROVIDER_UNKNOWN'));
   const older = checkStarciStacks(product, { advisoryCodes: CODES });
@@ -114,16 +114,16 @@ test('a leg admitted before the change reads the new codes as suspects', (t) => 
 });
 
 test('sonar-project.properties must name the declared project key', (t) => {
-  const { product } = workspace(t, { services: { sonar: sonarEntry('product'), codecov: codecovEntry('product') }, props: 'sonar.projectKey=other\n' });
+  const { product } = workspace(t, { services: { sonar: sonarEntry('product'), 'error-tracking': sentryEntry('product') }, props: 'sonar.projectKey=other\n' });
   assert.ok(codes(checkStarciStacks(product), 'refuse').includes('STACKS_PROJECT_DRIFT'));
 });
 
 test('services.sonar.qualityGate must name the one gate knowledge/sonar-gate.yaml owns', (t) => {
-  const own = workspace(t, { services: { sonar: sonarEntry('product', { qualityGate: 'my-own-gate' }), codecov: codecovEntry('product') } });
+  const own = workspace(t, { services: { sonar: sonarEntry('product', { qualityGate: 'my-own-gate' }), 'error-tracking': sentryEntry('product') } });
   const refused = checkStarciStacks(own.product);
   assert.ok(codes(refused, 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'));
   assert.match(refused.findings.find((finding) => finding.code === 'STACKS_QUALITY_GATE_DRIFT').message, /starci-new-code/);
-  const absent = workspace(t, { services: { sonar: (({ qualityGate, ...rest }) => rest)(sonarEntry('product')), codecov: codecovEntry('product') } });
+  const absent = workspace(t, { services: { sonar: (({ qualityGate, ...rest }) => rest)(sonarEntry('product')), 'error-tracking': sentryEntry('product') } });
   assert.ok(codes(checkStarciStacks(absent.product), 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'), 'a declaration with no qualityGate is refused');
   assert.equal(checkStarciStacks(own.product, { advisoryCodes: CODES }).ok, true, 'a leg admitted before the change reads it as a suspect');
 });
@@ -135,7 +135,7 @@ test('a product with no services block still resolves Sonar through the source h
   assert.equal(sonar.projectKey, 'product');
   assert.equal(sonar.host.local, 'http://localhost:9010');
   assert.equal(sonar.credentials[0].custody.encPresent, true);
-  assert.equal(resolveStackService(product, 'codecov'), null);
+  assert.equal(resolveStackService(product, 'error-tracking'), null);
 });
 
 test('the owner is never asked for a declared credential or CI setting', (t) => {
@@ -261,7 +261,7 @@ test('a frontend governed by its backend declaration is not held to the backend-
     projects: [{ repository: 'backend', key: 'ghcr.io/org/backend' }], credentials: [],
     ci: { wiring: 'required', permissions: ['packages: write'], secrets: [], vars: [] }, ownerAction: 'none' };
   write(path.join(backend, '.starcistacks', DECL), yamlOf({ ...baseDoc, sources: [{ repository: 'backend' }, { repository: 'product-fe' }],
-    services: { sonar: sonarEntry('product-fe'), codecov: codecovEntry('product-fe'), 'container-registry': registry } }));
+    services: { sonar: sonarEntry('product-fe'), 'error-tracking': sentryEntry('product-fe'), 'container-registry': registry } }));
   write(path.join(frontend, '.github', 'workflows', 'ci.yml'), CI);
   process.env.STARCI_SOURCE_ROOT = host;
   const result = checkStarciStacks(frontend);

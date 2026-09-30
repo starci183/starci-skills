@@ -1,8 +1,8 @@
 id: provider-qwen-removed
 effectiveAt: '2026-09-29T22:00:00+07:00'
 summary: >-
-  The Qwen provider is removed from the runtime entirely (owner ruling 2026-09-29: "xóa qwen đi quá lỏ!! không
-  mua nữa đâu, devin codex claude đủ r"). Only claude, codex and devin remain. Gone: the qwen agent card and the
+  The Qwen provider is removed from the runtime entirely (owner ruling 2026-09-29: "remove qwen, it is far too lame!! not
+  buying it any more, devin codex claude are enough"). Only claude, codex and devin remain. Gone: the qwen agent card and the
   qwen-agent, qwen3.8-max and deepseek-v4-pro profiles; the qwen-agent runtime pool and its place in every
   allocation tier, preference and audit order (allocation.hands is [devin-agent]; the easy tier lists the pools
   that pin an easy model, so Devin, which pins none, is absent there; a review of what Devin implemented goes to
@@ -15,8 +15,8 @@ summary: >-
   Orca qwen agent, recipe and receipt list; qwen in provider-circuit, quit-agent, reconciler seat detection and
   the workers agent set; the qwen CHECK values of the machine and runtime 0001-init schemas. The defaultOperation
   target is devin-agent. A config.yaml that still names qwen (allocation.preferredProvider, allocation.shares,
-  allocation.grants, kernel.agent, kernel.group agent, supervisor.kernel.agent) is refused with "Qwen đã bị
-  gỡ; dùng claude, codex hoặc devin"; a leftover quota key is refused as an unknown key. The card hooks only Qwen declared - credentialRefresh, hostPrerequisites (scripts/agent/trust.mjs ensureHostSettings) and
+  allocation.grants, kernel.agent, kernel.group agent, supervisor.kernel.agent) is refused with "Qwen has been
+  removed; use claude, codex or devin"; a leftover quota key is refused as an unknown key. The card hooks only Qwen declared - credentialRefresh, hostPrerequisites (scripts/agent/trust.mjs ensureHostSettings) and
   hostIdentity - are deleted with their readers; gateAutoAnswer stays (the claude and codex cards declare it). History (earlier contract-change entries, benchmark snapshots and findings, CHANGELOG) keeps its
   mentions; the deleted files it cites are listed in modules/kernel/retired-paths.yaml.
 safetyCritical: false

@@ -108,6 +108,15 @@ const isWorldErrorHome = (hfs, filename) => {
     return placed.slot === "be.tests.world" && placed.path === `${placed.root}/test-world.error.ts`
 }
 
+/** True when a class of a unit spec (`<name>.spec.ts`) is local to it: neither exported by declaration nor by an `export { Name }` list. */
+const isSpecLocalClass = (filename, node) => {
+    if (!/\.spec\.[cm]?ts$/.test(filename) || !node.id) return false
+    if (node.parent?.type === "ExportNamedDeclaration" || node.parent?.type === "ExportDefaultDeclaration") return false
+    const program = node.parent?.type === "Program" ? node.parent : null
+    if (!program) return node.type === "ClassDeclaration" || node.type === "ClassExpression"
+    return !program.body.some((statement) => statement.type === "ExportNamedDeclaration" && !statement.source && statement.specifiers.some((specifier) => (specifier.local.name ?? specifier.local.value) === node.id.name))
+}
+
 /** An error class is declared at its owner in `errors/<capability>.error.ts` and derives from `DomainError`. */
 export const errorHome = {
     meta: {
@@ -131,6 +140,8 @@ export const errorHome = {
             if (isDomainErrorHost) return
             if (derivesFromDomainError(context, type)) {
                 if (isWorldErrorHome(hfs, filename)) return
+                // A spec-local subclass of the abstract base is a test double for code that takes any DomainError, not an error family.
+                if (isSpecLocalClass(filename, node)) return
                 const home = errorHomeOf(hfs, filename)
                 const owner = ownerName(hfs.ownerOf(filename))
                 if (!home || home.capability !== owner) context.report({ node: node.id, messageId: "place", data: { name: node.id.name, owner: owner ?? "<capability>" } })

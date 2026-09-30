@@ -5,21 +5,18 @@
  * would miss the one in a log message, so it walks comments, identifiers, string literals, template
  * chunks and JSX text alike - everywhere prose can hide in a source file.
  *
- * THE SECOND-LANGUAGE RULE IS GONE. It carried a `vn-ok: <reason>` pragma, an escape hatch that was
- * used 490 times in one repository, and one escape is enough to turn a rule into a comment
- * convention. Its job is now held by `no-hardcoded-copy` in `translation.mjs`, which has no
- * pragma: user-facing text comes from a `next-intl` catalogue, and the catalogue is the only place
- * a second language is content.
+ * `no-vietnamese-in-source` holds the English-only law: identifiers, string literals, template text, JSX text,
+ * comments and test titles carry no Vietnamese letter. The old `vn-ok: <reason>` pragma is gone (it was used 490
+ * times in one repository, and one escape is enough to turn a rule into a comment convention). Detection is
+ * structural on characters (`scripts/lib/language.mjs`, folded to NFC), never a word list.
  *
  * The exceptions that remain are placements, not judgements, and that is on purpose: a locale dictionary
  * IS the other language, and a fixture reproducing a real string has to reproduce it exactly. A
- * judgement-based exception would be argued per file forever.
+ * judgement-based exception would be argued per file forever. The Vietnamese rule has no placement exemption at all.
  */
 
-import { fileOf, inSlot, isSpecFile } from "./lib/scope.mjs"
-
-/** The letters that mark the second language a source string must not carry outside a catalogue. */
-export const SECOND_LANGUAGE_LETTER = /[À-ÃÈ-ÊÌÍÒ-ÕÙÚÝà-ãè-êìíò-õùúýĂăĐđĨĩŨũƠơƯưẠ-ỿ]/
+import { hasSecondLanguage } from "./runtime/scripts/lib/language.mjs"
+import { fileOf, inSlot } from "./lib/scope.mjs"
 
 /**
  * Extended pictographs, or a regional-indicator pair.
@@ -35,17 +32,16 @@ export const hasEmoji = (text) =>
 /**
  * Files whose second-language text or emoji is CONTENT rather than authoring, decided by what the file IS.
  *
- * Three kinds only: the locale dictionaries (a `.json` file of an i18n slot, `fe.modules.i18n` or `fe.package.i18n`),
- * which are the product's other language; the e2e support tree (slot `fe.e2e-support`: fixtures and support),
- * and specs, which reproduce real strings and would be testing something else if they translated them. There is no
- * "copy module": a `resources/` folder of strings is copy that skipped the catalogue.
+ * One kind only: the locale dictionaries (a `.json` file of an i18n slot, `fe.modules.i18n` or `fe.package.i18n`),
+ * which are the product's other language. There is no "copy module": a `resources/` folder of strings is copy that
+ * skipped the catalogue.
  *
  * @param {object} context - The ESLint rule context.
  * @returns {boolean} True when the linted file holds content rather than authoring.
  */
 export const isContentFile = (context) => {
   const file = fileOf(context)
-  return isSpecFile(file) || inSlot(context, "fe.e2e-support") || (inSlot(context, "fe.modules.i18n", "fe.package.i18n") && file.endsWith(".json"))
+  return inSlot(context, "fe.modules.i18n", "fe.package.i18n") && file.endsWith(".json")
 }
 
 /** Walk every place prose can hide, and hand each to one check. */
@@ -56,6 +52,12 @@ const proseVisitors = (context, report) => {
       for (const comment of source.getAllComments()) report(comment, comment.value)
     },
     Identifier(node) {
+      report(node, node.name)
+    },
+    JSXIdentifier(node) {
+      report(node, node.name)
+    },
+    PrivateIdentifier(node) {
       report(node, node.name)
     },
     Literal(node) {
@@ -121,10 +123,31 @@ export const noEmojiInSource = {
   },
 }
 
+// -- COMMENTS-5 ------------------------------------------------------------------------------------
+
+/** Source prose is English: no Vietnamese letter in an identifier, string, comment, JSX text or test title. */
+export const noVietnameseInSource = {
+  meta: {
+    type: "problem",
+    docs: { description: "No Vietnamese in source authoring, specs included." },
+    schema: [],
+    messages: {
+      vietnamese:
+        "A Vietnamese letter in source. Every reader has to be able to read all of the code, its comments and its test titles, and half of a two-language file is unavailable to somebody. Write it in English; product copy lives in the `messages/<locale>.json` catalogue behind `t()`; there is no pragma.",
+    },
+  },
+  create(context) {
+    return proseVisitors(context, (node, text) => {
+      if (hasSecondLanguage(text)) context.report({ node, messageId: "vietnamese" })
+    })
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "require-export-jsdoc": requireExportJsdoc,
   "no-emoji-in-source": noEmojiInSource,
+  "no-vietnamese-in-source": noVietnameseInSource,
 }
 
 /**

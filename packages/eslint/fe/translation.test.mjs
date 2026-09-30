@@ -16,7 +16,6 @@ const tester = slotTester()
 
 const LEAF = at("apps/web/src/components/leaves/Input/index.tsx")
 const COMPOSITE = at("apps/web/src/components/composites/SearchBox/index.tsx")
-const FIXTURE = at("e2e/fixtures/copy.ts")
 const BLOCK = at("apps/web/src/components/blocks/DailyQuest/index.tsx")
 
 test("every rule this law declares is exported under its published name", () => {
@@ -78,10 +77,6 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
       { filename: BLOCK, code: "const E = () => <p>{t(\"installed\", { count })}</p>" },
       // catalogue keys are lower-case dotted tokens
       { filename: BLOCK, code: "const o = { title: t(\"course.title\") }" },
-      // the dictionaries and fixtures are content
-      { filename: FIXTURE, code: "const t = \"Tiếp tục học\"" },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "const E = () => <p>Tiếp tục học</p>" },
-      // a fixture inside a component owner is authoring, not content
       // English comments are the rule
       { filename: BLOCK, code: "// the reason this exists\nconst x = 1" },
     ],
@@ -123,17 +118,6 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
       { filename: BLOCK, code: "const s = { ready: \"Your course is ready\" }", errors: [{ messageId: "property" }] },
       { filename: at("apps/web/src/hooks/lesson/useLesson.ts"), code: "export const useLesson = () => ({ status: \"Loading your lesson\", error: \"Something went wrong.\" })", errors: [{ messageId: "property" }, { messageId: "property" }] },
       { filename: at("apps/web/src/modules/notify/messages.ts"), code: "export const M = { saved: `Saved ${n} items`, kind: \"Search courses\" }", errors: [{ messageId: "property" }, { messageId: "property" }] },
-      // the second language, wherever it hides, with no pragma to excuse it
-      { filename: BLOCK, code: "const message = \"hạn cuối đã qua\"", errors: [{ messageId: "second" }] },
-      { filename: BLOCK, code: "const message = `hạn cuối đã qua ${x}`", errors: [{ messageId: "second" }] },
-      { filename: BLOCK, code: "// hạn cuối đã qua\nconst x = 1", errors: [{ messageId: "comment" }] },
-      { filename: BLOCK, code: "const LABEL = \"Tiếng Việt\"", errors: [{ messageId: "second" }] },
-      {
-        // vn-ok was the escape hatch; it excuses nothing now
-        filename: BLOCK,
-        code: "// vn-ok: the server sends this verbatim\nconst S = \"Đã huỷ\"",
-        errors: [{ messageId: "second" }],
-      },
     ],
   })
 })

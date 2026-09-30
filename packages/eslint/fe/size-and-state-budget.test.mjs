@@ -43,11 +43,10 @@ test("BUDGET-1: a component file stays within the line budget its slot states fo
 ` },
       { filename: BLOCK, code: lines(200) },
       { filename: at("apps/web/src/features/pages/Home/component.tsx"), code: lines(FEATURE["component.tsx"]) },
-      // a spec is not held to a budget; a hook and a module by the `file` budget of their slot (200, 400)
+      // a hook and a module are held by the `file` budget of their slot (200, 400)
       { filename: HOOK, code: lines(200) },
       { filename: at("apps/web/src/modules/feed/index.ts"), code: lines(400) },
       { filename: at("apps/web/src/modules/config/index.ts"), code: lines(400) },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: lines(400) },
       // a file the slots do not put in a component owner is not judged by this rule
       { filename: at("apps/web/src/modules/components/x.tsx"), code: lines(400) },
       { filename: at("apps/web/src/lib/Big.tsx"), code: lines(400) },
@@ -78,7 +77,6 @@ test("BUDGET-2: a unit holds at most six state hooks and six data hooks", () => 
       { filename: BLOCK, code: `${unit("A", 4, 4)}\n${unit("B", 4, 4)}` },
       // a callback that is not a unit does not own the calls
       { filename: BLOCK, code: "export const Feed = () => { const a = items.map(() => 1); const [x] = useState(0); return a }" },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: unit("Feed", 9, 9) },
       // a slot that states no useState / dataHooks budget puts no bound on the count (hooks, features, modules)
       { filename: HOOK, code: unit("useFeed", 6, 6) },
       { filename: at("apps/web/src/modules/feed/index.ts"), code: unit("Feed", 9, 9) },
@@ -107,7 +105,6 @@ test("BUDGET-3: no hand-rolled polling loop", () => {
       { filename: BLOCK, code: "declare const useQueryFeedSwr: (o: object) => unknown\nconst E = () => { const d = useQueryFeedSwr({ refreshInterval: 5000 }); return d }" },
       // a one-shot delay is not a loop
       { filename: BLOCK, code: "import { useEffect } from \"react\"\ndeclare const setOpen: (v: boolean) => void\nconst E = () => { useEffect(() => { const t = setTimeout(() => setOpen(false), 300); return () => clearTimeout(t) }, []) }" },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "setInterval(() => 1, 10)" },
       // a shared clock ticking the time for labels reads no data (nivo-fe apps/app/src/hooks/time/useNow.ts)
       {
         filename: at("apps/web/src/hooks/time/useNow.ts"),

@@ -32,6 +32,17 @@ function privateOwnerChain(context, owners, edge) {
   return null;
 }
 
+/**
+ * A `*.builder.ts` of slot be.tests.fixtures.builders arranges data at the schema level: it may deep-import the persistence
+ * entity classes and connection entity lists (slot be.persistence) of any capability. No other file may.
+ */
+function arrangesSchema(config, from, to) {
+  const resolver = config.hfs;
+  if (!resolver?.classifyPath) return false;
+  return resolver.classifyPath(relativePath(config.root, from)).slot === 'be.tests.fixtures.builders'
+    && resolver.classifyPath(relativePath(config.root, to)).slot === 'be.persistence';
+}
+
 /** Enforce explicit same-source owner entries without constraining imports inside one owner. */
 export function checkOwners(config, context) {
   if (!config.owners?.length) return [];
@@ -60,6 +71,7 @@ export function checkOwners(config, context) {
     for (const edge of context.edges.get(from) ?? []) {
       const bypass = privateOwnerChain(context, owners, edge);
       if (!bypass) continue;
+      if (arrangesSchema(config, from, bypass.chain.at(-1))) continue;
       violations.push({
         ruleId: 'ARCH_OWNER_EXPORT_BYPASS',
         path: relativePath(config.root, from),

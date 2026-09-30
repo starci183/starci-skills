@@ -38,7 +38,7 @@ test("the parameters come from the shipped manifest, and the law declares its on
   assert.deepEqual(Object.keys(rules), ["file-size-growth"])
 })
 
-test("a new file over the manifest budget is refused, in a component, a hook and a spec alike", () => {
+test("a new file over the manifest budget is refused, in a component and a hook alike", () => {
   tester.run("file-size-growth", fileSizeGrowth, {
     valid: [
       { filename: "D:/repo/src/components/Card/index.tsx", code: lines(BUDGET) },
@@ -48,8 +48,6 @@ test("a new file over the manifest budget is refused, in a component, a hook and
     invalid: [
       { filename: "D:/repo/src/components/Card/index.tsx", code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
       { filename: "D:/repo/src/hooks/useFeed.ts", code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
-      { filename: "D:/repo/src/components/Card/index.spec.tsx", code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
-      { filename: "D:/repo/e2e/checkout.e2e.ts", code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
     ],
   })
 })

@@ -2,6 +2,9 @@
 
 ## 2.0.0 - unreleased (lane C0, BE-CONVENTION)
 
+- Changed (lane UT): `inbox-dedupe-required` (R80) moves from the door to the service. It judges the public methods of a `*.service.ts` whose first parameter TYPE has an `eventId` property: the first awaited expression must be `claim(source, eventId, ...)` on the `Inbox` port, with an early return on `false`. Consumers and `SignedWebhook` controllers are no longer judged by it, and `transport-is-thin` no longer allows an `Inbox` injection or an inbox guard in a door.
+- Changed: `transport-is-thin` allows `unwrapOutcome` of `platform/primitives` (resolved by its symbol) beside the bus call and pure mapper functions.
+- Fixed: `infra-needs-injector` (R85) no longer judges the constructor of a CQRS message (`extends Command<R>` / `Query<R>` of `@nestjs/cqrs`): its `params` is data built with `new`.
 - Changed (lane UT, unit-test standard 2026-09-30): `unit-test-colocated` (R47) no longer keeps twin specs for handlers, guards, mappers, policies, clients and row mappers. Only a service is unit-tested: a `<name>.service.ts` has its `<name>.service.spec.ts` beside it (message `missing`), a unit spec (a `*.spec.ts` outside `src/tests/{e2e,integration,contract,world}` and `apps/migrate`) must be a `<name>.service.spec.ts` beside its service (`notService`, `orphan`), and a composition spec is no longer a unit kind.
 - New `unit-spec` rules (R48 `BE_SPEC_QUALITY`): `spec-builds-with-testing-module`, `spec-no-new-subject`, `spec-module-definition-only-providers`, `spec-no-module-mock` (own modules and third-party libraries), `no-return-only-generic` (cast laundering in a spec or a test fixture) and `spec-infra-double-from-kit`, which reads the token-to-double table from `ruleParams.be.specDoubles` of the slot manifest (`knowledge/hfs/slots.yaml`).
 - Changed: `spec-typed-entity-manager` (R48) requires the EntityManager double to be `mockEntityManager()` or `fakeTransaction()` imported from `@starci/jest-preset`; `src/tests/fixtures/database.ts` is no longer a source, and `mock<EntityManager>()` is refused.
@@ -10,6 +13,8 @@
 - Changed: `transport-dispatch-only` is replaced by `transport-is-thin` (R88), which keeps its injection and one-dispatch checks and adds: no branch, loop or throw, no call other than the bus, the inbox claim and pure `*.mapper.ts` functions (the R80 inbox guard `if (!(await this.inbox.claim(...))) return` is the one allowed `if`), and a route method returns the dispatch result. There is no alias for the old name.
 - Changed: `spec-infra-double-from-kit` also accepts a value whose declared type is a kit type (`MockEntityManager`, `FakeCache`, `FakeLock`, `RecordingOutbox`, `FakeClock`, `FakeIds`, or a `ReturnType` of the kit function): a spec helper parameter, `tx.em` of a `fakeTransaction(...)`, inline `fakeTransaction(...).em`.
 - Fixed: `no-ambient-clock` (R79) exempts the whole test world, `world/kit` included, not only its root slot.
+- Added: the Operations law (R95 `BE_OPERATION_CONTRACT`, `operations.mjs`): `operation-contract-decidable` refuses an `OperationContract` whose input or output is `any`, `unknown`, `Record<string, unknown>`, an unbound generic, a function or a standard-library class, or whose refusal codes are not a closed union of string literals; `operation-route-driven-by-table` requires a route that takes `OperationRequest<Table>` or answers `OperationReply<Table>` to do both, of one table. The canon types are recognised by where they are declared (the platform capability `operations`).
+- Changed: `no-non-ascii-source` (R89) folds each line to NFC before it looks for a Vietnamese letter, so a decomposed spelling is caught like the precomposed one, and it exempts the i18n fixtures slot `be.tests.fixtures.i18n` (`src/tests/fixtures/i18n/`) beside the message-catalog slots; a test title, an identifier and a string in any other spec or fixture are still refused. The detection is `scripts/lib/language.mjs`, shipped in `runtime/`.
 
 - Changed: the messages and header of `tests-no-override` and `tests-infra-only-in-world` (`test-world.mjs`) follow the owner refinement 2026-09-30 of R47: a service of the repository's own stack runs real and is failed on purpose through `world.infra.<service>`, only an external SaaS is a network fake (`world.fake.<provider>`). Detection is unchanged.
 - Breaking: one configuration, `export default starciBeConfig({ hfs: loadHfs(import.meta.url) })`. The factory is async
@@ -78,6 +83,11 @@
 - Breaking: `no-entity-in-contract` (R37) is type-aware: any type whose declaration carries `typeorm`'s `@Entity`, reached directly or through type arguments and properties, from a transport signature, a handler `execute`, a `*.contracts.ts`, `*.command.ts` or `*.query.ts`; and entity files importing `@nestjs/graphql` or `class-validator`. The `*Entity` name test is deleted.
 - Changed: `user-copy-through-catalog` (R78) judges error classes by the constructed type extending `Error` (not a `*Error` name) and outbound ports by the receiver's type (declared by an `integrations` owner or `platform/messaging`, not the method names `notify/send/publish`); transport slots come from the slot view.
 - Changed: `http-needs-timeout` receivers are identified by type (`AxiosInstance`, `AxiosStatic`, `HttpService`), not by name. `async-needs-await`, `json-parse-needs-guard`, `sql-only-in-repository` and `migration-down-reversible` ask the slot view instead of a path pattern, and none of the R70/R73/R76/R78/R79/R81 rules exempts specs any more.
+
+## 1.8.0 - 2026-09-30 (hotfix off 1.7.1, branch release/canon-be-1.8)
+
+- Breaking: `sql-only-in-repository` removed; `sql-text-only` (R36) allows raw SQL text only in a `<name>.sql.ts` (including `src/tests/fixtures/builders/<area>.sql.ts`); `.query(...)` elsewhere takes an imported constant; `createQueryBuilder` refused; migrations exempt. 2.0.0 keeps the id with the typed `SqlText` check.
+- New: `no-repository-file`: a `*.repository.ts` file is a finding (2.0.0 refuses the suffix through R89 as well).
 
 ## 1.7.1 - 2026-09-30
 

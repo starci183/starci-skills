@@ -1,7 +1,7 @@
 /** Rules for named React props, ordinary children, and local visual ownership. */
 
 import { declarationsOf, fileOf as declarationFile } from "./lib/types.mjs"
-import { fileOf, isComponentFile, isComponentPath, isProductSource, isSpecFile, kindOfFile } from "./lib/scope.mjs"
+import { fileOf, isComponentFile, isComponentPath, isProductSource, kindOfFile } from "./lib/scope.mjs"
 
 const propertyName = (node) => {
   const key = node?.key ?? node?.property
@@ -70,7 +70,7 @@ export const publicComponentSignature = {
       const actual = type?.type === "TSTypeReference" && type.typeName?.type === "Identifier" ? type.typeName.name : null
       if (!actual || !expected.includes(actual)) context.report({ node: params[0], messageId: "type", data: { name, expected: expected.join(" or ") } })
     }
-    if (!isComponentFile(context) || isSpecFile(fileOf(context))) return {}
+    if (!isComponentFile(context)) return {}
     return {
       VariableDeclarator(node) {
         const name = componentNameOf(node)
@@ -93,7 +93,7 @@ export const noPerPartClassNameProp = {
     messages: { perPart: "Keep internal part styling owned by the component." },
   },
   create(context) {
-    if (!isComponentFile(context) || isSpecFile(fileOf(context))) return {}
+    if (!isComponentFile(context)) return {}
     return { TSPropertySignature(node) { const name = propertyName(node); if (name && name !== "className" && /^[a-z][A-Za-z0-9]*ClassName$/.test(name)) context.report({ node, messageId: "perPart" }) } }
   },
 }
@@ -107,7 +107,6 @@ export const noPublicClassNameProp = {
     messages: { declaration: "Component props must not expose {{prop}}.", usage: "Do not pass {{prop}} to house component {{component}}." },
   },
   create(context) {
-    if (isSpecFile(fileOf(context))) return {}
     const declared = isComponentFile(context)
     /** A house component: the identifier resolves (through its import) to a file of a component layer. */
     const isHouseComponent = (identifier) => declarationsOf(context, identifier).some((declaration) => isComponentPath(context, declarationFile(declaration)))
@@ -128,7 +127,7 @@ export const noPublicClassNameProp = {
 export const noPublicFrameCssProps = {
   meta: { type: "problem", docs: { description: "Non-leaf component props do not expose CSS-shaped frame decisions." }, schema: [], messages: { css: "Move {{prop}} into component-owned layout behavior." } },
   create(context) {
-    if (isSpecFile(fileOf(context)) || !isComponentFile(context) || kindOfFile(context) === "leaves") return {}
+    if (!isComponentFile(context) || kindOfFile(context) === "leaves") return {}
     const cssProps = new Set(["gap", "padding", "align", "justify", "className", "classNames", "style", "inline", "nested"])
     return { TSPropertySignature(node) { const name = propertyName(node); if (cssProps.has(name)) context.report({ node, messageId: "css", data: { prop: name } }) } }
   },

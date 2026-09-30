@@ -5,7 +5,7 @@
 // templates/<profile or common>/<managedBy>/<file path with each leading dot dropped>. Two targets are not whole files
 // of a managedBy slot and are listed in this module: the marked block of the shared .gitignore, and
 // .starciwork/.gitignore, which lives inside the .starciwork directory slot. Every file is rendered with the
-// repository's hfs.json (profile and apps) and, for the coverage denominators, the same jest/vitest preset the
+// repository's hfs.json (profile and apps) and, for the Sonar exclusions, the same jest preset a back end
 // repository installs. `--check` compares the sha256 of the rendered content with the file on disk and fails on any
 // drift; `--write` rewrites the drifted files. `.gitignore` is the one shared file: only the marked block is managed
 // and the repository's own lines around it are left alone. A back end's package.json is managed by its `scripts`
@@ -14,7 +14,6 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { braceVariants } from '../runtime/scripts/lib/glob.mjs';
 import { loadSlotManifest } from '../runtime/scripts/lib/hfs-slots.mjs';
 import { readDeclaredSonarKey } from './sonar-key.mjs';
@@ -104,9 +103,10 @@ export function render(text, vars, readTemplate = readBundled) {
   });
 }
 
-/** Coverage denominators from the preset the repository installs: { sonarExclusions, sonarCoverageExclusions }. */
+/** The Sonar exclusions from the jest preset a back end installs: { sonarExclusions }; a front end has no test runner and no preset: null. */
 export async function loadPresets(root, profile) {
-  const name = profile === 'be' ? '@starci/jest-preset' : '@starci/vitest-preset';
+  if (profile === 'fe') return null;
+  const name = '@starci/jest-preset';
   const require = createRequire(path.join(root, 'package.json'));
   let resolved;
   try {
@@ -114,8 +114,8 @@ export async function loadPresets(root, profile) {
   } catch {
     throw new SyncError('HFS_SYNC_PRESET_MISSING', `${name} is not installed under ${root}; set it to the exact version in knowledge/hfs/canon-pins.yaml and reinstall`);
   }
-  const preset = profile === 'be' ? require(resolved) : await import(pathToFileURL(resolved).href);
-  return { sonarExclusions: preset.sonarExclusions(), sonarCoverageExclusions: preset.sonarCoverageExclusions() };
+  const preset = require(resolved);
+  return { sonarExclusions: preset.sonarExclusions() };
 }
 
 /**
@@ -141,7 +141,6 @@ export const STYLE_GLOB = '{apps,packages}/*/src/**/*.css';
 
 /** Every value a template can name, derived from hfs.json and the presets. */
 export function variables(hfs, presets, sonarKey) {
-  const globs = [...presets.sonarExclusions.split(','), ...presets.sonarCoverageExclusions.split(',')];
   const packages = hfs.profile === 'fe' && opensPackages(hfs);
   return {
     header: HEADER(hfs.profile),
@@ -149,9 +148,7 @@ export function variables(hfs, presets, sonarKey) {
     profile: hfs.profile,
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? `${hfs.project}-${hfs.profile === 'be' ? 'backend' : 'fe'}`,
-    sonarExclusions: presets.sonarExclusions,
-    sonarCoverageExclusions: presets.sonarCoverageExclusions,
-    codecovIgnore: globs.map(glob => JSON.stringify(glob)).join('\n  - '),
+    sonarExclusions: presets?.sonarExclusions ?? '',
     tsconfigPaths: [...hfs.apps.map(app => `apps/${app.name}/tsconfig.json`), ...(packages ? ['packages/*/tsconfig.json'] : [])].join(','),
     sonarRoots: packages ? 'apps,packages' : 'apps',
     styleGlob: STYLE_GLOB,

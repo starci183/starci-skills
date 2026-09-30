@@ -199,7 +199,7 @@ policy:
               actual accessible results. Do not execute gates, repair code or accept scanner
               submission as Sonar pass - Sonar proof is the producer's attached sonar.json from
               scripts/checks/sonar-local.mjs with scope slice, outcome pass and revision.commit
-              equal to the tested commit (the slice's new issues, hotspots and new-code coverage;
+              equal to the tested commit (the slice's new issues, hotspots and duplication;
               projectGate is whole-project debt, a note and never a finding against the slice).
               The code-pattern proof of a slice is the producer's attached scoped-lint.json from
               check-scoped-lint.mjs over the owned files with --base the slice's recorded base

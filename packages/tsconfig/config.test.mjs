@@ -50,7 +50,7 @@ test('nest.json is gone: be.json is the one back-end preset, and the package exp
 
 test('be.json carries every flag of the locked back-end contract, none of them lowered', () => {
   const be = effective('be.json');
-  for (const flag of ['strict', 'noImplicitAny', 'strictNullChecks', 'noUncheckedIndexedAccess', 'noImplicitOverride', 'noImplicitReturns', 'noFallthroughCasesInSwitch', 'noUnusedLocals', 'noUnusedParameters', 'isolatedModules', 'experimentalDecorators', 'emitDecoratorMetadata', 'importHelpers']) {
+  for (const flag of ['strict', 'noImplicitAny', 'strictNullChecks', 'noUncheckedIndexedAccess', 'noImplicitOverride', 'noImplicitReturns', 'noFallthroughCasesInSwitch', 'noUnusedLocals', 'noUnusedParameters', 'isolatedModules', 'experimentalDecorators', 'emitDecoratorMetadata']) {
     assert.equal(be[flag], true, flag);
   }
   assert.equal(be.allowJs, false);
