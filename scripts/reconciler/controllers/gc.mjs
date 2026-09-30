@@ -13,6 +13,11 @@
 //      (at most every lowResourceGapMs): `node scripts/supervisor/housekeeping.mjs --apply` through ctx.run.
 //   4. key gc:blob-sweep, every blobSweepEveryMs (24 h): scripts/supervisor/blob-gc.mjs (mark each ledger, then machine.sqlite;
 //      sweep what nothing marks) - shadow logs the read-only plan, active runs --apply as a child.
+//   5. key gc:worktrees, every worktrees.gcEveryMs (5 min, modules/kernel/product-land.yaml): scripts/lib/worktrees.mjs
+//      gcWorktrees. ALWAYS ACTIVE, whatever the controller's mode (owner order lane WT: 600+ orphan worktrees piled up
+//      while the GC ran shadow): a worktree whose branch is merged, whose owner op settled, or whose owner process has
+//      been gone for worktrees.ownerGoneMs (30 min) is preserved (refs/heads/preserved/<name>) and removed. Every item
+//      is a gc_items row.
 //
 // Shadow: every actuator goes through ctx.run (the engine records a reconciler.would row and runs nothing) or, for an
 // in-process one (the sweep, a staging removal), a reconciler.would row written here; the sweep runs gc.mjs as a dry
@@ -58,7 +63,7 @@ export const landKey = (jobId) => (clean(jobId) ? `gc:land:${clean(jobId)}` : nu
 /** A key → {type, ledgerId?, id}. The ledger id never holds ':' (a repo basename or 'supervisor'); ids may. */
 export function parseKey(key) {
   const k = String(key ?? '');
-  if (k === 'gc:sweep' || k === 'gc:housekeeping' || k === 'gc:blob-sweep') return { type: k.slice(3) };
+  if (k === 'gc:sweep' || k === 'gc:housekeeping' || k === 'gc:blob-sweep' || k === 'gc:worktrees') return { type: k.slice(3) };
   let m = /^gc:(job|workflow):([^:]+):(.+)$/.exec(k);
   if (m) return { type: m[1], ledgerId: m[2], id: m[3] };
   m = /^gc:land:(.+)$/.exec(k);
@@ -99,6 +104,8 @@ const liveDeps = {
     return report;
   },
   list: async () => (await import('../../api/orca/terminal-list.mjs')).terminalList({ includeVisualLayouts: true }),
+  worktrees: async ({ env, repos }) => (await import('../../lib/worktrees.mjs')).gcWorktrees({ env, repos: (await import('../../kernel/target-repo.mjs')).boundRepoRoots(repos) }),
+  worktreeSettings: async () => (await import('../../lib/worktrees.mjs')).worktreeSettings(),
   read: async () => (await import('../../api/orca/terminal-read.mjs')).terminalRead,
   hostResources: async () => (await import('../../lib/host-resources.mjs')).hostResourcesFor({}),
   lesson: async (args) => (await import('../../supervisor/lessons.mjs')).recordLeftover(args),
@@ -299,7 +306,8 @@ export function createGcController(overrides = {}) {
       throw Object.assign(new Error('gc-busy: another GC apply holds the host lock'), { retryAfterMs: 120_000 });
     }
     try { await deps.recordSweep(report); } catch { /* the sweep happened; the event is the digest's */ }
-    ctx.log('reconciler.gc.sweep', report.line, { controller: NAME, counts: report.counts, errors: report.errors.slice(0, 5) });
+    ctx.log('reconciler.gc.sweep', report.line, { controller: NAME, counts: report.counts, errors: report.errors.slice(0, 5), progress: report.progress ?? null });
+    if (report.stopped) await stoppedDecision(ctx, report.stopped);
     await leaseDecisionsOf(ctx, report);
     await ownerlessDecisions(ctx, report);
     await record(ctx, 'sweep', report.items.map(sweepItem), report);
@@ -361,6 +369,52 @@ export function createGcController(overrides = {}) {
     return ctx.mode === 'active' ? { ran: true, ok: r?.ok ?? null } : { shadow: true, plan: plan?.error ? { error: plan.error } : { marked: plan?.marked ?? null, toArchive: plan?.toArchive?.length ?? 0, toSweep: plan?.toSweep?.length ?? 0 } };
   }
 
+  /** A removal changed a main checkout: the GC stopped itself; the Supervisor gets one runtime-defect item per stop. */
+  async function stoppedDecision(ctx, stop) {
+    ctx.log('reconciler.gc.stopped', `GC STOPPED: a worktree removal changed the main checkout (${(stop.damage ?? []).join('; ').slice(0, 300)})`, { controller: NAME, ...stop });
+    await ctx.openDecision({
+      schema: 'starci/decision-item@1', kind: 'runtime-defect', decider: 'supervisor', ledger: 'supervisor',
+      idempotencyKey: `gc-main-damaged:${String(stop.path ?? 'unknown').replace(/:/g, '_')}`, entity: { type: 'worktree', id: String(stop.path ?? 'unknown') },
+      summary: `The GC stopped: removing ${stop.path ?? 'a worktree'} changed the main checkout (${(stop.damage ?? []).join('; ').slice(0, 300)})`,
+      evidence: [{ ref: `worktree:${stop.path ?? ''}`, why: (stop.damage ?? []).join('; ').slice(0, 500) }],
+      options: [{ key: 'restore-and-resume', verb: 'restore the main checkout (git checkout -- <paths>, npm ci), find the link that was followed, then node scripts/lib/worktrees.mjs resume', recommended: true }],
+      allowedVerbs: [], openedBy: 'gc-controller', escalateTo: 'owner',
+    });
+  }
+
+  /**
+   * key gc:worktrees: the worktree GC, ALWAYS ACTIVE (the owner's order overrides the controller's shadow mode for
+   * worktrees). Every item - removed, unregistered, failed - is recorded in gc_items whatever the mode.
+   */
+  async function reconcileWorktrees(ctx) {
+    const now = ctx.now();
+    const every = settings.worktreeGcEveryMs ?? (await deps.worktreeSettings()).gcEveryMs;
+    const claim = claimDue(ctx, { controller: NAME, duty: 'worktrees', intervalMs: every, now });
+    if (!claim.due) return { skipped: 'not due', nextAt: claim.nextAt ?? null };
+    let items = [];
+    try { items = await deps.worktrees({ env: ctx.env ?? process.env, repos: (ctx.ledgers ?? []).map((l) => l.repo).filter(Boolean) }); }
+    catch (error) {
+      finishDuty(ctx, { controller: NAME, duty: 'worktrees', result: 'failed', now: ctx.now() });
+      ctx.log('reconciler.gc.worktrees', `worktree gc FAILED: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME });
+      return { ok: false, error: String(error?.message ?? error).slice(0, 200) };
+    }
+    const stop = items.find((i) => i.action === 'stopped');
+    if (stop) await stoppedDecision(ctx, { reason: stop.reason, path: items.find((i) => i.fatal)?.path ?? null, damage: items.find((i) => i.fatal)?.damage ?? [stop.error] });
+    const removed = items.filter((i) => i.ok === true && i.action === 'remove').length;
+    const failed = items.filter((i) => i.ok === false);
+    if (items.length) {
+      ctx.log('reconciler.gc.worktrees', `worktree gc: ${removed} removed, ${items.filter((i) => i.action === 'unregister').length} unregistered, ${failed.length} failed`,
+        { controller: NAME, items: items.slice(0, 50) });
+      try {
+        await deps.recordRun({ trigger: 'sweep', items: items.map((i) => ({ collector: 'gc-worktrees', kind: 'worktree', target: String(i.path ?? ''), ownerRef: i.preserved ?? null,
+          action: i.ok === false ? 'failed' : 'removed', reason: i.reason ?? null, outcome: i.ok === false ? 'gave-up' : 'done',
+          ...(i.ok === false ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : { verifiedGoneAt: ctx.now() }) })) });
+      } catch (error) { ctx.log('reconciler.gc.record.error', `gc_items write failed: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
+    }
+    finishDuty(ctx, { controller: NAME, duty: 'worktrees', result: failed.length ? 'failed' : 'done', now: ctx.now() });
+    return { active: true, removed, failed: failed.length, items: items.length };
+  }
+
   async function reconcileHousekeeping(ctx) {
     const now = ctx.now();
     let host = null;
@@ -382,13 +436,14 @@ export function createGcController(overrides = {}) {
     resyncMs: settings.resyncMs,
     concurrency: settings.concurrency,
     routes: ROUTES,
-    async list() { return ['gc:sweep', 'gc:housekeeping', 'gc:blob-sweep']; },
+    async list() { return ['gc:sweep', 'gc:housekeeping', 'gc:blob-sweep', 'gc:worktrees']; },
     async reconcile(key, ctx) {
       const k = parseKey(key);
       // The engine runs this controller only when it is not off; ctx.mode decides act (active) or record (shadow).
       if (k.type === 'sweep') return reconcileSweep(ctx);
       if (k.type === 'housekeeping') return reconcileHousekeeping(ctx);
       if (k.type === 'blob-sweep') return reconcileBlobSweep(ctx);
+      if (k.type === 'worktrees') return reconcileWorktrees(ctx);
       if (k.type === 'job') return reconcileJob(ctx, k);
       if (k.type === 'workflow') return reconcileWorkflow(ctx, k);
       if (k.type === 'land') return reconcileSupJob(ctx, { jobId: k.id, sup: (await deps.gc()).supervisorView(), gc: await deps.gc() });

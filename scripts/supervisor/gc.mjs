@@ -73,13 +73,14 @@ import { gitResult } from '../lib/git.mjs';
 import { killProcessTree } from '../lib/kill-tree.mjs';
 import { lanesRoot, parseWorktreeList, laneActivity, treeBytes } from '../lib/hk-lanes.mjs';
 import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
+import { markRemoved } from '../lib/worktrees.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder } from '../lib/terminal-ledger.mjs';
 import { SKILL_ROOT, landRoot, productRepos, seatOf, stagingRoot, readSupervisor, withSupervisor } from './home.mjs';
-import { jobsOf, removeStaging, unlinkNodeModulesLink } from './workers.mjs';
+import { jobsOf, removeStaging } from './workers.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { pidAlive } from '../../engine/machine-db.mjs';
 import { LANE_IDLE_MS, laneOwnerOf, tabTitles } from '../lib/lane-owner.mjs';
@@ -91,7 +92,7 @@ export const SCHEMA = 'starci/gc-report@1';
 export const GC_EVENT_KIND = 'supervisor-gc';
 export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'tmp', 'tasks', 'leases', 'lanelogs']);
 export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, sweepMs: 1_800_000,
-  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS });
+  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS, laneBudgetMs: 240_000 });
 /** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
 export const LEFTOVER_OWNERS = Object.freeze({
   lease: 'settle/reconcile did not release the job lease (scripts/kernel/api.mjs cmdSettle/cmdReconcile DELETE FROM leases, workers.mjs releaseLeases)',
@@ -120,7 +121,10 @@ export function gcSettings(allocation = allocationSettings()) {
     leaseMinAgeMs: num(gc.leaseMinAgeMs, DEFAULTS.leaseMinAgeMs), laneLogMinAgeMs: num(gc.laneLogMinAgeMs, DEFAULTS.laneLogMinAgeMs),
     laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),
     // A landed lane worktree goes only after laneIdleMs (60 min) with no git activity, never below gcLaneGraceMs.
-    laneIdleMs: Math.max(num(gc.laneIdleMs, DEFAULTS.laneIdleMs), num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)) };
+    laneIdleMs: Math.max(num(gc.laneIdleMs, DEFAULTS.laneIdleMs), num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)),
+    // One pass judges lanes for at most laneBudgetMs, then records where it stopped; the next pass resumes there (a
+    // backlog of hundreds of lane worktrees timed the sweep child out every pass, 2026-10-01).
+    laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs) };
 }
 
 
@@ -561,11 +565,19 @@ function laneContentLanded(commits, branch, root, run) {
   return true;
 }
 
+/** The lanes collector's resume point: the path key the last bounded pass stopped before (machine.sqlite machine_meta). */
+export const LANE_CURSOR = 'lanes';
+export const readLaneCursor = (env = process.env) => readSupervisor((m) => m.gcCursor(LANE_CURSOR), null, { env });
+export const writeLaneCursor = (value, env = process.env) => { try { withSupervisor((m) => m.setGcCursor(LANE_CURSOR, value), { env }); } catch { /* the next pass starts over */ } };
+
 /**
  * Decide and (apply) remove the lane worktrees. `git` runner (args, {cwd}) -> {ok, stdout, error}; `sup` supervisorView.
- * Returns {items, freedBytes, errors}.
+ * BOUNDED: the lanes are judged in path order from `cursor` to the end for at most settings.laneBudgetMs
+ * (`clock` is the seam); `progress` says how far it got and where the next pass resumes. A removal that changed the main
+ * checkout (safeRemoveWorktree fatal) stops the collector at once. Returns {items, freedBytes, errors, progress, fatal?}.
  */
-export function collectLanes({ apply = false, env = process.env, now = Date.now(), settings, sup, root = SKILL_ROOT, git = null, landBusy = false, terminals = [], titles = new Map() }) {
+export function collectLanes({ apply = false, env = process.env, now = Date.now(), settings, sup, root = SKILL_ROOT, git = null, landBusy = false, terminals = [], titles = new Map(),
+  cursor = null, clock = Date.now }) {
   const run = git ?? ((args, { cwd }) => gitResult(args, { cwd }));
   const base = lanesRoot({ env });
   const items = [], errors = [];
@@ -581,18 +593,31 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
   const item = (verdict, target, reason, extra = {}) => items.push({ class: 'lane', verdict, target, reason, ...extra });
   const branchOf = (ref) => String(ref ?? '').replace(/^refs\/heads\//, '');
   const dirty = (p) => { const s = run(['status', '--porcelain', '--untracked-files=normal'], { cwd: p }); return s.ok ? s.stdout.trim().split(/\r?\n/).filter(Boolean).length : null; };
+  let fatal = null;
   const removeTree = (w, branch, { why = 'landed in main, clean, idle' }) => {
     const bytes = treeBytes(w.path);
     if (!apply) { item('collect', w.path, `would remove (${why})`, { bytes, branch, worktree: true }); freedBytes += bytes; return; }
-    if (!unlinkNodeModulesLink(w.path)) { errors.push(`${w.path}: node_modules link could not be unlinked; left in place`); item('refuse', w.path, 'node_modules junction could not be unlinked'); return; }
+    // safeRemoveWorktree: every link removed as a link (found without following one), zero links asserted, then git
+    // worktree remove, and the main checkout asserted untouched (a violation stops the collector).
     const r = safeRemoveWorktree(w.path, { repo: root, git: run });
+    if (r.fatal) { fatal = { path: w.path, damage: r.damage }; errors.push(`${w.path}: main checkout damaged: ${(r.damage ?? []).join('; ')}`); item('refuse', w.path, 'removal changed the main checkout: the GC stops', { ok: false }); return; }
     if (!r.ok) { errors.push(`${w.path}: ${(r.errors ?? []).slice(0, 2).map((e) => e.message).join('; ')}`); item('refuse', w.path, 'removal failed', { ok: false }); return; }
+    markRemoved(w.path, { env });
     item('collect', w.path, `removed (${why})`, { bytes, branch, branchDeleted: false, ok: true, worktree: true });
     freedBytes += bytes;
   };
-  for (const w of worktrees) {
-    const key = pathKey(w.path);
-    if (key === mainKey || key === selfKey || !key.startsWith(baseKey)) continue;
+  const lanes = worktrees.filter((w) => { const k = pathKey(w.path); return k !== mainKey && k !== selfKey && k.startsWith(baseKey); })
+    .sort((a, b) => (pathKey(a.path) < pathKey(b.path) ? -1 : pathKey(a.path) > pathKey(b.path) ? 1 : 0));
+  // Resume at the cursor and run to the end of the path order; a pass that reaches the end is complete (the next one
+  // starts from the beginning again).
+  const at = cursor ? lanes.findIndex((w) => pathKey(w.path) >= cursor) : 0;
+  const ordered = at < 0 ? [] : lanes.slice(at);
+  const started = clock();
+  const progress = { total: lanes.length, from: at < 0 ? lanes.length : at, done: 0, complete: true, next: null, budgetMs: settings.laneBudgetMs ?? DEFAULTS.laneBudgetMs };
+  for (const w of ordered) {
+    if (fatal) { progress.complete = false; progress.next = pathKey(w.path); break; }
+    if (clock() - started > progress.budgetMs) { progress.complete = false; progress.next = pathKey(w.path); break; }
+    progress.done += 1;
     if (w.locked) { item('keep', w.path, 'locked'); continue; }
     if (!fs.existsSync(w.path)) { if (apply) run(['worktree', 'prune'], { cwd: root }); item('collect', w.path, 'registration of a missing directory (pruned)'); continue; }
     const branch = branchOf(w.branch);
@@ -642,6 +667,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     if (owner) { item('keep', w.path, `landed but its owner is alive: ${owner}`, { branch, liveOwner: true }); continue; }
     removeTree(w, branch, { why: 'landed in main, clean, idle; branch kept' });
   }
+  if (fatal) return { items, freedBytes, errors, progress, fatal };
   if (apply) run(['worktree', 'prune'], { cwd: root });
   // Leftover empty directories of removed checkouts (staging/<job>, land/<scratch>) whose registration is gone.
   for (const parent of [stagingRoot(env), landRoot(env)]) {
@@ -657,7 +683,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
       else item('collect', p, 'would remove empty leftover directory');
     }
   }
-  return { items, freedBytes, errors };
+  return { items, freedBytes, errors, progress };
 }
 
 /* ------------------------------------------------------------ the run */
@@ -776,7 +802,19 @@ export async function runGc({ apply = false, only = null, env = process.env, now
       const lt = lanesListing ?? (deps.list ?? (() => terminalList({ includeVisualLayouts: true })))();
       if (lt?.ok) { laneTerms = lt.terminals ?? []; laneTitles = tabTitles(lt.visualLayouts); }
     } catch { laneTerms = null; }
-    const l = collectLanes({ apply, env, now, settings, sup, git: deps.git ?? null, landBusy, terminals: laneTerms, titles: laneTitles });
+    // A removal that ever changed a main checkout stops every worktree removal until an operator clears it
+    // (node scripts/lib/worktrees.mjs resume): the same stop mark as the worktree GC.
+    const stoppedMark = (deps.gcStop ?? (() => readSupervisor((m) => m.worktreeGcStop(), null, { env })))();
+    const cursor = (deps.laneCursor ?? readLaneCursor)(env);
+    const l = stoppedMark ? { items: [], freedBytes: 0, errors: [`lanes skipped: the worktree GC is stopped since ${new Date(stoppedMark.at).toISOString()} (${(stoppedMark.damage ?? []).join('; ').slice(0, 200)})`], progress: { total: 0, done: 0, complete: false, next: null, stopped: true } } : collectLanes({ apply, env, now, settings, sup, git: deps.git ?? null, landBusy, terminals: laneTerms, titles: laneTitles, cursor, clock: deps.clock ?? Date.now });
+    report.progress = { ...(report.progress ?? {}), lanes: l.progress };
+    // A partial pass resumes where it stopped; a complete one starts over next time (a dry run never moves the cursor).
+    if (apply && !stoppedMark) (deps.writeLaneCursor ?? writeLaneCursor)(l.progress.complete ? null : l.progress.next, env);
+    if (stoppedMark) { report.ok = false; report.stopped = { reason: 'main-checkout-damaged', ...stoppedMark, since: stoppedMark.at }; }
+    if (l.fatal) {
+      report.ok = false; report.stopped = { reason: 'main-checkout-damaged', ...l.fatal };
+      try { (deps.setGcStop ?? ((stop) => withSupervisor((m) => m.setWorktreeGcStop(stop), { env })))({ at: Date.now(), ...l.fatal }); } catch { /* the report carries it */ }
+    }
     for (const i of l.items) {
       if (i.verdict === 'keep' && !i.unmerged && !i.liveOwner) continue;
       report.items.push({ class: 'lane', action: 'remove-worktree', target: i.target, reason: i.reason, verdict: i.verdict === 'keep' ? 'refuse' : i.verdict,

@@ -47,6 +47,18 @@ export function projectBinding(repo, { sourceRoot = starciSourceRoot() } = {}) {
   return null;
 }
 
+/** Every repository root the given ledger repos are bound to (their own roots included): where product worktrees live. */
+export function boundRepoRoots(ledgerRepos) {
+  const out = new Map();
+  for (const repo of (ledgerRepos ?? []).filter(Boolean)) {
+    out.set(path.resolve(repo).toLowerCase(), path.resolve(repo));
+    let binding = null;
+    try { binding = projectBinding(repo); } catch { binding = null; }
+    for (const r of binding?.repos ?? []) if (fs.existsSync(path.join(r.root, '.git'))) out.set(path.resolve(r.root).toLowerCase(), path.resolve(r.root));
+  }
+  return [...out.values()];
+}
+
 const repoName = (url) => (typeof url === 'string' ? url.replace(/[\\/]+$/, '').split(/[\\/:]/).pop().replace(/\.git$/i, '') : null);
 
 // A repo id is a side (be or fe), or the app repository's name or path.
