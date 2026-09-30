@@ -2,7 +2,7 @@ import type { Writable } from "node:stream"
 import { FakeClock, mock } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { Test } from "@nestjs/testing"
-import { JsonLoggerService } from "./json-logger.service"
+import { createJsonLogger, JsonLoggerService } from "./json-logger.service"
 import { LOG_ERR, LOG_OUT } from "./logging.decorators"
 
 const build = async () => {
@@ -90,5 +90,26 @@ describe("JsonLoggerService", () => {
                 line: `${JSON.stringify({ level: "error", event: "db.failed", time: "2026-05-06T07:08:09.000Z", errorMessage: "plain failure" })}\n`,
             },
         ])
+    })
+
+    describe("createJsonLogger", () => {
+        afterEach(() => {
+            jest.restoreAllMocks()
+        })
+
+        it("builds a logger that writes info to stdout and errors to stderr, stamped by the clock", () => {
+            const lines: Array<string> = []
+            jest.spyOn(process.stdout, "write").mockImplementation((chunk) => lines.push(`out:${String(chunk)}`) > 0)
+            jest.spyOn(process.stderr, "write").mockImplementation((chunk) => lines.push(`err:${String(chunk)}`) > 0)
+            const logger = createJsonLogger(new FakeClock("2026-05-06T07:08:09.000Z"))
+
+            logger.info("server.started")
+            logger.warn("cache.slow")
+
+            expect(lines).toEqual([
+                `out:${JSON.stringify({ level: "info", event: "server.started", time: "2026-05-06T07:08:09.000Z" })}\n`,
+                `err:${JSON.stringify({ level: "warn", event: "cache.slow", time: "2026-05-06T07:08:09.000Z" })}\n`,
+            ])
+        })
     })
 })
