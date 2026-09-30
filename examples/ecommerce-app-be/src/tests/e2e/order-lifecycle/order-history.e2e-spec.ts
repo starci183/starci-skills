@@ -1,6 +1,6 @@
 import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
-import { asBearer, present } from "../../fixtures/bearer.mapper"
+import { present } from "../../fixtures/present.mapper"
 import type { CatalogProductView, CartData, PlaceOrderData, AccountData, BuyerStatusData } from "../../fixtures/e2e-views.contracts"
 import type { OrderRow, OrderLineRow, PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows, readCount } from "../../fixtures/persistence/e2e-verification.rows"
@@ -32,8 +32,8 @@ describe("order lifecycle: order history", () => {
     it("a buyer placing several orders builds a confirmed, paid history both services can read", async () => {
         const session = await world.auth.registerBuyer("hist-a", password)
         const { personId } = session
-        const buyer = asBearer(world.apps.order.api, session.sessionToken)
-        const identity = asBearer(world.apps.identity.api, session.sessionToken)
+        const buyer = world.apps.order.api.bearing(session.sessionToken)
+        const identity = world.apps.identity.api.bearing(session.sessionToken)
 
         // Baseline: not a buyer yet, on both sides of the contract.
         expect((await buyer.read<BuyerStatusData>("buyerStatus")).data?.buyerStatus).toEqual({ personId, hasOrders: false })
@@ -103,7 +103,7 @@ describe("order lifecycle: order history", () => {
     it("a refusal and an idempotent replay never append to order history", async () => {
         const session = await world.auth.registerBuyer("hist-b", password)
         const { personId } = session
-        const buyer = asBearer(world.apps.order.api, session.sessionToken)
+        const buyer = world.apps.order.api.bearing(session.sessionToken)
 
         // Refusal 1: an empty cart confirms nothing and records nothing.
         const emptyRefusal = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: {} } })

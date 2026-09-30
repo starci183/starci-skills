@@ -1,7 +1,7 @@
-import { AcceptLanguageLocale } from "./request-locale.service"
+import { RequestLocaleService } from "./request-locale.service"
 
-describe("AcceptLanguageLocale", () => {
-    const locale = new AcceptLanguageLocale()
+describe("RequestLocaleService", () => {
+    const locale = new RequestLocaleService()
 
     it("picks the first supported language of the header", () => {
         expect(locale.of("fr-FR, en-US;q=0.8, vi;q=0.5")).toBe("en")

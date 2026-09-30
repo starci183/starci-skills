@@ -10,7 +10,7 @@ import { IDENTITY_API, IDENTITY_API_ERROR_KINDS, IDENTITY_API_MESSAGES, Identity
 import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
-import { DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbe } from "@modules/platform/database"
+import { DATABASE_ERROR_KINDS, DatabaseModule, DatabaseProbeService } from "@modules/platform/database"
 import { ERRORS_MESSAGES, ErrorsFilter, ErrorsModule } from "@modules/platform/errors"
 import { GraphqlModule } from "@modules/platform/graphql"
 import { HTTP_ERROR_KINDS, HTTP_MESSAGES, HttpModule } from "@modules/platform/http"
@@ -77,7 +77,7 @@ export class AppModule {
                 PaymentModule.register({ isGlobal: true }),
                 OrderModule.register({ isGlobal: true }),
                 IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),
-                ProbesModule.register({ isGlobal: true, service: "order", probes: [DatabaseProbe, IDENTITY_API] }),
+                ProbesModule.register({ isGlobal: true, service: "order", probes: [DatabaseProbeService, IDENTITY_API] }),
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,
                 CheckoutGraphqlModule,

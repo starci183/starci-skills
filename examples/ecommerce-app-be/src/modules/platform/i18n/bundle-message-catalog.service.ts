@@ -8,7 +8,7 @@ const PLACEHOLDER = /\{\{(\w+)\}\}/g
 
 @Injectable()
 /** The catalog over the bundles of I18nOptions: later bundles never override earlier ones, keys are owned by one bundle. */
-export class BundleMessageCatalog implements MessageCatalog {
+export class BundleMessageCatalogService implements MessageCatalog {
     private readonly texts: Readonly<Record<Locale, ReadonlyMap<string, string>>>
 
     constructor(@InjectI18nOptions() options: I18nOptions) {

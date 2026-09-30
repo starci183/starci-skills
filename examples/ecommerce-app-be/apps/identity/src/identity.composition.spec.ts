@@ -13,7 +13,7 @@ import { CACHE } from "@modules/integrations/cache"
 import type { Cache } from "@modules/integrations/cache"
 import { EnvSource, Secret } from "@modules/platform/config"
 import { ERRORS_SERVICE, ErrorsFilter } from "@modules/platform/errors"
-import { DatabaseProbe, IDENTITY_CONNECTION } from "@modules/platform/database"
+import { DatabaseProbeService, IDENTITY_CONNECTION } from "@modules/platform/database"
 import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
 import { mockEntityManager } from "@tests/fixtures/database"
 import { AppModule } from "./app.module"
@@ -66,7 +66,7 @@ describe("identity AppModule", () => {
     })
 
     it("provides the database probe over the connection double", () => {
-        expect(module.get(DatabaseProbe)).toBeInstanceOf(DatabaseProbe)
+        expect(module.get(DatabaseProbeService)).toBeInstanceOf(DatabaseProbeService)
     })
 
     it("binds the one errors filter of platform/errors app-wide", () => {

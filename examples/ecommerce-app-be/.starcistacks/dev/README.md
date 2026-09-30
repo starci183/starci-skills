@@ -21,7 +21,6 @@ that mentions dev+vps is reported as a finding, not answered with a fake).
 | status | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml ps` |
 | logs | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml logs -f postgres redis` |
 | down | `docker compose -f .starcistacks/dev/infra/compose/compose.yaml down` (add `-v` to drop the Postgres volume, then migrate and seed again) |
-| verification | `node scripts/live-proof.mjs` - registers a fresh visitor, signs in, adds cart lines, confirms an order, replays the idempotency key, and reads `hasOrders` back through identity -> order over real GraphQL; exits 0 only when every step passed |
 
 The dev Postgres runs with trust authentication (DEMO-ONLY: a local container whose published
 ports bind loopback, holding the demo seeds - nothing worth a password). A real

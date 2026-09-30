@@ -1,10 +1,21 @@
 import "reflect-metadata"
+import { NestFactory } from "@nestjs/core"
+import { SystemClockService } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
-import { serveApi } from "@modules/platform/serving"
+import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { parseOrderAppOptions } from "./order.options"
 
-void serveApi("order", () => {
+/** Reads the environment once, builds the order api from it and listens. */
+async function bootstrap(): Promise<void> {
     const options = parseOrderAppOptions(EnvSource.fromProcess())
-    return { module: AppModule.register(options), port: options.port }
+    const app = await NestFactory.create(AppModule.register(options))
+    app.enableShutdownHooks()
+    await app.listen(options.port)
+    createJsonLogger(new SystemClockService()).info(LoggingLogEvent.ServerStarted, { service: "order", port: options.port })
+}
+
+bootstrap().catch((error: unknown) => {
+    createJsonLogger(new SystemClockService()).error(LoggingLogEvent.StartupFailed, error, { service: "order" })
+    process.exit(1)
 })

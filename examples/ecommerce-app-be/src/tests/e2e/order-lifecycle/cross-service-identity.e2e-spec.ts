@@ -1,6 +1,5 @@
 import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
-import { asBearer } from "../../fixtures/bearer.mapper"
 import type { CartData, PlaceOrderData, AccountData, RevokeSessionData } from "../../fixtures/e2e-views.contracts"
 import type { OrderRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
@@ -29,8 +28,8 @@ describe("order lifecycle: identity to order boundary", () => {
 
     it("a revoked session is refused at the order boundary until re-auth resumes the same buyer", async () => {
         const session = await world.auth.registerBuyer("xsrv", password)
-        const identity = asBearer(world.apps.identity.api, session.sessionToken)
-        const before = asBearer(world.apps.order.api, session.sessionToken)
+        const identity = world.apps.identity.api.bearing(session.sessionToken)
+        const before = world.apps.order.api.bearing(session.sessionToken)
 
         // The token is live at the order boundary: the guard just verified it against identity.
         const added = await before.mutate("addCartItem", { variables: { input: { productId: "sku-notebook", quantity: 1 } } })
@@ -47,7 +46,7 @@ describe("order lifecycle: identity to order boundary", () => {
         const resumed = await world.auth.signIn(session.email, password)
         expect(resumed.personId).toBe(session.personId)
         expect(resumed.sessionToken).not.toBe(session.sessionToken)
-        const after = asBearer(world.apps.order.api, resumed.sessionToken)
+        const after = world.apps.order.api.bearing(resumed.sessionToken)
 
         // Resume: the cart line added under the dead session is person-keyed, so it is still there...
         const cart = await after.read<CartData>("cart")
@@ -59,7 +58,7 @@ describe("order lifecycle: identity to order boundary", () => {
         expect(placed.errorCode).toBeNull()
         expect(placed.data?.placeOrder.status).toBe("confirmed")
         expect(await readRows<OrderRow>(world.db.order, ORDERS_OF_PERSON, [session.personId])).toEqual([expect.objectContaining({ status: "confirmed" })])
-        const account = await asBearer(world.apps.identity.api, resumed.sessionToken).read<AccountData>("account")
+        const account = await world.apps.identity.api.bearing(resumed.sessionToken).read<AccountData>("account")
         expect(account.data?.account.hasOrders).toBe(true)
     })
 })

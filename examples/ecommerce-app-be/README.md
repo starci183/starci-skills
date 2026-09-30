@@ -49,7 +49,7 @@ From this directory run `npm run typecheck`, `npm run lint:check`, `npm run buil
 `.claude` tree, run `node scripts/checks/canon-scan.mjs --root examples/ecommerce-app-be --json`
 and `node scripts/checks/check-starcistacks.mjs examples/ecommerce-app-be`.
 
-`npm run test:e2e` and `node scripts/live-proof.mjs` need the declared Postgres, Redis, and
+`npm run test:e2e` needs the declared Postgres, Redis, and
 application processes. There are exactly two test kinds: unit `*.spec.ts` beside the source and e2e
 `*.e2e-spec.ts` under `src/tests/e2e/`. Narrow an e2e run with jest arguments, for example
 `npm run test:e2e -- checkout/checkout-journey` or `npm run test:e2e -- resilience`. E2E runs manually only: no hook, default typecheck/lint, coverage or automatic CI job runs it (`npm run typecheck:e2e` is its manual type check).

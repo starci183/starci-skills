@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
-import { asBearer, present } from "../../fixtures/bearer.mapper"
+import { present } from "../../fixtures/present.mapper"
 import type { AccountData, RegisterData, SignInData, VerifySessionData, RevokeSessionData } from "../../fixtures/e2e-views.contracts"
 import type { PersonRow, TableRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
@@ -23,7 +23,7 @@ describe("identity sign-up and sign-in journey", () => {
     const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
     it("registers a person, issues and verifies a session, then revokes it", async () => {
-        const anonymous = asBearer(world.apps.identity.api)
+        const anonymous = world.apps.identity.api
 
         const registered = await anonymous.mutate<RegisterData>("register", { variables: { input: { email, password } } })
         expect(registered.errorCode).toBeNull()
@@ -55,7 +55,7 @@ describe("identity sign-up and sign-in journey", () => {
         expect(verified.data?.verifySession.personId).toBe(personId)
 
         // The account view is the cross-service proof: identity reads hasOrders live from order, forwarding the caller token.
-        const caller = asBearer(world.apps.identity.api, session.sessionToken)
+        const caller = world.apps.identity.api.bearing(session.sessionToken)
         const account = await caller.read<AccountData>("account")
         expect(account.errorCode).toBeNull()
         expect(account.data?.account).toEqual({ personId, email, hasOrders: false })

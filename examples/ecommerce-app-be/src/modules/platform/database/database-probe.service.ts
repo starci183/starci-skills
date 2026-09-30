@@ -3,7 +3,7 @@ import type { Probe } from "@modules/platform/probes"
 import { PING } from "./database.sql"
 
 /** The health probe of the database capability: every connection the app opened must answer a ping. */
-export class DatabaseProbe implements Probe {
+export class DatabaseProbeService implements Probe {
     /** The name the health report lists this probe under. */
     readonly name = "database"
 

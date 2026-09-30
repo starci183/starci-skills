@@ -12,7 +12,7 @@ import { CatalogService } from "@modules/domain/catalog"
 import { OrderService } from "@modules/domain/order"
 import { PaymentService } from "@modules/domain/payment"
 import { EnvSource, Secret } from "@modules/platform/config"
-import { DatabaseProbe, ORDER_CONNECTION } from "@modules/platform/database"
+import { DatabaseProbeService, ORDER_CONNECTION } from "@modules/platform/database"
 import { ERRORS_SERVICE, ErrorsFilter } from "@modules/platform/errors"
 import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
 import { mockEntityManager } from "@tests/fixtures/database"
@@ -64,7 +64,7 @@ describe("order AppModule", () => {
     })
 
     it("provides the database probe over the connection double", () => {
-        expect(module.get(DatabaseProbe)).toBeInstanceOf(DatabaseProbe)
+        expect(module.get(DatabaseProbeService)).toBeInstanceOf(DatabaseProbeService)
     })
 
     it("binds the one errors filter of platform/errors app-wide", () => {

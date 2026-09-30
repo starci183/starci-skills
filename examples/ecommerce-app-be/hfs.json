@@ -3,7 +3,8 @@
   "profile": "be",
   "project": "ecommerce-app-be",
   "optionalSlots": [
-    "repo.docs"
+    "repo.docs",
+    "be.contract.graphql"
   ],
   "apps": [
     {

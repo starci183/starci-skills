@@ -1,6 +1,6 @@
 import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
-import { asBearer, present } from "../../fixtures/bearer.mapper"
+import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData, ClearCartData } from "../../fixtures/e2e-views.contracts"
 import type { PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
@@ -25,7 +25,7 @@ interface FreshBuyer {
 describe("payment failure", () => {
     const freshBuyer = async (tag: string): Promise<FreshBuyer> => {
         const session = await world.auth.registerBuyer(`payment-${tag}`, "e2e-payment-pass")
-        return { personId: session.personId, buyer: asBearer(world.apps.order.api, session.sessionToken) }
+        return { personId: session.personId, buyer: world.apps.order.api.bearing(session.sessionToken) }
     }
 
     const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })

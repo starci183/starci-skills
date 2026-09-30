@@ -16,8 +16,8 @@ import { paymentEntities } from "@modules/domain/payment"
 import { EnvSource, Secret } from "@modules/platform/config"
 import { IDENTITY_CONNECTION, ORDER_CONNECTION } from "@modules/platform/database"
 import type { DatabaseConnectionOptions } from "@modules/platform/database"
-import type { IdentityAppOptions } from "../../../apps/identity/src/identity.options"
-import type { OrderAppOptions } from "../../../apps/order/src/order.options"
+import type { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
+import type { AppModule as OrderApp } from "../../../apps/order/src/app.module"
 import type { RegisterData, SignInData } from "../fixtures/e2e-views.contracts"
 import { RedisFakeService } from "./fakes/redis/redis-fake.service"
 
@@ -42,7 +42,12 @@ export interface TestApi {
     read<TData>(document: string, options?: GraphqlCallOptions): Promise<GraphqlObserved<TData>>
     /** Sends a mutation. */
     mutate<TData>(document: string, options?: GraphqlCallOptions): Promise<GraphqlObserved<TData>>
+    /** The same door with every call riding on `token`; without a token every call is anonymous. */
+    bearing(token?: string): TestApi
 }
+
+type IdentityAppOptions = Parameters<typeof IdentityApp.register>[0]
+type OrderAppOptions = Parameters<typeof OrderApp.register>[0]
 
 /** The composition root of an app: its static `register` builds the root module from typed options. */
 export interface TestAppModule<TOptions> {
@@ -141,9 +146,10 @@ interface Running {
 
 const transport = createE2EGraphqlTransport({ documents: DOCUMENTS })
 
-const apiOf = (url: string): TestApi => ({
-    read: (document, options) => transport.call(url, "query", document, options),
-    mutate: (document, options) => transport.call(url, "mutate", document, options),
+const apiOf = (url: string, token?: string): TestApi => ({
+    read: (document, options) => transport.call(url, "query", document, { ...options, token: options?.token ?? token }),
+    mutate: (document, options) => transport.call(url, "mutate", document, { ...options, token: options?.token ?? token }),
+    bearing: (bearer) => apiOf(url, bearer),
 })
 
 const authOf = (identity: TestApi): TestAuth => {

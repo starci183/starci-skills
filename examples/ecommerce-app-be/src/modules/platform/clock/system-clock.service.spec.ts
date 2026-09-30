@@ -1,9 +1,9 @@
-import { SystemClock } from "./system-clock.service"
+import { SystemClockService } from "./system-clock.service"
 
-describe("SystemClock", () => {
+describe("SystemClockService", () => {
     it("answers the current instant of the host", () => {
         const before = Date.now()
-        const reading = new SystemClock().now().getTime()
+        const reading = new SystemClockService().now().getTime()
         expect(reading).toBeGreaterThanOrEqual(before)
         expect(reading).toBeLessThanOrEqual(Date.now())
     })

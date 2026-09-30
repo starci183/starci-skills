@@ -1,6 +1,6 @@
 import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
-import { asBearer, present } from "../../fixtures/bearer.mapper"
+import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData, AccountData, BuyerStatusData } from "../../fixtures/e2e-views.contracts"
 import type { OrderSummaryRow, PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
@@ -27,7 +27,7 @@ describe("checkout journey", () => {
     it("register, browse the catalog, add to the cart, place the order, pay, and end with an empty cart", async () => {
         const session = await world.auth.registerBuyer("checkout", "e2e-checkout-pass")
         personId = session.personId
-        const buyer = asBearer(world.apps.order.api, session.sessionToken)
+        const buyer = world.apps.order.api.bearing(session.sessionToken)
 
         // The catalog is read through the cart query: it is the only catalog surface checkout has.
         const browsed = await buyer.read<CartData>("cart")
@@ -72,11 +72,11 @@ describe("checkout journey", () => {
         // The identity to order contract, live: order answers buyerStatus for the bearer, and identity account reads it.
         const buyerStatus = await buyer.read<BuyerStatusData>("buyerStatus")
         expect(buyerStatus.data?.buyerStatus).toEqual({ personId, hasOrders: true })
-        const account = await asBearer(world.apps.identity.api, session.sessionToken).read<AccountData>("account")
+        const account = await world.apps.identity.api.bearing(session.sessionToken).read<AccountData>("account")
         expect(account.data?.account).toMatchObject({ personId, email: session.email, hasOrders: true })
 
         // Sign-out: the guard consults identity on every request, so the revoked token stops answering on order.
-        const revoked = await asBearer(world.apps.identity.api, session.sessionToken).mutate("revokeSession", {
+        const revoked = await world.apps.identity.api.bearing(session.sessionToken).mutate("revokeSession", {
             variables: { input: { sessionToken: session.sessionToken } },
         })
         expect(revoked.errorCode).toBeNull()

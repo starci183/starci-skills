@@ -23,5 +23,4 @@ They require an available container runtime and are not part of `test:unit`.
 
 E2E runs MANUALLY only (owner ruling 2026-09-29): husky, `typecheck`, `lint`/`lint:check`, coverage (`test:coverage`, Codecov, Sonar) and automatic CI never touch `src/tests/e2e/**`. `npm run typecheck:e2e` (`src/tests/e2e/tsconfig.json`), `npm run lint:e2e` and `npm run test:e2e` are run by hand when asked; any e2e CI job is `workflow_dispatch` only.
 
-`node scripts/live-proof.mjs` exercises a live checkout across the identity and order services.
 The dev stack and process instructions are in `.starcistacks/dev/README.md`.

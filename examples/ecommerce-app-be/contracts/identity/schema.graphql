@@ -1,0 +1,55 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AccountType {
+  email: String!
+  hasOrders: Boolean!
+  personId: ID!
+}
+
+type Mutation {
+  register(request: RegisterInput!): RegisterType!
+  revokeSession(request: RevokeSessionInput!): RevokeSessionType!
+  signIn(request: SignInInput!): SignInType!
+}
+
+type Query {
+  account: AccountType!
+  verifySession(request: VerifySessionInput!): VerifySessionType!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+}
+
+type RegisterType {
+  personId: ID!
+}
+
+input RevokeSessionInput {
+  sessionToken: String!
+}
+
+type RevokeSessionType {
+  revoked: Boolean!
+}
+
+input SignInInput {
+  email: String!
+  password: String!
+}
+
+type SignInType {
+  personId: ID!
+  sessionToken: String!
+}
+
+input VerifySessionInput {
+  sessionToken: String!
+}
+
+type VerifySessionType {
+  personId: ID!
+}

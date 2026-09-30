@@ -4,7 +4,7 @@ import { APP_PIPE } from "@nestjs/core"
 import { ThrottlerModule } from "@nestjs/throttler"
 import { ConfigurableModuleClass, MODULE_OPTIONS_TOKEN, OPTIONS_TYPE } from "./http-security.module-definition"
 import { throttlerOptionsOf } from "./rate-limit.guard"
-import { RequestValidationPipe } from "./request-validation.service"
+import { RequestValidationService } from "./request-validation.service"
 
 @Module({})
 /** The http-security capability: the global validation pipe, the throttler windows and the options the guards (registered by each api app) read. */
@@ -15,7 +15,7 @@ export class HttpSecurityModule extends ConfigurableModuleClass {
         return {
             ...base,
             imports: [...(base.imports ?? []), ThrottlerModule.forRoot(throttlerOptionsOf(options.rateLimit))],
-            providers: [...(base.providers ?? []), { provide: APP_PIPE, useClass: RequestValidationPipe }],
+            providers: [...(base.providers ?? []), { provide: APP_PIPE, useClass: RequestValidationService }],
             exports: [MODULE_OPTIONS_TOKEN],
         }
     }
