@@ -9,7 +9,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {findHostBoundaryViolations} from '../scripts/checks/check-host-boundary.mjs';
 import {spawnAgent,startAgent} from '../scripts/agent/lib.mjs';
-import {orcaCall} from '../scripts/api/orca/lib.mjs';
+import {pathToFileURL} from 'node:url';
 
 // Every agent launch goes through orchestration worker-start (modules/kernel/contract-changes/
 // launch-through-worker-start.yaml): the Kernel, the [Supervisor], every [Worker] and every [Op]. This spec fails when
@@ -65,8 +65,16 @@ test('the Orca contract carries no terminal-creating call and forbids it for the
   const api=readYaml('modules/host/orca/api.yaml');
   for(const command of BYPASS)assert.ok(api.forbiddenForStarciOrchestration.includes(command),`${command} is forbidden`);
   assert.equal(api.roleCommands?.workflowKernel?.includes('terminal create')??false,false);
-  assert.throws(()=>orcaCall('terminal-create',{title:'x',command:'claude'}),/terminal-create/);
-  assert.throws(()=>orcaCall('worker-start',{task:'t',worktree:'w',agent:'claude',run:'r',terminal:'term-1'}),/--terminal is not a flag/);
+  // The wrapper lib builds every argv from calls.yaml: neither a terminal-create call nor a --terminal adoption can be built.
+  const refusals=spawnSync(process.execPath,['--input-type=module','-e',
+    `import {orcaCall} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','api','orca','lib.mjs')).href)};`+
+    "const t=f=>{try{f();return null;}catch(e){return e.message;}};"+
+    "console.log(JSON.stringify([t(()=>orcaCall('terminal-create',{title:'x',command:'claude'})),"+
+    "t(()=>orcaCall('worker-start',{task:'t',worktree:'w',agent:'claude',run:'r',terminal:'term-1'}))]));"],
+    {cwd:ROOT,encoding:'utf8',windowsHide:true,env:{...process.env,STARCI_ORCA_COMMAND:'orca-must-not-run'}});
+  const [createRefused,adoptRefused]=json(refusals.stdout.trim())??[];
+  assert.match(createRefused??'',/terminal-create/,refusals.stderr);
+  assert.match(adoptRefused??'',/--terminal is not a flag/,refusals.stderr);
 });
 
 test('every profile and registry target launches through worker-start --agent <card>',()=>{

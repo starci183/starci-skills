@@ -234,7 +234,7 @@ export function sweepWorkers(m, d, { now = Date.now() } = {}) {
   const markClosed = (job, extra = {}) => m.transaction(() => m.update('sup_jobs', { payload_json: { ...job.payload, terminalClosed: true, ...extra }, updated_at: now }, { job_id: job.job_id }));
   const fail = (job, reason, result, closed, extra = {}) => m.transaction(() => {
     m.releaseSupLeases(job.job_id);
-    m.setSupJobStatus(job.job_id, 'failed', { payload: { ...job.payload, terminalClosed: closed, result: { reason: result, detail: reason } } });
+    m.setSupJobStatus(job.job_id, 'failed', { payload: { ...job.payload, terminalClosed: closed, result } });
     supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-died', payload: { terminal: job.worker_id, reason, agent: job.payload.agent ?? null, ...extra }, now });
   });
   for (const job of jobsOf(m, ['running', 'reported'])) {
@@ -246,7 +246,7 @@ export function sweepWorkers(m, d, { now = Date.now() } = {}) {
       const closed = bestEffort(() => d.close(handle));
       if (reported) { if (closed?.ok) { markClosed(job); out.closed.push({ jobId: job.job_id, handle }); } continue; }
       const reason = 'terminal-launched worker retired: every [Worker] is now a worker-start worker';
-      fail(job, reason, 'worker-retired-terminal-launch', closed?.ok === true);
+      fail(job, reason, { reason: 'worker-retired-terminal-launch', detail: reason }, closed?.ok === true);
       out.deaths.push({ jobId: job.job_id, reason });
       continue;
     }
@@ -263,7 +263,7 @@ export function sweepWorkers(m, d, { now = Date.now() } = {}) {
     if (!dead) continue;
     const reason = `worker ${shown.state} without a report`;
     const release = bestEffort(() => d.release(dispatch));
-    fail(job, reason, 'worker-died-no-report', release?.ok === true, { dispatch });
+    fail(job, reason, { reason: 'worker-died-no-report', detail: reason }, release?.ok === true, { dispatch });
     out.deaths.push({ jobId: job.job_id, reason });
   }
   return out;
