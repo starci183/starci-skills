@@ -1,0 +1,11 @@
+id: json-exceptions-mirror-roots
+effectiveAt: '2026-10-01T18:00:00+07:00'
+summary: >-
+  check-json-exceptions skips the three generated runtime mirrors sync-runtime.mjs writes (packages/hfs/runtime,
+  packages/eslint/be/runtime, packages/eslint/fe/runtime; GENERATED_MIRROR_ROOTS) and json-exceptions.yaml registers the
+  authored JSON added under packages/ and examples/ecommerce-app-fe since 2026-09-29, drops six entries deleted from disk,
+  and lets directories[] admit a package whose every direct JSON is toolchain config. No check, code or key added.
+reach: new-legs
+paths:
+  - modules/schemas/json-exceptions.yaml
+  - modules/kernel/contract-changes/json-exceptions-mirror-roots.yaml

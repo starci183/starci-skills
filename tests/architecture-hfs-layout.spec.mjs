@@ -13,7 +13,7 @@ const ROOT_FE = {
   'eslint.config.mjs': 'export default [];\n', 'package-lock.json': '{}\n', 'README.md': '# fixture\n', 'sonar-project.properties': 'sonar.projectKey=x\n',
 };
 const APP_FE = Object.fromEntries(['package.json', 'next.config.ts', 'tsconfig.json', 'postcss.config.mjs'].map(name => [`apps/web/${name}`, name.endsWith('.json') ? '{}\n' : 'export default {};\n']));
-const ROOT_BE = { ...ROOT_FE, 'codecov.yml': 'coverage: {}\n', '.sops.yaml': 'creation_rules: []\n', '.starcistacks/.keep': '', '.starciwork/.keep': '', 'jest.config.js': 'module.exports = {};\n', 'nest-cli.json': '{}\n' };
+const ROOT_BE = { ...ROOT_FE,'.sops.yaml': 'creation_rules: []\n', '.starcistacks/.keep': '', '.starciwork/.keep': '', 'jest.config.js': 'module.exports = {};\n', 'nest-cli.json': '{}\n' };
 const run = (t, profile, files) => runArch(archFixture(t, { profile, files }));
 const ids = (report, id) => findings(report, id).map(item => item.path).sort();
 

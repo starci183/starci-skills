@@ -211,3 +211,36 @@ test('checker CLI succeeds only when the installed authored source is clean', ()
   assert.equal(cli.status,0,cli.stderr||cli.stdout);
   assert.match(cli.stdout,/OK:/);
 });
+
+test('generated runtime mirrors are skipped, so their copies of authored JSON are not wrongly blocked', async t => {
+  const checkJsonExceptions = await loadChecker();
+  const dir = disposable(t, 'starci-json-mirror-');
+  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
+  const allowlist = path.join(dir, 'schemas', 'json-exceptions.yaml');
+  fs.writeFileSync(allowlist, 'schema: starci/json-exceptions@1\nexceptions: []\n');
+  const original = 'packages/hfs/templates/be/package-scripts/package.json';
+  const mirrored = [
+    `packages/hfs/runtime/${original}`,
+    `packages/eslint/be/runtime/${original}`,
+    `packages/eslint/fe/runtime/${original}`,
+  ];
+  const authored = [
+    `other/packages/hfs/runtime/${original}`, // a same-named tree elsewhere is authored
+    original, // the authored original the mirrors copy
+    `packages/hfs/src/runtime/${original}`,
+  ];
+  for (const relative of [...mirrored, ...authored]) {
+    const file = path.join(dir, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, '{}\n');
+  }
+  const result = checkJsonExceptions({ root: dir, allowlistFile: allowlist });
+  assert.deepEqual(result.offenders, [...authored].sort((a, b) => a.localeCompare(b)), 'only the exact mirror roots are skipped');
+  assert.equal(result.ok, false, 'the authored original is still reported');
+});
+
+test('the skipped mirror roots are exactly the bundles sync-runtime.mjs writes and --check guards', async () => {
+  const { GENERATED_MIRROR_ROOTS } = await import(pathToFileURL(checkerFile).href);
+  const { BUNDLES } = await import(pathToFileURL(path.join(skillRoot, 'packages', 'hfs', 'scripts', 'sync-runtime.mjs')).href);
+  assert.deepEqual([...GENERATED_MIRROR_ROOTS].sort(), Object.keys(BUNDLES).sort());
+});

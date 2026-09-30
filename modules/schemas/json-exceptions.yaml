@@ -3,14 +3,28 @@ description: >
   Exact relative paths (from this skill root) allowed to remain authored JSON
   while declarative sources are YAML. No wildcards. exceptions[] names one file
   each; directories[] names one exact directory whose direct *.json children are
-  an append-only record written one file per entry (subdirectories are not admitted,
-  and the directory must exist).
+  all admitted: an append-only record written one file per entry, or a package whose
+  every direct JSON is toolchain config (subdirectories are not admitted, and the
+  directory must exist). Generated runtime mirrors (GENERATED_MIRROR_ROOTS in
+  scripts/checks/check-json-exceptions.mjs) are not authored source and are not listed.
 directories:
   - path: benchmark/snapshots
     reason: >
       Append-only model-pool snapshots written by scripts/agent/benchmark-snapshot.mjs, one
       <YYYY-MM-DD>-<N>h.json per date and window in the raw model-scorecard --json shape
       (benchmark/README.md). JSON by the scorecard contract; a new snapshot needs no new line here.
+  - path: examples/ecommerce-app-fe/packages/ecommerce-api
+    reason: >
+      npm workspace package of the ecommerce-app-fe example: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
+  - path: examples/ecommerce-app-fe/packages/ecommerce-i18n
+    reason: >
+      npm workspace package of the ecommerce-app-fe example: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
+  - path: examples/ecommerce-app-fe/packages/ecommerce-ui
+    reason: >
+      npm workspace package of the ecommerce-app-fe example: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
+  - path: packages/tsconfig
+    reason: >
+      The @starci/tsconfig package: its package.json and the shared presets (base, be, build, e2e, next) that product tsconfig files extend; tsc reads JSON, and a new preset needs no new line here.
 exceptions:
   - path: engine/yaml-license.json
     reason: >
@@ -22,12 +36,6 @@ exceptions:
   - path: examples/ecommerce-app-be/.starcistacks/dev/infra/metadata.json
     reason: >
       Resolved runtime projection (port map) for the ecommerce product; JSON by the example tooling contract.
-  - path: examples/ecommerce-app-be/apps/identity/package.json
-    reason: >
-      npm package manifest inside the ecommerce-app-be project; the npm toolchain requires JSON.
-  - path: examples/ecommerce-app-be/apps/order/package.json
-    reason: >
-      npm package manifest inside the ecommerce-app-be project; the npm toolchain requires JSON.
   - path: examples/ecommerce-app-be/hfs.json
     reason: >
       HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the ecommerce-app-be example; the architecture machine reads hfs.json as JSON.
@@ -49,12 +57,24 @@ exceptions:
   - path: examples/ecommerce-app-fe/apps/landing/package.json
     reason: >
       npm package manifest inside the ecommerce-app-fe project; the npm toolchain requires JSON.
+  - path: examples/ecommerce-app-fe/apps/landing/src/modules/i18n/messages/en.json
+    reason: >
+      i18n message catalog inside the ecommerce-app-fe app source; the app i18n loader consumes JSON.
+  - path: examples/ecommerce-app-fe/apps/landing/src/modules/i18n/messages/vi.json
+    reason: >
+      i18n message catalog inside the ecommerce-app-fe app source; the app i18n loader consumes JSON.
   - path: examples/ecommerce-app-fe/apps/landing/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
   - path: examples/ecommerce-app-fe/apps/shop/package.json
     reason: >
       npm package manifest inside the ecommerce-app-fe project; the npm toolchain requires JSON.
+  - path: examples/ecommerce-app-fe/apps/shop/src/modules/i18n/messages/en.json
+    reason: >
+      i18n message catalog inside the ecommerce-app-fe app source; the app i18n loader consumes JSON.
+  - path: examples/ecommerce-app-fe/apps/shop/src/modules/i18n/messages/vi.json
+    reason: >
+      i18n message catalog inside the ecommerce-app-fe app source; the app i18n loader consumes JSON.
   - path: examples/ecommerce-app-fe/apps/shop/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
@@ -67,18 +87,6 @@ exceptions:
   - path: examples/ecommerce-app-fe/package.json
     reason: >
       npm package manifest inside the ecommerce-app-fe project; the npm toolchain requires JSON.
-  - path: examples/ecommerce-app-fe/packages/shared/package.json
-    reason: >
-      npm workspace manifest for the built ecommerce-app-fe shared package; npm requires JSON.
-  - path: examples/ecommerce-app-fe/packages/shared/src/messages/en.json
-    reason: >
-      i18n message catalog inside the ecommerce-app-fe app source; the app i18n loader consumes JSON.
-  - path: examples/ecommerce-app-fe/packages/shared/src/messages/vi.json
-    reason: >
-      i18n message catalog inside the ecommerce-app-fe app source; the app i18n loader consumes JSON.
-  - path: examples/ecommerce-app-fe/packages/shared/tsconfig.build.json
-    reason: >
-      TypeScript build config for the ecommerce-app-fe shared package; tsc reads JSON.
   - path: examples/ecommerce-app-fe/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
@@ -154,9 +162,15 @@ exceptions:
     reason: npm lockfile; package managers require JSON filename and syntax.
   - path: package.json
     reason: npm package manifest; Node/npm require JSON filename and syntax.
+  - path: packages/eslint/be/fixtures/typed/tsconfig.json
+    reason: >
+      TypeScript project for the typed-lint fixture of @starci/eslint-canon-be; typescript-eslint reads a JSON tsconfig.
   - path: packages/eslint/be/package.json
     reason: >
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+  - path: packages/eslint/fe/fixtures/typed/tsconfig.json
+    reason: >
+      TypeScript project for the typed-lint fixture of @starci/eslint-canon-fe; typescript-eslint reads a JSON tsconfig.
   - path: packages/eslint/fe/package.json
     reason: >
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
@@ -190,10 +204,55 @@ exceptions:
   - path: packages/heroicons/tsconfig.build.json
     reason: >
       TypeScript toolchain config inside the packages workspace project; tsc reads JSON (with comments).
+  - path: packages/hfs/package.json
+    reason: >
+      npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+  - path: packages/hfs/templates/be/package-scripts/package.json
+    reason: >
+      Managed package-scripts template @starci/hfs writes into a product repository (README script names the architecture machine reads); npm requires JSON.
+  - path: packages/hfs/templates/be/tool-config/tsconfig.build.json
+    reason: >
+      TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+  - path: packages/hfs/templates/be/tool-config/tsconfig.json
+    reason: >
+      TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+  - path: packages/hfs/templates/fe/package-scripts/package.json
+    reason: >
+      Managed package-scripts template @starci/hfs writes into a product repository (README script names the architecture machine reads); npm requires JSON.
+  - path: packages/hfs/templates/fe/skeleton-shared/packages/__family__-api/package.json
+    reason: >
+      npm workspace manifest template for a scaffolded FE shared package; npm requires JSON.
+  - path: packages/hfs/templates/fe/skeleton-shared/packages/__family__-api/tsconfig.json
+    reason: >
+      TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+  - path: packages/hfs/templates/fe/skeleton-shared/packages/__family__-i18n/package.json
+    reason: >
+      npm workspace manifest template for a scaffolded FE shared package; npm requires JSON.
+  - path: packages/hfs/templates/fe/skeleton-shared/packages/__family__-i18n/tsconfig.json
+    reason: >
+      TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+  - path: packages/hfs/templates/fe/skeleton/apps/__app__/src/modules/i18n/messages/vi.json
+    reason: >
+      next-intl message catalogue template for a scaffolded FE app; next-intl requires JSON.
+  - path: packages/hfs/templates/fe/tool-config/tsconfig.json
+    reason: >
+      TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+  - path: packages/jest-preset/package.json
+    reason: >
+      npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
   - path: packages/package-lock.json
     reason: >
       npm lockfile inside the packages workspace project; npm writes JSON by contract.
   - path: packages/package.json
+    reason: >
+      npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+  - path: packages/prettier-config/package.json
+    reason: >
+      npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
+  - path: packages/stylelint/package-lock.json
+    reason: >
+      npm lockfile inside the packages workspace project; npm writes JSON by contract.
+  - path: packages/stylelint/package.json
     reason: >
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
   - path: ui/components.json

@@ -10,6 +10,9 @@ import { validateAgainstSchema } from '../scripts/checks/check-op-manifest.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const schema = () => parseYaml(fs.readFileSync(path.join(ROOT, SCHEMA_FILE), 'utf8'));
+// The released @starci/tsconfig version, read from its package, so a release does not break the expectations below.
+const TSCONFIG_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', 'tsconfig', 'package.json'), 'utf8')).version;
+const literal = (text) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 // A runtime tree with one package and a pins document, so a test can break either.
 function runtime(t, mutate = (doc) => doc) {
@@ -62,8 +65,9 @@ test('a missing required pin, an unknown key and an unknown group are refused', 
 });
 
 test('a @starci pin that differs from its package, or names no source, is refused', (t) => {
-  const drift = checkCanonPins({ root: runtime(t, (doc) => { doc.pins['@starci/tsconfig'].version = '1.0.1'; }) });
-  assert.match(drift.errors.join('\n'), /CANON_PIN_SOURCE @starci\/tsconfig: pinned 1\.0\.1 but packages\/tsconfig\/package\.json is 1\.0\.0/);
+  const drifted = TSCONFIG_VERSION === '0.0.1' ? '0.0.2' : '0.0.1';
+  const drift = checkCanonPins({ root: runtime(t, (doc) => { doc.pins['@starci/tsconfig'].version = drifted; }) });
+  assert.match(drift.errors.join('\n'), new RegExp(literal(`CANON_PIN_SOURCE @starci/tsconfig: pinned ${drifted} but packages/tsconfig/package.json is ${TSCONFIG_VERSION}`)));
   const noSource = checkCanonPins({ root: runtime(t, (doc) => { delete doc.pins['@starci/grammar'].source; }) });
   assert.match(noSource.errors.join('\n'), /CANON_PIN_NO_SOURCE @starci\/grammar/);
   const registrySource = checkCanonPins({ root: runtime(t, (doc) => { doc.pins.jest.source = 'packages/tsconfig/package.json'; }) });
@@ -85,7 +89,7 @@ test('checkRepoPins judges a repository: every pin, @starci packages included, b
   const before = checkRepoPins({ repo, side: 'be', root: ROOT });
   assert.equal(before.ok, false);
   assert.match(before.errors.join('\n'), /typescript: declared \^5\.7\.3, pinned 5\.9\.3/);
-  assert.match(before.errors.join('\n'), /@starci\/tsconfig: declared file:\.starci\/packages\/tsconfig, pinned 1\.0\.0/);
+  assert.match(before.errors.join('\n'), new RegExp(literal(`@starci/tsconfig: declared file:.starci/packages/tsconfig, pinned ${TSCONFIG_VERSION}`)));
   assert.doesNotMatch(before.errors.join('\n'), /vitest/, 'a front-end pin is not judged on a back-end repository');
   assert.doesNotMatch(before.errors.join('\n'), /jest:/, 'an exact declared pin passes');
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ devDependencies: { typescript: '5.9.3', '@starci/tsconfig': loadPins(ROOT).pins['@starci/tsconfig'].version } }));

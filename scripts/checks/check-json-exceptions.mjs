@@ -59,6 +59,19 @@ const LOCAL_ONLY = new Set(['config.json', 'settings.local.json']);
  */
 const RUNTIME_OWNED_ROOTS = new Set(['.starciwork', 'runtime']);
 
+/**
+ * Generated mirrors of runtime files that the published packages carry: packages/hfs/scripts/sync-runtime.mjs writes each
+ * tree byte for byte from the runtime (its BUNDLES) and `sync-runtime --check` fails on any missing, stale or extra file.
+ * The authored originals stay in the inventory; only these exact skill-root paths are skipped, not a same-named tree elsewhere.
+ */
+export const GENERATED_MIRROR_ROOTS = Object.freeze([
+  'packages/eslint/be/runtime',
+  'packages/eslint/fe/runtime',
+  'packages/hfs/runtime',
+]);
+
+const GENERATED_MIRROR_SET = new Set(GENERATED_MIRROR_ROOTS);
+
 /** One allowlist entry's path: a non-empty relative skill path, forward slashes, no wildcard. */
 function entryPath(entry, list) {
   if (!entry || typeof entry.path !== 'string' || !entry.path.trim()) {
@@ -114,6 +127,7 @@ function loadAllowlist(allowlistFile) {
 function shouldSkipDir(relativePosix, name) {
   if (SKIP_DIR_NAMES.has(name)) return true;
   if (relativePosix === '' && RUNTIME_OWNED_ROOTS.has(name)) return true;
+  if (GENERATED_MIRROR_SET.has(relativePosix ? `${relativePosix}/${name}` : name)) return true;
   if (relativePosix.startsWith('sites/') && (name === '.next' || name === 'out')) return true;
   return false;
 }
