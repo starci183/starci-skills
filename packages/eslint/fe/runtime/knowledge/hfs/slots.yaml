@@ -703,9 +703,10 @@ slots:
     tests: none
     why: >-
       the ONE e2e world (owner ruling 2026-09-30): global-setup.ts starts the shared infrastructure (containers) and runs
-      apps/migrate's exported bootstrap once; the world boots the REAL AppModule.register(testOptions) with integration
-      tokens overridden and exposes useE2eWorld({ app }) -> world.api, world.db.<connection> (the shared EntityManager),
-      world.fake. It is the only test location that may import typeorm's DataSource or testcontainers, call
+      apps/migrate's exported bootstrap once; the world boots one or several REAL apps (AppModule.register(testOptions),
+      wired through typed options) with only integration tokens overridden and exposes
+      useE2eWorld({ apps: { <name>: { module, listen? } } }) -> world.apps.<name>.api, world.db.<connection> (the shared
+      EntityManager), world.fake (external services only), world.waitFor. It is the only test location that may import typeorm's DataSource or testcontainers, call
       migrate/runMigrations/synchronize, or write process.env; specs use only useE2eWorld.
   - id: be.tests.fixtures
     profiles: [be]

@@ -1,0 +1,16 @@
+id: hfs-e2e-fakes
+effectiveAt: '2026-09-30T23:00:00+07:00'
+summary: >-
+  Owner addendum 2026-09-30 to the one e2e world: useE2eWorld({ apps: { <name>: { module, listen? } } }) boots one or
+  several real apps wired through typed options (world.apps.<name>.api, world.db.<connection>, world.fake, world.waitFor).
+  New eslint-be rule e2e-fakes-external-only (R47): in e2e specs and the world, overrideProvider/overrideModule/
+  overrideGuard/overrideInterceptor/overrideFilter/overridePipe and jest.mock may target only external services (declared
+  in tier integrations, resolved by the checker); a first-party app, module, guard or provider is never faked.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-e2e-fakes.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/hfs/slots.yaml
+  - packages/eslint/be/e2e-flow.mjs
+  - packages/eslint/be/e2e-schema.test.mjs

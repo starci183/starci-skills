@@ -6,7 +6,7 @@
  */
 import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"
-import { e2eNoSchemaWork } from "./e2e-flow.mjs"
+import { e2eFakesExternalOnly, e2eNoSchemaWork } from "./e2e-flow.mjs"
 
 const tester = typedTester()
 const SPEC = at("src/tests/e2e/checkout/place-order.e2e-spec.ts")
@@ -38,6 +38,30 @@ test("R47: an e2e spec boots, calls and asserts; infrastructure and schema are t
             { filename: SPEC, code: 'process.env.PRIMARY_DB_HOST = "x"', errors: [{ messageId: "env" }] },
             { filename: SPEC, code: 'delete process.env["PRIMARY_DB_HOST"]', errors: [{ messageId: "env" }] },
             { filename: SPEC, code: 'Object.assign(process.env, { A: "1" })', errors: [{ messageId: "env" }] },
+        ],
+    })
+})
+
+test("R47: e2e fakes only external services; first-party apps, modules and providers are real", () => {
+    const INTEGRATION = '"../../../modules/integrations/foo/foo.decorators"'
+    const SERVICE = '"../../../modules/domain/order/order.service"'
+    const MODULE = '"../../../modules/domain/order/order.module"'
+    const WORLD_FILE = at("src/tests/e2e/world/world.ts")
+    const moduleRef = "declare const moduleRef: { overrideProvider(token: unknown): unknown; overrideModule(module: unknown): unknown }\n"
+    tester.run("e2e-fakes-external-only", e2eFakesExternalOnly, {
+        valid: [
+            // an integration token is external: the world fakes it
+            { filename: WORLD_FILE, code: `import { FOO } from ${INTEGRATION}\n${moduleRef}moduleRef.overrideProvider(FOO)` },
+            { filename: SPEC, code: `import { FOO } from ${INTEGRATION}\n${moduleRef}moduleRef.overrideProvider(FOO)` },
+            // outside e2e the rule has nothing to say
+            { filename: at("src/modules/domain/order/order.service.spec.ts"), code: `import { OrderService } from "./order.service"\n${moduleRef}moduleRef.overrideProvider(OrderService)` },
+        ],
+        invalid: [
+            { filename: SPEC, code: `import { OrderService } from ${SERVICE}\n${moduleRef}moduleRef.overrideProvider(OrderService)`, errors: [{ messageId: "firstParty" }] },
+            { filename: WORLD_FILE, code: `import { OrderModule } from ${MODULE}\n${moduleRef}moduleRef.overrideModule(OrderModule)`, errors: [{ messageId: "firstParty" }] },
+            // a renamed import is the same first-party class
+            { filename: SPEC, code: `import { OrderService as Svc } from ${SERVICE}\n${moduleRef}moduleRef.overrideProvider(Svc)`, errors: [{ messageId: "firstParty" }] },
+            { filename: SPEC, code: `jest.mock(${SERVICE})`, errors: [{ messageId: "firstParty" }] },
         ],
     })
 })

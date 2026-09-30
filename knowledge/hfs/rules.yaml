@@ -491,7 +491,7 @@ rules:
   - id: R47
     code: "BE_TEST_TOPOLOGY"
     title_vi: "Cấu hình test lệch chuẩn"
-    law: "One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`; ONE e2e world (`src/tests/e2e/world`: global-setup runs `apps/migrate` once, `useE2eWorld({ app })` gives `world.api`, `world.db.<connection>`, `world.fake`) owns containers, DataSource, migrations and `process.env`; an e2e spec never imports or does any of them."
+    law: "One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`; ONE e2e world (`src/tests/e2e/world`: global-setup runs `apps/migrate` once, `useE2eWorld({ apps })` gives `world.apps.<name>.api`, `world.db.<connection>`, `world.fake`, `world.waitFor`) owns containers, DataSource, migrations and `process.env`; an e2e spec never imports or does any of them, and e2e fakes only external services (integration tokens), never a first-party app, module or provider."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["BE_TEST_TOPOLOGY"]
@@ -499,6 +499,7 @@ rules:
       - {kind: hfs, id: test-topology, status: planned}
       - {kind: eslint-be, id: unit-test-colocated}
       - {kind: eslint-be, id: e2e-no-schema-work}
+      - {kind: eslint-be, id: e2e-fakes-external-only}
   - id: R48
     code: "BE_SPEC_QUALITY"
     title_vi: "Spec đọc mã nguồn hoặc ép kiểu mock"

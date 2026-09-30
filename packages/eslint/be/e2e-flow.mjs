@@ -215,7 +215,8 @@ export const noWiringInFlowSpec = {
 /**
  * R47 (owner ruling 2026-09-30): ONE e2e world. `src/tests/e2e/world/global-setup.ts` starts the shared infrastructure
  * and runs `apps/migrate`'s exported bootstrap once; a spec (slot `be.tests.e2e` / `be.tests.e2e-live`) only uses
- * `useE2eWorld({ app })` (`world.api`, `world.db.<connection>`, `world.fake`). Refused in a spec: importing a migration
+ * `useE2eWorld({ apps: { <name>: { module, listen? } } })` (`world.apps.<name>.api`, `world.db.<connection>`,
+ * `world.fake` for external services only, `world.waitFor`). Refused in a spec: importing a migration
  * (a class declared in a `be.persistence` `migrations/` file, or a value whose type is an array of them), importing
  * anything the migrate app declares, importing typeorm's `DataSource` or any testcontainers package, calling
  * `runMigrations`, `undoLastMigration`, `synchronize`, `dropDatabase` or `createSchema` on a typeorm receiver,
@@ -238,7 +239,7 @@ export const e2eNoSchemaWork = {
         messages: {
             migration: "An e2e spec imports a migration or the migrate app. The schema is prepared once by the e2e globalSetup running the real `apps/migrate` entry; test migrations in `apps/migrate`'s own specs.",
             call: "`{{name}}` builds or changes the schema inside an e2e spec. The e2e globalSetup runs `apps/migrate` once; a spec boots the app and asserts through the fixture's EntityManager.",
-            container: "An e2e spec imports or starts test infrastructure (testcontainers, typeorm's DataSource). It belongs to the e2e world in `src/tests/e2e/world`; the spec uses `useE2eWorld({ app })` and `world.db.<connection>`.",
+            container: "An e2e spec imports or starts test infrastructure (testcontainers, typeorm's DataSource). It belongs to the e2e world in `src/tests/e2e/world`; the spec uses `useE2eWorld({ apps })` and `world.db.<connection>`.",
             env: "An e2e spec writes `process.env`. The environment of the booted app is set once by the e2e world (`src/tests/e2e/world`); a spec takes the world as it is.",
         },
     },
@@ -305,6 +306,69 @@ export const e2eNoSchemaWork = {
     },
 }
 
+
+/**
+ * R47 (owner ruling 2026-09-30): in e2e (slots `be.tests.e2e`, `be.tests.e2e-live`, `be.tests.e2e-world`) only EXTERNAL
+ * services are faked. `world.fake` overrides integration tokens; a first-party app, module, feature or domain/platform
+ * provider is always real. Refused: `.overrideProvider(X)`, `.overrideModule(X)`, `.overrideGuard(X)`,
+ * `.overrideInterceptor(X)`, `.overrideFilter(X)`, `.overridePipe(X)` whose target is declared in the repository outside
+ * tier `integrations` (resolved with the checker, not by name), and `jest.mock(<relative path>)` / `jest.mock` of a
+ * repository alias (`@modules/`, `@features/`) that does not resolve into `integrations`.
+ */
+const OVERRIDES = new Set(["overrideProvider", "overrideModule", "overrideGuard", "overrideInterceptor", "overrideFilter", "overridePipe"])
+
+export const e2eFakesExternalOnly = {
+    meta: {
+        type: "problem",
+        docs: { description: "E2E fakes only external services (integration tokens); first-party apps, modules and providers are real." },
+        schema: [],
+        messages: {
+            firstParty: "`{{what}}` fakes a first-party piece (declared in `{{file}}`). An e2e world fakes only external services (integration tokens, `world.fake`); apps, modules, guards and domain or platform providers run for real.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        const filename = context.filename || context.getFilename()
+        const slot = hfs.slotOf(filename)
+        if (!["be.tests.e2e", "be.tests.e2e-live", "be.tests.e2e-world"].includes(slot)) return {}
+        const firstPartyFile = (file) => {
+            const rel = hfs.relative(file)
+            if (rel.startsWith("..") || /(?:^|\/)node_modules\//.test(rel)) return false
+            const tier = hfs.tierOf(file)
+            return tier !== null && tier !== "integrations" && tier !== "e2e" && tier !== "fixtures" && tier !== "package"
+        }
+        const declaredFile = (node) => {
+            const { checker, toTs } = typed(context)
+            const tsNode = toTs(node)
+            if (!tsNode) return null
+            let symbol = checker.getSymbolAtLocation(tsNode)
+            if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
+            const declaration = symbol?.getDeclarations?.()?.[0]
+            return declaration ? String(declaration.getSourceFile().fileName).replace(/\\/g, "/") : null
+        }
+        return {
+            CallExpression(node) {
+                const callee = node.callee
+                if (callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier") {
+                    if (OVERRIDES.has(callee.property.name) && node.arguments[0]) {
+                        const file = declaredFile(node.arguments[0])
+                        if (file && firstPartyFile(file)) context.report({ node, messageId: "firstParty", data: { what: callee.property.name, file: hfs.relative(file) } })
+                        return
+                    }
+                    if (callee.object.type === "Identifier" && callee.object.name === "jest" && callee.property.name === "mock") {
+                        const target = node.arguments[0]
+                        if (target?.type !== "Literal" || typeof target.value !== "string") return
+                        const { program } = typed(context)
+                        const resolved = ts.resolveModuleName(target.value, filename, program.getCompilerOptions(), ts.sys).resolvedModule
+                        const file = resolved?.resolvedFileName ? String(resolved.resolvedFileName).replace(/\\/g, "/") : null
+                        if (file && !resolved.isExternalLibraryImport && firstPartyFile(file)) context.report({ node, messageId: "firstParty", data: { what: "jest.mock", file: hfs.relative(file) } })
+                    }
+                }
+            },
+        }
+    },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "e2e-uses-production-transport": e2eUsesProductionTransport,
@@ -312,6 +376,7 @@ export const rules = {
     "no-branch-in-flow-step": noBranchInFlowStep,
     "no-wiring-in-flow-spec": noWiringInFlowSpec,
     "e2e-no-schema-work": e2eNoSchemaWork,
+    "e2e-fakes-external-only": e2eFakesExternalOnly,
 }
 
 /** Every rule of this law ships at `error`. */
@@ -321,4 +386,5 @@ export const recommended = {
     "starci-be/no-branch-in-flow-step": "error",
     "starci-be/no-wiring-in-flow-spec": "error",
     "starci-be/e2e-no-schema-work": "error",
+    "starci-be/e2e-fakes-external-only": "error",
 }
