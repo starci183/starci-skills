@@ -33,7 +33,10 @@ test('the gate is one file: the thresholds, the enforced ops and the server cond
     {metric:'new_security_hotspots_reviewed',op:'LT',error:'100'},
     {metric:'new_blocker_violations',op:'GT',error:'0'},
     {metric:'new_critical_violations',op:'GT',error:'0'},
+    {metric:'violations',op:'GT',error:'0'},
+    {metric:'duplicated_lines_density',op:'GT',error:'3'},
   ]);
+  assert.deepEqual(gate.overall.issues.engines,['starci-hfs','eslint','stylelint']);
   assert.deepEqual(thresholdsOf(gate),{name:'starci-new-code',coverageMinPercent:80,ignoreBelowChangedLines:20,duplicationMaxPercent:3,blockingSeverities:['BLOCKER','CRITICAL'],blockingIssuesMax:0,unreviewedHotspotsMax:0});
   for(const op of gate.enforcedOps){
     const manifest=fs.readFileSync(path.join(ROOT,'modules','ops','ops',`${op}.yaml`),'utf8');

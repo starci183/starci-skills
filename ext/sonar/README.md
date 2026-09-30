@@ -55,7 +55,7 @@ two files above exist — `sonarqube-bootstrap` and the tunnel mount them read-o
 
 ## The quality gate
 
-The server gate every project is selected onto is `starci-new-code`; its conditions (new-code coverage, duplication, blocker/critical issues, reviewed hotspots) are written once, in `knowledge/sonar-gate.yaml`, and `sonar-local.mjs scan` makes the server match that file on every run (a hand edit is put back). A product repository only names the gate in its `.starcistacks` declaration. Code-writing ops are judged on the lines they changed against the same numbers and cannot settle done while the gate is red; when this server is down the op records the `sonar-unavailable` why and the Supervisor gets a runtime incident - bring the stack up (`docker compose ... up -d`, above) and the op is re-run.
+The server gate every project is selected onto is `starci-new-code`; its conditions (new-code coverage, duplication, blocker/critical issues, reviewed hotspots, and on the whole code the open-issue count and duplicated-lines density, which hold every imported HFS, ESLint and stylelint finding at zero) are written once, in `knowledge/sonar-gate.yaml`, and `sonar-local.mjs scan` makes the server match that file on every run (a hand edit is put back). A product repository only names the gate in its `.starcistacks` declaration. Code-writing ops are judged on the lines they changed against the same numbers and cannot settle done while the gate is red; when this server is down the op records the `sonar-unavailable` why and the Supervisor gets a runtime incident - bring the stack up (`docker compose ... up -d`, above) and the op is re-run.
 
 ## Who uses it
 

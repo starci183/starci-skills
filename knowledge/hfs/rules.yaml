@@ -131,7 +131,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["HFS_SONAR_CONFIG"]
     enforcers:
-      - {kind: hfs, id: sonar-config, status: planned}
+      - {kind: hfs, id: sonar-config, at: packages/hfs/sync/managed.mjs}
   - id: R12
     code: "HFS_E2E_IN_AUTOMATIC_GATE"
     title_vi: "e2e chạy trong cổng tự động"
@@ -219,7 +219,7 @@ rules:
       - {kind: eslint-be, id: file-size-growth}
       - {kind: eslint-fe, id: file-size-growth}
       - {kind: hfs, id: size-growth, status: planned}
-      - {kind: sonar, id: cognitive-complexity, status: planned}
+      - {kind: sonar, id: cognitive-complexity, at: knowledge/sonar-gate.yaml}
   - id: R21
     code: "HFS_DUPLICATE_CODE"
     title_vi: "Mã trùng lặp"
@@ -230,7 +230,7 @@ rules:
     enforcers:
       - {kind: machine, id: duplicate-code, at: scripts/checks/architecture/clones.mjs}
       - {kind: machine, id: duplicate-symbol, at: scripts/checks/architecture/symbols.mjs}
-      - {kind: sonar, id: duplicated-lines-density, status: planned}
+      - {kind: sonar, id: duplicated-lines-density, at: knowledge/sonar-gate.yaml}
   - id: R22
     code: "HFS_TS_STRICT"
     title_vi: "tsconfig hạ cờ strict"

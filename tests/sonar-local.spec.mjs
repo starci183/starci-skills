@@ -865,7 +865,7 @@ test('the scan makes the server gate carry knowledge/sonar-gate.yaml, selects it
   const first=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
   assert.equal(first.report.qualityGate.outcome,'ok',JSON.stringify(first.report.qualityGate));
   const conditions=Object.fromEntries([...state.gateConditions.values()].map(c=>[c.metric,`${c.op} ${c.error}`]));
-  assert.deepEqual(conditions,{new_coverage:'LT 80',new_duplicated_lines_density:'GT 3',new_security_hotspots_reviewed:'LT 100',new_blocker_violations:'GT 0',new_critical_violations:'GT 0'});
+  assert.deepEqual(conditions,{new_coverage:'LT 80',new_duplicated_lines_density:'GT 3',new_security_hotspots_reviewed:'LT 100',new_blocker_violations:'GT 0',new_critical_violations:'GT 0',violations:'GT 0',duplicated_lines_density:'GT 3'});
   assert.equal(state.gateSelected.get('product-repo'),'starci-new-code');
   assert.equal(state.newCode.get('product-repo'),'NUMBER_OF_DAYS:30');
   const made=state.requests.filter(r=>/create|update_condition|delete_condition/.test(r.path)&&r.path.includes('qualitygates')).length;

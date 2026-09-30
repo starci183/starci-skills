@@ -22,21 +22,26 @@ export function loadSonarGate({ base = root, file = null } = {}) {
   if (!file && cache && cache.base === base) return cache.gate;
   const gate = parseYaml(fs.readFileSync(file ?? path.join(base, GATE_FILE), 'utf8'));
   if (gate?.schema !== GATE_SCHEMA) throw new Error(`${file ?? GATE_FILE}: schema must be ${GATE_SCHEMA}`);
-  for (const key of ['gate', 'newCode', 'enforcedOps'])
+  for (const key of ['gate', 'newCode', 'overall', 'enforcedOps'])
     if (gate[key] == null) throw new Error(`${file ?? GATE_FILE}: ${key} is required`);
   if (!file) cache = { base, gate };
   return gate;
 }
 
-/** The conditions the server gate carries: [{metric, op, error}] (SonarQube api/qualitygates conditions). */
+/**
+ * The conditions the server gate carries: [{metric, op, error}] (SonarQube api/qualitygates conditions): the new-code ones,
+ * then the overall-code ones (open issues of any origin, imported HFS/ESLint/stylelint findings included, and duplication).
+ */
 export function serverConditions(gate) {
   const n = gate.newCode;
+  const o = gate.overall;
   const out = [
     { metric: n.coverage.metric, op: 'LT', error: String(n.coverage.minPercent) },
     { metric: n.duplication.metric, op: 'GT', error: String(n.duplication.maxPercent) },
     { metric: n.hotspots.metric, op: 'LT', error: String(n.hotspots.minReviewedPercent) },
   ];
   for (const severity of n.issues.blockingSeverities) out.push({ metric: n.issues.metrics[severity], op: 'GT', error: String(n.issues.max) });
+  out.push({ metric: o.issues.metric, op: 'GT', error: String(o.issues.max) }, { metric: o.duplication.metric, op: 'GT', error: String(o.duplication.maxPercent) });
   return out;
 }
 

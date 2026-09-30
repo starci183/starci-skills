@@ -8,6 +8,9 @@ purpose: |
   conditions and selects it for the project, and (2) judges an op's slice - the lines it changed - against
   the same numbers. Code-writing ops cannot settle done while the slice is red
   (scripts/kernel/sonar-settle.mjs). Changing a number here changes every repository on the next scan.
+  The gate has two parts: `newCode` (the recent work: coverage, duplication, blocker/critical issues, hotspots) and
+  `overall` (the whole code: no imported HFS, ESLint or stylelint finding, no duplicated-lines excess, no cognitive-
+  complexity issue). The one Sonar mechanism of the HFS canon is packages/hfs/README.md section "Sonar".
 gate:
   name: starci-new-code
   # A project with no new-code baseline judges the whole project as new code (nivo inc-f92febebbb64); a fixed
@@ -31,6 +34,36 @@ newCode:
     metric: new_security_hotspots_reviewed
     minReviewedPercent: 100
     unreviewedMax: 0
+# The whole code, not only the new code. Every finding of the HFS canon reaches Sonar through ONE pipeline
+# (packages/hfs, contract change hfs-sonar-import) and the gate holds the open-issue count of the whole project at zero:
+#   starci-hfs   `hfs check --sonar reports/hfs.sonar.json` (repository, managed-file and architecture-machine findings;
+#                the rule id is the finding code) -> sonar.externalIssuesReportPaths
+#   eslint       `eslint -f json -o reports/eslint.json` (the BE and FE canon plugins alike) -> sonar.eslint.reportPaths
+#   stylelint    `stylelint --formatter json` converted by `hfs report-stylelint` -> sonar.externalIssuesReportPaths
+# A SonarQube gate condition cannot filter issues by engine, so the condition is the project's open issues (`violations`,
+# overall code): the three engines above are the imports it counts, and every native Sonar issue counts with them. That is
+# stricter than the engines alone and it is intended: a project that meets this gate has no open issue of any origin.
+overall:
+  issues:
+    metric: violations
+    max: 0
+    engines: [starci-hfs, eslint, stylelint]
+  # HFS_DUPLICATE_CODE (R21): duplicated lines density of the whole project, the Sonar enforcer of the machine's clone check.
+  # SonarJS runs its own token-based detection (sonar.cpd.* minimums are not read for TypeScript), so ruleParams.<profile>.duplicateBlock
+  # is enforced by the machine and imported as starci-hfs issues, and this density is the Sonar-side backstop.
+  duplication:
+    metric: duplicated_lines_density
+    maxPercent: 3
+  # HFS_SIZE_GROWTH (R20): the cognitive complexity of a function is the Sonar rule S3776 (typescript:S3776, Sonar way, default
+  # threshold); an open S3776 issue is an open issue of `overall.issues`, so the zero-issue condition is its gate.
+  cognitiveComplexity:
+    rule: typescript:S3776
+    via: overall.issues
+# The Sonar enforcers of the rule catalog (knowledge/hfs/rules.yaml): the failure code each condition above is the gate of.
+enforces:
+  - {rule: R20, code: HFS_SIZE_GROWTH, enforcer: cognitive-complexity, condition: cognitiveComplexity}
+  - {rule: R21, code: HFS_DUPLICATE_CODE, enforcer: duplicated-lines-density, condition: duplication}
+  - {rule: R21, code: HFS_DUPLICATE_SYMBOL, enforcer: duplicated-lines-density, condition: duplication}
 # Ops that write product code: each runs sonar-local on its own change and cannot settle done while the gate is red.
 enforcedOps: [backend.implement, interface.implement, code.refactor]
 reasoning: |
@@ -42,7 +75,12 @@ reasoning: |
   duplication 3: the Sonar way value; the worst project today is 2.1, so 3 rejects a real copy-paste block and
   passes ordinary work.
   blocker/critical 0: the two severities that are defects, not style. main carries old debt of both kinds
-  (nivo-backend 3 blocker, 137 critical), so the gate reads only changed lines and never main's backlog;
+  (nivo-backend 3 blocker, 137 critical), so the SLICE verdict reads only changed lines and never main's backlog;
   major and lower are reported on the summary and never fail a slice.
+  overall issues 0 and overall duplication 3: the server gate is also the owner's definition of done for the HFS canon:
+  a repository that carries any open ESLint, stylelint or HFS finding is not green, whatever the age of the line. The
+  op slice keeps judging changed lines (an op cannot fix a repository's whole backlog); the dashboard and CI show the
+  whole-project condition. Adopting a repository therefore means clearing its imported findings, which `hfs check`,
+  eslint and stylelint already demand at land.
   hotspots 0 unreviewed: a hotspot is a question the author must answer; on changed lines it is answered in the
   same slice.
