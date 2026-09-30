@@ -7,11 +7,9 @@
 // {ok, outcome, effectState, dispatchId, state, launch, result}.
 import { orcaCall, arg } from './lib.mjs';
 
-// `terminal`: adopt a terminal the runtime already launched the agent in (a product op worktree's agent, created on the
-// repository's root Orca worktree so the sidebar lists it - DESIGN §16.7); then no agent/model/effort is passed.
-export function workerStart({ task, worktree, agent, model, effort, name, repo, baseBranch, displayName, setup, retryOf, timeoutMs, run, from, terminal }) {
+export function workerStart({ task, worktree, agent, model, effort, name, repo, baseBranch, displayName, setup, retryOf, timeoutMs, run, from }) {
   const r = orcaCall('worker-start', {
-    task, worktree, ...(terminal ? { terminal } : { agent, model, effort }), name, repo,
+    task, worktree, agent, model, effort, name, repo,
     'base-branch': baseBranch, 'display-name': displayName, setup,
     'retry-of': retryOf, 'timeout-ms': timeoutMs, run, from,
   });
@@ -47,7 +45,6 @@ if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].rep
     timeoutMs: arg(argv, 'timeout-ms'),
     run: arg(argv, 'run'),
     from: arg(argv, 'from'),
-    terminal: arg(argv, 'terminal'),
   });
   console.log(JSON.stringify(out, null, 2));
   process.exit(out.ok ? 0 : 1);

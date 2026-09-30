@@ -1,33 +1,33 @@
 // scripts/agent/lib.mjs — semantic agent lifecycle over the Orca API layer.
-// Provider differences are DATA (modules/models/agents/<name>.yaml); this
-// module is the only mechanism. Callers pass --agent and get the card's
-// command prefix (credential refresh, env strip), command requirements
-// (--yolo, --permission-mode dangerous, …) and readiness/submission patterns
-// injected automatically — forgetting a bypass flag is structurally
-// impossible because no caller ever assembles a provider command by hand.
+// Provider differences are DATA (modules/models/agents/<name>.yaml); this module is the only mechanism.
 //
-//   spawnAgent({provider, model, effort, worktree, title, prompt|promptFile, kernel})
-//     → create terminal → awaitReadiness → send → awaitSubmission
-//     → awaitAttestation (bounded death-watch: provider activity AND absence
-//       of known-failure signatures) → receipt. A submitted prompt is NOT a
-//       live agent — a terminal can die on an auth failure after submission
-//       while the job is still marked running.
+//   startAgent({provider, model, effort, worktree, title, prompt, objective, entry}) → run-create → task-create → spawnAgent
+//   spawnAgent({provider, model, effort, worktree, title, task, run, from})
+//     → ensureLaunchTrust → orca orchestration worker-start --agent → dispatch-show (assignee)
+//     → terminal rename → worker-show attestation (effective agent/model) → receipt.
+//   deliverPrompt / awaitSubmission / awaitAttestation: follow-up input to a LIVE agent (agent/send.mjs, nudge).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { terminalCreate } from '../api/orca/terminal-create.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { terminalClose } from '../api/orca/terminal-close.mjs';
-import { closeOperationTerminal } from '../kernel/close-op-terminal.mjs';
-import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
-import { classifyAgentScreen, gateRemedy, stagedInputRegion, DEFAULT_STAGED_PATTERN, exitedAgentPromptRow, shellPromptPrefix, frameWithDraft, wakeDeliveryOf } from '../kernel/terminal-liveness.mjs';
-import { INPUT_GLYPH_CHARS, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
+import { classifyAgentScreen, stagedInputRegion, DEFAULT_STAGED_PATTERN, frameWithDraft, wakeDeliveryOf } from '../kernel/terminal-liveness.mjs';
+import { INPUT_GLYPH_CHARS, INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { WAKE_PROOF_READS, WAKE_PROOF_INTERVAL_MS } from '../kernel/wake-delivery.mjs';
 import { ensureLaunchTrust } from './trust.mjs';
+import { workerStart } from '../api/orca/worker-start.mjs';
+import { workerShow } from '../api/orca/worker-show.mjs';
+import { workerStop } from '../api/orca/worker-stop.mjs';
+import { workerRelease } from '../api/orca/worker-release.mjs';
+import { dispatchShow } from '../api/orca/dispatch-show.mjs';
+import { terminalRename } from '../api/orca/terminal-rename.mjs';
+import { runCreate } from '../api/orca/run-create.mjs';
+import { runShow } from '../api/orca/run-show.mjs';
+import { taskCreate } from '../api/orca/task-create.mjs';
+import { taskSpecOf } from '../kernel/task-spec.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
@@ -40,117 +40,6 @@ export function loadAdapter(provider) {
   } catch (e) {
     return { provider, error: `adapter card ${provider}.yaml unparsable: ${e.message}` };
   }
-}
-
-// Build the terminal command for a provider. Composition:
-//   launchEnv + env                                        ← card launch env (claude DISABLE_AUTOUPDATER), the
-//                                                            caller's launch env
-//   + commandPrefix[plat]                                  ← card-owned env prep (ACP strip, auth probe)
-//   + hostLaunchPrefix[plat]                               ← keeps the launch on Orca's runtime-owned PTY path
-//   + explicit `command` (e.g. a model profile's launch.orca.command carrying model+tuning flags)
-//     AND any missing card requirements (kernel → kernelCommandRequirements)
-//   OR the card's own body plus those requirements
-//     or terminalFallback.command + bypassArgs for native-managed agents.
-// A terminalFallback may additionally declare modelArgs/effortArgs/bypassArgs.
-// Those arrays are the only source of provider-specific CLI flags; placeholder
-// values are shell-quoted before they enter Orca's command string.
-// Requirements ALWAYS come from the card — that is where --yolo/dangerous lives.
-const shellQuote = (value) => {
-  const text = String(value);
-  return process.platform === 'win32'
-    ? `'${text.replaceAll("'", "''")}'`
-    : `'${text.replaceAll("'", `'"'"'`)}'`;
-};
-
-const renderArgs = (args, values) => {
-  if (!Array.isArray(args)) return [];
-  return args.map((arg) => {
-    const raw = String(arg);
-    const exact = raw.match(/^<(model|effort)>$/);
-    if (exact) return shellQuote(values[exact[1]]);
-    let rendered = raw;
-    for (const [name, value] of Object.entries(values))
-      rendered = rendered.replaceAll(`<${name}>`, String(value));
-    return rendered === raw ? raw : shellQuote(rendered);
-  });
-};
-
-// `env` sets variables inside the terminal's own shell before the agent
-// starts (PowerShell on win32, POSIX sh elsewhere): the op launch carries
-// STARCI_ROLE=op and STARCI_OP_JOB=<job>, which scripts/kernel/api.mjs reads to
-// refuse kernel-only verbs from an op (inc-360891316369). Keys are
-// [A-Z_][A-Z0-9_]*; values are single-quoted and may not hold a quote.
-export const envPrefix = (env = {}, plat = process.platform === 'win32' ? 'win32' : 'posix') => Object.entries(env ?? {})
-  .filter(([key, value]) => /^[A-Z_][A-Z0-9_]*$/.test(key) && value != null && !/['\r\n]/.test(String(value)))
-  .map(([key, value]) => (plat === 'win32' ? `$env:${key}='${value}';` : `export ${key}='${value}';`)).join(' ');
-// `cwd` is the directory the agent starts in when it is not the Orca worktree
-// the terminal is created on: Orca's terminal create has no cwd flag, and a
-// checkout Orca does not manage (the Supervisor's staging worktrees) gets an
-// orphaned terminal no project in the sidebar shows. The terminal is created
-// on the project's registered worktree and its shell changes directory first;
-// a failed change stops the whole line, so the agent never starts elsewhere.
-export const cwdCommand = (dir, plat = process.platform === 'win32' ? 'win32' : 'posix') => {
-  if (typeof dir !== 'string' || !dir.trim() || /['"\r\n]/.test(dir)) return null;
-  return plat === 'win32' ? `Set-Location -LiteralPath '${dir}' -ErrorAction Stop;` : `cd '${dir}' || exit 1;`;
-};
-// `pathPrefix` is a directory put FIRST on the agent's PATH inside the same
-// shell: the op launch puts the shared-checkout guard shims there (git, npm:
-// scripts/guards/install.mjs guardLaunch), so the worker's `git` is the guard.
-export const pathPrefixCommand = (dir, plat = process.platform === 'win32' ? 'win32' : 'posix') => {
-  if (typeof dir !== 'string' || !dir.trim() || /['"\r\n]/.test(dir)) return null;
-  return plat === 'win32' ? `$env:PATH='${dir};'+$env:PATH;` : `export PATH='${dir}':"$PATH";`;
-};
-export function buildSpawnCommand({ provider, kernel = false, command = null, model = null, effort = null, env = null, pathPrefix = null, cwd = null } = {}) {
-  const { card, error } = loadAdapter(provider);
-  if (error) return { provider, error };
-  const plat = process.platform === 'win32' ? 'win32' : 'posix';
-  const cd = cwd == null ? null : cwdCommand(cwd, plat);
-  if (cwd != null && !cd) return { provider, error: `launch cwd cannot be rendered into a shell command: ${cwd}` };
-  // 'none' is in the config effort vocabulary (engine/config.mjs) and means
-  // "no effort pin" — normalize it away before any card asks for effortArgs.
-  if (effort === 'none') effort = null;
-  // hostLaunchPrefix: Orca's CLI sends a command whose first word is `codex`
-  // or `claude` down its renderer-backed tab path, which waits at most 10s
-  // for the UI to publish a handle and otherwise answers "Timed out waiting
-  // for terminal handle after creation" while the tab still spawns later,
-  // untracked. A leading shell call operator runs the same binary on the
-  // runtime-owned PTY path devin already uses (agent card reason).
-  const prefix = [envPrefix(card?.launchEnv, plat), envPrefix(env, plat), pathPrefixCommand(pathPrefix, plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
-    .filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).join(' ');
-  const requirementList = (kernel && Array.isArray(card?.kernelCommandRequirements)
-    ? card.kernelCommandRequirements
-    : (Array.isArray(card?.commandRequirements) ? card.commandRequirements : [])).map(String);
-  const reqs = requirementList.join(' ');
-  const tf = card?.terminalFallback;
-  // Native-managed agents still use this terminal fallback for the long-lived
-  // Kernel and for any explicitly requested command-terminal lane. Their
-  // unattended flags therefore apply to explicit profile commands too; an
-  // override may choose model/tuning, never permission interactivity.
-  const fallbackBypassArgs = Array.isArray(tf?.bypassArgs) ? tf.bypassArgs.map(String) : [];
-  const explicit = typeof command === 'string' && command.trim() ? command.trim() : null;
-  let body = explicit;
-  if (body) {
-    const missing = requirementList.filter((requirement) => !body.includes(requirement));
-    const missingBypass = fallbackBypassArgs.length > 0
-      && !fallbackBypassArgs.every((requirement) => body.includes(requirement))
-      ? fallbackBypassArgs
-      : [];
-    body = [body, ...missing, ...missingBypass].filter(Boolean).join(' ');
-  }
-  if (!body && typeof tf?.command === 'string' && tf.command.trim()) {
-    if (model && !Array.isArray(tf.modelArgs))
-      return { provider, error: `adapter card ${provider}.yaml cannot pin model '${model}' (terminalFallback.modelArgs missing)` };
-    if (effort && !Array.isArray(tf.effortArgs))
-      return { provider, error: `adapter card ${provider}.yaml cannot pin effort '${effort}' (terminalFallback.effortArgs missing)` };
-    const modelArgs = model ? renderArgs(tf.modelArgs, { model, effort }) : [];
-    const effortArgs = effort ? renderArgs(tf.effortArgs, { model, effort }) : [];
-    body = [tf.command.trim(), reqs, ...modelArgs, ...effortArgs, ...fallbackBypassArgs].filter(Boolean).join(' ');
-  } else if (!body && (prefix || reqs)) {
-    body = [card?.agent ?? provider, reqs].filter(Boolean).join(' ');
-  }
-  if (!body) return { provider, error: `adapter card ${provider}.yaml yields no command (no command, no terminalFallback)` };
-  return { provider, command: [cd, prefix, body].filter(Boolean).join(' '), commandSource: `modules/models/agents/${provider}.yaml`, adapter: card,
-    model: model ?? null, effort: effort ?? null };
 }
 
 const regexp = (source, fallback) => {
@@ -292,16 +181,6 @@ export function answerAllowlistedGate(handle, adapter, gate, { screen = null, io
   return out;
 }
 
-// The prompt glyph alone on its row - or followed by the placeholder hint an
-// empty input box shows. Claude Code 2.1.x prints `❯ Try "write a test for
-// <filepath>"` in a fresh box: the bare-glyph pattern never matched it and
-// three nivo kernel boots (wf-nivo-fe-debt, 2026-09-24) timed out at readiness
-// while each sat ready at its prompt from its 6th second. A menu cursor with
-// an option label (`❯ 1. Dark mode`) is still not a prompt. Claude separates the
-// glyph from the hint with a NO-BREAK SPACE (U+00A0), not a space: the second
-// launch after the first fix still timed out on exactly that byte.
-export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Enter a prompt|(^|\n)[ \t\u00a0]*` + INPUT_GLYPH_CLASS + String.raw`(?:[ \t\u00a0]+Try "[^\n]*)?[ \t\u00a0]*(\r?\n|$))`;
-
 // The tail of a terminal frame, kept on a failed launch so its cause is
 // visible after the terminal is gone: the last `rows` non-empty rows, capped.
 export function lastOutputOf(screen, { rows = 30, chars = 3000 } = {}) {
@@ -309,204 +188,6 @@ export function lastOutputOf(screen, { rows = 30, chars = 3000 } = {}) {
   return text.length > chars ? text.slice(-chars) : text;
 }
 
-// Host CPU times for a busy-share reading (os.loadavg() is all zeros on
-// Windows). Null when unreadable.
-export function cpuSample() {
-  try {
-    let idle = 0, total = 0;
-    for (const cpu of os.cpus()) { const t = cpu.times; idle += t.idle; total += t.user + t.nice + t.sys + t.idle + t.irq; }
-    return total > 0 ? { idle, total } : null;
-  } catch { return null; }
-}
-const busyShare = (from, to) => (from && to && to.total > from.total ? Math.min(1, Math.max(0, 1 - (to.idle - from.idle) / (to.total - from.total))) : null);
-
-// An agent frame row (never a shell prompt row): its input glyph, banner or footer.
-const AGENT_FRAME_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|Claude Code|OpenAI Codex|\\bDevin\\b|bypass permissions|esc to (?:interrupt|cancel)`, 'iu');
-const AGENT_LAUNCH_ROW = /^\s*(?:&\s*|command\s+)?["']?[\w:\\/.~-]*?\b(?:claude|codex|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
-const screenRows = (screen) => String(screen ?? '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
-// The frame ends in a bare shell prompt: the launched agent command returned.
-function bareShellPrompt(screen) {
-  const last = screenRows(screen).at(-1);
-  if (!last) return null;
-  const prefix = shellPromptPrefix(last);
-  return prefix && !last.slice(prefix.length).trim() ? last : null;
-}
-
-// Card-driven readiness: screen must show the provider's prompt pattern
-// (and identity when declared) before anything is sent.
-//
-// The window is wall-clock. spec.timeoutMs (default 120000) is the base. With
-// `adaptive` (the Kernel boot) it stretches with host load - by the CPU busy
-// share measured over the wait and by Orca's read latency, up to
-// spec.maxLoadFactor (default 2) - and past that deadline it keeps waiting
-// while the terminal is alive and still printing (its frame changed within
-// spec.quietMs, default 30000), up to spec.maxTimeoutMs (default 360000).
-// A launch fails early only on a real exit: Orca reports the terminal exited
-// or disconnected, or its frame ends in a bare shell prompt on two reads after
-// the agent drew its frame or the launch line was echoed.
-// Every failure carries failureKind, transient and lastOutput:
-//   agent-exited             the agent or its terminal is gone (transient)
-//   readiness-stalled        alive, frame unchanged, window spent (transient)
-//   readiness-still-starting alive and still printing at the hard cap:
-//                            stillStarting - the caller must not close it
-//   interactive-gate, failure-signature: never transient.
-// `onWait({step, elapsedMs})` is called on every poll (the Kernel boot renews
-// its startup reservation from it). `io` {read, sleep, now, cpu} is the
-// Orca/clock seam the specs fake.
-export function awaitReadiness(handle, adapter, { cwd = null, delivered = null, adaptive = false, onWait = null, io = null } = {}) {
-  const readTerminal = io?.read ?? ((h) => terminalRead({ terminal: h }));
-  const sleep = io?.sleep ?? sleepSync;
-  const now = io?.now ?? (() => Date.now());
-  const cpu = io?.cpu ?? cpuSample;
-  const spec = adapter?.readiness && typeof adapter.readiness === 'object' ? adapter.readiness : {};
-  // A bare prompt glyph on its own line, wherever that line sits: Claude Code
-  // 2.1.280 draws a rule and a status row BELOW its `❯` prompt, so the former
-  // end-of-screen anchor never matched and every Claude kernel timed out at
-  // readiness while it sat ready at its prompt.
-  const ready = regexp(spec.screenPattern, DEFAULT_READY_PATTERN);
-  const identity = spec.identityPattern ? regexp(spec.identityPattern, spec.identityPattern) : null;
-  const baseMs = Number(spec.timeoutMs) || 120000;
-  const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
-  const maxMs = adaptive ? Math.max(baseMs, Number(spec.maxTimeoutMs) || 360000) : baseMs;
-  const quietMs = Math.max(intervalMs, Number(spec.quietMs) || 30000);
-  const maxLoadFactor = adaptive ? Math.max(1, Number(spec.maxLoadFactor) || 2) : 1;
-  const start = now();
-  const cpuStart = adaptive ? cpu() : null;
-  let screen = '', lastScreen = '', seen = false, lastChangeAt = start, readMsTotal = 0, reads = 0;
-  let agentSeen = false, launchSeen = false, shellPromptReads = 0, loadFactor = 1, busy = null;
-  const gateAnswers = [];
-  const settle = (state) => {
-    for (const a of gateAnswers) if (a.answered) a.cleared = state?.gate !== a.gate;
-    return gateAnswers.length ? { gateAnswers } : {};
-  };
-  const waited = () => ({ waitedMs: now() - start, loadFactor: Math.round(loadFactor * 100) / 100,
-    ...(busy != null ? { cpuBusy: Math.round(busy * 100) / 100 } : {}), ...(reads ? { readMs: Math.round(readMsTotal / reads) } : {}) });
-  const failed = (failureKind, transient, reason, extra = {}) => ({ ok: false, failureKind, transient, reason, screen,
-    lastOutput: lastOutputOf(screen || lastScreen), ...waited(), ...extra, ...settle(null) });
-  for (;;) {
-    const readAt = now();
-    const read = readTerminal(handle);
-    readMsTotal += now() - readAt; reads += 1;
-    screen = read.screen ?? '';
-    const t = read.terminal ?? {};
-    // A real exit: Orca says the terminal exited or disconnected.
-    if (t.status === 'exited' || t.connected === false || (!read.ok && /terminal_gone|not connected|exited/i.test(String(read.error ?? '')))) {
-      const cause = t.exitCause ? (typeof t.exitCause === 'string' ? t.exitCause : (t.exitCause.kind ?? t.exitCause.reason ?? JSON.stringify(t.exitCause))) : null;
-      return failed('agent-exited', true, `agent exited before readiness: terminal ${t.status === 'exited' ? 'exited' : 'disconnected'}${cause ? ` (${cause})` : ''}`);
-    }
-    if (read.ok) {
-      // ... or the frame fell back to a bare shell prompt after the agent drew
-      // its frame (or its launch line was echoed), on two reads in a row.
-      const rows = screenRows(screen);
-      if (rows.some((row) => !shellPromptPrefix(row) && AGENT_FRAME_ROW.test(row))) agentSeen = true;
-      // The launch line may set env first (claude.yaml launchEnv): any ';' statement that runs an agent counts.
-      if (rows.some((row) => { const p = shellPromptPrefix(row); return p && row.slice(p.length).split(';').some((st) => AGENT_LAUNCH_ROW.test(st)); })) launchSeen = true;
-      // A bare prompt before either is the shell the launch has not reached yet.
-      const shellRow = (agentSeen || launchSeen) ? (exitedAgentPromptRow(screen) ?? bareShellPrompt(screen)) : null;
-      shellPromptReads = shellRow ? shellPromptReads + 1 : 0;
-      if (shellPromptReads >= 2) return failed('agent-exited', true, `agent exited before readiness: the frame ends in a bare shell prompt ('${shellRow.slice(0, 80)}')`);
-      if (seen && screen !== lastScreen) lastChangeAt = now();
-      seen = true;
-      lastScreen = screen;
-    }
-    const failure = failureOnScreen(adapter, screen, delivered);
-    if (read.ok && failure) return { ...failed('failure-signature', false, `terminal rejected readiness: ${failure.signal}`), ...failure };
-    // A screen waiting on an answer never turns ready by itself. An
-    // allowlisted launch gate is answered once by the runtime; any other gate
-    // (or one that persists) fails at once and names the gate.
-    const screenState = read.ok ? classifyAgentScreen(screen) : null;
-    if (screenState?.state === 'interactive-gate') {
-      const gate = screenState.gate;
-      const rule = gateAutoAnswerRule(adapter, gate);
-      const prior = gateAnswers.find((a) => a.gate === gate);
-      if (rule && !prior) {
-        if (rule.delayMs) {
-          // Claude refuses keys for a moment after a dialog opens.
-          sleep(rule.delayMs);
-          screen = readTerminal(handle).screen ?? screen;
-        }
-        const answer = answerGate(handle, rule, screen);
-        gateAnswers.push({ gate, keystroke: answer.keystroke, answered: answer.answered, at: now(), settleMs: rule.settleMs,
-          ...(answer.reason ? { reason: answer.reason } : {}) });
-        if (answer.answered) { sleep(intervalMs); continue; }
-      } else if (rule && prior?.answered && now() - prior.at < prior.settleMs) {
-        sleep(intervalMs);
-        continue;
-      }
-      const remedy = gateRemedy(gate, { cwd });
-      const tried = gateAnswers.find((a) => a.gate === gate);
-      const why = !rule ? "is not on the agent card's gateAutoAnswer allowlist and needs the owner's answer"
-        : tried?.answered ? `persisted after the runtime answered it (${tried.keystroke})`
-          : `could not be auto-answered (${tried?.reason ?? 'no answer'})`;
-      return { ok: false, failureKind: 'interactive-gate', transient: false, state: 'interactive-gate', signal: 'interactive-gate', gate, remedy,
-        reason: `terminal is blocked on interactive gate '${gate}' — it ${why}${remedy ? ` — to clear it once: ${remedy}` : ''}`, screen,
-        lastOutput: lastOutputOf(screen), ...waited(), ...settle(screenState) };
-    }
-    if (read.ok && ready.test(screen) && (!identity || identity.test(screen))) return { ok: true, screen, ...waited(), ...settle(screenState) };
-    const at = now();
-    const elapsed = at - start;
-    if (adaptive) {
-      // Host load stretches the base window: the CPU busy share over the wait
-      // (70% busy = x1, 100% = x2) and Orca's read latency (1s nominal).
-      busy = busyShare(cpuStart, cpu());
-      const byCpu = busy == null ? 1 : 1 + Math.max(0, busy - 0.7) / 0.3;
-      const byReads = reads ? 1 + Math.max(0, readMsTotal / reads - 1000) / 2000 : 1;
-      loadFactor = Math.min(maxLoadFactor, Math.max(1, byCpu, byReads, loadFactor));
-    }
-    const deadline = Math.min(maxMs, baseMs * loadFactor);
-    const printing = at - lastChangeAt < quietMs;
-    const window = `window ${Math.round(deadline)}ms, load x${Math.round(loadFactor * 100) / 100}`;
-    if (elapsed >= maxMs && adaptive && printing)
-      return failed('readiness-still-starting', false, `terminal readiness timeout after ${elapsed}ms: the terminal is alive and still printing at the ${maxMs}ms cap (${window}); it was left open`, { stillStarting: true });
-    if (elapsed >= maxMs || (elapsed >= deadline && !(adaptive && printing)))
-      return failed('readiness-stalled', true, `terminal readiness timeout after ${elapsed}ms (${window}): no prompt, frame unchanged for ${at - lastChangeAt}ms`);
-    if (typeof onWait === 'function') { try { onWait({ step: 'readiness', elapsedMs: elapsed }); } catch { /* a heartbeat never fails the launch */ } }
-    sleep(intervalMs);
-  }
-}
-
-const modelPattern = (model) => {
-  const escaped = String(model).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?:^|[^A-Za-z0-9._:-])${escaped}(?=$|[^A-Za-z0-9._:-])`, 'i');
-};
-
-// A CLI flag is intent, not proof. Kernel boot accepts a pinned model only
-// after the provider TUI renders that exact model id on the terminal screen.
-function awaitModelAttestation(handle, expectedModel, adapter, initialScreen = '', delivered = null) {
-  if (!expectedModel) return { ok: true, screen: initialScreen, model: null };
-  const spec = adapter?.modelAttestation && typeof adapter.modelAttestation === 'object' ? adapter.modelAttestation : {};
-  // 'launch-flag': the provider TUI never renders the model id on screen, so
-  // a screen regex can never attest it. The composed launch command pins the
-  // model and the CLI exits before the readiness prompt on an unknown id, so
-  // reaching this point (readiness passed) is the attestation.
-  if (spec.mode === 'launch-flag')
-    return { ok: true, screen: initialScreen ?? '', model: expectedModel, mode: 'launch-flag' };
-  const timeoutMs = Number(spec.timeoutMs) || 15000;
-  const intervalMs = Math.max(250, Number(spec.intervalMs) || 1000);
-  // A TUI that renders the model's display name instead of its id (Claude
-  // Code shows "Opus 5.5 with high effort" for claude-opus-5-5) declares that
-  // name per id in the card's modelAttestation.displayNames.
-  const displayName = spec.displayNames?.[expectedModel] ?? null;
-  const byId = modelPattern(expectedModel);
-  const byName = displayName ? modelPattern(displayName) : null;
-  const expected = { test: (text) => byId.test(text) || Boolean(byName?.test(text)) };
-  let screen = initialScreen ?? '';
-  for (let elapsed = 0; elapsed <= timeoutMs; elapsed += intervalMs) {
-    const failure = failureOnScreen(adapter, screen, delivered);
-    if (failure) return { ok: false, screen, reason: `terminal rejected model attestation: ${failure.signal}`, ...failure };
-    if (expected.test(screen)) return { ok: true, screen, model: expectedModel };
-    if (elapsed >= timeoutMs) break;
-    sleepSync(intervalMs);
-    const read = terminalRead({ terminal: handle });
-    screen = read.screen ?? '';
-    if (!read.ok || read.terminal?.connected === false)
-      return { ok: false, screen, reason: `terminal became ${read.terminal?.connected === false ? 'disconnected' : 'unreadable'} before model attestation` };
-  }
-  return { ok: false, screen, reason: `terminal did not render expected model '${expectedModel}' within ${timeoutMs}ms` };
-}
-
-// The card's submission window (submission.timeoutMs, default 45s): awaitSubmission's screen wait and
-// the host's --wait-submit observation of a prompt send.
 const submissionTimeoutMs = (adapter) => Number(adapter?.submission?.timeoutMs) || 45000;
 
 // Card-driven submission: the prompt is consumed when the provider shows
@@ -688,196 +369,112 @@ export function cleanupDeliveryArtifact(artifact) {
   return { ok: true, removed: true };
 }
 
-// ---- create reconciliation ------------------------------------------------
-// `terminal create` can fail AFTER Orca made the tab (effectUnknown): the
-// renderer-backed path answers "Timed out waiting for terminal handle after
-// creation" and the tab still spawns its command. The runtime never leaves
-// such a terminal untracked: it lists the worktree, finds the terminals that
-// did not exist before this create and carry this create's exact tab title,
-// adopts one live match and closes every other match. The tab title is the
-// marker because a provider TUI rewrites the pane title (Codex writes the cwd
-// name) while the tab keeps --title. The receipt lands in createRecovery on
-// the spawn result, and callers write it into their dispatch/kernel events.
-const CREATE_RECOVERY_MS = 8000;
-const CREATE_RECOVERY_INTERVAL_MS = 1000;
 
-// handle → tab title, from terminal list --include-visual-layouts.
-function tabTitles(visualLayouts) {
-  const titles = new Map();
-  const pending = [];
-  const walk = (node, tabTitle) => {
-    if (!node || typeof node !== 'object') return;
-    if (Array.isArray(node)) { for (const item of node) walk(item, tabTitle); return; }
-    const title = typeof node.tabId === 'string' && 'panes' in node && typeof node.title === 'string' ? node.title : tabTitle;
-    if (node.type === 'terminal') {
-      if (typeof node.handle === 'string' && node.handle) titles.set(node.handle, title ?? null);
-      else if (title) pending.push({ tabId: node.tabId ?? null, title });
-    }
-    for (const value of Object.values(node)) if (value && typeof value === 'object') walk(value, title);
-  };
-  walk(visualLayouts, null);
-  return { titles, pending };
-}
-
-function listWorktree(worktree) {
-  try {
-    const listed = terminalList({ worktree, includeVisualLayouts: true });
-    if (!listed.ok) return null;
-    const { titles, pending } = tabTitles(listed.visualLayouts);
-    return {
-      terminals: (listed.terminals ?? []).filter((t) => typeof t?.handle === 'string')
-        .map((t) => ({ handle: t.handle, title: t.title ?? null, tabTitle: titles.get(t.handle) ?? null,
-          connected: t.connected !== false, writable: t.writable !== false })),
-      pending,
-    };
-  } catch { return null; }
-}
-
-/** Handles that exist in `worktree` before a create, or null when unreadable. */
-export function terminalSnapshot(worktree) {
-  const listing = listWorktree(worktree);
-  return listing ? new Set(listing.terminals.map((t) => t.handle)) : null;
-}
-
-export function recoverCreatedTerminal({ worktree, title, before = null, error = null,
-  timeoutMs = CREATE_RECOVERY_MS, intervalMs = CREATE_RECOVERY_INTERVAL_MS } = {}) {
-  const receipt = { cause: error ?? null, title, adopted: null, closed: [], pendingTabs: [], listed: false,
-    beforeKnown: before instanceof Set };
-  let matches = [];
-  for (let elapsed = 0; ; elapsed += intervalMs) {
-    const listing = listWorktree(worktree);
-    if (listing) {
-      receipt.listed = true;
-      matches = listing.terminals.filter((t) => (!before || !before.has(t.handle)) && (t.tabTitle === title || t.title === title));
-      receipt.pendingTabs = listing.pending.filter((p) => p.title === title);
-      if (matches.length) break;
-    }
-    if (elapsed >= timeoutMs) break;
-    sleepSync(intervalMs);
-  }
-  // Without a before-snapshot a title match may be an older terminal this
-  // create did not make: it is reported, never adopted or closed.
-  if (!(before instanceof Set)) {
-    receipt.unowned = matches.map((t) => t.handle);
-    receipt.action = matches.length ? 'unowned-matches' : 'not-found';
-    return receipt;
-  }
-  const live = matches.find((t) => t.connected && t.writable) ?? null;
-  for (const t of matches) {
-    if (t === live) continue;
-    let closed;
-    try { closed = terminalClose({ terminal: t.handle }); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
-    receipt.closed.push({ handle: t.handle, ok: closed?.ok === true,
-      ...(closed?.error ? { error: typeof closed.error === 'string' ? closed.error : JSON.stringify(closed.error) } : {}) });
-  }
-  receipt.adopted = live?.handle ?? null;
-  receipt.action = live ? 'adopted' : (receipt.closed.length ? 'closed' : (receipt.pendingTabs.length ? 'pending-tab' : 'not-found'));
-  return receipt;
-}
-
-// Full spawn pipeline. Every failure closes the terminal and returns a typed
-// step so callers can persist an incident instead of leaking terminals.
-// Every failure also carries lastOutput (the tail of the terminal's last frame,
-// read before the close when the step had none) and, where the step knows it,
-// failureKind and transient (awaitReadiness / awaitSubmission).
-// `readiness` {adaptive} stretches the readiness window with host load and
-// while the terminal is still printing (the Kernel boot); `onWait` is called on
-// every readiness and submission poll. With `keepStartingTerminal`, a terminal
-// readiness gave up on while it was still printing (stillStarting) is NOT
-// closed: it is reported as terminalLeftOpen for the caller to account for.
-// `attest` (default true) adds the post-submission death-watch; a rejection
-// comes back as {ok:false, step:'attestation', signal} with the terminal
-// already closed — the caller must never mark the job running on it.
-// `worktree` is the Orca worktree the terminal is created on (and listed by);
-// `cwd`, when set, is the directory the agent runs in (cwdCommand).
-// onCreated(handle) runs the moment the terminal exists, before any wait: the caller records the handle
-// durably, so a caller killed mid-spawn leaves a terminal the ledger can still close (nivo inc-e523617a3c31).
-export function spawnAgent({ provider, model = null, effort = null, worktree, cwd = null, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null, pathPrefix = null, readiness = null, onWait = null, onCreated = null, keepStartingTerminal = false, fallbackWorktree = null } = {}) {
-  const launchDir = cwd ?? worktree;
-  const built = buildSpawnCommand({ provider, kernel, command, model, effort, env, pathPrefix, cwd: cwd && cwd !== worktree ? cwd : null });
-  if (built.error) return { ok: false, step: 'command', error: built.error, provider };
-  // Pre-trust the launch directory (trust.mjs) so the agent opens at its
-  // input box, not at a trust/consent prompt; the receipt joins every result.
+// ---- the one agent launch --------------------------------------------------
+// Every agent - Kernel, [Supervisor], [Worker], [Op] - starts through `orca orchestration worker-start --agent
+// <provider> [--model <id> --effort <level>]` (modules/kernel/contract-changes/launch-through-worker-start.yaml).
+// Orca composes the launch (placement, the owner's per-agent default args, readiness, Task injection) and owns the
+// worker's lifecycle; the runtime pre-trusts the directory, starts the worker on an existing Task, resolves the
+// exact assignee terminal (dispatch-show), gives it its semantic title and attests the EFFECTIVE agent and model
+// (worker-show) against what was routed. A card whose `start.modelArgument` is false (devin) takes no model flag
+// and is attested on its agent alone.
+// Returns {ok:true, terminal, dispatchId, taskId, runId, provider, model, effort, effective, trust, titleApplied} or
+// {ok:false, step, error, errorCode, effectState, dispatchId, terminal, observation, cleanup, trust}. A start that left
+// an effect is reconciled before the failure returns, so no caller ever owns a half launch.
+// `onCreated(handle, dispatchId)` runs the moment the assignee terminal is known, before attestation: the caller
+// records it durably (nivo inc-e523617a3c31).
+export function spawnAgent({ provider, model = null, effort = null, worktree, title, task, run, from = null, retryOf = null, onCreated = null,
+  io = null } = {}) {
+  const orca = { start: io?.start ?? workerStart, show: io?.show ?? workerShow, assignee: io?.assignee ?? dispatchShow,
+    rename: io?.rename ?? terminalRename, stop: io?.stop ?? workerStop, release: io?.release ?? workerRelease,
+    trust: io?.trust ?? ensureLaunchTrust };
+  const { card, error: cardError } = loadAdapter(provider);
+  if (cardError) return { ok: false, step: 'card', error: cardError, provider };
+  const takesModel = card?.start?.modelArgument !== false;
+  if (effort === 'none') effort = null;
   let trust = null;
-  try { trust = ensureLaunchTrust({ agent: provider, cwd: launchDir }); }
+  try { trust = orca.trust({ agent: provider, cwd: worktree }); }
   catch (e) { trust = { agent: provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
-  let gateAnswers = null;
-  const before = terminalSnapshot(worktree);
-  const create = terminalCreate({ worktree, title, command: built.command });
-  // `worktree` may be a checkout Orca does not register (the runtime's own .claude is a nested repo, not a worktree
-  // of the host repo): Orca refuses it with selector_not_found before any effect. The launch then retries on
-  // `fallbackWorktree` (the registered host repo root) with the agent started in `worktree` (cwdCommand).
-  if (!create.handle && create.errorCode === 'selector_not_found' && fallbackWorktree && fallbackWorktree !== worktree) {
-    return spawnAgent({ provider, model, effort, worktree: fallbackWorktree, cwd: cwd ?? worktree, title, prompt, promptFile, command, kernel, dispatchId,
-      attest, env, pathPrefix, readiness, onWait, onCreated, keepStartingTerminal });
-  }
-  // A handle-less create whose effect is unknown is reconciled before it is
-  // called a failure: adopt the terminal it made, or close it.
-  const createRecovery = !create.handle && create.effectUnknown
-    ? recoverCreatedTerminal({ worktree, title, before, error: create.error })
-    : null;
-  const handle = create.handle ?? createRecovery?.adopted ?? null;
-  if (handle && onCreated) { try { onCreated(handle); } catch { /* the launch's own receipts still name the handle */ } }
-  let artifact = null;
-  const fail = (step, error, signal = null, extra = {}) => {
-    cleanupDeliveryArtifact(artifact);
-    let terminalClosed = null;
-    let terminalLeftOpen = null;
-    let lastOutput = typeof extra.lastOutput === 'string' && extra.lastOutput ? extra.lastOutput
-      : (extra.screen ? lastOutputOf(extra.screen) : null);
-    if (handle && !lastOutput) {
-      // The cause must outlive the terminal: its last frame is read before the close.
-      try { lastOutput = lastOutputOf(terminalRead({ terminal: handle }).screen); } catch { /* best-effort */ }
+  const started = orca.start({ task, worktree, agent: card?.start?.agentArgument ?? provider,
+    ...(takesModel && model ? { model, ...(effort ? { effort } : {}) } : {}), displayName: title, run, from, retryOf });
+  const dispatchId = started?.dispatchId ?? null;
+  // A failed start is reconciled before it returns (Orca's safety floor: only proof of exit authorizes a stop):
+  // no effect -> nothing; unknown -> worker-show first, cleaned only when Orca shows the worker ended; a partial
+  // effect -> cleaned. `io.cleanup(dispatchId)` -> {effectState, ...} replaces the default stop + release.
+  const cleanupOf = io?.cleanup ?? ((id) => {
+    const stop = bestEffortCall(() => orca.stop({ dispatch: id }));
+    const release = bestEffortCall(() => orca.release({ dispatch: id }));
+    return { effectState: release?.ok === true ? 'none' : 'partial', stop, release };
+  });
+  const reconcile = (effectState) => {
+    if (effectState === 'none' || !dispatchId) return { effectState, observation: null, cleanup: null };
+    if (effectState === 'unknown') {
+      const observation = bestEffortCall(() => orca.show({ dispatch: dispatchId }));
+      if (!observation?.ok || !['failed', 'stopped', 'released'].includes(observation.state)) return { effectState: 'unknown', observation, cleanup: null };
+      const cleanup = cleanupOf(dispatchId);
+      return { effectState: cleanup.effectState, observation, cleanup };
     }
-    if (handle && keepStartingTerminal && extra.stillStarting === true) {
-      terminalLeftOpen = { handle, reason: 'still-starting: the terminal was alive and printing when readiness gave up' };
-    } else if (handle) {
-      let closed;
-      // With its tab when the tab is its own, so Orca cannot resume the refused
-      // agent under a new handle (scripts/kernel/close-op-terminal.mjs).
-      try { closed = closeOperationTerminal(handle); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
-      terminalClosed = { handle, ok: closed?.ok === true,
-        ...(closed?.error ? { error: typeof closed.error === 'string' ? closed.error : JSON.stringify(closed.error) } : {}) };
-    }
-    return { ok: false, step, error, ...(signal ? { signal } : {}), ...extra, lastOutput: lastOutput ?? '', terminal: handle, provider, command: built.command,
-      ...(terminalClosed ? { terminalClosed } : {}), ...(terminalLeftOpen ? { terminalLeftOpen } : {}), ...(createRecovery ? { createRecovery } : {}),
-      ...(trust ? { trust } : {}), ...(gateAnswers ? { gateAnswers } : {}) };
+    const cleanup = cleanupOf(dispatchId);
+    return { effectState: cleanup.effectState, observation: null, cleanup };
   };
-  if (!handle) return fail('create', create.error || 'no terminal handle', null, create.errorCode ? { errorCode: create.errorCode } : {});
-  const ready = awaitReadiness(handle, built.adapter, { cwd: launchDir, delivered: built.command, adaptive: readiness?.adaptive === true, onWait,
-    io: readiness?.io ?? null });
-  gateAnswers = ready.gateAnswers ?? null;
-  const waitFacts = { waitedMs: ready.waitedMs ?? null, loadFactor: ready.loadFactor ?? 1,
-    ...(ready.cpuBusy != null ? { cpuBusy: ready.cpuBusy } : {}), ...(ready.readMs != null ? { readMs: ready.readMs } : {}) };
-  if (!ready.ok) return fail('readiness', ready.reason, ready.signal ?? null,
-    { screen: ready.screen, lastOutput: ready.lastOutput, matched: ready.matched, failureKind: ready.failureKind ?? null,
-      transient: ready.transient === true, readiness: waitFacts, ...(ready.stillStarting ? { stillStarting: true } : {}),
-      ...(ready.gate ? { state: ready.state, gate: ready.gate, remedy: ready.remedy ?? null } : {}) });
-  const modelAttested = awaitModelAttestation(handle, model, built.adapter, ready.screen, built.command);
-  if (!modelAttested.ok) return fail('model-attestation', modelAttested.reason, modelAttested.signal ?? null,
-    { requestedModel: model, screen: modelAttested.screen, matched: modelAttested.matched, failureKind: 'model-attestation', transient: false });
-  const text = promptFile ? fs.readFileSync(promptFile, 'utf8') : prompt;
-  if (text != null) {
-    const send = deliverPrompt({ handle, adapter: built.adapter, prompt: text, worktree: launchDir, dispatchId });
-    artifact = send.artifact ?? null;
-    if (!send.ok) return fail('send', send.error || 'send failed', send.failureKind ?? null,
-      { screen: send.screen, failureKind: send.failureKind ?? null, transient: send.transient === true });
-    // A turn_started receipt proved the submit; otherwise the screen proves it.
-    const submitted = send.submitted ? { ok: true } : awaitSubmission(handle, built.adapter, { sentText: send.sentText ?? text, onWait });
-    if (!submitted.ok) return fail('submission', submitted.reason, submitted.signal ?? null,
-      { screen: submitted.screen, lastOutput: submitted.lastOutput, matched: submitted.matched,
-        failureKind: submitted.failureKind ?? null, transient: submitted.transient === true });
-    if (attest) {
-      const attested = awaitAttestation(handle, built.adapter, { delivered: [built.command, send.sentText ?? text] });
-      if (!attested.ok) return fail('attestation', `attestation rejected: ${attested.signal}`, attested.signal,
-        { lastOutput: lastOutputOf(attested.screen), failureKind: 'attestation', transient: false });
-    }
-    // Attested — the dispatch artifact has been consumed; it must not live on.
-    cleanupDeliveryArtifact(artifact);
-    artifact = null;
+  const fail = (step, error, { effectState = 'partial', ...extra } = {}) => {
+    const reconciled = reconcile(effectState);
+    return { ok: false, step, error, provider, dispatchId, taskId: task ?? null, runId: run ?? null, ...extra, ...(trust ? { trust } : {}),
+      effectState: reconciled.effectState, ...(reconciled.observation ? { observation: reconciled.observation } : {}),
+      ...(reconciled.cleanup ? { cleanup: reconciled.cleanup } : {}) };
+  };
+  if (started?.ok !== true || (started.outcome != null && started.outcome !== 'ok') || !dispatchId) {
+    return fail('worker-start', started?.error ?? `worker-start outcome=${started?.outcome ?? 'none'} state=${started?.state ?? 'none'} effect=${started?.effectState ?? 'none'}`,
+      { effectState: started?.effectState ?? 'unknown', errorCode: started?.errorCode ?? null, details: started ?? null });
   }
-  return { ok: true, terminal: handle, provider, model: model ?? null, effort: effort ?? null,
-    modelAttested: modelAttested.model, command: built.command, commandSource: built.commandSource, readiness: waitFacts,
-    ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}), ...(gateAnswers ? { gateAnswers } : {}) };
+  const shown = orca.assignee({ task, from });
+  const terminal = shown?.ok ? shown.assigneeHandle : null;
+  if (!terminal) return fail('dispatch-show', shown?.error ?? 'dispatch-show returned no assignee', { details: shown ?? null });
+  if (onCreated) { try { onCreated(terminal, dispatchId); } catch { /* the receipt still names the handle */ } }
+  // A worker in an existing worktree gets Orca's default tab title; the semantic title is presentation only.
+  const renamed = title ? bestEffortCall(() => orca.rename({ terminal, title })) : null;
+  const attest = orca.show({ dispatch: dispatchId });
+  const eff = attest?.effective ?? {};
+  const effAgent = eff.agent ?? eff.provider ?? null;
+  const effModel = eff.model ?? eff.modelId ?? null;
+  const agentOk = effAgent === (card?.start?.agentArgument ?? provider);
+  const modelOk = !takesModel || !model || effModel === model;
+  if (attest?.ok !== true || !agentOk || !modelOk) {
+    return fail('attestation', `worker attest failed: expected agent=${provider} model=${takesModel ? model : '(agent default)'}, got agent=${effAgent} model=${effModel} state=${attest?.state ?? 'none'}`,
+      { terminal, incident: true, details: attest ?? null });
+  }
+  return { ok: true, terminal, dispatchId, taskId: task ?? null, runId: run ?? null, provider, model: takesModel ? model : null,
+    effort: takesModel && model ? effort : null, effective: { agent: effAgent, model: effModel }, titleApplied: renamed?.ok === true,
+    ...(trust ? { trust } : {}) };
 }
 
+const bestEffortCall = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+
+// An agent that is not an operation - the Kernel, the [Supervisor], a [Worker] - is a worker of its own Run: the
+// entry terminal (the owner's chat, the Supervisor, whoever ran the launcher; `entry`, Orca's ORCA_TERMINAL_HANDLE)
+// is that Run's coordinator. `priorRunId` is reused while Orca still knows it and accepts the Task; otherwise a fresh
+// Run is created (a Run's coordinator is the terminal that created it, so a relaunch from another entry cannot add
+// a Task to it). The Task spec is the prompt, spilled to `specFile` past the host's argv (task-spec.mjs).
+// Returns spawnAgent's receipt (runId/taskId on it), or {ok:false, step:'run-create'|'task-create', effectState:'none'}.
+export function startAgent({ provider, model = null, effort = null, worktree, title, prompt, specFile = null, heading = null, objective,
+  entry = null, priorRunId = null, onCreated = null, io = null } = {}) {
+  const orca = { runShow: io?.runShow ?? runShow, runCreate: io?.runCreate ?? runCreate, taskCreate: io?.taskCreate ?? taskCreate };
+  const spec = taskSpecOf({ prompt, file: specFile, heading: heading ?? title }).spec;
+  const from = entry ? { from: entry } : {};
+  const newRun = () => {
+    const created = orca.runCreate({ objective, ...from });
+    return created?.ok && created.runId ? { runId: created.runId } : { error: created?.error ?? 'run-create returned no runId' };
+  };
+  const newTask = (runId) => orca.taskCreate({ run: runId, spec, taskTitle: title, displayName: title, ...from });
+  let runId = null;
+  if (priorRunId && orca.runShow({ id: priorRunId })?.ok) runId = priorRunId;
+  let task = runId ? newTask(runId) : null;
+  if (!task?.ok || !task.taskId) {
+    const made = newRun();
+    if (made.error) return { ok: false, step: 'run-create', error: made.error, provider, effectState: 'none' };
+    runId = made.runId;
+    task = newTask(runId);
+  }
+  if (!task?.ok || !task.taskId) return { ok: false, step: 'task-create', error: task?.error ?? 'task-create returned no taskId', provider, runId, effectState: 'none' };
+  return spawnAgent({ provider, model, effort, worktree, title, task: task.taskId, run: runId, from: entry, onCreated, io: io?.spawn ?? null });
+}

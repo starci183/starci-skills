@@ -141,14 +141,11 @@ export function resolveLaunchModel(target, difficulty, opts = {}) {
   return { target: pool.target ?? target, modelId, effort: pool.effort?.[d] ?? null };
 }
 
-// The model + effort a card-composed command terminal launches with (a
-// command-terminal profile with no static launch.orca.command — the Codex
-// profiles). Order: the persisted `api route` decision when it names this
-// target, the pool's difficulty pin, then the profile's own requestedModel for
-// launch-only targets (gpt-6-sol/gpt-6-luna) that runtimes.yaml has no pool
-// for. No model at all is a typed error — a Codex terminal is never launched
-// on the CLI's own default model, because attestation could not prove it.
-export function resolveCardLaunchModel({ target, requestedModel = null, payload = {}, runtimes, modelsDir } = {}) {
+// The model + effort a worker launches with (worker-start --model/--effort). Order: the persisted `api route`
+// decision when it names this target, the pool's difficulty pin, then the profile's own requestedModel for
+// launch-only targets (gpt-6-sol/gpt-6-luna) that runtimes.yaml has no pool for. No model at all is a typed error -
+// a worker is never started on the CLI's own default model, because attestation could not prove it.
+export function resolveWorkerLaunchModel({ target, requestedModel = null, payload = {}, runtimes, modelsDir } = {}) {
   if (payload?.modelId && (!payload.model || payload.model === target))
     return { modelId: payload.modelId, effort: payload.effort ?? null, source: 'route' };
   const pinned = resolveLaunchModel(target, payload?.difficulty ?? 'medium', { runtimes, modelsDir });

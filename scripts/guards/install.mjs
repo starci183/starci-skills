@@ -178,6 +178,18 @@ export function bindGuardTerminal({ skillRoot = path.resolve(here, '..', '..'), 
   return writeGuardFile(terminalsDir(skillRoot), handle, { ...guard, terminal: handle, boundAt: new Date().toISOString() });
 }
 
+/**
+ * runtime/guards/seats/<handle>.json — the tools a seat's agent may not use, keyed by the Orca terminal it runs in.
+ * worker-start takes no provider argv, so a seat's tool denial (the [Supervisor]'s Agent/Task, start-supervisor.mjs
+ * SEAT_DENIED_TOOLS) is enforced by the project PreToolUse hook (.claude/settings.json -> scripts/guards/seat-tools.mjs),
+ * which denies a tool only for the terminal bound here.
+ */
+export const seatsDir = (skillRoot = path.resolve(here, '..', '..')) => path.join(guardsRoot(skillRoot), 'seats');
+export function bindSeatGuard({ skillRoot = path.resolve(here, '..', '..'), handle, role, deniedTools }) {
+  return writeGuardFile(seatsDir(skillRoot), handle, { schema: 'starci/seat-guard@1', role, terminal: handle,
+    deniedTools: [...new Set((deniedTools ?? []).map(String))], boundAt: new Date().toISOString() });
+}
+
 /** Remove the guard bound to terminal `handle` once that terminal is closed; true when a file was removed. */
 export function unbindGuardTerminal({ skillRoot = path.resolve(here, '..', '..'), handle }) {
   if (!handle) return false;

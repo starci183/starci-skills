@@ -1,59 +1,17 @@
 schema: starci/agent-card@1
 agent: devin
-kind: command-terminal-agent
+kind: native-managed-agent
 model: devin-agent
 modelAuthority: configured-logical-runtime
 why: |-
-  Orca has no native Devin worker adapter. The official local Devin CLI can run in the exact workflow
-  worktree, so Orca owns a fresh terminal and Dispatch for each attempt and observes the same report boundary
-  as every other operation agent. The underlying account-selected model is deliberately not inferred.
-commandPrefix:
-  win32: '$devinExe=(Get-Command devin -ErrorAction SilentlyContinue).Source; if (-not $devinExe) { $devinExe=Join-Path $env:LOCALAPPDATA ''devin\cli\bin\devin.exe'' }; if (-not (Test-Path -LiteralPath $devinExe)) { Write-Error ''Devin CLI is not installed''; exit 127 }; Remove-Item Env:ACP_BACKEND -ErrorAction SilentlyContinue; & $devinExe models list --format json *> $null; if ($LASTEXITCODE -ne 0) { Write-Error ''Devin CLI is not authenticated''; exit $LASTEXITCODE }; $starciDevinArgs=@(); $starciDevinCfgSrc=Join-Path $env:APPDATA ''devin\config.json''; if (Test-Path -LiteralPath $starciDevinCfgSrc) { $starciDevinCfgText=[IO.File]::ReadAllText($starciDevinCfgSrc); if ($starciDevinCfgText -match ''agent-hooks\\\\devin-hook\.cmd'') { $starciDevinCfg=Join-Path $env:TEMP (''starci-devin-config-'' + $PID + ''.json''); [IO.File]::WriteAllText($starciDevinCfg, [regex]::Replace($starciDevinCfgText, ''(?<="command"\s*:\s*")[^"]*?agent-hooks\\\\devin-hook\.cmd(?=")'', { param($m) $m.Value.Replace(''\\'', ''/'') })); $starciDevinArgs=@(''--config'', $starciDevinCfg) } }; Remove-Variable starciDevinCfgText, starciDevinCfgSrc -ErrorAction SilentlyContinue; function devin { & $devinExe @starciDevinArgs @args }; '
-  posix: 'command -v devin >/dev/null 2>&1 && env -u ACP_BACKEND devin models list --format json >/dev/null && '
-  reason: Fail before Task delivery when the official CLI is absent or the owner is not authenticated; auth status alone exits zero while logged out, so the read-only model inventory is the probe. No token is copied into commands or receipts.
-  statusHookReason: |-
-    Orca shows Devin's working/idle state only from its devin-hook (the pane is recognised as Devin by its devin.exe
-    foreground process, but that gives no status). Orca 1.4.209 installs the hook into %APPDATA%\devin\config.json
-    as the bare Windows path C:\Users\<you>\.orca\agent-hooks\devin-hook.cmd, while Devin CLI 3000.10.27 runs a
-    hook `command` through Git Bash on Windows. Bash eats the unquoted backslashes and every hook exits 127
-    ("Effects evaluator failed for hook None: Command exited with code 127" in %APPDATA%\devin\cli\logs), so the
-    tab sat at Idle while Devin worked. The win32 prefix therefore launches Devin with --config pointing at a
-    per-terminal copy (%TEMP%\starci-devin-config-<pid>.json) of the owner's config in which only those hook
-    commands are rewritten to forward slashes; everything else is copied byte for byte and the owner's file, which
-    Orca rewrites at every start, is never touched. The copy exists only when Orca's hook is installed; without it
-    Devin starts on its default config as before. Settings Devin saves during the session land in the copy.
-    Verified 2026-09-24: hooks ran with zero failures and Orca's status for the pane went working on
-    UserPromptSubmit/PreToolUse and done on Stop, on the first turn and on the next.
-environmentStrip:
-  - name: ACP_BACKEND
-    reason: |-
-      A leaked ACP_BACKEND=windsurf in terminal environments makes the spawned
-      devin agent child pick the wrong backend surface; interactive sessions then exit immediately
-      with 'agent child exited: exit code: 0'. The strip must run inside the terminal command before
-      devin starts — clearing it in the spawn host does not help a terminal that already inherited it.
-commandRequirements:
-  - '--permission-mode dangerous'
-  - '--respect-workspace-trust false'
-terminalFallback:
-  command: devin
-  modelArgs: ['--model', '<model>']
-kernelPermissionReason: |-
-  The long-lived kernel is not an implementation worker: its required loop repeatedly invokes the declared
-  Node kernel API and Orca observation commands. Per-command menus deadlock an unattended kernel. Dangerous
-  mode is scoped to this dedicated terminal; the kernel packet still forbids direct ledger writes, source
-  implementation and self-spawned operation terminals. Operation agents also launch unattended, but remain
-  bounded by their narrower operation contract and owned-path leases.
+  Every agent launches the one way (modules/kernel/contract-changes/launch-through-worker-start.yaml): Orca's
+  orchestration worker-start --agent devin places the worker, launches the Devin CLI with the owner's per-agent default
+  args (Orca settings agentDefaultArgs.devin: --permission-mode bypass --respect-workspace-trust false), injects the Task
+  and owns its lifecycle. worker-start takes --model only for Claude, Codex and Cursor, so a Devin worker starts on its
+  CLI's default model: the account-selected model is deliberately not inferred, and attestation checks the agent alone.
 readiness:
   screenPattern: '(?:Ask Devin|Message Devin|Type your message|Enter a prompt|(^|\n)\s*[>❯❭]\s*$)'
   identityPattern: 'Devin'
-modelAttestation:
-  mode: launch-flag
-  reason: >-
-    The Devin TUI does not render the model id on screen, so screen attestation can never pass.
-    The launch command pins --model and the CLI exits with 'Unknown model' before the readiness
-    prompt on an invalid id, so surviving to readiness is the attestation.
-  timeoutMs: 120000
-  intervalMs: 5000
 delivery:
   mode: file-reference-above-inline-limit
   maxInlineChars: 16384
@@ -94,21 +52,12 @@ approvalMode:
     lease fencing. The worker must therefore be non-interactive: per-command permission menus deadlock the
     workflow without adding authority. Dangerous mode removes the UI prompt; the operation contract,
     owned paths and Kernel settlement remain the actual boundary.
-kernelApprovalMode:
-  working: dangerous
-  reasoning: dedicated-long-lived-kernel-must-not-stall-on-declared-api-commands
 start:
-  - {api: terminal.create, binding: declared-target-command-after-auth-status}
-  - {api: terminal.read, phase: readiness}
-  - {api: orchestration.dispatch, binding: return-preamble}
-  - {api: terminal.send, phase: submit}
-  - {api: terminal.read, phase: submission}
-  - {api: orchestration.dispatch-show, phase: assignee-attestation}
+  api: orchestration.worker-start
+  agentArgument: devin
+  modelArgument: false
 release:
-  api: orchestration.worker-stop
-  then: terminal.close
-bypassMode:
-  launch: '--permission-mode dangerous — equivalent unattended/yolo mode, injected before Task delivery.'
+  api: orchestration.worker-release
 knownFailures:
   - signal: 'Unknown model'
     meaning: The --model flag named an id the account cannot run; the CLI exits before the prompt.

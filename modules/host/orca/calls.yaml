@@ -125,10 +125,10 @@ calls:
     command: orchestration worker-start
     kind: mutation
     timeoutMs: 150000
-    flags: [task, worktree, agent, model, effort, name, repo, base-branch, display-name, setup, retry-of, timeout-ms, run, from, terminal]
-    # exactly one of --agent (Orca launches the agent) or --terminal (adopt a terminal the runtime launched the agent in:
-    # a product op worktree's agent, created on the repository's root Orca worktree so the sidebar lists it, DESIGN §16.7)
-    required: [task, worktree, run]
+    flags: [task, worktree, agent, model, effort, name, repo, base-branch, display-name, setup, retry-of, timeout-ms, run, from]
+    # The one agent launch (contract-changes/launch-through-worker-start.yaml): Orca launches the agent itself; the
+    # runtime never adopts a terminal (--terminal is not a declared flag, so orcaCall refuses it).
+    required: [task, worktree, agent, run]
     forbidden: [on]
     forbiddenValues:
       on: [windows, macos, linux]

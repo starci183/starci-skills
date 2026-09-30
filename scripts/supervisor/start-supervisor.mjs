@@ -1,32 +1,30 @@
 #!/usr/bin/env node
 // start-supervisor.mjs — the entry point of the ONE [Supervisor] kernel (modules/supervisor/supervise.yaml
-// kernelSeat, docs/supervisor.md). It launches a durable Orca terminal titled "[Supervisor] main" in the
-// runtime's own worktree (or, when Orca does not register the nested .claude repo, on the host repo root with the
-// agent started in the runtime: spawnAgent fallbackWorktree), running the configured agent (config.yaml supervisor.kernel, else the kernel pin)
-// with a prompt built from modules/supervisor/supervisor-prompt.md and supervise.yaml.
+// kernelSeat, docs/supervisor.md). It starts the durable "[Supervisor] main" worker in the runtime's own worktree
+// through orca orchestration worker-start (scripts/agent/lib.mjs startAgent: a Run coordinated by the launching
+// terminal, one Task, the configured agent - config.yaml supervisor.kernel, else the kernel pin) with a prompt built
+// from modules/supervisor/supervisor-prompt.md and supervise.yaml. Its Agent/Task denial is a seat guard
+// (scripts/guards/install.mjs bindSeatGuard, enforced by the .claude/settings.json PreToolUse hook).
 //
 // The kernel is OPTIONAL: it runs only in config.yaml supervisor.mode kernel. In chat mode (the default; owner,
-// 2026-09-25) the owner's desktop chat is the Supervisor, and start, --replace, --adopt and --restart launch nothing
+// 2026-09-25) the owner's desktop chat is the Supervisor, and start, --replace and --restart launch nothing
 // (action 'chat-mode'); --stop and --status still work. The seat's liveness is the reconciler Host controller's
 // (concern host.supervisor-seat: scripts/supervisor/watchdog.mjs --once).
 //
 //   node scripts/supervisor/start-supervisor.mjs [--json] [--plan] [--reason <text>]
 //       enable the seat and launch it unless one is live
 //   node scripts/supervisor/start-supervisor.mjs --replace [--json]      (the watchdog's call; never enables)
-//   node scripts/supervisor/start-supervisor.mjs --adopt <terminal> [--json]
 //   node scripts/supervisor/start-supervisor.mjs --status [--json]
-//   node scripts/supervisor/start-supervisor.mjs --stop [--json]         disable, quit the agent, close the tab
+//   node scripts/supervisor/start-supervisor.mjs --stop [--json]         disable, worker-stop + worker-release
 //   node scripts/supervisor/start-supervisor.mjs --restart [--json]      stop + start (a contract reload)
 //
 // Singleton, three fences:
 //   1. a host lock (machine.sqlite host_locks 'supervisor-start'): two launchers never run at once;
 //   2. the seat (machine.sqlite seats row 'supervisor', scripts/supervisor/home.mjs seatOf/writeSeat): a 'starting'
-//      reservation with an expiry, then the attested terminal. A seat whose terminal a responding Orca calls live is never
-//      replaced; an Orca that does not answer proves nothing (exit 75, nothing touched);
+//      reservation with an expiry, then the attested worker (its Dispatch and terminal). A seat whose Dispatch
+//      worker-show reports live is never replaced; an Orca that does not answer proves nothing (exit 75, nothing touched);
 //   3. dedupe: every other terminal whose tab or pane title carries "[Supervisor]" is a duplicate (a [Worker]
-//      tab or a terminal an open worker job owns never is). With no
-//      live seat, a live agent session among them is ADOPTED instead of launching a second; every other
-//      one (bare shells, extra sessions) is quit and closed.
+//      tab or a terminal an open worker job owns never is): bare shells and extra sessions are quit and closed.
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -87,70 +85,65 @@ export function renderSupervisorPrompt({ template, doc, settings, restart = null
     .replaceAll('{pollMinutes}', String(Math.round(settings.pollIntervalMs / 60_000)));
 }
 
-/* ------------------------------------------------------------ the seat's command */
+/* ------------------------------------------------------------ the seat's denied tools */
 
 /**
  * Tools the Supervisor's own agent may not use. Its in-process subagents (Claude Code's Agent tool, formerly
  * Task) bypass the design - [Worker]s across four providers, leases, staging, the land gate and /status all
  * see nothing of them (2026-09-24: four "general-purpose" subagents diagnosed clusters). Diagnosis is a
- * [Worker] job too (modules/supervisor/supervisor-prompt.md).
+ * [Worker] job too (modules/supervisor/supervisor-prompt.md). worker-start takes no provider argv, so the denial is
+ * a seat guard bound to the seat's terminal (bindSeatGuard) that the project PreToolUse hook enforces.
  */
 export const SEAT_DENIED_TOOLS = Object.freeze({ claude: Object.freeze(['Agent', 'Task']) });
-export const SEAT_DENY_FLAG = Object.freeze({ claude: '--disallowedTools' });
-
-/**
- * The seat's launch command body for adapter card `card` (terminalFallback command + model/effort args) plus the
- * denied tools, or null when the agent has no denial to add (the card's own command is used then).
- */
-export function seatCommand({ agent, model = null, effort = null, card }) {
-  const denied = SEAT_DENIED_TOOLS[agent];
-  const tf = card?.terminalFallback;
-  if (!denied?.length || typeof tf?.command !== 'string') return null;
-  const render = (args) => (Array.isArray(args) ? args.map((a) => String(a).replaceAll('<model>', model ?? '').replaceAll('<effort>', effort ?? '')) : []);
-  return [tf.command.trim(), ...(model ? render(tf.modelArgs) : []), ...(effort ? render(tf.effortArgs) : []),
-    SEAT_DENY_FLAG[agent], `'${denied.join(',')}'`].join(' ');
-}
 
 /* ------------------------------------------------------------ Orca seams (lazy: specs inject them) */
 
 async function orcaDeps() {
-  const [{ terminalList }, { terminalRead }, host, liveness, closeMod, quitMod, agentLib, dedupe] = await Promise.all([
-    import('../api/orca/terminal-list.mjs'), import('../api/orca/terminal-read.mjs'), import('../kernel/host-outage.mjs'),
+  const [{ terminalList }, { terminalRead }, liveness, closeMod, quitMod, agentLib, dedupe, workerMod, workerStopMod, workerReleaseMod, guards] = await Promise.all([
+    import('../api/orca/terminal-list.mjs'), import('../api/orca/terminal-read.mjs'),
     import('../kernel/terminal-liveness.mjs'), import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'),
-    import('../agent/lib.mjs'), import('../kernel/terminal-dedupe.mjs')]);
+    import('../agent/lib.mjs'), import('../kernel/terminal-dedupe.mjs'), import('../api/orca/worker-show.mjs'),
+    import('../api/orca/worker-stop.mjs'), import('../api/orca/worker-release.mjs'), import('../guards/install.mjs')]);
   return {
     list: () => terminalList({ includeVisualLayouts: true }),
     tabTitles: dedupe.tabTitlesOf,
-    verdict: (handle) => host.kernelTerminalVerdict(handle),
     screen: (handle) => { try { const r = terminalRead({ terminal: handle, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } },
     exitedRow: liveness.exitedAgentPromptRow,
-    classify: (screen) => liveness.classifyAgentScreen(screen).state,
     close: (handle) => closeMod.closeOperationTerminal(handle),
     quit: (handle, agent) => quitMod.quitAgent({ handle, agent }),
-    spawn: (opts) => agentLib.spawnAgent(opts),
-    card: (agent) => agentLib.loadAdapter(agent).card ?? null,
+    start: (opts) => agentLib.startAgent(opts),
+    show: (dispatch) => workerMod.workerShow({ dispatch }),
+    stop: (dispatch) => workerStopMod.workerStop({ dispatch }),
+    release: (dispatch) => workerReleaseMod.workerRelease({ dispatch }),
+    bindSeat: (handle) => guards.bindSeatGuard({ handle, role: 'supervisor', deniedTools: SEAT_DENIED_TOOLS[supervisorSettings().agent] ?? [] }),
   };
 }
 
 /* ------------------------------------------------------------ seat health and dedupe */
 
+// worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
+const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
+
 /**
- * What the seat's terminal proves: {live, dead, hostUnavailable, unverified, agentExited, reason, terminal}.
- * A live terminal whose frame ends in a bare shell prompt is an exited agent: dead.
+ * What the seat's worker proves: {live, dead, hostUnavailable, legacy, reason, terminal, dispatch}. Liveness is
+ * worker-show on the seat's Dispatch. A seat with a terminal and no Dispatch was launched by terminal create before
+ * every launch went through worker-start: dead (legacy), retired by the next launch.
  */
-export function seatHealth(seat, deps, now = Date.now()) {
+export function seatHealth(seat, deps) {
   if (!seat) return { live: false, dead: true, reason: 'no seat', terminal: null };
   if (seat.starting) return { live: true, starting: true, reason: 'startup reservation active', terminal: null };
   const terminal = seat.value?.terminal ?? null;
-  if (!terminal) return { live: false, dead: true, reason: seat.expired ? 'startup reservation expired' : 'seat has no terminal', terminal: null };
-  const v = deps.verdict(terminal);
-  if (v.verdict === 'host-unavailable') return { live: false, hostUnavailable: true, reason: v.reason, terminal };
-  if (v.verdict === 'unverified') return { live: false, unverified: true, reason: v.reason, terminal };
-  if (v.verdict !== 'live') return { live: false, dead: true, gone: v.verdict === 'gone', reason: v.reason, terminal };
-  const screen = deps.screen(terminal);
-  const exited = screen == null ? null : deps.exitedRow(screen);
-  if (exited) return { live: false, dead: true, agentExited: true, shellPrompt: exited, reason: `agent exited to the shell prompt '${exited}'`, terminal };
-  return { live: true, reason: 'terminal connected', terminal };
+  const dispatch = seat.value?.dispatch ?? null;
+  if (!dispatch) {
+    if (!terminal) return { live: false, dead: true, reason: seat.expired ? 'startup reservation expired' : 'seat has no worker', terminal: null };
+    return { live: false, dead: true, legacy: true, reason: 'terminal-launched seat: every Supervisor is now a worker-start worker', terminal };
+  }
+  let shown;
+  try { shown = deps.show(dispatch); } catch (e) { shown = { ok: false, error: String(e?.message ?? e) }; }
+  if (shown?.hostUnavailable) return { live: false, hostUnavailable: true, reason: shown.error ?? 'worker-show did not answer', terminal, dispatch };
+  const state = shown?.state ?? null;
+  if (shown?.ok === true && !(state && DEAD_WORKER_STATE.test(state))) return { live: true, reason: `worker ${state ?? 'ready'}`, terminal, dispatch };
+  return { live: false, dead: true, reason: shown?.ok ? `worker ${state}` : (shown?.error || 'worker-show refused'), terminal, dispatch };
 }
 
 /**
@@ -169,19 +162,18 @@ export function supervisorTerminals(listing, tabTitlesOf = () => new Map(), { ow
 }
 
 /**
- * The dedupe plan: the seat terminal is kept; with no live seat, the first live agent session is adopted;
- * every other marked terminal is closed. `screenOf(handle)` reads a frame (null = unreadable: kept).
- * Returns {adopt: entry|null, close: [entry], keep: [entry]}.
+ * The dedupe plan: the seat terminal is kept; every other marked terminal is closed - a terminal is never adopted
+ * as the seat (every seat is a worker-start worker). `screenOf(handle)` reads a frame (null = unreadable: kept).
+ * Returns {close: [entry], keep: [entry]}.
  */
-export function planSupervisorDedupe({ marked, seatTerminal = null, seatLive = false, screenOf, exitedRow }) {
-  const plan = { adopt: null, close: [], keep: [] };
+export function planSupervisorDedupe({ marked, seatTerminal = null, screenOf, exitedRow }) {
+  const plan = { close: [], keep: [] };
   for (const t of marked) {
     if (t.handle === seatTerminal) { plan.keep.push({ ...t, reason: 'seat' }); continue; }
     const screen = screenOf(t.handle);
     if (screen == null) { plan.keep.push({ ...t, reason: 'unreadable' }); continue; }
     const shell = exitedRow(screen);
     if (shell) { plan.close.push({ ...t, kind: 'shell', reason: 'bare-shell' }); continue; }
-    if (!seatLive && !plan.adopt) { plan.adopt = { ...t, reason: 'live-unbound-session' }; continue; }
     plan.close.push({ ...t, kind: 'agent', reason: 'duplicate-session' });
   }
   return plan;
@@ -217,12 +209,12 @@ function claimStartLock(m) {
 
 /**
  * One launch pass. `mode`: 'start' (the owner's entry: enables the seat), 'replace' (the watchdog: only when
- * enabled), 'adopt' (bind `adoptHandle`). Every host seam is in `deps`. Returns a result object; `exit` is the
+ * enabled). Every host seam is in `deps`. Returns a result object; `exit` is the
  * process exit code it maps to.
  */
-export async function launchSupervisor({ mode = 'start', adoptHandle = null, reason = null, plan: planOnly = false,
+export async function launchSupervisor({ mode = 'start', reason = null, plan: planOnly = false,
   env = process.env, deps = null, settings = supervisorSettings(), template = null, doc = null, now = Date.now } = {}) {
-  // Chat mode never starts a seat: not the owner's start, not the watchdog's replace, not an adopt.
+  // Chat mode never starts a seat: not the owner's start, not the watchdog's replace.
   if (supervisorMode({ env }) === 'chat') {
     return { ok: planOnly || mode === 'replace', exit: planOnly || mode === 'replace' ? 0 : 1, action: 'chat-mode', supervisorMode: 'chat', reason: CHAT_MODE_REASON, wouldLaunch: false };
   }
@@ -244,15 +236,10 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
     try { listing = d.list(); } catch (e) { listing = { ok: false, error: String(e?.message ?? e) }; }
     if (listing?.hostUnavailable) return { ok: false, exit: EXIT_HOST_UNAVAILABLE, action: 'host-unavailable', reason: listing.error ?? 'terminal list did not answer' };
     const marked = listing?.ok ? supervisorTerminals(listing, d.tabTitles, { owned: openWorkerHandles(m) }) : [];
-    const dedupe = planSupervisorDedupe({ marked, seatTerminal: health.terminal, seatLive: health.live, screenOf: d.screen, exitedRow: d.exitedRow });
-    if (adoptHandle) {
-      const target = marked.find((t) => t.handle === adoptHandle) ?? { handle: adoptHandle };
-      dedupe.adopt = health.live ? null : { ...target, reason: 'requested' };
-      dedupe.close = dedupe.close.filter((t) => t.handle !== adoptHandle);
-    }
+    const dedupe = planSupervisorDedupe({ marked, seatTerminal: health.terminal, screenOf: d.screen, exitedRow: d.exitedRow });
 
     if (planOnly) return { ok: true, exit: 0, action: 'plan', enabled, seat: seat?.value ?? null, health, dedupe,
-      wouldLaunch: !health.live && !dedupe.adopt, agent: settings.agent, model: settings.model, effort: settings.effort };
+      wouldLaunch: !health.live, agent: settings.agent, model: settings.model, effort: settings.effort };
 
     if (health.live) {
       const closed = closeDuplicates(dedupe.close, d, settings.agent);
@@ -262,22 +249,8 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
     const token = `supervisor-${crypto.randomBytes(6).toString('hex')}`;
     const at = now();
     const attempt = (seat?.value?.attempt ?? 0) + 1;
-    const previous = seat?.value?.terminal ? { terminal: seat.value.terminal, reason: health.reason } : null;
-
-    if (dedupe.adopt) {
-      const handle = dedupe.adopt.handle;
-      const v = d.verdict(handle);
-      const screen = v.verdict === 'live' ? d.screen(handle) : null;
-      if (v.verdict !== 'live' || screen == null || d.exitedRow(screen)) return { ok: false, exit: 1, action: 'adopt-refused', terminal: handle, reason: v.verdict !== 'live' ? v.reason : 'no agent session on screen' };
-      const value = { terminal: handle, agent: agentOfTerminal(dedupe.adopt, settings.agent), model: seat?.value?.model ?? settings.model, effort: seat?.value?.effort ?? settings.effort,
-        startedAt: seat?.value?.startedAt ?? new Date(at).toISOString(), adoptedAt: new Date(at).toISOString(), attempt };
-      m.transaction(() => {
-        writeSeat(m, { token, value, now: at });
-        supervisorEvent(m, { kind: 'supervisor-adopted', payload: { ...value, previous, reason: dedupe.adopt.reason }, now: at });
-      });
-      const closed = closeDuplicates(dedupe.close, d, settings.agent);
-      return { ok: true, exit: 0, action: 'adopted', terminal: handle, ...(closed.length ? { closedDuplicates: closed } : {}) };
-    }
+    const previous = seat?.value?.terminal || seat?.value?.dispatch
+      ? { terminal: seat.value.terminal ?? null, dispatch: seat.value.dispatch ?? null, reason: health.reason, ...(health.legacy ? { legacy: true } : {}) } : null;
 
     // Reserve the seat: a concurrent launcher that got past the lock (a stale lock) still meets this row.
     const reserved = m.transaction(() => {
@@ -288,9 +261,10 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
     });
     if (!reserved) return { ok: true, exit: 0, action: 'starting', reason: 'another launcher holds the startup reservation' };
 
-    // The previous seat's terminal: a disconnected one is closed now; an exited agent's shell after the launch.
+    // The previous seat: its Dispatch is fenced and released; a terminal-launched seat's terminal is closed.
     const closedPrevious = [];
-    if (previous && !health.gone && !health.agentExited) { try { closedPrevious.push({ handle: previous.terminal, ...(d.close(previous.terminal) ?? {}) }); } catch { /* best effort */ } }
+    if (previous?.dispatch) closedPrevious.push({ dispatch: previous.dispatch, stop: bestEffort(() => d.stop(previous.dispatch)), release: bestEffort(() => d.release(previous.dispatch)) });
+    else if (previous?.terminal) closedPrevious.push({ handle: previous.terminal, ...(bestEffort(() => d.close(previous.terminal)) ?? {}) });
     const closedDuplicates = closeDuplicates(dedupe.close, d, settings.agent);
 
     const prompt = renderSupervisorPrompt({
@@ -298,24 +272,26 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
       doc: doc ?? parseYaml(fs.readFileSync(DOCTRINE_FILE, 'utf8')),
       settings, restart: previous ? (reason ?? `the previous Supervisor terminal ${previous.terminal} failed its liveness check (${previous.reason})`) : null,
     });
-    const command = d.card ? seatCommand({ agent: settings.agent, model: settings.model, effort: settings.effort, card: d.card(settings.agent) }) : null;
-    const spawned = d.spawn({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT, fallbackWorktree: path.dirname(SKILL_ROOT),
-      title: SUPERVISOR_TITLE, prompt, kernel: true, dispatchId: `supervisor-${SUPERVISOR_ID}`, ...(command ? { command } : {}) });
+    const spawned = d.start({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT, title: SUPERVISOR_TITLE, prompt,
+      specFile: path.join(SKILL_ROOT, 'runtime', 'supervisor', `prompt.a${attempt}.md`), objective: `${SUPERVISOR_TITLE} — ${SUPERVISOR_ID}`,
+      entry: env.ORCA_TERMINAL_HANDLE || null, priorRunId: seat?.value?.runId ?? null });
     if (!spawned?.ok) {
       m.transaction(() => {
         clearSeat(m, { token });
-        supervisorEvent(m, { kind: 'supervisor-start-failed', payload: { step: spawned?.step ?? null, error: spawned?.error ?? null, terminal: spawned?.terminal ?? null, agent: settings.agent }, now: now() });
+        supervisorEvent(m, { kind: 'supervisor-start-failed', payload: { step: spawned?.step ?? null, error: spawned?.error ?? null, terminal: spawned?.terminal ?? null,
+          dispatch: spawned?.dispatchId ?? null, effectState: spawned?.effectState ?? null, agent: settings.agent }, now: now() });
       });
       return { ok: false, exit: 1, action: 'launch-failed', step: spawned?.step ?? null, error: spawned?.error ?? 'spawn failed', terminal: spawned?.terminal ?? null };
     }
-    const value = { terminal: spawned.terminal, agent: settings.agent, model: settings.model, effort: settings.effort,
-      startedAt: new Date(now()).toISOString(), attempt, modelAttested: spawned.modelAttested ?? null };
+    const guard = bestEffort(() => d.bindSeat(spawned.terminal));
+    const value = { terminal: spawned.terminal, dispatch: spawned.dispatchId, runId: spawned.runId, taskId: spawned.taskId, agent: settings.agent,
+      model: settings.model, effort: settings.effort, startedAt: new Date(now()).toISOString(), attempt, effective: spawned.effective ?? null,
+      seatGuard: typeof guard === 'string' ? guard : (guard?.error ?? null) };
     m.transaction(() => {
       writeSeat(m, { token, value, now: now() });
       supervisorEvent(m, { kind: previous ? 'supervisor-restarted' : 'supervisor-booted', payload: { ...value, previous, reason }, now: now() });
     });
-    if (previous && health.agentExited) { try { closedPrevious.push({ handle: previous.terminal, ...(d.close(previous.terminal) ?? {}) }); } catch { /* best effort */ } }
-    return { ok: true, exit: 0, action: previous ? 'restarted' : 'booted', terminal: spawned.terminal, agent: settings.agent, model: settings.model,
+    return { ok: true, exit: 0, action: previous ? 'restarted' : 'booted', terminal: spawned.terminal, dispatch: spawned.dispatchId, agent: settings.agent, model: settings.model,
       attempt, ...(closedDuplicates.length ? { closedDuplicates } : {}), ...(closedPrevious.length ? { closedPrevious } : {}) };
   } finally {
     lock.release();
@@ -323,7 +299,7 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
   }
 }
 
-/** Disable the seat, ask its agent to quit and close its tab. The watchdog then leaves it down. */
+/** Disable the seat, fence and release its worker (worker-stop + worker-release). The watchdog then leaves it down. */
 export async function stopSupervisor({ env = process.env, deps = null, now = Date.now } = {}) {
   const d = deps ?? await orcaDeps();
   const m = openMachine({ env });
@@ -331,21 +307,25 @@ export async function stopSupervisor({ env = process.env, deps = null, now = Dat
     setEnabled(m, false, { by: 'start-supervisor --stop', now: now() });
     const seat = seatOf(m, now());
     const terminal = seat?.value?.terminal ?? null;
-    let quit = null, closed = null;
-    if (terminal) {
-      try { quit = d.quit(terminal, seat.value.agent ?? 'claude'); } catch (e) { quit = { error: String(e?.message ?? e) }; }
-      try { closed = d.close(terminal); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
-    }
+    const dispatch = seat?.value?.dispatch ?? null;
+    let stopped = null, released = null, closed = null;
+    if (dispatch) {
+      stopped = bestEffort(() => d.stop(dispatch));
+      released = bestEffort(() => d.release(dispatch));
+    } else if (terminal) closed = bestEffort(() => d.close(terminal));
     m.transaction(() => {
       clearSeat(m);
-      supervisorEvent(m, { kind: 'supervisor-stopped', payload: { terminal, quit, closed: closed?.ok ?? null }, now: now() });
+      supervisorEvent(m, { kind: 'supervisor-stopped', payload: { terminal, dispatch, stopped: stopped?.ok ?? null, released: released?.ok ?? null, closed: closed?.ok ?? null }, now: now() });
     });
-    return { ok: true, action: 'stopped', terminal, quit, closed: closed?.ok === true || quit?.exited === true };
+    return { ok: true, action: 'stopped', terminal, dispatch, stopped: stopped?.ok === true, released: released?.ok === true,
+      closed: closed?.ok === true || released?.ok === true };
   } finally { m.close(); }
 }
 
 
 /* ------------------------------------------------------------ CLI */
+
+const bestEffort = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
 
 const describe = (r) => {
   if (r.action === 'status') return `[Supervisor] mode ${r.supervisorMode}; ${r.enabled === false ? 'DISABLED' : r.enabled ? 'enabled' : 'never started'}; seat ${r.seat?.terminal ?? 'none'} (${r.health?.reason ?? '-'})`;
@@ -358,7 +338,7 @@ async function main() {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const asJson = has('json');
   const out = (r) => { console.log(asJson ? JSON.stringify(r) : describe(r)); process.exitCode = r.exit ?? (r.ok ? 0 : 1); };
-  if (has('help')) { console.log('use: start-supervisor.mjs [--plan] [--reason <t>] | --replace | --adopt <terminal> | --status | --stop | --restart  [--json]'); return; }
+  if (has('help')) { console.log('use: start-supervisor.mjs [--plan] [--reason <t>] | --replace | --status | --stop | --restart  [--json]'); return; }
   if (has('status')) {
     const d = await orcaDeps();
     const { seat, enabled } = readSupervisor((m) => ({ seat: seatOf(m), enabled: enabledOf(m) }), { seat: null, enabled: null });
@@ -372,8 +352,8 @@ async function main() {
     supervisorLog('start', `restart: ${describe(r)}`, { level: r.ok ? 'info' : 'warn', data: r });
     return out(r);
   }
-  const mode = has('replace') ? 'replace' : value('adopt') ? 'adopt' : 'start';
-  const r = await launchSupervisor({ mode, adoptHandle: value('adopt'), reason: value('reason'), plan: has('plan') });
+  const mode = has('replace') ? 'replace' : 'start';
+  const r = await launchSupervisor({ mode, reason: value('reason'), plan: has('plan') });
   if (!has('plan')) supervisorLog('start', `${mode}: ${describe(r)}`, { level: r.ok ? 'info' : 'warn', data: r });
   return out(r);
 }

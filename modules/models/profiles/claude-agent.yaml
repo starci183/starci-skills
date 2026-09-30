@@ -28,7 +28,7 @@ capacity:
   roles: [implement, verify, write, decide, plan]   # runtimes.yaml — all five
 
 launch:
-  orca: {kind: managed-agent, agent: claude}   # registry.yaml orcaLaunch — worker-start path
+  orca: {agent: claude}   # the one launch: orca orchestration worker-start --agent (modules/kernel/contract-changes/launch-through-worker-start.yaml)
 
 position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 

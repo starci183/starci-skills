@@ -7,7 +7,7 @@
 //   service:<name>                one registry service (scripts/reconciler/services.mjs), stepped through the DESIGN 9.7
 //                                 state machine; a start is the entry's actuator command through ctx.run.
 //   seat:kernel:<ledgerId>:<wf>   one running, unarchived workflow's Kernel seat: scripts/kernel/watchdog.mjs --once
-//                                 --repair (that child proves death twice, respects host outages, replaces, adopts,
+//                                 --repair (that child proves death twice, respects host outages, replaces,
 //                                 presses Enter, repairs titles). In shadow the read-only probe (--once without
 //                                 --repair) runs, and a repair is recorded only when the probe says one is needed.
 //                                 A workflow whose goal text is missing or unrendered (INV-W4) gets no seat and a DI
@@ -97,8 +97,8 @@ export function staleTerminalsOf(rows, { liveHandle = null } = {}) {
 export function seatStateOf(action) {
   if (['finished', 'archived'].includes(action)) return 'vacant';
   if (['restart-needed', 'agent-exit-unconfirmed', 'terminal-unverified', 'terminal-unreadable'].includes(action)) return 'suspect';
-  if (['restarted', 'adopted'].includes(action)) return 'reserving';
-  if (['restart-failed', 'adopt-failed', 'kernel-terminal-close-failed'].includes(action)) return 'replacing';
+  if (action === 'restarted') return 'reserving';
+  if (['restart-failed', 'kernel-terminal-close-failed'].includes(action)) return 'replacing';
   if (action === 'host-unavailable') return 'hostOutage';
   if (['queued-input', 'staged-input'].includes(action)) return 'inputPending';
   if (action === 'interactive-gate') return 'gated';
