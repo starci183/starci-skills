@@ -110,6 +110,9 @@ function fixtureRepo() {
   write('package.json', JSON.stringify({ name: 'fixture', private: true, dependencies: { next: '15.0.0' } }));
   write('eslint.config.mjs', 'import { recommended } from "@starci/eslint-canon-fe"\nexport default [{ rules: recommended }]\n');
   write('node_modules/eslint/package.json', JSON.stringify({ name: 'eslint', version: '9.0.0-fixture', main: 'index.js' }));
+  // The canon package's own dependencies resolve from the repository, as they do when it is installed.
+  write('node_modules/@typescript-eslint/parser/package.json', JSON.stringify({ name: '@typescript-eslint/parser', version: '8.70.0-fixture', main: 'index.js' }));
+  write('node_modules/@typescript-eslint/parser/index.js', 'module.exports = {};\n');
   write('node_modules/eslint/index.js', `
 const path = require('node:path'), fs = require('node:fs'), { pathToFileURL } = require('node:url');
 class ESLint {

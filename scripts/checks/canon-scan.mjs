@@ -212,17 +212,34 @@ function runtimeCanon(name) {
 }
 
 let redirected = null;
-/** Resolve every import of the canon package to the runtime source, once per process. */
-function redirectCanon(name, entry) {
+/** Resolve every import of the canon package to the runtime source, once per process. A bare import the
+ *  redirected source makes (the package's declared dependencies and peers, e.g. @typescript-eslint/parser)
+ *  resolves the way the installed package's would: from the scanned repository's node_modules when it
+ *  carries the dependency, else from the runtime's tree. Resolution is settled here, not in the hook -
+ *  a failed next() poisons the specifier for every later parent. */
+function redirectCanon(name, entry, dir, root) {
   const url = pathToFileURL(entry).href;
   if (redirected) {
-    if (redirected[name] !== url) throw Object.assign(Error(`canon import already redirected to ${redirected[name] ?? 'another package'}`), { code: 'CANON_SOURCE_UNAVAILABLE' });
+    if (redirected.map[name] !== url) throw Object.assign(Error(`canon import already redirected to ${redirected.map[name] ?? 'another package'}`), { code: 'CANON_SOURCE_UNAVAILABLE' });
     return;
   }
-  redirected = { [name]: url };
-  const hooks = 'let map={};export async function initialize(data){map=data.map;}'
-    + 'export async function resolve(specifier,context,next){return Object.hasOwn(map,specifier)?{url:map[specifier],shortCircuit:true}:next(specifier,context);}';
-  register(`data:text/javascript,${encodeURIComponent(hooks)}`, { data: { map: redirected } });
+  const deps = {};
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+  const bases = [createRequire(path.join(root, 'package.json')), createRequire(entry)];
+  for (const dep of Object.keys({ ...manifest.peerDependencies, ...manifest.optionalDependencies, ...manifest.dependencies })) {
+    for (const require of bases) {
+      try { deps[dep] = pathToFileURL(require.resolve(dep)).href; break; } catch { /* the next base */ }
+    }
+  }
+  const canonPrefix = `${pathToFileURL(dir).href}/`;
+  const hooks = 'let map={},deps={},canonPrefix="";'
+    + 'export async function initialize(data){map=data.map;deps=data.deps;canonPrefix=data.canonPrefix;}'
+    + 'export async function resolve(specifier,context,next){'
+    + 'if(Object.hasOwn(map,specifier))return{url:map[specifier],shortCircuit:true};'
+    + 'if(context.parentURL&&context.parentURL.startsWith(canonPrefix)&&Object.hasOwn(deps,specifier))return{url:deps[specifier],shortCircuit:true};'
+    + 'return next(specifier,context);}';
+  redirected = { map: { [name]: url } };
+  register(`data:text/javascript,${encodeURIComponent(hooks)}`, { data: { map: redirected.map, deps, canonPrefix } });
 }
 
 function detectProfile(root) {
@@ -249,7 +266,7 @@ function familyOf(ruleId, canonPrefix, ruleOwners) {
 async function lintRepository(root, options, canon, relative) {
   const require = createRequire(path.join(root, 'package.json'));
   const { ESLint } = require(require.resolve('eslint'));
-  redirectCanon(canon.name, canon.entry);
+  redirectCanon(canon.name, canon.entry, canon.dir, root);
   const loaded = await import(pathToFileURL(canon.entry).href);
   const selected = (ruleId) => !options.families.length || options.families.includes(familyOf(ruleId, canon.prefix, loaded.ruleOwners ?? {}));
   // Sibling product worktrees (<repo>/.starciwork/worktrees/**, DESIGN §16.7) are never linted as this checkout's files.
@@ -287,7 +304,7 @@ export async function scanCanon(options) {
   const packageName = catalog?.profiles?.[profile]?.canon?.package;
   if (!packageName) throw Object.assign(Error(`code-patterns.yaml declares no canon package for ${profile}`), { code: 'CANON_SOURCE_UNAVAILABLE' });
   const source = runtimeCanon(packageName);
-  const canon = { name: packageName, entry: source.entry, prefix: profile === 'nest' ? 'starci-be/' : 'starci-fe/' };
+  const canon = { name: packageName, entry: source.entry, dir: source.dir, prefix: profile === 'nest' ? 'starci-be/' : 'starci-fe/' };
   const report = {
     schema: CANON_FINDINGS, repository: root, profile,
     canon: { package: packageName, version: source.version, source: posixPath(path.relative(skillRoot, source.dir)) },
