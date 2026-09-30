@@ -2,10 +2,10 @@
  * The rule that keeps every back-end spec running (catalog R48 `BE_SPEC_QUALITY`, owner test policy 2026-09-30).
  *
  * A unit, integration, e2e or contract spec never skips, focuses, marks as todo or picks its own runner: a test that does
- * not run is a claim nobody checks. The ONE legitimate skip is the contract layer's own: the contract helper (a file of the
- * slot `be.tests.world`, e.g. `contract.client.ts`) skips itself when the provider sandbox is not configured and hands the
- * spec `sandbox.describe(...)`. That decision lives in the world, so this rule does not look at a `be.tests.world` file
- * and a spec has no way to write a skip itself.
+ * not run is a claim nobody checks. The ONE legitimate skip is the contract layer's own, and it lives in the test-world
+ * library: `useSandbox(...)` of `@starci/test-world` skips itself when the provider sandbox is not configured and hands
+ * the spec `sandbox.describe(...)`. No file of the repository writes a skip: the rule judges every spec AND every file
+ * of the test tree (`be.tests.*` slots: world, fixtures, kit), so a repo-local helper cannot become a second skip path.
  *
  * Refused in a spec: `it|test|describe` followed by `.skip`, `.skipIf`, `.runIf`, `.todo` or `.only`; `xit`, `xtest`,
  * `xdescribe`, `fit`, `ftest`, `fdescribe`; and a runner used as a value (a conditional `(cond ? describe : describe.skip)`,
@@ -34,16 +34,17 @@ const resolve = (scope, name) => {
 export const specNoSkip = {
     meta: {
         type: "problem",
-        docs: { description: "A spec never skips, focuses, marks todo or selects its runner conditionally; only the world's contract helper skips itself." },
+        docs: { description: "No spec or test-tree file skips, focuses, marks todo or selects its runner conditionally; only the test-world library's `useSandbox` skips." },
         schema: [],
         messages: {
-            skip: "`{{what}}` keeps a test from running. A spec runs every test it declares: delete it or write it. The only skip is the contract helper's own (`sandbox.describe(...)` of `src/tests/world`), decided in the world when the sandbox config is absent.",
-            select: "A test runner (`{{what}}`) is used as a value here, so the spec picks or hides what runs. Call `describe`/`it`/`test` directly; a contract spec calls `sandbox.describe(...)` and the world decides the skip.",
+            skip: "`{{what}}` keeps a test from running. A spec runs every test it declares: delete it or write it. The only skip is the test-world library's own: a contract spec calls `useSandbox(...)` of `@starci/test-world` and writes `sandbox.describe(...)`.",
+            select: "A test runner (`{{what}}`) is used as a value here, so the spec picks or hides what runs. Call `describe`/`it`/`test` directly; a contract spec writes `sandbox.describe(...)` from `useSandbox(...)` of `@starci/test-world`, which decides the skip.",
         },
     },
     create(context) {
         const filename = context.filename || context.getFilename()
-        if (!isSpecFile(filename) || hfsOf(context).slotOf(filename) === "be.tests.world") return {}
+        const slot = hfsOf(context).slotOf(filename)
+        if (!isSpecFile(filename) && !String(slot ?? "").startsWith("be.tests.")) return {}
         const isRunner = (node) => {
             const variable = resolve(context.sourceCode.getScope(node), node.name)
             if (variable === null) return true

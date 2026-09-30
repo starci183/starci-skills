@@ -23,14 +23,11 @@ test("the law publishes spec-no-skip", () => {
     assert.deepEqual(Object.keys(rules), ["spec-no-skip"])
 })
 
-test("R48: no spec skips, focuses, marks todo or selects its runner; the contract helper's sandbox.describe stays", () => {
+test("R48: no spec skips, focuses, marks todo or selects its runner; the test-world library's sandbox.describe stays", () => {
     tester.run("spec-no-skip", specNoSkip, {
         valid: [
             ...[UNIT, INTEGRATION, E2E, CONTRACT].map((filename) => ({ filename, code: `${RUNNERS}describe("x", () => { it("y", () => {}); it.each([1])("z", () => {}); it.concurrent("c", () => {}) })` })),
             { filename: CONTRACT, code: `${SANDBOX}sandbox.describe("sepay sandbox contract", () => { it("works", () => {}) })` },
-            // the contract helper is a world file: the skip decision lives there
-            { filename: HELPER, code: `${RUNNERS}export const run = (open: boolean) => (open ? describe : describe.skip)` },
-            { filename: WORLD_SPEC, code: `${RUNNERS}describe.skip("world", () => {})` },
             // a local binding called it/test is not the runner
             { filename: UNIT, code: "const it = { skip: 1 }\nexport const a = it.skip" },
             // not a spec file
