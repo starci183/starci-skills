@@ -32,7 +32,7 @@ This decision rejects three common alternatives:
 | Responsibility | Owns | May depend on | Must not own |
 | --- | --- | --- | --- |
 | Framework entry | Boot, route parameters, headers/cookies, redirects, framework providers | Feature entry, app composition | Product scenario logic, persistence, reusable UI internals |
-| Feature | One user or system scenario, use cases, transport adapters, scenario state and mapping | Reusable modules and visual contracts | Generic infrastructure for unrelated scenarios |
+| Feature | One user or system scenario, its commands, queries and handlers, transport adapters, scenario state and mapping | Reusable modules and visual contracts | Generic infrastructure for unrelated scenarios |
 | Module | One cohesive reusable domain, platform, or integration capability | Lower modules and vendor APIs | Feature orchestration or app boot |
 | Grammar/UI package | Product-agnostic renderers, tokens, interaction primitives | Its declared peers | Routes, session, persistence, product names, transport |
 
@@ -163,19 +163,19 @@ src/
       transport/
         graphql/add-to-cart.resolver.ts
       application/
-        add-to-cart.use-case.ts
-        add-to-cart.input.ts
-        add-to-cart.result.ts
-      domain/                             # only policy genuinely owned by this feature
+        add-to-cart.command.ts
+        add-to-cart.handler.ts
+        add-to-cart.contracts.ts
   modules/
     domain/
       identity/
         index.ts
     platform/
-      primary-postgresql/
+      database/
         index.ts
-        primary-postgresql.module.ts
-        primary-postgresql.options.ts     # typed runtime configuration when it exists
+        database.module.ts
+        database.options.ts               # typed runtime configuration when it exists
+        primary.decorators.ts             # InjectPrimaryEntityManager()
     integrations/
       payment-provider/
         index.ts
@@ -183,18 +183,18 @@ src/
 
 - Apps own boot/configuration/composition. They do not own handlers, services, controllers, or business
   rules.
-- A feature owns its transport adapters and application use cases. A resolver/controller/message consumer
-  validates/adapts the protocol and invokes a typed use-case boundary.
+- A feature owns its transport adapters and its application handlers. A resolver/controller/message consumer
+  validates/adapts the protocol and dispatches one typed command or query.
 - A reusable module under `modules/{domain,platform,integrations}/<capability>` owns one cohesive domain,
   platform, or provider capability. It never imports a feature
   or app. Named databases, provider instances, and tenant/workspace instances remain with their actual
   owner; do not turn them into a universal global singleton.
-- Use a command/handler split only when a selected bus owns concrete dispatch or pipeline semantics.
-  Multiple adapters can call the same direct use case. Async delivery, replay, and audit need their own
-  durable contracts; an in-process command bus does not establish them. Do not add resolver -> forwarding
-  service -> command -> forwarding handler when one use case owns the work.
-- Use a dynamic module or module-definition only for real typed runtime options, instance registration, or
-  lifecycle. A static module is the default when those semantics are absent.
+- The application layer of the backend is one typed command or query per operation and one handler that owns
+  it. Multiple adapters can dispatch the same command. Async delivery, replay, and audit need their own
+  durable contracts (an outbox message consumed by a job or consumer); an in-process command bus does not
+  establish them. Do not add resolver -> forwarding service -> command -> forwarding handler.
+- A backend capability module is a configurable module with typed options and one representative module
+  registered once per app; a feature module is static.
 - Transport DTOs belong to their adapter. Application input/results remain framework-neutral. Persistence
   entities stay behind the database adapter and are mapped before crossing the feature contract.
 

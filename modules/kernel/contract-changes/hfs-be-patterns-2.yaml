@@ -1,0 +1,62 @@
+id: hfs-be-patterns-2
+effectiveAt: '2026-09-30T18:00:00+07:00'
+summary: >-
+  Lane C0 sub-lane P1 (BE-CONVENTION locked 2026-09-30, RED20). The back-end pattern knowledge states exactly the locked
+  convention and one rule system. Every knowledge/patterns/be/*.yaml is rewritten (same schema, provenance.reviewedAt
+  2026-09-30, no legacy note): folder, naming, function, imports, comment, typing, error, test, api-auth, config,
+  logging, persistence, background, messages, temporal, idempotency, resilience, architecture-check; four new topics
+  cqrs (BE-CQRS-1..4), injection (BE-INJECTION-1..4), transport (BE-TRANSPORT-1..4) and infra (BE-INFRA-1..4); rules keep
+  their ids where they continue (the code-patterns inventory still maps them) and cite the catalog ids R84 to R90 they
+  implement (hfsRules). The cases use the section 5 shapes: injectors over unique symbol tokens, sql-tagged SqlText
+  constants, Command and Query with ExecuteParams plus an ICQRSHandler.process handler, bus-only resolvers with
+  unwrapOutcome, the code enum plus kind table error family, EnvSource typed readers, the representative module
+  registered once per app. Repository classes, use cases, @Global, raw @Inject, TransactionService, the response
+  envelope, envConfig() and zod are gone from the patterns. RED20: scripts/checks/check-hfs-rules.mjs reports
+  HFS_RULE_CODE_UNCATALOGUED naming the file when a knowledge file (knowledge/patterns/**, architecture-rules.yaml,
+  modules/models/code-patterns.yaml) names an HFS_, BE_, FE_ or ARCH_ code that is neither a code of
+  knowledge/hfs/rules.yaml nor a key of failure-codes.yaml; the data it found is fixed (BE_SQL_OUTSIDE_REPOSITORY became
+  BE_SQL_OUTSIDE_PERSISTENCE, the deleted FE_FRAMEWORK_ADAPTER_IMPORT and FE_COMPONENT_IMPORTS_TRANSPORT became
+  FE_TIER_DIRECTION, the never-emitted HFS_SLOT_RETIRED is dropped). knowledge/code-pattern-enforcement.yaml is deleted
+  (its three rules only restated modules/models/code-patterns.yaml and docs/code-pattern-enforcement.md; registered in
+  retired-paths.yaml; the kinds.yaml and op selectors now name hfs/rules), and knowledge/architecture-rules.yaml keeps only
+  the obligations no catalog rule states (ARCH-COMPOSITION, DEPENDENCY, PUBLIC-API, DATA-BOUNDARY and CONFIG are removed as
+  duplicates of R26 to R32, R37, R43 and R44). knowledge/index.yaml, knowledge/hfs/README.md section 5, docs/backend-source-pattern.md,
+  docs/architecture-rules.md and docs/portable-source-architecture.md follow the convention. The obligation prose of
+  modules/models/code-patterns.yaml no longer names use cases or repositories; its machine ruleIds are unchanged.
+reach: new-legs
+paths:
+  - knowledge/architecture-rules.yaml
+  - knowledge/code-pattern-enforcement.yaml
+  - knowledge/hfs/README.md
+  - knowledge/index.yaml
+  - knowledge/patterns/be/api-auth.yaml
+  - knowledge/patterns/be/architecture-check.yaml
+  - knowledge/patterns/be/background.yaml
+  - knowledge/patterns/be/comment.yaml
+  - knowledge/patterns/be/config.yaml
+  - knowledge/patterns/be/cqrs.yaml
+  - knowledge/patterns/be/error.yaml
+  - knowledge/patterns/be/folder.yaml
+  - knowledge/patterns/be/function.yaml
+  - knowledge/patterns/be/idempotency.yaml
+  - knowledge/patterns/be/imports.yaml
+  - knowledge/patterns/be/index.yaml
+  - knowledge/patterns/be/infra.yaml
+  - knowledge/patterns/be/injection.yaml
+  - knowledge/patterns/be/logging.yaml
+  - knowledge/patterns/be/messages.yaml
+  - knowledge/patterns/be/naming.yaml
+  - knowledge/patterns/be/persistence.yaml
+  - knowledge/patterns/be/resilience.yaml
+  - knowledge/patterns/be/temporal.yaml
+  - knowledge/patterns/be/test.yaml
+  - knowledge/patterns/be/transport.yaml
+  - knowledge/patterns/be/typing.yaml
+  - knowledge/patterns/enforcement.yaml
+  - knowledge/patterns/fe/folder.yaml
+  - knowledge/patterns/fe/imports.yaml
+  - knowledge/patterns/fe/typing.yaml
+  - knowledge/patterns/repo/folder.yaml
+  - knowledge/patterns/scan-coverage.yaml
+  - modules/models/code-patterns.yaml
+  - modules/kernel/contract-changes/hfs-be-patterns-2.yaml

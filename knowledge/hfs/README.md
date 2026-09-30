@@ -49,7 +49,7 @@ optionally a `tier`, `requires`, `allows`, `forbids`, `tests`, `budget`, `manage
   a budget that no pinned repository exceeds. Every repository on the same major stays green without edits.
 - **Major**: change or remove a slot, make an optional slot required, raise a rule from `warn` to `error`, change the
   direction matrix. It needs owner approval and one migration lane per repository.
-- A retired slot gets `retiredIn` and a successor id; afterwards a path matching it is `HFS_SLOT_RETIRED`.
+- A retired slot gets `retiredIn` and a successor id; afterwards a path matching it belongs to no slot and is `HFS_SLOT_UNDECLARED`.
 - A repository pins only the major (`"hfs": 1`) and always runs the newest minor of that major.
 
 ### 2.2 Adding something without breaking HFS
@@ -57,7 +57,7 @@ optionally a `tier`, `requires`, `allows`, `forbids`, `tests`, `budget`, `manage
 | To add | Do | Bump |
 | --- | --- | --- |
 | Helper or type used by one feature only | `application/support/<name>.ts` (`be.feature.application.support`, optional), a spec beside each file; another feature cannot import it, a second user moves it to a `domain` capability | minor |
-| Command line entry | `transport/cli/<command>.command.ts` in the feature plus an app of kind `cli` (`be.feature.transport.cli`, opt-in); it calls application use cases only | minor |
+| Command line entry | `transport/cli/<name>.cli.ts` in the feature plus an app of kind `cli` (`be.feature.transport.cli`, opt-in); it dispatches one command or query | minor |
 | Queue consumer | `transport/message/` in the feature plus an app of kind `worker` | none, declared in `hfs.json` |
 | Cron, sweep, outbox publisher | `transport/schedule/<job>.job.ts` | none |
 | Another api app or a cli | `apps/<name>` plus its kind in `hfs.json` | none |
@@ -84,12 +84,15 @@ The only file a repository adds. It declares the profile, the project binding, t
     { "name": "migrate", "kind": "migrate" }
   ],
   "optionalSlots": ["be.transport.message", "be.transport.schedule", "be.contract.graphql", "repo.docs"],
-  "connections": ["primary", "agentos"]
+  "connections": [
+    { "name": "primary", "envPrefix": "PRIMARY_DB" },
+    { "name": "agentos", "envPrefix": "AGENTOS_DB" }
+  ]
 }
 ```
 
 `profile` is `be` or `fe`. `apps` lists every `apps/<name>` with its kind (`api`, `worker`, `migrate`, `cli` for
-backends; `next` for frontends). `connections` (backend only) names the databases. A missing `hfs.json`, or a machine
+backends; `next` for frontends). `connections` (backend only) lists every physical database as `{ name, envPrefix }`: the logical name (never the engine) and the prefix of its `<PREFIX>_*` environment keys. A missing `hfs.json`, or a machine
 run that analysed zero files for a declared profile, is a failure (`HFS_ARCH_CONFIG_UNREAD`), never "unavailable".
 Owners are derived from slots; `hfs.json` holds no owner list, path or disabled rule.
 
@@ -126,31 +129,41 @@ intermediate draw images and prompt files are agent data.
 
 ## 5. Backend
 
+The rules of this section are the owner-locked back-end convention of 2026-09-30. Each rule id (R..) is a row of the
+catalog in section 12; the pattern files in `knowledge/patterns/be/` cite them and give the code forms.
+
 ### 5.1 Source tree
 
 ```text
 apps/<app>/src/                       kind api | worker | migrate | cli, declared in hfs.json
-  main.ts                             read EnvSource once, parse options, bootstrap, handle startup failure
-  app.module.ts                       AppModule.register(options): feature transport modules and capability modules
-  <app>.options.ts                    optional options type of the app
+  main.ts                             at most 80 lines: build EnvSource once, parse options, bootstrap, handle startup failure
+  app.module.ts                       at most 250 lines: AppModule.register(options), each capability once with isGlobal true, transports
+  <app>.options.ts                    the options type of the app
   <app>.composition.spec.ts           required: boots the REAL AppModule with stubbed options, resolves real tokens
 src/features/<feature>/
   index.ts                            module class and the contract an app needs; no export *
-  <feature>.module.ts                 application module (use cases)
-  application/                        <action>.use-case.ts, <action>.contracts.ts, optional command/query/handler, specs
+  <feature>.module.ts                 application module (handlers)
+  application/                        <action>.command.ts | <action>.query.ts, <action>.handler.ts, <action>.contracts.ts, specs
   application/support/                opt-in by need: helpers and types local to this one feature, a spec beside each file
-  transport/http/                     <feature>-http.module.ts, <action>.controller.ts, dto/
-  transport/graphql/                  <feature>-graphql.module.ts, <action>.resolver.ts, dto/
+  transport/graphql/                  <feature>-graphql.module.ts, <action>.resolver.ts, <action>.mapper.ts, dto/
+  transport/http/                     opt-in: <feature>-http.module.ts, <action>.controller.ts, dto/ (webhooks, OAuth, health, byte streams)
+  transport/websocket/                opt-in: <feature>-websocket.module.ts, <channel>.gateway.ts
   transport/message/                  opt-in: <feature>-message.module.ts, <event>.consumer.ts
   transport/schedule/                 opt-in: <feature>-schedule.module.ts, <job>.job.ts
-  transport/cli/                      opt-in: <feature>-cli.module.ts, <command>.command.ts; composed only by an app of kind cli
-src/modules/domain/<capability>/      index.ts, module, config, options, errors/, persistence/, policies, services, contracts
-src/modules/platform/{config,logging,errors,primitives,database,...}/   config, logging, errors, primitives are required
-src/modules/integrations/<provider>/  index.ts, <provider>.config.ts, errors/, client
+  transport/cli/                      opt-in: <feature>-cli.module.ts, <name>.cli.ts; composed only by an app of kind cli
+  messages/                           opt-in: <feature>.messages.ts (vi and en copy)
+src/modules/domain/<capability>/      index.ts, module, module-definition, options, config, decorators, log-events, errors/, persistence/, messages/, services
+src/modules/platform/<capability>/    composition, config, errors, primitives, logging, clock, cqrs are required; database, http, retry, inbox, outbox, ... by need
+src/modules/integrations/<provider>/  index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts, errors/
 src/tests/e2e/<area>/*.e2e-spec.ts    plus e2e/live/<area>/ and e2e/setup/
-src/tests/fixtures/                   typed builders and mock<T>() doubles; never imports a feature
+src/tests/fixtures/                   typed builders, mock<T>() doubles, database.ts; never imports a feature
 contracts/<app>/schema.graphql        opt-in committed contract
 ```
+
+Nothing else exists at `src/` level, and no `types`, `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or
+`exceptions` folder exists under `src/modules` or `src/features` (R01, R89). Files carry a role suffix from the closed
+list of the slot manifest (`module`, `command`, `handler`, `decorators`, `sql`, `rows`, ...); `use-case`, `repository`,
+`store`, `worker`, `scheduler` and `dto` are not among them (R89).
 
 ### 5.2 Tiers and direction (R26 to R28)
 
@@ -162,106 +175,127 @@ contracts/<app>/schema.graphql        opt-in committed contract
 | integrations | no | no | no | no | yes | yes |
 | platform | no | no | no | no | yes, acyclic | yes |
 
-Type-only imports count. Every import across owners goes through the owner's `index.ts`. Shared types that both platform
-and domain need go down to platform or are passed as options. Only these three module tiers exist.
+Type-only imports count. Every import across owners goes through the owner's single `index.ts`; inside one owner imports
+are relative and never go through the owner's own `index.ts` (R30). Shared types that both platform and domain need go
+down to platform or are passed as options. Only these three module tiers exist.
 
-### 5.3 One schema authority (R34 to R36)
+### 5.3 Persistence: one authority, one connection per database (R34 to R36, R83 to R86)
 
-Schema changes only by migration. `synchronize` is the literal `false` everywhere, including e2e databases (e2e runs
-the real migrations). There is no runtime DDL, no `dataSource.synchronize()`, no `migrationsRun` in an api or worker
-app, no `CREATE|ALTER|DROP TABLE` outside `persistence/migrations/**`, no entity or migration glob. `apps/migrate` is
-the only process that runs migrations, once per connection, before api and worker start. Entities and migrations live
-in `persistence/` of the capability that owns the table (`domain/<cap>/persistence/` or `platform/<cap>/persistence/`
-for technical tables such as outbox and lease). `persistence/connection.ts` names one connection from
-`hfs.json.connections`; each capability exports explicit `entities` and `migrations` lists from its `index.ts` and the
-app composes them into `PlatformDatabaseModule.register({ connection, entities, migrations })`. Raw SQL only as `SqlText` constants in
-`persistence/<name>.sql.ts`.
+Schema changes only by migration. `synchronize` is the literal `false` everywhere, including e2e databases (e2e runs the
+real migrations). There is no runtime DDL, no `dataSource.synchronize()`, no `migrationsRun`, no `CREATE|ALTER|DROP TABLE`
+outside `persistence/migrations/**`, no entity or migration glob. `apps/migrate` is the only process that runs migrations,
+once per connection, before api and worker start. Entities and migrations live in `persistence/{entities,migrations}/` of
+the capability that owns the table; the owner's `index.ts` exports `<c>Entities` and `<c>Migrations` and the app composes
+them per connection. Migrations are `<epochMs13>-<kebab-name>.ts`.
+
+One physical database is one connection (`hfs.json` `connections`), one `<conn>.connection.ts`, one `<conn>.config.ts` and
+one injector `Inject<Conn>EntityManager()` in `platform/database` (R84). The database is reached through that shared
+`EntityManager`, injected with the named injector and called directly: `getRepository`, `@InjectRepository`,
+`Repository<T>`, repository or store classes, QueryBuilder, an injected `DataSource` or `QueryRunner` outside
+`platform/database` and `apps/migrate` do not exist (R83). A handler opens the transaction with
+`this.entityManager.transaction(async (manager) => ...)` and only `manager` is used inside it.
+
+Raw SQL is a `sql`-tagged `SqlText` constant in `persistence/<name>.sql.ts` of the owning capability; `.query()` accepts
+only `SqlText` and numbered parameters; row shapes and mappers sit in `<name>.rows.ts` (R36, R68). SQL writes only its own
+capability's tables and reads only tables of owners it may import, and every multi-row read is bounded (R86, R69, R77).
 
 ### 5.4 Errors, logging, filters (R37 to R40)
 
-One error profile. `platform/errors` owns `DomainError` (stable UPPER_SNAKE `code`, `cause`), one HTTP
-`ExceptionFilter`, one GraphQL `formatError`, the code to status table the transport owns, and masking of undeclared
-errors (a 500 with a generic message, detail only in the log). Each capability declares its errors in `errors/`.
-Expected outcomes (refused, pending) are typed unions, not exceptions. A domain never throws a platform error
-(`EnvError`, `PersistenceError`); repositories translate driver errors into capability errors. `platform/logging`
-(`Logger` port, enum identity, structured payload) is mandatory; `console.*` and the Nest logger are forbidden. Each
-app registers exactly one filter through `APP_FILTER`. Every `catch` logs, rethrows or returns a typed outcome that
-carries the cause; an empty `catch {}` is forbidden.
+One error profile. `platform/errors` owns `DomainError`, the closed `ErrorKind`, the one kind-to-HTTP table, one REST
+`ExceptionFilter` and one GraphQL `formatError` (HTTP 200 with `extensions.{code,kind}`), and masks undeclared errors (`INTERNAL`
+and a generic message, detail only in the log). Each capability owns `errors/<c>.error.ts`: a code enum
+(`<CAPABILITY>_<WHAT>`), an exhaustive `Record<Code, ErrorKind>` table and one error class. Expected refusals are
+`Outcome<Value, Code>` values, returned; the transport turns one into the error with `unwrapOutcome`. A domain never
+throws a platform error. Display text is resolved by code through the message catalog (R78). `platform/logging` (the
+`Logger` port through `InjectLogger()`, enum identities from `<owner>.log-events.ts`, JSON lines) is mandatory;
+`console.*`, the Nest logger and `winston` outside it are forbidden. Each app registers exactly one filter through
+`APP_FILTER`. Every `catch` logs, rethrows or returns an outcome that carries the cause; an empty `catch {}` is forbidden.
 
 ### 5.5 Default deny (R41, R42)
 
-`domain/identity` exports `AuthGuard`, `@Public({ reason: PublicReason.X })` and `@Roles()`. Every api app registers
-`APP_GUARD`, and that chain is the only authentication and authorization: no `@UseGuards`. A public operation carries
-`@Public({ reason: PublicReason.X })` with a member of the closed `PublicReason` enum of `domain/identity` (auth, signed
-webhook, health); a string or another enum is refused. Webhooks use the shared signature verifier and compare secrets with
-`timingSafeEqual`. No `@Body() x: unknown`, no `GraphQLJSON` parameter, no `switch (input.operation)` in transport. Every
-property of an input class carries the validators its type calls for (a string `@MaxLength`, an enum `@IsEnum`, an array
-`@ArrayMaxSize`, a nested object `@ValidateNested()` with `@Type`), and pagination is by cursor only: no `skip`, `offset`,
-`OFFSET` or page number. GraphQL has depth and complexity limits, and the auth and webhook doors are rate limited.
+`domain/identity` exports `AuthGuard`, `@Public({ reason: PublicReason.X })`, `@Roles()` and `@CurrentPrincipal()`. Every api
+app registers `APP_GUARD` throttler, then the CSRF origin guard, then `AuthGuard`, and that chain is the only authentication
+and authorization: no `@UseGuards`. A public operation carries `@Public({ reason: PublicReason.X })` with a member of the
+closed `PublicReason` enum of `domain/identity` (`Health`, `AuthHandshake`, `SignedWebhook`, `CatalogRead`); a string or
+another enum is refused. Webhooks use the shared signature verifier and compare secrets with `timingSafeEqual`. No
+`@Body() x: unknown`, no `GraphQLJSON`, no `switch (input.operation)` in transport. The global `ValidationPipe` whitelists and
+forbids unknown fields, every property of an input class carries the validators its type calls for (a string `@MaxLength`,
+an enum `@IsEnum`, an array `@ArrayMaxSize`, a nested object `@ValidateNested()` with `@Type`), and pagination is by cursor
+only: no `skip`, `offset`, `OFFSET` or page number. GraphQL has depth and complexity limits, and the auth and webhook
+doors are strictly rate limited.
 
 ### 5.6 Configuration and secrets (R43, R44)
 
-Only the file of `platform/config` that declares `EnvSource` (which also resolves `*_FILE`) touches `process.env`. Each
-capability and provider has `<name>.config.ts` (`parse<Name>Config(env: EnvSource): <Name>Options`) and
-`<name>.options.ts`. `main.ts` reads the environment once and passes options to `AppModule.register(options)`; modules
-receive options through DI. A value typed `Secret` or `Url` by `platform/config` has no default of any kind (no default
-argument, no `??` or `||` fallback, no `""`, `localhost` or `http://` literal); a missing value stops boot with an error
-that names the key. There is one config path: no `@nestjs/config`, `dotenv` or `envConfig()`. No `process.cwd()` joined
+Only the file of `platform/config` that declares `EnvSource` (which also resolves `<KEY>_FILE`, and its typed readers)
+touches `process.env`. Each capability and provider has `<name>.config.ts` (`parse<C>Config(env: EnvSource): <C>Options`, or
+`<C>Options | null` for an optional integration) and `<name>.options.ts`. `main.ts` builds `EnvSource` once and passes options
+to `AppModule.register(options)`; classes read them with `Inject<C>Options()`. `envConfig()`, `ConfigService`,
+`@nestjs/config` and dotenv preloaders do not exist. A value typed `Secret` or `Url` by `platform/config` has no default of
+any kind (no default argument, no `??` or `||` fallback, no `""`, `localhost` or `http://` literal): a secret, credential,
+host, URL, remote port, bucket or database name has no default, and an optional integration is all-or-nothing: none of its
+keys set gives `null`, some set stops boot naming the missing keys. No `process.cwd()` joined
 with `src` or `.starcistacks`.
 
 ### 5.7 Background work (R46)
 
-Background work is a transport. `transport/schedule/<job>.job.ts` (cron, sweep, outbox publisher) and
-`transport/message/<event>.consumer.ts` (queue) call use cases exactly as a controller does. Mechanisms live in
-`platform/scheduling` and `platform/messaging`. Only an app of kind `worker` composes them; an api app never runs
-cron. A method named `sweep*`, `deliver*`, `reconcile*` or `retry*` that no job or consumer calls is a failure.
+Background work is a transport. `transport/schedule/<job>.job.ts` (a `ScheduledJob` with `run(at)`) and
+`transport/message/<event>.consumer.ts` dispatch one command exactly as a resolver does. Mechanisms live in
+`platform/scheduling` and `platform/messaging` (adapters over the queue and stream libraries, with lease and fencing).
+Only an app of kind `worker` composes them; an api app never runs cron. A method named `sweep*`, `deliver*`,
+`reconcile*`, `retry*` or `relay*` that no job or consumer calls is a failure. Producers publish through typed queues, and
+a publish that must be atomic with a write goes through the outbox inside the transaction.
 
-### 5.8 Modules and features (R29 to R33, R45)
+### 5.8 Modules, features and injection (R29 to R33, R45, R85, R87, R88)
 
-A feature root holds `index.ts`, `<feature>.module.ts`, `application/` and `transport/<protocol>/` only. `application/`
-has no protocol-named folder. Each transport has exactly one Nest module `<feature>-<protocol>.module.ts`, plus one
-application module; never one module per operation. `@Global()` appears nowhere and `isGlobal: true` only in an app's
-`app.module.ts`; a module never lists another owner's module in `imports`; `ConfigurableModuleBuilder<Options>` always
-carries a real options type; `register` is the one factory and is `static`; no module-level `let`; no `new` of an
-`@Injectable`. Every feature and every transport module is composed by at least one app. Apps hold only
-`main.ts`, `app.module.ts`, `<app>.options.ts` and the composition spec. Entrypoints (`main.ts`, `bootstrap()`,
-top-level `void x()`) exist only in `apps/*/src`.
+A feature root holds `index.ts`, `<feature>.module.ts`, `application/`, `transport/<protocol>/` and, when it has copy,
+`messages/` only. `application/` holds commands, queries, handlers and contracts: each message is a typed
+`Command<R>`/`Query<R>` carrying one `params` (`ExecuteParams<T>` or `PublicExecuteParams<T>`), each handler
+`extends ICQRSHandler` and overrides `process`; there is no use-case class, forwarder service or in-process event (R87).
+A transport injects only the command or query bus, dispatches exactly one message, returns no envelope and takes no
+`GraphQLJSON` (R88). Each transport has exactly one Nest module `<feature>-<protocol>.module.ts`, plus one application
+module; never one module per operation.
 
-### 5.9 Query, transport and runtime safety (R68 to R77)
+A capability module is `@Module` extending `ConfigurableModuleClass` from a typed `ConfigurableModuleBuilder<Options>`, and
+its only registration method is `register`. Each capability has one representative module, registered exactly once per app
+in `apps/<app>/src/app.module.ts` as `X.register({ isGlobal: true, ...options.x })`; it may import its own sub-modules as
+plain imports. No module imports another capability's representative module; other capabilities reach it through its
+injectors. `isGlobal: true` appears only at an app root and `@Global()` nowhere (R45).
+
+Every infrastructure dependency arrives through a zero-argument `Inject<Thing>()` exported from its owner's
+`<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(`, `ModuleRef`, `forwardRef` and property injection do
+not exist (R85). Every feature and every transport module is composed by at least one app. Apps hold only `main.ts`,
+`app.module.ts`, `<app>.options.ts` and the composition spec. Entrypoints exist only in `apps/*/src` (R33).
+
+### 5.9 Query, transport and runtime safety (R68 to R77, R89, R90)
 
 A statement is text plus numbered parameters; a runtime value never becomes part of the text (R68). A list read states its
 bound, and a caller that needs every row pages by keyset instead of truncating (R69); a read never runs once per element of a
-loop, the keys are read once (R77). Every outbound HTTP call carries a
-timeout or an abort signal (R70). A logger call names no credential and no personal identifier (R71). `as never` and `x!`
-are not used (R72). An `async` function awaits (R73). A migration's `down()` reverses its `up()` (R74). A handler and a
-public method of an Injectable, Resolver or Controller declare their return type (R75). `JSON.parse` of outside text sits
-inside a `try` (R76). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`; the input classes of R42 carry a
-`class-validator` decorators its types call for (`input-bounded`).
+loop, the keys are read once (R77). Every outbound HTTP call goes through `platform/http` whose `timeoutMs` is required
+(R70). A logger call names no credential and no personal identifier (R71). No type escape exists anywhere, specs included:
+`as X`, `as never`, `x!`, `any` (R72). An `async` function awaits (R73). A migration's `down()` reverses its `up()` (R74). A
+handler and a public method of an Injectable, Resolver or Controller declare their return type (R75). `JSON.parse` of
+outside text sits inside a `try` (R76). Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date,
+config, events) is imported only by its one owning platform or integration capability (R90). Each has an `eslint-be`
+enforcer in `@starci/eslint-canon-be`; the input classes of R42 carry the `class-validator` decorators their types call for
+(`input-bounded`).
 
 ### 5.10 Copy, time, delivery and transactions (R78 to R82)
 
-Text a user reads - an exception's message, a notification's subject or body, a response's `message` or
-`description` - comes from a per-capability `messages` catalog (Vietnamese and English) through the typed
-`platform/i18n` `MessageCatalog` port, never a literal in source (R78). The catalog lookup takes an explicit
-locale: `platform/i18n`'s `RequestLocale` provider resolves it inside a request (the authenticated user's stored
-preference, else the first of `vi`/`en` named in `Accept-Language`, else `vi`) and a job resolves it from the
-message's recipient (their stored preference, else `vi`) - never a call-site guess (knowledge/patterns/be/
-messages.yaml). The ambient clock (`Date.now()`, a bare `new Date()`, `performance.now()`) is read only inside
-`platform/clock`; business code asks the injected `Clock` port, so a spec can drive time with a `FakeClock` (R79).
-Delivery that can repeat - a webhook a sender resends, an outbox or queue redelivering a message - is claimed
-through a shared inbox (`inbox_claims`, unique on `(source, event id)`, owned by `platform/inbox`) keyed by
-`(source, event id)` before it acts, so a repeat is a no-op; a consumer is recognized by a decorated handler
-(`@EventPattern`, `@MessagePattern`, `@OnEvent`, `@Process`) or a `*Consumer`/`*OutboxConsumer` class name as well
-as the `<event>.consumer.ts` filename, and an outbox producer that only publishes is not asked for a claim (R80).
-A loop that catches an error and waits before trying again goes through the shared `platform/retry` helper
-(bounded attempts, exponential backoff with jitter, an abort signal), never a loop written at the call site (R81).
-No transaction spans an external call: commit first and call out after, or write an outbox message inside the
-transaction (R82). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`.
-
-The database is reached through the shared `EntityManager`, injected by a named injector (`InjectPrimaryEntityManager()`,
-`InjectAgentOsEntityManager()`, `InjectExpertAcademyEntityManager()` or `@InjectEntityManager(<CONNECTION_TOKEN>)`) and
-called directly. A bare `@InjectEntityManager()`, `.getRepository(...)`, `@InjectRepository(...)`, `Repository<T>` and an
-injected `DataSource` are refused; only the platform database module and `apps/migrate` hold a `DataSource` (R83).
+Text a user reads - an error's display text, a notification's subject or body, a response's `message` or `description` -
+comes from the owner's `messages/<owner>.messages.ts` catalog (Vietnamese and English) through the typed `MessageCatalog`
+port and `InjectMessageCatalog()`, never a literal in source (R78). The catalog lookup takes an explicit locale:
+`platform/i18n`'s `RequestLocale` (`InjectRequestLocale()`) resolves it inside a request (the authenticated user's stored
+preference, else the first of `vi`/`en` named in `Accept-Language`, else `vi`) and a job resolves it from the message's
+recipient (their stored preference, else `vi`) - never a call-site guess (knowledge/patterns/be/messages.yaml). The ambient
+clock (`Date.now`, a bare `new Date()`, `performance.now`, `process.hrtime`) is read only inside `platform/clock`; business
+code takes the injected `Clock` (`InjectClock()`), so a spec can drive time with a `FakeClock` (R79). Delivery that can
+repeat - a signed webhook a sender resends, a queue redelivering a message - is claimed through the shared inbox
+(`InjectInbox()`, table `inbox_claims`, unique on `(source, event id)`, owned by `platform/inbox`): the first awaited
+expression of a consumer or signed-webhook handler is `inbox.claim(source, eventId)` on a receiver typed `Inbox`, and a
+`false` answer returns without effect (R80). A loop that catches an error and waits before trying again goes through
+`platform/retry` (bounded attempts, exponential backoff with jitter, an abort signal), never a loop written at the call
+site (R81). No transaction spans an external call: commit first and call out after, or enqueue an outbox message inside
+the transaction (R82). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`.
 
 ## 6. Frontend
 
