@@ -464,8 +464,9 @@ export function checkHfs(config) {
     }
     const testChildren = slotTestChildren(resolver);
     for (const child of tree.children('src/tests').sort()) {
-      if (!testChildren.has(child)) {
-        finding('HFS_SRC_LAYOUT_INVALID', `src/tests/${child}`, `Backend src/tests/ holds only ${[...testChildren].join(', ')}; ${child} must move.`);
+      // A file directly below src/tests/ that a slot owns (src/tests/tsconfig.json, be.tool-config) is that slot's, not a stray folder.
+      if (!testChildren.has(child) && resolver.classifyPath(`src/tests/${child}`).status !== 'owned') {
+        finding('HFS_SRC_LAYOUT_INVALID', `src/tests/${child}`, `Backend src/tests/ holds only ${[...testChildren].join(', ')} and the files a slot owns there; ${child} must move.`);
       }
     }
   }
