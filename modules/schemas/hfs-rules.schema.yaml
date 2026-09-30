@@ -2,7 +2,7 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: urn:starci:hfs-rules:1
 title: HFS rule catalog
 description: >-
-  The shape of knowledge/hfs/rules.yaml. Semantic rules JSON Schema cannot state (ids R01..R<n> in order, a failure code
+  The shape of knowledge/hfs/rules.yaml. Semantic rules JSON Schema cannot state (ids increasing, a retired id never reused, a failure code
   named by one rule only, the first failure code is the rule's own code, an existing non-eslint enforcer names its file,
   every rule runs at land, a pre-commit rule also runs at pre-push, the sonar gate needs a sonar enforcer) are checked by
   scripts/lib/hfs-slots.mjs loadRuleCatalog. Whether the named eslint rules, files and catalog entries exist is

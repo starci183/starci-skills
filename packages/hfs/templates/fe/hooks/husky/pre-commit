@@ -1,5 +1,5 @@
 {{header}}
-# Commit gate: types, lint and format of the staged files, the unit specs the staged files touch. Never e2e.
+# Commit gate: types, lint and format of the staged files.
 npm run typecheck
 sources=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' '*.mts' '*.cts' '*.js' '*.jsx' '*.mjs' '*.cjs' || true)
 if [ -n "$sources" ]; then
@@ -12,8 +12,4 @@ fi
 formatted=$(git diff --cached --name-only --diff-filter=ACMR || true)
 if [ -n "$formatted" ]; then
   npx prettier --check --ignore-unknown $formatted
-fi
-specs=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' | grep -v -E '(^|/)e2e/|\.e2e-spec\.ts$' || true)
-if [ -n "$specs" ]; then
-  npx vitest related --run --passWithNoTests $specs
 fi

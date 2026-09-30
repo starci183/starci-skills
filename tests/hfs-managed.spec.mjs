@@ -150,16 +150,16 @@ test('a front end: HFS_RULE_OFF_WITHOUT_REPLACEMENT is any edit of eslint.config
   assert.deepEqual(await findings(clean), []);
 });
 
-test('a front end: HFS_TS_STRICT judges the root tsconfig.json by flag (another preset, a compiler option, an alias, a dropped e2e exclusion); the render and a formatting-only change are clean or drift', async () => {
+test('a front end: HFS_TS_STRICT judges the root tsconfig.json by flag (another preset, a compiler option, an alias, an added exclude); the render and a formatting-only change are clean or drift', async () => {
   const dir = await synced(FE);
   const tsconfig = JSON.parse(read(dir, 'tsconfig.json'));
-  assert.deepEqual(tsconfig.exclude, ['node_modules', 'e2e', 'playwright.config.ts']);
+  assert.deepEqual(tsconfig.exclude, ['node_modules']);
   const flags = (actual) => tsStrictFindings(JSON.stringify(actual), renderTargets(FE, PRESETS.fe).find((target) => target.path === 'tsconfig.json').content).map((finding) => finding.flag);
   assert.deepEqual(flags(tsconfig), []);
   assert.deepEqual(flags({ ...tsconfig, extends: '@starci/tsconfig/base.json' }), ['extends']);
   assert.deepEqual(flags({ ...tsconfig, compilerOptions: { strict: false, jsx: 'preserve' } }).sort(), ['jsx', 'strict']);
   assert.deepEqual(flags({ ...tsconfig, compilerOptions: { paths: { '@/*': ['./src/*'] } } }), ['paths'], 'the root config has no alias: each app declares its own in apps/<app>/tsconfig.json');
-  assert.deepEqual(flags({ ...tsconfig, exclude: ['node_modules'] }), ['exclude'], 'the e2e tree is excluded, so the default typecheck never includes it');
+  assert.deepEqual(flags({ ...tsconfig, exclude: ['node_modules', 'e2e'] }), ['exclude'], 'a front end narrows its program with nothing: there is no e2e tree to exclude');
   assert.deepEqual(flags({ ...tsconfig, include: ['**/*'] }), ['include']);
   put(dir, 'tsconfig.json', JSON.stringify({ ...tsconfig, compilerOptions: { noUncheckedIndexedAccess: false } }));
   assert.deepEqual(await findings(dir), [['HFS_TS_STRICT', 'tsconfig.json']]);
@@ -167,17 +167,14 @@ test('a front end: HFS_TS_STRICT judges the root tsconfig.json by flag (another 
   assert.deepEqual(await findings(dir), [['HFS_MANAGED_FILE_DRIFT', 'tsconfig.json']], 'same content, other bytes');
 });
 
-test('a front end: HFS_MANAGED_FILE_DRIFT is an edited vitest.config.ts, tsconfig.e2e.json, .prettierrc, .prettierignore, hook or scripts block; an app-level vitest.config.ts, key order and the rest of package.json are not', async () => {
+test('a front end: HFS_MANAGED_FILE_DRIFT is an edited .prettierrc, .prettierignore, hook or scripts block; key order and the rest of package.json are not', async () => {
   const dir = await synced(FE);
-  put(dir, 'vitest.config.ts', 'export default {}\n');
-  put(dir, 'tsconfig.e2e.json', '{}\n');
   put(dir, '.prettierrc', '{ "semi": false }\n');
   put(dir, '.prettierignore', 'dist/\n');
   const pkg = JSON.parse(read(dir, 'package.json'));
   put(dir, 'package.json', JSON.stringify({ ...pkg, scripts: { ...pkg.scripts, 'lint:e2e': 'eslint e2e' } }));
-  assert.deepEqual((await findings(dir)).sort(), [['HFS_MANAGED_FILE_DRIFT', '.prettierignore'], ['HFS_MANAGED_FILE_DRIFT', '.prettierrc'], ['HFS_MANAGED_FILE_DRIFT', 'package.json'], ['HFS_MANAGED_FILE_DRIFT', 'tsconfig.e2e.json'], ['HFS_MANAGED_FILE_DRIFT', 'vitest.config.ts']]);
+  assert.deepEqual((await findings(dir)).sort(), [['HFS_MANAGED_FILE_DRIFT', '.prettierignore'], ['HFS_MANAGED_FILE_DRIFT', '.prettierrc'], ['HFS_MANAGED_FILE_DRIFT', 'package.json']]);
   const fine = await synced(FE);
-  put(fine, 'apps/web/vitest.config.ts', 'export default {}\n');
   const parsed = JSON.parse(read(fine, 'package.json'));
   put(fine, 'package.json', JSON.stringify({ ...parsed, name: 'renamed', workspaces: ['apps/*'], devDependencies: { a: '1' }, scripts: Object.fromEntries(Object.entries(parsed.scripts).reverse()) }));
   assert.deepEqual(await findings(fine), []);
@@ -206,9 +203,9 @@ test('a front end: plain tool commands, a createPlugin that is not stylelint and
   assert.deepEqual(await findings(dir), []);
 });
 
-test('a front end: the forbidden tool files (.eslintrc, a second eslint or stylelint config, prettier or vitest or jest configs, lint-staged) are HFS_TOOL_CONFIG_LOCAL through their slot, the managed and repository-owned ones are not', () => {
+test('a front end: the forbidden tool files (.eslintrc, a second eslint or stylelint config, prettier configs, lint-staged) are HFS_TOOL_CONFIG_LOCAL through their slot, the managed and repository-owned ones are not', () => {
   const at = (files) => checkRepo({ repoRoot: os.tmpdir(), declaration: { ...FE }, files, tree: false }).findings.filter((finding) => finding.code === 'HFS_TOOL_CONFIG_LOCAL' || finding.code === 'HFS_FORBIDDEN_PRESENT' || finding.code === 'HFS_PLAINTEXT_SECRET').map((finding) => [finding.code, finding.path]);
-  const forbidden = ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', '.stylelintignore', 'stylelint.config.cjs', '.prettierrc.json', 'prettier.config.js', 'vitest.config.mjs', 'jest.config.js', '.lintstagedrc.json', 'lint-staged.config.mjs'];
+  const forbidden = ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', '.stylelintignore', 'stylelint.config.cjs', '.prettierrc.json', 'prettier.config.js', '.lintstagedrc.json', 'lint-staged.config.mjs'];
   assert.deepEqual(at(forbidden).sort(), forbidden.map((file) => ['HFS_TOOL_CONFIG_LOCAL', file]).sort());
-  assert.deepEqual(at(['eslint.config.mjs', 'stylelint.config.mjs', 'vitest.config.ts', 'vitest.setup.ts', 'playwright.config.ts', '.prettierrc', '.prettierignore', 'apps/web/vitest.config.ts', 'apps/web/tsconfig.json']), []);
+  assert.deepEqual(at(['eslint.config.mjs', 'stylelint.config.mjs', 'turbo.json', '.prettierrc', '.prettierignore', 'apps/web/tsconfig.json']), []);
 });

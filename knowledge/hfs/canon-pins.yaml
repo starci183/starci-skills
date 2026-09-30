@@ -24,7 +24,7 @@ pins:
     source: packages/eslint/be/package.json
     why: 'back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.7.0: the round-3 catch-up landed the nest code-pattern profile''s version and content digest, left unbumped when R78-R82 landed, plus the inbox-dedupe-required shape-detection fix; 1.7.0 adds named-entity-manager-only (R83); 1.7.1 reads the slot manifest from the installed @starci/hfs runtime copy instead of the product repository. 1.8.0 (hotfix off 1.7.1): sql-text-only replaces sql-only-in-repository (raw SQL only in <name>.sql.ts) and no-repository-file refuses *.repository.ts.'
   '@starci/eslint-canon-fe':
-    version: 6.0.2
+    version: 7.0.0
     group: starci
     install: registry
     side: fe
@@ -56,18 +56,6 @@ pins:
     side: be
     source: packages/jest-preset/package.json
     why: gains the FakeClock test double (./clock) for the platform/clock Clock port, used by the R79 no-ambient-clock migration.
-  '@starci/vitest-preset':
-    version: 1.0.0
-    group: starci
-    install: registry
-    side: fe
-    source: packages/vitest-preset/package.json
-  '@starci/playwright-preset':
-    version: 1.0.0
-    group: starci
-    install: registry
-    side: fe
-    source: packages/playwright-preset/package.json
   '@starci/hfs':
     version: 1.0.1
     group: starci
@@ -124,36 +112,6 @@ pins:
     version: 29.5.14
     group: test
     side: be
-  vitest:
-    version: 3.2.7
-    group: test
-    side: fe
-  '@vitest/coverage-v8':
-    version: 3.2.7
-    group: test
-    side: fe
-  '@playwright/test':
-    version: 1.63.0
-    group: test
-    side: fe
-    why: nivo-fe pins 1.51.1 and starci-next-fe 1.63.0; the newer wins and the viewport projects need no older API.
-  jsdom:
-    version: 29.1.1
-    group: test
-    side: fe
-  '@vitejs/plugin-react':
-    version: 5.2.0
-    group: test
-    side: fe
-  '@testing-library/react':
-    version: 16.3.3
-    group: test
-    side: fe
-    why: nivo-fe resolves 16.3.2, the other two 16.3.3.
-  '@testing-library/jest-dom':
-    version: 7.0.1
-    group: test
-    side: fe
   # --- framework
   next:
     version: 16.1.6

@@ -617,12 +617,11 @@ rules:
       - {kind: hfs, id: i18n-placement, at: scripts/lib/hfs-rules/frontend.mjs}
   - id: R60
     code: "FE_I18N_CATALOG"
-    law: "Same keys in every catalog, real catalog in specs, `pick` for clients."
+    law: "Same keys in every catalog, `pick` for clients."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["FE_I18N_CATALOG"]
     enforcers:
-      - {kind: eslint-fe, id: no-mocked-translations}
       - {kind: hfs, id: i18n-catalog, at: scripts/lib/hfs-rules/frontend.mjs}
   - id: R61
     code: "FE_STYLE_TOKEN_ONLY"
@@ -694,33 +693,6 @@ rules:
       - {kind: eslint-fe, id: effect-subscription-needs-cleanup}
       - {kind: eslint-fe, id: no-empty-catch}
       - {kind: eslint-fe, id: no-console}
-  - id: R66
-    code: "FE_E2E_SHAPE"
-    law: "Playwright shape, three viewports, no environment coupling."
-    kinds: [lint, codemod]
-    gates: [land, ci]
-    failureCodes: ["FE_E2E_SHAPE"]
-    enforcers:
-      - {kind: eslint-fe, id: e2e-spec-location}
-      - {kind: eslint-fe, id: e2e-no-absolute-path}
-      - {kind: eslint-fe, id: e2e-no-docker}
-      - {kind: eslint-fe, id: e2e-no-cross-repo-write}
-      - {kind: eslint-fe, id: e2e-no-skip}
-      - {kind: eslint-fe, id: e2e-typed-helpers}
-      - {kind: eslint-fe, id: playwright-viewports}
-  - id: R67
-    code: "FE_SPEC_QUALITY"
-    law: "No class pinning, no barrel specs, axe per connected screen."
-    kinds: [lint, design]
-    gates: [settle, land, ci]
-    failureCodes: ["FE_SPEC_QUALITY"]
-    enforcers:
-      - {kind: eslint-fe, id: no-class-string-in-spec}
-      - {kind: eslint-fe, id: spec-tests-its-neighbour}
-      - {kind: eslint-fe, id: no-barrel-spec}
-      - {kind: eslint-fe, id: no-double-cast-in-spec}
-      - {kind: eslint-fe, id: connected-spec-has-axe}
-      - {kind: eslint-fe, id: unit-test-colocated}
   - id: R68
     code: "BE_SQL_INTERPOLATED"
     law: "SQL text carries no runtime substitution; values are numbered parameters."
@@ -1032,3 +1004,11 @@ rules:
     failureCodes: ["HFS_DOC_NOT_ENGLISH"]
     enforcers:
       - {kind: machine, id: doc-language, at: scripts/checks/architecture/doc-language.mjs}
+  - id: R97
+    code: "FE_NO_TESTS"
+    law: "A front-end repository has no tests by standard: no `*.spec.*`, `*.test.*` or `*-spec.*` file, no `e2e/` or `__tests__/` directory, no vitest, Playwright, jest or Cypress configuration or setup file, no test script, and no test-runner, test-environment, testing-library or axe dependency in any `package.json`; there is no exception, `scripts/` included."
+    kinds: [check]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["FE_NO_TESTS"]
+    enforcers:
+      - {kind: hfs, id: fe-no-tests, at: scripts/lib/hfs-rules/fe-no-tests.mjs}

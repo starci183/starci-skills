@@ -7,11 +7,10 @@ import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '..
 import { renderTargets, writeTargets } from '../packages/hfs/sync/index.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index.cjs');
-const vitestPreset = await import('../packages/vitest-preset/index.mjs');
-/** The coverage denominators `hfs sync` would load from the preset a repository installs, per profile. */
+/** The coverage denominators `hfs sync` would load from the preset a repository installs, per profile (a front end has no test runner, so none). */
 export const PRESETS = {
   be: { sonarExclusions: jestPreset.sonarExclusions() },
-  fe: { sonarExclusions: vitestPreset.sonarExclusions() },
+  fe: null,
 };
 
 export const BE = { hfs: 1, profile: 'be', project: 'demo', apps: [{ name: 'core', kind: 'api' }] };
@@ -97,10 +96,8 @@ export function cleanup(dirs) {
   for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });
 }
 
-/** Installs the coverage presets `hfs sync` and `hfs check` load from the checked repository (a fresh process has no injected presets), without tracking them. */
+/** Installs the coverage preset `hfs sync` and `hfs check` load from a checked back-end repository (a fresh process has no injected presets), without tracking it. */
 export function installPresets(dir) {
-  for (const name of ['jest-preset', 'vitest-preset']) {
-    fs.cpSync(path.resolve(import.meta.dirname, '..', 'packages', name), path.join(dir, 'node_modules', '@starci', name), { recursive: true });
-  }
+  fs.cpSync(path.resolve(import.meta.dirname, '..', 'packages', 'jest-preset'), path.join(dir, 'node_modules', '@starci', 'jest-preset'), { recursive: true });
   return dir;
 }

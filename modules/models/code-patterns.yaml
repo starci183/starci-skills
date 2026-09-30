@@ -620,12 +620,6 @@ profiles:
       - FE-NAMING-5
       - FE-NAMING-6
       - FE-NAMING-7
-      - FE-TEST-1
-      - FE-TEST-2
-      - FE-TEST-3
-      - FE-TEST-4
-      - FE-TEST-5
-      - FE-TEST-6
       - FE-TYPING-1
       - FE-TYPING-2
       - FE-TYPING-3
@@ -665,7 +659,7 @@ profiles:
         status: implemented
       - id: NEXT-DEPENDENCY-DIRECTION
         sourceRuleIds: [FE-ARCHITECTURE-2, FE-ARCHITECTURE-4, FE-FOLDER-1, FE-FOLDER-4, FE-IMPORTS-1, FE-IMPORTS-3, FE-IMPORTS-4]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.{ts,tsx}', '**/*-spec.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*-test.{ts,tsx}', '**/__tests__/**', 'test/**', 'tests/**'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
           requirement: Resolve real routes, tiers, transports, aliases and package exports before enforcing inward/downward dependencies.
           check:
@@ -691,7 +685,7 @@ profiles:
         status: implemented
       - id: NEXT-COMMENT-SOURCE-HYGIENE
         sourceRuleIds: [FE-COMMENT-1, FE-COMMENT-5]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.spec.ts', '**/*.spec.tsx'] }
+        applicability: { include: ['**/*.{ts,tsx}'] }
         mechanical:
           requirement: Require export docs and reject second-language, emoji and inline lint configuration in source/path.
           check:
@@ -719,7 +713,7 @@ profiles:
         status: implemented
       - id: NEXT-PRESENTATION-API
         sourceRuleIds: [FE-FUNCTION-2, FE-FUNCTION-3, FE-NAMING-2, FE-NAMING-6]
-        applicability: { include: ['**/*.tsx'], exclude: ['**/*.spec.tsx'] }
+        applicability: { include: ['**/*.tsx'] }
         mechanical:
           requirement: Keep public props explicit, actions conventionally named and CSS/frame ownership out of public component contracts.
           check:
@@ -790,23 +784,9 @@ profiles:
           guidance: knowledge/patterns/fe/typing.yaml
           review: Type ownership and runtime wire mapping remain distinct from syntax.
         status: implemented
-      - id: NEXT-TEST-COLLOCATION
-        sourceRuleIds: [FE-TEST-1]
-        applicability: { include: ['**/*.{ts,tsx}'] }
-        mechanical:
-          requirement: Behavior specs are colocated with their subject under the selected source layout.
-          check:
-            kind: eslint
-            sourceOnly: true
-            ruleIds: [starci-fe/unit-test-colocated]
-            expected: { severity: error }
-        semantic:
-          guidance: knowledge/patterns/fe/test.yaml
-          review: Test selection follows behavior/risk, never missing-file count alone.
-        status: implemented
       - id: NEXT-OWNER-PUBLIC-ENTRY
         sourceRuleIds: [FE-ARCHITECTURE-4, FE-ARCHITECTURE-5, FE-FOLDER-4, FE-IMPORTS-1, FE-IMPORTS-4, FE-IMPORTS-6, FE-IMPORTS-7]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.spec.{ts,tsx}', '**/*-spec.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*-test.{ts,tsx}', '**/__tests__/**'] }
+        applicability: { include: ['**/*.{ts,tsx}'] }
         mechanical:
           requirement: Cross-owner same-source imports use explicit named public entries and those entries do not export-star.
           check:
@@ -819,7 +799,7 @@ profiles:
         status: implemented
       - id: NEXT-GRAMMAR-CONTRACT
         sourceRuleIds: [FE-FOLDER-5, FE-IMPORTS-1, FE-IMPORTS-5, FE-IMPORTS-7]
-        applicability: { include: ['**/*.{ts,tsx}', 'package.json', 'packages/grammar/package.json'], exclude: ['**/*.spec.{ts,tsx}', '**/*-spec.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*-test.{ts,tsx}', '**/__tests__/**'] }
+        applicability: { include: ['**/*.{ts,tsx}', 'package.json', 'packages/grammar/package.json'] }
         mechanical:
           requirement: Product imports resolve through selected installed Grammar exports and the declared peer/style family matches that package.
           check:
@@ -832,7 +812,7 @@ profiles:
         status: implemented
       - id: NEXT-CONDITIONAL-RENDER-BOUNDARY
         sourceRuleIds: [FE-ARCHITECTURE-3, FE-FUNCTION-4]
-        applicability: { include: ['**/*.tsx'], exclude: ['**/*.spec.tsx'] }
+        applicability: { include: ['**/*.tsx'] }
         mechanical:
           requirement: A product-world owner uses an explicit resolved render boundary; intrinsic-only client state does not require a Base twin.
           check:
@@ -845,7 +825,7 @@ profiles:
         status: implemented
       - id: NEXT-SOURCE-LAYOUT-AND-HOOK-OWNERSHIP
         sourceRuleIds: [FE-FOLDER-1, FE-FOLDER-2, FE-ARCHITECTURE-1, FE-ARCHITECTURE-2, FE-ARCHITECTURE-3, FE-IMPORTS-3, FE-IMPORTS-4, FE-FUNCTION-4, FE-FUNCTION-6]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.{spec,test}.tsx', '**/*.{spec,test}.ts', '**/*-{spec,test}.{ts,tsx}', '**/__tests__/**', 'test/**', 'tests/**'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
           requirement: Enforce features/pages-layouts-overlays, shared component tiers, centralized custom hooks, app-to-feature-only internal imports, thin framework-pinned source-root adapters (knowledge/patterns/fe/folder.yaml frameworkPinnedRootFiles) and a sibling render file for connected blocks.
           check:
@@ -858,7 +838,7 @@ profiles:
         status: implemented
       - id: NEXT-ERROR-STATE-MAPPING
         sourceRuleIds: [FE-ERROR-1, FE-ERROR-2, FE-ERROR-4]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', 'test/**', 'tests/**'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
           requirement: Bind declared world failure to closed render state, selected envelope unwrapping, action feedback ownership and installed Next recovery boundaries across the selected production programs.
           check: { kind: script, sourceOnly: true, ruleIds: [FE_ERROR_WORLD_STATE_MAPPING, FE_ERROR_ENVELOPE_POLICY, FE_WRITE_FEEDBACK_OWNER, FE_NEXT_ERROR_BOUNDARY_LOCATION] }
@@ -868,7 +848,7 @@ profiles:
         status: implemented
       - id: NEXT-REQUIRED-VALUE-FAILURE
         sourceRuleIds: [FE-ERROR-3]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', 'test/**', 'tests/**'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
           requirement: Once an owner declares a required payload or context value, its absent-value path terminates with an actual Error before unsafe continuation.
           check: { kind: script, sourceOnly: true, ruleIds: [FE_REQUIRED_VALUE_FAILURE] }
@@ -888,7 +868,7 @@ profiles:
         status: implemented
       - id: NEXT-DATA-LIFECYCLE-KEYS
         sourceRuleIds: [FE-FUNCTION-6, FE-NAMING-4, FE-TYPING-8]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', 'test/**', 'tests/**'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
           requirement: Selected SWR hooks use null for unavailable inputs, include all result identities in keys and keep mutation identity tied to the resource.
           check:
@@ -901,7 +881,7 @@ profiles:
         status: implemented
       - id: NEXT-READONLY-PROPS-CONTRACT
         sourceRuleIds: [FE-TYPING-2]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
           requirement: Enforce readonly component props and nested collection fields on the explicit public props contract.
           check: { kind: script, ruleIds: [FE_READONLY_PROPS_CONTRACT] }
@@ -911,7 +891,7 @@ profiles:
         status: implemented
       - id: NEXT-RETURN-TYPE-PROFILE
         sourceRuleIds: [FE-TYPING-5]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
           requirement: Enforce the declared return-form profile after the component, hook, async-utility or primitive-helper role is explicitly bound.
           check: { kind: script, ruleIds: [FE_RETURN_TYPE_PROFILE] }
@@ -921,7 +901,7 @@ profiles:
         status: implemented
       - id: NEXT-CLOSED-VOCABULARY-SHAPE
         sourceRuleIds: [FE-TYPING-3, FE-TYPING-7]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
           requirement: Enforce a closed state or mode vocabulary only after its owned inventory and transport mapping are explicitly declared.
           check: { kind: script, ruleIds: [FE_CLOSED_VOCABULARY_SHAPE] }
@@ -931,7 +911,7 @@ profiles:
         status: implemented
       - id: NEXT-SOURCE-NAME-SHAPE
         sourceRuleIds: [FE-NAMING-4, FE-NAMING-5, FE-NAMING-7]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
           requirement: Enforce hook and module basenames plus frozen module-value names without treating framework-reserved exports as product constants (route exports, nextConfig, and the framework-mandated exports of a framework-pinned source-root file listed in knowledge/patterns/fe/folder.yaml frameworkPinnedRootExports).
           check: { kind: script, ruleIds: [FE_SOURCE_NAME_SHAPE] }
@@ -941,7 +921,7 @@ profiles:
         status: implemented
       - id: NEXT-CONTRACT-NAME-SHAPE
         sourceRuleIds: [FE-NAMING-2]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
           requirement: Enforce the adopted public contract and contract-part naming forms.
           check: { kind: script, ruleIds: [FE_CONTRACT_NAME_SHAPE] }
@@ -949,28 +929,8 @@ profiles:
           guidance: knowledge/patterns/fe/naming.yaml
           review: Confirm the named value actually owns a public contract role.
         status: implemented
-      - id: NEXT-SPEC-SUBJECT-AND-DESCRIBE
-        sourceRuleIds: [FE-TEST-4]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
-        mechanical:
-          requirement: Bind each behavior spec to its exact colocated subject and name a real exported subject in the top-level describe; a cross-operation describe whose it-blocks exercise two or more subject exports may name the subject module (file stem or src-relative module path), and a subject with no own static named export may use its file stem or default export local name.
-          check: { kind: script, ruleIds: [FE_SPEC_SUBJECT_AND_DESCRIBE] }
-        semantic:
-          guidance: knowledge/patterns/fe/test.yaml
-          review: Connected and pure test responsibilities apply only when production owns that meaningful split.
-        status: implemented
-      - id: NEXT-SPEC-NO-SNAPSHOT
-        sourceRuleIds: [FE-TEST-5]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
-        mechanical:
-          requirement: Reject snapshot matchers while preserving behavior assertions selected from the subject's real contract.
-          check: { kind: script, ruleIds: [FE_SPEC_NO_SNAPSHOT] }
-        semantic:
-          guidance: knowledge/patterns/fe/test.yaml
-          review: Decide whether an assertion proves behavior rather than copied implementation detail.
-        status: implemented
       - id: NEXT-LEGACY-BLOCK-TWIN-GUARD
-        sourceRuleIds: [FE-ARCHITECTURE-3, FE-FUNCTION-4, FE-TEST-1]
+        sourceRuleIds: [FE-ARCHITECTURE-3, FE-FUNCTION-4]
         applicability: { include: ['src/components/blocks/**/index.tsx'] }
         mechanical:
           requirement: Keep the unconditional filename twin heuristic explicitly disabled; the conditional world-owner architecture check is the replacement.
@@ -992,10 +952,6 @@ profiles:
         sourceRuleIds: [FE-FOLDER-1, FE-FOLDER-6, FE-FUNCTION-2, FE-FUNCTION-3, FE-FUNCTION-5]
         rationale: Cohesion and usefulness of a separate render/helper contract depend on the product responsibility.
         guidance: docs/portable-source-architecture.md
-      - id: NEXT-SPEC-BEHAVIOR-SELECTION
-        sourceRuleIds: [FE-TEST-2, FE-TEST-3, FE-TEST-5, FE-TEST-6]
-        rationale: Connected and pure responsibilities, copied implementation detail, network substitution and Grammar rendering proof depend on the actual product behavior and owned boundary; syntax alone cannot decide them.
-        guidance: knowledge/patterns/fe/test.yaml
       - id: NEXT-IMPORT-ORDER-OBSERVATION
         sourceRuleIds: [FE-IMPORTS-2]
         rationale: The source explicitly records import order as descriptive rather than mandatory.

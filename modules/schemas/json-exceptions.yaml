@@ -43,8 +43,6 @@ exceptions:
   - path: examples/ecommerce-app-be/tsconfig.build.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-be project; tsc reads JSON (with comments).
-  - path: examples/ecommerce-app-be/tsconfig.e2e.json
-    reason: TypeScript project config for the manual typecheck:e2e of the ecommerce-app-be example; tsc expects a JSON tsconfig file.
   - path: examples/ecommerce-app-be/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-be project; tsc reads JSON (with comments).
@@ -63,9 +61,6 @@ exceptions:
   - path: examples/ecommerce-app-fe/hfs.json
     reason: >
       HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the ecommerce-app-fe example; the architecture machine reads hfs.json as JSON.
-  - path: examples/ecommerce-app-fe/e2e/tsconfig.json
-    reason: >
-      TypeScript toolchain config for the ecommerce-app-fe Playwright harness; tsc reads JSON (with comments).
   - path: examples/ecommerce-app-fe/package-lock.json
     reason: >
       npm lockfile inside the ecommerce-app-fe project; npm writes JSON by contract.
@@ -130,8 +125,6 @@ exceptions:
     reason: npm package manifest for the real todo-app-backend example; Node/npm require JSON filename and syntax.
   - path: examples/todo-app-backend/tsconfig.build.json
     reason: TypeScript build project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
-  - path: examples/todo-app-backend/tsconfig.e2e.json
-    reason: TypeScript project config for the manual typecheck:e2e of the todo-app-backend example; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-backend/tsconfig.json
     reason: TypeScript project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-frontend/apps/web/package.json
@@ -151,8 +144,6 @@ exceptions:
     reason: npm lockfile for the real todo-app-frontend example; package managers require JSON filename and syntax.
   - path: examples/todo-app-frontend/package.json
     reason: npm package manifest for the real todo-app-frontend example; Node/npm require JSON filename and syntax.
-  - path: examples/todo-app-frontend/tsconfig.e2e.json
-    reason: TypeScript project config for the Playwright uat harness; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-frontend/tsconfig.json
     reason: TypeScript project config for the real todo-app-frontend example; tsc expects a JSON tsconfig file.
   - path: knowledge/ui/proof/calibration/calibration.json

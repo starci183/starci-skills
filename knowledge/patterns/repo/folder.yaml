@@ -36,7 +36,7 @@ rules:
       (built packages with explicit exports), scripts/ (lasting tooling only, `*.mjs`, no product code and no one-off codemod),
       docs/{adr,runbooks,guides}/ (opt-in), .npmrc, .dockerignore, apps/<app>/Dockerfile. A backend repository additionally
       requires src/, nest-cli.json, jest.config.js, .starciwork/, .starcistacks/ and .sops.yaml, and forbids a root e2e/. A
-      frontend repository allows vitest, Playwright and turbo config and a root e2e/, and forbids src/, .starciwork/,
+      frontend repository allows turbo config, has no test configuration and no e2e/ (it has no tests), and forbids src/, .starciwork/,
       .starcistacks/ and .sops.yaml. Anything else at the root moves to its owner: infrastructure, compose, docker and
       environment templates, seeds and database init to `.starcistacks/<env>/`; migrations to the owning capability's
       `persistence/`; product docs and workflow notes to `.starciwork` records or `docs/`; code generators to `scripts/` or a
@@ -139,7 +139,7 @@ rules:
     hfsRules: [R03, R06, R07]
     requirement: |
       Content is `tracked`, `ignored` or `external`. Ignored, and only ignored, are the tool build outputs that must exist in
-      place: node_modules, dist, .next, coverage, test-results, playwright-report, next-env.d.ts, *.tsbuildinfo, and generated
+      place: node_modules, dist, .next, coverage, test-results, next-env.d.ts, *.tsbuildinfo, and generated
       code (`__generated__/`, Nest schema.gql) produced by `codegen`. External, meaning they must not exist in the working
       tree at all, are: tool caches (.eslintcache, .turbo, .scannerwork, .jest-cache, .cache, .tools), which the canon presets
       redirect to %LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/; worktrees (.worktrees, worktrees), which live under
