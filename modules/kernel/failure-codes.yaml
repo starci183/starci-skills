@@ -13354,6 +13354,8 @@ FE_NO_TESTS:
     - "Thêm vitest, Playwright, jest, testing-library hoặc axe vào package.json"
     - "Thêm script test hoặc cấu hình test vào repository front end"
   nextStep_vi: "Xóa tệp, cấu hình, script và thư viện test đó; front end không có ngoại lệ, kể cả thư mục scripts/. Kiểm tra giao diện bằng lint, typecheck và hfs check."
+  owner: op-retry
+  kind: check-finding
 BE_SPEC_PLACEMENT:
   title: "A back-end spec lives in one of the four test layers"
   title_vi: "Spec đặt ngoài bốn tầng test"
