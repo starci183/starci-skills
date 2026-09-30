@@ -46,7 +46,7 @@ export function writeCleanRepo(declaration, { declare = true, into, name = 'demo
   if (declaration.profile === 'be') put('.starcistacks/application-stacks.yaml', STACKS_DECLARATION);
   if (declaration.profile === 'fe') for (const app of declaration.apps) put(`apps/${app.name}/package.json`, `${JSON.stringify({ name: `@demo/${app.name}`, private: true, dependencies: { 'next-intl': '4.13.6' } }, null, 2)}
 `);
-  for (const entry of resolver.requiredPaths().paths) if (!entry.path.endsWith('/')) put(entry.path, entry.path === 'hfs.json' ? '' : 'export {};\n');
+  for (const entry of resolver.requiredPaths().paths) if (!entry.path.endsWith('/')) put(entry.path, entry.path === 'hfs.json' ? '' : /^apps\/[^/]+\/src\/app\.module\.ts$/.test(entry.path) ? 'export class AppModule {}\n' : 'export {};\n');
   if (declaration.profile === 'fe') {
     const required = resolver.requiredPaths().paths.map((entry) => entry.path);
     for (const app of declaration.apps) {

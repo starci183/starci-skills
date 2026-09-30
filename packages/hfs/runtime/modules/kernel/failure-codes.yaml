@@ -922,9 +922,9 @@ HFS_CI_MISSING_CANON:
 HFS_CONTRACT_SNAPSHOT_DRIFT:
   title: "Contract snapshot equals the emit, the FE copy equals the BE"
   title_vi: "Bản hợp đồng lệch bản thật"
-  meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `contract:emit` (BE) / `contract:pull` (FE)."
+  meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `npm run contract:emit` (BE) / `contract:pull` (FE) rồi commit kết quả. Nếu emit không chạy được thì finding nêu nguyên văn lỗi của emit; không bao giờ bỏ qua âm thầm."
   causes_vi:
-    - "Vi phạm luật R23: BE: `contracts/<app>/schema.graphql` bằng bản emit. FE: `modules/api/contract/*` bằng bản BE (so hash)."
+    - "Vi phạm luật R23: BE: `contracts/<app>/schema.graphql` phải bằng bản `hfs emit-contracts` phát ra ngay lúc kiểm tra (đồ thị module đọc từ mã nguồn, không cần env, DB hay mạng); chỉ chạy ở lượt kiểm tra đầy đủ, `--fast` bỏ qua và nói rõ trong phần coverage. FE: `modules/api/contract/*` bằng bản BE (so hash)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding

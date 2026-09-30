@@ -37,6 +37,7 @@ import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
+import { contractEmitFindings } from '../runtime/scripts/lib/hfs-rules/contract.mjs';
 import { LINTER_KINDS, convertReportFile, sonarReport, sourceRootsOf, writeReport } from '../report/sonar.mjs';
 
 const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]
@@ -68,6 +69,8 @@ function printCheck(result, out) {
   out(`hfs check${result.fast ? ' --fast' : ''} ${result.repoRoot} (profile ${result.profile ?? 'unknown'}, manifest ${result.manifest}, ${result.tracked} tracked paths)\n`);
   if (result.fast) out(`  ${result.fast.changed} path${result.fast.changed === 1 ? '' : 's'} changed since ${result.fast.base.slice(0, 12)}\n`);
   out(`  architecture machine: ${result.machine.status === 'ran' ? `ran over ${result.machine.files} source files${result.machine.paths ? ` (owners ${result.machine.paths.join(', ')})` : ''}` : `skipped, ${result.machine.reason}`}\n`);
+  if (result.contracts) out(`  contract snapshots: ${result.contracts.status === 'checked' ? `emitted and compared, ${result.contracts.apps.map((a) => `${a.app} ${a.status}`).join(', ') || 'no api app'}` : `skipped, ${result.contracts.reason}`}
+`);
   const byCode = new Map();
   for (const f of result.findings) byCode.set(f.code, [...(byCode.get(f.code) ?? []), f]);
   for (const [code, list] of byCode) {
@@ -116,7 +119,20 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
       const tracked = trackedFiles(repoRoot);
       // Managed files, the .gitignore block and sonar against their render (R04, R05, R11, ...), and prettier through the repository's own install (R19, never under --fast).
       const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...(opts.fast === true ? [] : await formatFindings({ repoRoot, files: tracked, prettier }))];
+      // R23 against the app itself (full pass only): the committed snapshots equal what `emit-contracts` writes now.
+      let contracts = null;
+      let declared = null;
+      try { declared = JSON.parse(fs.readFileSync(path.join(repoRoot, 'hfs.json'), 'utf8')); } catch { /* checkRepository reports the unreadable declaration */ }
+      if (declared?.profile === 'be') {
+        if (opts.fast === true) contracts = { status: 'skipped', reason: '--fast does not emit the apps' };
+        else {
+          const emitted = contractEmitFindings({ repoRoot, files: tracked, repo: declared, emit: emitContracts });
+          extraFindings.push(...emitted.findings);
+          contracts = { status: 'checked', apps: emitted.apps };
+        }
+      }
       const result = checkRepository({ repoRoot, fast: opts.fast === true, base: opts.base, extraFindings });
+      if (contracts) result.contracts = contracts;
       if (opts.sonar !== undefined) writeSonarReport({ repoRoot, file: path.resolve(opts.sonar), result });
       if (opts.json) stdout(`${JSON.stringify(result, null, 2)}\n`); else printCheck(result, stdout);
       return result.ok ? 0 : 1;
@@ -134,11 +150,15 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     if (verb === 'emit-contracts') {
       if (opts.positional.length) throw new Error('hfs emit-contracts takes no path');
       const declaration = JSON.parse(fs.readFileSync(path.join(repoRoot, 'hfs.json'), 'utf8'));
-      const { written, skipped } = emitContracts({ repoRoot, declaration });
+      const { written, skipped, standIns } = emitContracts({ repoRoot, declaration });
       for (const file of written) stdout(`wrote ${file}
 `);
-      stdout(`hfs emit-contracts: ${written.length} written${skipped.length ? `, ${skipped.join(', ')} compose no GraphQL resolver` : ''}
+      stdout(`hfs emit-contracts: ${written.length} written${skipped.length ? `, ${skipped.join(', ')} serve no GraphQL` : ''}
 `);
+      for (const [app, lines] of Object.entries(standIns)) {
+        stdout(`${app}: ${lines.length} dependenc${lines.length === 1 ? 'y' : 'ies'} of the resolvers could not load here and stood in (no GraphQL type is affected):\n`);
+        for (const line of lines) stdout(`  ${line}\n`);
+      }
       return 0;
     }
     if (verb === 'init') {

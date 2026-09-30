@@ -531,6 +531,22 @@ test('--fast with the real machine: an uncomposed module already on main is not 
   assert.match(full.out, /BE_FEATURE_NOT_COMPOSED x1/);
 });
 
+test('HFS_CONTRACT_SNAPSHOT_DRIFT against the app: the full check emits every api app and says so, --fast skips it and says so, an emit that cannot run is a finding', async () => {
+  const dir = branched();
+  const full = await cli(['check', '--repo', dir, '--json']);
+  assert.deepEqual(JSON.parse(full.out).contracts, { status: 'checked', apps: [{ app: 'core', status: 'no-graphql' }] });
+  assert.deepEqual(only(JSON.parse(full.out), 'HFS_CONTRACT_SNAPSHOT_DRIFT'), []);
+  assert.match((await cli(['check', '--repo', dir])).out, /contract snapshots: emitted and compared, core no-graphql/);
+  assert.match((await cli(['check', '--repo', dir, '--fast'])).out, /contract snapshots: skipped, --fast does not emit the apps/);
+  assert.equal(JSON.parse((await cli(['check', '--repo', dir, '--fast', '--json'])).out).contracts.status, 'skipped');
+  put(dir, 'apps/core/src/app.module.ts', "import { Missing } from './missing';\nexport class AppModule {\n  static register() {\n    return { module: AppModule, imports: [Missing] };\n  }\n}\n");
+  const broken = JSON.parse((await cli(['check', '--repo', dir, '--json'])).out);
+  const [finding] = only(broken, 'HFS_CONTRACT_SNAPSHOT_DRIFT');
+  assert.match(finding.message, /cannot be verified.*cannot resolve \.\/missing/);
+  assert.match(finding.whyVi, HAS_VIETNAMESE);
+  assert.equal(broken.contracts.apps[0].status, 'emit-failed');
+});
+
 test('HFS_FORMAT: --fast never runs prettier, the full check runs the repository\'s own, and a repository with none is a refusal, never a pass', async () => {
   const dir = branched();
   put(dir, 'src/features/orders/application/place-order.use-case.ts', 'export const placed = 1;\n');

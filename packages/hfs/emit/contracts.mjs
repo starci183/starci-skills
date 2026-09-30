@@ -2,25 +2,25 @@
  * `hfs emit-contracts`: writes `contracts/<app>/schema.graphql` for every api app of hfs.json that serves GraphQL.
  *
  * The snapshot is `printSchema(lexicographicSortSchema(schema))`, nothing else, so it is deterministic and never carries a
- * generator banner. It needs no environment, no database and no network: the schema is built from the RESOLVER CLASSES the
- * app composes, never by booting the app (`AppModule.register(options)` needs the options of a deployment).
+ * generator banner. It needs no environment, no database and no network, and never boots the app.
  *
- * Which resolvers an app composes (the exact variant, chosen over "every resolver file of every feature"): the app root
- * imports the feature transport modules by name (`import { CheckoutGraphqlModule } from "@features/checkout"`). This command
- * reads those import declarations of `apps/<app>/src/app.module.ts`, loads each imported class and keeps the ones that are
- * Nest modules; the resolvers are the providers of those modules that carry Nest GraphQL's resolver metadata. A resolver a
- * module does not provide is not served by the app and therefore not in its contract. The schema itself comes from Nest's
- * own `GraphQLSchemaFactory` (the builder the running server uses), so the printed text is what the server answers.
+ * What an app serves is decided from its source (`static-graph.mjs`): the module graph is walked from `AppModule` of
+ * `apps/<app>/src/app.module.ts` through every import (imports of imports, `register`/`forRoot`/`forRootAsync` dynamic modules,
+ * `forwardRef`, spreads and both branches of a conditional), and the resolver providers of the modules the GraphQL server reads
+ * (all of them, or the `include` whitelist and its imports) are the resolvers of the contract. The schema itself comes from
+ * Nest's own `GraphQLSchemaFactory` (the builder the running server uses) over those classes, compiled the way `tsc` compiles
+ * them. An app whose graph holds no GraphQL server is skipped; an app whose graph cannot be decided is an error.
  *
- * TypeScript is loaded by the `typescript` package the repository already pins (`transpileModule` behind a `.ts` require
- * hook and the `paths` aliases of its tsconfig.json); nothing is added to the managed devDependencies. Every app runs in its
- * own child process (`schema-worker.mjs`) because Nest GraphQL's type metadata is process-global.
+ * TypeScript, Nest and graphql are the repository's own packages; nothing is added to the managed devDependencies. Every app
+ * runs in its own child process (`schema-worker.mjs`) because Nest GraphQL's type metadata is process-global.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/** The stderr prefix of a dependency the worker could not load and stood in for. */
+export const STAND_IN = 'stand-in ';
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'schema-worker.mjs');
 
 /** The repository-relative path of an app's root module. */
@@ -28,24 +28,6 @@ export const appModulePath = (app) => `apps/${app}/src/app.module.ts`;
 
 /** The repository-relative path of an app's snapshot. */
 export const snapshotPath = (app) => `contracts/${app}/schema.graphql`;
-
-/**
- * The named bindings an app root imports: [{ name, specifier }] in source order. `import type` declarations and type-only
- * specifiers are skipped (they load nothing). Pure: takes the TypeScript module and the source text.
- */
-export function importedBindings(ts, sourceText) {
-  const sourceFile = ts.createSourceFile('app.module.ts', sourceText, ts.ScriptTarget.Latest, true);
-  const bindings = [];
-  for (const statement of sourceFile.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-    const clause = statement.importClause;
-    if (!clause || clause.isTypeOnly || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) continue;
-    for (const element of clause.namedBindings.elements) {
-      if (!element.isTypeOnly) bindings.push({ name: (element.propertyName ?? element.name).text, specifier: statement.moduleSpecifier.text });
-    }
-  }
-  return bindings;
-}
 
 /** The `paths` aliases of a tsconfig as [{ prefix, targets }], `@modules/*` giving prefix `@modules/`. Pure. */
 export function aliasesOf(paths, baseDir) {
@@ -66,31 +48,34 @@ export const apiApps = (declaration) => (declaration.apps ?? []).filter((app) =>
 /** The text written to a snapshot file: the printed schema and one final newline. Pure. */
 export const snapshotText = (printed) => `${printed.replace(/\n+$/, '')}\n`;
 
-/** Runs the worker of one app and answers its printed schema, or null when the app composes no resolver. */
+/** Runs the worker of one app; answers `{ printed, standIns }`, or null when the app composes no GraphQL server. */
 function emitApp(repoRoot, app) {
-  const result = spawnSync(process.execPath, [WORKER, repoRoot, app], { encoding: 'utf8', cwd: repoRoot, env: { PATH: process.env.PATH ?? '' }, maxBuffer: 64 * 1024 * 1024 });
+  const result = spawnSync(process.execPath, [WORKER, repoRoot, app], { encoding: 'utf8', cwd: repoRoot, env: { PATH: process.env.PATH ?? '' }, maxBuffer: 256 * 1024 * 1024 });
   if (result.status === 3) return null;
-  if (result.status !== 0) throw new Error(`hfs emit-contracts: ${app} failed (exit ${result.status}): ${(result.stderr || result.stdout).trim()}`);
-  return result.stdout;
+  const lines = (result.stderr ?? '').split(/\r?\n/).filter(Boolean);
+  if (result.status !== 0) throw new Error(`hfs emit-contracts: ${app} failed (exit ${result.status}): ${(lines.join('\n') || result.stdout).trim()}`);
+  return { printed: result.stdout, standIns: lines.filter((line) => line.startsWith(STAND_IN)) };
 }
 
 /**
- * Writes the snapshot of every api app that serves GraphQL; answers `{ written: [paths], skipped: [apps] }`.
- * `declaration` is the parsed hfs.json.
+ * Writes the snapshot of every api app that serves GraphQL; answers `{ written: [paths], skipped: [apps], standIns: { app: [lines] } }`.
+ * `declaration` is the parsed hfs.json. `outDir` (absolute) redirects the snapshots to another root, keeping their relative paths.
  */
-export function emitContracts({ repoRoot, declaration }) {
+export function emitContracts({ repoRoot, declaration, outDir = repoRoot }) {
   const written = [];
   const skipped = [];
+  const standIns = {};
   for (const app of apiApps(declaration)) {
-    const printed = emitApp(repoRoot, app);
-    if (printed === null) {
+    const emitted = emitApp(repoRoot, app);
+    if (emitted === null) {
       skipped.push(app);
       continue;
     }
-    const target = path.join(repoRoot, snapshotPath(app));
+    const target = path.join(outDir, snapshotPath(app));
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, snapshotText(printed));
+    fs.writeFileSync(target, snapshotText(emitted.printed));
     written.push(snapshotPath(app));
+    if (emitted.standIns.length) standIns[app] = emitted.standIns;
   }
-  return { written, skipped };
+  return { written, skipped, standIns };
 }
