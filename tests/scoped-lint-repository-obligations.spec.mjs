@@ -157,7 +157,7 @@ test('script adapters: an undeclared package.json contract and a project gap out
 // unavailable because of files in sibling slices, and every slice of the repository read unavailable with it. A gap
 // the architecture checker locates file by file is judged only where it touches the slice.
 test('a backend coverage gap located on files outside the slice is counted outside; on a slice file or unlocated it is unavailable', async (t) => {
-  const obligations = [architectureObligation('LAYOUT', ['FE_LAYOUT']), architectureObligation('BE-SHAPE', ['BE_FEATURE_LAYOUT_INVALID', 'BE_SOURCE_NAME_INVALID'])];
+  const obligations = [architectureObligation('LAYOUT', ['FE_LAYOUT']), architectureObligation('BE-SHAPE', ['BE_FEATURE_LAYOUT_INVALID', 'BE_SOURCE_FORM'])];
   const coverage = { backendSourceShape: {
     layout: { status: 'unavailable', reason: 'one or more backend source placement relations are not statically proved', details: ['src/b.ts role presenter is not a selected transport-layer role'] },
     naming: { status: 'unavailable', reason: 'one or more backend source naming relations are not statically proved', details: ['src/c.ts has no statically identifiable source role', 'src/b.ts declares exported class X with unclassified file role store'] },

@@ -12,6 +12,7 @@
 //   HFS_REQUIRED_MISSING          a file or directory a required slot (or an instance of one) must contain
 //   HFS_MIN_INSTANCES             fewer instances of a slot than minInstances
 //   HFS_CANON_PIN_DRIFT           a dependency whose declared version is not the pinned one
+//   BE_SOURCE_FORM                (be) a tracked src/apps .ts file whose name is not index.ts, main.ts, a migration or <kebab>.<suffix>.ts with a suffix of ruleParams.be.suffixes
 //   HFS_SIZE_SOFT_BACKLOG         (info, report-only, never fails) a source file above ruleParams fileLines.soft
 //   HFS_EMPTY_DIR                 a directory with no file below it (git never tracks one), outside .git, node_modules and ignored slots
 //   HFS_GHOST_TREE                an empty directory beside a sibling within two edits of its name (business / bussiness)
@@ -36,7 +37,7 @@ export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 /** The codes this module emits that are not the slot loader's own: the why bundle of packages/hfs ships exactly these plus the loader's. */
 export const CHECK_CODES = Object.freeze([
   'HFS_PATH_NO_SLOT', 'HFS_SLOT_NOT_ENABLED', 'HFS_SLOT_AMBIGUOUS', 'HFS_TRACKED_MUST_BE_IGNORED', 'HFS_FORBIDDEN_PRESENT',
-  'HFS_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG',
+  'HFS_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG', 'BE_SOURCE_FORM',
   'HFS_INIT_EXISTS', 'HFS_INIT_UNDETECTED', 'HFS_REPO_UNREADABLE',
   'HFS_DECLARATION_INVALID', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
@@ -96,6 +97,37 @@ function pinFindings({ repoRoot, files, profile, root, only }) {
         const drift = pinnedSpec(spec, pin);
         if (drift) findings.push({ code: 'HFS_CANON_PIN_DRIFT', level: 'error', path: file, dependency: name, section, pinned: pin.version, declared: spec, message: `${name} in ${file} ${section}: ${drift}` });
       }
+    }
+  }
+  return findings;
+}
+
+const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SOURCE_ROOT = /^(?:src|apps)\//;
+const FREE_NAMES = new Set(['index.ts', 'main.ts']);
+
+/**
+ * BE_SOURCE_FORM (R89): every tracked src/ or apps/ TypeScript file of a back end is index.ts, main.ts, a migration of
+ * be.persistence, or <kebab-name>.<suffix>.ts with <suffix> in the closed vocabulary ruleParams.be.suffixes (a name such
+ * as api.composition.spec.ts keeps its inner words kebab-case). A suffix of ruleParams.be.bannedSuffixes anywhere in the
+ * name is refused by name. Paths no slot owns are HFS_PATH_NO_SLOT's, not this code's.
+ */
+function sourceFormFindings({ files, resolver }) {
+  const { suffixes, bannedSuffixes } = resolver.ruleParams();
+  const findings = [];
+  for (const file of files) {
+    if (!file.endsWith('.ts') || !SOURCE_ROOT.test(file)) continue;
+    const c = resolver.classifyPath(file);
+    if (c.status !== 'owned' || c.tracking === 'ignored') continue;
+    const base = path.posix.basename(file);
+    if (FREE_NAMES.has(base)) continue;
+    if (c.slot === 'be.persistence' && path.posix.basename(path.posix.dirname(file)) === 'migrations') continue;
+    const parts = base.slice(0, -'.ts'.length).split('.');
+    const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));
+    if (banned) {
+      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})` });
+    } else if (parts.length < 2 || !parts.every((part) => KEBAB.test(part)) || !suffixes.includes(parts.at(-1))) {
+      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, message: `${file}: the name must be <kebab-name>.<suffix>.ts with a suffix from the closed list (${suffixes.join(', ')}), or index.ts, main.ts or a migration` });
     }
   }
   return findings;
@@ -224,6 +256,7 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
   }
 
   findings.push(...pinFindings({ repoRoot, files: tracked, profile: repo.profile, root, only: scoped }));
+  if (repo.profile === 'be') findings.push(...sourceFormFindings({ files: tracked.filter(inScope), resolver }));
 
   const soft = resolver.ruleParams().fileLines.soft;
   for (const file of tracked) {

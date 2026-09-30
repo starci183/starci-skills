@@ -459,7 +459,7 @@ profiles:
         applicability: { include: ['src/features/**/*.{ts,mts,cts,tsx}', 'src/modules/**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.{spec,test}.{ts,mts,cts,tsx}', '**/*-{spec,test}.{ts,mts,cts,tsx}', '**/__tests__/**'] }
         mechanical:
           requirement: Enforce adopted feature/application/transport placement and filename, class, enum, type and GraphQL surface syntax.
-          check: { kind: architecture, ruleIds: [BE_FEATURE_LAYOUT_INVALID, BE_SOURCE_NAME_INVALID] }
+          check: { kind: architecture, ruleIds: [BE_FEATURE_LAYOUT_INVALID, BE_SOURCE_FORM] }
         semantic:
           guidance: docs/backend-source-pattern.md
           review: Select direct use case versus bus and domain versus persistence ownership before judging placement.
@@ -535,7 +535,7 @@ profiles:
           requirement: Enforce explicit named public inputs/results, readonly dependency/message fields and adopted serialized enum/type-name forms.
           check:
             kind: architecture
-            ruleIds: [BE_PUBLIC_CONTRACT_FORM, BE_READONLY_BOUNDARY, BE_SOURCE_NAME_INVALID]
+            ruleIds: [BE_PUBLIC_CONTRACT_FORM, BE_READONLY_BOUNDARY, BE_SOURCE_FORM]
             externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
         semantic:
           guidance: knowledge/patterns/be/typing.yaml

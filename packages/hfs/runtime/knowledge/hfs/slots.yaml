@@ -95,6 +95,40 @@ ruleParams:
     # R21 HFS_DUPLICATE_CODE: the ONE threshold of duplicate code (the architecture machine reads it here; no other file states it):
     # a token-normalised block of at least `lines` source lines and `tokens` tokens that appears twice.
     duplicateBlock: {lines: 8, tokens: 60}
+    # R90 BE_INFRA_OWNER: raw infrastructure library (a module specifier or a global reference) -> the platform or
+    # integration capabilities allowed to import it; [] means nowhere in a back end. A specifier also covers its subpaths.
+    infraOwners:
+      fetch: [platform/http]
+      axios: [platform/http]
+      got: [platform/http]
+      undici: [platform/http]
+      "node:http": [platform/http]
+      "node:https": [platform/http]
+      http: [platform/http]
+      https: [platform/http]
+      cache-manager: [integrations/cache, integrations/redis]
+      redis: [integrations/cache, integrations/redis]
+      ioredis: [integrations/cache, integrations/redis]
+      bullmq: [platform/messaging]
+      "@nestjs/bullmq": [platform/messaging]
+      kafkajs: [platform/messaging]
+      "@nestjs/schedule": [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      setInterval: [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      setTimeout: [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      "node:timers": [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      "node:timers/promises": [platform/scheduling, platform/retry, platform/messaging, platform/http]
+      winston: [platform/logging]
+      dayjs: [platform/clock, platform/primitives]
+      moment: [platform/clock, platform/primitives]
+      date-fns-tz: [platform/clock, platform/primitives]
+      "@nestjs/config": []
+      dotenv: []
+      "@nestjs/event-emitter": []
+    # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
+    # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
+    # only names outside it.
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, e2e-spec, global-setup]
+    bannedSuffixes: [use-case, repository, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
     fileLines: {soft: 500, hardGrowth: true}
@@ -424,17 +458,17 @@ slots:
     presence: required
     tracked: tracked
     tier: feature
-    allows: ["<action>.use-case.ts", "<action>.contracts.ts", "<action>.{command,query,handler}.ts", "*.spec.ts"]
+    allows: ["<action>.{command,query,handler,contracts}.ts", "*.spec.ts"]
     forbids: [graphql/, http/, message/, schedule/, transport/]   # no protocol names under application/
     tests: unit-beside
-    rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT]
+    rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]
   - id: be.feature.application.support
     profiles: [be]
     path: "src/features/<feature>/application/support/"
     presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
     tracked: tracked
     tier: feature                 # feature tier: another feature cannot import it (features never import features)
-    allows: ["<name>.ts", "<name>.types.ts", "*.spec.ts"]
+    allows: ["<name>.<role>.ts", "*.spec.ts"]     # <role> from ruleParams.be.suffixes; no <name>.types.ts
     forbids: [graphql/, http/, message/, schedule/, transport/]
     tests: unit-beside            # a <name>.spec.ts beside every <name>.ts
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_FEATURE_IMPORTS_FEATURE]
@@ -448,7 +482,7 @@ slots:
     requires: ["<feature>-http.module.ts"]
     allows: ["<action>.controller.ts", "dto/<action>.{request,response}.ts", "<action>.mapper.ts", "*.spec.ts"]
     tests: unit-beside
-    rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED]
+    rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.graphql
     profiles: [be]
     path: "src/features/<feature>/transport/graphql/"
@@ -458,7 +492,7 @@ slots:
     requires: ["<feature>-graphql.module.ts"]
     allows: ["<action>.resolver.ts", "dto/<action>.{input,type,args}.ts", "<action>.mapper.ts", "*.spec.ts"]
     tests: unit-beside
-    rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED]
+    rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.message
     profiles: [be]
     path: "src/features/<feature>/transport/message/"
@@ -492,11 +526,11 @@ slots:
   - id: be.feature.transport.cli
     profiles: [be]
     path: "src/features/<feature>/transport/cli/"
-    presence: opt-in              # a command line entry: calls application use cases only, composed by an app of kind cli
+    presence: opt-in              # a command line entry: dispatches one command or query, composed by an app of kind cli
     tracked: tracked
     tier: feature
     requires: ["<feature>-cli.module.ts"]
-    allows: ["<command>.command.ts", "dto/*.ts", "*.spec.ts"]
+    allows: ["<name>.cli.ts", "dto/*.ts", "*.spec.ts"]     # .cli.ts: .command.ts is a CQRS message (HFS delta 3)
     tests: unit-beside
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_FEATURE_NOT_COMPOSED, BE_ENTRYPOINT_ONLY_IN_APPS]
     since: 1.0.0

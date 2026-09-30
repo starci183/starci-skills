@@ -98,6 +98,24 @@ test('a tracked path in a forbidden (external) slot is HFS_FORBIDDEN_PRESENT and
   assert.match(found.find((f) => f.path === '.env').goesTo, /\.starcistacks/);
 });
 
+test('BE_SOURCE_FORM: a back-end source name outside the closed suffix vocabulary is refused; a role name, index, main and a migration are not', () => {
+  const dir = repoOf(BE, (repo) => {
+    for (const ok of ['cancel-order.command.ts', 'cancel-order.query.ts', 'cancel-order.handler.spec.ts']) put(repo, `src/features/orders/application/${ok}`);
+    put(repo, 'src/modules/domain/stock/index.ts');
+    put(repo, 'src/modules/domain/stock/persistence/migrations/20260101000000-create-stock.ts');
+    for (const bad of ['cancel-order.use-case.ts', 'order.types.ts', 'CancelOrder.handler.ts', 'helpers.ts', 'order.repository.ts']) put(repo, `src/features/orders/application/${bad}`);
+    put(repo, 'apps/core/src/core.options.ts');
+  });
+  const result = checkRepo({ repoRoot: dir });
+  const refused = only(result, 'BE_SOURCE_FORM');
+  assert.deepEqual(refused.map((f) => path.posix.basename(f.path)).sort(), ['CancelOrder.handler.ts', 'cancel-order.use-case.ts', 'helpers.ts', 'order.repository.ts', 'order.types.ts']);
+  assert.ok(refused.every((f) => f.level === 'error'));
+  assert.equal(refused.find((f) => f.path.endsWith('order.types.ts')).suffix, 'types');
+  assert.equal(result.ok, false);
+  assert.deepEqual(only(checkRepo({ repoRoot: repoOf(BE) }), 'BE_SOURCE_FORM'), []);
+  assert.deepEqual(only(checkRepo({ repoRoot: repoOf(FE, (repo) => put(repo, 'apps/web/src/modules/api/helpers.ts')) }), 'BE_SOURCE_FORM'), [], 'a front-end repository is not judged by the back-end suffix list');
+});
+
 test('an opt-in slot the repository did not declare is HFS_SLOT_NOT_ENABLED, and declaring it clears the finding', () => {
   const mutate = (dir) => put(dir, 'docs/adr/0001-record.md', '# ADR\n');
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(BE, mutate) }), 'HFS_SLOT_NOT_ENABLED').map((f) => f.slot), ['repo.docs']);
@@ -186,7 +204,7 @@ test('every code the check can emit has a Vietnamese catalog entry, and the pack
 
 test('explain names the slot, tier, allowed imports and required tests of a path', () => {
   const dir = repoOf(BE);
-  const owned = explainPath({ repoRoot: dir, input: 'src/features/orders/application/place-order.use-case.ts' });
+  const owned = explainPath({ repoRoot: dir, input: 'src/features/orders/application/place-order.handler.ts' });
   assert.equal(owned.slot, 'be.feature.application');
   assert.equal(owned.tier, 'feature');
   assert.deepEqual(owned.owner, { slot: 'be.feature', root: 'src/features/orders' });

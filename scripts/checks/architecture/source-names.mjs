@@ -3,7 +3,7 @@ import { isInside } from './config.mjs';
 import { isUnshadowedCommonJsRequire, relativePath, sourceLocation, UNPROVEN_FRAMEWORK, unwrapExpression } from './typescript.mjs';
 
 const SOURCE_LAYOUT_RULE_ID = 'BE_FEATURE_LAYOUT_INVALID';
-const SOURCE_NAME_RULE_ID = 'BE_SOURCE_NAME_INVALID';
+const SOURCE_NAME_RULE_ID = 'BE_SOURCE_FORM';
 const FRAMEWORK_EXPORTS = new Map([
   ['@nestjs/graphql', new Set(['Args', 'ArgsType', 'InputType', 'Mutation', 'ObjectType', 'Query', 'registerEnumType'])],
   ['typeorm', new Set(['Entity', 'EntitySchema', 'MigrationInterface', 'ViewEntity'])],

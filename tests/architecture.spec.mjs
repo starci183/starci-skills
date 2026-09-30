@@ -693,7 +693,7 @@ test('backend source shape accepts adopted application, transport, persistence, 
     files: 10, layout: { status: 'checked' }, naming: { status: 'checked' },
   });
   assert.ok(result.coverage.checkedRuleIds.includes('BE_FEATURE_LAYOUT_INVALID'));
-  assert.ok(result.coverage.checkedRuleIds.includes('BE_SOURCE_NAME_INVALID'));
+  assert.ok(result.coverage.checkedRuleIds.includes('BE_SOURCE_FORM'));
 });
 
 test('backend source shape locates layer, class, enum, contract, and GraphQL naming violations', t => {
@@ -722,18 +722,18 @@ test('backend source shape locates layer, class, enum, contract, and GraphQL nam
   assert.ok(result.violations.some(item => item.ruleId === 'BE_FEATURE_LAYOUT_INVALID' && item.path.endsWith('/order-view.mapper.ts')), JSON.stringify(result, null, 2));
   assert.ok(result.violations.some(item => item.ruleId === 'BE_FEATURE_LAYOUT_INVALID' && /Migration source/.test(item.message)), JSON.stringify(result, null, 2));
   assert.ok(result.violations.some(item => item.ruleId === 'BE_FEATURE_LAYOUT_INVALID' && /EntitySchema/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /Source basename/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /Exported class WrongName/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && item.path.endsWith('/export-list.service.ts')), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && item.path.endsWith('/class-expression.service.ts')), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && item.path.endsWith('/named-expression.service.ts')), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /CreateOrderData/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /WrappedWrong/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /AliasWrong/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /Source basename/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /Exported class WrongName/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && item.path.endsWith('/export-list.service.ts')), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && item.path.endsWith('/class-expression.service.ts')), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && item.path.endsWith('/named-expression.service.ts')), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /CreateOrderData/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /WrappedWrong/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /AliasWrong/.test(item.message)), JSON.stringify(result, null, 2));
   assert.equal(result.violations.some(item => /Scalar/.test(item.message)), false, JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /Enums must/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /GraphQL field name/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /literal name request/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /Enums must/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /GraphQL field name/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /literal name request/.test(item.message)), JSON.stringify(result, null, 2));
 });
 
 test('backend source shape exposes dynamic naming as unavailable coverage', t => {
@@ -753,7 +753,7 @@ test('backend source shape exposes dynamic naming as unavailable coverage', t =>
   assert.equal(result.coverage.backendSourceShape.layout.status, 'unavailable');
   assert.equal(result.coverage.backendSourceShape.naming.status, 'unavailable');
   assert.equal(result.coverage.checkedRuleIds.includes('BE_FEATURE_LAYOUT_INVALID'), false);
-  assert.equal(result.coverage.checkedRuleIds.includes('BE_SOURCE_NAME_INVALID'), false);
+  assert.equal(result.coverage.checkedRuleIds.includes('BE_SOURCE_FORM'), false);
   assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /dynamic @Query field name/.test(item)));
   assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /constructed Query decorator identity/.test(item)));
   assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /unproven framework decorator identity/.test(item)));

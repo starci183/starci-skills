@@ -49,11 +49,21 @@ properties:
       be:
         type: object
         additionalProperties: false
-        required: [globalModules, fileLines, duplicateBlock]
+        required: [globalModules, fileLines, duplicateBlock, infraOwners, suffixes, bannedSuffixes]
         properties:
           globalModules: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
           fileLines: {$ref: '#/$defs/fileLines'}
           duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
+          infraOwners:
+            type: object
+            minProperties: 1
+            description: R90 BE_INFRA_OWNER. Raw library specifier or global reference -> the capabilities allowed to use it; [] means nowhere.
+            additionalProperties:
+              type: array
+              uniqueItems: true
+              items: {type: string, pattern: '^(platform|integrations)/[a-z][a-z0-9-]*$'}
+          suffixes: {$ref: '#/$defs/roleSuffixes'}
+          bannedSuffixes: {$ref: '#/$defs/roleSuffixes'}
       fe:
         type: object
         additionalProperties: false
@@ -87,6 +97,12 @@ $defs:
     properties:
       lines: {type: integer, minimum: 2}
       tokens: {type: integer, minimum: 1}
+  roleSuffixes:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    description: R89 BE_SOURCE_FORM. The closed role-suffix vocabulary of a source file name (suffixes) or the suffixes that are never a role (bannedSuffixes); the two lists are disjoint.
+    items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
   nameList:
     type: array
     minItems: 1

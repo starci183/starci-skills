@@ -23,7 +23,7 @@ authored inline union;
   classes; installed transformation/validation tooling may require mutable DTO
   construction.
 
-The existing `BE_SOURCE_NAME_INVALID` result remains the separate proof for
+The existing `BE_SOURCE_FORM` result remains the separate proof for
 adopted public contract names and serialized enum forms. A contract result does
 not replace that rule.
 

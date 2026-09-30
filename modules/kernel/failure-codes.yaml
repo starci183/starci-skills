@@ -829,16 +829,6 @@ BE_SOURCE_FORM:
   owner: op-retry
   kind: check-finding
 
-BE_SOURCE_NAME_INVALID:
-  title: "Source file name invalid"
-  title_vi: "Tên tệp nguồn sai quy ước"
-  meaning_vi: "Tên tệp nguồn của feature backend không theo quy ước đặt tên vai trò."
-  causes_vi:
-    - "Đặt tên tệp không có hậu tố vai trò đúng"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
 BE_SPEC_QUALITY:
   title: "Spec reads source, or an e2e breaks its flow shape"
   title_vi: "Spec đọc mã nguồn hoặc e2e phá dạng luồng"

@@ -41,9 +41,9 @@ export function writeCleanRepo(declaration, { declare = true, into, name = 'demo
     }
   }
   if (declaration.profile === 'be') {
-    put('src/features/orders/index.ts', `import './orders.module';\nimport './application/place-order.use-case';\nexport {};\n`);
+    put('src/features/orders/index.ts', `import './orders.module';\nimport './application/place-order.handler';\nexport {};\n`);
     put('src/features/orders/orders.module.ts', 'export {};\n');
-    put('src/features/orders/application/place-order.use-case.ts', 'export {};\n');
+    put('src/features/orders/application/place-order.handler.ts', 'export {};\n');
     // The machine judges reachability: the app composes the feature and every required module, so a clean repository is clean to it too.
     const owners = ['src/features/orders/index.ts', ...resolver.requiredPaths().paths.map((entry) => entry.path).filter((p) => /^src\/modules\/[^/]+\/[^/]+\/index\.ts$/.test(p))];
     fs.writeFileSync(path.join(dir, 'apps/core/src/main.ts'), owners.map((file) => `import '../../../${file.replace(/\.ts$/, '')}';`).join('\n') + '\n');

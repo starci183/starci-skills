@@ -141,7 +141,7 @@ test('BE fixture: which slot owns a path', () => {
   assert.equal(owner('apps/worker/src/app.module.ts'), 'owned:be.app.worker');
   assert.equal(owner('apps/migrate/src/main.ts'), 'owned:be.app.migrate');
   assert.equal(owner('src/features/orders/index.ts'), 'owned:be.feature');
-  assert.equal(owner('src/features/orders/application/place.use-case.ts'), 'owned:be.feature.application');
+  assert.equal(owner('src/features/orders/application/place.handler.ts'), 'owned:be.feature.application');
   assert.equal(owner('src/features/orders/application/support/price-lines.ts'), 'owned:be.feature.application.support');
   assert.equal(owner('src/features/orders/application/support/price-lines.spec.ts'), 'owned:be.feature.application.support');
   assert.equal(owner('src/features/orders/transport/http/place.controller.ts'), 'owned:be.transport.http');
@@ -169,7 +169,7 @@ test('BE fixture: which slot owns a path', () => {
   // a Windows spelling and a directory spelling reach the same slot
   assert.equal(owner('src\\features\\orders\\index.ts'), 'owned:be.feature');
   assert.equal(owner('src/features/orders/'), 'owned:be.feature');
-  assert.equal(be.ownerOf('src/features/orders/application/place.use-case.ts').root, 'src/features/orders');
+  assert.equal(be.ownerOf('src/features/orders/application/place.handler.ts').root, 'src/features/orders');
   assert.equal(be.classifyPath('e2e/probe.spec.ts').goesTo.startsWith('src/tests/e2e/'), true);
 });
 
@@ -207,8 +207,8 @@ test('BE fixture: tracked, tier, required files', () => {
 test('BE fixture: import direction', () => {
   const be = openHfs({ declaration: BE });
   const ok = (a, b) => be.importAllowed(a, b);
-  assert.equal(ok('src/features/orders/application/place.use-case.ts', 'src/modules/domain/stock/index.ts').allowed, true);
-  assert.equal(ok('src/features/orders/application/place.use-case.ts', 'src/features/orders/orders.module.ts').reason, 'sameOwner');
+  assert.equal(ok('src/features/orders/application/place.handler.ts', 'src/modules/domain/stock/index.ts').allowed, true);
+  assert.equal(ok('src/features/orders/application/place.handler.ts', 'src/features/orders/orders.module.ts').reason, 'sameOwner');
   assert.deepEqual([ok('src/features/orders/application/a.ts', 'src/features/billing/index.ts').allowed, ok('src/features/orders/application/a.ts', 'src/features/billing/index.ts').reason], [false, 'tierDirection']);   // feature never imports feature
   assert.equal(ok('src/features/orders/application/a.ts', 'src/modules/domain/stock/stock.service.ts').reason, 'notPublicEntry');          // cross-owner targets index.ts
   assert.equal(ok('src/modules/platform/config/index.ts', 'src/modules/domain/stock/index.ts').reason, 'tierDirection');                   // platform never imports domain
@@ -308,7 +308,7 @@ test('be.feature.application.support is an optional feature-tier slot inside app
   assert.equal(slot.tests, 'unit-beside');
   assert.equal(slot.owner, undefined, 'support is not an owner: it belongs to the enclosing feature');
   const be = openHfs({ declaration: BE });
-  assert.equal(be.classifyPath('src/features/orders/application/place.use-case.ts').slot, 'be.feature.application');
+  assert.equal(be.classifyPath('src/features/orders/application/place.handler.ts').slot, 'be.feature.application');
   assert.equal(be.classifyPath('src/features/orders/application/support/price-lines.ts').slot, 'be.feature.application.support');
 });
 
