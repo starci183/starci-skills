@@ -1,11 +1,10 @@
 id: hfs-machine-owed
 effectiveAt: '2026-09-30T20:00:00+07:00'
 summary: >-
-  Lane C0 sub-lane Q2 (rules R24, R29, R30, R32, R35, R45, R46, R50, R54, R56, R63): every architecture-machine enforcer the
+  Lane C0 sub-lane Q2 (rules R24, R29, R32, R35, R45, R46, R50, R54, R56, R63): every architecture-machine enforcer the
   catalog still listed as planned ships, each with a violating and a passing tree. Back end (coverage.hfsMachine.<name>):
   feature-shape (BE_FEATURE_SHAPE, a feature root and its application and transport folders match the requires and allows
-  of their slots through the resolver), public-surface (BE_PUBLIC_SURFACE: one index.ts per owner, only named export
-  lines, at most the slot's indexExports names, no nested index), composition-spec (BE_APP_COMPOSITION_ONLY: the app's
+  of their slots through the resolver), composition-spec (BE_APP_COMPOSITION_ONLY: the app's
   composition spec imports the real AppModule and calls AppModule.register), schema-owner (BE_SCHEMA_OWNER: entities and
   migrations in the owning capability's persistence, connection.ts naming an hfs.json connection, index exports
   <c>Entities and <c>Migrations, migration file, class and name shape), module-per-transport (BE_MODULE_SHAPE: one module
@@ -19,7 +18,10 @@ summary: >-
   target inside dist). config-unread (HFS_ARCH_CONFIG_UNREAD, R24) refuses a retired architecture.json and a declaration
   that analyses no file. The slot manifest gains the slot field composedBy (the app kinds that compose a transport slot) and
   an indexExports budget on platform and integrations; the loader and hfs-slots.schema.yaml accept the field. No new
-  failure code; the Vietnamese entries of the affected codes gain the machine's causes.
+  failure code; the Vietnamese entries of the affected codes gain the machine's causes. R30's planned machine enforcer
+  index-export-count is deleted, not built: the eslint rule no-folder-reexport now refuses a nested index, a non-export
+  statement and more than the indexExports names in an owner's index (one obligation, one rule); the indexExports budget it
+  reads now also exists on platform and integrations.
 reach: new-legs
 paths:
   - knowledge/hfs/rules.yaml

@@ -319,7 +319,6 @@ rules:
       - {kind: eslint-be, id: no-folder-reexport}
       - {kind: machine, id: owner-export-bypass, at: scripts/checks/architecture/owners.mjs}
       - {kind: machine, id: alias-reexport, at: scripts/checks/architecture/symbols.mjs}
-      - {kind: machine, id: index-export-count, at: scripts/checks/architecture/public-surface.mjs}
       - {kind: eslint-be, id: no-relative-capability-escape}
       - {kind: eslint-be, id: no-self-module-alias}
   - id: R31
