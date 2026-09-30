@@ -66,8 +66,21 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
       { filename: BLOCK, code: "const E = () => <kbd>K</kbd>" },
       // a token in an object is not copy
       { filename: BLOCK, code: "const o = { title: \"sm\", label: \"date\" }" },
-      // a key that is not a copy key is not copy
-      { filename: BLOCK, code: "const o = { kind: \"Search courses\" }" },
+      // a key that is not a copy key carries copy only when the value is a whole sentence: tokens, classes, ids, media types and formats are not
+      { filename: BLOCK, code: "const o = { kind: \"not-found\", method: \"GET\", accept: \"application/json\" }" },
+      { filename: BLOCK, code: "const o = { root: \"flex items-center gap-2\", size: \"sm\", mode: \"Dark\" }" },
+      { filename: BLOCK, code: "const o = { format: \"YYYY-MM-DD HH:mm\", pattern: \"dd/MM/yyyy\", url: \"/courses/list\" }" },
+      // templates that are not copy: class names, urls, keys, ids, units, format tokens
+      { filename: BLOCK, code: "const E = () => <div className={`btn ${size} btn-${tone}`} />" },
+      { filename: BLOCK, code: "const E = () => <a href={`/courses/${id}/lessons`}>{t(\"open\")}</a>" },
+      { filename: BLOCK, code: "const E = () => <span>{`${a}-${b}`}</span>" },
+      { filename: BLOCK, code: "const E = () => <span>{`${x} / ${y}`}</span>" },
+      { filename: BLOCK, code: "const E = () => <span style={{ width: `${pct}%` }} />" },
+      { filename: BLOCK, code: "const E = () => <input placeholder={`${a}${b}`} />" },
+      { filename: BLOCK, code: "const key = `course:${id}:lesson`; const o = { id: `row-${n}`, path: `/a/${b}` }" },
+      { filename: BLOCK, code: "const o = { title: `${a}-${b}`, label: `${n}px` }" },
+      // a template resolved through t() is not a literal
+      { filename: BLOCK, code: "const E = () => <p>{t(\"installed\", { count })}</p>" },
       // catalogue keys are lower-case dotted tokens
       { filename: BLOCK, code: "const o = { title: t(\"course.title\") }" },
       // the dictionaries and fixtures are content
@@ -103,6 +116,17 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
       // copy in an object
       { filename: BLOCK, code: "const o = { title: \"Your courses\" }", errors: [{ messageId: "property" }] },
       { filename: "D:/repo/src/app/[locale]/page.tsx", code: "export const metadata = { description: \"Learn to code\" }", errors: [{ messageId: "property" }] },
+      // a template with substitutions whose static parts hold a word is copy: JSX child, spoken attribute, prose attribute
+      { filename: BLOCK, code: "const E = () => <p>{`${count} installed`}</p>", errors: [{ messageId: "text" }] },
+      { filename: BLOCK, code: "const E = () => <p>{`You have ${c} unread messages`}</p>", errors: [{ messageId: "text" }] },
+      { filename: LEAF, code: "const E = () => <button aria-label={`Close ${name}`} />", errors: [{ messageId: "attribute" }] },
+      { filename: BLOCK, code: "const E = () => <Field hint={`Up to ${max} characters`} />", errors: [{ messageId: "attribute" }] },
+      // a template as a copy-key value
+      { filename: BLOCK, code: "const o = { title: `Welcome back, ${name}` }", errors: [{ messageId: "property" }] },
+      // any key: a whole sentence is copy (a hook returning its own status text)
+      { filename: BLOCK, code: "const s = { ready: \"Your course is ready\" }", errors: [{ messageId: "property" }] },
+      { filename: "D:/repo/src/hooks/lesson/useLesson.ts", code: "export const useLesson = () => ({ status: \"Loading your lesson\", error: \"Something went wrong.\" })", errors: [{ messageId: "property" }, { messageId: "property" }] },
+      { filename: "D:/repo/src/modules/notify/messages.ts", code: "export const M = { saved: `Saved ${n} items`, kind: \"Search courses\" }", errors: [{ messageId: "property" }, { messageId: "property" }] },
       // the second language, wherever it hides, with no pragma to excuse it
       { filename: BLOCK, code: "const message = \"hạn cuối đã qua\"", errors: [{ messageId: "second" }] },
       { filename: BLOCK, code: "const message = `hạn cuối đã qua ${x}`", errors: [{ messageId: "second" }] },

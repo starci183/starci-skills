@@ -33,6 +33,8 @@ User-facing text comes from a `next-intl` catalogue through `t()`, at every tier
 <button>Save</button>
 <input placeholder="Search courses" />
 const o = { title: "Your courses" }
+const status = { ready: "Your course is ready" }
+<p>{`${count} installed`}</p>
 ```
 
 **Valid** (`src/components/blocks/Feed/index.tsx`)
@@ -42,6 +44,8 @@ const o = { title: "Your courses" }
 <input placeholder={t("search")} />
 const o = { title: t("courses.title") }
 ```
+
+A template literal with substitutions is copy when its static parts contain a word (`${count} installed`, `You have ${c} unread messages`) in a JSX child, a copy attribute or a copy-key value; class names, URLs, keys, ids, units and format tokens (`btn-${tone}`, `/courses/${id}`, `${n}px`, `YYYY-MM-DD HH:mm`) are not copy. An object property under any key is copy when its value is a whole sentence (two or more words, starting like a sentence, ending like one, or in a non-ASCII script): a hook returning `{ ready: "Your course is ready" }` is a finding.
 
 **Finding code:** `FE_I18N_LITERAL`
 

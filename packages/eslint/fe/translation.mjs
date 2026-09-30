@@ -119,6 +119,36 @@ const staticString = (node) => {
   return null
 }
 
+/**
+ * The static text of a template literal that has substitutions, each substitution standing as `#`
+ * (a template of "the count, then installed" reads "# installed"); null for anything that is not such a template.
+ */
+const templateText = (node) => {
+  if (!node || node.type !== "TemplateLiteral" || node.expressions.length === 0) return null
+  return node.quasis.map((quasi) => quasi.value.cooked ?? "").join("#")
+}
+
+/** True when the static parts of a template with substitutions contain a word (a count then "installed", not two ids joined by a dash). */
+const templateHasWord = (node) => {
+  const text = templateText(node)
+  return text !== null && hasLetter(text.replaceAll("#", " "))
+}
+
+/**
+ * A sentence rather than a token, for a property whose key does not say it is copy: two or more words made of
+ * letters and sentence punctuation only (so a class list, a URL, a media type or an id never qualifies), and it starts
+ * like a sentence, ends like one, or carries a non-ASCII letter.
+ */
+const looksLikeSentence = (text) => {
+  const tokens = text.trim().split(/\s+/)
+  if (tokens.length < 2) return false
+  // a word has punctuation only at its edges or as a hyphen between letters; an all-capitals hyphen chain (YYYY-MM-DD) is a format
+  const isWord = (token) => /^["'(]*[\p{L}\p{N}#'’]+(?:-[\p{L}\p{N}#]+)*[.,!?:;")]*$/u.test(token) && !/^\p{Lu}{2,}(?:-\p{Lu}{2,})+$/u.test(token)
+  if (!tokens.every(isWord)) return false
+  if (tokens.filter((token) => /\p{L}{2,}/u.test(token)).length < 2) return false
+  return /^\p{Lu}/u.test(text.trim()) || /[^\x00-\x7F]/.test(text) || /[.!?]$/.test(text.trim())
+}
+
 /** Static string carried by a JSX attribute value, else null. */
 const attributeText = (node) => {
   const value = node && node.value
@@ -205,6 +235,10 @@ export const noHardcodedCopy = {
         // `<p>{"Hello"}</p>`: a literal in child position is JSX text with braces around it.
         const parent = node.parent
         if (!parent || (parent.type !== "JSXElement" && parent.type !== "JSXFragment")) return
+        if (templateHasWord(node.expression)) {
+          claimed.add(node.expression)
+          return context.report({ node, messageId: "text", data: { text: source.getText(node.expression) } })
+        }
         const text = staticString(node.expression)
         if (text === null || !hasLetter(text.trim())) return
         claimed.add(node.expression)
@@ -215,19 +249,24 @@ export const noHardcodedCopy = {
         if (!attr) return
         const strict = STRICT_ATTRS.has(attr)
         if (!strict && !PROSE_ATTRS.has(attr)) return
-        const text = attributeText(node)
+        const value = attributeValueNode(node)
+        const template = templateText(value)
+        const text = template ?? attributeText(node)
         if (text === null) return
-        if (strict ? !hasLetter(text) : !looksLikeProse(text)) return
-        claimed.add(attributeValueNode(node))
-        context.report({ node, messageId: "attribute", data: { attr, text } })
+        if (strict ? !hasLetter(text.replaceAll("#", " ")) : !looksLikeProse(text)) return
+        claimed.add(value)
+        context.report({ node, messageId: "attribute", data: { attr, text: template === null ? text : source.getText(value) } })
       },
       Property(node) {
         const key = keyName(node)
-        if (!key || !COPY_KEYS.has(key)) return
-        const text = staticString(node.value)
-        if (text === null || !looksLikeProse(text)) return
+        if (!key || node.parent.type !== "ObjectExpression") return
+        const template = templateText(node.value)
+        const text = template ?? staticString(node.value)
+        if (text === null) return
+        // a copy key needs prose; any other key needs a whole sentence: { ready: "Your course is ready" } in a hook is copy
+        if (!(COPY_KEYS.has(key) ? looksLikeProse(text) : looksLikeSentence(text))) return
         claimed.add(node.value)
-        context.report({ node, messageId: "property", data: { key, text } })
+        context.report({ node, messageId: "property", data: { key, text: template === null ? text : source.getText(node.value) } })
       },
       Literal(node) {
         if (claimed.has(node) || typeof node.value !== "string") return
