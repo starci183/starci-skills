@@ -253,7 +253,7 @@ export function checkRepoPresentation({ root, runtime = false, tree = treeView(r
 // Owner ruling 2026-09-29 (layout 2026-09-30): integration, e2e and contract run MANUALLY only. No hook, default typecheck,
 // coverage run or automatic CI trigger may include those trees or run those projects. Linting the e2e files is not running them: ESLint reads them
 // as syntax in the one repository-wide lint run (the factory's e2e block), so no `lint:e2e` command exists to judge.
-const E2E_COMMAND = /\btest:(?:e2e|integration|contract)\b|\btypecheck:(?:e2e|tests)\b|\blint:e2e\b|\bplaywright\s+test\b|--selectProjects\s+(?:e2e|integration|contract)\b|src\/tests\/(?:world|integration|e2e|contract)\b|jest[^\n|&;]*(?:e2e|integration|contract)/u;
+const E2E_COMMAND = /\btest:(?:e2e|integration|contract)\b|\btypecheck:(?:e2e|tests)\b|\bplaywright\s+test\b|--selectProjects\s+(?:e2e|integration|contract)\b|src\/tests\/(?:world|integration|e2e|contract)\b|jest[^\n|&;]*(?:e2e|integration|contract)/u;
 const UNIT_RUN_SCRIPTS = ['test', 'test:unit', 'test:ci', 'test:affected', 'test:coverage', 'test:cov'];
 // An --ignore-pattern names the e2e tree to keep it OUT of a command; it is not a run of e2e.
 const runsE2e = text => E2E_COMMAND.test(String(text).replace(/--ignore-pattern[= ]+(?:"[^"]*"|'[^']*'|\S+)/gu, ''));

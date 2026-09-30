@@ -136,16 +136,11 @@ rules:
     kind: mandatory
     hfsRules: [R12]
     requirement: |
-<<<<<<< HEAD
-      No e2e spec, e2e setup or e2e-only dependency joins husky, lint-staged, the default typecheck, coverage or Codecov, or an
-      automatic CI trigger. `typecheck:e2e` exists and is green, `lint:check` lints `e2e/` in its one ESLint run (linting is not running e2e), and `test:e2e` runs `typecheck:e2e` first. A kept e2e
-      workflow is `workflow_dispatch` only.
-=======
       No integration, e2e or contract spec, test world or e2e-only dependency joins husky, lint-staged, the default typecheck,
       coverage or Codecov, or an automatic CI trigger. A back end has `typecheck:tests` (`src/tests/tsconfig.json`) and its
-      `test:integration`, `test:e2e` and `test:contract` run it first; a front end has `typecheck:e2e` and `lint:e2e`, and
-      `test:e2e` runs `typecheck:e2e` first. A kept e2e workflow is `workflow_dispatch` only.
->>>>>>> a69e81f4d (docs(hfs): owner test layout in hfs README/rules, patterns, docs, changelogs)
+      `test:integration`, `test:e2e` and `test:contract` run it first; a front end has `typecheck:e2e` and `test:e2e` runs it first.
+      `lint:check` lints the e2e trees in its one ESLint run (linting is not running e2e). A kept e2e workflow is
+      `workflow_dispatch` only.
     rationale: |
       These suites are slow and environment-bound, but their code must not rot, so their type check is a separate manual gate.
     cases: []
