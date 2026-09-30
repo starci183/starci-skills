@@ -17,6 +17,7 @@
 //   node scripts/reconciler/notifier.mjs urgent --class <class> --key <key> --text "<text>" [--send] [--json]
 //
 // The Fleet controller calls `digest --send` / `urgent --send` through ctx.run, so in shadow nothing is sent.
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
@@ -130,13 +131,26 @@ async function languageOf() {
 
 /** Everything the digest reads: live workflows' progress (progress-rca.mjs), GC line, violations, owner waits. `repos` defaults to config.yaml supervisor.repos. */
 export async function digestInputs({ env = process.env, now = Date.now(), repos = null } = {}) {
-  const [{ productRepos, supervisorSettings }, { openLedgerReader }, { workflowView }, { listDecisions }] = await Promise.all([
-    import('../supervisor/home.mjs'), import('../../engine/ledger-db.mjs'), import('../kernel/progress-rca.mjs'), import('./decisions.mjs')]);
+  const [{ productRepos, supervisorSettings }, { openLedgerReader, ledgerFileFor }, { readMachine }, { workflowView }, { listDecisions }] = await Promise.all([
+    import('../supervisor/home.mjs'), import('../../engine/ledger-db.mjs'), import('../../engine/machine-db.mjs'), import('../kernel/progress-rca.mjs'), import('./decisions.mjs')]);
   const progress = [], ownerWaits = [];
   if (repos == null) { try { repos = productRepos(supervisorSettings()); } catch { repos = []; } }
   for (const repo of repos) {
     let db;
-    try { db = openLedgerReader(path.join(repo, '.starciwork', 'runtime.sqlite')); } catch { continue; }
+    try {
+      // Decision Q1: a repo's runtime ledger is the file machine.ledgers names for it (ledgerFileFor) —
+      // %LOCALAPPDATA%/StarCi/projects/<ledger id>/runtime.sqlite — never the pre-Q1 in-repo
+      // .starciwork/runtime.sqlite. That legacy store is opened only when the registry names NO ledger for the
+      // repo at all (a checkout the Q1 registration never reached: the file is its only record); a repo with a
+      // registered ledger never has its stale in-repo file opened (LEDGER_LEGACY_WORK_SQLITE).
+      const resolved = ledgerFileFor(repo, { env });
+      if (fs.existsSync(resolved)) db = openLedgerReader(resolved);
+      else if (!readMachine((m) => m.resolveLedger({ repoRoot: repo }), null, { env })) {
+        const legacy = path.join(repo, '.starciwork', 'runtime.sqlite');
+        if (fs.existsSync(legacy)) db = openLedgerReader(legacy);
+      }
+    } catch { continue; }
+    if (!db) continue;
     try {
       for (const w of db.prepare("SELECT * FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY created_at").all()) {
         try {

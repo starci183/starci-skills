@@ -70,11 +70,24 @@ export function classifyNpm(argv) {
 }
 
 /** Jobs of OTHER workflows of this ledger that hold a lease right now (read-only). */
-export async function peerLeasedJobs({ ledgerRepo, workflowId, now = Date.now() }) {
+export async function peerLeasedJobs({ ledgerRepo, workflowId, env = process.env, now = Date.now() }) {
   if (!ledgerRepo) return { known: false, jobs: [] };
-  const file = path.join(ledgerRepo, '.starciwork', 'runtime.sqlite');
-  if (!fs.existsSync(file)) return { known: false, jobs: [] };
-  const { openLedgerReader } = await import('../../engine/ledger-db.mjs');
+  const { openLedgerReader, ledgerFileFor } = await import('../../engine/ledger-db.mjs');
+  const { readMachine } = await import('../../engine/machine-db.mjs');
+  // Decision Q1 (same as the owner digest): the repo's runtime ledger is the file machine.ledgers names for it —
+  // never the pre-Q1 in-repo .starciwork/runtime.sqlite. That legacy store is opened only when the registry names
+  // no ledger for the repo at all: a never-registered checkout's in-repo file is its only lease record, and a
+  // guard errs toward reading a possible lease list rather than silently skipping it.
+  let file = null;
+  try {
+    const resolved = ledgerFileFor(ledgerRepo, { env });
+    if (fs.existsSync(resolved)) file = resolved;
+    else if (!readMachine((m) => m.resolveLedger({ repoRoot: ledgerRepo }), null, { env })) {
+      const legacy = path.join(ledgerRepo, '.starciwork', 'runtime.sqlite');
+      if (fs.existsSync(legacy)) file = legacy;
+    }
+  } catch { file = null; }
+  if (!file) return { known: false, jobs: [] };
   const db = openLedgerReader(file);
   try {
     db.exec('PRAGMA busy_timeout=5000');

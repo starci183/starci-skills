@@ -315,8 +315,19 @@ async function main(argv) {
   let files = filesArg ? filesArg.split(',').map((s) => s.trim()).filter(Boolean) : [];
   let job = null;
   if (jobId) {
-    const { openLedgerReader } = await import('../../engine/ledger-db.mjs');
-    const db = openLedgerReader(path.join(repo, '.starciwork', 'runtime.sqlite'));
+    const { openLedgerReader, ledgerFileFor } = await import('../../engine/ledger-db.mjs');
+    const { readMachine } = await import('../../engine/machine-db.mjs');
+    // Decision Q1: the repo's runtime ledger is the file machine.ledgers names for it — never the pre-Q1 in-repo
+    // .starciwork/runtime.sqlite. That legacy store is opened only when the registry names no ledger for the
+    // repo at all (a never-registered checkout's in-repo file is its only record).
+    const resolved = ledgerFileFor(path.resolve(repo));
+    let file = fs.existsSync(resolved) ? resolved : null;
+    if (!file && !readMachine((m) => m.resolveLedger({ repoRoot: path.resolve(repo) }), null, { env: process.env })) {
+      const legacy = path.join(repo, '.starciwork', 'runtime.sqlite');
+      if (fs.existsSync(legacy)) file = legacy;
+    }
+    if (!file) { process.stderr.write(`no runtime ledger for ${repo}\n`); return 2; }
+    const db = openLedgerReader(file);
     try {
       const bound = jobBoundFiles(db, jobId);
       if (!bound) { process.stderr.write(`unknown job ${jobId}\n`); return 2; }
