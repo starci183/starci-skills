@@ -463,7 +463,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | Id | Code | Rule |
 | --- | --- | --- |
 | R01 | `HFS_SLOT_UNDECLARED` | Every tracked path matches exactly one slot. |
-| R02 | `HFS_SLOT_REQUIRED_MISSING` | A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`). |
+| R02 | `HFS_SLOT_REQUIRED_MISSING` | A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`), or the root README breaks its standard shape (title, description, standard sections in order, Work pointer, live badges only, no private URL). |
 | R03 | `HFS_UNTRACKED_ROOT_ENTRY` | No untracked or ignored entry outside an `ignored` slot. |
 | R04 | `HFS_GITIGNORE_BLOCK_DRIFT` | The managed `.gitignore` block equals its render. |
 | R05 | `HFS_MANAGED_FILE_DRIFT` | A managed file equals its template render. |
@@ -475,7 +475,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R11 | `HFS_SONAR_CONFIG` | Sonar config is generated, with no host URL and matching coverage exclusions. |
 | R12 | `HFS_E2E_IN_AUTOMATIC_GATE` | e2e never joins husky, coverage or automatic CI. |
 | R13 | `HFS_CI_MISSING_CANON` | CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky. |
-| R14 | `HFS_DEP_VERSION_SKEW` | One version per dependency in the workspace. |
+| R14 | `HFS_DEP_VERSION_SKEW` | One version per dependency in the workspace, and npm is the only package manager. |
 | R15 | `HFS_CANON_PIN_DRIFT` | Canon packages and frameworks match `canon-pins.yaml`. |
 | R16 | `HFS_TOOL_CONFIG_LOCAL` | Configs only call the factories; no local rules. |
 | R17 | `HFS_RULE_OFF_WITHOUT_REPLACEMENT` | The ESLint configuration is the rendered one-liner, so no rule is off, warned or redefined in a repository. |
@@ -492,12 +492,12 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 
 | Id | Code | Rule |
 | --- | --- | --- |
-| R26 | `BE_TIER_DIRECTION` | The tier direction matrix. |
+| R26 | `BE_TIER_DIRECTION` | The tier direction matrix; a shared package never imports an app. |
 | R27 | `ARCH_OWNER_CYCLE` | No owner cycles, type-only included. |
 | R28 | `BE_FEATURE_IMPORTS_FEATURE` | A feature never imports a feature. |
-| R29 | `BE_FEATURE_SHAPE` | Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`. |
-| R30 | `BE_PUBLIC_SURFACE` | Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export, at most 60 exports. |
-| R31 | `BE_FEATURE_NOT_COMPOSED` | Every feature and transport module is composed by an app. |
+| R29 | `BE_FEATURE_SHAPE` | Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`; `application/` never imports `transport/` or a protocol framework. |
+| R30 | `BE_PUBLIC_SURFACE` | Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export, at most 60 exports; cross-package imports use the package name and a declared export. |
+| R31 | `BE_FEATURE_NOT_COMPOSED` | Every feature, transport module and capability module is composed by an app. |
 | R32 | `BE_APP_COMPOSITION_ONLY` | Apps compose only; the composition spec boots the real module. |
 | R33 | `BE_ENTRYPOINT_ONLY_IN_APPS` | Entrypoints only in `apps/*/src`. |
 | R34 | `BE_SCHEMA_AUTHORITY` | Migrations are the only schema authority; `synchronize` is `false`. |
@@ -511,7 +511,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R42 | `BE_INPUT_BOUNDED` | Bounded input, cursor-only pagination, depth limits, rate limits; every property of an input class carries the `class-validator` decorators its type calls for. |
 | R43 | `BE_CONFIG_OWNER` | Only `platform/config` reads `process.env`; config per capability. |
 | R44 | `BE_SECRET_DEFAULT` | No default for a secret key or infrastructure URL. |
-| R45 | `BE_MODULE_SHAPE` | `@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport. |
+| R45 | `BE_MODULE_SHAPE` | `@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport; every handler and provider registered exactly once. |
 | R46 | `BE_BACKGROUND_UNOWNED` | Every sweep, outbox or retry has a job or consumer run by a worker app. |
 | R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`; ONE e2e world (`src/tests/e2e/world`: global-setup runs `apps/migrate` once, `useE2eWorld({ apps })` gives `world.apps.<name>.api`, `world.db.<connection>`, `world.fake`, `world.waitFor`) owns containers, DataSource, migrations and `process.env`; an e2e spec never imports or does any of them, and e2e fakes only external services (integration tokens), never a first-party app, module or provider. |
 | R48 | `BE_SPEC_QUALITY` | No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); an e2e enters through transport, waits with `waitFor`, boots through `src/tests/e2e/setup`, reads persisted state back and reaches no model provider. |
@@ -534,9 +534,9 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R84 | `BE_CONNECTION_DUPLICATE` | One physical database is one connection and one `Inject<Conn>EntityManager()` injector declared once in `platform/database`; `hfs.json` connections, connection files, injectors and module registrations correspond one to one. |
 | R85 | `BE_RAW_INJECT` | Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there. |
 | R86 | `BE_SQL_TABLE_OWNER` | SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded. |
-| R87 | `BE_CQRS_SHAPE` | The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`; no use-case classes, forwarder services or in-process events. |
+| R87 | `BE_CQRS_SHAPE` | The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`; no use-case classes, forwarder services or in-process events; a message and an injected dependency are `readonly`. |
 | R88 | `BE_TRANSPORT_SHAPE` | A transport handler maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else, returns no envelope and takes no `GraphQLJSON`. |
-| R89 | `BE_SOURCE_FORM` | Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji or Vietnamese outside message catalogs. |
+| R89 | `BE_SOURCE_FORM` | Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji or Vietnamese outside message catalogs; a public input or output is a named contract, never an inline object type. |
 | R90 | `BE_INFRA_OWNER` | Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability. |
 
 **Frontend**
@@ -544,13 +544,13 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | Id | Code | Rule |
 | --- | --- | --- |
 | R49 | `FE_ENV_OWNER` | Only `modules/config` reads the environment; no localhost fallback. |
-| R50 | `FE_TRANSPORT_OWNER` | One `fetch` per repository, in the transport client: `apps/<app>/src/modules/api/client.ts` of a one-app repository or `packages/<family>-api/src/client.ts` shared by every app; timeout and abort. |
+| R50 | `FE_TRANSPORT_OWNER` | One `fetch` per repository, in the transport client: `apps/<app>/src/modules/api/client.ts` of a one-app repository or `packages/<family>-api/src/client.ts` shared by every app; timeout and abort; a client read is SWR whose key carries the identity of its result, and a mutation is tied to its resource. |
 | R51 | `FE_HTTP_STATUS_COLLAPSE` | One `Outcome<T>` union per repository (the api slot's `outcome.ts`); 401 and 403 become `refused`. |
 | R52 | `FE_WIRE_GENERATED` | Wire types generated from the contract copy. |
 | R53 | `FE_ERROR_BOUNDARY_MISSING` | Global, locale error, not-found and loading boundaries exist. |
 | R54 | `FE_ROUTE_FILES_THIN` | Route files mount one owner; Next conventions (`proxy.ts`, metadata). |
 | R55 | `FE_CLIENT_BOUNDARY` | Server first; `"use client"` only where allowed. |
-| R56 | `FE_HOOKS_ARE_HOOKS` | `hooks/` hold hooks and one shared file per domain. |
+| R56 | `FE_HOOKS_ARE_HOOKS` | `hooks/` hold hooks and one shared file per domain; a product hook is defined only there and imported through its index. |
 | R57 | `FE_OWNER_REACHABLE` | Every owner is mounted; every href resolves to a route. |
 | R58 | `FE_I18N_LITERAL` | No display text at any tier, no escape comment. |
 | R59 | `FE_I18N_PLACEMENT` | `next-intl` with `[locale]`; the next-intl stack is written once per repository: `packages/<family>-i18n` (`createAppI18n`) called by each app's `modules/i18n/index.ts`, or the only app's `modules/i18n/`. |
@@ -563,5 +563,5 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R66 | `FE_E2E_SHAPE` | Playwright shape, three viewports, no environment coupling. |
 | R67 | `FE_SPEC_QUALITY` | No class pinning, no barrel specs, axe per connected screen. |
 | R91 | `FE_SOURCE_FORM` | Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc and no emoji. |
-| R92 | `FE_COMPONENT_API` | A component exposes the canon surface: typed named props and slots, a presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file. |
-| R93 | `FE_VENDOR_BOUNDARY` | Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner. |
+| R92 | `FE_COMPONENT_API` | A component exposes the canon surface: typed named props and slots, a presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file; a pure component reaches no hook, router, locale or API. |
+| R93 | `FE_VENDOR_BOUNDARY` | Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner; the Grammar package is imported only through its selected code and style entry and keeps its declared contract. |

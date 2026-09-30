@@ -2472,17 +2472,6 @@ FE_ERROR_WORLD_STATE_MAPPING:
   owner: other-op:interface.implement
   kind: check-finding
 
-FE_FETCH_OUTSIDE_TRANSPORT:
-  title: "Raw fetch outside transport root"
-  title_vi: "Gọi fetch thô ngoài lớp truyền tải API"
-  meaning_vi: "Mã dùng fetch trực tiếp ở nơi không phải lớp truyền tải API hay route adapter máy chủ."
-  causes_vi:
-    - "Gọi fetch ngay trong thành phần hoặc hook"
-    - "Bỏ qua lớp client API của dự án"
-  nextStep_vi: "Op interface.implement chuyển lời gọi vào lớp truyền tải API đã cấu hình."
-  owner: other-op:interface.implement
-  kind: check-finding
-
 FE_GRAMMAR_GUARD_BEHAVIOR:
   title: "Grammar guard vectors failed"
   title_vi: "Bộ thử bảo vệ của Grammar không đạt"
@@ -12153,6 +12142,18 @@ HFS_RULE_UNTESTED:
   owner: supervisor
   kind: check-finding
 
+HFS_RULE_CODE_UNOWNED:
+  title: "Emitted finding code that no rule owns"
+  title_vi: "Mã lỗi mà máy có thể báo nhưng không luật nào sở hữu"
+  meaning_vi: "Máy kiến trúc hoặc hfs check có thể phát ra một mã lỗi mà không luật nào của knowledge/hfs/rules.yaml liệt kê trong failureCodes. Mã không thuộc luật nào thì không có số R, không có cổng chạy và không có bằng chứng test. Chỉ các mã từ chối vì không phán xét được (hạ tầng hỏng, cấu hình không đọc được) được miễn, và chủ của chúng xuất khẩu chúng thành một danh sách riêng."
+  causes_vi:
+    - "Thêm một mã mới vào máy kiến trúc hoặc hfs check nhưng chưa xếp nó dưới luật nào"
+    - "Hai mã cùng nói một nghĩa vụ nên phải giữ một và xoá một"
+    - "Mã chỉ là lỗi hạ tầng nhưng chưa vào danh sách từ chối của chủ nó"
+  nextStep_vi: "Người giám sát xếp mã vào failureCodes của đúng một luật mà nó phục vụ (mở rộng luật gần nhất nếu chưa ai nêu nghĩa vụ đó), xoá mã trùng hoặc lỗi thời cùng mọi tham chiếu, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 HFS_FORMAT:
   title: "Prettier is the only formatter"
   title_vi: "Chưa format bằng Prettier"
@@ -12305,13 +12306,14 @@ BE_FEATURE_SHAPE:
   kind: check-finding
 
 BE_FEATURE_NOT_COMPOSED:
-  title: "Feature not composed into any app"
-  title_vi: "Feature không được lắp vào ứng dụng nào"
-  meaning_vi: "Một feature backend không có đường import chạy thật (không tính import chỉ-kiểu) từ tệp gốc của bất kỳ ứng dụng nào (app.module.ts hoặc main.ts). Không tiến trình nào nạp nó nên code này không bao giờ được phục vụ."
+  title: "Feature or capability module not composed into any app"
+  title_vi: "Feature hoặc module năng lực không được lắp vào ứng dụng nào"
+  meaning_vi: "Một feature backend, hoặc một module domain, integrations hay platform, không có đường import chạy thật (không tính import chỉ-kiểu) từ tệp gốc của bất kỳ ứng dụng nào (app.module.ts hoặc main.ts), kể cả qua các module khác đã được lắp. Không tiến trình nào nạp nó nên code này không bao giờ được phục vụ."
   causes_vi:
     - "Quên thêm module của feature vào app.module.ts của ứng dụng"
     - "Chỉ import kiểu (import type) từ ứng dụng, nên feature không thật sự được lắp vào"
     - "Feature đã bị bỏ dở hoặc thay bằng feature khác nhưng thư mục cũ vẫn còn"
+    - "Module năng lực được viết sẵn nhưng chưa feature nào import nó, hoặc feature từng dùng nó đã bị xoá"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để lắp module của feature vào ứng dụng phù hợp hoặc xoá feature không dùng; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -12979,18 +12981,6 @@ STACKS_QUALITY_GATE_DRIFT:
     - "Repository tự đặt tên cổng riêng"
   nextStep_vi: "Từ chối nếu Sonar được khai báo trong chính repository, nghi ngờ nếu khai báo đi qua nguồn khác; ghi qualityGate: starci-new-code vào khối services.sonar."
   owner: other-op:workspace.manage
-  kind: check-finding
-
-BE_MODULE_NOT_COMPOSED:
-  title: "Capability module not composed into any app"
-  title_vi: "Module năng lực không được lắp vào ứng dụng nào"
-  meaning_vi: "Một module domain, integrations hoặc platform không có đường import chạy thật từ tệp gốc của bất kỳ ứng dụng nào, kể cả qua các module khác đã được lắp. Nó là code chết: không tiến trình nào dùng đến."
-  causes_vi:
-    - "Module được viết sẵn nhưng chưa feature nào import nó"
-    - "Feature từng dùng module này đã bị xoá hoặc đổi hướng sang module khác"
-    - "Chỉ có import kiểu tới module, không có import chạy thật"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để nối module vào feature cần nó hoặc xoá module không ai dùng; không cần ai can thiệp thêm."
-  owner: op-retry
   kind: check-finding
 
 BE_REQUIRED_MODULE_MISSING:

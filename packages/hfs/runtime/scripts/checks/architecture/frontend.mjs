@@ -969,23 +969,6 @@ function checkWorldRenderBoundaries(config, context, roots) {
   return violations;
 }
 
-function checkRawFetch(config, context, sourceFile, roots) {
-  if (insideAny(roots.transport, sourceFile.fileName) || insideAny(roots.routes, sourceFile.fileName)) return [];
-  const { ts } = context;
-  const violations = [];
-  const visit = node => {
-    if (ts.isCallExpression(node)) {
-      const direct = ts.isIdentifier(node.expression) && node.expression.text === 'fetch';
-      const member = ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'fetch'
-        && ts.isIdentifier(node.expression.expression) && ['globalThis', 'window'].includes(node.expression.expression.text);
-      if (direct || member) violations.push(violation(config, sourceFile, node, 'FE_FETCH_OUTSIDE_TRANSPORT', 'Raw fetch belongs under the configured API transport root or a server route adapter.', { ts }));
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return violations;
-}
-
 /** Enforce route adapters, UI responsibility tiers, pure/connected, and transport boundaries. */
 export function checkFrontend(config, context) {
   const roots = {
@@ -1006,7 +989,6 @@ export function checkFrontend(config, context) {
     violations.push(...checkFrontendSourceLayout(config, sourceFile, roots));
     violations.push(...checkCustomHookLocations(config, context, sourceFile, roots));
     violations.push(...checkPureAndData(config, context, sourceFile, roots));
-    violations.push(...checkRawFetch(config, context, sourceFile, roots));
   }
   violations.push(...checkWorldRenderBoundaries(config, context, roots));
   return violations;

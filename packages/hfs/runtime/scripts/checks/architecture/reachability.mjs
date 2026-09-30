@@ -9,7 +9,7 @@
  *       must resolve to a route of that app (page.tsx / route.ts under src/app, route groups and [locale] transparent).
  * Only literals are judged: a computed href is counted as skipped, never guessed at.
  */
-export const REACHABILITY_RULE_IDS = ['BE_FEATURE_NOT_COMPOSED', 'BE_MODULE_NOT_COMPOSED', 'FE_OWNER_REACHABLE', 'FE_HREF_RESOLVES'];
+export const REACHABILITY_RULE_IDS = ['BE_FEATURE_NOT_COMPOSED', 'FE_OWNER_REACHABLE', 'FE_HREF_RESOLVES'];
 
 const BE_CAPABILITY_SLOTS = new Set(['be.domain', 'be.integrations', 'be.platform']);
 const TEST_FILE = /(?:\.(?:spec|test|stories|e2e-spec)\.[cm]?[jt]sx?$)|(?:(?:^|\/)__tests__\/)/;
@@ -78,7 +78,7 @@ function checkBackend(graph) {
     counts.notComposed += 1;
     const label = root.replace(/\/$/, '');
     violations.push({
-      ruleId: feature ? 'BE_FEATURE_NOT_COMPOSED' : 'BE_MODULE_NOT_COMPOSED',
+      ruleId: 'BE_FEATURE_NOT_COMPOSED',
       path: entryOf(root, files), owner: label, slot, appRoots: roots,
       message: `${feature ? 'Feature' : 'Module'} ${label} is not composed into any app: no runtime import path leads from ${roots.join(', ')} to it (a type-only import composes nothing), so it is dead code that no process serves.`,
     });

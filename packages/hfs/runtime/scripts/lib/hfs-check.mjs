@@ -56,6 +56,14 @@ import { testTopologyFindings } from './hfs-rules/test-topology.mjs';
 
 export const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
+/**
+ * The codes `hfs check` and `hfs init` report when they cannot judge (an unreadable repository, a refused declaration or
+ * manifest, an init that cannot proceed): infrastructure refusals, never obligations, so no rule of knowledge/hfs/rules.yaml owns them.
+ */
+export const REFUSAL_CODES = Object.freeze([
+  'HFS_INIT_EXISTS', 'HFS_INIT_UNDETECTED', 'HFS_REPO_UNREADABLE',
+  'HFS_DECLARATION_INVALID', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID',
+]);
 /** The codes this module emits that are not the slot loader's own: the why bundle of packages/hfs ships exactly these plus the loader's. */
 export const CHECK_CODES = Object.freeze([
   'HFS_SLOT_UNDECLARED', 'HFS_SLOT_NOT_ENABLED', 'HFS_SLOT_AMBIGUOUS', 'HFS_TRACKED_MUST_BE_IGNORED', 'HFS_FORBIDDEN_PRESENT',
@@ -64,9 +72,8 @@ export const CHECK_CODES = Object.freeze([
   'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT',
   'BE_TEST_TOPOLOGY', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG',
   'HFS_GITIGNORE_BLOCK_DRIFT', 'HFS_SONAR_CONFIG', 'HFS_FORMAT', 'HFS_FORMAT_TOOL_MISSING',
-  'HFS_INIT_EXISTS', 'HFS_INIT_UNDETECTED', 'HFS_REPO_UNREADABLE',
-  'HFS_DECLARATION_INVALID', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
+  ...REFUSAL_CODES,
 ]);
 /** Every code `hfs check` can report: its own and every code the architecture machine can emit (derived from the machine's rule id lists). */
 export const ALL_CHECK_CODES = Object.freeze([...new Set([...CHECK_CODES, ...ARCHITECTURE_RULE_IDS])].sort());

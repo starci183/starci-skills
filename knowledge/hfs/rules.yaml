@@ -38,18 +38,21 @@ rules:
     law: "Every tracked path matches exactly one slot."
     kinds: [check]
     gates: [pre-push, settle, land, ci]
-    failureCodes: ["HFS_SLOT_UNDECLARED", "HFS_SLOT_AMBIGUOUS", "HFS_SLOT_NOT_ENABLED", "HFS_FORBIDDEN_PRESENT", "HFS_TRACKED_MUST_BE_IGNORED"]
+    failureCodes: ["HFS_SLOT_UNDECLARED", "HFS_SLOT_AMBIGUOUS", "HFS_SLOT_NOT_ENABLED", "HFS_FORBIDDEN_PRESENT", "HFS_TRACKED_MUST_BE_IGNORED", "HFS_ROOT_ENTRY_FORBIDDEN", "HFS_ROOT_MARKDOWN_FORBIDDEN", "HFS_ROOT_SRC_FORBIDDEN_FE", "HFS_SRC_LAYOUT_INVALID", "HFS_MODULE_TIER_INVALID", "HFS_WORK_IN_FE", "HFS_STACKS_IN_FE"]
     enforcers:
       - {kind: hfs, id: slot-undeclared, at: scripts/lib/hfs-check.mjs}
+      - {kind: machine, id: repository-tree-layout, at: scripts/checks/architecture/hfs.mjs}
   - id: R02
     code: "HFS_SLOT_REQUIRED_MISSING"
     title_vi: "Ô thiếu tệp bắt buộc"
-    law: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`)."
+    law: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`), or the root README breaks its standard shape (title, description, standard sections in order, Work pointer, live badges only, no private URL)."
     kinds: [check, codemod]
     gates: [settle, land, ci]
-    failureCodes: ["HFS_SLOT_REQUIRED_MISSING", "HFS_MIN_INSTANCES"]
+    failureCodes: ["HFS_SLOT_REQUIRED_MISSING", "HFS_MIN_INSTANCES", "BE_REQUIRED_MODULE_MISSING", "HFS_REQUIRED_FILE_MISSING", "HFS_ROOT_ENTRY_MISSING", "HFS_APPS_REQUIRED", "HFS_APP_LAYOUT_INVALID", "HFS_README_TITLE_INVALID", "HFS_README_DESCRIPTION_INVALID", "HFS_README_SECTION_MISSING", "HFS_README_SECTION_ORDER", "HFS_README_DEVELOPMENT_INCOMPLETE", "HFS_README_WORK_POINTER_MISSING", "HFS_README_PRIVATE_URL", "HFS_README_BADGE_NOT_LIVE"]
     enforcers:
       - {kind: hfs, id: slot-required-missing, at: scripts/lib/hfs-check.mjs}
+      - {kind: machine, id: required-files, at: scripts/checks/architecture/required-files.mjs}
+      - {kind: machine, id: repository-tree-required, at: scripts/checks/architecture/hfs.mjs}
   - id: R03
     code: "HFS_UNTRACKED_ROOT_ENTRY"
     title_vi: "Mục lạ ở gốc kho"
@@ -155,12 +158,13 @@ rules:
   - id: R14
     code: "HFS_DEP_VERSION_SKEW"
     title_vi: "Một gói nhiều phiên bản"
-    law: "One version per dependency in the workspace."
+    law: "One version per dependency in the workspace, and npm is the only package manager."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
-    failureCodes: ["HFS_DEP_VERSION_SKEW"]
+    failureCodes: ["HFS_DEP_VERSION_SKEW", "HFS_PACKAGE_MANAGER_MIXED"]
     enforcers:
       - {kind: hfs, id: dep-version-skew, at: scripts/lib/hfs-rules/deps.mjs}
+      - {kind: machine, id: package-manager, at: scripts/checks/architecture/hfs.mjs}
   - id: R15
     code: "HFS_CANON_PIN_DRIFT"
     title_vi: "Phiên bản canon lệch bản pin"
@@ -275,12 +279,13 @@ rules:
   - id: R26
     code: "BE_TIER_DIRECTION"
     title_vi: "Hướng import giữa các tầng bị cấm"
-    law: "The tier direction matrix."
+    law: "The tier direction matrix; a shared package never imports an app."
     kinds: [check, design]
     gates: [pre-push, settle, land, ci]
-    failureCodes: ["BE_TIER_DIRECTION"]
+    failureCodes: ["BE_TIER_DIRECTION", "FE_TIER_DIRECTION", "ARCH_PACKAGE_IMPORTS_APP"]
     enforcers:
       - {kind: machine, id: tier-direction, at: scripts/checks/architecture/tiers.mjs}
+      - {kind: machine, id: package-imports-app, at: scripts/checks/architecture/typescript.mjs}
   - id: R27
     code: "ARCH_OWNER_CYCLE"
     title_vi: "Vòng phụ thuộc giữa các owner"
@@ -302,19 +307,21 @@ rules:
   - id: R29
     code: "BE_FEATURE_SHAPE"
     title_vi: "Feature sai hình dạng"
-    law: "Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`."
+    law: "Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`; `application/` never imports `transport/` or a protocol framework."
     kinds: [check, codemod, design]
     gates: [settle, land, ci]
-    failureCodes: ["BE_FEATURE_SHAPE"]
+    failureCodes: ["BE_FEATURE_SHAPE", "BE_FEATURE_LAYOUT_INVALID", "BE_APPLICATION_IMPORTS_TRANSPORT", "BE_APPLICATION_TRANSPORT_FRAMEWORK"]
     enforcers:
       - {kind: machine, id: feature-shape, at: scripts/checks/architecture/feature-shape.mjs}
+      - {kind: machine, id: feature-layout, at: scripts/checks/architecture/source-names.mjs}
+      - {kind: machine, id: application-never-imports-transport, at: scripts/checks/architecture/backend.mjs}
   - id: R30
     code: "BE_PUBLIC_SURFACE"
     title_vi: "Import sâu qua cổng công khai"
-    law: "Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export, at most 60 exports."
+    law: "Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export, at most 60 exports; cross-package imports use the package name and a declared export."
     kinds: [check, lint, codemod]
     gates: [pre-push, settle, land, ci]
-    failureCodes: ["BE_PUBLIC_SURFACE", "ARCH_OWNER_EXPORT_BYPASS", "ARCH_OWNER_EXPORT_STAR", "HFS_ALIAS_REEXPORT"]
+    failureCodes: ["BE_PUBLIC_SURFACE", "ARCH_OWNER_EXPORT_BYPASS", "ARCH_OWNER_EXPORT_STAR", "HFS_ALIAS_REEXPORT", "ARCH_PACKAGE_EXPORT_BYPASS"]
     enforcers:
       - {kind: eslint-be, id: import-owner-entry}
       - {kind: eslint-be, id: no-folder-reexport}
@@ -322,10 +329,11 @@ rules:
       - {kind: machine, id: alias-reexport, at: scripts/checks/architecture/symbols.mjs}
       - {kind: eslint-be, id: no-relative-capability-escape}
       - {kind: eslint-be, id: no-self-module-alias}
+      - {kind: machine, id: package-export-bypass, at: scripts/checks/architecture/typescript.mjs}
   - id: R31
     code: "BE_FEATURE_NOT_COMPOSED"
     title_vi: "Feature không được app nào compose"
-    law: "Every feature and transport module is composed by an app."
+    law: "Every feature, transport module and capability module is composed by an app."
     kinds: [check, design]
     gates: [land, ci]
     failureCodes: ["BE_FEATURE_NOT_COMPOSED"]
@@ -337,7 +345,7 @@ rules:
     law: "Apps compose only; the composition spec boots the real module."
     kinds: [check, codemod]
     gates: [settle, land, ci]
-    failureCodes: ["BE_APP_COMPOSITION_ONLY"]
+    failureCodes: ["BE_APP_COMPOSITION_ONLY", "BE_APP_BUSINESS_ROLE"]
     enforcers:
       - {kind: machine, id: app-composition-only, at: scripts/checks/architecture/backend.mjs}
       - {kind: machine, id: composition-spec-boots-real-module, at: scripts/checks/architecture/composition-spec.mjs}
@@ -464,10 +472,10 @@ rules:
   - id: R45
     code: "BE_MODULE_SHAPE"
     title_vi: "Module sai hình dạng"
-    law: "`@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport."
+    law: "`@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport; every handler and provider registered exactly once."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["BE_MODULE_SHAPE"]
+    failureCodes: ["BE_MODULE_SHAPE", "BE_MODULE_HANDLER_REGISTRATION", "BE_MODULE_PROVIDER_REREGISTRATION"]
     enforcers:
       - {kind: eslint-be, id: no-global-decorator}
       - {kind: eslint-be, id: is-global-only-in-app}
@@ -480,6 +488,7 @@ rules:
       - {kind: eslint-be, id: one-module-per-file}
       - {kind: machine, id: register-once, at: scripts/checks/architecture/register-once.mjs}
       - {kind: machine, id: module-per-transport, at: scripts/checks/architecture/module-per-transport.mjs}
+      - {kind: machine, id: module-registration, at: scripts/checks/architecture/registration.mjs}
   - id: R46
     code: "BE_BACKGROUND_UNOWNED"
     title_vi: "Việc nền không có ai chạy"
@@ -502,6 +511,7 @@ rules:
       - {kind: eslint-be, id: unit-test-colocated}
       - {kind: eslint-be, id: e2e-no-schema-work}
       - {kind: eslint-be, id: e2e-fakes-external-only}
+      - {kind: machine, id: test-kind-retired, at: scripts/checks/architecture/hfs.mjs}
   - id: R48
     code: "BE_SPEC_QUALITY"
     title_vi: "Spec đọc mã nguồn hoặc ép kiểu mock"
@@ -533,10 +543,10 @@ rules:
   - id: R50
     code: "FE_TRANSPORT_OWNER"
     title_vi: "fetch ngoài client duy nhất"
-    law: "One `fetch` per repository, in the transport client: `apps/<app>/src/modules/api/client.ts` of a one-app repository or `packages/<family>-api/src/client.ts` shared by every app; timeout and abort."
+    law: "One `fetch` per repository, in the transport client: `apps/<app>/src/modules/api/client.ts` of a one-app repository or `packages/<family>-api/src/client.ts` shared by every app; timeout and abort; a client read is SWR whose key carries the identity of its result, and a mutation is tied to its resource."
     kinds: [check, lint, design]
     gates: [settle, land, ci]
-    failureCodes: ["FE_TRANSPORT_OWNER", "FE_EFFECT_FETCH"]
+    failureCodes: ["FE_TRANSPORT_OWNER", "FE_EFFECT_FETCH", "FE_SWR_KEY_IDENTITY", "FE_SWR_MUTATION_RESOURCE_IDENTITY"]
     enforcers:
       - {kind: eslint-fe, id: fetch-only-in-api-client}
       - {kind: eslint-fe, id: client-fetch-has-signal}
@@ -545,6 +555,7 @@ rules:
       - {kind: machine, id: transport-owner, at: scripts/checks/architecture/transport-owner.mjs}
       - {kind: eslint-fe, id: api-client-attaches-the-locale}
       - {kind: eslint-fe, id: locale-header-belongs-to-the-link}
+      - {kind: machine, id: swr-data-lifecycle, at: scripts/checks/architecture/next-data.mjs}
   - id: R51
     code: "FE_HTTP_STATUS_COLLAPSE"
     title_vi: "Gộp mọi mã HTTP thành một nhánh"
@@ -583,11 +594,12 @@ rules:
     law: "Route files mount one owner; Next conventions (`proxy.ts`, metadata)."
     kinds: [check, lint]
     gates: [settle, land, ci]
-    failureCodes: ["FE_ROUTE_FILES_THIN", "FE_NEXT_CONVENTIONS", "FE_PAGE_METADATA_MISSING"]
+    failureCodes: ["FE_ROUTE_FILES_THIN", "FE_NEXT_CONVENTIONS", "FE_PAGE_METADATA_MISSING", "FE_ROUTE_ONE_PAGE", "FE_ROUTE_DRAWING_DECISION", "FE_ROUTE_CLIENT_BOUNDARY", "FE_ROUTE_CLIENT_HOOK", "FE_ROUTE_DEFAULT_EXPORT"]
     enforcers:
       - {kind: eslint-fe, id: no-middleware-file}
       - {kind: eslint-fe, id: page-exports-metadata}
       - {kind: machine, id: route-files-thin, at: scripts/checks/architecture/route-files-thin.mjs}
+      - {kind: machine, id: route-adapter, at: scripts/checks/architecture/frontend.mjs}
   - id: R55
     code: "FE_CLIENT_BOUNDARY"
     title_vi: "use client sai chỗ"
@@ -603,20 +615,21 @@ rules:
   - id: R56
     code: "FE_HOOKS_ARE_HOOKS"
     title_vi: "hooks/ chứa thứ không phải hook"
-    law: "`hooks/` hold hooks and one shared file per domain."
+    law: "`hooks/` hold hooks and one shared file per domain; a product hook is defined only there and imported through its index."
     kinds: [check, codemod]
     gates: [settle, land, ci]
-    failureCodes: ["FE_HOOKS_ARE_HOOKS"]
+    failureCodes: ["FE_HOOKS_ARE_HOOKS", "FE_CUSTOM_HOOK_LOCATION", "FE_BLOCK_PRODUCT_HOOK_DEFINITION", "FE_COMPONENT_DEEP_HOOK_IMPORT"]
     enforcers:
       - {kind: eslint-fe, id: hooks-folder-holds-hooks-only}
       - {kind: machine, id: hooks-are-hooks, at: scripts/checks/architecture/hooks-are-hooks.mjs}
+      - {kind: machine, id: hook-location, at: scripts/checks/architecture/frontend.mjs}
   - id: R57
     code: "FE_OWNER_REACHABLE"
     title_vi: "Owner không được route nào mount"
     law: "Every owner is mounted; every href resolves to a route."
     kinds: [check, design, lint]
     gates: [settle, land, ci]
-    failureCodes: ["FE_OWNER_REACHABLE", "FE_ROUTE_HARDCODED"]
+    failureCodes: ["FE_OWNER_REACHABLE", "FE_ROUTE_HARDCODED", "FE_HREF_RESOLVES"]
     enforcers:
       - {kind: eslint-fe, id: no-hardcoded-route}
       - {kind: machine, id: owner-reachable, at: scripts/checks/architecture/reachability.mjs}
@@ -944,10 +957,10 @@ rules:
   - id: R87
     code: "BE_CQRS_SHAPE"
     title_vi: "Tầng ứng dụng sai hình CQRS"
-    law: "The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`; no use-case classes, forwarder services or in-process events."
-    kinds: [lint, codemod]
+    law: "The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`; no use-case classes, forwarder services or in-process events; a message and an injected dependency are `readonly`."
+    kinds: [lint, codemod, check]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["BE_CQRS_SHAPE"]
+    failureCodes: ["BE_CQRS_SHAPE", "BE_READONLY_BOUNDARY"]
     enforcers:
       - {kind: eslint-be, id: handler-overrides-process}
       - {kind: eslint-be, id: message-carries-params-only}
@@ -955,6 +968,7 @@ rules:
       - {kind: eslint-be, id: no-use-case}
       - {kind: eslint-be, id: no-event-bus}
       - {kind: eslint-be, id: execute-params-shape}
+      - {kind: machine, id: readonly-boundary, at: scripts/checks/architecture/contracts.mjs}
   - id: R88
     code: "BE_TRANSPORT_SHAPE"
     title_vi: "Tầng giao tiếp làm nhiều hơn chuyển lệnh"
@@ -973,10 +987,10 @@ rules:
   - id: R89
     code: "BE_SOURCE_FORM"
     title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"
-    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji or Vietnamese outside message catalogs."
+    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji or Vietnamese outside message catalogs; a public input or output is a named contract, never an inline object type."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["BE_SOURCE_FORM"]
+    failureCodes: ["BE_SOURCE_FORM", "BE_PUBLIC_CONTRACT_FORM"]
     enforcers:
       - {kind: eslint-be, id: require-export-jsdoc}
       - {kind: eslint-be, id: require-enum-member-jsdoc}
@@ -991,6 +1005,7 @@ rules:
       - {kind: eslint-be, id: no-default-export}
       - {kind: hfs, id: source-suffix, at: scripts/lib/hfs-check.mjs}
       - {kind: machine, id: source-names, at: scripts/checks/architecture/source-names.mjs}
+      - {kind: machine, id: public-contract-form, at: scripts/checks/architecture/contracts.mjs}
   - id: R90
     code: "BE_INFRA_OWNER"
     title_vi: "Thư viện hạ tầng dùng ngoài năng lực sở hữu"
@@ -1004,9 +1019,9 @@ rules:
     code: "FE_SOURCE_FORM"
     title_vi: "Tệp nguồn FE sai quy ước tên, vị trí hoặc chú thích"
     law: "Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc and no emoji."
-    kinds: [lint, codemod]
+    kinds: [lint, codemod, check]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["FE_SOURCE_FORM"]
+    failureCodes: ["FE_SOURCE_FORM", "FE_SOURCE_LAYOUT_INVALID"]
     enforcers:
       - {kind: eslint-fe, id: require-export-jsdoc}
       - {kind: eslint-fe, id: no-emoji-in-source}
@@ -1023,13 +1038,14 @@ rules:
       - {kind: eslint-fe, id: handler-on-prefix}
       - {kind: eslint-fe, id: no-second-language-in-path}
       - {kind: eslint-fe, id: no-direct-const-alias}
+      - {kind: machine, id: frontend-source-layout, at: scripts/checks/architecture/frontend.mjs}
   - id: R92
     code: "FE_COMPONENT_API"
     title_vi: "Component FE sai bề mặt công khai"
-    law: "A component exposes the canon surface: typed named props and slots, a presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file."
-    kinds: [lint, design]
+    law: "A component exposes the canon surface: typed named props and slots, a presentational twin for every connected block, status through the slot view, no className or CSS doors, no resting twin or placeholder prop, class names in the colocated file; a pure component reaches no hook, router, locale or API."
+    kinds: [lint, design, check]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["FE_COMPONENT_API"]
+    failureCodes: ["FE_COMPONENT_API", "FE_COMPONENT_WORLD_OWNERSHIP", "FE_WORLD_OWNER_RENDER_BOUNDARY", "FE_CONNECTED_BLOCK_RENDER_PAIR", "FE_PURE_REACHES_DATA", "FE_PURE_WORLD_HOOK", "FE_PURE_WORLD_IMPORT"]
     enforcers:
       - {kind: eslint-fe, id: no-inline-parameter-type}
       - {kind: eslint-fe, id: public-component-signature}
@@ -1049,16 +1065,18 @@ rules:
       - {kind: eslint-fe, id: no-inline-class-name}
       - {kind: eslint-fe, id: class-names-in-colocated-file}
       - {kind: eslint-fe, id: cn-arguments-are-single-tokens}
+      - {kind: machine, id: component-purity, at: scripts/checks/architecture/frontend.mjs}
   - id: R93
     code: "FE_VENDOR_BOUNDARY"
     title_vi: "Thư viện giao diện bên ngoài dùng ngoài chủ sở hữu"
-    law: "Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner."
-    kinds: [lint, codemod]
+    law: "Vendor primitives and icons reach components only through their named owner: heroicons through the icon leaf at the glyph scale, every vendor primitive behind a named owner; the Grammar package is imported only through its selected code and style entry and keeps its declared contract."
+    kinds: [lint, codemod, check]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["FE_VENDOR_BOUNDARY"]
+    failureCodes: ["FE_VENDOR_BOUNDARY", "ARCH_GRAMMAR_CONTRACT_INVALID", "ARCH_GRAMMAR_EXPORT_BYPASS"]
     enforcers:
       - {kind: eslint-fe, id: no-vendor-icon-outside-icon-leaf}
       - {kind: eslint-fe, id: heroicons-is-the-glyph-vendor}
       - {kind: eslint-fe, id: no-off-scale-glyph-size}
       - {kind: eslint-fe, id: no-decorative-icon-in-metric-cell}
       - {kind: eslint-fe, id: vendor-primitive-has-named-owner}
+      - {kind: machine, id: grammar-entry, at: scripts/checks/architecture/frontend.mjs}
