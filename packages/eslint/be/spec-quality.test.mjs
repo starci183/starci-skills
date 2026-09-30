@@ -1,13 +1,17 @@
+import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { specNoSourceRead, specTypedDoubles } from "./spec-quality.mjs"
+import { at, fixtureHfs } from "./fixtures/typed/tester.mjs"
+import { rules, specNoSourceRead } from "./spec-quality.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
+    settings: { starci: { hfs: fixtureHfs() } },
 })
-const SPEC = "D:/repo/src/modules/domain/plan/plan.service.spec.ts"
-const SERVICE = "D:/repo/src/modules/domain/plan/plan.service.ts"
+const SPEC = at("src/modules/domain/plan/plan.service.spec.ts")
+const E2E = at("src/tests/e2e/checkout/checkout.e2e-spec.ts")
+const SERVICE = at("src/modules/domain/plan/plan.service.ts")
 
 test("a spec does not read the repository's source files", () => {
     tester.run("spec-no-source-read", specNoSourceRead, {
@@ -19,7 +23,7 @@ test("a spec does not read the repository's source files", () => {
             { filename: SPEC, code: "import { readFile } from 'node:fs/promises'\nconst target = makeTmp()\nawait readFile(join(target, 'out.json'))" },
             { filename: SPEC, code: "import fs from 'node:fs'\nfs.readdirSync(outputDir)" },
             // production code may read files; this rule judges specs
-            { filename: SERVICE, code: "import { readFileSync } from 'node:fs'\nreadFileSync('src/a.ts')" },
+            { filename: SERVICE, code: "import { readFileSync } from 'node:fs'\nreadFileSync('src/modules/domain/plan/plan.service.ts')" },
         ],
         invalid: [
             { filename: SPEC, code: "import { readFileSync } from 'node:fs'\nreadFileSync('src/a.ts', 'utf8')", errors: [{ messageId: "read" }] },
@@ -38,19 +42,26 @@ test("a spec does not read the repository's source files", () => {
     })
 })
 
-test("a double is a typed mock, never a cast", () => {
-    tester.run("spec-typed-doubles", specTypedDoubles, {
-        valid: [
-            { filename: SPEC, code: "const repo = mock<PlanRepository>()" },
-            { filename: SPEC, code: "const x = value as PlanSummary" },
-            { filename: SPEC, code: "const x = value as unknown" },
-            // production code is judged by no-double-cast, not by this rule
-            { filename: SERVICE, code: "const x = value as never" },
-        ],
+
+test("a spec is judged the same whether it is a unit spec or an e2e spec", () => {
+    tester.run("spec-no-source-read", specNoSourceRead, {
+        valid: [{ filename: E2E, code: "import { readFileSync } from 'node:fs'\nreadFileSync(join(outputDir, 'receipt.json'))" }],
+        invalid: [{ filename: E2E, code: "import { readFileSync } from 'node:fs'\nreadFileSync('src/modules/domain/plan/plan.service.ts')", errors: [{ messageId: "read" }] }],
+    })
+})
+
+test("a path the slot manifest places in the repository is source, whatever it is called", () => {
+    tester.run("spec-no-source-read", specNoSourceRead, {
+        valid: [{ filename: SPEC, code: "import { readdirSync } from 'node:fs'\nreaddirSync('tmp/out')" }],
         invalid: [
-            { filename: SPEC, code: "const repo = {} as never", errors: [{ messageId: "never" }] },
-            { filename: SPEC, code: "const repo = fake as unknown as PlanRepository", errors: [{ messageId: "doubleCast" }] },
-            { filename: "D:/repo/src/tests/fixtures/plan.ts", code: "export const p = {} as never", errors: [{ messageId: "never" }] },
+            { filename: SPEC, code: "import { readdirSync } from 'node:fs'\nreaddirSync('src/modules/domain')", errors: [{ messageId: "read" }] },
+            { filename: SPEC, code: "import { readdirSync } from 'node:fs'\nreaddirSync(`./src/features`)", errors: [{ messageId: "read" }] },
+            { filename: SPEC, code: "import { readFileSync } from 'node:fs'\nreadFileSync('apps/api/src/main.ts')", errors: [{ messageId: "read" }] },
+            { filename: SPEC, code: "import { readFileSync } from 'node:fs'\nreadFileSync('anywhere/config.mjs')", errors: [{ messageId: "read" }] },
         ],
     })
+})
+
+test("the cast rules are the factory's borrowed set, not a second copy here", () => {
+    assert.deepEqual(Object.keys(rules), ["spec-no-source-read"])
 })
