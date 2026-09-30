@@ -896,9 +896,9 @@ HFS_CANON_PIN_DRIFT:
   kind: check-finding
 
 HFS_CI_MISSING_CANON:
-  title: "CI runs the pinned `@starci/hfs check`, the one lint gate and typecheck; pre-push runs typecheck and lint"
+  title: "CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint"
   title_vi: "CI thiếu bước canon"
-  meaning_vi: "Workflow hoặc husky pre-push không còn chạy bước `<step>` (`hfs check`, `lint:check` gồm ESLint trên apps, packages, e2e/ và stylelint, hoặc `typecheck`) mà bản render có. Cấu trúc chỉ được kiểm khi agent chạy — CI phải tự kiểm."
+  meaning_vi: "Workflow/husky thiếu bước `<step>`. Cấu trúc chỉ được kiểm khi agent chạy — CI phải tự kiểm."
   causes_vi:
     - "Vi phạm luật R13: CI phải chạy `npx @starci/hfs check` (bản pin); pre-push phải có `typecheck` + `lint:check`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -997,7 +997,7 @@ HFS_FORBIDDEN_PRESENT:
 HFS_FORMAT:
   title: "Prettier is the only formatter"
   title_vi: "Chưa format bằng Prettier"
-  meaning_vi: "`<file>` không còn chạy bước format (`format:check` trong CI hoặc pre-push, `prettier --check` trong pre-commit) mà bản render có. Prettier là formatter duy nhất; cổng chạy nó không được bỏ."
+  meaning_vi: "`<file>` chưa được format. Chạy `npm run format`."
   causes_vi:
     - "Vi phạm luật R19: Prettier (config `@starci/prettier-config`) là formatter duy nhất; ESLint không còn luật định dạng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."

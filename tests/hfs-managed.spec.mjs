@@ -212,33 +212,3 @@ test('a front end: the forbidden tool files (.eslintrc, a second eslint or style
   assert.deepEqual(at(forbidden).sort(), forbidden.map((file) => ['HFS_TOOL_CONFIG_LOCAL', file]).sort());
   assert.deepEqual(at(['eslint.config.mjs', 'stylelint.config.mjs', 'vitest.config.ts', 'vitest.setup.ts', 'playwright.config.ts', '.prettierrc', '.prettierignore', 'apps/web/vitest.config.ts', 'apps/web/tsconfig.json']), []);
 });
-
-test('HFS_CI_MISSING_CANON and HFS_FORMAT: a workflow or hook that drops a canon step its render holds is reported by the step, not as drift; a step only commented out counts as dropped; other edits stay drift', async () => {
-  for (const declaration of [BE, FE]) {
-    const dir = await synced(declaration);
-    const drop = (file, needle) => put(dir, file, read(dir, file).split('\n').filter((line) => !line.includes(needle)).join('\n'));
-    const restore = (file) => put(dir, file, renderTargets(declaration, PRESETS[declaration.profile]).find((target) => target.path === file).content);
-    drop('.github/workflows/ci.yml', 'npm run hfs:report');
-    assert.deepEqual(await findings(dir), [['HFS_CI_MISSING_CANON', '.github/workflows/ci.yml']], `${declaration.profile}: CI without hfs check`);
-    restore('.github/workflows/ci.yml');
-    drop('.github/workflows/ci.yml', 'npm run format:check');
-    assert.deepEqual(await findings(dir), [['HFS_FORMAT', '.github/workflows/ci.yml']], `${declaration.profile}: CI without the format gate`);
-    restore('.github/workflows/ci.yml');
-    put(dir, '.husky/pre-push', read(dir, '.husky/pre-push').replace('npm run typecheck', '# npm run typecheck'));
-    assert.deepEqual(await findings(dir), [['HFS_CI_MISSING_CANON', '.husky/pre-push']], `${declaration.profile}: pre-push with the typecheck commented out`);
-    restore('.husky/pre-push');
-    drop('.husky/pre-push', 'npm run lint:check');
-    drop('.husky/pre-push', 'npm run format:check');
-    assert.deepEqual((await findings(dir)).sort(), [['HFS_CI_MISSING_CANON', '.husky/pre-push'], ['HFS_FORMAT', '.husky/pre-push']], `${declaration.profile}: two steps, one finding each`);
-    restore('.husky/pre-push');
-    drop('.husky/pre-commit', 'prettier --check');
-    assert.deepEqual(await findings(dir), [['HFS_FORMAT', '.husky/pre-commit']], `${declaration.profile}: pre-commit without prettier`);
-    restore('.husky/pre-commit');
-    put(dir, '.husky/pre-push', `${read(dir, '.husky/pre-push')}echo extra\n`);
-    put(dir, '.github/workflows/ci.yml', `${read(dir, '.github/workflows/ci.yml')}# a note\n`);
-    assert.deepEqual((await findings(dir)).sort(), [['HFS_MANAGED_FILE_DRIFT', '.github/workflows/ci.yml'], ['HFS_MANAGED_FILE_DRIFT', '.husky/pre-push']], `${declaration.profile}: every step kept, the rest edited`);
-    restore('.husky/pre-push');
-    restore('.github/workflows/ci.yml');
-    assert.deepEqual(await findings(dir), []);
-  }
-});

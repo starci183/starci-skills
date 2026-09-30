@@ -17,9 +17,7 @@ summary: >-
   test:ci, build) call only managed scripts. (3) @starci/stylelint-canon exports loadAppTokens(import.meta.url), which derives
   `appTokens` from the globals.css files, so the managed stylelint.config.mjs holds no repository choice. (4) hfs check judges both
   profiles: HFS_RULE_OFF_WITHOUT_REPLACEMENT also for stylelint.config.mjs, HFS_TS_STRICT for the front end's root tsconfig,
-  HFS_TOOL_CONFIG_LOCAL also for stylelint plugins, stylelint flags and tool configuration keys of a package.json, and the new gate
-  findings HFS_CI_MISSING_CANON (R13) and HFS_FORMAT (R19), reported when the CI workflow or a hook lost a canon step of its render
-  (ci-missing-canon and format ship as `hfs` enforcers in packages/hfs/sync/managed.mjs). (5) Sonar (amends hfs-sonar-import):
+  HFS_TOOL_CONFIG_LOCAL also for stylelint plugins, stylelint flags and tool configuration keys of a package.json. (5) Sonar (amends hfs-sonar-import):
   `hfs report <eslint|stylelint> <in> <out>` replaces `hfs report-stylelint` and converts both linters through one placement rule,
   so a finding on a file outside sonar.sources (packages, e2e/, a config file) is filed on the first source file with its real
   path in the message instead of being dropped; sonar.eslint.reportPaths is no longer rendered (both profiles) and
