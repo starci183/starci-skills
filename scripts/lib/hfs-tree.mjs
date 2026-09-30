@@ -4,7 +4,7 @@
 // Read-only: it walks the file system and asks git, nothing else.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { gitOutput } from './git.mjs';
 import { posixPath } from './path-key.mjs';
 
 /** Directory names no tree check enters: git's own store and installed packages. */
@@ -75,6 +75,6 @@ export function treeFacts(tree) {
 
 /** Entries git neither tracks nor ignores, as it prints them (a wholly untracked directory is one entry ending in '/'). */
 export function untrackedEntries(repoRoot) {
-  const out = execFileSync('git', ['-C', repoRoot, 'ls-files', '-z', '--others', '--exclude-standard', '--directory', '--no-empty-directory'], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+  const out = gitOutput(['ls-files', '-z', '--others', '--exclude-standard', '--directory', '--no-empty-directory'], { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 });
   return out.split('\0').filter(Boolean).map(posixPath);
 }

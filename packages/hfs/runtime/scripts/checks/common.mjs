@@ -8,9 +8,6 @@ export function isInside(root, target) {
   return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
 }
 
-/** Whether posix `file` is `prefix` itself or under it (`file === prefix || file` starts with `prefix/`). */
-export const sameOrUnder = (file, prefix) => file === prefix || file.startsWith(`${prefix}/`);
-
 /** True when this module is the process entry point (`node file.mjs`, not an import). */
 export const isMain = (metaUrl, argv = process.argv) => Boolean(argv[1]) && path.resolve(argv[1]) === fileURLToPath(metaUrl);
 

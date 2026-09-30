@@ -242,7 +242,7 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
 
 // ------------------------------------------------------------------------------------------ the whole check
 
-const gitOut = (repoRoot, args) => execFileSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+const gitOut = (repoRoot, args) => gitOutput(args, { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 });
 
 /** The merge-base of HEAD with `base`, else with origin/main, else with main; null when none resolves. */
 function mergeBaseOf(repoRoot, base) {

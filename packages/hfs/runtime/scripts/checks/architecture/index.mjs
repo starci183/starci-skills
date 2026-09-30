@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { canonical, loadArchitectureConfig } from './config.mjs';
-import { sameOrUnder } from '../common.mjs';
+import { sameOrUnder } from '../../lib/path-key.mjs';
 import { buildTypeScriptContext, relativePath } from './typescript.mjs';
 import { checkBackend } from './backend.mjs';
 import { checkBackendContracts, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID } from './contracts.mjs';

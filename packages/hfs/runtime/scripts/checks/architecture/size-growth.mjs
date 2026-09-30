@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { gitOutput } from '../../lib/git.mjs';
 
 /**
  * HFS check 6, file size growth (knowledge/hfs/slots.yaml ruleParams.<profile>.fileLines {soft, hardGrowth}):
@@ -15,7 +15,7 @@ const MAX_BUFFER = 64 * 1024 * 1024;
 
 function git(root, args) {
   try {
-    return execFileSync('git', args, { cwd: root, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: MAX_BUFFER }).toString();
+    return gitOutput(args, { cwd: root, maxBuffer: MAX_BUFFER });
   } catch {
     return null;
   }

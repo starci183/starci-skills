@@ -3,9 +3,9 @@
 // they carry the same README title, the same stack-declaration project name and the same sibling repositories.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { gitOutput } from './git.mjs';
 
-const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+const git = (root, args) => gitOutput(args, { cwd: root }).trim();
 const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
 
 /** { repositoryRoot, inWorkTree, home } for `root`: home is the main checkout folder when root is a repository top level. */

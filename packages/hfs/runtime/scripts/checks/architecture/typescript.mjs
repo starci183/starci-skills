@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { canonical, isInside, slash } from './config.mjs';
-import { sameOrUnder } from '../common.mjs';
+import { sameOrUnder } from '../../lib/path-key.mjs';
 import { createTypeScriptProgram, readTypeScriptProject, resolveTypeScriptModule, sharedInProgramRun, typeScriptProjectReferencePath } from '../typescript-programs.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
 

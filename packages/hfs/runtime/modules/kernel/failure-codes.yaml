@@ -1022,12 +1022,12 @@ HFS_ROOT_SRC_FORBIDDEN_FE:
 HFS_SIZE_GROWTH:
   title: "Source file over the size budget grew"
   title_vi: "Tệp mã nguồn vượt hạn mức dòng vẫn tiếp tục dài thêm"
-  meaning_vi: "Một tệp mã nguồn đã dài hơn hạn mức mềm (500 dòng) nhưng lại dài thêm so với phiên bản gốc của nhánh, hoặc một tệp mới tạo đã vượt hạn mức ngay từ đầu. Tệp quá dài khó đọc, khó sửa và là nơi lỗi dễ ẩn; quy tắc này cho phép tệp cũ đang quá dài được giữ nguyên hoặc thu nhỏ dần, nhưng không cho phép nó phình thêm."
+  meaning_vi: "Một tệp mã nguồn đã dài hơn hạn mức mềm của ruleParams.fileLines nhưng lại dài thêm so với phiên bản gốc của nhánh, hoặc một tệp mới tạo đã vượt hạn mức ngay từ đầu. Tệp quá dài khó đọc, khó sửa và là nơi lỗi dễ ẩn; quy tắc này cho phép tệp cũ đang quá dài được giữ nguyên hoặc thu nhỏ dần, nhưng không cho phép nó phình thêm."
   causes_vi:
-    - "Op thêm mã mới vào một tệp vốn đã quá 500 dòng thay vì tách phần mới sang tệp khác"
-    - "Một tệp đang dưới 500 dòng được thêm mã cho đến khi vượt hạn mức"
-    - "Một tệp mới tạo dài hơn 500 dòng, hoặc một tệp bị di chuyển sang đường dẫn mới nên bị coi là tệp mới"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tách phần mã mới (hoặc bớt phần cũ) sang tệp riêng đúng ô của nó, sao cho tệp không dài hơn phiên bản gốc và tệp mới không quá 500 dòng."
+    - "Op thêm mã mới vào một tệp vốn đã quá hạn mức thay vì tách phần mới sang tệp khác"
+    - "Một tệp đang dưới hạn mức được thêm mã cho đến khi vượt hạn mức"
+    - "Một tệp mới tạo dài hơn hạn mức, hoặc một tệp bị di chuyển sang đường dẫn mới nên bị coi là tệp mới"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tách phần mã mới (hoặc bớt phần cũ) sang tệp riêng đúng ô của nó, sao cho tệp không dài hơn phiên bản gốc và tệp mới nằm trong hạn mức."
   owner: op-retry
   kind: check-finding
 
