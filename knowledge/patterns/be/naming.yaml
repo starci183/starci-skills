@@ -37,7 +37,7 @@ rules:
     cases:
       - id: case-1
         when: Feature application
-        write: place-order.command.ts, place-order.query.ts, place-order.handler.ts, place-order.contracts.ts, place-order.handler.spec.ts
+        write: place-order.command.ts, place-order.query.ts, place-order.handler.ts, place-order.contracts.ts
       - id: case-2
         when: Feature transport
         write: place-order.resolver.ts, place-order.controller.ts, place-order.mapper.ts, dto/place-order.input.ts, dto/place-order.type.ts, dto/place-order.request.ts, dto/place-order.response.ts, checkout-graphql.module.ts, checkout-http.module.ts
@@ -55,10 +55,10 @@ rules:
         write: errors/purchase.error.ts holds the code enum, the kind table and the one error class.
       - id: case-7
         when: Spec
-        write: 'unit `place-order.handler.spec.ts` beside its subject; e2e `place-order.e2e-spec.ts` under src/tests/e2e/checkout/'
+        write: 'unit `commission.service.spec.ts` beside `commission.service.ts`; e2e `place-order.e2e-spec.ts` under src/tests/e2e/checkout/'
       - id: case-8
         when: App
-        write: main.ts, app.module.ts, api.options.ts, api.composition.spec.ts
+        write: main.ts, app.module.ts, api.options.ts
     verification:
       automated:
         - HFS_SLOT_UNDECLARED

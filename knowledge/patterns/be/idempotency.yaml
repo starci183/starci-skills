@@ -18,8 +18,8 @@ provenance:
     - knowledge/patterns/be/persistence.yaml
   limitations: |-
     Static checks read the first awaited expression of a consumer or signed-webhook handler and the type of its receiver.
-    They cannot see whether the claim still runs first after a later edit adds an earlier await, which is what the twin
-    spec of the consumer asserts.
+    They cannot see whether the claim still runs first after a later edit adds an earlier await, which is what the service spec of the
+    service the consumer calls (the consumer itself is thin) and the e2e run assert.
 rules:
   - id: BE-IDEMPOTENCY-1
     title: A consumer or signed webhook claims the event before it acts

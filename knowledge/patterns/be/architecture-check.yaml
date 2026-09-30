@@ -20,7 +20,7 @@ provenance:
     - https://www.typescriptlang.org/docs/handbook/modules/reference.html
   limitations: |-
     Static TypeScript dependency analysis does not prove Nest dependency-injection identity, provider scope, runtime
-    registration, transaction boundaries or business behavior. The composition spec that boots the real AppModule and the
+    registration, transaction boundaries or business behavior. The e2e run that boots the real apps through `useTestWorld({ apps })` and the
     behavior evidence separately prove registration. The selected repository's manifests, tsconfig and resolved package
     exports are the resolution authority.
 rules:
@@ -69,12 +69,12 @@ rules:
     hfsRules: [R32, R33]
     requirement: |-
       An app directory `apps/<app>/src` holds `main.ts` (at most 80 lines), `app.module.ts` (at most 250 lines, with
-      `static register(options: AppOptions)`), `<app>.options.ts` and the required `<app>.composition.spec.ts`. `main.ts`
+      `static register(options: AppOptions)`), and `<app>.options.ts`; an app has no spec of its own (BE-TEST-1). `main.ts`
       builds `EnvSource` once, parses every capability config into `AppOptions`, calls `AppModule.register(options)` and handles
       startup failure. `app.module.ts` registers the capability modules, the transport modules of the app's kind (api:
       `-graphql`, `-http`, `-websocket`; worker: `-schedule`, `-message`; cli: `-cli`), and `APP_GUARD` and `APP_FILTER`, and
-      holds no business handler, service, controller, resolver or entity. The composition spec boots the real
-      `AppModule.register(testOptions)` and resolves real provider tokens. A process entrypoint (`main.ts`, `bootstrap()`, a
+      holds no business handler, service, controller, resolver or entity. The e2e world boots the real
+      `AppModule.register(options)` (BE-TEST-12). A process entrypoint (`main.ts`, `bootstrap()`, a
       top-level `void x()`, `NestFactory.create`) exists only under `apps/*/src`; migrations run from `apps/migrate`.
     rationale: |-
       A thin composition root makes startup explicit and keeps product behavior independently testable below it.
@@ -95,7 +95,7 @@ rules:
         - BE_ENTRYPOINT_ONLY_IN_APPS
         - HFS_SLOT_REQUIRED_MISSING
       manual:
-        - Verify that the composition spec resolves real tokens and fails when a module is missing.
+        - Verify that the e2e run of the app fails when a module or provider is missing.
     relatedExamples: []
   - id: BE-ARCHITECTURE-3
     title: One module shape; one representative module per capability, registered once per app
@@ -139,7 +139,7 @@ rules:
         - BE_PUBLIC_SURFACE
         - BE_MODULE_SHAPE
       manual:
-        - Review provider token, scope and lifetime through the composition spec.
+        - Review provider token, scope and lifetime through the e2e run of the app.
     relatedExamples: []
   - id: BE-ARCHITECTURE-4
     title: Application contracts do not depend on transport adapters
@@ -183,7 +183,7 @@ rules:
         write: Extract the shared contract into a third capability or into platform, and make both depend on it.
       - id: case-2
         when: A new feature is added
-        write: Add its transport modules to the app that serves it in the same change and extend the composition spec.
+        write: Add its transport modules to the app that serves it in the same change and cover it in the app's e2e.
     verification:
       automated:
         - ARCH_OWNER_CYCLE

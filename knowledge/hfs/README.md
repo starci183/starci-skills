@@ -142,7 +142,6 @@ apps/<app>/src/                       kind api | worker | migrate | cli, declare
   main.ts                             at most 80 lines: build EnvSource once, parse options, bootstrap, handle startup failure
   app.module.ts                       at most 250 lines: AppModule.register(options), each capability once with isGlobal true, transports
   <app>.options.ts                    the options type of the app
-  <app>.composition.spec.ts           required: boots the REAL AppModule with stubbed options, resolves real tokens
 src/features/<feature>/
   index.ts                            module class and the contract an app needs; no export *
   <feature>.module.ts                 application module (handlers)
@@ -159,7 +158,7 @@ src/modules/domain/<capability>/      index.ts, module, module-definition, optio
 src/modules/platform/<capability>/    composition, config, errors, primitives, logging, clock, cqrs are required; database, http, retry, inbox, outbox, ... by need
 src/modules/integrations/<provider>/  index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts, errors/
 src/tests/world/                      the only test infrastructure: global-setup.ts, use-test-world.ts, fakes/<provider>/, test-world.config.ts
-src/tests/fixtures/                   typed builders and doubles, database.ts (mockEntityManager, fakeTransaction); never imports a feature
+src/tests/fixtures/                   typed builders (the doubles come from `@starci/jest-preset`); never imports a feature
 src/tests/integration/<capability>/*.integration-spec.ts   one capability module on the real database, no HTTP
 src/tests/e2e/<area>/*.e2e-spec.ts    flows through the real apps
 src/tests/contract/<provider>/*.contract-spec.ts   provider sandboxes, run only by test:contract
@@ -270,7 +269,7 @@ injectors. `isGlobal: true` appears only at an app root and `@Global()` nowhere 
 Every infrastructure dependency arrives through a zero-argument `Inject<Thing>()` exported from its owner's
 `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(`, `ModuleRef`, `forwardRef` and property injection do
 not exist (R85). Every feature and every transport module is composed by at least one app. Apps hold only `main.ts`,
-`app.module.ts`, `<app>.options.ts` and the composition spec. Entrypoints exist only in `apps/*/src` (R33).
+`app.module.ts` and `<app>.options.ts`; an app has no spec (the e2e world boots it). Entrypoints exist only in `apps/*/src` (R33).
 
 ### 5.9 Query, transport and runtime safety (R68 to R77, R89, R90)
 
@@ -393,13 +392,13 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
   inference, a self-hosted embedding model) may be faked when `test-world.config.ts` declares it in `fakedBy` with a
   `reason`; a stateful service (database, cache, identity, storage, mail, queue, search, or one with a persistent volume)
   never is (R47 `test-world-files`).
-- Integration, e2e and contract run by hand: no husky, lint-staged, default typecheck, coverage, Codecov or automatic
+- Integration, e2e and contract run by hand: no husky, lint-staged, default typecheck, coverage or automatic
   CI; the e2e workflow is `workflow_dispatch` only (R12). `test:contract` is never part of `test` or `test:e2e`.
 - Backend: one `jest.config.js` (preset `@starci/jest-preset`) with exactly the projects `unit`, `integration`, `e2e`
   and `contract`; ts-jest `diagnostics: false` and `isolatedModules: true`; types are checked by `typecheck` (unit specs
   and fixtures included) at pre-push and CI and by `typecheck:tests` (`src/tests/tsconfig.json`) for the world,
   integration, e2e and contract trees. `test:integration`, `test:e2e` and `test:contract` are each
-  `npm run typecheck:tests && jest --selectProjects <name>`; `test` is `jest --selectProjects unit`.
+  `npm run typecheck:tests && jest --selectProjects <name>`; `test` is `jest --selectProjects unit --coverage` (per-file 100 on `src/**/*.service.ts`).
 - A backend e2e boots the real apps through the world; it never hand-assembles a lane module. Fixtures are typed
   builders and doubles, not `as never` or `as unknown as`; they never import a feature. No `testing/` folder in
   `src/modules`. A spec does not read source code with `fs` (R48).
@@ -464,14 +463,14 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
 | OS op settle | `hfs check --paths <owned paths>` and ESLint on the op's paths; a red result does not settle | per op | every file-level and owner-level rule in scope |
 | LG land gate | full `hfs check` including reachability, composition, contract, size growth, duplicates; canon scan; unit; build | per repo | every rule |
 | CI GitHub | the same pinned `npx @starci/hfs check`, lint, typecheck, unit with coverage, build, `prettier --check` | | as LG except R23 on the frontend |
-| SQ Sonar | duplication, cognitive complexity, coverage on new code | | R20, R21 (second gate) |
+| SQ Sonar | duplication, cognitive complexity; no coverage condition (coverage is the unit project's per-file 100 on `*.service.ts`) | | R20, R21 (second gate) |
 
 A rule's gates are data in `rules.yaml`; adding a rule to a gate edits the manifest, not a repository.
 
 ## 11. Done for a repository
 
 1. `hfs check` has zero findings for every rule at the pinned version, and CI runs it.
-2. The composition spec of every app boots the real `AppModule` and is green.
+2. The e2e run boots the real `AppModule` of every app and is green when run by hand.
 3. No feature or owner is left uncomposed or unmounted; no dead export.
 4. The backend and frontend contracts match by hash.
 5. `typecheck`, `lint:check`, `build`, `test`, `prettier --check` and the Sonar gate are green.
@@ -537,8 +536,8 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R44 | `BE_SECRET_DEFAULT` | No default for a secret key or infrastructure URL. |
 | R45 | `BE_MODULE_SHAPE` | `@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport; every handler and provider registered exactly once. |
 | R46 | `BE_BACKGROUND_UNOWNED` | Every sweep, outbox or retry has a job or consumer run by a worker app. |
-| R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit`, `integration`, `e2e` and `contract`, live by folder, `diagnostics: false`; unit specs `<name>.spec.ts` sit beside their subject (a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec) and take `mockEntityManager()` and `fakeTransaction()` from `src/tests/fixtures/database.ts`; `src/tests/world/` is the ONLY test infrastructure: `global-setup.ts` starts the repository's own stack (`.starcistacks/<env>`, named by `stacks` in `test-world.config.ts` of the test-world library: every service it declares runs REAL, behind toxiproxy, images and versions read from the stack at run time, never spelled in test source) or attaches to a warm one that answers, and runs `apps/migrate` once; `global-teardown.ts` stops only what its setup started; `use-test-world.ts` exports `useTestWorld({ apps } | { modules })` (`world.apps.<name>.api`, `world.db.<connection>`, `world.infra.<service>` with `latency(ms)`, `cut()` and `restore()` on the real service, `world.fake.<provider>`, `world.waitFor`) and `fakes/<provider>/` holds the network-edge fakes (`failNext`, `replayWebhook`, `delay`, payload fixtures) of external SaaS the team does not operate ONLY: a fake of a service the stack declares is refused, except stateless compute that needs special hardware or an external model (GPU inference, a self-hosted embedding model), which `test-world.config.ts` declares in `fakedBy` with a non-empty `reason` (a stateful service, or one with a persistent volume, is never accepted); it alone owns containers, DataSource, migrations and `process.env`; nothing under `src/tests` overrides a provider or DI token; `src/tests/integration/<capability>/*.integration-spec.ts` (`{ modules }`, real database, no HTTP), `src/tests/e2e/<area>/*.e2e-spec.ts` (`{ apps }`) and `src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped without sandbox config, run only by `test:contract`, never by `test` or `test:e2e`) agree folder with suffix; no `.test.ts`, `int-spec` or `harness-spec`, no `live/` and no `src/tests/e2e/world`. |
-| R48 | `BE_SPEC_QUALITY` | No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); a unit spec takes its EntityManager from `mockEntityManager()` or `fakeTransaction()`, never an ad-hoc `jest.fn` object; an e2e enters through transport, waits with `waitFor`, boots through `useTestWorld`, reads persisted state back and reaches no model provider. |
+| R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit`, `integration`, `e2e` and `contract`, live by folder, `diagnostics: false`; unit specs are `<name>.service.spec.ts` beside a `<name>.service.ts` and nowhere else (every service has exactly one; any other `*.spec.ts` outside `src/tests/{world,integration,e2e,contract}` and `apps/migrate` is a finding, composition specs included), and the unit project collects coverage from `src/**/*.service.ts` only with a per-file threshold of 100 on lines, branches, functions and statements (`test` runs `--coverage`; `importHelpers` and `tslib`); `src/tests/world/` is the ONLY test infrastructure: `global-setup.ts` starts the repository's own stack (`.starcistacks/<env>`, named by `stacks` in `test-world.config.ts` of the test-world library: every service it declares runs REAL, behind toxiproxy, images and versions read from the stack at run time, never spelled in test source) or attaches to a warm one that answers, and runs `apps/migrate` once; `global-teardown.ts` stops only what its setup started; `use-test-world.ts` exports `useTestWorld({ apps } | { modules })` (`world.apps.<name>.api`, `world.db.<connection>`, `world.infra.<service>` with `latency(ms)`, `cut()` and `restore()` on the real service, `world.fake.<provider>`, `world.waitFor`) and `fakes/<provider>/` holds the network-edge fakes (`failNext`, `replayWebhook`, `delay`, payload fixtures) of external SaaS the team does not operate ONLY: a fake of a service the stack declares is refused, except stateless compute that needs special hardware or an external model (GPU inference, a self-hosted embedding model), which `test-world.config.ts` declares in `fakedBy` with a non-empty `reason` (a stateful service, or one with a persistent volume, is never accepted); it alone owns containers, DataSource, migrations and `process.env`; nothing under `src/tests` overrides a provider or DI token; `src/tests/integration/<capability>/*.integration-spec.ts` (`{ modules }`, real database, no HTTP), `src/tests/e2e/<area>/*.e2e-spec.ts` (`{ apps }`) and `src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped without sandbox config, run only by `test:contract`, never by `test` or `test:e2e`) agree folder with suffix; no `.test.ts`, `int-spec` or `harness-spec`, no `live/` and no `src/tests/e2e/world`. |
+| R48 | `BE_SPEC_QUALITY` | No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); a unit spec builds its service with `Test.createTestingModule({ providers })` (no `new`, no `imports`, no `overrideProvider`), provides exactly the constructor dependencies, takes every infrastructure double from `@starci/jest-preset` (`mockEntityManager`, `fakeTransaction`, `fakeCache`, `fakeLock`, `recordingOutbox`, `FakeClock`, `fakeIds`, `mock<T>()`, `builder`), never an ad-hoc `jest.fn` object, and uses no `jest.mock` of an own or third-party module, no ambient clock and no `process.env`; an e2e enters through transport, waits with `waitFor`, boots through `useTestWorld`, reads persisted state back and reaches no model provider. |
 | R68 | `BE_SQL_INTERPOLATED` | SQL text carries no runtime substitution; values are numbered parameters. |
 | R69 | `BE_QUERY_UNBOUNDED` | A read that can return many rows states `take`, `limit` or `LIMIT`, or pages by cursor. |
 | R70 | `BE_HTTP_TIMEOUT` | Every outbound `fetch`, axios or HttpService call states a timeout or an abort signal. |
@@ -558,8 +557,8 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R84 | `BE_CONNECTION_DUPLICATE` | One physical database is one connection and one `Inject<Conn>EntityManager()` injector declared once in `platform/database`; `hfs.json` connections, connection files, injectors and module registrations correspond one to one. |
 | R85 | `BE_RAW_INJECT` | Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there. |
 | R86 | `BE_SQL_TABLE_OWNER` | SQL writes only the tables of its own capability's entities, reads only tables of owners it may import, and every multi-row SELECT is bounded. |
-| R87 | `BE_CQRS_SHAPE` | The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`; no use-case classes, forwarder services or in-process events; a message and an injected dependency are `readonly`. |
-| R88 | `BE_TRANSPORT_SHAPE` | A transport handler maps its input, dispatches exactly one command or query through the injected bus and maps the result; it injects nothing else, returns no envelope and takes no `GraphQLJSON`. |
+| R87 | `BE_CQRS_SHAPE` | The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process` and stay thin (map the message, call exactly one method of an injected `*.service`, return its result: no branch, loop or EntityManager; decisions live in services); no use-case classes, forwarder services or in-process events; a message and an injected dependency are `readonly`. |
+| R88 | `BE_TRANSPORT_SHAPE` | A transport handler (resolver, controller, gateway, job, CLI) maps its input, dispatches exactly one command or query through the injected bus and maps the result, and a message consumer calls exactly one method of an injected `*.service`; none injects anything else or branches or loops, and a handler returns no envelope and takes no `GraphQLJSON`. |
 | R89 | `BE_SOURCE_FORM` | Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji or Vietnamese outside message catalogs; a public input or output is a named contract, never an inline object type. |
 | R90 | `BE_INFRA_OWNER` | Each raw infrastructure library (HTTP, cache, queue, scheduler, logger, date, config, events) is imported or referenced only by its one owning platform or integration capability. |
 

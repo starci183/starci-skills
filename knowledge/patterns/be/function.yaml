@@ -40,7 +40,7 @@ rules:
         - BE_FEATURE_SHAPE
         - BE_CQRS_SHAPE
       manual:
-        - Verify handler registration through the composition spec and test the handler through its twin spec.
+        - Verify handler registration through the e2e run of the app and test the service the handler calls through its service spec.
     relatedExamples: []
   - id: BE-FUNCTION-2
     title: Messages carry stable application contracts

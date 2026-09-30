@@ -137,7 +137,7 @@ rules:
     hfsRules: [R12]
     requirement: |
       No integration, e2e or contract spec, test world or e2e-only dependency joins husky, lint-staged, the default typecheck,
-      coverage or Codecov, or an automatic CI trigger. A back end has `typecheck:tests` (`src/tests/tsconfig.json`) and its
+      or coverage, or an automatic CI trigger. A back end has `typecheck:tests` (`src/tests/tsconfig.json`) and its
       `test:integration`, `test:e2e` and `test:contract` run it first; a front end has `typecheck:e2e` and `test:e2e` runs it first.
       `lint:check` lints the e2e trees in its one ESLint run (linting is not running e2e). A kept e2e workflow is
       `workflow_dispatch` only.

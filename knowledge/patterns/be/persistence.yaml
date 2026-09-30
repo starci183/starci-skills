@@ -56,7 +56,7 @@ rules:
     requirement: |-
       An app of kind `migrate` is the only process that runs migrations, once per connection, before any api or worker
       process starts (a deploy runs it as an init job). It is required as soon as `hfs.json` declares a connection. It has
-      `main.ts` and a composition spec and no business code; it builds its `DataSource` from the same `<conn>.config.ts` the
+      `main.ts` and no business code; it builds its `DataSource` from the same `<conn>.config.ts` the
       api uses. Api and worker apps never run migrations.
     rationale: |-
       Two processes racing to migrate corrupt a schema, and a migration inside a module cannot be scheduled or retried on
@@ -233,7 +233,7 @@ rules:
       (reads only `<ENVPREFIX>_*` keys) and `<conn>.decorators.ts`
       (`Inject<Conn>EntityManager = (): TypedParameterDecorator<EntityManager> => injector<EntityManager>(getEntityManagerToken(<CONN>_CONNECTION))`).
       No other file declares a connection or calls `TypeOrmModule.forRoot*`, `new DataSource(`, `getEntityManagerToken(`,
-      `InjectEntityManager(` or `InjectDataSource(`, except `apps/migrate` and `src/tests/fixtures/database.ts`. There is no
+      `InjectEntityManager(` or `InjectDataSource(`, except `apps/migrate`. There is no
       capability-specific injector, no second connection name onto an existing database, and two connections never resolve to
       the same (host, port, database).
     rationale: |-

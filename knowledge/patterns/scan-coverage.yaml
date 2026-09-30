@@ -61,9 +61,9 @@ observations:
     lane: backend
     kind: observation
     summary: |
-      The composition spec that boots the real AppModule is the evidence for registration and DI identity. Isolated handler unit
-      tests do not prove bootable dependency injection. Test topology is one jest config with the projects unit and e2e
-      (BE-TEST-1, BE-TEST-7).
+      The e2e run that boots the real apps is the evidence for registration and DI identity. Service unit specs do not prove
+      bootable dependency injection. Test topology is one jest config with the projects unit, integration, e2e and contract
+      (BE-TEST-1, BE-TEST-13).
     automated:
       - BE_APP_COMPOSITION_ONLY
       - BE_TEST_TOPOLOGY
@@ -88,7 +88,7 @@ observations:
     summary: |
       The injection rules identify a constructor parameter by the declared type and the file that declares it, never by the
       variable name, and compare an injector's declared type with the parameter annotation. They do not verify that the
-      module provides the token at runtime; the composition spec that boots the real AppModule does.
+      module provides the token at runtime; the e2e run that boots the real apps does.
     automated:
       - BE_RAW_INJECT
       - BE_UNNAMED_DATA_ACCESS
@@ -140,7 +140,7 @@ observations:
     lane: cross-cutting
     kind: gap
     summary: |
-      Not covered by any static check: cohesive ownership, complete public API design, DI identity beyond the composition spec,
+      Not covered by any static check: cohesive ownership, complete public API design, DI identity beyond the e2e boot,
       resource authorization, transaction isolation, idempotency, crash recovery, remote fencing, translation quality and
       rendered UI. Each needs its own executed evidence against the exact source revision. Do not claim these are verified from a
       green static run.

@@ -18,7 +18,7 @@ provenance:
     - https://docs.nestjs.com/fundamentals/custom-providers
   limitations: |-
     Static checks compare an injector's declared type with the parameter annotation and look up where the parameter's type
-    is declared. They do not prove that the module provides the token; the composition spec that boots the real AppModule
+    is declared. They do not prove that the module provides the token; the e2e run that boots the real apps
     does.
 rules:
   - id: BE-INJECTION-1
@@ -90,7 +90,7 @@ rules:
       `InjectInbox` (platform/inbox), `InjectMessageCatalog` and `InjectRequestLocale` (platform/i18n),
       `InjectCommandBus` and `InjectQueryBus` (platform/cqrs), `InjectAdvisoryLock` (platform/database), `Inject<Cap>Options`
       (each capability with options) and `Inject<Provider>` for each integration SDK client (`InjectPayOS`, `InjectStripe`,
-      `InjectDigitalOceanS3`). A spec overrides a token through the same `*.decorators.ts` export.
+      `InjectDigitalOceanS3`). A spec provides a token through the same exported token of that `*.decorators.ts` (BE-TEST-3).
     rationale: |-
       Fixed names let an agent and a reader find the port of any dependency without opening the module, and let e2e override
       exactly the integration tokens.

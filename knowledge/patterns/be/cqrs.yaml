@@ -18,8 +18,8 @@ provenance:
     - https://docs.nestjs.com/recipes/cqrs
   limitations: |-
     Static checks prove the shape of a message, its handler and the dispatch. They do not prove that a handler decides the
-    right thing, that a transaction boundary is right or that a refusal is chosen over an exception correctly; the twin
-    handler spec and the e2e run prove those.
+    right thing, that a transaction boundary is right or that a refusal is chosen over an exception correctly; the service
+    spec of the service the handler calls and the e2e run prove those.
 rules:
   - id: BE-CQRS-1
     title: The application folder holds messages, handlers, contracts and support only
@@ -27,7 +27,7 @@ rules:
     hfsRules: [R87, R29]
     requirement: |-
       `src/features/<feature>/application/` holds `<action>.command.ts` or `<action>.query.ts`, `<action>.handler.ts`,
-      `<action>.contracts.ts`, their `*.spec.ts` and the opt-in `support/` folder of helpers local to the feature. A
+      `<action>.contracts.ts` and the opt-in `support/` folder of helpers local to the feature. A
       `*.use-case.ts` file, a forwarder `<op>.service.ts` and a folder named after a protocol do not exist. A read is a
       query and a write is a command; a handler never serves both.
     rationale: |-
@@ -36,10 +36,10 @@ rules:
     cases:
       - id: case-1
         when: A new write operation
-        write: application/start-checkout.command.ts, start-checkout.handler.ts, start-checkout.contracts.ts and start-checkout.handler.spec.ts.
+        write: application/start-checkout.command.ts, start-checkout.handler.ts, start-checkout.contracts.ts (the handler has no spec: its service does).
       - id: case-2
         when: A new read operation
-        write: application/get-cart.query.ts, get-cart.handler.ts, get-cart.contracts.ts and get-cart.handler.spec.ts.
+        write: application/get-cart.query.ts, get-cart.handler.ts, get-cart.contracts.ts (the handler has no spec: its service does).
     verification:
       automated:
         - BE_CQRS_SHAPE
@@ -84,11 +84,12 @@ rules:
       logs `OperationFailed` with the operation name and the error and rethrows, and counts refused outcomes. `<Action>Result`
       is a plain projection type or an `Outcome<Value, Code>` and the return type of `process` is declared. The handler opens
       the transaction (`this.entityManager.transaction(async (manager) => ...)`), stamps `this.clock.now()` once and passes
-      it down. A twin `<action>.handler.spec.ts` sits beside it and asserts decisions: persisted state, the `where` that
-      holds ownership, and that nothing is written on a refusal.
+      it down. The handler is thin (BE-TEST-7): its `process` maps the message, calls exactly one method of an injected `*.service` and
+      returns the result, so it has no unit spec; the decisions (persisted state, the `where` that holds ownership, nothing
+      written on a refusal) live in the service and its `<name>.service.spec.ts` asserts them.
     rationale: |-
-      A single template gives every operation the same failure log and metric, and the twin spec pins the decision the
-      handler makes.
+      A single template gives every operation the same failure log and metric, and the service spec pins the decision the
+      handler delegates.
     cases:
       - id: case-1
         when: A handler
@@ -113,7 +114,7 @@ rules:
         - BE_RETURN_TYPE
         - BE_SPEC_QUALITY
       manual:
-        - Confirm the twin spec asserts refusal paths and ownership, not only that a mock was called.
+        - Confirm the service spec the handler calls asserts refusal paths and ownership, not only that a mock was called.
     relatedExamples: []
   - id: BE-CQRS-4
     title: Transports dispatch the bus; nothing else forwards

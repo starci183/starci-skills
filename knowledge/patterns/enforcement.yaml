@@ -62,8 +62,8 @@ rules:
     hfsRules: [R03, R18, R47]
     requirement: |
       Check ignored-file status, actual lint results, suppressed messages and TypeScript ignore or nocheck directives. Verify
-      tests are discovered by the real runner. Directly constructed service tests and mocked transport tests do not establish full
-      application wiring or database behavior; the composition spec does.
+      tests are discovered by the real runner. Service unit specs built on doubles do not establish full application wiring or database behavior; the integration
+      and e2e runs do.
     rationale: |
       Ignored files and undiscovered tests create false green results.
 

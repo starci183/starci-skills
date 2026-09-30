@@ -87,7 +87,7 @@ topics:
   - id: be.test
     title: Test
     path: test.yaml
-    decides: Unit and e2e placement, the jest topology, typed doubles and twin specs, composition specs, real-AppModule e2e, what an assertion proves
+    decides: Unit and e2e placement, the jest topology, service-only unit specs built on the testing module with kit doubles, the thin-transport prerequisite, per-file 100 service coverage, real-app e2e, what an assertion proves
     rules: BE-TEST-1 … BE-TEST-7
   - id: be.api-auth
     title: API authentication and input bounds

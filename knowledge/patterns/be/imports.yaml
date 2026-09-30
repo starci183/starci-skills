@@ -42,7 +42,7 @@ rules:
         write: 'import { FIND_OPEN_PURCHASES } from "./persistence/purchase.sql"'
       - id: case-3
         when: Test helpers
-        write: 'import { mockEntityManager } from "@tests/fixtures/database"'
+        write: 'import { mockEntityManager } from "@starci/jest-preset"'
     verification:
       automated:
         - BE_PUBLIC_SURFACE
@@ -164,8 +164,8 @@ rules:
     kind: mandatory
     hfsRules: [R47]
     requirement: |-
-      The jest preset mirrors the tsconfig path aliases in `moduleNameMapper`, and specs mock module paths through those
-      aliases.
+      The jest preset mirrors the tsconfig path aliases in `moduleNameMapper`, and specs import through those aliases (a spec never
+      `jest.mock`s a module path).
     rationale: |-
       A spec must resolve the same module the compiler resolves.
     cases:

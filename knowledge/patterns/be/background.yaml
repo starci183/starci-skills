@@ -57,7 +57,7 @@ rules:
     requirement: |-
       An app of kind `worker` composes the schedule and message modules; an api app never runs cron or consumes a queue,
       because cron in an api app runs once per replica. Every schedule or message transport has at least one worker app that
-      composes it, and the worker has a composition spec that boots its real AppModule.
+      composes it, and an e2e run boots the worker's real AppModule.
     rationale: |-
       A job that no process composes never runs, and a job inside a replicated api runs many times.
     cases:

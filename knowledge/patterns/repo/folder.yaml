@@ -69,7 +69,7 @@ rules:
     requirement: |
       Every repository, backend and frontend, is an apps/<app>/ monorepo even with one application; a single-app repository
       names the app by its role (for example web). A backend app's composition lives in apps/<app>/src (main.ts, app.module.ts,
-      optional <app>.options.ts and the required <app>.composition.spec.ts) and nothing else; shared backend source lives in
+      and optional <app>.options.ts) and nothing else; shared backend source lives in
       src/features and src/modules. A frontend app carries its own package.json, next.config.ts, tsconfig.json and
       postcss.config.mjs in apps/<app>/, and all product source sits under apps/<app>/src; a frontend repository has no root
       src/. Apps never import each other. There is one topology for every repository.
