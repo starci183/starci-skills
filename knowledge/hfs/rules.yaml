@@ -56,9 +56,9 @@ rules:
     law: "No untracked or ignored entry outside an `ignored` slot."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
-    failureCodes: ["HFS_UNTRACKED_ROOT_ENTRY"]
+    failureCodes: ["HFS_UNTRACKED_ROOT_ENTRY", "HFS_EMPTY_DIR", "HFS_GHOST_TREE"]
     enforcers:
-      - {kind: hfs, id: untracked-root-entry, status: planned}
+      - {kind: hfs, id: untracked-root-entry, at: scripts/lib/hfs-check.mjs}
   - id: R04
     code: "HFS_GITIGNORE_BLOCK_DRIFT"
     title_vi: "Khối .gitignore lệch bản render"

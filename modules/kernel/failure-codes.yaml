@@ -316,6 +316,16 @@ ARCH_INTERNAL_IMPORT_UNRESOLVED:
   owner: op-retry
   kind: check-finding
 
+ARCH_KNOWLEDGE_UNAVAILABLE:
+  title: "Architecture knowledge unavailable"
+  title_vi: "Tri thức của bộ kiểm kiến trúc không đọc được"
+  meaning_vi: "Bộ kiểm kiến trúc cần một tệp tri thức đi kèm (danh sách tệp gốc do framework ghim) nhưng không đọc được hoặc sai khuôn, nên không phán xét bằng hợp đồng khác."
+  causes_vi:
+    - "Bản đóng gói của `hfs` thiếu hoặc hỏng tệp tri thức, hoặc tệp tri thức trong runtime bị sửa sai khuôn."
+  nextStep_vi: "Cài lại `@starci/hfs` đúng phiên bản đã ghim; nếu là runtime thì sửa tệp tri thức rồi chạy `node packages/hfs/scripts/sync-runtime.mjs`."
+  owner: runtime-core
+  kind: check-finding
+
 ARCH_NO_SOURCE:
   title: "No production source found"
   title_vi: "Không có mã nguồn để kiểm"
@@ -404,6 +414,26 @@ ARCH_TSCONFIG_REFERENCE_OUTSIDE:
   causes_vi:
     - "Đường dẫn references dùng ../ vượt gốc"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_TYPESCRIPT_INVALID:
+  title: "TypeScript package has no compiler API"
+  title_vi: "Gói TypeScript trong kho không có API trình biên dịch"
+  meaning_vi: "Gói `typescript` trong kho được kiểm không cung cấp API trình biên dịch mà bộ kiểm kiến trúc cần."
+  causes_vi:
+    - "Gói `typescript` bị cài hỏng hoặc bị thay bằng gói khác cùng tên."
+  nextStep_vi: "Cài lại `typescript` đúng phiên bản đã ghim trong `knowledge/hfs/canon-pins.yaml` rồi chạy lại `hfs check`."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_TYPESCRIPT_MISSING:
+  title: "TypeScript is not installed in the checked repository"
+  title_vi: "Kho được kiểm chưa cài TypeScript"
+  meaning_vi: "Bộ kiểm kiến trúc chỉ dùng TypeScript cài trong chính kho được kiểm, không thay bằng bộ phân tích khác, nên không kiểm được."
+  causes_vi:
+    - "Kho thiếu `package.json` hoặc chưa chạy `npm ci` nên `node_modules/typescript` không có."
+  nextStep_vi: "Chạy `npm ci` trong kho rồi chạy lại `hfs check`."
   owner: op-retry
   kind: check-finding
 
@@ -11977,9 +12007,29 @@ HFS_SLOT_REQUIRED_MISSING:
 HFS_UNTRACKED_ROOT_ENTRY:
   title: "No untracked or ignored entry outside an `ignored` slot"
   title_vi: "Mục lạ ở gốc kho"
-  meaning_vi: "Có `<name>` ở gốc repo nhưng HFS không cho phép nó tồn tại ở đây (kể cả khi đã ignore). Lưu trữ ra `D:/starci-archive/` rồi xóa."
+  meaning_vi: "Có mục chưa được git theo dõi, cũng không nằm trong `.gitignore` hay slot `ignored`, nên HFS không cho phép nó tồn tại trong cây làm việc. Theo dõi nó vào đúng slot, hoặc lưu trữ ra `D:/starci-archive/` rồi xóa."
   causes_vi:
     - "Vi phạm luật R03: Thư mục làm việc không được có mục untracked/ignored ngoài slot `ignored` (vd `nul`, `.qwen/`, `.worktrees/`, `design-plans/`, `express`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_EMPTY_DIR:
+  title: "No empty directory outside an `ignored` slot"
+  title_vi: "Thư mục rỗng còn sót lại"
+  meaning_vi: "Có thư mục không có tệp nào bên dưới (kể cả các thư mục con cũng rỗng). Git không theo dõi thư mục rỗng nên nó chỉ là dấu vết của cấu trúc đã đổi tên hoặc đã xóa. Xóa thư mục."
+  causes_vi:
+    - "Vi phạm luật R03: cấu trúc bị đổi tên hoặc tệp bị xóa mà thư mục cũ không được dọn (vd `src/modules/business/*` còn trống bên cạnh `domain/*`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_GHOST_TREE:
+  title: "No empty directory beside a near-identical sibling"
+  title_vi: "Cây thư mục ma cạnh thư mục gần trùng tên"
+  meaning_vi: "Có thư mục rỗng mà tên chỉ khác vài ký tự so với thư mục anh em cùng cấp (thông báo nêu cả hai), tức là bản đổi tên hoặc gõ sai của cùng một cấu trúc chưa được dọn. Giữ bản có tệp, xóa bản rỗng."
+  causes_vi:
+    - "Vi phạm luật R03: đổi tên cấu trúc để lại bản cũ hoặc bản gõ sai (vd `business` và `bussiness`)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding

@@ -1,8 +1,15 @@
 #!/usr/bin/env node
 // hfs - the HFS command line of a StarCi product repository.
-//   hfs check   [--repo <dir>] [--json]     every tracked path has a slot; required files exist; nothing forbidden or
-//                                            tracked-that-must-be-ignored; pins match; soft-size backlog (report only).
-//                                            Exit 1 on any error-level finding.
+//   hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>]
+//                                            every tracked path has a slot; required files exist; nothing forbidden or
+//                                            tracked-that-must-be-ignored; pins match; no empty or ghost directory, no untracked
+//                                            entry outside an ignored slot; soft-size backlog (report only); then the whole
+//                                            architecture machine (tiers, owners, clones, dead exports, module registration, the
+//                                            front-end and back-end source rules), each violation a finding with its why.
+//                                            --fast: only what changed since the merge-base with origin/main (else main; --base
+//                                            overrides it, and without --fast is the base of the size-growth check); the machine
+//                                            runs on those owners without clones and dead exports. No merge-base is a refusal
+//                                            (exit 2), never a silent full pass. Exit 1 on any error-level finding.
 //   hfs init    [--repo <dir>] [--stdout]   write a starter hfs.json by detecting the profile and the apps.
 //   hfs explain <path> [--repo <dir>] [--json]   which slot owns the path, its tier, allowed imports, required tests.
 //   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar, codecov); sync/cli.mjs
@@ -11,19 +18,19 @@
 // (init writes hfs.json only, and only when none exists). Exit codes: 0 clean, 1 error findings, 2 a refusal or bad usage.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkRepo, explainPath, initRepo } from '../runtime/scripts/lib/hfs-check.mjs';
+import { checkRepository, explainPath, initRepo } from '../runtime/scripts/lib/hfs-check.mjs';
 import { HfsSlotsError } from '../runtime/scripts/lib/hfs-slots.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
 
-const USAGE = `hfs check [--repo <dir>] [--json]
+const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>]
 hfs init [--repo <dir>] [--stdout]
 hfs explain <path> [--repo <dir>] [--json]
 hfs sync (--check | --write) [--root <dir>]
 hfs work-hygiene
 `;
 const PER_CODE_LIMIT = 25;
-const VALUE_FLAGS = new Set(['--repo']);
-const BOOL_FLAGS = new Set(['--json', '--stdout']);
+const VALUE_FLAGS = new Set(['--repo', '--base']);
+const BOOL_FLAGS = new Set(['--json', '--stdout', '--fast']);
 
 function parse(argv) {
   const opts = { positional: [] };
@@ -39,7 +46,9 @@ function parse(argv) {
 
 function printCheck(result, out) {
   const { counts } = result;
-  out(`hfs check ${result.repoRoot} (profile ${result.profile ?? 'unknown'}, manifest ${result.manifest}, ${result.tracked} tracked paths)\n`);
+  out(`hfs check${result.fast ? ' --fast' : ''} ${result.repoRoot} (profile ${result.profile ?? 'unknown'}, manifest ${result.manifest}, ${result.tracked} tracked paths)\n`);
+  if (result.fast) out(`  ${result.fast.changed} path${result.fast.changed === 1 ? '' : 's'} changed since ${result.fast.base.slice(0, 12)}\n`);
+  out(`  architecture machine: ${result.machine.status === 'ran' ? `ran over ${result.machine.files} source files${result.machine.paths ? ` (owners ${result.machine.paths.join(', ')})` : ''}` : `skipped, ${result.machine.reason}`}\n`);
   const byCode = new Map();
   for (const f of result.findings) byCode.set(f.code, [...(byCode.get(f.code) ?? []), f]);
   for (const [code, list] of byCode) {
@@ -77,7 +86,7 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     const repoRoot = path.resolve(opts.repo ?? process.cwd());
     if (verb === 'check') {
       if (opts.positional.length) throw new Error('hfs check takes no path');
-      const result = checkRepo({ repoRoot });
+      const result = checkRepository({ repoRoot, fast: opts.fast === true, base: opts.base });
       if (opts.json) stdout(`${JSON.stringify(result, null, 2)}\n`); else printCheck(result, stdout);
       return result.ok ? 0 : 1;
     }

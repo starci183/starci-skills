@@ -1,3 +1,647 @@
+ARCH_COMPILER_FAILURE:
+  title: "Compiler failed during architecture check"
+  title_vi: "Trình biên dịch lỗi khi kiểm kiến trúc"
+  meaning_vi: "Trình biên dịch TypeScript gặp lỗi không rõ nhóm nên kiểm tra kiến trúc dừng."
+  causes_vi:
+    - "Lỗi trong bộ kiểm tra hoặc môi trường TypeScript"
+    - "Mã nguồn làm hỏng trình biên dịch"
+  nextStep_vi: "Lỗi được ghi thành lỗi đầu vào chưa kiểm; cần xem chi tiết thông báo, nếu là lỗi bộ kiểm tra thì sửa ở lõi."
+  owner: runtime-core
+  kind: check-finding
+
+ARCH_CONFIG_INVALID:
+  title: "Architecture config invalid"
+  title_vi: "Cấu hình kiến trúc không hợp lệ"
+  meaning_vi: "Tệp cấu hình kiến trúc của dự án không đọc hoặc không đúng khuôn."
+  causes_vi:
+    - "Sai cú pháp hoặc thiếu trường bắt buộc"
+  nextStep_vi: "Op dựng khung hoặc sửa mã phải sửa cấu hình rồi chạy lại kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_DYNAMIC_DEPENDENCY_UNPROVEN:
+  title: "Dynamic import cannot be resolved"
+  title_vi: "Phụ thuộc động không xác định được"
+  meaning_vi: "Có import hoặc require dùng tên module không phải chuỗi cố định nên không biết nó phụ thuộc vào đâu."
+  causes_vi:
+    - "Dùng import(biến) hoặc require(biến)"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_EXECUTION_UNAVAILABLE:
+  title: "Architecture checker could not run"
+  title_vi: "Bộ kiểm tra kiến trúc không chạy được"
+  meaning_vi: "Không chạy được tiến trình kiểm kiến trúc."
+  causes_vi:
+    - "Thiếu công cụ hoặc TypeScript trong dự án mục tiêu"
+    - "Tiến trình kiểm tra gặp lỗi"
+  nextStep_vi: "Kết quả ghi là chưa kiểm; cần sửa môi trường hoặc bộ kiểm tra rồi chạy lại."
+  owner: runtime-core
+  kind: check-finding
+
+ARCH_GRAMMAR_CONTRACT_INVALID:
+  title: "Grammar contract invalid"
+  title_vi: "Hợp đồng Grammar không hợp lệ"
+  meaning_vi: "Khai báo Grammar trong package.json của dự án không đúng khuôn."
+  causes_vi:
+    - "Thiếu gói, entry hoặc styleEntry của Grammar"
+  nextStep_vi: "Op sửa package.json cho đúng hợp đồng Grammar rồi chạy lại."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_GRAMMAR_EXPORT_BYPASS:
+  title: "Grammar entry bypassed"
+  title_vi: "Bỏ qua cổng xuất của Grammar"
+  meaning_vi: "Mã giao diện import Grammar không qua entry mã hoặc style được chọn."
+  causes_vi:
+    - "Import thẳng đường dẫn sâu trong gói Grammar"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_INTERNAL_IMPORT_OUTSIDE:
+  title: "Import leaves its own project"
+  title_vi: "Import trỏ ra ngoài dự án"
+  meaning_vi: "Một import nội bộ trỏ tới tệp nằm ngoài các dự án được kiểm."
+  causes_vi:
+    - "Import đường dẫn tương đối vượt khỏi dự án"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_INTERNAL_IMPORT_UNRESOLVED:
+  title: "Internal import unresolved"
+  title_vi: "Import nội bộ không tìm thấy đích"
+  meaning_vi: "Một import nội bộ không phân giải được tới tệp nào."
+  causes_vi:
+    - "Sai đường dẫn hoặc tệp đã bị xoá hay đổi tên"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_KNOWLEDGE_UNAVAILABLE:
+  title: "Architecture knowledge unavailable"
+  title_vi: "Tri thức của bộ kiểm kiến trúc không đọc được"
+  meaning_vi: "Bộ kiểm kiến trúc cần một tệp tri thức đi kèm (danh sách tệp gốc do framework ghim) nhưng không đọc được hoặc sai khuôn, nên không phán xét bằng hợp đồng khác."
+  causes_vi:
+    - "Bản đóng gói của `hfs` thiếu hoặc hỏng tệp tri thức, hoặc tệp tri thức trong runtime bị sửa sai khuôn."
+  nextStep_vi: "Cài lại `@starci/hfs` đúng phiên bản đã ghim; nếu là runtime thì sửa tệp tri thức rồi chạy `node packages/hfs/scripts/sync-runtime.mjs`."
+  owner: runtime-core
+  kind: check-finding
+
+ARCH_NO_SOURCE:
+  title: "No production source found"
+  title_vi: "Không có mã nguồn để kiểm"
+  meaning_vi: "Các dự án TypeScript được cấu hình không chứa mã TypeScript hay JavaScript sản phẩm nào."
+  causes_vi:
+    - "Cấu hình include sai"
+    - "Dự án còn trống"
+  nextStep_vi: "Op phải sửa cấu hình hoặc thêm mã rồi chạy lại."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_OWNER_CYCLE:
+  title: "Owner import cycle"
+  title_vi: "Vòng import giữa các đơn vị sở hữu"
+  meaning_vi: "Các đơn vị sở hữu (feature, module domain, platform, gói...) import lẫn nhau thành vòng khép kín, kể cả bằng import chỉ kiểu. Vòng làm hai đơn vị không thể hiểu, kiểm thử hay thay thế riêng lẻ; bộ kiểm tra báo kèm đường đi của vòng."
+  causes_vi:
+    - "Hai module domain dùng chung một kiểu và import kiểu của nhau"
+    - "Một module gọi ngược lại module đã gọi nó thay vì nhận qua tham số hoặc sự kiện"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để cắt vòng: chuyển phần chung sang một đơn vị thấp hơn hoặc đảo phụ thuộc; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_OWNER_EXPORT_BYPASS:
+  title: "Owner public export bypassed"
+  title_vi: "Bỏ qua cổng xuất công khai của module"
+  meaning_vi: "Import vào module chủ sở hữu không đi qua cổng xuất công khai của nó."
+  causes_vi:
+    - "Import thẳng tệp bên trong module khác"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_OWNER_EXPORT_STAR:
+  title: "Owner public export uses export star"
+  title_vi: "Cổng xuất công khai dùng export *"
+  meaning_vi: "Cổng xuất công khai của module dùng export * nên lộ mọi thứ bên trong."
+  causes_vi:
+    - "Viết export * from trong tệp index công khai"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_PACKAGE_EXPORT_BYPASS:
+  title: "Package export bypassed"
+  title_vi: "Bỏ qua cổng xuất của gói"
+  meaning_vi: "Import giữa các gói không dùng tên gói và export đã khai báo."
+  causes_vi:
+    - "Import đường dẫn tương đối sang gói khác"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_PACKAGE_IMPORTS_APP:
+  title: "Package depends on an app"
+  title_vi: "Gói dùng chung phụ thuộc vào ứng dụng"
+  meaning_vi: "Một gói dùng chung lại import mã của ứng dụng cụ thể."
+  causes_vi:
+    - "Đặt mã dùng chung nhưng lấy phụ thuộc từ app"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_SYNTAX_INVALID:
+  title: "Source syntax invalid"
+  title_vi: "Cú pháp mã nguồn không hợp lệ"
+  meaning_vi: "Trình biên dịch báo mã nguồn sai cú pháp."
+  causes_vi:
+    - "Tệp dở dang hoặc gõ sai"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_TSCONFIG_INVALID:
+  title: "tsconfig invalid"
+  title_vi: "tsconfig không hợp lệ"
+  meaning_vi: "Một tệp tsconfig không đọc được hoặc sai."
+  causes_vi:
+    - "Sai JSON hoặc tuỳ chọn không hợp lệ"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_TSCONFIG_MISSING:
+  title: "tsconfig missing"
+  title_vi: "Thiếu tsconfig"
+  meaning_vi: "Dự án được chọn nhưng không có tsconfig."
+  causes_vi:
+    - "Tệp bị xoá hoặc đường dẫn sai"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_TSCONFIG_REFERENCE_OUTSIDE:
+  title: "tsconfig reference leaves repo"
+  title_vi: "Tham chiếu tsconfig ra ngoài kho"
+  meaning_vi: "Một project reference trong tsconfig trỏ ra ngoài kho mã."
+  causes_vi:
+    - "Đường dẫn references dùng ../ vượt gốc"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_TYPESCRIPT_INVALID:
+  title: "TypeScript package has no compiler API"
+  title_vi: "Gói TypeScript trong kho không có API trình biên dịch"
+  meaning_vi: "Gói `typescript` trong kho được kiểm không cung cấp API trình biên dịch mà bộ kiểm kiến trúc cần."
+  causes_vi:
+    - "Gói `typescript` bị cài hỏng hoặc bị thay bằng gói khác cùng tên."
+  nextStep_vi: "Cài lại `typescript` đúng phiên bản đã ghim trong `knowledge/hfs/canon-pins.yaml` rồi chạy lại `hfs check`."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_TYPESCRIPT_MISSING:
+  title: "TypeScript is not installed in the checked repository"
+  title_vi: "Kho được kiểm chưa cài TypeScript"
+  meaning_vi: "Bộ kiểm kiến trúc chỉ dùng TypeScript cài trong chính kho được kiểm, không thay bằng bộ phân tích khác, nên không kiểm được."
+  causes_vi:
+    - "Kho thiếu `package.json` hoặc chưa chạy `npm ci` nên `node_modules/typescript` không có."
+  nextStep_vi: "Chạy `npm ci` trong kho rồi chạy lại `hfs check`."
+  owner: op-retry
+  kind: check-finding
+
+BE_APPLICATION_IMPORTS_TRANSPORT:
+  title: "Application imports transport layer"
+  title_vi: "Lớp ứng dụng import lớp giao vận"
+  meaning_vi: "Mã lớp application của feature backend phụ thuộc vào adapter hay DTO của lớp transport."
+  causes_vi:
+    - "Import DTO hoặc controller vào use case, kể cả qua barrel hoặc import kiểu"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_APPLICATION_TRANSPORT_FRAMEWORK:
+  title: "Application uses transport framework types"
+  title_vi: "Lớp ứng dụng dùng kiểu khung giao vận"
+  meaning_vi: "Mã lớp application import decorator, kiểu request hay response của giao thức."
+  causes_vi:
+    - "Đặt validator hay decorator HTTP trong lớp application"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_APP_BUSINESS_ROLE:
+  title: "Composition root holds business role"
+  title_vi: "Gốc ghép nối chứa vai trò nghiệp vụ"
+  meaning_vi: "Thư mục ứng dụng gốc chứa mã có vai trò nghiệp vụ hay nhà cung cấp."
+  causes_vi:
+    - "Đặt service hay repository trong src của ứng dụng gốc"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_APP_COMPOSITION_ONLY:
+  title: "Composition root has stray source"
+  title_vi: "Gốc ghép nối có tệp lạc chỗ"
+  meaning_vi: "Mã trong ứng dụng gốc không phải entry, module gốc hay bootstrap được cho phép."
+  causes_vi:
+    - "Thêm tệp không đúng tên vào thư mục ứng dụng gốc"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_FEATURE_LAYOUT_INVALID:
+  title: "Feature folder layout invalid"
+  title_vi: "Bố cục thư mục feature sai"
+  meaning_vi: "Tệp của feature đặt sai thư mục application hoặc transport so với vai trò của nó."
+  causes_vi:
+    - "Đặt vai trò giao vận trong application/ hoặc ngược lại"
+    - "Thiếu tên giao thức dưới transport/"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_FEATURE_NOT_COMPOSED:
+  title: "Feature not composed into any app"
+  title_vi: "Feature không được lắp vào ứng dụng nào"
+  meaning_vi: "Một feature backend không có đường import chạy thật (không tính import chỉ-kiểu) từ tệp gốc của bất kỳ ứng dụng nào (app.module.ts hoặc main.ts). Không tiến trình nào nạp nó nên code này không bao giờ được phục vụ."
+  causes_vi:
+    - "Quên thêm module của feature vào app.module.ts của ứng dụng"
+    - "Chỉ import kiểu (import type) từ ứng dụng, nên feature không thật sự được lắp vào"
+    - "Feature đã bị bỏ dở hoặc thay bằng feature khác nhưng thư mục cũ vẫn còn"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để lắp module của feature vào ứng dụng phù hợp hoặc xoá feature không dùng; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_MODULE_HANDLER_REGISTRATION:
+  title: "Handler not registered exactly once"
+  title_vi: "Handler chưa đăng ký đúng một lần"
+  meaning_vi: "Một handler không được đăng ký trực tiếp đúng một lần trong module Nest."
+  causes_vi:
+    - "Quên đăng ký vào providers"
+    - "Đăng ký ở nhiều module"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_MODULE_NOT_COMPOSED:
+  title: "Capability module not composed into any app"
+  title_vi: "Module năng lực không được lắp vào ứng dụng nào"
+  meaning_vi: "Một module domain, integrations hoặc platform không có đường import chạy thật từ tệp gốc của bất kỳ ứng dụng nào, kể cả qua các module khác đã được lắp. Nó là code chết: không tiến trình nào dùng đến."
+  causes_vi:
+    - "Module được viết sẵn nhưng chưa feature nào import nó"
+    - "Feature từng dùng module này đã bị xoá hoặc đổi hướng sang module khác"
+    - "Chỉ có import kiểu tới module, không có import chạy thật"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để nối module vào feature cần nó hoặc xoá module không ai dùng; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_MODULE_PROVIDER_REREGISTRATION:
+  title: "Provider re-registered"
+  title_vi: "Provider bị đăng ký lại"
+  meaning_vi: "Một provider đã có nơi đăng ký lại bị đăng ký thêm ở module khác."
+  causes_vi:
+    - "Khai báo cùng provider ở hai module"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_PUBLIC_CONTRACT_FORM:
+  title: "Public contract form invalid"
+  title_vi: "Dạng hợp đồng công khai sai"
+  meaning_vi: "Hợp đồng công khai của backend không được khai báo theo dạng được yêu cầu (ví dụ kiểu inline)."
+  causes_vi:
+    - "Viết kiểu ngay tại tham số thay vì khai báo tên riêng"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_READONLY_BOUNDARY:
+  title: "Readonly boundary violated"
+  title_vi: "Vi phạm ranh giới chỉ-đọc"
+  meaning_vi: "Thông điệp hoặc phụ thuộc được tiêm không được đánh dấu readonly hoặc có setter."
+  causes_vi:
+    - "Thiếu readonly trên trường"
+    - "Có setter hay index signature"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_REQUIRED_MODULE_MISSING:
+  title: "Required backend module, app or feature file is missing"
+  title_vi: "Thiếu tệp hoặc thư mục bắt buộc của một phần backend"
+  meaning_vi: "Bảng kê HFS bắt buộc mỗi ứng dụng, tính năng, module miền, tích hợp và module nền tảng (cấu hình, ghi nhật ký, lỗi, kiểu nguyên thuỷ) phải có một số tệp hoặc thư mục cố định, ví dụ index.ts, tệp .module.ts, thư mục application/ hay bài kiểm thử ghép ứng dụng. Ở đây một mục như vậy không tồn tại, nên phần đó chưa đúng khuôn và các bộ kiểm tra khác không thể tin vào nó."
+  causes_vi:
+    - "Tạo module hoặc tính năng mới nhưng quên tệp cửa vào index.ts hoặc tệp .module.ts"
+    - "Module nền tảng bắt buộc (config, logging, errors, primitives) chưa được tạo hoặc đặt tên khác"
+    - "Ứng dụng thiếu bài kiểm thử ghép <app>.composition.spec.ts"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tạo tệp hoặc thư mục còn thiếu đúng theo bảng kê; nếu tên hiện có là do thiết kế khác thì đó là việc đổi bảng kê, do người giám sát quyết định."
+  owner: op-retry
+  kind: check-finding
+
+BE_SOURCE_NAME_INVALID:
+  title: "Source file name invalid"
+  title_vi: "Tên tệp nguồn sai quy ước"
+  meaning_vi: "Tên tệp nguồn của feature backend không theo quy ước đặt tên vai trò."
+  causes_vi:
+    - "Đặt tên tệp không có hậu tố vai trò đúng"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_TIER_DIRECTION:
+  title: "Backend import against the tier direction"
+  title_vi: "Backend import ngược chiều tầng"
+  meaning_vi: "Một tệp backend import từ tầng mà bảng kê HFS không cho phép tầng của nó phụ thuộc vào. Mỗi tầng (app, feature, domain, integrations, platform) chỉ được nhìn xuống các tầng liệt kê trong bảng; hai feature không bao giờ import nhau, và import chỉ kiểu (type-only) cũng tính như import thật."
+  causes_vi:
+    - "Một feature import feature khác thay vì đi qua một module domain dùng chung"
+    - "Một module domain, integrations hoặc platform import ngược lên feature hoặc app"
+    - "Một module platform import domain hoặc integrations"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để đưa phần dùng chung xuống đúng tầng (domain hoặc platform) rồi cho cả hai bên import từ đó; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_APP_ISOLATION:
+  title: "App imports another app"
+  title_vi: "Một app import app khác"
+  meaning_vi: "Một app trong apps/ import mã nguồn của app khác. Các app độc lập, build và triển khai riêng; mã dùng chung phải nằm trong một gói packages/<pkg>."
+  causes_vi:
+    - "Import đường dẫn tương đối hoặc bí danh trỏ sang apps/<app-khác>/src"
+    - "Sao chép cách dùng chung bằng import thay vì tạo gói dùng chung"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển phần dùng chung vào một gói packages/<pkg> hoặc nhân bản có chủ đích; nếu cần ô gói mới thì người giám sát thêm ô vào bảng kê."
+  owner: op-retry
+  kind: check-finding
+
+FE_BLOCK_PRODUCT_HOOK_DEFINITION:
+  title: "Block defines a product hook"
+  title_vi: "Khối giao diện tự định nghĩa hook sản phẩm"
+  meaning_vi: "Một block định nghĩa luôn vòng đời dữ liệu của sản phẩm, trong khi block chỉ được gọi hook có sẵn từ thư mục hooks."
+  causes_vi:
+    - "Viết hook dữ liệu ngay trong file block"
+    - "Trộn logic thế giới sản phẩm vào block"
+  nextStep_vi: "Op interface.implement chuyển hook sang thư mục hooks và để block chỉ gọi nó."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_COMPONENT_DEEP_HOOK_IMPORT:
+  title: "Component imports a hook too deeply"
+  title_vi: "Thành phần nhập hook quá sâu"
+  meaning_vi: "Thành phần giao diện nhập hook dữ liệu không qua cửa (barrel) của thư mục hooks."
+  causes_vi:
+    - "Nhập thẳng tệp hook thay vì qua barrel"
+    - "Đường nhập đi vòng qua nhiều tầng"
+  nextStep_vi: "Op interface.implement đổi sang nhập qua barrel hooks của nơi sở hữu."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_COMPONENT_WORLD_OWNERSHIP:
+  title: "Component owns product-world state"
+  title_vi: "Thành phần nắm trạng thái của thế giới sản phẩm"
+  meaning_vi: "Một thành phần cấp thấp tự giữ dữ liệu, điều hướng, ngôn ngữ hoặc phiên, trong khi chỉ được xử lý tương tác trình duyệt đơn giản."
+  causes_vi:
+    - "Gọi hook điều hướng hoặc ngôn ngữ trong thành phần thuần"
+    - "Đặt vòng đời dữ liệu ở tầng sai"
+  nextStep_vi: "Op interface.implement chuyển phần này lên thành phần kết nối (index.tsx) của tầng sở hữu."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_CONNECTED_BLOCK_RENDER_PAIR:
+  title: "Connected block lacks pure render twin"
+  title_vi: "Khối kết nối thiếu bản render thuần đi kèm"
+  meaning_vi: "Block kết nối (index.tsx) không giao mọi đường render cho hàm thuần trong component.tsx cùng cấp."
+  causes_vi:
+    - "Viết JSX trực tiếp trong index.tsx"
+    - "Chưa có bản thuần trong component.tsx"
+  nextStep_vi: "Op interface.implement tách phần hiển thị sang component.tsx và để index.tsx chỉ nối dữ liệu."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_CUSTOM_HOOK_LOCATION:
+  title: "Custom hook declared outside hooks root"
+  title_vi: "Hook tự viết nằm ngoài thư mục hooks"
+  meaning_vi: "Một hook useX do dự án tự viết được khai báo ngoài thư mục hooks đã cấu hình."
+  causes_vi:
+    - "Viết hook ngay trong file thành phần"
+    - "Đặt hook ở thư mục khác"
+  nextStep_vi: "Op interface.implement chuyển hook vào thư mục hooks."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_ERROR_BOUNDARY_MISSING:
+  title: "Next app lacks a required error or loading boundary"
+  title_vi: "Ứng dụng Next thiếu trang lỗi hoặc trang đang tải bắt buộc"
+  meaning_vi: "Mỗi ứng dụng Next phải có global-error.tsx, error.tsx, not-found.tsx và loading.tsx trong src/app theo bảng kê HFS. Thiếu chúng thì khi trang gặp lỗi, không tìm thấy hoặc đang tải, người dùng sẽ thấy màn hình mặc định của khung phần mềm hoặc màn hình trắng thay vì giao diện của sản phẩm."
+  causes_vi:
+    - "Ứng dụng mới được dựng mà chưa thêm các trang biên lỗi"
+    - "Trang lỗi được đặt sai thư mục, ví dụ ngoài src/app/[locale]/"
+    - "Tệp bị xoá hoặc đổi tên trong lúc dọn dẹp"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để thêm tệp còn thiếu vào đúng src/app hoặc src/app/[locale]; giao diện của các trang này do người thiết kế duyệt."
+  owner: op-retry
+  kind: check-finding
+
+FE_FETCH_OUTSIDE_TRANSPORT:
+  title: "Raw fetch outside transport root"
+  title_vi: "Gọi fetch thô ngoài lớp truyền tải API"
+  meaning_vi: "Mã dùng fetch trực tiếp ở nơi không phải lớp truyền tải API hay route adapter máy chủ."
+  causes_vi:
+    - "Gọi fetch ngay trong thành phần hoặc hook"
+    - "Bỏ qua lớp client API của dự án"
+  nextStep_vi: "Op interface.implement chuyển lời gọi vào lớp truyền tải API đã cấu hình."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_HREF_RESOLVES:
+  title: "Link points to a route that does not exist"
+  title_vi: "Liên kết trỏ tới đường dẫn không tồn tại"
+  meaning_vi: "Một liên kết viết thẳng trong code (href, redirect hoặc router.push) trỏ tới đường dẫn mà không tệp page.tsx hay route.ts nào của ứng dụng phục vụ. Người dùng bấm vào sẽ gặp trang 404."
+  causes_vi:
+    - "Gõ sai đường dẫn hoặc đổi tên route mà quên sửa liên kết"
+    - "Route đã bị xoá hoặc chưa được tạo"
+    - "Thiếu một tham số động trong đường dẫn so với cấu trúc thư mục route"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa liên kết cho khớp route thật hoặc tạo route còn thiếu; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_OWNER_REACHABLE:
+  title: "Page feature not mounted by a route"
+  title_vi: "Feature trang chưa được route nào gắn vào"
+  meaning_vi: "Một feature trang, layout hoặc overlay của frontend không có đường import chạy thật từ bất kỳ tệp nào trong cây route của ứng dụng (thư mục src/app). Người dùng sẽ không bao giờ thấy nó vì không route nào hiển thị."
+  causes_vi:
+    - "Quên import feature vào page.tsx hoặc layout.tsx tương ứng"
+    - "Route chỉ import kiểu của feature chứ không render nó"
+    - "Feature đã bị thay thế nhưng thư mục cũ vẫn còn"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để gắn feature vào route đúng hoặc xoá feature không dùng; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_PURE_REACHES_DATA:
+  title: "Pure component reaches hooks or API"
+  title_vi: "Thành phần thuần chạm tới hook hoặc API"
+  meaning_vi: "Tệp component.tsx thuần lại nhập được hook hoặc lớp truyền tải API, kể cả qua alias hay barrel."
+  causes_vi:
+    - "Nhập hook dữ liệu vào thành phần thuần"
+    - "Đường nhập gián tiếp đưa hook vào"
+  nextStep_vi: "Op interface.implement đưa phần dữ liệu lên index.tsx kết nối và giữ component.tsx thuần."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_PURE_WORLD_HOOK:
+  title: "Pure component uses a world hook"
+  title_vi: "Thành phần thuần dùng hook của thế giới sản phẩm"
+  meaning_vi: "Tệp component.tsx thuần dùng hook về trạng thái thế giới, thứ mà index.tsx kết nối mới được giữ."
+  causes_vi:
+    - "Gọi hook điều hướng, ngôn ngữ hay phiên trong thành phần thuần"
+    - "Chưa tách bản thuần khỏi bản kết nối"
+  nextStep_vi: "Op interface.implement chuyển hook sang index.tsx và truyền dữ liệu xuống qua props."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_PURE_WORLD_IMPORT:
+  title: "Pure component imports router or locale"
+  title_vi: "Thành phần thuần nhập bộ định tuyến hoặc ngôn ngữ"
+  meaning_vi: "Tệp component.tsx thuần nhập module về định tuyến hoặc ngôn ngữ, việc chỉ index.tsx kết nối được làm."
+  causes_vi:
+    - "Nhập next/navigation hoặc thư viện dịch trong thành phần thuần"
+    - "Bản thuần và bản kết nối chưa được tách"
+  nextStep_vi: "Op interface.implement bỏ nhập này khỏi component.tsx và để index.tsx truyền vào."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_ROUTE_CLIENT_BOUNDARY:
+  title: "Route page owns client boundary"
+  title_vi: "Trang route tự khai báo phía client"
+  meaning_vi: "Tệp page.tsx mang chỉ thị client, việc này route adapter phía máy chủ không được làm."
+  causes_vi:
+    - "Thêm use client vào page.tsx"
+    - "Gộp giao diện tương tác vào route"
+  nextStep_vi: "Op interface.implement bỏ chỉ thị client khỏi page.tsx và đặt nó ở thành phần được mount."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_ROUTE_CLIENT_HOOK:
+  title: "Server route imports a client hook"
+  title_vi: "Route máy chủ nhập hook phía client"
+  meaning_vi: "Tệp page.tsx phía máy chủ nhập hook chỉ dùng được ở phía client."
+  causes_vi:
+    - "Dùng useX ngay trong page.tsx"
+    - "Nhập hook vào route thay vì thành phần"
+  nextStep_vi: "Op interface.implement chuyển hook sang thành phần được page.tsx mount."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_ROUTE_DEFAULT_EXPORT:
+  title: "Page has no single default export"
+  title_vi: "Trang route thiếu một export mặc định duy nhất"
+  meaning_vi: "Tệp page.tsx phải mặc định export đúng một hàm route cục bộ nhưng không làm vậy."
+  causes_vi:
+    - "Thiếu export default"
+    - "Export mặc định là thứ khác hàm route"
+  nextStep_vi: "Op interface.implement khai báo const Page và kết thúc bằng export default Page."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_ROUTE_DRAWING_DECISION:
+  title: "Route makes a visual composition choice"
+  title_vi: "Route tự quyết định bố cục hiển thị"
+  meaning_vi: "Tệp route chọn hoặc bỏ phần bố cục hình ảnh, việc chỉ redirect hoặc notFound mới được làm."
+  causes_vi:
+    - "Có điều kiện chọn giao diện ngay trong page.tsx"
+    - "Trộn logic hiển thị vào route"
+  nextStep_vi: "Op interface.implement đưa quyết định bố cục vào thành phần trang, route chỉ còn redirect hoặc notFound."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_ROUTE_ONE_PAGE:
+  title: "Route must mount exactly one page"
+  title_vi: "Route phải mount đúng một thành phần trang"
+  meaning_vi: "Tệp page.tsx phải mount đúng một thành phần cấp trang, hoặc chỉ redirect và notFound không có JSX."
+  causes_vi:
+    - "Mount nhiều thành phần hoặc thành phần sai tầng"
+    - "Vừa có JSX vừa redirect"
+  nextStep_vi: "Op interface.implement sửa route để chỉ mount một thành phần trang."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_SOURCE_LAYOUT_INVALID:
+  title: "Frontend source in wrong folder"
+  title_vi: "Mã giao diện nằm sai thư mục"
+  meaning_vi: "Mã sản phẩm frontend không thuộc app, features, components, hooks hoặc modules, cũng không phải tệp gốc framework yêu cầu."
+  causes_vi:
+    - "Đặt tệp ở thư mục không có chủ sở hữu"
+    - "Tính năng chứa thứ không phải trang, layout hay overlay"
+  nextStep_vi: "Op interface.implement chuyển tệp về đúng thư mục theo cấu trúc chuẩn."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_SWR_KEY_IDENTITY:
+  title: "SWR key misses an identity"
+  title_vi: "Khóa SWR thiếu thông tin định danh"
+  meaning_vi: "Hook SWR không dùng null khi thiếu đầu vào hoặc khóa chưa chứa đủ định danh của kết quả."
+  causes_vi:
+    - "Khóa thiếu định danh người xem hoặc tham số"
+    - "Không trả null khi thiếu đầu vào"
+  nextStep_vi: "Op interface.implement sửa khóa để chứa đủ định danh và dùng null khi thiếu đầu vào."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_SWR_MUTATION_RESOURCE_IDENTITY:
+  title: "SWR mutation not tied to resource"
+  title_vi: "Thao tác ghi SWR chưa gắn với tài nguyên"
+  meaning_vi: "Thao tác thay đổi dữ liệu của hook SWR không giữ định danh tài nguyên mà nó tác động."
+  causes_vi:
+    - "Mutation dùng khóa chung không chỉ tài nguyên"
+    - "Thiếu định danh tài nguyên khi làm mới"
+  nextStep_vi: "Op interface.implement gắn định danh tài nguyên vào khóa của thao tác ghi."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+FE_TIER_DIRECTION:
+  title: "Frontend import against the tier direction"
+  title_vi: "Frontend import ngược chiều tầng"
+  meaning_vi: "Một tệp frontend import từ tầng mà bảng kê HFS không cho phép: route chỉ nhìn xuống feature, feature chỉ nhìn xuống components, hooks và modules, hai feature không bao giờ import nhau, và một lớp component chỉ import các lớp đứng sau nó (blocks, composites, branches, leaves)."
+  causes_vi:
+    - "Một feature import một feature khác thay vì đưa phần dùng chung xuống components, hooks hoặc modules"
+    - "Một component import ngược lên lớp cao hơn hoặc lên feature"
+    - "Một module import hooks hoặc components"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển phần dùng chung xuống tầng thấp hơn rồi cho cả hai bên import từ đó; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_WORLD_OWNER_RENDER_BOUNDARY:
+  title: "World-state owner renders inline"
+  title_vi: "Nơi giữ trạng thái sản phẩm tự render trực tiếp"
+  meaning_vi: "Thành phần đọc trạng thái sản phẩm không giao mọi đường render cho hàm hoặc thành phần thuần đã xác định."
+  causes_vi:
+    - "Viết JSX trực tiếp trong thành phần đọc dữ liệu"
+    - "Chưa có thành phần thuần tương ứng"
+  nextStep_vi: "Op interface.implement tách phần hiển thị sang thành phần thuần và giao cho nó."
+  owner: other-op:interface.implement
+  kind: check-finding
+
+HFS_APPS_REQUIRED:
+  title: "Repository has no apps directory"
+  title_vi: "Kho mã không có thư mục apps"
+  meaning_vi: "Kho HFS phải là monorepo apps/<app>/ và có ít nhất một ứng dụng nhưng chưa có."
+  causes_vi:
+    - "Chưa tạo thư mục apps"
+    - "Mã còn nằm ở gốc kho"
+  nextStep_vi: "Op dựng khung (backend.scaffold hoặc interface.scaffold) tạo apps/<app> theo bố cục HFS."
+  owner: other-op:backend.scaffold
+  kind: check-finding
+
+HFS_APP_LAYOUT_INVALID:
+  title: "App directory layout invalid"
+  title_vi: "Bố cục thư mục ứng dụng chưa đúng"
+  meaning_vi: "Mục dưới apps/ không phải thư mục, hoặc thiếu các tệp bắt buộc của bố cục HFS."
+  causes_vi:
+    - "Có tệp lẻ trong apps/"
+    - "Ứng dụng thiếu tệp bắt buộc"
+  nextStep_vi: "Op dựng khung sửa bố cục ứng dụng theo HFS rồi kiểm tra lại."
+  owner: other-op:backend.scaffold
+  kind: check-finding
+
 HFS_CANON_PIN_DRIFT:
   title: "Dependency version differs from the canon pin"
   title_vi: "Phiên bản phụ thuộc lệch khỏi bản đã ghim"
@@ -23,6 +667,39 @@ HFS_DECLARATION_INVALID:
   owner: op-retry
   kind: check-finding
 
+HFS_DUPLICATE_CODE:
+  title: "Duplicated code block"
+  title_vi: "Mã trùng lặp"
+  meaning_vi: "Một đoạn mã (bỏ qua khác biệt về tên biến và giá trị chữ hoặc số) xuất hiện hai lần trong mã sản phẩm: ở hai chủ sở hữu, ở hai tệp của một chủ sở hữu, hoặc hai lần trong một tệp. Ngưỡng số dòng và số token là một định nghĩa duy nhất trong ruleParams.<profile>.duplicateBlock của knowledge/hfs/slots.yaml; lời nhắn của bộ kiểm tra ghi rõ ngưỡng và hai vị trí."
+  causes_vi:
+    - "Op cần một hàm hỗ trợ đã có ở nơi khác nhưng chép lại thay vì dùng chung"
+    - "Hai nơi cùng tự viết một logic giống nhau vì chưa ai đưa nó vào chỗ dùng chung"
+    - "Đoạn mã được chép nguyên rồi chỉ đổi tên biến hoặc hằng số"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để đưa đoạn mã về một chỗ duy nhất theo lời nhắn (trong cùng chủ sở hữu, hoặc src/modules/platform/primitives, module miền của năng lực đó, hay packages/* với FE) rồi gọi từ cả hai nơi; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
+HFS_E2E_IN_AUTOMATIC_GATE:
+  title: "E2E runs in automatic gate"
+  title_vi: "Kiểm thử e2e nằm trong cổng tự động"
+  meaning_vi: "Hook husky hoặc script tự động gọi cả kiểm thử e2e, trong khi e2e không được nằm trong cổng tự động."
+  causes_vi:
+    - "Pre-commit hoặc pre-push chạy e2e"
+    - "Script lint:check kéo e2e vào"
+  nextStep_vi: "Op backend.scaffold gỡ e2e khỏi hook và script tự động."
+  owner: other-op:backend.scaffold
+  kind: check-finding
+
+HFS_EMPTY_DIR:
+  title: "No empty directory outside an `ignored` slot"
+  title_vi: "Thư mục rỗng còn sót lại"
+  meaning_vi: "Có thư mục không có tệp nào bên dưới (kể cả các thư mục con cũng rỗng). Git không theo dõi thư mục rỗng nên nó chỉ là dấu vết của cấu trúc đã đổi tên hoặc đã xóa. Xóa thư mục."
+  causes_vi:
+    - "Vi phạm luật R03: cấu trúc bị đổi tên hoặc tệp bị xóa mà thư mục cũ không được dọn (vd `src/modules/business/*` còn trống bên cạnh `domain/*`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_FORBIDDEN_PRESENT:
   title: "Tracked path in a forbidden slot"
   title_vi: "Có tệp bị cấm trong cây mã nguồn"
@@ -32,6 +709,26 @@ HFS_FORBIDDEN_PRESENT:
     - "Tệp .env hoặc khoá bí mật dạng rõ nằm trong kho"
     - "Thư mục e2e ở gốc thay vì src/tests/e2e"
   nextStep_vi: "Chuyển tệp tới nơi ô đó chỉ định (trường goesTo) hoặc xoá nó, rồi gỡ khỏi Git; tệp bí mật phải được niêm phong đúng chỗ, không bao giờ để dạng rõ. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_GHOST_TREE:
+  title: "No empty directory beside a near-identical sibling"
+  title_vi: "Cây thư mục ma cạnh thư mục gần trùng tên"
+  meaning_vi: "Có thư mục rỗng mà tên chỉ khác vài ký tự so với thư mục anh em cùng cấp (thông báo nêu cả hai), tức là bản đổi tên hoặc gõ sai của cùng một cấu trúc chưa được dọn. Giữ bản có tệp, xóa bản rỗng."
+  causes_vi:
+    - "Vi phạm luật R03: đổi tên cấu trúc để lại bản cũ hoặc bản gõ sai (vd `business` và `bussiness`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_HOOKS_PATH_REDIRECTED:
+  title: "A clone redirects core.hooksPath away from husky"
+  title_vi: "core.hooksPath bị đổi hướng khỏi husky"
+  meaning_vi: "Cấu hình Git cục bộ của bản clone đặt `core.hooksPath` trỏ ra ngoài `.husky`, nên hook pre-commit và pre-push không chạy và cổng mà mọi clone khác phải qua đã bị bỏ qua."
+  causes_vi:
+    - "Vi phạm luật R13: pre-push chạy typecheck và lint, và không clone nào được đổi `core.hooksPath` để né husky; giá trị duy nhất được phép là `.husky` hoặc `.husky/_` do chính husky đặt."
+  nextStep_vi: "Gỡ cấu hình bằng `git config --local --unset core.hooksPath` rồi commit lại qua hook; không dùng `--no-verify` và không đổi đường dẫn hook để né kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -90,6 +787,28 @@ HFS_MIN_INSTANCES:
   owner: op-retry
   kind: check-finding
 
+HFS_MODULE_TIER_INVALID:
+  title: "Module tier name is not allowed"
+  title_vi: "Tên tầng module không hợp lệ"
+  meaning_vi: "Trong src/modules có thư mục tầng không thuộc domain, platform hoặc integrations."
+  causes_vi:
+    - "Đặt tên tầng tự do"
+    - "Sai chính tả tên tầng"
+  nextStep_vi: "Op backend.implement chuyển module về một trong ba tầng hợp lệ."
+  owner: other-op:backend.implement
+  kind: check-finding
+
+HFS_PACKAGE_MANAGER_MIXED:
+  title: "Package manager mixed with npm"
+  title_vi: "Trộn trình quản lý gói khác với npm"
+  meaning_vi: "Trường packageManager trong package.json mâu thuẫn với hợp đồng dùng npm và package-lock.json."
+  causes_vi:
+    - "Khai pnpm hoặc yarn trong package.json"
+    - "Còn tệp khóa của trình khác"
+  nextStep_vi: "Op dựng khung đưa packageManager về npm rồi kiểm tra lại."
+  owner: other-op:backend.scaffold
+  kind: check-finding
+
 HFS_PATH_NO_SLOT:
   title: "Path matches no HFS slot"
   title_vi: "Đường dẫn không khớp ô nào của HFS"
@@ -100,6 +819,94 @@ HFS_PATH_NO_SLOT:
     - "Tên tệp hoặc thư mục viết sai so với mẫu của ô gần nhất"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển tệp vào ô gần nhất được báo hoặc xoá nó; nếu thực sự cần một loại nội dung mới thì đó là việc thêm ô vào bảng kê, do người giám sát làm, không phải kho tự thêm."
   owner: op-retry
+  kind: check-finding
+
+HFS_README_BADGE_NOT_LIVE:
+  title: "README badge is not a live service"
+  title_vi: "Huy hiệu README không phải dịch vụ ngoài đang chạy"
+  meaning_vi: "Một huy hiệu trong README không trỏ tới dịch vụ ngoài HTTPS đang hoạt động."
+  causes_vi:
+    - "Dùng huy hiệu tĩnh hoặc địa chỉ nội bộ"
+    - "Địa chỉ huy hiệu không hợp lệ"
+  nextStep_vi: "Op docs.author thay bằng huy hiệu từ dịch vụ ngoài HTTPS thật."
+  owner: other-op:docs.author
+  kind: check-finding
+
+HFS_README_DESCRIPTION_INVALID:
+  title: "README description line invalid"
+  title_vi: "Dòng mô tả trong README chưa đúng"
+  meaning_vi: "README thiếu một dòng mô tả ngắn ngay dưới tên kho."
+  causes_vi:
+    - "Không có dòng mô tả dưới tiêu đề"
+    - "Mô tả dài nhiều dòng"
+  nextStep_vi: "Op docs.author thêm một dòng mô tả ngắn ngay dưới tiêu đề."
+  owner: other-op:docs.author
+  kind: check-finding
+
+HFS_README_DEVELOPMENT_INCOMPLETE:
+  title: "README Development section incomplete"
+  title_vi: "Mục Development trong README chưa đủ lệnh"
+  meaning_vi: "Mục Development chưa nêu đủ các lệnh cài đặt, typecheck, lint:check, build và test:unit."
+  causes_vi:
+    - "Quên một hoặc vài lệnh"
+    - "Viết bằng lệnh của trình quản lý khác"
+  nextStep_vi: "Op docs.author bổ sung đủ các lệnh npm còn thiếu."
+  owner: other-op:docs.author
+  kind: check-finding
+
+HFS_README_PRIVATE_URL:
+  title: "README links a private host"
+  title_vi: "README chứa địa chỉ nội bộ hoặc cục bộ"
+  meaning_vi: "README có địa chỉ trỏ tới máy cục bộ hoặc mạng riêng."
+  causes_vi:
+    - "Để nguyên địa chỉ localhost hoặc IP riêng"
+    - "Dán nhầm liên kết nội bộ"
+  nextStep_vi: "Op docs.author xóa hoặc thay bằng địa chỉ công khai."
+  owner: other-op:docs.author
+  kind: check-finding
+
+HFS_README_SECTION_MISSING:
+  title: "README lacks a standard section"
+  title_vi: "README thiếu một mục chuẩn"
+  meaning_vi: "README thiếu một trong các mục chuẩn: Overview, Stack, Repository layout, Development."
+  causes_vi:
+    - "Chưa viết mục đó"
+    - "Đặt sai cấp tiêu đề (không phải ##)"
+  nextStep_vi: "Op docs.author thêm mục còn thiếu bằng tiêu đề ## đúng tên."
+  owner: other-op:docs.author
+  kind: check-finding
+
+HFS_README_SECTION_ORDER:
+  title: "README sections out of order"
+  title_vi: "Các mục README sai thứ tự"
+  meaning_vi: "Các mục chuẩn của README không theo đúng thứ tự quy định."
+  causes_vi:
+    - "Đặt mục sau trước mục trước"
+    - "Chèn mục thêm làm xáo trộn thứ tự"
+  nextStep_vi: "Op docs.author sắp lại các mục theo thứ tự chuẩn."
+  owner: other-op:docs.author
+  kind: check-finding
+
+HFS_README_TITLE_INVALID:
+  title: "README title does not match repo name"
+  title_vi: "Tiêu đề README không khớp tên kho"
+  meaning_vi: "Dòng đầu README phải là # kèm tên kho nhưng đang khác."
+  causes_vi:
+    - "Tiêu đề đặt tên khác"
+    - "Kho đổi tên mà README chưa đổi"
+  nextStep_vi: "Op docs.author sửa dòng đầu thành # <tên kho>."
+  owner: other-op:docs.author
+  kind: check-finding
+
+HFS_README_WORK_POINTER_MISSING:
+  title: "README lacks Work pointer"
+  title_vi: "README thiếu chỉ dẫn tới cây Work"
+  meaning_vi: "README chưa chỉ tới cây .starciwork của kho backend."
+  causes_vi:
+    - "Chưa viết dòng trỏ tới .starciwork"
+    - "Chỉ dẫn viết sai nơi"
+  nextStep_vi: "Op docs.author thêm chỉ dẫn tới cây .starciwork của backend."
+  owner: other-op:docs.author
   kind: check-finding
 
 HFS_REPO_UNREADABLE:
@@ -113,6 +920,18 @@ HFS_REPO_UNREADABLE:
   owner: op-retry
   kind: input-invalid
 
+HFS_REQUIRED_FILE_MISSING:
+  title: "Required file, directory or minimum instance is missing"
+  title_vi: "Thiếu tệp, thư mục hoặc số lượng tối thiểu bắt buộc theo bảng kê"
+  meaning_vi: "Bảng kê HFS đòi một tệp hoặc thư mục phải có trong mỗi phần của kho (gói dùng chung, module frontend, api, i18n, tuyến, layout...), hoặc đòi kho có ít nhất một ứng dụng hay tính năng thuộc loại bắt buộc. Mục đó không tồn tại; khi là số lượng tối thiểu thì báo tại hfs.json. Thiếu nó thì phần liên quan chưa hoạt động đầy đủ hoặc kho chưa phải một sản phẩm hoàn chỉnh."
+  causes_vi:
+    - "Tạo thư mục mới nhưng chưa thêm tệp bắt buộc như index.ts, client.ts, outcome.ts hoặc package.json"
+    - "Tệp có nhưng tên hoặc chỗ đặt khác với bảng kê"
+    - "Kho chưa có tính năng hoặc ứng dụng nào của loại bắt buộc"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tạo tệp còn thiếu đúng chỗ bảng kê chỉ định; nếu cấu trúc hiện có là chủ ý thì đó là việc sửa bảng kê, do người giám sát làm, không phải kho tự đổi."
+  owner: op-retry
+  kind: check-finding
+
 HFS_REQUIRED_MISSING:
   title: "Required file or directory missing"
   title_vi: "Thiếu tệp hoặc thư mục bắt buộc"
@@ -122,6 +941,62 @@ HFS_REQUIRED_MISSING:
     - "Ứng dụng thiếu main.ts, app.module.ts hoặc spec ghép ứng dụng"
     - "Kho thiếu tệp gốc bắt buộc như README.md, hfs.json, .starciwork, .starcistacks"
   nextStep_vi: "Tạo tệp hoặc thư mục theo mẫu của ô rồi commit; tệp chưa git add vẫn tính là thiếu. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_ROOT_ENTRY_FORBIDDEN:
+  title: "Root entry not on HFS allowlist"
+  title_vi: "Mục ở thư mục gốc không được phép"
+  meaning_vi: "Ở thư mục gốc của repo có một tệp hoặc thư mục không nằm trong danh sách được phép của cấu trúc chuẩn."
+  causes_vi:
+    - "Worker tạo thêm tệp hoặc thư mục ngay ở gốc repo"
+    - "Tệp cũ chưa được dời vào đúng chỗ của nó"
+  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op vừa tạo ra mục đó phải dời nó vào thư mục sở hữu rồi chạy lại kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+HFS_ROOT_ENTRY_MISSING:
+  title: "Required root entry is missing"
+  title_vi: "Thiếu mục bắt buộc ở thư mục gốc"
+  meaning_vi: "Repo thiếu một tệp hoặc thư mục mà cấu trúc chuẩn bắt buộc phải có ở gốc, hoặc README.md không đọc được."
+  causes_vi:
+    - "Repo mới chưa được dựng khung đầy đủ"
+    - "Tệp gốc bị xóa hoặc chưa được commit"
+  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op đang làm việc phải tạo mục còn thiếu rồi chạy lại kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+HFS_ROOT_MARKDOWN_FORBIDDEN:
+  title: "Markdown file at repository root"
+  title_vi: "Tệp Markdown đặt ở thư mục gốc"
+  meaning_vi: "Có một tệp Markdown nằm ngay ở gốc repo, trong khi tài liệu phải nằm trong thư mục docs hoặc hồ sơ Work của nó."
+  causes_vi:
+    - "Worker ghi ghi chú hoặc báo cáo thẳng ra gốc repo"
+    - "Tài liệu cũ chưa được dời đi"
+  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải chuyển tệp vào docs/ hoặc hồ sơ Work rồi chạy lại."
+  owner: op-retry
+  kind: check-finding
+
+HFS_ROOT_SRC_FORBIDDEN_FE:
+  title: "Root src folder in frontend repo"
+  title_vi: "Repo giao diện có thư mục src ở gốc"
+  meaning_vi: "Repo giao diện có thư mục src ngay ở gốc, trong khi mã nguồn chỉ được đặt trong apps/<tên app>/src."
+  causes_vi:
+    - "Dự án giao diện được dựng theo kiểu một app đơn"
+    - "Worker tạo mã ngoài thư mục app"
+  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải chuyển toàn bộ src vào apps/<app>/src rồi chạy lại."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SIZE_GROWTH:
+  title: "Source file over the size budget grew"
+  title_vi: "Tệp mã nguồn vượt hạn mức dòng vẫn tiếp tục dài thêm"
+  meaning_vi: "Một tệp mã nguồn đã dài hơn hạn mức mềm (500 dòng) nhưng lại dài thêm so với phiên bản gốc của nhánh, hoặc một tệp mới tạo đã vượt hạn mức ngay từ đầu. Tệp quá dài khó đọc, khó sửa và là nơi lỗi dễ ẩn; quy tắc này cho phép tệp cũ đang quá dài được giữ nguyên hoặc thu nhỏ dần, nhưng không cho phép nó phình thêm."
+  causes_vi:
+    - "Op thêm mã mới vào một tệp vốn đã quá 500 dòng thay vì tách phần mới sang tệp khác"
+    - "Một tệp đang dưới 500 dòng được thêm mã cho đến khi vượt hạn mức"
+    - "Một tệp mới tạo dài hơn 500 dòng, hoặc một tệp bị di chuyển sang đường dẫn mới nên bị coi là tệp mới"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tách phần mã mới (hoặc bớt phần cũ) sang tệp riêng đúng ô của nó, sao cho tệp không dài hơn phiên bản gốc và tệp mới không quá 500 dòng."
   owner: op-retry
   kind: check-finding
 
@@ -157,6 +1032,39 @@ HFS_SLOT_NOT_ENABLED:
   owner: op-retry
   kind: check-finding
 
+HFS_SRC_LAYOUT_INVALID:
+  title: "Backend src holds unexpected folders"
+  title_vi: "Thư mục src của backend có mục lạ"
+  meaning_vi: "Trong src của repo backend có thư mục nằm ngoài ba nơi cho phép là features, modules và tests."
+  causes_vi:
+    - "Worker tạo thư mục mới ngay dưới src"
+    - "Mã cũ chưa được dời về đúng feature hoặc module"
+  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải dời thư mục đó về nơi sở hữu nó rồi chạy lại."
+  owner: op-retry
+  kind: check-finding
+
+HFS_STACKS_IN_FE:
+  title: "Stack declarations in frontend repo"
+  title_vi: "Khai báo stack nằm trong repo giao diện"
+  meaning_vi: "Repo giao diện đang chứa thư mục .starcistacks, trong khi khai báo stack chỉ được đặt ở repo backend."
+  causes_vi:
+    - "Sao chép nhầm thư mục stack từ backend sang"
+    - "Worker tạo stack ở sai repo"
+  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải xóa thư mục khỏi repo giao diện và đặt khai báo ở backend."
+  owner: op-retry
+  kind: check-finding
+
+HFS_TEST_KIND_RETIRED:
+  title: "Retired test kind or extra test config"
+  title_vi: "Dùng loại test đã bỏ hoặc cấu hình test thừa"
+  meaning_vi: "Có tệp test thuộc loại đã bị loại bỏ, hoặc một cấu hình jest hay Playwright riêng thay vì một cấu hình chung ở gốc."
+  causes_vi:
+    - "Viết spec tích hợp hoặc harness theo kiểu cũ"
+    - "Tạo thêm tệp cấu hình test cho riêng từng nhóm"
+  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải đổi tệp thành unit hoặc e2e và bỏ cấu hình thừa rồi chạy lại."
+  owner: op-retry
+  kind: check-finding
+
 HFS_TRACKED_MUST_BE_IGNORED:
   title: "Tracked path that must be gitignored"
   title_vi: "Tệp bị theo dõi nhưng lẽ ra phải bị bỏ qua"
@@ -165,5 +1073,38 @@ HFS_TRACKED_MUST_BE_IGNORED:
     - "Thư mục dist, coverage, .next hoặc tệp sinh tự động bị git add"
     - ".gitignore thiếu dòng cho thư mục này"
   nextStep_vi: "Gỡ tệp khỏi Git bằng git rm --cached và thêm vào khối .gitignore chuẩn; không xoá thư mục trên đĩa. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_UNTRACKED_ROOT_ENTRY:
+  title: "No untracked or ignored entry outside an `ignored` slot"
+  title_vi: "Mục lạ ở gốc kho"
+  meaning_vi: "Có mục chưa được git theo dõi, cũng không nằm trong `.gitignore` hay slot `ignored`, nên HFS không cho phép nó tồn tại trong cây làm việc. Theo dõi nó vào đúng slot, hoặc lưu trữ ra `D:/starci-archive/` rồi xóa."
+  causes_vi:
+    - "Vi phạm luật R03: Thư mục làm việc không được có mục untracked/ignored ngoài slot `ignored` (vd `nul`, `.qwen/`, `.worktrees/`, `design-plans/`, `express`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_UNUSED_EXPORT:
+  title: "Public export that nothing outside the module uses"
+  title_vi: "Tên xuất công khai mà không nơi nào bên ngoài dùng"
+  meaning_vi: "Cửa vào công khai (index.ts) của một module, tính năng hoặc gói đang xuất ra một tên mà không tệp sản xuất nào nằm ngoài module đó import. Tệp kiểm thử không được tính là nơi dùng. Tên thừa ở cửa vào làm bề mặt công khai phình to, khiến người sau tưởng có thể dựa vào nó và làm việc thay đổi module khó hơn."
+  causes_vi:
+    - "Xuất thêm kiểu, hằng số hoặc hàm 'phòng khi cần' nhưng chưa có nơi nào dùng"
+    - "Nơi từng dùng tên này đã bị xoá hoặc chuyển vào cùng module, còn dòng xuất ở cửa vào bị bỏ sót"
+    - "Tên chỉ được dùng trong tệp kiểm thử, nên với bộ kiểm tra nó vẫn là thừa"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để xoá tên khỏi cửa vào (hoặc bỏ luôn phần khai báo nếu không còn ai dùng); nếu tên thực sự cần cho một nơi ngoài module thì nơi đó phải import nó qua cửa vào."
+  owner: op-retry
+  kind: check-finding
+
+HFS_WORK_IN_FE:
+  title: "Work tree inside frontend repo"
+  title_vi: "Hồ sơ Work nằm trong repo giao diện"
+  meaning_vi: "Repo giao diện chứa thư mục .starciwork, trong khi hồ sơ Work chỉ được lưu ở repo backend."
+  causes_vi:
+    - "Tạo hồ sơ Work nhầm repo"
+    - "Sao chép nguyên cây Work sang repo giao diện"
+  nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải chuyển hồ sơ sang repo backend rồi chạy lại."
   owner: op-retry
   kind: check-finding

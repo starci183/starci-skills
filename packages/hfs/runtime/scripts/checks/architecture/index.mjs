@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { canonical, loadArchitectureConfig } from './config.mjs';
-import { sameOrUnder } from '../../lib/path-key.mjs';
+import { sameOrUnder } from '../common.mjs';
 import { buildTypeScriptContext, relativePath } from './typescript.mjs';
 import { checkBackend } from './backend.mjs';
 import { checkBackendContracts, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID } from './contracts.mjs';
@@ -17,7 +17,6 @@ import { checkDeadExports, DEAD_EXPORT_RULE_IDS } from './dead-exports.mjs';
 import { checkRequiredFiles, REQUIRED_FILE_RULE_IDS } from './required-files.mjs';
 import { checkSizeGrowth, SIZE_GROWTH_RULE_IDS } from './size-growth.mjs';
 import { checkClones, CLONE_RULE_IDS } from './clones.mjs';
-import { checkSymbols, SYMBOL_RULE_IDS } from './symbols.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -76,7 +75,7 @@ const ERROR_RULE_IDS = ['ARCH_COMPILER_FAILURE', 'ARCH_CONFIG_INVALID', 'ARCH_EX
 export const ARCHITECTURE_RULE_IDS = Object.freeze([...new Set([
   ...COMMON_RULE_IDS, ...BACKEND_RULE_IDS, ...FRONTEND_RULE_IDS, ...HFS_RULE_IDS, ...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS,
   ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS,
-  ...REGISTRATION_RULE_IDS, ...SWR_DATA_RULE_IDS, ...SYMBOL_RULE_IDS, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID, PUBLIC_CONTRACT_RULE_ID,
+  ...REGISTRATION_RULE_IDS, ...SWR_DATA_RULE_IDS, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID, PUBLIC_CONTRACT_RULE_ID,
   READONLY_BOUNDARY_RULE_ID, ...ERROR_RULE_IDS,
 ])].sort());
 
@@ -86,7 +85,7 @@ function stable(items) {
 
 /**
  * Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. `fast` leaves out the two checks
- * that read the whole repository to answer (clones, dead exports, repository-wide symbols); the pre-push check of the changed owners uses it.
+ * that read the whole repository to answer (clones, dead exports); the pre-push check of the changed owners uses it.
  */
 export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = [], base, fast = false, hfs: openedHfs } = {}) {
   let config;
@@ -150,13 +149,13 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
   }
   // HFS machine: the slot-driven graph checks read the whole program, also when the caller asked for one path.
   const hfsContext = paths.length ? buildTypeScriptContext(config, injectedTypeScript) : context;
-  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, sizeGrowth: null, clones: null, symbols: null };
+  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, sizeGrowth: null, clones: null };
   if (hfsContext.program) {
     const graph = buildHfsGraph(config, hfsContext);
     const input = { config, context: hfsContext, graph, base };
     const runs = { tiers: () => checkTiers(graph), reachability: () => checkReachability(input), deadExports: () => checkDeadExports(input),
-      requiredFiles: () => checkRequiredFiles(input), sizeGrowth: () => checkSizeGrowth(input), clones: () => checkClones(input), symbols: () => checkSymbols(input) };
-    if (fast) { delete runs.deadExports; delete runs.clones; delete runs.symbols; }
+      requiredFiles: () => checkRequiredFiles(input), sizeGrowth: () => checkSizeGrowth(input), clones: () => checkClones(input) };
+    if (fast) { delete runs.deadExports; delete runs.clones; }
     for (const [name, run] of Object.entries(runs)) {
       const result = run();
       violations.push(...result.violations);
@@ -198,7 +197,6 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     ...(hfsChecks.requiredFiles?.status === 'checked' ? REQUIRED_FILE_RULE_IDS : []),
     ...(hfsChecks.sizeGrowth?.status === 'checked' ? SIZE_GROWTH_RULE_IDS : []),
     ...(hfsChecks.clones?.status === 'checked' ? CLONE_RULE_IDS : []),
-    ...(hfsChecks.symbols?.status === 'checked' ? SYMBOL_RULE_IDS : []),
     ...(frontendChecked ? FRONTEND_RULE_IDS : []),
     ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
     ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),

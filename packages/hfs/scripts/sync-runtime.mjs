@@ -2,13 +2,15 @@
 // sync-runtime.mjs - refreshes the self-contained copies of the runtime files the published packages read, so each package
 // works in a product repository that has no runtime checkout. Every copy mirrors the runtime layout (engine/,
 // scripts/lib/, knowledge/hfs/, modules/kernel/) byte for byte, so the imports need no rewriting.
-//   packages/hfs/runtime         what `hfs` reads, plus the failure-code catalog slice holding only the codes it can emit
+//   packages/hfs/runtime         what `hfs` reads: the slot loader, the check, the architecture machine and every file either
+//                                imports (computed from the import graph, not listed), plus the failure-code catalog slice
+//                                holding exactly the codes `hfs check` can emit (its own and the machine's rule id lists)
 //   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots and hfs.json)
 //   node packages/hfs/scripts/sync-runtime.mjs [--check]     --check exits 1 when a copy differs (npm run check runs it)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CHECK_CODES } from '../../../scripts/lib/hfs-check.mjs';
+import { ALL_CHECK_CODES } from '../../../scripts/lib/hfs-check.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 /** The runtime files the slot resolver needs; both bundles carry them. */
@@ -21,10 +23,31 @@ const SLOT_FILES = [
   'scripts/lib/hfs-slots.mjs',
   'knowledge/hfs/slots.yaml',
 ];
+/** The entry modules of `hfs check`; everything they import, statically, is bundled. */
+const CHECK_ENTRIES = ['scripts/lib/hfs-check.mjs', 'scripts/checks/architecture.mjs'];
+/** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
+const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;
+const URL_SPEC = /new URL\(\s*['"](\.[^'"]+\.ya?ml)['"]\s*,\s*import\.meta\.url/g;
+
+/** The runtime-relative files reachable from `entries` through relative imports and `new URL(..., import.meta.url)` reads. */
+export function importClosure(entries) {
+  const seen = new Set();
+  const visit = (file) => {
+    if (seen.has(file)) return;
+    if (!fs.existsSync(path.join(runtimeRoot, file))) throw new Error(`${file} is imported by the bundled check but does not exist`);
+    seen.add(file);
+    if (!file.endsWith('.mjs')) return;
+    const text = fs.readFileSync(path.join(runtimeRoot, file), 'utf8');
+    for (const match of [...text.matchAll(IMPORT_SPEC), ...text.matchAll(URL_SPEC)]) visit(path.posix.normalize(path.posix.join(path.posix.dirname(file), match[1])));
+  };
+  for (const entry of entries) visit(entry);
+  return [...seen].sort();
+}
+
 export const CATALOG = 'modules/kernel/failure-codes.yaml';
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
-  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...SLOT_FILES, 'scripts/lib/hfs-check.mjs', 'scripts/lib/git.mjs', 'scripts/lib/fs-kind.mjs', 'knowledge/hfs/canon-pins.yaml']), catalog: true }),
+  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml'])].sort()), catalog: true }),
   'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...SLOT_FILES]), catalog: false }),
 });
 
@@ -44,7 +67,7 @@ export function expectedBundle(bundle) {
   if (!spec) throw new Error(`no bundle ${bundle}`);
   const out = new Map();
   for (const file of spec.files) out.set(file, fs.readFileSync(path.join(runtimeRoot, file), 'utf8'));
-  if (spec.catalog) out.set(CATALOG, catalogSlice(fs.readFileSync(path.join(runtimeRoot, CATALOG), 'utf8'), CHECK_CODES));
+  if (spec.catalog) out.set(CATALOG, catalogSlice(fs.readFileSync(path.join(runtimeRoot, CATALOG), 'utf8'), ALL_CHECK_CODES));
   return out;
 }
 

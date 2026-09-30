@@ -13,16 +13,23 @@
 //   HFS_MIN_INSTANCES             fewer instances of a slot than minInstances
 //   HFS_CANON_PIN_DRIFT           a dependency whose declared version is not the pinned one
 //   HFS_SIZE_SOFT_BACKLOG         (info, report-only, never fails) a source file above ruleParams fileLines.soft
-// Every finding carries its code and the Vietnamese why text of modules/kernel/failure-codes.yaml. Only `error`
+//   HFS_EMPTY_DIR                 a directory with no file below it (git never tracks one), outside .git, node_modules and ignored slots
+//   HFS_GHOST_TREE                an empty directory beside a sibling within two edits of its name (business / bussiness)
+//   HFS_UNTRACKED_ROOT_ENTRY      an entry git neither tracks nor ignores, outside an `ignored` slot (R03)
+// checkRepository() is the whole `hfs check`: checkRepo() plus the architecture machine (scripts/checks/architecture.mjs, one
+// implementation; the published bundle carries a byte copy), its violations and errors reported as findings under their own
+// codes; `fast` limits both to the owners changed since the merge-base. Every finding carries its code and the Vietnamese why text of modules/kernel/failure-codes.yaml. Only `error`
 // findings fail the check.
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
+import { ARCHITECTURE_RULE_IDS, checkArchitecture } from '../checks/architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { HFS_DECLARATION_FILE, HfsSlotsError, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './hfs-slots.mjs';
 import { isDir } from './fs-kind.mjs';
 import { gitOutput } from './git.mjs';
 import { posixPath } from './path-key.mjs';
+import { readTree, treeFacts, untrackedEntries } from './hfs-tree.mjs';
 
 export const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
@@ -32,7 +39,10 @@ export const CHECK_CODES = Object.freeze([
   'HFS_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG',
   'HFS_INIT_EXISTS', 'HFS_INIT_UNDETECTED', 'HFS_REPO_UNREADABLE',
   'HFS_DECLARATION_INVALID', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID',
+  'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
 ]);
+/** Every code `hfs check` can report: its own and every code the architecture machine can emit (derived from the machine's rule id lists). */
+export const ALL_CHECK_CODES = Object.freeze([...new Set([...CHECK_CODES, ...ARCHITECTURE_RULE_IDS])].sort());
 const SOURCE_EXT = /\.(?:[cm]?[jt]sx?)$/;
 const VAR = /<([a-z][a-z0-9-]*)>/g;
 const DEP_SECTIONS = ['dependencies', 'devDependencies'];
@@ -72,10 +82,10 @@ export function openRepo({ repoRoot, root = skillRoot, manifest = loadSlotManife
 
 const pinnedSpec = (spec, pin) => (spec === pin.version ? null : `declared ${spec}, pinned ${pin.version}`);
 
-function pinFindings({ repoRoot, files, profile, root }) {
+function pinFindings({ repoRoot, files, profile, root, only }) {
   const pins = parseYaml(fs.readFileSync(path.join(root, CANON_PINS_FILE), 'utf8'))?.pins ?? {};
   const findings = [];
-  for (const file of files.filter((f) => f === 'package.json' || f.endsWith('/package.json'))) {
+  for (const file of files.filter((f) => (f === 'package.json' || f.endsWith('/package.json')) && (!only || only.has(f)))) {
     let pkg;
     try { pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, file), 'utf8')); } catch { continue; }
     for (const [name, pin] of Object.entries(pins)) {
@@ -134,12 +144,34 @@ function summarize(findings) {
   };
 }
 
+/** The tree findings of R03: empty directories, ghost siblings, untracked entries outside an ignored slot. */
+function treeFindings({ repoRoot, resolver }) {
+  const inIgnoredSlot = (rel) => resolver.classifyPath(`${rel}/.probe`).tracking === 'ignored';
+  const findings = [];
+  const facts = treeFacts(readTree(repoRoot, { isIgnored: inIgnoredSlot }));
+  for (const { path: dir, below } of facts.empty) {
+    findings.push({ code: 'HFS_EMPTY_DIR', level: 'error', path: dir, below, message: `${dir} has no file below it${below ? ` (nor in its ${below} sub-director${below === 1 ? 'y' : 'ies'})` : ''}; git tracks no empty directory, so it is a leftover` });
+  }
+  for (const { path: dir, of, distance } of facts.ghosts) {
+    findings.push({ code: 'HFS_GHOST_TREE', level: 'error', path: dir, of, distance, message: `${dir} is empty and ${distance} edit${distance === 1 ? '' : 's'} from its sibling ${of}: a renamed or misspelt structure that was never removed` });
+  }
+  for (const entry of untrackedEntries(repoRoot)) {
+    const bare = entry.replace(/\/$/, '');
+    const ignored = entry.endsWith('/') ? inIgnoredSlot(bare) : resolver.classifyPath(bare).tracking === 'ignored';
+    if (!ignored) findings.push({ code: 'HFS_UNTRACKED_ROOT_ENTRY', level: 'error', path: bare, message: `${entry} is neither tracked nor git-ignored, and no ignored slot owns it` });
+  }
+  return findings;
+}
+
 /**
  * The check of one repository. `declaration` overrides hfs.json (a dry run over a repository that has none); `files`
- * overrides git ls-files (specs). Returns {ok, profile, apps, manifest, tracked, findings, counts}; a missing or invalid
+ * overrides git ls-files (specs). `only` (a list of paths) limits the per-path checks (slot, pin, size) to those paths; the
+ * checks of the tree as a whole (required files, minimum instances, empty directories, untracked entries) are not
+ * per-path. `tree: false` skips the file-system checks (empty directories, ghosts, untracked); they also do not run
+ * over `files`, which is a dry run. Returns {ok, profile, apps, manifest, tracked, findings, counts}; a missing or invalid
  * hfs.json is one HFS_DECLARATION_INVALID / HFS_MANIFEST_MAJOR_MISMATCH error finding, never an exception.
  */
-export function checkRepo({ repoRoot, root = skillRoot, declaration, files, manifest = loadSlotManifest({ root }) }) {
+export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only, tree = files === undefined, manifest = loadSlotManifest({ root }) }) {
   const why = readWhy(root);
   let repo;
   try {
@@ -154,8 +186,11 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, mani
   const trackedSet = new Set(tracked);
   const present = (p) => (p.endsWith('/') ? tracked.some((f) => f.startsWith(p)) : trackedSet.has(p));
   const findings = [];
+  const scoped = only ? new Set(only) : null;
+  const inScope = (file) => !scoped || scoped.has(file);
 
   for (const file of tracked) {
+    if (!inScope(file)) continue;
     const c = resolver.classifyPath(file);
     if (c.status === 'no-slot') {
       findings.push({ code: 'HFS_PATH_NO_SLOT', level: 'error', path: file, nearest: c.nearest, message: `${file} matches no slot${c.nearest ? `; nearest slot ${c.nearest.slot} (${c.nearest.pattern}), matched ${c.nearest.matchedPrefix || '.'} then expected ${c.nearest.expectedNext ?? 'nothing'}` : ''}` });
@@ -188,19 +223,93 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, mani
     if (count < min) findings.push({ code: 'HFS_MIN_INSTANCES', level: 'error', path: resolver.slot(slot).path, slot, min, count, message: `${slot} needs at least ${min} instance${min === 1 ? '' : 's'} (${resolver.slot(slot).path}), found ${count}` });
   }
 
-  findings.push(...pinFindings({ repoRoot, files: tracked, profile: repo.profile, root }));
+  findings.push(...pinFindings({ repoRoot, files: tracked, profile: repo.profile, root, only: scoped }));
 
   const soft = resolver.ruleParams().fileLines.soft;
   for (const file of tracked) {
-    if (!SOURCE_EXT.test(file) || resolver.classifyPath(file).status !== 'owned') continue;
+    if (!inScope(file) || !SOURCE_EXT.test(file) || resolver.classifyPath(file).status !== 'owned') continue;
     let lines;
     try { lines = fs.readFileSync(path.join(repoRoot, file), 'utf8').split('\n').length; } catch { continue; }
     if (lines > soft) findings.push({ code: 'HFS_SIZE_SOFT_BACKLOG', level: 'info', path: file, lines, soft, message: `${file} has ${lines} lines, above the soft size ${soft}; report only` });
   }
 
+  if (tree) findings.push(...treeFindings({ repoRoot, resolver }));
+
   const finished = withWhy(findings, why);
   const counts = summarize(finished);
   return { ok: counts.error === 0, repoRoot, manifest: manifest.version, profile: repo.profile, apps: repo.apps, tracked: tracked.length, findings: finished, counts };
+}
+
+// ------------------------------------------------------------------------------------------ the whole check
+
+const gitOut = (repoRoot, args) => execFileSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+
+/** The merge-base of HEAD with `base`, else with origin/main, else with main; null when none resolves. */
+function mergeBaseOf(repoRoot, base) {
+  for (const ref of base ? [base] : ['origin/main', 'main']) {
+    try {
+      const sha = gitOut(repoRoot, ['merge-base', 'HEAD', ref]).trim();
+      if (sha) return sha;
+    } catch { /* this ref has no merge-base with HEAD; try the next */ }
+  }
+  return null;
+}
+
+/** Tracked paths that differ from the merge-base (commits, staged and unstaged edits; deletions are not paths to judge). */
+export function changedSince(repoRoot, base) {
+  const sha = mergeBaseOf(repoRoot, base);
+  if (!sha) {
+    throw new Error(base
+      ? `--base ${base} has no merge-base with HEAD; pass a ref this branch descends from`
+      : '--fast needs a merge-base with origin/main or main and found none; run `git fetch origin main` or pass --base <ref>');
+  }
+  const files = gitOut(repoRoot, ['diff', '--name-only', '--diff-filter=ACMRT', '-z', sha]).split('\0').filter(Boolean).map(posixPath);
+  return { base: sha, files };
+}
+
+/** The machine's violations and errors as findings: each keeps the machine's rule id as its code. */
+function machineFindings(report) {
+  const of = (item) => ({ code: item.ruleId, level: 'error', ...(item.path ? { path: item.path } : {}), ...(item.line ? { line: item.line, column: item.column } : {}), source: 'machine', message: `${item.path ? `${item.path}${item.line ? `:${item.line}` : ''}: ` : ''}${item.message}` });
+  return [...report.errors.map(of), ...report.violations.map(of)];
+}
+
+/**
+ * The whole `hfs check` of one repository: checkRepo() (slots, pins, size, tree) and then the architecture machine over the
+ * same work tree, its violations and errors merged in as findings with the Vietnamese why of their codes. `fast` judges
+ * only what changed since the merge-base (`base` names another ref): the per-path slot and pin checks on the changed
+ * paths, the machine on the owners of the changed source files without clones and dead exports, and no file-system tree
+ * checks. `machine` is injectable for specs. A missing merge-base under `fast` is an Error, never a silent full pass.
+ */
+export function checkRepository({ repoRoot, root = skillRoot, fast = false, base, manifest = loadSlotManifest({ root }), machine = checkArchitecture }) {
+  const changed = fast ? changedSince(repoRoot, base) : null;
+  const baseSha = changed ? changed.base : (base ? (mergeBaseOf(repoRoot, base) ?? refuse('HFS_REPO_UNREADABLE', `--base ${base} has no merge-base with HEAD`, { repoRoot, base })) : undefined);
+  const slotResult = checkRepo({ repoRoot, root, manifest, ...(changed ? { only: changed.files, tree: false } : {}) });
+  if (slotResult.profile === null) return { ...slotResult, machine: { status: 'skipped', reason: 'hfs.json is not valid' } };
+
+  let paths;
+  if (changed) {
+    const resolver = createSlotResolver(manifest, readRepoDeclaration(manifest, repoRoot));
+    paths = [...new Set(changed.files.filter((f) => SOURCE_EXT.test(f) || resolver.ownerOf(f)).map((f) => resolver.ownerOf(f)?.root ?? f))].sort();
+    if (!paths.length) return { ...slotResult, machine: { status: 'skipped', reason: 'no changed source file', base: changed.base }, fast: { base: changed.base, changed: changed.files.length } };
+  }
+  let report;
+  try {
+    report = machine({ repositoryRoot: repoRoot, base: baseSha, ...(changed ? { paths, fast: true } : {}) });
+  } catch (error) {
+    report = { ok: false, files: 0, kinds: [], violations: [], errors: [{ ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error?.message ?? error) }] };
+  }
+  const found = machineFindings(report);
+  const why = readWhy(root, [...new Set(found.map((f) => f.code))]);
+  const findings = [...slotResult.findings, ...withWhy(found, why)];
+  const counts = summarize(findings);
+  return {
+    ...slotResult,
+    ok: counts.error === 0,
+    findings,
+    counts,
+    machine: { status: 'ran', files: report.files, kinds: report.kinds, ...(changed ? { paths, base: changed.base } : {}) },
+    ...(changed ? { fast: { base: changed.base, changed: changed.files.length } } : {}),
+  };
 }
 
 // --------------------------------------------------------------------------------------------------- explain
