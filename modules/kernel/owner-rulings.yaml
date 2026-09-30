@@ -115,8 +115,8 @@ rulings:
     enforcedBy: [scripts/lib/test-secrets.mjs, scripts/lib/secret-patterns.mjs, scripts/supervisor/push-mains.mjs, modules/supervisor/push-scan-allow.yaml, modules/ops/_common.yaml]
   - id: evidence-in-db-and-blobs
     date: '2026-09-28'
-    ruling: "All agent and runtime metadata leaves product git: attempts, models, reports, checks, logs, evidence, captures and renders live in SQL plus the external sha256 blob store, whose rows carry file_uri and /api/blob/<sha256> links. .starciwork retains important product content only: Work records, SRS/SDS, UI specifications and brand. Backfill and verify old evidence before removal; no legacy read fallback remains afterward. The host machine.sqlite owns machine and fleet state; no third DB is added."
-    confirmed: '2026-09-28 owner chat: "ok làm đi, 10 agent sol"; final owner principle: all agent/runtime metadata in SQL plus blobs, .starciwork only important product content'
+    ruling: "All agent and runtime metadata leaves product git: attempts, models, reports, checks, logs, evidence, captures and renders live in SQL plus the external sha256 blob store, whose rows carry file_uri and /api/blob/<sha256> links. .starciwork retains important product content only: Work records, SRS/SDS, UI specifications and brand. Start the final canonical schema fresh after verified archival of old stores; no legacy data migration or read fallback. The host machine.sqlite owns machine and fleet state; no third DB is added."
+    confirmed: '2026-09-28 owner chat: "ok làm đi, 10 agent sol"; owner final storage principle and CLEAN-SLATE ruling in D:/starci-tmp/evidence-db'
     enforcedBy: [modules/schemas/work-layout.yaml, modules/kernel/contract-changes/evidence-db-blobs.yaml, engine/evidence.sql, scripts/lib/artifact-store.mjs]
   - id: provider-qwen-removed
     date: '2026-09-29'

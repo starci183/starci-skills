@@ -315,9 +315,8 @@ rules:
     self-invalidating proof."
   - "Product records, SRS/SDS, UI specifications and brand remain canonical Work in .starciwork.
     Agent/runtime metadata, including execution evidence, captures and renders, lives in SQL
-    plus the external blob store even when a product record cites it. Existing Work proof paths
-    are read-only migration inputs; job_artifacts_v2 may represent them as storage=work-proof
-    until migrated, while new operational artifacts use storage=blob and have no repo_path."
+    plus the external blob store even when a product record cites it. Old Work proof paths
+    are not read by the runtime; new operational artifacts use storage=blob and have no repo_path."
   - Source code remains in bound repositories; code/index.yaml tracks requirements, exact source
     references and completion.
   - All structured Work records and results use YAML. JSON and underscore-prefixed directories are

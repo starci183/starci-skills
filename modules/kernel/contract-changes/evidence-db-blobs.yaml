@@ -8,22 +8,19 @@ summary: >-
   videos, DOM snapshots and report attachments are immutable sha256 blobs under
   ~/.starci/artifacts/ (STARCI_ARTIFACT_ROOT may override). blobs indexes their
   hash, size, media type, file_uri, http_path (/api/blob/<sha256>) and archive
-  state; job_artifacts_v2 indexes each output
+  state; job_artifacts indexes each output
   by logical name, role, storage and sha256; report_attachments links reports to
-  artifacts, and artifact_proofs_v2 links proof claims to artifact IDs. A blob
+  artifacts, and artifact_proofs links proof claims to artifact IDs. A blob
   artifact has no repo_path. .starciwork retains only important product content
   (Work records, SRS/SDS, UI specifications and brand); execution evidence,
   captures and renders belong in SQL plus blobs even when product records cite
-  them. The SCHEMA.sql work-proof storage class handles existing on-disk proof
-  through migration; it does not authorize new agent-operational files there.
+  them.
   New op attempts write raw output to STARCI_JOB_SCRATCH outside every repository;
   api report ingests it into the ledger and blob store, then removes scratch.
-  Existing .starciwork/kernel-evidence trees are backfilled into DB and blobs,
-  verified by hash, size and rows, archived to verified ZIPs, and removed from
-  product git without rewriting history. After all readers use the new schema,
-  the v1 tables are renamed and the v2 artifact/proof tables become canonical.
-  After verified ledger archives, the retired v1 tables and every legacy
-  kernel-evidence read fallback are removed. No writer may create new
+  Each old store, including kernel-evidence, is archived into a verified ZIP
+  before its removal and fresh ledgers start with
+  canonical job_artifacts, artifact_proofs and check_runs tables. There is no
+  table-rename migration or transitional read fallback. No writer may create new
   operational evidence there. op_attempts records each attempt's runner,
   provider/model/pool, terminal/worktree, timestamps, op report outcome versus
   verified verdict, failure class and reported cost. unit_edges materializes
