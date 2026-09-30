@@ -1,4 +1,5 @@
 export { DATABASE_PROBE } from "./database-probe.service"
+export { PRIMARY_CONNECTION } from "./primary.connection"
 export { DatabaseModule } from "./database.module"
 export type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "./database.options"
 export { LIST_ROWS_MAX, sql } from "./database.sql"

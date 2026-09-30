@@ -30,8 +30,6 @@ import { useTestWorld } from "../../world/use-test-world"
  * Run: npm run test:e2e -- order-lifecycle/order-history
  */
 describe("order lifecycle: order history", () => {
-    const password = "e2e-history-pass"
-
     const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
     beforeAll(async () => {
