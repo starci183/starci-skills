@@ -1,5 +1,5 @@
 import { treeOf } from './required-files.mjs';
-import { allowsFile } from './slot-allows.mjs';
+import { allowsFile } from '../../lib/hfs-allows.mjs';
 
 /**
  * R94 `fe-slot-allows` (FE_SLOT_FILE_ROLE). A front-end slot that owns a whole directory (`fe.route`, `fe.feature`,

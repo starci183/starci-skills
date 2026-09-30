@@ -33,7 +33,7 @@ test("every rule this law declares is exported under its published name", () => 
 test("TOKEN-3: a fractional step is off the ladder, wherever it is written", () => {
   tester.run("no-fractional-step", noFractionalStep, {
     valid: [
-      // a file under a src folder that no product slot owns is not judged (the machine's HFS_PATH_NO_SLOT covers it)
+      // a file under a src folder that no product slot owns is not judged (the machine's HFS_SLOT_UNDECLARED covers it)
       { filename: at("apps/web/src/lib/x.ts"), code: "const G = \"gap-1.5\"" },
       // a script is not product source
       { filename: at("scripts/x.ts"), code: "const G = \"gap-1.5\"" },

@@ -65,17 +65,18 @@ test("FILE-2: a surface folder holds its two halves and their twins", () => {
 
 test("FILE-6: the routing tree holds route files and nothing else", () => {
   const A = "apps/web/src/app"
+  const L = `${A}/[locale]`
   tester.run("route-tree-holds-routes-only", routeTreeHoldsRoutesOnly, {
     valid: [
       // The framework slots, at the root and nested under segments and groups.
       { filename: at(`${A}/page.tsx`), code: "export default () => null" },
-      { filename: at(`${A}/layout.tsx`), code: "export default () => null" },
+      { filename: at(`${L}/layout.tsx`), code: "export default () => null" },
       { filename: at(`${A}/providers.tsx`), code: "export const P = () => null" },
       { filename: at(`${A}/globals.css`), code: "" },
-      { filename: at(`${A}/provisioning/page.tsx`), code: "export default () => null" },
-      { filename: at(`${A}/(auth)/sign-in/page.tsx`), code: "export default () => null" },
-      { filename: at(`${A}/provisioning/loading.tsx`), code: "export default () => null" },
-      { filename: at(`${A}/not-found.tsx`), code: "export default () => null" },
+      { filename: at(`${L}/provisioning/page.tsx`), code: "export default () => null" },
+      { filename: at(`${L}/(auth)/sign-in/page.tsx`), code: "export default () => null" },
+      { filename: at(`${L}/provisioning/loading.tsx`), code: "export default () => null" },
+      { filename: at(`${L}/not-found.tsx`), code: "export default () => null" },
       { filename: at(`${A}/global-error.tsx`), code: "export default () => null" },
       { filename: at(`${A}/opengraph-image.tsx`), code: "export default () => null" },
       // Server code and the Next opt-out folder are not screens and are not this rule business.
@@ -84,26 +85,32 @@ test("FILE-6: the routing tree holds route files and nothing else", () => {
       // A page owner in the tier that groups it with its siblings.
       { filename: at(`${F}/pages/ProvisioningPage/component.tsx`), code: cmp },
       // The second app of the repository has its own routing tree, judged the same way.
-      { filename: at("apps/admin/src/app/dashboard/page.tsx"), code: "export default () => null" },
+      { filename: at("apps/admin/src/app/[locale]/dashboard/page.tsx"), code: "export default () => null" },
       /*
        * Twin tests beside the route they test. A test ships in no bundle and no route renders it, so
        * it cannot become the second page this rule exists to prevent. The names split by concern
        * rather than matching `page`, which is how route tests are actually written.
        */
-      { filename: at(`${A}/dashboard/access.spec.tsx`), code: "export const t = 1" },
-      { filename: at(`${A}/(auth)/screen.spec.tsx`), code: "export const t = 1" },
-      { filename: at(`${A}/(auth)/layout-boundary.spec.ts`), code: "export const t = 1" },
+      { filename: at(`${L}/dashboard/access.spec.tsx`), code: "export const t = 1" },
+      { filename: at(`${L}/(auth)/screen.spec.tsx`), code: "export const t = 1" },
+      { filename: at(`${L}/(auth)/layout-boundary.spec.ts`), code: "export const t = 1" },
+      // a default slot and a nested route handler
+      { filename: at(`${L}/@modal/default.tsx`), code: "export default () => null" },
+      { filename: at(`${L}/api/webhook/route.ts`), code: "export const POST = () => null" },
       // a folder called `app` that no slot owns is not a routing tree
       { filename: at("apps/web/src/modules/app/helper.ts"), code: "export const t = 1" },
     ],
     invalid: [
-      { filename: at(`${A}/dashboard/access.test.tsx`), code: "export const t = 1", errors: [{ messageId: "stray" }] },
+      // a root layout and a segment that is not [locale] are not what the route slot names
+      { filename: at(`${A}/layout.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
+      { filename: at(`${A}/[lang]/page.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
+      { filename: at(`${L}/dashboard/access.test.tsx`), code: "export const t = 1", errors: [{ messageId: "stray" }] },
       // The exact file this rule was written for: it built, linted, typechecked and was approved.
-      { filename: at(`${A}/provisioning/fleet-page.tsx`), code: "export const FleetPage = () => null", errors: [{ messageId: "stray" }] },
-      { filename: at(`${A}/dashboard/DashboardHeader.tsx`), code: "export const H = () => null", errors: [{ messageId: "stray" }] },
+      { filename: at(`${L}/provisioning/fleet-page.tsx`), code: "export const FleetPage = () => null", errors: [{ messageId: "stray" }] },
+      { filename: at(`${L}/dashboard/DashboardHeader.tsx`), code: "export const H = () => null", errors: [{ messageId: "stray" }] },
       // `utils` is not a framework slot, and a route folder is not where a helper hides.
-      { filename: at(`${A}/provisioning/utils.ts`), code: "export const f = () => null", errors: [{ messageId: "stray" }] },
-      { filename: at("apps/admin/src/app/users/UserList.tsx"), code: "export const f = () => null", errors: [{ messageId: "stray" }] },
+      { filename: at(`${L}/provisioning/utils.ts`), code: "export const f = () => null", errors: [{ messageId: "stray" }] },
+      { filename: at("apps/admin/src/app/[locale]/users/UserList.tsx"), code: "export const f = () => null", errors: [{ messageId: "stray" }] },
     ],
   })
 })
@@ -247,7 +254,7 @@ test("FILE-8: shells are not a component tier", () => {
     valid: [
       { filename: at(`${R}/branches/ModalBranch/index.tsx`), code: "export const ModalBranch = () => null" },
       { filename: at("packages/nivo-ui/src/branches/ModalBranch/index.tsx"), code: "export const ModalBranch = () => null" },
-      // another unknown folder is HFS_PATH_NO_SLOT to name, and a `shells` folder outside the component tier is no shell tier
+      // another unknown folder is HFS_SLOT_UNDECLARED to name, and a `shells` folder outside the component tier is no shell tier
       { filename: at(`${R}/pages/Home/index.tsx`), code: "export const Home = () => null" },
       { filename: at("apps/web/src/modules/shells/x.ts"), code: "export const x = 1" },
     ],

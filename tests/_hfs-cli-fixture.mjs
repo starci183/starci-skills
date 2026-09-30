@@ -59,7 +59,7 @@ export function writeCleanRepo(declaration, { declare = true, into, name = 'demo
         const siblings = required.filter((p) => path.posix.dirname(p) === path.posix.dirname(entry) && p !== entry && /\.tsx?$/.test(p));
         fs.writeFileSync(path.join(dir, ...entry.split('/')), `${siblings.map((p) => `import './${path.posix.basename(p).replace(/\.tsx?$/, '')}';\n`).join('')}export {};\n`);
       }
-      put(`apps/${app.name}/src/app/health/route.ts`, `${entries.map((p) => `import '../../modules/${path.posix.basename(path.posix.dirname(p))}';\n`).join('')}export const GET = () => new Response('ok');\n`);
+      put(`apps/${app.name}/src/app/health/live/route.ts`, `${entries.map((p) => `import '../../../modules/${path.posix.basename(path.posix.dirname(p))}';\n`).join('')}export const GET = () => new Response('ok');\nexport const app_${app.name.replace(/-/g, '_')} = 1;\n`);
     }
   }
   if (declaration.profile === 'be') {

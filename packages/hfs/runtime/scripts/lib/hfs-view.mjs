@@ -3,6 +3,7 @@
 // runtime/ bundle (packages/hfs/scripts/sync-runtime.mjs), so a path-scoped rule in either package asks the SAME resolver the
 // architecture machine and `hfs check` use, and never tests a path with a regular expression of its own.
 import path from 'node:path';
+import { allowsFile } from './hfs-allows.mjs';
 import { openHfs } from './hfs-slots.mjs';
 
 const posix = (p) => String(p).replace(/\\/g, '/');
@@ -43,6 +44,8 @@ export function hfsView(opened, repoRoot) {
     tierOf: (file) => opened.tierOf(rel(file)) ?? null,
     /** The owner root of a file, or null. */
     ownerOf: (file) => opened.ownerOf(rel(file))?.root ?? null,
+    /** What the slot that owns a file says about it: `{ slot, root, relative, allowed, entry?, forbiddenBy?, allows }`, or null when the slot names no `allows`. */
+    allows: (file) => allowsFile(opened, rel(file)),
     /** A slot definition by id. */
     slot: (id) => opened.slot(id),
   });

@@ -5,6 +5,7 @@ import { archFixture, runArch, findings } from './_hfs-arch-fixture.mjs';
 // R94 fe-slot-allows (FE_SLOT_FILE_ROLE): a front-end slot that owns a directory holds only the files its `allows` names,
 // inside a folder of its own.
 const CLEAN = {
+  'apps/web/src/app/.keep': null,
   'apps/web/src/modules/config/index.ts': 'export const config = 1;\n',
   'apps/web/src/hooks/orders/index.ts': "export { useOrders } from './useOrders';\n",
   'apps/web/src/hooks/orders/useOrders.ts': 'export const useOrders = () => 1;\n',

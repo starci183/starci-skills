@@ -1,10 +1,10 @@
 import path from 'node:path';
-import { braceVariants, globExpression } from '../../lib/glob.mjs';
+import { braceVariants, globExpression } from './glob.mjs';
 
 /**
  * What a slot's `requires`, `allows` and `forbids` entries (knowledge/hfs/slots.yaml) say about a file, read through the
  * resolver of scripts/lib/hfs-slots.mjs. The machine checks that judge "this folder holds only what its slot allows"
- * (feature-shape, and any later one) read it here so no check keeps a path list.
+ * (feature-shape, fe-slot-allows) and the front-end lint rules (through `hfs.allows(file)` of scripts/lib/hfs-view.mjs) read it here so no check keeps a path list.
  *
  * An entry is a name relative to the slot instance root: `<var>` is the instance's bound variable when the slot binds it
  * (`<feature>`, `<capability>`) and one path segment of any text otherwise (`<action>`), `*` and `?` stay inside a segment,

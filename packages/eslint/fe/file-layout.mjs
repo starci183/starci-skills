@@ -253,19 +253,6 @@ export const monorepoTierBelongsToItsSide = {
 // -- FILE-6 --------------------------------------------------------------------------------------
 
 /**
- * The file names of an app's routing tree that no slot role names: Next's own `default`, its metadata files, and the
- * two files the root layout mounts (`providers`, `globals`). The route slots themselves (`page`, `layout`, `template`,
- * `loading`, `error`, `not-found`, `global-error`, `route`) are the roles of slot `fe.route`.
- */
-const ROUTE_TREE_EXTRA_FILES = new Set(["default", "providers", "globals", "middleware", "sitemap", "robots", "manifest", "opengraph-image", "twitter-image", "apple-icon", "icon", "favicon"])
-
-/** `app/api/**` is server code, not a screen; `_private/**` is Next's own opt-out folder. */
-const routeTreeExempt = (rest) => rest[0] === "api" || rest[0].startsWith("_")
-
-/** The stem of a route-tree file name: `sitemap.ts` -> `sitemap`, `icon.svg` -> `icon`, `opengraph-image.alt.txt` -> `opengraph-image`. */
-const routeStem = (basename) => basename.split(".")[0]
-
-/**
  * A test sitting beside the thing it tests.
  *
  * EXEMPT, because a test is not a component and cannot become the second page this rule exists to
@@ -308,11 +295,10 @@ export const routeTreeHoldsRoutesOnly = {
   },
   create(context) {
     if (!inSlot(context, "fe.route")) return {}
-    const rest = hfsOf(context).relative(fileOf(context)).slice(classOf(context).root.length + 1)
+    const verdict = hfsOf(context).allows(fileOf(context))
+    if (!verdict || verdict.allowed) return {}
+    const rest = verdict.relative
     const basename = rest.slice(rest.lastIndexOf("/") + 1)
-    if (routeTreeExempt(rest.split("/"))) return {}
-    if (isSpecFile(basename) && basename.includes(".spec.")) return {}
-    if (roleOfFile(context) !== null || ROUTE_TREE_EXTRA_FILES.has(routeStem(basename))) return {}
     return {
       Program(node) {
         context.report({ node, messageId: "stray", data: { rest, basename } })

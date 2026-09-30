@@ -23,6 +23,7 @@ const SLOT_FILES = [
   'scripts/lib/path-key.mjs',
   'scripts/lib/hfs-slots.mjs',
   'scripts/lib/hfs-view.mjs',
+  'scripts/lib/hfs-allows.mjs',
   'knowledge/hfs/slots.yaml',
 ];
 /** The entry modules of `hfs check`; everything they import, statically, is bundled. */

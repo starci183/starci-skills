@@ -824,8 +824,10 @@ slots:
     presence: required
     tracked: tracked
     tier: route
-    allows: ["[locale]/**/{page,layout,template,loading,error,not-found,default}.tsx", "[locale]/**/route.ts", global-error.tsx, page.tsx,   # the root page.tsx only redirects (FE_ROUTE_FILES_THIN)
-             "health/{live,ready}/route.ts", globals.css, "icon.*", robots.ts, sitemap.ts]
+    allows: ["[locale]/**/{page,layout,template,loading,error,not-found,default}.tsx", "[locale]/**/route.ts", "[locale]/providers.tsx",
+             global-error.tsx, page.tsx,   # the root page.tsx only redirects (FE_ROUTE_FILES_THIN)
+             "health/{live,ready}/route.ts", "api/**/route.ts", "_*/**", providers.tsx, globals.css,
+             "{icon,favicon,apple-icon,opengraph-image,twitter-image}.*", robots.ts, sitemap.ts, manifest.ts, "**/*.spec.ts", "**/*.spec.tsx"]
     roles: {page: page.tsx, layout: layout.tsx, template: template.tsx, loading: loading.tsx, error: error.tsx, not-found: not-found.tsx, default: default.tsx, route: route.ts, global-error: global-error.tsx}
     tests: none
     rules: [FE_ROUTE_FILES_THIN, FE_CLIENT_BOUNDARY, FE_OWNER_REACHABLE]

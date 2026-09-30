@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { treeOf } from './required-files.mjs';
-import { allowsFile } from './slot-allows.mjs';
+import { allowsFile } from '../../lib/hfs-allows.mjs';
 
 /**
  * R29 `feature-shape` (BE_FEATURE_SHAPE). A feature root holds `index.ts`, `<feature>.module.ts`, `application/`,
