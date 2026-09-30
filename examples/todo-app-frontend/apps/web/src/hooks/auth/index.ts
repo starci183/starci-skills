@@ -2,4 +2,3 @@
 export { useSessionToken } from "./useSessionToken"
 export { useSignIn } from "./useSignIn"
 export { useSignOut } from "./useSignOut"
-export type { SignInSnapshot, UseSignIn } from "./useSignIn"

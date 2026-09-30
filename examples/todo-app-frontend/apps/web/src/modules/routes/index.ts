@@ -5,6 +5,7 @@
  */
 export const ROUTES = {
     tasks: "/tasks",
+    recur: "/recur",
     notifyPreferences: "/notify/preferences",
     planUsage: "/plan/usage",
     privacy: "/privacy",

@@ -1,22 +1,6 @@
-import { graphql, type Result } from "./client"
+import type { Task } from "@/modules/types"
+import { graphql, unwrap } from "./client"
 import { runWrite } from "./write-feedback"
-
-/** The one shape a task takes on the wire and in every product-facing list. */
-export interface Task {
-  readonly id: string;
-  readonly title: string;
-  readonly complete: boolean;
-}
-
-/** Every failed GraphQL `Result` this module sees becomes a thrown `Error` here, the one place - so a
- * `useSWR`/`useSWRMutation` caller sees the rejection it already expects, same as the former `ApiError`
- * thrown by `client.ts`'s `apiRequest`. */
-const unwrap = <T>(result: Result<T>): T => {
-    if (!result.ok) {
-        throw new Error(result.reason, result.code ? { cause: new Error(result.code) } : undefined)
-    }
-    return result.data
-}
 
 interface TaskSummary {
   readonly taskId: string;

@@ -1,5 +1,5 @@
 import useSWR from "swr"
-import { useSessionToken } from "@/hooks/auth/useSessionToken"
+import { useSessionToken } from "@/hooks/auth"
 import { listCollaborators } from "@/modules/api"
 
 /**

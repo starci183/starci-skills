@@ -1,5 +1,3 @@
-import { signOut } from "@/modules/api"
-
 /**
  * The one place the session token is stored. A read that finds no token, or one the backend has already
  * expired, is indistinguishable from "signed out" at this layer - the task list hook turns that into its
@@ -40,6 +38,3 @@ export const subscribe = (listener: Listener): (() => void) => {
     LISTENERS.add(listener)
     return () => LISTENERS.delete(listener)
 }
-
-/** End the remote session; callers clear the local token immediately. */
-export const endRemoteSession = (token: string): Promise<boolean> => signOut(token)

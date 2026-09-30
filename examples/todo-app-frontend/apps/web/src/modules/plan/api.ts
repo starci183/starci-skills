@@ -1,4 +1,4 @@
-import { graphql, type Result } from "@/modules/api"
+import { graphql, unwrap } from "@/modules/api"
 
 /**
  * The plan feature's GraphQL surface (fr.plan.usage.view, fr.plan.upgrade), reached through the app's
@@ -6,27 +6,18 @@ import { graphql, type Result } from "@/modules/api"
  */
 
 /** The one shape plan usage takes on the wire (fr.plan.usage.view). */
-export interface PlanUsage {
+interface PlanUsage {
   readonly plan: string;
   readonly cap: number | null;
   readonly activeCount: number;
 }
 
 /** The one shape a started checkout takes on the wire (fr.plan.upgrade). */
-export interface PlanCheckout {
+interface PlanCheckout {
   readonly subscriptionId: string;
   readonly paymentIntentId: string;
   readonly checkoutUrl: string;
   readonly status: string;
-}
-
-/** Mirrors modules/api/tasks.ts: every failed GraphQL Result becomes a thrown Error at this one seam,
- * so a useSWR/useSWRMutation caller sees the rejection it already expects. */
-const unwrap = <T>(result: Result<T>): T => {
-    if (!result.ok) {
-        throw new Error(result.reason, result.code ? { cause: new Error(result.code) } : undefined)
-    }
-    return result.data
 }
 
 const PLAN_USAGE_DOCUMENT = "query { planUsage { plan cap activeCount } }"

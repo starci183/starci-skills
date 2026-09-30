@@ -35,6 +35,7 @@ describe("useSignIn", () => {
         expect(pushMock).toHaveBeenCalledTimes(1)
         expect(pushMock).toHaveBeenCalledWith("/tasks")
         expect(result.current.refusal).toBeNull()
+        expect(result.current.credentialsRefused).toBe(false)
         expect(result.current.submitting).toBe(false)
     })
 
@@ -48,5 +49,6 @@ describe("useSignIn", () => {
 
         expect(pushMock).not.toHaveBeenCalled()
         expect(result.current.refusal).toBe("That email and password do not match.")
+        expect(result.current.credentialsRefused).toBe(true)
     })
 })

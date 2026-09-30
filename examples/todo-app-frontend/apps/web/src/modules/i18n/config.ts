@@ -22,8 +22,5 @@ export const i18n = defineI18nConfig({
     timeZone: "Asia/Ho_Chi_Minh",
 })
 
-/** One of the locales the app ships. */
-export type Locale = (typeof i18n.LOCALES)[number];
-
 /** Stable product timezone shared by server formatting and the hydrated client provider. */
 export const PRODUCT_TIME_ZONE = i18n.PRODUCT_TIME_ZONE

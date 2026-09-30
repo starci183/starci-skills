@@ -1,6 +1,5 @@
 import { graphql } from "./client"
 import { SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth"
-export { SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth"
 
 /**
  * br.login.password.sign-in: a refusal must not say which half of the pair was wrong. This module
@@ -10,7 +9,7 @@ export { SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth"
  */
 
 /** The one value a successful sign-in call returns: the session token. */
-export interface SignInResult {
+interface SignInResult {
   readonly token: string;
 }
 

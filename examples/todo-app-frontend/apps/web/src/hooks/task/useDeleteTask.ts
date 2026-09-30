@@ -1,5 +1,5 @@
 import useSWRMutation from "swr/mutation"
-import { useSessionToken } from "@/hooks/auth/useSessionToken"
+import { useSessionToken } from "@/hooks/auth"
 import { deleteTaskAndNotify } from "@/modules/api"
 
 type DeleteTaskMutationArg = { readonly arg: { readonly id: string } };

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest"
-import { graphql } from "./client"
+import { graphql, unwrap } from "./client"
 
 describe("graphql", () => {
     const originalFetch = global.fetch
@@ -68,5 +68,27 @@ describe("graphql", () => {
         const result = await graphql("query { tasks { taskId } }")
 
         expect(result).toEqual({ ok: false, reason: "empty", code: "EMPTY" })
+    })
+})
+
+describe("unwrap", () => {
+    it("returns the payload of an ok result", () => {
+        expect(unwrap({ ok: true, data: [1, 2] })).toEqual([1, 2])
+    })
+
+    it("throws the refusal's reason with its stable code on cause", () => {
+        let thrown: unknown
+        try {
+            unwrap({ ok: false, reason: "The session is not active.", code: "SESSION_NOT_FOUND" })
+        } catch (error) {
+            thrown = error
+        }
+        expect(thrown).toBeInstanceOf(Error)
+        expect((thrown as Error).message).toBe("The session is not active.")
+        expect(((thrown as Error).cause as Error).message).toBe("SESSION_NOT_FOUND")
+    })
+
+    it("throws without a cause when the refusal names no code", () => {
+        expect(() => unwrap({ ok: false, reason: "empty" })).toThrow("empty")
     })
 })

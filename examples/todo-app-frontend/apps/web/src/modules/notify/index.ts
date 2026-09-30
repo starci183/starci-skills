@@ -1,2 +1,1 @@
-export { endSession, readNotificationPreferences, unsubscribeFromEmail, updateNotificationPreferences } from "./api"
-export type { NotificationPreferences } from "./api"
+export { readNotificationPreferences, unsubscribeFromEmail, updateNotificationPreferences } from "./api"

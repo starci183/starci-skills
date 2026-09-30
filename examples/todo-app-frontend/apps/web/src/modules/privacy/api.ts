@@ -1,31 +1,22 @@
-import { graphql, type Result } from "@/modules/api"
-import { signOut } from "@/modules/api"
+import { graphql, unwrap } from "@/modules/api"
 
 /**
  * The privacy screen's transport adapter: the GraphQL documents the audit backend already serves
  * (fr.audit.export's `exportMyData` query and fr.audit.erasure.request/complete's `requestErasure` /
- * `completeErasure` mutations) plus the one session call Sign out needs. The privacy capability owns these calls and uses the shared GraphQL transport.
+ * `completeErasure` mutations). The privacy capability owns these calls and uses the shared GraphQL transport.
  */
 
 /** One decrypted audit line `exportMyData` returns for the calling person. */
-export interface AuditLine {
+interface AuditLine {
   readonly at: string;
   readonly action: string;
   readonly target: string;
 }
 
 /** What `requestErasure` and `completeErasure` both return. */
-export interface ErasureRequest {
+interface ErasureRequest {
   readonly requestId: string;
   readonly state: string;
-}
-
-/** The same refusal-to-throw rule `modules/api/tasks.ts` applies to every failed Result. */
-const unwrap = <T>(result: Result<T>): T => {
-    if (!result.ok) {
-        throw new Error(result.reason, result.code ? { cause: new Error(result.code) } : undefined)
-    }
-    return result.data
 }
 
 const EXPORT_MY_DATA_DOCUMENT = "query { exportMyData { at action target } }"
@@ -48,9 +39,4 @@ const COMPLETE_ERASURE_DOCUMENT =
 /** fr.audit.erasure.complete: destroys the caller's key so their lines become unreadable. */
 export const completeErasure = async (token: string, requestId: string): Promise<ErasureRequest> => {
     return unwrap(await graphql<ErasureRequest>(COMPLETE_ERASURE_DOCUMENT, { requestId }, token))
-}
-
-/** Sign out ends the server session; clearing local state stays with the caller. */
-export const endSession = async (token: string): Promise<boolean> => {
-    return signOut(token)
 }

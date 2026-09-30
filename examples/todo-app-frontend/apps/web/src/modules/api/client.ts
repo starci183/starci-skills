@@ -1,8 +1,6 @@
 import { apiGraphqlUrl } from "@/modules/config"
 import type { Result } from "./outcome"
 
-export type { Result } from "./outcome"
-
 /**
  * The one place raw `fetch` is allowed to appear (FE_FETCH_OUTSIDE_TRANSPORT). Every other module, hook
  * and component reaches the network through the named calls exported from `auth.ts`/`tasks.ts`, which
@@ -69,4 +67,16 @@ export const graphql = async <T,>(
         return { ok: false, reason: "empty", code: "EMPTY" }
     }
     return { ok: true, data: payload as T }
+}
+
+/**
+ * The one place a refused `Result` becomes the thrown `Error` a `useSWR`/`useSWRMutation` caller
+ * expects, with the backend's stable code kept on `cause`. Every module that wants an exception
+ * instead of a `Result` unwraps through here rather than carrying its own copy.
+ */
+export const unwrap = <T,>(result: Result<T>): T => {
+    if (!result.ok) {
+        throw new Error(result.reason, result.code ? { cause: new Error(result.code) } : undefined)
+    }
+    return result.data
 }

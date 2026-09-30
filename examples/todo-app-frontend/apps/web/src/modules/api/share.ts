@@ -1,28 +1,6 @@
-import { graphql, type Result } from "./client"
+import type { Collaborator, ShareRole } from "@/modules/types"
+import { graphql, unwrap } from "./client"
 import { runWrite } from "./write-feedback"
-
-/** br.share.role.permissions: a collaborator is a viewer or an editor, never anything else. */
-export type ShareRole = "viewer" | "editor";
-
-/** sds.share.invitation-lifecycle: the live status fr.share.list returns, recomputed on every read. */
-export type ShareInvitationStatus = "pending" | "accepted" | "expired" | "revoked";
-
-/** The one shape a collaborator row takes on the wire and in the collaborator list. */
-export interface Collaborator {
-  readonly id: string;
-  readonly email: string;
-  readonly role: ShareRole;
-  readonly status: ShareInvitationStatus;
-}
-
-/** Same unwrapping convention as tasks.ts: a refused GraphQL `Result` becomes the thrown `Error` a
- * `useSWR`/`useSWRMutation` caller already expects, with the backend's stable code kept on `cause`. */
-const unwrap = <T>(result: Result<T>): T => {
-    if (!result.ok) {
-        throw new Error(result.reason, result.code ? { cause: new Error(result.code) } : undefined)
-    }
-    return result.data
-}
 
 interface CollaboratorSummary {
   readonly invitationId: string;
@@ -35,7 +13,7 @@ const toCollaborator = (summary: CollaboratorSummary): Collaborator => ({
     id: summary.invitationId,
     email: summary.email,
     role: summary.role as ShareRole,
-    status: summary.status as ShareInvitationStatus,
+    status: summary.status as Collaborator["status"],
 })
 
 const LIST_COLLABORATORS_DOCUMENT =

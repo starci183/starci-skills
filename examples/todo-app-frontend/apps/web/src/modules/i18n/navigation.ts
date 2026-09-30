@@ -13,4 +13,4 @@ import { routing } from "./routing"
  * wrote and import these helpers instead of `next/navigation`; a file still importing from
  * `next/navigation` is a file that was missed.
  */
-export const { Link, redirect, usePathname, useRouter, getPathname } = createI18nNavigation(routing)
+export const { Link, usePathname, useRouter } = createI18nNavigation(routing)
