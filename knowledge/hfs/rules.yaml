@@ -1086,3 +1086,12 @@ rules:
       - {kind: eslint-fe, id: no-decorative-icon-in-metric-cell}
       - {kind: eslint-fe, id: vendor-primitive-has-named-owner}
       - {kind: machine, id: grammar-entry, at: scripts/checks/architecture/frontend.mjs}
+  - id: R94
+    code: "FE_SLOT_FILE_ROLE"
+    title_vi: "Tệp không đúng vai trò trong slot"
+    law: "A front-end file is owned by a slot and named by it: a slot that owns a directory (route, feature, components, hooks, api module) holds only the files its `allows` list names, and holds them inside a folder of its own."
+    kinds: [check, design]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_SLOT_FILE_ROLE"]
+    enforcers:
+      - {kind: machine, id: fe-slot-allows, at: scripts/checks/architecture/fe-slot-allows.mjs}

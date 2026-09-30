@@ -812,10 +812,11 @@ slots:
     rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS]
   - id: fe.app-optional
     profiles: [fe]
-    path: "apps/<app>/{vitest.config.ts,public/}"
+    path: "apps/<app>/{vitest.config.ts,playwright.config.ts,public/}"
     presence: optional
     tracked: tracked
     tier: none
+    roles: {playwright: playwright.config.ts}
     tests: none
   - id: fe.route
     profiles: [fe]
@@ -823,9 +824,9 @@ slots:
     presence: required
     tracked: tracked
     tier: route
-    allows: ["[locale]/**/{page,layout,template,loading,error,not-found}.tsx", "[locale]/**/route.ts", global-error.tsx, "page.tsx (redirect only)",
+    allows: ["[locale]/**/{page,layout,template,loading,error,not-found,default}.tsx", "[locale]/**/route.ts", global-error.tsx, page.tsx,   # the root page.tsx only redirects (FE_ROUTE_FILES_THIN)
              "health/{live,ready}/route.ts", globals.css, "icon.*", robots.ts, sitemap.ts]
-    roles: {page: page.tsx, layout: layout.tsx, template: template.tsx, loading: loading.tsx, error: error.tsx, not-found: not-found.tsx, route: route.ts, global-error: global-error.tsx}
+    roles: {page: page.tsx, layout: layout.tsx, template: template.tsx, loading: loading.tsx, error: error.tsx, not-found: not-found.tsx, default: default.tsx, route: route.ts, global-error: global-error.tsx}
     tests: none
     rules: [FE_ROUTE_FILES_THIN, FE_CLIENT_BOUNDARY, FE_OWNER_REACHABLE]
   - id: fe.source-root-pinned
@@ -834,8 +835,18 @@ slots:
     presence: optional
     tracked: tracked
     tier: route
+    roles: {proxy: proxy.ts, instrumentation: instrumentation.ts, instrumentation-client: instrumentation-client.ts}
     tests: none
-    rules: [FE_NEXT_CONVENTIONS]   # middleware.ts is refused on Next >= 16
+    rules: [FE_NEXT_CONVENTIONS]   # middleware.ts is refused on Next >= 16 (fe.source-root-retired)
+  - id: fe.source-root-retired
+    profiles: [fe]
+    path: "apps/<app>/src/{middleware.ts,middleware.js}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "apps/<app>/src/proxy.ts: Next >= 16 renamed middleware to proxy and refuses the old name"
+    rules: [FE_NEXT_CONVENTIONS]
   - id: fe.feature
     profiles: [fe]
     path: "apps/<app>/src/features/{pages,layouts,overlays}/<name>/"
@@ -848,7 +859,7 @@ slots:
     allows: [index.tsx, component.tsx, classNames.ts, "*.spec.tsx", "*.spec.ts"]
     roles: {entry: index.tsx, drawing: component.tsx, styles: classNames.ts}   # the connected entry, the pure drawing half and the styling declarations of a component owner
     tests: unit-beside
-    budget: {component.tsx: 300, index.tsx: 200}
+    budget: {component.tsx: 300, index.tsx: 200, dataHooks: 6, useState: 6}
     rules: [FE_SIZE_BUDGET, FE_OWNER_REACHABLE, FE_I18N_LITERAL]
   - id: fe.components
     profiles: [fe]
@@ -875,7 +886,7 @@ slots:
     allows: [index.ts, "use<name>.ts", "<domain>.shared.ts", "*.spec.ts"]   # React hooks only; <domain>.shared.ts = sanctioned non-hook helpers
     roles: {entry: index.ts, shared: "<domain>.shared.ts"}
     tests: unit-beside
-    budget: {file: 200}
+    budget: {file: 200, dataHooks: 6, useState: 6}
     rules: [FE_HOOKS_ARE_HOOKS, FE_DATA_FRESHNESS]
   - id: fe.modules
     profiles: [fe]
@@ -976,6 +987,7 @@ slots:
     roles: {entry: index.tsx, drawing: component.tsx, styles: classNames.ts}
     requires: [package.json, src/index.ts, tsconfig.json]
     tests: unit-beside
+    budget: {component.tsx: 300, index.tsx: 200, dataHooks: 6, useState: 6}
     why: built to dist with explicit named exports; only composites, branches and leaves; no unused export; no colour literal
     rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT, FE_STYLE_TOKEN_ONLY]
   - id: fe.package.api

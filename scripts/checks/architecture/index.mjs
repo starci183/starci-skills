@@ -37,6 +37,7 @@ import { checkHooksAreHooks, HOOKS_ARE_HOOKS_RULE_IDS } from './hooks-are-hooks.
 import { checkClientReachesServer, CLIENT_REACHES_SERVER_RULE_IDS } from './client-reaches-server.mjs';
 import { checkCrossAppDuplicate, CROSS_APP_DUPLICATE_RULE_IDS } from './cross-app-duplicate.mjs';
 import { checkPackageShape, PACKAGE_SHAPE_RULE_IDS } from './package-shape.mjs';
+import { checkFeSlotAllows, FE_SLOT_ALLOWS_RULE_IDS } from './fe-slot-allows.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -65,7 +66,7 @@ const BACKEND_MACHINE = {
   backgroundUnowned: [checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS],
 };
 
-// The frontend repository machine (R21, R50, R54, R55, R56, R63): same shape, run for a front-end repository only.
+// The frontend repository machine (R21, R50, R54, R55, R56, R63, R94): same shape, run for a front-end repository only.
 const FRONTEND_MACHINE = {
   transportOwner: [checkTransportOwner, TRANSPORT_OWNER_RULE_IDS],
   routeFilesThin: [checkRouteFilesThin, ROUTE_FILES_THIN_RULE_IDS],
@@ -73,6 +74,7 @@ const FRONTEND_MACHINE = {
   packageShape: [checkPackageShape, PACKAGE_SHAPE_RULE_IDS],
   clientReachesServer: [checkClientReachesServer, CLIENT_REACHES_SERVER_RULE_IDS],
   crossAppDuplicate: [checkCrossAppDuplicate, CROSS_APP_DUPLICATE_RULE_IDS],
+  feSlotAllows: [checkFeSlotAllows, FE_SLOT_ALLOWS_RULE_IDS],
 };
 
 /** Errors the machine reports when a program cannot be built or an edge cannot be proven: it cannot judge, so it refuses. */
