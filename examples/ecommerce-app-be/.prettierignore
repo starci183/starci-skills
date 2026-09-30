@@ -3,5 +3,6 @@ dist/
 coverage/
 node_modules/
 package-lock.json
+contracts/
 .starcistacks/
 .starciwork/

@@ -18,6 +18,7 @@
     "test": "jest --selectProjects unit",
     "test:e2e": "npm run typecheck:e2e && jest --selectProjects e2e",
     "test:e2e:live": "npm run typecheck:e2e && jest --selectProjects e2e --testPathIgnorePatterns /node_modules/ --testPathPattern e2e.live",
+    "contract:emit": "hfs emit-contracts",
     "hfs:check": "hfs check",
     "hfs:report": "hfs check --sonar reports/hfs.sonar.json"
   },
