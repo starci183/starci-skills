@@ -13,11 +13,12 @@
 // its own path under its parent's real path (any name-surrogate reparse point). A link that cannot be
 // unlinked stops the removal of everything above it; nothing is ever deleted through it.
 //
-// safeRemoveWorktree removes a git worktree's directory with safeRemoveTree and then prunes the registration,
-// so `git worktree remove --force` never walks the tree.
+// safeRemoveWorktree removes a git worktree: every link removed as a link first (found without following one), zero
+// links asserted, only then `git worktree remove --force`, and the main checkout asserted untouched afterwards.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sleepSync } from './sleep-sync.mjs';
 import { samePath } from './path-key.mjs';
@@ -181,15 +182,106 @@ export function safeRemoveTree(root, { retries = 5, checkoutsUnder = null } = {}
 }
 
 /**
- * Remove a git worktree without letting git walk it: its directory goes through safeRemoveTree, then
- * `git worktree prune` (run in `repo`) drops the registration. `git(args, {cwd})` is the caller's git runner;
- * omitted, git is spawned directly.
+ * Every link (junction, symlink, other reparse point) under `dir`, found WITHOUT following one: the walk is its own
+ * (lstat / isLinkLike), it never recurses into a directory that is itself a link, so a link inside a live tree some junction
+ * points at is never listed (`dir /AL /S` descends through junctions and listed main's own links: the 490-file
+ * .claude incident). Outermost first (walk order). The worktree's own .git file is not a link.
+ */
+export function linksUnder(dir) {
+  const out = [];
+  if (isLinkLike(dir)) return [path.resolve(dir)];
+  const walk = (p) => {
+    let entries = [];
+    try { entries = fs.readdirSync(p, { withFileTypes: true }); } catch { return; }
+    const parentReal = realpathOr(p);
+    for (const e of entries) {
+      const child = path.join(p, e.name);
+      if (isLinkLike(child, { parentReal })) { out.push(child); continue; }
+      if (e.isDirectory()) walk(child);
+    }
+  };
+  walk(path.resolve(dir));
+  return out;
+}
+
+/** Remove one link as a link, never its target: `cmd /c rmdir <link>` on Windows (no /s), then unlinkOnly. */
+export function removeLink(p) {
+  if (WIN) {
+    let st = null;
+    try { st = fs.lstatSync(p); } catch { return true; }
+    if (st.isDirectory() || st.isSymbolicLink()) spawnSync('cmd', ['/d', '/c', 'rmdir', p], { windowsHide: true, encoding: 'utf8' });
+  }
+  return unlinkOnly(p);
+}
+
+/** The main checkout's state a removal must never change: its tracked deletions and its node_modules entry counts. */
+export function mainCheckoutGuard(mainRoot, { git = null } = {}) {
+  const run = git ?? ((args, opts) => gitSpawn('git', args, { cwd: opts.cwd, maxBuffer: 64 * 1024 * 1024 }));
+  const count = (rel) => { try { return fs.readdirSync(path.join(mainRoot, rel)).length; } catch { return null; } };
+  // porcelain v2 ("1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>"): no leading blank a runner's trim could eat.
+  const st = run(['status', '--porcelain=v2', '--untracked-files=no'], { cwd: mainRoot });
+  const text = String(st?.stdout ?? st?.out ?? '');
+  const ok = st?.ok ?? (!st?.error && st?.status === 0);
+  const deleted = text.split(/\r?\n/).map((l) => l.trim().split(' ')).filter((f) => f[0] === '1' && f.length >= 9 && f[1].includes('D')).map((f) => f.slice(8).join(' '));
+  return { ok: Boolean(ok), deleted: new Set(deleted),
+    nodeModules: count('node_modules'), packagesNodeModules: count(path.join('packages', 'node_modules')) };
+}
+/** What changed in the main checkout between two guards: [] when nothing. */
+export function mainCheckoutDamage(before, after) {
+  const out = [];
+  if (before.ok && after.ok) for (const f of after.deleted) if (!before.deleted.has(f)) out.push(`tracked file deleted: ${f}`);
+  if (before.nodeModules !== after.nodeModules) out.push(`node_modules entries ${before.nodeModules} -> ${after.nodeModules}`);
+  if (before.packagesNodeModules !== after.packagesNodeModules) out.push(`packages/node_modules entries ${before.packagesNodeModules} -> ${after.packagesNodeModules}`);
+  return out;
+}
+
+/**
+ * Remove a git worktree (the one algorithm; the 490-file .claude incident and nivo-fe inc-c8fbf76aa499):
+ *   1. enumerate every link in it WITHOUT following one (linksUnder);
+ *   2. remove each as a link (removeLink: `cmd /c rmdir <link>`, never /s), outermost first;
+ *   3. re-scan the same way and refuse (link-stuck, nothing deleted) unless ZERO links remain;
+ *   4. only then `git worktree remove --force` (a link-free tree: git cannot walk out of it); a directory git does not know
+ *      goes through safeRemoveTree (never follows a link); `git worktree prune`;
+ *   5. assert the main checkout is untouched: no new tracked deletion, node_modules and packages/node_modules entry counts
+ *      unchanged - a violation is {ok:false, fatal:true, reason:'main-checkout-damaged'}: the caller (the GC) stops.
+ * Never robocopy, rm -rf or rmdir /s. `git(args, {cwd})` is the caller's git runner; `repo` any checkout of the repository.
+ * {ok, root, links, removed, errors, damage?}
  */
 export function safeRemoveWorktree(worktree, { repo, git = null, retries = 5 } = {}) {
-  const removed = safeRemoveTree(worktree, { retries });
-  if (repo) {
-    const run = git ?? ((args, opts) => gitSpawn('git', args, { cwd: opts.cwd }));
-    try { run(['worktree', 'prune'], { cwd: repo }); } catch { /* the registration is pruned on the next prune */ }
+  const target = path.resolve(String(worktree ?? ''));
+  const run = git ?? ((args, opts) => gitSpawn('git', args, { cwd: opts.cwd, maxBuffer: 64 * 1024 * 1024 }));
+  const out = { ok: false, root: target, links: 0, removed: { files: 0, dirs: 0, links: 0 }, errors: [] };
+  const list = repo ? String((run(['worktree', 'list', '--porcelain'], { cwd: repo }) ?? {}).stdout ?? '') : '';
+  const trees = list.split(/\r?\n/).filter((l) => l.startsWith('worktree ')).map((l) => path.resolve(l.slice(9).trim()));
+  const mainRoot = trees[0] ?? null;
+  if (mainRoot && same(mainRoot, target)) { out.errors.push({ path: target, code: 'REFUSED', message: 'refusing to remove the main checkout' }); return out; }
+  const refused = forbiddenRoot(target);
+  if (refused) { out.errors.push({ path: target, code: 'REFUSED', message: `refusing to remove ${refused}` }); return out; }
+  const before = mainRoot ? mainCheckoutGuard(mainRoot, { git: run }) : null;
+  if (fs.existsSync(target)) {
+    for (const link of linksUnder(target)) { if (removeLink(link)) out.links += 1; else out.errors.push({ path: link, code: 'LINK_STUCK', message: 'a link could not be removed' }); }
+    const left = linksUnder(target);
+    if (left.length) {
+      for (const l of left) if (!out.errors.some((e) => e.path === l)) out.errors.push({ path: l, code: 'LINK_STUCK', message: 'a link is still there after removal' });
+      out.reason = 'link-stuck';
+      return out;
+    }
+    out.removed.links = out.links;
+    const registered = trees.some((t) => same(t, target));
+    if (registered && repo) run(['worktree', 'remove', '--force', target], { cwd: repo });
+    if (fs.existsSync(target)) {
+      if (linksUnder(target).length) { out.errors.push({ path: target, code: 'LINK_STUCK', message: 'a link appeared during removal' }); out.reason = 'link-stuck'; return out; }
+      const rm = safeRemoveTree(target, { retries });
+      out.removed.files += rm.removed.files; out.removed.dirs += rm.removed.dirs;
+      out.errors.push(...rm.errors);
+    }
   }
-  return removed;
+  if (repo) { try { run(['worktree', 'prune'], { cwd: repo }); } catch { /* the registration is pruned on the next prune */ } }
+  if (before) {
+    const damage = mainCheckoutDamage(before, mainCheckoutGuard(mainRoot, { git: run }));
+    if (damage.length) { out.damage = damage; out.fatal = true; out.reason = 'main-checkout-damaged'; out.errors.push({ path: mainRoot, code: 'main-checkout-damaged', message: damage.join('; ') }); return out; }
+  }
+  out.ok = !fs.existsSync(target) && (() => { try { fs.lstatSync(target); return false; } catch { return true; } })();
+  if (!out.ok && !out.reason) out.reason = 'remove-failed';
+  return out;
 }

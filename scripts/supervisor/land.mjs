@@ -19,7 +19,7 @@
 //    Append-only files (.gitattributes merge=union) never conflict.
 // 3. Checks on the result, each red one refusing the land:
 //      node --check of every changed .mjs; YAML/JSON parse of every changed .yaml/.yml/.json;
-//      check-module-yaml, check-contract-cites, check-api-surface, check-db-openers (red only when red on the candidate and not
+//      check-module-yaml, check-contract-cites, check-api-surface, check-db-openers, check-worktree-add (red only when red on the candidate and not
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      sync-runtime --check when the change touches a file a runtime mirror bundles (mirrorDriftCheck, same baseline);
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
@@ -64,7 +64,8 @@ import { git, normPath, unlinkNodeModulesLink, finishLanded, selfJobsLandedBy, r
 import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/machine-db.mjs';
 import { lanesRoot } from '../lib/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
-import { safeRemoveTree, isLinkLike, unlinkOnly } from '../lib/safe-remove.mjs';
+import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
+import { createWorktree, markRemoved } from '../lib/worktrees.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
 import { grammarDistStatus } from '../checks/grammar-dist.mjs';
@@ -76,7 +77,7 @@ import { DEFAULT_DUE_MS } from '../reconciler/decisions.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 export { CONTRACT_CHANGES_DIR };
 export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
-export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs']);
+export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs', 'scripts/checks/check-worktree-add.mjs']);
 export const MAX_MAIN_RETRIES = 3;
 export const LAND_WAIT_MS = allocationMs('landGate.waitMs');
 /** The spec run's timeout: a base plus a share per spec, so a 70-spec engine change is not cut off under load. */
@@ -256,15 +257,12 @@ const tail = (text, n = 25) => String(text ?? '').trim().split(/\r?\n/).slice(-n
  */
 export function removeScratch(dir, { root }) {
   try {
-    // Never remove a scratch whose node_modules link to the live tree is still there: a junction lstat does not
-    // report as a symlink (unlinkNodeModulesLink leaves those) is caught by isLinkLike and unlinked as a link.
-    const nm = path.join(dir, 'node_modules');
-    if (!unlinkNodeModulesLink(dir) || (isLinkLike(nm) && !unlinkOnly(nm))) return false;
-    // Never `git worktree remove --force`: it follows junctions (nivo-fe inc-c8fbf76aa499). The tree goes
-    // through safeRemoveTree, which never descends into a link; prune drops the registration.
-    if (fs.existsSync(dir)) safeRemoveTree(dir);
-    git(['worktree', 'prune'], { cwd: root });
-    return !fs.existsSync(dir);
+    // safeRemoveWorktree: every link (the node_modules junction to the live tree included) removed as a link, found
+    // without following one; zero links asserted; only then `git worktree remove`; the main checkout asserted untouched.
+    safeRemoveWorktree(dir, { repo: root, git });
+    const gone = !fs.existsSync(dir);
+    if (gone) markRemoved(dir);
+    return gone;
   } catch { return false; }
 }
 
@@ -294,8 +292,8 @@ export function waitGitHealthy({ root = SKILL_ROOT, waitMs = GIT_HEALTH_WAIT_MS,
 function makeScratch({ root, base, env }) {
   const dir = path.join(landRoot(env), `scratch-${process.pid}-${Date.now().toString(36)}${randomBytes(2).toString('hex')}`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
-  const added = git(['worktree', 'add', '--detach', dir, base], { cwd: root });
-  if (!added.ok) { removeScratch(dir, { root }); return { ok: false, error: added.stderr || 'git worktree add failed' }; }
+  const added = createWorktree({ repoRoot: root, dir, kind: 'land-scratch', detach: true, base, git });
+  if (!added.ok) { removeScratch(dir, { root }); return { ok: false, error: added.detail || added.reason || 'git worktree add failed' }; }
   const nm = path.join(root, 'node_modules');
   try { if (fs.existsSync(nm)) fs.symlinkSync(nm, path.join(dir, 'node_modules'), 'junction'); } catch { /* specs without deps */ }
   try { const cfg = path.join(root, 'config.yaml'); if (fs.existsSync(cfg)) fs.copyFileSync(cfg, path.join(dir, 'config.yaml')); } catch { /* optional */ }

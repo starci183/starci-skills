@@ -47,7 +47,8 @@ import {
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
 } from './home.mjs';
 import { openMachine } from '../../engine/machine-db.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
+import { createWorktree, markRemoved } from '../lib/worktrees.mjs';
 import { closeSelfSafe, releaseSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
@@ -218,8 +219,9 @@ export const stagingPathOf = (jobId, env = process.env) => path.join(stagingRoot
 export const branchOf = (jobId) => `sup/${jobId}`;
 
 /**
- * Create the job's staging checkout: `git worktree add -b sup/<job> <staging> <base>` of the runtime, plus a
- * node_modules junction and a copy of the owner config so specs run there as they do live.
+ * Create the job's staging checkout: a worktree on sup/<job> at <base> of the runtime, made by the one worktree API
+ * (scripts/lib/worktrees.mjs, registered with its [Worker] job for the GC), plus a node_modules junction and a copy of
+ * the owner config so specs run there as they do live.
  */
 export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, base = null }) {
   const dir = stagingPathOf(jobId, env);
@@ -227,8 +229,8 @@ export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, bas
   if (!baseSha) return { ok: false, error: 'cannot resolve main' };
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   if (fs.existsSync(dir)) return { ok: false, error: `staging path ${dir} already exists` };
-  const added = git(['worktree', 'add', '-b', branchOf(jobId), dir, baseSha], { cwd: root });
-  if (!added.ok) return { ok: false, error: added.stderr || added.error || 'git worktree add failed' };
+  const added = createWorktree({ repoRoot: root, dir, kind: 'supervisor-staging', branch: branchOf(jobId), newBranch: true, base: baseSha, owner: { lane: jobId }, env, git });
+  if (!added.ok) return { ok: false, error: added.detail || added.reason || 'git worktree add failed' };
   const nm = path.join(root, 'node_modules');
   try { if (fs.existsSync(nm)) fs.symlinkSync(nm, path.join(dir, 'node_modules'), 'junction'); } catch { /* specs without deps still run */ }
   try { const cfg = path.join(root, 'config.yaml'); if (fs.existsSync(cfg)) fs.copyFileSync(cfg, path.join(dir, 'config.yaml')); } catch { /* optional */ }
@@ -255,20 +257,18 @@ export function unlinkNodeModulesLink(dir) {
 export function removeStaging({ jobId, root = SKILL_ROOT, env = process.env, landed = false, base = null }) {
   const dir = stagingPathOf(jobId, env);
   const out = { jobId, path: dir, removed: false, branchDeleted: false };
-  // The node_modules junction is unlinked first (unlink removes the link, never its target) so the forced
-  // removal can never walk into the live node_modules; if it cannot be unlinked nothing is removed.
-  if (!unlinkNodeModulesLink(dir)) return { ...out, error: `cannot unlink ${path.join(dir, 'node_modules')}; checkout left in place` };
   if (fs.existsSync(dir)) {
-    // Never `git worktree remove --force`: Git for Windows follows a junction inside the worktree and empties
-    // its target (nivo-fe inc-c8fbf76aa499). safeRemoveTree unlinks every link and never descends into one;
-    // the prune below drops the registration. A checkout whose registration is already gone is unregistered.
+    // safeRemoveWorktree: every link (the node_modules junction included) removed as a link, found without following
+    // one; zero links asserted; only then `git worktree remove`; the main checkout asserted untouched.
     const registered = git(['rev-parse', '--git-dir'], { cwd: dir }).ok;
-    const r = safeRemoveTree(dir);
+    const r = safeRemoveWorktree(dir, { repo: root, git });
     out.removed = r.ok;
+    if (r.fatal) { out.fatal = true; out.damage = r.damage; }
     if (!r.ok) out.error = r.errors.slice(0, 3).map((e) => `${e.code} ${e.path}: ${e.message}`).join('; ');
     else if (!registered) out.unregistered = true;
   } else out.removed = true;
   git(['worktree', 'prune'], { cwd: root });
+  if (out.removed) markRemoved(dir, { env });
   const branch = branchOf(jobId);
   const exists = git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: root }).ok;
   if (exists) {

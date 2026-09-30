@@ -1254,6 +1254,39 @@ const pushes = (m, { repoRoot = null, limit = 50 } = {}) => m.db.prepare(`SELECT
 const upsertWorktree = (m, wt) => upsertRow(m.db, 'worktrees', { created_at: m.now(), ...snake(wt), path: path.resolve(wt.path) }, ['path']);
 const removedWorktree = (m, wtPath, { error = null, archivedRef = null } = {}) => m.db.prepare('UPDATE worktrees SET removed_at=CASE WHEN ? IS NULL THEN ? ELSE removed_at END, remove_error=?, archived_ref=COALESCE(?,archived_ref) WHERE path=?')
   .run(error, m.now(), error, archivedRef, path.resolve(wtPath)).changes > 0;
+/**
+ * The worktree registry (scripts/lib/worktrees.mjs is its one caller): reserve a row for a worktree about to be created,
+ * atomically against the per-repo cap. BEGIN IMMEDIATE: two dispatches never both take the last slot. `cap` null: no cap.
+ * {ok, live} | {ok:false, reason:'worktree-cap', live, cap}
+ */
+function reserveWorktree(m, wt, { cap = null } = {}) {
+  return m.transaction((db) => {
+    const repoRoot = repoKey(wt.repoRoot);
+    const target = path.resolve(wt.path);
+    const live = db.prepare('SELECT path FROM worktrees WHERE repo_root=? AND removed_at IS NULL').all(repoRoot).filter((r) => r.path !== target).length;
+    if (cap != null && live >= cap) return { ok: false, reason: 'worktree-cap', live, cap };
+    upsertRow(db, 'worktrees', { ...snake(wt), path: target, repo_root: repoRoot, created_at: m.now(), removed_at: null, remove_error: null }, ['path']);
+    return { ok: true, live: live + 1 };
+  });
+}
+/** Live (not removed) registry rows, optionally of one repo. */
+const liveWorktrees = (m, { repoRoot = null } = {}) => m.db.prepare(`SELECT * FROM worktrees WHERE removed_at IS NULL ${repoRoot ? 'AND repo_root=?' : ''} ORDER BY created_at`)
+  .all(...(repoRoot ? [repoKey(repoRoot)] : []));
+const worktreeRow = (m, wtPath) => m.db.prepare('SELECT * FROM worktrees WHERE path=?').get(path.resolve(wtPath)) ?? null;
+/** Every repo the registry ever held a worktree of. */
+const worktreeRepos = (m) => m.db.prepare('SELECT DISTINCT repo_root FROM worktrees ORDER BY repo_root').all().map((r) => r.repo_root);
+/** A reservation whose `git worktree add` failed: the row goes, nothing was created. */
+/** A GC collector's resume point (machine_meta gc_cursor:<name>): where its last bounded pass stopped, or null. */
+const gcCursor = (m, name) => m.db.prepare('SELECT value FROM machine_meta WHERE key=?').get(`gc_cursor:${name}`)?.value ?? null;
+const setGcCursor = (m, name, value) => (value == null
+  ? m.db.prepare('DELETE FROM machine_meta WHERE key=?').run(`gc_cursor:${name}`)
+  : m.db.prepare('INSERT INTO machine_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(`gc_cursor:${name}`, String(value))).changes > 0;
+/** The worktree GC's stop mark (a removal changed the main checkout): {at, damage, path} or null. set(null) clears it. */
+const worktreeGcStop = (m) => parse(m.db.prepare("SELECT value FROM machine_meta WHERE key='worktree_gc_stopped'").get()?.value ?? null);
+const setWorktreeGcStop = (m, stop) => (stop
+  ? m.db.prepare("INSERT INTO machine_meta(key,value) VALUES('worktree_gc_stopped',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(stop))
+  : m.db.prepare("DELETE FROM machine_meta WHERE key='worktree_gc_stopped'").run()).changes > 0;
+const dropWorktree = (m, wtPath) => m.db.prepare('DELETE FROM worktrees WHERE path=? AND removed_at IS NULL').run(path.resolve(wtPath)).changes > 0;
 const upsertEnvServer = (m, server) => upsertRow(m.db, 'env_servers', snake(server), ['server_id']);
 const envServer = (m, serverId) => m.db.prepare('SELECT * FROM env_servers WHERE server_id=?').get(serverId) ?? null;
 const envServers = (m, { live = false } = {}) => m.db.prepare(`SELECT * FROM env_servers ${live ? "WHERE state IN ('starting','ready')" : ''} ORDER BY server_id`).all();
@@ -1443,13 +1476,13 @@ const API = {
   upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, release: releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets,
   startGcRun, finishGcRun, recordGcItem, addGcItem: recordGcItem, updateGcItem, gcItems, gcMark, addGcMarks: gcMark, gcRuns, markMachineBlobArchived, pruneSeatSnapshots,
   upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox,
-  upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk,
+  upsertWorktree, removedWorktree, reserveWorktree, liveWorktrees, worktreeRow, worktreeRepos, dropWorktree, worktreeGcStop, setWorktreeGcStop, gcCursor, setGcCursor, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk,
   log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
 };
 
 /** Every typed function at module level too: fn(handle, ...args) — blob-gc and callers holding a handle. */
 export {
-  putMachineBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markMachineBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
+  putMachineBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markMachineBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, upsertWorktree, removedWorktree, reserveWorktree, liveWorktrees, worktreeRow, worktreeRepos, dropWorktree, worktreeGcStop, setWorktreeGcStop, gcCursor, setGcCursor, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
 };
 export const addGcItem = recordGcItem;
 export const addGcMarks = gcMark;

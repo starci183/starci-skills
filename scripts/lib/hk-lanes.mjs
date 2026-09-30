@@ -179,7 +179,9 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
     const branch = shortBranch(w.branch);
     if (!out.apply) { out.wouldRemove.push({ path: w.path, branch, freedBytes }); out.freedBytes += freedBytes; continue; }
     const removed = safeRemoveWorktree(w.path, { repo: root, git: run });
-    if (!removed.ok) { fail(w.path, removed.error || 'worktree removal failed'); continue; }
+    // A removal that changed the main checkout stops housekeeping's lane pass at once (safe-remove.mjs mainCheckoutGuard).
+    if (removed.fatal) { fail(w.path, `main checkout damaged: ${(removed.damage ?? []).join('; ')}`); out.stopped = { path: w.path, damage: removed.damage }; break; }
+    if (!removed.ok) { fail(w.path, (removed.errors ?? [])[0]?.message || removed.reason || 'worktree removal failed'); continue; }
     const dropped = run(['branch', '-d', branch], { cwd: root });
     out.removed.push({ path: w.path, branch, freedBytes, branchDeleted: dropped.ok });
     out.freedBytes += freedBytes;

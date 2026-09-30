@@ -38,7 +38,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { safeRemoveTree, safeRemoveWorktree } from '../lib/safe-remove.mjs';
+import { createWorktree, markRemoved } from '../lib/worktrees.mjs';
 import { getBlob, putBlob } from '../lib/artifact-store.mjs';
 import { redactText } from '../lib/redact.mjs';
 import {sha256} from '../../engine/digest.mjs';
@@ -428,17 +429,17 @@ export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = f
   const links = [];
   const cleanup = () => {
     for (const link of links.splice(0).reverse()) unlinkLink(link);
-    // Never `git worktree remove --force` or a recursive rmSync: Git for Windows follows a junction left in
-    // the worktree into the live checkout (nivo-fe inc-c8fbf76aa499). safeRemoveTree unlinks any link it
-    // meets (recorded or not) and never descends into one; prune drops the registration.
-    try { safeRemoveTree(worktree); } catch { /* best effort */ }
-    try { run(['worktree', 'prune'], { cwd: repo }); } catch { /* best effort */ }
+    // safeRemoveWorktree: every link left (recorded or not) removed as a link, found without following one; zero links
+    // asserted; only then `git worktree remove`; the main checkout asserted untouched (nivo-fe inc-c8fbf76aa499).
+    try { safeRemoveWorktree(worktree, { repo, git: run }); } catch { /* best effort */ }
     try { safeRemoveTree(base); } catch { /* best effort */ }
+    if (!fs.existsSync(worktree)) markRemoved(worktree);
   };
   const unavailable = (error) => { cleanup(); return { ok: false, unavailable: true, error, scratch: base }; };
   try {
-    const added = run(['worktree', 'add', '--detach', worktree, 'main'], { cwd: repo });
-    if (!added.ok) return unavailable(added.stderr || added.error || 'git worktree add failed');
+    // The one worktree API (scripts/lib/worktrees.mjs): registered for the GC, removed by cleanup().
+    const added = createWorktree({ repoRoot: repo, dir: worktree, kind: 'push-scratch', detach: true, base: 'main', git: run });
+    if (!added.ok) return unavailable(added.detail || added.reason || 'git worktree add failed');
     for (const dir of nodeModulesRoots(repo)) {
       const rel = path.relative(repo, dir);
       try { const link = path.join(worktree, rel); linkDir(dir, link); links.push(link); }

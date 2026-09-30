@@ -47,6 +47,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { gitSpawn } from '../lib/git.mjs';
+import { createWorktree, removeWorktree } from '../lib/worktrees.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { SKILL_ROOT, readSupervisor, supervisorEvent, withSupervisor } from './home.mjs';
@@ -346,7 +347,9 @@ export async function revertExperiment({ id, apply = false, env = process.env, n
   const plan = { id, signature: e.signature, commits: e.commits, lane: name, dir };
   if (!apply) return { ok: true, planned: true, ...plan };
   const step = (args, cwd = dir) => { const r = git(args, { cwd }); if (!r.ok) throw Object.assign(new Error(`git ${args.join(' ')}: ${r.err}`), { code: 'revert-git' }); return r.out; };
-  step(['worktree', 'add', dir, '-b', `lane/${name}`, 'main'], root);
+  // The one worktree API (scripts/lib/worktrees.mjs): registered for the GC, removed in the finally below.
+  const made = createWorktree({ repoRoot: root, dir, kind: 'lane', branch: `lane/${name}`, newBranch: true, base: 'main', owner: { lane: name }, env, git: (args, o) => git(args, o) });
+  if (!made.ok) throw Object.assign(new Error(`worktree ${dir}: ${made.detail ?? made.reason}`), { code: 'revert-git' });
   try {
     for (const sha of [...e.commits].reverse()) step(['revert', '--no-commit', sha]);
     const changed = step(['diff', '--cached', '--name-only']).split(/\r?\n/).filter(Boolean).map(norm);
@@ -372,10 +375,8 @@ export async function revertExperiment({ id, apply = false, env = process.env, n
       text: `${e.signature}: ${e.commits.map((c) => c.slice(0, 9)).join(',')} did not work (${state.experiments[id].result?.reason ?? ''}); reverted by ${sha.slice(0, 9)}` }, now());
     return { ok: landed?.ok === true, ...plan, revertCommit: sha, land: landed };
   } finally {
-    // Never `git worktree remove --force` (it follows junctions): safeRemoveWorktree never walks a link, then prunes.
-    const { safeRemoveWorktree } = await import('../lib/safe-remove.mjs');
-    safeRemoveWorktree(dir, { repo: root });
-    git(['branch', '-D', `lane/${name}`], { cwd: root });
+    // Never `git worktree remove --force` (it follows junctions): removeWorktree removes every link as a link, then the tree.
+    removeWorktree({ repoRoot: root, dir, branch: `lane/${name}`, deleteBranch: 'force', env, git: (args, o) => git(args, o) });
   }
 }
 

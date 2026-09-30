@@ -67,6 +67,7 @@ contract-churn	nhan nhom nguyen nhan (cause class) cua bai hoc Supervisor, khong
 crash-loop	nhan lop thong bao khan (urgent class) cua notifier, khong phai ma refusal
 deferred-settle	wait-kind label of a queued job, not a failure code
 define-goal	workflow creation reason label, not a failure
+directory-gone	GC item label (gc_items.reason) for a registry row whose worktree directory is already gone, not a failure
 dispatch-reconciled	ledger event kind name, not a failure code
 dispatch-rejected	ledger event kind name, not a failure code
 draw-review	ask class label excluded from auto-accept, not a code
@@ -120,6 +121,7 @@ shared-system	owner ask class label
 starci-agent-session	terminal dedupe reason (close decision), not a failure
 supervisor-gate	next-action kind label
 test-env-unrooted	session archive skip reason (informational)
+time-budget	GC item label: a bounded worktree GC pass stopped at its time budget and resumes next pass, not a failure
 typed-dependent	staleness relation label
 work-owner-only	product-isolation skip reason (not a failure)
 workflow-ended	incident close reason (success)

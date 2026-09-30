@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {safeRemoveTree} from '../lib/safe-remove.mjs';
+import {safeRemoveTree,safeRemoveWorktree} from '../lib/safe-remove.mjs';
+import {createWorktree,markRemoved} from '../lib/worktrees.mjs';
 import {posixPath,slash} from '../lib/path-key.mjs';
 
 /**
@@ -104,15 +105,16 @@ export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],gi
     // Never `git worktree remove --force` or a recursive rmSync: a junction a proof command made in the scratch
     // (a dependency link) would be followed into its target (nivo-fe inc-c8fbf76aa499). safeRemoveTree never
     // descends into a link; prune drops the registration.
-    try{safeRemoveTree(scratch);}catch{/* the temporary worktree is best-effort */}
+    try{safeRemoveWorktree(scratch,{repo:worktree,git:args=>run(args)});}catch{/* the temporary worktree is best-effort */}
     try{safeRemoveTree(parent);}catch{/* nothing to keep */}
-    try{run(['worktree','prune']);}catch{/* nothing to keep */}
+    if(!fs.existsSync(scratch))markRemoved(scratch);
   };
   try{
-    const added=run(['worktree','add','--detach',scratch,baseHead]);
-    if(added?.status!==0)
-      return {...empty('fail-before',baseHead,opHead,commands,`the base worktree of ${short(baseHead)} could not be created: ${tail(added?.stderr,200)}`),
-        specs:plan,verdict:'weak',error:tail(added?.stderr,200)||'git worktree add failed'};
+    // The one worktree API (scripts/lib/worktrees.mjs): registered for the GC, removed in the finally below.
+    const added=createWorktree({repoRoot:worktree,dir:scratch,kind:'land-scratch',detach:true,base:baseHead,git:args=>run(args)});
+    if(!added.ok)
+      return {...empty('fail-before',baseHead,opHead,commands,`the base worktree of ${short(baseHead)} could not be created: ${tail(added.detail??added.reason,200)}`),
+        specs:plan,verdict:'weak',error:tail(added.detail??added.reason,200)||'git worktree add failed'};
     const copied=[],missing=[];
     for(const spec of plan){
       const source=path.join(worktree,native(spec)),target=path.join(scratch,native(spec));
