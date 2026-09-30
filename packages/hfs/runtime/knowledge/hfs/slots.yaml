@@ -631,7 +631,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: inherit
-    requires: [connection.ts]     # export const CONNECTION = "<name from hfs.json connections>"
+    requires: [connection.ts]     # CONNECTION = <CONN>_CONNECTION of an hfs.json connection, and the capability's <c>Entities / <c>Migrations arrays (the owner index re-exports the two arrays by name)
     allows: ["entities/<table>.entity.ts", "migrations/<epochMs13>-<kebab-name>.ts", "<name>.sql.ts", "<name>.rows.ts", connection.ts, "*.spec.ts"]
     forbids: [index.ts, "<name>.repository.ts"]
     tests: unit-beside
