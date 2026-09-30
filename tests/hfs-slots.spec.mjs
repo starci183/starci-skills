@@ -222,7 +222,7 @@ test('BE fixture: import direction', () => {
   assert.equal(ok('src/tests/fixtures/orders.ts', 'src/features/orders/index.ts').reason, 'tierDirection');                                // fixtures never import a feature
   assert.equal(ok('src/features/orders/index.ts', 'README.md').reason, 'untiered');
   const unknown = ok('src/features/orders/index.ts', 'src/whatever/x.ts');
-  assert.deepEqual([unknown.allowed, unknown.reason, unknown.code], [false, 'unowned', 'HFS_PATH_NO_SLOT']);
+  assert.deepEqual([unknown.allowed, unknown.reason, unknown.code], [false, 'unowned', 'HFS_SLOT_UNDECLARED']);
   assert.equal(ok('src/features/orders/transport/message/a.ts', 'src/features/orders/index.ts').reason, 'slotNotEnabled');
 });
 
@@ -283,10 +283,10 @@ test('FE multi-app fixture', () => {
   assert.equal(openHfs({ declaration: { ...FE, optionalSlots: [] } }).classifyPath('packages/nivo-ui/src/index.ts').status, 'not-enabled');
 });
 
-test('an unknown path is reported with its nearest slot and HFS_PATH_NO_SLOT', () => {
+test('an unknown path is reported with its nearest slot and HFS_SLOT_UNDECLARED', () => {
   const be = openHfs({ declaration: BE });
   const stray = be.classifyPath('src/tests/e2e/orders/place.ts');
-  assert.deepEqual([stray.status, stray.code], ['no-slot', 'HFS_PATH_NO_SLOT']);
+  assert.deepEqual([stray.status, stray.code], ['no-slot', 'HFS_SLOT_UNDECLARED']);
   assert.equal(stray.nearest.slot, 'be.tests.e2e');
   assert.equal(stray.nearest.matchedPrefix, 'src/tests/e2e/orders');
   assert.equal(stray.nearest.expectedNext, '*.e2e-spec.ts');
@@ -367,7 +367,7 @@ test('growth is a minor: adding a slot changes no existing answer; every slot pa
 
 test('the failure catalog explains the new codes in Vietnamese', () => {
   const catalog = parseYaml(fs.readFileSync(path.join(root, 'modules/kernel/failure-codes.yaml'), 'utf8'));
-  for (const code of ['HFS_PATH_NO_SLOT', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID', 'HFS_DECLARATION_INVALID']) {
+  for (const code of ['HFS_SLOT_UNDECLARED', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID', 'HFS_DECLARATION_INVALID']) {
     assert.ok(catalog[code], `${code} has no catalog entry`);
     for (const field of ['title_vi', 'meaning_vi', 'nextStep_vi']) assert.match(catalog[code][field], /[À-ỹ]/, `${code}.${field} is not Vietnamese`);
   }

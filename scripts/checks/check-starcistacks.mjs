@@ -37,16 +37,15 @@ import { list } from '../lib/list.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { loadSonarGate } from './sonar-gate.mjs';
 import { slash } from '../lib/path-key.mjs';
+import { DECLARATION, STACK_ROOT, declaredStack, findStackDeclaration, readDeclaration, readText, text } from '../lib/stack-declaration.mjs';
+
+export { DECLARATION, STACK_ROOT, findStackDeclaration };
 
 export const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 export const DECLARATION_SCHEMA = 'starci/application-stacks@1';
-export const DECLARATION = 'application-stacks.yaml';
-/** The one stack root a repository owns. */
-export const STACK_ROOT = '.starcistacks';
 export const CONTRACT_CHANGE = 'starcistacks-services';
 export const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
   detail: 'author the services block of the repository stack declaration (sonar, codecov and every other delivery/quality service) from examples/starcistacks-services/<repository>.services.yaml' };
-const MAX_BYTES = 2 * 1024 * 1024;
 
 /** The closed service catalog: its providers and the CI text that shows a workflow calls it. */
 export const SERVICE_CATALOG = {
@@ -78,9 +77,6 @@ const INFRA_VALUE_FILE = /^(\.env(\..+)?|.+\.(env|key|pem|tfvars)(\..+)?)$/;
 const INFRA_VALUE_PROBES = ['infra/compose/.env', 'infra/compose/.env.generated', 'infra/compose/service/.env.local',
   'infra/compose/tls.key', 'infra/terraform/terraform.tfvars'];
 
-const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
-
-const readText = (file) => { try { return fs.statSync(file).size > MAX_BYTES ? null : fs.readFileSync(file, 'utf8'); } catch { return null; } };
 const escapeRe = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The runtime's source host: the repository this runtime tree lives in (STARCI_SOURCE_ROOT overrides). */
@@ -127,25 +123,6 @@ export function schemaErrors(value, shape, at = '$', root = declarationSchema())
 
 // ---- locating declarations and repositories -------------------------------------------------------------
 
-function readDeclaration(file) {
-  const raw = readText(file);
-  if (raw === null) return { error: 'unreadable or larger than 2 MiB' };
-  try { const doc = parseYaml(raw); return plain(doc) ? { doc } : { error: 'not a YAML mapping' }; }
-  catch (error) { return { error: `YAML does not parse: ${String(error?.message ?? error).split('\n')[0]}` }; }
-}
-
-/**
- * The stack declaration a repository owns: {root, file, rooted, doc|error} - or {missing:true, rooted}
- * when .starcistacks/application-stacks.yaml does not exist. `rooted` says the .starcistacks tree exists.
- */
-export function findStackDeclaration(repoRoot) {
-  const repo = path.resolve(String(repoRoot ?? ''));
-  const rooted = isDir(path.join(repo, STACK_ROOT));
-  const file = path.join(repo, STACK_ROOT, DECLARATION);
-  if (isFile(file)) return { repo, root: STACK_ROOT, file, rooted, ...readDeclaration(file) };
-  return { repo, missing: true, rooted };
-}
-
 /**
  * A repository named in a declaration, on this machine: the declaring repository itself, the runtime's
  * source host, or a sibling checkout of either. Null when it is not checked out here.
@@ -190,7 +167,7 @@ export function normalizeService(id, entry, { declaringRepo } = {}) {
   const stack = plain(s.stack) ? s.stack : null;
   // owner: host - the stack lives inside the installed runtime tree (.claude/ext/<service>);
   // `environment` is the slot the extension serves, not a path segment (<root>/<compose> resolves it).
-  const hostOwned = stack && text(stack.owner) === 'host';
+  const hostOwned = declaredStack(entry)?.hostOwned ?? false;
   const hostRoot = hostOwned ? slash(stack.root) : null;
   const extDir = hostRoot && /^\.claude\//.test(hostRoot) && !hostRoot.split('/').includes('..')
     ? path.join(skillRoot, hostRoot.replace(/^\.claude\//, '')) : null;

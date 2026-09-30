@@ -9,7 +9,7 @@ import { ARCHITECTURE_RULE_IDS } from '../scripts/checks/architecture/index.mjs'
 import { HfsSlotsError } from '../scripts/lib/hfs-slots.mjs';
 import { main } from '../packages/hfs/bin/hfs.mjs';
 import { BUNDLES, driftOfRuntime, importClosure } from '../packages/hfs/scripts/sync-runtime.mjs';
-import { BE, FE, PRESETS, cleanup, gitAdd, installPresets, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { BE, FE, FORMATTED, PRESETS, cleanup, gitAdd, installPresets, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const pins = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins;
@@ -34,10 +34,10 @@ const presetsOf = (argv) => {
   const at = argv.indexOf('--repo');
   try { return PRESETS[JSON.parse(fs.readFileSync(path.join(argv[at + 1], 'hfs.json'), 'utf8')).profile]; } catch { return undefined; }
 };
-const cli = async (argv) => {
+const cli = async (argv, seams = {}) => {
   let out = '';
   let err = '';
-  const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets: presetsOf(argv) });
+  const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets: presetsOf(argv), prettier: FORMATTED, ...seams });
   return { code, out, err };
 };
 const HAS_VIETNAMESE = /[À-ỹ]/;
@@ -56,29 +56,42 @@ test('a clean multi-app front-end repository passes and expands the required fil
   assert.deepEqual(result.apps.map((a) => a.name), ['web', 'admin']);
 });
 
-test('HFS_PATH_NO_SLOT names the path and the nearest slot', () => {
+test('HFS_SLOT_UNDECLARED names the path and the nearest slot', () => {
   const result = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, 'src/stray/thing.ts')) });
-  const [finding] = only(result, 'HFS_PATH_NO_SLOT');
+  const [finding] = only(result, 'HFS_SLOT_UNDECLARED');
   assert.equal(result.ok, false);
   assert.equal(finding.path, 'src/stray/thing.ts');
   assert.equal(finding.level, 'error');
   assert.ok(finding.nearest.slot, 'the nearest slot is reported');
 });
 
-test('HFS_REQUIRED_MISSING is reported per slot, and per app in a multi-app repository', () => {
+test('HFS_SLOT_REQUIRED_MISSING is reported per slot, and per app in a multi-app repository', () => {
   const be = checkRepo({ repoRoot: repoOf(BE, (dir) => drop(dir, '.nvmrc')) });
-  const [rootFile] = only(be, 'HFS_REQUIRED_MISSING');
+  const [rootFile] = only(be, 'HFS_SLOT_REQUIRED_MISSING');
   assert.equal(rootFile.path, '.nvmrc');
   assert.equal(rootFile.slot, 'repo.tool-config');
 
   const fe = checkRepo({ repoRoot: repoOf(FE, (dir) => drop(dir, 'apps/admin/src/app/global-error.tsx')) });
-  const [perApp] = only(fe, 'HFS_REQUIRED_MISSING');
+  const [perApp] = only(fe, 'HFS_SLOT_REQUIRED_MISSING');
   assert.equal(fe.findings.length, 1);
   assert.equal(perApp.app, 'admin');
   assert.equal(perApp.slot, 'fe.app.next');
 
   const feature = checkRepo({ repoRoot: repoOf(BE, (dir) => drop(dir, 'src/features/orders/index.ts')) });
-  assert.deepEqual(only(feature, 'HFS_REQUIRED_MISSING').map((f) => f.path), ['src/features/orders/index.ts']);
+  assert.deepEqual(only(feature, 'HFS_SLOT_REQUIRED_MISSING').map((f) => f.path), ['src/features/orders/index.ts']);
+});
+
+test('HFS_SLOT_REQUIRED_MISSING and HFS_MIN_INSTANCES are silent when every required file and instance is tracked', () => {
+  for (const declaration of [BE, FE]) {
+    const result = checkRepo({ repoRoot: repoOf(declaration) });
+    assert.deepEqual(only(result, 'HFS_SLOT_REQUIRED_MISSING'), []);
+    assert.deepEqual(only(result, 'HFS_MIN_INSTANCES'), []);
+  }
+});
+
+test('HFS_SLOT_UNDECLARED is silent when every tracked path has an owner', () => {
+  assert.deepEqual(only(checkRepo({ repoRoot: repoOf(BE) }), 'HFS_SLOT_UNDECLARED'), []);
+  assert.deepEqual(only(checkRepo({ repoRoot: repoOf(FE) }), 'HFS_SLOT_UNDECLARED'), []);
 });
 
 test('HFS_MIN_INSTANCES fires when the repository has no feature', () => {
@@ -95,11 +108,14 @@ test('a tracked path in an ignored slot is HFS_TRACKED_MUST_BE_IGNORED', () => {
   assert.equal(result.ok, false);
 });
 
-test('a tracked path in a forbidden (external) slot is HFS_FORBIDDEN_PRESENT and names where it belongs', () => {
+test('a tracked path in a forbidden (external) slot is HFS_FORBIDDEN_PRESENT and names where it belongs; a plaintext secret file is the secret rule\'s, once', () => {
   const result = checkRepo({ repoRoot: repoOf(BE, (dir) => { put(dir, '.env', 'A=1\n'); put(dir, 'report-1.json', '{}'); }) });
   const found = only(result, 'HFS_FORBIDDEN_PRESENT');
-  assert.deepEqual(found.map((f) => f.path).sort(), ['.env', 'report-1.json']);
-  assert.match(found.find((f) => f.path === '.env').goesTo, /\.starcistacks/);
+  assert.deepEqual(found.map((f) => f.path), ['report-1.json']);
+  assert.match(found[0].goesTo, /agent scratchpad/);
+  const [secret] = only(result, 'HFS_PLAINTEXT_SECRET');
+  assert.equal(secret.path, '.env');
+  assert.match(secret.goesTo, /\.starcistacks/);
 });
 
 test('BE_SOURCE_FORM: a back-end source name outside the closed suffix vocabulary is refused; a role name, index, main and a migration are not', () => {
@@ -193,7 +209,7 @@ test('every finding carries its code and the Vietnamese why text from the catalo
     assert.equal(finding.whyVi, catalog[finding.code].meaning_vi);
     assert.match(finding.whyVi, HAS_VIETNAMESE);
   }
-  assert.equal(result.counts.byCode.HFS_PATH_NO_SLOT.count, 1);
+  assert.equal(result.counts.byCode.HFS_SLOT_UNDECLARED.count, 1);
 });
 
 test('every code the check can emit has a Vietnamese catalog entry, and the package bundle carries it', () => {
@@ -221,7 +237,7 @@ test('explain names the slot, tier, allowed imports and required tests of a path
 
   const lost = explainPath({ repoRoot: dir, input: 'src/stray/x.ts' });
   assert.equal(lost.status, 'no-slot');
-  assert.equal(lost.code, 'HFS_PATH_NO_SLOT');
+  assert.equal(lost.code, 'HFS_SLOT_UNDECLARED');
   assert.match(lost.whyVi, HAS_VIETNAMESE);
 
   const secret = explainPath({ repoRoot: dir, input: '.env' });
@@ -271,10 +287,10 @@ test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json 
   assert.equal(bad.code, 1);
   const parsed = JSON.parse(bad.out);
   assert.equal(parsed.ok, false);
-  assert.equal(parsed.findings[0].code, 'HFS_PATH_NO_SLOT');
+  assert.equal(parsed.findings[0].code, 'HFS_SLOT_UNDECLARED');
 
   const text = await cli(['check', '--repo', stray]);
-  assert.match(text.out, /HFS_PATH_NO_SLOT x1/);
+  assert.match(text.out, /HFS_SLOT_UNDECLARED x1/);
   assert.match(text.out, HAS_VIETNAMESE);
 
   const notGit = writeCleanRepo(BE);
@@ -309,8 +325,18 @@ test('sync is delegated to the packaged sync command: a repository without the g
   assert.equal((await cli(['sync'])).code === 0, false);
 });
 
+/** A package the repository "installed": its node_modules entry, the way `npm ci` leaves it. */
+const install = (dir, name, body) => {
+  const target = path.join(dir, 'node_modules', ...name.split('/'));
+  fs.mkdirSync(target, { recursive: true });
+  fs.writeFileSync(path.join(target, 'package.json'), JSON.stringify({ name, main: 'index.js' }));
+  fs.writeFileSync(path.join(target, 'index.js'), body);
+};
+
 test('the packaged entry point runs from a fresh process with no runtime checkout around it', () => {
   const dir = installPresets(installTypeScript(repoOf(BE)));
+  // A fresh process has no seams: the coverage exclusions come from the installed preset and the format check from the repository's own prettier.
+  install(dir, 'prettier', 'module.exports = { getFileInfo: async () => ({ ignored: true }), resolveConfig: async () => null, check: async () => true };');
   const run = spawnSync(process.execPath, [path.join(root, 'packages/hfs/bin/hfs.mjs'), 'check', '--repo', dir, '--json'], { encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   assert.equal(JSON.parse(run.stdout).ok, true);
@@ -478,10 +504,10 @@ test('--fast: slot checks run on the changed paths only, and the tree checks do 
   mkdir(dir, 'src/modules/business');
   git(dir, 'add', '-A', '--', '.', ':!node_modules');
   const fast = checkRepository({ repoRoot: dir, fast: true, machine: NO_FINDINGS_MACHINE });
-  assert.deepEqual(only(fast, 'HFS_PATH_NO_SLOT').map((f) => f.path), ['src/stray/new.ts'], 'the stray file already on main is not this change');
+  assert.deepEqual(only(fast, 'HFS_SLOT_UNDECLARED').map((f) => f.path), ['src/stray/new.ts'], 'the stray file already on main is not this change');
   assert.deepEqual(only(fast, 'HFS_EMPTY_DIR'), []);
   const full = checkRepository({ repoRoot: dir, machine: NO_FINDINGS_MACHINE });
-  assert.deepEqual(only(full, 'HFS_PATH_NO_SLOT').map((f) => f.path).sort(), ['src/stray/new.ts', 'src/stray/old.ts']);
+  assert.deepEqual(only(full, 'HFS_SLOT_UNDECLARED').map((f) => f.path).sort(), ['src/stray/new.ts', 'src/stray/old.ts']);
   assert.deepEqual(only(full, 'HFS_EMPTY_DIR').map((f) => f.path), ['src/modules/business']);
 
   const cliFast = await cli(['check', '--repo', dir, '--fast', '--json']);
@@ -499,6 +525,20 @@ test('--fast with the real machine: an uncomposed module already on main is not 
   const full = await cli(['check', '--repo', dir]);
   assert.equal(full.code, 1);
   assert.match(full.out, /BE_MODULE_NOT_COMPOSED x1/);
+});
+
+test('HFS_FORMAT: --fast never runs prettier, the full check runs the repository\'s own, and a repository with none is a refusal, never a pass', async () => {
+  const dir = branched();
+  put(dir, 'src/features/orders/application/place-order.use-case.ts', 'export const placed = 1;\n');
+  let calls = 0;
+  const counting = { ...FORMATTED, check: async () => { calls += 1; return true; } };
+  await cli(['check', '--repo', dir, '--fast'], { prettier: counting });
+  assert.equal(calls, 0);
+  await cli(['check', '--repo', dir, '--json'], { prettier: counting });
+  assert.ok(calls > 0);
+  const refused = await cli(['check', '--repo', dir], { prettier: undefined });
+  assert.equal(refused.code, 2);
+  assert.match(refused.err, /HFS_FORMAT_TOOL_MISSING/);
 });
 
 test('the CLI: machine findings fail the exit code and print with their Vietnamese why', async () => {

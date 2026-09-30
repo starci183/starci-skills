@@ -17,6 +17,11 @@ export const PRESETS = {
 export const BE = { hfs: 1, profile: 'be', project: 'demo', apps: [{ name: 'core', kind: 'api' }] };
 export const FE = { hfs: 1, profile: 'fe', project: 'demo', apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }] };
 
+/** The repository's `prettier` for a spec that is not about formatting: it judges every file formatted. */
+export const FORMATTED = Object.freeze({ getFileInfo: async () => ({ ignored: false, inferredParser: 'babel' }), resolveConfig: async () => null, check: async () => true });
+/** application-stacks.yaml as the standard shape wants it: a Sonar owned by the host. */
+export const STACKS_DECLARATION = ['schema: starci/application-stacks@1', 'services:', '  sonar:', '    provider: sonarqube', '    mode: local', '    stack:', '      owner: host', '      root: .claude/ext/sonar', '      environment: dev', ''].join('\n');
+
 const readmeOf = (name, profile) => [`# ${name}`, '', 'A demo repository for the hfs check specs.', '', '## Overview', '', 'Demo.', '', '## Stack', '', 'TypeScript.', '', '## Repository layout', '', 'apps and src.', '',
   '## Development', '', '```sh', 'npm ci', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm run test:unit', '```', '', ...(profile === 'be' ? ['## Work', '', 'Records live in `.starciwork`.', ''] : [])].join('\n');
 
@@ -37,11 +42,17 @@ export function writeCleanRepo(declaration, { declare = true, into, name = 'demo
   };
   put('package.json', `${JSON.stringify({ name: 'demo', private: true })}\n`);
   writeTargets(dir, renderTargets(declaration, PRESETS[declaration.profile]));
+  // The files a rule reads the content of that the render does not write: the stack declaration of a back end, the manifests of a front end.
+  if (declaration.profile === 'be') put('.starcistacks/application-stacks.yaml', STACKS_DECLARATION);
+  if (declaration.profile === 'fe') for (const app of declaration.apps) put(`apps/${app.name}/package.json`, `${JSON.stringify({ name: `@demo/${app.name}`, private: true, dependencies: { 'next-intl': '4.13.6' } }, null, 2)}
+`);
   for (const entry of resolver.requiredPaths().paths) if (!entry.path.endsWith('/')) put(entry.path, entry.path === 'hfs.json' ? '' : 'export {};\n');
   if (declaration.profile === 'fe') {
     const required = resolver.requiredPaths().paths.map((entry) => entry.path);
     for (const app of declaration.apps) {
       put(`apps/${app.name}/src/modules/i18n/messages/en.json`, '{}');
+      put(`apps/${app.name}/src/modules/i18n/messages/vi.json`, '{}');
+      put(`apps/${app.name}/src/proxy.ts`);
       // The machine judges reachability: every module entry imports its siblings and the app's route handler imports every module entry.
       const entries = required.filter((p) => p.startsWith(`apps/${app.name}/src/modules/`) && p.endsWith('/index.ts'));
       for (const entry of entries) {
