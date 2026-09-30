@@ -1,40 +1,35 @@
 /**
  * The rules that hold HFS errors and their handling (catalog R38 `BE_ERROR_HOME`, R40 `BE_LOGGER_REQUIRED`).
  *
- * TWO RULES, ONE HABIT: a failure is either named where its owner lives, or it is visible.
+ * One habit: a failure is either named where its owner lives, or it is visible. Every question is answered by TYPE and by
+ * the owner that declares the type (BE-CONVENTION 1.8, 3.1): no rule here matches a class, receiver or file by its name.
  *
- *   - `catch-must-account` refuses a `catch` (and a promise `.catch`) that swallows. A handler passes when it
- *     rethrows, when it logs through a logger port, or when it returns an outcome that carries the caught
- *     error as its `cause`. An empty handler, and one that returns `null` or `false` and moves on, turns a
- *     real failure into "nothing happened" - the payment error that became `unavailable` with no trace.
- *   - `error-home` keeps every error where its semantic owner is. A class deriving from `DomainError` lives in
- *     `<capability>/errors/`; the retired `exceptions/` capability, the retired `AbstractException` base, a bare
- *     `throw new Error(...)`, a framework `HttpException`, and a domain that throws a platform error are all
- *     refused. Expected business results are typed unions, not exceptions, and are outside this rule.
- *
- * This file replaces the Academy `AbstractException` laws: those rules pinned a central exception family that
- * HFS no longer has, and a rule that survives its standard as "off" is a rule nobody can trust.
+ *   - `catch-must-account` refuses a `catch` (and a promise `.catch`) that swallows. A handler passes when it rethrows,
+ *     returns an outcome carrying the caught error, or calls a method on a receiver typed `Logger` from `platform/logging`.
+ *   - `error-home` keeps every error class where its owner is: a class that derives from `DomainError` is declared only in
+ *     `errors/<capability>.error.ts` of its own owner, and a class that derives from the built-in `Error` some other way
+ *     (`AbstractException`, a framework `HttpException` subclass, a bare `extends Error`) is refused.
+ *   - `throw-domain-error` refuses a `throw` whose type does not derive from `DomainError` (`throw new Error`, the Nest
+ *     `HttpException` family, a thrown string or object), and a domain owner that throws a platform error outward.
+ *   - `error-family-shape` holds the one shape of `errors/<c>.error.ts`: a `<C>ErrorCode` string enum, a
+ *     `<C>_ERROR_KINDS: Record<<C>ErrorCode, ErrorKind>` table, and an empty `<C>Error extends DomainError<<C>ErrorCode>`.
+ *     Code uniqueness across the repository is the architecture machine's job, not a single file's.
  */
 import { some, walk } from "./lib/ast.mjs"
-import { isDeclarationFile, isTestLane, normalizePath } from "./lib/path.mjs"
-
-const LOG_METHODS = new Set(["error", "warn", "info", "debug", "log", "fatal", "verbose", "trace"])
-
-/** The object a member call is made on, as the last identifier of its chain (`this.logger.error` gives `logger`). */
-const receiverName = (callee) => {
-    const object = callee.object
-    if (object.type === "Identifier") return object.name
-    if (object.type === "MemberExpression" && !object.computed && object.property.type === "Identifier") return object.property.name
-    return null
-}
-
-/** `logger.error(...)`, `this.log.warn(...)`: a call on a logger port. `console` is never one. */
-const isLoggerCall = (node) => {
-    if (node.type !== "CallExpression" || node.callee.type !== "MemberExpression" || node.callee.computed) return false
-    if (node.callee.property.type !== "Identifier" || !LOG_METHODS.has(node.callee.property.name)) return false
-    const receiver = receiverName(node.callee)
-    return receiver !== null && receiver !== "console" && /log/i.test(receiver)
-}
+import {
+    derives,
+    derivesFromBuiltinError,
+    derivesFromDomainError,
+    errorHomeOf,
+    isOwnedBy,
+    isOwnedType,
+    ownerName,
+    partsOf,
+    typeOf,
+} from "./lib/declared.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { normalizePath } from "./lib/path.mjs"
+import { typed } from "./lib/types.mjs"
 
 /** True when `name` is used as a value in `node` (not just as the object of `name.message`). */
 const carriesCaught = (node, name) => {
@@ -42,45 +37,44 @@ const carriesCaught = (node, name) => {
     let carried = false
     walk(node, (child) => {
         if (child.type !== "Identifier" || child.name !== name) return
-        const parent = child.parent
-        if (parent?.type === "MemberExpression" && parent.object === child) return
+        let inner = child
+        while (inner.parent && (inner.parent.type === "TSAsExpression" || inner.parent.type === "TSNonNullExpression" || inner.parent.type === "TSTypeAssertion")) inner = inner.parent
+        const parent = inner.parent
+        if (parent?.type === "MemberExpression" && parent.object === inner) return
         carried = true
     })
     return carried
 }
 
-/**
- * Whether a handler block accounts for the failure.
- *
- * @param {object} body - The block of the handler.
- * @param {string | null} param - The caught error's name, when the handler names it.
- * @returns {boolean} True when it rethrows, logs, or returns an outcome carrying the error.
- */
-const accounts = (body, param) =>
-    some(
-        body,
-        (node) =>
-            node.type === "ThrowStatement" ||
-            isLoggerCall(node) ||
-            (node.type === "ReturnStatement" && node.argument !== null && carriesCaught(node.argument, param)),
-        { intoFunctions: false },
-    )
-
 const paramName = (fn) => (fn.params?.[0]?.type === "Identifier" ? fn.params[0].name : null)
 
-/** Every failure is rethrown, logged, or returned as an outcome carrying its cause. */
+/** Every failure is rethrown, logged through the logger port, or returned as an outcome carrying its cause. */
 export const catchMustAccount = {
     meta: {
         type: "problem",
-        docs: { description: "A catch rethrows, logs through a logger port, or returns an outcome that carries the cause." },
+        docs: { description: "A catch rethrows, calls a method on a `Logger` receiver, or returns an outcome that carries the cause." },
         schema: [],
         messages: {
-            empty: "This `catch` is empty, so the failure vanishes. Rethrow it, log it through the logger port, or return a typed outcome carrying it as `cause`.",
+            empty: "This `catch` is empty, so the failure vanishes. Rethrow it, log it through the `Logger` of `platform/logging`, or return a typed outcome carrying it as `cause`.",
             swallowed:
-                "This `catch` neither rethrows, logs, nor returns an outcome carrying the caught error, so the failure leaves no trace. Rethrow it, log it through the logger port, or return a typed outcome with `cause`.",
+                "This `catch` neither rethrows, logs through the `Logger` of `platform/logging`, nor returns an outcome carrying the caught error, so the failure leaves no trace. Rethrow it, log it through the `Logger`, or return a typed outcome with `cause`.",
         },
     },
     create(context) {
+        /** A call of a method on a receiver whose type is the `Logger` port declared by `platform/logging`. */
+        const isLoggerCall = (node) =>
+            node.type === "CallExpression" &&
+            node.callee.type === "MemberExpression" &&
+            isOwnedType(context, node.callee.object, "Logger", "platform", "logging")
+        const accounts = (body, param) =>
+            some(
+                body,
+                (node) =>
+                    node.type === "ThrowStatement" ||
+                    isLoggerCall(node) ||
+                    (node.type === "ReturnStatement" && node.argument !== null && carriesCaught(node.argument, param)),
+                { intoFunctions: false },
+            )
         const checkBlock = (reportNode, body, param) => {
             if (body.body.length === 0) context.report({ node: reportNode, messageId: "empty" })
             else if (!accounts(body, param)) context.report({ node: reportNode, messageId: "swallowed" })
@@ -104,93 +98,199 @@ export const catchMustAccount = {
     },
 }
 
-/** The framework exceptions that carry an HTTP status and no identity. */
-const FRAMEWORK_EXCEPTIONS = new Set([
-    "BadRequestException",
-    "NotFoundException",
-    "UnauthorizedException",
-    "ForbiddenException",
-    "InternalServerErrorException",
-    "HttpException",
-    "ConflictException",
-    "NotAcceptableException",
-    "RequestTimeoutException",
-    "GoneException",
-    "PayloadTooLargeException",
-    "UnsupportedMediaTypeException",
-    "UnprocessableEntityException",
-    "NotImplementedException",
-    "BadGatewayException",
-    "ServiceUnavailableException",
-    "GatewayTimeoutException",
-])
-
-const BUILTIN_ERRORS = new Set(["Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "EvalError", "URIError"])
-
-/** `<capability>/errors/` under a module tier or a feature, or the platform `errors` capability itself. */
-const ERRORS_HOME =
-    /\/src\/(?:modules\/(?:domain|platform|integrations)\/[^/]+|features\/[^/]+)\/(?:[^/]+\/)*errors\/|\/src\/modules\/platform\/errors\//
-const PLATFORM_ERRORS = /\/src\/modules\/platform\/errors\//
-const RETIRED_HOME = /\/src\/modules\/(?:domain|platform|integrations)\/exceptions\//
-const DOMAIN_TIER = /\/src\/modules\/domain\//
-const HEALTH_PROBE = /\/health(?:z)?\.controller\.ts$|\/health\//
-
-/** An error class is declared at its owner, extends `DomainError`, and is never a bare or framework throw. */
+/** An error class is declared at its owner in `errors/<capability>.error.ts` and derives from `DomainError`. */
 export const errorHome = {
     meta: {
         type: "problem",
-        docs: { description: "Errors live in `<capability>/errors/`, extend DomainError, and no bare or framework error escapes." },
+        docs: { description: "An error class derives from `DomainError` and is declared only in `errors/<capability>.error.ts` of its owner." },
         schema: [],
         messages: {
-            place: "`{{name}}` is an error of this capability but is declared outside its `errors/` folder. Move it to the `errors/` folder of the capability that owns its meaning.",
-            retiredHome: "This file sits in a retired `exceptions/` capability. Errors belong to the capability that owns their meaning, in its `errors/` folder.",
-            retiredBase: "`{{name}}` extends `AbstractException`, the retired central base. Extend `DomainError` from `platform/errors` and keep the class in its capability's `errors/`.",
-            mustExtendDomainError: "`{{name}}` extends the built-in `{{parent}}`. Extend `DomainError` so the error carries a stable `code` and a `cause`.",
-            bareError: "`throw new Error(...)` carries a sentence and no code, so nothing downstream can group or map it. Throw a `DomainError` subclass of the owning capability.",
-            framework: "`throw new {{name}}(...)` carries an HTTP status and no identity. Throw a `DomainError` subclass and let the transport map its code to a status.",
-            platformThrown: "A domain capability throws `{{name}}`, a platform error. Translate it into an error of this capability so platform details do not cross the boundary.",
+            place: "`{{name}}` derives from `DomainError` but is not declared in `errors/{{owner}}.error.ts` of its owner. An owner has one error class, in that file; move it there.",
+            mustExtendDomainError:
+                "`{{name}}` derives from the built-in `Error` without deriving from `DomainError` (`AbstractException`, a framework exception or a bare `extends Error`). Extend `DomainError` from `platform/errors` in the owner's `errors/<capability>.error.ts`.",
         },
     },
     create(context) {
-        const filename = normalizePath(context.filename || context.getFilename())
-        if (isDeclarationFile(filename)) return {}
-        const listeners = {}
-        if (RETIRED_HOME.test(filename)) {
-            listeners.Program = (node) => context.report({ node, messageId: "retiredHome" })
+        const hfs = hfsOf(context)
+        const filename = normalizePath(context.filename)
+        const check = (node) => {
+            if (!node.id) return
+            const type = typeOf(context, node.id)
+            if (!type) return
+            const isDomainErrorHost = node.id.name === "DomainError" && isOwnedBy(hfs, filename, "platform", "errors")
+            if (isDomainErrorHost) return
+            if (derivesFromDomainError(context, type)) {
+                const home = errorHomeOf(hfs, filename)
+                const owner = ownerName(hfs.ownerOf(filename))
+                if (!home || home.capability !== owner) context.report({ node: node.id, messageId: "place", data: { name: node.id.name, owner: owner ?? "<capability>" } })
+            } else if (derivesFromBuiltinError(context, type)) {
+                context.report({ node: node.id, messageId: "mustExtendDomainError", data: { name: node.id.name } })
+            }
         }
-        if (isTestLane(filename)) return listeners
-        const inHome = ERRORS_HOME.test(filename)
-        const platformImports = new Set()
-        listeners.ImportDeclaration = (node) => {
-            if (typeof node.source.value !== "string" || !/(?:^|\/)platform\//.test(node.source.value)) return
-            for (const specifier of node.specifiers) platformImports.add(specifier.local.name)
-        }
-        listeners.ClassDeclaration = (node) => {
-            const parent = node.superClass
-            if (!node.id || !parent || parent.type !== "Identifier") return
-            if (parent.name === "AbstractException") {
-                context.report({ node: parent, messageId: "retiredBase", data: { name: node.id.name } })
-            } else if (BUILTIN_ERRORS.has(parent.name)) {
-                if (!PLATFORM_ERRORS.test(filename)) {
-                    context.report({ node: parent, messageId: "mustExtendDomainError", data: { name: node.id.name, parent: parent.name } })
+        return { ClassDeclaration: check, ClassExpression: check }
+    },
+}
+
+/** The variable a thrown identifier names is the parameter of a `catch` clause or of a promise `.catch` handler. */
+const isCaughtValue = (context, identifier) => {
+    for (let scope = context.sourceCode.getScope(identifier); scope; scope = scope.upper) {
+        const variable = scope.set.get(identifier.name)
+        if (!variable) continue
+        return variable.defs.some((definition) => {
+            if (definition.type === "CatchClause") return true
+            if (definition.type !== "Parameter") return false
+            const fn = definition.node
+            const call = fn.parent
+            return (
+                (fn.type === "ArrowFunctionExpression" || fn.type === "FunctionExpression") &&
+                call?.type === "CallExpression" &&
+                call.arguments[0] === fn &&
+                call.callee.type === "MemberExpression" &&
+                !call.callee.computed &&
+                call.callee.property.type === "Identifier" &&
+                call.callee.property.name === "catch" &&
+                fn.params[0] === definition.name
+            )
+        })
+    }
+    return false
+}
+
+/** Every thrown value is a `DomainError` of the owner that throws it. */
+export const throwDomainError = {
+    meta: {
+        type: "problem",
+        docs: { description: "A thrown value's type derives from `DomainError`; a domain owner never throws a platform error outward." },
+        schema: [],
+        messages: {
+            bareError: "`throw new Error(...)` carries a sentence and no code, so nothing downstream can group or map it. Throw the `<C>Error` of the owning capability with one of its codes.",
+            framework: "`throw new {{name}}(...)` carries an HTTP status and no identity. Throw the `<C>Error` of the owning capability; the one filter of `platform/errors` maps its code to a status.",
+            notDomainError: "This `throw` does not throw a `DomainError`. Throw the `<C>Error` of the owning capability with one of its codes, or return an `Outcome` and let the transport unwrap it.",
+            platformThrown: "A domain owner throws `{{name}}`, an error of a platform owner. Translate it into the error of this capability so platform details do not cross the boundary.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        const filename = normalizePath(context.filename)
+        const { checker } = typed(context)
+        const isHttpException = (type) => derives(checker, type, (name, file) => name === "HttpException" && /\/node_modules\/@nestjs\/common\//.test(file))
+        return {
+            ThrowStatement(node) {
+                const thrown = node.argument
+                if (!thrown) return
+                if (thrown.type === "Identifier" && isCaughtValue(context, thrown)) return
+                const type = typeOf(context, thrown)
+                const parts = partsOf(type)
+                const foreign = parts.find((part) => !derivesFromDomainError(context, part))
+                if (parts.length === 0 || foreign) {
+                    if (foreign && isHttpException(foreign)) {
+                        context.report({ node: thrown, messageId: "framework", data: { name: foreign.getSymbol()?.name ?? "HttpException" } })
+                    } else if (foreign && derivesFromBuiltinError(context, foreign)) {
+                        context.report({ node: thrown, messageId: "bareError" })
+                    } else {
+                        context.report({ node: thrown, messageId: "notDomainError" })
+                    }
+                    return
                 }
-            } else if (/Error$/.test(parent.name) && !inHome) {
-                context.report({ node: node.id, messageId: "place", data: { name: node.id.name } })
-            }
+                if (hfs.tierOf(filename) !== "domain") return
+                for (const part of parts) {
+                    const declarations = part.getSymbol()?.declarations ?? []
+                    const platform = declarations.find((declaration) => hfs.tierOf(String(declaration.getSourceFile().fileName).replace(/\\/g, "/")) === "platform")
+                    if (platform) {
+                        context.report({ node: thrown, messageId: "platformThrown", data: { name: part.getSymbol().name } })
+                        return
+                    }
+                }
+            },
         }
-        listeners.ThrowStatement = (node) => {
-            const thrown = node.argument
-            if (!thrown || thrown.type !== "NewExpression" || thrown.callee.type !== "Identifier") return
-            const name = thrown.callee.name
-            if (name === "Error") {
-                context.report({ node: thrown, messageId: "bareError" })
-            } else if (FRAMEWORK_EXCEPTIONS.has(name) && !HEALTH_PROBE.test(filename)) {
-                context.report({ node: thrown, messageId: "framework", data: { name } })
-            } else if (DOMAIN_TIER.test(filename) && name !== "DomainError" && /Error$/.test(name) && platformImports.has(name)) {
-                context.report({ node: thrown, messageId: "platformThrown", data: { name } })
-            }
+    },
+}
+
+const words = (kebab) => kebab.split("-")
+const pascal = (kebab) => words(kebab).map((word) => word[0].toUpperCase() + word.slice(1)).join("")
+const upperSnake = (kebab) => words(kebab).join("_").toUpperCase()
+
+/** The exported declaration inside an `export ...` statement, else null. */
+const exportedDeclaration = (statement) => (statement.type === "ExportNamedDeclaration" ? statement.declaration : null)
+
+/** The one shape of an owner's `errors/<capability>.error.ts`. */
+export const errorFamilyShape = {
+    meta: {
+        type: "problem",
+        docs: { description: "`errors/<c>.error.ts` exports one code enum, one `Record<Code, ErrorKind>` table and one empty error class." },
+        schema: [],
+        messages: {
+            noCode: "This file must export `enum {{pascal}}ErrorCode` with one member per code of the capability.",
+            extra: "`{{name}}` is an extra export. An error family file exports only `{{pascal}}ErrorCode`, `{{upper}}_ERROR_KINDS` and `{{pascal}}Error`.",
+            memberValue: "`{{member}}` must be a string literal `{{upper}}_<WHAT>` in upper snake case with no `_EXCEPTION` or `_ERROR` suffix.",
+            noKinds: "This file must export `const {{upper}}_ERROR_KINDS: Record<{{pascal}}ErrorCode, ErrorKind>` so the compiler proves every code has a kind.",
+            kindsType: "`{{upper}}_ERROR_KINDS` must be annotated `Record<{{pascal}}ErrorCode, ErrorKind>` with `ErrorKind` from `platform/errors`; only that annotation makes the table exhaustive.",
+            noClass: "This file must export `class {{pascal}}Error extends DomainError<{{pascal}}ErrorCode> {}`, the one error class of the capability.",
+            classShape: "`{{pascal}}Error` must extend `DomainError<{{pascal}}ErrorCode>` from `platform/errors` and declare nothing beyond its JSDoc: no body, no per-case subclass.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        const home = errorHomeOf(hfs, normalizePath(context.filename))
+        if (!home) return {}
+        const data = { pascal: pascal(home.capability), upper: upperSnake(home.capability) }
+        const codeName = `${data.pascal}ErrorCode`
+        const kindsName = `${data.upper}_ERROR_KINDS`
+        const className = `${data.pascal}Error`
+        return {
+            Program(program) {
+                const declared = program.body.map(exportedDeclaration).filter(Boolean)
+                const enums = declared.filter((declaration) => declaration.type === "TSEnumDeclaration")
+                const code = enums.find((declaration) => declaration.id.name === codeName)
+                if (!code) context.report({ node: program, loc: { line: 1, column: 0 }, messageId: "noCode", data })
+                else {
+                    const prefix = new RegExp(`^${data.upper}_[A-Z0-9]+(?:_[A-Z0-9]+)*$`)
+                    for (const member of code.body?.members ?? code.members) {
+                        const value = member.initializer
+                        const text = value?.type === "Literal" && typeof value.value === "string" ? value.value : null
+                        if (text === null || !prefix.test(text) || /_(?:EXCEPTION|ERROR)$/.test(text)) {
+                            context.report({ node: member, messageId: "memberValue", data: { ...data, member: member.id.name ?? member.id.value } })
+                        }
+                    }
+                }
+                const kinds = declared.find((declaration) => declaration.type === "VariableDeclaration" && declaration.declarations.some((d) => d.id.name === kindsName))
+                if (!kinds) context.report({ node: program, loc: { line: 1, column: 0 }, messageId: "noKinds", data })
+                else {
+                    const declarator = kinds.declarations.find((d) => d.id.name === kindsName)
+                    const annotation = declarator.id.typeAnnotation?.typeAnnotation
+                    const args = annotation?.typeArguments?.params ?? annotation?.typeParameters?.params ?? []
+                    const isRecord = annotation?.type === "TSTypeReference" && annotation.typeName.type === "Identifier" && annotation.typeName.name === "Record"
+                    const keyOk = args[0]?.type === "TSTypeReference" && args[0].typeName.type === "Identifier" && args[0].typeName.name === codeName
+                    const valueOk = args.length === 2 && args[1].type === "TSTypeReference" && isOwnedType(context, args[1], "ErrorKind", "platform", "errors")
+                    if (!isRecord || args.length !== 2 || !keyOk || !valueOk) context.report({ node: declarator.id, messageId: "kindsType", data })
+                }
+                const cls = declared.find((declaration) => declaration.type === "ClassDeclaration" && declaration.id?.name === className)
+                if (!cls) context.report({ node: program, loc: { line: 1, column: 0 }, messageId: "noClass", data })
+                else {
+                    const parent = cls.superClass
+                    const args = cls.superTypeArguments?.params ?? cls.superTypeParameters?.params ?? []
+                    const parentOk = parent && isOwnedType(context, parent, "DomainError", "platform", "errors")
+                    const argOk = args.length === 1 && args[0].type === "TSTypeReference" && args[0].typeName.type === "Identifier" && args[0].typeName.name === codeName
+                    if (!parentOk || !argOk || cls.body.body.length > 0) context.report({ node: cls.id, messageId: "classShape", data })
+                }
+                for (const statement of program.body) {
+                    const declaration = exportedDeclaration(statement)
+                    const isExport = statement.type === "ExportNamedDeclaration" || statement.type === "ExportDefaultDeclaration" || statement.type === "ExportAllDeclaration"
+                    if (!isExport) continue
+                    const name =
+                        declaration?.type === "VariableDeclaration"
+                            ? declaration.declarations.map((d) => d.id.name).find((n) => n !== kindsName)
+                            : declaration?.id?.name
+                    if (declaration === null || declaration === undefined) {
+                        context.report({ node: statement, messageId: "extra", data: { ...data, name: statement.type } })
+                    } else if (name !== undefined && name !== codeName && name !== kindsName && name !== className) {
+                        context.report({ node: declaration, messageId: "extra", data: { ...data, name } })
+                    } else if (name === undefined && declaration.type !== "VariableDeclaration") {
+                        context.report({ node: declaration, messageId: "extra", data: { ...data, name: declaration.type } })
+                    }
+                }
+            },
         }
-        return listeners
     },
 }
 
@@ -198,10 +298,14 @@ export const errorHome = {
 export const rules = {
     "catch-must-account": catchMustAccount,
     "error-home": errorHome,
+    "throw-domain-error": throwDomainError,
+    "error-family-shape": errorFamilyShape,
 }
 
-/** Both start at error: HFS has no baseline, and the migration lanes clear the debt before a repository adopts them. */
+/** All start at error: HFS has no baseline, and the migration lanes clear the debt before a repository adopts them. */
 export const recommended = {
     "starci-be/catch-must-account": "error",
     "starci-be/error-home": "error",
+    "starci-be/throw-domain-error": "error",
+    "starci-be/error-family-shape": "error",
 }
