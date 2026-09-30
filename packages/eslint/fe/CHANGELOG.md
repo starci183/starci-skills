@@ -2,6 +2,13 @@
 
 ## 6.0.0 - unreleased (lanes C0, F0)
 
+- New law `status-colors` (R61 `FE_STYLE_TOKEN_ONLY`): `status-text-uses-soft-foreground` refuses a class that paints text, an icon or a
+  text decoration with a solid status tone (`text-success`, `fill-danger`, `stroke-warning`, `decoration-info`, with any variant, opacity or
+  `!`), read from `className`/`class`, `cn()`/`clsx()` arguments, conditionals, arrays, constants and `classes` entries. The soft pair
+  (`text-<tone>-soft-foreground`, `bg-<tone>-soft`), a solid fill with its own ink (`bg-<tone> text-<tone>-foreground`) and solid borders,
+  rings and outlines pass. The tones come from `lib/status-tones.generated.mjs`, generated from the grammar by
+  `packages/stylelint` (`npm run vocabulary`), never listed in the rule.
+
 - **Breaking: `starciFeConfig({ hfs: loadHfs(import.meta.url) })` replaces `starciFeConfig({ layout })`.** The factory reads the
   repository's `hfs.json` and the shipped slot manifest (`runtime/`, refreshed by `packages/hfs/scripts/sync-runtime.mjs`), lints
   every app's and every workspace package's `src/` with typed linting (`parserOptions.projectService`) and the e2e tree

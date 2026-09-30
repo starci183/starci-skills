@@ -40,6 +40,7 @@ import { recommended as shapeSlotRecommended, rules as shapeSlotRules } from "./
 import { recommended as sizeBudgetRecommended, rules as sizeBudgetRules } from "./size-and-state-budget.mjs"
 import { recommended as sizeGrowthRecommended, rules as sizeGrowthRules } from "./size-growth.mjs"
 import { recommended as specQualityRecommended, rules as specQualityRules } from "./spec-quality.mjs"
+import { recommended as statusColorsRecommended, rules as statusColorsRules } from "./status-colors.mjs"
 import { recommended as splitRecommended, rules as splitRules } from "./the-split.mjs"
 import { recommended as tokensRecommended, rules as tokensRules } from "./tokens.mjs"
 import { recommended as transportRecommended, rules as transportRules } from "./transport.mjs"
@@ -81,6 +82,7 @@ const CONTRIBUTIONS = [
   { law: "size-and-state-budget", rules: sizeBudgetRules, recommended: sizeBudgetRecommended },
   { law: "size-growth", rules: sizeGrowthRules, recommended: sizeGrowthRecommended },
   { law: "spec-quality", rules: specQualityRules, recommended: specQualityRecommended },
+  { law: "status-colors", rules: statusColorsRules, recommended: statusColorsRecommended },
   { law: "the-split", rules: splitRules, recommended: splitRecommended },
   { law: "tokens", rules: tokensRules, recommended: tokensRecommended },
   { law: "translation", rules: translationRules, recommended: translationRecommended },

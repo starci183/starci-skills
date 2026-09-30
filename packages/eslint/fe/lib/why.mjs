@@ -96,6 +96,11 @@ export const why = {
     vi: "`<file>` dùng giá trị màu/độ dài thô (`<what>`). Màu và khoảng cách chỉ đến từ token grammar; màu thương hiệu chỉ ở `brand.css`.",
     fixVi: "Dùng lớp hoặc biến token của grammar; giá trị màu chỉ khai trong `modules/brand/brand.css`.",
   },
+  "status-text-uses-soft-foreground": {
+    code: "FE_STYLE_TOKEN_ONLY",
+    vi: "`<file>` tô chữ hoặc icon bằng tông trạng thái đặc (`<what>`, ví dụ `text-success`). Tông đặc là màu nền; dùng làm màu chữ nó đọc dưới 4.5:1 trên nền trang.",
+    fixVi: "Đổi thành cặp mềm: `text-<tông>-soft-foreground` (kèm `bg-<tông>-soft` nếu nằm trên nền nhạt); tông đặc chỉ dùng với `bg-<tông>` và `text-<tông>-foreground`.",
+  },
   "no-native-form-control": {
     code: "FE_NATIVE_FORM_CONTROL",
     vi: "`<tag>` thô ở `<file>`. Dùng renderer của grammar.",
