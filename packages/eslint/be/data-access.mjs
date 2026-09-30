@@ -10,7 +10,9 @@
  *   connection. A lookalike (`InjectFooEntityManager`) or a bare `InjectEntityManager()` is not one.
  * - `named-entity-manager-only` - no property injection of an `EntityManager`, `DataSource` or `QueryRunner`; a
  *   `DataSource` or `QueryRunner` is injected only in the platform database capability and the migrate app; no
- *   `getRepository(...)` on a manager or data source.
+ *   `getRepository(...)` on a manager or data source; and outside those places no type reference, awaited value,
+ *   or `provide:` token is a `DataSource` or `QueryRunner` (a wrapper service that exposes one is the same door), and no
+ *   class receives a wrapper class that exposes one.
  * - `no-injected-repository` - no `@InjectRepository`, no `Repository<T>` type, no `TypeOrmModule.forFeature`.
  * - `require-entity-table-name` - `@Entity()` names its table.
  * - `no-outer-manager-in-transaction` - inside `<manager>.transaction(async (tx) => ...)` every call uses `tx`; any other
@@ -20,16 +22,19 @@
  *   `integrations/**`, `HttpClient` or `MessagePublisher`, and no `fetch`.
  */
 
+import ts from "typescript"
 import { walk } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import {
     declaredInjectorNames,
     inDatabaseCapability,
     inMigrateApp, inTestBootstrap,
+    implementsMigration,
     infraTypeOf,
     injectionSites,
+    isMigrationFile,
 } from "./lib/persistence.mjs"
-import { isPackageType, typeOrigins } from "./lib/types.mjs"
+import { isPackageType, originsOfType, typed, typeOrigins } from "./lib/types.mjs"
 
 /** The `typeorm` repository types no class receives. */
 const REPOSITORY_TYPES = ["Repository", "TreeRepository", "MongoRepository"]
@@ -72,6 +77,12 @@ export const namedEntityManagerOnly = {
                 "`{{type}}` is injected as a class property. Property injection hides the dependency from the constructor and the app module. Receive the named-injector `EntityManager` as a constructor parameter.",
             infra:
                 "`{{type}}` is injected here. A `DataSource` or `QueryRunner` is built and held only by the platform database capability, the migrate app and the test world in `src/tests/world`; specs take `world.db.<connection>`; everything else injects the shared `EntityManager` through its named injector and calls it directly.",
+            exposed:
+                "`{{type}}` is written here outside the platform database capability, the migrate app and the test world. A wrapper service that returns, holds or hands out a connection is the same door as injecting it: the connection is opened and held only by `platform/database`, and everything else calls the shared EntityManager through its named injector.",
+            token:
+                "This provider is bound to a `{{type}}`. A token that resolves to a connection object is a second door to the database: only `platform/database`, the migrate app and the test world provide one.",
+            wrapper:
+                "`{{wrapper}}` exposes a `{{type}}` through `{{member}}`, and this class receives it. A connection wrapper is not a service dependency: inject the shared EntityManager with its named injector and call it directly.",
             getRepository:
                 "`.getRepository(...)` binds a handle to ONE entity and hides which connection it came from. Call the shared manager directly: `manager.find(Entity, ...)`, `manager.save(Entity, ...)`, `tx.insert(Entity, ...)`.",
         },
@@ -79,15 +90,100 @@ export const namedEntityManagerOnly = {
     create(context) {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
-        const mayHoldConnections = inDatabaseCapability(hfs, filename) || inMigrateApp(hfs, filename) || inTestBootstrap(hfs, filename)
+        const mayHoldConnections = inDatabaseCapability(hfs, filename) || inMigrateApp(hfs, filename) || inTestBootstrap(hfs, filename) || isMigrationFile(hfs, filename)
+        const CONNECTION_TYPES = new Set(["DataSource", "QueryRunner"])
+        /** The connection type (DataSource / QueryRunner) a value or written type is declared as, else null. */
+        const connectionTypeOf = (node) => {
+            const type = infraTypeOf(context, node)
+            return type !== null && CONNECTION_TYPES.has(type) ? type : null
+        }
+        /** The connection type of a checker type (awaited), else null. */
+        const connectionOfType = (type) => {
+            if (!type) return null
+            const { checker } = typed(context)
+            const awaited = checker.getAwaitedType(type) ?? type
+            const origin = originsOfType(checker, awaited).find((entry) => entry.module === "typeorm" && CONNECTION_TYPES.has(entry.name))
+            return origin ? origin.name : null
+        }
+        /** True when the node sits inside a class that implements typeorm's `MigrationInterface` (it receives a `QueryRunner` by contract). */
+        const insideMigrationClass = (node) => {
+            for (let current = node.parent; current; current = current.parent) {
+                if ((current.type === "ClassDeclaration" || current.type === "ClassExpression") && implementsMigration(context, current)) return true
+            }
+            return false
+        }
+        /** The annotation of the constructor parameter or class property that contains this type node, else null. */
+        const siteAnnotationOf = (node) => {
+            for (let current = node.parent; current; current = current.parent) {
+                if (current.type !== "TSTypeAnnotation") continue
+                const owner = current.parent
+                const isProperty = owner?.type === "PropertyDefinition"
+                const isParam = owner?.type === "Identifier" && (owner.parent?.type === "TSParameterProperty"
+                    || (owner.parent?.type === "FunctionExpression" && owner.parent.parent?.type === "MethodDefinition" && owner.parent.parent.kind === "constructor"))
+                return isProperty || isParam ? current.typeAnnotation : null
+            }
+            return null
+        }
+        /** The member of a repository-declared class type that hands out a connection: `{ member, type, wrapper }`, else null. */
+        const exposedConnection = (annotation) => {
+            const { checker, toTs } = typed(context)
+            const tsNode = toTs(annotation)
+            if (!tsNode) return null
+            const type = checker.getTypeFromTypeNode(tsNode)
+            const symbol = type.getSymbol()
+            const declaration = symbol && symbol.flags & ts.SymbolFlags.Class ? symbol.declarations?.[0] : null
+            if (!declaration || declaration.getSourceFile().fileName.replace(/\\/g, "/").includes("/node_modules/")) return null
+            for (const property of checker.getPropertiesOfType(type)) {
+                if (property.declarations?.some((entry) => ts.getCombinedModifierFlags(entry) & (ts.ModifierFlags.Private | ts.ModifierFlags.Protected))) continue
+                const memberType = checker.getTypeOfSymbolAtLocation(property, tsNode)
+                for (const candidate of [memberType, ...memberType.getCallSignatures().map((signature) => signature.getReturnType())]) {
+                    const found = connectionOfType(candidate)
+                    if (found) return { member: property.getName(), type: found, wrapper: symbol.getName() }
+                }
+            }
+            return null
+        }
         return {
             ...injectionSites(({ node, kind, annotation }) => {
                 if (!annotation) return
                 const type = infraTypeOf(context, annotation)
-                if (!type) return
+                if (!type) {
+                    const wrapper = kind === "param" && !mayHoldConnections ? exposedConnection(annotation) : null
+                    if (wrapper) context.report({ node, messageId: "wrapper", data: wrapper })
+                    return
+                }
                 if (kind === "property") context.report({ node, messageId: "property", data: { type } })
                 else if (type !== "EntityManager" && !mayHoldConnections) context.report({ node, messageId: "infra", data: { type } })
             }),
+            TSTypeReference(node) {
+                if (mayHoldConnections) return
+                const type = connectionTypeOf(node)
+                if (!type || insideMigrationClass(node)) return
+                const site = siteAnnotationOf(node)
+                if (site && infraTypeOf(context, site)) return
+                context.report({ node, messageId: "exposed", data: { type } })
+            },
+            AwaitExpression(node) {
+                if (mayHoldConnections || insideMigrationClass(node)) return
+                const { checker, toTs } = typed(context)
+                const tsNode = toTs(node)
+                const type = tsNode ? connectionOfType(checker.getTypeAtLocation(tsNode)) : null
+                if (type) context.report({ node, messageId: "exposed", data: { type } })
+            },
+            Property(node) {
+                if (mayHoldConnections || node.parent?.type !== "ObjectExpression" || node.computed) return
+                if ((node.key.type === "Identifier" ? node.key.name : node.key.value) !== "provide") return
+                const { checker, toTs } = typed(context)
+                for (const sibling of node.parent.properties) {
+                    if (sibling.type !== "Property" || sibling.computed || sibling.key.type !== "Identifier") continue
+                    const tsNode = toTs(sibling.value)
+                    if (!tsNode) continue
+                    const type = checker.getTypeAtLocation(tsNode)
+                    const provided = sibling.key.name === "useValue" ? type : sibling.key.name === "useFactory" ? type.getCallSignatures()[0]?.getReturnType() : null
+                    const found = connectionOfType(provided)
+                    if (found) context.report({ node, messageId: "token", data: { type: found } })
+                }
+            },
             CallExpression(node) {
                 const callee = node.callee
                 if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return

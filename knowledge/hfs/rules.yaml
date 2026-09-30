@@ -779,7 +779,7 @@ rules:
       - {kind: eslint-be, id: json-parse-needs-guard}
   - id: R77
     code: "BE_QUERY_IN_LOOP"
-    law: "A repository, entity-manager or query-builder read does not run once per element of a loop; read once before the loop by key list."
+    law: "A read through the shared EntityManager does not run once per element of a loop; read once before the loop by key list."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_QUERY_IN_LOOP"]
@@ -827,7 +827,7 @@ rules:
       - {kind: eslint-be, id: no-external-call-in-transaction}
   - id: R83
     code: "BE_UNNAMED_DATA_ACCESS"
-    law: "The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, `apps/migrate` and the test world `src/tests/world`, whose `world.db.<connection>` EntityManager the specs use."
+    law: "The database is reached through the shared EntityManager, injected as a constructor parameter by the `Inject<Conn>EntityManager()` of a declared connection and called directly; no bare `@InjectEntityManager()`, `getRepository`, repository, QueryBuilder or property injection; a `DataSource` or `QueryRunner` only in `platform/database`, `apps/migrate` and the test world `src/tests/world`, whose `world.db.<connection>` EntityManager the specs use. No class outside an application handler, a domain service or a platform persistence capability takes, holds or returns an `EntityManager`, `Repository`, `DataSource` or `QueryRunner` (a repository under any name, a store, dao, gateway or persistence wrapper included), no exported function whose first parameter is an `EntityManager` (a statement module), and no wrapper return type, awaited value or `provide:` token hands out a connection object."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_UNNAMED_DATA_ACCESS"]
@@ -835,6 +835,7 @@ rules:
       - {kind: eslint-be, id: named-entity-manager-only}
       - {kind: eslint-be, id: no-injected-repository}
       - {kind: eslint-be, id: must-inject-entity-manager}
+      - {kind: eslint-be, id: no-repository-class}
       - {kind: eslint-be, id: no-eager-relation}
       - {kind: eslint-be, id: no-outer-manager-in-transaction}
       - {kind: eslint-be, id: require-entity-table-name}
@@ -849,7 +850,7 @@ rules:
       - {kind: eslint-be, id: connection-map}
   - id: R85
     code: "BE_RAW_INJECT"
-    law: "Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there, and every such token is exported so a spec can provide it."
+    law: "Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there, and every such token is exported so a spec can provide it; a constructor parameter of a provider is typed by a class or carries an `Inject<Thing>()`, never a bare primitive, `Map`, union or interface."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_RAW_INJECT"]
@@ -858,6 +859,7 @@ rules:
       - {kind: eslint-be, id: injector-shape}
       - {kind: eslint-be, id: injector-type-match}
       - {kind: eslint-be, id: infra-needs-injector}
+      - {kind: eslint-be, id: provider-param-token}
       - {kind: eslint-be, id: no-module-ref}
       - {kind: eslint-be, id: no-forward-ref}
       - {kind: eslint-be, id: no-string-token}
@@ -872,7 +874,7 @@ rules:
       - {kind: eslint-be, id: sql-owner}
   - id: R87
     code: "BE_CQRS_SHAPE"
-    law: "The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`, where `process` is one `return this.<service>.<method>(...)` and the handler injects only `*Service` classes and the Logger (no EntityManager, no branch, no loop, no second call); no use-case classes, forwarder services or in-process events; a message and an injected dependency are `readonly`."
+    law: "The application layer is CQRS: typed `Command<R>`/`Query<R>` messages carrying one `params`, handlers extending `ICQRSHandler` that override `process`, where `process` is one `return this.<service>.<method>(...)` and the handler injects only `*Service` classes and the Logger (no EntityManager, no branch, no loop, no second call); no use-case classes, forwarder services or in-process events (`EventBus`, `EventEmitter`, an RxJS `Subject`, a stored listener list); a message and an injected dependency are `readonly`."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_CQRS_SHAPE", "BE_READONLY_BOUNDARY"]
@@ -901,7 +903,7 @@ rules:
       - {kind: eslint-be, id: em-injection-slots}
   - id: R89
     code: "BE_SOURCE_FORM"
-    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type."
+    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_SOURCE_FORM", "BE_PUBLIC_CONTRACT_FORM"]
@@ -916,6 +918,7 @@ rules:
       - {kind: eslint-be, id: no-const-enum}
       - {kind: eslint-be, id: no-inline-object-type}
       - {kind: eslint-be, id: no-inline-param-type}
+      - {kind: eslint-be, id: no-test-double-in-source}
       - {kind: eslint-be, id: no-default-export}
       - {kind: hfs, id: source-suffix, at: scripts/lib/hfs-check.mjs}
       - {kind: eslint-be, id: source-suffix}

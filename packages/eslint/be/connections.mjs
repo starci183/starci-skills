@@ -28,14 +28,12 @@ import {
     infraTypeOf,
     injectionSites,
     injectorNameOf,
+    mayHoldEntityManager,
 } from "./lib/persistence.mjs"
 import { isPackageType, originsOfType, typed, typeOrigins } from "./lib/types.mjs"
 
 /** The `@nestjs/typeorm` calls that build a second door to a connection. */
 const RAW_CONNECTION_CALLS = new Set(["InjectEntityManager", "InjectDataSource", "getEntityManagerToken"])
-
-/** The platform capabilities that own a `persistence/` and so may hold an `EntityManager`. */
-const PERSISTENCE_CAPABILITIES = ["database", "inbox", "outbox", "lease"]
 
 /** The initializers that can be an injector factory; a plain value is never typed here. */
 const FUNCTION_LIKE = new Set(["ArrowFunctionExpression", "FunctionExpression", "CallExpression"])
@@ -207,15 +205,6 @@ export const oneConnectionPerDatabase = {
             },
         }
     },
-}
-
-/** Whether a class in this file may receive an `EntityManager`. */
-const mayHoldEntityManager = (hfs, file) => {
-    const found = hfs.classify(file)
-    const base = baseNameOf(file)
-    if (found.slot === "be.feature.application") return base.endsWith(".handler.ts")
-    if (found.slot === "be.domain") return base.endsWith(".service.ts")
-    return found.slot === "be.platform" && PERSISTENCE_CAPABILITIES.includes(found.bindings?.capability)
 }
 
 /** An EntityManager is injected in an application handler, a domain service or a platform persistence capability only. */

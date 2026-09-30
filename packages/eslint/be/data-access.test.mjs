@@ -79,6 +79,15 @@ test("R83: no property injection, no injected DataSource or QueryRunner outside 
             { filename: E2E_WORLD, code: constructorOf("private readonly dataSource: DataSource") },
             // a getRepository that is not typeorm's
             { filename: HANDLER, code: "declare const registry: { getRepository(name: string): string }\nregistry.getRepository('orders')" },
+            // the database capability may return and provide the connection
+            { filename: DATABASE_MODULE, code: `${TYPEORM}export class Wrapper { open(): Promise<DataSource> { return Promise.resolve(new DataSource({ type: "postgres" })) } }\nexport const p = { provide: "X", useFactory: () => new DataSource({ type: "postgres" }) }` },
+            // a service receiving a class that hands out no connection
+            { filename: SERVICE, code: `${TYPEORM}class Clock { now(): number { return 1 } }\nclass S { constructor(private readonly clock: Clock) {} }` },
+            // a manager written as a type is the handler's and service's business, not a connection
+            { filename: SERVICE, code: `${TYPEORM}export const run = (manager: EntityManager): Promise<unknown> => manager.query("select 1")` },
+            // a migration receives a QueryRunner by contract, as a class and in a migration file
+            { filename: SERVICE, code: `import { MigrationInterface, QueryRunner } from "typeorm"\nexport class CreateOrders implements MigrationInterface {\n up(runner: QueryRunner): Promise<void> { return runner.query("select 1").then(() => undefined) }\n down(runner: QueryRunner): Promise<void> { return runner.query("select 1").then(() => undefined) } }` },
+            { filename: at("src/modules/domain/order/persistence/migrations/1730000000000-create-orders.ts"), code: `${TYPEORM}export const up = (runner: QueryRunner) => runner.query("select 1")` },
         ],
         invalid: [
             { filename: HANDLER, code: `${TYPEORM}class S { @InjectPrimaryEntityManager() private readonly entityManager: EntityManager }`, errors: [{ messageId: "property" }] },
@@ -87,21 +96,34 @@ test("R83: no property injection, no injected DataSource or QueryRunner outside 
             { filename: SERVICE, code: constructorOf("@InjectDataSource() private readonly source: DataSource"), errors: [{ messageId: "infra" }] },
             { filename: SERVICE, code: constructorOf("private readonly runner: QueryRunner"), errors: [{ messageId: "infra" }] },
             // an alias of the type is the same type
-            { filename: SERVICE, code: `${TYPEORM}type Source = DataSource\nclass S { constructor(private readonly source: Source) {} }`, errors: [{ messageId: "infra" }] },
+            { filename: SERVICE, code: `${TYPEORM}type Source = DataSource\nclass S { constructor(private readonly source: Source) {} }`, errors: [{ messageId: "exposed" }, { messageId: "infra" }] },
             { filename: HANDLER, code: `${TYPEORM}declare const manager: EntityManager\nmanager.getRepository(OrderEntity)`, errors: [{ messageId: "getRepository" }] },
-            { filename: HANDLER, code: `${TYPEORM}declare const source: DataSource\nsource.getRepository(OrderEntity)`, errors: [{ messageId: "getRepository" }] },
+            { filename: HANDLER, code: `${TYPEORM}declare const source: DataSource\nsource.getRepository(OrderEntity)`, errors: [{ messageId: "exposed" }, { messageId: "getRepository" }] },
             // a renamed receiver is still the manager
             { filename: HANDLER, code: `${TYPEORM}declare const manager: EntityManager\nconst db = manager\ndb.getRepository(OrderEntity)`, errors: [{ messageId: "getRepository" }] },
             // a spec is not exempt
-            { filename: HANDLER_SPEC, code: `${TYPEORM}declare const source: DataSource\nsource.getRepository(OrderEntity)`, errors: [{ messageId: "getRepository" }] },
+            { filename: HANDLER_SPEC, code: `${TYPEORM}declare const source: DataSource\nsource.getRepository(OrderEntity)`, errors: [{ messageId: "exposed" }, { messageId: "getRepository" }] },
             { filename: HANDLER_SPEC, code: constructorOf("private readonly source: DataSource"), errors: [{ messageId: "infra" }] },
             // an e2e spec takes the fixture's EntityManager, never a DataSource of its own
             { filename: E2E_SPEC, code: constructorOf("private readonly source: DataSource"), errors: [{ messageId: "infra" }] },
             { filename: E2E_SPEC, code: `${TYPEORM}declare const source: DataSource
-source.getRepository(OrderEntity)`, errors: [{ messageId: "getRepository" }] },
+source.getRepository(OrderEntity)`, errors: [{ messageId: "exposed" }, { messageId: "getRepository" }] },
             // the bootstrap may hold a DataSource but still never binds a repository
             { filename: E2E_WORLD, code: `${TYPEORM}declare const source: DataSource
 source.getRepository(OrderEntity)`, errors: [{ messageId: "getRepository" }] },
+            // a wrapper service that exposes a DataSource is the same door: its return type, an awaited use, a class that receives it
+            { filename: SERVICE, code: `${TYPEORM}export class ConnectionService { connect(): Promise<DataSource> { return Promise.reject(new Error("x")) } }`, errors: [{ messageId: "exposed" }] },
+            { filename: SERVICE, code: `${TYPEORM}declare const wrapper: { connect(): Promise<DataSource> }
+export const use = async () => { const source = await wrapper.connect(); return source }`, errors: [{ messageId: "exposed" }, { messageId: "exposed" }] },
+            { filename: SERVICE, code: `${TYPEORM}export const acquire = (): DataSource | null => null`, errors: [{ messageId: "exposed" }] },
+            { filename: SERVICE, code: `${TYPEORM}export class Wrapper { constructor(private readonly source: DataSource | null) {} }`, errors: [{ messageId: "infra" }] },
+            { filename: HANDLER, code: `${TYPEORM}export class ConnectionService { open(): Promise<DataSource> { return Promise.reject(new Error("x")) } }
+export class H { constructor(private readonly connection: ConnectionService) {} }`, errors: [{ messageId: "exposed" }, { messageId: "wrapper" }] },
+            // a token bound to a connection, by value or by factory, outside the database capability
+            { filename: SERVICE, code: `${TYPEORM}declare const source: DataSource
+export const p = { provide: "POSTGRES_DATA_SOURCE", useValue: source }`, errors: [{ messageId: "exposed" }, { messageId: "token" }] },
+            { filename: SERVICE, code: `${TYPEORM}export const p = { provide: "POSTGRES_DATA_SOURCE", useFactory: () => new DataSource({ type: "postgres" }) }`, errors: [{ messageId: "token" }] },
+            { filename: SERVICE, code: `${TYPEORM}export const p = { provide: "POSTGRES_DATA_SOURCE", useFactory: async () => new DataSource({ type: "postgres" }) }`, errors: [{ messageId: "token" }] },
         ],
     })
 })
