@@ -38,6 +38,7 @@ import { assetsOf, flag, list, readYaml, sha256File, slash, stateKey, workRootOf
 import { readJsonFile } from '../lib/json.mjs';
 import { DRAW_REVIEW_DECISIONS, DRAW_REVIEW_KIND, reviewShapesOf } from './draw-review.mjs';
 import { defaultGrammarRoot, grammarComponentNames, readBrandRecord } from '../checks/brand.mjs';
+import { text } from '../lib/stack-declaration.mjs';
 
 export const DRAW_FEEDBACK_SCHEMA = 'starci/draw-feedback@1';
 /** The contract change that made owner feedback a runtime loop (modules/kernel/contract-changes.yaml). */
@@ -63,7 +64,6 @@ const GRAMMAR_WORDS = /\b(grammar|DNA|variant|new component|missing component|an
 const KNOWLEDGE_WORDS = /\bknowledge\b|\bguideline\b|kiến thức|quy tắc chung|nguyên tắc chung/i;
 const OWNER = 'owner';
 
-const text = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
 /** A note's stable id: the ask it answered, its place and its words. A rubric check id and a brief anchor. */
 export const noteIdOf = (dispatchId, index, words) => `ON-${sha256(`${dispatchId ?? '-'}|${index}|${words}`).slice(0, 10)}`;

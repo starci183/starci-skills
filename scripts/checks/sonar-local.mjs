@@ -15,6 +15,7 @@ import {posixPath} from '../lib/path-key.mjs';
 import {runGit,unquoteDiffPath} from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
 import {loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
+import {text} from '../lib/stack-declaration.mjs';
 
 /**
  * Product Sonar analysis runs against a LOCAL SonarQube (owner ruling 2026-09-24). Where it is comes from
@@ -119,7 +120,6 @@ export function sourceHostStackDir(){
 
 const DECLARATION='application-stacks.yaml';
 
-const text=value=>typeof value==='string'&&value.trim()?value.trim():null;
 
 /**
  * Find the stack declaration that governs a repository: its own .starcistacks/application-stacks.yaml,

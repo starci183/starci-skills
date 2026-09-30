@@ -511,7 +511,6 @@ rules:
       - {kind: eslint-be, id: unit-test-colocated}
       - {kind: eslint-be, id: e2e-no-schema-work}
       - {kind: eslint-be, id: e2e-fakes-external-only}
-      - {kind: machine, id: test-kind-retired, at: scripts/checks/architecture/hfs.mjs}
   - id: R48
     code: "BE_SPEC_QUALITY"
     title_vi: "Spec đọc mã nguồn hoặc ép kiểu mock"
