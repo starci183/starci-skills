@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { trackedFiles } from '../scripts/lib/hfs-check.mjs';
 import { main } from '../packages/hfs/bin/hfs.mjs';
 import { SyncError } from '../packages/hfs/sync/index.mjs';
@@ -67,7 +68,17 @@ test('the CLI reports the block drift with its Vietnamese why, and a repository 
 
 // ------------------------------------------------------------------------------------------------ R19 HFS_FORMAT
 
-const prettierOf = path.resolve(import.meta.dirname, '..', 'examples', 'shape-slot', 'node_modules', 'prettier');
+test('HFS_FORMAT: the runtime declares and resolves its pinned prettier from this checkout', () => {
+  const runtime = path.resolve(import.meta.dirname, '..');
+  const manifest = JSON.parse(fs.readFileSync(path.join(runtime, 'package.json'), 'utf8'));
+  assert.equal(manifest.devDependencies.prettier, '3.9.6');
+  const installed = createRequire(import.meta.url).resolve('prettier/package.json');
+  assert.ok(!path.relative(runtime, installed).startsWith('..'), `prettier must resolve from this checkout: ${installed}`);
+  assert.ok(installed.includes(`${path.sep}node_modules${path.sep}prettier${path.sep}`));
+  assert.equal(JSON.parse(fs.readFileSync(installed, 'utf8')).version, '3.9.6');
+});
+
+const prettierOf = path.dirname(createRequire(import.meta.url).resolve('prettier/package.json'));
 
 /** A tracked repository whose node_modules holds the runtime's own prettier, the way `npm ci` would have installed it. */
 function withPrettier(files) {
