@@ -33,6 +33,7 @@ import { starciLocalRoot } from '../../engine/machine-db.mjs';
 import { isLinkLike } from './safe-remove.mjs';
 import { rotateLog, LOG_CAP_BYTES } from './self-reload.mjs';
 import { artifactHoldOf } from './artifact-hold.mjs';
+import { realpathOr } from './fs-kind.mjs';
 
 /** Spec-agreed window and cap. logMaxAgeMs: runtimes.yaml allocation.housekeeping.logMaxAgeMs (14d). */
 export const DEFAULT_LOG_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -45,7 +46,6 @@ const BUSY = new Set(['EBUSY', 'EPERM', 'EACCES']);
 const SKIP_DIRS = new Set(['.git', 'node_modules']);
 const LIST_MAX = 500;
 
-const realOf = (p) => { try { return fs.realpathSync.native(p); } catch { return null; } };
 const sizeOf = (p) => { try { return fs.statSync(p).size; } catch { return null; } };
 
 /**
@@ -105,7 +105,7 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
         if (isLinkLike(p, { parentReal, stat: st })) { skip(p, 'link'); continue; }
         if (SKIP_DIRS.has(e.name)) { skip(p, `excluded-dir:${e.name}`); continue; }
         dirs?.push(p);
-        walk(p, realOf(p) ?? parentReal, onFile, dirs);
+        walk(p, realpathOr(p) ?? parentReal, onFile, dirs);
       } else onFile(p, st);
     }
   };
@@ -114,7 +114,7 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
     let st;
     try { st = fs.lstatSync(resolved); } catch { return; }   // absent root: nothing to do
     if (isLinkLike(resolved, { stat: st }) || !st.isDirectory()) { skip(resolved, 'link-or-not-a-dir'); return; }
-    walk(resolved, realOf(resolved) ?? resolved, onFile, dirs);
+    walk(resolved, realpathOr(resolved) ?? resolved, onFile, dirs);
   };
 
   const starciFile = (p, st) => {

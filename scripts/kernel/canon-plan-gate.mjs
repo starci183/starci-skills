@@ -9,11 +9,11 @@
 // moves all landed on another slice (no fix target: it is cut again, never enqueued to block).
 import fs from 'node:fs';
 import { canonCutPlanOf } from './cut-seam.mjs';
+import { sameOrUnder } from '../lib/path-key.mjs';
 
 const norm = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, '');
-const within = (file, root) => file === root || file.startsWith(`${root}/`);
 /** An owned path `q` (maybe repository-prefixed, e.g. nivo-fe/apps/...) covers the scan-relative path `p`. */
-const covers = (q, p) => { const a = norm(q), b = norm(p); return within(b, a) || a.endsWith(`/${b}`) || [...a.split('/').keys()].some((i) => within(b, a.split('/').slice(i).join('/'))); };
+const covers = (q, p) => { const a = norm(q), b = norm(p); return sameOrUnder(b, a) || a.endsWith(`/${b}`) || [...a.split('/').keys()].some((i) => sameOrUnder(b, a.split('/').slice(i).join('/'))); };
 
 /** A canon slice's payload: cut + params.canonFamilies, and not its wire leg. */
 export const isCanonSlice = ({ cut = null, params = null } = {}) => Boolean(cut && String(params?.canonFamilies ?? '').trim() && params?.canonWire !== true);
@@ -37,7 +37,7 @@ export function unfixableSlicesOf(plan) {
   return plan.slices.flatMap((slice) => {
     if (slice.grants.length) return [];
     const moves = plan.wires.filter((w) => w.wave === slice.wave).flatMap((w) => w.reasons)
-      .filter((r) => { const moving = /\s(\S+) -> /.exec(r)?.[1]; return moving && slice.paths.some((root) => within(norm(moving), norm(root))); });
+      .filter((r) => { const moving = /\s(\S+) -> /.exec(r)?.[1]; return moving && slice.paths.some((root) => sameOrUnder(norm(moving), norm(root))); });
     return moves.length ? [{ ordinal: slice.ordinal, moves }] : [];
   });
 }

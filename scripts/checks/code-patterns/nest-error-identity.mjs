@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
-import { sameOrUnder } from '../common.mjs';
+import { sameOrUnder } from '../../lib/path-key.mjs';
 import { IDENTIFIER, assignedBefore, codePatternContract, declaredType, exact, exportedIdentity, extendsIdentity, identityInProgram, importedBinding, issueSink,
   projectBinding, readPackageManifest, repositoryPath, repositoryRelative, scriptReport, symbolAt, unchangedOrigin, unwrapValue as unwrap } from './common.mjs';
 

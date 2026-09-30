@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import {spawn, spawnSync} from 'node:child_process';
-import {sha256} from '../../engine/digest.mjs';
+import {sha256, sha256File} from '../../engine/digest.mjs';
 import {fileURLToPath} from 'node:url';
 import {renameOver} from '../lib/rename-over.mjs';
 import {packageAt} from '../lib/package-at.mjs';
@@ -40,7 +40,6 @@ const launchEnv=prepared=>Object.fromEntries([...SAFE_ENV,...prepared.session.la
 // How a manifest command is spawned: scripts/uat/launch.mjs (re-exported for existing callers).
 export {launchFor};
 
-export const digestFile=file=>sha256(fs.readFileSync(file));
 const canonical=value=>{
   if(Array.isArray(value))return value.map(canonical);
   if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])]));
@@ -148,16 +147,16 @@ export function inspectPreparedRequest({requestPath,receiptPath,allowExistingRec
   for(const script of session.scripts){
     const file=resolvePrepared(root,script.path,`script ${script.flowId}`);
     need(fs.existsSync(file),`prepared script is missing: ${file}`);
-    assertDigest(digestFile(file),script.sha256,`script ${script.flowId}`);
+    assertDigest(sha256File(file),script.sha256,`script ${script.flowId}`);
   }
   const cleanupFile=resolvePrepared(root,request.cleanup.path,'cleanup plan');
   const redactionFile=resolvePrepared(root,request.redaction.path,'redaction policy');
   need(fs.existsSync(cleanupFile),'cleanup plan is missing'); need(fs.existsSync(redactionFile),'redaction policy is missing');
   validate('cleanup',readYaml(cleanupFile));validate('redaction',readYaml(redactionFile));
   try{for(const rule of readYaml(redactionFile).rules)new RegExp(rule.pattern,'giu');}catch(error){throw Object.assign(new Error(`redaction schema: invalid regular expression (${error.message})`),{code:'assisted-uat-schema-invalid'});}
-  assertDigest(digestFile(cleanupFile),request.cleanup.sha256,'request cleanup plan');
+  assertDigest(sha256File(cleanupFile),request.cleanup.sha256,'request cleanup plan');
   assertDigest(request.cleanup.sha256,session.bindings.cleanupPlanDigest,'session cleanup plan');
-  assertDigest(digestFile(redactionFile),request.redaction.sha256,'request redaction policy');
+  assertDigest(sha256File(redactionFile),request.redaction.sha256,'request redaction policy');
   assertDigest(request.redaction.sha256,session.bindings.redactionPolicyDigest,'session redaction policy');
   const flowById=new Map(request.flows.map(flow=>[flow.id,flow]));
   for(const gate of request.humanGates){
@@ -278,7 +277,7 @@ const finishReceipt=(prepared,state,data,completionSignal,launchExit)=>{
     const file=path.resolve(prepared.root,artifact.path);
     if(!fs.existsSync(file)||!inside(prepared.runDir,file)){redactionFailures.push(`artifact missing or outside run: ${artifact.path}`);continue;}
     if(!artifact.redacted){redactionFailures.push(`artifact lacks redaction attestation: ${artifact.path}`);continue;}
-    artifacts.push({...artifact,sha256:digestFile(file),redacted:true});
+    artifacts.push({...artifact,sha256:sha256File(file),redacted:true});
   }
   for(const required of prepared.session.artifacts.requiredMedia)if(!artifacts.some(artifact=>artifact.mediaType===required))redactionFailures.push(`required media missing: ${required}`);
   const flowEvents=new Map(data.steps.map(step=>[`${step.flowId}\0${step.id}`,step]));

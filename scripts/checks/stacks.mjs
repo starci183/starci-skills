@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {runGit} from '../lib/git.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
+import {slash} from '../lib/path-key.mjs';
 
 const RESULT='starci/application-stacks-check@1';
 const STACKS_DIR='.starcistacks';
@@ -10,7 +11,6 @@ const MAX_INPUT_BYTES=4*1024*1024;
 const SCHEMA_ID='starci/application-stacks@1';
 const RUNBOOK_COMMANDS=['prepare','doctor','up','status','logs','down','verification'];
 const PLAINTEXT_SECRET_PATTERN=/\.(key|pem|p12|pfx)$/i;
-const slash=value=>String(value??'').replaceAll('\\','/');
 const inside=(root,target)=>{const rel=path.relative(path.resolve(root),path.resolve(target));return rel===''||(!rel.startsWith('..')&&!path.isAbsolute(rel));};
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
 const sensitive=/pass(word)?|secret|token|credential|private[_-]?key|api[_-]?key/i;

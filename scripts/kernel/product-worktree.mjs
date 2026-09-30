@@ -54,6 +54,7 @@ import { brokenImports } from './import-scan.mjs';
 import { checkVerdictOf } from '../reconcile/check-verdict.mjs';
 import { launchFor } from '../uat/launch.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
+import { realpathOr } from '../lib/fs-kind.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -228,7 +229,6 @@ export function nodeModulesDirs(repoRoot, { maxDepth = 3 } = {}) {
   return out;
 }
 
-const realOf = (p) => { try { return fs.realpathSync.native(p); } catch { return null; } };
 const junction = (target, link) => { fs.symlinkSync(target, link, 'junction'); };
 
 /**
@@ -240,10 +240,10 @@ const junction = (target, link) => { fs.symlinkSync(target, link, 'junction'); }
 export function buildOverlay({ repoRoot, worktree, source = repoRoot, settings = productSettings() }) {
   // `source`: the install the overlay mirrors - the main checkout, or the workflow worktree once its deps unit installed
   // there (a package.json/lockfile change of the workflow, not yet in main).
-  const rootReal = realOf(source) ?? path.resolve(source);
+  const rootReal = realpathOr(source) ?? path.resolve(source);
   const out = { ok: true, dirs: [], links: 0, copied: 0, workspace: [], lockHash: lockHashOf(source, settings), source: path.resolve(source), errors: [] };
   const mapTarget = (entryAbs) => {
-    const real = realOf(entryAbs);
+    const real = realpathOr(entryAbs);
     if (!real) return null;
     const rel = path.relative(rootReal, real);
     const inside = rel && !rel.startsWith('..') && !path.isAbsolute(rel);
@@ -280,7 +280,7 @@ export function buildOverlay({ repoRoot, worktree, source = repoRoot, settings =
     const src = path.join(source, dir, 'node_modules');
     const wtDir = path.join(worktree, dir);
     if (!fs.existsSync(wtDir)) continue; // a workspace dir the worktree's commit does not have
-    fill(realOf(src) ?? src, path.join(wtDir, 'node_modules'), dir ? `${dir}/node_modules/` : 'node_modules/');
+    fill(realpathOr(src) ?? src, path.join(wtDir, 'node_modules'), dir ? `${dir}/node_modules/` : 'node_modules/');
     out.dirs.push(dir);
   }
   fs.mkdirSync(path.join(worktree, 'node_modules'), { recursive: true });
@@ -340,8 +340,8 @@ export function verifyResolution(worktree, overlay = null) {
   const workspace = overlay?.workspace ?? [];
   const outside = [];
   for (const w of workspace) {
-    const real = realOf(path.join(worktree, ...w.name.split('/')));
-    if (!real || !insidePath(real, realOf(worktree) ?? worktree)) outside.push({ name: w.name, real });
+    const real = realpathOr(path.join(worktree, ...w.name.split('/')));
+    if (!real || !insidePath(real, realpathOr(worktree) ?? worktree)) outside.push({ name: w.name, real });
   }
   let node = null;
   const first = workspace.find((w) => w.name.startsWith('node_modules/'));
@@ -350,7 +350,7 @@ export function verifyResolution(worktree, overlay = null) {
     const r = spawnSync(process.execPath, ['-e', `try{process.stdout.write(require('fs').realpathSync(require.resolve(${JSON.stringify(`${pkg}/package.json`)})))}catch(e){try{process.stdout.write(require.resolve(${JSON.stringify(pkg)}))}catch(f){process.stdout.write('!'+f.code)}}`],
       { cwd: worktree, encoding: 'utf8', windowsHide: true, timeout: 30_000 });
     const got = String(r.stdout ?? '').trim();
-    node = { pkg, resolved: got, inside: !got.startsWith('!') && insidePath(got, realOf(worktree) ?? worktree) };
+    node = { pkg, resolved: got, inside: !got.startsWith('!') && insidePath(got, realpathOr(worktree) ?? worktree) };
     if (!node.inside && !got.startsWith('!ERR_PACKAGE_PATH_NOT_EXPORTED')) outside.push({ name: pkg, real: got, via: 'require.resolve' });
   }
   return { ok: outside.length === 0, checked: workspace.length, outside, node };

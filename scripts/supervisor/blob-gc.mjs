@@ -173,7 +173,7 @@ export async function planBlobGc({ env = process.env, now = Date.now(), retentio
 
 /**
  * The writer functions --apply calls (lanes a3-1 / a3-2 own them). machine-db.mjs: openMachine, startGcRun,
- * addGcMarks, addGcItem, finishGcRun, recordArchive, markBlobArchived, pruneSeatSnapshots (fn(m, args)). ledger-db.mjs:
+ * addGcMarks, addGcItem, finishGcRun, recordArchive, markMachineBlobArchived, pruneSeatSnapshots (fn(m, args)). ledger-db.mjs:
  * openLedger, markBlobArchived(db, {sha256, archivedAt, archiveRef}), pruneAttemptSnapshots(db, {now, passMs, failMs})
  * - the ledger two are run inside the handle's transaction.
  */
@@ -182,7 +182,7 @@ export async function gcWriters() {
   let machine = null, ledger = null;
   try { machine = await import('../../engine/machine-db.mjs'); } catch { missing.push('engine/machine-db.mjs'); }
   try { ledger = await import('../../engine/ledger-db.mjs'); } catch { missing.push('engine/ledger-db.mjs'); }
-  for (const fn of ['openMachine', 'startGcRun', 'addGcMarks', 'addGcItem', 'finishGcRun', 'recordArchive', 'markBlobArchived', 'pruneSeatSnapshots']) if (machine && typeof machine[fn] !== 'function') missing.push(`machine-db.mjs ${fn}`);
+  for (const fn of ['openMachine', 'startGcRun', 'addGcMarks', 'addGcItem', 'finishGcRun', 'recordArchive', 'markMachineBlobArchived', 'pruneSeatSnapshots']) if (machine && typeof machine[fn] !== 'function') missing.push(`machine-db.mjs ${fn}`);
   for (const fn of ['openLedger', 'markBlobArchived', 'pruneAttemptSnapshots']) if (ledger && typeof ledger[fn] !== 'function') missing.push(`ledger-db.mjs ${fn}`);
   return { ok: missing.length === 0, missing, machine, ledger };
 }
@@ -247,7 +247,7 @@ export async function runBlobGc({ apply = false, env = process.env, now = Date.n
         if (!ref || !fs.existsSync(zip)) { items.push({ sha: it.sha, action: 'refuse', reason: `no verified archive (${ref ?? 'none'})` }); continue; }
         for (const name of it.rows) {
           if (it.archiveRef) continue;
-          if (name === 'machine') w.machine.markBlobArchived(machine, { sha256: it.sha, archivedAt: now, archiveRef: ref });
+          if (name === 'machine') w.machine.markMachineBlobArchived(machine, { sha256: it.sha, archivedAt: now, archiveRef: ref });
           else inLedger(name, w.ledger.markBlobArchived, { sha256: it.sha, archivedAt: now, archiveRef: ref });
         }
         let removed = false, error = null;

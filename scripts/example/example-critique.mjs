@@ -7,6 +7,7 @@ import {walk} from '../checks/check-example-work.mjs';
 import {computeDerived} from './example-derive.mjs';
 import {indexInlineCriteria, repoRootFor, resolveRecordRef} from './example-ownership.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
+import { canonicalJSON } from '../../engine/canonical-json.mjs';
 
 /**
  * `.starciwork` can already answer "what is done, what is stale, what is blocked" (example-derive.mjs).
@@ -621,14 +622,6 @@ function buildCritiqueMarkdown(critique) {
 const CRITIQUE_MD_REL = '_derived/critique.md';
 const CRITIQUE_YAML_REL = '_derived/critique.yaml';
 
-/** Deterministic JSON, keys sorted at every level - reproduced locally exactly as example-derive.mjs's own
- * `canonicalJSON` is, for the same reason (comparing two structures without importing that module's whole
- * write path for one helper). */
-function canonicalJSON(value) {
-  if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(',')}]`;
-  if (isPlainObject(value)) return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonicalJSON(value[k])}`).join(',')}}`;
-  return JSON.stringify(value);
-}
 
 export function runCritique(workRoot, {write} = {}) {
   if (write && [CRITIQUE_YAML_REL, CRITIQUE_MD_REL].some(rel => !isProductPath(rel))) {

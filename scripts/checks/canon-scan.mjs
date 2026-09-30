@@ -30,9 +30,8 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { checkArchitecture } from './architecture/index.mjs';
-import { posixPath } from '../lib/path-key.mjs';
+import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { WORKTREES_IGNORE_GLOBS } from '../lib/worktree-exclude.mjs';
-import { sameOrUnder } from './common.mjs';
 import { emitCheckOutput } from './output.mjs';
 
 export const CANON_FINDINGS = 'starci/canon-findings@1';

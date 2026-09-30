@@ -9,7 +9,7 @@ export const loopFileOfRef = (ref) => { const dir = ref?.sha256 ? bundleDir(ref.
 /** How a loop citation is named in findings and gate evidence. */
 export const loopLabelOf = (ref) => (ref?.sha256 ? `blob:${ref.sha256.slice(0, 12)}` : null);
 import path from 'node:path';
-import {sha256} from '../../engine/digest.mjs';
+import {sha256, sha256File} from '../../engine/digest.mjs';
 import { assetsOf, list, slash } from '../work/work-io.mjs';
 import { isFile } from '../lib/fs-kind.mjs';
 
@@ -17,7 +17,6 @@ export const LOOP_SCHEMA = 'starci/draw-loop@1';
 export const DRAW_LOOP_MISSING = 'DRAW_LOOP_MISSING';
 
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
-const shaOfFile = (f) => sha256(fs.readFileSync(f));
 
 const PART_ROLES = new Set(['direction-content', 'direction']);
 const viewportFromName = (file) => { const m = /--(\d{2,5})x(\d{2,5})--/.exec(path.basename(file)); return m ? { width: Number(m[1]), height: Number(m[2]) } : null; };
@@ -50,7 +49,7 @@ export function loopCoverageFindings(recordDir, record, repo) {
     const loop = loopFile ? readJson(loopFile) : null;
     if (loop?.schema !== LOOP_SCHEMA) { out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} names the loop blob:${ref.sha256}, which is not a draw-loop bundle in the blob store` }); continue; }
     let sha = null;
-    try { sha = shaOfFile(p.png); } catch { sha = null; }
+    try { sha = sha256File(p.png); } catch { sha = null; }
     if (!list(loop.installed).some((i) => i.sha256 === sha)) out.push({ code: DRAW_LOOP_MISSING, path: at, detail: `${p.asset.path} is not a part its loop blob:${ref.sha256} installed (finish installs the best round's parts; a part edited after is redrawn through the loop)` });
   }
   return out;

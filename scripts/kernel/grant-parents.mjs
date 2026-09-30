@@ -8,18 +8,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ownedPathPlacements, projectBinding } from './target-repo.mjs';
+import { isDir } from '../lib/fs-kind.mjs';
 
 const slash = (p) => String(p).replace(/\\/g, '/');
 const isGlobOrDir = (p) => /(^|\/)\*{1,2}$/.test(p) || /\/$/.test(p);
 const tidy = (p) => slash(p).replace(/(^|\/)\*{1,2}$/, '').replace(/\/+$/, '').replace(/^\.\//, '') || '.';
-const isDirectory = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 
 export const newModulesOf = (payload) => (Array.isArray(payload?.new_modules) ? payload.new_modules : []);
 
 /** The closest existing directory at or above `rel` inside `base`, as a repo-relative path ('.' is the repo root). */
 function closestExisting(base, rel) {
   let cur = rel;
-  while (cur && cur !== '.' && !isDirectory(path.join(base, cur))) cur = path.posix.dirname(cur);
+  while (cur && cur !== '.' && !isDir(path.join(base, cur))) cur = path.posix.dirname(cur);
   return cur || '.';
 }
 
@@ -38,12 +38,12 @@ export function grantParentViolations({ placements, newModules = [], workDir = '
     const declared = modules.find((m) => rel === m || rel.startsWith(`${m}/`));
     if (declared) {
       const parent = path.posix.dirname(declared);
-      if (parent === '.' || isDirectory(path.join(place.base, parent))) continue;
+      if (parent === '.' || isDir(path.join(place.base, parent))) continue;
       const closest = closestExisting(place.base, parent);
       out.push({ owned: place.owned, base: place.base, dir: parent, closest, atRoot: closest === '.', newModule: declared });
       continue;
     }
-    if (dir === '.' || isDirectory(path.join(place.base, dir))) continue;
+    if (dir === '.' || isDir(path.join(place.base, dir))) continue;
     const closest = closestExisting(place.base, dir);
     out.push({ owned: place.owned, base: place.base, dir, closest, atRoot: closest === '.' });
   }

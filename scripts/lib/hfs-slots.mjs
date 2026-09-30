@@ -14,6 +14,7 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { braceVariants } from './glob.mjs';
 import { posixPath } from './path-key.mjs';
+import { isPlainObject } from '../../engine/plain-object.mjs';
 
 export const HFS_MANIFEST_FILE = 'knowledge/hfs/slots.yaml';
 export const HFS_DECLARATION_FILE = 'hfs.json';
@@ -36,7 +37,6 @@ const PRESENCE = ['required', 'optional', 'opt-in', 'forbidden'];
 const TRACKED = ['tracked', 'ignored', 'external'];
 const TESTS = ['unit-beside', 'e2e', 'none'];
 const PROFILES = ['be', 'fe'];
-const isMap = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const strList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0);
 
 // ------------------------------------------------------------------------------------------------ patterns
@@ -119,17 +119,17 @@ const fail = (code, message, details) => { throw new HfsSlotsError(code, message
 /** Shape problems of a parsed manifest, in the words of modules/schemas/hfs-slots.schema.yaml. */
 function manifestShapeProblems(m) {
   const bad = [];
-  if (!isMap(m)) return ['the manifest is not a map'];
+  if (!isPlainObject(m)) return ['the manifest is not a map'];
   const allowed = new Set(['schema', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'appKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers']);
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
   if (!/^starci\/hfs-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/hfs-slots@<major>');
   if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
-  if (!isMap(m.versioning) || !['patch', 'minor', 'major', 'retire', 'pins'].every((k) => typeof m.versioning[k] === 'string')) bad.push('versioning needs patch, minor, major, retire and pins text');
+  if (!isPlainObject(m.versioning) || !['patch', 'minor', 'major', 'retire', 'pins'].every((k) => typeof m.versioning[k] === 'string')) bad.push('versioning needs patch, minor, major, retire and pins text');
   if (JSON.stringify(m.presenceValues) !== JSON.stringify(PRESENCE)) bad.push(`presenceValues must be ${PRESENCE.join(', ')}`);
   if (JSON.stringify(m.trackedValues) !== JSON.stringify(TRACKED)) bad.push(`trackedValues must be ${TRACKED.join(', ')}`);
   if (JSON.stringify(m.testValues) !== JSON.stringify(TESTS)) bad.push(`testValues must be ${TESTS.join(', ')}`);
   for (const key of ['appKinds', 'tiers']) {
-    if (!isMap(m[key])) { bad.push(`${key} must be a map with be and fe`); continue; }
+    if (!isPlainObject(m[key])) { bad.push(`${key} must be a map with be and fe`); continue; }
     for (const extra of Object.keys(m[key])) if (!PROFILES.includes(extra)) bad.push(`${key}.${extra} is not a profile`);
     for (const profile of PROFILES) if (!(profile in m[key])) bad.push(`${key}.${profile} is missing`);
   }
@@ -138,17 +138,17 @@ function manifestShapeProblems(m) {
     if (kinds !== undefined && (!Array.isArray(kinds) || !kinds.length || !kinds.every((k) => NAME.test(String(k))) || new Set(kinds).size !== kinds.length)) bad.push(`appKinds.${profile} must be a non-empty list of unique names`);
     const tiers = m.tiers?.[profile];
     if (tiers === undefined) continue;
-    if (!isMap(tiers) || !Object.keys(tiers).length) { bad.push(`tiers.${profile} must be a non-empty map`); continue; }
+    if (!isPlainObject(tiers) || !Object.keys(tiers).length) { bad.push(`tiers.${profile} must be a non-empty map`); continue; }
     for (const [tier, def] of Object.entries(tiers)) {
       if (!NAME.test(tier)) bad.push(`tiers.${profile}.${tier} is not a tier name`);
-      if (!isMap(def) || !Array.isArray(def.mayImport) || !def.mayImport.every((t) => NAME.test(String(t)))) bad.push(`tiers.${profile}.${tier}.mayImport must be a list of tier names`);
+      if (!isPlainObject(def) || !Array.isArray(def.mayImport) || !def.mayImport.every((t) => NAME.test(String(t)))) bad.push(`tiers.${profile}.${tier}.mayImport must be a list of tier names`);
       for (const key of Object.keys(def ?? {})) if (!['mayImport', 'acyclic', 'lowerLayerOnly'].includes(key)) bad.push(`tiers.${profile}.${tier}.${key} is not a tier field`);
     }
   }
-  const blockOk = (v) => isMap(v) && Number.isInteger(v.lines) && v.lines >= 2 && Number.isInteger(v.tokens) && v.tokens >= 1 && Object.keys(v).length === 2;
-  const fileLinesOk = (v) => isMap(v) && Number.isInteger(v.soft) && v.soft >= 1 && typeof v.hardGrowth === 'boolean' && Object.keys(v).length === 2;
+  const blockOk = (v) => isPlainObject(v) && Number.isInteger(v.lines) && v.lines >= 2 && Number.isInteger(v.tokens) && v.tokens >= 1 && Object.keys(v).length === 2;
+  const fileLinesOk = (v) => isPlainObject(v) && Number.isInteger(v.soft) && v.soft >= 1 && typeof v.hardGrowth === 'boolean' && Object.keys(v).length === 2;
   const rp = m.ruleParams;
-  if (!isMap(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isMap(rp[p]))) bad.push('ruleParams must be a map with be and fe');
+  if (!isPlainObject(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isPlainObject(rp[p]))) bad.push('ruleParams must be a map with be and fe');
   else {
     if (!(strList(rp.be.globalModules) && new Set(rp.be.globalModules).size === rp.be.globalModules.length) || !fileLinesOk(rp.be.fileLines) || !blockOk(rp.be.duplicateBlock) || Object.keys(rp.be).length !== 3) bad.push('ruleParams.be needs globalModules (unique paths), fileLines {soft, hardGrowth} and duplicateBlock {lines >= 2, tokens >= 1}');
     if (!fileLinesOk(rp.fe.fileLines) || typeof rp.fe.clientModule !== 'string' || !rp.fe.clientModule || !blockOk(rp.fe.duplicateBlock) || Object.keys(rp.fe).length !== 3) bad.push('ruleParams.fe needs fileLines {soft, hardGrowth}, clientModule and duplicateBlock {lines >= 2, tokens >= 1}');
@@ -156,8 +156,8 @@ function manifestShapeProblems(m) {
   if (!Array.isArray(m.slots) || !m.slots.length) { bad.push('slots must be a non-empty list'); return bad; }
   const slotKeys = new Set(['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'allows', 'forbids', 'layers', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor']);
   m.slots.forEach((slot, index) => {
-    const at = isMap(slot) && typeof slot.id === 'string' ? `slot ${slot.id}` : `slots[${index}]`;
-    if (!isMap(slot)) { bad.push(`${at} is not a map`); return; }
+    const at = isPlainObject(slot) && typeof slot.id === 'string' ? `slot ${slot.id}` : `slots[${index}]`;
+    if (!isPlainObject(slot)) { bad.push(`${at} is not a map`); return; }
     for (const key of Object.keys(slot)) if (!slotKeys.has(key)) bad.push(`${at}: unknown field ${key}`);
     if (!SLOT_ID.test(String(slot.id))) bad.push(`${at}: id must look like be.transport.http`);
     if (!Array.isArray(slot.profiles) || !slot.profiles.length || !slot.profiles.every((p) => PROFILES.includes(p)) || new Set(slot.profiles).size !== slot.profiles.length) bad.push(`${at}: profiles must be a unique non-empty subset of be, fe`);
@@ -170,9 +170,9 @@ function manifestShapeProblems(m) {
     if (slot.appKind !== undefined && !NAME.test(String(slot.appKind))) bad.push(`${at}: appKind must be a name`);
     if (slot.minInstances !== undefined && !(Number.isInteger(slot.minInstances) && slot.minInstances >= 1)) bad.push(`${at}: minInstances must be a positive integer`);
     if (slot.requiredWhen !== undefined && slot.requiredWhen !== 'connections') bad.push(`${at}: requiredWhen may only be connections`);
-    if (slot.requiredInstances !== undefined && !(isMap(slot.requiredInstances) && Object.values(slot.requiredInstances).every((v) => strList(v) && v.length))) bad.push(`${at}: requiredInstances must map a variable to a non-empty list of names`);
+    if (slot.requiredInstances !== undefined && !(isPlainObject(slot.requiredInstances) && Object.values(slot.requiredInstances).every((v) => strList(v) && v.length))) bad.push(`${at}: requiredInstances must map a variable to a non-empty list of names`);
     for (const key of ['requires', 'allows', 'forbids', 'layers']) if (slot[key] !== undefined && !strList(slot[key])) bad.push(`${at}: ${key} must be a list of strings`);
-    if (slot.budget !== undefined && !(isMap(slot.budget) && Object.keys(slot.budget).length && Object.values(slot.budget).every((v) => Number.isInteger(v) && v >= 1))) bad.push(`${at}: budget must map names to positive integers`);
+    if (slot.budget !== undefined && !(isPlainObject(slot.budget) && Object.keys(slot.budget).length && Object.values(slot.budget).every((v) => Number.isInteger(v) && v >= 1))) bad.push(`${at}: budget must map names to positive integers`);
     if (slot.managedBy !== undefined && !NAME.test(String(slot.managedBy))) bad.push(`${at}: managedBy must be a template id`);
     if (slot.rules !== undefined && !(Array.isArray(slot.rules) && slot.rules.every((r) => /^[A-Z][A-Z0-9_]*\*?$/.test(String(r))) && new Set(slot.rules).size === slot.rules.length)) bad.push(`${at}: rules must be unique rule ids`);
     if (slot.since !== undefined && !SEMVER.test(String(slot.since))) bad.push(`${at}: since must be a version`);
@@ -248,21 +248,21 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 /** Shape problems of a parsed hfs.json, in the words of modules/schemas/hfs-repo.schema.yaml. */
 function declarationShapeProblems(d) {
   const bad = [];
-  if (!isMap(d)) return ['hfs.json is not an object'];
+  if (!isPlainObject(d)) return ['hfs.json is not an object'];
   for (const key of Object.keys(d)) if (!['hfs', 'profile', 'project', 'apps', 'optionalSlots', 'connections', 'stacks'].includes(key)) bad.push(`unknown key ${key}`);
   if (!(Number.isInteger(d.hfs) && d.hfs >= 1)) bad.push('hfs must be the pinned manifest major (an integer, 1 or more)');
   if (!PROFILES.includes(d.profile)) bad.push('profile must be be or fe');
   if (!NAME.test(String(d.project))) bad.push('project must be a project name');
   if (!Array.isArray(d.apps) || !d.apps.length) bad.push('apps must list every apps/<name> with its kind');
   else d.apps.forEach((app, i) => {
-    if (!isMap(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`apps[${i}] must be {name, kind}`);
+    if (!isPlainObject(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`apps[${i}] must be {name, kind}`);
   });
   if (d.stacks !== undefined && (d.profile !== 'fe' || typeof d.stacks !== 'string' || !d.stacks || /^([a-zA-Z]:)?[\/]/.test(d.stacks))) bad.push('stacks is front end only and must be a relative path to the sibling back-end repository');
   if (d.optionalSlots !== undefined && (!Array.isArray(d.optionalSlots) || !d.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(d.optionalSlots).size !== d.optionalSlots.length)) bad.push('optionalSlots must be a unique list of slot ids');
   if (d.connections !== undefined) {
     // One physical database = one entry (R84): {name, envPrefix}; names and env prefixes unique, no prefix inside another's keys.
     const list = Array.isArray(d.connections) ? d.connections : null;
-    if (!list || !list.every((c) => isMap(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && Object.keys(c).length === 2)) bad.push('connections must be a list of {name: kebab-case database name, envPrefix: UPPER_SNAKE prefix of its env keys}');
+    if (!list || !list.every((c) => isPlainObject(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && Object.keys(c).length === 2)) bad.push('connections must be a list of {name: kebab-case database name, envPrefix: UPPER_SNAKE prefix of its env keys}');
     else {
       if (new Set(list.map((c) => c.name)).size !== list.length) bad.push('connections names must be unique');
       for (const a of list) for (const b of list) if (a !== b && `${b.envPrefix}_`.startsWith(`${a.envPrefix}_`)) bad.push(`connections ${a.name} and ${b.name} share env keys (${a.envPrefix}_ covers ${b.envPrefix}_)`);
@@ -567,14 +567,14 @@ const FILE_ENFORCERS = ['machine', 'hfs', 'work-validate', 'sonar'];
 /** Shape and semantic problems of a parsed knowledge/hfs/rules.yaml, in the words of modules/schemas/hfs-rules.schema.yaml. */
 function ruleCatalogProblems(d) {
   const bad = [];
-  if (!isMap(d)) return ['the rule catalog is not a map'];
+  if (!isPlainObject(d)) return ['the rule catalog is not a map'];
   for (const key of Object.keys(d)) if (!['schema', 'version', 'gates', 'enforcerKinds', 'rules'].includes(key)) bad.push(`unknown top-level key ${key}`);
   const schemaOk = /^starci\/hfs-rules@\d+$/.test(String(d.schema));
   if (!schemaOk) bad.push('schema must be starci/hfs-rules@<major>');
   if (!SEMVER.test(String(d.version))) bad.push('version must be MAJOR.MINOR.PATCH');
   else if (schemaOk && d.schema.split('@')[1] !== d.version.split('.')[0]) bad.push('the major of version must equal the number after @ in schema');
   const vocabulary = (key, names) => {
-    if (!isMap(d[key])) { bad.push(`${key} must be a map`); return; }
+    if (!isPlainObject(d[key])) { bad.push(`${key} must be a map`); return; }
     if (JSON.stringify(Object.keys(d[key])) !== JSON.stringify(names)) bad.push(`${key} must list exactly ${names.join(', ')} in that order`);
     for (const [name, text] of Object.entries(d[key])) if (typeof text !== 'string' || !text.trim()) bad.push(`${key}.${name} needs a description`);
   };
@@ -584,7 +584,7 @@ function ruleCatalogProblems(d) {
   const codeOwner = new Map();
   d.rules.forEach((r, index) => {
     const at = `rules[${index}]`;
-    if (!isMap(r)) { bad.push(`${at} is not a map`); return; }
+    if (!isPlainObject(r)) { bad.push(`${at} is not a map`); return; }
     const label = typeof r.id === 'string' ? r.id : at;
     for (const key of Object.keys(r)) if (!['id', 'code', 'title_vi', 'law', 'kinds', 'gates', 'failureCodes', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
     const expectedId = `R${String(index + 1).padStart(2, '0')}`;
@@ -618,7 +618,7 @@ function ruleCatalogProblems(d) {
     const seen = new Set();
     r.enforcers.forEach((e, n) => {
       const eat = `${label}.enforcers[${n}]`;
-      if (!isMap(e)) { bad.push(`${eat} is not a map`); return; }
+      if (!isPlainObject(e)) { bad.push(`${eat} is not a map`); return; }
       for (const key of Object.keys(e)) if (!['kind', 'id', 'status', 'at'].includes(key)) bad.push(`${eat} has unknown key ${key}`);
       if (!ENFORCER_FAMILIES.includes(e.kind)) bad.push(`${eat}.kind must be one of ${ENFORCER_FAMILIES.join(', ')}`);
       if (!ENFORCER_ID.test(String(e.id))) bad.push(`${eat}.id must be kebab-case`);
@@ -632,7 +632,7 @@ function ruleCatalogProblems(d) {
       } else if (FILE_ENFORCERS.includes(e.kind) && e.status !== 'planned') bad.push(`${eat} exists, so it names the file (at) that emits its code`);
     });
     if (Array.isArray(r.gates)) {
-      const hasSonar = r.enforcers.some((e) => isMap(e) && e.kind === 'sonar');
+      const hasSonar = r.enforcers.some((e) => isPlainObject(e) && e.kind === 'sonar');
       if (r.gates.includes('sonar') !== hasSonar) bad.push(`${label}: the sonar gate and a sonar enforcer go together`);
     }
   });

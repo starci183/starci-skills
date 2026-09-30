@@ -30,6 +30,7 @@ import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { jobResultSql } from './api-lib/rows.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
+import { sameOrUnder } from '../lib/path-key.mjs';
 
 export const SEAM_INTERFACE_EVENT = 'seam-interface-published';
 export const SEAM_RELEASED_EVENT = 'seam-released';
@@ -44,7 +45,6 @@ const payloadOf = (row) => parseJson(row?.payload_json ?? '', {}) ?? {};
 const ownedOf = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : [])
   .map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && p.trim())
   .map((p) => p.replace(/\\/g, '/').replace(/\/\*\*$/, '').replace(/\/+$/, ''));
-const within = (file, root) => file === root || file.startsWith(`${root}/`);
 
 /**
  * modules/models/runtimes.yaml allocation.cutSeam: maxSiblingWaitMs (the longest a sibling ordinal waits on
@@ -173,7 +173,7 @@ export function recutPlanOf(db, { workflowId, op, cutId, isOwnerWait = () => fal
   let common = segs.length ? segs[0].slice(0, -1) : [];
   for (const parts of segs) { let i = 0; while (i < common.length && i < parts.length - 1 && common[i] === parts[i]) i += 1; common = common.slice(0, i); }
   const root = common.join('/');
-  const keep = seamPaths.filter((p) => p.startsWith('.starciwork/') || (root && within(p, root)));
+  const keep = seamPaths.filter((p) => p.startsWith('.starciwork/') || (root && sameOrUnder(p, root)));
   const wire = seamPaths.filter((p) => !keep.includes(p));
   const cut = payloadOf(seam.head).cut ?? {};
   const split = wire.length && keep.length
@@ -196,7 +196,7 @@ export function digestInterfaceFiles({ repo, payload, files }) {
   for (const raw of files) {
     const file = String(raw).replace(/\\/g, '/').replace(/^\.\//, '');
     if (!file || path.isAbsolute(file) || file.split('/').includes('..')) throw Object.assign(new Error(`seam interface file ${raw} is not a workspace-relative path`), { code: 'seam-interface-path-invalid' });
-    if (!owned.some((root) => within(file, root))) throw Object.assign(new Error(`seam interface file ${file} is outside the seam's owned paths (${owned.join(', ')})`), { code: 'seam-interface-outside-seam' });
+    if (!owned.some((root) => sameOrUnder(file, root))) throw Object.assign(new Error(`seam interface file ${file} is outside the seam's owned paths (${owned.join(', ')})`), { code: 'seam-interface-outside-seam' });
     const abs = path.resolve(repo, file);
     let bytes;
     try { bytes = fs.readFileSync(abs); } catch { throw Object.assign(new Error(`seam interface file ${file} is missing in ${repo}: commit it before publishing`), { code: 'seam-interface-file-missing' }); }
@@ -239,7 +239,7 @@ export function seamPromptLines({ cut, jobLabel, api = 'scripts/kernel/api.mjs',
 // (canonRedispatchOf), never from scratch.
 
 const CANON_OP = 'code.refactor';
-const overlaps = (a, b) => within(a, b) || within(b, a);
+const overlaps = (a, b) => sameOrUnder(a, b) || sameOrUnder(b, a);
 const srcRootOf = (file) => {
   const segments = String(file).split('/');
   const src = segments.lastIndexOf('src', segments.length - 2);
@@ -294,7 +294,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
   const { relocations, sharedRoots } = policy ?? canonConformancePolicy();
   const findings = scan?.findings ?? [];
   const slices = (scan?.slices ?? []).map((slice) => ({ ordinal: Number(slice.ordinal), wave: String(slice.wave), paths: [...slice.paths], grants: [] }));
-  const holderOf = (file) => slices.find((slice) => slice.paths.some((root) => within(file, root))) ?? null;
+  const holderOf = (file) => slices.find((slice) => slice.paths.some((root) => sameOrUnder(file, root))) ?? null;
   const wireByWave = new Map();
   const wireOf = (wave) => {
     if (!wireByWave.has(wave)) wireByWave.set(wave, { paths: new Set(), reasons: [] });
@@ -316,7 +316,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
   }
   // Shared-root files (policy sharedRoots; empty in HFS, where owners are derived from slots): the wire's, never a slice's.
   for (const slice of slices) {
-    const packages = new Set(findings.filter((finding) => slice.paths.some((root) => within(finding.file, root)))
+    const packages = new Set(findings.filter((finding) => slice.paths.some((root) => sameOrUnder(finding.file, root)))
       .map((finding) => srcRootOf(finding.file)).filter(Boolean).map((src) => src.split('/').slice(0, -1).join('/')));
     for (const pkg of packages) {
       for (const shared of sharedRoots) {
@@ -472,7 +472,7 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
   const sharedNamed = sharedRoots.filter((root) => text.includes(root));
   const sharedWire = (derived.length || sharedNamed.length) ? packages.flatMap((pkg) => (sharedNamed.length ? sharedNamed : sharedRoots).map((root) => `${pkg}/${root}`)) : [];
   for (const dest of [...destinations.map(norm), ...derived, ...sharedWire]) {
-    if (owned.some((o) => within(dest, o))) continue;
+    if (owned.some((o) => sameOrUnder(dest, o))) continue;
     if (CONFIG_FILE_RE.test(dest) || sharedRoots.some((root) => dest === root || dest.endsWith(`/${root}`))) { wire.push(dest); continue; }
     // A public entry (index.*) is its folder's: the slice gets the folder unless a sibling holds it.
     const target = PUBLIC_ENTRY_RE.test(dest) ? dest.replace(PUBLIC_ENTRY_RE, '') : dest;

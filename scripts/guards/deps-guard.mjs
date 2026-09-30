@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { sleepSync } from '../lib/sleep-sync.mjs';
+import { pidAlive } from '../../engine/machine-db.mjs';
 
 const INSTALL = new Set(['install', 'i', 'in', 'ins', 'inst', 'insta', 'instal', 'isnt', 'isnta', 'isntal', 'isntall', 'add',
   'uninstall', 'un', 'unlink', 'remove', 'rm', 'r', 'update', 'up', 'upgrade', 'udpate', 'prune', 'dedupe', 'ddp', 'rebuild', 'rb', 'link', 'ln',
@@ -83,10 +84,6 @@ export async function peerLeasedJobs({ ledgerRepo, workflowId, now = Date.now() 
   } finally { db.close(); }
 }
 
-const alive = (pid) => {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try { process.kill(pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
-};
 
 /**
  * modules/models/runtimes.yaml allocation.depsLock {waitMs, staleMs, pollMs}. Loaded on demand: the shim runs
@@ -128,7 +125,7 @@ export function acquireDepsLock({ lockFile, holder, waitMs, staleMs, pollMs, onW
     let current = null;
     try { current = JSON.parse(fs.readFileSync(lockFile, 'utf8')); } catch { current = null; }
     const age = current?.at ? now() - Date.parse(current.at) : Infinity;
-    if (!current || !alive(current.pid) || age > staleMs) {
+    if (!current || !pidAlive(current.pid) || age > staleMs) {
       try { fs.rmSync(lockFile, { force: true }); } catch { /* raced */ }
       continue;
     }

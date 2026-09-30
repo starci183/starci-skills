@@ -164,7 +164,7 @@ export function captureServerLog(envId, service, env = process.env) {
   let text = '';
   try { text = fs.readFileSync(serverLogFile(serverId), 'utf8'); } catch { return null; }
   if (!text) return null;
-  return withMachine((m) => { const sha = m.putBlob(text, { mediaType: 'text/plain' }); m.update('env_servers', { log_sha: sha }, { server_id: serverId }); return sha; }, { env });
+  return withMachine((m) => { const sha = m.putMachineBlob(text, { mediaType: 'text/plain' }); m.update('env_servers', { log_sha: sha }, { server_id: serverId }); return sha; }, { env });
 }
 /** A started server judged: its row ready or failed, its output so far kept as a blob. Returns the log sha. */
 function judgeServer(envId, service, ready, env) {

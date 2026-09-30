@@ -18,8 +18,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { putBlob, blobPath } from '../lib/artifact-store.mjs';
 import { redactBytes } from '../lib/redact.mjs';
-import { recordBlob, recordArtifact, recordCheckRun as writeCheckRun, recordTranscriptSnapshot, attachToReport, setAttemptTranscript, newSpanId,
+import { recordBlob, recordArtifact, recordCheckRun as writeCheckRun, recordTranscriptSnapshot, attachToReport, setAttemptTranscript,
   JOB_ARTIFACT_KINDS, JOB_ARTIFACT_SUBKINDS, JOB_ARTIFACT_ROLES } from '../../engine/ledger-db.mjs';
+import { newSpanId } from '../../engine/machine-db.mjs';
 
 export const ARTIFACT_ROLES = JOB_ARTIFACT_ROLES;
 export const ARTIFACT_KINDS = JOB_ARTIFACT_KINDS;

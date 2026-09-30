@@ -23,8 +23,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { claimManager, lockHolder, pidAlive } from '../connectors/lib.mjs';
-import { withMachine } from '../../engine/machine-db.mjs';
+import { claimManager, lockHolder } from '../connectors/lib.mjs';
+import { pidAlive, withMachine } from '../../engine/machine-db.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { conflictHunks, fastForwardLive } from '../supervisor/land.mjs';
 import {

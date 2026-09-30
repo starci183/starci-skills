@@ -35,6 +35,7 @@ import { loadConfig } from '../../engine/config.mjs';
 import { ensure, crashLoopPlan, crashLoopRecord, leaderState, restartEngine, status } from './boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, reconcilerConfig, reconcilerNumbers } from './state.mjs';
 import { probeOrcaAsync, runChild, serviceRegistry, servicePorts, startService } from './services.mjs';
+import { sleep } from '../lib/sleep.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const MIN_SQLITE = '3.51.3';
@@ -395,7 +396,6 @@ export function renderText(items, { applied = [] } = {}) {
 
 /* ------------------------------------------------------------ apply */
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Write a named profile to config.yaml (backup first): only `start --set-profile` calls it. {changed, backup} or {error}. */
 export function applyProfileFile({ file = path.join(SKILL_ROOT, 'config.yaml'), now = Date.now(), profile = PROFILE } = {}) {

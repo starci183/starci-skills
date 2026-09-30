@@ -29,6 +29,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { runGit } from '../lib/git.mjs';
+import { sameOrUnder } from '../lib/path-key.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const PARITY_OPS = Object.freeze(['code.refactor']);
@@ -147,7 +148,7 @@ export function baseBlobsOf(root, base, ownedRels, { run = git } = {}) {
   return { ok: true, blobs };
 }
 
-/** Every file under the owned paths in the working tree (root-relative posix), links never followed. */
+/** Every file sameOrUnder the owned paths in the working tree (root-relative posix), links never followed. */
 export function ownedFilesOf(root, ownedRels) {
   const out = [];
   const walk = (rel) => {
@@ -439,11 +440,10 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
 
 /** A path of a report or payload (maybe prefixed with the repository folder, e.g. nivo-fe/apps/...) relative to root. */
 const relOf = (p, root) => { const n = norm(p).replace(/\/+$/, ''); const head = path.basename(root); return n.startsWith(`${head}/`) ? n.slice(head.length + 1) : n; };
-const under = (file, dir) => file === dir || file.startsWith(`${dir}/`);
 
 /**
  * The owedToWire acceptance of canon findings left on the owned paths. {ok, why?, wires?}. Every finding must be
- * (1) declared in report.owedToWire (its file under the entry's file/path, the ruleId equal when both name one),
+ * (1) declared in report.owedToWire (its file sameOrUnder the entry's file/path, the ruleId equal when both name one),
  * (2) held by a canon-wire leg of the workflow that is queued or running and owns its path - or a queued leg, which
  * settle widens with the owed paths - and (3) present at base at least as often as now (canonBase at base).
  */
@@ -453,13 +453,13 @@ export async function owedToWireAccept(item, slice, { root, base, ownedRels, wir
   if (!owed.length) return { ok: false, why: 'the report declares no owedToWire' };
   if (!list.length || list.length !== slice.findings) return { ok: false, why: 'the findings are not itemised' };
   const entries = owed.map((o) => ({ at: relOf(o.file ?? o.path, root), path: relOf(o.path, root), ruleId: o.ruleId ?? null }));
-  const undeclared = list.filter((f) => !entries.some((e) => under(norm(f.file), e.at) && (!e.ruleId || !f.ruleId || e.ruleId === f.ruleId)));
+  const undeclared = list.filter((f) => !entries.some((e) => sameOrUnder(norm(f.file), e.at) && (!e.ruleId || !f.ruleId || e.ruleId === f.ruleId)));
   if (undeclared.length) return { ok: false, why: `${undeclared.length} finding(s) not declared: ${undeclared.slice(0, 3).map((f) => `${f.file} ${f.ruleId}`).join('; ')}` };
   const wires = wireLegs.filter((w) => ['queued', 'leased', 'running'].includes(w.status));
   if (!wires.length) return { ok: false, why: 'no canon-wire leg is queued or running' };
   const holders = new Set();
   for (const e of entries) {
-    const w = wires.find((x) => x.ownedPaths.some((o) => under(e.path, relOf(o, root)) || under(relOf(o, root), e.path))) ?? wires.find((x) => x.status === 'queued');
+    const w = wires.find((x) => x.ownedPaths.some((o) => sameOrUnder(e.path, relOf(o, root)) || sameOrUnder(relOf(o, root), e.path))) ?? wires.find((x) => x.status === 'queued');
     if (!w) return { ok: false, why: `no queued or running canon-wire leg holds ${e.path}` };
     holders.add(w.jobId);
   }

@@ -20,7 +20,8 @@
 // A row whose workflow the ledger does not hold is refused (the FK), counted as `rejected`, never thrown.
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { appendLog, beginImmediate, isBusyError, ledgerTransactionDepth, LOG_ACTORS, LOG_LEVELS, openLedgerConnection, setLogCursor } from '../../engine/ledger-db.mjs';
+import { appendLog, beginImmediate, ledgerTransactionDepth, LOG_ACTORS, LOG_LEVELS, openLedgerConnection, setLogCursor } from '../../engine/ledger-db.mjs';
+import { isBusyError } from '../../engine/machine-db.mjs';
 
 const require = createRequire(import.meta.url);
 export const LOG_FLUSH_MS = 250;

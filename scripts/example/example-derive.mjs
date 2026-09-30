@@ -6,6 +6,7 @@ import {isPlainObject} from '../../engine/plain-object.mjs';import {sha256File} 
 import {ID_RE, walk as walkAll} from '../checks/check-example-work.mjs';
 import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from './example-ownership.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
+import { canonicalJSON } from '../../engine/canonical-json.mjs';
 
 /**
  * The layout promises a reader can answer every work question from the tree without opening source
@@ -42,14 +43,6 @@ const HEADER = [
 
 const isoTime = v => typeof v === 'string' && Number.isFinite(Date.parse(v)) ? Date.parse(v) : NaN;
 
-/** Deterministic JSON, keys sorted at every level - the same shape core/index.mjs's own canonicalJSON uses,
- * reproduced locally (four lines) rather than imported, since importing core/index.mjs would pull in its
- * entire validate() machinery for one helper. Used only to compare two derived structures for the gate. */
-function canonicalJSON(value) {
-  if (Array.isArray(value)) return `[${value.map(canonicalJSON).join(',')}]`;
-  if (isPlainObject(value)) return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonicalJSON(value[k])}`).join(',')}}`;
-  return JSON.stringify(value);
-}
 
 /** Every id-shaped string under `value`, tagged with the dotted key path it was found at (arrays do not add
  * a segment), so the caller can tell `blockedBy.record` from `refs`. Mirrors check-example-work.mjs's own

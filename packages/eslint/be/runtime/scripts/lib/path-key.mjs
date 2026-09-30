@@ -7,6 +7,8 @@ const WIN = process.platform === 'win32';
 export const slash = (p) => String(p ?? '').replaceAll('\\', '/');
 /** A relative path in git's spelling: forward slashes, no leading './'. */
 export const posixPath = (p) => slash(p).replace(/^\.\//, '');
+/** Whether posix `file` is `prefix` itself or under it (`file === prefix || file` starts with `prefix/`). */
+export const sameOrUnder = (file, prefix) => file === prefix || file.startsWith(`${prefix}/`);
 /** `p` case-folded where the filesystem ignores case (Windows). */
 export const foldCase = (p) => (WIN ? p.toLowerCase() : p);
 /** Whether two spellings name the same path on this host's filesystem. */

@@ -48,8 +48,8 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
-import { starciLocalRoot, withMachine } from '../../engine/machine-db.mjs';
-import { argsOf, claimManager, connectorLog, connectorState, lockHolder, markStarting, ownerConfig, pidAlive, recordAlive, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
+import { pidAlive, starciLocalRoot, withMachine } from '../../engine/machine-db.mjs';
+import { argsOf, claimManager, connectorLog, connectorState, lockHolder, markStarting, ownerConfig, recordAlive, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { GATEWAY_FILE, gatewayAlive, gatewayState } from './ask-gateway.mjs';
 import { listHostProcesses } from '../lib/process-list.mjs';
@@ -129,7 +129,7 @@ function cloudflaredOutput(env) {
     // The exit: one log row whose data names the blob holding the output tail.
     exit(detail) {
       let sha = null;
-      try { if (tail) sha = withMachine((m) => m.putBlob(tail, { mediaType: 'text/plain' }), { env }); } catch { sha = null; }
+      try { if (tail) sha = withMachine((m) => m.putMachineBlob(tail, { mediaType: 'text/plain' }), { env }); } catch { sha = null; }
       connectorLog('tunnel', `cloudflared exited (code ${detail.code ?? '-'}, signal ${detail.signal ?? '-'})`, { env, kind: 'cloudflared-exit', level: 'warn', data: { ...detail, logSha: sha } });
       tail = '';
     },

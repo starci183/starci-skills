@@ -8,7 +8,7 @@ import {sha256} from './digest.mjs';
 import {SETTLED_JOB_LIST} from './admission.mjs';
 import {putBlob,blobPath} from '../scripts/lib/artifact-store.mjs';
 import {redactData,redactText} from '../scripts/lib/redact.mjs';
-import {isUnderTempDir,machineFileFor,readMachine,starciLocalRoot,TEST_REGISTRY_ENV,withMachine} from './machine-db.mjs';
+import {isBusyError,isUnderTempDir,localProjectsRoot,machineFileFor,newSpanId,newTraceId,readMachine,starciLocalRoot,TEST_REGISTRY_ENV,withMachine} from './machine-db.mjs';
 // The machine-side path helpers have one definition (engine/machine-db.mjs); re-exported for the ledger's callers.
 export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV};
 const require=createRequire(import.meta.url);
@@ -30,9 +30,6 @@ const require=createRequire(import.meta.url);
 // Vocabulary
 // ---------------------------------------------------------------------------------------------------------
 export const newToken=()=>crypto.randomBytes(24).toString('hex');
-/** W3C trace id (32 hex) and span id (16 hex). */
-export const newTraceId=()=>crypto.randomBytes(16).toString('hex');
-export const newSpanId=()=>crypto.randomBytes(8).toString('hex');
 /** The TRACEPARENT an op receives: 00-<trace>-<span>-01. */
 export const traceparent=(traceId,spanId)=>`00-${traceId}-${spanId}-01`;
 /**
@@ -79,7 +76,7 @@ const normDir=file=>path.resolve(String(file)).replace(/\\/g,'/').replace(/\/+$/
 /** %LOCALAPPDATA%/StarCi/projects (starciLocalRoot, itself overridable by STARCI_LOCAL_ROOT; a node --test process tree gets one under the OS temp directory). */
 export const projectsRootFor=(env=process.env)=>{
   if(env[PROJECTS_ROOT_ENV])return path.resolve(env[PROJECTS_ROOT_ENV]);
-  const root=path.join(starciLocalRoot(env),'projects');
+  const root=localProjectsRoot(env);
   if(env.NODE_TEST_CONTEXT&&!isUnderTempDir(root,{env}))return path.join(os.tmpdir(),'starci-test-projects');
   return root;
 };
@@ -148,8 +145,6 @@ export const connectionFacts=db=>({journalMode:String(db.prepare('PRAGMA journal
   tempStore:Number(db.prepare('PRAGMA temp_store').get().temp_store),cacheSize:Number(db.prepare('PRAGMA cache_size').get().cache_size),
   walAutocheckpoint:Number(db.prepare('PRAGMA wal_autocheckpoint').get().wal_autocheckpoint),
   foreignKeys:Number(db.prepare('PRAGMA foreign_keys').get().foreign_keys),queryOnly:Number(db.prepare('PRAGMA query_only').get().query_only)});
-/** True for SQLITE_BUSY / SQLITE_LOCKED ("database is locked"). */
-export const isBusyError=error=>error?.errcode===5||error?.errcode===6||/SQLITE_BUSY|database is (?:locked|busy)/i.test(String(error?.message??error));
 /** BEGIN IMMEDIATE: spin for `spinMs` without the busy handler's 15 ms sleeps, then wait with the connection's busy_timeout. */
 export const LEDGER_SPIN_MS=20;
 export function beginImmediate(db,{spinMs=LEDGER_SPIN_MS}={}){

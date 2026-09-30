@@ -44,7 +44,7 @@ import { redactText } from '../lib/redact.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { git } from './workers.mjs';
-import { projectBinding, sourceRootOf } from '../kernel/target-repo.mjs';
+import { projectBinding } from '../kernel/target-repo.mjs';
 import { SKILL_ROOT, readSupervisor, withSupervisor, supervisorSettings, productRepos, supervisorLog } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -54,6 +54,7 @@ const selfFile = fileURLToPath(import.meta.url);
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/test-secrets.mjs';
+import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
 export { FORBIDDEN_FILES, SECRET_PATTERNS };
 
 /**
@@ -492,7 +493,7 @@ const repoKey = (p) => (process.platform === 'win32' ? canonical(p).toLowerCase(
  * work.json (the same binding api enqueue/dispatch/settle resolve against). [] when no binding
  * names `repo` its Work owner.
  */
-export function boundRepos(repo, { sourceRoot = sourceRootOf() } = {}) {
+export function boundRepos(repo, { sourceRoot = starciSourceRoot() } = {}) {
   return (projectBinding(repo, { sourceRoot })?.repos ?? []).map((r) => r.root);
 }
 
@@ -502,7 +503,7 @@ export function boundRepos(repo, { sourceRoot = sourceRootOf() } = {}) {
  * wait on, which a bare supervisor.repos list never pushed (inc-4de495f55f1e). Canonical-deduped:
  * a binding role that resolves to an already-listed checkout adds nothing.
  */
-export function defaultPushRepos(settings = supervisorSettings(), { sourceRoot = sourceRootOf() } = {}) {
+export function defaultPushRepos(settings = supervisorSettings(), { sourceRoot = starciSourceRoot() } = {}) {
   const seen = new Map();
   const add = (repo) => { const k = repoKey(repo); if (!seen.has(k)) seen.set(k, path.resolve(repo)); };
   add(SKILL_ROOT);
@@ -541,7 +542,7 @@ const pushResultOf = (r) => (r.pushed ? 'pushed' : r.skipped || r.deferred ? 'sk
 const blobText = (sha) => { if (!sha) return null; try { return getBlob(sha).toString('utf8'); } catch { return null; } };
 
 /** Push every listed main and record one pushes row per repository in machine.sqlite (MB-03: full stdout/stderr blobs). */
-export function pushMains({ repos = null, dryRun = false, hooksOnly = false, env = process.env, record = true, settings = null, sourceRoot = sourceRootOf() } = {}) {
+export function pushMains({ repos = null, dryRun = false, hooksOnly = false, env = process.env, record = true, settings = null, sourceRoot = starciSourceRoot() } = {}) {
   const list = repos ?? defaultPushRepos(settings ?? supervisorSettings(), { sourceRoot });
   const priors = record && !dryRun && !hooksOnly ? lastRefusals({ env }) : new Map();
   const results = list.map((repo) => pushMain(path.resolve(repo), { dryRun, hooksOnly, prior: priors.get(repoKey(path.resolve(repo))) ?? null }));

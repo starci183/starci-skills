@@ -36,6 +36,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { list } from '../lib/list.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { loadSonarGate } from './sonar-gate.mjs';
+import { slash } from '../lib/path-key.mjs';
 
 export const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 export const DECLARATION_SCHEMA = 'starci/application-stacks@1';
@@ -78,7 +79,6 @@ const INFRA_VALUE_PROBES = ['infra/compose/.env', 'infra/compose/.env.generated'
   'infra/compose/tls.key', 'infra/terraform/terraform.tfvars'];
 
 const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
-const slash = (value) => String(value ?? '').replaceAll('\\', '/');
 
 const readText = (file) => { try { return fs.statSync(file).size > MAX_BYTES ? null : fs.readFileSync(file, 'utf8'); } catch { return null; } };
 const escapeRe = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

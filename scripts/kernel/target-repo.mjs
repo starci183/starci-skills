@@ -7,13 +7,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runGit } from '../lib/git.mjs';
-import { readModuleJson, skillRoot } from '../../engine/runtime-root.mjs';
+import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
-
-// STARCI_SOURCE_ROOT is the same registry seam scripts/goal/define-goal.mjs reads.
-export const sourceRootOf = () => (process.env.STARCI_SOURCE_ROOT
-  ? path.resolve(process.env.STARCI_SOURCE_ROOT) : path.dirname(skillRoot));
+import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
 
 const canonical = (value) => {
   const resolved = path.resolve(value);
@@ -29,7 +26,7 @@ const inside = (root, abs) => {
 
 // The binding (.workspaces/projects/<p>/work.json) whose work.ownerRole
 // repository is `repo`, or null — no binding means --repo is authoritative.
-export function projectBinding(repo, { sourceRoot = sourceRootOf() } = {}) {
+export function projectBinding(repo, { sourceRoot = starciSourceRoot() } = {}) {
   const projects = path.join(sourceRoot, '.workspaces', 'projects');
   let entries = [];
   try { entries = fs.readdirSync(projects, { withFileTypes: true }); } catch { return null; }
@@ -59,7 +56,7 @@ export function bindingRepo(binding, id) {
   const want = id.trim();
   return binding.repos.find((r) => r.role === want)
     ?? binding.repos.find((r) => repoName(r.gitRepository) === want || path.basename(r.root) === want)
-    ?? binding.repos.find((r) => samePath(r.root, path.resolve(sourceRootOf(), want)))
+    ?? binding.repos.find((r) => samePath(r.root, path.resolve(starciSourceRoot(), want)))
     ?? null;
 }
 

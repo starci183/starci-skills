@@ -65,11 +65,11 @@ export const LOCAL_ROOT_ENV = 'STARCI_LOCAL_ROOT';
 export const starciLocalRoot = (env = process.env) =>
   env[LOCAL_ROOT_ENV] ? path.resolve(env[LOCAL_ROOT_ENV]) : path.join(env.LOCALAPPDATA || path.join(os.homedir(), '.local', 'state'), 'StarCi');
 /** <local root>/projects: one directory per ledger (decision Q1). */
-export const projectsRootFor = (env = process.env) => path.join(starciLocalRoot(env), 'projects');
+export const localProjectsRoot = (env = process.env) => path.join(starciLocalRoot(env), 'projects');
 /** The runtime.sqlite of one ledger (decision Q1): %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite. */
 export const projectLedgerFile = (ledgerId, env = process.env) => {
   if (!/^[A-Za-z0-9-]{8,64}$/.test(String(ledgerId ?? ''))) throw Error(`projectLedgerFile needs a ledger id, got ${ledgerId}`);
-  return path.join(projectsRootFor(env), String(ledgerId), 'runtime.sqlite');
+  return path.join(localProjectsRoot(env), String(ledgerId), 'runtime.sqlite');
 };
 /** The explicit test registry: a machine.sqlite that replaces the host's for this process tree (tests/setup/isolated-registry.mjs). */
 export const TEST_REGISTRY_ENV = 'STARCI_TEST_MACHINE_FILE';
@@ -126,7 +126,8 @@ export const MACHINE_BUSY_CODE = 'STARCI_MACHINE_BUSY';
 export const isMachineBusy = (error) => error?.code === MACHINE_BUSY_CODE;
 const busyError = (file, error, { retries, where }) => Object.assign(Error(`machine-db-busy: ${file} ${where}: database still locked after busy_timeout and ${retries} retries: ${String(error?.message ?? error).slice(0, 200)}`),
   { code: MACHINE_BUSY_CODE, cause: error, file, retries, where });
-const isBusy = (error) => error?.errcode === 5 || error?.errcode === 6 || /SQLITE_BUSY|database is (?:locked|busy)/i.test(String(error?.message ?? error));
+/** True for SQLITE_BUSY / SQLITE_LOCKED ("database is locked"). */
+export const isBusyError = (error) => error?.errcode === 5 || error?.errcode === 6 || /SQLITE_BUSY|database is (?:locked|busy)/i.test(String(error?.message ?? error));
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Transient SQLITE_CORRUPT / SQLITE_NOTADB (incident 2026-09-28: a land's record write and a read-only quick_check saw
@@ -192,7 +193,7 @@ function resilientConnection(openRaw, { file, inTransaction, onRecovered }) {
         if (retries) onRecovered({ where, retries });
         return out;
       } catch (error) {
-        if (isBusy(error) && !isMachineBusy(error) && !isCorruptError(error)) {
+        if (isBusyError(error) && !isMachineBusy(error) && !isCorruptError(error)) {
           if (inTransaction() || raw.isTransaction) throw error;
           if (busyRetries >= BUSY_RETRY_DELAYS_MS.length) throw busyError(file, error, { retries: busyRetries, where });
           scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyRetries]); busyRetries += 1; retries -= 1; continue;
@@ -330,7 +331,7 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
       return db;
     } catch (error) {
       try { db?.close(); } catch { /* closed */ }
-      const busy = isBusy(error) && !isCorruptError(error);
+      const busy = isBusyError(error) && !isCorruptError(error);
       if (!busy && !/unable to open/i.test(String(error?.message ?? '')) && !(isCorruptError(error) && error.code !== MACHINE_CORRUPT_CODE)) throw error;
       lastError = error;
       if (busy) { if (busyOpens >= BUSY_RETRY_DELAYS_MS.length) throw busyError(path.resolve(file), error, { retries: busyOpens, where: 'open' }); scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyOpens]); busyOpens += 1; }
@@ -346,7 +347,7 @@ function recordFacts(db) {
   const stale = Object.entries(facts).filter(([k, v]) => db.prepare('SELECT value FROM machine_meta WHERE key=?').get(k)?.value !== v);
   if (!stale.length) return;
   const put = db.prepare('INSERT INTO machine_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
-  try { for (const [k, v] of stale) put.run(k, v); } catch (error) { if (!isBusy(error)) throw error; /* another writer records them */ }
+  try { for (const [k, v] of stale) put.run(k, v); } catch (error) { if (!isBusyError(error)) throw error; /* another writer records them */ }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -483,7 +484,7 @@ function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tem
 // Blobs
 // ---------------------------------------------------------------------------------------------------------------------
 /** Store bytes (Buffer | string | file path via {file}) in the blob store and record the blobs row. Returns the sha. */
-function putBlob(m, content, { mediaType = 'application/octet-stream', pinned = false } = {}) {
+function putMachineBlob(m, content, { mediaType = 'application/octet-stream', pinned = false } = {}) {
   // Every blob is redacted before it is stored (scripts/lib/redact.mjs): text media 'v1', anything else 'binary'.
   const raw = Buffer.isBuffer(content) ? content : Buffer.from(typeof content === 'string' ? content : JSON.stringify(content));
   const { bytes, redaction } = redactBytes(raw, mediaType);
@@ -497,7 +498,7 @@ function jsonOrBlob(m, value, limit = JSON_LIMIT) {
   if (value === undefined || value === null) return { json: null, sha: null };
   const text = typeof value === 'string' ? value : JSON.stringify(value);
   if (Buffer.byteLength(text) <= limit) return { json: text, sha: null };
-  const sha = putBlob(m, text, { mediaType: 'application/json' });
+  const sha = putMachineBlob(m, text, { mediaType: 'application/json' });
   return { json: JSON.stringify({ truncated: true, bytes: Buffer.byteLength(text), sha256: sha }), sha };
 }
 /** The full JSON value behind a jsonOrBlob stub ({truncated, sha256}); the value itself otherwise. */
@@ -507,7 +508,7 @@ export function fullJson(value) {
   }
   return value;
 }
-const textBlob = (m, text, mediaType = 'text/plain') => (text == null || text === '' ? null : putBlob(m, String(text), { mediaType }));
+const textBlob = (m, text, mediaType = 'text/plain') => (text == null || text === '' ? null : putMachineBlob(m, String(text), { mediaType }));
 
 // ---------------------------------------------------------------------------------------------------------------------
 // B0. Ledgers registry and repositories
@@ -779,7 +780,7 @@ function setSupSignal(m, { scope, key = 'main', value = null, token = null, hold
 }
 const supSignal = (m, scope, key = 'main') => { const r = m.db.prepare('SELECT * FROM sup_signals WHERE scope=? AND key=?').get(scope, key); return r ? { ...r, value: parse(r.value_json) } : null; };
 const clearSupSignal = (m, scope, key = 'main') => m.db.prepare('DELETE FROM sup_signals WHERE scope=? AND key=?').run(scope, key).changes > 0;
-function recordLlmUsage(m, { subjectType, supAttemptId = null, turnRef = null, spanId = null, provider, requestModel = null, responseModel = null, source = 'cli-transcript', ...counts }) {
+function recordMachineLlmUsage(m, { subjectType, supAttemptId = null, turnRef = null, spanId = null, provider, requestModel = null, responseModel = null, source = 'cli-transcript', ...counts }) {
   return Number(insertRow(m.db, 'llm_usage', { subject_type: subjectType, sup_attempt_id: supAttemptId, turn_ref: turnRef, span_id: spanId, provider, request_model: requestModel,
     response_model: responseModel, source, at: m.now(), ...snake(counts) }).lastInsertRowid);
 }
@@ -912,7 +913,7 @@ function actionFinish(m, id, { state = 'done', exitCode = null, result: rawResul
   const result = rawResult == null ? null : redactData(rawResult);
   const summary = rawSummary == null ? null : redactData(rawSummary);
   const full = result == null ? null : typeof result === 'string' ? result : JSON.stringify(result);
-  const resultSha = full == null ? null : putBlob(m, full, { mediaType: typeof result === 'string' ? 'text/plain' : 'application/json' });
+  const resultSha = full == null ? null : putMachineBlob(m, full, { mediaType: typeof result === 'string' ? 'text/plain' : 'application/json' });
   let brief = summary ?? (full != null && Buffer.byteLength(full) <= 8192 && typeof result !== 'string' ? result : null);
   if (brief != null) { const s = JSON.stringify(brief); if (Buffer.byteLength(s) > 8192) brief = { truncated: true, bytes: Buffer.byteLength(s), sha256: resultSha }; }
   const stdoutSha = textBlob(m, stdout), stderrSha = textBlob(m, stderr);
@@ -1020,7 +1021,7 @@ function recordSeatInput(m, { seatId, terminal = null, action, messageKind = 'wa
 const startSeatTurn = (m, { seatId, wokenByDelivery = null, spanId = newSpanId() }) => Number(insertRow(m.db, 'seat_turns', { seat_id: seatId, woken_by_delivery: wokenByDelivery, started_at: m.now(), span_id: spanId }).lastInsertRowid);
 const endSeatTurn = (m, turnId, { endReason = 'idle', actionsCount = null } = {}) => m.db.prepare('UPDATE seat_turns SET ended_at=?, end_reason=?, actions_count=COALESCE(?,actions_count) WHERE turn_id=? AND ended_at IS NULL').run(m.now(), endReason, actionsCount, turnId).changes > 0;
 function seatTranscriptSnapshot(m, { seatId, terminalHandle = null, text }) {
-  const sha = putBlob(m, String(text), { mediaType: 'text/plain' });
+  const sha = putMachineBlob(m, String(text), { mediaType: 'text/plain' });
   insertRow(m.db, 'seat_transcript_snapshots', { seat_id: seatId, terminal_handle: terminalHandle, at: m.now(), lines: String(text).split('\n').length, bytes: Buffer.byteLength(String(text)), sha256: sha }, { orIgnore: true });
   return sha;
 }
@@ -1150,7 +1151,7 @@ const budgets = (m) => m.db.prepare('SELECT * FROM budgets ORDER BY scope_key').
 const startGcRun = (m, { trigger = 'sweep', actionId = null, collectors = null, startedAt = m.now() } = {}) => Number(insertRow(m.db, 'gc_runs', { action_id: actionId, started_at: startedAt, trigger, collectors_json: collectors }).lastInsertRowid);
 /** Finish a GC run; the full report is a blob (G4). */
 function finishGcRun(m, runId, { freedBytes = null, counts = null, errors = null, report = null, finishedAt = m.now() } = {}) {
-  const reportSha = report == null ? null : putBlob(m, JSON.stringify(report), { mediaType: 'application/json' });
+  const reportSha = report == null ? null : putMachineBlob(m, JSON.stringify(report), { mediaType: 'application/json' });
   return m.db.prepare('UPDATE gc_runs SET finished_at=?, freed_bytes=?, counts_json=?, errors_json=?, report_sha=? WHERE run_id=?')
     .run(finishedAt, freedBytes, toJson(counts), toJson(errors), reportSha, runId).changes > 0;
 }
@@ -1163,7 +1164,7 @@ function gcMark(m, runId, entries) {
   return m.transaction((db) => { const st = db.prepare('INSERT OR IGNORE INTO gc_marks(run_id,sha256,source,pinned) VALUES(?,?,?,?)'); for (const e of entries) st.run(runId, e.sha256, e.source, e.pinned ? 1 : 0); return entries.length; });
 }
 /** A blob whose bytes were archived (zip) before the sweep: archived_at + archive_ref on the machine's blobs row. */
-const markBlobArchived = (m, { sha256: sha, archivedAt = m.now(), archiveRef }) => m.db.prepare('UPDATE blobs SET archived_at=?, archive_ref=? WHERE sha256=?').run(archivedAt, archiveRef, sha).changes > 0;
+const markMachineBlobArchived = (m, { sha256: sha, archivedAt = m.now(), archiveRef }) => m.db.prepare('UPDATE blobs SET archived_at=?, archive_ref=? WHERE sha256=?').run(archivedAt, archiveRef, sha).changes > 0;
 /**
  * Seat scrollback snapshots that are no longer needed (Q4): every snapshot taken before a seat session ended whose FINAL
  * transcript is stored (agent_sessions.transcript_sha of that seat, ended_at set), plus any snapshot older than `seatMs`
@@ -1313,7 +1314,7 @@ const latestMetrics = (m, { kind, ledgerId = null, workflowId = null } = {}) => 
 /** A notification, deduplicated on dedupeKey (replaces telegram-sent.json). Returns {id, duplicate}. */
 function recordNotification(m, { channel, kind, text, media = null, mediaType = 'image/png', sentAt = null, delivery = null, ref = null, dedupeKey = null }) {
   if (dedupeKey) { const hit = m.db.prepare('SELECT notif_id FROM notifications WHERE dedupe_key=?').get(dedupeKey); if (hit) return { id: Number(hit.notif_id), duplicate: true }; }
-  const mediaSha = media ? putBlob(m, media, { mediaType }) : null;
+  const mediaSha = media ? putMachineBlob(m, media, { mediaType }) : null;
   return { id: Number(insertRow(m.db, 'notifications', { channel, kind, text, media_sha: mediaSha, sent_at: sentAt, delivery, ref, dedupe_key: dedupeKey }).lastInsertRowid), duplicate: false };
 }
 const notificationSent = (m, dedupeKey) => Boolean(m.db.prepare('SELECT 1 FROM notifications WHERE dedupe_key=?').get(dedupeKey));
@@ -1422,13 +1423,13 @@ function snake(obj) {
 
 const API = {
   insert: (m, table, row, opts) => insertRow(m.db, table, row, opts), upsert: (m, table, row, keys) => upsertRow(m.db, table, row, keys), update: (m, table, set, where) => updateRow(m.db, table, set, where),
-  putBlob, jsonOrBlob, meta, checkpoint,
+  putMachineBlob, jsonOrBlob, meta, checkpoint,
   registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet,
   supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases,
   startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport,
   openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed,
   upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead,
-  setSupSignal, supSignal, clearSupSignal, recordLlmUsage,
+  setSupSignal, supSignal, clearSupSignal, recordMachineLlmUsage,
   startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns,
   leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors,
   enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules,
@@ -1440,7 +1441,7 @@ const API = {
   throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples,
   setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas,
   upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, release: releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets,
-  startGcRun, finishGcRun, recordGcItem, addGcItem: recordGcItem, updateGcItem, gcItems, gcMark, addGcMarks: gcMark, gcRuns, markBlobArchived, pruneSeatSnapshots,
+  startGcRun, finishGcRun, recordGcItem, addGcItem: recordGcItem, updateGcItem, gcItems, gcMark, addGcMarks: gcMark, gcRuns, markMachineBlobArchived, pruneSeatSnapshots,
   upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox,
   upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk,
   log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
@@ -1448,7 +1449,7 @@ const API = {
 
 /** Every typed function at module level too: fn(handle, ...args) — blob-gc and callers holding a handle. */
 export {
-  putBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
+  putMachineBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordMachineLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markMachineBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
 };
 export const addGcItem = recordGcItem;
 export const addGcMarks = gcMark;

@@ -16,12 +16,11 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { hasLedgerColumn, hasLedgerTable, openLedgerReader } from '../../engine/ledger-db.mjs';
 import { machineFileFor, readMachine } from '../../engine/machine-db.mjs';
-import { pathKey } from './path-key.mjs';
+import { pathKey, sameOrUnder } from './path-key.mjs';
 
 const require = createRequire(import.meta.url);
 const REGISTRY_TTL_MS = 30000;
 const norm = pathKey;
-const under = (child, parent) => child === parent || child.startsWith(`${parent}/`);
 let cache = { file: null, at: 0, repos: [] };
 
 const openReadOnly = (file) => openLedgerReader(file);
@@ -37,7 +36,7 @@ export function registeredRepos({ env = process.env, now = Date.now() } = {}) {
 
 /**
  * Null when removing `target` touches no indexed artifact; else {ledger, repo, paths:[...up to 5], count}.
- * Held: an indexed file at or under `target`, or `target` inside the directory of an indexed file.
+ * Held: an indexed file at or sameOrUnder `target`, or `target` inside the directory of an indexed file.
  * A ledger that cannot be read holds its whole repository, and an unreadable registry holds every path in or
  * holding a .starciwork directory - where every indexed artifact lives (fail closed).
  */
@@ -49,12 +48,12 @@ export function artifactHoldOf(target, { env = process.env, repos = registeredRe
   }
   for (const { ledger, repo } of repos) {
     const r = norm(repo);
-    if (!under(t, r) && !under(r, t)) continue;
+    if (!sameOrUnder(t, r) && !sameOrUnder(r, t)) continue;
     // The repository's typed logs (scripts/kernel/typed-logs.mjs: the ledger's logs table, and the retired logs.sqlite
     // with its migrated copy) are append-only history: never swept.
     const work = path.join(repo, '.starciwork');
-    const logFiles = [path.basename(ledger), 'logs.sqlite', ...(fs.existsSync(work) && under(norm(work), t) ? fs.readdirSync(work).filter((n) => /^logs\.sqlite\.migrated-/.test(n)) : [])]
-      .filter((name, i, all) => all.indexOf(name) === i).map((name) => path.join(work, name)).filter((file) => under(norm(file), t) && fs.existsSync(file));
+    const logFiles = [path.basename(ledger), 'logs.sqlite', ...(fs.existsSync(work) && sameOrUnder(norm(work), t) ? fs.readdirSync(work).filter((n) => /^logs\.sqlite\.migrated-/.test(n)) : [])]
+      .filter((name, i, all) => all.indexOf(name) === i).map((name) => path.join(work, name)).filter((file) => sameOrUnder(norm(file), t) && fs.existsSync(file));
     if (logFiles.length) return { ledger, repo, paths: logFiles.map((file) => `.starciwork/${path.basename(file)}`), count: logFiles.length };
     if (!fs.existsSync(ledger)) continue;
     let paths;
@@ -68,13 +67,13 @@ export function artifactHoldOf(target, { env = process.env, repos = registeredRe
       return { ledger, repo, paths: [], count: null, error: String(error?.message ?? error) };
     }
     // "Around" holds an evidence directory, never a shared root: an artifact filed at the repository root or directly
-    // in .starciwork (e.g. a scope op indexing .starciwork/index.yaml) held every tree under it, so no purge could
+    // in .starciwork (e.g. a scope op indexing .starciwork/index.yaml) held every tree sameOrUnder it, so no purge could
     // remove an archived workflow's kernel-evidence directory.
     const shared = new Set([r, norm(work), norm(path.join(work, 'evidence')), norm(path.join(work, 'kernel-evidence'))]);
     const held = paths.filter((rel) => {
       const abs = norm(path.join(repo, rel));
       const dir = norm(path.dirname(abs));
-      return under(abs, t) || (!shared.has(dir) && under(t, dir));
+      return sameOrUnder(abs, t) || (!shared.has(dir) && sameOrUnder(t, dir));
     });
     if (held.length) return { ledger, repo, paths: held.slice(0, 5), count: held.length };
   }

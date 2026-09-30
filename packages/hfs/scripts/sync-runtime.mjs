@@ -15,6 +15,7 @@ const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const SLOT_FILES = [
   'engine/runtime-root.mjs',
   'engine/yaml.mjs',
+  'engine/plain-object.mjs',
   'scripts/lib/glob.mjs',
   'scripts/lib/path-key.mjs',
   'scripts/lib/hfs-slots.mjs',

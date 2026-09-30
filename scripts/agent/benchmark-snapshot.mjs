@@ -15,9 +15,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isRuntimeRoot, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { sourceRootOf } from '../kernel/target-repo.mjs';
 import { scorecardFor, UNROUTED, localDay, shortPool, pctText } from './model-scorecard.mjs';
 import { readJsonFile as readJson } from '../lib/json.mjs';
+import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
 
 export const SNAPSHOTS_DIR = path.join(skillRoot, 'benchmark', 'snapshots');
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -35,7 +35,7 @@ export const snapshotName = (date, sinceHours) => `${date}-${sinceHours}h.json`;
  * The Work owner repo of every .workspaces/projects/<p>/work.json binding under `sourceRoot`
  * (repositories[work.ownerRole ?? 'be'].pathFromSource), each kept once and only when it holds a ledger.
  */
-export function boundRepos({ sourceRoot = sourceRootOf() } = {}) {
+export function boundRepos({ sourceRoot = starciSourceRoot() } = {}) {
   const projects = path.join(sourceRoot, '.workspaces', 'projects');
   let entries = [];
   try { entries = fs.readdirSync(projects, { withFileTypes: true }); } catch { return []; }
@@ -104,7 +104,7 @@ export function formatDelta({ file, snapshot, previous, delta }) {
  * Returns { file, snapshot, previous, delta }.
  */
 export function takeSnapshot({ repos = null, sinceHours, now = Date.now(), date = localDate(now), dir = SNAPSHOTS_DIR,
-  sourceRoot = sourceRootOf() } = {}) {
+  sourceRoot = starciSourceRoot() } = {}) {
   if (!(Number(sinceHours) > 0)) throw Object.assign(Error('--since-hours needs a positive number'), { code: 'EUSAGE' });
   if (!DATE.test(date)) throw Object.assign(Error(`--date needs YYYY-MM-DD, got ${date}`), { code: 'EUSAGE' });
   const name = snapshotName(date, Number(sinceHours));

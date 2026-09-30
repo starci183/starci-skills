@@ -14,17 +14,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, isRuntimeRoot } from '../../engine/ledger-db.mjs';
-import { machineLog, readMachine, withMachine } from '../../engine/machine-db.mjs';
+import { machineLog, pidAlive, readMachine, withMachine } from '../../engine/machine-db.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { jobDisplayNameOf, workflowNameOf } from '../lib/display-names.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
 
-export const pidAlive = (pid) => {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; }
-};
 
 /** When this host last booted (ms). */
 export const hostBootAt = () => Date.now() - os.uptime() * 1000;
@@ -222,8 +219,6 @@ export const spawnDetached = (script, args = [], { env = process.env } = {}) => 
   return child.pid ?? null;
 };
 
-// The source root: the directory holding this skill (target-repo.mjs sourceRootOf, same seam).
-export const sourceRootOf = (env = process.env) => (env.STARCI_SOURCE_ROOT ? path.resolve(env.STARCI_SOURCE_ROOT) : path.dirname(skillRoot));
 
 const hasLedger = (root) => {
   try { return !isRuntimeRoot(root) && fs.existsSync(ledgerFileFor(root)); } catch { return false; }
@@ -235,7 +230,7 @@ const hasLedger = (root) => {
  * owner of every .workspaces/projects/<p>/work.json binding — each kept only when it holds a ledger.
  */
 export function askRepos(connectors, { env = process.env, extra = [] } = {}) {
-  const source = sourceRootOf(env);
+  const source = starciSourceRoot(env);
   const listed = (connectors?.repos ?? []).map((repo) => path.resolve(source, repo));
   let candidates = listed;
   if (!listed.length) {

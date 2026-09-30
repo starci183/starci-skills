@@ -20,6 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classesOf, parseHtml, walkElements } from './draw-dna.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import {isFile} from '../lib/fs-kind.mjs';
 
 export const DRAW_NESTED_VARIANT = 'DRAW_NESTED_VARIANT';
 export const DRAW_MEASURE_UNCAPPED = 'DRAW_MEASURE_UNCAPPED';
@@ -168,7 +169,6 @@ export const LAYER_PROBE = Object.freeze({
 // ---------------------------------------------------------------------------------------------------------
 
 const readJsonFile = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
-const fileExists = (f) => { try { return fs.statSync(f).isFile(); } catch { return false; } };
 
 /** Every drawn part (png with a draw-render record) under the paths, skipping node_modules and capture outputs. */
 export function partsUnder(paths) {
@@ -192,12 +192,12 @@ export function partsUnder(paths) {
 /** The html a part can be re-rendered from: its round's harness, its record's html source, the html beside it. */
 function renderSourceOf({ png, record }) {
   const harness = path.join(path.dirname(png), 'harness', 'index.html');
-  if (fileExists(harness)) return harness;
+  if (isFile(harness)) return harness;
   // The html beside the part is the copy that was judged; the record's source path may point at a live repo since edited.
   const beside = png.replace(/\.png$/i, '.html');
-  if (fileExists(beside)) return beside;
+  if (isFile(beside)) return beside;
   const src = record?.source?.html?.path;
-  return src && fileExists(src) ? src : null;
+  return src && isFile(src) ? src : null;
 }
 
 /**
@@ -211,8 +211,8 @@ export async function layerFindingsForParts(parts, { playwright = null } = {}) {
     for (const part of parts) {
       const label = path.basename(part.png).replace(/\.png$/i, '');
       const viewport = part.record?.viewport ? { width: part.record.viewport.width, height: part.record.viewport.height } : null;
-      let dom = part.record?.dom?.path && fileExists(part.record.dom.path) ? part.record.dom.path : part.png.replace(/\.png$/i, '.dom.html');
-      if (!fileExists(dom)) dom = fileExists(part.png.replace(/\.png$/i, '.html')) ? part.png.replace(/\.png$/i, '.html') : null;
+      let dom = part.record?.dom?.path && isFile(part.record.dom.path) ? part.record.dom.path : part.png.replace(/\.png$/i, '.dom.html');
+      if (!isFile(dom)) dom = isFile(part.png.replace(/\.png$/i, '.html')) ? part.png.replace(/\.png$/i, '.html') : null;
       let layer = part.record?.layer && !part.record.layer.error ? part.record.layer : null;
       let measured = layer ? 'record' : null;
       if (!layer && playwright && viewport) {
@@ -222,7 +222,7 @@ export async function layerFindingsForParts(parts, { playwright = null } = {}) {
             const { captureHtml } = await import('../work/draw-render.mjs');
             const [r] = await captureHtml({ html: source, out: path.join(scratch, `${results.length}`), viewports: [viewport], theme: 'light', fullPage: true, name: 'layer-remeasure', source: { mode: 'html' }, playwright, rationale: null });
             if (r?.layer && !r.layer.error) { layer = r.layer; measured = `re-rendered ${path.relative(process.cwd(), source)}`; }
-            if (!dom && r?.dom?.path && fileExists(r.dom.path)) dom = r.dom.path;
+            if (!dom && r?.dom?.path && isFile(r.dom.path)) dom = r.dom.path;
           } catch (error) { measured = `re-render failed: ${String(error?.message ?? error).split(/\r?\n/)[0]}`; }
         }
       }

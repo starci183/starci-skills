@@ -112,7 +112,7 @@ import { classifyCheck as settlerClassifyCheck, rerunCheck as settlerRerunCheck 
 import { releaseSettledSession } from './op-session.mjs';
 import { recordSettledAttemptUsage } from './usage-record.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
-import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
+import { withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
 import { isLiveProofOp } from './serve-ask.mjs';
 import {
@@ -191,6 +191,7 @@ import { taskSpecOf } from './task-spec.mjs';
 import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageOf } from './proof-integrity.mjs';
 import { classifyFailure, isMeasurementLeg, measurementCheckClass, resolveRootOwner } from './verify-failure.mjs';
+import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The owner config (config.yaml) lives at the runtime root. STARCI_OWNER_ROOT points the one
@@ -4572,7 +4573,7 @@ function liveAgentLaunches(db, { repo = null, exclude = null, now = Date.now() }
     const key = (p) => path.resolve(p).toLowerCase();
     const seen = new Set(repo ? [key(repo)] : []);
     let listed = [];
-    try { listed = (loadConfig()?.supervisor?.repos ?? []).map((r) => path.resolve(sourceRootOf(), r)); } catch { listed = []; }
+    try { listed = (loadConfig()?.supervisor?.repos ?? []).map((r) => path.resolve(starciSourceRoot(), r)); } catch { listed = []; }
     for (const other of listed) {
       if (seen.has(key(other))) continue;
       seen.add(key(other));

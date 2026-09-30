@@ -20,7 +20,7 @@
 
 import { lineageHeadById, typedIncidents } from './gate-conditions.mjs';
 import { allocationMs } from '../../engine/config.mjs';
-import { posixPath } from '../lib/path-key.mjs';
+import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
@@ -37,7 +37,6 @@ const JOB_ID = /\bop-[a-z][a-z0-9.-]*?-[0-9a-f]{10}\b/gi;
 const norm = (p) => posixPath(p).replace(/\/+$/, '');
 const ownedRecordPaths = (payload) => (payload?.owned_paths ?? [])
   .map((p) => norm(typeof p === 'string' ? p : p?.path)).filter((p) => p.startsWith('.starciwork/'));
-const within = (p, root) => p === root || p.startsWith(`${root}/`);
 const round2 = (n) => Math.round(n * 100) / 100;
 
 /**
@@ -75,7 +74,7 @@ export function blockingJobs(db, { now = Date.now() } = {}) {
       if (cond.type === 'record') {
         const want = norm(cond.path);
         for (const job of open) {
-          if (ownedRecordPaths(job.payload).some((owned) => within(want, owned) || within(owned, want))) {
+          if (ownedRecordPaths(job.payload).some((owned) => sameOrUnder(want, owned) || sameOrUnder(owned, want))) {
             add(job, { workflowId: incident.workflowId, via: 'until-record', ref: incident.incidentId, since: incident.since });
           }
         }
@@ -158,7 +157,7 @@ export function orderQueuedByBlocking(queued, blocking) {
   }
   const indexed = queued.map((item, index) => ({ item, index }));
   // Foundation legs (api enqueue --foundation) keep leading the list; a queued cut seam (api status
-  // queued[].seam, scripts/kernel/cut-seam.mjs) comes next - its siblings build on it; blocking weight orders within.
+  // queued[].seam, scripts/kernel/cut-seam.mjs) comes next - its siblings build on it; blocking weight orders sameOrUnder.
   const foundationOf = (item) => Number(Boolean(item.foundation));
   const seamOf = (item) => Number(Boolean(item.seam));
   indexed.sort((a, b) => foundationOf(b.item) - foundationOf(a.item) || seamOf(b.item) - seamOf(a.item) || weightOf(b.item) - weightOf(a.item) || a.index - b.index);

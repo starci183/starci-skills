@@ -3,7 +3,7 @@ import path from 'node:path';
 import { loadArchitectureConfig, isInside, slash } from '../architecture/config.mjs';
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
 import { codePatternContract, compilerIdentity, exact, pathKey, readPackageManifest, repositoryPath, repositoryRelative, scriptReport, symbolAt, unwrap } from './common.mjs';
-import { sameOrUnder } from '../common.mjs';
+import { sameOrUnder } from '../../lib/path-key.mjs';
 
 export const NEXT_ERROR_RULES = Object.freeze([
   'FE_ERROR_WORLD_STATE_MAPPING',

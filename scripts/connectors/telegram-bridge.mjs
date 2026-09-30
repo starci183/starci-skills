@@ -67,10 +67,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configRoot, connectorsConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
-import { readMachine, withMachine } from '../../engine/machine-db.mjs';
+import { pidAlive, readMachine, withMachine } from '../../engine/machine-db.mjs';
 import {
-  argsOf, askRepos, askState, claimManager, claimOrTakeOver, connectorLog, connectorState, connectorStates, lockHolder, notifiedRepos, openAskList, ownerConfig, pidAlive,
-  recordAlive, sourceRootOf, spawnDetached, withLedgerRead, writeConnectorState,
+  argsOf, askRepos, askState, claimManager, claimOrTakeOver, connectorLog, connectorState, connectorStates, lockHolder, notifiedRepos, openAskList, ownerConfig,
+  recordAlive, spawnDetached, withLedgerRead, writeConnectorState,
 } from './lib.mjs';
 import {
   ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, drawReviewEntryByMessage, linkFor, recordAskMessage, redact,
@@ -82,6 +82,7 @@ import { answerDrawReviewByReply, askClassOf } from '../kernel/serve-ask.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { sleep } from '../lib/sleep.mjs';
+import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
 
 export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/serve-ask.mjs', import.meta.url));
 
@@ -321,7 +322,7 @@ export async function getUpdates({ token, offset = null, timeoutS = POLL_TIMEOUT
 /* ------------------------------------------------------------ the bridge */
 
 const defaultStatusMessages = (config, env) => {
-  const source = sourceRootOf(env);
+  const source = starciSourceRoot(env);
   const repos = reportRepos([], config).map((repo) => path.resolve(source, repo));
   return progressMessages(collectProgress(repos, { config }));
 };
@@ -330,7 +331,7 @@ const defaultStatusMessages = (config, env) => {
 // config.yaml supervisor.repos names (the workflows the supervisor runs) and every repo a notice named.
 export const bridgeAskRepos = ({ env = process.env, config = ownerConfig() ?? undefined } = {}) => {
   try {
-    const source = sourceRootOf(env);
+    const source = starciSourceRoot(env);
     const supervised = reportRepos([], config).map((repo) => path.resolve(source, repo));
     return askRepos(connectorsConfig(config, env), { env, extra: [...supervised, ...notifiedRepos(env)] });
   } catch { return []; }

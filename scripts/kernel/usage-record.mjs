@@ -280,7 +280,7 @@ export function planSeatUsage(db, { role, workflowId = null, entry, prices = loa
  * Supervisor sessions (machine.sqlite). `dryRun` reads and reports, writes nothing. Returns a summary.
  */
 export async function sweepUsage({ env = process.env, home = os.homedir(), now = Date.now(), lookbackMs = DEFAULT_LOOKBACK_MS, dryRun = false, archiveRoot = null, ledgerName = null, detail = false, ledgerFiles = null } = {}) {
-  const [{ openMachineReader, withMachine, recordLlmUsage }, { openLedger, openLedgerReader }] = await Promise.all([
+  const [{ openMachineReader, withMachine, recordMachineLlmUsage }, { openLedger, openLedgerReader }] = await Promise.all([
     import('../../engine/machine-db.mjs'), import('../../engine/ledger-db.mjs'),
   ]);
   const since = now - lookbackMs;
@@ -348,7 +348,7 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
           out.supervisor.recorded += 1;
           out.supervisor.rows += plan.rows.length;
           if (dryRun) continue;
-          m.transaction(() => { for (const r of plan.rows) recordLlmUsage(m, { subjectType: 'supervisor-turn', turnRef: plan.turnRef, provider: e.agent, responseModel: r.model, source: plan.source, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheReadTokens: r.cacheReadTokens, cacheWriteTokens: r.cacheWriteTokens, reasoningTokens: r.reasoningTokens, costUsd: r.costUsd, turns: r.turns, toolCalls: r.toolCalls, toolErrors: r.toolErrors }); });
+          m.transaction(() => { for (const r of plan.rows) recordMachineLlmUsage(m, { subjectType: 'supervisor-turn', turnRef: plan.turnRef, provider: e.agent, responseModel: r.model, source: plan.source, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheReadTokens: r.cacheReadTokens, cacheWriteTokens: r.cacheWriteTokens, reasoningTokens: r.reasoningTokens, costUsd: r.costUsd, turns: r.turns, toolCalls: r.toolCalls, toolErrors: r.toolErrors }); });
         } catch (error) { out.errors.push(`supervisor ${path.basename(e.file)}: ${message(error).slice(0, 160)}`); }
       }
     };

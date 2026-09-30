@@ -23,10 +23,10 @@ import { sleepSync } from './sleep-sync.mjs';
 import { samePath } from './path-key.mjs';
 import { gitSpawn } from './git.mjs';
 import { artifactHoldReason } from './artifact-hold.mjs';
+import { realpathOr } from './fs-kind.mjs';
 
 const WIN = process.platform === 'win32';
 const same = samePath;
-const realOf = (p) => { try { return fs.realpathSync.native(p); } catch { return null; } };
 
 /**
  * True when `p` is a link of any kind: a symlink, a junction, or another reparse point that redirects it.
@@ -39,8 +39,8 @@ export function isLinkLike(p, { parentReal = null, stat = null } = {}) {
   if (st.isSymbolicLink()) return true;
   if (!st.isDirectory()) return false;
   try { fs.readlinkSync(p); return true; } catch { /* not a link readlink can read */ }
-  const parent = parentReal ?? realOf(path.dirname(p));
-  const real = realOf(p);
+  const parent = parentReal ?? realpathOr(path.dirname(p));
+  const real = realpathOr(p);
   if (!parent || !real) return true; // cannot prove it is a plain directory: treat it as a link
   return !same(real, path.join(parent, path.basename(p)));
 }
@@ -76,8 +76,8 @@ export function strictlyInsideReal(p, root) {
   if (!root) return false;
   const rel = path.relative(path.resolve(root), path.resolve(p));
   if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return false;
-  const real = realOf(p);
-  const rootReal = realOf(root);
+  const real = realpathOr(p);
+  const rootReal = realpathOr(root);
   // Its real path must be the same relative place under the root's real path: no link between them.
   return Boolean(real && rootReal) && same(real, path.join(rootReal, rel));
 }
@@ -125,8 +125,8 @@ export function safeRemoveTree(root, { retries = 5, checkoutsUnder = null } = {}
   // CONTAINMENT (the .claude/node_modules wipe, 2026-09-28): nothing is ever deleted whose real path is not
   // the root itself or strictly under the root's real path. A link is unlinked above (the link only); any other
   // entry that resolves outside the tree is refused, whatever made it look like a plain entry.
-  const rootReal = realOf(target);
-  const insideRoot = (p) => { const real = realOf(p); if (!real || !rootReal) return false; if (same(real, rootReal)) return true;
+  const rootReal = realpathOr(target);
+  const insideRoot = (p) => { const real = realpathOr(p); if (!real || !rootReal) return false; if (same(real, rootReal)) return true;
     const rel = path.relative(rootReal, real); return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel); };
   const walk = (dir, st, parentReal) => {
     if (isLinkLike(dir, { parentReal, stat: st })) {
@@ -135,7 +135,7 @@ export function safeRemoveTree(root, { retries = 5, checkoutsUnder = null } = {}
       return false;
     }
     if (!insideRoot(dir)) {
-      fail(dir, { code: 'OUTSIDE_ROOT', message: `refusing to delete ${dir}: its real path ${realOf(dir) ?? '?'} is outside ${rootReal ?? target}` });
+      fail(dir, { code: 'OUTSIDE_ROOT', message: `refusing to delete ${dir}: its real path ${realpathOr(dir) ?? '?'} is outside ${rootReal ?? target}` });
       return false;
     }
     if (!st.isDirectory()) {
@@ -143,7 +143,7 @@ export function safeRemoveTree(root, { retries = 5, checkoutsUnder = null } = {}
       if (error) { fail(dir, error); return false; }
       out.removed.files += 1; return true;
     }
-    const real = realOf(dir);
+    const real = realpathOr(dir);
     if (!real) { fail(dir, { code: 'REALPATH', message: 'cannot resolve the directory' }); return false; }
     let entries;
     try { entries = fs.readdirSync(dir); } catch (error) { fail(dir, error); return false; }

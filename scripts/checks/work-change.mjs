@@ -3,6 +3,7 @@ import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {canonicalJSON} from '../../engine/canonical-json.mjs';import {sha256} from '../../engine/digest.mjs';
 import {slash} from '../lib/path-key.mjs';
+import {list} from '../lib/list.mjs';
 
 /**
  * The change record: the part of the Work model that decides how far an edit travels.
@@ -55,7 +56,6 @@ export {WorkChangeInputError};
 
 const object=value=>Boolean(value)&&typeof value==='object'&&!Array.isArray(value);
 const text=value=>typeof value==='string'&&Boolean(value.trim());
-const list=value=>Array.isArray(value)?value:[];
 const positiveInteger=value=>Number.isInteger(value)&&value>0;
 const key=value=>canonicalJSON(value??null);
 /** A word a person would recognize in both a clause and the sentence that explains why it went. */

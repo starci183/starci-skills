@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isRuntimeRoot, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { loadConfig } from '../../engine/config.mjs';
-import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
+import { withLedgerRead } from '../connectors/lib.mjs';
+import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
 
 /**
  * The managed product ledgers: {repos, missing, configError?}. `missing` names listed paths that hold no ledger;
@@ -18,7 +19,7 @@ import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 export function resumeRepos({ config = null, env = process.env, extra = [] } = {}) {
   let listed = [], configError = null;
   try { listed = (config ?? loadConfig())?.supervisor?.repos ?? []; } catch (error) { configError = String(error?.message ?? error); }
-  const source = sourceRootOf(env);
+  const source = starciSourceRoot(env);
   const seen = new Set(), repos = [], missing = [];
   for (const repo of [...(listed ?? []).map((r) => path.resolve(source, r)), ...extra.map((r) => path.resolve(r))]) {
     const key = process.platform === 'win32' ? repo.toLowerCase() : repo;

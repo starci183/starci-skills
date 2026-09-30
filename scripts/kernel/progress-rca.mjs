@@ -27,7 +27,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
-import { priorityTable, readThrottleState } from '../lib/ram-throttle.mjs';
+import { SLOT_STATUSES, priorityTable, readThrottleState } from '../lib/ram-throttle.mjs';
 import { specsOf } from './spec-deferral.mjs';
 import { JOB_ROW } from './api-lib/rows.mjs';
 import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
@@ -37,7 +37,6 @@ import { blockingDecisions, resolutionOf } from '../reconciler/decisions.mjs';
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
 
 export const OPEN_JOB = Object.freeze(['queued', 'leased', 'running', 'reported', 'effect_unknown', 'answering']);
-export const RUNNING_JOB = Object.freeze(['leased', 'running', 'reported', 'effect_unknown', 'answering']);
 export const DECISION_KIND = 'kernel-decision';
 export const DECISION_RESULT_KIND = 'kernel-decision-result';
 export const GRAPH_EDIT_KIND = 'kernel-graph-edit';
@@ -151,7 +150,7 @@ export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now 
   const unitsPerHour = Math.round(inWin(settings.windowMs) / (settings.windowMs / HOUR) * 10) / 10;
   const etaRate = inWin(settings.etaWindowMs) / (settings.etaWindowMs / HOUR);
   const remaining = total - done.length;
-  const running = jobs.filter((j) => RUNNING_JOB.includes(j.status)).length;
+  const running = jobs.filter((j) => SLOT_STATUSES.includes(j.status)).length;
   const queued = core.frontier?.queued ?? [];
   const readyJobs = queued.filter((q) => q.queuedBecause === 'ready').map((q) => q.jobId);
   const queuedReady = readyJobs.length;
@@ -541,7 +540,7 @@ export function missingQueuedOf(units, resolve) {
   const out = [];
   // A path a running unit of this workflow owns (or sits under/over) may be created by it: never called missing.
   const low = (p) => String(p).replace(/\\/g, '/').toLowerCase();
-  const running = units.flatMap((u) => u.jobs.filter((j) => RUNNING_JOB.includes(j.status))).flatMap((j) => (j.payload?.owned_paths ?? []).map(low));
+  const running = units.flatMap((u) => u.jobs.filter((j) => SLOT_STATUSES.includes(j.status))).flatMap((j) => (j.payload?.owned_paths ?? []).map(low));
   const near = (p) => running.some((r) => r === p || r.startsWith(`${p}/`) || p.startsWith(`${r}/`) || r.split('/').slice(0, -1).join('/') === p.split('/').slice(0, -1).join('/'));
   for (const u of units) {
     for (const j of u.jobs.filter((x) => x.status === 'queued' && !(x.payload?.after ?? []).length)) {

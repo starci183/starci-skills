@@ -4,8 +4,8 @@ export const ACCEPTANCE_VERDICTS=Object.freeze(['pass','fail','inconclusive','un
 import fs from 'node:fs';
 import path from 'node:path';
 import {sha256File} from '../../engine/digest.mjs';
+import {list} from '../lib/list.mjs';
 
-const list=value=>Array.isArray(value)?value:[];
 const nonempty=value=>typeof value==='string'&&Boolean(value.trim());
 const identityMatches=(packet,identity)=>['workflowId','opId','attempt','generation','jobId'].every(field=>String(packet?.[field])===String(identity?.[field]));
 const safeArtifact=(root,given)=>{
