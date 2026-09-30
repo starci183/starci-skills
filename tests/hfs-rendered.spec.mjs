@@ -73,7 +73,11 @@ test('HFS_FORMAT: the runtime declares and resolves its pinned prettier from thi
   const manifest = JSON.parse(fs.readFileSync(path.join(runtime, 'package.json'), 'utf8'));
   assert.equal(manifest.devDependencies.prettier, '3.9.6');
   const installed = createRequire(import.meta.url).resolve('prettier/package.json');
-  assert.ok(!path.relative(runtime, installed).startsWith('..'), `prettier must resolve from this checkout: ${installed}`);
+  // Junction-aware: node_modules may be a junction (the land gate's scratch links the live runtime's), so compare realpaths;
+  // an ancestor's node_modules (e.g. the host repo one level up) still falls outside realpath(runtime/node_modules).
+  const ownModules = fs.realpathSync(path.join(runtime, 'node_modules'));
+  const inside = path.relative(ownModules, fs.realpathSync(installed));
+  assert.ok(inside && !inside.startsWith('..') && !path.isAbsolute(inside), `prettier must resolve from this checkout's node_modules (${ownModules}): ${installed}`);
   assert.ok(installed.includes(`${path.sep}node_modules${path.sep}prettier${path.sep}`));
   assert.equal(JSON.parse(fs.readFileSync(installed, 'utf8')).version, '3.9.6');
 });
