@@ -6,7 +6,7 @@ import {createRequire,isBuiltin} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {canonicalJSON} from '../../engine/canonical-json.mjs';import {isPlainObject as plain} from '../../engine/plain-object.mjs';import {sha256} from '../../engine/digest.mjs';
 import {readModuleJson} from '../../engine/runtime-root.mjs';
-import {checkArchitecture,GRAMMAR_RULE_IDS,OWNER_RULE_IDS,SWR_DATA_RULE_IDS} from './architecture/index.mjs';
+import {checkArchitecture,GRAMMAR_RULE_IDS,OWNER_RULE_IDS,REGISTRATION_RULE_IDS,SWR_DATA_RULE_IDS} from './architecture/index.mjs';
 import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architecture/typescript.mjs';
 import {discoverNestMetadataInputs} from './code-patterns/nest-metadata.mjs';
 import {loadRuleCatalog} from '../lib/hfs-slots.mjs';

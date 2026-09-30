@@ -6,7 +6,7 @@ import { archFixture, runArch, findings } from './_hfs-arch-fixture.mjs';
 // BE_REQUIRED_MODULE_MISSING (backend app, feature, domain, integrations, platform), FE_ERROR_BOUNDARY_MISSING
 // (fe.app.next error and loading files) and HFS_REQUIRED_FILE_MISSING (every other file, and the minimums at hfs.json).
 
-const PLATFORM = ['config', 'logging', 'errors', 'primitives'];
+const PLATFORM = ['config', 'logging', 'errors', 'primitives', 'clock', 'i18n'];
 const platformFiles = (skip = []) => Object.fromEntries(PLATFORM.filter(name => !skip.includes(name))
   .map(name => [`src/modules/platform/${name}/index.ts`, 'export const value = 1;\n']));
 const paths = (report, ruleId) => findings(report, ruleId).map(item => item.path).sort();
@@ -35,7 +35,7 @@ test('BE: a missing required platform instance is flagged once', t => {
   assert.equal(hits[0].slot, 'be.platform');
 });
 
-test('BE: with no platform module at all all four are missing; one lacking index.ts names the file', t => {
+test('BE: with no platform module at all all six are missing; one lacking index.ts names the file', t => {
   const none = archFixture(t, { files: { ...COMPOSITION, ...FEATURE } });
   assert.deepEqual(paths(runArch(none), 'BE_REQUIRED_MODULE_MISSING'), PLATFORM.map(name => `src/modules/platform/${name}`).sort());
   const noIndex = archFixture(t, { files: { ...platformFiles(['logging']), 'src/modules/platform/logging/logger.ts': 'export const l = 1;\n', ...COMPOSITION, ...FEATURE } });
@@ -123,12 +123,10 @@ test('FE: a complete Next app raises no required-file finding', t => {
   assert.deepEqual(findings(report, 'BE_REQUIRED_MODULE_MISSING'), []);
 });
 
-test('FE: a missing layout.tsx, api client.ts and i18n file are HFS_REQUIRED_FILE_MISSING', t => {
+test('FE: a missing layout.tsx is HFS_REQUIRED_FILE_MISSING; api client.ts and i18n request.ts are optional (shared by a package) and raise nothing', t => {
   const files = { ...NEXT, ...BOUNDARIES, 'apps/web/src/app/[locale]/layout.tsx': null, 'apps/web/src/modules/api/client.ts': null, 'apps/web/src/modules/i18n/request.ts': null };
   const report = runArch(archFixture(t, { profile: 'fe', files }));
-  assert.deepEqual(paths(report, 'HFS_REQUIRED_FILE_MISSING'), [
-    'apps/web/src/app/[locale]/layout.tsx', 'apps/web/src/modules/api/client.ts', 'apps/web/src/modules/i18n/request.ts',
-  ]);
+  assert.deepEqual(paths(report, 'HFS_REQUIRED_FILE_MISSING'), ['apps/web/src/app/[locale]/layout.tsx']);
   assert.deepEqual(findings(report, 'FE_ERROR_BOUNDARY_MISSING'), []);
 });
 

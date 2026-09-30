@@ -21,10 +21,10 @@ const REPRESENTATIVES = {
   'src/modules/domain/billing/invoice.module.ts': MODULE('InvoiceModule'),
 };
 const FEATURE = {
-  'src/features/a/index.ts': "export { AGraphqlModule } from './a-graphql.module';\nexport { AHttpModule } from './a-http.module';\n",
+  'src/features/a/index.ts': "export { AGraphqlModule } from './transport/graphql/a-graphql.module';\nexport { AHttpModule } from './transport/http/a-http.module';\n",
   'src/features/a/a.module.ts': "import { Module } from '@nestjs/common';\n@Module({})\nexport class AModule {}\n",
-  'src/features/a/a-graphql.module.ts': "import { Module } from '@nestjs/common';\nimport { AModule } from './a.module';\n@Module({ imports: [AModule] })\nexport class AGraphqlModule {}\n",
-  'src/features/a/a-http.module.ts': "import { Module } from '@nestjs/common';\nimport { AModule } from './a.module';\n@Module({ imports: [AModule] })\nexport class AHttpModule {}\n",
+  'src/features/a/transport/graphql/a-graphql.module.ts': "import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\n@Module({ imports: [AModule] })\nexport class AGraphqlModule {}\n",
+  'src/features/a/transport/http/a-http.module.ts': "import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\n@Module({ imports: [AModule] })\nexport class AHttpModule {}\n",
 };
 const APP = imports => `import { Module } from '@nestjs/common';
 import { ConfigModule } from '../../../src/modules/platform/config';
@@ -119,10 +119,11 @@ test('BE: `isGlobal: true` outside an app root is refused, `isGlobal: false` is 
   assert.equal(found[0].line, 2);
 });
 
+// A worker app composes no http/graphql transport module (slots composedBy), so it registers the representatives only.
 test('BE: two apps may each register the same representative once', t => {
   const report = runArch(archFixture(t, {
     apps: [{ name: 'core', kind: 'api' }, { name: 'jobs', kind: 'worker' }],
-    files: { ...REPRESENTATIVES, ...FEATURE, 'apps/core/src/app.module.ts': APP(GOOD), 'apps/jobs/src/app.module.ts': APP(GOOD) },
+    files: { ...REPRESENTATIVES, ...FEATURE, 'apps/core/src/app.module.ts': APP(GOOD), 'apps/jobs/src/app.module.ts': APP(GOOD.slice(0, 2)) },
   }));
   assert.deepEqual(hits(report), []);
 });

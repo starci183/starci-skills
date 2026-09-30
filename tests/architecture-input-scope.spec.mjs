@@ -9,6 +9,44 @@ import {execFileSync} from 'node:child_process';
 import {checkScopedLint,settingMatches} from '../scripts/checks/check-scoped-lint.mjs';
 import {checkArchitecture} from '../scripts/checks/architecture/index.mjs';
 
+// A complete HFS backend tree: the six platform instances, the default-deny guards and the one filter of the api app, a
+// feature composed through its transport module, and the domain capabilities the app root reaches at runtime.
+const stub=name=>`export const ${name}=1;\n`;
+const COMPLETE_TREE={
+  ...Object.fromEntries(['config','logging','primitives','clock','i18n'].map(name=>[`src/modules/platform/${name}/index.ts`,stub(name)])),
+  'src/modules/platform/errors/index.ts':"export { AllExceptionsFilter } from './all-exceptions.filter';\n",
+  'src/modules/platform/errors/all-exceptions.filter.ts':'export class AllExceptionsFilter { catch(): void {} }\n',
+  'src/modules/platform/http-security/index.ts':"export { CsrfOriginGuard } from './csrf-origin.guard';\n",
+  'src/modules/platform/http-security/csrf-origin.guard.ts':'export class CsrfOriginGuard { canActivate(): boolean { return true; } }\n',
+  'src/modules/domain/identity/index.ts':"export { AuthGuard } from './auth.guard';\n",
+  'src/modules/domain/identity/auth.guard.ts':'export class AuthGuard { canActivate(): boolean { return true; } }\n',
+  'src/modules/domain/store/index.ts':"export { Service } from './service';\n",
+  'src/features/a/index.ts':"export { AHttpModule } from './transport/http/a-http.module';\n",
+  'src/features/a/a.module.ts':"import { Module } from '@nestjs/common';\n@Module({})\nexport class AModule {}\n",
+  'src/features/a/application/run.command.ts':stub('run'),
+  'src/features/a/transport/http/a-http.module.ts':"import { Module } from '@nestjs/common';\nimport { AModule } from '../../a.module';\nimport { run } from '../../application/run.command';\n@Module({ imports: [AModule], providers: [{ provide: 'run', useValue: run }] })\nexport class AHttpModule {}\n",
+};
+const APP_MODULE=`import { Module } from '@nestjs/common';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { config } from '../../../src/modules/platform/config';
+import { logging } from '../../../src/modules/platform/logging';
+import { primitives } from '../../../src/modules/platform/primitives';
+import { clock } from '../../../src/modules/platform/clock';
+import { i18n } from '../../../src/modules/platform/i18n';
+import { AllExceptionsFilter } from '../../../src/modules/platform/errors';
+import { CsrfOriginGuard } from '../../../src/modules/platform/http-security';
+import { AuthGuard } from '../../../src/modules/domain/identity';
+import { Service } from '../../../src/modules/domain/store';
+import { Store } from '../../../packages/store/src/store';
+import { AHttpModule } from '../../../src/features/a';
+@Module({ imports: [AHttpModule], providers: [Service, Store, { provide: 'platform', useValue: [config, logging, primitives, clock, i18n] }, { provide: APP_FILTER, useClass: AllExceptionsFilter },
+  { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: CsrfOriginGuard }, { provide: APP_GUARD, useClass: AuthGuard }] })
+export class AppModule {
+  static register(options: object) { return { module: AppModule, ...options }; }
+}
+`;
+
 function fixture(t){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-architecture-input-scope-'));
   t.after(()=>{
@@ -113,7 +151,7 @@ test('real broad TypeScript programs retain explicit configuration roles without
   for(const [file,text] of Object.entries({'.gitattributes':'* text=auto eol=lf\n','.github/workflows/check.yml':'name: check\n','.gitignore':'node_modules/\n',
     '.husky/pre-commit':'exit 0\n','.sops.yaml':'creation_rules: []\n','.starcistacks/application-stacks.yaml':'environments: []\n','.starciwork/.gitignore':'runtime.sqlite\n',
     'README.md':hfsReadme(f.root),'codecov.yml':'coverage: {}\n','eslint.config.mjs':'export default [];\n','nest-cli.json':'{}\n','package-lock.json':'{}\n',
-    'sonar-project.properties':'sonar.projectKey=fixture\n','apps/api/package.json':'{"name":"@fixture/api","private":true}\n','apps/api/src/app.module.ts':'export const AppModule=1;\n'}))f.write(file,text);
+    'sonar-project.properties':'sonar.projectKey=fixture\n','apps/api/package.json':'{"name":"@fixture/api","private":true}\n','apps/api/src/app.module.ts':APP_MODULE,'apps/api/src/api.composition.spec.ts':"import { AppModule } from './app.module';\nit('boots', () => { AppModule.register({}); });\n",...COMPLETE_TREE}))f.write(file,text);
   f.write('package.json',JSON.stringify({private:true}));
   f.write('hfs.json',JSON.stringify({hfs:1,profile:'be',project:'fixture',apps:[{name:'api',kind:'api'}]}));
   f.write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true,allowJs:true},include:['**/*.ts','jest.config.js']}));
@@ -125,13 +163,14 @@ test('real broad TypeScript programs retain explicit configuration roles without
   execFileSync('git',['init','-q'],{cwd:f.root});execFileSync('git',['add','-A','.'],{cwd:f.root});
   profile.sourceGlobs.push('apps/*/src/**/*.ts');profile.inputGlobs.push('apps/*/jest*.js');
   profile.obligations[0].mechanical.check.ruleIds=['ARCH_SYNTAX_INVALID'];
+  profile.obligations[0].applicability.exclude=['**/*.spec.ts'];
   profile.obligations.push({id:'SOURCE-SCRIPT',sourceRuleIds:['BE-TYPING-1'],applicability:{include:['**/*.ts','**/*.js']},
     mechanical:{requirement:'Check selected source contracts.',check:{kind:'script',sourceOnly:true,ruleIds:['SOURCE_TEST_RULE']}},
     semantic:{guidance:'docs/architecture-input-scope.md',review:'Review behavior separately.'},status:'implemented'});
   const options={...f.options,architecture:checkArchitecture};
   let report=await checkScopedLint(f.root,[],options);
   assert.equal(report.status,'clean',JSON.stringify(report.issues));
-  const expected=['apps/api/src/app.module.ts','apps/api/src/main.ts','packages/store/src/store.ts','src/modules/domain/store/service.ts'];
+  const expected=[...new Set([...Object.keys(COMPLETE_TREE),'apps/api/src/api.composition.spec.ts','apps/api/src/app.module.ts','apps/api/src/main.ts','packages/store/src/store.ts','src/modules/domain/store/service.ts'])].filter(file=>file.endsWith('.ts')).sort();
   assert.deepEqual(report.obligations.find(item=>item.id==='SOURCE-SCRIPT').files,expected);
   const input=f.seen.find(item=>item.ruleIds.includes('SOURCE_TEST_RULE'));
   assert.deepEqual(input.sourceContextFiles,expected);

@@ -60,7 +60,7 @@ test('a nested copy that lacks the selected export is refused and named', (t) =>
   m.put('apps/app/node_modules/@starci/grammar/package.json', JSON.stringify(manifest));
   const invalid = grammarViolations(m.check()).find((item) => item.ruleId === 'ARCH_GRAMMAR_CONTRACT_INVALID');
   assert.ok(invalid, 'refused');
-  assert.match(invalid.message, /common\.css is not a safe declared style export \(as apps\/app\/package\.json resolves it, apps\/app\/node_modules\/@fixture\/grammar\)/);
+  assert.match(invalid.message, /common\.css is not a safe declared style export \(as apps\/app\/package\.json resolves it, apps\/app\/node_modules\/@starci\/grammar\)/);
 });
 
 test('one style entry per app: importing the family sheet beside common.css is a bypass, since core.css imports common itself', (t) => {
