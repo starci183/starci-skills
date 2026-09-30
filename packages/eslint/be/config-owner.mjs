@@ -5,8 +5,13 @@
  *   - `no-direct-env-read` keeps the process environment inside the one file that declares the `EnvSource` class of
  *     `platform/config`. Everything else receives typed options from `<capability>.config.ts`. `process.env` in any form
  *     (member access, destructuring, `Reflect.get(process, "env")`, an `env` import of `node:process`), an import of
- *     `@nestjs/config` or `dotenv`, a call of `envConfig()`, and a `process.cwd()` path joined into `src` or
- *     `.starcistacks` are refused everywhere else.
+ *     `@nestjs/config` or `dotenv`, and a `process.cwd()` path joined into `src` or
+ *     `.starcistacks` are refused everywhere else. A config getter that reads `process.env` itself is caught here at its
+ *     definition.
+ *   - `config-parsed-in-main` keeps the parsing of configuration in `main.ts`: a call of a function exported by a
+ *     `<capability>.config.ts` (or of a function returning a `<capability>.options.ts` type, at module scope) is refused
+ *     outside the app entry, the config file itself, its own spec and the test world. The callee is found through the type
+ *     checker, so no function name is matched.
  *   - `no-secret-default` refuses a default for a value typed `Secret` or `Url` by `platform/config`: a default argument
  *     to an `EnvSource` reader, a `??`/`||` fallback on such a value, and a string literal default (`""`, `"localhost"`,
  *     `"127.0.0.1"`, `"0.0.0.0"`, `http(s)://...`) given to any reader that returns one. The TYPE decides; no key name is
@@ -16,10 +21,12 @@
  *
  * No test lane is exempt: a spec builds its `EnvSource` from a literal record and never touches the process environment.
  */
+import ts from "typescript"
 import { keyName, staticText, walk, wordsOf } from "./lib/ast.mjs"
 import { isOwnedBy, originsOf } from "./lib/declared.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isDeclarationFile, normalizePath } from "./lib/path.mjs"
+import { originsOfType, typed } from "./lib/types.mjs"
 
 const PROCESS_MODULES = new Set(["process", "node:process"])
 
@@ -46,7 +53,6 @@ export const noDirectEnvRead = {
         messages: {
             env: "The process environment is read outside the `EnvSource` of `platform/config`. Add the key to the capability's `<capability>.config.ts` (`parse<C>Config(env: EnvSource)`) and receive the value through its `<capability>.options.ts`.",
             package: "`{{source}}` is a second config path. Configuration is parsed once in `main.ts` by `platform/config` typed readers and reaches a module through `register(options)`.",
-            envConfig: "`envConfig()` re-reads the environment per call site. Receive the value through the capability's options, read with `Inject<C>Options()`.",
             cwdPath: "A path built from `process.cwd()` and `{{segment}}` depends on where the process was started. Resolve it from a configured root.",
         },
     },
@@ -101,7 +107,6 @@ export const noDirectEnvRead = {
             },
             CallExpression(node) {
                 const callee = node.callee
-                if (callee.type === "Identifier" && callee.name === "envConfig") context.report({ node, messageId: "envConfig" })
                 if (callee.type === "Identifier" && callee.name === "require") {
                     const source = staticText(node.arguments[0])
                     if (source !== null) reportSource(node, source)
@@ -122,6 +127,76 @@ export const noDirectEnvRead = {
                         if (segment) context.report({ node, messageId: "cwdPath", data: { segment } })
                     }
                 }
+            },
+        }
+    },
+}
+
+const CONFIG_SUFFIX = ".config.ts"
+const OPTIONS_SUFFIX = ".options.ts"
+const CONFIG_SPEC_SUFFIX = ".config.spec.ts"
+
+const baseOf = (file) => normalizePath(file).split("/").at(-1) ?? ""
+
+/** A file in a slot of the repository whose role is `<c>.config.ts` (a file with the suffix that no slot claims is not one). */
+const isConfigFile = (hfs, file) => baseOf(file).endsWith(CONFIG_SUFFIX) && hfs.slotOf(file) !== null
+
+/** A file in a slot of the repository whose role is `<c>.options.ts`. */
+const isOptionsFile = (hfs, file) => baseOf(file).endsWith(OPTIONS_SUFFIX) && hfs.slotOf(file) !== null
+
+/** The declaration of a plain function (declaration, or arrow/function expression bound to a variable), else null: a method is not a getter. */
+const functionDeclarationOf = (declaration) => {
+    if (!declaration) return null
+    if (ts.isFunctionDeclaration(declaration)) return declaration
+    if ((ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) && ts.isVariableDeclaration(declaration.parent)) return declaration
+    return null
+}
+
+/** True when the node is evaluated when the module loads: no function, method or class member body encloses it. */
+const isModuleScope = (node) => {
+    for (let parent = node.parent; parent; parent = parent.parent) {
+        if (/Function|MethodDefinition|PropertyDefinition|StaticBlock/.test(parent.type)) return false
+    }
+    return true
+}
+
+/** Config is parsed once, in `main.ts`; nothing else calls a config parser or getter. */
+export const configParsedInMain = {
+    meta: {
+        type: "problem",
+        docs: { description: "A function of a `<capability>.config.ts` is called only from the app entry, its own config file or spec, and the test world." },
+        schema: [],
+        messages: {
+            parsed: "`{{name}}` is declared by `{{file}}` and parses configuration. Configuration is parsed once in `apps/<app>/src/main.ts` and reaches a module through `register(options)`; read it here with `Inject<C>Options()`.",
+            moduleScope: "`{{name}}` returns configuration options and is called when the module loads. Options are built once in `main.ts` and injected with `Inject<C>Options()`.",
+        },
+    },
+    create(context) {
+        const filename = normalizePath(context.filename || context.getFilename())
+        if (isDeclarationFile(filename)) return {}
+        const hfs = hfsOf(context)
+        const slot = hfs.slotOf(filename) ?? ""
+        const isEntry = slot.startsWith("be.app.") && baseOf(filename) === "main.ts"
+        const isWorld = slot === "be.tests.world"
+        const isOwnSpec = baseOf(filename).endsWith(CONFIG_SPEC_SUFFIX)
+        if (isEntry || isWorld || isOwnSpec) return {}
+        const { checker, toTs } = typed(context)
+        return {
+            CallExpression(node) {
+                const tsCall = toTs(node)
+                if (!tsCall) return
+                const signature = checker.getResolvedSignature(tsCall)
+                const declaration = functionDeclarationOf(signature?.declaration)
+                if (!declaration) return
+                const declaredIn = normalizePath(declaration.getSourceFile().fileName)
+                const name = context.sourceCode.getText(node.callee)
+                if (isConfigFile(hfs, declaredIn)) {
+                    if (declaredIn !== filename) context.report({ node, messageId: "parsed", data: { name, file: baseOf(declaredIn) } })
+                    return
+                }
+                if (!isModuleScope(node)) return
+                const returned = originsOfType(checker, checker.getReturnTypeOfSignature(signature))
+                if (returned.some((origin) => isOptionsFile(hfs, origin.file))) context.report({ node, messageId: "moduleScope", data: { name } })
             },
         }
     },
@@ -242,13 +317,15 @@ export const secretCompareTimingSafe = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "no-direct-env-read": noDirectEnvRead,
+    "config-parsed-in-main": configParsedInMain,
     "no-secret-default": noSecretDefault,
     "secret-compare-timing-safe": secretCompareTimingSafe,
 }
 
-/** All three start at error: a secret in source or a timing leak is never a warning. */
+/** All four start at error: a secret in source or a timing leak is never a warning. */
 export const recommended = {
     "starci-be/no-direct-env-read": "error",
+    "starci-be/config-parsed-in-main": "error",
     "starci-be/no-secret-default": "error",
     "starci-be/secret-compare-timing-safe": "error",
 }

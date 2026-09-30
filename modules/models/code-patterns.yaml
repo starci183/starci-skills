@@ -202,7 +202,7 @@ profiles:
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/no-untyped-body, starci-be/public-needs-reason, starci-be/no-direct-env-read, starci-be/no-secret-default, starci-be/secret-compare-timing-safe]
+            ruleIds: [starci-be/no-untyped-body, starci-be/public-needs-reason, starci-be/no-direct-env-read, starci-be/config-parsed-in-main, starci-be/no-secret-default, starci-be/secret-compare-timing-safe]
             expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/be/error.yaml

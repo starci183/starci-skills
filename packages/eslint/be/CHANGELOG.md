@@ -21,6 +21,8 @@
 - Changed: `no-non-ascii-source` (R89) folds each line to NFC before it looks for a Vietnamese letter, so a decomposed spelling is caught like the precomposed one, and it exempts the i18n fixtures slot `be.tests.fixtures.i18n` (`src/tests/fixtures/i18n/`) beside the message-catalog slots; a test title, an identifier and a string in any other spec or fixture are still refused. The detection is `scripts/lib/language.mjs`, shipped in `runtime/`.
 
 - Changed: the messages and header of `tests-no-override` and `tests-infra-only-in-world` (`test-world.mjs`) follow the owner refinement 2026-09-30 of R47: a service of the repository's own stack runs real and is failed on purpose through `world.infra.<service>`, only an external SaaS is a network fake (`world.fake.<provider>`). Detection is unchanged.
+- New: `config-parsed-in-main` (R43) refuses a call of a function declared by a `<capability>.config.ts` (found through the type checker, at module scope, in a method or in a module factory) outside `apps/<app>/src/main.ts`, that config file, its `<c>.config.spec.ts` and `src/tests/world/`, and a module-scope call of a function returning a `<c>.options.ts` type. Removed: the name-based `envConfig()` check of `no-direct-env-read` (its `envConfig` messageId); a getter that reads `process.env` is caught at its definition.
+
 - Breaking: one configuration, `export default starciBeConfig({ hfs: loadHfs(import.meta.url) })`. The factory is async
   (ESLint awaits it), turns typed linting on for every `.ts/.mts/.cts/.js/.mjs/.cjs` (`parserOptions.projectService`),
   ignores only `dist/`, `coverage/`, `node_modules/`, borrows `@typescript-eslint/{consistent-type-assertions (never),
