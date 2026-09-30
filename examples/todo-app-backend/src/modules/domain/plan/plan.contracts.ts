@@ -177,3 +177,72 @@ export type SubscriptionLookupResult = SubscriptionView | null
 
 /** The answer of a payment intent lookup: the intent, or null when there is none. */
 export type PaymentIntentLookupResult = PaymentIntentView | null
+
+/** What opening the checkout of the paid plan needs. */
+export interface UpgradeParams {
+    /** The person who upgrades. */
+    readonly personId: string
+}
+
+/** Where the checkout stands after it was opened. */
+export interface CheckoutView {
+    /** The subscription of the person. */
+    readonly subscriptionId: string
+    /** The payment intent to reconcile later. */
+    readonly paymentIntentId: string
+    /** Where the person completes the payment. */
+    readonly checkoutUrl: string
+    /** The subscription status after the checkout started. */
+    readonly status: SubscriptionStatus
+}
+
+/** What returning a person to the free plan needs. */
+export interface DowngradeParams {
+    /** The person who downgrades. */
+    readonly personId: string
+}
+
+/** The subscription after the downgrade. */
+export interface DowngradeView {
+    /** The subscription of the person. */
+    readonly subscriptionId: string
+    /** The plan the subscription holds afterwards. */
+    readonly plan: PlanTier
+    /** The subscription status afterwards. */
+    readonly status: SubscriptionStatus
+}
+
+/** What polling the gateway for one payment intent of a person needs. */
+export interface ReconcileParams {
+    /** The person who asks; the intent must belong to their subscription. */
+    readonly personId: string
+    /** The payment intent id. */
+    readonly paymentIntentId: string
+}
+
+/** What the gateway said and what it caused. */
+export interface ReconcileView {
+    /** The status the gateway reported just now. */
+    readonly gatewayStatus: PaymentIntentStatus
+    /** True when this call is the one that applied the intent. */
+    readonly applied: boolean
+    /** The status of the subscription afterwards. */
+    readonly subscriptionStatus: SubscriptionStatus
+}
+
+/** What one webhook delivery carries: the presented credential and what the gateway reported. */
+export interface WebhookDeliveryParams {
+    /** The Authorization header as presented, absent when the sender sent none. */
+    readonly authorization: string | undefined
+    /** The id the gateway knows the transaction under; it is also the id of the delivery. */
+    readonly gatewayIntentId: string
+    /** What the gateway reported. */
+    readonly outcome: "paid" | "failed"
+    /** The end of the paid period, absent for the default period. */
+    readonly periodEnd: Date | undefined
+}
+
+/** What a webhook delivery caused: ignored, or what the confirmation changed. */
+export type WebhookReceipt =
+    | { readonly ignored: true }
+    | { readonly ignored: false; readonly applied: boolean; readonly subscriptionStatus: SubscriptionStatus }

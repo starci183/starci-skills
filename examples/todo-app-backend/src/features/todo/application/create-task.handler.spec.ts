@@ -1,7 +1,7 @@
 import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import { AuditAction } from "@modules/domain/audit"
-import type { CapGuardPolicy } from "@modules/domain/plan"
+import type { SubscriptionService } from "@modules/domain/plan"
 import { TaskErrorCode } from "@modules/domain/task"
 import type { TaskService, TaskView } from "@modules/domain/task"
 import type { Principal } from "@modules/platform/cqrs"
@@ -19,20 +19,20 @@ const created: TaskView = { id: "t1", owner: "owner-1", title: "Write", complete
 interface Built {
     handler: CreateTaskHandler
     tasks: TaskService
-    capGuard: CapGuardPolicy
+    capGuard: SubscriptionService
     outbox: Outbox
     inner: ReturnType<typeof mockEntityManager>
 }
 
 const build = (
-    parts: { verdict?: Awaited<ReturnType<CapGuardPolicy["check"]>>; owned?: ReadonlyArray<TaskView>; create?: jest.Mock } = {},
+    parts: { verdict?: Awaited<ReturnType<SubscriptionService["checkCap"]>>; owned?: ReadonlyArray<TaskView>; create?: jest.Mock } = {},
 ): Built => {
     const inner = mockEntityManager()
     const tasks = mock<TaskService>({
         listOwnedBy: jest.fn().mockResolvedValue(parts.owned ?? []),
         create: parts.create ?? jest.fn().mockResolvedValue({ kind: "ok", value: created }),
     })
-    const capGuard = mock<CapGuardPolicy>({ check: jest.fn().mockResolvedValue(parts.verdict ?? { allowed: true }) })
+    const capGuard = mock<SubscriptionService>({ checkCap: jest.fn().mockResolvedValue(parts.verdict ?? { allowed: true }) })
     const outbox = mock<Outbox>()
     const entityManager = mockEntityManager({ transaction: fakeTransaction(inner) })
     const handler = new CreateTaskHandler(mock<Logger>(), entityManager, new FakeClock(AT), outbox, tasks, capGuard)
@@ -55,7 +55,7 @@ describe("CreateTaskHandler", () => {
         const done: TaskView = { ...created, id: "t0", complete: true, completedAt: AT }
         const { handler, capGuard } = build({ owned: [done, created] })
         await handler.execute(new CreateTaskCommand({ request: { title: "Write" }, principal }))
-        expect(capGuard.check).toHaveBeenCalledWith({ personId: "owner-1", activeTaskCount: 1 })
+        expect(capGuard.checkCap).toHaveBeenCalledWith({ personId: "owner-1", activeTaskCount: 1 })
     })
 
     it("refuses with the cap and the upgrade path and writes nothing when the plan is full", async () => {

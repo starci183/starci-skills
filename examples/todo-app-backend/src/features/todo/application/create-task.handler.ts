@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { CommandHandler } from "@nestjs/cqrs"
 import { AuditAction, toAuditAppendMessage } from "@modules/domain/audit"
-import { CapGuardPolicy } from "@modules/domain/plan"
+import { SubscriptionService } from "@modules/domain/plan"
 import { TaskErrorCode, TaskService } from "@modules/domain/task"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
@@ -28,7 +28,7 @@ export class CreateTaskHandler extends ICQRSHandler<CreateTaskCommand, CreateTas
         @InjectClock() private readonly clock: Clock,
         @InjectOutbox() private readonly outbox: Outbox,
         private readonly tasks: TaskService,
-        private readonly capGuard: CapGuardPolicy,
+        private readonly subscriptions: SubscriptionService,
     ) {
         super(logger)
     }
@@ -37,7 +37,7 @@ export class CreateTaskHandler extends ICQRSHandler<CreateTaskCommand, CreateTas
         const { request, principal } = command.params
         const at = this.clock.now()
         const owned = await this.tasks.listOwnedBy({ ownerId: principal.id })
-        const verdict = await this.capGuard.check({
+        const verdict = await this.subscriptions.checkCap({
             personId: principal.id,
             activeTaskCount: owned.filter((task) => !task.complete).length,
         })
