@@ -1,14 +1,12 @@
 #!/usr/bin/env node
-// core-watch.mjs — the chat's continuous, READ-ONLY watch over the StarCi core while workflows run (skills/claude-debug).
+// core-watch.mjs — one READ-ONLY snapshot of the StarCi core (skills/claude-debug): every fact, every open alert, then exit.
 //
-//   node scripts/supervisor/core-watch.mjs                      one stdout line per CHANGE, every --interval seconds, forever
-//   node scripts/supervisor/core-watch.mjs --once [--json]      one snapshot (all facts and alerts), then exit
-//     [--interval <sec>]         default 60
-//     [--child-timeout <sec>]    timeout of every child call (api status, boot --status, services --list), default 90
+//   node scripts/supervisor/core-watch.mjs [--json]
+//     [--child-timeout <sec>]    timeout of every child call (api status, services --list), default 90
 //     [--token-window <min>]     llm_usage window for the token-spike fact, default 10
 //     [--token-spike <n>]        input+output tokens in that window that raise TOKENS, default 3000000 (0 disables)
 //
-// Facts (each is ok or an alert; a line prints only when a fact turns into an alert, changes its alert text, or recovers):
+// Facts (each is ok or an alert):
 //   ENGINE    leader missing/STALE (heartbeat > 90 s), safe mode, a controller configured active but effective shadow/off
 //   SERVICE   harness-ui local and public /healthz, harness-tunnel, ask-gateway, ask-tunnel, telegram-bridge, orca, every seat
 //   WORKFLOW  per non-finished workflow of EVERY registered active ledger (no hard-coded ids): phase, legs turning
@@ -17,7 +15,8 @@
 //
 // It never restarts, writes, dispatches or types into anything: machine.sqlite and every ledger are opened read-only, the
 // only children are read-only verbs, every one with a timeout. Auto-restart made crash-loop safe mode worse; the fix path
-// is a lane (skills/claude-debug). Suitable for a Monitor stream: stdout has lines only on change.
+// is a lane. Repetition is the chat's `/loop` over scripts/supervisor/debug-pass.mjs (skills/claude-debug), never a
+// scheduler in this script.
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -132,8 +131,6 @@ function runningWorkflows() {
   return out;
 }
 
-const statusFails = new Map();
-let lastFacts = new Map();
 const short = (id) => String(id).replace(/^wf-/, '').replace(/-mu\w+$/, '');
 const count = (a) => (Array.isArray(a) ? a.length : 0);
 
@@ -145,15 +142,13 @@ async function workflowFacts(o) {
     if (!w.id) { facts.set(`wf:${w.ledger}`, w.error); return; }
     const k = `wf:${w.ledger}:${short(w.id)}`;
     if (w.phase !== 'running') { facts.set(`${k}:phase`, w.phase === 'paused' || w.phase === 'queued' ? null : `phase ${w.phase}`); return; }
-    const r = await child(['scripts/kernel/api.mjs', 'status', '--repo', w.repo, '--workflow', w.id, '--json'], o);
-    const j = r.ok || r.stdout ? firstJson(r.stdout) : null;
-    if (!j) { // one failed call is noise; two in a row is a fact. The last known facts of this workflow stay meanwhile.
-      const n = (statusFails.get(k) ?? 0) + 1; statusFails.set(k, n);
-      facts.set(`${k}:status`, n >= 2 ? `api status failed ${n}x (${r.error ?? 'no json'})` : null);
-      for (const [key, text] of lastFacts) if (key.startsWith(`${k}:`) && key !== `${k}:status`) facts.set(key, text);
-      return;
-    }
-    statusFails.delete(k);
+    // One failed call is noise; the snapshot asks twice and only two failures in a row are a fact.
+    const ask = () => child(['scripts/kernel/api.mjs', 'status', '--repo', w.repo, '--workflow', w.id, '--json'], o);
+    const parse = (r) => (r.ok || r.stdout ? firstJson(r.stdout) : null);
+    let r = await ask();
+    let j = parse(r);
+    if (!j) { r = await ask(); j = parse(r); }
+    if (!j) { facts.set(`${k}:status`, `api status failed 2x (${r.error ?? 'no json'})`); return; }
     facts.set(`${k}:status`, null);
     const f = j.frontier ?? {};
     for (const leg of j.legs ?? []) {
@@ -182,50 +177,32 @@ function tokenFacts(o) {
   return facts;
 }
 
-/* ------------------------------------------------------------ diff, output */
+/* ------------------------------------------------------------ snapshot, output */
 
-/** The lines one tick owes, given the previous alert map (mutated) and this tick's facts. */
-export function diffFacts(prev, facts, { first = false } = {}) {
-  const lines = [];
-  for (const [key, text] of facts) {
-    const before = prev.get(key) ?? null;
-    if (text) { if (text !== before) lines.push(`[core-watch] ALERT ${key}: ${text}`); prev.set(key, text); }
-    else { if (before && !first) lines.push(`[core-watch] OK ${key} (was: ${before})`); prev.delete(key); }
-  }
-  for (const key of [...prev.keys()]) if (!facts.has(key)) { lines.push(`[core-watch] GONE ${key} (was: ${prev.get(key)})`); prev.delete(key); }
-  return lines;
-}
-
+/** Every fact of the core now: Map<key, alertText|null>. A crashed collector is itself an alert. */
 async function collect(o) {
   const parts = await Promise.all([engineFacts(), serviceFacts(o), workflowFacts(o), tokenFacts(o)].map((p) => Promise.resolve(p).catch((e) => new Map([['collector', `collector crashed: ${String(e?.message ?? e).slice(0, 120)}`]]))));
-  lastFacts = new Map(parts.flatMap((m) => [...m]));
-  return lastFacts;
+  return new Map(parts.flatMap((m) => [...m]));
 }
 
-function parseArgs(argv) {
+/** The watch options from argv (defaults when absent). */
+export function watchOptions(argv = []) {
   const val = (name, d) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] != null ? Number(argv[i + 1]) : d; };
-  return { once: argv.includes('--once'), json: argv.includes('--json'), intervalMs: val('--interval', 60) * 1000, timeoutMs: val('--child-timeout', 90) * 1000,
-    tokenWindowMs: val('--token-window', 10) * 60_000, tokenSpike: val('--token-spike', 3_000_000) };
+  return { timeoutMs: val('--child-timeout', 90) * 1000, tokenWindowMs: val('--token-window', 10) * 60_000, tokenSpike: val('--token-spike', 3_000_000) };
+}
+
+/** One read-only snapshot: {at, ok, alerts: [{key, text}], facts: <count>}. */
+export async function snapshot(o = watchOptions()) {
+  const facts = await collect(o);
+  const alerts = [...facts].filter(([, t]) => t).map(([key, text]) => ({ key, text }));
+  return { at: new Date().toISOString(), ok: alerts.length === 0, alerts, facts: facts.size };
 }
 
 async function main(argv = process.argv.slice(2)) {
-  if (argv.includes('--help') || argv.includes('-h')) { console.log('usage: core-watch.mjs [--once [--json]] [--interval <sec>] [--child-timeout <sec>] [--token-window <min>] [--token-spike <n>]  (read-only)'); return; }
-  const o = parseArgs(argv);
-  const prev = new Map();
-  if (o.once) {
-    const facts = await collect(o);
-    const alerts = [...facts].filter(([, t]) => t).map(([key, text]) => ({ key, text }));
-    if (o.json) console.log(JSON.stringify({ at: new Date().toISOString(), ok: alerts.length === 0, alerts, facts: facts.size }));
-    else console.log(alerts.length ? alerts.map((a) => `[core-watch] ALERT ${a.key}: ${a.text}`).join('\n') : `[core-watch] OK (${facts.size} facts, no alert)`);
-    return;
-  }
-  let first = true;
-  for (;;) {
-    const started = Date.now();
-    try { for (const line of diffFacts(prev, await collect(o), { first })) console.log(line); } catch (e) { console.log(`[core-watch] ALERT watcher: ${String(e?.message ?? e).slice(0, 160)}`); }
-    if (first) { console.log(`[core-watch] baseline done, ${prev.size} alert(s) open; printing changes only`); first = false; }
-    await new Promise((r) => setTimeout(r, Math.max(1000, o.intervalMs - (Date.now() - started))));
-  }
+  if (argv.includes('--help') || argv.includes('-h')) { console.log('usage: core-watch.mjs [--json] [--child-timeout <sec>] [--token-window <min>] [--token-spike <n>]  (one read-only snapshot)'); return; }
+  const snap = await snapshot(watchOptions(argv));
+  if (argv.includes('--json')) console.log(JSON.stringify(snap));
+  else console.log(snap.alerts.length ? snap.alerts.map((a) => `[core-watch] ALERT ${a.key}: ${a.text}`).join('\n') : `[core-watch] OK (${snap.facts} facts, no alert)`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

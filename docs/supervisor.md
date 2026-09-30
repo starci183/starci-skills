@@ -171,8 +171,11 @@ pin registry semver, never a `file:` link.
 
 ## Core debugging from a chat
 
-A chat that supervises and debugs the core while workflows run follows `skills/claude-debug` (`/claude-debug`): the
-read-only watch `node scripts/supervisor/core-watch.mjs` (one stdout line per change: engine leader, services, every
-running workflow of every registered ledger, token spikes; `--once --json` for a snapshot; it never restarts anything),
-the read-only diagnosis playbook, the lane fix loop landed with `land.mjs --specs touching`, and the known failure
-signatures. The chat fixes only the core; Kernels and the Supervisor seat run the workflows.
+A chat that supervises and debugs the core while workflows run follows `skills/claude-debug` (`/claude-debug`). Invoked
+once, it records one loop with `node scripts/supervisor/debug-pass.mjs setup` and starts Claude Code's `/loop 10m
+/claude-debug pass` (a second invocation finds the live loop and starts none). Each tick is one pass: `debug-pass.mjs pass`
+takes the read-only snapshot of `scripts/supervisor/core-watch.mjs` (engine leader, services, every running workflow of
+every registered ledger, token spikes; it never restarts anything), the chat diagnoses each new alert with the read-only
+playbook and dispatches one lane per core defect (`claim`), recorded by alert key so no later pass dispatches it again,
+and prints a Vietnamese status table. Lanes land with `land.mjs --specs touching`; the known failure signatures are in the
+skill. The chat fixes only the core; Kernels and the Supervisor seat run the workflows.

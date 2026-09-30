@@ -2,8 +2,9 @@
 name: claude-debug
 description: >-
   Supervise and debug the StarCi CORE (the .claude runtime, reconciler engine, services, harness UI, checkers) from a
-  chat while workflows run: a continuous read-only core watch, a read-only diagnosis playbook, a fix loop through
-  disjoint Claude Sonnet lanes landed through the gate, hard rules and the known failure signatures. Kernels and the
+  chat while workflows run: invoked once it starts one Claude Code `/loop 10m` (never a second one); each tick is one
+  pass (read-only core snapshot, read-only diagnosis, one lane per new alert, a Vietnamese status table), plus the fix
+  loop through disjoint Claude Sonnet lanes landed through the gate, hard rules and the known failure signatures. Kernels and the
   Supervisor seat run the workflows; this chat only fixes the core. Use when the owner says claude-debug, "debug
   core", "monitor core", "fix core while a workflow runs", or runs /claude-debug. Owner-facing replies in Vietnamese.
 user-invocable: true
@@ -11,9 +12,18 @@ user-invocable: true
 
 # claude-debug
 
-Reusable procedure for a chat that supervises and debugs the StarCi core while workflows run, so no chat writes an
-ad-hoc watcher or one-off query script again. Reply to the owner in Vietnamese; every file, commit and lane prompt is
-English.
+**Invoke once; it loops by itself.** `/claude-debug` (no argument) is the setup:
+
+1. Run `node --no-warnings scripts/supervisor/debug-pass.mjs setup --interval 10m`.
+2. `{"created": false}`: a live loop already runs on this host (in this chat or another). Start nothing; tell the owner
+   in Vietnamese which loop (`loop.id`, last pass) and stop here.
+3. `{"created": true}`: start Claude Code's built-in loop with the loop skill: `/loop 10m /claude-debug pass`. That is the
+   only scheduler; never write a watcher, a sleep loop or a Monitor stream instead.
+
+`/claude-debug pass` is one tick (section 2): exactly one pass, then the turn ends. To stop, end the `/loop` and run
+`node scripts/supervisor/debug-pass.mjs stop`.
+
+Reply to the owner in Vietnamese; every file, commit and lane prompt is English.
 
 ## 1. Role
 
@@ -24,17 +34,24 @@ English.
 - Reading a Kernel screen is allowed (read only, section 3). Restarting the engine or the host is the owner's
   `/start`, not this chat's reflex.
 
-## 2. Continuous core watch (read only, stdout lines only on change)
+## 2. One pass (`/claude-debug pass`)
 
-Start it once per chat as a Monitor stream:
+Commands run from the runtime root (`.claude`). One pass, then stop:
 
-```
-node --no-warnings scripts/supervisor/core-watch.mjs                  # forever, one line per change, every 60 s
-node --no-warnings scripts/supervisor/core-watch.mjs --once --json    # one snapshot {ok, alerts[]}
-```
+1. `node --no-warnings scripts/supervisor/debug-pass.mjs pass` takes one read-only core snapshot
+   (`scripts/supervisor/core-watch.mjs --json` in process) and prints `{ok, loop, dispatched[], rows[]}`. It closes the fixes
+   whose alert cleared and reserves every alert that has no open fix; `dispatched` lists only those new alerts. An alert
+   that already has a lane (or a note) is never in `dispatched` again, so a pass is idempotent.
+2. Diagnose each `dispatched` alert read-only with section 3.
+3. A core defect: dispatch one lane (section 4), then
+   `node scripts/supervisor/debug-pass.mjs claim --key <alert key> --lane <lane>`. Not a core defect (an owner ask, a
+   workflow waiting normally): `node scripts/supervisor/debug-pass.mjs note --key <alert key> --reason "<why>"`. A lane that
+   died or landed without clearing its alert: `release --key <alert key>` so the next pass dispatches it again. A
+   reservation nobody claims or notes within 30 minutes is dispatched again.
+4. Print a short status table in Vietnamese from `rows` (columns: alert key, state, lane, since), then end the turn.
 
-Flags: `--interval <sec>`, `--child-timeout <sec>` (every child call is bounded, default 90), `--token-window <min>`,
-`--token-spike <n>` (0 disables). Lines are `ALERT <key>: <text>`, `OK <key> (was ...)` and `GONE <key>`. Facts:
+`core-watch.mjs [--json]` alone prints the same snapshot for a manual look. Flags (both scripts): `--child-timeout <sec>`
+(every child call is bounded, default 90), `--token-window <min>`, `--token-spike <n>` (0 disables). Facts (alert keys):
 
 - `engine`: no leader, leader STALE (heartbeat > 90 s), SAFE MODE. `engine-controllers`: a controller configured active
   that runs shadow/off. `engine-queue`: failing queue items.
@@ -42,12 +59,14 @@ Flags: `--interval <sec>`, `--child-timeout <sec>` (every child call is bounded,
   every seat not live.
 - `wf:<ledger>:<workflow>:*` for every non-finished workflow of every registered active ledger (no hard-coded ids):
   `leg:<op>:<job>` turning failed/blocked/cancelled, `wedged`, `dead`, `stale`, `stuck`, `held`, `owner` (open owner
-  asks), `status` (api status failed twice in a row).
+  asks), `status` (api status failed twice in a row within the snapshot).
 - `tokens`: input+output tokens in the window above the spike limit, from `machine.sqlite` `llm_usage` (there is no
   `api usage` verb).
 
-The watcher never restarts, writes or dispatches anything. Auto-restart made the crash-loop safe mode worse; do not
-add it. An ALERT is a trigger for section 3, not for a restart.
+State: `<StarCi state root>/claude-debug/state.json` (`%LOCALAPPDATA%/StarCi`, moved by `STARCI_LOCAL_ROOT`), holding the
+loop record (live while it passed within 2 x interval + 5 min) and the open fixes keyed by alert key. The snapshot never
+restarts, writes or dispatches anything. Auto-restart made the crash-loop safe mode worse; do not add it. An alert is a
+trigger for section 3, not for a restart.
 
 ## 3. Diagnosis playbook (read only)
 
@@ -106,8 +125,8 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
    `node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] --lane <lane> --specs touching --json`.
    Anything under `modules/`, `knowledge/` or a schema needs a `modules/kernel/contract-changes/<id>.yaml`.
 5. Never push. Pushing is `/push-git`'s job (once it exists; reference it by name, never run `push-mains.mjs`).
-6. After the land, watch the stream (section 2) until the alert clears, then report to the owner in Vietnamese: what
-   broke, the root cause, the landed shas, what is still open.
+6. After the land, the next passes (section 2) show the alert `resolved` once it clears; then report to the owner in
+   Vietnamese: what broke, the root cause, the landed shas, what is still open.
 
 ## 5. Hard rules (verbatim in every lane prompt)
 

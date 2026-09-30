@@ -108,7 +108,7 @@ goes to `scripts/checks/failure-codes.not-codes` with the reason.
 
 - `api status`: `legs[].why` (latest attempt of each non-green leg), `legs[].attempts[]` (each with its `why`),
   `frontier.why`, `kernelNotes[]`; the text form prints `why:` lines.
-- `scripts/supervisor/core-watch.mjs`: a bad leg's line is `<op> <state> - <why.headline>`.
+- `scripts/supervisor/core-watch.mjs`: a bad leg's alert text is `<op> <state> - <why.headline>`.
 - Dry-run backfill: `node scripts/supervisor/why-backfill.mjs [--ledger <name>] [--workflow <id>] [--op <op>] [--json]`
   computes the why of every attempt of a registered ledger that needs one and prints it; it opens the ledger read-only and has
   no apply mode.
