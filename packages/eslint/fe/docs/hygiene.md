@@ -2,13 +2,24 @@
 
 Law module: `hygiene.mjs`. Catalogue: R65 FE_SIZE_AND_STATE_BUDGET (sub-checks `FE_EFFECT_CLEANUP`, `FE_SWALLOWED_ERROR`, `FE_CONSOLE_CALL`) and R50 FE_TRANSPORT_OWNER (sub-check `FE_EFFECT_FETCH`).
 
-Work started by a component that nobody owns the end of: a timer that outlives the component, a fetch in an effect with no cache or cancel, an empty `catch` that hides the failure, a `console` call no pipeline reads. `modules/**` is exempt from the timer rule only (the API client owns its timeout timer and clears it in `finally`).
+Work started by a component that nobody owns the end of: a timer, listener, observer, socket or subscription that outlives the component, a fetch in an effect with no cache or cancel, an empty `catch` that hides the failure, a `console` call no pipeline reads. Every rule here decides by resolution: an effect is a call to React's own `useEffect` / `useLayoutEffect` export (the import is followed), the timer or listener is the platform's when its symbol is declared by the default library, "the same handle" is the same scope binding (or member path such as `timerRef.current`), and "a promise" is what the type checker says. There is no folder exemption: a `modules/` file is judged by its structure like any other (the API client starts its timeout timer and clears it in `finally`, in the same function).
 
 Every rule below is an error in `starciFeConfig`; none can be switched off or suppressed inline.
 
-## `starci-fe/timer-needs-effect-cleanup`
+## `starci-fe/effect-subscription-needs-cleanup`
 
-`setTimeout` and `setInterval` live in an effect whose cleanup clears them.
+Inside a `useEffect` / `useLayoutEffect` callback and inside the subscribe function of `useSyncExternalStore`, everything that keeps running after the callback returns is released by the cleanup the callback returns, against the same handle, target and listener:
+
+| Started | Released by the returned cleanup |
+| --- | --- |
+| `setTimeout` / `setInterval` (the handle) | `clearTimeout(id)` / `clearInterval(id)` on the same handle (variable, ref member, module `let`, or a list drained with `forEach(clearTimeout)`) |
+| `requestAnimationFrame` (the id) | `cancelAnimationFrame(id)` |
+| `target.addEventListener(type, listener)` | `target.removeEventListener(type, listener)` with the same target, type and listener binding; an inline listener cannot be removed; or `{ signal }` with `controller.abort()` |
+| `new ResizeObserver` / `IntersectionObserver` / `MutationObserver` that is `.observe`d | `observer.disconnect()` |
+| `new WebSocket` / `EventSource` / `BroadcastChannel` | `connection.close()` |
+| a call returning a subscription object (its type has `unsubscribe`, `off` or `close`) | that method on the stored object |
+
+The cleanup may be a returned function, a named function that is returned, or may call a same-file function that releases. Outside an effect, a timer or frame is accepted only when the function that starts it also releases it (the API client's `try { ... } finally { clearTimeout(id) }`, the `subscribe` that returns its own unsubscribe); a listener started outside an effect is not judged. A function-returning unsubscribe (`const off = on(handler)`) is not decided here: the checker cannot tell it from any other callback.
 
 **Invalid** (`src/components/blocks/Feed/component.tsx`)
 
@@ -46,7 +57,7 @@ const subscribe = (listener: () => void) => {
 
 ## `starci-fe/no-data-fetch-in-effect`
 
-No `await`, `fetch` or `.then` inside a `useEffect`; read through SWR or a server reader.
+An effect body starts no promise: no `await`, `fetch`, `.then`, `void load()`, `mutate()` or `refresh()`; read through SWR or a server reader. The call is judged when it runs synchronously in the body (an immediately-invoked function counts); a promise started inside a listener or timer callback the effect registers, or in the cleanup, is that callback's work. A call is a load when its type is a promise, when it is `.then`-ed, or when it is `void`-ed and untyped; a platform promise other than `fetch` (`audio.play()`, `clipboard.writeText()`) is not a data load. Data freshness comes from the SWR key: an SWR `mutate()` or `refresh()` called directly in the effect body is a finding too; run it from the event that changed the data (a handler, a socket message).
 
 **Invalid** (`src/components/blocks/Feed/component.tsx`)
 
