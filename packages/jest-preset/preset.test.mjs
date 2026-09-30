@@ -64,17 +64,33 @@ test('the default mock needs the jest runtime and says so outside it', () => {
 });
 
 test('starciJestConfig is unit + e2e, ts-jest, diagnostics false (K20), isolatedModules from the tsconfig', () => {
-  const config = preset.starciJestConfig({ moduleNameMapper: { '^@x/(.*)$': '<rootDir>/src/$1' } });
+  const config = preset.starciJestConfig();
   assert.deepEqual(config.projects.map((p) => p.displayName), ['unit', 'e2e']);
   for (const project of config.projects) {
     const [name, options] = project.transform[String.raw`^.+\.ts$`];
     assert.equal(name, 'ts-jest');
     assert.equal(options.diagnostics, false);
     assert.equal('isolatedModules' in options, false, 'the deprecated ts-jest option is not set; @starci/tsconfig carries it');
-    assert.equal(project.moduleNameMapper['^@x/(.*)$'], '<rootDir>/src/$1');
   }
   assert.equal(new RegExp(String.raw`^.+\.ts$`).test('a.ts'), true);
   assert.equal(new RegExp(String.raw`^.+\.ts$`).test('a.tsx'), false);
+});
+
+test('starciJestConfig takes no option: the managed jest.config.js has nothing to tune, and every call is a fresh, equal value', () => {
+  assert.equal(preset.starciJestConfig.length, 0);
+  const tuned = preset.starciJestConfig({ moduleNameMapper: { '^@x/(.*)$': '<rootDir>/x/$1' }, e2e: { globalSetup: 'x' }, unit: { setupFiles: ['x'] } });
+  assert.deepEqual(tuned, preset.starciJestConfig(), 'an argument changes nothing');
+  assert.notEqual(preset.starciJestConfig().projects[0].moduleNameMapper, preset.starciJestConfig().projects[0].moduleNameMapper);
+});
+
+test('both projects map exactly the three aliases the managed tsconfig.json declares', () => {
+  const expected = { '^@features/(.*)$': '<rootDir>/src/features/$1', '^@modules/(.*)$': '<rootDir>/src/modules/$1', '^@tests/(.*)$': '<rootDir>/src/tests/$1' };
+  assert.deepEqual(preset.MODULE_NAME_MAPPER, expected);
+  for (const project of preset.starciJestConfig().projects) assert.deepEqual(project.moduleNameMapper, expected);
+});
+
+test('coverage is measured by v8, not istanbul', () => {
+  assert.equal(preset.starciJestConfig().coverageProvider, 'v8');
 });
 
 test('the unit project matches *.spec.ts only and never an e2e spec', () => {
@@ -82,17 +98,20 @@ test('the unit project matches *.spec.ts only and never an e2e spec', () => {
   assert.deepEqual(unit.testMatch, ['**/*.spec.ts']);
   const ignored = (file) => unit.testPathIgnorePatterns.some((pattern) => new RegExp(pattern).test(file));
   assert.equal(ignored('/r/src/tests/e2e/a/x.e2e-spec.ts'), true);
+  assert.equal(ignored(String.raw`C:\r\src\tests\e2e\a\x.e2e-spec.ts`), true);
   assert.equal(ignored('/r/src/features/x/y.spec.ts'), false);
 });
 
-test('the e2e project skips src/tests/e2e/live/ unless E2E_LIVE=1 (K21)', () => {
-  const ignoresLive = (config) => config.projects[1].testPathIgnorePatterns.some((p) => new RegExp(p).test('/r/src/tests/e2e/live/x.e2e-spec.ts'));
+test('the e2e project never runs src/tests/e2e/live/, whatever the environment says (K21)', () => {
+  const ignoresLive = (file) => preset.starciJestConfig().projects[1].testPathIgnorePatterns.some((p) => new RegExp(p).test(file));
   const saved = process.env.E2E_LIVE;
   try {
-    delete process.env.E2E_LIVE;
-    assert.equal(ignoresLive(preset.starciJestConfig()), true);
-    process.env.E2E_LIVE = '1';
-    assert.equal(ignoresLive(preset.starciJestConfig()), false);
+    for (const value of [undefined, '1']) {
+      if (value === undefined) delete process.env.E2E_LIVE; else process.env.E2E_LIVE = value;
+      assert.equal(ignoresLive('/r/src/tests/e2e/live/x.e2e-spec.ts'), true);
+      assert.equal(ignoresLive(String.raw`C:\r\src\tests\e2e\live\x.e2e-spec.ts`), true);
+      assert.equal(ignoresLive('/r/src/tests/e2e/orders/x.e2e-spec.ts'), false);
+    }
   } finally {
     if (saved === undefined) delete process.env.E2E_LIVE; else process.env.E2E_LIVE = saved;
   }
@@ -143,7 +162,7 @@ test('the mock<T>() types replace `as unknown as`: typed jest.Mock members, assi
     ].join('\n'));
     const program = ts.createProgram([path.join(dir, 'probe.ts')], {
       strict: true, noEmit: true, skipLibCheck: true, types: ['jest'], typeRoots: [path.resolve(import.meta.dirname, '../../node_modules/@types')],
-      module: ts.ModuleKind.CommonJS, moduleResolution: ts.ModuleResolutionKind.Node10, target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, target: ts.ScriptTarget.ES2022,
     });
     const problems = ts.getPreEmitDiagnostics(program).map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'));
     assert.deepEqual(problems, []);

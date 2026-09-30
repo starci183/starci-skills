@@ -42,28 +42,36 @@ function transform(tsconfig) {
 }
 
 /**
- * The whole jest config of a Nest repository: one `unit` project and one `e2e` project.
- *
- * @param {object} options
- * @param {string} [options.tsconfig]            ts-jest tsconfig, default `tsconfig.json`
- * @param {Record<string,string|string[]>} [options.moduleNameMapper]  path aliases for both projects
- * @param {string[]} [options.roots]             default `<rootDir>/src`, `<rootDir>/apps`
- * @param {object} [options.unit]                extra jest project options for unit (setupFiles, ...)
- * @param {object} [options.e2e]                 extra jest project options for e2e (globalSetup, ...)
+ * The path aliases of a StarCi back end: the same three `paths` the managed `tsconfig.json` declares, so jest resolves what
+ * `tsc` resolves. They are part of the preset, not an option: a repository has no other alias.
  */
-function starciJestConfig(options = {}) {
-  const tsconfig = options.tsconfig ?? "tsconfig.json"
+const MODULE_NAME_MAPPER = Object.freeze({
+  "^@features/(.*)$": "<rootDir>/src/features/$1",
+  "^@modules/(.*)$": "<rootDir>/src/modules/$1",
+  "^@tests/(.*)$": "<rootDir>/src/tests/$1",
+})
+
+/**
+ * The whole jest config of a Nest repository: one `unit` project and one `e2e` project. It takes no options: the
+ * repository's `jest.config.js` is a managed file (R05), rendered by `hfs sync` as
+ * `module.exports = require("@starci/jest-preset").starciJestConfig()`, so there is nothing a repository could tune.
+ *
+ * `src/tests/e2e/live/` is never part of the e2e project; `test:e2e:live` selects it explicitly.
+ * Coverage uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
+ * as thousands of branches no spec can cover, while v8 measures the real source.
+ */
+function starciJestConfig() {
   const shared = {
     preset: "ts-jest",
     testEnvironment: "node",
-    rootDir: options.rootDir ?? ".",
-    roots: options.roots ?? ["<rootDir>/src", "<rootDir>/apps"],
-    moduleNameMapper: options.moduleNameMapper ?? {},
-    transform: transform(tsconfig),
+    rootDir: ".",
+    roots: ["<rootDir>/src", "<rootDir>/apps"],
+    moduleNameMapper: { ...MODULE_NAME_MAPPER },
+    transform: transform("tsconfig.json"),
   }
-  const live = process.env.E2E_LIVE === "1"
   return {
     testTimeout: 120_000,
+    coverageProvider: "v8",
     collectCoverageFrom: collectCoverageFrom(),
     coverageDirectory: "coverage",
     coverageReporters: ["lcov", "text-summary"],
@@ -73,16 +81,14 @@ function starciJestConfig(options = {}) {
         displayName: "unit",
         clearMocks: true,
         testMatch: ["**/*.spec.ts"],
-        testPathIgnorePatterns: ["/node_modules/", "\.e2e-spec\.ts$", "[\\/]src[\\/]tests[\\/]e2e[\\/]"],
-        ...options.unit,
+        testPathIgnorePatterns: ["/node_modules/", String.raw`\.e2e-spec\.ts$`, String.raw`[\\/]src[\\/]tests[\\/]e2e[\\/]`],
       },
       {
         ...shared,
         displayName: "e2e",
         maxWorkers: 1,
         testMatch: ["<rootDir>/src/tests/e2e/**/*.e2e-spec.ts"],
-        testPathIgnorePatterns: live ? ["/node_modules/"] : ["/node_modules/", "[\\/]src[\\/]tests[\\/]e2e[\\/]live[\\/]"],
-        ...options.e2e,
+        testPathIgnorePatterns: ["/node_modules/", String.raw`[\\/]src[\\/]tests[\\/]e2e[\\/]live[\\/]`],
       },
     ],
   }
@@ -90,6 +96,7 @@ function starciJestConfig(options = {}) {
 
 module.exports = {
   starciJestConfig,
+  MODULE_NAME_MAPPER,
   mock,
   createMock,
   collectCoverageFrom,

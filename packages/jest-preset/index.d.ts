@@ -2,16 +2,9 @@ import type { Config } from "jest"
 
 export { mock, createMock, MockOf } from "./mock"
 
-export interface StarciJestOptions {
-  rootDir?: string
-  tsconfig?: string
-  moduleNameMapper?: Record<string, string | string[]>
-  roots?: string[]
-  unit?: Record<string, unknown>
-  e2e?: Record<string, unknown>
-}
-
-export declare function starciJestConfig(options?: StarciJestOptions): Config
+/** The whole jest config: projects `unit` and `e2e`. It takes no options; the repository config is a managed file. */
+export declare function starciJestConfig(): Config
+export declare const MODULE_NAME_MAPPER: Readonly<Record<string, string>>
 export declare function collectCoverageFrom(): string[]
 export declare function sonarCoverageExclusions(): string
 export declare function sonarExclusions(): string

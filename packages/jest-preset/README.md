@@ -3,28 +3,25 @@
 The jest config of a Nest repository, and the typed `mock<T>()` helper. Install it from the npm registry at the exact version in [`knowledge/hfs/canon-pins.yaml`](../../knowledge/hfs/canon-pins.yaml) (see [`packages/README.md`](../README.md)).
 
 ```js
-// jest.config.js
-const { pathsToModuleNameMapper } = require("ts-jest")
-const { starciJestConfig } = require("@starci/jest-preset")
-const { compilerOptions } = require("./tsconfig.json")
-
-module.exports = starciJestConfig({
-    moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths, { prefix: `${__dirname}/` }),
-    e2e: { globalSetup: "<rootDir>/src/tests/e2e/setup/global-setup.js" },
-})
+// jest.config.js (a managed file: `hfs sync` renders it, `hfs check` compares it; do not edit)
+module.exports = require("@starci/jest-preset").starciJestConfig()
 ```
+
+`starciJestConfig()` takes no options: a repository has no jest setting to tune, so the file above is the whole config.
 
 ## What it sets
 
 - **Two projects**: `unit` (`**/*.spec.ts`, mocked, `clearMocks`) and `e2e` (`src/tests/e2e/**/*.e2e-spec.ts`, one worker, 120 s).
-  `src/tests/e2e/live/` is skipped unless `E2E_LIVE=1`; `test:e2e:live` is `E2E_LIVE=1 jest --selectProjects e2e src/tests/e2e/live`.
+  The e2e project never runs `src/tests/e2e/live/`; `test:e2e:live` names it on the command line
+  (`jest --selectProjects e2e --testPathIgnorePatterns /node_modules/ --testPathPattern e2e.live`).
+- **The three path aliases** `@features/*`, `@modules/*`, `@tests/*` (`MODULE_NAME_MAPPER`), the same ones the managed `tsconfig.json` declares.
 - **ts-jest with `diagnostics: false`** in both. `isolatedModules: true` comes from `@starci/tsconfig` (ts-jest 29.4 reads it
   there; its own option is deprecated). Types are checked once, by `typecheck` (unit specs included) and `typecheck:e2e`, and
   `test:e2e` is `npm run typecheck:e2e && jest --selectProjects e2e`, so nobody runs e2e on code that does not type-check.
 - **Coverage that matches Sonar.** `collectCoverageFrom` is `src/**/*.ts` and `apps/**/*.ts` minus specs, e2e specs, `dist`,
   `coverage`, `src/tests/**`, `*.d.ts` and `main.ts`: the same set Sonar counts. `sonarExclusions()` and
   `sonarCoverageExclusions()` render the two `sonar-project.properties` values from the same lists, so the denominators
-  cannot drift. Reports are `coverage/lcov.info` (Codecov and Sonar read the one file) and a text summary. Thresholds are not
+  cannot drift. Coverage is measured by v8, which counts the real source and not the helpers TypeScript emits. Reports are `coverage/lcov.info` (Codecov and Sonar read the one file) and a text summary. Thresholds are not
   set here; Codecov's project and patch targets own the gate.
 
 ## `mock<T>()`

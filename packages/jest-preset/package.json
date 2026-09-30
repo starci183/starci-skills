@@ -24,7 +24,8 @@
     "*.cjs",
     "*.d.ts",
     "!*.test.*",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public"
