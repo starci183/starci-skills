@@ -65,6 +65,13 @@ export const noGlobalDecorator = {
 /** The app composition file: `apps/<app>/src/app.module.ts`, judged by the app slot and the file's role name. */
 const isAppModule = (hfs, filename) => (hfs.slotOf(filename) ?? "").startsWith("be.app.") && filename.split("/").at(-1) === "app.module.ts"
 
+/**
+ * The test world (slot `be.tests.world`, `src/tests/world`) is the TEST COMPOSITION ROOT: `use-test-world.ts` assembles
+ * capability modules with `isGlobal: true` the way `apps/<app>/src/app.module.ts` does in production. A spec (integration,
+ * contract, e2e) does not compose and stays refused: it calls `useTestWorld(...)` only.
+ */
+const isWorld = (hfs, filename) => hfs.slotOf(filename) === "be.tests.world"
+
 const isTrue = (node) => node?.type === "Literal" && node.value === true
 
 /** `isGlobal: true` appears only in the app's `app.module.ts`. */
@@ -79,7 +86,7 @@ export const isGlobalOnlyInApp = {
     },
     create(context) {
         const filename = normalizePath(context.filename || context.getFilename())
-        if (isDeclarationFile(filename) || isAppModule(hfsOf(context), filename)) return {}
+        if (isDeclarationFile(filename) || isAppModule(hfsOf(context), filename) || isWorld(hfsOf(context), filename)) return {}
         return {
             Property(node) {
                 if (node.computed && node.key.type !== "Literal") return

@@ -10,6 +10,10 @@
  * `new Date(value)` - built from a value the caller already holds (a stored timestamp, a parsed header) - is not an
  * ambient read and is left alone; only the zero-argument form reads "now". The owner that may read the clock is asked
  * of the slot view (`platform` tier, capability `clock`), not of a path.
+ *
+ * The test world (slot `be.tests.world`) reads the wall clock too: it is the TEST COMPOSITION ROOT and infrastructure
+ * owner (like an app's `main.ts` and `platform`), and its readiness polling, deadlines and fake servers measure real
+ * elapsed time against real processes, which a `FakeClock` cannot drive. A spec is not the world: specs stay refused.
  */
 import { hfsOf } from "./lib/hfs.mjs"
 import { isOwnedBy } from "./lib/ports.mjs"
@@ -74,7 +78,7 @@ export const noAmbientClock = {
     create(context) {
         const hfs = hfsOf(context)
         const filename = context.filename || context.getFilename()
-        if (isOwnedBy(hfs, filename, "platform", "clock")) return {}
+        if (isOwnedBy(hfs, filename, "platform", "clock") || hfs.slotOf(filename) === "be.tests.world") return {}
         const reportRoot = (node, root, member) => {
             if (!isAmbientRoot(context, root)) return
             const wanted = AMBIENT[root.name]

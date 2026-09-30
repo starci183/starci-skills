@@ -98,6 +98,16 @@ export const catchMustAccount = {
     },
 }
 
+/**
+ * The test world (slot `be.tests.world`) is the TEST COMPOSITION ROOT and owns no capability folder: its one error class
+ * `TestWorldError` lives in `test-world.error.ts` at the world root, which is the world's `errors/<capability>.error.ts`.
+ * Only that file is a home; a nested `fakes/**` file, a spec and every other owner stay judged by `errors/<c>.error.ts`.
+ */
+const isWorldErrorHome = (hfs, filename) => {
+    const placed = hfs.classify(filename)
+    return placed.slot === "be.tests.world" && placed.path === `${placed.root}/test-world.error.ts`
+}
+
 /** An error class is declared at its owner in `errors/<capability>.error.ts` and derives from `DomainError`. */
 export const errorHome = {
     meta: {
@@ -120,6 +130,7 @@ export const errorHome = {
             const isDomainErrorHost = node.id.name === "DomainError" && isOwnedBy(hfs, filename, "platform", "errors")
             if (isDomainErrorHost) return
             if (derivesFromDomainError(context, type)) {
+                if (isWorldErrorHome(hfs, filename)) return
                 const home = errorHomeOf(hfs, filename)
                 const owner = ownerName(hfs.ownerOf(filename))
                 if (!home || home.capability !== owner) context.report({ node: node.id, messageId: "place", data: { name: node.id.name, owner: owner ?? "<capability>" } })

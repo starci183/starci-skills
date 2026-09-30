@@ -23,6 +23,9 @@ const tester = typedTester()
 
 const FLOW = at("src/tests/e2e/checkout/course-purchase.e2e-spec.ts")
 const UNIT = at("src/modules/domain/billing/charge.spec.ts")
+const WORLD = `import { useTestWorld } from "../../world/test-world.contracts"
+const world = useTestWorld()
+`
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -99,6 +102,15 @@ test("E2E-7: a step asserts one outcome, so it takes no branch", () => {
       { filename: UNIT, code: "it(\"charges\", () => { if (x) expect(a).toBe(b) })" },
       // `&&` inside an assertion is an expression, not a hidden if
       { filename: FLOW, code: "it(\"pays\", () => { expect(a && b).toBe(true) })" },
+      // the probe of the world's waitFor is a polling predicate, not a step: it fails at the deadline instead of passing
+      {
+        filename: FLOW,
+        code: WORLD + "it(\"pays\", async () => { const row = await world.waitFor(\"paid\", async () => { const rows = [1]; return rows.length > 0 ? rows : null }); expect(row).toHaveLength(1) })",
+      },
+      {
+        filename: FLOW,
+        code: WORLD + "it(\"pays\", async () => { await world.waitFor(\"paid\", async () => { if (world) return 1; return null }) })",
+      },
     ],
     invalid: [
       {
@@ -114,6 +126,18 @@ test("E2E-7: a step asserts one outcome, so it takes no branch", () => {
       {
         filename: FLOW,
         code: "it(\"pays\", async () => { order && expect(order.status).toBe(\"paid\") })",
+        errors: [{ messageId: "branch" }],
+      },
+      // a branch in the step beside the probe is still a branch in a step
+      {
+        filename: FLOW,
+        code: WORLD + "it(\"pays\", async () => { await world.waitFor(\"paid\", async () => 1); if (world) { expect(1).toBe(1) } })",
+        errors: [{ messageId: "branch" }],
+      },
+      // a waitFor of another type is no probe: the receiver's type decides, not its name
+      {
+        filename: FLOW,
+        code: "declare const world: { waitFor(label: string, check: () => Promise<number | null>): Promise<number> }; it(\"pays\", async () => { await world.waitFor(\"paid\", async () => (world ? 1 : null)) })",
         errors: [{ messageId: "branch" }],
       },
     ],

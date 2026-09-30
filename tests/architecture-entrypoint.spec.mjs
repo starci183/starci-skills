@@ -48,3 +48,17 @@ test('BE: a lookalike NestFactory that is not from @nestjs/core is not an entryp
   }));
   assert.deepEqual(hits(report), []);
 });
+
+test('BE: the test world (be.tests.world) is a composition root and may call NestFactory; another test folder and a feature may not', t => {
+  const boot = "import { NestFactory } from '@nestjs/core';\nexport const boot = (module: unknown) => NestFactory.create(module);\n";
+  const report = runArch(archFixture(t, {
+    files: {
+      'apps/core/src/main.ts': MAIN,
+      'apps/core/src/app.module.ts': 'export class AppModule {}\n',
+      'src/tests/world/use-test-world.ts': boot,
+      'src/tests/fixtures/boot.ts': boot,
+      'src/features/a/index.ts': boot,
+    },
+  }));
+  assert.deepEqual(hits(report).map(item => item.path).sort(), ['src/features/a/index.ts', 'src/tests/fixtures/boot.ts']);
+});

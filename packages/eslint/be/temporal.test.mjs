@@ -18,6 +18,9 @@ test("every ambient clock reference is refused outside platform/clock, in specs 
             { filename: CLOCK, code: "export const mark = () => performance.now()" },
             { filename: CLOCK, code: "export const stamp = () => process.hrtime.bigint()" },
             { filename: CLOCK_SPEC, code: "const before = Date.now()" },
+            // the test world is the composition root: readiness deadlines and fake servers read real time
+            { filename: at("src/tests/world/kit/poll.ts"), code: "const deadline = Date.now() + 5000" },
+            { filename: at("src/tests/world/fakes/smtp/server.ts"), code: "const at = new Date(); const t = performance.now()" },
             // a value the caller already holds is not an ambient read
             { filename: SERVICE, code: "const at = new Date(record.createdAt)" },
             { filename: SERVICE, code: "const at = new Date(0)" },
@@ -56,6 +59,8 @@ test("every ambient clock reference is refused outside platform/clock, in specs 
             // apps, tests and lookalike owners are not platform/clock
             { filename: at("apps/api/src/main.ts"), code: "const t = Date.now()", errors: [{ messageId: "now" }] },
             { filename: at("src/tests/e2e/order/place.e2e-spec.ts"), code: "const t = Date.now()", errors: [{ messageId: "now" }] },
+            { filename: at("src/tests/integration/plan/claim.integration-spec.ts"), code: "const t = Date.now()", errors: [{ messageId: "now" }] },
+            { filename: at("src/tests/fixtures/plan.builder.ts"), code: "const t = Date.now()", errors: [{ messageId: "now" }] },
             { filename: LOOKALIKE, code: "const t = Date.now()", errors: [{ messageId: "now" }] },
         ],
     })

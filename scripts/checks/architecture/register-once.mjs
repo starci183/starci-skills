@@ -27,6 +27,9 @@ export function checkRegisterOnce(input) {
   const violations = [];
   const report = (file, node, message, extra = {}) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, ...extra });
   const isAppRoot = file => Boolean(file.slot?.startsWith('be.app.')) && path.posix.basename(file.rel) === 'app.module.ts';
+  // The test world (slot be.tests.world) is the test composition root: useTestWorld registers capability modules with
+  // `isGlobal: true` the way an app root does. A spec (integration, contract, e2e) is not a composition root.
+  const isWorld = file => file.slot === 'be.tests.world';
   const appOf = file => config.apps.find(app => file.rel === `apps/${app.name}/src/app.module.ts`)?.name ?? null;
 
   // Every @Module class of the program.
@@ -55,6 +58,7 @@ export function checkRegisterOnce(input) {
   // The references to modules: importer (the enclosing module class, else the file), target, node, whether it is a register call.
   const references = [];
   for (const file of graph.files.values()) {
+    if (isWorld(file)) continue; // the test composition root assembles modules; it is not a module importer
     const checker = kit.checkerOf(file.sourceFile);
     const seen = new Set();
     const note = (element, viaImports) => {
@@ -73,7 +77,7 @@ export function checkRegisterOnce(input) {
       } else if (ts.isCallExpression(node) && !seen.has(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register') {
         note(node, false);
       }
-      if (ts.isPropertyAssignment(node) && kit.propertyNameText(node.name) === 'isGlobal' && node.initializer.kind === ts.SyntaxKind.TrueKeyword && !isAppRoot(file)) {
+      if (ts.isPropertyAssignment(node) && kit.propertyNameText(node.name) === 'isGlobal' && node.initializer.kind === ts.SyntaxKind.TrueKeyword && !isAppRoot(file) && !isWorld(file)) {
         report(file, node, '`isGlobal: true` appears only in the app root (apps/<app>/src/app.module.ts), where the representative module of a capability is registered; a module never decides its own globality.');
       }
       return true;

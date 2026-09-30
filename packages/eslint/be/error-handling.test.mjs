@@ -58,6 +58,8 @@ test("a DomainError subclass is declared only in errors/<capability>.error.ts of
         valid: [
             { filename: at("src/modules/domain/plan/errors/plan.error.ts"), code: `${ERR_HEAD}export class PlanError extends DomainError<PlanErrorCode> {}` },
             { filename: at("src/features/checkout/errors/checkout.error.ts"), code: `${ERR_HEAD.replace("PlanErrorCode", "CheckoutErrorCode")}export class CheckoutError extends DomainError<CheckoutErrorCode> {}` },
+            // the test world is a composition root with one error class at its root
+            { filename: at("src/tests/world/test-world.error.ts"), code: `${ERR_HEAD}export class TestWorldError extends DomainError<PlanErrorCode> {}` },
             // the declaration of DomainError itself
             { filename: at("src/modules/platform/errors/domain-error.ts"), code: "export abstract class DomainError<C extends string> extends Error { readonly code!: C }" },
             // a class that is not an error
@@ -71,6 +73,10 @@ test("a DomainError subclass is declared only in errors/<capability>.error.ts of
                 code: `${ERR_HEAD}class PlanError extends DomainError<PlanErrorCode> {}`,
                 errors: [{ messageId: "place" }],
             },
+            // the world's home is its root file only; the same class elsewhere in the world, in a spec or in a domain file stays refused
+            { filename: at("src/tests/world/kit/poll.ts"), code: `${ERR_HEAD}export class TestWorldError extends DomainError<PlanErrorCode> {}`, errors: [{ messageId: "place" }] },
+            { filename: at("src/tests/world/fakes/x/test-world.error.ts"), code: `${ERR_HEAD}export class TestWorldError extends DomainError<PlanErrorCode> {}`, errors: [{ messageId: "place" }] },
+            { filename: at("src/tests/e2e/flows/x.e2e-spec.ts"), code: `${ERR_HEAD}class TestWorldError extends DomainError<PlanErrorCode> {}`, errors: [{ messageId: "place" }] },
             // right folder, wrong file name for the owner
             {
                 filename: at("src/modules/domain/plan/errors/other.error.ts"),

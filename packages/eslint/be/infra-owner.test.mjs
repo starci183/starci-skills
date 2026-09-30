@@ -95,7 +95,13 @@ test("infra-import-owner: each raw library is used only by its owner", () => {
             { filename: INTEGRATION, code: `import { caching } from "cache-manager"\nexport { caching }`, errors: [{ messageId: "foreign" }] },
             // specs and the e2e lane are not exempt
             { filename: SPEC, code: `export const wait = () => new Promise((resolve) => setTimeout(resolve, 5))`, errors: [{ messageId: "foreign" }] },
-            { filename: E2E, code: `export const ping = () => fetch("/health")`, errors: [{ messageId: "foreign" }] },
+            // a spec does not compose: it reaches infrastructure through useTestWorld, and a feature stays refused
+            { filename: at("src/tests/e2e/flows/ping.e2e-spec.ts"), code: `export const ping = () => fetch("/health")`, errors: [{ messageId: "foreign" }] },
+            { filename: at("src/tests/integration/plan/ping.integration-spec.ts"), code: `import axios from "axios"
+export { axios }`, errors: [{ messageId: "foreign" }] },
+            { filename: FEATURE, code: `export const ping = () => fetch("/health")`, errors: [{ messageId: "foreign" }] },
+            // the world owns only what the table gives an owner: a library owned by nobody is refused there too
+            { filename: E2E, code: `import "dotenv/config"`, errors: [{ messageId: "nowhere" }] },
             // nowhere: not even the capability that would seem to own it
             { filename: CONFIG, code: `import { ConfigModule } from "@nestjs/config"\nexport { ConfigModule }`, errors: [{ messageId: "nowhere" }] },
             { filename: CONFIG, code: `import "dotenv/config"`, errors: [{ messageId: "nowhere" }] },

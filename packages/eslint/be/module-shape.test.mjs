@@ -55,6 +55,9 @@ test("isGlobal: true is written only in apps/<app>/src/app.module.ts", () => {
             { filename: MODULE, code: "const m = CatalogModule.register({ isGlobal: false })" },
             { filename: MODULE, code: "const flag = { isGlobal }" },
             { filename: MODULE, code: "const o = { global: true }" },
+            // the test world is the test composition root: it registers capability modules like an app root
+            { filename: at("src/tests/world/use-test-world.ts"), code: "const m = [CatalogModule.register({ isGlobal: true }), { module: PlanModule, global: true }]" },
+            { filename: at("src/tests/world/contract.client.ts"), code: "const m = X.register({ isGlobal: true })" },
         ],
         invalid: [
             { filename: MODULE, code: "const m = CatalogModule.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
@@ -62,6 +65,10 @@ test("isGlobal: true is written only in apps/<app>/src/app.module.ts", () => {
             { filename: at("apps/api/src/main.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
             { filename: at("apps/api/src/api.composition.spec.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
             { filename: at("src/modules/domain/plan/plan.module.spec.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
+            // a spec does not compose, and the same code in a feature or a domain file stays refused
+            { filename: at("src/tests/integration/plan/plan.integration-spec.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
+            { filename: at("src/tests/e2e/flows/plan.e2e-spec.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
+            { filename: at("src/tests/fixtures/plan.builder.ts"), code: "const m = X.register({ isGlobal: true })", errors: [{ messageId: "isGlobal" }] },
             // a computed literal key and an assignment are the same write
             { filename: MODULE, code: "const m = { ['isGlobal']: true }", errors: [{ messageId: "isGlobal" }] },
             { filename: MODULE, code: "options.isGlobal = true", errors: [{ messageId: "isGlobal" }] },

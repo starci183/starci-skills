@@ -11,6 +11,12 @@
  * an unresolved global (`fetch`, `setTimeout`, `globalThis.setInterval`) whose name is a key of the table. Specs are
  * included: they use the fake clock and the doubles the owning capability provides.
  *
+ * The test world (slot `be.tests.world`, `src/tests/world`) is an infrastructure owner like the platform capabilities: it is
+ * the TEST COMPOSITION ROOT that starts docker, polls readiness, serves the network-edge fakes over `node:http` and drives the
+ * apps over HTTP with a raw client, and it has no Nest container to inject a port from. It may use every library the
+ * table gives an owner; a library the table owns by nobody (`[]`, `nowhere`) is still refused there. A spec does not
+ * compose: specs stay refused and reach infrastructure through `useTestWorld(...)`.
+ *
  * `no-framework-logger` (R40) and `no-ambient-clock` (R79) judge Nest `Logger` and `Date`; the table holds neither.
  */
 import { hfsOf } from "./lib/hfs.mjs"
@@ -49,9 +55,10 @@ export const infraImportOwner = {
         const hfs = hfsOf(context)
         const table = hfs.ruleParams.infraOwners
         const here = ownerIdOf(hfs, context.filename)
+        const isWorld = hfs.slotOf(context.filename) === "be.tests.world"
         const check = (node, name, key) => {
             const owners = table[key]
-            if (owners.includes(here)) return
+            if (owners.includes(here) || (isWorld && owners.length > 0)) return
             if (owners.length === 0) context.report({ node, messageId: "nowhere", data: { name } })
             else context.report({ node, messageId: "foreign", data: { name, owners: owners.map((owner) => `\`${owner}\``).join(", ") } })
         }

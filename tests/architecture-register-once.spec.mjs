@@ -127,3 +127,13 @@ test('BE: two apps may each register the same representative once', t => {
   }));
   assert.deepEqual(hits(report), []);
 });
+
+test('BE: the test world (be.tests.world) is a composition root: isGlobal true and module imports there raise nothing, the same code in another test folder or a feature does', t => {
+  const compose = "import { ConfigModule } from '../../modules/platform/config';\nimport { BillingModule } from '../../modules/domain/billing';\nexport const modules = [ConfigModule.register({ isGlobal: true }), BillingModule.register({ isGlobal: true })];\nexport const own = { imports: [BillingModule], isGlobal: true };\n";
+  const world = run(t, { 'apps/core/src/app.module.ts': APP(GOOD), 'src/tests/world/use-test-world.ts': compose });
+  assert.deepEqual(hits(world).filter(item => item.path.startsWith('src/tests/')), []);
+  const spec = run(t, { 'apps/core/src/app.module.ts': APP(GOOD), 'src/tests/fixtures/compose.ts': compose });
+  assert.ok(hits(spec).some(item => item.path === 'src/tests/fixtures/compose.ts' && item.message.includes('isGlobal: true')));
+  const feature = run(t, { 'apps/core/src/app.module.ts': APP(GOOD), 'src/features/a/compose.ts': compose.replaceAll('../../modules', '../../modules') });
+  assert.ok(hits(feature).some(item => item.path === 'src/features/a/compose.ts'));
+});

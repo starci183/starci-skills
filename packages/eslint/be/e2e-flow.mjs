@@ -13,6 +13,7 @@
  */
 import { basename } from "node:path"
 import ts from "typescript"
+import { hfsOf } from "./lib/hfs.mjs"
 import { isPackageType, typeOrigins, typed } from "./lib/types.mjs"
 
 /** Files this law governs. A flow is a named lane, not every file that happens to touch a database. */
@@ -142,7 +143,15 @@ export const noSleepInFlow = {
 
 // -- E2E-7 ----------------------------------------------------------------------------------------
 
-/** A step asserts one outcome. A branch means the test is prepared for either, which is no assertion. */
+/**
+ * A step asserts one outcome. A branch means the test is prepared for either, which is no assertion.
+ *
+ * The probe handed to `world.waitFor(label, probe)` is not a step: it is a polling predicate ("answer the row once it is
+ * there, else nothing"), and a test whose probe never becomes ready FAILS at the deadline, so no path passes by omission.
+ * A probe is recognised by the type of the receiver (`waitFor` on a value whose type is declared in the test world,
+ * slot `be.tests.world`), never by the name of a variable; a `waitFor` of any other type, and every branch outside the
+ * probe, is still a branch in a step.
+ */
 export const noBranchInFlowStep = {
     meta: {
         type: "problem",
@@ -155,14 +164,28 @@ export const noBranchInFlowStep = {
     },
     create(context) {
         if (!isE2eSpec(context.filename || context.getFilename())) return {}
+        const hfs = hfsOf(context)
 
-        /** True when this node sits inside the callback of an `it(...)` or `test(...)`. */
+        /** True when the call is `world.waitFor(...)` on the test world's own handle. */
+        const isWorldPoll = (call) =>
+            call.callee.type === "MemberExpression" &&
+            !call.callee.computed &&
+            call.callee.property.type === "Identifier" &&
+            call.callee.property.name === "waitFor" &&
+            typeOrigins(context, call.callee.object).some((origin) => hfs.slotOf(origin.file) === "be.tests.world")
+
+        /** True when this node sits inside the callback of an `it(...)` or `test(...)`, and not inside a `waitFor` probe. */
         const insideStep = (node) => {
+            let child = node
             for (let current = node.parent; current; current = current.parent) {
-                if (current.type !== "CallExpression") continue
-                const callee = current.callee
-                const name = callee && (callee.name || (callee.object && callee.object.name))
-                if (name === "it" || name === "test") return true
+                if (current.type === "CallExpression") {
+                    const isFunction = child.type === "ArrowFunctionExpression" || child.type === "FunctionExpression"
+                    if (isFunction && current.arguments.includes(child) && isWorldPoll(current)) return false
+                    const callee = current.callee
+                    const name = callee && (callee.name || (callee.object && callee.object.name))
+                    if (name === "it" || name === "test") return true
+                }
+                child = current
             }
             return false
         }
