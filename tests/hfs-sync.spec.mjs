@@ -662,8 +662,8 @@ describe('scripts/checks/check-hfs-sync.mjs', () => {
     const result = await checkHfsSync(dir, { presets: PRESETS.be });
     assert.equal(result.ok, false);
     assert.deepEqual(result.findings.map(finding => [finding.code, finding.file]).sort(), [
-      ['HFS_SONAR_CONFIG', 'sonar-project.properties'],
       ['HFS_PLAINTEXT_SECRET', '.starcistacks/dev/secrets/db.txt'],
+      ['HFS_SONAR_CONFIG', 'sonar-project.properties'],
       ['HFS_WORK_AGENT_DATA', '.starciwork/features/a/evidence/run.log'],
     ]);
     assert.ok(result.findings.every(finding => CODES.includes(finding.code)));

@@ -495,7 +495,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R08 | `HFS_WORK_NODE_RETIRED` | Only flat family records, never `work/node`. |
 | R09 | `HFS_IDENTITY_CUSTODY` | An identity points its secret at `secrets/identity-<slug>.enc`; UAT chooses by role. |
 | R10 | `HFS_STACKS_SHAPE` | `.starcistacks` has the standard shape and the host Sonar owner. |
-| R11 | `HFS_SONAR_CONFIG` | Sonar config is generated, with no host URL and matching coverage exclusions. |
+| R11 | `HFS_SONAR_CONFIG` | Sonar config is generated, with no host URL and no coverage import. |
 | R12 | `HFS_E2E_IN_AUTOMATIC_GATE` | e2e never joins husky, coverage or automatic CI. |
 | R13 | `HFS_CI_MISSING_CANON` | CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky. |
 | R14 | `HFS_DEP_VERSION_SKEW` | One version per dependency in the workspace, and npm is the only package manager. |
