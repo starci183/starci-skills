@@ -104,10 +104,9 @@ test('static graph: static registration methods that use their options, spreads,
     'src/list.ts': `import { L1 } from './l1';\nexport const LIST = [L1];\n`,
     'src/l1.ts': `${COMMON}\nimport { L1Resolver } from './l1.resolver';\n@Module({ providers: [{ provide: 'x', useClass: L1Resolver }] })\nexport class L1 {}\n`,
     'src/l1.resolver.ts': resolverClass('L1Resolver'),
-    'src/optional.ts': `${COMMON}\nimport { OptionalResolver } from './optional.resolver';\n@Module({ providers: [OptionalResolver] })\nexport class OptionalFeature {}\n`,
-    'src/optional.resolver.ts': resolverClass('OptionalResolver'),
+    'src/optional.ts': `${COMMON}\n@Module({})\nexport class OptionalFeature {}\n`,
   });
-  assert.deepEqual(names(composition.resolvers).sort(), ['AResolver', 'L1Resolver', 'LateResolver', 'OptionalResolver']);
+  assert.deepEqual(names(composition.resolvers).sort(), ['AResolver', 'L1Resolver', 'LateResolver']);
 });
 
 test('static graph: a dynamic module built on super.register (the configurable-module pattern) and forRootAsync options are followed', () => {
@@ -168,6 +167,80 @@ test('static graph: GraphQLModule include limits the served providers to the lis
   });
   assert.deepEqual(names(composeOf(files('include: [Listed]')).resolvers).sort(), ['BelowResolver', 'ListedResolver']);
   assert.deepEqual(names(composeOf(files('')).resolvers).sort(), ['BelowResolver', 'ListedResolver', 'UnlistedResolver']);
+});
+
+// The features one app switches on decide which resolvers a module registers (`if (features.x) providers.push(...)`).
+const FEATURE_MODULE = [
+  COMMON,
+  "import { Base } from './base.resolver';",
+  "import { TwoFactor } from './two-factor.resolver';",
+  "import { Reset } from './reset.resolver';",
+  '@Module({})',
+  'export class FeatureGraphqlModule {',
+  '  static register(options: { features: { twoFactor: boolean; reset: boolean } }) {',
+  '    const { features } = options;',
+  '    const providers = [Base];',
+  '    if (features.twoFactor) {',
+  '      providers.push(TwoFactor);',
+  '    }',
+  '    if (!features.reset) {',
+  '      return { module: FeatureGraphqlModule, providers };',
+  '    }',
+  '    providers.push(Reset);',
+  '    return { module: FeatureGraphqlModule, providers };',
+  '  }',
+  '}',
+].join('\n');
+const featureApp = (bindings, argument) => ({
+  'src/app.module.ts': `${COMMON}\n${GQL}\nimport { FeatureGraphqlModule } from '@app/feature';\n${bindings}\n@Module({ imports: [${SERVER}, FeatureGraphqlModule.register(${argument})] })\nexport class AppModule {}\n`,
+  'src/feature.ts': FEATURE_MODULE,
+  'src/base.resolver.ts': resolverClass('Base'),
+  'src/two-factor.resolver.ts': resolverClass('TwoFactor'),
+  'src/reset.resolver.ts': resolverClass('Reset'),
+});
+
+test('static graph: features passed as literals include or exclude the resolvers they switch (a literal, a const-bound literal, a spread of a const)', () => {
+  const on = composeOf(featureApp('', '{ features: { twoFactor: true, reset: true } }'));
+  assert.deepEqual(names(on.resolvers).sort(), ['Base', 'Reset', 'TwoFactor']);
+  const off = composeOf(featureApp('', '{ features: { twoFactor: false, reset: false } }'));
+  assert.deepEqual(names(off.resolvers), ['Base']);
+  const mixed = composeOf(featureApp('const features = { twoFactor: true, reset: false };', '{ features }'));
+  assert.deepEqual(names(mixed.resolvers).sort(), ['Base', 'TwoFactor']);
+  const spread = composeOf(featureApp('const ENABLED = { twoFactor: false, reset: true };', '{ features: { ...ENABLED } }'));
+  assert.deepEqual(names(spread.resolvers).sort(), ['Base', 'Reset']);
+  const typed = composeOf(featureApp('interface Features { twoFactor: boolean; reset: boolean }\nconst features: Features = { twoFactor: true, reset: true };', '{ features }'));
+  assert.deepEqual(names(typed.resolvers).sort(), ['Base', 'Reset', 'TwoFactor']);
+});
+
+test('static graph: a condition literals do not decide is an error naming the file, line and condition, never a dropped or doubled resolver', () => {
+  const fromEnv = () => composeOf(featureApp("const flag = process.env.FLAG === '1';", '{ features: { twoFactor: flag, reset: true } }'));
+  assert.throws(fromEnv, /feature\.ts:\d+: the condition features\.twoFactor cannot be decided from literals/);
+  const unbound = () => composeOf(featureApp('', '{ features: unknownFeatures }'));
+  assert.throws(unbound, /cannot be decided/);
+  const ternary = () => composeOf({
+    'src/app.module.ts': `${COMMON}\n${GQL}\nimport { OnlyWhenAsked } from '@app/asked';\n@Module({})\nexport class AppModule {\n  static register(options: { asked: boolean }) {\n    return { module: AppModule, imports: [${SERVER}, ...(options.asked ? [OnlyWhenAsked] : [])] };\n  }\n}\n`,
+    'src/asked.ts': `${COMMON}\nimport { AskedResolver } from './asked.resolver';\n@Module({ providers: [AskedResolver] })\nexport class OnlyWhenAsked {}\n`,
+    'src/asked.resolver.ts': resolverClass('AskedResolver'),
+  });
+  assert.throws(ternary, /options\.asked cannot be decided from literals and its branches serve different resolvers \(AskedResolver\)/);
+  const unknownList = () => composeOf({
+    'src/app.module.ts': `${COMMON}\n${GQL}\nimport { PerItem } from '@app/per-item';\n@Module({})\nexport class AppModule {\n  static register(options: { items: string[] }) {\n    return { module: AppModule, imports: [${SERVER}, ...options.items.map((item) => PerItem.register(item))] };\n  }\n}\n`,
+    'src/per-item.ts': `${COMMON}\nimport { ItemResolver } from './item.resolver';\n@Module({})\nexport class PerItem {\n  static register(item: string) {\n    return { module: PerItem, providers: [ItemResolver] };\n  }\n}\n`,
+    'src/item.resolver.ts': resolverClass('ItemResolver'),
+  });
+  assert.throws(unknownList, /serve different resolvers \(ItemResolver\)/);
+});
+
+test('static graph: statements that return or change a list and are not modeled are errors', () => {
+  const looped = () => composeOf({
+    'src/app.module.ts': `${COMMON}\n${GQL}\nimport { R } from '@app/r';\n@Module({})\nexport class AppModule {\n  static register() {\n    const imports: unknown[] = [${SERVER}];\n    for (const each of [R]) {\n      imports.push(each);\n    }\n    return { module: AppModule, imports };\n  }\n}\n`,
+    'src/r.ts': `${COMMON}\n@Module({})\nexport class R {}\n`,
+  });
+  assert.throws(looped, /ForOfStatement that returns or changes a list is not modeled/);
+  const opened = () => composeOf({ 'src/app.module.ts': `${COMMON}\n${GQL}\n@Module({ imports: [${SERVER}, { module: AppModule, ...unknownBase }] })\nexport class AppModule {}\n` });
+  assert.throws(opened, /unknown spread|cannot be decided/);
+  const optionsOpen = () => composeOf({ 'src/app.module.ts': `${COMMON}\n${GQL}\n@Module({ imports: [GraphQLModule.forRoot({ autoSchemaFile: true, ...shared })] })\nexport class AppModule {}\n` });
+  assert.throws(optionsOpen, /cannot be decided \(an unknown spread\)/);
 });
 
 test('static graph: an app whose graph holds no GraphQL server composes nothing', () => {

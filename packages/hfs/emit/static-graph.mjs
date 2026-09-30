@@ -25,6 +25,7 @@ const NEST_GRAPHQL = '@nestjs/graphql';
 const SCHEMA_OPTIONS_NOT_MODELED = ['buildSchemaOptions', 'typeDefs', 'schema', 'transformSchema', 'transformAutoSchemaFile'];
 
 const undef = { t: 'undef' };
+const nul = { t: 'nul' };
 const free = (why) => ({ t: 'free', why });
 
 export function createGraphReader({ ts, host }) {
@@ -165,17 +166,88 @@ export function createGraphReader({ ts, host }) {
     return current;
   };
 
+  // ---- conditions: only what literals decide is folded; the rest is recorded and judged at the end ----
+  const undecidedRecords = [];
+  /** A choice the literals do not decide: both outcomes stay, and it is an error at the end unless they serve the same resolvers. */
+  function undecided(conditionNode, alts) {
+    undecidedRecords.push({ node: conditionNode, alts });
+    return { t: 'alt', alts };
+  }
+
+  /** The truthiness of a value: true, false, or null when it depends on something unknown. */
+  function truthiness(value) {
+    switch (value.t) {
+      case 'lit': return Boolean(value.v);
+      case 'undef': case 'nul': return false;
+      case 'obj': case 'arr': case 'class': case 'fn': case 'dyn': case 'ext': return true;
+      case 'alt': {
+        const all = value.alts.map((alt) => truthiness(force(alt)));
+        return all.every((item) => item === all[0]) ? all[0] : null;
+      }
+      default: return null;
+    }
+  }
+
+  /** Strict/loose equality of two forced values, or null when unknown. */
+  function equality(a, b, loose) {
+    if (a.t === 'free' || b.t === 'free' || a.t === 'alt' || b.t === 'alt') return null;
+    const nullish = (v) => v.t === 'undef' || v.t === 'nul';
+    if (nullish(a) && nullish(b)) return loose ? true : a.t === b.t;
+    if (nullish(a) || nullish(b)) return ['lit', 'class', 'obj', 'arr'].includes(nullish(a) ? b.t : a.t) ? false : null;
+    if (a.t === 'lit' && b.t === 'lit') return loose ? a.v == b.v : a.v === b.v; // eslint-disable-line eqeqeq
+    if (a.t === 'class' && b.t === 'class') return a === b;
+    return null;
+  }
+
+  /** The value of a condition expression: true, false, or null when literals do not decide it. */
+  function condition(rawNode, env) {
+    const node = unwrapped(rawNode);
+    const K = ts.SyntaxKind;
+    if (ts.isPrefixUnaryExpression(node) && node.operator === K.ExclamationToken) {
+      const inner = condition(node.operand, env);
+      return inner === null ? null : !inner;
+    }
+    if (ts.isBinaryExpression(node)) {
+      const op = node.operatorToken.kind;
+      if (op === K.AmpersandAmpersandToken || op === K.BarBarToken) {
+        const left = condition(node.left, env);
+        const right = condition(node.right, env);
+        if (op === K.AmpersandAmpersandToken) return left === false || right === false ? false : left === true && right === true ? true : null;
+        return left === true || right === true ? true : left === false && right === false ? false : null;
+      }
+      if (op === K.EqualsEqualsEqualsToken || op === K.ExclamationEqualsEqualsToken || op === K.EqualsEqualsToken || op === K.ExclamationEqualsToken) {
+        const equal = equality(force(thunk(node.left, env)), force(thunk(node.right, env)), op === K.EqualsEqualsToken || op === K.ExclamationEqualsToken);
+        return equal === null ? null : op === K.EqualsEqualsEqualsToken || op === K.EqualsEqualsToken ? equal : !equal;
+      }
+    }
+    return truthiness(force(thunk(node, env)));
+  }
+
   function ev(rawNode, env) {
     const node = unwrapped(rawNode);
     if (env.depth > 60) return free('evaluation too deep');
     if (ts.isIdentifier(node)) return identifier(node.text, node, env);
     if (ts.isArrayLiteralExpression(node)) return { t: 'arr', items: node.elements.map((element) => (ts.isSpreadElement(element) ? { t: 'spread', v: thunk(element.expression, env) } : thunk(element, env))) };
     if (ts.isObjectLiteralExpression(node)) return objectLiteral(node, env);
-    if (ts.isConditionalExpression(node)) return { t: 'alt', alts: [thunk(node.whenTrue, env), thunk(node.whenFalse, env)] };
+    if (ts.isConditionalExpression(node)) {
+      const decided = condition(node.condition, env);
+      if (decided === true) return thunk(node.whenTrue, env);
+      if (decided === false) return thunk(node.whenFalse, env);
+      return undecided(node.condition, [thunk(node.whenTrue, env), thunk(node.whenFalse, env)]);
+    }
     if (ts.isBinaryExpression(node)) {
       const op = node.operatorToken.kind;
-      if (op === ts.SyntaxKind.QuestionQuestionToken || op === ts.SyntaxKind.BarBarToken) return { t: 'alt', alts: [thunk(node.left, env), thunk(node.right, env)] };
-      if (op === ts.SyntaxKind.AmpersandAmpersandToken) return { t: 'alt', alts: [thunk(node.right, env), undef] };
+      if (op === ts.SyntaxKind.QuestionQuestionToken) {
+        const left = force(thunk(node.left, env));
+        if (left.t === 'undef' || left.t === 'nul') return thunk(node.right, env);
+        return left.t === 'free' ? undecided(node.left, [left, thunk(node.right, env)]) : left;
+      }
+      if (op === ts.SyntaxKind.BarBarToken || op === ts.SyntaxKind.AmpersandAmpersandToken) {
+        const decided = condition(node.left, env);
+        const orElse = op === ts.SyntaxKind.BarBarToken;
+        if (decided === null) return undecided(node.left, [thunk(node.right, env), orElse ? thunk(node.left, env) : undef]);
+        return decided === orElse ? thunk(node.left, env) : thunk(node.right, env);
+      }
       if (op === ts.SyntaxKind.EqualsToken) return thunk(node.right, env);
       return free('binary expression');
     }
@@ -183,9 +255,10 @@ export function createGraphReader({ ts, host }) {
     if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) return member(thunk(node.expression, env), node.argumentExpression.text);
     if (ts.isCallExpression(node)) return call(node, env);
     if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return { t: 'fn', node, env };
-    if (ts.isStringLiteralLike(node) || ts.isNumericLiteral(node)) return { t: 'lit', v: node.text };
+    if (ts.isStringLiteralLike(node)) return { t: 'lit', v: node.text };
+    if (ts.isNumericLiteral(node)) return { t: 'lit', v: Number(node.text) };
     if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) return { t: 'lit', v: node.kind === ts.SyntaxKind.TrueKeyword };
-    if (node.kind === ts.SyntaxKind.NullKeyword) return undef;
+    if (node.kind === ts.SyntaxKind.NullKeyword) return nul;
     return free(`unmodelled expression ${ts.SyntaxKind[node.kind]}`);
   }
 
@@ -245,6 +318,7 @@ export function createGraphReader({ ts, host }) {
           return property ? thunk(property.initializer, newEnv(base.file, { cache: property })) : free(`static ${key} of ${base.name}`);
         }
         case 'undef':
+        case 'nul':
           return undef;
         default:
           return free(`property ${key} of ${base.t}`);
@@ -276,7 +350,9 @@ export function createGraphReader({ ts, host }) {
     const items = base.t === 'arr' ? base.items : [free('an item of a list from the options of a deployment')];
     if (name === 'map' || name === 'flatMap') {
       const fn = args[0] ? force(args[0]) : null;
-      return fn?.t === 'fn' ? { t: 'arr', items: items.map((item) => callFunction(fn, [item, undef])) } : free(`${name} without a function`);
+      if (fn?.t !== 'fn') return free(`${name} without a function`);
+      const mapped = { t: 'arr', items: items.map((item) => callFunction(fn, [item, undef])) };
+      return base.t === 'arr' ? mapped : undecided(fn.node, [mapped, { t: 'arr', items: [] }]);
     }
     if (name === 'filter' || name === 'slice' || name === 'sort' || name === 'reverse') return base;
     if (name === 'concat') return { t: 'arr', items: [{ t: 'spread', v: base }, ...args.map((argument) => ({ t: 'spread', v: argument }))] };
@@ -323,9 +399,8 @@ export function createGraphReader({ ts, host }) {
     const body = fn.node.body;
     if (!body) return free('function without a body');
     if (!ts.isBlock(body)) return thunk(body, env);
-    const returns = [];
-    runStatements(body.statements, env, returns);
-    return returns.length === 0 ? undef : returns.length === 1 ? returns[0] : { t: 'alt', alts: returns };
+    const outcome = runStatements(body.statements, env);
+    return outcome.returned ? outcome.value : undef;
   }
 
   function bindParameter(name, value, env) {
@@ -338,20 +413,64 @@ export function createGraphReader({ ts, host }) {
     }
   }
 
-  function runStatements(statements, env, returns) {
+  /** True when a statement returns or changes a list a later `return` may hand back: what an undecided branch must not hide. */
+  function hasEffect(node) {
+    let found = false;
+    const visit = (child) => {
+      if (found) return;
+      if (ts.isReturnStatement(child) || (ts.isBinaryExpression(child) && child.operatorToken.kind === ts.SyntaxKind.EqualsToken)) found = true;
+      else if (ts.isCallExpression(child) && ts.isPropertyAccessExpression(child.expression) && ['push', 'unshift', 'splice'].includes(child.expression.name.text)) found = true;
+      else if (!ts.isFunctionLike(child)) ts.forEachChild(child, visit);
+    };
+    visit(node);
+    return found;
+  }
+
+  const SILENT_STATEMENTS = new Set([ts.SyntaxKind.EmptyStatement, ts.SyntaxKind.ThrowStatement, ts.SyntaxKind.FunctionDeclaration, ts.SyntaxKind.ClassDeclaration, ts.SyntaxKind.InterfaceDeclaration, ts.SyntaxKind.TypeAliasDeclaration]);
+
+  /**
+   * Runs statements in order against an environment: declarations bind lazily, `if` follows the branch its condition decides
+   * (an undecidable condition over statements that return or change a list is an error), `push` appends to a local list and
+   * `return` ends the run. Answers `{ returned, value }`. A loop, switch or try that returns or changes a list is an error.
+   */
+  function runStatements(statements, env) {
     for (const statement of statements) {
       if (ts.isVariableStatement(statement)) {
         for (const declaration of statement.declarationList.declarations) {
           if (declaration.initializer) bindParameter(declaration.name, thunk(declaration.initializer, env), env);
         }
-      } else if (ts.isReturnStatement(statement)) returns.push(statement.expression ? thunk(statement.expression, env) : undef);
+      } else if (ts.isReturnStatement(statement)) return { returned: true, value: statement.expression ? thunk(statement.expression, env) : undef };
       else if (ts.isIfStatement(statement)) {
-        for (const branch of [statement.thenStatement, statement.elseStatement]) {
-          if (!branch) continue;
-          runStatements(ts.isBlock(branch) ? branch.statements : [branch], env, returns);
+        const decided = condition(statement.expression, env);
+        if (decided === null && hasEffect(statement)) throw new Error(`${where(statement)}: the condition ${statement.expression.getText()} cannot be decided from literals and a branch returns or adds providers; the schema is not known`);
+        const branch = decided === false ? statement.elseStatement : decided === true ? statement.thenStatement : null;
+        if (branch) {
+          const outcome = runStatements(ts.isBlock(branch) ? branch.statements : [branch], env);
+          if (outcome.returned) return outcome;
         }
-      } else if (ts.isBlock(statement)) runStatements(statement.statements, env, returns);
+      } else if (ts.isBlock(statement)) {
+        const outcome = runStatements(statement.statements, env);
+        if (outcome.returned) return outcome;
+      } else if (ts.isExpressionStatement(statement)) pushStatement(statement, env);
+      else if (!SILENT_STATEMENTS.has(statement.kind) && hasEffect(statement)) throw new Error(`${where(statement)}: a ${ts.SyntaxKind[statement.kind]} that returns or changes a list is not modeled by this reader`);
     }
+    return { returned: false, value: undef };
+  }
+
+  /** `list.push(...)` on a local list and `name = value` on a local name; any other expression statement has no effect here. */
+  function pushStatement(statement, env) {
+    const expression = unwrapped(statement.expression);
+    if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.EqualsToken && ts.isIdentifier(expression.left) && env.vars.has(expression.left.text)) {
+      env.vars.set(expression.left.text, thunk(expression.right, env));
+      return;
+    }
+    if (!ts.isCallExpression(expression) || !ts.isPropertyAccessExpression(expression.expression)) return;
+    const name = expression.expression.name.text;
+    if (name !== 'push' && name !== 'unshift') return;
+    const list = force(thunk(expression.expression.expression, env));
+    if (list.t !== 'arr') throw new Error(`${where(statement)}: ${name} on something that is not a local list`);
+    const added = expression.arguments.map((argument) => (ts.isSpreadElement(argument) ? { t: 'spread', v: thunk(argument.expression, env) } : thunk(argument, env)));
+    if (name === 'push') list.items.push(...added); else list.items.unshift(...added);
   }
 
   // ---- modules ----
@@ -365,7 +484,9 @@ export function createGraphReader({ ts, host }) {
       const callee = force(thunk(expression.expression, newEnv(cls.file)));
       if (callee.t === 'ext' && callee.spec === NEST_COMMON && callee.name === 'Module') {
         const argument = expression.arguments[0];
-        return argument ? force(thunk(argument, newEnv(cls.file, { thisClass: cls }))) : { t: 'obj', props: new Map(), open: false };
+        const metadata = argument ? force(thunk(argument, newEnv(cls.file, { thisClass: cls }))) : { t: 'obj', props: new Map(), open: false };
+        if (metadata.t !== 'obj' || metadata.open) throw new Error(`${where(expression)}: the @Module metadata of ${cls.name} cannot be decided`);
+        return metadata;
       }
     }
     return null;
@@ -376,7 +497,7 @@ export function createGraphReader({ ts, host }) {
     const v = force(value);
     if (v.t === 'arr') for (const item of v.items) entries(item.t === 'spread' ? item.v : item, out);
     else if (v.t === 'alt') for (const alt of v.alts) entries(alt, out);
-    else if (v.t !== 'undef' && !(v.t === 'lit' && v.v === false)) out.push(v);
+    else if (v.t !== 'undef' && v.t !== 'nul' && !(v.t === 'lit' && !v.v)) out.push(v);
     return out;
   }
 
@@ -387,6 +508,7 @@ export function createGraphReader({ ts, host }) {
     if (value.t === 'class' || value.t === 'ext') return { module: value, dyn: null, key: value.t === 'class' ? value : `${value.spec}#${value.name}` };
     if (value.t === 'dyn') return { module: force(value.module), dyn: value, key: value };
     if (value.t === 'obj' && value.props.has('module')) {
+      if (value.open && !(value.props.has('imports') && value.props.has('providers'))) throw new Error(`${origin}: a module object with an unknown spread may add imports or providers`);
       const dyn = { t: 'dyn', module: value.props.get('module'), imports: value.props.has('imports') ? [value.props.get('imports')] : [], providers: value.props.has('providers') ? [value.props.get('providers')] : [], args: [] };
       return { module: force(dyn.module), dyn, key: value };
     }
@@ -483,7 +605,7 @@ export function createGraphReader({ ts, host }) {
     const objects = options.t === 'alt' ? options.alts.map(force) : [options];
     const props = new Map();
     for (const object of objects) {
-      if (object.t !== 'obj') throw new Error(`${origin}: the GraphQL server options cannot be decided (${object.why ?? object.t})`);
+      if (object.t !== 'obj' || object.open) throw new Error(`${origin}: the GraphQL server options cannot be decided (${object.why ?? (object.open ? 'an unknown spread' : object.t)})`);
       for (const [key, value] of object.props) props.set(key, value);
     }
     for (const key of SCHEMA_OPTIONS_NOT_MODELED) {
@@ -494,6 +616,33 @@ export function createGraphReader({ ts, host }) {
     const include = props.has('include') ? entries(props.get('include')) : [];
     if (include.some((item) => item.t !== 'class')) throw new Error(`${origin}: the GraphQL include list cannot be decided`);
     return { include };
+  }
+
+  /** The keys of the resolver and scalar classes one branch of an undecided choice would serve. */
+  function graphqlClassKeys(alt) {
+    const keys = new Set();
+    for (const value of entries(alt)) {
+      if (value.t === 'class' && graphqlKind(value)) keys.add(`${value.file}#${value.name}`);
+      const moduleLike = value.t === 'dyn' || (value.t === 'obj' && value.props.has('module')) || (value.t === 'class' && moduleMetadata(value) !== null);
+      if (!moduleLike) continue;
+      for (const cls of providerClasses(walk(value))) if (graphqlKind(cls)) keys.add(`${cls.file}#${cls.name}`);
+    }
+    return keys;
+  }
+
+  /**
+   * Every choice the literals did not decide (a condition on the options of a deployment, an unknown list) must serve the same
+   * resolvers whichever way it goes; when the branches differ the schema is not known and that is an error, never a guess.
+   */
+  function assertUndecidedHarmless() {
+    for (let at = 0; at < undecidedRecords.length; at += 1) {
+      const { node, alts } = undecidedRecords[at];
+      const [first, ...rest] = alts.map(graphqlClassKeys);
+      for (const other of rest) {
+        const differing = [...first].filter((key) => !other.has(key)).concat([...other].filter((key) => !first.has(key)));
+        if (differing.length) throw new Error(`${where(node)}: ${node.getText()} cannot be decided from literals and its branches serve different resolvers (${differing.map((key) => key.split('#')[1]).join(', ')})`);
+      }
+    }
   }
 
   /**
@@ -512,6 +661,7 @@ export function createGraphReader({ ts, host }) {
     if (servers.length > 1) throw new Error(`${appFile} composes ${servers.length} GraphQL servers; a contract snapshot describes exactly one`);
     const { include } = serverOptions(servers[0].server, `${exportName} of ${appFile}`);
     const classesOf = providerClasses(servedNodes(nodes, include));
+    assertUndecidedHarmless();
     const pick = (kind) => classesOf.filter((cls) => graphqlKind(cls) === kind).map((cls) => ({ file: cls.file, name: cls.name }));
     return { resolvers: pick('Resolver'), scalars: pick('Scalar'), include: include.map((cls) => ({ file: cls.file, name: cls.name })) };
   }
