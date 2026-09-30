@@ -37,11 +37,12 @@ export function checkDefaultDeny(input) {
   const classify = (checker, node) => {
     if (!node) return null;
     if (kit.importBinding(checker, node)?.module === '@nestjs/throttler') return 'throttler';
-    for (const declaration of kit.declarationsOf(checker, node)) {
+    const declarations = kit.declarationsOf(checker, node);
+    if (declarations.some(declaration => extendsThrottler(declaration))) return 'throttler';
+    for (const declaration of declarations) {
       const owner = kit.ownerOfDeclaration(declaration);
       if (owner?.tier === 'platform' && owner.name === 'http-security') return 'csrf';
       if (owner?.tier === 'domain' && owner.name === 'identity' && ts.isClassDeclaration(declaration) && declaration.name?.text === 'AuthGuard') return 'auth';
-      if (extendsThrottler(declaration)) return 'throttler';
     }
     return null;
   };

@@ -2,15 +2,18 @@ import path from 'node:path';
 import { machineKit } from './machine-ast.mjs';
 
 /**
- * R45 `register-once` (BE_MODULE_SHAPE). A capability module (a `@Module` class declared under a domain, platform or
- * integrations owner) is composed by the app root alone:
- *   - it is registered as `X.register(...)` in `apps/<app>/src/app.module.ts` (imports built by helpers of the same file
- *     count) and nowhere else: no other module registers it or lists it in `imports:` (RED03), an app root does not list
- *     the bare class;
- *   - `isGlobal: true` appears only in an app root;
- *   - one dynamic module class is registered once in the graph of an app (its root and every file the root reaches by
- *     runtime imports), whichever file the second registration sits in.
- * Owners register their own submodules freely: only a registration or import that crosses an owner boundary is refused.
+ * R45 `register-once` (BE_MODULE_SHAPE), the module graph read from the app roots (owner rule of 2026-09-30, the
+ * reference's `CodingModule imports DeviceModule` shape). Each capability has one representative module: the only module
+ * of the capability an app registers, once, in `apps/<app>/src/app.module.ts` as `X.register({ isGlobal: true, ... })`.
+ * It may split itself into sub-modules imported as plain `imports: [Sub]`; a sub-module is never in an app and has one
+ * importer, its parent. Over every `@Module` class of the program:
+ *
+ *   - a module in an app root's imports (a `X.register(...)` call or a listed class, helpers of the root included) is
+ *     listed once there, is imported by no other module, and, when it is a capability module of src/modules, is registered
+ *     with the literal `isGlobal: true` (a bare capability class is not a registration);
+ *   - a module imported by a non-app module has exactly one importer and appears in no app root; the one exception is
+ *     the feature case: a feature's application module is imported by each protocol module of the same feature;
+ *   - `isGlobal: true` appears only in an app root.
  */
 export const REGISTER_ONCE_RULE_IDS = ['BE_MODULE_SHAPE'];
 
@@ -24,9 +27,10 @@ export function checkRegisterOnce(input) {
   const violations = [];
   const report = (file, node, message, extra = {}) => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, node), message, ...extra });
   const isAppRoot = file => Boolean(file.slot?.startsWith('be.app.')) && path.posix.basename(file.rel) === 'app.module.ts';
+  const appOf = file => config.apps.find(app => file.rel === `apps/${app.name}/src/app.module.ts`)?.name ?? null;
 
-  // The module classes of the program, and which of them are capabilities.
-  const modules = new Map(); // declaration -> {name, rel, ownerRoot, capability}
+  // Every @Module class of the program.
+  const modules = new Map(); // declaration -> {name, file, capability}
   for (const file of graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
     for (const statement of file.sourceFile.statements) {
@@ -36,73 +40,98 @@ export function checkRegisterOnce(input) {
         const binding = kit.importBinding(checker, call);
         return binding?.module === '@nestjs/common' && binding.name === 'Module';
       });
-      if (isModule) modules.set(statement, { name: statement.name.text, rel: file.rel, ownerRoot: file.owner?.root ?? null, capability: CAPABILITY_TIERS.has(file.tier) });
+      if (isModule) modules.set(statement, { name: statement.name.text, file, capability: CAPABILITY_TIERS.has(file.tier) });
     }
   }
-  const moduleOf = (checker, node) => {
+  const targetOf = (checker, node) => {
     for (const declaration of kit.declarationsOf(checker, node)) if (modules.has(declaration)) return { declaration, ...modules.get(declaration) };
     return null;
   };
+  const enclosingModule = node => {
+    for (let current = node.parent; current; current = current.parent) if (ts.isClassDeclaration(current) && modules.has(current)) return current;
+    return null;
+  };
 
-  // Registration sites per file: `X.register(...)` calls of a module class.
-  const sites = new Map(); // rel -> [{module, node}]
-  let registrations = 0;
+  // The references to modules: importer (the enclosing module class, else the file), target, node, whether it is a register call.
+  const references = [];
   for (const file of graph.files.values()) {
     const checker = kit.checkerOf(file.sourceFile);
-    const list = [];
+    const seen = new Set();
+    const note = (element, viaImports) => {
+      const call = ts.isCallExpression(element) && ts.isPropertyAccessExpression(element.expression) && element.expression.name.text === 'register';
+      if (ts.isCallExpression(element) && !call) return;
+      const target = targetOf(checker, call ? element.expression.expression : element);
+      if (!target) return;
+      seen.add(element);
+      const owner = enclosingModule(element);
+      references.push({ file, node: element, target, register: call, viaImports, importer: owner ?? file.rel, importerOwner: file.owner?.root ?? null,
+        options: call ? element.arguments[0] : null, root: isAppRoot(file) });
+    };
     kit.walk(file.sourceFile, node => {
-      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register') {
-        const target = moduleOf(checker, node.expression.expression);
-        if (target) list.push({ module: target, node });
-      }
-      // isGlobal: true belongs to the app root alone.
-      if (ts.isPropertyAssignment(node) && kit.propertyNameText(node.name) === 'isGlobal' && node.initializer.kind === ts.SyntaxKind.TrueKeyword && !isAppRoot(file)) {
-        report(file, node, '`isGlobal: true` appears only in the app root (apps/<app>/src/app.module.ts), where the capability module is registered; a module never decides its own globality.');
-      }
-      // imports: [...] of a module outside the app root must not list another owner's capability module.
       if (ts.isPropertyAssignment(node) && kit.propertyNameText(node.name) === 'imports' && ts.isArrayLiteralExpression(node.initializer)) {
-        for (const element of node.initializer.elements) {
-          if (ts.isCallExpression(element)) continue;
-          const target = moduleOf(checker, element);
-          if (!target || !target.capability) continue;
-          if (isAppRoot(file)) report(file, element, `${target.name} is listed in imports as a bare class; a capability module is registered once in the app root as ${target.name}.register({ isGlobal: true, ...options }).`, { module: target.name });
-          else if (target.ownerRoot !== file.owner?.root) report(file, element, `${target.name} (${target.ownerRoot}) is imported by a module of another owner; capability modules are registered once in the app root and never imported by another module.`, { module: target.name });
-        }
+        for (const element of node.initializer.elements) note(element, true);
+      } else if (ts.isCallExpression(node) && !seen.has(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'register') {
+        note(node, false);
+      }
+      if (ts.isPropertyAssignment(node) && kit.propertyNameText(node.name) === 'isGlobal' && node.initializer.kind === ts.SyntaxKind.TrueKeyword && !isAppRoot(file)) {
+        report(file, node, '`isGlobal: true` appears only in the app root (apps/<app>/src/app.module.ts), where the representative module of a capability is registered; a module never decides its own globality.');
       }
       return true;
     });
-    sites.set(file.rel, list);
-    registrations += list.length;
-    for (const site of list) {
-      if (!site.module.capability || isAppRoot(file) || site.module.ownerRoot === file.owner?.root) continue;
-      report(file, site.node, `${site.module.name}.register(...) is called outside the app root; a capability module is registered once per app in apps/<app>/src/app.module.ts and never by another module.`, { module: site.module.name });
-    }
   }
 
-  // One registration of a module class in the graph of each app.
-  const reachable = rel => {
-    const seen = new Set([rel]);
-    const queue = [rel];
-    const outgoing = new Map();
-    for (const edge of graph.edges) if (edge.runtime) { if (!outgoing.has(edge.from)) outgoing.set(edge.from, []); outgoing.get(edge.from).push(edge.to); }
-    while (queue.length) for (const next of outgoing.get(queue.shift()) ?? []) if (!seen.has(next)) { seen.add(next); queue.push(next); }
-    return seen;
-  };
-  let apps = 0;
+  const trueGlobal = options => Boolean(options) && ts.isObjectLiteralExpression(options) && (() => {
+    const property = kit.propertyOf(options, 'isGlobal');
+    return Boolean(property) && ts.isPropertyAssignment(property) && property.initializer.kind === ts.SyntaxKind.TrueKeyword;
+  })();
+
+  // App roots: each module is listed once, capability modules are registered with isGlobal true.
+  const rootReferences = references.filter(item => item.root);
+  const inApps = new Map(); // module declaration -> Set(app names)
+  for (const item of rootReferences) {
+    const app = appOf(item.file) ?? item.file.rel;
+    if (!inApps.has(item.target.declaration)) inApps.set(item.target.declaration, new Set());
+    inApps.get(item.target.declaration).add(app);
+  }
   for (const app of config.apps) {
-    const root = kit.appRoot(app.name);
-    if (!root) continue;
-    apps += 1;
-    const counted = new Map();
-    for (const rel of [...reachable(root.rel)].sort()) {
-      for (const site of sites.get(rel) ?? []) {
-        const seenBefore = counted.get(site.module.declaration);
-        if (!seenBefore) { counted.set(site.module.declaration, rel); continue; }
-        const file = graph.files.get(rel);
-        report(file, site.node, `${site.module.name} is registered more than once in the graph of app ${app.name} (first in ${seenBefore}); register a dynamic module once.`, { module: site.module.name, app: app.name });
+    const seenInApp = new Map();
+    for (const item of rootReferences.filter(entry => appOf(entry.file) === app.name)) {
+      if (seenInApp.has(item.target.declaration)) {
+        report(item.file, item.node, `${item.target.name} is registered more than once in the root of app ${app.name}; a module is listed once per app.`, { module: item.target.name, app: app.name });
+      } else seenInApp.set(item.target.declaration, item.node);
+    }
+  }
+  for (const item of rootReferences) {
+    if (!item.target.capability || !item.viaImports && !item.register) continue;
+    if (!item.register) report(item.file, item.node, `${item.target.name} is listed in imports as a bare class; the representative module of a capability is registered in the app root as ${item.target.name}.register({ isGlobal: true, ...options }).`, { module: item.target.name });
+    else if (!trueGlobal(item.options)) report(item.file, item.node, `${item.target.name} is registered in the app root without the literal \`isGlobal: true\`; write ${item.target.name}.register({ isGlobal: true, ...options }).`, { module: item.target.name });
+  }
+
+  // Non-app importers: no importer of an app-registered module, exactly one importer otherwise (the feature case excepted).
+  const importersOf = new Map(); // module declaration -> [reference]
+  for (const item of references.filter(entry => !entry.root && entry.viaImports)) {
+    if (!importersOf.has(item.target.declaration)) importersOf.set(item.target.declaration, []);
+    importersOf.get(item.target.declaration).push(item);
+  }
+  for (const [declaration, list] of importersOf) {
+    const target = modules.get(declaration);
+    const apps = inApps.get(declaration);
+    if (apps) {
+      for (const item of list) {
+        report(item.file, item.node, `${target.name} is registered in the root of app ${[...apps].sort().join(', ')}, so no other module imports it; consume it through its Inject*() decorators.`, { module: target.name });
+      }
+      continue;
+    }
+    const distinct = [...new Set(list.map(item => item.importer))];
+    const featureCase = target.file.tier === 'feature' && target.file.owner && list.every(item => item.importerOwner === target.file.owner.root);
+    if (distinct.length > 1 && !featureCase) {
+      for (const item of list.filter(entry => entry.importer !== list[0].importer)) {
+        report(item.file, item.node, `${target.name} is imported by ${distinct.length} modules; a sub-module has exactly one importer, its parent. Another capability's module is consumed through its Inject*() decorators, never imported.`, { module: target.name });
       }
     }
   }
 
-  return { violations, coverage: { status: 'checked', apps, modules: modules.size, capabilityModules: [...modules.values()].filter(item => item.capability).length, registrations } };
+  return { violations, coverage: { status: 'checked', apps: config.apps.filter(app => kit.appRoot(app.name)).length, modules: modules.size,
+    capabilityModules: [...modules.values()].filter(item => item.capability).length, registrations: references.filter(item => item.register).length,
+    rootImports: rootReferences.length } };
 }

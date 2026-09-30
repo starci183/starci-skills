@@ -22,7 +22,6 @@ export function checkErrorCodes(input) {
   const files = [...graph.files.values()].filter(file => file.slot === 'be.errors' && file.owner && path.posix.basename(file.rel).endsWith('.error.ts'))
     .sort((a, b) => a.rel.localeCompare(b.rel));
   for (const file of files) {
-    const checker = kit.checkerOf(file.sourceFile);
     const capability = upperSnake(path.posix.basename(file.owner.root));
     const shape = new RegExp(`^${capability}_[A-Z0-9]+(?:_[A-Z0-9]+)*$`, 'u');
     for (const statement of file.sourceFile.statements) {
@@ -31,8 +30,8 @@ export function checkErrorCodes(input) {
       for (const member of statement.members) {
         const report = message => violations.push({ ruleId: RULE, path: file.rel, ...kit.at(file.rel, file.sourceFile, member), message });
         const name = kit.propertyNameText(member.name) ?? '?';
-        const value = member.initializer && ts.isStringLiteralLike(member.initializer) ? member.initializer.text : kit.stringValue(checker, member.initializer);
-        if (value === null || value === undefined) { report(`${statement.name.text}.${name} must be a string literal code (\`${capability}_<WHAT>\`); a computed or numeric code cannot be checked or told apart in a log.`); continue; }
+        const value = member.initializer && ts.isStringLiteralLike(member.initializer) ? member.initializer.text : null;
+        if (value === null) { report(`${statement.name.text}.${name} must be a string literal code (\`${capability}_<WHAT>\`); a computed or numeric code cannot be checked or told apart in a log.`); continue; }
         codes += 1;
         if (!shape.test(value) || /_(?:ERROR|EXCEPTION)$/u.test(value)) {
           report(`${statement.name.text}.${name} = "${value}" must match ${capability}_<WHAT> in UPPER_SNAKE with the capability prefix and no _ERROR or _EXCEPTION suffix.`);
