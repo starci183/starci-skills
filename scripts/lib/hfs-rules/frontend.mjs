@@ -54,7 +54,10 @@ function wireFindings({ repoRoot, app, tracked }) {
   const manifest = `${base}/package.json`;
   const scripts = scriptsOf(repoRoot, manifest);
   const rootScripts = scriptsOf(repoRoot, 'package.json');
-  const wired = (name) => scripts[name] ?? rootScripts[name];
+  // A root script that only fans out to the workspaces (`npm run x --workspaces`, the managed FE root) is not this app's
+  // script: the app's own manifest must declare it.
+  const delegates = (script) => /(?:^|\s)--workspaces?(?:\s|=|$)/.test(String(script ?? ''));
+  const wired = (name) => scripts[name] ?? (delegates(rootScripts[name]) ? undefined : rootScripts[name]);
   if (typeof wired('codegen') !== 'string') findings.push(found(WIRE_GENERATED, manifest, `${app} keeps a contract copy but declares no \`codegen\` script; wire types are generated from the copy, never typed by hand`, { app }));
   else for (const hook of ['prebuild', 'pretypecheck']) {
     if (!/\bcodegen\b/.test(String(wired(hook) ?? ''))) findings.push(found(WIRE_GENERATED, manifest, `${app} does not run codegen in \`${hook}\`; generate the wire types before build and typecheck`, { app, script: hook }));
