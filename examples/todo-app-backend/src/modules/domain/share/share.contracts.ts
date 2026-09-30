@@ -1,4 +1,5 @@
-import type { EntityManager } from "typeorm"
+import type { Outcome } from "@modules/platform/primitives"
+import type { ShareErrorCode } from "./errors/share.error"
 
 /** The roles an invitation can grant. */
 export enum ShareRole {
@@ -44,10 +45,8 @@ export interface InvitationView {
     readonly personId: string | null
 }
 
-/** What inviting needs; the write joins the caller transaction. */
+/** What inviting needs. */
 export interface InviteParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
     /** The owner of the task. */
     readonly ownerId: string
     /** The task. */
@@ -56,34 +55,24 @@ export interface InviteParams {
     readonly email: string
     /** The role to grant; anything but viewer or editor is refused. */
     readonly role: string
-    /** The instant of the decision. */
-    readonly at: Date
 }
 
-/** What accepting needs; the write joins the caller transaction. */
+/** What accepting needs. */
 export interface AcceptParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
     /** The accepting person. */
     readonly actorId: string
     /** The invitation. */
     readonly invitationId: string
     /** The accepting person's own address, matched against the invited one. */
     readonly email: string
-    /** The instant of the decision. */
-    readonly at: Date
 }
 
-/** What revoking needs; the write joins the caller transaction. */
+/** What revoking needs. */
 export interface RevokeParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
     /** The person who asks; must own the invitation. */
     readonly ownerId: string
     /** The invitation. */
     readonly invitationId: string
-    /** The instant of the decision. */
-    readonly at: Date
 }
 
 /** What listing the invitations of a task needs. */
@@ -92,8 +81,6 @@ export interface ListInvitationsParams {
     readonly actorId: string
     /** The task. */
     readonly taskId: string
-    /** The instant the statuses are read at. */
-    readonly at: Date
 }
 
 /** What the completion rule needs. */
@@ -112,4 +99,36 @@ export interface StoredInvitationStatus {
     readonly status: string
     /** When the invitation was sent. */
     readonly sentAt: Date
+}
+
+/** The answer of inviting: the created or re-opened invitation, or a refusal. */
+export type InviteResult = Outcome<
+    {
+        readonly invitationId: string
+        readonly taskId: string
+        readonly email: string
+        readonly role: string
+        readonly status: string
+    },
+    ShareErrorCode
+>
+
+/** The answer of accepting: the bound role and status, or a refusal. */
+export type AcceptResult = Outcome<
+    { readonly invitationId: string; readonly role: string; readonly status: string },
+    ShareErrorCode
+>
+
+/** The answer of revoking: the revoked invitation, or a refusal. */
+export type RevokeResult = Outcome<{ readonly invitationId: string; readonly status: string }, ShareErrorCode>
+
+/** The invitations of a task with their live statuses. */
+export interface CollaboratorList {
+    /** One summary per invitation the asker may see. */
+    readonly collaborators: ReadonlyArray<{
+        readonly invitationId: string
+        readonly email: string
+        readonly role: string
+        readonly status: string
+    }>
 }
