@@ -1,6 +1,6 @@
 import { Args, Query, Resolver } from "@nestjs/graphql"
 import type { QueryBus } from "@nestjs/cqrs"
-import { PublicReason, Public } from "@modules/domain/auth"
+import { PublicReason, Public } from "@modules/domain/identity"
 import { SessionError } from "@modules/domain/session"
 import { InjectQueryBus } from "@modules/platform/cqrs"
 import { RateLimit, RateTier } from "@modules/platform/http-security"

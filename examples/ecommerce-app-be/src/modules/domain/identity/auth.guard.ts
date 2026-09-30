@@ -5,9 +5,9 @@ import { InjectReflector } from "@modules/platform/composition"
 import type { Principal, Role } from "@modules/platform/cqrs"
 import { requestOf } from "@modules/platform/http-security"
 import { bearerTokenOf } from "./bearer-token.mapper"
-import { AuthError, AuthErrorCode } from "./errors/auth.error"
-import type { PublicMetadata, SessionVerifier } from "./auth.contracts"
-import { InjectSessionVerifier, PUBLIC_KEY, ROLES_KEY } from "./auth.decorators"
+import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
+import type { PublicMetadata, SessionVerifier } from "./identity.contracts"
+import { InjectSessionVerifier, PUBLIC_KEY, ROLES_KEY } from "./identity.decorators"
 
 @Injectable()
 /**
@@ -27,11 +27,11 @@ export class AuthGuard implements CanActivate {
         const request = requestOf(context)
         const token = bearerTokenOf(request.headers.authorization)
         const session = token === null ? null : await this.verifier.verify(token)
-        if (session === null) throw new AuthError({ code: AuthErrorCode.Unauthenticated })
+        if (session === null) throw new IdentityError({ code: IdentityErrorCode.Unauthenticated })
         const principal: Principal = { id: session.personId, roles: ["member"] }
         const required = this.reflector.getAllAndOverride<ReadonlyArray<Role> | undefined>(ROLES_KEY, targets) ?? []
         if (!required.every((role) => principal.roles.includes(role))) {
-            throw new AuthError({ code: AuthErrorCode.Forbidden })
+            throw new IdentityError({ code: IdentityErrorCode.Forbidden })
         }
         request.principal = principal
         return true

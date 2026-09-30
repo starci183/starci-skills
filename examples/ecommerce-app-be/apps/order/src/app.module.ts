@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_GUARD } from "@nestjs/core"
-import { AUTH_ERROR_KINDS, AUTH_MESSAGES, AuthGuard, AuthModule } from "@modules/domain/auth"
+import { IDENTITY_ERROR_KINDS, IDENTITY_MESSAGES, AuthGuard, IdentityModule } from "@modules/domain/identity"
 import { CART_ERROR_KINDS, CartModule, cartEntities, cartMigrations } from "@modules/domain/cart"
 import { CatalogModule, catalogEntities, catalogMigrations } from "@modules/domain/catalog"
 import { ORDER_ERROR_KINDS, ORDER_MESSAGES, OrderModule, orderEntities, orderMigrations } from "@modules/domain/order"
@@ -41,7 +41,7 @@ export class AppModule {
                         PROBES_MESSAGES,
                         IDENTITY_API_MESSAGES,
                         ORDER_MESSAGES,
-                        AUTH_MESSAGES,
+                        IDENTITY_MESSAGES,
                     ],
                 }),
                 ErrorsModule.register({
@@ -55,7 +55,7 @@ export class AppModule {
                         IDENTITY_API_ERROR_KINDS,
                         CART_ERROR_KINDS,
                         ORDER_ERROR_KINDS,
-                        AUTH_ERROR_KINDS,
+                        IDENTITY_ERROR_KINDS,
                     ],
                 }),
                 CqrsModule.register({ isGlobal: true }),
@@ -76,7 +76,7 @@ export class AppModule {
                 CartModule.register({ isGlobal: true }),
                 PaymentModule.register({ isGlobal: true }),
                 OrderModule.register({ isGlobal: true }),
-                AuthModule.register({ isGlobal: true, verifier: IDENTITY_API }),
+                IdentityModule.register({ isGlobal: true, verifier: IDENTITY_API }),
                 ProbesModule.register({ isGlobal: true, service: "order", probes: [DATABASE_PROBE, IDENTITY_API] }),
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,

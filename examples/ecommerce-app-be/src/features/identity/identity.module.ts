@@ -9,4 +9,4 @@ import { VerifySessionHandler } from "./application/verify-session.handler"
     providers: [RegisterHandler, SignInHandler, VerifySessionHandler, RevokeSessionHandler, GetAccountHandler],
 })
 /** The identity feature: the handlers of registration, sign-in, session verification and revocation, and the account read. */
-export class IdentityModule {}
+export class IdentityFeatureModule {}

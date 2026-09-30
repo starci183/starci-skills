@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_GUARD } from "@nestjs/core"
 import { ACCOUNT_ERROR_KINDS, ACCOUNT_MESSAGES, AccountModule, accountEntities, accountMigrations } from "@modules/domain/account"
-import { AUTH_ERROR_KINDS, AUTH_MESSAGES, AuthGuard, AuthModule } from "@modules/domain/auth"
+import { IDENTITY_ERROR_KINDS, IDENTITY_MESSAGES, AuthGuard, IdentityModule } from "@modules/domain/identity"
 import { SESSION_ERROR_KINDS, SESSION_MESSAGES, SessionModule, SessionService } from "@modules/domain/session"
 import { CACHE, CACHE_ERROR_KINDS, CACHE_MESSAGES, CacheModule } from "@modules/integrations/cache"
 import { ORDER_API_ERROR_KINDS, ORDER_API_MESSAGES, OrderApiModule } from "@modules/integrations/order-api"
@@ -42,7 +42,7 @@ export class AppModule {
                         ORDER_API_MESSAGES,
                         ACCOUNT_MESSAGES,
                         SESSION_MESSAGES,
-                        AUTH_MESSAGES,
+                        IDENTITY_MESSAGES,
                     ],
                 }),
                 ErrorsModule.register({
@@ -57,7 +57,7 @@ export class AppModule {
                         ORDER_API_ERROR_KINDS,
                         ACCOUNT_ERROR_KINDS,
                         SESSION_ERROR_KINDS,
-                        AUTH_ERROR_KINDS,
+                        IDENTITY_ERROR_KINDS,
                     ],
                 }),
                 CqrsModule.register({ isGlobal: true }),
@@ -71,7 +71,7 @@ export class AppModule {
                 OrderApiModule.register({ isGlobal: true, ...options.orderApi }),
                 AccountModule.register({ isGlobal: true }),
                 SessionModule.register({ isGlobal: true }),
-                AuthModule.register({ isGlobal: true, verifier: SessionService }),
+                IdentityModule.register({ isGlobal: true, verifier: SessionService }),
                 ProbesModule.register({ isGlobal: true, service: "identity", probes: [DATABASE_PROBE, CACHE] }),
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,

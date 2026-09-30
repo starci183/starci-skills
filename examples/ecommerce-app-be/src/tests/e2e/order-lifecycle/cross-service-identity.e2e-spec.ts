@@ -5,7 +5,7 @@ import type { AccountData, CartData, PlaceOrderData, RevokeSessionData } from ".
 /**
  * The identity to order boundary for real: an order operation authenticates because the auth guard asks identity
  * verifySession over live GraphQL on EVERY request, so when a session dies mid-journey (revoked on the identity side)
- * the next order operation answers AUTH_UNAUTHENTICATED, not a cached principal. Re-auth then issues a new token for the
+ * the next order operation answers IDENTITY_UNAUTHENTICATED, not a cached principal. Re-auth then issues a new token for the
  * same person, and the person-keyed state (the cart) resumes the journey.
  *
  * Session lifetime is declared by the session cache key (one hour), so an expiry journey is not part of the suite: it
@@ -43,7 +43,7 @@ describe("order lifecycle: identity to order boundary", () => {
 
         // The order boundary refuses the dead token: no principal survives the revoke.
         const refused = await before.read<CartData>("cart")
-        expect(refused.errorCode).toBe("AUTH_UNAUTHENTICATED")
+        expect(refused.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
 
         // Re-auth: a different token for the same person.
         const resumed = await world.auth.signIn(session.email, password)

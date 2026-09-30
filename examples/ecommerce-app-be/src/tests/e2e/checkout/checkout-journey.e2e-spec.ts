@@ -84,6 +84,6 @@ describe("checkout journey", () => {
         })
         expect(revoked.errorCode).toBeNull()
         const afterRevoke = await buyer.read<CartData>("cart")
-        expect(afterRevoke.errorCode).toBe("AUTH_UNAUTHENTICATED")
+        expect(afterRevoke.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
     })
 })

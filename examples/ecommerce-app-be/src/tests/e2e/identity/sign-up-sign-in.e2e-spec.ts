@@ -77,7 +77,7 @@ describe("identity sign-up and sign-in journey", () => {
 
         // The account door is default-deny: without a live session it is refused.
         const denied = await anonymous.read<AccountData>("account")
-        expect(denied.errorCode).toBe("AUTH_UNAUTHENTICATED")
+        expect(denied.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
 
         // Out-of-band verification: the person persisted, and both databases carry their migrated tables.
         expect(await world.database.personById(personId)).toEqual([{ id: personId, email }])
@@ -90,6 +90,6 @@ describe("identity sign-up and sign-in journey", () => {
         const afterRevoke = await anonymous.read<VerifySessionData>("verifySession", { variables: { input: { sessionToken: session.sessionToken } } })
         expect(afterRevoke.errorCode).toBe("SESSION_INVALID")
         const accountAfter = await caller.read<AccountData>("account")
-        expect(accountAfter.errorCode).toBe("AUTH_UNAUTHENTICATED")
+        expect(accountAfter.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
     })
 })

@@ -1,7 +1,7 @@
 import { Args, Mutation, Resolver } from "@nestjs/graphql"
 import type { CommandBus } from "@nestjs/cqrs"
 import { AccountError } from "@modules/domain/account"
-import { PublicReason, Public } from "@modules/domain/auth"
+import { PublicReason, Public } from "@modules/domain/identity"
 import { InjectCommandBus } from "@modules/platform/cqrs"
 import { RateLimit, RateTier } from "@modules/platform/http-security"
 import { unwrapOutcome } from "@modules/platform/primitives"

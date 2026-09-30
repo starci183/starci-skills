@@ -1,6 +1,6 @@
 import { Mutation, Resolver } from "@nestjs/graphql"
 import type { CommandBus } from "@nestjs/cqrs"
-import { CurrentPrincipal } from "@modules/domain/auth"
+import { CurrentPrincipal } from "@modules/domain/identity"
 import { InjectCommandBus } from "@modules/platform/cqrs"
 import type { Principal } from "@modules/platform/cqrs"
 import { ClearCartCommand } from "../../application/clear-cart.command"

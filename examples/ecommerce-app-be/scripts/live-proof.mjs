@@ -133,9 +133,9 @@ if (process.argv.slice(2).includes('--expect-down')) {
 
   await step('order: a cart read without a live session is refused at the door', async () => {
     const anonymous = await gql(ORDER, CART, {});
-    assert(anonymous.code === 'AUTH_UNAUTHENTICATED', `cart without a token answered ${anonymous.code ?? anonymous.status}`);
+    assert(anonymous.code === 'IDENTITY_UNAUTHENTICATED', `cart without a token answered ${anonymous.code ?? anonymous.status}`);
     const dead = await gql(ORDER, CART, {}, 'not-a-live-session');
-    assert(dead.code === 'AUTH_UNAUTHENTICATED', `wrong token answered ${dead.code ?? dead.status}`);
+    assert(dead.code === 'IDENTITY_UNAUTHENTICATED', `wrong token answered ${dead.code ?? dead.status}`);
   });
 
   await step('order: the live session verifies through identity and the cart opens', async () => {

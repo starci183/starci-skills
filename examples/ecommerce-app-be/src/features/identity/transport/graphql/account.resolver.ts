@@ -1,7 +1,7 @@
 import { Query, Resolver } from "@nestjs/graphql"
 import type { QueryBus } from "@nestjs/cqrs"
 import { AccountError } from "@modules/domain/account"
-import { BearerToken, CurrentPrincipal } from "@modules/domain/auth"
+import { BearerToken, CurrentPrincipal } from "@modules/domain/identity"
 import { InjectQueryBus } from "@modules/platform/cqrs"
 import type { Principal } from "@modules/platform/cqrs"
 import { unwrapOutcome } from "@modules/platform/primitives"

@@ -1,6 +1,6 @@
 import { Query, Resolver } from "@nestjs/graphql"
 import type { QueryBus } from "@nestjs/cqrs"
-import { CurrentPrincipal } from "@modules/domain/auth"
+import { CurrentPrincipal } from "@modules/domain/identity"
 import { InjectQueryBus } from "@modules/platform/cqrs"
 import type { Principal } from "@modules/platform/cqrs"
 import { GetBuyerStatusQuery } from "../../application/get-buyer-status.query"

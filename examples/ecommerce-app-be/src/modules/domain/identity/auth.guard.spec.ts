@@ -3,10 +3,10 @@ import type { Reflector } from "@nestjs/core"
 import { mock } from "@starci/jest-preset/mock"
 import type { Principal } from "@modules/platform/cqrs"
 import { AuthGuard } from "./auth.guard"
-import { AuthError, AuthErrorCode } from "./errors/auth.error"
-import { PublicReason } from "./auth.contracts"
-import type { SessionVerifier } from "./auth.contracts"
-import { PUBLIC_KEY, ROLES_KEY } from "./auth.decorators"
+import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
+import { PublicReason } from "./identity.contracts"
+import type { SessionVerifier } from "./identity.contracts"
+import { PUBLIC_KEY, ROLES_KEY } from "./identity.decorators"
 
 interface Metadata {
     readonly reason?: PublicReason
@@ -40,7 +40,7 @@ const codeOf = async (call: Promise<unknown>): Promise<string | undefined> => {
     try {
         await call
     } catch (error) {
-        if (error instanceof AuthError) return error.code
+        if (error instanceof IdentityError) return error.code
     }
     return undefined
 }
@@ -64,13 +64,13 @@ describe("AuthGuard", () => {
     it("refuses a request without a bearer token and a token no session answers", async () => {
         const missing = requestOfContext({}).context
         const dead = requestOfContext({ authorization: "Bearer dead" }).context
-        expect(await codeOf(new AuthGuard(reflectorOf({}), verifierFor("p-1")).canActivate(missing))).toBe(AuthErrorCode.Unauthenticated)
-        expect(await codeOf(new AuthGuard(reflectorOf({}), verifierFor(null)).canActivate(dead))).toBe(AuthErrorCode.Unauthenticated)
+        expect(await codeOf(new AuthGuard(reflectorOf({}), verifierFor("p-1")).canActivate(missing))).toBe(IdentityErrorCode.Unauthenticated)
+        expect(await codeOf(new AuthGuard(reflectorOf({}), verifierFor(null)).canActivate(dead))).toBe(IdentityErrorCode.Unauthenticated)
     })
 
     it("refuses an authenticated caller who lacks a required role", async () => {
         const { context } = requestOfContext({ authorization: "Bearer live" })
         const guard = new AuthGuard(reflectorOf({ roles: ["admin"] }), verifierFor("p-1"))
-        expect(await codeOf(guard.canActivate(context))).toBe(AuthErrorCode.Forbidden)
+        expect(await codeOf(guard.canActivate(context))).toBe(IdentityErrorCode.Forbidden)
     })
 })

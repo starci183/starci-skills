@@ -1,6 +1,6 @@
 import { Args, Mutation, Resolver } from "@nestjs/graphql"
 import type { CommandBus } from "@nestjs/cqrs"
-import { CurrentPrincipal } from "@modules/domain/auth"
+import { CurrentPrincipal } from "@modules/domain/identity"
 import { OrderError } from "@modules/domain/order"
 import { InjectCommandBus } from "@modules/platform/cqrs"
 import type { Principal } from "@modules/platform/cqrs"
