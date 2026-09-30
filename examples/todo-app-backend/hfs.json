@@ -23,6 +23,7 @@
     }
   ],
   "optionalSlots": [
-    "repo.docs"
+    "repo.docs",
+    "be.contract.graphql"
   ]
 }

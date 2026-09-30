@@ -1,0 +1,495 @@
+input AcceptInvitationInput {
+  email: String!
+  invitationId: ID!
+}
+
+type AcceptInvitationType {
+  invitationId: ID!
+  role: String!
+  status: String!
+}
+
+input AttachUploadInput {
+  taskId: ID!
+  uploadId: ID!
+}
+
+type AuditLogType {
+  action: String!
+  at: DateTime!
+  target: String
+}
+
+input CompleteErasureInput {
+  requestId: ID!
+}
+
+type CompleteErasureType {
+  requestId: ID!
+  state: String!
+}
+
+input CompleteOccurrenceInput {
+  occurrenceId: ID!
+}
+
+type CompleteOccurrenceType {
+  occurrenceId: ID!
+  status: String!
+}
+
+input CompleteTaskInput {
+  id: ID!
+}
+
+type CompleteTaskType {
+  complete: Boolean!
+  taskId: ID!
+}
+
+input CreateTaskInput {
+  title: String!
+}
+
+type CreateTaskType {
+  taskId: ID!
+  title: String!
+}
+
+input CreateUploadIntentInput {
+  filename: String!
+  mime: String!
+  sizeBytes: Int!
+}
+
+type CreateUploadIntentType {
+  expiresAt: String!
+  headers: [UploadHeaderType!]!
+  method: String!
+  uploadId: ID!
+  url: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+input DeleteTaskInput {
+  id: ID!
+}
+
+type DeleteTaskType {
+  deleted: Boolean!
+}
+
+input DeleteUploadInput {
+  uploadId: ID!
+}
+
+type DeleteUploadType {
+  deleted: Boolean!
+  uploadId: ID!
+}
+
+type DowngradePlanType {
+  plan: String!
+  status: String!
+  subscriptionId: ID!
+}
+
+input EditRecurrenceInput {
+  dayOfMonth: Int
+  frequency: RecurFrequency
+  n: Int
+  ruleId: ID!
+
+  """Local time HH:MM at which the rule fires, in timeZone."""
+  time: String
+
+  """IANA time zone, for example Asia/Ho_Chi_Minh."""
+  timeZone: String
+}
+
+type EditRecurrenceType {
+  frequency: String!
+  ruleId: ID!
+  time: String!
+  timeZone: String!
+}
+
+input EndRecurrenceInput {
+  """
+  Local calendar date (YYYY-MM-DD), in the zone of the rule, on which the rule ends.
+  """
+  endedAt: String!
+  ruleId: ID!
+}
+
+type EndRecurrenceType {
+  endedAt: String!
+
+  """How many already materialised occurrences this call orphaned."""
+  orphanedCount: Int!
+  ruleId: ID!
+}
+
+type ExportMyDataType {
+  action: String!
+  at: DateTime!
+  target: String
+}
+
+input InviteInput {
+  email: String!
+  role: String!
+  taskId: ID!
+}
+
+type InviteType {
+  email: String!
+  invitationId: ID!
+  role: String!
+  status: String!
+  taskId: ID!
+}
+
+input ListCollaboratorsInput {
+  taskId: ID!
+}
+
+type ListCollaboratorsType {
+  email: String!
+  invitationId: ID!
+  role: String!
+  status: String!
+}
+
+type ListTasksType {
+  complete: Boolean!
+  taskId: ID!
+  title: String!
+}
+
+input MakeRecurringInput {
+  """Required only when frequency is monthly-day; 1 to 31."""
+  dayOfMonth: Int
+  frequency: RecurFrequency!
+
+  """Required only when frequency is every-n-days."""
+  n: Int
+
+  """Local calendar date (YYYY-MM-DD) on which the rule starts."""
+  startDate: String!
+
+  """Local time HH:MM at which the rule fires, in timeZone."""
+  time: String!
+
+  """IANA time zone, for example Asia/Ho_Chi_Minh."""
+  timeZone: String!
+  title: String!
+}
+
+type MakeRecurringType {
+  frequency: String!
+  ruleId: ID!
+  startDate: String!
+  time: String!
+  timeZone: String!
+  title: String!
+}
+
+type MaterialisedOccurrenceType {
+  dueAtUtc: String!
+  localDate: String!
+  occurrenceId: ID!
+  status: String!
+}
+
+type Mutation {
+  """Accept a pending invitation addressed to the caller."""
+  acceptInvitation(request: AcceptInvitationInput!): AcceptInvitationType!
+
+  """Attach a ready upload of the caller to a task of the caller."""
+  attachUpload(request: AttachUploadInput!): UploadType!
+
+  """
+  Complete a verified erasure request: destroy the subject key, then confirm and log completion.
+  """
+  completeErasure(request: CompleteErasureInput!): CompleteErasureType!
+
+  """
+  Complete an occurrence of a recurrence rule owned by the caller, and the task it spawned.
+  """
+  completeOccurrence(request: CompleteOccurrenceInput!): CompleteOccurrenceType!
+
+  """Mark a task complete."""
+  completeTask(request: CompleteTaskInput!): CompleteTaskType!
+
+  """Create a task owned by the caller."""
+  createTask(request: CreateTaskInput!): CreateTaskType!
+
+  """
+  Open an upload intent; the answer is the presigned request that stores the bytes.
+  """
+  createUploadIntent(request: CreateUploadIntentInput!): CreateUploadIntentType!
+
+  """Delete a task permanently."""
+  deleteTask(request: DeleteTaskInput!): DeleteTaskType!
+
+  """Delete an upload of the caller together with its stored bytes."""
+  deleteUpload(request: DeleteUploadInput!): DeleteUploadType!
+
+  """
+  Return to the free plan, effective at once. Tasks are untouched; the cap applies from the next create.
+  """
+  downgradePlan: DowngradePlanType!
+
+  """
+  Edit a recurrence rule owned by the caller. Only the owner may edit a rule.
+  """
+  editRecurrence(request: EditRecurrenceInput!): EditRecurrenceType!
+
+  """
+  End a recurrence rule owned by the caller: no occurrence is generated after the given date.
+  """
+  endRecurrence(request: EndRecurrenceInput!): EndRecurrenceType!
+
+  """Invite a collaborator onto one of the caller's own tasks."""
+  invite(request: InviteInput!): InviteType!
+
+  """Create a recurrence rule owned by the caller."""
+  makeRecurring(request: MakeRecurringInput!): MakeRecurringType!
+
+  """
+  Ask the payment gateway for the state of a pending payment and apply it.
+  """
+  reconcilePayment(request: ReconcilePaymentInput!): ReconcilePaymentType!
+
+  """Reopen a completed task."""
+  reopenTask(request: ReopenTaskInput!): ReopenTaskType!
+
+  """
+  Request that everything identifying the caller be erased from the audit log.
+  """
+  requestErasure: RequestErasureType!
+
+  """Revoke a collaborator on one of the caller's own tasks."""
+  revokeCollaborator(request: RevokeCollaboratorInput!): RevokeCollaboratorType!
+
+  """
+  Sign in with email and password; returns a session token to send as a Bearer authorization header.
+  """
+  signIn(request: SignInInput!): SignInType!
+
+  """End a session by its token."""
+  signOut(request: SignOutInput!): SignOutType!
+
+  """
+  Skip an occurrence of a recurrence rule owned by the caller, without completing its task.
+  """
+  skipOccurrence(request: SkipOccurrenceInput!): SkipOccurrenceType!
+
+  """Stop receiving notifications on one channel."""
+  unsubscribe(request: UnsubscribeInput!): UnsubscribeType!
+
+  """
+  Change the digest window and/or unsubscribed flag for one notification channel.
+  """
+  updateNotificationPreferences(request: UpdateNotificationPreferencesInput!): UpdateNotificationPreferencesType!
+
+  """
+  Start checkout for the paid plan: records the pending subscription and payment intent and returns the checkout URL.
+  """
+  upgradePlan: UpgradePlanType!
+}
+
+input NotificationPreferencesInput {
+  channel: String
+}
+
+type NotificationPreferencesType {
+  channel: String!
+  digestWindowMinutes: Int
+  unsubscribed: Boolean!
+}
+
+type PlanUsageType {
+  activeCount: Int!
+  cap: Int
+  plan: String!
+}
+
+type Query {
+  """
+  The caller's own audit log lines, oldest first; an administrator reads the whole chain.
+  """
+  auditLog(action: String, target: String): [AuditLogType!]!
+
+  """
+  List a task's collaborators, visible to the owner and to bound collaborators.
+  """
+  collaborators(request: ListCollaboratorsInput!): [ListCollaboratorsType!]!
+
+  """
+  Every log line naming the caller, decrypted, or nothing once the caller's key has been erased.
+  """
+  exportMyData: [ExportMyDataType!]!
+
+  """The caller's own notification preferences for one channel."""
+  notificationPreferences(request: NotificationPreferencesInput): NotificationPreferencesType!
+
+  """
+  The plan of the caller against the active tasks the caller holds; the cap is null on the paid plan.
+  """
+  planUsage: PlanUsageType!
+
+  """How many tasks of the caller are open and complete."""
+  taskCounts: TaskCountsType!
+
+  """List the uploads attached to a task of the caller."""
+  taskUploads(request: TaskUploadsInput!): [UploadType!]!
+
+  """List the tasks owned by the caller."""
+  tasks: [ListTasksType!]!
+
+  """
+  The materialised occurrences of a rule of the caller, with a live preview of the dates it fires on next.
+  """
+  upcomingOccurrences(request: UpcomingOccurrencesInput!): UpcomingOccurrencesType!
+}
+
+input ReconcilePaymentInput {
+  paymentIntentId: ID!
+}
+
+type ReconcilePaymentType {
+  applied: Boolean!
+  gatewayStatus: String!
+  subscriptionStatus: String!
+}
+
+"""
+The cadence of a recurrence rule: every-weekday, every-n-days (needs n) or monthly-day (needs dayOfMonth).
+"""
+enum RecurFrequency {
+  EveryNDays
+  EveryWeekday
+  MonthlyDay
+}
+
+input ReopenTaskInput {
+  id: ID!
+}
+
+type ReopenTaskType {
+  complete: Boolean!
+  taskId: ID!
+}
+
+type RequestErasureType {
+  requestId: ID!
+  state: String!
+}
+
+input RevokeCollaboratorInput {
+  invitationId: ID!
+}
+
+type RevokeCollaboratorType {
+  invitationId: ID!
+  status: String!
+}
+
+input SignInInput {
+  email: String!
+  password: String!
+}
+
+type SignInType {
+  personId: String!
+  sessionToken: String!
+}
+
+input SignOutInput {
+  sessionToken: String!
+}
+
+type SignOutType {
+  signedOut: Boolean!
+}
+
+input SkipOccurrenceInput {
+  occurrenceId: ID!
+}
+
+type SkipOccurrenceType {
+  occurrenceId: ID!
+  status: String!
+}
+
+type TaskCountsType {
+  complete: Int!
+  open: Int!
+}
+
+input TaskUploadsInput {
+  taskId: ID!
+}
+
+input UnsubscribeInput {
+  channel: String! = "email"
+}
+
+type UnsubscribeType {
+  channel: String!
+  unsubscribed: Boolean!
+}
+
+input UpcomingOccurrencesInput {
+  ruleId: ID!
+}
+
+type UpcomingOccurrencesType {
+  materialised: [MaterialisedOccurrenceType!]!
+
+  """
+  The dates the rule fires on next, computed live. Empty for an ended rule.
+  """
+  previewDates: [String!]!
+  ruleId: ID!
+}
+
+input UpdateNotificationPreferencesInput {
+  channel: String! = "email"
+  digestWindowMinutes: Int
+  unsubscribed: Boolean
+}
+
+type UpdateNotificationPreferencesType {
+  channel: String!
+  digestWindowMinutes: Int
+  unsubscribed: Boolean!
+}
+
+type UpgradePlanType {
+  checkoutUrl: String!
+  paymentIntentId: ID!
+  status: String!
+  subscriptionId: ID!
+}
+
+type UploadHeaderType {
+  name: String!
+  value: String!
+}
+
+type UploadType {
+  createdAt: String!
+  filename: String!
+  mime: String!
+  sizeBytes: Int!
+  status: String!
+  taskId: ID
+  uploadId: ID!
+}
