@@ -687,6 +687,18 @@ FE_I18N_PLACEMENT:
   owner: op-retry
   kind: check-finding
 
+FE_NO_TESTS:
+  title: "Front end holds a test file, test tooling or a test dependency"
+  title_vi: "Front end có tệp test, công cụ test hoặc thư viện test"
+  meaning_vi: "Chuẩn của front end là không có test: repository có spec, e2e, cấu hình vitest, Playwright hay jest, script test, hoặc khai báo thư viện chạy test, dựng môi trường test, testing-library, axe trong package.json."
+  causes_vi:
+    - "Viết spec hoặc e2e cho component, hook hay trang"
+    - "Thêm vitest, Playwright, jest, testing-library hoặc axe vào package.json"
+    - "Thêm script test hoặc cấu hình test vào repository front end"
+  nextStep_vi: "Xóa tệp, cấu hình, script và thư viện test đó; front end không có ngoại lệ, kể cả thư mục scripts/. Kiểm tra giao diện bằng lint, typecheck và hfs check."
+  owner: op-retry
+  kind: check-finding
+
 FE_OWNER_REACHABLE:
   title: "Page feature not mounted by a route"
   title_vi: "Feature trang chưa được route nào gắn vào"
@@ -1135,7 +1147,7 @@ HFS_MANAGED_FILE_DRIFT:
   title_vi: "Tệp do .claude quản lý bị lệch"
   meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `hfs sync --write`, không sửa tay."
   causes_vi:
-    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js hoặc vitest.config.ts, .prettierrc, .prettierignore, husky, workflows, sonar, codecov, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
+    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, codecov, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -1445,7 +1457,7 @@ HFS_SONAR_CONFIG:
   title_vi: "Cấu hình Sonar lệch"
   meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Hai con số coverage (Codecov/Sonar) sẽ không khớp."
   causes_vi:
-    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `coverage.exclusions` = đúng danh sách loại trừ coverage của jest/vitest, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `coverage.exclusions` = đúng danh sách loại trừ coverage của jest (back end), không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
     - "Khối `services.sonar.qualityGate` của khai báo stack phải gọi đúng cổng chất lượng duy nhất của `knowledge/sonar-gate.yaml`; repo không tự ghi ngưỡng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
@@ -1497,7 +1509,7 @@ HFS_TEST_KIND_RETIRED:
 HFS_TOOL_CONFIG_LOCAL:
   title: "Configs only call the factories; no local rules"
   title_vi: "Kho tự đặt luật cục bộ"
-  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` hay `stylelint.config.*` thứ hai, cấu hình prettier/vitest/jest/lint-staged khác), tệp tự định nghĩa luật ESLint hoặc plugin stylelint, khóa cấu hình công cụ trong `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), hoặc lệnh chạy eslint/stylelint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`, `--ignore-pattern`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
+  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` hay `stylelint.config.*` thứ hai, cấu hình prettier/lint-staged khác), tệp tự định nghĩa luật ESLint hoặc plugin stylelint, khóa cấu hình công cụ trong `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), hoặc lệnh chạy eslint/stylelint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`, `--ignore-pattern`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
   causes_vi:
     - "Vi phạm luật R16: Cấu hình của repo chỉ gọi factory của `.claude`; cấm tệp cấu hình công cụ khác, tệp luật cục bộ (vd một tệp eslint-local trong thư mục scripts) và cờ dòng lệnh đổi hoặc tắt cấu hình trong hook, workflow, script."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."

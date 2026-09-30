@@ -194,7 +194,7 @@ function assertFrontendRolesDisjoint(root, frontend) {
   }
 }
 
-const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', '.next', '.turbo', 'coverage', 'test-results', 'playwright-report', '.starciwork', '.starcistacks']);
+const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', '.next', '.turbo', 'coverage', 'test-results', '.starciwork', '.starcistacks']);
 
 function directoriesUnder(root, relative, depth) {
   const out = [];
