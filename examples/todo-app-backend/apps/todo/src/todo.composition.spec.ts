@@ -6,7 +6,7 @@ import type { TestingModule } from "@nestjs/testing"
 import { getDataSourceToken, getEntityManagerToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { mock } from "@starci/jest-preset/mock"
-import { PlanService } from "@modules/domain/plan"
+import { SubscriptionService } from "@modules/domain/plan"
 import { AuthGuard, SessionService } from "@modules/domain/session"
 import { TaskService } from "@modules/domain/task"
 import { ConfigError, EnvSource, Secret } from "@modules/platform/config"
@@ -70,7 +70,7 @@ describe("todo AppModule", () => {
     })
 
     it("resolves the capabilities and the platform ports the doors depend on", () => {
-        for (const token of [SessionService, TaskService, PlanService]) {
+        for (const token of [SessionService, TaskService, SubscriptionService]) {
             expect(module.get(token)).toBeInstanceOf(token)
         }
         expect(module.get(CommandBus)).toBeInstanceOf(CommandBus)

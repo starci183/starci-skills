@@ -1,5 +1,3 @@
-import { getEntityManagerToken } from "@nestjs/typeorm"
-import type { Provider } from "@nestjs/common"
 import { mock } from "@starci/jest-preset/mock"
 import type { MockOf } from "@starci/jest-preset/mock"
 import type { EntityManager } from "typeorm"
@@ -14,9 +12,3 @@ export const fakeTransaction = (inner: EntityManager): jest.Mock =>
         const work = args.find((arg): arg is (manager: EntityManager) => Promise<unknown> => typeof arg === "function")
         return work ? work(inner) : Promise.resolve(undefined)
     })
-
-/** The provider that stands `manager` in for the EntityManager of `connection` in a testing module. */
-export const entityManagerProvider = (connection: string, manager: EntityManager): Provider => ({
-    provide: getEntityManagerToken(connection),
-    useValue: manager,
-})
