@@ -44,9 +44,10 @@ test('a clean example passes and a dirty one fails with its findings counted by 
   assert.equal(dirty.status, 'findings');
   assert.equal(dirty.byCode.HFS_EMPTY_DIR, 1, 'the empty directory of the slot check');
   assert.equal(dirty.byCode.BE_MODULE_NOT_COMPOSED, 1, 'the uncomposed module of the machine');
+  assert.equal(dirty.byCode.HFS_UNUSED_FILE, 1, 'and the file nothing imports');
   const text = formatResults(results);
   assert.match(text, /clean: clean/);
-  assert.match(text, /dirty: 2 findings/);
+  assert.match(text, /dirty: 3 findings/);
   assert.match(text, /BE_MODULE_NOT_COMPOSED x1/);
   assert.match(text, /1 of 2 examples not clean/);
 });
@@ -56,7 +57,7 @@ test('the script exits 1 while any example has a finding, 0 when every one is cl
   const script = path.join(root, 'scripts', 'checks', 'check-example-architecture.mjs');
   const dirty = spawnSync(process.execPath, [script, '--examples', dir], { encoding: 'utf8' });
   assert.equal(dirty.status, 1);
-  assert.match(dirty.stdout, /dirty: 2 findings/);
+  assert.match(dirty.stdout, /dirty: 3 findings/);
   const clean = spawnSync(process.execPath, [script, '--examples', dir, '--only', 'clean'], { encoding: 'utf8' });
   assert.equal(clean.status, 0, clean.stdout + clean.stderr);
   assert.equal(main(['--nope'], { err: () => {} }), 2);

@@ -27,9 +27,21 @@ export function writeCleanRepo(declaration, { declare = true, into, name = 'demo
   };
   put('package.json', `${JSON.stringify({ name: 'demo', private: true })}\n`);
   for (const entry of resolver.requiredPaths().paths) if (!entry.path.endsWith('/')) put(entry.path, entry.path === 'hfs.json' ? '' : 'export {};\n');
-  if (declaration.profile === 'fe') for (const app of declaration.apps) put(`apps/${app.name}/src/modules/i18n/messages/en.json`, '{}');
+  if (declaration.profile === 'fe') {
+    const required = resolver.requiredPaths().paths.map((entry) => entry.path);
+    for (const app of declaration.apps) {
+      put(`apps/${app.name}/src/modules/i18n/messages/en.json`, '{}');
+      // The machine judges reachability: every module entry imports its siblings and the app's route handler imports every module entry.
+      const entries = required.filter((p) => p.startsWith(`apps/${app.name}/src/modules/`) && p.endsWith('/index.ts'));
+      for (const entry of entries) {
+        const siblings = required.filter((p) => path.posix.dirname(p) === path.posix.dirname(entry) && p !== entry && /\.tsx?$/.test(p));
+        fs.writeFileSync(path.join(dir, ...entry.split('/')), `${siblings.map((p) => `import './${path.posix.basename(p).replace(/\.tsx?$/, '')}';\n`).join('')}export {};\n`);
+      }
+      put(`apps/${app.name}/src/app/health/route.ts`, `${entries.map((p) => `import '../../modules/${path.posix.basename(path.posix.dirname(p))}';\n`).join('')}export const GET = () => new Response('ok');\n`);
+    }
+  }
   if (declaration.profile === 'be') {
-    put('src/features/orders/index.ts', 'export {};\n');
+    put('src/features/orders/index.ts', `import './orders.module';\nimport './application/place-order.use-case';\nexport {};\n`);
     put('src/features/orders/orders.module.ts', 'export {};\n');
     put('src/features/orders/application/place-order.use-case.ts', 'export {};\n');
     // The machine judges reachability: the app composes the feature and every required module, so a clean repository is clean to it too.

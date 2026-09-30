@@ -265,7 +265,7 @@ test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json 
 });
 
 test('the CLI: report-only backlog leaves the exit code 0; explain and init print what they found', async () => {
-  const dir = repoOf(BE, (d) => put(d, 'src/features/orders/application/big.ts', 'export {};\n'.repeat(600)));
+  const dir = repoOf(BE, (d) => put(d, 'src/features/orders/application/place-order.use-case.ts', 'export {};\n'.repeat(600)));
   assert.equal((await cli(['check', '--repo', dir])).code, 0);
 
   const explained = await cli(['explain', 'src/features/orders/index.ts', '--repo', dir]);
