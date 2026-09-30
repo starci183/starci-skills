@@ -299,7 +299,7 @@ slots:
     rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: repo.quality-config
     profiles: [be, fe]
-    path: "{sonar-project.properties,codecov.yml}"
+    path: "sonar-project.properties"
     presence: required
     tracked: tracked
     tier: none

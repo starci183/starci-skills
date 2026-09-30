@@ -32,7 +32,7 @@ npx jest -t "refuses"                 # one test name
 npm run test:coverage       # jest --coverage -> coverage/lcov.info (+ text summary)
 ```
 
-`collectCoverageFrom` covers all `src/**/*.ts` except specs and `main.ts`. Coverage is measured with the V8 provider (`coverageProvider: 'v8'` in `jest.config.js`) — istanbul under `ts-jest` inflates branch totals with transpiler-emitted helper branches (`__awaiter`/`__generator`/`__spreadArray`), which made the branch number meaningless. The lcov artifact is what codecov consumes (flag `todo-be`).
+`collectCoverageFrom` covers all `src/**/*.ts` except specs and `main.ts`. Coverage is measured with the V8 provider (`coverageProvider: 'v8'` in `jest.config.js`) — istanbul under `ts-jest` inflates branch totals with transpiler-emitted helper branches (`__awaiter`/`__generator`/`__spreadArray`), which made the branch number meaningless.
 
 ## Integration, e2e and contract tests
 

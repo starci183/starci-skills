@@ -29,7 +29,7 @@ reads:
       en: The NestJS stack every project uses and the toolchain a new backend repository carries from its
         first commit — configs that are thin calls into the @starci presets (tsconfig, prettier, jest, canon lint),
         and the files that cannot extend, which `hfs sync` generates from hfs.json - husky, the ci and e2e
-        workflows, .gitignore, sonar-project.properties, codecov.yml and .starciwork/.gitignore.
+        workflows, .gitignore, sonar-project.properties and .starciwork/.gitignore.
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,data}/**/index.yaml
     purpose:
@@ -132,7 +132,7 @@ steps:
       en: Write the manifest first - hfs.json and package.json with the pinned engines and dependencies;
         then run `hfs sync --write`, which generates the tool configuration (tsconfig.json, tsconfig.build.json,
         tsconfig.e2e.json, eslint.config.mjs, jest.config.js, .prettierrc, .prettierignore), the package.json scripts, husky,
-        .github/workflows/ci.yml and e2e.yml, .gitignore, sonar-project.properties, codecov.yml and
+        .github/workflows/ci.yml and e2e.yml, .gitignore, sonar-project.properties and
         .starciwork/.gitignore, and `hfs check` must report no managed-file finding -
         a generated file is never hand-written or edited, and a value `hfs sync` does not carry is a named gap in the
         scaffold evidence, never an improvised choice - then the declared layout, then the first source tree by running `hfs sync --init`
@@ -174,8 +174,8 @@ proofs:
         observed hook and CI output is recorded.
   - id: services-declared
     requirement:
-      en: The ci.yml, codecov.yml and sonar-project.properties the baseline writes take the Sonar project key
-        and host, the Codecov project and the CI secret/variable names from the stack declaration's services
+      en: The ci.yml and sonar-project.properties the baseline writes take the Sonar project key
+        and host and the CI secret/variable names from the stack declaration's services
         block (the repository's own .starcistacks, or the backend declaration whose sources list it), and
         `node scripts/checks/check-starcistacks.mjs <repo> --new` reports no refusal. When that declaration
         is outside this op's owned paths, the check runs without --new and its STACKS_SERVICES_MISSING /

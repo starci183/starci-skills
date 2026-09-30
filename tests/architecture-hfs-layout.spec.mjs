@@ -10,7 +10,7 @@ import { checkRepoPresentation } from '../scripts/checks/architecture/hfs.mjs';
 // HFS_ROOT_ENTRY_MISSING, HFS_ROOT_SRC_FORBIDDEN_FE, HFS_SRC_LAYOUT_INVALID, HFS_PACKAGE_MANAGER_MIXED, HFS_ROOT_MARKDOWN_FORBIDDEN.
 const ROOT_FE = {
   '.gitattributes': '* text=auto\n', '.gitignore': 'node_modules\n', '.github/workflows/ci.yml': 'name: ci\non: workflow_dispatch\n', '.husky/pre-commit': 'npm run lint:check\n',
-  'codecov.yml': 'coverage: {}\n', 'eslint.config.mjs': 'export default [];\n', 'package-lock.json': '{}\n', 'README.md': '# fixture\n', 'sonar-project.properties': 'sonar.projectKey=x\n',
+  'eslint.config.mjs': 'export default [];\n', 'package-lock.json': '{}\n', 'README.md': '# fixture\n', 'sonar-project.properties': 'sonar.projectKey=x\n',
 };
 const APP_FE = Object.fromEntries(['package.json', 'next.config.ts', 'tsconfig.json', 'postcss.config.mjs'].map(name => [`apps/web/${name}`, name.endsWith('.json') ? '{}\n' : 'export default {};\n']));
 const ROOT_BE = { ...ROOT_FE, '.sops.yaml': 'creation_rules: []\n', '.starcistacks/.keep': '', '.starciwork/.keep': '', 'jest.config.js': 'module.exports = {};\n', 'nest-cli.json': '{}\n' };

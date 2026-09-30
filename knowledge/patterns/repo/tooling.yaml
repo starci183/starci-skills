@@ -2,8 +2,7 @@ schema: starci/knowledge-source@1
 id: repo.tooling
 title: Repository tooling
 purpose: |
-  Given a tool configuration in a repository (ESLint, TypeScript, Jest, Vitest, Playwright, stylelint, husky, CI, Sonar,
-  Codecov), who owns its content? `.claude` owns it. A repository holds a thin call into a `.claude` package, or a file that
+  Given a tool configuration in a repository (ESLint, TypeScript, Jest, Vitest, Playwright, stylelint, husky, CI, Sonar), who owns its content? `.claude` owns it. A repository holds a thin call into a `.claude` package, or a file that
   `hfs sync` generates and hash-checks.
 appliesTo:
   - backend
@@ -60,7 +59,7 @@ rules:
     requirement: |
       Files that cannot extend a package are rendered by `hfs sync` from templates in `.claude` and hash-checked: `.husky/`,
       `.github/workflows/ci.yml` (and the optional `e2e.yml`), the managed block of `.gitignore`, `sonar-project.properties`,
-      `codecov.yml`, `.sops.yaml`. Any difference from the render is a finding; the fix is to run `hfs sync`, never to edit the
+      `.sops.yaml`. Any difference from the render is a finding; the fix is to run `hfs sync`, never to edit the
       file. A template change is a change in `.claude`, after which `hfs sync` updates the repositories.
     rationale: |
       A hand-edited hook or workflow drifts, and drift is how a gate stops running.
@@ -137,7 +136,7 @@ rules:
     hfsRules: [R12]
     requirement: |
       No integration, e2e or contract spec, test world or e2e-only dependency joins husky, lint-staged, the default typecheck,
-      or coverage, or an automatic CI trigger. A back end has `typecheck:tests` (`src/tests/tsconfig.json`) and its
+      coverage, or an automatic CI trigger. A back end has `typecheck:tests` (`src/tests/tsconfig.json`) and its
       `test:integration`, `test:e2e` and `test:contract` run it first; a front end has `typecheck:e2e` and `test:e2e` runs it first.
       `lint:check` lints the e2e trees in its one ESLint run (linting is not running e2e). A kept e2e workflow is
       `workflow_dispatch` only.

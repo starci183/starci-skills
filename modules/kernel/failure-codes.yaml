@@ -1386,38 +1386,6 @@ CONTRACT_ROUTE_UNPROVEN:
   owner: other-op:work.author
   kind: check-finding
 
-COVERAGE_MISSING:
-  title: "No coverage report found"
-  title_vi: "Không có báo cáo độ phủ"
-  meaning_vi: "Bộ quét Sonar không tìm thấy báo cáo độ phủ kiểm thử nào."
-  causes_vi:
-    - "Chưa chạy test:ci trong lần này"
-    - "Báo cáo nằm sai đường dẫn"
-  nextStep_vi: "Quét bị từ chối; op chạy test:ci có độ phủ trong lần thử này rồi quét lại."
-  owner: op-retry
-  kind: check-finding
-
-COVERAGE_NOT_IMPORTED:
-  title: "Coverage report was not imported"
-  title_vi: "Báo cáo độ phủ không được nhập"
-  meaning_vi: "Phân tích Sonar không mang theo độ phủ nào nên báo cáo lcov không được nhập."
-  causes_vi:
-    - "Sai đường dẫn sonar.javascript.lcov.reportPaths"
-    - "Báo cáo lcov rỗng"
-  nextStep_vi: "Quét bị từ chối; op kiểm tra đường dẫn lcov, chạy lại test:ci rồi quét lại."
-  owner: op-retry
-  kind: check-finding
-
-COVERAGE_STALE:
-  title: "Coverage report is out of date"
-  title_vi: "Báo cáo độ phủ đã cũ"
-  meaning_vi: "Báo cáo độ phủ được ghi trước commit đầu hoặc trước khi mã đổi nên không còn đáng tin."
-  causes_vi:
-    - "Dùng lại báo cáo từ lần chạy trước"
-  nextStep_vi: "Quét bị từ chối; op chạy lại test:ci có độ phủ trong lần thử này rồi quét lại."
-  owner: op-retry
-  kind: check-finding
-
 DATA_STATUS_DRAWN:
   title: "Data status drawn by hand"
   title_vi: "Trạng thái dữ liệu bị vẽ tay"
@@ -6085,7 +6053,7 @@ STACKS_SERVICES_MISSING:
   meaning_vi: "Tệp khai báo hạ tầng tồn tại nhưng chưa liệt kê dịch vụ nào."
   causes_vi:
     - "Mới có khung khai báo, chưa điền dịch vụ"
-  nextStep_vi: "Cần chạy bước quản lý workspace chế độ stacks để soạn phần dịch vụ (sonar, codecov và các dịch vụ khác)."
+  nextStep_vi: "Cần chạy bước quản lý workspace chế độ stacks để soạn phần dịch vụ (sonar và các dịch vụ khác)."
   owner: other-op:workspace.manage
   kind: check-finding
 
@@ -12010,7 +11978,7 @@ HFS_MANAGED_FILE_DRIFT:
   title_vi: "Tệp do .claude quản lý bị lệch"
   meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `hfs sync --write`, không sửa tay."
   causes_vi:
-    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js hoặc vitest.config.ts, .prettierrc, .prettierignore, husky, workflows, sonar, codecov, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
+    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js hoặc vitest.config.ts, .prettierrc, .prettierignore, husky, workflows, sonar, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -12066,11 +12034,11 @@ HFS_STACKS_SHAPE:
   kind: check-finding
 
 HFS_SONAR_CONFIG:
-  title: "Sonar config is generated, with no host URL and matching coverage exclusions"
+  title: "Sonar config is generated, with no host URL and no coverage import"
   title_vi: "Cấu hình Sonar lệch"
-  meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Hai con số coverage (Codecov/Sonar) sẽ không khớp."
+  meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Sonar phải đọc đúng cấu hình sinh ra, không nhập báo cáo độ phủ."
   causes_vi:
-    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `coverage.exclusions` = đúng danh sách loại trừ coverage của jest/vitest, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest/vitest, không nhập lcov hay `sonar.coverage.*`, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
     - "Khối `services.sonar.qualityGate` của khai báo stack phải gọi đúng cổng chất lượng duy nhất của `knowledge/sonar-gate.yaml`; repo không tự ghi ngưỡng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry

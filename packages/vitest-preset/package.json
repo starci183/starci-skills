@@ -1,7 +1,7 @@
 {
   "name": "@starci/vitest-preset",
   "version": "1.0.0",
-  "description": "The StarCi vitest configs for Next front ends: one workspace lane per app or package (jsdom, HeroUI and React deduped) and one root config that writes a single coverage/lcov.info matching the Sonar denominators.",
+  "description": "The StarCi vitest configs for Next front ends: one workspace lane per app or package (jsdom, HeroUI and React deduped) and one root config that runs every lane.",
   "license": "UNLICENSED",
   "private": false,
   "type": "module",

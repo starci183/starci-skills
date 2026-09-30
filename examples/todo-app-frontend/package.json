@@ -13,7 +13,6 @@
     "typecheck": "npm run typecheck --workspace @starci/todo-web --",
     "lint:check": "eslint . --max-warnings=0",
     "test:unit": "vitest run",
-    "test:coverage": "vitest run --coverage",
     "typecheck:e2e": "tsc -p tsconfig.e2e.json",
     "test:e2e": "playwright test",
     "uat:typecheck": "tsc --noEmit -p tsconfig.e2e.json"

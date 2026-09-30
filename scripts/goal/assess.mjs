@@ -114,8 +114,8 @@ function assessRepo(repoPath) {
   else if (hasDep('jest') || hasDep('@nestjs/testing') || jestCfg) out.testInfra.framework = 'jest';
   else if (hasDep('@playwright/test') || pwCfg) out.testInfra.framework = 'playwright';
 
-  // coverage config: rc files, codecov, or coverage key in root test configs/scripts
-  let covCfg = hasFile(/^\.nycrc|^\.c8rc|^codecov\.yml$/) || /\bcoverage\b/.test(pkgScripts)
+  // coverage config: rc files or coverage key in root test configs/scripts
+  let covCfg = hasFile(/^\.nycrc|^\.c8rc/) || /\bcoverage\b/.test(pkgScripts)
     || !!(pkg.jest && (pkg.jest.collectCoverage || pkg.jest.coverageThreshold))
     || !!(pkg.nyc || pkg.c8);
   if (!covCfg) {

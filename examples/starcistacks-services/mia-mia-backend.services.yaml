@@ -53,21 +53,3 @@ services:
         Set on starci-lab/miamia-be. A Kernel re-sets them from custody (gh secret set SONAR_TOKEN with
         the value piped from sonar-local.mjs token, gh variable set SONAR_HOST_URL); never the owner.
     ownerAction: none
-  codecov:
-    provider: codecov
-    mode: hosted
-    purpose: Coverage dashboard and the 80% project status from the one lcov run.
-    host:
-      public: https://app.codecov.io
-    auth: oidc
-    projects:
-      - {repository: mia-mia-backend, key: gh/starci-lab/miamia-be}
-    credentials: []
-    ci:
-      workflow: .github/workflows/ci.yml
-      wiring: required
-      permissions: ['id-token: write']
-      secrets: []
-      vars: []
-      provisioning: codecov/codecov-action@v5 with use_oidc true; no CODECOV_TOKEN secret is set or needed.
-    ownerAction: none

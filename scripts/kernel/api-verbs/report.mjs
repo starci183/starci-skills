@@ -125,7 +125,7 @@ export default {
     }
   }
   // An ask for what the repository's stack declaration says the runtime already holds (a service declared
-  // ownerAction none with its custody present: a Sonar token or host, a Codecov or GitHub CI setting) never
+  // ownerAction none with its custody present: a Sonar token or host, a GitHub CI setting) never
   // reaches the owner (owner ruling 2026-09-24; scripts/checks/check-starcistacks.mjs ownerAskConflict).
   // The guard fails open: a declaration it cannot read never blocks a report.
   if (report.outcome === 'ask') {

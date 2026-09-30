@@ -315,7 +315,9 @@ test('the one gate holds the imports at zero on the whole code, beside the new-c
     { metric: 'violations', op: 'GT', error: '0' },
     { metric: 'duplicated_lines_density', op: 'GT', error: String(gate.overall.duplication.maxPercent) },
   ]);
-  assert.ok(conditions.some((condition) => condition.metric === 'new_coverage'), 'the new-code conditions stay');
+  assert.ok(conditions.some((condition) => condition.metric === 'new_duplicated_lines_density'), 'the new-code conditions stay');
+  assert.equal(conditions.some((condition) => /coverage/.test(condition.metric)), false, 'Sonar holds no coverage condition');
+  assert.equal('coverage' in gate.newCode, false);
   assert.deepEqual(gate.enforces.map((entry) => entry.code).sort(), ['HFS_DUPLICATE_CODE', 'HFS_DUPLICATE_SYMBOL', 'HFS_SIZE_GROWTH']);
   const rules = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/rules.yaml'), 'utf8')).rules;
   for (const entry of gate.enforces) assert.ok(rules.find((rule) => rule.id === entry.rule).failureCodes.includes(entry.code), `${entry.rule} lists ${entry.code}`);

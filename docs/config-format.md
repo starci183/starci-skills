@@ -208,7 +208,7 @@ What an op does when a class is off is its brief's `policy.specsToggle.<class>`:
   skip it, and a deferred queued job is a dispatch nextAction whatever held it.
 - `skip` (backend.implement, interface.implement, code.refactor) - the op runs; the dispatch prompt's `specs:`
   line tells it to run and write no such tests and to demand no changed-line coverage. Sonar still runs, with
-  `sonar-local.mjs scan --no-coverage` (no lcov read or refused, no coverage condition held), so bugs, smells and
+  `sonar-local.mjs scan` (Sonar holds no coverage condition anywhere), so bugs, smells and
   security findings still gate. A skipped gate is recorded as a check named `specs.unit` / `specs.e2e`, exit 0.
 - `not-counted` (review.verify, handover.review) - the gate does not count those tests or that coverage; `api
   coverage` (and the handover-proof-owed refusal) drops that `requiresProof` kind from must-haves (`notCounted`).

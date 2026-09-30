@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // check-starcistacks.mjs - the .starcistacks services contract (owner ruling 2026-09-24: "stacks làm rõ
-// codecov, sonar ... update .claude và enforce định dạng .starcistacks").
+// sonar ... update .claude và enforce định dạng .starcistacks").
 //
-// Every product states the delivery and quality services its code and CI use - Sonar, Codecov, a
+// Every product states the delivery and quality services its code and CI use - Sonar, a
 // container registry, analytics, error tracking - in the `services` block of its stack declaration
 // (modules/schemas/application-stacks.schema.yaml $defs.service): provider, mode local|hosted|disabled,
 // host (local and public URL), the stack that runs a local one, project keys per repository, credentials
@@ -45,13 +45,12 @@ export const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 export const DECLARATION_SCHEMA = 'starci/application-stacks@1';
 export const CONTRACT_CHANGE = 'starcistacks-services';
 export const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
-  detail: 'author the services block of the repository stack declaration (sonar, codecov and every other delivery/quality service) from examples/starcistacks-services/<repository>.services.yaml' };
+  detail: 'author the services block of the repository stack declaration (sonar and every other delivery/quality service) from examples/starcistacks-services/<repository>.services.yaml' };
 
 /** The closed service catalog: its providers and the CI text that shows a workflow calls it. */
 export const SERVICE_CATALOG = {
   sonar: { providers: ['sonarqube', 'sonarcloud'], words: ['sonar', 'sonarqube', 'sonarcloud'],
     ci: [/SonarSource\/sonar(?:qube|cloud)-[a-z-]+-action/i, /\bsonar-scanner\b/i, /\bSONAR_TOKEN\b/] },
-  codecov: { providers: ['codecov'], words: ['codecov'], ci: [/codecov\/codecov-action/i, /\bCODECOV_TOKEN\b/] },
   'container-registry': { providers: ['ghcr', 'dockerhub', 'ecr', 'gar'], words: ['ghcr', 'registry', 'docker hub', 'dockerhub'],
     ci: [/docker\/login-action/i] },
   analytics: { providers: ['posthog', 'plausible', 'umami', 'google-analytics'], words: ['posthog', 'plausible', 'umami', 'analytics'], ci: [] },
@@ -293,7 +292,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
   const services = plain(doc?.services) ? doc.services : null;
   const declFile = declaration?.file ? shown(declaration.file) : `.starcistacks/${DECLARATION}`;
   if (doc && !Object.hasOwn(doc, 'services'))
-    add(missingLevel, 'STACKS_SERVICES_MISSING', declFile, `the declaration has no services block; declare sonar, codecov and every other delivery/quality service the repository uses - follow-up: ${FOLLOW_UP.op} mode stacks`);
+    add(missingLevel, 'STACKS_SERVICES_MISSING', declFile, `the declaration has no services block; declare sonar and every other delivery/quality service the repository uses - follow-up: ${FOLLOW_UP.op} mode stacks`);
 
   // CI evidence: which services the workflows call, and which secret/variable names they read.
   const workflows = workflowTexts(repo);
@@ -478,7 +477,7 @@ function summary(service) {
 
 // ---- the owner-ask guard --------------------------------------------------------------------------------
 
-const ASK_WORDS = /\b(tokens?|secrets?|credentials?|api[ _-]?keys?|passwords?|host|url|access|github (?:settings?|secrets?|variables?)|repository (?:settings?|secrets?|variables?))\b|\bSONAR_[A-Z_]+|\bCODECOV_[A-Z_]+/i;
+const ASK_WORDS = /\b(tokens?|secrets?|credentials?|api[ _-]?keys?|passwords?|host|url|access|github (?:settings?|secrets?|variables?)|repository (?:settings?|secrets?|variables?))\b|\bSONAR_[A-Z_]+/i;
 
 /**
  * An ask that requests what a stack declaration already answers: a service declared `ownerAction: none`
@@ -519,7 +518,7 @@ async function admittedCodes(argv) {
   return { ok: true, codes, drop: [at, at + 1, ...(opAt >= 0 ? [opAt, opAt + 1] : [])] };
 }
 
-const USAGE = 'Usage: node scripts/checks/check-starcistacks.mjs <repo-root> [--new] [--admitted-at <ISO|epoch-ms> [--op <op>]] [--json]\n\nHolds a repository\'s stack declaration services block (sonar, codecov, container-registry, analytics, error-tracking) and its custody layout to modules/schemas/application-stacks.schema.yaml and stacks-layout.yaml. Exit 0 clean (suspects allowed), 1 refused, 2 usage.\n';
+const USAGE = 'Usage: node scripts/checks/check-starcistacks.mjs <repo-root> [--new] [--admitted-at <ISO|epoch-ms> [--op <op>]] [--json]\n\nHolds a repository\'s stack declaration services block (sonar, container-registry, analytics, error-tracking) and its custody layout to modules/schemas/application-stacks.schema.yaml and stacks-layout.yaml. Exit 0 clean (suspects allowed), 1 refused, 2 usage.\n';
 
 export async function checkStarciStacksMain(argv = []) {
   const admitted = await admittedCodes(argv);

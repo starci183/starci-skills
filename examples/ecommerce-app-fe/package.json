@@ -24,11 +24,10 @@
     "lint:check": "eslint . --max-warnings=0",
     "prepare": "husky",
     "test:unit": "vitest run",
-    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "typecheck:e2e": "tsc -p tsconfig.e2e.json",
     "test:e2e": "playwright test",
-    "test:ci": "vitest run --coverage",
+    "test:ci": "vitest run",
     "test:affected": "vitest run --changed origin/main --passWithNoTests"
   },
   "devDependencies": {

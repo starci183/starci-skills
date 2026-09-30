@@ -23,7 +23,7 @@
 //   hfs explain <path> [--repo <dir>] [--json]   which slot owns the path, its tier, allowed imports, required tests.
 //   hfs emit-contracts [--repo <dir>]      write contracts/<app>/schema.graphql of every api app that serves GraphQL (emit/contracts.mjs):
 //                                            printSchema(lexicographicSortSchema) of the resolvers the app root composes; no env, no database, no network.
-//   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar, codecov); sync/cli.mjs
+//   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar); sync/cli.mjs
 //   hfs work-hygiene                              the pre-commit guard for staged .starciwork and .starcistacks paths; sync/cli.mjs
 // Every finding names a why code and carries its Vietnamese text. The command reads the repository, never writes to it
 // (init writes hfs.json only, and only when none exists). Exit codes: 0 clean, 1 error findings, 2 a refusal or bad usage.
@@ -106,7 +106,7 @@ function printExplain(e, out) {
   if (e.code) out(`  ${e.code}: ${e.titleVi}\n  ${e.whyVi}\n`);
 }
 
-/** `presets` and `prettier` are test seams: the coverage denominators sync would load from the repository's installed preset, and the repository's own prettier. */
+/** `presets` and `prettier` are test seams: the Sonar exclusions sync would load from the repository's installed preset, and the repository's own prettier. */
 export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
   const [verb, ...rest] = argv;
   if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report', 'emit-contracts'].includes(verb)) { stderr(USAGE); return 2; }

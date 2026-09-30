@@ -15,7 +15,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "test:unit": "vitest run",
-    "test:ci": "vitest run --coverage",
+    "test:ci": "vitest run",
     "test:affected": "vitest related --run --passWithNoTests $(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx')"
   },
   "lint-staged": {

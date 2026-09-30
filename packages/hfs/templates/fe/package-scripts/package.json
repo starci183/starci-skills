@@ -13,7 +13,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run codegen --silent && vitest run",
-    "test:ci": "npm run codegen --silent && vitest run --coverage",
+    "test:ci": "npm run codegen --silent && vitest run",
     "test:affected": "npm run codegen --silent && vitest run --changed origin/main --passWithNoTests",
     "test:e2e": "npm run typecheck:e2e && playwright test",
     "hfs:check": "hfs check",

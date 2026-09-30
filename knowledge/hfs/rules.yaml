@@ -130,7 +130,7 @@ rules:
   - id: R11
     code: "HFS_SONAR_CONFIG"
     title_vi: "Cấu hình Sonar lệch"
-    law: "Sonar config is generated, with no host URL and matching coverage exclusions."
+    law: "Sonar config is generated, with no host URL and no coverage import."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["HFS_SONAR_CONFIG"]

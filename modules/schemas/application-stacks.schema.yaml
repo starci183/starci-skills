@@ -60,7 +60,6 @@ properties:
     additionalProperties: false
     properties:
       sonar: {$ref: '#/$defs/service'}
-      codecov: {$ref: '#/$defs/service'}
       container-registry: {$ref: '#/$defs/service'}
       analytics: {$ref: '#/$defs/service'}
       error-tracking: {$ref: '#/$defs/service'}
@@ -73,7 +72,7 @@ $defs:
       provider:
         description: >-
           Closed per service id (check-starcistacks.mjs PROVIDERS): sonar sonarqube|sonarcloud,
-          codecov codecov, container-registry ghcr|dockerhub|ecr|gar, analytics posthog|plausible|umami|google-analytics,
+          container-registry ghcr|dockerhub|ecr|gar, analytics posthog|plausible|umami|google-analytics,
           error-tracking sentry|glitchtip.
         type: string
         minLength: 1

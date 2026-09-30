@@ -216,7 +216,7 @@ writes:
         the whole repository) are not this slice's. Run Sonar only
         through `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <repo-id> --wait
         --base <source commit recorded before this slice's first edit> --paths <owned paths,
-        comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` right after a fresh coverage run; attach both files at api report
+        comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` attach both files at api report
         (the specs of the changed or added source and the specs that import it - never the repository's whole test:ci, owner 2026-09-29) in this same attempt: it scans against the local SonarQube the
         stack declaration names (default the source host's dev stack), takes the project key, host
         and token from that declaration and its custody, creates the project and its analysis
@@ -224,15 +224,14 @@ writes:
         dashboard URL; never run a bare scanner or supply a token by hand. The Sonar proof is this
         slice's own: outcome pass means no open blocker or critical issue and no to-review security hotspot on a line
         the slice changed, its duplicated share of the changed lines within the duplication
-        threshold and its changed lines meeting the new-coverage threshold - the numbers are
+        threshold - the numbers are
         knowledge/sonar-gate.yaml's alone. The gate is enforced at settle: the runtime re-reads the
         attached sonar.json and refuses a done without outcome pass (sonar-gate-red, sonar-scan-refused,
         sonar-proof-missing); a scan that could not run (outcome blocked, unavailable true: server
         down, custody missing) is reported blocked, never done - the runtime records the explicit
         sonar-unavailable why and tells the Supervisor. The
         whole-project quality gate and debt outside the slice are recorded as projectGate, a note,
-        never a block and never an open item. A stale or missing lcov (older than the head commit
-        or a slice file) is refused before the scan: run test:ci again and rescan. Scanner
+        never a block and never an open item. Scanner
         submission alone is not pass. Fix scoped failures and rerun affected checks. A
         helper outcome blocked (server down, custody missing), a missing runner or coverage target
         is blocked/not-run, never pass and never an owner credential ask; do not move this
@@ -554,8 +553,7 @@ proofs:
   - id: implementation-quality
     requirement:
       en: Fix scoped failures and rerun affected checks. Sonar passes only as the sonar-local.mjs
-        attached sonar.json summary with scope slice and outcome pass for the tested commit, scanned
-        after a fresh coverage run of the same attempt; the whole-project gate is a note, never a
+        attached sonar.json summary with scope slice and outcome pass for the tested commit, the whole-project gate is a note, never a
         block. Reuse existing authorization and keep secrets outside evidence.
   - id: shell-layout
     requirement:
@@ -651,7 +649,6 @@ policy:
     sonarGate: slice-new-code-pass-for-tested-revision
     sonarProjectGate: note-never-block
     sonarEnforcement: settle-refuses-done-without-pass-unavailable-is-explicit
-    coverageFreshness: lcov-from-this-attempt-newer-than-head
     scopedLintGate: slice-verdict-clean-for-tested-revision
     repositoryObligationOwed: note-owed-by-repo-owner-never-block
     missingRunner: blocked

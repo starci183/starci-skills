@@ -103,28 +103,6 @@ services:
         `gh secret set SONAR_TOKEN` (value piped from sonar-local.mjs token, never argv) and
         `gh variable set SONAR_HOST_URL`; never the owner.
     ownerAction: none
-  codecov:
-    provider: codecov
-    mode: hosted
-    purpose: Coverage dashboard and the project/patch status checks from the one lcov run.
-    host:
-      public: https://app.codecov.io
-    auth: oidc
-    projects:
-      - {repository: starci-academy-backend, key: gh/starci-lab/starci-academy-backend}
-    credentials:
-      - id: upload-token
-        purpose: Fallback upload token for a manual upload; CI does not use it (OIDC).
-        env: CODECOV_TOKEN
-        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/codecov-token.key}
-    ci:
-      workflow: .github/workflows/ci.yml
-      wiring: required
-      permissions: ['id-token: write']
-      secrets: []
-      vars: []
-      provisioning: codecov/codecov-action@v5 with use_oidc true; no CODECOV_TOKEN secret is set or needed.
-    ownerAction: none
   error-tracking:
     provider: sentry
     mode: hosted

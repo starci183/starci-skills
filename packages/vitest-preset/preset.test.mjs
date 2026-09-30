@@ -24,18 +24,13 @@ test('grammar and next-intl are inlined; extra inline deps are added, not replac
   assert.ok(grammar.test('/repo/node_modules/@starci/grammar/dist/x.js'));
 });
 
-test('the root config runs every lane as a project and writes one lcov report', () => {
+test('the root config runs every lane as a project and configures no coverage', () => {
   const root = preset.starciVitestWorkspace({ rootDir: path.resolve('/r') });
   assert.deepEqual(root.test.projects, ['apps/*/vitest.config.ts', 'packages/*/vitest.config.ts']);
-  assert.equal(root.test.coverage.provider, 'v8');
-  assert.ok(root.test.coverage.reporter.includes('lcov'));
-  assert.equal(root.test.coverage.reportsDirectory, path.resolve('/r', 'coverage'));
-  assert.equal('thresholds' in root.test.coverage, false, 'Codecov owns the gate, not the preset');
+  assert.equal('coverage' in root.test, false);
 });
 
-test('coverage denominators: same set Sonar counts', () => {
-  assert.deepEqual(preset.COVERAGE_INCLUDE, ['apps/*/src/**/*.{ts,tsx}', 'packages/*/src/**/*.{ts,tsx}']);
-  const sonar = [...preset.sonarExclusions().split(','), ...preset.sonarCoverageExclusions().split(',')];
-  assert.deepEqual([...sonar].sort(), [...preset.COVERAGE_EXCLUDE].sort());
-  for (const g of ['**/*.spec.ts', '**/*.spec.tsx', '**/.next/**', '**/src/messages/**', '**/*.d.ts']) assert.ok(preset.COVERAGE_EXCLUDE.includes(g), g);
+test('Sonar exclusions render as one comma list and no coverage list exists', () => {
+  for (const g of ['**/*.spec.ts', '**/*.spec.tsx', '**/.next/**', '**/src/messages/**']) assert.ok(preset.sonarExclusions().split(',').includes(g), g);
+  assert.equal('sonarCoverageExclusions' in preset, false);
 });

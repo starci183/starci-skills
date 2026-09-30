@@ -24,7 +24,7 @@ apps/shape-slot/
   src/modules/{api,config,i18n,routes,slot}/
 ```
 
-Các tệp gốc (`.husky/`, `.github/workflows/`, `sonar-project.properties`, `codecov.yml`, khối `.gitignore`) do `hfs sync` sinh ra; `.editorconfig`, `.nvmrc`, `.prettierignore`, `.gitattributes` là stub mỏng.
+Các tệp gốc (`.husky/`, `.github/workflows/`, `sonar-project.properties`, khối `.gitignore`) do `hfs sync` sinh ra; `.editorconfig`, `.nvmrc`, `.prettierignore`, `.gitattributes` là stub mỏng.
 
 ## Development
 

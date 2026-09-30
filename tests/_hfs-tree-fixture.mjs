@@ -9,7 +9,6 @@ const COMMON = {
   '.github/workflows/check.yml': 'name: check\n',
   '.gitignore': 'node_modules/\n',
   '.husky/pre-commit': 'exit 0\n',
-  'codecov.yml': 'coverage: {}\n',
   'eslint.config.mjs': 'export default [];\n',
   'package-lock.json': '{}\n',
   'sonar-project.properties': 'sonar.projectKey=fixture\n',

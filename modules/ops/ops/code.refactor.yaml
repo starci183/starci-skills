@@ -289,14 +289,13 @@ steps:
         mapping of moved symbols to destinations must account for the whole change. Commit only when
         authorized, read back the full SHA/diff and prove the tested tree corresponds to that
         commit; otherwise report uncommitted honestly. Sonar gates every refactor - after the AFTER
-        regression run (which, when specs.unit is on, writes this slice's lcov with --coverage
-        --coverageReporters=lcovonly --coverageDirectory=<STARCI_JOB_SCRATCH>/coverage), run Sonar only
+        regression run, run Sonar only
         through `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <absolute repository
-        root> --wait --isolate --lcov <that directory>/lcov.info --base <source commit recorded before
+        root> --wait --isolate --base <source commit recorded before
         this slice's first edit> --paths <owned paths, comma-separated> --out
         <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` and attach both files
         at api report. The verdict is the slice's own - outcome pass means no open blocker or critical issue and
-        no to-review security hotspot on a changed line, duplication and new-code coverage within the
+        no to-review security hotspot on a changed line, duplication within the
         numbers of knowledge/sonar-gate.yaml (a pure move or rename changes no line, so nothing new is
         held). The runtime re-reads that sonar.json at settle and refuses a done without outcome pass; a
         scan that could not run (outcome blocked, unavailable true) is reported blocked, never done - the
@@ -514,7 +513,6 @@ policy:
     sonarProjectGate: note-never-block
     sonarAnalysis: isolated-slice
     sonarEnforcement: settle-refuses-done-without-pass-unavailable-is-explicit
-    coverageFreshness: lcov-from-this-attempt-newer-than-head
   refactorPolicy:
     behaviorInvariant: required
     regressionCheck: same-check-verbatim-before-and-after

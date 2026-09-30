@@ -24,8 +24,8 @@ const vitestPreset = await import('../packages/vitest-preset/index.mjs');
 const BE = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] };
 const FE = { hfs: 1, profile: 'fe', project: 'nivo', apps: [{ name: 'app', kind: 'web' }, { name: 'admin', kind: 'web' }] };
 const PRESETS = {
-  be: { sonarExclusions: jestPreset.sonarExclusions(), sonarCoverageExclusions: jestPreset.sonarCoverageExclusions() },
-  fe: { sonarExclusions: vitestPreset.sonarExclusions(), sonarCoverageExclusions: vitestPreset.sonarCoverageExclusions() },
+  be: { sonarExclusions: jestPreset.sonarExclusions() },
+  fe: { sonarExclusions: vitestPreset.sonarExclusions() },
 };
 const rendered = hfs => Object.fromEntries(renderTargets(hfs, PRESETS[hfs.profile]).map(target => [target.path, target.content]));
 
@@ -70,8 +70,8 @@ describe('hfs.json validation', () => {
 
 describe('the generated file set', () => {
   it('a back end owns its tool configuration, package scripts, hooks, workflows, quality files and .starciwork/.gitignore; a front end owns its tool configuration, package scripts, hooks, workflows and quality files', () => {
-    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'codecov.yml', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'src/tests/tsconfig.json', 'tsconfig.build.json', 'tsconfig.json']);
-    assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', 'codecov.yml', 'eslint.config.mjs', 'package.json', 'sonar-project.properties', 'stylelint.config.mjs', 'tsconfig.e2e.json', 'tsconfig.json', 'vitest.config.ts']);
+    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'src/tests/tsconfig.json', 'tsconfig.build.json', 'tsconfig.json']);
+    assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', 'eslint.config.mjs', 'package.json', 'sonar-project.properties', 'stylelint.config.mjs', 'tsconfig.e2e.json', 'tsconfig.json', 'vitest.config.ts']);
   });
   it('the file list is the managedBy slots of the manifest, not code: each listed file is a literal path of a slot naming managedBy', () => {
     const manifest = loadSlotManifest();
@@ -148,7 +148,7 @@ describe('.husky/pre-push', () => {
 
 describe('.github/workflows', () => {
   const CI_STEPS = {
-    be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --coverage --ci', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run build', 'npm ci'],
+    be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run build', 'npm ci'],
     fe: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm run test:ci', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run lint:report:css', 'npx hfs report stylelint reports/stylelint.json reports/stylelint.sonar.json', 'npm run build', 'npm ci'],
   };
   for (const hfs of [BE, FE]) {
@@ -164,7 +164,9 @@ describe('.github/workflows', () => {
       const uses = doc.jobs.ci.steps.map(step => step.uses).filter(Boolean);
       assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-scan-action')));
       assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-quality-gate-action')));
-      assert.ok(uses.some(use => use.startsWith('codecov/codecov-action')));
+      assert.ok(!uses.some(use => use.startsWith('codecov/')), 'no coverage upload: Sonar and CI hold no coverage');
+      assert.equal(doc.permissions['id-token'], undefined);
+      assert.doesNotMatch(text, /lcov|codecov|--coverage/);
       assert.doesNotMatch(text, /e2e/);
       assert.match(text, /node-version: 22/);
     });
@@ -197,20 +199,19 @@ describe('.gitignore', () => {
   });
 });
 
-describe('sonar-project.properties and codecov.yml', () => {
+describe('sonar-project.properties', () => {
   const properties = text => Object.fromEntries(text.split('\n').filter(line => line && !line.startsWith('#')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
-  it('take the coverage exclusions from the profile preset, so the denominators cannot drift', () => {
+  it('takes its exclusions from the profile preset and imports no coverage', () => {
     const be = properties(rendered(BE)['sonar-project.properties']);
     assert.equal(be['sonar.exclusions'], jestPreset.sonarExclusions());
-    assert.equal(be['sonar.coverage.exclusions'], jestPreset.sonarCoverageExclusions());
+    assert.deepEqual(Object.keys(be).filter(key => /coverage|lcov/i.test(key)), []);
     assert.equal(be['sonar.projectKey'], 'nivo-backend');
     assert.equal(be['sonar.sources'], 'apps,src');
     const fe = properties(rendered(FE)['sonar-project.properties']);
     assert.equal(fe['sonar.exclusions'], vitestPreset.sonarExclusions());
-    assert.equal(fe['sonar.coverage.exclusions'], vitestPreset.sonarCoverageExclusions());
+    assert.deepEqual(Object.keys(fe).filter(key => /coverage|lcov/i.test(key)), []);
     assert.equal(fe['sonar.projectKey'], 'nivo-fe');
     assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json');
-    assert.equal(fe['sonar.javascript.lcov.reportPaths'], 'coverage/lcov.info');
     assert.equal(fe['sonar.sources'], 'apps', 'no package slot: the sources are the apps');
     assert.equal(fe['sonar.tests'], 'apps');
     // One import path for every linter (hfs report): Sonar's own ESLint import is not used, it drops issues on files outside sonar.sources.
@@ -219,13 +220,9 @@ describe('sonar-project.properties and codecov.yml', () => {
     assert.equal(be['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json,reports/eslint.sonar.json');
     assert.ok(!('sonar.host.url' in be) && !('sonar.host.url' in fe), 'the host is SONAR_HOST_URL, never a property (R11)');
   });
-  it('codecov ignores exactly the union of both preset lists and keeps the 80/90 gates', () => {
-    const doc = parseYaml(rendered(BE)['codecov.yml']);
-    assert.deepEqual(doc.ignore, [...jestPreset.sonarExclusions().split(','), ...jestPreset.sonarCoverageExclusions().split(',')]);
-    assert.equal(doc.coverage.status.project.default.target, '80%');
-    assert.equal(doc.coverage.status.patch.default.target, '90%');
-    assert.equal(doc.coverage.status.project.default.informational, false);
-    assert.equal(doc.comment, false);
+  it('has no codecov file and no coverage upload: codecov.yml is not a managed file', () => {
+    assert.equal('codecov.yml' in rendered(BE), false);
+    assert.equal('codecov.yml' in rendered(FE), false);
   });
 });
 
@@ -311,21 +308,21 @@ describe('the drift check', () => {
     assert.equal((await run(['--check'], dir)).code, 1, 'nothing is written yet');
     const written = await run(['--write'], dir);
     assert.equal(written.code, 0);
-    assert.match(written.lines.at(-1), /16 written, 0 already in sync/);
+    assert.match(written.lines.at(-1), /15 written, 0 already in sync/);
     const checked = await run(['--check'], dir);
     assert.equal(checked.code, 0);
-    assert.match(checked.lines.at(-1), /16 of 16 in sync/);
+    assert.match(checked.lines.at(-1), /15 of 15 in sync/);
   });
   it('a hand edit fails --check with the file, the hashes and the first differing line, and --write repairs it', async t => {
     const dir = repo(t, BE);
     await run(['--write'], dir);
-    const file = path.join(dir, 'codecov.yml');
-    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('80%', '50%'));
+    const file = path.join(dir, 'sonar-project.properties');
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('sonar.sourceEncoding=UTF-8', 'sonar.sourceEncoding=UTF-16'));
     const failed = await run(['--check'], dir);
     assert.equal(failed.code, 1);
-    assert.match(failed.lines[0], /^HFS_SYNC_DRIFT codecov\.yml: drift, expected sha256 [0-9a-f]{12}, found [0-9a-f]{12} \(line \d+: expected .*80%/);
+    assert.match(failed.lines[0], /^HFS_SYNC_DRIFT sonar-project\.properties: drift, expected sha256 [0-9a-f]{12}, found [0-9a-f]{12} \(line \d+: expected .*UTF-8/);
     const repaired = await run(['--write'], dir);
-    assert.match(repaired.lines[0], /^wrote codecov\.yml$/);
+    assert.match(repaired.lines[0], /^wrote sonar-project\.properties$/);
     assert.equal((await run(['--check'], dir)).code, 0);
   });
   it('a deleted file is reported missing', async t => {
@@ -416,7 +413,7 @@ describe('the package.json scripts of a back end', () => {
     assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'contract:emit', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'migrate', 'start:core', 'test', 'test:contract', 'test:e2e', 'test:integration', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts(BE)['start:core'], 'node dist/apps/core/src/main.js');
     assert.equal(scripts(BE).migrate, 'node dist/apps/migrate/src/main.js');
-    assert.equal(scripts(BE).test, 'jest --selectProjects unit');
+    assert.equal(scripts(BE).test, 'jest --selectProjects unit --coverage');
     for (const project of ['integration', 'e2e', 'contract']) assert.equal(scripts(BE)[`test:${project}`], `npm run typecheck:tests && jest --selectProjects ${project}`);
     assert.equal(scripts(BE)['typecheck:tests'], 'tsc -p src/tests/tsconfig.json');
     assert.doesNotMatch(Object.values(scripts(BE)).join('\n'), /--rule|--no-inline-config|--no-eslintrc/);
@@ -469,7 +466,7 @@ describe('the package.json scripts of a front end', () => {
     assert.equal(all['lint:report'], 'eslint . --format json --output-file reports/eslint.json');
     assert.equal(all['lint:report:css'], 'stylelint "{apps,packages}/*/src/**/*.css" --formatter json --output-file reports/stylelint.json');
     assert.equal(all.test, 'npm run codegen --silent && vitest run');
-    assert.equal(all['test:ci'], 'npm run codegen --silent && vitest run --coverage');
+    assert.equal(all['test:ci'], 'npm run codegen --silent && vitest run');
   });
   it('the sources and the tsconfig paths include packages/ exactly when hfs.json opts into a package slot', () => {
     const properties = hfs => Object.fromEntries(rendered(hfs)['sonar-project.properties'].split('\n').filter(line => line && !line.startsWith('#')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
@@ -656,7 +653,7 @@ describe('scripts/checks/check-hfs-sync.mjs', () => {
     execFileSync('git', ['init', '-q'], { cwd: dir });
     assert.deepEqual(await checkHfsSync(dir, { presets: PRESETS.be }), { ok: true, findings: [] });
 
-    fs.writeFileSync(path.join(dir, 'codecov.yml'), '# hand written\n');
+    fs.writeFileSync(path.join(dir, 'sonar-project.properties'), '# hand written\n');
     fs.mkdirSync(path.join(dir, '.starciwork', 'features', 'a', 'evidence'), { recursive: true });
     fs.writeFileSync(path.join(dir, '.starciwork', 'features', 'a', 'evidence', 'run.log'), 'log\n');
     fs.mkdirSync(path.join(dir, '.starcistacks', 'dev', 'secrets'), { recursive: true });
@@ -665,7 +662,7 @@ describe('scripts/checks/check-hfs-sync.mjs', () => {
     const result = await checkHfsSync(dir, { presets: PRESETS.be });
     assert.equal(result.ok, false);
     assert.deepEqual(result.findings.map(finding => [finding.code, finding.file]).sort(), [
-      ['HFS_MANAGED_FILE_DRIFT', 'codecov.yml'],
+      ['HFS_SONAR_CONFIG', 'sonar-project.properties'],
       ['HFS_PLAINTEXT_SECRET', '.starcistacks/dev/secrets/db.txt'],
       ['HFS_WORK_AGENT_DATA', '.starciwork/features/a/evidence/run.log'],
     ]);

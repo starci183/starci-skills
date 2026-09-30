@@ -30,7 +30,5 @@ export default defineConfig(starciVitestWorkspace({ rootDir: import.meta.dirname
 
 - A lane is `jsdom`, `globals: true`, `src/**/*.spec.{ts,tsx}`, with `react`, `react-dom`, `@heroui/react` and
   `@heroui/styles` deduped and `next-intl` and `@starci/grammar` inlined.
-- The root runs every `apps/*` and `packages/*` lane as a project, so one run writes one `coverage/lcov.info` (v8, plus a
-  text and JSON summary). Coverage includes `apps/*/src` and `packages/*/src` and excludes specs, `.next`, `node_modules`,
-  `coverage`, `src/messages`, `*.d.ts` and e2e specs: the set Sonar counts. `sonarExclusions()` and `sonarCoverageExclusions()`
-  render the `sonar-project.properties` values from the same lists. Thresholds belong to Codecov, not the preset.
+- The root runs every `apps/*` and `packages/*` lane as a project. It configures no coverage: Sonar imports none and there is no
+  coverage upload. `sonarExclusions()` renders the `sonar.exclusions` value of `sonar-project.properties`.

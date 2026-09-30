@@ -32,7 +32,7 @@ rules:
       `hfs.json` (`hfs` major, `profile`, `project`, `apps` with kinds, `optionalSlots`, `connections`) and nothing else; there
       is no owner list, path, allowlist or disabled rule. Required on both profiles: README.md, hfs.json, package.json,
       package-lock.json, .gitignore, .gitattributes, tsconfig.json, eslint.config.mjs, .editorconfig, .nvmrc,
-      .prettierignore, sonar-project.properties, codecov.yml, .husky/, .github/workflows/ci.yml and apps/. Optional: packages/
+      .prettierignore, sonar-project.properties, .husky/, .github/workflows/ci.yml and apps/. Optional: packages/
       (built packages with explicit exports), scripts/ (lasting tooling only, `*.mjs`, no product code and no one-off codemod),
       docs/{adr,runbooks,guides}/ (opt-in), .npmrc, .dockerignore, apps/<app>/Dockerfile. A backend repository additionally
       requires src/, nest-cli.json, jest.config.js, .starciwork/, .starcistacks/ and .sops.yaml, and forbids a root e2e/. A

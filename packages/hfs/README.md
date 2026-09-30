@@ -32,7 +32,7 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `HFS_MIN_INSTANCES` | error | fewer instances of a slot than `minInstances` |
 | `HFS_CANON_PIN_DRIFT` | error | a dependency not at the exact version of `knowledge/hfs/canon-pins.yaml` |
 | `HFS_SIZE_SOFT_BACKLOG` | info | a source file over `ruleParams.fileLines.soft`; report only, never fails |
-| `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, codecov, `tsconfig.build.json`, `src/tests/tsconfig.json` (back end; a front end keeps `tsconfig.e2e.json`), `jest.config.js` (back end), `vitest.config.ts` (front end), `.prettierrc`, `.prettierignore`, the `scripts` block of `package.json`, compared as parsed JSON) |
+| `HFS_MANAGED_FILE_DRIFT` | error | a managed file that exists but differs from its render (hooks, workflows, sonar, `tsconfig.build.json`, `src/tests/tsconfig.json` (back end; a front end keeps `tsconfig.e2e.json`), `jest.config.js` (back end), `vitest.config.ts` (front end), `.prettierrc`, `.prettierignore`, the `scripts` block of `package.json`, compared as parsed JSON) |
 | `HFS_RULE_OFF_WITHOUT_REPLACEMENT` | error | `eslint.config.mjs`, or a front end's `stylelint.config.mjs`, differs from its one-line render, so a rule could be off, warned or redefined in it |
 | `HFS_TOOL_CONFIG_LOCAL` | error | a repository holds a tool config outside the managed set (`.eslintrc*`, `.eslintignore`, a second `eslint.config.*` or `stylelint.config.*`, another prettier, vitest, jest or lint-staged config), a file that defines an ESLint rule or a stylelint plugin, a tool configuration key in a `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), or a script that runs eslint, stylelint or prettier with a flag that swaps the configuration |
 | `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render (no host URL; the ESLint report and HFS import paths), or the stack declaration names another quality gate than the one of `knowledge/sonar-gate.yaml` |
@@ -50,14 +50,14 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `FE_I18N_PLACEMENT` | error | no `next-intl`, no `src/proxy.ts`, a `middleware.ts`, a route file outside `[locale]`, no `vi.json` catalog (R59) |
 | `FE_I18N_CATALOG` | error | a locale catalog lacking a key another locale has (R60) |
 | `HFS_GITIGNORE_BLOCK_DRIFT` | error | the managed `.gitignore` block differs from its render (R04; `sync/managed.mjs`) |
-| `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render: no `sonar.host.url`, the coverage exclusions of the installed jest / vitest preset (R11; `sync/managed.mjs`) |
+| `HFS_SONAR_CONFIG` | error | `sonar-project.properties` differs from its render: no `sonar.host.url`, the `sonar.exclusions` of the installed jest / vitest preset, no coverage import (R11; `sync/managed.mjs`) |
 | `HFS_FORMAT` | error | a tracked file the repository's own prettier would change (R19; `sync/format.mjs`, not under `--fast`) |
 | `HFS_FORMAT_TOOL_MISSING` | refusal (exit 2) | prettier is not installed in the repository; the format check is never skipped |
 
 The managed files are judged by `sync/managed.mjs` and `sync/ts-strict.mjs` (the package renders the templates; the runtime copy does not). The list of managed
 files is the `managedBy` slots of `slots.yaml`; `hfs sync --write` renders them and `hfs check` compares them, so a hand edit and a forgotten `sync` are the same finding.
 Each finding is reported once: the eslint and stylelint one-liners under R17, `tsconfig.json` under R22 when it names a flag, a workflow or hook that lost a canon step under R13 (or R19 for the format step), everything else under R05.
-A front end is rendered by the same mechanism as a back end: `tsconfig.json`, `tsconfig.e2e.json`, `eslint.config.mjs`, `stylelint.config.mjs`, `vitest.config.ts`, `.prettierrc`, `.prettierignore`, the hooks, the workflows, the Sonar and codecov files
+A front end is rendered by the same mechanism as a back end: `tsconfig.json`, `tsconfig.e2e.json`, `eslint.config.mjs`, `stylelint.config.mjs`, `vitest.config.ts`, `.prettierrc`, `.prettierignore`, the hooks, the workflows, the Sonar file
 and the `scripts` block (`lint:check` is the one lint gate, ESLint over apps, packages and `e2e/` plus stylelint; `test:e2e` is the only script that runs Playwright). `vitest.setup.ts`, `playwright.config.ts` and `turbo.json` stay the repository's own
 (`fe.tool-config-repo`): they carry the repository's setup, web servers and ports, which no preset can render, and per-app `vitest.config.ts` files carry aliases and plugins.
 
@@ -99,10 +99,12 @@ The managed `sonar-project.properties` carries `sonar.externalIssuesReportPaths`
 reaches Sonar while the job stays failed. There is no `continue-on-error`. Both profiles run `npm run hfs:report`, `npm run lint:report` (a front end also `npm run lint:report:css`) and `npx hfs report <linter> <in> <out>` for each. The duplicate-block threshold (`ruleParams.<profile>.duplicateBlock`) has no Sonar property for TypeScript (SonarJS detects
 clones with its own token rule), so the machine enforces it (R21) and its findings are imported like every other.
 
-The gate is `knowledge/sonar-gate.yaml`, the one declaration: the new-code conditions and an `overall` part (0 open issues on the whole code,
+The gate is `knowledge/sonar-gate.yaml`, the one declaration: the new-code conditions (duplication, blocker and critical issues, hotspots; no coverage condition) and an `overall` part (0 open issues on the whole code,
 duplicated lines density, cognitive complexity through the S3776 rule). A SonarQube gate condition cannot filter by engine, so the condition counts every
 open issue, imported or native; that is stricter than the three imports alone and is intended. `hfs check` reports `HFS_SONAR_CONFIG` (R11) when the
 properties file is not its render or the stack declaration names another gate. R20 and R21 have their Sonar enforcers as conditions of that file.
+
+Sonar does not depend on coverage: the managed properties file has no `sonar.*.lcov.reportPaths` and no `sonar.coverage.*`, the gate has no coverage condition, and the managed CI workflow uploads no coverage anywhere (no Codecov). A back end's unit coverage is the runner's: the managed `test` script is `jest --selectProjects unit --coverage`, which fails below the per-file 100 threshold on `src/**/*.service.ts`.
 
 ## Maintaining the bundle
 

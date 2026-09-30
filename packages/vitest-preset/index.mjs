@@ -1,13 +1,7 @@
-import { resolve } from "node:path"
-
 /**
- * What Sonar counts as production code in a front-end repository, expressed once. `sonarCoverageExclusions`
- * renders the same list for `sonar.coverage.exclusions`, so the vitest denominator and Sonar's cannot drift.
- *
- * Sonar side: sources = the app and package `src` trees; exclusions = specs, .next, node_modules, coverage and
- * the message catalogues; coverage.exclusions = declaration files and e2e specs.
+ * What Sonar does not analyse in a front-end repository, expressed once: `sonarExclusions()` renders `sonar.exclusions`.
+ * Sonar reads no coverage report, so there is no coverage denominator here.
  */
-export const COVERAGE_INCLUDE = ["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"]
 export const SONAR_EXCLUSIONS = [
     "**/*.spec.ts",
     "**/*.spec.tsx",
@@ -16,11 +10,8 @@ export const SONAR_EXCLUSIONS = [
     "**/coverage/**",
     "**/src/messages/**",
 ]
-export const COVERAGE_ONLY_EXCLUSIONS = ["**/*.d.ts", "**/*.e2e-spec.ts"]
-export const COVERAGE_EXCLUDE = [...SONAR_EXCLUSIONS, ...COVERAGE_ONLY_EXCLUSIONS]
 
 export const sonarExclusions = () => SONAR_EXCLUSIONS.join(",")
-export const sonarCoverageExclusions = () => COVERAGE_ONLY_EXCLUSIONS.join(",")
 
 /** Packages a workspace lane must resolve once, so React context and HeroUI state are shared. */
 export const DEDUPE = ["react", "react-dom", "@heroui/react", "@heroui/styles"]
@@ -57,7 +48,7 @@ export function starciVitestProject(options) {
 }
 
 /**
- * The repository-root config: every lane is a `projects` entry, so one run writes one `coverage/lcov.info`.
+ * The repository-root config: every lane is a `projects` entry, so one run runs every lane.
  *
  * @param {object} options
  * @param {string} options.rootDir              `import.meta.dirname` of the root config
@@ -65,18 +56,11 @@ export function starciVitestProject(options) {
  * @param {unknown[]} [options.plugins]
  */
 export function starciVitestWorkspace(options) {
-    const { rootDir, projects = ["apps/*/vitest.config.ts", "packages/*/vitest.config.ts"], plugins = [] } = options
+    const { projects = ["apps/*/vitest.config.ts", "packages/*/vitest.config.ts"], plugins = [] } = options
     return {
         plugins,
         test: {
             projects,
-            coverage: {
-                provider: "v8",
-                reporter: ["text-summary", "json-summary", "lcov"],
-                reportsDirectory: resolve(rootDir, "coverage"),
-                include: COVERAGE_INCLUDE,
-                exclude: COVERAGE_EXCLUDE,
-            },
         },
     }
 }
