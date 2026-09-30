@@ -18,7 +18,12 @@ export class RedisFakeService {
     private port = 0
 
     private readonly entries = new Map<string, string>()
-    private readonly server: Server = createServer((socket) => this.serve(socket))
+    private readonly sockets = new Set<Socket>()
+    private readonly server: Server = createServer((socket) => {
+        this.sockets.add(socket)
+        socket.once("close", () => this.sockets.delete(socket))
+        this.serve(socket)
+    })
     private failures = 0
 
     /** Starts the fake on a free loopback port. */
@@ -63,7 +68,7 @@ export class RedisFakeService {
     async stop(): Promise<void> {
         await new Promise<void>((resolve) => {
             this.server.close(() => resolve())
-            this.server.closeAllConnections?.()
+            for (const socket of this.sockets) socket.destroy()
         })
     }
 

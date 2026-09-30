@@ -13,7 +13,7 @@ import "reflect-metadata"
 import { strict as assert } from "node:assert"
 import { randomUUID } from "node:crypto"
 import { Module } from "@nestjs/common"
-import type { DynamicModule, INestApplicationContext, Type } from "@nestjs/common"
+import type { DynamicModule, INestApplication, INestApplicationContext, Type } from "@nestjs/common"
 import { NestFactory } from "@nestjs/core"
 import { DataSource } from "typeorm"
 import { freePorts } from "@tests/world/kit/free-ports"
@@ -58,6 +58,21 @@ const DEFAULT_POLL_MS = 250
 const DATABASE_RETURN_DEADLINE_MS = 120_000
 const RATE_LIMIT_HIGH = 100_000
 const CALL_DEADLINE_MS = 5000
+
+/** The identity app's keycloak admin target: a loopback discard port nothing listens on, so the world's sign-up refuses as unavailable. */
+const ABSENT_KEYCLOAK_URL = "http://127.0.0.1:9"
+
+/** The loopback port a listening app is bound to. */
+const portOf = (app: INestApplication): number => {
+    const address: unknown = app.getHttpServer().address()
+    if (typeof address === "object" && address !== null && "port" in address && typeof address.port === "number") {
+        return address.port
+    }
+    throw new TestWorldError({
+        code: TestWorldErrorCode.InfrastructureFailed,
+        params: { detail: "an app listens on no port" },
+    })
+}
 const NEST_LOGGER = ["error", "warn"] as const
 
 const IDENTITY_ENTITIES: DatabaseConnectionOptions["entities"] = accountEntities
@@ -261,6 +276,12 @@ export class TestWorld {
                 database: { name: IDENTITY_CONNECTION, url: new Secret(state.identity.url) },
                 cache: { url: new Secret(fake.redis.url) },
                 orderApi: { url: orderUrl, timeoutMs: CALL_DEADLINE_MS },
+                keycloakAdmin: {
+                    url: ABSENT_KEYCLOAK_URL,
+                    realm: "world",
+                    token: new Secret("world-absent"),
+                    timeoutMs: CALL_DEADLINE_MS,
+                },
                 httpSecurity: { allowedOrigins, rateLimit },
             }),
             { logger: [...NEST_LOGGER] },
