@@ -39,7 +39,7 @@ reads:
         manifests. The inspection binds the exact inspected tree; configuration includes declared
         deployment files inside the read set.
   - id: rules
-    path: knowledge/architecture-rules.yaml + knowledge/code-pattern-enforcement.yaml +
+    path: knowledge/architecture-rules.yaml + knowledge/hfs/rules.yaml +
       docs/code-pattern-enforcement.md
     purpose:
       en: Read the declared responsibility boundaries and enforcement rules the inspection measures

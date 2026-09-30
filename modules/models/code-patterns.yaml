@@ -133,7 +133,7 @@ profiles:
         sourceRuleIds: [BE-ARCHITECTURE-4, BE-FOLDER-2, BE-FUNCTION-2, BE-FUNCTION-4, BE-TYPING-7]
         applicability: { include: ['src/features/**/application/**/*.ts', 'apps/*/src/features/**/application/**/*.ts', 'libs/*/src/features/**/application/**/*.ts'], exclude: ['**/*.spec.ts', '**/*-spec.ts', '**/*.test.ts', '**/*-test.ts', '**/__tests__/**'] }
         mechanical:
-          requirement: Application use cases and contracts cannot import transport DTOs or protocol-framework surfaces.
+          requirement: Application messages, handlers and contracts cannot import transport DTOs or protocol-framework surfaces.
           check:
             kind: architecture
             ruleIds: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK]
@@ -352,7 +352,7 @@ profiles:
         sourceRuleIds: [BE-FUNCTION-1, BE-FUNCTION-2, BE-NAMING-6]
         applicability: { include: ['src/**/*.handler.ts', 'src/**/*.command.ts', 'src/**/*.query.ts', 'apps/*/src/**/*.handler.ts', 'apps/*/src/**/*.command.ts', 'apps/*/src/**/*.query.ts', 'libs/*/src/**/*.handler.ts', 'libs/*/src/**/*.command.ts', 'libs/*/src/**/*.query.ts'] }
         mechanical:
-          requirement: When the Academy ICQRS compatibility profile is present, handlers and messages retain its executable contract.
+          requirement: The application layer is CQRS, so handlers extend ICQRSHandler and override process, and messages carry one params field.
           check:
             kind: eslint
             sourceOnly: true
@@ -360,7 +360,7 @@ profiles:
             expected: { severity: error }
         semantic:
           guidance: docs/backend-source-pattern.md
-          review: A bus must own real dispatch/pipeline semantics; this check does not require CQRS for direct use cases.
+          review: Judge whether each handler owns one operation; this check does not judge handler logic.
         status: implemented
       - id: NEST-AUTHORIZATION-DOOR
         sourceRuleIds: [BE-FUNCTION-4, BE-FUNCTION-6]
@@ -462,7 +462,7 @@ profiles:
           check: { kind: architecture, ruleIds: [BE_FEATURE_LAYOUT_INVALID, BE_SOURCE_FORM] }
         semantic:
           guidance: docs/backend-source-pattern.md
-          review: Select direct use case versus bus and domain versus persistence ownership before judging placement.
+          review: Select domain versus persistence ownership before judging placement.
         status: implemented
       - id: NEST-TRANSPORT-ERROR-MAPPING
         sourceRuleIds: [BE-ERROR-4, BE-ERROR-5, BE-ERROR-6]

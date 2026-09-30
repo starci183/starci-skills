@@ -38,7 +38,7 @@ vocabularies:
   # What an operation is handed beside its records, declared per kind as `knowledge`, `checks` and `stacks`
   # ref lists and resolved by the kernel to concrete paths and digests - never a repo dump. `knowledge`
   # names entries of the `knowledge/` tree by extensionless name or directory glob (`patterns/fe/*`,
-  # `architecture-rules`, `design-patterns`, `code-pattern-enforcement`, `grammars/<name>`, `ui/*`,
+  # `architecture-rules`, `design-patterns`, `hfs/rules`, `grammars/<name>`, `ui/*`,
   # `application-stacks`); `checks` names executable check scripts (`scripts/checks/check-scoped-lint.mjs`,
   # `scripts/checks/code-patterns/*.mjs`, `scripts/checks/architecture/*.mjs`, `scripts/checks/acceptance.mjs`); `stacks` names the
   # bound repository's `.starcistacks` compose manifests and the `.claude`-owned layout and schema definitions an
@@ -216,7 +216,7 @@ kinds:
     # A design is derived from the requirement it realises and the decisions around it - never from source.
     reads: [srs, sds, decision]
     writes: [sds, decision]
-    knowledge: [architecture-rules, design-patterns, code-pattern-enforcement]
+    knowledge: [architecture-rules, design-patterns, hfs/rules]
     checks: []
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/sds-component@1, work/contract@1, work/integration@1, work/policy-decision@1]
@@ -232,7 +232,7 @@ kinds:
     # The repair reads the same three records the decision did; it may not open a new decision for the owner.
     reads: [srs, sds, decision]
     writes: [sds]
-    knowledge: [architecture-rules, design-patterns, code-pattern-enforcement]
+    knowledge: [architecture-rules, design-patterns, hfs/rules]
     checks: []
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/sds-component@1, work/contract@1, work/integration@1, work/policy-decision@1]
@@ -333,7 +333,7 @@ kinds:
     # node's `assets/`. The operation's exact allowlist confines these asset records to that node; design
     # directions and generated artwork remain owned by the separate `ui` lane.
     writes: [code, asset]
-    knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, code-pattern-enforcement]
+    knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, hfs/rules]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
@@ -365,7 +365,7 @@ kinds:
     readOnly: false
     reads: [srs, sds, decision, code]
     writes: [code]
-    knowledge: [patterns/be/*, architecture-rules, code-pattern-enforcement, application-stacks]
+    knowledge: [patterns/be/*, architecture-rules, hfs/rules, application-stacks]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
@@ -382,7 +382,7 @@ kinds:
     # the @starci presets and `hfs sync`; settled design is read only for layout and dependencies beyond it.
     reads: [srs, sds, decision]
     writes: [code]
-    knowledge: [patterns/be/*, architecture-rules, code-pattern-enforcement, application-stacks]
+    knowledge: [patterns/be/*, architecture-rules, hfs/rules, application-stacks]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/check-hfs-sync.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
@@ -403,7 +403,7 @@ kinds:
     # layouts that ship are one; brand.decide then takes the real captures.
     reads: [srs, sds, design, brand, shell, grammar]
     writes: [code, asset, shell]
-    knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, code-pattern-enforcement]
+    knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, hfs/rules]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs, scripts/checks/check-hfs-sync.mjs]
     stacks: [modules/schemas/workspace-routing.yaml, modules/schemas/work-layout-tree.schema.yaml]
     carries: [work/layout-tree@1]
@@ -420,7 +420,7 @@ kinds:
     # owning code exists yet - `code` here means the host repo, not the package's own source.
     reads: [sds, decision, code]
     writes: [code]
-    knowledge: [patterns/be/*, architecture-rules, code-pattern-enforcement]
+    knowledge: [patterns/be/*, architecture-rules, hfs/rules]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
@@ -455,7 +455,7 @@ kinds:
     # unit must render inside; it writes the grammar package and the consumer bump, which is product code.
     reads: [design, grammar, brand]
     writes: [grammar, code]
-    knowledge: [grammars/*, ui/*, code-pattern-enforcement]
+    knowledge: [grammars/*, ui/*, hfs/rules]
     checks: [scripts/checks/code-patterns/*.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/*]
@@ -563,7 +563,7 @@ kinds:
     # runtime record its build wrote is `lane-proof-blind`.
     reads: [srs, sds, code, evidence, runtime]
     writes: []
-    knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, design-patterns, code-pattern-enforcement]
+    knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, design-patterns, hfs/rules]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/acceptance.mjs]
     stacks: []
     carries: []
@@ -735,7 +735,7 @@ kinds:
     readOnly: false
     reads: [sds, code]
     writes: [code]
-    knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, code-pattern-enforcement]
+    knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, hfs/rules]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
@@ -752,7 +752,7 @@ kinds:
     # code they pin. This kind writes them; judging them stays the prove kinds' work.
     reads: [sds, code]
     writes: [code]
-    knowledge: [patterns/be/*, patterns/fe/*, code-pattern-enforcement]
+    knowledge: [patterns/be/*, patterns/fe/*, hfs/rules]
     checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
@@ -770,7 +770,7 @@ kinds:
     readOnly: false
     reads: [code, asset]
     writes: [evidence]
-    knowledge: [code-pattern-enforcement]
+    knowledge: [hfs/rules]
     checks: [scripts/checks/code-patterns/*.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
@@ -870,7 +870,7 @@ kinds:
     # canon when the rule is a language rule - together with the node whose evidence raised the challenge.
     reads: [record, code, grammar]
     writes: [code]
-    knowledge: [patterns/be/*, patterns/fe/*, code-pattern-enforcement]
+    knowledge: [patterns/be/*, patterns/fe/*, hfs/rules]
     checks: [scripts/checks/code-patterns/*.mjs]
     stacks: [modules/schemas/knowledge-source.schema.yaml, modules/schemas/knowledge-rule.schema.yaml]
     carries: [starci/knowledge-source@1]

@@ -1,23 +1,23 @@
 schema: starci/knowledge-source@1
 id: architecture-rules
 title: Common architecture invariants
-purpose: "Shared invariants for all StarCi projects: TypeScript + Next.js frontend + NestJS backend, using the
-  owner Academy code patterns and enterprise reasoning. Read docs/architecture-rules.md before the concrete
-  mono/single-source profiles. Mechanically decidable code rules require complete executable checking;
-  semantic design patterns and edge cases use Markdown plus agent review. No manual fallback can pass a
-  missing code check."
+purpose: "Semantic design obligations shared by all StarCi projects: TypeScript + Next.js frontend + NestJS backend.
+  Every obligation a machine can decide (tiers, composition, public surface, data boundary, configuration) is a rule of
+  knowledge/hfs/rules.yaml, the one rule catalog, and is not restated here; this file holds only what needs a reviewing
+  agent. Read docs/architecture-rules.md before the concrete profiles. No manual fallback can pass a missing code check."
 appliesTo:
   - backend
   - frontend
 family: cross-cutting
 provenance:
-  reviewedAt: 2026-09-16
+  reviewedAt: 2026-09-30
   sources:
+    - knowledge/hfs/rules.yaml
     - docs/architecture-rules.md
     - docs/portable-source-architecture.md
     - docs/backend-source-pattern.md
     - docs/application-runtime-config-and-health.md
-  limitations: Fixed Nest/Next family; source topology is configurable, framework substitution is not. Automated
+  limitations: Fixed Nest/Next family; the source topology is the one HFS tree, framework substitution is not possible. Automated
     checks have explicit supported syntax/path/contract bounds. Missing applicable code-rule coverage blocks
     conformance. Agent design review and real behavioral evidence cover semantic obligations. Runtime
     installation performs no product source changes.
@@ -32,50 +32,6 @@ rules:
       automated: []
       manual:
         - Identify authoritative state, contract owner and affected consumers.
-  - id: ARCH-COMPOSITION
-    title: Entry points compose processes
-    kind: mandatory
-    requirement: Executable entries own startup, shutdown and dependency composition. Product scenarios and
-      invariants belong to features or capabilities below that entry.
-    rationale: Deployment topology must not become the owner of business behavior.
-    verification:
-      automated:
-        - BE_APP_COMPOSITION_ONLY
-        - BE_APP_BUSINESS_ROLE
-        - FE_ROUTE_DEFAULT_EXPORT
-        - FE_ROUTE_ONE_PAGE
-        - FE_ROUTE_DRAWING_DECISION
-        - FE_ROUTE_CLIENT_BOUNDARY
-        - FE_ROUTE_CLIENT_HOOK
-      manual:
-        - Map the actual framework entry and inspect callbacks for hidden product behavior.
-  - id: ARCH-DEPENDENCY
-    title: Dependencies preserve responsibility direction
-    kind: mandatory
-    requirement: Reusable capabilities do not depend on their feature/app consumers. Owner dependencies are
-      explicit and avoid cycles; aliases and re-exports cannot reverse this direction.
-    rationale: A reusable capability must not require its delivery-specific caller to exist.
-    verification:
-      automated:
-        - BE_TIER_DIRECTION
-        - ARCH_PACKAGE_IMPORTS_APP
-        - ARCH_PACKAGE_EXPORT_BYPASS
-        - ARCH_INTERNAL_IMPORT_UNRESOLVED
-        - FE_TIER_DIRECTION
-      manual:
-        - Review semantic ownership and cycles beyond the supported static checks.
-  - id: ARCH-PUBLIC-API
-    title: Consumers use owned public contracts
-    kind: mandatory
-    requirement: Cross-owner consumers use explicit public contracts and preserve dependency identity. Private
-      deep imports, raw-state access and duplicate provider registration cannot substitute for an API.
-    rationale: Reachability alone is not an owned or stable contract.
-    verification:
-      automated:
-        - ARCH_PACKAGE_EXPORT_BYPASS
-      manual:
-        - Review public API cohesion and actual DI token/lifetime behavior. Same-source export coverage remains
-          a mechanical obligation in modules/models/code-patterns.yaml and cannot be waived by this review.
   - id: ARCH-ABSTRACTION
     title: Every abstraction has a responsibility
     kind: mandatory
@@ -87,21 +43,6 @@ rules:
       automated: []
       manual:
         - Explain the boundary each abstraction adds and remove pointless forwarding in authorized scope.
-  - id: ARCH-DATA-BOUNDARY
-    title: Data representations have explicit owners
-    kind: mandatory
-    requirement: Distinguish protocol, application, persistence and provider representations. Keep validation and
-      projection at their owning boundary; do not accidentally expose entities or import transport DTOs into
-      application contracts.
-    rationale: Unrelated protocol and persistence changes must not silently redefine the application API.
-    verification:
-      automated:
-        - BE_APPLICATION_IMPORTS_TRANSPORT
-        - BE_APPLICATION_TRANSPORT_FRAMEWORK
-        - FE_TIER_DIRECTION
-      manual:
-        - Review semantic validation and DTO mapping as design obligations; missing mechanical path/type
-          coverage is a code-check gap, not a manual waiver.
   - id: ARCH-STATE
     title: State has authority and lifecycle
     kind: mandatory
@@ -114,28 +55,16 @@ rules:
       manual:
         - Exercise relevant state changes, identity changes, lag and restart recovery.
   - id: ARCH-IDENTITY
-    title: Preserve dependency identity and lifetime
+    title: Preserve scope identity and lifetime
     kind: mandatory
-    requirement: Connections, provider instances, tenant/workspace and request scopes retain distinct identity
-      where their contract requires it. Global registration or caching cannot collapse incompatible
-      configurations or lifetimes.
+    requirement: Tenant, workspace and request scopes retain distinct identity where their contract requires it. A
+      cached value or long-lived instance cannot collapse incompatible scopes or lifetimes; connection and module
+      identity are judged by the HFS rules of the catalog, not here.
     rationale: Correct names and imports alone do not guarantee the correct runtime instance.
     verification:
       automated: []
       manual:
         - Inspect tokens/configuration and verify applicable boot and scope isolation.
-  - id: ARCH-CONFIG
-    title: Validate configuration before effects
-    kind: mandatory
-    requirement: Parse required configuration through a declared boundary before its effects; reject malformed
-      critical values, separate public/server/secret values and redact failures. Defaults cannot disguise
-      missing production authority or endpoints.
-    rationale: Configuration is a runtime input contract, not scattered unchecked environment reads.
-    verification:
-      automated: []
-      manual:
-        - Test missing/malformed/valid inputs and browser-secret separation; use applicable stack reference
-          checks.
   - id: ARCH-AUTHORITY
     title: Identity is not permission
     kind: mandatory

@@ -46,7 +46,7 @@ reads:
         be empty or absent — that is the greenfield case.
   - id: conventions
     path: knowledge/patterns/be/* + knowledge/architecture-rules.yaml +
-      knowledge/code-pattern-enforcement.yaml
+      knowledge/hfs/rules.yaml
     purpose:
       en: A scaffold that violates day-one rules creates refactor debt.
   - id: stacks

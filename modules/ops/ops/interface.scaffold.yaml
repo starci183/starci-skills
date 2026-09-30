@@ -59,7 +59,7 @@ reads:
       en: Resolve the actual checkout, HEAD and dirty state; the declared app path may be empty — that is
         the greenfield case.
   - id: conventions
-    path: knowledge/patterns/fe/* + knowledge/ui/* + knowledge/code-pattern-enforcement.yaml
+    path: knowledge/patterns/fe/* + knowledge/ui/* + knowledge/hfs/rules.yaml
     purpose:
       en: House FE rules the new tree conforms to from its first commit — lint kits, source layout,
         naming, boundary contracts.

@@ -69,6 +69,7 @@ retired:
   - {path: packages/eslint/be/cdc.test.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none'}
   - {path: packages/eslint/be/event-delivery.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: SAB-only NATS delivery rules are deleted; in-process events are banned by R87 and side effects go through the outbox'}
   - {path: packages/eslint/be/event-delivery.test.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none'}
+  - {path: knowledge/code-pattern-enforcement.yaml, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'knowledge/hfs/rules.yaml (the one rule catalog) and modules/models/code-patterns.yaml (the executable inventory, described by docs/code-pattern-enforcement.md); its three rules only restated that manifest'}
   - {path: skills/restart/SKILL.md, retiredAt: 2026-09-29, removedIn: start-set-profile, replacedBy: 'skills/start (start --set-profile); the restart skill is removed'}
   - {path: scripts/checks/blob-output.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: no caller besides its test (RED18); checks store output with scripts/checks/output.mjs emitCheckOutput'}
   - {path: scripts/kernel/usage-backfill.mjs, retiredAt: 2026-09-30, removedIn: dv-c0, replacedBy: 'none: the one-shot backfill ran; the Host controller sweeps usage (scripts/kernel/usage-record.mjs sweepUsage)'}
