@@ -1,0 +1,10 @@
+export declare class UpdateResult { raw: unknown; affected?: number }
+export declare class InsertResult { raw: unknown }
+export declare class DeleteResult { raw: unknown; affected?: number | null }
+export declare class EntityManager {
+  findOne<T>(entity: new () => T, options: object): Promise<T | null>
+  save<T>(entity: T): Promise<T>
+  update(entity: unknown, criteria: unknown, patch: unknown): Promise<UpdateResult>
+  transaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T>
+}
+

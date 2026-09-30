@@ -148,20 +148,7 @@ test('the mock<T>() types replace `as unknown as`: typed jest.Mock members, assi
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-mock-types-'));
   try {
     fs.copyFileSync(path.join(import.meta.dirname, 'mock.d.ts'), path.join(dir, 'mock.d.ts'));
-    fs.writeFileSync(path.join(dir, 'probe.ts'), [
-      'import { mock } from "./mock"',
-      'interface Repo { find(id: string): Promise<{ id: string } | null>; readonly name: string }',
-      'const repo = mock<Repo>()',
-      'repo.find.mockResolvedValue({ id: "a" })',
-      'const asRepo: Repo = repo',
-      'const named = mock<Repo>({ name: "x" })',
-      'export const ok: string = named.name + String(asRepo)',
-      '// @ts-expect-error a stub of the wrong shape is a compile error',
-      'repo.find.mockResolvedValue(1)',
-      '// @ts-expect-error a member the interface does not have is a compile error',
-      'repo.missing',
-      '',
-    ].join('\n'));
+    fs.writeFileSync(path.join(dir, 'probe.ts'), fs.readFileSync(new URL('probe-mock.fixture', import.meta.url), 'utf8'));
     const program = ts.createProgram([path.join(dir, 'probe.ts')], {
       strict: true, noEmit: true, skipLibCheck: true, types: ['jest'], typeRoots: [path.resolve(import.meta.dirname, '../../node_modules/@types')],
       module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, target: ts.ScriptTarget.ES2022,
@@ -446,49 +433,8 @@ test('the kit types: mockEntityManager() is assignable to EntityManager with no 
   try {
     for (const file of ['mock.d.ts', 'entity-manager.d.ts', 'ids.d.ts', 'matchers.d.ts', 'clock.d.ts']) fs.copyFileSync(path.join(import.meta.dirname, file), path.join(dir, file));
     fs.mkdirSync(path.join(dir, 'node_modules', 'typeorm'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'node_modules', 'typeorm', 'index.d.ts'), [
-      'export declare class UpdateResult { raw: unknown; affected?: number }',
-      'export declare class InsertResult { raw: unknown }',
-      'export declare class DeleteResult { raw: unknown; affected?: number | null }',
-      'export declare class EntityManager {',
-      '  findOne<T>(entity: new () => T, options: object): Promise<T | null>',
-      '  save<T>(entity: T): Promise<T>',
-      '  update(entity: unknown, criteria: unknown, patch: unknown): Promise<UpdateResult>',
-      '  transaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T>',
-      '}',
-      '',
-    ].join('\n'));
-    fs.writeFileSync(path.join(dir, 'probe.ts'), [
-      'import type { EntityManager } from "typeorm"',
-      'import { mockEntityManager, fakeTransaction } from "./entity-manager"',
-      'import { fakeIds } from "./ids"',
-      'import { FakeClock } from "./clock"',
-      'import type { RefusalReason } from "./matchers"',
-      'class Order { id = "" }',
-      'function handle(em: EntityManager): Promise<Order | null> { return em.findOne(Order, {}) }',
-      'const em = mockEntityManager()',
-      'const typed = mockEntityManager({ findOne: [Order, new Order()], find: [Order, [new Order()]], count: [Order, 3], update: [Order, { affected: 1 }], query: ["select 1", [{ n: 1 }]] })',
-      'export const list = mockEntityManager({ findOne: [[Order, null], [Order, new Order()]] })',
-      'export const fromTyped = typed.findOne',
-      'export const run = handle(em)',
-      'const tx = fakeTransaction(em)',
-      'export const commits: number = tx.commits',
-      'export const id: string = fakeIds().next()',
-      'export const at: Date = new FakeClock().now()',
-      'export const reason: RefusalReason = { code: "X" }',
-      'declare const outcome: unknown',
-      'expect(outcome).toBeRefused("STOCK_EXHAUSTED")',
-      'expect(outcome).toSucceedWith({ id: "a" })',
-      '// @ts-expect-error a result of the wrong type for the entity is a compile error',
-      'mockEntityManager({ findOne: [Order, 5] })',
-      '// @ts-expect-error a method the double cannot stub is a compile error',
-      'mockEntityManager({ missing: [Order, 1] })',
-      '// @ts-expect-error a stub needs the entity class first',
-      'mockEntityManager({ count: 3 })',
-      '// @ts-expect-error a member EntityManager does not have is a compile error',
-      'em.missing',
-      '',
-    ].join('\n'));
+    fs.writeFileSync(path.join(dir, 'node_modules', 'typeorm', 'index.d.ts'), fs.readFileSync(new URL('typeorm-stub.fixture', import.meta.url), 'utf8'));
+    fs.writeFileSync(path.join(dir, 'probe.ts'), fs.readFileSync(new URL('probe-kit.fixture', import.meta.url), 'utf8'));
     const program = ts.createProgram([path.join(dir, 'probe.ts')], {
       strict: true, noEmit: true, skipLibCheck: true, types: ['jest'], typeRoots: [path.resolve(import.meta.dirname, '../../node_modules/@types')],
       module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, target: ts.ScriptTarget.ES2022,

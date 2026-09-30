@@ -1,0 +1,12 @@
+import { mock } from "./mock"
+interface Repo { find(id: string): Promise<{ id: string } | null>; readonly name: string }
+const repo = mock<Repo>()
+repo.find.mockResolvedValue({ id: "a" })
+const asRepo: Repo = repo
+const named = mock<Repo>({ name: "x" })
+export const ok: string = named.name + String(asRepo)
+// @ts-expect-error a stub of the wrong shape is a compile error
+repo.find.mockResolvedValue(1)
+// @ts-expect-error a member the interface does not have is a compile error
+repo.missing
+

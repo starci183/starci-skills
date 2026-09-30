@@ -1,0 +1,29 @@
+import type { EntityManager } from "typeorm"
+import { mockEntityManager, fakeTransaction } from "./entity-manager"
+import { fakeIds } from "./ids"
+import { FakeClock } from "./clock"
+import type { RefusalReason } from "./matchers"
+class Order { id = "" }
+function handle(em: EntityManager): Promise<Order | null> { return em.findOne(Order, {}) }
+const em = mockEntityManager()
+const typed = mockEntityManager({ findOne: [Order, new Order()], find: [Order, [new Order()]], count: [Order, 3], update: [Order, { affected: 1 }], query: ["select 1", [{ n: 1 }]] })
+export const list = mockEntityManager({ findOne: [[Order, null], [Order, new Order()]] })
+export const fromTyped = typed.findOne
+export const run = handle(em)
+const tx = fakeTransaction(em)
+export const commits: number = tx.commits
+export const id: string = fakeIds().next()
+export const at: Date = new FakeClock().now()
+export const reason: RefusalReason = { code: "X" }
+declare const outcome: unknown
+expect(outcome).toBeRefused("STOCK_EXHAUSTED")
+expect(outcome).toSucceedWith({ id: "a" })
+// @ts-expect-error a result of the wrong type for the entity is a compile error
+mockEntityManager({ findOne: [Order, 5] })
+// @ts-expect-error a method the double cannot stub is a compile error
+mockEntityManager({ missing: [Order, 1] })
+// @ts-expect-error a stub needs the entity class first
+mockEntityManager({ count: 3 })
+// @ts-expect-error a member EntityManager does not have is a compile error
+em.missing
+
