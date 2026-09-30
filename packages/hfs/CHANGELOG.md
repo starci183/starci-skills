@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 3.0.0 - 2026-10-01
+
+- Breaking: one entry, `hfs lint`. It runs the repository's eslint, the `hfs check` repository pass and, for a front end, stylelint, and writes one `starci/lint@1` report; `--sonar <file>` writes the single Sonar import (engines starci-hfs, eslint and stylelint in one document); `--changed <files...> --format json` is the land-gate shape. `hfs report`, `hfs check --sonar` and the managed scripts `lint:check`, `lint:report`, `hfs:check` and `hfs:report` are deleted; the managed `lint` script is `hfs lint`, and CI, hooks and the Sonar template read `reports/lint.sonar.json`.
+- Changed: 48 TS-attached architecture checks are served to eslint through one cached project graph (the `project-graph` law of both canons); `hfs check` keeps only findings with no TS file to sit on. The machine `size-growth` is gone (eslint `file-size-growth` holds the law).
+- Fixed: workspace package imports resolve to their source (package `exports`/`types` mapped from dist to src through the package tsconfig), so `hfs check` needs no build and consumed exports are not reported unused; `ARCH_OWNER_EXPORT_BYPASS` accepts every entry the package's `exports` maps.
 
 - Changed: Back-end apps have no composition spec. App slots admit only their production composition files, and R102 rejects a spec under `apps/<app>/src`. The e2e world proves that each app boots.
 

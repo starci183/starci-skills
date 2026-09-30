@@ -1,6 +1,8 @@
 # Changelog
 
-## 7.0.1 - 2026-10-01
+## 7.1.0 - 2026-10-01
+
+- New: the `project-graph` law: the TS-attached front-end architecture checks (routes, owners, paths) as eslint rules at error, from one cached project graph per lint run.
 
 - Breaking (rule id): `no-http-status-collapse` is renamed `no-failure-collapse`. It fires on UI code that consumes an `Outcome` as well as on HTTP clients, so its name and messages now speak of a failure and its reason (branch on an `Outcome`'s reason code; map an HTTP status to an `Outcome` first). A branch that reads `reason` or `kind` counts as inspecting the failure. Update any `eslint-disable` naming the old id; there is no alias.
 

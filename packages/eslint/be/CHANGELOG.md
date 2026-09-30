@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 2.1.0 - 2026-10-01
+
+- New: the `project-graph` law: the TS-attached architecture checks (tiers, owners, dead exports, composition, data, paths) as eslint rules at error on the offending line, from one cached project graph per lint run.
+- New: `spec-exact-values` (R48): `expect.any(String|Number|Date)` in a `*.service.spec.ts` is refused; ids come from `fakeIds()` and dates from `FakeClock` and are asserted exactly.
 
 - Changed: Back-end apps have no composition spec, including the migrate app. `unit-test-colocated` has no app exception; only service unit specs and the integration, e2e and contract layers remain.
 
