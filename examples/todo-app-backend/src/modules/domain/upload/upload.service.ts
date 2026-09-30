@@ -1,73 +1,218 @@
 import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
+import { TaskService } from "@modules/domain/task"
+import { UploadStorageError, InjectUploadStorage } from "@modules/integrations/upload"
+import type { UploadStorage } from "@modules/integrations/upload"
+import { InjectClock } from "@modules/platform/clock"
+import type { Clock } from "@modules/platform/clock"
 import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
 import { UploadErrorCode } from "./errors/upload.error"
 import { UploadEntity } from "./persistence/entities/upload.entity"
-import { toUploadView } from "./persistence/upload.rows"
+import { toUploadSummary, toUploadView } from "./persistence/upload.rows"
 import type {
+    AcceptContentParams,
     AdmitContentParams,
-    AttachUploadParams,
-    AuthorizeUploadParams,
-    CreateUploadParams,
-    FindUploadParams,
+    AttachParams,
+    CreateDirectParams,
+    CreateIntentParams,
+    DeletedUpload,
     ListTaskUploadsParams,
-    MarkReadyParams,
-    PresignParams,
     PresignedToken,
-    RemoveUploadParams,
-    UploadLookupResult,
+    ReadContentParams,
+    RemoveParams,
+    TaskUploads,
+    UploadContent,
+    UploadIntent,
+    UploadOutcome,
+    UploadSummary,
     UploadView,
 } from "./upload.contracts"
+import { UPLOAD_TOKEN_HEADER } from "./upload.contracts"
 import { InjectUploadOptions } from "./upload.decorators"
 import type { UploadOptions } from "./upload.options"
 import { signUploadToken, verifyUploadToken } from "./upload-token.policy"
-
-type IntakeRefusal = UploadErrorCode.MimeNotAllowed | UploadErrorCode.TooLarge
-type AdmitRefusal = UploadErrorCode.NotFound | UploadErrorCode.TokenInvalid | UploadErrorCode.TooLarge
-type AuthorizeRefusal = UploadErrorCode.NotFound | UploadErrorCode.Forbidden
 
 /** The one place a storage key is minted: from the upload id only, so nothing a client controls reaches the storage plane. */
 const storageKeyOf = (uploadId: string): string => `uploads/${uploadId}`
 
 @Injectable()
 /**
- * The upload metadata rows and the rules on them: intake validation, the presigned content token, the owner and ready
- * guards. It never touches the bytes (the storage integration does, orchestrated by the handlers) and never reads a
- * task: attaching an upload to a task needs the task ownership decision, which the handler makes with TaskService.
+ * The uploads: the metadata rows, the intake rules, the presigned content token, the owner and ready guards, and the
+ * orchestration of the byte plane. The bytes are stored and inspected outside any transaction; only then does the row
+ * turn ready, so a rejected inspection leaves the row pending. Attaching to a task needs the task ownership decision,
+ * which is made here with the task service.
  */
 export class UploadService {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        @InjectClock() private readonly clock: Clock,
         @InjectUploadOptions() private readonly options: UploadOptions,
+        @InjectUploadStorage() private readonly storage: UploadStorage,
+        private readonly tasks: TaskService,
     ) {}
 
-    /** Writes a pending upload row for the owner, or refuses a media type off the allowlist or a size out of bounds. */
-    async createPending(params: CreateUploadParams): Promise<Outcome<UploadView, IntakeRefusal>> {
-        const refusal = this.intakeRefusal(params.mime, params.sizeBytes)
-        if (refusal) return refusal
-        const id = randomUUID()
-        const saved = await params.manager.save(UploadEntity, {
-            id,
-            owner: params.ownerId,
-            taskId: null,
-            filename: params.filename.trim() || "file",
-            mime: params.mime,
-            sizeBytes: params.sizeBytes,
-            storageKey: storageKeyOf(id),
-            status: "pending",
-            createdAt: params.at,
+    /**
+     * Opens a pending upload for the owner after the declared media type and size pass the intake rules, and answers
+     * the presigned request the client fulfils on the content door. Nothing is stored yet: the bytes come with the token.
+     */
+    async createIntent(params: CreateIntentParams): Promise<UploadOutcome<UploadIntent>> {
+        const at = this.clock.now()
+        const created = await this.openPending({ ...params, at })
+        if (created.kind === "refused") return created
+        const { token, expiresAt } = this.presign(created.value.id, at)
+        return ok({
+            uploadId: created.value.id,
+            method: "PUT",
+            url: `/uploads/${created.value.id}/content`,
+            headers: [
+                { name: UPLOAD_TOKEN_HEADER, value: token },
+                { name: "content-type", value: created.value.mime },
+            ],
+            expiresAt,
         })
+    }
+
+    /**
+     * Stores a file that arrived with the request: the pending row is written with the received size, then the storing,
+     * the inspection and the ready flip run exactly as for a presigned upload, with a token minted just now.
+     */
+    async createDirect(params: CreateDirectParams): Promise<UploadOutcome<UploadSummary>> {
+        const at = this.clock.now()
+        const created = await this.openPending({
+            ownerId: params.ownerId,
+            filename: params.filename,
+            mime: params.mime,
+            sizeBytes: params.content.length,
+            at,
+        })
+        if (created.kind === "refused") return created
+        const { token } = this.presign(created.value.id, at)
+        return this.acceptContent({ uploadId: created.value.id, token, content: params.content })
+    }
+
+    /**
+     * The presigned data plane: stores the bytes of a pending upload when its token verifies. The token, the pending
+     * state and the RECEIVED size are decided first; a rejected inspection leaves the row pending.
+     */
+    async acceptContent(params: AcceptContentParams): Promise<UploadOutcome<UploadSummary>> {
+        const { uploadId, content } = params
+        const admitted = await this.admitContent({
+            uploadId,
+            token: params.token,
+            sizeBytes: content.length,
+            at: this.clock.now(),
+        })
+        if (admitted.kind === "refused") return admitted
+        try {
+            const verdict = await this.storage.store({ uploadId, content })
+            if (!verdict.accepted) return refused(UploadErrorCode.ScanRejected, { uploadId, reason: verdict.reason })
+        } catch (error) {
+            return this.storageRefusal(error, uploadId)
+        }
+        const ready = await this.entityManager.transaction((manager) =>
+            manager.save(UploadEntity, { ...this.rowOf(admitted.value), sizeBytes: content.length, status: "ready" }),
+        )
+        return ok(toUploadSummary(toUploadView(ready)))
+    }
+
+    /** Attaches a ready upload of the actor to a task of the actor. Attaching is metadata only: the bytes never move. */
+    async attach(params: AttachParams): Promise<UploadOutcome<UploadSummary>> {
+        const authorized = await this.authorize(params.uploadId, params.actorId)
+        if (authorized.kind === "refused") return authorized
+        const ready = this.requireReady(authorized.value)
+        if (ready.kind === "refused") return ready
+        const task = await this.tasks.find({ id: params.taskId })
+        if (!task) return refused(UploadErrorCode.NotFound, { taskId: params.taskId })
+        if (task.owner !== params.actorId) return refused(UploadErrorCode.Forbidden, { taskId: task.id })
+        const attached = await this.entityManager.transaction((manager) =>
+            manager.save(UploadEntity, { ...this.rowOf(ready.value), taskId: task.id }),
+        )
+        return ok(toUploadSummary(toUploadView(attached)))
+    }
+
+    /**
+     * Deletes an upload of the actor. The stored bytes go first, outside any transaction, and a failure of the storage
+     * refuses before the row goes, so a surviving object never outlives the metadata that names it.
+     */
+    async remove(params: RemoveParams): Promise<UploadOutcome<DeletedUpload>> {
+        const authorized = await this.authorize(params.uploadId, params.actorId)
+        if (authorized.kind === "refused") return authorized
+        const uploadId = authorized.value.id
+        try {
+            await this.storage.delete({ uploadId })
+        } catch (error) {
+            return this.storageRefusal(error, uploadId)
+        }
+        await this.entityManager.transaction((manager) => manager.delete(UploadEntity, uploadId))
+        return ok({ uploadId, deleted: true })
+    }
+
+    /**
+     * Lists the uploads attached to a task, for the owner of the task only: the task ownership decision precedes the
+     * listing, so a stranger learns nothing about the attachments, and the read itself is bound to the owner.
+     */
+    async listForTask(params: ListTaskUploadsParams): Promise<UploadOutcome<TaskUploads>> {
+        const task = await this.tasks.find({ id: params.taskId })
+        if (!task) return refused(UploadErrorCode.NotFound, { taskId: params.taskId })
+        if (task.owner !== params.actorId) return refused(UploadErrorCode.Forbidden, { taskId: task.id })
+        const rows = await this.entityManager.find(UploadEntity, {
+            where: { taskId: task.id, owner: params.actorId },
+            take: LIST_ROWS_MAX,
+        })
+        return ok({ uploads: rows.map((row) => toUploadSummary(toUploadView(row))) })
+    }
+
+    /**
+     * Reads the bytes of a ready upload for its owner. A ready row whose object vanished from storage answers not found:
+     * metadata without bytes is not downloadable, and the refusal has the shape a never-existing id gets.
+     */
+    async readContent(params: ReadContentParams): Promise<UploadOutcome<UploadContent>> {
+        const authorized = await this.authorize(params.uploadId, params.actorId)
+        if (authorized.kind === "refused") return authorized
+        const ready = this.requireReady(authorized.value)
+        if (ready.kind === "refused") return ready
+        const uploadId = ready.value.id
+        try {
+            const content = await this.storage.get({ uploadId })
+            if (content === null) return refused(UploadErrorCode.NotFound, { uploadId, reason: "object-missing" })
+            return ok({ filename: ready.value.filename, mime: ready.value.mime, content })
+        } catch (error) {
+            return this.storageRefusal(error, uploadId)
+        }
+    }
+
+    /** Writes a pending upload row for the owner, or refuses a media type off the allowlist or a size out of bounds. */
+    private async openPending(
+        params: CreateIntentParams & { readonly at: Date },
+    ): Promise<Outcome<UploadView, UploadErrorCode.MimeNotAllowed | UploadErrorCode.TooLarge>> {
+        if (!this.options.allowedMimes.includes(params.mime)) return refused(UploadErrorCode.MimeNotAllowed, { mime: params.mime })
+        const oversize = this.sizeRefusal(params.sizeBytes)
+        if (oversize) return oversize
+        const id = randomUUID()
+        const saved = await this.entityManager.transaction((manager) =>
+            manager.save(UploadEntity, {
+                id,
+                owner: params.ownerId,
+                taskId: null,
+                filename: params.filename.trim() || "file",
+                mime: params.mime,
+                sizeBytes: params.sizeBytes,
+                storageKey: storageKeyOf(id),
+                status: "pending",
+                createdAt: params.at,
+            }),
+        )
         return ok(toUploadView(saved))
     }
 
     /** Mints the content token of a pending upload, valid for the configured lifetime. */
-    presign(params: PresignParams): PresignedToken {
-        const expiresAt = new Date(params.at.getTime() + this.options.presignTtlMs)
+    private presign(uploadId: string, at: Date): PresignedToken {
+        const expiresAt = new Date(at.getTime() + this.options.presignTtlMs)
         const token = signUploadToken({
-            uploadId: params.uploadId,
+            uploadId,
             expiresAtMs: expiresAt.getTime(),
             secret: this.options.signingSecret.reveal(),
         })
@@ -78,9 +223,9 @@ export class UploadService {
      * The upload with this id, or null. An empty id is answered before any query: TypeORM drops an undefined
      * criterion from the WHERE clause, so a lookup on it would match an arbitrary row.
      */
-    async find(params: FindUploadParams): Promise<UploadLookupResult> {
-        if (!params.uploadId) return null
-        const row = await this.entityManager.findOneBy(UploadEntity, { id: params.uploadId })
+    private async find(uploadId: string): Promise<UploadView | null> {
+        if (!uploadId) return null
+        const row = await this.entityManager.findOneBy(UploadEntity, { id: uploadId })
         return row ? toUploadView(row) : null
     }
 
@@ -89,8 +234,10 @@ export class UploadService {
      * pending (a consumed intent is refused, never overwritten), and the RECEIVED size must be inside the ceiling (a
      * client can declare a small intent and send a large body).
      */
-    async admitContent(params: AdmitContentParams): Promise<Outcome<UploadView, AdmitRefusal>> {
-        const upload = await this.find({ uploadId: params.uploadId })
+    private async admitContent(
+        params: AdmitContentParams,
+    ): Promise<Outcome<UploadView, UploadErrorCode.NotFound | UploadErrorCode.TokenInvalid | UploadErrorCode.TooLarge>> {
+        const upload = await this.find(params.uploadId)
         if (!upload) return refused(UploadErrorCode.NotFound, { uploadId: params.uploadId })
         const verdict = verifyUploadToken({
             uploadId: upload.id,
@@ -106,57 +253,30 @@ export class UploadService {
     }
 
     /** The upload when the person owns it: a missing row and somebody else's row are told apart for the owner decision. */
-    async authorize(params: AuthorizeUploadParams): Promise<Outcome<UploadView, AuthorizeRefusal>> {
-        const upload = await this.find({ uploadId: params.uploadId })
-        if (!upload) return refused(UploadErrorCode.NotFound, { uploadId: params.uploadId })
-        if (upload.owner !== params.actorId) return refused(UploadErrorCode.Forbidden, { uploadId: upload.id })
+    private async authorize(
+        uploadId: string,
+        actorId: string,
+    ): Promise<Outcome<UploadView, UploadErrorCode.NotFound | UploadErrorCode.Forbidden>> {
+        const upload = await this.find(uploadId)
+        if (!upload) return refused(UploadErrorCode.NotFound, { uploadId })
+        if (upload.owner !== actorId) return refused(UploadErrorCode.Forbidden, { uploadId: upload.id })
         return ok(upload)
     }
 
     /** The upload when its bytes landed; a pending upload is not an attachment and not downloadable. */
-    requireReady(upload: UploadView): Outcome<UploadView, UploadErrorCode.NotReady> {
+    private requireReady(upload: UploadView): Outcome<UploadView, UploadErrorCode.NotReady> {
         return upload.status === "ready" ? ok(upload) : refused(UploadErrorCode.NotReady, { uploadId: upload.id })
-    }
-
-    /** Flips a pending upload to ready with the size that landed. */
-    async markReady(params: MarkReadyParams): Promise<UploadView> {
-        const saved = await params.manager.save(UploadEntity, {
-            ...this.rowOf(params.upload),
-            sizeBytes: params.sizeBytes,
-            status: "ready",
-        })
-        return toUploadView(saved)
-    }
-
-    /** Points an upload at a task. Attaching is metadata only: the bytes never move. */
-    async attach(params: AttachUploadParams): Promise<UploadView> {
-        const saved = await params.manager.save(UploadEntity, { ...this.rowOf(params.upload), taskId: params.taskId })
-        return toUploadView(saved)
-    }
-
-    /** The uploads of the owner attached to a task, at most LIST_ROWS_MAX; the owner is part of the read. */
-    async listForTask(params: ListTaskUploadsParams): Promise<Array<UploadView>> {
-        const rows = await this.entityManager.find(UploadEntity, {
-            where: { taskId: params.taskId, owner: params.ownerId },
-            take: LIST_ROWS_MAX,
-        })
-        return rows.map(toUploadView)
-    }
-
-    /** Deletes the upload row. */
-    async remove(params: RemoveUploadParams): Promise<void> {
-        await params.manager.delete(UploadEntity, params.id)
-    }
-
-    /** The mime rule first, then the size rule. */
-    private intakeRefusal(mime: string, sizeBytes: number): Outcome<never, IntakeRefusal> | null {
-        if (!this.options.allowedMimes.includes(mime)) return refused(UploadErrorCode.MimeNotAllowed, { mime })
-        return this.sizeRefusal(sizeBytes)
     }
 
     private sizeRefusal(sizeBytes: number): Outcome<never, UploadErrorCode.TooLarge> | null {
         const valid = Number.isInteger(sizeBytes) && sizeBytes > 0 && sizeBytes <= this.options.maxBytes
         return valid ? null : refused(UploadErrorCode.TooLarge, { sizeBytes, maxBytes: this.options.maxBytes })
+    }
+
+    /** A failure of the storage integration is a refusal; any other failure is a bug and is rethrown. */
+    private storageRefusal(error: unknown, uploadId: string): Outcome<never, UploadErrorCode.StorageUnavailable> {
+        if (error instanceof UploadStorageError) return refused(UploadErrorCode.StorageUnavailable, { uploadId })
+        throw error
     }
 
     private rowOf(upload: UploadView): UploadEntity {

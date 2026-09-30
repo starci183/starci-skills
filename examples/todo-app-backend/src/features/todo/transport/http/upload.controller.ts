@@ -33,9 +33,6 @@ import {
 } from "./upload-request.mapper"
 import { toDownloadHeaders, toUploadResponse } from "./upload-response.mapper"
 
-/** What a body-less request stores: nothing, which the intake rules refuse as an empty file. */
-const NO_BYTES = Buffer.alloc(0)
-
 @Controller("uploads")
 /**
  * The byte plane of the uploads: the only REST door of the upload flow, because bytes cannot travel as GraphQL. The
@@ -56,7 +53,7 @@ export class UploadController {
         @Headers("content-type") contentType: string | undefined,
         @Req() request: Request,
     ): Promise<UploadResponse> {
-        const content = toUploadBody(request.body) ?? NO_BYTES
+        const content = toUploadBody(request.body)
         const outcome = await this.commandBus.execute(
             new CreateDirectUploadCommand({ request: toDirectUploadRequest(query, contentType, content), principal }),
         )
@@ -73,7 +70,7 @@ export class UploadController {
         @Headers(UPLOAD_TOKEN_HEADER) token: string | undefined,
         @Req() request: Request,
     ): Promise<UploadResponse> {
-        const content = toUploadBody(request.body) ?? NO_BYTES
+        const content = toUploadBody(request.body)
         const outcome = await this.commandBus.execute(
             new AcceptUploadContentCommand({ request: toAcceptUploadContentRequest(params, token, content) }),
         )
@@ -91,7 +88,7 @@ export class UploadController {
             new ReadUploadContentQuery({ request: toReadUploadContentRequest(params), principal }),
         )
         const upload = unwrapOutcome(outcome, UploadError)
-        for (const [name, value] of Object.entries(toDownloadHeaders(upload))) response.setHeader(name, value)
+        response.setHeaders(toDownloadHeaders(upload))
         return new StreamableFile(upload.content)
     }
 }
