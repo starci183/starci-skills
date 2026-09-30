@@ -1036,6 +1036,5 @@ rules:
       - {kind: eslint-fe, id: heroicons-is-the-glyph-vendor}
       - {kind: eslint-fe, id: no-off-scale-glyph-size}
       - {kind: eslint-fe, id: no-decorative-icon-in-metric-cell}
-      - {kind: eslint-fe, id: no-direct-heroicon-import}
       - {kind: eslint-fe, id: vendor-primitive-has-named-owner}
       - {kind: eslint-fe, id: no-internal-starci-href}

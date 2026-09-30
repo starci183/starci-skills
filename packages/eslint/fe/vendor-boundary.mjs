@@ -11,15 +11,6 @@ const leafFile = (filename) => /\/src\/components\/leaves\//.test(normalize(file
 const mechanicsFile = (filename) => /\/src\/components\/(branches|overlays)\//.test(normalize(filename))
 const classNamesFile = (filename) => /\/src\/components\/.*\/classNames\.tsx?$/.test(normalize(filename))
 
-/** Keep direct Heroicons imports in the Icon leaf. */
-export const noVendorIconOutsideIconLeaf = {
-  meta: { type: "problem", docs: { description: "Vendor Heroicons imports belong in the Icon leaf." }, schema: [], messages: { owner: "Import vendor glyphs through the Icon leaf." } },
-  create(context) {
-    if (!componentFile(context.filename || context.getFilename()) || leafFile(context.filename || context.getFilename())) return {}
-    return { ImportDeclaration(node) { if (/^@heroicons\//.test(String(node.source.value))) context.report({ node, messageId: "owner" }) } }
-  },
-}
-
 /** Keep HeroUI mechanics inside leaves, named mechanics branches, and styling-owner modules. */
 export const vendorPrimitiveHasNamedOwner = {
   meta: { type: "problem", docs: { description: "HeroUI primitives have a named component or styling owner." }, schema: [], messages: { owner: "Import HeroUI primitives from a named leaf, mechanics branch, or colocated classNames module." } },
@@ -40,7 +31,6 @@ export const noInternalStarciHref = {
 }
 
 export const rules = {
-  "no-direct-heroicon-import": noVendorIconOutsideIconLeaf,
   "vendor-primitive-has-named-owner": vendorPrimitiveHasNamedOwner,
   "no-internal-starci-href": noInternalStarciHref,
 }

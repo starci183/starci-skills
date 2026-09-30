@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.0.0 - unreleased (lane C0)
+
+- **Breaking: `no-direct-heroicon-import` is deleted.** It was a second name for a second copy of
+  `no-vendor-icon-outside-icon-leaf` (icon law); one obligation has one rule (redundancy RED20). The copy in
+  `vendor-boundary.mjs` is gone; `no-vendor-icon-outside-icon-leaf` is unchanged.
+- `no-internal-starci-href` gained its RuleTester cases.
+- Every rule is catalogued under an HFS rule id (R91 FE_SOURCE_FORM, R92 FE_COMPONENT_API, R93 FE_VENDOR_BOUNDARY added).
+
 ## 5.1.2 - 2026-09-30
 
 - **Fix: `timer-needs-effect-cleanup` refused a correctly cleaned-up timer outside an effect.** nivo-fe `useNow` starts its `setInterval` inside the `subscribe` given to `useSyncExternalStore` and clears it in the unsubscribe that `subscribe` returns; the rule knew only `useEffect` cleanups and reported it. A timer is now also accepted when a function enclosing it directly returns a function (arrow expression body, or the last top-level `return`) that calls `clearTimeout`/`clearInterval` (bare, `window.` or `globalThis.`) on the same identifier the timer handle was stored in (`const id = ...` or `id = ...`). Detection is structural, not by name. A timer with no stored handle, a returned cleanup that clears another handle, or no returned cleanup at all is still refused.
