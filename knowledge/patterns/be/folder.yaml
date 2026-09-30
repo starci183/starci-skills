@@ -170,8 +170,8 @@ rules:
       Entities, constraints and migrations live in `persistence/` of the capability that owns the table
       (`domain/<capability>/persistence/`, or `platform/<capability>/persistence/` for technical tables such as outbox
       and lease). `persistence/connection.ts` exports the connection name from `hfs.json` `connections`. Migrations are
-      `migrations/<yyyyMMddHHmmss>-<kebab-name>.ts`, entities `entities/<table>.entity.ts`, raw SQL only in
-      `<name>.repository.ts`. `platform/database` owns the connection mechanism; the app composes the explicit entity
+      `migrations/<yyyyMMddHHmmss>-<kebab-name>.ts`, entities `entities/<table>.entity.ts`, raw SQL only as `SqlText` constants in
+      `<name>.sql.ts`. `platform/database` owns the connection mechanism; the app composes the explicit entity
       and migration lists. No feature transport owns a schema definition. See persistence.yaml.
     rationale: |-
       Schema ownership by capability keeps the tier direction (platform never imports domain) and gives every table one
@@ -184,7 +184,7 @@ rules:
       automated:
         - BE_SCHEMA_OWNER
         - BE_SCHEMA_AUTHORITY
-        - BE_SQL_OUTSIDE_REPOSITORY
+        - BE_SQL_OUTSIDE_PERSISTENCE
       manual:
         - Verify the data owner, the actual connection token and the transaction boundary.
     relatedExamples: []

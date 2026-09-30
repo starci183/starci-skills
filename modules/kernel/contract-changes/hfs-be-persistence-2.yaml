@@ -1,0 +1,36 @@
+id: hfs-be-persistence-2
+effectiveAt: '2026-09-30T18:00:00+07:00'
+summary: >-
+  Lane C0 sub-lane RA (BE-CONVENTION 1.3, 1.4, 2.1, 2.2; rules R36, R68, R69, R77, R82, R83, R84, R88): the persistence
+  rules of eslint-canon-be read types and slots. New one-connection-per-database (R84) and em-injection-slots (R88, law
+  connections); new sql-text-only and no-query-builder replace sql-only-in-repository (R36; a *.repository.ts no longer
+  exists); no-interpolated-sql (R68) judges sql-tag substitutions by the SqlIdent type; query-needs-limit and
+  no-query-in-loop (R69, R77) find the receiver by its EntityManager type; the R82/R83 rules (must-inject-entity-manager,
+  named-entity-manager-only, no-injected-repository, no-outer-manager-in-transaction, no-external-call-in-transaction)
+  require Inject<Pascal(connection)>EntityManager of a declared connection, refuse property injection and a DataSource
+  or QueryRunner outside platform/database and the migrate app, and no longer exempt specs or match paths. Slot
+  be.persistence allows <name>.sql.ts, <name>.rows.ts and connection.ts and forbids index.ts and <name>.repository.ts;
+  its migration name is <epochMs13>-<kebab-name>.ts and its rule is BE_SQL_OUTSIDE_PERSISTENCE.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-be-persistence-2.yaml
+  - modules/models/code-patterns.yaml
+  - modules/kernel/failure-codes.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/scan-coverage.yaml
+  - knowledge/patterns/be/folder.yaml
+  - knowledge/patterns/be/persistence.yaml
+  - packages/hfs/runtime/knowledge/hfs/slots.yaml
+  - packages/eslint/be/runtime/knowledge/hfs/slots.yaml
+  - packages/eslint/be/index.mjs
+  - packages/eslint/be/connections.mjs
+  - packages/eslint/be/data-access.mjs
+  - packages/eslint/be/query-safety.mjs
+  - packages/eslint/be/schema-authority.mjs
+  - packages/eslint/be/lib/persistence.mjs
+  - packages/eslint/be/lib/types.mjs
+  - packages/eslint/be/fixtures/typed/tester.mjs
+  - packages/eslint/be/README.md
+  - packages/eslint/be/CHANGELOG.md

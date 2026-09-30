@@ -184,11 +184,11 @@ profiles:
         sourceRuleIds: [BE-FOLDER-6, BE-TYPING-7]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts'] }
         mechanical:
-          requirement: The schema changes by migration only; raw SQL and query builders stay in a persistence repository; no ORM entity appears in a contract, DTO, resolver or controller type.
+          requirement: The schema changes by migration only; SQL is a `SqlText` constant in a persistence `<name>.sql.ts` and there is no query builder; no ORM entity appears in a contract, DTO, resolver or controller type.
           check:
             kind: eslint
             sourceOnly: false
-            ruleIds: [starci-be/no-runtime-schema, starci-be/sql-only-in-repository, starci-be/no-entity-in-contract]
+            ruleIds: [starci-be/no-runtime-schema, starci-be/sql-text-only, starci-be/no-query-builder, starci-be/no-entity-in-contract]
             expected: { severity: error }
         semantic:
           guidance: docs/backend-source-pattern.md

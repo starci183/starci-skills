@@ -174,8 +174,8 @@ the only process that runs migrations, once per connection, before api and worke
 in `persistence/` of the capability that owns the table (`domain/<cap>/persistence/` or `platform/<cap>/persistence/`
 for technical tables such as outbox and lease). `persistence/connection.ts` names one connection from
 `hfs.json.connections`; each capability exports explicit `entities` and `migrations` lists from its `index.ts` and the
-app composes them into `PlatformDatabaseModule.register({ connection, entities, migrations })`. Raw SQL only in
-`*.repository.ts`.
+app composes them into `PlatformDatabaseModule.register({ connection, entities, migrations })`. Raw SQL only as `SqlText` constants in
+`persistence/<name>.sql.ts`.
 
 ### 5.4 Errors, logging, filters (R37 to R40)
 

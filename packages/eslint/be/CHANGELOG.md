@@ -31,6 +31,15 @@
   `injector-type-match` (the `T` of the injector equals the parameter annotation), `infra-needs-injector` (a constructor parameter typed by a platform/integrations declaration or a package carries an injector; only domain services and same-owner types are class-injected),
   `no-module-ref`, `no-forward-ref`, `no-string-token` (a string or template literal, or a string-typed value, as `Inject(...)`/`injector(...)`/`provide:` token; a string literal argument of `getEntityManagerToken`/`getDataSourceToken` outside `<conn>.connection.ts`).
 
+## 2.0.0 additions - persistence rules (lane C0 RA)
+
+- New law `connections`: `one-connection-per-database` (R84 `BE_CONNECTION_DUPLICATE`) and `em-injection-slots` (R88 `BE_TRANSPORT_SHAPE`).
+- New: `sql-text-only` and `no-query-builder` (R36 `BE_SQL_OUTSIDE_PERSISTENCE`). Removed: `sql-only-in-repository` (a `*.repository.ts` no longer exists; slot `be.persistence` allows `<name>.sql.ts` and `<name>.rows.ts` instead).
+- Changed: `no-interpolated-sql` (R68) judges the `sql` tag's substitutions by type (`SqlIdent`), drops the UPPER_SNAKE, `quoteIdent` and `sqlSetClause` allowlists, and refuses a `.query()` string built by template or `+`.
+- Changed: `query-needs-limit` (R69) and `no-query-in-loop` (R77) identify the receiver by its `EntityManager` type, not its name; query-builder and raw-SQL reads are gone from both, spec files are no longer exempt, and `.query` text is judged by the machine (R86).
+- Changed: `must-inject-entity-manager`, `named-entity-manager-only`, `no-injected-repository`, `no-outer-manager-in-transaction` and `no-external-call-in-transaction` (R82, R83) read types (`typeorm`, integrations, `HttpClient`, `MessagePublisher`) and slots instead of names and path patterns: the injector must be `Inject<Pascal(connection)>EntityManager` of a declared connection, property injection and a `DataSource`/`QueryRunner` outside `platform/database` and the migrate app are refused, `TypeOrmModule.forFeature` is refused, and specs get the same law.
+- Changed: `lib/types.mjs` origins include a type's alias declaration and its own symbol (new `originsOfType`), so an alias over a generic type hides nothing; new `lib/persistence.mjs` holds the connection and injection-site helpers.
+
 ## 1.7.1 - 2026-09-30
 
 - Fixed: eslint no longer fails to start in a product repository with `HFS slot manifest not found at <repo>/knowledge/hfs/slots.yaml`. `lib/slots.mjs` used to look for the manifest at a path above the package (the product repository, or a linked runtime copy that no longer exists). The package now depends on `@starci/hfs` and resolves the manifest and the YAML reader as `@starci/hfs/runtime/knowledge/hfs/slots.yaml` and `@starci/hfs/runtime/engine/yaml.mjs`, so what the canon reads travels with the installed packages. `STARCI_HFS_SLOTS` still overrides the manifest file.

@@ -95,22 +95,23 @@ rules:
         - Verify the data owner and the connection token of each entity.
     relatedExamples: []
   - id: BE-PERSISTENCE-4
-    title: SQL only in repositories
+    title: SQL only as SqlText constants
     kind: mandatory
     hfsRules: [R36, R37]
     requirement: |-
-      `.query(` and query builders appear only in `<name>.repository.ts` inside `persistence/`. Use cases and services call a
-      repository method. A repository returns plain contracts or projections and translates driver errors into
-      capability errors. No `*Entity` type appears in a contract, DTO or resolver return type.
+      Raw SQL is a `SqlText` constant built with the `sql` tag in `<name>.sql.ts` inside `persistence/`; `.query(` takes only a
+      `SqlText` and a parameter array, and there is no query builder. Handlers and domain services run the constant on the
+      injected EntityManager; row shapes and their mappers live in `<name>.rows.ts`. No `*Entity` type appears in a
+      contract, DTO or resolver return type.
     rationale: |-
-      Raw SQL scattered through services cannot be reviewed as a data boundary and couples every layer to the schema.
+      Raw SQL written inline in services cannot be reviewed as a data boundary and couples every layer to the schema.
     cases:
       - id: case-1
         when: A read
-        write: 'OrderRepository.findOpenByCustomer(customerId) returns OrderSummary[] built from a query in order.repository.ts.'
+        write: 'FIND_OPEN_ORDERS in order.sql.ts is a SqlText constant; the handler runs entityManager.query(FIND_OPEN_ORDERS, [customerId, LIST_ROWS_MAX]) and maps rows with toOrderSummary from order.rows.ts.'
     verification:
       automated:
-        - BE_SQL_OUTSIDE_REPOSITORY
+        - BE_SQL_OUTSIDE_PERSISTENCE
         - BE_ENTITY_IN_CONTRACT
       manual:
         - Review query loading behavior, indexes and transaction use.

@@ -374,9 +374,8 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["BE_SQL_OUTSIDE_PERSISTENCE"]
     enforcers:
-      - {kind: eslint-be, id: sql-only-in-repository}
-      - {kind: eslint-be, id: sql-text-only, status: planned}
-      - {kind: eslint-be, id: no-query-builder, status: planned}
+      - {kind: eslint-be, id: sql-text-only}
+      - {kind: eslint-be, id: no-query-builder}
   - id: R37
     code: "BE_ENTITY_IN_CONTRACT"
     title_vi: "Entity ORM lộ ra hợp đồng"
@@ -892,7 +891,7 @@ rules:
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_CONNECTION_DUPLICATE"]
     enforcers:
-      - {kind: eslint-be, id: one-connection-per-database, status: planned}
+      - {kind: eslint-be, id: one-connection-per-database}
       - {kind: machine, id: connection-map, status: planned}
   - id: R85
     code: "BE_RAW_INJECT"
@@ -946,7 +945,7 @@ rules:
       - {kind: eslint-be, id: transport-dispatch-only, status: planned}
       - {kind: eslint-be, id: no-response-envelope, status: planned}
       - {kind: eslint-be, id: no-graphql-json, status: planned}
-      - {kind: eslint-be, id: em-injection-slots, status: planned}
+      - {kind: eslint-be, id: em-injection-slots}
   - id: R89
     code: "BE_SOURCE_FORM"
     title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"

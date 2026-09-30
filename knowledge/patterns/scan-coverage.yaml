@@ -75,7 +75,7 @@ observations:
     automated:
       - BE_SCHEMA_AUTHORITY
       - BE_SCHEMA_OWNER
-      - BE_SQL_OUTSIDE_REPOSITORY
+      - BE_SQL_OUTSIDE_PERSISTENCE
       - BE_CONFIG_OWNER
       - BE_SECRET_DEFAULT
   - id: lint-must-inject-entity-manager
