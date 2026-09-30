@@ -232,7 +232,7 @@ test('the menu cursor is read from the screen, not assumed',()=>{
   assert.equal(gateMenuPosition('Do you trust the contents of this directory? › 1. Yes, continue 2. No, quit','Yes, continue'),null,'no cursor row, no answer');
 });
 
-/* ------------------------------------------- gate auto-answer: op dispatch */
+/* ------------------------------------------- launch trust: op dispatch */
 
 const opFixture=(t,extra={})=>{
   const root=tmp(t,'starci-gate-op-');
@@ -270,38 +270,23 @@ const opFixture=(t,extra={})=>{
   return {repo,trustHome,dispatch,events,job,orcaState};
 };
 
-test('an allowlisted Codex trust gate is answered once by the runtime and the dispatch proceeds',t=>{
-  const fx=opFixture(t,{STARCI_FAKE_ORCA_GATE_SCREEN:'codex-trust'});
+// Every launch is orchestration worker-start: Orca answers nothing on the owner's behalf and the runtime types
+// nothing into a starting agent, so the launch pre-trusts its directory and the receipt rides the dispatch.
+test('a Codex op dispatch pre-trusts its worktree and the trust receipt rides op-dispatched',t=>{
+  const fx=opFixture(t);
   const r=fx.dispatch();
   assert.equal(r.status,0,`dispatch failed: ${r.stderr||r.stdout}`);
   assert.equal(fx.job()?.status,'running');
-  assert.deepEqual(fx.orcaState().terminals['fake-terminal-1'].gateKeys,['\r'],'one Enter on the cursor already at "Yes, continue"');
-  const [approved]=fx.events('gate-auto-approved');
-  assert.deepEqual([approved?.gate,approved?.keystroke,approved?.cleared],['codex-directory-trust','enter',true]);
   const [dispatched]=fx.events('op-dispatched');
   assert.equal(dispatched?.trust?.agent,'codex');
   assert.equal(dispatched.trust.status,'written');
   assert.deepEqual(dispatched.trust.paths,[path.resolve(fx.repo)]);
   const toml=fs.readFileSync(path.join(fx.trustHome,'.codex','config.toml'),'utf8');
   for(const k of codexKeyForms(fx.repo))assert.equal(codexProjectTables(toml).get(k)?.trust,'trusted');
+  assert.equal(fx.events('gate-auto-approved').length,0,'nothing is typed into a starting worker');
 });
 
-test('a gate that persists after its one answer is refused and the terminal closed',t=>{
-  const fx=opFixture(t,{STARCI_FAKE_ORCA_GATE_SCREEN:'codex-trust',STARCI_FAKE_ORCA_GATE_STICKY:'1'});
-  const r=fx.dispatch();
-  assert.notEqual(r.status,0);
-  const [rejected]=fx.events('dispatch-rejected');
-  assert.equal(rejected?.step,'readiness');
-  assert.match(rejected.error,/interactive gate 'codex-directory-trust' — it persisted after the runtime answered it \(enter\)/);
-  assert.equal(rejected.terminalClosed,true);
-  assert.equal(rejected.trust?.agent,'codex','the trust receipt rides the refusal too');
-  assert.deepEqual(fx.orcaState().terminals['fake-terminal-1'].gateKeys,['\r'],'answered exactly once, never hammered');
-  const [approved]=fx.events('gate-auto-approved');
-  assert.deepEqual([approved?.keystroke,approved?.cleared],['enter',false]);
-  assert.equal(fx.job()?.status,'ready');
-});
-
-/* ----------------------------------------------- gate auto-answer: kernel */
+/* ----------------------------------------------- launch trust: kernel */
 
 const kernelFixture=(t,kernelLine,extra={})=>{
   const root=tmp(t,'starci-gate-kernel-');
@@ -331,34 +316,17 @@ const kernelFixture=(t,kernelLine,extra={})=>{
 
 const CLAUDE_KERNEL='kernel: {agent: claude, model: claude-opus-5-5, effort: high}';
 
-for(const [screen,gate,select] of [['claude-trust','claude-workspace-trust','Yes, I trust this folder'],['claude-bypass','claude-bypass-permissions-consent','Yes, I accept']]){
-  test(`kernel boot answers the Claude ${gate} gate by walking the cursor to '${select}'`,t=>{
-    const f=kernelFixture(t,CLAUDE_KERNEL,{STARCI_FAKE_ORCA_GATE_SCREEN:screen});
-    const r=f.boot();
-    assert.equal(r.status,0,r.stderr||r.stdout);
-    assert.deepEqual(f.orcaState().terminals['fake-terminal-1'].gateKeys,['\x1b[B','\r'],'Down from "No, exit", then Enter');
-    const events=f.events();
-    const approved=events.find(e=>e.kind==='gate-auto-approved');
-    assert.deepEqual([approved?.payload.gate,approved?.payload.keystroke,approved?.payload.cleared],[gate,'down,enter',true]);
-    const booted=events.find(e=>e.kind==='kernel-booted');
-    assert.equal(booted?.payload.trust?.agent,'claude');
-    assert.equal(booted.payload.trust.status,'written');
-    assert.equal(booted.payload.trust.bypassConsent,'written');
-    const doc=JSON.parse(fs.readFileSync(path.join(f.trustHome,'.claude.json'),'utf8'));
-    for(const k of claudeKeyForms(f.repo))assert.equal(doc.projects[k].hasTrustDialogAccepted,true,k);
-  });
-}
-
-test('a gate outside the allowlist is refused with no keystroke',t=>{
-  const f=kernelFixture(t,CLAUDE_KERNEL,{STARCI_FAKE_ORCA_GATE_SCREEN:'claude-onboarding'});
+test('a Claude kernel boot pre-trusts the repository and asserts the bypass consent before worker-start',t=>{
+  const f=kernelFixture(t,CLAUDE_KERNEL);
   const r=f.boot();
-  assert.equal(r.status,1);
-  const events=f.events();
-  const failed=events.find(e=>e.kind==='kernel-start-failed');
-  assert.deepEqual([failed?.payload.step,failed?.payload.gate],['readiness','claude-first-run-onboarding']);
-  assert.match(failed.payload.error,/not on the agent card's gateAutoAnswer allowlist/);
-  assert.deepEqual(f.orcaState().terminals['fake-terminal-1'].gateKeys,[],'nothing was typed into the gate');
-  assert.equal(events.some(e=>e.kind==='gate-auto-approved'),false);
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const booted=f.events().find(e=>e.kind==='kernel-booted');
+  assert.equal(booted?.payload.launch,'worker');
+  assert.equal(booted.payload.trust?.agent,'claude');
+  assert.equal(booted.payload.trust.status,'written');
+  assert.equal(booted.payload.trust.bypassConsent,'written');
+  const doc=JSON.parse(fs.readFileSync(path.join(f.trustHome,'.claude.json'),'utf8'));
+  for(const k of claudeKeyForms(f.repo))assert.equal(doc.projects[k].hasTrustDialogAccepted,true,k);
 });
 
 // A new Codex release put an "Update available! ... Press enter to continue"

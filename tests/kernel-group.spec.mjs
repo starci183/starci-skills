@@ -44,7 +44,7 @@ test('the group form plans Claude Opus 5.5 first with GPT-6 Sol behind it',t=>{
   assert.deepEqual([body.agent,body.model,body.effort,body.routedBy],['claude','claude-opus-5-5','high','config']);
   assert.deepEqual(body.group.map(m=>[m.agent,m.model,m.effort]),[['claude','claude-opus-5-5','high'],['codex','gpt-6-sol','high']]);
   assert.equal(body.fallThrough,true);
-  assert.match(body.command,/\bclaude\b/);
+  assert.equal(body.launch,'worker','every Kernel starts through orchestration worker-start');
 });
 
 test('the group skips a dead or circuit-open Claude and orders a limited one last',t=>{
@@ -94,53 +94,51 @@ const kernelEvents=(repo,workflowId)=>{
 const readState=f=>json(fs.readFileSync(f.state,'utf8'));
 const boot=(f,extra={})=>{const r=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json'],extra);return {r,body:json(r.stdout)};};
 
-test('a Claude onboarding gate falls through to GPT-6 Sol in the same boot and closes the gated terminal',t=>{
+test('a Claude worker that never reaches readiness falls through to GPT-6 Sol in the same boot',t=>{
+  // worker-start refused before a Dispatch existed: no effect, so the group hands the boot to the next member.
   const f=fixture(t,GROUP);
-  const {r,body}=boot(f,{STARCI_FAKE_ORCA_GATE:'claude'});
+  const {r,body}=boot(f,{STARCI_FAKE_ORCA_START_REFUSE:'claude'});
   assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.deepEqual([body.agent,body.model,body.routedBy],['codex','gpt-6-sol','config']);
-  assert.deepEqual(body.fellThrough.map(x=>[x.agent,x.model,x.step,x.gate]),[['claude','claude-opus-5-5','readiness','claude-first-run-onboarding']]);
+  assert.deepEqual([body.agent,body.model,body.routedBy,body.launch],['codex','gpt-6-sol','config','worker']);
+  assert.deepEqual(body.fellThrough.map(x=>[x.agent,x.model,x.step]),[['claude','claude-opus-5-5','worker-start']]);
   const events=kernelEvents(f.repo,f.workflowId);
   assert.deepEqual(events.map(e=>e.kind),['kernel-start-failed','kernel-booted']);
   const [failed,booted]=events;
-  assert.equal(failed.payload.gate,'claude-first-run-onboarding');
-  assert.equal(failed.payload.state,'interactive-gate');
+  assert.deepEqual([failed.payload.step,failed.payload.effectState],['worker-start','none']);
   assert.deepEqual(failed.payload.fellThroughTo,{agent:'codex',model:'gpt-6-sol'});
-  assert.equal(failed.payload.terminalClosed?.ok,true);
-  assert.deepEqual([booted.payload.agent,booted.payload.model],['codex','gpt-6-sol']);
+  assert.deepEqual([booted.payload.agent,booted.payload.model,booted.payload.launch],['codex','gpt-6-sol','worker']);
   assert.equal(booted.payload.fellThrough.length,1);
   const state=readState(f);
-  assert.equal(state.counter,2,'one terminal per member tried');
-  assert.deepEqual(state.closed,[failed.payload.terminal],'the gated terminal is closed');
-  const live=Object.values(state.terminals).filter(term=>!term.closed).map(term=>term.handle);
-  assert.deepEqual(live,[body.terminal],'exactly one live kernel terminal, the booted one');
-  assert.match(state.terminals[body.terminal].command,/\bcodex\b/);
+  assert.deepEqual(state.refusedStarts,['claude']);
+  assert.deepEqual(state.workerStarts.map(w=>[w.agent,w.model]),[['codex','gpt-6-sol']],'one live Kernel worker, the booted one');
+  assert.equal(body.terminal,state.workerStarts[0].handle);
 });
 
-test('fall-through never happens for a single pin, a refused close, or the last member',t=>{
+test('fall-through never happens for a single pin, a start with effect, or the last member',t=>{
   const pinned=fixture(t,'kernel: {agent: claude, model: claude-opus-5-5, effort: high}');
-  const p=boot(pinned,{STARCI_FAKE_ORCA_GATE:'claude'});
-  assert.equal(p.r.status,1,'a gated single pin fails closed');
+  const p=boot(pinned,{STARCI_FAKE_ORCA_START_REFUSE:'claude'});
+  assert.equal(p.r.status,1,'a refused single pin fails closed');
   assert.deepEqual(kernelEvents(pinned.repo,pinned.workflowId).map(e=>e.kind),['kernel-start-failed']);
-  assert.equal(readState(pinned).counter,1,'no second member is tried');
+  assert.deepEqual(readState(pinned).refusedStarts,['claude'],'no second member is tried');
 
-  const refused=fixture(t,GROUP);
-  const c=boot(refused,{STARCI_FAKE_ORCA_GATE:'claude',STARCI_FAKE_ORCA_CLOSE_FAILS:'*'});
-  assert.equal(c.r.status,1,'a gated member whose terminal stays open must not fall through');
-  const [event]=kernelEvents(refused.repo,refused.workflowId);
-  assert.equal(event.payload.terminalClosed?.ok,false);
-  assert.match(event.payload.fallThroughRefused,/not closed/);
-  assert.equal(readState(refused).counter,1);
+  // A start that failed after its Dispatch existed and whose release Orca refused keeps its effect: the next
+  // member would run beside a worker nobody proved gone.
+  const partial=fixture(t,GROUP);
+  const c=boot(partial,{STARCI_FAKE_ORCA_START_PARTIAL:'claude',STARCI_FAKE_ORCA_RELEASE_FAILS:'1'});
+  assert.equal(c.r.status,1,'a start with a surviving effect must not fall through');
+  const [event]=kernelEvents(partial.repo,partial.workflowId);
+  assert.notEqual(event.payload.effectState,'none');
+  assert.match(event.payload.fallThroughRefused,/effect/);
+  assert.deepEqual(readState(partial).refusedStarts,['claude']);
 
   const both=fixture(t,GROUP);
-  const b=boot(both,{STARCI_FAKE_ORCA_GATE:'claude,codex'});
+  const b=boot(both,{STARCI_FAKE_ORCA_START_REFUSE:'claude,codex'});
   assert.equal(b.r.status,1);
   const events=kernelEvents(both.repo,both.workflowId);
-  assert.deepEqual(events.map(e=>[e.kind,e.payload.agent,e.payload.gate]),
-    [['kernel-start-failed','claude','claude-first-run-onboarding'],['kernel-start-failed','codex','codex-directory-trust']]);
+  assert.deepEqual(events.map(e=>[e.kind,e.payload.agent,e.payload.step]),
+    [['kernel-start-failed','claude','worker-start'],['kernel-start-failed','codex','worker-start']]);
   assert.deepEqual(events[1].payload.fellThrough?.map(x=>x.agent),['claude']);
-  const state=readState(both);
-  assert.equal(Object.values(state.terminals).filter(term=>!term.closed).length,0,'no orphan terminal after an exhausted group');
+  assert.equal((readState(both).workerStarts??[]).length,0,'no worker after an exhausted group');
   const ledger=inspectLedger({file:ledgerFileFor(both.repo)});
   try{assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM signals WHERE scope='kernel' AND key=?").get(both.workflowId).n,0,'the startup reservation is released');}
   finally{ledger.close();}

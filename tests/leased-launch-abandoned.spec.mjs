@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
+import {spawnAgent} from '../scripts/agent/lib.mjs';
 
 // nivo inc-c1d5bdbea173 (2026-09-25, Collab): the Kernel wrapped `api dispatch --job
 // op-backend.implement-dd957e8395 --spawn` in a shell `timeout 115`, which killed the api mid-spawn. The row
@@ -109,19 +110,16 @@ test('settle of a leased job closes the terminal its dispatch created',t=>{
   assert.ok((fx.orcaState().closed??[]).includes('term-orphan'),JSON.stringify(fx.orcaState()));
 });
 
-test('spawnAgent hands the caller the terminal handle before it waits on the launch',async t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-on-created-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
-  const r=spawnSync(process.execPath,['--input-type=module','-e',`
-    import {spawnAgent} from ${JSON.stringify(new URL('../scripts/agent/lib.mjs',import.meta.url).href)};
-    const seen=[];
-    const out=spawnAgent({provider:'devin',worktree:${JSON.stringify(root)},title:'t',dispatchId:'j1',onCreated:(h)=>seen.push(h)});
-    console.log(JSON.stringify({seen,ok:out.ok,step:out.step,terminal:out.terminal}));`],
-    {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-      STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),STARCI_FAKE_ORCA_MODE:'auth'}});
-  const out=json(r.stdout.trim().split(/\r?\n/).at(-1));
-  assert.ok(out,r.stdout+r.stderr);
-  assert.equal(out.ok,false,'the launch itself fails at readiness');
-  assert.deepEqual(out.seen,[out.terminal],'the handle reached the caller before the readiness wait');
+test('spawnAgent hands the caller the worker terminal before it attests the launch',()=>{
+  // The handle is recorded durably the moment the assignee is known: an attestation that then fails still leaves
+  // the caller the handle (and the Dispatch) to account for (nivo inc-e523617a3c31).
+  const seen=[];
+  const io={trust:()=>({status:'ok'}),start:()=>({ok:true,outcome:'ok',dispatchId:'ctx_1',state:'ready'}),
+    assignee:()=>({ok:true,assigneeHandle:'term_1'}),rename:()=>({ok:true}),
+    show:()=>({ok:true,state:'ready',effective:{agent:'claude',model:'another-model'}}),stop:()=>({ok:true}),release:()=>({ok:true})};
+  const out=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'t',task:'task_1',run:'run_1',
+    onCreated:(handle,dispatch)=>seen.push([handle,dispatch]),io});
+  assert.equal(out.ok,false,'the launch itself fails at attestation');
+  assert.equal(out.step,'attestation');
+  assert.deepEqual(seen,[['term_1','ctx_1']],'the handle reached the caller before the attestation');
 });

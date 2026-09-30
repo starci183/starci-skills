@@ -35,6 +35,7 @@ import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
+import { stopAndRelease } from '../lib/close-verify.mjs';
 // worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
 const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
 import { readJsonFile } from '../lib/json.mjs';
@@ -170,16 +171,22 @@ const kernelWakeRefusedAt = (terminal) => withKernelLedger((ledger) => ledger.db
 const recordKernelWakeRefused = (terminal, proof) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
   workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_UNWRITABLE_EVENT,
   payload: { terminal, errorCode: KERNEL_NOT_WRITABLE, sendErrorCode: proof?.sendErrorCode ?? KERNEL_NOT_WRITABLE } }))?.created_at ?? Date.now());
-// Terminal close is a host call, not typed input: it lands where a quit send cannot.
-const closeKernelTerminal = (handle) => {
+// A host call, not typed input: it lands where a quit send cannot. A worker-start Kernel is fenced and released by its
+// Dispatch (worker-stop + worker-release), so Orca never reports it live again and start-workflow replaces it; a seat
+// with no Dispatch (terminal-launched) has only its terminal to close.
+const closeKernelTerminal = (handle, dispatch = null) => {
+  if (dispatch) {
+    const released = stopAndRelease(dispatch);
+    return { handle, dispatch, ok: released.ok, ...(released.ok ? {} : { error: released.release.error ?? released.stop.error ?? 'worker-release refused' }) };
+  }
   let closed = null;
   try { closed = closeOperationTerminal(handle); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
   return { handle, ok: closed?.ok === true, ...(closed?.error ? { error: String(closed.error) } : {}) };
 };
 // The unwritable stale incarnation: record the refusal (once), close the terminal, replace the seat.
-const replaceUnwritableKernel = ({ phase, terminal, stale, outputAgeMs, proof = null, refusedAt = null }) => {
+const replaceUnwritableKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, proof = null, refusedAt = null }) => {
   const sendRefusedAt = refusedAt ?? (proof != null ? recordKernelWakeRefused(terminal, proof) : kernelWakeRefusedAt(terminal));
-  const terminalClosed = closeKernelTerminal(terminal);
+  const terminalClosed = closeKernelTerminal(terminal, dispatch);
   const base = { workflowId, phase, terminal, ...stale, outputAgeMs, sendRefused: true,
     sendErrorCode: proof?.sendErrorCode ?? KERNEL_NOT_WRITABLE, ...(sendRefusedAt != null ? { sendRefusedAt } : {}), terminalClosed };
   if (!terminalClosed.ok) return { ...base, ok: false, action: 'kernel-terminal-close-failed',
@@ -263,16 +270,16 @@ const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
 // replacement is recorded only once its terminal closed.
 const closeFailed = (base, terminalClosed, what) => ({ ...base, terminalClosed, ok: false, action: 'kernel-terminal-close-failed',
   error: terminalClosed.error ?? `the ${what} kernel terminal could not be closed` });
-const replaceIdleKernel = ({ phase, terminal, stale, outputAgeMs, idle }) => {
-  const terminalClosed = closeKernelTerminal(terminal);
+const replaceIdleKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, idle }) => {
+  const terminalClosed = closeKernelTerminal(terminal, dispatch);
   if (!terminalClosed.ok) return closeFailed({ workflowId, phase, terminal, ...stale, outputAgeMs, idle }, terminalClosed, 'idle');
   withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_IDLE_REPLACED_EVENT, payload: { terminal, wakes: idle.wakes } })));
   return replaceKernel({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
     deathReason: `kernel ${terminal} received ${idle.wakes} wakes with an actionable frontier and made no move: replaced (H11)` });
 };
 
-const replaceWakeDeadKernel = ({ phase, terminal, stale, outputAgeMs, misses, firstAt }) => {
-  const terminalClosed = closeKernelTerminal(terminal);
+const replaceWakeDeadKernel = ({ phase, terminal, dispatch = null, stale, outputAgeMs, misses, firstAt }) => {
+  const terminalClosed = closeKernelTerminal(terminal, dispatch);
   if (!terminalClosed.ok) return closeFailed({ workflowId, phase, terminal, ...stale, outputAgeMs, misses, firstAt }, terminalClosed, 'wake-dead');
   return replaceKernel({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
     deathReason: `kernel terminal ${terminal} missed ${misses} wakes since ${new Date(firstAt).toISOString()} with no output: a dead kernel behind a listed terminal` });
@@ -394,7 +401,7 @@ function kernelTick(status, phase) {
     // Delivery is proven from the screen, not Orca's receipt: a stalled Enter
     // whose frame left the input row submitted it (scripts/kernel/wake-delivery.mjs).
     const earlier = wakeFailuresProveDead(kernelWakeFailures(terminal), { lastOutputAt });
-    if (earlier.dead) return replaceWakeDeadKernel({ phase, terminal, stale, outputAgeMs, ...earlier });
+    if (earlier.dead) return replaceWakeDeadKernel({ phase, terminal, dispatch: signalValue.dispatch, stale, outputAgeMs, ...earlier });
     const proof = sendEnterWithProof({ terminal });
     if (!proof.ok) recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null });
     return { ok: proof.ok, workflowId, phase, terminal, action: proof.ok ? `${classified.state}-sent` : 'wake-failed', outputAgeMs,
@@ -410,14 +417,14 @@ function kernelTick(status, phase) {
     // A wake send Orca already refused terminal_not_writable on this frame is not typed again.
     const refusedAt = liveness.staleActive ? kernelWakeRefusedAt(terminal) : null;
     if (refusedAt != null && refusedAt > (lastOutputAt ?? 0))
-      return replaceUnwritableKernel({ phase, terminal, stale, outputAgeMs, refusedAt });
+      return replaceUnwritableKernel({ phase, terminal, dispatch: signalValue.dispatch, stale, outputAgeMs, refusedAt });
     // Orca's agent_prompt_stalled/agent_prompt_blocked receipt is inconclusive:
     // a wake the screen shows landed or queued is woken (no retry, no failed
     // tick); only a screen-proven miss is wake-failed.
     const earlier = wakeFailuresProveDead(kernelWakeFailures(terminal), { lastOutputAt });
-    if (earlier.dead) return replaceWakeDeadKernel({ phase, terminal, stale, outputAgeMs, ...earlier });
+    if (earlier.dead) return replaceWakeDeadKernel({ phase, terminal, dispatch: signalValue.dispatch, stale, outputAgeMs, ...earlier });
     const idle = kernelIdleWakes();
-    if (idle.due) return idle.replaced ? escalateIdleStall({ phase, terminal, idle, outputAgeMs }) : replaceIdleKernel({ phase, terminal, stale, outputAgeMs, idle });
+    if (idle.due) return idle.replaced ? escalateIdleStall({ phase, terminal, idle, outputAgeMs }) : replaceIdleKernel({ phase, terminal, dispatch: signalValue.dispatch, stale, outputAgeMs, idle });
     const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
     if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
     if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1 });
@@ -425,7 +432,7 @@ function kernelTick(status, phase) {
     // terminal-incarnation-stale. The terminal is closed without a quit (refused too; an Orca
     // interrupt is refused as well) and the seat replaced through start-workflow.
     if (!proof.ok && liveness.staleActive && wakeSendRefused(proof))
-      return replaceUnwritableKernel({ phase, terminal, stale, outputAgeMs, proof });
+      return replaceUnwritableKernel({ phase, terminal, dispatch: signalValue.dispatch, stale, outputAgeMs, proof });
     return {
       ok: proof.ok, workflowId, phase, terminal,
       // A shell got the wake (the agent exited under it): the next tick sees the shell and replaces the kernel.

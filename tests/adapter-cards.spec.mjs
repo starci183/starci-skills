@@ -5,9 +5,8 @@ import path from 'node:path';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const ADAPTERS=path.join(ROOT,'modules','models','agents');
-// Agent differences are data. Every merged agent card must parse and carry the
-// fields its kind needs — a card missing readiness/submission patterns or a
-// fallback command is a dispatch stall waiting to happen. The card is the old
+// Agent differences are data. Every agent card must parse and start the one way, orchestration
+// worker-start (Orca composes the command). The card is the
 // Orca adapter card at top level plus an optional `capabilities:` key.
 //
 // The yaml parser is canonical at engine/yaml.mjs post-flip (core/ is doomed);
@@ -24,36 +23,20 @@ const {parseYaml}=YAML_MODULE;
 const cards=fs.readdirSync(ADAPTERS).filter(f=>f.endsWith('.yaml')).sort();
 assert.ok(cards.length>0,'modules/models/agents holds no cards');
 
-const KINDS=['command-terminal-agent','native-managed-agent'];
-
 for(const file of cards){
-  test(`agent card ${file} parses and carries the fields its kind needs`,()=>{
+  test(`agent card ${file} parses and starts through orchestration worker-start`,()=>{
     const card=parseYaml(fs.readFileSync(path.join(ADAPTERS,file),'utf8'));
     assert.ok(card&&typeof card==='object',`${file} did not parse to an object`);
     assert.equal(card.schema,'starci/agent-card@1',`${file} schema`);
     assert.equal(card.agent,path.basename(file,'.yaml'),`${file} agent name must equal the filename`);
-    assert.ok(KINDS.includes(card.kind),`${file} kind '${card.kind}' is not a known adapter kind`);
-
-    if(card.kind==='command-terminal-agent'){
-      // The spawnable path: either declared requirement flags or a fallback command body.
-      const hasReqs=Array.isArray(card.commandRequirements)&&card.commandRequirements.length>0;
-      const hasFallback=typeof card.terminalFallback?.command==='string'&&card.terminalFallback.command.trim().length>0;
-      assert.ok(hasReqs||hasFallback,`${file}: command-terminal-agent needs commandRequirements or terminalFallback.command`);
-      assert.equal(typeof card.readiness?.screenPattern,'string',`${file}: readiness.screenPattern is how spawn proves the prompt rendered`);
-      const sub=card.submission??{};
-      assert.ok(typeof sub.activityPattern==='string'||typeof sub.stagedPattern==='string',
-        `${file}: submission needs an activity or staged pattern — else prompt delivery is never attested`);
-    }
-
-    if(card.kind==='native-managed-agent'){
-      // The managed path: orchestration starts the worker; the terminal fallback is the escape hatch.
-      assert.equal(card.start?.api,'orchestration.worker-start',`${file}: native-managed agents start via orchestration.worker-start`);
-      assert.equal(typeof card.terminalFallback?.command,'string',`${file}: native-managed agents still need a terminalFallback.command`);
-      assert.ok(Array.isArray(card.terminalFallback?.modelArgs),`${file}: Kernel terminal fallback must pin its concrete model`);
-      assert.ok(Array.isArray(card.terminalFallback?.effortArgs),`${file}: Kernel terminal fallback must pin its effort`);
-      const bypass=card.terminalFallback?.bypassArgs;
-      assert.ok(Array.isArray(bypass)&&bypass.length>0,`${file}: terminal fallback must be unattended`);
-    }
+    // Every agent is the one kind: Orca starts and supervises it (contract-changes/launch-through-worker-start.yaml).
+    assert.equal(card.kind,'native-managed-agent',`${file} kind`);
+    assert.equal(card.start?.api,'orchestration.worker-start',`${file}: every agent starts via orchestration.worker-start`);
+    assert.equal(card.start?.agentArgument,card.agent,`${file}: worker-start --agent names the card's agent`);
+    assert.ok(card.start?.modelArgument===undefined||typeof card.start.modelArgument==='boolean',`${file}: start.modelArgument is a boolean`);
+    assert.equal(card.release?.api,'orchestration.worker-release',`${file}: a settled worker is released`);
+    for(const gone of ['terminalFallback','hostLaunchPrefix','commandPrefix','commandRequirements','kernelCommandRequirements','environmentStrip'])
+      assert.equal(card[gone],undefined,`${file}: no hand-built launch command (${gone}) - Orca composes it`);
   });
 }
 

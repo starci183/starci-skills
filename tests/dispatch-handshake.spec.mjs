@@ -89,43 +89,35 @@ test('healthy stub: dispatch --spawn attests and marks the job running',t=>{
   assert.equal(r.status,0,`dispatch failed against a healthy terminal: ${r.stderr||r.stdout}`);
   const job=jobRow(fx,fx.jobId);
   assert.equal(job?.status,'running',`a successfully attested spawn must mark the job running, got ${job?.status}`);
-  assert.equal(job?.worker_id,'fake-terminal-1');
+  assert.equal(job?.worker_id,'dispatch-fake-1','the op is a worker-start worker, keyed by its Dispatch');
   const seen=calls(fx);
-  for(const step of ['terminal create','terminal read','terminal send'])
+  for(const step of ['orchestration task-create','orchestration worker-start','orchestration dispatch-show','terminal rename','orchestration worker-show'])
     assert.ok(seen.includes(step),`fake orca never saw '${step}' — log: ${seen.join(', ')}`);
-  const create=callArgv(fx).find(argv=>argv.slice(0,2).join(' ')==='terminal create');
-  assert.equal(create?.[create.indexOf('--title')+1],'[Op] Chỉnh sửa mã nguồn · docs · wf-dispatch',
-    'a command terminal is a flat sidebar row: it carries the semantic name at creation, not the provider auto-summary');
-  const command=create?.[create.indexOf('--command')+1]??'';
-  assert.match(command,/--permission-mode dangerous/,'the real API dispatch path must inject the Devin bypass mode into the profile command');
-  assert.match(command,/--model swe-2-max/,'the real API dispatch path must pin the profile model');
+  assert.equal(seen.includes('terminal create'),false,'no agent terminal is created by the runtime');
+  const start=callArgv(fx).find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
+  assert.equal(start?.[start.indexOf('--agent')+1],'devin');
+  assert.equal(start?.includes('--model'),false,'devin takes no --model on worker-start: it starts on its CLI default');
+  const rename=callArgv(fx).find(argv=>argv.slice(0,2).join(' ')==='terminal rename');
+  assert.equal(rename?.[rename.indexOf('--title')+1],'[Op] Chỉnh sửa mã nguồn · docs · wf-dispatch',
+    'the worker\'s tab carries the semantic name, not the provider auto-summary');
 });
 
-// The 401 screen still carries the readiness pattern (the TUI renders its
-// prompt then dies on the first API call — the observed failure shape), so
-// readiness passes and the death surfaces where the contract says it must:
-// post-submission attestation.
-test('auth-dead stub: dispatch never leaves the job running and leaks no terminal',t=>{
+// A provider whose worker-start is refused for auth (the observed failure shape: the CLI dies on its first API
+// call) never leaves the job running and never leaves a worker or terminal behind.
+test('auth-dead stub: dispatch never leaves the job running and leaks no worker',t=>{
   const fx=fixture(t).make('auth');
   const r=runDispatch(fx);
-  assert.notEqual(r.status,0,'a terminal whose screen shows 401 Invalid API-key must not dispatch clean');
+  assert.notEqual(r.status,0,'a worker-start refused not_authenticated must not dispatch clean');
   const job=jobRow(fx,fx.jobId);
   assert.notEqual(job?.status,'running','job must NOT be running after a rejected dispatch — this was the observed defect');
-  assert.ok(calls(fx).includes('terminal close'),'the dead terminal must be closed — log shows no close call');
-  // docs/fable.md orca-hierarchy: a refused op left its [Op] terminal open and the
-  // Orca sidebar kept showing it "Idle" under the kernel. A rejection leaves
-  // no live terminal for that dispatch, and says so on the record.
+  assert.equal(calls(fx).includes('terminal create'),false,'no terminal is ever created');
   assert.deepEqual(liveTerminals(fx),[],'a rejected dispatch leaves no live terminal behind');
-  assert.deepEqual(orcaState(fx).closed,['fake-terminal-1']);
-  assert.equal(callArgv(fx).filter(argv=>argv.slice(0,2).join(' ')==='terminal close').length,1,
-    'the terminal is closed once, in the step that records the refusal');
   const rejection=JSON.parse(r.stdout||'{}')?.rejection;
-  assert.equal(rejection?.terminalClosed,true);
-  assert.equal(rejection?.closed?.handle,'fake-terminal-1');
+  assert.equal(rejection?.effectState,'none','a start refused before any Dispatch existed has no effect');
   const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
   try{
     const event=ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id='wf-dispatch' AND kind='dispatch-rejected'").get();
-    assert.equal(JSON.parse(event?.payload_json??'{}')?.terminalClosed,true,'dispatch-rejected carries the containment proof');
+    assert.equal(JSON.parse(event?.payload_json??'{}')?.step,'worker-start','the rejection names the launch step');
   }finally{ledger.close();}
 });
 

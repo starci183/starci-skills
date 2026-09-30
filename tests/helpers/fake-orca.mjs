@@ -548,6 +548,20 @@ else if (verb === 'orchestration worker-start') {
   // effectState none, so the candidate is reusable and nothing said why.
   if (mode === 'worker-start-refused')
     fail({ ok: false, error: { code: 'worker_start_failed', message: '' }, result: {} });
+  // STARCI_FAKE_ORCA_START_REFUSE=<agent,...>: that agent never reaches readiness and Orca cleans up (no effect).
+  // STARCI_FAKE_ORCA_START_PARTIAL=<agent,...>: the start fails after its Dispatch existed (a residual resource).
+  const listed = name => String(process.env[name] || '').split(',').map(x => x.trim()).filter(Boolean).includes(arg('agent'));
+  if (listed('STARCI_FAKE_ORCA_START_REFUSE')) {
+    state.refusedStarts = [...(state.refusedStarts || []), arg('agent')]; save();
+    fail({ ok: false, error: { code: 'agent_readiness_failed', message: arg('agent') + ' did not reach readiness' },
+      result: { stage: 'agent_readiness', failedStage: 'agent_readiness', residualResources: [] } });
+  }
+  if (listed('STARCI_FAKE_ORCA_START_PARTIAL')) {
+    state.refusedStarts = [...(state.refusedStarts || []), arg('agent')];
+    state.workerStates = { ...(state.workerStates || {}), 'dispatch-partial': 'failed' }; save();
+    fail({ ok: false, error: { code: 'agent_prompt_stalled' },
+      result: { dispatchId: 'dispatch-partial', stage: 'dispatch_input', failedStage: 'dispatch_input', residualResources: ['dispatch-partial'] } });
+  }
   // Orca creates the worker's own agent terminal and injects the Task: the terminal record a real worker leaves.
   state.counter = (state.counter || 0) + 1;
   const handle = uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1';
@@ -557,8 +571,11 @@ else if (verb === 'orchestration worker-start') {
     worktree: arg('worktree'), closed: false } };
   state.workerStarts = [...(state.workerStarts || []), { agent: arg('agent'), model: arg('model') ?? null, effort: arg('effort') ?? null, task: arg('task'),
     worktree: arg('worktree'), run: arg('run'), from: arg('from') ?? null, handle }];
-  state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = 'dispatch-fake-1'; save();
-  out({ ok: true, result: { runId: arg('run'), taskId: arg('task'), dispatchId: 'dispatch-fake-1',
+  // Every start is its own Dispatch (the first is dispatch-fake-1): a released op never reads as its Kernel's seat.
+  const dispatchId = 'dispatch-fake-' + state.workerStarts.length;
+  state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = dispatchId; state.assignee = handle;
+  state.workerStates = { ...(state.workerStates || {}), [dispatchId]: 'ready' }; save();
+  out({ ok: true, result: { runId: arg('run'), taskId: arg('task'), dispatchId,
     state: 'ready', stage: 'ready',
     launch: { effective: { agent: arg('agent'), model: arg('model'), effort: arg('effort') } } } });
 }
@@ -570,13 +587,18 @@ else if (verb === 'orchestration worker-show') {
       observation: { exactWorker: true, status: 'exited' } } });
   else
     out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1', lastHeartbeatAt: state.heartbeatAt ?? null },
-      worker: { state: 'ready', agent_terminal_handle: 'fake-terminal-1',
+      // workerStates[dispatch]: what worker-stop / worker-release left (a seeded Dispatch reads ready).
+      worker: { state: state.workerStates?.[arg('dispatch')] ?? 'ready', agent_terminal_handle: 'fake-terminal-1',
         startOptions: { launch: { effective: { agent: state.agent ?? 'codex', model: state.model ?? 'gpt-6-sol' } } } },
       observation: { exactWorker: true } } });
 }
-else if (verb === 'orchestration worker-stop')
+else if (verb === 'orchestration worker-stop') {
+  state.workerStates = { ...(state.workerStates || {}), [arg('dispatch')]: 'stopped' }; save();
   out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'stopped', alreadySettled: false } });
+}
 else if (verb === 'orchestration worker-release') {
+  if (process.env.STARCI_FAKE_ORCA_RELEASE_FAILS === '1')
+    fail({ ok: false, error: { code: 'release_refused' }, result: { dispatchId: arg('dispatch'), state: 'retained', reason: 'identity_unproven' } });
   if (mode === 'prompt-stalled')
     fail({ ok: false, result: { dispatchId: arg('dispatch'), state: 'retained', reason: 'identity_unproven' } });
   // STARCI_FAKE_ORCA_RELEASE_UNKNOWN=<n>: the first n releases answer
@@ -594,8 +616,10 @@ else if (verb === 'orchestration worker-release') {
       out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'release_unknown', processAction: 'closed_agent_terminal',
         lastError: 'The agent terminal was closed but its process could not be confirmed stopped' } });
   }
-  if (!(unknownReleases > 0 && state.releases <= unknownReleases))
+  if (!(unknownReleases > 0 && state.releases <= unknownReleases)) {
+    state.workerStates = { ...(state.workerStates || {}), [arg('dispatch')]: 'released' }; save();
     out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'released' } });
+  }
 }
 else if (verb === 'orchestration worker-abandon')
   out({ ok: true, result: { dispatchId: arg('dispatch'), state: 'abandoned' } });
@@ -606,7 +630,7 @@ else if (verb === 'orchestration worker-read')
 else if (verb === 'orchestration dispatch')
   out({ ok: true, result: { dispatch: { id: arg('to') ?? 'dispatch-fake-1' }, preamble: process.env.STARCI_FAKE_ORCA_PREAMBLE || 'fake dispatch preamble' } });
 else if (verb === 'orchestration dispatch-show')
-  out({ ok: true, result: { dispatch: { id: 'dispatch-fake-1', assignee_handle: uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1' } } });
+  out({ ok: true, result: { dispatch: { id: state.dispatchId ?? 'dispatch-fake-1', assignee_handle: state.assignee ?? (uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1') } } });
 else if (verb === 'orchestration check')
   out({ ok: true, result: { deliveries: [] } });
 else if (verb === 'orchestration send')
