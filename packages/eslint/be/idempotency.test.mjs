@@ -1,92 +1,106 @@
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import { inboxDedupeRequired } from "./idempotency.mjs"
 
-const tester = new RuleTester({
-    languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
-})
-const WEBHOOK = "D:/repo/src/features/billing/transport/http/billing-webhook.controller.ts"
-const OTHER_CONTROLLER = "D:/repo/src/features/billing/transport/http/plan.controller.ts"
-const CONSUMER = "D:/repo/src/features/billing/transport/message/payment-captured.consumer.ts"
-// Not under transport/message/ and not named *.consumer.ts: only the shape (decorator or class-name suffix) says these consume.
-const SHAPED_HANDLER = "D:/repo/src/features/billing/platform/payment-captured.handler.ts"
-const OUTBOX_CONSUMER_ELSEWHERE = "D:/repo/src/features/billing/jobs/payment-captured.ts"
-// The producer half of an outbox: it publishes, it does not consume, and its name says nothing about consuming.
-const OUTBOX_PRODUCER = "D:/repo/src/features/billing/transport/schedule/billing-outbox.service.ts"
+const tester = typedTester()
+const CONSUMER = at("src/features/checkout/transport/message/payment-captured.consumer.ts")
+const WEBHOOK = at("src/features/checkout/transport/http/payment.controller.ts")
+const PLAIN_CONTROLLER = at("src/features/checkout/transport/http/plan.controller.ts")
+const SPEC = at("src/features/checkout/transport/message/payment-captured.consumer.spec.ts")
+const PRELUDE = [
+    'import type { Inbox } from "@modules/platform/inbox/inbox.port"',
+    'import type { Inbox as Lookalike } from "@modules/domain/order/lookalike.service"',
+    'import { Public, PublicReason } from "@modules/domain/identity/identity.decorators"',
+].join("\n")
+const withPrelude = (body) => `${PRELUDE}\n${body}`
 
-test("a webhook or outbox consumer claims the event through the inbox before it acts", () => {
+test("a consumer or SignedWebhook handler claims the event on the Inbox port first and returns on false", () => {
     tester.run("inbox-dedupe-required", inboxDedupeRequired, {
         valid: [
+            // the claim as the negated test of an early return
             {
-                filename: WEBHOOK,
-                code: "@Controller('billing') class C { @Public({ reason: 'external' }) handle() { this.inboxPort.claim(source, id) } }",
+                name: "case 1", filename: CONSUMER,
+                code: withPrelude("class C { constructor(private readonly inbox: Inbox) {}\n async handle(m: { id: string }) { if (!(await this.inbox.claim('billing', m.id))) return\n await this.work() }\n private async work() { await this.inbox.claim('x', 'y') } }"),
             },
+            // the claim stored, then refused on the next statement; the receiver's name is irrelevant
             {
-                filename: CONSUMER,
-                code: "class C { handle() { return this.dedupeStore.claim(key) } }",
+                name: "case 2", filename: CONSUMER,
+                code: withPrelude("class C { constructor(private readonly seen: Inbox) {}\n async handle(m: { id: string }) { const fresh = await this.seen.claim('billing', m.id)\n if (!fresh) { return }\n await this.work() }\n private async work() {} }"),
             },
+            // compared to false, in a block that logs then returns
             {
-                filename: CONSUMER,
-                code: "class C { constructor(private readonly idempotencyPort: IdempotencyPort) {} }",
+                name: "case 3", filename: CONSUMER,
+                code: withPrelude("class C { constructor(private readonly inbox: Inbox) {}\n async handle(m: { id: string }) { if ((await this.inbox.claim('billing', m.id)) === false) { console.log('dup'); return }\n await this.work() }\n private async work() {} }"),
             },
-            // a plain door with no webhook shape and no Public decorator is out of scope
-            { filename: OTHER_CONTROLLER, code: "@Controller('plan') class C { get() { return 1 } }" },
-            // a spec arranges its own doubles
-            { filename: "D:/repo/src/features/billing/transport/http/billing-webhook.controller.spec.ts", code: "class C {}" },
-            // a consumer recognized by shape, claiming through the inbox
+            // a SignedWebhook handler that claims first
             {
-                filename: SHAPED_HANDLER,
-                code: "class PaymentCapturedHandler { @EventPattern('payment.captured') async handle(payload) { if (!(await this.inbox.claim('internal-outbox', payload.eventId))) return } }",
+                name: "case 4", filename: WEBHOOK,
+                code: withPrelude("class C { constructor(private readonly inbox: Inbox) {}\n @Public({ reason: PublicReason.SignedWebhook })\n async receive(body: { id: string }) { if (!(await this.inbox.claim('payos', body.id))) return\n await this.work() }\n private async work() {} }"),
             },
+            // another public reason is not a webhook door
             {
-                filename: OUTBOX_CONSUMER_ELSEWHERE,
-                code: "class PaymentCapturedOutboxConsumer { handle() { return this.dedupeStore.claim(key) } }",
+                name: "case 5", filename: WEBHOOK,
+                code: withPrelude("class C { @Public({ reason: PublicReason.Health })\n async ping() { await this.work() }\n private async work() {} }"),
             },
-            // the producer half of an outbox publishes; it has no delivery to dedupe and is not asked for one
+            // a controller with no public door
+            { name: "case 6", filename: PLAIN_CONTROLLER, code: "class C { async list() { await this.work() }\n private async work() {} }" },
+            // private helpers of a consumer are not handlers
             {
-                filename: OUTBOX_PRODUCER,
-                code: "class BillingOutboxService { @Cron('*/10 * * * * *') async publish() { const rows = await this.repo.findPending(); for (const row of rows) await this.broker.publish(row) } }",
+                name: "case 7", filename: CONSUMER,
+                code: withPrelude("class C { constructor(private readonly inbox: Inbox) {}\n async handle(m: { id: string }) { if (!(await this.inbox.claim('billing', m.id))) return\n await this.work() }\n private async work() { await this.step() }\n private async step() {} }"),
             },
+            // a producer that only publishes lives outside transport/message and carries no consumer file name
+            { name: "case 8", filename: at("src/features/checkout/application/billing-outbox.service.ts"), code: "class C { async publish() { await this.work() }\n async work() {} }" },
         ],
         invalid: [
+            // no claim at all
+            { name: "case 9", filename: CONSUMER, code: withPrelude("class C { async handle() { await this.work() }\n private async work() {} }"), errors: [{ messageId: "noClaim" }] },
+            // a handler that never awaits
+            { name: "case 10", filename: CONSUMER, code: withPrelude("class C { handle() { this.work() }\n private work() {} }"), errors: [{ messageId: "noClaim" }] },
+            // keyword-only: the words inbox and dedupe appear, the type is not the port
             {
-                filename: WEBHOOK,
-                code: "@Controller('billing') class C { @Public({ reason: 'external' }) handle() { return this.service.charge() } }",
-                errors: [{ messageId: "webhook" }],
+                name: "case 11", filename: CONSUMER,
+                code: withPrelude("class C { constructor(private readonly inbox: Lookalike) {}\n async handle(m: { id: string }) { if (!(await this.inbox.claim('billing', m.id))) return\n await this.work() }\n private async work() {} }"),
+                errors: [{ messageId: "noClaim" }],
             },
+            // a claim exists but not as the first awaited expression
             {
-                filename: CONSUMER,
-                code: "class C { handle() { return this.service.capture() } }",
-                errors: [{ messageId: "consumer" }],
+                name: "case 12", filename: CONSUMER,
+                code: withPrelude("class C { constructor(private readonly inbox: Inbox) {}\n async handle(m: { id: string }) { await this.work()\n if (!(await this.inbox.claim('billing', m.id))) return }\n private async work() {} }"),
+                errors: [{ messageId: "noClaim" }],
             },
+            // the claim is awaited and ignored
             {
-                filename: OTHER_CONTROLLER,
-                code: "@Controller('billing/webhook') class C { @Public({ reason: 'external' }) handle() { return this.service.charge() } }",
-                errors: [{ messageId: "webhook" }],
+                name: "case 13", filename: CONSUMER,
+                code: withPrelude("class C { constructor(private readonly inbox: Inbox) {}\n async handle(m: { id: string }) { await this.inbox.claim('billing', m.id)\n await this.work() }\n private async work() {} }"),
+                errors: [{ messageId: "noEarlyReturn" }],
             },
-            // a decorator naming an incoming message/event handler is a consumer shape, wherever the file sits
+            // the answer is tested but the branch does not return
             {
-                filename: SHAPED_HANDLER,
-                code: "class PaymentCapturedHandler { @EventPattern('payment.captured') async handle(payload) { return this.service.capture(payload) } }",
-                errors: [{ messageId: "consumer" }],
+                name: "case 14", filename: CONSUMER,
+                code: withPrelude("class C { constructor(private readonly inbox: Inbox) {}\n async handle(m: { id: string }) { const fresh = await this.inbox.claim('billing', m.id)\n if (!fresh) { console.log('dup') }\n await this.work() }\n private async work() {} }"),
+                errors: [{ messageId: "noEarlyReturn" }],
             },
+            // a claim with the wrong arity is not `claim(source, eventId)`
             {
-                filename: SHAPED_HANDLER,
-                code: "class PaymentSettled { @MessagePattern('payment.settled') async handle(payload) { return this.service.settle(payload) } }",
-                errors: [{ messageId: "consumer" }],
+                name: "case 15", filename: CONSUMER,
+                code: withPrelude("class C { constructor(private readonly inbox: Inbox) {}\n async handle(m: { id: string }) { if (!(await this.inbox.claim(m.id))) return }\n }"),
+                errors: [{ messageId: "noClaim" }],
             },
-            // a class name ending Consumer/OutboxConsumer is a consumer shape, wherever the file sits
+            // a SignedWebhook handler with no claim, reason read by type
             {
-                filename: OUTBOX_CONSUMER_ELSEWHERE,
-                code: "class PaymentCapturedOutboxConsumer { handle() { return this.service.capture() } }",
-                errors: [{ messageId: "consumer" }],
+                name: "case 16", filename: WEBHOOK,
+                code: withPrelude("const reason = PublicReason.SignedWebhook\nclass C { @Public({ reason })\n async receive() { await this.work() }\n private async work() {} }"),
+                errors: [{ messageId: "noClaim" }],
             },
+            // the decorator on the class covers every public method
             {
-                filename: OUTBOX_CONSUMER_ELSEWHERE,
-                code: "class PaymentSettledConsumer { handle() { return this.service.settle() } }",
-                errors: [{ messageId: "consumer" }],
+                name: "case 17", filename: WEBHOOK,
+                code: withPrelude("@Public({ reason: PublicReason.SignedWebhook })\nclass C { async receive() { await this.work() }\n async other() { await this.work() }\n private async work() {} }"),
+                errors: [{ messageId: "noClaim" }, { messageId: "noClaim" }],
             },
+            // specs are not exempt
+            { name: "case 18", filename: SPEC, code: withPrelude("class C { @Public({ reason: PublicReason.SignedWebhook })\n async receive() { await this.work() }\n private async work() {} }"), errors: [{ messageId: "noClaim" }] },
         ],
     })
 })
