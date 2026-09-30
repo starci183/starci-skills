@@ -78,10 +78,10 @@ test('legacyWorkSqliteFindings is pure: it never opens a database, only checks t
   fs.mkdirSync(path.join(legacy, '.starciwork'), { recursive: true });
   fs.writeFileSync(path.join(legacy, '.starciwork', 'runtime.sqlite'), 'x');
   fs.writeFileSync(path.join(legacy, '.starciwork', 'runtime.sqlite-wal'), 'x');
-  const found = legacyWorkSqliteFindings([clean, legacy, missing, legacy]); // a duplicate root is deduped
+  const found = legacyWorkSqliteFindings([clean, legacy, missing, legacy, repoKeyOf(legacy)]); // a duplicate root is deduped across separator styles
   assert.equal(found.length, 1);
   assert.equal(found[0].code, LEGACY_WORK_SQLITE_CODE);
-  assert.equal(found[0].repoRoot, legacy);
+  assert.equal(found[0].repoRoot, repoKeyOf(legacy)); // the canonical registry form (machine-db.mjs repoKey), not the raw OS path
   assert.deepEqual(found[0].files.map((f) => path.basename(f)).sort(), ['runtime.sqlite', 'runtime.sqlite-wal']);
 });
 
