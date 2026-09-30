@@ -20,7 +20,7 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
-import { fileOf, inSlot, isSpecFile, kindOfFile, roleOfFile } from "./lib/scope.mjs"
+import { classifyImport, fileOf, inSlot, isSpecFile, kindOfFile, roleOfFile } from "./lib/scope.mjs"
 
 /** The layers and feature kinds that split into a connected `index.tsx` and a pure `component.tsx`; a shared package's layers never split. */
 const SPLIT_KINDS = new Set(["blocks", "pages", "layouts", "overlays"])
@@ -208,11 +208,12 @@ export const baseImportPair = {
     const isOwnIndex = roleOfFile(context) === "entry"
     const spec = isSpecFile(fileOf(context))
     const inTier = inSplitTier(context)
-    const reachesPure = (source) => /(?:^|\/)component(?:\.tsx)?$/.test(source)
+    // An import reaches a pure half when the file it resolves to has the `drawing` role of its slot.
+    const reachesPure = (source) => classifyImport(context, source)?.role === "drawing"
 
     const check = (node, source) => {
       if (typeof source !== "string" || !reachesPure(source)) return
-      const isSibling = source === "./component" || source === "./component.tsx"
+      const isSibling = /^\.\/[^/]+$/.test(source)
       if (isSibling && (isOwnIndex || spec)) return
       if (isSibling && !inTier) return
       context.report({ node, messageId: "reach", data: { source } })

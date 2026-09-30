@@ -6,6 +6,7 @@
  * environment, and the disagreement shows up as a finding nobody can satisfy.
  */
 
+import { dirname, join, resolve } from "node:path"
 import { hfsOf } from "./hfs.mjs"
 import { normalizePath } from "./path.mjs"
 
@@ -47,18 +48,6 @@ export const roleOfFile = (context) => classOf(context).role ?? null
  */
 export const isSpecFile = (filename) => /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(normalizePath(filename))
 
-/** Product source: under `src/`, and not a spec. */
-export const isProductFile = (filename) => {
-  const file = normalizePath(filename)
-  return file.includes("/src/") && !isSpecFile(file)
-}
-
-/** The e2e tree: `e2e/**` and the Playwright config beside it. */
-export const isE2eFile = (filename) => {
-  const file = normalizePath(filename)
-  return /(?:^|\/)e2e\//.test(file) || /(?:^|\/)playwright\.config\.[cm]?[jt]s$/.test(file)
-}
-
 /** The tiers of product source: everything a slot places in an app's route, feature, component, hook or module tiers and in a shared package. */
 const PRODUCT_TIERS = new Set(["route", "feature", "components", "hooks", "foundation", "modules", "transport", "package"])
 
@@ -86,9 +75,6 @@ export const isApiClient = (context) => inSlot(context, "fe.transport.client", "
 /** The file that may declare the one Outcome union: slot `fe.transport.outcome` or `fe.package.api.outcome`. */
 export const isOutcomeModule = (context) => inSlot(context, "fe.transport.outcome", "fe.package.api.outcome")
 
-/** The route files Next mounts as a segment slot. */
-export const ROUTE_SLOTS = ["page", "layout", "template", "loading", "not-found", "default", "route"]
-
 /** The basename of a path without directories. */
 export const baseName = (filename) => normalizePath(filename).split("/").pop() ?? ""
 
@@ -115,4 +101,42 @@ export const globalReferences = (context, names) => {
   }
   visit(sourceCode.scopeManager.globalScope)
   return found
+}
+
+/**
+ * Where an import specifier of the linted file points, as an absolute path without an extension: a relative specifier, or `@/`
+ * from the owning app's `src/` (the app directory is the directory part of slot `fe.app.next`). Null for a package or a file no app owns.
+ *
+ * @param {object} context - The ESLint rule context.
+ * @param {string} specifier - The module specifier.
+ * @returns {string | null} The absolute path, or null.
+ */
+export const resolveImport = (context, specifier) => {
+  const hfs = hfsOf(context)
+  const file = fileOf(context)
+  if (specifier.startsWith(".")) return resolve(dirname(file), specifier)
+  if (!specifier.startsWith("@/")) return null
+  const app = hfs.classify(file).bindings?.app
+  if (app === undefined) return null
+  const appDirectory = hfs.slot("fe.app.next").path.split("/{")[0].replace("<app>", app)
+  return join(hfs.repoRoot, appDirectory, "src", specifier.slice(2))
+}
+
+/**
+ * The classification of the file an import specifier resolves to, trying the extensions a module file has. Null when the
+ * specifier resolves to no path.
+ *
+ * @param {object} context - The ESLint rule context.
+ * @param {string} specifier - The module specifier.
+ * @returns {object | null} The slot classification (`{ slot, root, role, ... }`) of the first candidate a slot owns.
+ */
+export const classifyImport = (context, specifier) => {
+  const target = resolveImport(context, specifier)
+  if (target === null) return null
+  const hfs = hfsOf(context)
+  // The specifier names no extension: try the ones a module file has and take the candidate a slot gives a role, else the first a slot owns.
+  const owned = [`${target}.ts`, `${target}.tsx`, `${target}/index.ts`, `${target}/index.tsx`, target]
+    .map((candidate) => hfs.classify(candidate))
+    .filter((found) => found.slot && found.status === "owned")
+  return owned.find((found) => found.role) ?? owned[0] ?? null
 }

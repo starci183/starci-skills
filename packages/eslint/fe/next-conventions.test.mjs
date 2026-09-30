@@ -158,6 +158,10 @@ test("FE-NEXT-7: navigation helpers come from modules/i18n/navigation", () => {
       { filename: at("apps/web/src/components/blocks/Nav/index.tsx"), code: "import Link from 'next/link'", errors: [{ messageId: "link" }] },
       { filename: at("apps/web/src/components/blocks/Nav/index.tsx"), code: "import { useRouter } from 'next/navigation'", errors: [{ messageId: "helper" }] },
       { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "import { redirect } from 'next/navigation'", errors: [{ messageId: "helper" }] },
+      // only the proxy and global-error are exempt from the source-root slot and the route slot, not their siblings
+      { filename: at("apps/web/src/instrumentation.ts"), code: "import { redirect } from 'next/navigation'", errors: [{ messageId: "helper" }] },
+      { filename: at("apps/web/src/instrumentation-client.ts"), code: "import { useRouter } from 'next/navigation'", errors: [{ messageId: "helper" }] },
+      { filename: at("apps/web/src/app/[locale]/error.tsx"), code: "import { useRouter } from 'next/navigation'", errors: [{ messageId: "helper" }] },
       {
         filename: at("apps/web/src/components/blocks/Nav/index.tsx"),
         code: "import { usePathname, notFound, permanentRedirect } from 'next/navigation'",

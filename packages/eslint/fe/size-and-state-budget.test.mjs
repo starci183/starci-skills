@@ -43,8 +43,9 @@ test("BUDGET-1: a component file stays within the line budget its slot states fo
 ` },
       { filename: BLOCK, code: lines(200) },
       { filename: at("apps/web/src/features/pages/Home/component.tsx"), code: lines(FEATURE["component.tsx"]) },
-      // only a role that has a budget is held to it: a hook, a module and a spec are not
-      { filename: HOOK, code: lines(400) },
+      // a spec is not held to a budget; a hook and a module by the `file` budget of their slot (200, 400)
+      { filename: HOOK, code: lines(200) },
+      { filename: at("apps/web/src/modules/feed/index.ts"), code: lines(400) },
       { filename: at("apps/web/src/modules/config/index.ts"), code: lines(400) },
       { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: lines(400) },
       // a file the slots do not put in a component owner is not judged by this rule
@@ -54,6 +55,9 @@ test("BUDGET-1: a component file stays within the line budget its slot states fo
       { filename: at("apps/web/src/components/blocks/Feed/classNames.ts"), code: lines(400) },
     ],
     invalid: [
+      { filename: HOOK, code: lines(201), errors: [{ messageId: "lines", data: { count: 201, max: 200 } }] },
+      { filename: at("apps/web/src/modules/feed/index.ts"), code: lines(401), errors: [{ messageId: "lines", data: { count: 401, max: 400 } }] },
+      { filename: at("packages/nivo-ui/src/leaves/Chip/component.tsx"), code: lines(301), errors: [{ messageId: "lines" }] },
       { filename: DRAWING, code: lines(301), errors: [{ messageId: "lines", data: { count: 301, max: 300 } }] },
       // the connected entry has the smaller budget
       { filename: BLOCK, code: lines(201), errors: [{ messageId: "lines", data: { count: 201, max: 200 } }] },
@@ -76,13 +80,15 @@ test("BUDGET-2: a unit holds at most six state hooks and six data hooks", () => 
       { filename: BLOCK, code: "export const Feed = () => { const a = items.map(() => 1); const [x] = useState(0); return a }" },
       { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: unit("Feed", 9, 9) },
       // a slot that states no useState / dataHooks budget puts no bound on the count (hooks, features, modules)
-      { filename: HOOK, code: unit("useFeed", 7, 0) },
+      { filename: HOOK, code: unit("useFeed", 6, 6) },
       { filename: at("apps/web/src/modules/feed/index.ts"), code: unit("Feed", 9, 9) },
       // a file no slot owns is not judged
       { filename: at("apps/web/src/lib/x.tsx"), code: unit("Feed", 9, 9) },
     ],
     invalid: [
       { filename: BLOCK, code: unit("Feed", 7, 0), errors: [{ messageId: "state" }] },
+      { filename: HOOK, code: unit("useFeed", 7, 0), errors: [{ messageId: "state" }] },
+      { filename: at("packages/nivo-ui/src/leaves/Chip/index.tsx"), code: unit("Chip", 0, 7), errors: [{ messageId: "data" }] },
       { filename: BLOCK, code: unit("Feed", 0, 7), errors: [{ messageId: "data" }] },
       { filename: BLOCK, code: unit("Feed", 8, 8), errors: [{ messageId: "state" }, { messageId: "data" }] },
       { filename: at("apps/admin/src/components/leaves/Chip/component.tsx"), code: unit("Chip", 7, 0), errors: [{ messageId: "state" }] },

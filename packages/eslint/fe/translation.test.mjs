@@ -9,23 +9,15 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
-import tsParser from "@typescript-eslint/parser"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import { noCopyResolutionBelowBlock, noHardcodedCopy, rules } from "./translation.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const tester = slotTester()
 
-const LEAF = "D:/repo/src/components/leaves/Input/index.tsx"
-const COMPOSITE = "D:/repo/src/components/composites/SearchBox/index.tsx"
-const FIXTURE = "D:/repo/src/components/blocks/Feed/fixtures/copy.ts"
-const BLOCK = "D:/repo/src/components/blocks/dashboard/DailyQuest/index.tsx"
+const LEAF = at("apps/web/src/components/leaves/Input/index.tsx")
+const COMPOSITE = at("apps/web/src/components/composites/SearchBox/index.tsx")
+const FIXTURE = at("e2e/fixtures/copy.ts")
+const BLOCK = at("apps/web/src/components/blocks/DailyQuest/index.tsx")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -36,12 +28,15 @@ test("every rule this law declares is exported under its published name", () => 
 test("COPY-1: a tier that receives its words never resolves one", () => {
   tester.run("no-copy-resolution-below-block", noCopyResolutionBelowBlock, {
     valid: [
+      // a block resolves copy; a folder named leaves inside a module is not a vocabulary layer
+      { filename: at("apps/web/src/modules/leaves/index.ts"), code: "const t = useTranslations(\"input\")" },
       { filename: LEAF, code: "const E = ({ props }) => props.label" },
       // the connected half is where the word is chosen
       { filename: BLOCK, code: "const t = useTranslations(\"quest\")" },
     ],
     invalid: [
       { filename: LEAF, code: "const t = useTranslations(\"input\")", errors: [{ messageId: "resolves" }] },
+      { filename: at("packages/nivo-ui/src/leaves/Input/index.tsx"), code: "const t = useTranslations(\"input\")", errors: [{ messageId: "resolves" }] },
       { filename: COMPOSITE, code: "const l = useLocale()", errors: [{ messageId: "resolves" }] },
     ],
   })
@@ -85,7 +80,8 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
       { filename: BLOCK, code: "const o = { title: t(\"course.title\") }" },
       // the dictionaries and fixtures are content
       { filename: FIXTURE, code: "const t = \"Tiếp tục học\"" },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: "const E = () => <p>Tiếp tục học</p>" },
+      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "const E = () => <p>Tiếp tục học</p>" },
+      // a fixture inside a component owner is authoring, not content
       // English comments are the rule
       { filename: BLOCK, code: "// the reason this exists\nconst x = 1" },
     ],
@@ -115,7 +111,7 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
       { filename: BLOCK, code: "const E = () => <Field label=\"sm\" />", errors: [{ messageId: "attribute" }] },
       // copy in an object
       { filename: BLOCK, code: "const o = { title: \"Your courses\" }", errors: [{ messageId: "property" }] },
-      { filename: "D:/repo/src/app/[locale]/page.tsx", code: "export const metadata = { description: \"Learn to code\" }", errors: [{ messageId: "property" }] },
+      { filename: at("apps/web/src/app/[locale]/page.tsx"), code: "export const metadata = { description: \"Learn to code\" }", errors: [{ messageId: "property" }] },
       // a template with substitutions whose static parts hold a word is copy: JSX child, spoken attribute, prose attribute
       { filename: BLOCK, code: "const E = () => <p>{`${count} installed`}</p>", errors: [{ messageId: "text" }] },
       { filename: BLOCK, code: "const E = () => <p>{`You have ${c} unread messages`}</p>", errors: [{ messageId: "text" }] },
@@ -125,8 +121,8 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
       { filename: BLOCK, code: "const o = { title: `Welcome back, ${name}` }", errors: [{ messageId: "property" }] },
       // any key: a whole sentence is copy (a hook returning its own status text)
       { filename: BLOCK, code: "const s = { ready: \"Your course is ready\" }", errors: [{ messageId: "property" }] },
-      { filename: "D:/repo/src/hooks/lesson/useLesson.ts", code: "export const useLesson = () => ({ status: \"Loading your lesson\", error: \"Something went wrong.\" })", errors: [{ messageId: "property" }, { messageId: "property" }] },
-      { filename: "D:/repo/src/modules/notify/messages.ts", code: "export const M = { saved: `Saved ${n} items`, kind: \"Search courses\" }", errors: [{ messageId: "property" }, { messageId: "property" }] },
+      { filename: at("apps/web/src/hooks/lesson/useLesson.ts"), code: "export const useLesson = () => ({ status: \"Loading your lesson\", error: \"Something went wrong.\" })", errors: [{ messageId: "property" }, { messageId: "property" }] },
+      { filename: at("apps/web/src/modules/notify/messages.ts"), code: "export const M = { saved: `Saved ${n} items`, kind: \"Search courses\" }", errors: [{ messageId: "property" }, { messageId: "property" }] },
       // the second language, wherever it hides, with no pragma to excuse it
       { filename: BLOCK, code: "const message = \"hạn cuối đã qua\"", errors: [{ messageId: "second" }] },
       { filename: BLOCK, code: "const message = `hạn cuối đã qua ${x}`", errors: [{ messageId: "second" }] },

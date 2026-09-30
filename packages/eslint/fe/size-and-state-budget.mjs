@@ -30,12 +30,16 @@ const budgetOf = (context) => {
   return id === null ? {} : hfsOf(context).slot(id)?.budget ?? {}
 }
 
-/** The line limit of the linted file: the budget keyed by the file name its role has in the slot (`component.tsx` for the drawing, `index.tsx` for the entry), or null. */
+/**
+ * The line limit of the linted file: the budget keyed by the file name its role has in the slot (`component.tsx` for the drawing,
+ * `index.tsx` for the entry), else the slot's `file` budget (hooks 200, modules 400), else null.
+ */
 const lineBudgetOf = (context) => {
   const role = roleOfFile(context)
   const id = slotOfFile(context)
   const fileName = role === null || id === null ? undefined : hfsOf(context).slot(id)?.roles?.[role]
-  const limit = fileName === undefined ? undefined : budgetOf(context)[fileName]
+  const budget = budgetOf(context)
+  const limit = fileName !== undefined && typeof budget[fileName] === "number" ? budget[fileName] : budget.file
   return typeof limit === "number" ? limit : null
 }
 
@@ -67,19 +71,19 @@ const isUnitName = (name) => Boolean(name) && (/^[A-Z]/.test(name) || /^use[A-Z0
 
 // -- BUDGET-1 --------------------------------------------------------------------------------------
 
-/** A component file is within the slot's line budget for its role. */
+/** A file is within the line budget its slot states for its role (`component.tsx`, `index.tsx`) or for every file (`file`). */
 export const componentLineBudget = {
   meta: {
     type: "suggestion",
-    docs: { description: "A component file stays within the line budget its slot states (`component.tsx`, `index.tsx`)." },
+    docs: { description: "A file stays within the line budget its slot states (`component.tsx`, `index.tsx`, `file`)." },
     schema: [],
     messages: {
       lines:
-        "This component file has {{count}} lines; the budget is {{max}}. A file this size is several units in one: split the drawing from the data, and the sections from each other, so each part can be named, tested and reviewed on its own.",
+        "This file has {{count}} lines; the budget is {{max}}. A file this size is several units in one: split the drawing from the data, and the sections from each other, so each part can be named, tested and reviewed on its own.",
     },
   },
   create(context) {
-    // Only a role of a component owner has a line budget (the drawing half and the connected entry); a spec, a hook or a module is not held to it here.
+    // A spec is not held to a budget; a file has one when its role or its slot states it.
     if (isSpecFile(fileOf(context))) return {}
     const max = lineBudgetOf(context)
     if (max === null) return {}

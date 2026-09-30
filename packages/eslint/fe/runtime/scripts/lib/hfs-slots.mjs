@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { braceVariants } from './glob.mjs';
+import { braceVariants, globExpression } from './glob.mjs';
 import { posixPath } from './path-key.mjs';
 import { isPlainObject } from '../../engine/plain-object.mjs';
 
@@ -421,10 +421,10 @@ export function createSlotResolver(manifest, repo) {
     return below.split('/').slice(0, -1).find((segment) => names.includes(segment)) ?? null;
   }
 
-  /** The role of a file in its slot: the entry of `roles` whose file name (variables filled from the path) is the file's name. */
+  /** The role of a file in its slot: the entry of `roles` whose file name (variables filled from the path, `*` a wildcard inside the name) matches the file's name. */
   function roleOf(slot, bindings, p) {
     const name = p.split('/').pop();
-    for (const [role, file] of Object.entries(slot.roles ?? {})) if (fillVars(file, bindings) === name) return role;
+    for (const [role, file] of Object.entries(slot.roles ?? {})) if (globExpression(fillVars(file, bindings)).test(name)) return role;
     return null;
   }
 

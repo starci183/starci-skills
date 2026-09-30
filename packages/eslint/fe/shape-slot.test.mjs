@@ -117,7 +117,7 @@ test("only the sibling index reaches the pure half, and it never re-exports XBas
     ],
     invalid: [
       { filename: PAGE, code: "import { HandoffBlockBase } from \"@/components/blocks/sales/HandoffBlock/component\"", errors: [{ messageId: "reach" }] },
-      { filename: LAYOUT, code: "import { X } from \"../../blocks/Y/component\"", errors: [{ messageId: "reach" }] },
+      { filename: LAYOUT, code: "import { X } from \"../../../components/blocks/Y/component\"", errors: [{ messageId: "reach" }] },
       { filename: BLOCK_INDEX, code: "export { HandoffBlockBase } from \"./component\"", errors: [{ messageId: "reexport" }] },
     ],
   })

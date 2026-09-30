@@ -5,9 +5,7 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import { RuleTester } from "eslint"
 import { at, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
-import tsParser from "@typescript-eslint/parser"
 import {
   clientNoServerImport,
   serverModuleMarksServerOnly,
@@ -17,14 +15,6 @@ import {
   webStorageOnlyInModules,
 } from "./client-boundary.mjs"
 
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
 
 const slots = slotTester()
 
@@ -78,16 +68,18 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
 })
 
 test("FE-CLIENT-2: a client component imports nothing that exists only on the server", () => {
-  const CLIENT = "D:/repo/src/components/blocks/Feed/index.tsx"
-  tester.run("client-no-server-import", clientNoServerImport, {
+  const CLIENT = at("apps/web/src/components/blocks/Feed/index.tsx")
+  slots.run("client-no-server-import", clientNoServerImport, {
     valid: [
       { filename: CLIENT, code: '"use client"\nimport { useState } from "react"' },
       { filename: CLIENT, code: '"use client"\nimport useSWR from "swr"\nimport { readCourses } from "@/hooks/courses/useCourses"' },
       { filename: CLIENT, code: '"use client"\nimport type { Headers } from "next/headers"' },
       // a server component may import all of it
-      { filename: "D:/repo/src/features/pages/Home/index.tsx", code: 'import { headers } from "next/headers"\nimport { readCourses } from "@/modules/api/courses/read-courses"' },
-      { filename: "D:/repo/src/features/pages/Home/index.tsx", code: 'import "server-only"' },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: '"use client"\nimport fs from "node:fs"' },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: 'import { headers } from "next/headers"\nimport { readCourses } from "@/modules/api/courses/read-courses"' },
+      { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: 'import "server-only"' },
+      // a `read-` file outside the api module is not a server reader
+      { filename: CLIENT, code: '"use client"\nimport { readLocal } from "@/modules/storage/read-local"' },
+      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: '"use client"\nimport fs from "node:fs"' },
     ],
     invalid: [
       { filename: CLIENT, code: '"use client"\nimport "server-only"', errors: [{ messageId: "server" }] },
@@ -106,29 +98,29 @@ test("FE-CLIENT-2: a client component imports nothing that exists only on the se
 })
 
 test("FE-CLIENT-3: web storage is touched only inside modules", () => {
-  tester.run("web-storage-only-in-modules", webStorageOnlyInModules, {
+  slots.run("web-storage-only-in-modules", webStorageOnlyInModules, {
     valid: [
-      { filename: "D:/repo/src/modules/theme/index.ts", code: 'window.localStorage.setItem("theme", value)' },
-      { filename: "D:/repo/src/modules/session/storage.ts", code: 'const v = sessionStorage.getItem("k")' },
-      { filename: "D:/repo/src/components/blocks/Feed/index.tsx", code: "const store = { localStorage: 1 }" },
-      { filename: "D:/repo/src/components/blocks/Feed/index.tsx", code: "const v = repo.localStorage" },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: 'localStorage.clear()' },
+      { filename: at("apps/web/src/modules/theme/index.ts"), code: 'window.localStorage.setItem("theme", value)' },
+      { filename: at("apps/web/src/modules/session/storage.ts"), code: 'const v = sessionStorage.getItem("k")' },
+      { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: "const store = { localStorage: 1 }" },
+      { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: "const v = repo.localStorage" },
+      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: 'localStorage.clear()' },
     ],
     invalid: [
-      { filename: "D:/repo/src/components/blocks/Feed/index.tsx", code: 'const v = localStorage.getItem("k")', errors: [{ messageId: "storage" }] },
-      { filename: "D:/repo/src/components/blocks/Feed/index.tsx", code: 'sessionStorage.setItem("k", "v")', errors: [{ messageId: "storage" }] },
-      { filename: "D:/repo/src/features/layouts/Sidebar/index.tsx", code: 'const v = globalThis.localStorage?.getItem("k")', errors: [{ messageId: "storage" }] },
-      { filename: "D:/repo/src/hooks/session/useDraft.ts", code: 'window.sessionStorage.removeItem("k")', errors: [{ messageId: "storage" }] },
+      { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: 'const v = localStorage.getItem("k")', errors: [{ messageId: "storage" }] },
+      { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: 'sessionStorage.setItem("k", "v")', errors: [{ messageId: "storage" }] },
+      { filename: at("apps/web/src/features/layouts/Sidebar/index.tsx"), code: 'const v = globalThis.localStorage?.getItem("k")', errors: [{ messageId: "storage" }] },
+      { filename: at("apps/web/src/hooks/session/useDraft.ts"), code: 'window.sessionStorage.removeItem("k")', errors: [{ messageId: "storage" }] },
     ],
   })
 })
 
 test("FE-CLIENT-4: raw HTML only on a script", () => {
-  tester.run("no-dangerous-html", noDangerousHtml, {
+  slots.run("no-dangerous-html", noDangerousHtml, {
     valid: [
       { code: "const A = () => <script type=\"application/ld+json\" dangerouslySetInnerHTML={{ __html: JSON_LD }} />" },
       { code: "const A = () => <p>{text}</p>" },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: "const A = () => <div dangerouslySetInnerHTML={{ __html: x }} />" },
+      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "const A = () => <div dangerouslySetInnerHTML={{ __html: x }} />" },
     ],
     invalid: [
       { code: "const A = () => <div dangerouslySetInnerHTML={{ __html: html }} />", errors: [{ messageId: "html" }] },

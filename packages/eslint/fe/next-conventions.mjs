@@ -36,14 +36,11 @@ export const noMiddlewareFile = {
   create(context) {
     const file = fileOf(context)
     if (isSpecFile(file)) return {}
-    // `middleware.ts` is a file no slot owns: the manifest pins the source-root interceptor as `proxy.ts` (slot `fe.source-root-pinned`), so the
-    // retired name is the nearest-slot case - a file directly in that source root that the slot refuses.
-    const found = classOf(context)
-    const pinnedRoot = found.status === "no-slot" && found.nearest?.slot === "fe.source-root-pinned" ? found.nearest.matchedPrefix : null
-    if (pinnedRoot !== null && stem(file) === "middleware" && hfsOf(context).relative(file) === `${pinnedRoot}/${baseName(file)}`) {
+    // The retired name has a slot of its own (`fe.source-root-retired`, forbidden); the interceptor is the `proxy` role of `fe.source-root-pinned`.
+    if (inSlot(context, "fe.source-root-retired")) {
       return { Program: (node) => context.report({ node, messageId: "file", data: { name: baseName(file) } }) }
     }
-    if (!inSlot(context, "fe.source-root-pinned") || stem(file) !== "proxy") return {}
+    if (!inSlot(context, "fe.source-root-pinned") || roleOfFile(context) !== "proxy") return {}
     const check = (node) => {
       const names = []
       const declaration = node.declaration
@@ -215,9 +212,11 @@ export const noNullSuspenseFallback = {
 
 // -- FE-NEXT-7 -------------------------------------------------------------------------------------
 
-/** Files that legitimately sit outside the locale provider or own the navigation module: the i18n module, the root error boundary, the source-root interceptor. */
+/** Files that legitimately sit outside the locale provider or own the navigation module: the i18n module, the root error boundary (role `global-error`), the proxy (role `proxy`; `instrumentation` files are not exempt). */
 const isNavigationOwner = (context) =>
-  inSlot(context, "fe.modules.i18n", "fe.source-root-pinned") || (inSlot(context, "fe.route") && roleOfFile(context) === "global-error")
+  inSlot(context, "fe.modules.i18n") ||
+  (inSlot(context, "fe.source-root-pinned") && roleOfFile(context) === "proxy") ||
+  (inSlot(context, "fe.route") && roleOfFile(context) === "global-error")
 
 /** The router helpers that are locale-blind in `next/navigation`. */
 const LOCALE_BLIND = new Set(["useRouter", "usePathname", "redirect", "permanentRedirect"])

@@ -1,10 +1,10 @@
 /** Twin tests for the lint escape-hatch fence. */
 import assert from "node:assert/strict"
-import path from "node:path"
 import test from "node:test"
 import { Linter, RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import { linterOptions } from "./lib/config.mjs"
+import { at, fixtureHfs } from "./fixtures/typed/tester.mjs"
 import { noInlineLintConfig, rules } from "./lint-escape-hatch.mjs"
 
 const tester = new RuleTester({
@@ -13,10 +13,11 @@ const tester = new RuleTester({
     ecmaVersion: 2022,
     sourceType: "module",
   },
+  settings: { starci: { hfs: fixtureHfs() } },
   linterOptions,
 })
 
-const SOURCE = "D:/repo/src/components/blocks/dashboard/CreditStatRow/index.tsx"
+const SOURCE = at("apps/web/src/components/blocks/CreditStatRow/index.tsx")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule?.meta && rule.create, `${name} is not a rule`)
@@ -26,7 +27,9 @@ test("LINT-ESCAPE-1: product source cannot change its own lint policy", () => {
   tester.run("no-inline-lint-config", noInlineLintConfig, {
     valid: [
       { filename: SOURCE, code: "// the rule is fixed centrally\nconst value = 1" },
-      { filename: "D:/repo/plugins/eslint/rule.test.mjs", code: "const fixture = 'eslint-disable'" },
+      { filename: at("plugins/eslint/rule.test.mjs"), code: "const fixture = 'eslint-disable'" },
+      // a file outside every product slot (tooling under a folder named src) is not governed
+      { filename: at("tools/src/build.ts"), code: "// @ts-ignore\nconst value = 1" },
       // a comment that merely mentions a tool without being its directive
       { filename: SOURCE, code: "// coverage is measured by the runner, not by a marker\nconst value = 1" },
       { filename: SOURCE, code: "// the formatter is not asked to ignore anything here\nconst value = 1" },
@@ -67,8 +70,8 @@ test("LINT-ESCAPE-1: product source cannot change its own lint policy", () => {
       { filename: SOURCE, code: "/* stylelint-disable color-no-hex */\nconst value = 1", errors: [{ messageId: "tool" }] },
       { filename: SOURCE, code: "// stylelint-disable-next-line\nconst value = 1", errors: [{ messageId: "tool" }] },
       // the e2e tree and specs are governed too
-      { filename: "D:/repo/e2e/course/play.e2e-spec.ts", code: "// @ts-ignore\nconst value = 1", errors: [{ messageId: "typescript" }] },
-      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: "// @ts-ignore\nconst value = 1", errors: [{ messageId: "typescript" }] },
+      { filename: at("e2e/course/play.e2e-spec.ts"), code: "// @ts-ignore\nconst value = 1", errors: [{ messageId: "typescript" }] },
+      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "// @ts-ignore\nconst value = 1", errors: [{ messageId: "typescript" }] },
       {
         filename: SOURCE,
         code: "/* eslint-env browser */\nconst value = 1",
@@ -109,11 +112,12 @@ test("LINT-ESCAPE-2: the directive cannot silence its own guard", () => {
     {
       files: ["**/*.tsx"],
       languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
+      settings: { starci: { hfs: fixtureHfs() } },
       linterOptions,
       plugins: { "starci-fe": { rules } },
       rules: { "starci-fe/no-inline-lint-config": "error" },
     },
-    path.join(process.cwd(), "src/components/Example/index.tsx"),
+    at("apps/web/src/components/blocks/Example/index.tsx"),
   )
   assert.equal(
     messages.find((message) => message.ruleId === "starci-fe/no-inline-lint-config")?.severity,

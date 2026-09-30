@@ -19,14 +19,10 @@
  * nothing is dead weight that reads as if it did.
  */
 
-import { isE2eFile, isProductFile, isSpecFile } from "./lib/scope.mjs"
-import { normalizePath } from "./lib/path.mjs"
+import { fileOf, isE2eSource, isProductSource, isSpecFile } from "./lib/scope.mjs"
 
 /** Product source, its specs and the e2e tree are governed; canon tests deliberately build forbidden directives. */
-const isGoverned = (filename) => {
-  const file = normalizePath(filename)
-  return isProductFile(file) || isSpecFile(file) || isE2eFile(file)
-}
+const isGoverned = (context) => isProductSource(context) || isSpecFile(fileOf(context)) || isE2eSource(context)
 
 /**
  * Any directive that changes ESLint's active rule set inside a source file.
@@ -71,7 +67,7 @@ export const noInlineLintConfig = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename || context.getFilename())) return {}
+    if (!isGoverned(context)) return {}
     const source = context.sourceCode || context.getSourceCode()
     return {
       Program() {

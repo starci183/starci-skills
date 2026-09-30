@@ -20,10 +20,10 @@
  */
 
 import { existsSync, readFileSync } from "node:fs"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join } from "node:path"
 import ts from "typescript"
 import { hfsOf } from "./lib/hfs.mjs"
-import { baseName, isSpecFile } from "./lib/scope.mjs"
+import { baseName, isSpecFile, resolveImport } from "./lib/scope.mjs"
 import { normalizePath } from "./lib/path.mjs"
 
 /** The subject a spec sits beside: `Feed.test.tsx` -> `Feed`. */
@@ -238,21 +238,11 @@ const walk = (root, keys, visit) => {
   }
 }
 
-/** Where an import specifier points, as an absolute path: a relative path, or `@/` from the owning app's `src/`. */
-const resolveSpecifier = (hfs, file, specifier) => {
-  if (specifier.startsWith(".")) return resolve(dirname(file), specifier)
-  if (!specifier.startsWith("@/")) return null
-  const app = hfs.classify(file).bindings?.app
-  if (app === undefined) return null
-  // The app directory is the directory part of the slot `fe.app.next` (`apps/<app>/{package.json,...}`); `@/` is its `src/`.
-  const appDirectory = hfs.slot("fe.app.next").path.split("/{")[0].replace("<app>", app)
-  return join(hfs.repoRoot, appDirectory, "src", specifier.slice(2))
-}
-
 /** True when the specifier is the app's message catalogue: a file under `messages/` of the i18n module slot. */
-const isCatalogSpecifier = (hfs, file, specifier) => {
-  const target = resolveSpecifier(hfs, file, specifier)
+const isCatalogSpecifier = (context, specifier) => {
+  const target = resolveImport(context, specifier)
   if (!target) return false
+  const hfs = hfsOf(context)
   const { slot, root } = hfs.classify(target)
   return slot === "fe.modules.i18n" && hfs.relative(target).startsWith(`${root}/messages/`)
 }
@@ -280,7 +270,7 @@ export const noMockedTranslations = {
     const hoisted = []
     return {
       ImportDeclaration(node) {
-        if (!isCatalogSpecifier(hfsOf(context), file, String(node.source.value))) return
+        if (!isCatalogSpecifier(context, String(node.source.value))) return
         for (const specifier of node.specifiers) catalogBindings.add(specifier.local.name)
       },
       CallExpression(node) {
@@ -298,7 +288,7 @@ export const noMockedTranslations = {
           walk(root, keys, (inner) => {
             if (inner.type === "Identifier" && catalogBindings.has(inner.name)) found = true
             const specifier = inner.type === "ImportExpression" ? staticString(inner.source) : null
-            if (specifier !== null && isCatalogSpecifier(hfsOf(context), file, specifier)) found = true
+            if (specifier !== null && isCatalogSpecifier(context, specifier)) found = true
           })
           return found
         }

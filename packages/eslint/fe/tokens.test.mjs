@@ -103,9 +103,13 @@ test("TOKEN-5: large text plus a heavy weight is a heading", () => {
 /** A repository whose stylesheet defines ONE container token, built fresh for this run. */
 const themedRoot = () => {
   const root = mkdtempSync(join(tmpdir(), "starci-tokens-")).replace(/\\/g, "/")
-  mkdirSync(join(root, "src/app"), { recursive: true })
+  mkdirSync(join(root, "apps/web/src/app"), { recursive: true })
+  mkdirSync(join(root, "apps/web/src/modules/brand"), { recursive: true })
+  mkdirSync(join(root, "apps/admin/src/app"), { recursive: true })
+  writeFileSync(join(root, "apps/admin/src/app/globals.css"), "@theme {\n    --container-app-xs: 20rem;\n}\n", "utf8")
+  writeFileSync(join(root, "apps/web/src/modules/brand/brand.css"), "@theme {\n    --container-app-md: 48rem;\n}\n", "utf8")
   writeFileSync(
-    join(root, "src/app/globals.css"),
+    join(root, "apps/web/src/app/globals.css"),
     "@theme {\n    --container-app-sm: 40rem;\n    --max-height-rail: calc(100dvh - 7rem);\n}\n",
     "utf8",
   )
@@ -126,6 +130,8 @@ test("TOKEN-9: a class naming a theme token is dead unless the theme defines it"
       // The token exists, so the class means what it says.
       { filename: `${THEMED}/apps/web/src/features/pages/Reader/component.tsx`, code: 'const M = "mx-auto max-w-app-sm"' },
       { filename: `${THEMED}/apps/web/src/features/layouts/Rail/component.tsx`, code: 'const R = "max-h-rail overflow-y-auto"' },
+      // the brand slot's stylesheet is part of the app's theme
+      { filename: `${THEMED}/apps/web/src/features/pages/Reader/component.tsx`, code: 'const M = "max-w-app-md"' },
       // Tailwind's own scale, not a theme promise: nothing here is derivable from a variable name.
       { filename: `${THEMED}/apps/web/src/features/pages/Reader/component.tsx`, code: 'const S = "max-w-sm gap-4 text-muted"' },
       // Outside src, this is somebody else\'s rule to enforce.
@@ -137,6 +143,8 @@ test("TOKEN-9: a class naming a theme token is dead unless the theme defines it"
       { filename: `${THEMED}/apps/web/src/features/pages/Reader/component.spec.tsx`, code: 'const M = "max-w-app-xl"' },
     ],
     invalid: [
+      // another app has its own stylesheet: this one's token does not resolve there
+      { filename: `${THEMED}/apps/admin/src/features/pages/Reader/component.tsx`, code: 'const M = "max-w-app-sm"', errors: [{ messageId: "unresolved" }] },
       {
         filename: `${THEMED}/apps/web/src/features/pages/Reader/component.tsx`,
         code: 'const M = "mx-auto max-w-app-xl"',

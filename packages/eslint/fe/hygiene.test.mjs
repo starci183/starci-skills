@@ -10,25 +10,18 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { at, typedTester } from "./fixtures/typed/tester.mjs"
+import { at, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
 import { effectSubscriptionNeedsCleanup, noConsole, noDataFetchInEffect, noEmptyCatch, rules } from "./hygiene.mjs"
 
-const syntaxTester = new RuleTester({
-  languageOptions: {
-    parser: tsParser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-})
+const syntaxTester = slotTester()
 const typed = typedTester()
 
 const FILE = at("apps/web/src/components/blocks/Feed/index.tsx")
 const HOOK = at("apps/web/src/hooks/lesson/useLesson.ts")
 const MODULE = at("apps/web/src/modules/api/client.ts")
 const SPEC = at("apps/web/src/components/blocks/Feed/index.test.tsx")
-const PLAIN_FILE = "D:/repo/src/components/blocks/Feed/index.tsx"
-const PLAIN_SPEC = "D:/repo/src/components/blocks/Feed/index.test.tsx"
+const PLAIN_FILE = at("apps/web/src/components/blocks/Feed/index.tsx")
+const PLAIN_SPEC = at("apps/web/src/components/blocks/Feed/index.test.tsx")
 
 /** The imports every effect case starts with. */
 const REACT = "import { useEffect, useLayoutEffect, useSyncExternalStore } from \"react\"\n"
@@ -256,12 +249,16 @@ test("HYGIENE-4: no console in product source", () => {
       { filename: PLAIN_FILE, code: "const consoleWidth = 80" },
       { filename: PLAIN_FILE, code: "logger.error('x')" },
       { filename: PLAIN_SPEC, code: "console.log('debug')" },
-      { filename: "D:/repo/scripts/build.mjs", code: "console.log('building')" },
+      { filename: at("apps/web/scripts/build.mjs"), code: "console.log('building')" },
+      // a folder named src that no product slot owns is not product source
+      { filename: at("tools/src/build.ts"), code: "console.log('building')" },
+      { filename: at("packages/nivo-ui/src/leaves/Chip/index.tsx"), code: "logger.info('x')" },
     ],
     invalid: [
       { filename: PLAIN_FILE, code: "console.log('x')", errors: [{ messageId: "console" }] },
       { filename: PLAIN_FILE, code: "console.error(error)", errors: [{ messageId: "console" }] },
-      { filename: "D:/repo/src/modules/api/client.ts", code: "console.warn('slow')", errors: [{ messageId: "console" }] },
+      { filename: at("apps/web/src/modules/api/client.ts"), code: "console.warn('slow')", errors: [{ messageId: "console" }] },
+      { filename: at("packages/nivo-ui/src/leaves/Chip/index.tsx"), code: "console.log('x')", errors: [{ messageId: "console" }] },
     ],
   })
 })

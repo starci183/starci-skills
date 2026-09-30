@@ -2,6 +2,16 @@
 
 ## 6.0.0 - unreleased (lanes C0, F0)
 
+- **Every law scopes by slot, never by folder regex (lane F0-H).** The path predicates of `class-names`, `props-and-slots`,
+  `vendor-boundary`, `loading`, `type-safety`, `typography`, `brand-values`, `formatting`, `comments`, `hygiene`, `translation`,
+  `lint-escape-hatch`, `client-boundary`, `file-layout`, `shape-slot`, `the-split`, `landmark`, `icon`, `served-locale`, `e2e-shape`,
+  `hooks-folder`, `naming`, `next-conventions`, `tokens`, `size-and-state-budget`, `spec-quality` and `transport` ask the slot view
+  (`kind`, `role`, tier, owner, `hfs.allows(file)`, `classifyImport`) instead of testing a path. Shared-package layers (`fe.package.ui`)
+  are governed like app components; a file no slot owns is judged by `hfs check` (`HFS_SLOT_UNDECLARED`), not by a folder-name rule.
+  Line and hook budgets (`component.tsx`, `index.tsx`, `file`, `useState`, `dataHooks`) are read from the slot manifest.
+  `navigation-from-intl` exempts only the `proxy` and `global-error` roles; `no-middleware-file` reads slot `fe.source-root-retired`;
+  `route-tree-holds-routes-only` reads the `allows` of `fe.route`; `no-unresolved-token-class` reads the app's route and brand stylesheets.
+
 - New law `status-colors` (R61 `FE_STYLE_TOKEN_ONLY`): `status-text-uses-soft-foreground` refuses a class that paints text, an icon or a
   text decoration with a solid status tone (`text-success`, `fill-danger`, `stroke-warning`, `decoration-info`, with any variant, opacity or
   `!`), read from `className`/`class`, `cn()`/`clsx()` arguments, conditionals, arrays, constants and `classes` entries. The soft pair

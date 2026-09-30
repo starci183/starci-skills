@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 
 /**
  * The rules that hold `tokens.md`.
@@ -16,7 +16,8 @@ import { dirname, join } from "node:path"
  * license one.
  */
 
-import { fileOf, isProductSource } from "./lib/scope.mjs"
+import { hfsOf } from "./lib/hfs.mjs"
+import { classOf, isProductSource } from "./lib/scope.mjs"
 
 /**
  * A fractional step, in any family that measures.
@@ -182,33 +183,27 @@ const TOKEN_CLASS_FAMILIES = [
   { pattern: /^min-h-([a-z][a-z0-9-]*)$/, variable: (name) => `--min-height-${name}` },
 ]
 
-/** Stylesheets a repository may declare its theme in, relative to the repository root. */
-const STYLESHEET_CANDIDATES = [
-  "src/app/globals.css",
-  "apps/app/src/app/globals.css",
-  "apps/expert/src/app/globals.css",
-  "apps/landing/src/app/globals.css",
-  "packages/ui/src/styles/globals.css",
-]
-
-/** Every stylesheet found above the linted file, read once and cached for the run. */
+/**
+ * The stylesheets an app declares its theme in: the route slot's `globals.css` (`fe.route`, named by its `allows`) and the brand slot's
+ * `brand.css` (`fe.modules.brand`), both with `<app>` filled from the linted file's slot. Null when the file belongs to no app
+ * (a shared package has no theme of its own).
+ */
+/** Every theme read once per lint run. */
 const themeCache = new Map()
-const themeTextFor = (filename) => {
-  let directory = dirname(filename)
-  for (let depth = 0; depth < 12 && directory !== "/" && directory !== ""; depth += 1) {
-    if (themeCache.has(directory)) return themeCache.get(directory)
-    const found = STYLESHEET_CANDIDATES
-      .map((relative) => join(directory, relative))
-      .filter((candidate) => existsSync(candidate))
-      .map((candidate) => readFileSync(candidate, "utf8"))
-    if (found.length > 0) {
-      const text = found.join("\n")
-      themeCache.set(directory, text)
-      return text
-    }
-    directory = dirname(directory)
+const themeText = (context) => {
+  const hfs = hfsOf(context)
+  const app = classOf(context).bindings?.app
+  if (app === undefined) return null
+  const candidates = [
+    join(hfs.slot("fe.route").path.replace("<app>", app), "globals.css"),
+    hfs.slot("fe.modules.brand").path.replace("<app>", app),
+  ].map((relative) => join(hfs.repoRoot, relative))
+  const key = candidates.join("|")
+  if (!themeCache.has(key)) {
+    const found = candidates.filter((candidate) => existsSync(candidate)).map((candidate) => readFileSync(candidate, "utf8"))
+    themeCache.set(key, found.length > 0 ? found.join("\n") : null)
   }
-  return null
+  return themeCache.get(key)
 }
 
 /** A class naming a token the theme never defines is a class that draws nothing. */
@@ -224,7 +219,7 @@ export const noUnresolvedTokenClass = {
   },
   create(context) {
     if (!isProductSource(context)) return {}
-    const theme = themeTextFor(fileOf(context))
+    const theme = themeText(context)
     // A reader that cannot find the stylesheet stays quiet rather than calling every token dead.
     if (theme === null) return {}
     // The visitor hands (node, text) in that order; reversing them here is how a rule reports the

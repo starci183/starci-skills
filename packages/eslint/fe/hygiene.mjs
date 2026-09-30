@@ -21,15 +21,8 @@ import { walk } from "./lib/ast.mjs"
 import { calleeParts, functionOf, isFn, keyOf, parentOf, unwrap } from "./lib/bindings.mjs"
 import { isPlatform, isUnresolvedType, propertyNamesOf } from "./lib/platform.mjs"
 import { EFFECT_HOOKS, reactHookOf } from "./lib/react.mjs"
-import { isSpecFile } from "./lib/scope.mjs"
-import { normalizePath } from "./lib/path.mjs"
+import { isProductSource } from "./lib/scope.mjs"
 import { isPromiseValued } from "./lib/types.mjs"
-
-/** Product source outside specs. */
-const isGoverned = (filename) => {
-  const file = normalizePath(filename)
-  return file.includes("/src/") && !isSpecFile(file)
-}
 
 // -- HYGIENE-1 -------------------------------------------------------------------------------------
 
@@ -315,7 +308,7 @@ export const effectSubscriptionNeedsCleanup = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename)) return {}
+    if (!isProductSource(context)) return {}
     const owners = new Map()
     const resources = []
     return {
@@ -432,7 +425,7 @@ export const noDataFetchInEffect = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename)) return {}
+    if (!isProductSource(context)) return {}
     return {
       CallExpression(node) {
         const hook = reactHookOf(context, node)
@@ -462,7 +455,7 @@ export const noEmptyCatch = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename || context.getFilename())) return {}
+    if (!isProductSource(context)) return {}
     return {
       CatchClause(node) {
         if (node.body.body.length === 0) context.report({ node, messageId: "empty" })
@@ -496,7 +489,7 @@ export const noConsole = {
     },
   },
   create(context) {
-    if (!isGoverned(context.filename || context.getFilename())) return {}
+    if (!isProductSource(context)) return {}
     return {
       CallExpression(node) {
         const callee = node.callee

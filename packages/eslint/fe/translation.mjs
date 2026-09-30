@@ -29,16 +29,10 @@
  */
 
 import { SECOND_LANGUAGE_LETTER, isContentFile } from "./comments.mjs"
-import { normalizePath } from "./lib/path.mjs"
+import { isComponentFile, kindOfFile } from "./lib/scope.mjs"
 
-/** Tiers that receive every word they render: they know no domain, so they can know no sentence. */
-const VOCABULARY_DIRS = ["leaves", "shells", "composites", "branches"]
-
-/** True when a file sits in a tier that must not resolve copy. */
-const isVocabularyFile = (filename) => {
-  const file = normalizePath(filename)
-  return VOCABULARY_DIRS.some((dir) => file.includes(`/src/components/${dir}/`))
-}
+/** True when a file sits in a component layer that must not resolve copy: every layer but `blocks` receives every word it renders, so it can know no domain and no sentence. */
+const isVocabularyFile = (context) => isComponentFile(context) && kindOfFile(context) !== "blocks"
 
 /** Attributes a reader sees or hears: any word in them is copy. */
 const STRICT_ATTRS = new Set([
@@ -183,7 +177,7 @@ export const noCopyResolutionBelowBlock = {
     },
   },
   create(context) {
-    if (!isVocabularyFile(context.filename || context.getFilename())) return {}
+    if (!isVocabularyFile(context)) return {}
     return {
       CallExpression(node) {
         const callee = node.callee
@@ -216,7 +210,7 @@ export const noHardcodedCopy = {
     },
   },
   create(context) {
-    if (isContentFile(context.filename || context.getFilename())) return {}
+    if (isContentFile(context)) return {}
     const source = context.sourceCode || context.getSourceCode()
     /** Value nodes already reported through their owner (attribute, property), so a string reports once. */
     const claimed = new WeakSet()

@@ -16,13 +16,11 @@
  */
 
 import ts from "typescript"
-import { hfsOf } from "./lib/hfs.mjs"
-import { ROUTE_SLOTS, isSpecFile, stem } from "./lib/scope.mjs"
-import { normalizePath } from "./lib/path.mjs"
+import { classifyImport, fileOf, isProductSource, isSpecFile, kindOfFile, roleOfFile, slotOfFile, tierOfFile } from "./lib/scope.mjs"
 import { typed } from "./lib/types.mjs"
 
-/** The framework's own client-only files. */
-const FRAMEWORK_CLIENT = new Set(["error", "global-error"])
+/** The route roles that are client-only by the framework's own rule: `error` and `global-error`. */
+const FRAMEWORK_CLIENT_ROLES = new Set(["error", "global-error"])
 
 /** True when the program opens with the `"use client"` directive. */
 const clientDirective = (program) =>
@@ -30,37 +28,25 @@ const clientDirective = (program) =>
     (statement) => statement.type === "ExpressionStatement" && statement.directive === "use client",
   ) ?? null
 
-/**
- * The component tiers of a workspace package sit directly under `src/` of the package slot `fe.package.ui`
- * (grammar tier names: composites, branches, leaves), with no `components/` folder above them. A package has no data
- * layer, so its interactive tiers, branches and leaves, are where the directive is legitimate; a composite is
- * presentation and stays a server-safe component.
- */
-const PACKAGE_CLIENT_TIERS = ["branches", "leaves"]
-
-/** True for a file in an interactive tier of the `fe.package.ui` slot: the slot says whose package it is, the tier says where. */
-const isPackageClientTier = (context, file) => {
-  const hfs = hfsOf(context)
-  if (hfs.slotOf(file) !== "fe.package.ui") return false
-  const root = hfs.ownerOf(file)
-  const inside = root === null ? "" : hfs.relative(file).slice(root.length + 1)
-  return PACKAGE_CLIENT_TIERS.some((tier) => inside.startsWith(`src/${tier}/`))
+/** The layers whose files are legitimately client: a block's entry, a leaf (its interaction is intrinsic) and, in a shared package, the interactive layers (branches and leaves; a composite is presentation). */
+const isInteractionBoundary = (context) => {
+  const slot = slotOfFile(context)
+  const kind = kindOfFile(context)
+  const role = roleOfFile(context)
+  if (slot === "fe.components") return kind === "leaves" || (kind === "blocks" && role === "entry")
+  if (slot === "fe.feature") return kind === "overlays" && role === "entry"
+  if (slot === "fe.package.ui") return kind === "branches" || kind === "leaves"
+  return false
 }
 
 /** Where the directive is a legitimate boundary. */
-const isBoundary = (context, file) =>
-  FRAMEWORK_CLIENT.has(stem(file)) ||
-  (/\/components\/blocks\//.test(file) && stem(file) === "index") ||
-  (/\/features\/overlays\//.test(file) && stem(file) === "index") ||
-  /\/components\/leaves\//.test(file) ||
-  isPackageClientTier(context, file)
+const isBoundary = (context) => (slotOfFile(context) === "fe.route" && FRAMEWORK_CLIENT_ROLES.has(roleOfFile(context))) || isInteractionBoundary(context)
 
-/** The slot a file fills in the route tree, when it fills one. */
-const slotOf = (file) => {
-  const name = stem(file)
-  if (/\/app\//.test(file) && ROUTE_SLOTS.includes(name)) return name
-  if (/\/features\/pages\//.test(file)) return "page owner"
-  if (/\/features\/layouts\//.test(file)) return "layout owner"
+/** The slot a file fills in the route tree (its role in `fe.route`, or the page or layout owner of a feature), when it fills one. */
+const routeFill = (context) => {
+  if (slotOfFile(context) === "fe.route" && roleOfFile(context) !== null) return roleOfFile(context)
+  if (slotOfFile(context) === "fe.feature" && kindOfFile(context) === "pages") return "page owner"
+  if (slotOfFile(context) === "fe.feature" && kindOfFile(context) === "layouts") return "layout owner"
   return null
 }
 
@@ -78,9 +64,8 @@ export const useClientOnlyAtBoundary = {
     },
   },
   create(context) {
-    const filename = normalizePath(context.filename || context.getFilename())
-    if (isSpecFile(filename) || isBoundary(context, filename)) return {}
-    const slot = slotOf(filename)
+    if (isSpecFile(fileOf(context)) || isBoundary(context)) return {}
+    const slot = routeFill(context)
     return {
       Program(program) {
         const directive = clientDirective(program)
@@ -106,12 +91,13 @@ const serverApiReason = (source) => {
   return null
 }
 
-/** A server-only source: the marker package, a server API, a server reader. */
-const serverOnlyReason = (source) => {
+/** A server-only source: the marker package, a server API, a server reader (role `reader` of slot `fe.modules.api`). */
+const serverOnlyReason = (context, source) => {
   if (source === "server-only") return "`server-only`"
   const api = serverApiReason(source)
   if (api) return api
-  if (/(?:^|\/)modules\/api\/(?:.+\/)?read-[^/]+$/.test(source)) return `the server reader \`${source}\``
+  const target = classifyImport(context, source)
+  if (target?.slot === "fe.modules.api" && target.role === "reader") return `the server reader \`${source}\``
   return null
 }
 
@@ -127,8 +113,7 @@ export const clientNoServerImport = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (isSpecFile(file)) return {}
+    if (isSpecFile(fileOf(context))) return {}
     let client = false
     return {
       Program(program) {
@@ -136,7 +121,7 @@ export const clientNoServerImport = {
       },
       ImportDeclaration(node) {
         if (!client || node.importKind === "type") return
-        const what = serverOnlyReason(String(node.source.value))
+        const what = serverOnlyReason(context, String(node.source.value))
         if (what) context.report({ node, messageId: "server", data: { what } })
       },
     }
@@ -183,9 +168,8 @@ export const serverModuleMarksServerOnly = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (isSpecFile(file)) return {}
-    const slot = hfsOf(context).slotOf(file)
+    if (isSpecFile(fileOf(context))) return {}
+    const slot = slotOfFile(context)
     if (!slot || ROUTE_FILE_SLOTS.has(slot)) return {}
     let client = false
     let marked = false
@@ -235,8 +219,8 @@ export const webStorageOnlyInModules = {
     },
   },
   create(context) {
-    const file = normalizePath(context.filename || context.getFilename())
-    if (isSpecFile(file) || !file.includes("/src/") || /\/modules\//.test(file)) return {}
+    // Product source outside the module tiers (foundation modules, the other modules, the api transport), which are where storage is guarded.
+    if (!isProductSource(context) || ["foundation", "modules", "transport"].includes(tierOfFile(context))) return {}
     return {
       MemberExpression(node) {
         if (node.computed || node.property.type !== "Identifier" || !STORAGE.has(node.property.name)) return
