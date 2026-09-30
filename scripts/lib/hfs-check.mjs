@@ -22,10 +22,10 @@
 //   HFS_CONTRACT_SNAPSHOT_DRIFT   (R23, hfs-rules/contract.mjs) an uncommitted back-end snapshot, or a front-end copy that differs from it
 //   BE_TEST_TOPOLOGY              (R47, hfs-rules/test-topology.mjs) a `.test` file, a testing/ folder, a second jest configuration
 //   FE_NO_TESTS                   (R97, hfs-rules/fe-no-tests.mjs) a front end holds a spec, e2e or test-tool file, a test script or a test dependency; no exception
-//   BE_SPEC_PLACEMENT             (R98, hfs-rules/spec-placement.mjs) a spec or test file outside the four test layers, scripts/ and tools/ included
-//   HFS_REPO_LOCAL_CHECK          (R99, hfs-rules/repo-local-checks.mjs) a local eslint rule or plugin, a `check-*` script, a relative import in eslint.config
-//   HFS_LINT_SUPPRESSION_FILE     (R100, hfs-rules/lint-suppression.mjs) an eslint suppressions file, script or option
-//   HFS_PROOF_COMMAND_FILE_MISSING (R101, hfs-rules/proof-commands.mjs) a .starciwork proof command that runs a file the repository does not hold
+//   BE_SPEC_PLACEMENT             (R102, hfs-rules/spec-placement.mjs) a spec or test file outside the four test layers, scripts/ and tools/ included
+//   HFS_REPO_LOCAL_CHECK          (R103, hfs-rules/repo-local-checks.mjs) a local eslint rule or plugin, a `check-*` script, a relative import in eslint.config
+//   HFS_LINT_SUPPRESSION_FILE     (R104, hfs-rules/lint-suppression.mjs) an eslint suppressions file, script or option
+//   HFS_PROOF_COMMAND_FILE_MISSING (R105, hfs-rules/proof-commands.mjs) a .starciwork proof command that runs a file the repository does not hold
 //   FE_WIRE_GENERATED, FE_I18N_PLACEMENT, FE_I18N_CATALOG   (R52, R59, R60, hfs-rules/frontend.mjs) the front-end tree of each app
 //   HFS_GITIGNORE_BLOCK_DRIFT, HFS_SONAR_CONFIG   (R04, R11) produced by packages/hfs/sync/managed.mjs, which renders the templates
 //   HFS_FORMAT                    (R19) produced by packages/hfs/sync/format.mjs, which runs the repository's own prettier
@@ -152,14 +152,6 @@ const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SOURCE_ROOT = /^(?:src|apps)\//;
 const FREE_NAMES = new Set(['index.ts', 'main.ts']);
 const PLAIN_ENTRY = /^<[a-z][a-z0-9-]*>.ts$/;
-/**
- * Where the work of a banned data-access suffix goes. The suffix is banned by the manifest (ruleParams.be.bannedSuffixes);
- * this only adds the convention's home to the finding, so a file that is a repository or a store is told what replaces it.
- */
-const BANNED_SUFFIX_HOME = Object.freeze({
-  repository: 'SQL text is a constant in <name>.sql.ts of the capability persistence/ folder, and data access is the capability *.service.ts (or the application *.handler.ts) calling the shared EntityManager through its Inject<Conn>EntityManager()',
-  store: 'SQL text is a constant in <name>.sql.ts of the capability persistence/ folder, and data access is the capability *.service.ts (or the application *.handler.ts) calling the shared EntityManager through its Inject<Conn>EntityManager()',
-});
 
 /**
  * BE_SOURCE_FORM (R89): every tracked src/ or apps/ TypeScript file of a back end is index.ts, main.ts, a migration of
@@ -193,7 +185,7 @@ function sourceFormFindings({ files, resolver }) {
     const parts = base.slice(0, -'.ts'.length).split('.');
     const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));
     if (banned) {
-      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})${BANNED_SUFFIX_HOME[banned] ? `. ${BANNED_SUFFIX_HOME[banned]}` : ''}` });
+      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})` });
     } else if (boundSuffixes.has(parts.at(-1)) && parts.length >= 2 && boundSuffixes.get(parts.at(-1)).id !== c.slot) {
       findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: parts.at(-1), message: `${file}: the suffix .${parts.at(-1)}.ts belongs to ${boundSuffixes.get(parts.at(-1)).path} only; move the file there` });
     } else if (parts.length < 2 || !parts.every((part) => KEBAB.test(part)) || !suffixes.includes(parts.at(-1))) {

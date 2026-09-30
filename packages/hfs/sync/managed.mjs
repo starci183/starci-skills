@@ -1,7 +1,7 @@
 // The managed-file findings of `hfs check` (BE-CONVENTION 1.17, 3.1 principle 4): the rendered set of `hfs sync`, compared
 // with the tracked repository, and the tool configuration nothing may add to it.
 //   HFS_MANAGED_FILE_DRIFT (R05)  a managed file that exists but differs from its render: tsconfig*.json (but see R22),
-//                                 jest.config.js (back end), .prettierrc, .prettierignore, husky hooks, both workflows, sonar and codecov
+//                                 jest.config.js (back end), .prettierrc, .prettierignore, husky hooks, both workflows and sonar
 //                                 files, and the `scripts` block of package.json (compared as parsed JSON, so key order is
 //                                 not drift). A file that is absent is the slot manifest's finding (HFS_SLOT_REQUIRED_MISSING);
 //                                 the `.gitignore` block is R04's.
@@ -20,7 +20,7 @@
 //                                 `prettier`, `lint-staged`, `jest`). Forbidden tool-config files (.eslintrc*, .eslintignore, a second
 //                                 eslint.config.*) are refused by hfs-check through the slot manifest under the same code.
 //   HFS_SONAR_CONFIG (R11)        sonar-project.properties differs from its render (the render names no host URL, sources and tests that
-//                                 do not overlap, the coverage exclusions of the jest preset (a back end), the ESLint report and the
+//                                 do not overlap, the `sonar.exclusions` of the jest preset (a back end), no coverage import, the ESLint report and the
 //                                 HFS import files Sonar reads), or the stack declaration names a quality gate other than the one
 //                                 gate of knowledge/sonar-gate.yaml (bundled in the runtime copy). One edit is one finding.
 //   HFS_TS_STRICT (R22)           the root tsconfig.json drift (either profile), named by flag (ts-strict.mjs) instead of by hash.

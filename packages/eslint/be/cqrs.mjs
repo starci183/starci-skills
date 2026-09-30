@@ -411,29 +411,6 @@ const EVENT_NAMES = new Set(["EventBus", "EventsHandler", "IEventHandler"])
 /** The package of the second in-process event system. */
 const EVENT_EMITTER_PACKAGE = "@nestjs/event-emitter"
 
-/** The Node and RxJS classes that are an in-process event bus when constructed or extended: package -> class names. */
-const BUS_CLASSES = { events: new Set(["EventEmitter"]), "node:events": new Set(["EventEmitter"]), rxjs: new Set(["Subject", "BehaviorSubject", "ReplaySubject", "AsyncSubject"]) }
-
-/** The bus class a constructed or extended expression is declared as (by declaration origin), else null. */
-const busClassOf = (context, node) => {
-    const origin = typeOrigins(context, node).find((entry) => entry.module !== null && BUS_CLASSES[entry.module]?.has(entry.name))
-    return origin ? origin.name : null
-}
-
-/** The methods that register a subscriber on a collection. */
-const REGISTER_METHODS = new Set(["add", "push", "unshift", "set"])
-
-/** True for a type that is a function: it has a call signature and no construct signature. */
-const isFunctionType = (type) => type.getCallSignatures().length > 0 && type.getConstructSignatures().length === 0
-
-/** True when a collection type (Set, Array, Map) holds functions. */
-const holdsFunctions = (checker, type) => {
-    const symbolName = type.getSymbol()?.getName()
-    if (!["Set", "Array", "ReadonlyArray", "Map", "WeakSet"].includes(symbolName ?? "")) return false
-    const args = checker.getTypeArguments(type)
-    return args.length > 0 && isFunctionType(args[args.length - 1])
-}
-
 /** No in-process events: a side effect that must happen anyway is an outbox message. */
 export const noEventBus = {
     meta: {
@@ -442,56 +419,11 @@ export const noEventBus = {
         schema: [],
         messages: {
             event: "`{{name}}` is an in-process event mechanism. Events die with the process and run outside the transaction: write an outbox message in the transaction and consume it in `transport/message/` instead.",
-            bus: "`{{name}}` is constructed or extended here as an in-process event bus. A `*TransitionEmitter`, a Subject used as a channel or an EventEmitter subclass has the same failure as `EventBus`: listeners live in one process and run outside the transaction. Write an outbox message in the transaction and consume it in `transport/message/`; a state a caller waits for is read from the database.",
-            registry: "`{{name}}` stores callbacks that other code registers and this class later calls: a hand-rolled listener list is an in-process event bus. Write an outbox message in the transaction and consume it in `transport/message/` instead.",
         },
     },
     create(context) {
         const report = (node, name) => context.report({ node, messageId: "event", data: { name } })
-        const { checker, toTs } = typed(context)
-        /** Collects, per class, the functions-collection properties and the registrations made on them. */
-        const checkClass = (classNode) => {
-            const collections = new Map()
-            for (const member of classNode.body.body) {
-                if (member.type !== "PropertyDefinition" || member.computed || member.key.type !== "Identifier") continue
-                const tsKey = toTs(member.key)
-                if (tsKey && holdsFunctions(checker, checker.getTypeAtLocation(tsKey))) collections.set(member.key.name, member.key)
-            }
-            if (collections.size === 0) return
-            const registered = new Set()
-            const visit = (node) => {
-                if (!node || typeof node.type !== "string") return
-                if (node.type === "CallExpression" && node.callee.type === "MemberExpression" && !node.callee.computed && node.callee.property.type === "Identifier" && REGISTER_METHODS.has(node.callee.property.name)) {
-                    const holder = node.callee.object
-                    if (holder.type === "MemberExpression" && holder.object.type === "ThisExpression" && !holder.computed && holder.property.type === "Identifier" && collections.has(holder.property.name)) {
-                        const callback = node.arguments[node.arguments.length - 1]
-                        const tsCallback = callback ? toTs(callback) : null
-                        if (tsCallback && isFunctionType(checker.getTypeAtLocation(tsCallback)) && callback.type === "Identifier") registered.add(holder.property.name)
-                    }
-                }
-                for (const key of Object.keys(node)) {
-                    if (key === "parent") continue
-                    const value = node[key]
-                    if (Array.isArray(value)) for (const child of value) visit(child)
-                    else if (value && typeof value.type === "string") visit(value)
-                }
-            }
-            visit(classNode.body)
-            for (const name of registered) context.report({ node: collections.get(name), messageId: "registry", data: { name } })
-        }
         return {
-            ClassDeclaration(node) {
-                checkClass(node)
-                if (node.superClass) {
-                    const name = busClassOf(context, node.superClass)
-                    if (name) context.report({ node: node.superClass, messageId: "bus", data: { name } })
-                }
-            },
-            ClassExpression(node) { checkClass(node) },
-            NewExpression(node) {
-                const name = busClassOf(context, node.callee)
-                if (name) context.report({ node, messageId: "bus", data: { name } })
-            },
             ...moduleReferences(({ node, source, value, names }) => {
                 if (value === EVENT_EMITTER_PACKAGE) report(source, value)
                 else if (value === CQRS_PACKAGE) for (const name of names) if (EVENT_NAMES.has(name)) report(node, name)

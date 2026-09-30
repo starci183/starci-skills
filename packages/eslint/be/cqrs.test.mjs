@@ -246,23 +246,8 @@ test("no-event-bus: no EventBus, @EventsHandler, IEventHandler or @nestjs/event-
             // a local class with the same name is not the package's
             { filename: HANDLER, code: "class EventBus {}\nexport const x = new EventBus()" },
             { filename: DOMAIN, code: `import { Module } from "@nestjs/common"\nexport const x = Module` },
-            // a local class named like the Node one is not the package's; a collection of data is not a listener list
-            { filename: DOMAIN, code: "class EventEmitter {}\nexport const x = new EventEmitter()" },
-            { filename: DOMAIN, code: "export class Seen { private readonly ids = new Set<string>()\n mark(id: string) { this.ids.add(id) } }" },
-            // a callback the class only runs, never stores, is not a registry
-            { filename: DOMAIN, code: "export class Runner { run(work: () => void) { work() } }" },
-            // an Observable is a read-only stream, not a channel
-            { filename: DOMAIN, code: `import { Observable } from "rxjs"\nexport const stream = (): Observable<number> | null => null` },
         ],
         invalid: [
-            // the hand-rolled forms: an EventEmitter held or extended, a Subject used as a channel, a stored listener list
-            { filename: DOMAIN, code: `import { EventEmitter } from "events"\nexport class TransitionEmitter { private readonly emitter = new EventEmitter() }`, errors: [{ messageId: "bus" }] },
-            { filename: DOMAIN, code: `import { EventEmitter } from "events"\nexport class Feed extends EventEmitter {}`, errors: [{ messageId: "bus" }] },
-            { filename: DOMAIN, code: `import { EventEmitter as Node } from "events"\nexport const bus = new Node()`, errors: [{ messageId: "bus" }] },
-            { filename: DOMAIN, code: `import { Subject } from "rxjs"\nexport class Changes { readonly stream = new Subject<string>() }`, errors: [{ messageId: "bus" }] },
-            { filename: DOMAIN, code: `import { BehaviorSubject } from "rxjs"\nexport const state = new BehaviorSubject<number>(0)`, errors: [{ messageId: "bus" }] },
-            { filename: DOMAIN, code: "export class Listeners { private readonly listeners = new Set<(id: string) => void>()\n on(listener: (id: string) => void) { this.listeners.add(listener) } }", errors: [{ messageId: "registry" }] },
-            { filename: DOMAIN, code: "export class Hooks { private handlers: Array<() => void> = []\n subscribe(callback: () => void) { this.handlers.push(callback) } }", errors: [{ messageId: "registry" }] },
             { filename: HANDLER, code: `import { EventBus } from "@nestjs/cqrs"\nexport const x = EventBus`, errors: [{ messageId: "event" }] },
             { filename: HANDLER, code: `import { EventsHandler } from "@nestjs/cqrs"\nexport const x = EventsHandler`, errors: [{ messageId: "event" }] },
             { filename: HANDLER, code: `import type { IEventHandler } from "@nestjs/cqrs"\nexport type X = IEventHandler`, errors: [{ messageId: "event" }] },

@@ -1,1 +1,1 @@
-export { SystemHealthModule } from "./system-health.module"
+export { SystemHealthHttpModule } from "./transport/http/system-health-http.module"

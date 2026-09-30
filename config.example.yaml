@@ -174,7 +174,7 @@ reconciler:
 # specs.unit / specs.e2e in workflows (the `specs` map near the top; owner 2026-09-28 "speed up development;
 # test later when asked"; scripts/kernel/spec-deferral.mjs). Each op brief's policy.specsToggle says what it does:
 #   unit: false - backend.implement, interface.implement and code.refactor run no jest/vitest/test:ci/coverage
-#     and demand no changed-line coverage (Sonar still runs with --no-coverage: bugs, smells, security gate);
+#     and demand no changed-line coverage (Sonar still runs: bugs, smells, security gate);
 #     test.author legs are never dispatched; review/handover gates do not count unit tests or coverage.
 #   e2e: false - e2e.verify legs and e2e test authoring are never dispatched; uat.verify is not e2e.
 #   A leg that is not dispatched settles `deferred: specs.<class>=false` with no attempt spent and the workflow

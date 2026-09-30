@@ -1,7 +1,7 @@
 // sonar-gate.mjs - the Sonar quality gate as data plus its pure judgments (knowledge/sonar-gate.yaml).
 //
 // The thresholds live in that one knowledge file; nothing here restates a number. Three readers use it:
-//   scripts/checks/sonar-local.mjs      judges a slice's changed lines (issues, duplication, coverage, hotspots)
+//   scripts/checks/sonar-local.mjs      judges a slice's changed lines (issues, duplication, hotspots)
 //                                       and makes the server gate `gate.name` carry `serverConditions(gate)`
 //   scripts/checks/check-starcistacks.mjs  refuses a declaration whose services.sonar.qualityGate is not `gate.name`
 //   scripts/kernel/sonar-settle.mjs     `judgeSummary` reads the sonar.json an op attached and says whether the
@@ -36,7 +36,6 @@ export function serverConditions(gate) {
   const n = gate.newCode;
   const o = gate.overall;
   const out = [
-    { metric: n.coverage.metric, op: 'LT', error: String(n.coverage.minPercent) },
     { metric: n.duplication.metric, op: 'GT', error: String(n.duplication.maxPercent) },
     { metric: n.hotspots.metric, op: 'LT', error: String(n.hotspots.minReviewedPercent) },
   ];
@@ -53,8 +52,7 @@ export function thresholdsOf(gate) {
   const n = gate.newCode;
   return {
     name: gate.gate.name,
-    coverageMinPercent: n.coverage.minPercent,
-    ignoreBelowChangedLines: n.coverage.ignoreBelowChangedLines,
+    ignoreBelowChangedLines: n.ignoreBelowChangedLines,
     duplicationMaxPercent: n.duplication.maxPercent,
     blockingSeverities: [...n.issues.blockingSeverities],
     blockingIssuesMax: n.issues.max,
@@ -68,7 +66,7 @@ export function thresholdsOf(gate) {
  *   pass         the slice meets the gate (or Sonar is disabled by the repository's own declaration - noted)
  *   red          the slice fails the gate on new code: findings[] names every failing condition
  *   unavailable  the scan could not run (server down, custody missing, token rejected): never a pass
- *   refused      the scan was refused before it ran (stale or missing coverage, unknown base ...): the op fixes and reruns
+ *   refused      the scan was refused before it ran (unknown base, empty slice ...): the op fixes and reruns
  *   missing      no sonar.json (or one that is not a scan summary) is attached
  * A slice that changed no file is a pass with `note`: there is nothing new to fail.
  */

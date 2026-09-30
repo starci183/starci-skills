@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from './_hfs-arch-fixture.mjs';
 
-// R102 i18n-keys (FE_I18N_KEYS): the catalogs of an app and the source that reads them agree: a literal key read through next-intl is in
+// R106 i18n-keys (FE_I18N_KEYS): the catalogs of an app and the source that reads them agree: a literal key read through next-intl is in
 // every locale, and a catalog key that no string of the app's or the shared packages' source can be reading is dead.
 const CATALOG_DIR = 'apps/web/src/modules/i18n/messages';
 const catalog = (extra = {}) => `${JSON.stringify({ home: { title: 'Trang chu', subtitle: 'Mo ta' }, common: { save: 'Luu' }, ...extra })}\n`;

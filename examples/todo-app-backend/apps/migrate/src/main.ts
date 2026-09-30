@@ -4,7 +4,7 @@ import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
 import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
 import type { DatabaseConnectionOptions } from "@modules/platform/database"
-import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
+import { JsonLoggerService, LoggingLogEvent } from "@modules/platform/logging"
 import { primaryConnectionOf } from "./migrate.options"
 import type { MigrateAppOptions } from "./migrate.options"
 
@@ -39,9 +39,9 @@ export async function bootstrap(options: MigrateAppOptions): Promise<Readonly<Re
 /** The one process that changes a schema: migrates every connection and exits; the api and the worker start after it. */
 if (require.main === module) {
     bootstrap({ connections: [primaryConnectionOf(parsePrimaryDatabaseConfig(EnvSource.fromProcess()))] })
-        .then((applied) => createJsonLogger(new SystemClock()).info(LoggingLogEvent.MigrationsApplied, { applied }))
+        .then((applied) => new JsonLoggerService(new SystemClock(), process.stdout, process.stderr).info(LoggingLogEvent.MigrationsApplied, { applied }))
         .catch((error: unknown) => {
-            createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "migrate" })
+            new JsonLoggerService(new SystemClock(), process.stdout, process.stderr).error(LoggingLogEvent.StartupFailed, error, { service: "migrate" })
             process.exit(1)
         })
 }

@@ -4,7 +4,16 @@ import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
 import { NotifyErrorCode } from "./errors/notify.error"
-import type { FindPreferenceParams, PreferenceView, UpdatePreferenceParams } from "./notify.contracts"
+import type {
+    ChangePreferenceParams,
+    ChangePreferenceResult,
+    FindPreferenceParams,
+    PreferenceSummary,
+    PreferenceView,
+    UnsubscribeParams,
+    UnsubscribeResult,
+    UpdatePreferenceParams,
+} from "./notify.contracts"
 import { isBlankChannel, isValidDigestWindow } from "./notify.policy"
 import { NotifyPreferenceEntity } from "./persistence/entities/preference.entity"
 import { toPreferenceView } from "./persistence/notify.rows"
@@ -25,6 +34,41 @@ export class PreferencesService {
             channel: params.channel,
         })
         return row ? toPreferenceView(row) : { ...params, unsubscribed: false, digestWindowMinutes: null }
+    }
+
+    /** The preference of the pair in the shape the preference doors return; the default when nothing was ever written. */
+    async read(params: FindPreferenceParams): Promise<PreferenceSummary> {
+        const { channel, unsubscribed, digestWindowMinutes } = await this.get(params)
+        return { channel, unsubscribed, digestWindowMinutes }
+    }
+
+    /** Writes the changed fields of the pair in one transaction; an omitted field keeps its current value. */
+    change(params: ChangePreferenceParams): Promise<ChangePreferenceResult> {
+        return this.entityManager.transaction(async (manager) => {
+            const outcome = await this.update({
+                manager,
+                personId: params.personId,
+                channel: params.channel,
+                patch: { unsubscribed: params.unsubscribed, digestWindowMinutes: params.digestWindowMinutes },
+            })
+            if (outcome.kind === "refused") return outcome
+            const { channel, unsubscribed, digestWindowMinutes } = outcome.value
+            return ok({ channel, unsubscribed, digestWindowMinutes })
+        })
+    }
+
+    /** Marks the channel unsubscribed in one transaction; every later admission reads it, so there is no cache to invalidate. */
+    unsubscribe(params: UnsubscribeParams): Promise<UnsubscribeResult> {
+        return this.entityManager.transaction(async (manager) => {
+            const outcome = await this.update({
+                manager,
+                personId: params.personId,
+                channel: params.channel,
+                patch: { unsubscribed: true },
+            })
+            if (outcome.kind === "refused") return outcome
+            return ok({ channel: outcome.value.channel, unsubscribed: true as const })
+        })
     }
 
     /**

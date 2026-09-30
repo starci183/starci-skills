@@ -38,9 +38,8 @@ environments:
     # nothing to custody yet - a real environment adopts the SOPS+age pattern the todo-app example
     # demonstrates before it holds anything worth encrypting.
     secrets: []
-# Delivery/quality services (contract change starcistacks-services). Codecov is the one service CI
-# calls for this repository: the parent's example-coverage.yml uploads coverage/lcov.info under flag
-# ecommerce-be with OIDC. Sonar points to the shared host extension; CI does not scan this example.
+# Delivery/quality services (contract change starcistacks-services). Sonar points to the shared host extension;
+# CI does not scan this example.
 services:
   sonar:
     provider: sonarqube
@@ -75,26 +74,6 @@ services:
         The generated ci.yml scans and gates only when the repository has a SONAR_TOKEN secret (steps guarded by
         env.SONAR_TOKEN != ''); no project token is in custody for this example, so a Kernel (never the owner) mints
         one with sonar-local.mjs and sets it when it chooses to.
-    ownerAction: none
-  codecov:
-    provider: codecov
-    mode: hosted
-    purpose: Coverage dashboard for the example unit suite (lcov.info upload, flag ecommerce-be).
-    host:
-      public: https://app.codecov.io
-    auth: oidc
-    projects:
-      - {repository: ecommerce-app-be, key: gh/starci183/starci-skills, name: starci-skills}
-    credentials: []
-    ci:
-      workflow: .github/workflows/example-coverage.yml
-      wiring: required
-      permissions: ['id-token: write']
-      secrets: []
-      vars: []
-      provisioning: >-
-        codecov/codecov-action@v5 with use_oidc true, flags ecommerce-be; the workflow lives in the
-        parent repository's .github/workflows because examples carry no CI of their own.
     ownerAction: none
 k8s:
   status: deferred

@@ -1,11 +1,24 @@
 import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
+import { InjectClock } from "@modules/platform/clock"
+import type { Clock } from "@modules/platform/clock"
+import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectOutbox } from "@modules/platform/outbox"
+import type { Outbox } from "@modules/platform/outbox"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
+import { toAuditAppendMessage } from "./audit-append.policy"
 import { AuditKeystoreService } from "./audit-keystore.service"
-import { ErasureState } from "./audit.contracts"
-import type { ErasureRequestView, ErasureStepParams, RequestErasureParams } from "./audit.contracts"
+import { AuditAction, ErasureState, SYSTEM_ACTOR_ID } from "./audit.contracts"
+import type {
+    CompleteOwnErasureParams,
+    ErasureReceiptView,
+    ErasureRequestView,
+    ErasureStepParams,
+    RequestErasureParams,
+    RequestOwnErasureParams,
+} from "./audit.contracts"
 import { AuditErrorCode } from "./errors/audit.error"
 import { toErasureRequestView } from "./persistence/audit.rows"
 import { AuditErasureRequestEntity } from "./persistence/entities/audit-erasure-request.entity"
@@ -24,10 +37,49 @@ type ExecuteRefusal = ConfirmRefusal | AuditErrorCode.ErasureNotConfirmed
  * The lifecycle of one request to be forgotten, by crypto-shredding: requested, verified (or refused), executing,
  * complete. The subject is always the caller, so `request` opens and verifies in one step. Execution destroys the
  * subject key, confirms nothing about the subject stays readable, and drops the person id from the request row. The log
- * lines about the erasure are written by the handler through the audit queue, never here.
+ * lines about the erasure are queued through the outbox in the transaction of the step, naming the request and the
+ * system actor, never the person.
  */
 export class AuditErasureService {
-    constructor(private readonly keystore: AuditKeystoreService) {}
+    constructor(
+        @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        @InjectClock() private readonly clock: Clock,
+        @InjectOutbox() private readonly outbox: Outbox,
+        private readonly keystore: AuditKeystoreService,
+    ) {}
+
+    /**
+     * Opens and verifies the erasure request of the caller in one transaction, together with the erasure-requested
+     * audit line. A refusal is returned, not thrown, so what the step wrote before refusing still commits.
+     */
+    requestForCaller(params: RequestOwnErasureParams): Promise<Outcome<ErasureReceiptView, ConfirmRefusal>> {
+        const at = this.clock.now()
+        return this.entityManager.transaction(async (manager): Promise<Outcome<ErasureReceiptView, ConfirmRefusal>> => {
+            const outcome = await this.request({ manager, personId: params.personId, at })
+            if (outcome.kind === "refused") return outcome
+            await this.queueLine(manager, AuditAction.ErasureRequested, outcome.value.requestId, at)
+            return ok({ requestId: outcome.value.requestId, state: outcome.value.state })
+        })
+    }
+
+    /**
+     * Completes the verified erasure request of the caller in one transaction, together with the erasure-completed
+     * audit line. A refusal is returned, not thrown.
+     */
+    completeForCaller(params: CompleteOwnErasureParams): Promise<Outcome<ErasureReceiptView, ExecuteRefusal>> {
+        const at = this.clock.now()
+        return this.entityManager.transaction(async (manager): Promise<Outcome<ErasureReceiptView, ExecuteRefusal>> => {
+            const outcome = await this.execute({
+                manager,
+                requestId: params.requestId,
+                callerId: params.callerId,
+                at,
+            })
+            if (outcome.kind === "refused") return outcome
+            await this.queueLine(manager, AuditAction.ErasureCompleted, outcome.value.requestId, at)
+            return ok({ requestId: outcome.value.requestId, state: outcome.value.state })
+        })
+    }
 
     /** Opens a request for the caller and verifies it at once, since the caller is the subject. */
     async request(params: RequestErasureParams): Promise<Outcome<ErasureRequestView, ConfirmRefusal>> {
@@ -113,6 +165,13 @@ export class AuditErasureService {
             personId: null,
         })
         return ok(toErasureRequestView(saved))
+    }
+
+    private queueLine(manager: EntityManager, action: AuditAction, requestId: string, at: Date): Promise<void> {
+        return this.outbox.enqueue(
+            manager,
+            toAuditAppendMessage({ eventId: randomUUID(), actorId: SYSTEM_ACTOR_ID, action, target: requestId, at }),
+        )
     }
 
     private find(manager: EntityManager, requestId: string): Promise<AuditErasureRequestEntity | null> {

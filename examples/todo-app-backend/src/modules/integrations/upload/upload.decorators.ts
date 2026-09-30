@@ -1,6 +1,5 @@
 import { injector } from "@modules/platform/composition"
 import type { TypedParameterDecorator } from "@modules/platform/composition"
-import { MODULE_OPTIONS_TOKEN } from "./upload.module-definition"
 import type { UploadStorageOptions } from "./upload.options"
 import type { UploadScan, UploadStorage } from "./upload.port"
 
@@ -17,6 +16,9 @@ export const InjectUploadStorage = (): TypedParameterDecorator<UploadStorage> =>
 /** Injects the upload content inspection hook. Parameter type: UploadScan. */
 export const InjectUploadScan = (): TypedParameterDecorator<UploadScan> => injector<UploadScan>(UPLOAD_SCAN)
 
+/** Token of the upload storage options, exported so a spec can provide it. */
+export const UPLOAD_STORAGE_OPTIONS: unique symbol = Symbol("integrations.upload.options")
+
 /** Injects the options of the upload storage integration. Parameter type: UploadStorageOptions. */
 export const InjectUploadStorageOptions = (): TypedParameterDecorator<UploadStorageOptions> =>
-    injector<UploadStorageOptions>(MODULE_OPTIONS_TOKEN)
+    injector<UploadStorageOptions>(UPLOAD_STORAGE_OPTIONS)

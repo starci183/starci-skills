@@ -652,13 +652,12 @@ BE_CONNECTION_DUPLICATE:
 BE_CQRS_SHAPE:
   title: "Application layer is not in CQRS shape"
   title_vi: "Tầng ứng dụng sai hình CQRS"
-  meaning_vi: "Tầng application phải là CQRS: message Command<R>/Query<R> chỉ mang một trường readonly params kiểu ExecuteParams hoặc PublicExecuteParams, handler kế thừa ICQRSHandler và override process (không override execute). Bộ kiểm tra thấy tệp *.use-case.ts, service chuyển tiếp, message không khai kiểu kết quả, EventBus, @EventsHandler hoặc EventEmitter2, cũng như new EventEmitter() / extends EventEmitter, new Subject() (RxJS) dùng làm kênh, hoặc lớp giữ danh sách callback do nơi khác đăng ký (như *TransitionEmitter)."
+  meaning_vi: "Tầng application phải là CQRS: message Command<R>/Query<R> chỉ mang một trường readonly params kiểu ExecuteParams hoặc PublicExecuteParams, handler kế thừa ICQRSHandler và override process (không override execute). Bộ kiểm tra thấy tệp *.use-case.ts, service chuyển tiếp, message không khai kiểu kết quả, EventBus, @EventsHandler hoặc EventEmitter2."
   causes_vi:
     - "Còn lớp use case kiểu cũ"
     - "Message thiếu kiểu kết quả Command<R>"
     - "Handler override execute"
     - "Dùng sự kiện trong tiến trình thay cho outbox"
-    - "class XTransitionEmitter { private emitter = new EventEmitter() } hoặc lớp tự giữ Set<callback> rồi gọi từng callback"
   nextStep_vi: "Tách mỗi thao tác thành <action>.command.ts hoặc <action>.query.ts, <action>.handler.ts và <action>.contracts.ts; transport gọi bus trực tiếp; hiệu ứng phụ bắt buộc đi qua outbox trong transaction. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
@@ -837,9 +836,8 @@ BE_SECRET_DEFAULT:
 BE_SOURCE_FORM:
   title: "Back-end source file breaks the naming or form canon"
   title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"
-  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji, và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test ngoài catalog messages/ và slot fixture i18n; mã production không khai báo lớp, hàm hay hằng export có từ Mock, Fake hoặc Stub trong tên (đồ giả nằm trong spec hoặc src/tests; driver ngoại tuyến là adapter điều khiển bằng options, đặt tên theo việc nó làm)."
+  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji, và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test ngoài catalog messages/ và slot fixture i18n."
   causes_vi:
-    - "class MockExpertAgentService trong mã production thay vì adapter điều khiển bằng options"
     - "Tệp dùng hậu tố bị cấm (use-case, repository, store, util, helper, types, constants)"
     - "Lớp export không kết thúc bằng hậu tố vai trò của tệp và cũng không kết thúc bằng tên port (interface trong *.port.ts hoặc *.contracts.ts) mà nó implements"
     - "Interface trong tệp *.input.ts, *.request.ts, *.response.ts, *.type.ts, *.args.ts hoặc *.rows.ts không kết thúc bằng Input, Request, Response, Type, Args hoặc Row"
@@ -847,7 +845,6 @@ BE_SOURCE_FORM:
     - "Export default"
     - "Thiếu JSDoc trên export"
     - "Chú thích tiếng Việt trong mã"
-    - "class MockExpertAgentService trong mã production thay vì adapter điều khiển bằng options"
   nextStep_vi: "Đổi tên tệp theo vai trò trong danh sách đóng, chuyển kiểu vào <tên>.contracts.ts, thêm JSDoc tiếng Anh và bỏ export default. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
@@ -863,6 +860,52 @@ BE_SPEC_QUALITY:
     - "e2e gọi CommandBus, QueryBus hay handler trực tiếp; dùng sleep thay cho waitFor; tự gọi Test.createTestingModule; import SDK của nhà cung cấp mô hình; không đọc lại dòng đã lưu qua EntityManager"
     - "Spec đơn vị của service có providers khác với phụ thuộc constructor: thừa nhà cung cấp, thiếu nhà cung cấp, service không đứng đầu, token không suy ra được hoặc nhà cung cấp không phải lớp hay { provide, useValue }"
   nextStep_vi: "Chuyển luật kiến trúc sang lint hoặc bộ kiểm tra; khẳng định kết quả hoặc trạng thái; e2e vào bằng transport thật, chờ bằng waitFor và dựng thế giới ở src/tests/e2e/setup. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_TEST_BUILDER_HOME:
+  title: "A test data builder is outside the builders folder"
+  title_vi: "Builder dữ liệu test nằm ngoài thư mục builders"
+  meaning_vi: "Mọi hàm dựng dữ liệu test (hàm được export và tạo dòng trong cơ sở dữ liệu qua EntityManager, DataSource hoặc QueryRunner) chỉ được nằm trong src/tests/fixtures/builders/<khu>.builder.ts; SQL đi kèm nằm trong <khu>.sql.ts cạnh nó. Một mô-đun khác của cây test làm việc này là builder đặt sai chỗ, dù tên nó là gì."
+  causes_vi:
+    - "Mô-đun trong src/tests/world hoặc src/tests/fixtures (ngoài builders/) export hàm gọi save, insert hoặc upsert, hoặc chạy INSERT, qua EntityManager"
+    - "Hàm seed hoặc anOrder viết ngay cạnh spec thay vì trong builders/"
+    - "Tên tệp *.repository.ts, *.factory.ts hoặc *.fixture.ts trong src/tests (bị BE_SOURCE_FORM chặn cùng lúc)"
+  nextStep_vi: "Chuyển hàm sang src/tests/fixtures/builders/<khu>.builder.ts, chuyển chuỗi SQL sang <khu>.sql.ts cạnh nó, sửa import trong spec. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_TEST_ROW_BY_BUILDER:
+  title: "A spec hand-builds rows instead of using a builder"
+  title_vi: "Spec tự dựng dòng dữ liệu thay vì dùng builder"
+  meaning_vi: "Spec đơn vị, integration hoặc e2e không tự chèn hay ghi dòng: không có INSERT/UPDATE/DELETE thô, không gọi save, insert, upsert, update, delete, remove trên EntityManager, DataSource hoặc QueryRunner, và không dựng cùng một entity bằng object literal nhiều hơn một lần. Dòng dữ liệu đến từ builder của khu vực đó."
+  causes_vi:
+    - "em.query với chuỗi INSERT INTO ... hoặc chuỗi INSERT/UPDATE/DELETE được truyền vào query trong spec"
+    - "em.save({...}), em.insert(...) hoặc upsert trong spec"
+    - "Cùng một entity được viết thành object literal từ lần thứ hai trở đi trong một spec"
+  nextStep_vi: "Thêm hoặc mở rộng builder của khu vực (orderRow(overrides) cho spec đơn vị, orderBuilder(db).pending().build(overrides) cho integration và e2e) rồi gọi nó trong spec. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_TEST_CONSTRAINTS_ON:
+  title: "A test switches database constraints off"
+  title_vi: "Test tắt hoặc gỡ ràng buộc cơ sở dữ liệu"
+  meaning_vi: "Cây src/tests luôn chạy với ràng buộc bật: không tắt khóa ngoại, trigger hay ràng buộc, không hoãn ràng buộc. Builder tạo đủ chuỗi cha thay vì bỏ qua khóa ngoại."
+  causes_vi:
+    - "session_replication_role, SET CONSTRAINTS ... DEFERRED, DEFERRABLE INITIALLY DEFERRED, ALTER TABLE ... DISABLE hoặc DISABLE TRIGGER trong một câu SQL của cây test"
+    - "DROP CONSTRAINT trong SQL, hoặc QueryRunner.dropForeignKey(s), dropCheckConstraint(s), dropUniqueConstraint(s)"
+  nextStep_vi: "Bỏ câu lệnh tắt ràng buộc và tạo đủ dòng cha bằng builder. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
+BE_TEST_BUILDER_ARRANGES:
+  title: "A test data builder asserts or has a non-deterministic default"
+  title_vi: "Builder dữ liệu test khẳng định hoặc có giá trị mặc định không ổn định"
+  meaning_vi: "Builder chỉ sắp xếp dữ liệu: không import expect, jest hay @jest/globals, và giá trị mặc định cố định (id từ hằng hoặc fakeIds, ngày cố định) để test lỗi vẫn tái hiện được."
+  causes_vi:
+    - "expect, jest hoặc mô tả test được dùng trong tệp builder"
+    - "Date.now(), new Date() không tham số, Math.random(), randomUUID() hoặc crypto.random* trong builder"
+  nextStep_vi: "Trả về đối tượng hoặc dòng và để spec khẳng định; dùng id cố định hoặc fakeIds() và ngày cố định. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -1392,38 +1435,6 @@ CONTRACT_ROUTE_UNPROVEN:
     - "Hồ sơ impl thiếu tham chiếu proves tới hợp đồng"
   nextStep_vi: "Chỉ là nghi vấn; cần op bổ sung tham chiếu proves vào hồ sơ triển khai."
   owner: other-op:work.author
-  kind: check-finding
-
-COVERAGE_MISSING:
-  title: "No coverage report found"
-  title_vi: "Không có báo cáo độ phủ"
-  meaning_vi: "Bộ quét Sonar không tìm thấy báo cáo độ phủ kiểm thử nào."
-  causes_vi:
-    - "Chưa chạy test:ci trong lần này"
-    - "Báo cáo nằm sai đường dẫn"
-  nextStep_vi: "Quét bị từ chối; op chạy test:ci có độ phủ trong lần thử này rồi quét lại."
-  owner: op-retry
-  kind: check-finding
-
-COVERAGE_NOT_IMPORTED:
-  title: "Coverage report was not imported"
-  title_vi: "Báo cáo độ phủ không được nhập"
-  meaning_vi: "Phân tích Sonar không mang theo độ phủ nào nên báo cáo lcov không được nhập."
-  causes_vi:
-    - "Sai đường dẫn sonar.javascript.lcov.reportPaths"
-    - "Báo cáo lcov rỗng"
-  nextStep_vi: "Quét bị từ chối; op kiểm tra đường dẫn lcov, chạy lại test:ci rồi quét lại."
-  owner: op-retry
-  kind: check-finding
-
-COVERAGE_STALE:
-  title: "Coverage report is out of date"
-  title_vi: "Báo cáo độ phủ đã cũ"
-  meaning_vi: "Báo cáo độ phủ được ghi trước commit đầu hoặc trước khi mã đổi nên không còn đáng tin."
-  causes_vi:
-    - "Dùng lại báo cáo từ lần chạy trước"
-  nextStep_vi: "Quét bị từ chối; op chạy lại test:ci có độ phủ trong lần thử này rồi quét lại."
-  owner: op-retry
   kind: check-finding
 
 DATA_STATUS_DRAWN:
@@ -6071,7 +6082,7 @@ STACKS_SERVICES_MISSING:
   meaning_vi: "Tệp khai báo hạ tầng tồn tại nhưng chưa liệt kê dịch vụ nào."
   causes_vi:
     - "Mới có khung khai báo, chưa điền dịch vụ"
-  nextStep_vi: "Cần chạy bước quản lý workspace chế độ stacks để soạn phần dịch vụ (sonar, codecov và các dịch vụ khác)."
+  nextStep_vi: "Cần chạy bước quản lý workspace chế độ stacks để soạn phần dịch vụ (sonar và các dịch vụ khác)."
   owner: other-op:workspace.manage
   kind: check-finding
 
@@ -11996,7 +12007,7 @@ HFS_MANAGED_FILE_DRIFT:
   title_vi: "Tệp do .claude quản lý bị lệch"
   meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `hfs sync --write`, không sửa tay."
   causes_vi:
-    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, codecov, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
+    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -12052,11 +12063,11 @@ HFS_STACKS_SHAPE:
   kind: check-finding
 
 HFS_SONAR_CONFIG:
-  title: "Sonar config is generated, with no host URL and matching coverage exclusions"
+  title: "Sonar config is generated, with no host URL and no coverage import"
   title_vi: "Cấu hình Sonar lệch"
-  meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Hai con số coverage (Codecov/Sonar) sẽ không khớp."
+  meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Sonar phải đọc đúng cấu hình sinh ra, không nhập báo cáo độ phủ."
   causes_vi:
-    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `coverage.exclusions` = đúng danh sách loại trừ coverage của jest (back end), không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, không nhập lcov hay `sonar.coverage.*`, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
     - "Khối `services.sonar.qualityGate` của khai báo stack phải gọi đúng cổng chất lượng duy nhất của `knowledge/sonar-gate.yaml`; repo không tự ghi ngưỡng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
@@ -13108,7 +13119,6 @@ BE_RAW_INJECT:
     - "Token là chuỗi thay vì unique symbol"
     - "Tiêm lớp hạ tầng (CacheService, AppLogger) không qua injector"
     - "Dùng ModuleRef.get hoặc forwardRef để né vòng phụ thuộc"
-    - "constructor(private readonly timeoutMs: number) {} hoặc ReadonlyMap<string, X> không có Inject<Thing>() gắn token có tên"
   nextStep_vi: "Khai báo token `export const THING: unique symbol = Symbol(\"<owner>.<thing>\")` và `export const InjectThing = (): TypedParameterDecorator<Thing> => injector<Thing>(THING)` trong <owner>.decorators.ts rồi dùng @InjectThing() ở mọi nơi; vòng phụ thuộc là lỗi kiến trúc cần gỡ, không dùng forwardRef. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
@@ -13291,14 +13301,13 @@ BE_TRANSPORT_SHAPE:
 BE_UNNAMED_DATA_ACCESS:
   title: "Database reached without the named shared EntityManager"
   title_vi: "Truy cập cơ sở dữ liệu không qua EntityManager dùng chung có tên"
-  meaning_vi: "Tham số hoặc thuộc tính kiểu EntityManager không mang bộ tiêm Inject<Kết nối>EntityManager của một kết nối đã khai báo trong hfs.json (tên na ná cũng không đạt), hoặc tiêm bằng thuộc tính, hoặc gọi .getRepository(...), hoặc dùng @InjectRepository / Repository<T> / TypeOrmModule.forFeature, hoặc tiêm DataSource / QueryRunner ngoài platform/database, apps/migrate và test world (kể cả viết kiểu DataSource làm kiểu trả về, giá trị await, token provide: hay lớp bọc trả ra kết nối); lớp nào ngoài handler ứng dụng, domain service và năng lực persistence của platform mà nhận, giữ hoặc trả EntityManager, Repository, DataSource hay QueryRunner đều là repository dù đặt tên gì (Store, Dao, Gateway, Persistence, hoặc module hàm export nhận EntityManager làm tham số đầu như authoring.statements.ts); ứng dụng đăng ký nhiều kết nối nên cách viết này trỏ vào kết nối mặc định hoặc gắn một handle vào đúng một entity, và giao dịch không đi qua được sang bảng thứ hai."
+  meaning_vi: "Tham số hoặc thuộc tính kiểu EntityManager không mang bộ tiêm Inject<Kết nối>EntityManager của một kết nối đã khai báo trong hfs.json (tên na ná cũng không đạt), hoặc tiêm bằng thuộc tính, hoặc gọi .getRepository(...), hoặc dùng @InjectRepository / Repository<T> / TypeOrmModule.forFeature, hoặc tiêm DataSource / QueryRunner ngoài platform/database và apps/migrate; ứng dụng đăng ký nhiều kết nối nên cách viết này trỏ vào kết nối mặc định hoặc gắn một handle vào đúng một entity, và giao dịch không đi qua được sang bảng thứ hai."
   causes_vi:
     - "constructor(@InjectFooEntityManager() private readonly manager: EntityManager) {} với Foo không phải kết nối khai báo"
     - "@InjectPrimaryEntityManager() private readonly manager: EntityManager (tiêm bằng thuộc tính)"
     - "this.dataSource.getRepository(CourseEntity).find()"
     - "constructor(private readonly dataSource: DataSource) {} ngoài module database của platform"
     - "constructor(@InjectRepository(CourseEntity) private readonly repo: Repository<CourseEntity>) {}"
-    - "class AccountingLedgerRepository { appendPosting(manager: EntityManager, ...) {} } đặt ngoài handler và domain service (repository trá hình, kể cả khi tên không có hậu tố Repository)"
   nextStep_vi: "Nhận EntityManager dùng chung qua tham số constructor với bộ tiêm Inject<Kết nối>EntityManager() của kết nối khai báo trong hfs.json (ví dụ InjectPrimaryEntityManager()) rồi gọi trực tiếp manager.find(Entity, ...), manager.save(Entity, ...); DataSource chỉ do module database của platform dựng; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -13350,7 +13359,7 @@ BE_SPEC_PLACEMENT:
   title_vi: "Spec đặt ngoài bốn tầng test"
   meaning_vi: "Tệp spec hoặc test `<f>` nằm ngoài bốn tầng test của back end (kể cả trong `scripts/` hoặc `tools/`)."
   causes_vi:
-    - "Vi phạm luật R98: spec đơn vị là `<name>.service.spec.ts` cạnh service của nó; spec tích hợp, e2e và contract nằm dưới `src/tests/{integration,e2e,contract}`. Mọi `*.spec.*`, `*.test.*`, `*-spec.*` khác là vi phạm; script vận hành và công cụ không mang spec."
+    - "Vi phạm luật R102: spec đơn vị là `<name>.service.spec.ts` cạnh service của nó; spec tích hợp, e2e và contract nằm dưới `src/tests/{integration,e2e,contract}`. Mọi `*.spec.*`, `*.test.*`, `*-spec.*` khác là vi phạm; script vận hành và công cụ không mang spec."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: chuyển spec vào tầng đúng hoặc xóa nó; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
@@ -13360,7 +13369,7 @@ HFS_REPO_LOCAL_CHECK:
   title_vi: "Kho tự giữ bộ kiểm tra riêng"
   meaning_vi: "Kho có nguồn kiểm tra hoặc luật lint cục bộ ở `<f>`: tệp `check-*` trong `scripts/` hay `tools/`, tệp `eslint-local-rules*`, plugin eslint cục bộ, hoặc script npm chạy một tệp `check-*`."
   causes_vi:
-    - "Vi phạm luật R99: mọi bộ kiểm tra sống trong runtime `.claude` (hfs check, các canon eslint); kho sản phẩm không giữ bộ kiểm tra hay luật riêng. `scripts/` chỉ chứa script vận hành."
+    - "Vi phạm luật R103: mọi bộ kiểm tra sống trong runtime `.claude` (hfs check, các canon eslint); kho sản phẩm không giữ bộ kiểm tra hay luật riêng. `scripts/` chỉ chứa script vận hành."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xóa tệp và script trỏ tới nó; nếu luật còn cần thì đề xuất vào canon trong runtime `.claude`, không giữ bản sao trong kho."
   owner: op-retry
   kind: check-finding
@@ -13370,7 +13379,7 @@ HFS_LINT_SUPPRESSION_FILE:
   title_vi: "Kho có tệp hoặc script ghi nhận bỏ qua lỗi lint"
   meaning_vi: "Kho có tệp, script hoặc tùy chọn ghi nhận lỗi lint để bỏ qua ở `<f>`: `eslint.suppressions*`, script `lint:suppressions`, cờ `--suppress-all`/`--suppressions-location`, hoặc cấu hình eslint có `suppressions`."
   causes_vi:
-    - "Vi phạm luật R100: lỗi lint được sửa trong mã (hoặc luật được đổi trong canon); không ghi nhận để lỗi nằm lại trong tệp suppressions."
+    - "Vi phạm luật R104: lỗi lint được sửa trong mã (hoặc luật được đổi trong canon); không ghi nhận để lỗi nằm lại trong tệp suppressions."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: xóa tệp, script hoặc cờ, và sửa các lỗi lint trong mã."
   owner: op-retry
   kind: check-finding
@@ -13380,7 +13389,7 @@ HFS_PROOF_COMMAND_FILE_MISSING:
   title_vi: "Lệnh chứng minh trỏ tới tệp không tồn tại"
   meaning_vi: "Lệnh `requiresProof.<kind>.command` của hồ sơ `.starciwork` `<f>` chạy tệp `<path>` mà kho không có, nên không thể chạy đúng như đã viết."
   causes_vi:
-    - "Vi phạm luật R101: lệnh chứng minh phải chạy được nguyên văn; tệp spec, script hay cấu hình mà nó nêu tên phải có trong kho (script đã xóa thì kế hoạch chứng minh phải được viết lại)."
+    - "Vi phạm luật R105: lệnh chứng minh phải chạy được nguyên văn; tệp spec, script hay cấu hình mà nó nêu tên phải có trong kho (script đã xóa thì kế hoạch chứng minh phải được viết lại)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: tạo tệp được nêu hoặc viết lại kế hoạch chứng minh (ví dụ thành một spec e2e trên world); không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
@@ -13390,7 +13399,7 @@ FE_I18N_KEYS:
   title_vi: "Khóa catalog và mã nguồn đọc chúng không khớp"
   meaning_vi: "Mã nguồn đọc khóa `<key>` mà một locale không có, hoặc catalog `<f>` giữ khóa `<key>` mà không đoạn mã nào của app hay của package dùng chung đọc tới."
   causes_vi:
-    - "Vi phạm luật R102: khóa đọc bằng literal qua `next-intl` (`t`, `t.rich`, `t.raw`, `t.markup`) phải có trong mọi locale; khóa của catalog mà không chuỗi nào trong mã nguồn có thể đang đọc thì phải xóa."
+    - "Vi phạm luật R106: khóa đọc bằng literal qua `next-intl` (`t`, `t.rich`, `t.raw`, `t.markup`) phải có trong mọi locale; khóa của catalog mà không chuỗi nào trong mã nguồn có thể đang đọc thì phải xóa."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm khóa vào mọi catalog của app hoặc đọc khóa có thật; xóa khóa chết khỏi mọi catalog; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding

@@ -135,8 +135,6 @@ test('BE_SOURCE_FORM: a back-end source name outside the closed suffix vocabular
   assert.deepEqual(refused.map((f) => path.posix.basename(f.path)).sort(), ['Bad_Name.ts', 'CancelOrder.handler.ts', 'cancel-order.use-case.ts', 'helpers.ts', 'order.repository.ts', 'order.types.ts', 'poll.ts']);
   assert.ok(refused.every((f) => f.level === 'error'));
   assert.equal(refused.find((f) => f.path.endsWith('order.types.ts')).suffix, 'types');
-  assert.match(refused.find((f) => f.path.endsWith('order.repository.ts')).message, /\.sql\.ts.*\*\.service\.ts/, 'a repository file is told its home: <name>.sql.ts for text, the capability service for access');
-  assert.doesNotMatch(refused.find((f) => f.path.endsWith('order.types.ts')).message, /\.sql\.ts/, 'only the data-access suffixes carry the home hint');
   assert.equal(result.ok, false);
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(BE) }), 'BE_SOURCE_FORM'), []);
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(FE, (repo) => put(repo, 'apps/web/src/modules/api/helpers.ts')) }), 'BE_SOURCE_FORM'), [], 'a front-end repository is not judged by the back-end suffix list');

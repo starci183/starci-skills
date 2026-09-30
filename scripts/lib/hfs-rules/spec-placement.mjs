@@ -1,4 +1,4 @@
-// spec-placement.mjs - BE_SPEC_PLACEMENT (R98): a back-end spec or test file lives in one of the four test layers and nowhere else.
+// spec-placement.mjs - BE_SPEC_PLACEMENT (R102): a back-end spec or test file lives in one of the four test layers and nowhere else.
 //   - a unit spec is `<name>.service.spec.ts` beside its service, in a slot whose `tests` is `unit-beside` (the slot and the lint rule
 //     `unit-test-colocated` judge the name);
 //   - integration, e2e and contract specs are `src/tests/{integration,e2e,contract}/...`, the slots whose `tests` is `e2e`;
@@ -16,7 +16,7 @@ const TEST_SLOT_TESTS = new Set(['unit-beside', 'e2e']);
 /** True for a file name that is a spec or a test. */
 export const isSpecFile = (file) => SPEC_FILE.test(file);
 
-/** The findings of R98 over the tracked paths `files` of a back-end repository; `resolver` names the slots. */
+/** The findings of R102 over the tracked paths `files` of a back-end repository; `resolver` names the slots. */
 export function specPlacementFindings({ files, resolver }) {
   const findings = [];
   for (const file of files) {

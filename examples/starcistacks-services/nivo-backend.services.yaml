@@ -1,7 +1,7 @@
 # Ready-to-apply services block for nivo-backend (owner ruling 2026-09-24).
 # Apply: add `services:` below as the top-level `services` key of nivo-backend/.starcistacks/application-stacks.yaml.
 # Observed 2026-09-24: GitHub starci-lab/nivo-backend carries secret SONAR_TOKEN and variable SONAR_HOST_URL;
-# CI uploads to Codecov with OIDC; deploy.yml and agentos-images.yml push to GHCR with GITHUB_TOKEN.
+# deploy.yml and agentos-images.yml push to GHCR with GITHUB_TOKEN.
 # Custody: sonarqube-nivo-be-token.key validated against the local server (valid). The shared server
 # itself is a host extension (.claude/ext/sonar) - the `owner: host` stack form below, so nivo-backend
 # never carries SonarQube compose files of its own; its project token twin lives in its own
@@ -48,24 +48,6 @@ services:
       provisioning: >-
         Set on starci-lab/nivo-backend. A Kernel re-sets them from custody (gh secret set SONAR_TOKEN
         with the value piped from sonar-local.mjs token, gh variable set SONAR_HOST_URL); never the owner.
-    ownerAction: none
-  codecov:
-    provider: codecov
-    mode: hosted
-    purpose: Coverage dashboard from the one lcov run (codecov.yml statuses informational).
-    host:
-      public: https://app.codecov.io
-    auth: oidc
-    projects:
-      - {repository: nivo-backend, key: gh/starci-lab/nivo-backend}
-    credentials: []
-    ci:
-      workflow: .github/workflows/ci.yml
-      wiring: required
-      permissions: ['id-token: write']
-      secrets: []
-      vars: []
-      provisioning: codecov/codecov-action@v5 with use_oidc true; no CODECOV_TOKEN secret is set or needed.
     ownerAction: none
   container-registry:
     provider: ghcr

@@ -86,9 +86,9 @@ test('HFS_STACKS_SHAPE: runtime/files, a sealed file outside secrets/, DESIGN.md
 });
 
 test('HFS_STACKS_SHAPE: a service still rooted at .stacks and a declaration with no sonar are refused', () => {
-  const stale = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.starcistacks/application-stacks.yaml', `${STACKS_DECLARATION}  codecov:\n    provider: codecov\n    mode: local\n    stack:\n      repository: demo\n      root: .stacks\n      environment: dev\n`)) });
+  const stale = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.starcistacks/application-stacks.yaml', `${STACKS_DECLARATION}  error-tracking:\n    provider: sentry\n    mode: local\n    stack:\n      repository: demo\n      root: .stacks\n      environment: dev\n`)) });
   assert.match(only(stale, 'HFS_STACKS_SHAPE')[0].message, /retired \.stacks root/);
-  const silent = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.starcistacks/application-stacks.yaml', 'schema: starci/application-stacks@1\nservices:\n  codecov:\n    provider: codecov\n    mode: disabled\n')) });
+  const silent = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.starcistacks/application-stacks.yaml', 'schema: starci/application-stacks@1\nservices:\n  error-tracking:\n    provider: sentry\n    mode: disabled\n')) });
   assert.match(only(silent, 'HFS_STACKS_SHAPE')[0].message, /no sonar service/);
 });
 

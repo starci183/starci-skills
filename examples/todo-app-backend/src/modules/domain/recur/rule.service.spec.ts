@@ -1,13 +1,15 @@
-import { LIST_ROWS_MAX } from "@modules/platform/database"
-import { mockEntityManager } from "@tests/fixtures/database"
+import { Test } from "@nestjs/testing"
+import type { MockEntityManager } from "@starci/jest-preset"
+import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { MoreThan } from "typeorm"
 import { RecurErrorCode } from "./errors/recur.error"
+import { OccurrenceService } from "./occurrence.service"
 import { RuleEntity } from "./persistence/entities/rule.entity"
 import { RuleFrequency } from "./recur.contracts"
-import type { CreateRuleParams, RuleView } from "./recur.contracts"
 import { RuleService } from "./rule.service"
 
-const rule: RuleView = {
+const weekday: RuleEntity = {
     id: "r1",
     owner: "o1",
     title: "Stand-up",
@@ -20,168 +22,215 @@ const rule: RuleView = {
     endedAt: null,
 }
 
-const echoSave = (): jest.Mock =>
-    jest.fn().mockImplementation((_target: unknown, entity: object) => Promise.resolve(entity))
+const everyThreeDays: RuleEntity = { ...weekday, frequency: RuleFrequency.EveryNDays, n: 3 }
 
-const creation = (manager: ReturnType<typeof mockEntityManager>, overrides: Partial<CreateRuleParams> = {}): CreateRuleParams => ({
-    manager,
-    ownerId: "o1",
-    title: "Stand-up",
-    frequency: RuleFrequency.EveryWeekday,
-    n: null,
-    dayOfMonth: null,
-    timeZone: "Asia/Ho_Chi_Minh",
-    time: "09:00",
-    startDate: "2026-09-01",
-    ...overrides,
-})
+const build = async (em: MockEntityManager = mockEntityManager()) => {
+    const tx = fakeTransaction(em)
+    const occurrences = mock<OccurrenceService>()
+    const moduleRef = await Test.createTestingModule({
+        providers: [
+            RuleService,
+            { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
+            { provide: OccurrenceService, useValue: occurrences },
+        ],
+    }).compile()
+    return { service: moduleRef.get(RuleService), em: tx.em, tx, occurrences }
+}
 
 describe("RuleService", () => {
     describe("create", () => {
-        it("creates an every-weekday rule owned by the submitter, through the manager it was handed", async () => {
-            const inTransaction = mockEntityManager({ save: echoSave() })
-            const own = mockEntityManager()
-            const outcome = await new RuleService(own).create(creation(inTransaction))
-            expect(outcome).toMatchObject({ kind: "ok", value: { owner: "o1", endedAt: null, frequency: RuleFrequency.EveryWeekday } })
-            expect(inTransaction.save).toHaveBeenCalledWith(RuleEntity, expect.objectContaining({ owner: "o1", endedAt: null }))
-            expect(own.save).not.toHaveBeenCalled()
+        const request = {
+            ownerId: "o1",
+            title: "Stand-up",
+            frequency: RuleFrequency.EveryWeekday,
+            n: null,
+            dayOfMonth: null,
+            timeZone: "Asia/Ho_Chi_Minh",
+            time: "09:00",
+            startDate: "2026-09-01",
+        }
+
+        it("creates an every-weekday rule owned by the submitter in one transaction", async () => {
+            const { service, em, tx } = await build(mockEntityManager({ save: [RuleEntity, weekday] }))
+
+            await expect(service.create(request)).resolves.toSucceedWith({
+                ruleId: "r1",
+                title: "Stand-up",
+                frequency: RuleFrequency.EveryWeekday,
+                timeZone: "Asia/Ho_Chi_Minh",
+                time: "09:00",
+                startDate: "2026-09-01",
+            })
+
+            expect(em.save).toHaveBeenCalledWith(RuleEntity, {
+                id: expect.any(String),
+                owner: "o1",
+                title: "Stand-up",
+                frequency: RuleFrequency.EveryWeekday,
+                n: null,
+                dayOfMonth: null,
+                timeZone: "Asia/Ho_Chi_Minh",
+                time: "09:00",
+                startDate: "2026-09-01",
+                endedAt: null,
+            })
+            expect(tx.commits).toBe(1)
         })
 
         it("accepts a monthly-day rule naming the 31st, which most months lack", async () => {
-            const inTransaction = mockEntityManager({ save: echoSave() })
-            const outcome = await new RuleService(mockEntityManager()).create(
-                creation(inTransaction, { frequency: RuleFrequency.MonthlyDay, dayOfMonth: 31 }),
-            )
-            expect(outcome).toMatchObject({ kind: "ok", value: { dayOfMonth: 31 } })
+            const monthly: RuleEntity = { ...weekday, frequency: RuleFrequency.MonthlyDay, dayOfMonth: 31 }
+            const { service, em } = await build(mockEntityManager({ save: [RuleEntity, monthly] }))
+
+            await expect(service.create({ ...request, frequency: RuleFrequency.MonthlyDay, dayOfMonth: 31 })).resolves.toSucceedWith({
+                ruleId: "r1",
+                title: "Stand-up",
+                frequency: RuleFrequency.MonthlyDay,
+                timeZone: "Asia/Ho_Chi_Minh",
+                time: "09:00",
+                startDate: "2026-09-01",
+            })
+            expect(em.save).toHaveBeenCalledWith(RuleEntity, expect.objectContaining({ dayOfMonth: 31 }))
         })
 
         it.each([
             [RuleFrequency.EveryNDays, null, null, "n-required"],
             [RuleFrequency.EveryNDays, 2, 5, "day-of-month-forbidden"],
-            [RuleFrequency.MonthlyDay, null, 40, "day-of-month-required"],
-            [RuleFrequency.MonthlyDay, 2, 5, "n-forbidden"],
+            [RuleFrequency.MonthlyDay, null, 0, "day-of-month-required"],
+            [RuleFrequency.MonthlyDay, null, 32, "day-of-month-required"],
+            [RuleFrequency.MonthlyDay, 2, 15, "n-forbidden"],
             [RuleFrequency.EveryWeekday, 2, null, "n-forbidden"],
-        ])("refuses the shape %s n=%s dayOfMonth=%s with the reason %s and writes nothing", async (frequency, n, dayOfMonth, reason) => {
-            const inTransaction = mockEntityManager({ save: jest.fn() })
-            const outcome = await new RuleService(mockEntityManager()).create(creation(inTransaction, { frequency, n, dayOfMonth }))
-            expect(outcome).toEqual({ kind: "refused", code: RecurErrorCode.RuleInvalid, params: { reason } })
-            expect(inTransaction.save).not.toHaveBeenCalled()
+            [RuleFrequency.EveryWeekday, null, 5, "day-of-month-forbidden"],
+        ])("refuses a %s rule with n=%s and dayOfMonth=%s as %s and writes nothing", async (frequency, n, dayOfMonth, reason) => {
+            const { service, tx } = await build()
+
+            await expect(service.create({ ...request, frequency, n, dayOfMonth })).resolves.toBeRefused({
+                code: RecurErrorCode.RuleInvalid,
+                params: { reason },
+            })
+            expect(tx.outcomes).toEqual([])
         })
     })
 
-    describe("reads", () => {
-        it("finds a rule by id and answers null for an unknown one", async () => {
-            const own = mockEntityManager({ findOneBy: jest.fn().mockResolvedValueOnce({ ...rule }).mockResolvedValueOnce(null) })
-            const service = new RuleService(own)
-            await expect(service.find({ id: "r1" })).resolves.toEqual(rule)
-            await expect(service.find({ id: "nope" })).resolves.toBeNull()
-            expect(own.findOneBy).toHaveBeenCalledWith(RuleEntity, { id: "r1" })
+    describe("find", () => {
+        it("returns the view of a rule that exists", async () => {
+            const { service, em } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday] }))
+
+            await expect(service.find({ id: "r1" })).resolves.toEqual(weekday)
+            expect(em.findOneBy).toHaveBeenCalledWith(RuleEntity, { id: "r1" })
         })
 
-        it("lists rules in id order in bounded batches, resuming after the last id", async () => {
-            const own = mockEntityManager({ find: jest.fn().mockResolvedValue([{ ...rule }]) })
-            const service = new RuleService(own)
-            await expect(service.listBatch({ after: null })).resolves.toEqual([rule])
-            await service.listBatch({ after: "r1" })
-            expect(own.find).toHaveBeenNthCalledWith(1, RuleEntity, { where: {}, order: { id: "ASC" }, take: LIST_ROWS_MAX })
-            expect(own.find).toHaveBeenNthCalledWith(2, RuleEntity, {
-                where: { id: MoreThan("r1") },
-                order: { id: "ASC" },
-                take: LIST_ROWS_MAX,
-            })
+        it("returns null for a rule that does not exist", async () => {
+            const { service } = await build(mockEntityManager({ findOneBy: [RuleEntity, null] }))
+
+            await expect(service.find({ id: "nope" })).resolves.toBeNull()
+        })
+    })
+
+    describe("listBatch", () => {
+        it("reads the first batch from the start in id order", async () => {
+            const { service, em } = await build(mockEntityManager({ find: [RuleEntity, [weekday]] }))
+
+            await expect(service.listBatch({ after: null })).resolves.toEqual([weekday])
+            expect(em.find).toHaveBeenCalledWith(RuleEntity, { where: {}, order: { id: "ASC" }, take: LIST_ROWS_MAX })
+        })
+
+        it("reads the batch that follows the given rule id", async () => {
+            const { service, em } = await build(mockEntityManager({ find: [RuleEntity, [everyThreeDays]] }))
+
+            await expect(service.listBatch({ after: "r0" })).resolves.toEqual([everyThreeDays])
+            expect(em.find).toHaveBeenCalledWith(RuleEntity, { where: { id: MoreThan("r0") }, order: { id: "ASC" }, take: LIST_ROWS_MAX })
         })
     })
 
     describe("edit", () => {
-        const editing = (row: RuleView | null): ReturnType<typeof mockEntityManager> =>
-            mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(row && { ...row }), save: echoSave() })
+        it("refuses a rule that does not exist and writes nothing", async () => {
+            const { service, em } = await build(mockEntityManager({ findOneBy: [RuleEntity, null] }))
 
-        it("lets the owner change the frequency, time and zone; absent fields keep their value", async () => {
-            const inTransaction = editing({ ...rule, frequency: RuleFrequency.EveryNDays, n: 2 })
-            const outcome = await new RuleService(mockEntityManager()).edit({
-                manager: inTransaction,
-                id: "r1",
-                actorId: "o1",
-                patch: { time: "10:30", timeZone: "Europe/Berlin" },
-            })
-            expect(outcome).toMatchObject({
-                kind: "ok",
-                value: { frequency: RuleFrequency.EveryNDays, n: 2, time: "10:30", timeZone: "Europe/Berlin" },
-            })
+            await expect(service.edit({ id: "nope", actorId: "o1", patch: {} })).resolves.toBeRefused(RecurErrorCode.RuleNotFound)
+            expect(em.save).not.toHaveBeenCalled()
         })
 
-        it("lets an edit reshape the rule by carrying the old field explicitly to null", async () => {
-            const inTransaction = editing({ ...rule, frequency: RuleFrequency.EveryNDays, n: 2 })
-            const outcome = await new RuleService(mockEntityManager()).edit({
-                manager: inTransaction,
-                id: "r1",
-                actorId: "o1",
-                patch: { frequency: RuleFrequency.MonthlyDay, n: null, dayOfMonth: 15 },
-            })
-            expect(outcome).toMatchObject({ kind: "ok", value: { frequency: RuleFrequency.MonthlyDay, n: null, dayOfMonth: 15 } })
+        it("refuses somebody else's rule and writes nothing", async () => {
+            const { service, em } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday] }))
+
+            await expect(service.edit({ id: "r1", actorId: "intruder", patch: {} })).resolves.toBeRefused(RecurErrorCode.RuleForbidden)
+            expect(em.save).not.toHaveBeenCalled()
         })
 
-        it("refuses a stranger and writes nothing", async () => {
-            const inTransaction = editing(rule)
-            const outcome = await new RuleService(mockEntityManager()).edit({
-                manager: inTransaction,
-                id: "r1",
-                actorId: "stranger",
-                patch: { time: "10:30" },
+        it("keeps every field an empty patch does not name", async () => {
+            const { service, em, tx } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday], save: [RuleEntity, weekday] }))
+
+            await expect(service.edit({ id: "r1", actorId: "o1", patch: {} })).resolves.toSucceedWith({
+                ruleId: "r1",
+                frequency: RuleFrequency.EveryWeekday,
+                timeZone: "Asia/Ho_Chi_Minh",
+                time: "09:00",
             })
-            expect(outcome).toMatchObject({ kind: "refused", code: RecurErrorCode.RuleForbidden })
-            expect(inTransaction.save).not.toHaveBeenCalled()
+            expect(em.save).toHaveBeenCalledWith(RuleEntity, weekday)
+            expect(tx.commits).toBe(1)
         })
 
-        it("refuses an unknown rule", async () => {
-            const outcome = await new RuleService(mockEntityManager()).edit({
-                manager: editing(null),
-                id: "nope",
-                actorId: "o1",
-                patch: {},
-            })
-            expect(outcome).toMatchObject({ kind: "refused", code: RecurErrorCode.RuleNotFound })
+        it("applies every field of the patch, an explicit null clearing n", async () => {
+            const changed: RuleEntity = {
+                ...weekday,
+                frequency: RuleFrequency.MonthlyDay,
+                dayOfMonth: 15,
+                timeZone: "UTC",
+                time: "18:30",
+            }
+            const { service, em } = await build(mockEntityManager({ findOneBy: [RuleEntity, everyThreeDays], save: [RuleEntity, changed] }))
+
+            await expect(
+                service.edit({
+                    id: "r1",
+                    actorId: "o1",
+                    patch: { frequency: RuleFrequency.MonthlyDay, n: null, dayOfMonth: 15, timeZone: "UTC", time: "18:30" },
+                }),
+            ).resolves.toSucceedWith({ ruleId: "r1", frequency: RuleFrequency.MonthlyDay, timeZone: "UTC", time: "18:30" })
+            expect(em.save).toHaveBeenCalledWith(RuleEntity, changed)
         })
 
-        it("refuses an edit that would leave an invalid shape before anything is written", async () => {
-            const inTransaction = editing(rule)
-            const outcome = await new RuleService(mockEntityManager()).edit({
-                manager: inTransaction,
-                id: "r1",
-                actorId: "o1",
-                patch: { frequency: RuleFrequency.EveryNDays },
+        it("refuses a patch whose shape does not fit the frequency and writes nothing", async () => {
+            const { service, em } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday] }))
+
+            await expect(service.edit({ id: "r1", actorId: "o1", patch: { frequency: RuleFrequency.EveryNDays } })).resolves.toBeRefused({
+                code: RecurErrorCode.RuleInvalid,
+                params: { reason: "n-required" },
             })
-            expect(outcome).toMatchObject({ kind: "refused", code: RecurErrorCode.RuleInvalid, params: { reason: "n-required" } })
-            expect(inTransaction.save).not.toHaveBeenCalled()
+            expect(em.save).not.toHaveBeenCalled()
         })
     })
 
     describe("end", () => {
-        it("sets endedAt for the owner and keeps the row", async () => {
-            const inTransaction = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue({ ...rule }), save: echoSave(), delete: jest.fn() })
-            const outcome = await new RuleService(mockEntityManager()).end({
-                manager: inTransaction,
-                id: "r1",
-                actorId: "o1",
-                endedAt: "2026-09-20",
-            })
-            expect(outcome).toMatchObject({ kind: "ok", value: { endedAt: "2026-09-20" } })
-            expect(inTransaction.delete).not.toHaveBeenCalled()
+        it("refuses a rule that does not exist without orphaning anything", async () => {
+            const { service, occurrences } = await build(mockEntityManager({ findOneBy: [RuleEntity, null] }))
+
+            await expect(service.end({ id: "nope", actorId: "o1", endedAt: "2026-09-10" })).resolves.toBeRefused(RecurErrorCode.RuleNotFound)
+            expect(occurrences.orphanEnded).not.toHaveBeenCalled()
         })
 
-        it("refuses a stranger and an unknown rule", async () => {
-            const service = new RuleService(mockEntityManager())
-            const stranger = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue({ ...rule }), save: jest.fn() })
-            await expect(service.end({ manager: stranger, id: "r1", actorId: "x", endedAt: "2026-09-20" })).resolves.toMatchObject({
-                kind: "refused",
-                code: RecurErrorCode.RuleForbidden,
+        it("refuses somebody else's rule without orphaning anything", async () => {
+            const { service, em, occurrences } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday] }))
+
+            await expect(service.end({ id: "r1", actorId: "intruder", endedAt: "2026-09-10" })).resolves.toBeRefused(RecurErrorCode.RuleForbidden)
+            expect(em.save).not.toHaveBeenCalled()
+            expect(occurrences.orphanEnded).not.toHaveBeenCalled()
+        })
+
+        it("sets endedAt and orphans the materialised occurrences from that day in the same transaction", async () => {
+            const ended: RuleEntity = { ...weekday, endedAt: "2026-09-10" }
+            const { service, em, tx, occurrences } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday], save: [RuleEntity, ended] }))
+            occurrences.orphanEnded.mockResolvedValue(2)
+
+            await expect(service.end({ id: "r1", actorId: "o1", endedAt: "2026-09-10" })).resolves.toSucceedWith({
+                ruleId: "r1",
+                endedAt: "2026-09-10",
+                orphanedCount: 2,
             })
-            expect(stranger.save).not.toHaveBeenCalled()
-            const unknown = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null) })
-            await expect(service.end({ manager: unknown, id: "n", actorId: "o1", endedAt: "2026-09-20" })).resolves.toMatchObject({
-                kind: "refused",
-                code: RecurErrorCode.RuleNotFound,
-            })
+
+            expect(em.save).toHaveBeenCalledWith(RuleEntity, ended)
+            expect(occurrences.orphanEnded).toHaveBeenCalledWith({ manager: expect.anything(), ruleId: "r1", endedAt: "2026-09-10" })
+            expect(tx.commits).toBe(1)
         })
     })
 })

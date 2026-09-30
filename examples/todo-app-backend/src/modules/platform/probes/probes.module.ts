@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { ProbeChecker } from "./probe-checker.service"
+import { ProbeCheckerService } from "./probe-checker.service"
 import { PROBE_CHECKER, PROBES } from "./probes.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./probes.module-definition"
 import type { Probe } from "./probes.port"
@@ -20,7 +20,7 @@ export class ProbesModule extends ConfigurableModuleClass {
                     inject: [...options.probes],
                     useFactory: (...probes: Array<Probe>) => probes,
                 },
-                { provide: PROBE_CHECKER, useClass: ProbeChecker },
+                { provide: PROBE_CHECKER, useClass: ProbeCheckerService },
             ],
             exports: [PROBE_CHECKER],
         }

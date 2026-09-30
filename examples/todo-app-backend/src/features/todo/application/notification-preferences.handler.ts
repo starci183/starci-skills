@@ -20,12 +20,6 @@ export class NotificationPreferencesHandler extends ICQRSHandler<
     }
 
     protected override async process(query: NotificationPreferencesQuery): Promise<NotificationPreferencesResult> {
-        const { request, principal } = query.params
-        const preference = await this.preferences.get({ personId: principal.id, channel: request.channel })
-        return {
-            channel: preference.channel,
-            unsubscribed: preference.unsubscribed,
-            digestWindowMinutes: preference.digestWindowMinutes,
-        }
+        return this.preferences.read({ personId: query.params.principal.id, channel: query.params.request.channel })
     }
 }

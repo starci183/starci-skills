@@ -305,15 +305,6 @@ slots:
     tests: none
     managedBy: quality-config
     rules: [HFS_SONAR_CONFIG, HFS_MANAGED_FILE_DRIFT]
-  - id: be.codecov
-    profiles: [be]
-    path: codecov.yml     # a front end has no tests, so no coverage upload
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    managedBy: quality-config
-    rules: [HFS_MANAGED_FILE_DRIFT]
   - id: repo.hooks
     profiles: [be, fe]
     path: ".husky/{pre-commit,pre-push}"

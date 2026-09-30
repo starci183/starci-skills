@@ -36,16 +36,14 @@ import {text} from '../lib/stack-declaration.mjs';
  *   token [--key K] [-- command args...]     run a command with SONAR_TOKEN/SONAR_HOST_URL in its env
  *   scan --cwd REPO [--key K] [--wait]       run the repository's scanner against the local server
  *        [--base REV] [--paths P1,P2]        and judge the slice: the lines REV..working tree changed
- *        [--fresh-since ISO] [--project-gate]  (inside --paths), not the whole project
+ *        [--project-gate]                    (inside --paths), not the whole project
  *        [--out summary.json | --blob] [--log scanner.txt] [--no-ensure] [--timeout SECONDS]
- *        [--lcov FILE[,FILE]] [--isolate] [--no-coverage]
+ *        [--isolate]
  *
  * --cwd takes the repository root; a bare repository name (the brief's <repo-id>) resolves to that
  * directory beside or above the current one, never to <cwd>/<name> (starci-next learn-content
  * op-backend.implement-792d53da0b: `--cwd starci-next` from inside starci-next read
- * D:/Repositories/starci-next/starci-next and was blocked). --lcov names the coverage report(s) of this
- * attempt's slice run (a job-private coverage directory, so a peer's test:ci in the shared checkout
- * cannot overwrite them); the scanner reads exactly those. --isolate analyses the slice alone: the
+ * D:/Repositories/starci-next/starci-next and was blocked). --isolate analyses the slice alone: the
  * scanner indexes only --paths (sonar.inclusions, and the repository's test patterns under them) into
  * a throwaway project <key>-slice-<hash> scanned with the admin token, judged, then deleted. A whole
  * nivo-backend analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice;
@@ -59,20 +57,13 @@ import {text} from '../lib/stack-declaration.mjs';
  * there and nowhere else; the summary copies them as `gate`): it passes when the slice introduces no open
  * blocker or critical issue and no to-review security hotspot on a line it changed (a line-less one only
  * on a file it added), its duplicated share of the changed source lines is within the duplication
- * threshold and its changed coverable lines meet the new-coverage threshold (like the server's
- * ignoreSmallChanges, fewer changed lines than the gate's floor are held to neither). Lesser issues are
+ * threshold (like the server's ignoreSmallChanges, fewer changed lines than the gate's floor are not held to it).
+ * Sonar holds no coverage condition and reads no lcov report. Lesser issues are
  * listed on the summary and never fail it. The scan also makes the server's gate of that name carry the
  * same conditions and selects it for the project (`qualityGate` on the summary). The whole-project
  * gate is recorded as `projectGate`, a note that never blocks; --project-gate makes it the verdict.
  * A scan that cannot judge (server down, custody missing) exits 2 and carries `unavailable`: the settle
  * (scripts/kernel/sonar-settle.mjs) records it as the explicit sonar-unavailable why, never as a pass.
- * Coverage must be fresh: every lcov report the scanner reads must exist and be newer than the head
- * commit, than every file the slice changed and than --fresh-since; otherwise the scan is refused
- * before it runs (run the repository's test:ci first, in the same attempt).
- * --no-coverage (owner config.yaml `specs.unit: false`, 2026-09-28 "speed up development; test later when
- * asked"): no test run feeds the scan, so no lcov is read or refused and no coverage condition is held -
- * the slice verdict is its open issues and to-review hotspots on changed lines (bugs, smells, security),
- * and in --project-gate mode the coverage conditions of the gate are reported but never fail it.
  *
  * Secret handling: a token is decrypted from its .enc member with sops and the shared master identity
  * (~/.starci/master.identity, the same identity scripts/stack-secret.mjs uses) straight into memory; the
@@ -81,7 +72,7 @@ import {text} from '../lib/stack-declaration.mjs';
  * report, a log or an error; every text this module emits passes through scrub().
  *
  * Exit codes: 0 pass / up / ensured / disabled by the declaration, 1 a real failing result (slice
- * verdict fail, scanner failure) or a refused scan (stale or missing coverage, empty slice, unknown
+ * verdict fail, scanner failure) or a refused scan (empty slice, unknown
  * base) the op fixes itself, 2 blocked (server down, custody missing, invalid token, usage).
  */
 export const SCHEMA='starci/sonar-local@1';
@@ -738,42 +729,6 @@ export function sliceChanges(cwd,{base,paths}={}){
   return {ok:true,base:baseRef,baseCommit:used,paths:scope,files,...(baseFallback?{baseFallback}:{})};
 }
 
-// ---- coverage freshness ---------------------------------------------------------------------------------
-
-/** The lcov reports the scanner reads: sonar-project.properties, the sonar:check script, else coverage/lcov.info. */
-export function coverageReports({props={},pkg=null}={}){
-  const found=[];
-  for(const key of ['sonar.javascript.lcov.reportPaths','sonar.typescript.lcov.reportPaths'])found.push(...splitList(props[key]));
-  for(const match of String(pkg?.scripts?.['sonar:check']??'').matchAll(/lcov\.reportPaths=([^\s"']+)/g))found.push(...splitList(match[1]));
-  return [...new Set(found.length?found:['coverage/lcov.info'])];
-}
-
-/**
- * Coverage must come from a run of this attempt: every report exists and is newer than the head commit,
- * than every slice file on disk and than `since`. Returns {fresh, reports, code?, reason?}.
- */
-export function coverageFreshness(cwd,{reports,headCommittedAt,since,files=[]}={}){
-  const seen=reports.map(report=>{
-    const file=path.resolve(cwd,report);
-    try{return {path:report,exists:true,modifiedAt:new Date(fs.statSync(file).mtimeMs).toISOString(),mtimeMs:fs.statSync(file).mtimeMs};}
-    catch{return {path:report,exists:false};}
-  });
-  const view=seen.map(({mtimeMs,...rest})=>rest);
-  const present=seen.filter(r=>r.exists);
-  if(!present.length)return {fresh:false,reports:view,code:'COVERAGE_MISSING',reason:`no coverage report (${reports.join(', ')}): run the repository's test:ci (coverage) in this attempt, then scan`};
-  const oldest=present.reduce((a,b)=>(a.mtimeMs<=b.mtimeMs?a:b));
-  const floor=Math.floor(oldest.mtimeMs/1000)*1000;
-  const stale=reason=>({fresh:false,reports:view,code:'COVERAGE_STALE',reason:`${oldest.path} is stale: ${reason}; run the repository's test:ci (coverage) again in this attempt, then scan`});
-  const head=headCommittedAt?Date.parse(headCommittedAt):NaN;
-  if(Number.isFinite(head)&&floor<head)return stale(`written ${oldest.modifiedAt}, before the head commit (${headCommittedAt})`);
-  const after=since?Date.parse(since):NaN;
-  if(since&&!Number.isFinite(after))return {fresh:false,reports:view,code:'COVERAGE_STALE',reason:`--fresh-since ${since} is not a date`};
-  if(Number.isFinite(after)&&oldest.mtimeMs<after)return stale(`written ${oldest.modifiedAt}, before this attempt (${since})`);
-  const newer=files.filter(f=>{try{return fs.statSync(path.join(cwd,f)).mtimeMs>oldest.mtimeMs;}catch{return false;}});
-  if(newer.length)return stale(`${newer.slice(0,5).join(', ')}${newer.length>5?` and ${newer.length-5} more`:''} changed after it was written`);
-  return {fresh:true,reports:view};
-}
-
 /** GET with the analysis token, retried with the admin token when the analysis user may not browse. */
 async function read(cfg,tokens,pathname){
   let last;
@@ -860,15 +815,13 @@ export function duplicatedLinesOf(doc,fileKey){
 /**
  * Judge the slice on the processed analysis against `gate` (thresholdsOf(knowledge/sonar-gate.yaml)): open
  * blocker and critical issues and to-review hotspots on its changed lines (a line-less one only on a file
- * it added), the duplicated share of its changed source lines and the coverage of its changed coverable
- * lines. A changed file the server does not know (excluded, not source) is listed as not analyzed.
+ * it added), and the duplicated share of its changed source lines. A changed file the server does not know (excluded, not source) is listed as not analyzed.
  */
-export async function evaluateSlice(cfg,tokens,{key,slice,linesToCover=null,props={},pkg=null,coverage:holdCoverage=true,gate=thresholdsOf(loadSonarGate())}){
+export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate=thresholdsOf(loadSonarGate())}){
   const qualifierOf=fileQualifier(props,pkg);
   const files=slice.files.filter(f=>f.ranges.length||f.added);
   const analyzed=new Map(),notAnalyzed=[];
-  let coverableLines=0,coveredLines=0,conditionsTotal=0,coveredConditions=0,changedSourceLines=0;
-  const uncovered=[];
+  let changedSourceLines=0;
   for(const file of files){
     const fileKey=`${key}:${file.path}`;
     const from=file.ranges.length?Math.min(...file.ranges.map(r=>r[0])):1;
@@ -878,14 +831,6 @@ export async function evaluateSlice(cfg,tokens,{key,slice,linesToCover=null,prop
     if(!lines.reachable||lines.status!==200)return {error:`source lines of ${file.path} could not be read: ${lines.error??`HTTP ${lines.status}`}`};
     analyzed.set(fileKey,file);
     if(qualifierOf(file.path)==='FIL')changedSourceLines+=file.ranges.reduce((n,[a,b])=>n+(b-a+1),0);
-    const missed=[];
-    for(const source of lines.json?.sources??[]){
-      if(!inRanges(file.ranges,source.line))continue;
-      if(source.lineHits!==undefined&&source.lineHits!==null){coverableLines+=1;if(Number(source.lineHits)>0)coveredLines+=1;else missed.push(source.line);}
-      conditionsTotal+=Number(source.conditions??0);
-      coveredConditions+=Number(source.coveredConditions??0);
-    }
-    if(missed.length)uncovered.push({path:file.path,lines:missed.slice(0,ITEM_CAP)});
   }
   const onSlice=(item,component)=>{
     const file=analyzed.get(component);
@@ -915,21 +860,7 @@ export async function evaluateSlice(cfg,tokens,{key,slice,linesToCover=null,prop
   if(hotspotsRead.error)return {error:`hotspots of the project could not be read: ${hotspotsRead.error}`};
   const hotspots=hotspotsRead.items.filter(h=>onSlice(h,h.component));
   const pathOf=component=>analyzed.get(component)?.path??component;
-  const threshold=gate.coverageMinPercent;
-  const denominator=coverableLines+conditionsTotal;
-  const percent=denominator?Math.round(((coveredLines+coveredConditions)/denominator)*1000)/10:null;
-  const coverage={coverableLines,coveredLines,conditions:conditionsTotal,coveredConditions,percent,threshold,thresholdSource:`knowledge/sonar-gate.yaml (${gate.name})`,uncovered};
   const failures=[];
-  if(!holdCoverage){coverage.applied=false;coverage.note='coverage not held: specs.unit=false (--no-coverage)';}
-  else if(keys.length&&coverableLines===0&&conditionsTotal===0&&!(Number(linesToCover)>0)){
-    coverage.applied=false;
-    return {error:null,refused:{code:'COVERAGE_NOT_IMPORTED',reason:'the analysis carries no coverage (the project has no lines to cover): the scanner did not import the lcov report - check sonar.javascript.lcov.reportPaths and rerun test:ci, then scan'},
-      result:{analyzedFiles:keys.length,notAnalyzed,coverage}};
-  }
-  if(!holdCoverage){/* specs.unit=false: issues and hotspots only */}
-  else if(denominator===0){coverage.applied=false;coverage.note='the slice changed no coverable line';}
-  else if(coverableLines<gate.ignoreBelowChangedLines){coverage.applied=false;coverage.note=`${coverableLines} changed coverable lines (< ${gate.ignoreBelowChangedLines}): like the server's ignoreSmallChanges, the threshold is not held`;}
-  else{coverage.applied=true;if(percent<threshold)failures.push(`coverage on the slice's changed lines ${percent}% < ${threshold}%`);}
   // Duplication: the share of the changed source lines that sit inside a duplicated block (the file's own side).
   const duplication={changedLines:changedSourceLines,duplicatedLines:0,percent:null,threshold:gate.duplicationMaxPercent,files:[]};
   for(const fileKey of keys){
@@ -955,7 +886,7 @@ export async function evaluateSlice(cfg,tokens,{key,slice,linesToCover=null,prop
     newIssues:{total:issues.length,blocking:blocking.length,notBlocking:lesser.length,bySeverity:tally(issues,'severity'),byType:tally(issues,'type'),
       items:[...blocking,...lesser].slice(0,ITEM_CAP).map(i=>({key:i.key,rule:i.rule,severity:i.severity,type:i.type,path:pathOf(i.component),line:i.line??null,message:i.message,blocking:gate.blockingSeverities.includes(i.severity)}))},
     newHotspots:{total:hotspots.length,items:hotspots.slice(0,ITEM_CAP).map(h=>({key:h.key,rule:h.ruleKey,probability:h.vulnerabilityProbability,path:pathOf(h.component),line:h.line??null,message:h.message}))},
-    coverage,duplication,
+    duplication,
     verdict:failures.length?'fail':'pass',
     failures,
   }};
@@ -1035,7 +966,7 @@ export async function scan(cfg,options={}){
   if(cfg.disabled)return finish('disabled',`Sonar is disabled for this repository: ${cfg.disabled}`);
   if(!key)return finish('blocked','no project key: pass --key or set sonar.projectKey');
 
-  // The slice and its coverage are local facts: read and refuse them before the scanner runs.
+  // The slice is a local fact: read and refuse it before the scanner runs.
   const projectGateMode=Boolean(options.projectGate);
   summary.scope=projectGateMode?'project':'slice';
   let slice=null;
@@ -1045,16 +976,6 @@ export async function scan(cfg,options={}){
     summary.slice={base:slice.base,baseCommit:slice.baseCommit,...(slice.baseFallback?{baseFallback:slice.baseFallback}:{}),paths:slice.paths,changedFiles:slice.files.map(f=>f.path)};
     if(!slice.files.length)return finish('refused',`the slice changes no file against ${slice.base}${slice.paths.length?` inside ${slice.paths.join(', ')}`:''}: pass --base <the commit before this slice's first edit> and --paths <its owned paths>`,{code:'SLICE_EMPTY'});
   }
-  // --no-coverage (specs.unit=false): no test run feeds this scan, so no lcov is read, refused or imported.
-  const holdCoverage=!options.noCoverage;
-  const lcov=holdCoverage?splitList(options.lcov).map(file=>path.resolve(cwd,file)):[];
-  if(lcov.length)summary.lcov=lcov;
-  if(holdCoverage){
-    const freshness=coverageFreshness(cwd,{reports:lcov.length?lcov:coverageReports({props,pkg}),headCommittedAt:summary.revision.committedAt,since:options.freshSince,files:slice?.files.map(f=>f.path)??[]});
-    summary.coverageReport=freshness;
-    if(!freshness.fresh)return finish('refused',freshness.reason,{code:freshness.code});
-  }else summary.coverageReport={held:false,reason:'specs.unit=false (--no-coverage): no coverage is read or held'};
-
   const server=await call(cfg,'GET','/api/system/status');
   if(!(server.reachable&&server.json?.status==='UP')){
     const docker=containerState(cfg);
@@ -1094,7 +1015,6 @@ export async function scan(cfg,options={}){
       }
     }
   }
-  if(lcov.length)extra.push(`-Dsonar.javascript.lcov.reportPaths=${lcov.join(',')}`);
   const analysisToken=token.value;
   const childEnv={...process.env,SONAR_HOST_URL:cfg.host,SONAR_TOKEN:analysisToken};
 
@@ -1144,23 +1064,21 @@ export async function scan(cfg,options={}){
     if(issues.status===200)summary.issues={scope:'whole-project',total:issues.json?.paging?.total??issues.json?.total??null,bySeverity:facet(issues.json,'severities'),byType:facet(issues.json,'types'),byImpactSeverity:facet(issues.json,'impactSeverities')};
     const hotspots=await read(cfg,tokens,`/api/hotspots/search?projectKey=${component}&status=TO_REVIEW&ps=1`);
     if(hotspots.status===200)summary.hotspots={scope:'whole-project',toReview:hotspots.json?.paging?.total??null};
-    const measures=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=coverage,lines_to_cover,duplicated_lines_density,ncloc`);
+    const measures=await read(cfg,tokens,`/api/measures/component?component=${component}&metricKeys=duplicated_lines_density,ncloc`);
     if(measures.status===200)summary.measures=Object.fromEntries((measures.json?.component?.measures??[]).map(m=>[m.metric,m.value]));
     // Sonar way judges new code only: a project's first analysis has none, so the gate is OK with no
     // condition evaluated. That is the server's verdict and stays a pass, but the summary says so.
     if(projectGate.status==='OK'&&!projectGate.conditions.length)projectGate.note='no condition was evaluated (a first analysis has no new code); read the overall measures';
-    const coverageMetric=metric=>/coverage|lines_to_cover|uncovered/.test(String(metric));
-    const projectFailures=projectGate.conditions.filter(c=>c.status==='ERROR'&&(holdCoverage||!coverageMetric(c.metric))).map(c=>`${c.metric} ${c.actual} vs ${c.comparator} ${c.threshold}`);
+    const projectFailures=projectGate.conditions.filter(c=>c.status==='ERROR').map(c=>`${c.metric} ${c.actual} vs ${c.comparator} ${c.threshold}`);
     if(projectGateMode){
       if(projectGate.status==='OK')return finish('pass');
-      if(projectGate.status==='ERROR'&&!projectFailures.length&&!holdCoverage){projectGate.note='only coverage conditions failed; not held (specs.unit=false)';return finish('pass');}
       if(projectGate.status==='ERROR')return finish('fail','the quality gate failed: '+projectFailures.join(', '));
       return finish('blocked',`no quality-gate result for the analysis (status ${projectGate.status??`HTTP ${gate.status}`})`);
     }
     // The project has no new-code baseline, so its gate judges the whole project's debt: a note for the
     // report, never this slice's verdict.
     projectGate.note=[`whole-project debt, reported and not a block: the slice verdict decides${projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:''}`,projectGate.note].filter(Boolean).join('; ');
-    const judged=await evaluateSlice(cfg,tokens,{key,slice,linesToCover:summary.measures?.lines_to_cover??null,props,pkg,coverage:holdCoverage,gate:summary.gate});
+    const judged=await evaluateSlice(cfg,tokens,{key,slice,props,pkg,gate:summary.gate});
     if(judged.error)return finish('blocked',judged.error);
     Object.assign(summary.slice,judged.result);
     if(judged.refused)return finish('refused',judged.refused.reason,{code:judged.refused.code});
@@ -1188,17 +1106,14 @@ const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
                                           alone it reports custody presence (never the value)
   scan --cwd REPO [--key K] [--wait]      run the repository scanner against the local server
        [--base REV] [--paths P1,P2]     judge the slice: lines REV..working tree changed inside the paths
-       [--fresh-since ISO]              (default base HEAD); the lcov must be newer than HEAD, the slice
-       [--project-gate]                 files and ISO; --project-gate judges the whole-project gate instead
+       [--project-gate]                 (default base HEAD); --project-gate judges the whole-project gate instead
        [--out FILE.json | --blob] [--log FILE.txt] [--token-ref REF] [--no-ensure] [--timeout SEC] [--wait-timeout SEC]
-       [--lcov FILE[,FILE]]             the coverage report(s) of this attempt's slice run (else the repository's)
        [--isolate] [--keep-slice-project] analyse only --paths in a throwaway project (minutes, not a whole-repo scan)
-       [--no-coverage]                  specs.unit=false: no lcov read or refused, no coverage condition held
 
   common: [--cwd REPO] [--declaration FILE] [--host URL] [--stack DIR]
           host, stack, custody and project keys come from the repository's .starcistacks/application-stacks.yaml
           quality.sonar declaration when it has one, else ${DEFAULT_HOST} and the source host's .starcistacks/dev
-Exit 0 pass/up/ok, 1 failing result or refused scan (stale/missing coverage, empty slice), 2 blocked or usage.`;
+Exit 0 pass/up/ok, 1 failing result or refused scan (empty slice), 2 blocked or usage.`;
 
 function parseArgs(argv){
   const out={_:[],rest:null};
@@ -1211,7 +1126,6 @@ function parseArgs(argv){
     else if(a==='--project-gate')out.projectGate=true;
     else if(a==='--isolate')out.isolate=true;
     else if(a==='--keep-slice-project')out.keepSliceProject=true;
-    else if(a==='--no-coverage')out.noCoverage=true;
     else if(a==='--blob')out.blob=true;
     else if(a==='--help'||a==='-h')out.help=true;
     else if(a.startsWith('--')){
@@ -1253,7 +1167,7 @@ export async function sonarLocalMain(argv=[],{env=process.env,config,put=null}={
     }
   }else if(command==='scan'){
     report=await scan(cfg,{cwd:args.cwd,key:args.key,wait:args.wait,out:args.out,log:args.log,blob:args.blob,put,tokenRef:args.tokenRef,ensure:args.ensure,timeoutSec:args.timeout,waitSec:args.waitTimeout,
-      base:args.base,paths:args.paths,freshSince:args.freshSince,projectGate:args.projectGate,lcov:args.lcov,isolate:args.isolate,keepSliceProject:args.keepSliceProject,noCoverage:args.noCoverage});
+      base:args.base,paths:args.paths,projectGate:args.projectGate,isolate:args.isolate,keepSliceProject:args.keepSliceProject});
     if(args.out)await emitCheckOutput(`${scrub(JSON.stringify(report,null,2))}\n`,{out:args.out});
   }else return {exitCode:2,text:`sonar-local: unknown command ${command}\n\n${HELP}`};
   const safeReport=JSON.parse(scrub(JSON.stringify(report)));

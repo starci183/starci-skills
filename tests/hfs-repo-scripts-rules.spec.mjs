@@ -1,5 +1,5 @@
-// The repository-hygiene tree checks of `hfs check` (scripts/lib/hfs-rules): R98 BE_SPEC_PLACEMENT, R99 HFS_REPO_LOCAL_CHECK,
-// R100 HFS_LINT_SUPPRESSION_FILE, R101 HFS_PROOF_COMMAND_FILE_MISSING, and the slot repo.scripts that holds the root `scripts/` folder.
+// The repository-hygiene tree checks of `hfs check` (scripts/lib/hfs-rules): R102 BE_SPEC_PLACEMENT, R103 HFS_REPO_LOCAL_CHECK,
+// R104 HFS_LINT_SUPPRESSION_FILE, R105 HFS_PROOF_COMMAND_FILE_MISSING, and the slot repo.scripts that holds the root `scripts/` folder.
 // Each has a violating and a passing tree; the clean repository of tests/_hfs-cli-fixture.mjs is the passing base.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,7 +50,7 @@ test('repo.scripts: a script of another kind (.ts) and a nested folder match no 
   assert.deepEqual(pathsOf(result, 'HFS_SLOT_UNDECLARED').filter((p) => p.startsWith('scripts/')), ['scripts/codemod.ts', 'scripts/seed/run.mjs']);
 });
 
-// ------------------------------------------------------------------------------------------------ R98 BE_SPEC_PLACEMENT
+// ------------------------------------------------------------------------------------------------ R102 BE_SPEC_PLACEMENT
 
 test('BE_SPEC_PLACEMENT: a spec in scripts/, in tools/, beside a non-service file and under src/ elsewhere is refused', () => {
   const result = checkRepo({ repoRoot: repoOf(BE, (dir) => {
@@ -75,7 +75,7 @@ test('BE_SPEC_PLACEMENT: a service spec beside its service and the integration, 
   assert.deepEqual(only(result, 'BE_SPEC_PLACEMENT'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R99 HFS_REPO_LOCAL_CHECK
+// ------------------------------------------------------------------------------------------------ R103 HFS_REPO_LOCAL_CHECK
 
 test('HFS_REPO_LOCAL_CHECK: local rule sources, a check script and a script that runs a check are refused', () => {
   for (const declaration of [BE, FE]) {
@@ -98,7 +98,7 @@ test('HFS_REPO_LOCAL_CHECK: an operational script, an ordinary script and a scri
   assert.deepEqual(only(result, 'HFS_REPO_LOCAL_CHECK'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R100 HFS_LINT_SUPPRESSION_FILE
+// ------------------------------------------------------------------------------------------------ R104 HFS_LINT_SUPPRESSION_FILE
 
 test('HFS_LINT_SUPPRESSION_FILE: a suppressions file, the lint:suppressions script, an eslint suppress flag and a suppressions config are refused', () => {
   for (const declaration of [BE, FE]) {
@@ -119,7 +119,7 @@ test('HFS_LINT_SUPPRESSION_FILE: plain eslint scripts and the standard config ar
   assert.deepEqual(only(result, 'HFS_LINT_SUPPRESSION_FILE'), []);
 });
 
-// ------------------------------------------------------------------------------------------------ R101 HFS_PROOF_COMMAND_FILE_MISSING
+// ------------------------------------------------------------------------------------------------ R105 HFS_PROOF_COMMAND_FILE_MISSING
 
 const RECORD = (commands, repository) => `schema: work/implementation@1\nid: impl.demo.gate\nstate: todo\n${repository ? `repository: ${repository}\n` : ''}requiresProof:\n${Object.entries(commands).map(([kind, command]) => `  ${kind}:\n    required: true\n    command: ${JSON.stringify(command)}\n`).join('')}`;
 

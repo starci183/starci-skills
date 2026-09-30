@@ -92,7 +92,7 @@ rules:
   - id: FE-I18N-3
     title: Catalogs share one key set
     kind: mandatory
-    hfsRules: [R60, R102]
+    hfsRules: [R60, R106]
     requirement: |-
       The catalogs of all locales have exactly the same keys: no missing and no extra key. A key the source reads with a
       literal exists in every locale, and a key that nothing reads is deleted. Catalogs are split by namespace, and a

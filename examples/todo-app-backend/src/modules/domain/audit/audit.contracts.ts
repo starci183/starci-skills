@@ -204,3 +204,73 @@ export interface AppendedLineResult {
     /** The id of the appended line. */
     readonly lineId: string
 }
+
+/** What opening the erasure request of the caller needs: the transaction, the clock and the audit line are the service's. */
+export interface RequestOwnErasureParams {
+    /** The subject: always the caller. */
+    readonly personId: string
+}
+
+/** What completing the erasure request of the caller needs. */
+export interface CompleteOwnErasureParams {
+    /** The request. */
+    readonly requestId: string
+    /** Who asks; must be the subject of the request. */
+    readonly callerId: string
+}
+
+/** The receipt of an erasure step: the request id and its state. */
+export interface ErasureReceiptView {
+    /** The opaque request id. */
+    readonly requestId: string
+    /** The state of the request. */
+    readonly state: string
+}
+
+/** One line as a reader gets it: the actor and the key id never leave the server. */
+export interface AuditLineView {
+    /** When the action happened. */
+    readonly at: Date
+    /** The action label. */
+    readonly action: string
+    /** What it touched. */
+    readonly target: string | null
+}
+
+/** The lines a reader may see. */
+export interface AuditLinesView {
+    /** The lines, oldest first. */
+    readonly lines: ReadonlyArray<AuditLineView>
+}
+
+/** What reading the log as a principal needs. */
+export interface ReadAuditLogParams {
+    /** The id of the reader; empty when there is no verifiable identity. */
+    readonly principalId: string
+    /** The roles the reader holds. */
+    readonly roles: ReadonlyArray<string>
+    /** Only lines of this action, honoured for administrators only. */
+    readonly action: string | null
+    /** Only lines of this target, honoured for administrators only. */
+    readonly target: string | null
+}
+
+/** What appending a delivered line needs: the delivery identity plus the line itself. */
+export interface AppendDeliveredLineParams {
+    /** The stable event id of the delivery; a redelivery of the same id writes nothing. */
+    readonly eventId: string
+    /** The acting person, or the system actor. */
+    readonly actorId: string
+    /** What happened. */
+    readonly action: AuditAction
+    /** What it touched, null when nothing. */
+    readonly target: string | null
+    /** When it happened. */
+    readonly at: Date
+}
+
+/** What appending a delivered line answers: the chain position, or null when the delivery was already written. */
+export interface DeliveredLineResult {
+    /** The id of the appended line, null for a redelivery. */
+    readonly lineId: string | null
+}

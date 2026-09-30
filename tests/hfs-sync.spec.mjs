@@ -69,7 +69,7 @@ describe('hfs.json validation', () => {
 
 describe('the generated file set', () => {
   it('a back end owns its tool configuration, package scripts, hooks, workflows, quality files and .starciwork/.gitignore; a front end owns its tool configuration, package scripts, hooks, workflows and quality files', () => {
-    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'codecov.yml', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'src/tests/tsconfig.json', 'tsconfig.build.json', 'tsconfig.json']);
+    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', '.starciwork/.gitignore', 'eslint.config.mjs', 'jest.config.js', 'package.json', 'sonar-project.properties', 'src/tests/tsconfig.json', 'tsconfig.build.json', 'tsconfig.json']);
     assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.prettierignore', '.prettierrc', 'eslint.config.mjs', 'package.json', 'sonar-project.properties', 'stylelint.config.mjs', 'tsconfig.json']);
   });
   it('the file list is the managedBy slots of the manifest, not code: each listed file is a literal path of a slot naming managedBy', () => {
@@ -104,7 +104,7 @@ describe('the generated file set', () => {
 describe('.husky/pre-commit', () => {
   it('back end runs staged lint, typecheck, unit specs of staged files and work hygiene, and never integration, e2e or contract', () => {
     const hook = rendered(BE)['.husky/pre-commit'];
-    for (const step of ['npm run typecheck', 'npx eslint $sources', 'npx prettier --check $sources', 'npm test -- --passWithNoTests --findRelatedTests $specs', 'npx hfs work-hygiene']) assert.ok(hook.includes(step), step);
+    for (const step of ['npm run typecheck', 'npx eslint $sources', 'npx prettier --check $sources', 'npm run test:affected -- --findRelatedTests $specs', 'npx hfs work-hygiene']) assert.ok(hook.includes(step), step);
     assert.doesNotMatch(hook, /lint-staged|test:(e2e|integration|contract)|typecheck:tests|selectProjects (e2e|integration|contract)|playwright/);
   });
   it('front end runs the secrets guard, staged eslint, stylelint and prettier (no lint-staged) and no test step', () => {
@@ -116,7 +116,7 @@ describe('.husky/pre-commit', () => {
 
 describe('.husky/pre-push', () => {
   const PUSH_STEPS = {
-    be: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm test -- --passWithNoTests --changedSince=origin/main'],
+    be: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast', 'npm run test:affected -- --changedSince=origin/main'],
     fe: ['npm run typecheck', 'npm run lint:check', 'npm run format:check', 'npm run hfs:check -- --fast'],
   };
   for (const hfs of [BE, FE]) {
@@ -148,7 +148,7 @@ describe('.husky/pre-push', () => {
 
 describe('.github/workflows', () => {
   const CI_STEPS = {
-    be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --coverage --ci', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run build', 'npm ci'],
+    be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --ci', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run build', 'npm ci'],
     fe: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm run hfs:report', 'npm run lint:report', 'npx hfs report eslint reports/eslint.json reports/eslint.sonar.json', 'npm run lint:report:css', 'npx hfs report stylelint reports/stylelint.json reports/stylelint.sonar.json', 'npm run build', 'npm ci'],
   };
   for (const hfs of [BE, FE]) {
@@ -164,8 +164,10 @@ describe('.github/workflows', () => {
       const uses = doc.jobs.ci.steps.map(step => step.uses).filter(Boolean);
       assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-scan-action')));
       assert.ok(uses.some(use => use.startsWith('SonarSource/sonarqube-quality-gate-action')));
-      assert.equal(uses.some(use => use.startsWith('codecov/codecov-action')), hfs.profile === 'be', 'only a back end has tests to report');
-      if (hfs.profile === 'fe') assert.doesNotMatch(text, /test:ci|codecov|id-token|vitest/);
+      assert.ok(!uses.some(use => use.startsWith('codecov/')), 'no coverage upload: Sonar and CI hold no coverage');
+      assert.equal(doc.permissions['id-token'], undefined);
+      assert.doesNotMatch(text, /lcov|codecov|--coverage/);
+      if (hfs.profile === 'fe') assert.doesNotMatch(text, /test:ci|vitest/);
       assert.doesNotMatch(text, /e2e/);
       assert.match(text, /node-version: 22/);
     });
@@ -196,12 +198,12 @@ describe('.gitignore', () => {
   });
 });
 
-describe('sonar-project.properties and codecov.yml', () => {
+describe('sonar-project.properties', () => {
   const properties = text => Object.fromEntries(text.split('\n').filter(line => line && !line.startsWith('#')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
-  it('take the exclusions from the profile preset and read no coverage (owner 2026-09-30: the gate is imported issues only)', () => {
+  it('takes its exclusions from the profile preset and imports no coverage', () => {
     const be = properties(rendered(BE)['sonar-project.properties']);
     assert.equal(be['sonar.exclusions'], jestPreset.sonarExclusions());
-    assert.ok(!('sonar.coverage.exclusions' in be) && !('sonar.javascript.lcov.reportPaths' in be));
+    assert.deepEqual(Object.keys(be).filter(key => /coverage|lcov/i.test(key)), []);
     assert.equal(be['sonar.projectKey'], 'nivo-backend');
     assert.equal(be['sonar.sources'], 'apps,src');
     const fe = properties(rendered(FE)['sonar-project.properties']);
@@ -216,13 +218,9 @@ describe('sonar-project.properties and codecov.yml', () => {
     assert.equal(be['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json,reports/eslint.sonar.json');
     assert.ok(!('sonar.host.url' in be) && !('sonar.host.url' in fe), 'the host is SONAR_HOST_URL, never a property (R11)');
   });
-  it('codecov ignores exactly the preset exclusions and keeps the 80/90 gates', () => {
-    const doc = parseYaml(rendered(BE)['codecov.yml']);
-    assert.deepEqual(doc.ignore, jestPreset.sonarExclusions().split(','));
-    assert.equal(doc.coverage.status.project.default.target, '80%');
-    assert.equal(doc.coverage.status.patch.default.target, '90%');
-    assert.equal(doc.coverage.status.project.default.informational, false);
-    assert.equal(doc.comment, false);
+  it('has no codecov file and no coverage upload: codecov.yml is not a managed file', () => {
+    assert.equal('codecov.yml' in rendered(BE), false);
+    assert.equal('codecov.yml' in rendered(FE), false);
   });
 });
 
@@ -308,21 +306,21 @@ describe('the drift check', () => {
     assert.equal((await run(['--check'], dir)).code, 1, 'nothing is written yet');
     const written = await run(['--write'], dir);
     assert.equal(written.code, 0);
-    assert.match(written.lines.at(-1), /16 written, 0 already in sync/);
+    assert.match(written.lines.at(-1), /15 written, 0 already in sync/);
     const checked = await run(['--check'], dir);
     assert.equal(checked.code, 0);
-    assert.match(checked.lines.at(-1), /16 of 16 in sync/);
+    assert.match(checked.lines.at(-1), /15 of 15 in sync/);
   });
   it('a hand edit fails --check with the file, the hashes and the first differing line, and --write repairs it', async t => {
     const dir = repo(t, BE);
     await run(['--write'], dir);
-    const file = path.join(dir, 'codecov.yml');
-    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('80%', '50%'));
+    const file = path.join(dir, 'sonar-project.properties');
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('sonar.sourceEncoding=UTF-8', 'sonar.sourceEncoding=UTF-16'));
     const failed = await run(['--check'], dir);
     assert.equal(failed.code, 1);
-    assert.match(failed.lines[0], /^HFS_SYNC_DRIFT codecov\.yml: drift, expected sha256 [0-9a-f]{12}, found [0-9a-f]{12} \(line \d+: expected .*80%/);
+    assert.match(failed.lines[0], /^HFS_SYNC_DRIFT sonar-project\.properties: drift, expected sha256 [0-9a-f]{12}, found [0-9a-f]{12} \(line \d+: expected .*UTF-8/);
     const repaired = await run(['--write'], dir);
-    assert.match(repaired.lines[0], /^wrote codecov\.yml$/);
+    assert.match(repaired.lines[0], /^wrote sonar-project\.properties$/);
     assert.equal((await run(['--check'], dir)).code, 0);
   });
   it('a deleted file is reported missing', async t => {
@@ -410,10 +408,10 @@ describe('the back-end tool configuration', () => {
 describe('the package.json scripts of a back end', () => {
   const scripts = hfs => Object.fromEntries(renderTargets(hfs, PRESETS.be).find(target => target.path === 'package.json').content.trim().split('\n').map(line => [line.slice(0, line.indexOf(': ')), line.slice(line.indexOf(': ') + 2)]));
   it('are the fixed scripts, plus build and one start script per runnable app and migrate', () => {
-    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'contract:emit', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'migrate', 'start:core', 'test', 'test:contract', 'test:e2e', 'test:integration', 'typecheck', 'typecheck:tests']);
+    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'contract:emit', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'migrate', 'start:core', 'test', 'test:affected', 'test:contract', 'test:e2e', 'test:integration', 'typecheck', 'typecheck:tests']);
     assert.equal(scripts(BE)['start:core'], 'node dist/apps/core/src/main.js');
     assert.equal(scripts(BE).migrate, 'node dist/apps/migrate/src/main.js');
-    assert.equal(scripts(BE).test, 'jest --selectProjects unit');
+    assert.equal(scripts(BE).test, 'jest --selectProjects unit --coverage');
     for (const project of ['integration', 'e2e', 'contract']) assert.equal(scripts(BE)[`test:${project}`], `npm run typecheck:tests && jest --selectProjects ${project}`);
     assert.equal(scripts(BE)['typecheck:tests'], 'tsc -p src/tests/tsconfig.json');
     assert.doesNotMatch(Object.values(scripts(BE)).join('\n'), /--rule|--no-inline-config|--no-eslintrc/);
@@ -557,40 +555,51 @@ describe('hfs sync --init', () => {
   const filesUnder = dir => fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/')).sort();
   const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
 
-  it('a back end gets platform config, logging and errors, the health feature and one entrypoint per api app', async t => {
+  it('a back end gets platform config, clock, cqrs, logging and errors, the liveness capability, the health feature and one entrypoint per api app', async t => {
     const { dir, code } = await skeleton(t, BE);
     assert.equal(code, 0);
     const files = filesUnder(dir);
     for (const file of [
-      'apps/core/src/main.ts', 'apps/core/src/app.module.ts', 'apps/core/src/core.options.ts', 'apps/core/src/core.composition.spec.ts',
-      'src/modules/platform/config/env-source.ts', 'src/modules/platform/config/server.config.ts', 'src/modules/platform/config/index.ts',
-      'src/modules/platform/logging/logger.port.ts', 'src/modules/platform/logging/log-id.ts', 'src/modules/platform/logging/logging.module.ts',
-      'src/modules/platform/errors/domain-error.ts', 'src/modules/platform/errors/error.filter.ts',
-      'src/features/system-health/index.ts', 'src/features/system-health/transport/http/live.controller.ts',
+      'apps/core/src/main.ts', 'apps/core/src/app.module.ts', 'apps/core/src/core.options.ts',
+      'src/modules/platform/config/env-source.config.ts', 'src/modules/platform/config/server.config.ts', 'src/modules/platform/config/index.ts',
+      'src/modules/platform/logging/logging.port.ts', 'src/modules/platform/logging/logging.log-events.ts', 'src/modules/platform/logging/logging.module.ts', 'src/modules/platform/logging/json-logger.service.ts',
+      'src/modules/platform/clock/clock.port.ts', 'src/modules/platform/clock/system-clock.service.ts',
+      'src/modules/platform/cqrs/cqrs.handler.ts', 'src/modules/platform/cqrs/cqrs.decorators.ts', 'src/modules/platform/composition/composition.decorators.ts',
+      'src/modules/platform/errors/domain.error.ts', 'src/modules/platform/errors/error.filter.ts',
+      'src/modules/domain/liveness/liveness.service.ts', 'src/modules/domain/liveness/index.ts',
+      'src/features/system-health/index.ts', 'src/features/system-health/application/check-liveness.handler.ts', 'src/features/system-health/transport/http/live.controller.ts',
     ]) assert.ok(files.includes(file), file);
     assert.ok(!files.some(file => file.startsWith('apps/migrate/')), 'only api apps get an entrypoint');
   });
-  it('every behaviour file of the back-end skeleton has a spec beside it', async t => {
+  it('the back-end skeleton follows the unit standard: only services have a spec, each service has one, no composition spec', async t => {
     const { dir } = await skeleton(t, BE);
-    const files = new Set(filesUnder(dir));
-    for (const file of ['env-source', 'server.config', 'json-logger', 'domain-error', 'error.filter'].flatMap(name => [...files].filter(candidate => candidate.endsWith(`/${name}.ts`)))) {
-      assert.ok(files.has(file.replace(/\.ts$/, '.spec.ts')), `${file} has a spec`);
+    const files = filesUnder(dir);
+    const specs = files.filter(file => /\.spec\.ts$/.test(file));
+    assert.deepEqual(specs, files.filter(file => file.endsWith('.service.ts')).map(file => file.replace(/\.ts$/, '.spec.ts')).sort(), 'exactly one spec per service and no other spec');
+    assert.ok(specs.length >= 3);
+    for (const spec of specs) {
+      const text = read(dir, spec);
+      assert.match(text, /Test\.createTestingModule\(\{[\s\S]*?providers: \[/, `${spec} builds its subject with the testing module`);
+      assert.match(text, /moduleRef\.get\(/, spec);
+      assert.doesNotMatch(text, /\bnew [A-Z]\w*Service\(| as |jest\.mock|process\.env|Date\.now|imports:/, `${spec} keeps the unit law`);
     }
-    assert.ok(files.has('src/features/system-health/transport/http/live.controller.spec.ts'));
+    assert.ok(!files.some(file => /composition\.spec|\.controller\.spec|\.handler\.spec|\.module\.spec/.test(file)));
   });
-  it('the back-end skeleton follows HFS: one env reader, an enum-named logger port, the Terminus health shape, per-app options', async t => {
+  it('the back-end skeleton follows HFS: one env reader, an enum-named logger port, a thin door dispatching one query to a thin handler that calls one service, per-app options, no coverage upload', async t => {
     const { dir } = await skeleton(t, BE);
     const sources = filesUnder(dir).filter(file => file.endsWith('.ts') && !file.endsWith('.spec.ts'));
-    assert.deepEqual(sources.filter(file => /process\.env/.test(read(dir, file))), ['src/modules/platform/config/env-source.ts'], 'process.env is read only by platform/config');
-    assert.ok(sources.every(file => !/console\.|new Error\(|synchronize|@Cron/.test(read(dir, file))));
-    assert.match(read(dir, 'src/modules/platform/logging/log-id.ts'), /export enum LogId/);
-    assert.match(read(dir, 'src/modules/platform/logging/logger.port.ts'), /abstract error\(id: LogId/);
-    assert.match(read(dir, 'src/features/system-health/transport/http/live.controller.ts'), /@Get\("live"\)[\s\S]*health\.check\(\[\]\)/);
-    assert.match(read(dir, 'apps/core/src/core.composition.spec.ts'), /toEqual\(\{ status: "ok", info: \{\}, error: \{\}, details: \{\} \}\)/);
+    assert.deepEqual(sources.filter(file => /process\.env/.test(read(dir, file))), ['src/modules/platform/config/env-source.config.ts'], 'process.env is read only by platform/config');
+    assert.ok(sources.every(file => !/console\.|new Error\(|synchronize|@Cron|new Date\(\)|Date\.now/.test(read(dir, file)) || file === 'src/modules/platform/clock/system-clock.service.ts'), 'the ambient clock is read only by platform/clock');
+    assert.match(read(dir, 'src/modules/platform/logging/logging.log-events.ts'), /export enum LoggingLogEvent/);
+    assert.match(read(dir, 'src/modules/platform/logging/logging.port.ts'), /error\(event: string, cause: unknown/);
+    const door = read(dir, 'src/features/system-health/transport/http/live.controller.ts');
+    assert.match(door, /@Get\("live"\)[\s\S]*this\.queryBus\.execute\(new CheckLivenessQuery/);
+    assert.doesNotMatch(door, /EntityManager|HealthCheckService|\bif \(/, 'a door injects the bus only and branches never');
+    assert.match(read(dir, 'src/features/system-health/application/check-liveness.handler.ts'), /return this\.liveness\.check\(\)/);
     assert.match(read(dir, 'apps/core/src/app.module.ts'), /static register\(options: CoreOptions\): DynamicModule/);
     assert.match(read(dir, 'apps/core/src/app.module.ts'), /APP_FILTER/);
     assert.match(read(dir, 'apps/core/src/main.ts'), /EnvSource\.fromProcess\(\)/);
-    assert.doesNotMatch(filesUnder(dir).map(file => read(dir, file)).join('\n'), /\{\{[a-zA-Z]/, 'no template placeholder is left');
+    assert.doesNotMatch(filesUnder(dir).map(file => read(dir, file)).join('\n'), /\{\{[a-zA-Z]|lcov|codecov/i, 'no template placeholder and no coverage upload is left');
   });
   const SHARED = ['fe.package.i18n', 'fe.package.api'];
   const APP_SHELL = ['next.config.ts', 'src/proxy.ts', 'src/app/global-error.tsx', 'src/app/globals.css', 'src/app/health/live/route.ts',
@@ -672,7 +681,7 @@ describe('scripts/checks/check-hfs-sync.mjs', () => {
     execFileSync('git', ['init', '-q'], { cwd: dir });
     assert.deepEqual(await checkHfsSync(dir, { presets: PRESETS.be }), { ok: true, findings: [] });
 
-    fs.writeFileSync(path.join(dir, 'codecov.yml'), '# hand written\n');
+    fs.writeFileSync(path.join(dir, '.prettierignore'), '# hand written\n');
     fs.mkdirSync(path.join(dir, '.starciwork', 'features', 'a', 'evidence'), { recursive: true });
     fs.writeFileSync(path.join(dir, '.starciwork', 'features', 'a', 'evidence', 'run.log'), 'log\n');
     fs.mkdirSync(path.join(dir, '.starcistacks', 'dev', 'secrets'), { recursive: true });
@@ -681,7 +690,7 @@ describe('scripts/checks/check-hfs-sync.mjs', () => {
     const result = await checkHfsSync(dir, { presets: PRESETS.be });
     assert.equal(result.ok, false);
     assert.deepEqual(result.findings.map(finding => [finding.code, finding.file]).sort(), [
-      ['HFS_MANAGED_FILE_DRIFT', 'codecov.yml'],
+      ['HFS_MANAGED_FILE_DRIFT', '.prettierignore'],
       ['HFS_PLAINTEXT_SECRET', '.starcistacks/dev/secrets/db.txt'],
       ['HFS_WORK_AGENT_DATA', '.starciwork/features/a/evidence/run.log'],
     ]);

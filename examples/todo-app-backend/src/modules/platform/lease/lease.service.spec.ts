@@ -1,30 +1,48 @@
-import { mockEntityManager } from "@tests/fixtures/database"
+import { Test } from "@nestjs/testing"
+import { mockEntityManager } from "@starci/jest-preset"
+import { PLATFORM_AT } from "@tests/fixtures/builders/platform.builder"
+import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { PostgresLease } from "./lease.service"
 import { ACQUIRE_LEASE, RELEASE_LEASE } from "./persistence/lease.sql"
 
-const AT = new Date("2026-09-30T10:00:00.000Z")
+const AT = new Date(PLATFORM_AT)
+
+const build = async (manager: ReturnType<typeof mockEntityManager>) => {
+    const moduleRef = await Test.createTestingModule({
+        providers: [PostgresLease, { provide: PRIMARY_ENTITY_MANAGER, useValue: manager }],
+    }).compile()
+    return moduleRef.get(PostgresLease)
+}
 
 describe("PostgresLease", () => {
-    it("grants the lease with the fence the upsert answers", async () => {
-        const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([{ fence: "3" }]) })
-        const grant = await new PostgresLease(manager).acquire({ name: "job", holder: "a", ttlMs: 60_000, at: AT })
-        expect(grant).toEqual({ name: "job", holder: "a", fence: 3 })
-        expect(manager.query).toHaveBeenCalledWith(ACQUIRE_LEASE, [
-            "job",
-            "a",
-            new Date("2026-09-30T10:01:00.000Z"),
-            AT,
-        ])
+    describe("acquire", () => {
+        it("grants the lease with the fence the store returns as a number", async () => {
+            const manager = mockEntityManager({ query: [ACQUIRE_LEASE, [{ fence: "7" }]] })
+            const lease = await build(manager)
+
+            await expect(lease.acquire({ name: "digest", holder: "h-1", ttlMs: 60_000, at: AT })).resolves.toEqual({
+                name: "digest",
+                holder: "h-1",
+                fence: 7,
+            })
+            expect(manager.query).toHaveBeenCalledWith(ACQUIRE_LEASE, ["digest", "h-1", new Date("2026-05-01T10:01:00.000Z"), AT])
+        })
+
+        it("answers null when another holder owns the lease", async () => {
+            const lease = await build(mockEntityManager({ query: [ACQUIRE_LEASE, []] }))
+
+            await expect(lease.acquire({ name: "digest", holder: "h-2", ttlMs: 60_000, at: AT })).resolves.toBeNull()
+        })
     })
 
-    it("answers null when another live holder has the lease", async () => {
-        const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
-        await expect(new PostgresLease(manager).acquire({ name: "job", holder: "b", ttlMs: 1, at: AT })).resolves.toBeNull()
-    })
+    describe("release", () => {
+        it("releases the grant by name, fence and holder", async () => {
+            const manager = mockEntityManager({ query: [RELEASE_LEASE, []] })
+            const lease = await build(manager)
 
-    it("releases by name, fence and holder", async () => {
-        const manager = mockEntityManager({ query: jest.fn().mockResolvedValue([]) })
-        await new PostgresLease(manager).release({ grant: { name: "job", holder: "a", fence: 3 } })
-        expect(manager.query).toHaveBeenCalledWith(RELEASE_LEASE, ["job", 3, "a"])
+            await lease.release({ grant: { name: "digest", holder: "h-1", fence: 7 } })
+
+            expect(manager.query).toHaveBeenCalledWith(RELEASE_LEASE, ["digest", 7, "h-1"])
+        })
     })
 })

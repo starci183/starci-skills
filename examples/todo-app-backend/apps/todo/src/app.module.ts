@@ -2,6 +2,13 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { AUDIT_ERROR_KINDS, AUDIT_MESSAGES, AuditModule, auditEntities, auditMigrations } from "@modules/domain/audit"
+import {
+    COMMISSION_ERROR_KINDS,
+    COMMISSION_MESSAGES,
+    CommissionModule,
+    commissionEntities,
+    commissionMigrations,
+} from "@modules/domain/commission"
 import { NOTIFY_ERROR_KINDS, NOTIFY_MESSAGES, NotifyModule, notifyEntities, notifyMigrations } from "@modules/domain/notify"
 import { PLAN_ERROR_KINDS, PLAN_MESSAGES, PlanModule, planEntities, planMigrations } from "@modules/domain/plan"
 import { RECUR_ERROR_KINDS, RECUR_MESSAGES, RecurModule, recurEntities, recurMigrations } from "@modules/domain/recur"
@@ -15,6 +22,7 @@ import {
 } from "@modules/domain/identity"
 import { SHARE_ERROR_KINDS, SHARE_MESSAGES, ShareModule, shareEntities, shareMigrations } from "@modules/domain/share"
 import { TASK_ERROR_KINDS, TASK_MESSAGES, TaskModule, taskEntities, taskMigrations } from "@modules/domain/task"
+import { TaskflowModule } from "@modules/domain/taskflow"
 import { UPLOAD_ERROR_KINDS, UPLOAD_MESSAGES, UploadModule, uploadEntities, uploadMigrations } from "@modules/domain/upload"
 import { KEYCLOAK_ERROR_KINDS, KEYCLOAK_MESSAGES, KeycloakModule } from "@modules/integrations/keycloak"
 import { NOTIFY_SMTP_ERROR_KINDS, NOTIFY_SMTP_MESSAGES, NotifySmtpModule } from "@modules/integrations/notify-smtp"
@@ -65,6 +73,7 @@ export class AppModule {
                         TASK_MESSAGES,
                         SHARE_MESSAGES,
                         PLAN_MESSAGES,
+                        COMMISSION_MESSAGES,
                         RECUR_MESSAGES,
                         NOTIFY_MESSAGES,
                         AUDIT_MESSAGES,
@@ -87,6 +96,7 @@ export class AppModule {
                         TASK_ERROR_KINDS,
                         SHARE_ERROR_KINDS,
                         PLAN_ERROR_KINDS,
+                        COMMISSION_ERROR_KINDS,
                         RECUR_ERROR_KINDS,
                         NOTIFY_ERROR_KINDS,
                         AUDIT_ERROR_KINDS,
@@ -109,6 +119,7 @@ export class AppModule {
                                 ...taskEntities,
                                 ...shareEntities,
                                 ...planEntities,
+                                ...commissionEntities,
                                 ...recurEntities,
                                 ...notifyEntities,
                                 ...auditEntities,
@@ -121,6 +132,7 @@ export class AppModule {
                                 ...taskMigrations,
                                 ...shareMigrations,
                                 ...planMigrations,
+                                ...commissionMigrations,
                                 ...recurMigrations,
                                 ...notifyMigrations,
                                 ...auditMigrations,
@@ -142,6 +154,8 @@ export class AppModule {
                 TaskModule.register({ isGlobal: true }),
                 ShareModule.register({ isGlobal: true }),
                 PlanModule.register({ isGlobal: true, ...options.plan }),
+                TaskflowModule.register({ isGlobal: true }),
+                CommissionModule.register({ isGlobal: true, ...options.commission }),
                 RecurModule.register({ isGlobal: true, ...options.recur }),
                 NotifyModule.register({ isGlobal: true }),
                 AuditModule.register({ isGlobal: true }),

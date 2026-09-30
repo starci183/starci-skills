@@ -15,7 +15,8 @@
     "lint:report": "eslint . --format json --output-file reports/eslint.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "jest --selectProjects unit",
+    "test": "jest --selectProjects unit --coverage",
+    "test:affected": "jest --selectProjects unit --passWithNoTests",
     "test:integration": "npm run typecheck:tests && jest --selectProjects integration",
     "test:e2e": "npm run typecheck:tests && jest --selectProjects e2e",
     "test:contract": "npm run typecheck:tests && jest --selectProjects contract",
@@ -37,6 +38,7 @@
     "pg": "^8.12.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "tslib": "^2.8.1",
     "typeorm": "^0.3.20"
   },
   "devDependencies": {

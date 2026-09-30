@@ -69,7 +69,6 @@ function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core
     '.gitignore': 'node_modules/\n',
     '.husky/pre-commit': 'exit 0\n',
     'README.md': hfsReadme(root),
-    'codecov.yml': 'coverage: {}\n',
     'eslint.config.mjs': 'export default [];\n',
     'package-lock.json': '{}\n',
     'package.json': JSON.stringify(kind === 'frontend' ? { private: true, workspaces: ['apps/*'] } : { private: true }),

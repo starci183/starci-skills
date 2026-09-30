@@ -5,7 +5,7 @@
 // templates/<profile or common>/<managedBy>/<file path with each leading dot dropped>. Two targets are not whole files
 // of a managedBy slot and are listed in this module: the marked block of the shared .gitignore, and
 // .starciwork/.gitignore, which lives inside the .starciwork directory slot. Every file is rendered with the
-// repository's hfs.json (profile and apps) and, for the coverage denominators, the jest preset a back end
+// repository's hfs.json (profile and apps) and, for the Sonar exclusions, the same jest preset a back end
 // repository installs. `--check` compares the sha256 of the rendered content with the file on disk and fails on any
 // drift; `--write` rewrites the drifted files. `.gitignore` is the one shared file: only the marked block is managed
 // and the repository's own lines around it are left alone. A back end's package.json is managed by its `scripts`
@@ -141,7 +141,6 @@ export const STYLE_GLOB = '{apps,packages}/*/src/**/*.css';
 
 /** Every value a template can name, derived from hfs.json and the presets. */
 export function variables(hfs, presets, sonarKey) {
-  const globs = presets ? presets.sonarExclusions.split(',') : [];
   const packages = hfs.profile === 'fe' && opensPackages(hfs);
   return {
     header: HEADER(hfs.profile),
@@ -150,7 +149,6 @@ export function variables(hfs, presets, sonarKey) {
     nodeMajor: String(NODE_MAJOR),
     sonarKey: sonarKey ?? `${hfs.project}-${hfs.profile === 'be' ? 'backend' : 'fe'}`,
     sonarExclusions: presets?.sonarExclusions ?? '',
-    codecovIgnore: globs.map(glob => JSON.stringify(glob)).join('\n  - '),
     tsconfigPaths: [...hfs.apps.map(app => `apps/${app.name}/tsconfig.json`), ...(packages ? ['packages/*/tsconfig.json'] : [])].join(','),
     sonarRoots: packages ? 'apps,packages' : 'apps',
     styleGlob: STYLE_GLOB,

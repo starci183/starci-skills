@@ -1,77 +1,241 @@
-import { mockEntityManager } from "@tests/fixtures/database"
+import { Test } from "@nestjs/testing"
+import type { MockEntityManager } from "@starci/jest-preset"
+import { FakeClock, fakeTransaction, mock, mockEntityManager, recordingOutbox } from "@starci/jest-preset"
+import { AuditAction } from "@modules/domain/audit"
+import { KEYCLOAK, KeycloakError, KeycloakErrorCode, KeycloakLogEvent } from "@modules/integrations/keycloak"
+import type { KeycloakClient } from "@modules/integrations/keycloak"
+import { CLOCK } from "@modules/platform/clock"
+import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { LOGGER } from "@modules/platform/logging"
+import type { Logger } from "@modules/platform/logging"
+import { OUTBOX } from "@modules/platform/outbox"
+import {
+    IDENTITY_NOW,
+    findSessionInput,
+    lapsedSessionRow,
+    purgeSessionsInput,
+    sessionRow,
+    signInInput,
+    signOutInput,
+} from "@tests/fixtures/builders/identity.builder"
 import { IdentityErrorCode } from "./errors/identity.error"
+import { IDENTITY_OPTIONS } from "./identity.decorators"
 import { SessionEntity } from "./persistence/entities/session.entity"
 import { PURGE_LAPSED_SESSIONS } from "./persistence/session.sql"
 import { SessionService } from "./session.service"
 
-const AT = new Date("2026-09-30T10:00:00.000Z")
+const NOW = IDENTITY_NOW
+const AT = new Date(NOW)
 const OPTIONS = { ttlDays: 2, adminSubjects: ["boss"] }
 
-const row = (expiresAt: Date): SessionEntity => ({
-    token: "t1",
-    personId: "p1",
-    issuedAt: new Date("2026-09-29T10:00:00.000Z"),
-    expiresAt,
-})
+const LIVE = sessionRow()
+const LAPSED = lapsedSessionRow()
+
+const build = async (entityManager: MockEntityManager = mockEntityManager()) => {
+    const transaction = fakeTransaction(entityManager)
+    const clock = new FakeClock(NOW)
+    const outbox = recordingOutbox()
+    const keycloak = mock<KeycloakClient>()
+    const logger = mock<Logger>()
+    const moduleRef = await Test.createTestingModule({
+        providers: [
+            SessionService,
+            { provide: PRIMARY_ENTITY_MANAGER, useValue: transaction.em },
+            { provide: IDENTITY_OPTIONS, useValue: OPTIONS },
+            { provide: CLOCK, useValue: clock },
+            { provide: OUTBOX, useValue: outbox },
+            { provide: KEYCLOAK, useValue: keycloak },
+            { provide: LOGGER, useValue: logger },
+        ],
+    }).compile()
+    return { service: moduleRef.get(SessionService), transaction, outbox, keycloak, logger }
+}
 
 describe("SessionService", () => {
-    it("opens a session that lives for the configured days and saves it through the manager it was given", async () => {
-        const own = mockEntityManager()
-        const inTransaction = mockEntityManager({ save: jest.fn().mockImplementation((_target: unknown, entity: object) => entity) })
-        const session = await new SessionService(own, OPTIONS).open({ manager: inTransaction, personId: "p1", at: AT })
-        expect(session.personId).toBe("p1")
-        expect(session.issuedAt).toEqual(AT)
-        expect(session.expiresAt).toEqual(new Date("2026-10-02T10:00:00.000Z"))
-        expect(session.token).toEqual(expect.any(String))
-        expect(inTransaction.save).toHaveBeenCalledWith(SessionEntity, expect.objectContaining({ personId: "p1" }))
-        expect(own.save).not.toHaveBeenCalled()
-    })
+    describe("signIn", () => {
+        it("refuses an implausible email without calling the provider or the database", async () => {
+            const { service, keycloak, transaction, outbox } = await build()
 
-    it("refuses an empty token before it queries anything", async () => {
-        const manager = mockEntityManager()
-        const outcome = await new SessionService(manager, OPTIONS).find({ token: "", at: AT })
-        expect(outcome).toEqual({ kind: "refused", code: IdentityErrorCode.NotFound, params: { reason: "missing-token" } })
-        expect(manager.findOneBy).not.toHaveBeenCalled()
-    })
+            await expect(service.signIn(signInInput({ email: "not-an-email" }))).resolves.toBeRefused(
+                IdentityErrorCode.InvalidCredentials,
+            )
 
-    it("refuses an unknown token", async () => {
-        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(null) })
-        const outcome = await new SessionService(manager, OPTIONS).find({ token: "t1", at: AT })
-        expect(outcome).toMatchObject({ kind: "refused", code: IdentityErrorCode.NotFound })
-    })
+            expect(keycloak.signIn).not.toHaveBeenCalled()
+            expect(transaction.outcomes).toEqual([])
+            expect(outbox.messages).toEqual([])
+        })
 
-    it("refuses a lapsed session as expired", async () => {
-        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(row(AT)) })
-        const outcome = await new SessionService(manager, OPTIONS).find({ token: "t1", at: AT })
-        expect(outcome).toMatchObject({ kind: "refused", code: IdentityErrorCode.Expired })
-    })
+        it("refuses with the uniform credentials code when the provider rejects the pair", async () => {
+            const { service, keycloak, transaction } = await build()
+            keycloak.signIn.mockRejectedValue(new KeycloakError({ code: KeycloakErrorCode.InvalidCredentials }))
 
-    it("answers the view of a live session", async () => {
-        const later = new Date("2026-10-01T10:00:00.000Z")
-        const manager = mockEntityManager({ findOneBy: jest.fn().mockResolvedValue(row(later)) })
-        const outcome = await new SessionService(manager, OPTIONS).find({ token: "t1", at: AT })
-        expect(outcome).toEqual({
-            kind: "ok",
-            value: { token: "t1", personId: "p1", issuedAt: new Date("2026-09-29T10:00:00.000Z"), expiresAt: later },
+            await expect(service.signIn(signInInput())).resolves.toBeRefused(
+                IdentityErrorCode.InvalidCredentials,
+            )
+
+            expect(transaction.outcomes).toEqual([])
+        })
+
+        it("refuses as unavailable when the provider cannot be reached", async () => {
+            const { service, keycloak, transaction } = await build()
+            keycloak.signIn.mockRejectedValue(new KeycloakError({ code: KeycloakErrorCode.ProviderUnavailable }))
+
+            await expect(service.signIn(signInInput())).resolves.toBeRefused(
+                IdentityErrorCode.ProviderUnavailable,
+            )
+
+            expect(transaction.outcomes).toEqual([])
+        })
+
+        it("rethrows a failure that is not a provider refusal and opens no session", async () => {
+            const { service, keycloak, transaction } = await build()
+            const failure = new Error("boom")
+            keycloak.signIn.mockRejectedValue(failure)
+
+            await expect(service.signIn(signInInput())).rejects.toBe(failure)
+
+            expect(transaction.outcomes).toEqual([])
+        })
+
+        it("opens the session and writes the audit line in one committed transaction", async () => {
+            const { service, keycloak, transaction, outbox } = await build(mockEntityManager({ save: [SessionEntity, LIVE] }))
+            keycloak.signIn.mockResolvedValue({ subject: "p1" })
+
+            await expect(service.signIn(signInInput())).resolves.toSucceedWith({
+                sessionToken: "t1",
+                personId: "p1",
+            })
+
+            expect(keycloak.signIn).toHaveBeenCalledWith(signInInput())
+            expect(transaction.outcomes).toEqual(["commit"])
+            expect(transaction.committedWrites).toEqual([
+                {
+                    method: "save",
+                    args: [
+                        SessionEntity,
+                        {
+                            token: expect.any(String),
+                            personId: "p1",
+                            issuedAt: AT,
+                            expiresAt: new Date("2026-10-02T10:00:00.000Z"),
+                        },
+                    ],
+                },
+            ])
+            expect(outbox.allInTransaction).toBe(true)
+            expect(outbox.messages).toEqual([
+                {
+                    queue: "audit.append",
+                    eventId: expect.any(String),
+                    payload: { actorId: "p1", action: AuditAction.SignedIn, target: null, at: NOW },
+                    availableAt: AT,
+                },
+            ])
         })
     })
 
-    it("revokes by token through the caller manager", async () => {
-        const inTransaction = mockEntityManager({ delete: jest.fn().mockResolvedValue({ affected: 1, raw: [] }) })
-        await new SessionService(mockEntityManager(), OPTIONS).revoke({ manager: inTransaction, token: "t1" })
-        expect(inTransaction.delete).toHaveBeenCalledWith(SessionEntity, "t1")
+    describe("signOut", () => {
+        it("refuses an empty token before it queries anything", async () => {
+            const { service, keycloak, transaction, outbox } = await build()
+
+            const outcome = await service.signOut(signOutInput({ sessionToken: "" }))
+
+            expect(outcome).toBeRefused({ code: IdentityErrorCode.NotFound, params: { reason: "missing-token" } })
+            expect(transaction.outcomes).toEqual([])
+            expect(outbox.messages).toEqual([])
+            expect(keycloak.notifySignOut).not.toHaveBeenCalled()
+        })
+
+        it("refuses an unknown token and changes nothing", async () => {
+            const { service, keycloak, transaction, outbox } = await build(mockEntityManager({ findOneBy: [SessionEntity, null] }))
+
+            await expect(service.signOut(signOutInput())).resolves.toBeRefused(IdentityErrorCode.NotFound)
+
+            expect(transaction.outcomes).toEqual([])
+            expect(outbox.messages).toEqual([])
+            expect(keycloak.notifySignOut).not.toHaveBeenCalled()
+        })
+
+        it("refuses a lapsed session as expired and changes nothing", async () => {
+            const { service, keycloak, transaction } = await build(mockEntityManager({ findOneBy: [SessionEntity, LAPSED] }))
+
+            await expect(service.signOut(signOutInput())).resolves.toBeRefused(IdentityErrorCode.Expired)
+
+            expect(transaction.outcomes).toEqual([])
+            expect(keycloak.notifySignOut).not.toHaveBeenCalled()
+        })
+
+        it("revokes the session with its audit line in one transaction, then tells the provider", async () => {
+            const { service, keycloak, transaction, outbox, logger } = await build(mockEntityManager({
+                findOneBy: [SessionEntity, LIVE],
+                delete: [SessionEntity, { affected: 1 }],
+            }))
+            keycloak.notifySignOut.mockResolvedValue()
+
+            await expect(service.signOut(signOutInput())).resolves.toSucceedWith({ signedOut: true })
+
+            expect(transaction.outcomes).toEqual(["commit"])
+            expect(transaction.committedWrites).toEqual([{ method: "delete", args: [SessionEntity, "t1"] }])
+            expect(outbox.allInTransaction).toBe(true)
+            expect(outbox.messages).toEqual([
+                {
+                    queue: "audit.append",
+                    eventId: expect.any(String),
+                    payload: { actorId: "p1", action: AuditAction.SignedOut, target: null, at: NOW },
+                    availableAt: AT,
+                },
+            ])
+            expect(keycloak.notifySignOut).toHaveBeenCalledWith({ personId: "p1" })
+            expect(logger.error).not.toHaveBeenCalled()
+        })
+
+        it("logs a failed provider notice and still signs out", async () => {
+            const { service, keycloak, transaction, logger } = await build(mockEntityManager({
+                findOneBy: [SessionEntity, LIVE],
+                delete: [SessionEntity, { affected: 1 }],
+            }))
+            const failure = new Error("provider down")
+            keycloak.notifySignOut.mockRejectedValue(failure)
+
+            await expect(service.signOut(signOutInput())).resolves.toSucceedWith({ signedOut: true })
+
+            expect(transaction.outcomes).toEqual(["commit"])
+            expect(logger.error).toHaveBeenCalledWith(KeycloakLogEvent.SignOutNotifyFailed, failure)
+        })
     })
 
-    it("purges lapsed sessions and answers how many went", async () => {
-        const inTransaction = mockEntityManager({ query: jest.fn().mockResolvedValue([[{ token: "a" }, { token: "b" }], 2]) })
-        const count = await new SessionService(mockEntityManager(), OPTIONS).purgeLapsed({ manager: inTransaction, at: AT })
-        expect(count).toBe(2)
-        expect(inTransaction.query).toHaveBeenCalledWith(PURGE_LAPSED_SESSIONS, [AT])
+    describe("find", () => {
+        it("answers the view of a live session", async () => {
+            const { service } = await build(mockEntityManager({ findOneBy: [SessionEntity, LIVE] }))
+
+            await expect(service.find(findSessionInput())).resolves.toSucceedWith({
+                token: "t1",
+                personId: "p1",
+                issuedAt: new Date("2026-09-29T10:00:00.000Z"),
+                expiresAt: new Date("2026-10-01T10:00:00.000Z"),
+            })
+        })
     })
 
-    it("gives an administrator the admin role and everyone else only member", () => {
-        const service = new SessionService(mockEntityManager(), OPTIONS)
-        expect(service.principalOf("boss")).toEqual({ id: "boss", roles: ["member", "admin"] })
-        expect(service.principalOf("p1")).toEqual({ id: "p1", roles: ["member"] })
+    describe("purgeLapsed", () => {
+        it("deletes the lapsed sessions in one transaction and answers how many went", async () => {
+            const { service, transaction } = await build(mockEntityManager({
+                query: [PURGE_LAPSED_SESSIONS, [[{ token: "a" }, { token: "b" }], 2]],
+            }))
+
+            await expect(service.purgeLapsed(purgeSessionsInput())).resolves.toEqual({ purged: 2 })
+
+            expect(transaction.outcomes).toEqual(["commit"])
+            expect(transaction.em.query).toHaveBeenCalledWith(PURGE_LAPSED_SESSIONS, [AT])
+        })
+    })
+
+    describe("principalOf", () => {
+        it("gives an administrator the admin role and everyone else only member", async () => {
+            const { service } = await build()
+
+            expect(service.principalOf("boss")).toEqual({ id: "boss", roles: ["member", "admin"] })
+            expect(service.principalOf("p1")).toEqual({ id: "p1", roles: ["member"] })
+        })
     })
 })

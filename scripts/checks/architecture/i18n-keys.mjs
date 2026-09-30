@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * R102 `i18n-keys` (FE_I18N_KEYS). The catalogs of an app (`apps/<app>/src/modules/i18n/messages/<locale>.json`, slot fe.modules.i18n) and
+ * R106 `i18n-keys` (FE_I18N_KEYS). The catalogs of an app (`apps/<app>/src/modules/i18n/messages/<locale>.json`, slot fe.modules.i18n) and
  * the source that reads them agree, both ways. The key sets of the locales agree with each other (FE_I18N_CATALOG, `hfs check`); this
  * rule holds the source to the catalogs:
  *

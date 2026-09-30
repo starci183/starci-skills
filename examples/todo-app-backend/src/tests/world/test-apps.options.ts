@@ -33,6 +33,7 @@ export const testOptions = (state: TestWorldState): TestOptions => ({
         timeoutMs: CALL_DEADLINE_MS,
     },
     plan: { paidPriceMinorUnits: PAID_PRICE_MINOR_UNITS, paidCurrency: "VND" },
+    commission: { bps: 3000 },
     // The generation job is a cron of whole minutes: every minute is the shortest cadence it supports.
     recur: { tickCron: "* * * * *" },
     upload: {

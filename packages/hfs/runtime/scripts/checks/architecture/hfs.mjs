@@ -44,7 +44,7 @@ export const HFS_RULE_IDS = [
 const REQUIRED_COMMON = ['.gitattributes', '.github', '.gitignore', '.husky', 'hfs.json',
   'eslint.config.mjs', 'package-lock.json', 'package.json', 'README.md',
   'sonar-project.properties', 'tsconfig.json'];
-const REQUIRED_BACKEND = ['.sops.yaml', '.starcistacks', '.starciwork', 'codecov.yml', 'jest.config.js', 'nest-cli.json', 'src'];
+const REQUIRED_BACKEND = ['.sops.yaml', '.starcistacks', '.starciwork', 'jest.config.js', 'nest-cli.json', 'src'];
 const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb']);
 const RUNTIME_ROOT_MARKDOWN = new Set(['README.md', 'CONTEXT.md', 'CONTRIBUTING.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md']);
 const PRODUCT_ROOT_MARKDOWN = new Set(['README.md']);

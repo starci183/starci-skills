@@ -40,17 +40,17 @@ These are read-only structural findings shared with `modules/schemas/stacks-layo
 - `k8s-directory-missing` / `k8s-directory-unexpected` - `.starcistacks/k8s` and `k8s.status` disagree.
 - `STACKS_UNDECLARED_COMPOSE` - a Compose-shaped YAML file (one with a `services` or `include` key) sits under an environment's `infra/` tree without being declared in `composeFiles` or reachable through an `include:` chain from a declared file. A non-Compose YAML file in the same tree, such as a Prometheus scrape config, is not a compose file and is not flagged merely for its extension.
 
-## Services: Sonar, Codecov and every other delivery service
+## Services: Sonar and every other delivery service
 
-The declaration's `services` block (schema `$defs.service`) states the delivery, quality and platform services the repository's code and CI use - not Compose services, which are `components`. Ids are closed: `sonar`, `codecov`, `container-registry`, `analytics`, `error-tracking`. Each entry names:
+The declaration's `services` block (schema `$defs.service`) states the delivery, quality and platform services the repository's code and CI use - not Compose services, which are `components`. Ids are closed: `sonar`, `container-registry`, `analytics`, `error-tracking`. Each entry names:
 
 | field | meaning |
 |---|---|
-| `provider` | closed per id: sonarqube/sonarcloud, codecov, ghcr/dockerhub/ecr/gar, posthog/plausible/umami/google-analytics, sentry/glitchtip |
+| `provider` | closed per id: sonarqube/sonarcloud, ghcr/dockerhub/ecr/gar, posthog/plausible/umami/google-analytics, sentry/glitchtip |
 | `mode` | `local` (a stack runs it: `stack` and `host.local` required), `hosted` (`host.public` or `host.fromCredential`), `disabled` (`reason`; CI must not call it) |
 | `host` | `local` URL ops use, `public` URL GitHub CI uses, or `fromCredential` when the endpoint travels inside a credential (a Sentry DSN) |
 | `stack` | a local service's stack, one of two forms: project-owned `{repository, root: .starcistacks, environment, compose, container?, publishedBy?}` or host-owned `{owner: host, root: .claude/ext/<service>, environment, compose, container?, publishedBy?}` |
-| `auth` | `token`, `oidc` (Codecov), `github-token` (GHCR), `none` |
+| `auth` | `token`, `oidc`, `github-token` (GHCR), `none` |
 | `projects` | `[{repository, key}]` - the project key per repository (`sonar.projectKey` must match) |
 | `qualityGate` | sonar only: `starci-new-code`, the one gate whose thresholds live in `knowledge/sonar-gate.yaml` (any other value is `STACKS_QUALITY_GATE_DRIFT`); `sonar-local` makes the server gate of that name carry them and `api settle` holds `backend.implement`, `interface.implement` and `code.refactor` to it |
 | `credentials` | `[{id, env or key, custody: {repository, path}}]` - custody references, never values; `<path>.enc` must exist |

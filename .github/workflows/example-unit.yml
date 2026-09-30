@@ -1,0 +1,57 @@
+name: example-unit
+
+# Runs the unit suite of the example apps that have one. A back end example's `npm test` runs the unit project with
+# --coverage and fails below the per-file 100 threshold on its `*.service.ts` files; nothing is uploaded anywhere and
+# Sonar reads no coverage. ecommerce-app-fe is intentionally absent: it has no unit suite today.
+
+on:
+  push:
+    paths:
+      - 'examples/**'
+  pull_request:
+    paths:
+      - 'examples/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: example-unit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  unit:
+    name: ${{ matrix.app.flag }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - dir: examples/todo-app-backend
+            flag: todo-be
+            run: npm test
+          - dir: examples/ecommerce-app-be
+            flag: ecommerce-be
+            run: npm test
+          - dir: examples/todo-app-frontend
+            flag: todo-fe
+            run: npx vitest run
+    defaults:
+      run:
+        working-directory: ${{ matrix.app.dir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: ${{ matrix.app.run }}

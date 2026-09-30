@@ -117,10 +117,8 @@ export interface CollectDueParams {
     readonly limit: number
 }
 
-/** What creating a rule needs; the write joins the caller transaction. */
+/** What creating a rule needs. */
 export interface CreateRuleParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
     /** The person who will own the rule. */
     readonly ownerId: string
     /** The title of the tasks the rule creates. */
@@ -153,10 +151,8 @@ export interface RulePatch {
     readonly time?: string
 }
 
-/** What editing a rule needs; the write joins the caller transaction. */
+/** What editing a rule needs. */
 export interface EditRuleParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
     /** The rule id. */
     readonly id: string
     /** The person who asks; only the owner may edit. */
@@ -165,10 +161,8 @@ export interface EditRuleParams {
     readonly patch: RulePatch
 }
 
-/** What ending a rule needs; the write joins the caller transaction. */
+/** What ending a rule needs. */
 export interface EndRuleParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
     /** The rule id. */
     readonly id: string
     /** The person who asks; only the owner may end. */
@@ -205,16 +199,12 @@ export interface MaterialiseParams {
     readonly dueAtUtc: Date
 }
 
-/** What completing or skipping an occurrence needs; the writes join the caller transaction. */
+/** What completing or skipping an occurrence needs. */
 export interface TransitionOccurrenceParams {
-    /** The transaction manager of the caller. */
-    readonly manager: EntityManager
     /** The occurrence id. */
     readonly id: string
     /** The person who asks; only the owner of the task may act. */
     readonly actorId: string
-    /** The instant of the transition. */
-    readonly at: Date
 }
 
 /** What orphaning the occurrences of an ended rule needs; the write joins the caller transaction. */
@@ -241,3 +231,95 @@ export interface ExistingWindowKeysParams {
 
 /** The answer of a rule lookup: the rule, or null when there is none with that id. */
 export type RuleLookupResult = RuleView | null
+
+/** What generating the due occurrences of one tick needs. */
+export interface GenerateParams {
+    /** The tick instant: "today" is read from it in the zone of each rule. */
+    readonly at: Date
+}
+
+/** What one generation tick did. */
+export interface GenerationSummary {
+    /** How many occurrences were materialised, each with its task. */
+    readonly materialised: number
+    /** How many due occurrences were left for the next tick because their task could not be created, for example over the plan cap. */
+    readonly deferred: number
+}
+
+/** What previewing the upcoming occurrences of a rule needs. */
+export interface UpcomingParams {
+    /** The rule id. */
+    readonly ruleId: string
+    /** The person who asks; only the owner of the rule may read. */
+    readonly actorId: string
+    /** How many days ahead the live preview looks; 14 when absent. */
+    readonly previewDays?: number
+}
+
+/** One occurrence already materialised, as the preview lists it. */
+export interface MaterialisedSummary {
+    /** The occurrence id, the same as the id of the task it spawned. */
+    readonly occurrenceId: string
+    /** The local date it is due on. */
+    readonly localDate: string
+    /** The instant it is due at, as an ISO string. */
+    readonly dueAtUtc: string
+    /** The lifecycle state. */
+    readonly status: string
+}
+
+/** The occurrence picture of one rule: what is stored and what the rule will fire on next. */
+export interface UpcomingSummary {
+    /** The rule id. */
+    readonly ruleId: string
+    /** Every occurrence already materialised for the rule. */
+    readonly materialised: Array<MaterialisedSummary>
+    /** The dates the rule will next fire on, computed live; empty for an ended rule. */
+    readonly previewDates: Array<string>
+}
+
+/** A rule after it was created. */
+export interface RuleMade {
+    /** The new rule id. */
+    readonly ruleId: string
+    /** The stored title. */
+    readonly title: string
+    /** The recurrence shape. */
+    readonly frequency: RuleFrequency
+    /** The IANA zone. */
+    readonly timeZone: string
+    /** The local time. */
+    readonly time: string
+    /** The first date. */
+    readonly startDate: string
+}
+
+/** A rule after it was edited. */
+export interface RuleEdited {
+    /** The rule id. */
+    readonly ruleId: string
+    /** The recurrence shape. */
+    readonly frequency: RuleFrequency
+    /** The IANA zone. */
+    readonly timeZone: string
+    /** The local time. */
+    readonly time: string
+}
+
+/** A rule after it ended. */
+export interface RuleEnded {
+    /** The rule id. */
+    readonly ruleId: string
+    /** The local date the rule ended on. */
+    readonly endedAt: string
+    /** How many occurrences the end orphaned. */
+    readonly orphanedCount: number
+}
+
+/** An occurrence after a completion or a skip. */
+export interface OccurrenceTransitioned {
+    /** The occurrence id. */
+    readonly occurrenceId: string
+    /** The occurrence status afterwards. */
+    readonly status: OccurrenceStatus
+}

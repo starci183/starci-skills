@@ -1,5 +1,7 @@
 import type { NotifySmtpMessageParams } from "@modules/integrations/notify-smtp"
+import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
+import type { NotifyErrorCode } from "./errors/notify.error"
 
 /** The email channel, the only channel notifications are sent on today. */
 export const NOTIFY_CHANNEL_EMAIL = "email"
@@ -382,3 +384,77 @@ export interface NotifyDispatchMessageParams {
 
 /** The answer of preparing a dispatch: the plan to transmit, or null when there is nothing to send. */
 export type PreparedDispatchResult = DispatchPlan | null
+
+/** The preference of a person on one channel as the caller of the preference doors sees it. */
+export interface PreferenceSummary {
+    /** The channel. */
+    readonly channel: string
+    /** True when the person opted out of the channel. */
+    readonly unsubscribed: boolean
+    /** The digest window override in minutes, null for the default. */
+    readonly digestWindowMinutes: number | null
+}
+
+/** What changing the preference of a person needs; an omitted field keeps its current value. */
+export interface ChangePreferenceParams {
+    /** The person. */
+    readonly personId: string
+    /** The channel. */
+    readonly channel: string
+    /** The new opt-out flag. */
+    readonly unsubscribed?: boolean | undefined
+    /** The new digest window in minutes. */
+    readonly digestWindowMinutes?: number | undefined
+}
+
+/** What unsubscribing a person from a channel needs. */
+export interface UnsubscribeParams {
+    /** The person. */
+    readonly personId: string
+    /** The channel. */
+    readonly channel: string
+}
+
+/** The channel a person is now unsubscribed from. */
+export interface UnsubscribedSummary {
+    /** The channel. */
+    readonly channel: string
+    /** Always true. */
+    readonly unsubscribed: true
+}
+
+/** The refusals of writing a preference. */
+export type PreferenceRefusal = NotifyErrorCode.ChannelRequired | NotifyErrorCode.DigestWindowInvalid
+
+/** The stored preference after a change, or the refusal that names why nothing was written. */
+export type ChangePreferenceResult = Outcome<PreferenceSummary, PreferenceRefusal>
+
+/** The unsubscribed channel, or the refusal that names why nothing was written. */
+export type UnsubscribeResult = Outcome<UnsubscribedSummary, PreferenceRefusal>
+
+/** What receiving one delivered admit message needs; the event id is both the inbox claim and the source event id. */
+export interface ReceiveAdmitParams {
+    /** The id of the delivered message, which is the id of the event that produced the notification. */
+    readonly eventId: string
+    /** What happened. */
+    readonly kind: string
+    /** The person to tell. */
+    readonly recipientId: string
+    /** The channel to tell them on. */
+    readonly channel: string
+    /** The scalar facts of the event. */
+    readonly payload: NotifyPayload
+}
+
+/** How receiving an admit message ended: the admission, or null when the message was already claimed and nothing ran. */
+export type ReceiveAdmitResult = Outcome<AdmittedNotification | null, NotifyErrorCode.ChannelRequired>
+
+/** What receiving one delivered dispatch message needs. */
+export interface ReceiveDispatchParams {
+    /** The id of the delivered message, which is the inbox claim. */
+    readonly eventId: string
+    /** Whether the group is flushed because its window closed, or retried after a failed send. */
+    readonly kind: NotifyDispatchKind
+    /** The digest group. */
+    readonly groupId: string
+}

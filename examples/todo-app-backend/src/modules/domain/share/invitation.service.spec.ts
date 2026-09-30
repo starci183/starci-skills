@@ -1,192 +1,261 @@
-import { LIST_ROWS_MAX } from "@modules/platform/database"
-import { mockEntityManager } from "@tests/fixtures/database"
+import { Test } from "@nestjs/testing"
+import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { TaskService } from "@modules/domain/task"
+import { CLOCK } from "@modules/platform/clock"
+import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { invitationRow, SHARE_AT, SHARE_EXPIRED_SENT_AT, sharedTask } from "@tests/fixtures/builders/share.builder"
 import { ShareErrorCode } from "./errors/share.error"
 import { InvitationService } from "./invitation.service"
 import { InvitationEntity } from "./persistence/entities/invitation.entity"
 
-const DAY = 24 * 60 * 60 * 1000
-const SENT = new Date("2026-09-01T10:00:00.000Z")
-const SOON = new Date(SENT.getTime() + 13 * DAY)
-const LATE = new Date(SENT.getTime() + 15 * DAY)
+const at = new Date(SHARE_AT)
+const expired = invitationRow({ sentAt: SHARE_EXPIRED_SENT_AT })
 
-const pending: InvitationEntity = {
-    id: "i1",
-    taskId: "t1",
-    ownerId: "owner-1",
-    email: "ann@example.com",
-    role: "editor",
-    status: "pending",
-    sentAt: SENT,
-    acceptedAt: null,
-    revokedAt: null,
-    personId: null,
-}
-const accepted: InvitationEntity = { ...pending, status: "accepted", acceptedAt: SOON, personId: "ann" }
-const revoked: InvitationEntity = { ...pending, status: "revoked", revokedAt: SOON }
-
-const echoSave = (): jest.Mock =>
-    jest.fn().mockImplementation((_target: unknown, entity: object) => Promise.resolve(entity))
-
-const withRow = (row: InvitationEntity | null): ReturnType<typeof mockEntityManager> =>
-    mockEntityManager({ findOne: jest.fn().mockResolvedValue(row), save: echoSave() })
-
-const service = (): InvitationService => new InvitationService(mockEntityManager())
-
-describe("InvitationService.invite", () => {
-    it("creates a pending invitation bound to the task, the normalized email and the role", async () => {
-        const manager = withRow(null)
-        const outcome = await service().invite({
-            manager,
-            ownerId: "owner-1",
-            taskId: "t1",
-            email: "  Ann@Example.com ",
-            role: "editor",
-            at: SENT,
-        })
-        expect(outcome).toMatchObject({
-            kind: "ok",
-            value: { taskId: "t1", ownerId: "owner-1", email: "ann@example.com", role: "editor", status: "pending" },
-        })
-        expect(manager.findOne).toHaveBeenCalledWith(
-            InvitationEntity,
-            expect.objectContaining({ where: { taskId: "t1", email: "ann@example.com" } }),
-        )
-        expect(manager.save).toHaveBeenCalledWith(
-            InvitationEntity,
-            expect.objectContaining({ sentAt: SENT, acceptedAt: null, personId: null }),
-        )
-    })
-
-    it("refuses an email that is not well formed and writes nothing", async () => {
-        const manager = withRow(null)
-        const outcome = await service().invite({ manager, ownerId: "o", taskId: "t1", email: "nope", role: "viewer", at: SENT })
-        expect(outcome).toMatchObject({ kind: "refused", code: ShareErrorCode.InvalidEmail, params: { email: "nope" } })
-        expect(manager.save).not.toHaveBeenCalled()
-    })
-
-    it("refuses a role other than viewer or editor and writes nothing", async () => {
-        const manager = withRow(null)
-        const outcome = await service().invite({ manager, ownerId: "o", taskId: "t1", email: "a@b.co", role: "boss", at: SENT })
-        expect(outcome).toMatchObject({ kind: "refused", code: ShareErrorCode.InvalidRole, params: { role: "boss" } })
-        expect(manager.save).not.toHaveBeenCalled()
-    })
-
-    it("refuses a second invite over a pending pair and over an accepted pair", async () => {
-        for (const row of [pending, accepted]) {
-            const manager = withRow(row)
-            const outcome = await service().invite({ manager, ownerId: "owner-1", taskId: "t1", email: row.email, role: "viewer", at: SOON })
-            expect(outcome).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationAlreadyExists })
-            expect(manager.save).not.toHaveBeenCalled()
-        }
-    })
-
-    it("re-opens an expired row as one pending row and clears the stale person binding", async () => {
-        const manager = withRow({ ...accepted, status: "pending", personId: "ann" })
-        const outcome = await service().invite({ manager, ownerId: "owner-1", taskId: "t1", email: "ann@example.com", role: "viewer", at: LATE })
-        expect(outcome).toMatchObject({ kind: "ok", value: { id: "i1", role: "viewer", status: "pending", personId: null } })
-        expect(manager.save).toHaveBeenCalledWith(InvitationEntity, expect.objectContaining({ id: "i1", sentAt: LATE, personId: null }))
-    })
-
-    it("re-opens a revoked row pending", async () => {
-        const manager = withRow(revoked)
-        const outcome = await service().invite({ manager, ownerId: "owner-1", taskId: "t1", email: "ann@example.com", role: "editor", at: SOON })
-        expect(outcome).toMatchObject({ kind: "ok", value: { id: "i1", status: "pending", revokedAt: null } })
-    })
-})
-
-describe("InvitationService.accept", () => {
-    it("binds the accepting person and activates the role at once", async () => {
-        const manager = withRow(pending)
-        const outcome = await service().accept({ manager, actorId: "ann", invitationId: "i1", email: "ANN@example.com", at: SOON })
-        expect(outcome).toMatchObject({ kind: "ok", value: { status: "accepted", personId: "ann", role: "editor", acceptedAt: SOON } })
-        expect(manager.save).toHaveBeenCalledWith(
-            InvitationEntity,
-            expect.objectContaining({ status: "accepted", personId: "ann", acceptedAt: SOON }),
-        )
-    })
-
-    it("accepts thirteen days in but refuses fifteen days in as expired", async () => {
-        const early = await service().accept({ manager: withRow(pending), actorId: "ann", invitationId: "i1", email: "ann@example.com", at: SOON })
-        expect(early.kind).toBe("ok")
-        const manager = withRow(pending)
-        const late = await service().accept({ manager, actorId: "ann", invitationId: "i1", email: "ann@example.com", at: LATE })
-        expect(late).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationExpired })
-        expect(manager.save).not.toHaveBeenCalled()
-    })
-
-    it("refuses another email, a revoked invitation and an unknown id", async () => {
-        const mismatch = await service().accept({ manager: withRow(pending), actorId: "bob", invitationId: "i1", email: "bob@example.com", at: SOON })
-        expect(mismatch).toMatchObject({ kind: "refused", code: ShareErrorCode.EmailMismatch })
-        const gone = await service().accept({ manager: withRow(revoked), actorId: "ann", invitationId: "i1", email: "ann@example.com", at: SOON })
-        expect(gone).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationRevoked })
-        const unknown = await service().accept({ manager: withRow(null), actorId: "ann", invitationId: "nope", email: "ann@example.com", at: SOON })
-        expect(unknown).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationNotFound, params: { invitationId: "nope" } })
-    })
-
-    it("answers the same person accepting twice with the row untouched, and refuses a different person as closed", async () => {
-        const manager = withRow(accepted)
-        const again = await service().accept({ manager, actorId: "ann", invitationId: "i1", email: "ann@example.com", at: LATE })
-        expect(again).toMatchObject({ kind: "ok", value: { status: "accepted", personId: "ann" } })
-        expect(manager.save).not.toHaveBeenCalled()
-        const other = await service().accept({ manager: withRow(accepted), actorId: "bob", invitationId: "i1", email: "ann@example.com", at: LATE })
-        expect(other).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationAlreadyClosed })
-    })
-})
-
-describe("InvitationService.revoke", () => {
-    it("lets the owner revoke a pending or an accepted invitation", async () => {
-        for (const row of [pending, accepted]) {
-            const manager = withRow(row)
-            const outcome = await service().revoke({ manager, ownerId: "owner-1", invitationId: "i1", at: SOON })
-            expect(outcome).toMatchObject({ kind: "ok", value: { status: "revoked", revokedAt: SOON } })
-            expect(manager.save).toHaveBeenCalledWith(InvitationEntity, expect.objectContaining({ status: "revoked" }))
-        }
-    })
-
-    it("refuses anyone but the owner and writes nothing", async () => {
-        const manager = withRow(pending)
-        const outcome = await service().revoke({ manager, ownerId: "mallory", invitationId: "i1", at: SOON })
-        expect(outcome).toMatchObject({ kind: "refused", code: ShareErrorCode.Forbidden })
-        expect(manager.save).not.toHaveBeenCalled()
-    })
-
-    it("refuses an already revoked, an already expired and an unknown invitation", async () => {
-        const closedRevoked = await service().revoke({ manager: withRow(revoked), ownerId: "owner-1", invitationId: "i1", at: SOON })
-        expect(closedRevoked).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationAlreadyClosed })
-        const closedExpired = await service().revoke({ manager: withRow(pending), ownerId: "owner-1", invitationId: "i1", at: LATE })
-        expect(closedExpired).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationAlreadyClosed })
-        const unknown = await service().revoke({ manager: withRow(null), ownerId: "owner-1", invitationId: "nope", at: SOON })
-        expect(unknown).toMatchObject({ kind: "refused", code: ShareErrorCode.InvitationNotFound })
-    })
-})
-
-interface ListingRig {
-    readonly svc: InvitationService
-    readonly manager: ReturnType<typeof mockEntityManager>
+const build = async (em = mockEntityManager()) => {
+    const tx = fakeTransaction(em)
+    const tasks = mock<TaskService>()
+    const moduleRef = await Test.createTestingModule({
+        providers: [
+            InvitationService,
+            { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
+            { provide: CLOCK, useValue: new FakeClock(SHARE_AT) },
+            { provide: TaskService, useValue: tasks },
+        ],
+    }).compile()
+    return { service: moduleRef.get(InvitationService), em: tx.em, tx, tasks }
 }
 
-describe("InvitationService.listFor", () => {
-    const listing = (rows: Array<InvitationEntity>): ListingRig => {
-        const manager = mockEntityManager({ find: jest.fn().mockResolvedValue(rows) })
-        return { svc: new InvitationService(manager), manager }
-    }
+describe("InvitationService", () => {
+    describe("invite", () => {
+        const request = { ownerId: "owner-1", taskId: "t-1", email: "  Ann@Example.com ", role: "editor" }
 
-    it("shows the owner every row with its live status, bounded", async () => {
-        const { svc, manager } = listing([pending, accepted])
-        const views = await svc.listFor({ actorId: "owner-1", taskId: "t1", at: LATE })
-        expect(views.map((view) => view.status)).toEqual(["expired", "accepted"])
-        expect(manager.find).toHaveBeenCalledWith(InvitationEntity, { where: { taskId: "t1" }, take: LIST_ROWS_MAX })
+        it("refuses an unknown task without opening a transaction", async () => {
+            const { service, tx, tasks } = await build()
+            tasks.find.mockResolvedValue(null)
+
+            await expect(service.invite(request)).resolves.toBeRefused({ code: ShareErrorCode.Forbidden, params: { taskId: "t-1" } })
+            expect(tx.outcomes).toEqual([])
+        })
+
+        it("refuses somebody else's task", async () => {
+            const { service, tx, tasks } = await build()
+            tasks.find.mockResolvedValue(sharedTask())
+
+            await expect(service.invite({ ...request, ownerId: "intruder" })).resolves.toBeRefused(ShareErrorCode.Forbidden)
+            expect(tx.outcomes).toEqual([])
+        })
+
+        it("refuses a malformed email", async () => {
+            const { service, tx, tasks } = await build()
+            tasks.find.mockResolvedValue(sharedTask())
+
+            await expect(service.invite({ ...request, email: "nope" })).resolves.toBeRefused({
+                code: ShareErrorCode.InvalidEmail,
+                params: { email: "nope" },
+            })
+            expect(tx.outcomes).toEqual([])
+        })
+
+        it("refuses a role that is neither viewer nor editor", async () => {
+            const { service, tx, tasks } = await build()
+            tasks.find.mockResolvedValue(sharedTask())
+
+            await expect(service.invite({ ...request, role: "admin" })).resolves.toBeRefused({
+                code: ShareErrorCode.InvalidRole,
+                params: { role: "admin" },
+            })
+            expect(tx.outcomes).toEqual([])
+        })
+
+        it("creates a pending invitation for the normalized email, stamped with the clock", async () => {
+            const saved = invitationRow({ sentAt: at })
+            const { service, em, tx, tasks } = await build(mockEntityManager({ findOne: [InvitationEntity, null], save: [InvitationEntity, saved] }))
+            tasks.find.mockResolvedValue(sharedTask())
+
+            await expect(service.invite(request)).resolves.toSucceedWith({
+                invitationId: "i-1",
+                taskId: "t-1",
+                email: "ann@example.com",
+                role: "editor",
+                status: "pending",
+            })
+
+            expect(em.findOne).toHaveBeenCalledWith(InvitationEntity, {
+                where: { taskId: "t-1", email: "ann@example.com" },
+                lock: { mode: "pessimistic_write" },
+            })
+            expect(em.save).toHaveBeenCalledWith(InvitationEntity, {
+                id: expect.any(String),
+                taskId: "t-1",
+                ownerId: "owner-1",
+                email: "ann@example.com",
+                role: "editor",
+                status: "pending",
+                sentAt: at,
+                acceptedAt: null,
+                revokedAt: null,
+                personId: null,
+            })
+            expect(tx.commits).toBe(1)
+        })
+
+        it.each([
+            ["pending", invitationRow()],
+            ["accepted", invitationRow({ status: "accepted", personId: "ann" })],
+        ])("refuses inviting an address that already has a %s invitation, and saves nothing", async (_status, existing) => {
+            const { service, em, tasks } = await build(mockEntityManager({ findOne: [InvitationEntity, existing] }))
+            tasks.find.mockResolvedValue(sharedTask())
+
+            await expect(service.invite(request)).resolves.toBeRefused({
+                code: ShareErrorCode.InvitationAlreadyExists,
+                params: { taskId: "t-1", email: "ann@example.com" },
+            })
+            expect(em.save).not.toHaveBeenCalled()
+        })
+
+        it.each([
+            ["expired", expired],
+            ["revoked", invitationRow({ status: "revoked", revokedAt: new Date("2026-09-03T10:00:00.000Z") })],
+        ])("re-opens an %s invitation of the same pair, keeping its id", async (_status, existing) => {
+            const reopened = invitationRow({ role: "viewer", sentAt: at })
+            const { service, em, tasks } = await build(mockEntityManager({ findOne: [InvitationEntity, existing], save: [InvitationEntity, reopened] }))
+            tasks.find.mockResolvedValue(sharedTask())
+
+            await expect(service.invite({ ...request, role: "viewer" })).resolves.toSucceedWith({
+                invitationId: "i-1",
+                taskId: "t-1",
+                email: "ann@example.com",
+                role: "viewer",
+                status: "pending",
+            })
+            expect(em.save).toHaveBeenCalledWith(
+                InvitationEntity,
+                expect.objectContaining({ id: "i-1", role: "viewer", status: "pending", sentAt: at, acceptedAt: null, revokedAt: null, personId: null }),
+            )
+        })
     })
 
-    it("shows a bound collaborator the list too", async () => {
-        const { svc } = listing([pending, accepted])
-        await expect(svc.listFor({ actorId: "ann", taskId: "t1", at: SOON })).resolves.toHaveLength(2)
+    describe("accept", () => {
+        const request = { actorId: "ann", invitationId: "i-1", email: "ANN@example.com" }
+
+        it("refuses an unknown invitation", async () => {
+            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, null] }))
+
+            await expect(service.accept(request)).resolves.toBeRefused({
+                code: ShareErrorCode.InvitationNotFound,
+                params: { invitationId: "i-1" },
+            })
+            expect(em.save).not.toHaveBeenCalled()
+        })
+
+        it("refuses an invitation addressed to another email", async () => {
+            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow()] }))
+
+            await expect(service.accept({ ...request, email: "bob@example.com" })).resolves.toBeRefused(ShareErrorCode.EmailMismatch)
+        })
+
+        it("refuses an invitation past its window", async () => {
+            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, expired] }))
+
+            await expect(service.accept(request)).resolves.toBeRefused(ShareErrorCode.InvitationExpired)
+        })
+
+        it("refuses a revoked invitation", async () => {
+            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow({ status: "revoked" })] }))
+
+            await expect(service.accept(request)).resolves.toBeRefused(ShareErrorCode.InvitationRevoked)
+        })
+
+        it("answers the same success when the same person accepts again, and saves nothing", async () => {
+            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow({ status: "accepted", personId: "ann" })] }))
+
+            await expect(service.accept(request)).resolves.toSucceedWith({ invitationId: "i-1", role: "editor", status: "accepted" })
+            expect(em.save).not.toHaveBeenCalled()
+        })
+
+        it("refuses an invitation already accepted by somebody else", async () => {
+            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow({ status: "accepted", personId: "someone" })] }))
+
+            await expect(service.accept(request)).resolves.toBeRefused(ShareErrorCode.InvitationAlreadyClosed)
+        })
+
+        it("binds the accepting person to a pending invitation at the instant of the clock", async () => {
+            const saved = invitationRow({ status: "accepted", acceptedAt: at, personId: "ann" })
+            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow()], save: [InvitationEntity, saved] }))
+
+            await expect(service.accept(request)).resolves.toSucceedWith({ invitationId: "i-1", role: "editor", status: "accepted" })
+            expect(em.save).toHaveBeenCalledWith(
+                InvitationEntity,
+                expect.objectContaining({ id: "i-1", status: "accepted", acceptedAt: at, personId: "ann" }),
+            )
+        })
     })
 
-    it("shows a stranger, and a task with no rows, nothing", async () => {
-        const { svc } = listing([pending, accepted])
-        await expect(svc.listFor({ actorId: "stranger", taskId: "t1", at: SOON })).resolves.toEqual([])
-        const empty = listing([])
-        await expect(empty.svc.listFor({ actorId: "owner-1", taskId: "t9", at: SOON })).resolves.toEqual([])
+    describe("revoke", () => {
+        const request = { ownerId: "owner-1", invitationId: "i-1" }
+
+        it("refuses an unknown invitation", async () => {
+            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, null] }))
+
+            await expect(service.revoke(request)).resolves.toBeRefused(ShareErrorCode.InvitationNotFound)
+        })
+
+        it("refuses somebody who does not own the invitation, and saves nothing", async () => {
+            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, invitationRow()] }))
+
+            await expect(service.revoke({ ...request, ownerId: "intruder" })).resolves.toBeRefused(ShareErrorCode.Forbidden)
+            expect(em.save).not.toHaveBeenCalled()
+        })
+
+        it.each([
+            ["expired", expired],
+            ["revoked", invitationRow({ status: "revoked" })],
+        ])("refuses an %s invitation as closed", async (_status, existing) => {
+            const { service } = await build(mockEntityManager({ findOne: [InvitationEntity, existing] }))
+
+            await expect(service.revoke(request)).resolves.toBeRefused(ShareErrorCode.InvitationAlreadyClosed)
+        })
+
+        it.each([
+            ["pending", invitationRow()],
+            ["accepted", invitationRow({ status: "accepted", personId: "ann" })],
+        ])("revokes a %s invitation at the instant of the clock", async (_status, existing) => {
+            const saved = invitationRow({ status: "revoked", revokedAt: at })
+            const { service, em } = await build(mockEntityManager({ findOne: [InvitationEntity, existing], save: [InvitationEntity, saved] }))
+
+            await expect(service.revoke(request)).resolves.toSucceedWith({ invitationId: "i-1", status: "revoked" })
+            expect(em.save).toHaveBeenCalledWith(InvitationEntity, expect.objectContaining({ status: "revoked", revokedAt: at }))
+        })
+    })
+
+    describe("listFor", () => {
+        const rows = [invitationRow(), invitationRow({ id: "i-2", email: "bob@example.com", status: "accepted", personId: "bob" }), invitationRow({ id: "i-3", sentAt: SHARE_EXPIRED_SENT_AT })]
+
+        it("lists every invitation of the task for its owner, with live statuses", async () => {
+            const { service, em } = await build(mockEntityManager({ find: [InvitationEntity, rows] }))
+
+            await expect(service.listFor({ actorId: "owner-1", taskId: "t-1" })).resolves.toEqual({
+                collaborators: [
+                    { invitationId: "i-1", email: "ann@example.com", role: "editor", status: "pending" },
+                    { invitationId: "i-2", email: "bob@example.com", role: "editor", status: "accepted" },
+                    { invitationId: "i-3", email: "ann@example.com", role: "editor", status: "expired" },
+                ],
+            })
+            expect(em.find).toHaveBeenCalledWith(InvitationEntity, { where: { taskId: "t-1" }, take: LIST_ROWS_MAX })
+        })
+
+        it("lists the invitations for a bound collaborator", async () => {
+            const { service } = await build(mockEntityManager({ find: [InvitationEntity, rows] }))
+
+            const listed = await service.listFor({ actorId: "bob", taskId: "t-1" })
+
+            expect(listed.collaborators).toHaveLength(3)
+        })
+
+        it("lists nothing for a stranger", async () => {
+            const { service } = await build(mockEntityManager({ find: [InvitationEntity, rows] }))
+
+            await expect(service.listFor({ actorId: "stranger", taskId: "t-1" })).resolves.toEqual({ collaborators: [] })
+        })
     })
 })

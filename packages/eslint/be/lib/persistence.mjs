@@ -113,24 +113,6 @@ export const connectionFileOf = (hfs, file, role) => {
     return connectionsOf(hfs).find((connection) => connection.name === name) ?? null
 }
 
-/** The platform capabilities that own a `persistence/` and so may hold an `EntityManager`. */
-const PERSISTENCE_CAPABILITIES = ["database", "inbox", "outbox", "lease"]
-
-/**
- * Whether a class in this file may receive an `EntityManager`: an application handler, a domain service, a platform persistence capability.
- *
- * @param {object} hfs - The HFS view of the repository.
- * @param {string} file - A file path.
- * @returns {boolean} True for the EntityManager-using service roles.
- */
-export const mayHoldEntityManager = (hfs, file) => {
-    const found = hfs.classify(file)
-    const base = baseNameOf(file)
-    if (found.slot === "be.feature.application") return base.endsWith(".handler.ts")
-    if (found.slot === "be.domain") return base.endsWith(".service.ts")
-    return found.slot === "be.platform" && PERSISTENCE_CAPABILITIES.includes(found.bindings?.capability)
-}
-
 /**
  * The `typeorm` infrastructure type of a node (`EntityManager`, `DataSource`, `QueryRunner`), by type and not by name.
  *
@@ -142,17 +124,6 @@ export const infraTypeOf = (context, node) => {
     const origin = typeOrigins(context, node).find((entry) => entry.module === "typeorm" && INFRA_TYPES.has(entry.name))
     return origin ? origin.name : null
 }
-
-/**
- * Whether a class is a TypeORM migration: it implements the `MigrationInterface` typeorm declares. A migration receives a
- * `QueryRunner` by contract, wherever the file sits (a fixture migration is one too).
- *
- * @param {object} context - The ESLint rule context.
- * @param {object} classNode - A ClassDeclaration or ClassExpression.
- * @returns {boolean} True when the class implements typeorm's `MigrationInterface`.
- */
-export const implementsMigration = (context, classNode) =>
-    (classNode.implements ?? []).some((entry) => typeOrigins(context, entry).some((origin) => origin.module === "typeorm" && origin.name === "MigrationInterface"))
 
 /** The decorator names written on a node: `@Foo()` and `@Foo` both give `Foo`. */
 const decoratorNamesOf = (node) =>

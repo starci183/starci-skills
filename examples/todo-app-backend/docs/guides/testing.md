@@ -4,7 +4,7 @@ One root `jest.config.js` (managed: `require("@starci/jest-preset").starciJestCo
 
 | Project | Command | What it is |
 |---|---|---|
-| unit | `npm test` / `npm run test:unit` | In-process specs, `<name>.spec.ts` beside the subject. Fakes at provider boundaries: no docker, no network. |
+| unit | `npm test` | In-process specs of the `*.service.ts` files only, `<name>.service.spec.ts` beside the service, built with `Test.createTestingModule`. Doubles come from `@starci/jest-preset`: no docker, no network. Runs with per-file 100 percent coverage. |
 | e2e | `npm run test:e2e` | `src/tests/e2e/<area>/*.e2e-spec.ts`: A->Z journeys through the public doors of the real apps, `useTestWorld({ apps })`. |
 | contract | `npm run test:contract` | `src/tests/contract/<provider>/*.contract-spec.ts`: our client against the provider's real sandbox; skips itself without sandbox config. Never part of `test` or `test:e2e`. |
 
@@ -17,22 +17,38 @@ exports `useTestWorld(...)` -> `world.apps.<name>.api`, `world.db.<connection>` 
 ## Unit tests
 
 ```bash
-npm test                    # whole unit suite (jest.config.js, project `unit`)
-npx jest src/modules/domain/task   # one directory
+npm test                              # whole unit suite with coverage (jest --selectProjects unit --coverage)
+npx jest src/modules/domain/task      # one directory
 npx jest -t "refuses"                 # one test name
 ```
 
-- Config: `jest.config.js` project `unit` (ts-jest, `testMatch: **/*.spec.ts`, `@modules/*` / `@features/*` path aliases).
-- Convention: `Test.createTestingModule({ providers: [X, { provide: Dep, useValue: mock }] })`, `module.get(X)` - never `new X(deps)`. Mock at provider boundaries (repositories, clients, event emitters, config). See any existing spec for style.
-- The `unit` project ignores `src/tests/{world,integration,e2e,contract}/`, so those specs never run here.
+The unit standard has eight rules:
+
+1. Only `*.service.ts` files are unit-tested, each by exactly one colocated `<name>.service.spec.ts`. Handlers, resolvers,
+   controllers, consumers, jobs, mappers, entities, guards, policies, clients and modules have no unit spec; the apps are
+   proven by the e2e world.
+2. The subject is built with `Test.createTestingModule({ providers: [Service, { provide: TOKEN, useValue: double }] }).compile()` and
+   `moduleRef.get(Service)`: never `new Service(...)`, no `imports`, no `overrideProvider`.
+3. The providers are exactly the constructor dependencies. Every `Inject*()` decorator is `injector<T>(TOKEN)` over an exported plain
+   identifier (`PRIMARY_ENTITY_MANAGER`, `CLOCK`, `OUTBOX`, `LOGGER`, `<CAP>_OPTIONS`, ...), so a spec can provide it.
+4. Doubles come only from the package root of `@starci/jest-preset`: `mockEntityManager`, `fakeTransaction`, `fakeCache`, `fakeLock`,
+   `recordingOutbox`, `FakeClock`, `fakeIds`, `mock<T>()`, `builder`, and the matchers `toBeRefused` and `toSucceedWith`. No casts, no
+   `Date.now()`, no `jest.mock`, no `process.env`.
+5. `collectCoverageFrom` is `src/**/*.service.ts` only and every file must reach 100 percent lines, branches, functions and statements.
+6. Sonar does not depend on coverage; CI uploads no coverage.
+7. Doors are thin: a handler calls exactly one method of one injected service and returns its result; a resolver, controller, consumer or
+   job dispatches exactly one bus message. Everything that decides lives in a service.
+8. Pure helpers and decide functions have no spec of their own; a service spec covers them.
+
+Test data comes from the pure builders in `src/tests/fixtures/builders/<area>.builder.ts` (typed defaults, fixed ids and dates, no
+assertions). A `mockEntityManager` answers only what a spec stubs, so an unstubbed call throws and proves the service made no extra
+database call. Example: `src/modules/domain/commission/commission.service.spec.ts`.
 
 ## Coverage
 
-```bash
-npm run test:coverage       # jest --coverage -> coverage/lcov.info (+ text summary)
-```
-
-`collectCoverageFrom` covers all `src/**/*.ts` except specs and `main.ts`. Coverage is measured with the V8 provider (`coverageProvider: 'v8'` in `jest.config.js`) — istanbul under `ts-jest` inflates branch totals with transpiler-emitted helper branches (`__awaiter`/`__generator`/`__spreadArray`), which made the branch number meaningless. The lcov artifact is what codecov consumes (flag `todo-be`).
+`npm test` runs `jest --selectProjects unit --coverage`. Coverage is collected from `src/**/*.service.ts` and each file has a
+threshold of 100 for lines, branches, functions and statements, so the run fails below it. There is no lcov upload and no codecov
+flag: Sonar imports issues only.
 
 ## Integration, e2e and contract tests
 

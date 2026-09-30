@@ -6,7 +6,6 @@ import type { Principal, Role } from "@modules/platform/cqrs"
 import { requestOf } from "@modules/platform/http-security"
 import { IdentityError, IdentityErrorCode } from "./errors/identity.error"
 import type { PublicMetadata } from "./identity.contracts"
-import { MODULE_OPTIONS_TOKEN } from "./identity.module-definition"
 import type { IdentityOptions } from "./identity.options"
 
 /** Metadata key of `@Public`. */
@@ -15,9 +14,12 @@ export const PUBLIC_KEY = "domain.identity.public"
 /** Metadata key of `@Roles`. */
 export const ROLES_KEY = "domain.identity.roles"
 
+/** Token of the identity options, exported so a spec can provide it. */
+export const IDENTITY_OPTIONS: unique symbol = Symbol("domain.identity.options")
+
 /** Injects the options of the session capability. Parameter type: IdentityOptions. */
 export const InjectIdentityOptions = (): TypedParameterDecorator<IdentityOptions> =>
-    injector<IdentityOptions>(MODULE_OPTIONS_TOKEN)
+    injector<IdentityOptions>(IDENTITY_OPTIONS)
 
 /** Opens a door to anonymous callers, stating why; every other door needs a live session. */
 export const Public = (metadata: PublicMetadata): ReturnType<typeof SetMetadata> => SetMetadata(PUBLIC_KEY, metadata)

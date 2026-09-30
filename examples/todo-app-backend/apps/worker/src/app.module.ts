@@ -7,6 +7,7 @@ import { RecurModule, recurEntities } from "@modules/domain/recur"
 import { IdentityModule, identityEntities } from "@modules/domain/identity"
 import { ShareModule, shareEntities } from "@modules/domain/share"
 import { TaskModule, taskEntities } from "@modules/domain/task"
+import { TaskflowModule } from "@modules/domain/taskflow"
 import { UploadModule, uploadEntities } from "@modules/domain/upload"
 import { KeycloakModule } from "@modules/integrations/keycloak"
 import { NotifySmtpModule } from "@modules/integrations/notify-smtp"
@@ -74,6 +75,7 @@ export class AppModule {
                 TaskModule.register({ isGlobal: true }),
                 ShareModule.register({ isGlobal: true }),
                 PlanModule.register({ isGlobal: true, ...options.plan }),
+                TaskflowModule.register({ isGlobal: true }),
                 RecurModule.register({ isGlobal: true, ...options.recur }),
                 NotifyModule.register({ isGlobal: true }),
                 AuditModule.register({ isGlobal: true }),

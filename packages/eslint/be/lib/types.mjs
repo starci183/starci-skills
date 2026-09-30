@@ -67,7 +67,7 @@ export const originsOfType = (checker, type) => {
  * The package a declaration belongs to: the name of an enclosing `declare module "<pkg>"`, else the package directory
  * of a `node_modules/<pkg>/` (or `node_modules/@scope/<pkg>/`) file, else null for the repository's own source.
  */
-const moduleOf = (declaration, file) => {
+export const moduleOf = (declaration, file) => {
     for (let node = declaration.parent; node; node = node.parent) {
         if (ts.isModuleDeclaration(node) && ts.isStringLiteral(node.name)) return node.name.text
     }

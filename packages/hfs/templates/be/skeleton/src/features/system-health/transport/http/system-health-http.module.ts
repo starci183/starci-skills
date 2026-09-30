@@ -1,10 +1,7 @@
 import { Module } from "@nestjs/common"
-import { TerminusModule } from "@nestjs/terminus"
+import { SystemHealthModule } from "../../system-health.module"
 import { LiveController } from "./live.controller"
 
-/** The HTTP transport of the health feature. */
-@Module({
-    imports: [TerminusModule],
-    controllers: [LiveController],
-})
+@Module({ imports: [SystemHealthModule], controllers: [LiveController] })
+/** The HTTP transport of the health feature: the liveness door. */
 export class SystemHealthHttpModule {}

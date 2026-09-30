@@ -4,4 +4,4 @@ npm run typecheck
 npm run lint:check
 npm run format:check
 npm run hfs:check -- --fast
-npm test -- --passWithNoTests --changedSince=origin/main
+npm run test:affected -- --changedSince=origin/main

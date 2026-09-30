@@ -2,35 +2,23 @@ import { Body, Controller, Headers, HttpCode, HttpStatus, Post } from "@nestjs/c
 import type { CommandBus } from "@nestjs/cqrs"
 import { PlanError } from "@modules/domain/plan"
 import { Public, PublicReason } from "@modules/domain/identity"
-import { InjectSepayOptions, isWebhookAuthorized } from "@modules/integrations/sepay"
-import type { SepayOptions } from "@modules/integrations/sepay"
 import { InjectCommandBus } from "@modules/platform/cqrs"
 import { RateLimit, RateTier } from "@modules/platform/http-security"
-import { InjectInbox } from "@modules/platform/inbox"
-import type { Inbox } from "@modules/platform/inbox"
 import { unwrapOutcome } from "@modules/platform/primitives"
 import { ConfirmPaymentCommand } from "../../application/confirm-payment.command"
 import { SepayWebhookRequest } from "./dto/sepay-webhook.request"
 import type { SepayWebhookResponse } from "./dto/sepay-webhook.response"
-import { toConfirmPaymentRequest, toIgnoredSepayWebhookResponse, toSepayWebhookResponse } from "./sepay-webhook.mapper"
-
-/** The inbox source of the deliveries of this door. */
-const WEBHOOK_SOURCE = "sepay.webhook"
+import { toConfirmPaymentRequest, toSepayWebhookResponse } from "./sepay-webhook.mapper"
 
 @Controller("webhooks/sepay")
 /**
- * POST /webhooks/sepay, the signed intake door of the payment gateway. A delivery with an invalid signature, and a
- * replayed delivery, are ignored with a 200 and `{ ignored: true }` so the gateway has no reason to keep redelivering and
- * learns nothing from an unauthenticated call. Otherwise exactly one ConfirmPaymentCommand is dispatched.
+ * POST /webhooks/sepay, the signed intake door of the payment gateway. Exactly one ConfirmPaymentCommand is dispatched; a
+ * delivery with an invalid signature, and a replayed delivery, are answered with a 200 and `{ ignored: true }`.
  */
 export class SepayWebhookController {
-    constructor(
-        @InjectCommandBus() private readonly commandBus: CommandBus,
-        @InjectInbox() private readonly inbox: Inbox,
-        @InjectSepayOptions() private readonly options: SepayOptions,
-    ) {}
+    constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
-    /** Verifies the shared secret, claims the delivery once, and applies what the gateway reported. */
+    /** Hands the delivery, with the presented Authorization header, to the plan capability. */
     @Post()
     @HttpCode(HttpStatus.OK)
     @Public({ reason: PublicReason.SignedWebhook })
@@ -39,17 +27,9 @@ export class SepayWebhookController {
         @Headers("authorization") authorization: string | undefined,
         @Body() body: SepayWebhookRequest,
     ): Promise<SepayWebhookResponse> {
-        if (!isWebhookAuthorized(authorization, this.options.webhookSecret)) return toIgnoredSepayWebhookResponse()
-        const claimed = await this.inbox.claim(WEBHOOK_SOURCE, body.id)
-        if (!claimed) return toIgnoredSepayWebhookResponse()
-        try {
-            const outcome = await this.commandBus.execute(
-                new ConfirmPaymentCommand({ request: toConfirmPaymentRequest(body) }),
-            )
-            return toSepayWebhookResponse(unwrapOutcome(outcome, PlanError))
-        } catch (error) {
-            await this.inbox.release(WEBHOOK_SOURCE, body.id)
-            throw error
-        }
+        const outcome = await this.commandBus.execute(
+            new ConfirmPaymentCommand({ request: toConfirmPaymentRequest(authorization, body) }),
+        )
+        return toSepayWebhookResponse(unwrapOutcome(outcome, PlanError))
     }
 }

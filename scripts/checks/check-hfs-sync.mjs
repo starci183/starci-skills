@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // check-hfs-sync.mjs - the generated files of a product repository are the ones `hfs sync` renders, and its tracked
 // .starciwork / .starcistacks trees hold no agent output or plaintext secret. The op and land gates run it so a
-// hand-edited managed file (husky hook, workflow, sonar-project.properties, codecov.yml, tsconfig*.json, jest.config.js,
+// hand-edited managed file (husky hook, workflow, sonar-project.properties, tsconfig*.json, jest.config.js,
 // .prettierrc, .prettierignore, the package.json scripts, the eslint one-liner) is a finding, not a silent divergence
 // (HFS decision 10). The managed-file findings are the ones `hfs check` reports (packages/hfs/sync/managed.mjs).
 //

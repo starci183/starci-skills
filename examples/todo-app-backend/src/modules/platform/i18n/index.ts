@@ -1,4 +1,5 @@
 export type { Locale, MessageBundle } from "./i18n.contracts"
-export { InjectMessageCatalog, InjectRequestLocale, REQUEST_LOCALE } from "./i18n.decorators"
+export { InjectMessageCatalog, InjectRequestLocale, MESSAGE_CATALOG, REQUEST_LOCALE } from "./i18n.decorators"
 export { I18nModule } from "./i18n.module"
 export type { MessageCatalog, RequestLocale } from "./i18n.port"
+export type { I18nOptions } from "./i18n.options"

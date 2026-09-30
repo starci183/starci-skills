@@ -445,7 +445,6 @@ BE_RAW_INJECT:
     - "Token là chuỗi thay vì unique symbol"
     - "Tiêm lớp hạ tầng (CacheService, AppLogger) không qua injector"
     - "Dùng ModuleRef.get hoặc forwardRef để né vòng phụ thuộc"
-    - "constructor(private readonly timeoutMs: number) {} hoặc ReadonlyMap<string, X> không có Inject<Thing>() gắn token có tên"
   nextStep_vi: "Khai báo token `export const THING: unique symbol = Symbol(\"<owner>.<thing>\")` và `export const InjectThing = (): TypedParameterDecorator<Thing> => injector<Thing>(THING)` trong <owner>.decorators.ts rồi dùng @InjectThing() ở mọi nơi; vòng phụ thuộc là lỗi kiến trúc cần gỡ, không dùng forwardRef. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
@@ -485,9 +484,8 @@ BE_SCHEMA_OWNER:
 BE_SOURCE_FORM:
   title: "Back-end source file breaks the naming or form canon"
   title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"
-  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji, và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test ngoài catalog messages/ và slot fixture i18n; mã production không khai báo lớp, hàm hay hằng export có từ Mock, Fake hoặc Stub trong tên (đồ giả nằm trong spec hoặc src/tests; driver ngoại tuyến là adapter điều khiển bằng options, đặt tên theo việc nó làm)."
+  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji, và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test ngoài catalog messages/ và slot fixture i18n."
   causes_vi:
-    - "class MockExpertAgentService trong mã production thay vì adapter điều khiển bằng options"
     - "Tệp dùng hậu tố bị cấm (use-case, repository, store, util, helper, types, constants)"
     - "Lớp export không kết thúc bằng hậu tố vai trò của tệp và cũng không kết thúc bằng tên port (interface trong *.port.ts hoặc *.contracts.ts) mà nó implements"
     - "Interface trong tệp *.input.ts, *.request.ts, *.response.ts, *.type.ts, *.args.ts hoặc *.rows.ts không kết thúc bằng Input, Request, Response, Type, Args hoặc Row"
@@ -495,7 +493,6 @@ BE_SOURCE_FORM:
     - "Export default"
     - "Thiếu JSDoc trên export"
     - "Chú thích tiếng Việt trong mã"
-    - "class MockExpertAgentService trong mã production thay vì adapter điều khiển bằng options"
   nextStep_vi: "Đổi tên tệp theo vai trò trong danh sách đóng, chuyển kiểu vào <tên>.contracts.ts, thêm JSDoc tiếng Anh và bỏ export default. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
@@ -1178,7 +1175,7 @@ HFS_MANAGED_FILE_DRIFT:
   title_vi: "Tệp do .claude quản lý bị lệch"
   meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `hfs sync --write`, không sửa tay."
   causes_vi:
-    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, codecov, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
+    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -1504,11 +1501,11 @@ HFS_SLOT_UNDECLARED:
   kind: check-finding
 
 HFS_SONAR_CONFIG:
-  title: "Sonar config is generated, with no host URL and matching coverage exclusions"
+  title: "Sonar config is generated, with no host URL and no coverage import"
   title_vi: "Cấu hình Sonar lệch"
-  meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Hai con số coverage (Codecov/Sonar) sẽ không khớp."
+  meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Sonar phải đọc đúng cấu hình sinh ra, không nhập báo cáo độ phủ."
   causes_vi:
-    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `coverage.exclusions` = đúng danh sách loại trừ coverage của jest (back end), không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, không nhập lcov hay `sonar.coverage.*`, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
     - "Khối `services.sonar.qualityGate` của khai báo stack phải gọi đúng cổng chất lượng duy nhất của `knowledge/sonar-gate.yaml`; repo không tự ghi ngưỡng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry

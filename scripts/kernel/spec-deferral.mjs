@@ -11,7 +11,7 @@
 //                settles `succeeded` with result {verdict: 'deferred', deferred: {kind, reason}} and no attempt
 //                spent, so every leg behind it proceeds; `api run-deferred-tests` re-queues it later.
 //   skip         the op runs, but neither runs nor writes that class of test and demands no coverage of it
-//                (build ops: test:ci/jest/coverage are not run, Sonar runs with --no-coverage).
+//                (build ops: test:ci/jest/coverage are not run, Sonar still runs).
 //   not-counted  a review/verify gate that would demand those tests or that coverage does not count them.
 // uat.verify is outside both classes: it is owner-deferred separately until credentials.
 //
@@ -199,7 +199,7 @@ export function specsBriefLines({ skillRoot, op, settings = null, forced = false
   if (!off.length) return [];
   const say = {
     unit: {
-      skip: 'do NOT run or write product unit/integration tests (jest, vitest, test:ci, a slice coverage run) and demand no changed-line coverage; Sonar still runs - with --no-coverage and no --lcov - so its bugs, smells and security findings still gate. Record the skipped gates as a check named "specs.unit" with exitCode 0 and evidence "skipped: specs.unit=false"; a missing unit/coverage gate is never partial, blocked or a test-gap.',
+      skip: 'do NOT run or write product unit/integration tests (jest, vitest, test:ci, a slice coverage run) and demand no changed-line coverage; Sonar still runs, so its bugs, smells and security findings still gate. Record the skipped gates as a check named "specs.unit" with exitCode 0 and evidence "skipped: specs.unit=false"; a missing unit/coverage gate is never partial, blocked or a test-gap.',
       'not-counted': 'do NOT demand unit/integration test results or coverage: an absent or skipped unit/coverage gate is not counted against the producer, never a finding, partial or blocker; judge every other gate as usual.',
       'defer-leg': 'this leg is deferred and should not be running; report done with the check "specs.unit" evidence "deferred: specs.unit=false" and author nothing.',
     },

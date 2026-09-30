@@ -32,7 +32,7 @@ shape:
   compose: .starcistacks/<environment>/infra/compose/*.yaml (one fragment per backing service, composed by include)
   metadata: .starcistacks/<environment>/infra/metadata.json (the resolved port projection, value-free, tracked, read by the front end)
   keyRoster: .starcistacks/<environment>/runtime/env/KEYS.md and .starcistacks/<environment>/infra/KEYS.md (names and custody paths, never values)
-  services: the declaration's `services` block (application-stacks.schema.yaml $defs.service) - sonar, codecov and every other delivery/quality service, with custody references into runtime/files
+  services: the declaration's `services` block (application-stacks.schema.yaml $defs.service) - sonar and every other delivery/quality service, with custody references into runtime/files
 
 custody:
   summary: >-
@@ -158,7 +158,7 @@ rules:
   - The layout never encodes ownership or provenance. Which host runs an environment, which registry
     serves its images and which branch deploys it belong in the declaration, because a directory name
     cannot be reviewed.
-  - "Delivery and quality services (Sonar, Codecov, a container registry, analytics, error tracking) are
+  - "Delivery and quality services (Sonar, a container registry, analytics, error tracking) are
     declared in the declaration's `services` block, never inferred from CI YAML or a properties file:
     provider, mode local|hosted|disabled, host (local and public URL), the stack that runs a local one
     (repository, root, environment, compose), project keys per repository, credentials as custody

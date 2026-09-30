@@ -28,7 +28,6 @@ test('the gate is one file: the thresholds, the enforced ops and the server cond
   assert.equal(gate.gate.name,'starci-new-code');
   assert.deepEqual([...gate.enforcedOps].sort(),['backend.implement','code.refactor','interface.implement']);
   assert.deepEqual(serverConditions(gate),[
-    {metric:'new_coverage',op:'LT',error:'80'},
     {metric:'new_duplicated_lines_density',op:'GT',error:'3'},
     {metric:'new_security_hotspots_reviewed',op:'LT',error:'100'},
     {metric:'new_blocker_violations',op:'GT',error:'0'},
@@ -37,7 +36,7 @@ test('the gate is one file: the thresholds, the enforced ops and the server cond
     {metric:'duplicated_lines_density',op:'GT',error:'3'},
   ]);
   assert.deepEqual(gate.overall.issues.engines,['starci-hfs','eslint','stylelint']);
-  assert.deepEqual(thresholdsOf(gate),{name:'starci-new-code',coverageMinPercent:80,ignoreBelowChangedLines:20,duplicationMaxPercent:3,blockingSeverities:['BLOCKER','CRITICAL'],blockingIssuesMax:0,unreviewedHotspotsMax:0});
+  assert.deepEqual(thresholdsOf(gate),{name:'starci-new-code',ignoreBelowChangedLines:20,duplicationMaxPercent:3,blockingSeverities:['BLOCKER','CRITICAL'],blockingIssuesMax:0,unreviewedHotspotsMax:0});
   for(const op of gate.enforcedOps){
     const manifest=fs.readFileSync(path.join(ROOT,'modules','ops','ops',`${op}.yaml`),'utf8');
     assert.match(manifest,/sonar-local\.mjs scan/,`${op} tells its worker to run sonar-local`);
@@ -54,7 +53,7 @@ test('judgeSummary: pass, red, unavailable, refused and missing are told apart -
   const down=judgeSummary(scan({outcome:'blocked',unavailable:true,reason:'SonarQube at http://localhost:9010 is not reachable'}),gate);
   assert.deepEqual([down.status,down.code],['unavailable','sonar-unavailable']);
   assert.match(down.detail,/not reachable/);
-  const refused=judgeSummary(scan({outcome:'refused',code:'COVERAGE_STALE',reason:'coverage/lcov.info is stale'}),gate);
+  const refused=judgeSummary(scan({outcome:'refused',code:'SLICE_BASE_UNKNOWN',reason:'the base is not a revision'}),gate);
   assert.deepEqual([refused.status,refused.code],['refused','sonar-scan-refused']);
   assert.equal(judgeSummary(null,gate).code,'sonar-proof-missing');
   assert.equal(judgeSummary({schema:'something/else@1'},gate).status,'missing');

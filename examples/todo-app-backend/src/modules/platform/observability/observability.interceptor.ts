@@ -9,7 +9,7 @@ import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { InjectMetrics } from "./observability.decorators"
 import { ObservabilityLogEvent } from "./observability.log-events"
-import type { Metrics } from "./observability.port"
+import type { MetricsRegistryService } from "./metrics-registry.service"
 
 const REQUEST_ID_HEADER = "x-request-id"
 const GRAPHQL_ROUTE = "/graphql"
@@ -23,7 +23,7 @@ const UNMATCHED_ROUTE = "unmatched"
  */
 export class ObservabilityInterceptor implements NestInterceptor {
     constructor(
-        @InjectMetrics() private readonly metrics: Metrics,
+        @InjectMetrics() private readonly metrics: MetricsRegistryService,
         @InjectLogger() private readonly logger: Logger,
         @InjectClock() private readonly clock: Clock,
     ) {}

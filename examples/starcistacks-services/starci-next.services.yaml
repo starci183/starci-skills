@@ -57,21 +57,3 @@ services:
         SONAR_TOKEN with the value piped from sonar-local.mjs token, gh variable set SONAR_HOST_URL);
         until then the local sonar-local.mjs gate is the Sonar proof. Never an owner ask.
     ownerAction: none
-  codecov:
-    provider: codecov
-    mode: hosted
-    purpose: Coverage dashboard and the 80% project status from the one lcov run.
-    host:
-      public: https://app.codecov.io
-    auth: oidc
-    projects:
-      - {repository: starci-next, key: gh/starci-lab/starci-next}
-    credentials: []
-    ci:
-      workflow: .github/workflows/ci.yml
-      wiring: required
-      permissions: ['id-token: write']
-      secrets: []
-      vars: []
-      provisioning: codecov/codecov-action@v5 with use_oidc true; no CODECOV_TOKEN secret is set or needed.
-    ownerAction: none

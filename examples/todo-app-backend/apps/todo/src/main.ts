@@ -2,9 +2,10 @@ import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
-import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
+import { JsonLoggerService, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { parseIdentityConfig } from "@modules/domain/identity"
+import { parseCommissionConfig } from "@modules/domain/commission"
 import { parsePlanConfig } from "@modules/domain/plan"
 import { parseRecurConfig } from "@modules/domain/recur"
 import { parseUploadConfig } from "@modules/domain/upload"
@@ -27,6 +28,7 @@ async function bootstrap(): Promise<void> {
         keycloak: parseKeycloakConfig(env),
         sepay: parseSepayConfig(env),
         plan: parsePlanConfig(env),
+        commission: parseCommissionConfig(env),
         recur: parseRecurConfig(env),
         upload: parseUploadConfig(env),
         uploadStorage: parseUploadStorageConfig(env),
@@ -36,10 +38,10 @@ async function bootstrap(): Promise<void> {
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     app.enableShutdownHooks()
     await app.listen(options.port)
-    createJsonLogger(new SystemClock()).info(LoggingLogEvent.ServerStarted, { service: "todo", port: options.port })
+    new JsonLoggerService(new SystemClock(), process.stdout, process.stderr).info(LoggingLogEvent.ServerStarted, { service: "todo", port: options.port })
 }
 
 bootstrap().catch((error: unknown) => {
-    createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "todo" })
+    new JsonLoggerService(new SystemClock(), process.stdout, process.stderr).error(LoggingLogEvent.StartupFailed, error, { service: "todo" })
     process.exit(1)
 })

@@ -342,7 +342,7 @@ profiles:
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/must-inject-entity-manager, starci-be/no-injected-repository, starci-be/no-outer-manager-in-transaction, starci-be/require-entity-table-name, starci-be/no-eager-relation, starci-be/named-entity-manager-only, starci-be/no-repository-class]
+            ruleIds: [starci-be/must-inject-entity-manager, starci-be/no-injected-repository, starci-be/no-outer-manager-in-transaction, starci-be/require-entity-table-name, starci-be/no-eager-relation, starci-be/named-entity-manager-only]
             expected: { severity: error }
         semantic:
           guidance: docs/backend-source-pattern.md

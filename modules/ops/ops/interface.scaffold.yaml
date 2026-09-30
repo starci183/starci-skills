@@ -209,8 +209,8 @@ proofs:
         observed hook and CI output is recorded.
   - id: services-declared
     requirement:
-      en: The ci.yml, codecov.yml and sonar-project.properties the baseline writes take the Sonar project key
-        and host, the Codecov project and the CI secret/variable names from the stack declaration's services
+      en: The ci.yml and sonar-project.properties the baseline writes take the Sonar project key
+        and host and the CI secret/variable names from the stack declaration's services
         block (the repository's own .starcistacks, or the backend declaration whose sources list it), and
         `node scripts/checks/check-starcistacks.mjs <repo> --new` reports no refusal. When that declaration
         is outside this op's owned paths, the check runs without --new and its STACKS_SERVICES_MISSING /

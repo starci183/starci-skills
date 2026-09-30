@@ -1,3 +1,4 @@
+import type { CommissionOptions } from "@modules/domain/commission"
 import type { PlanOptions } from "@modules/domain/plan"
 import type { RecurOptions } from "@modules/domain/recur"
 import type { IdentityOptions } from "@modules/domain/identity"
@@ -25,6 +26,8 @@ export interface TodoAppOptions {
     readonly sepay: SepayOptions
     /** The paid plan. */
     readonly plan: PlanOptions
+    /** The referral commission rate. */
+    readonly commission: CommissionOptions
     /** The recurrence generation tick. */
     readonly recur: RecurOptions
     /** The upload rules. */

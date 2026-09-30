@@ -1,4 +1,4 @@
-import type { UploadStatus, UploadView } from "../upload.contracts"
+import type { UploadStatus, UploadSummary, UploadView } from "../upload.contracts"
 import type { UploadEntity } from "./entities/upload.entity"
 
 /** The lifecycle a stored status text names; anything but ready is still pending. */
@@ -15,4 +15,15 @@ export const toUploadView = (row: UploadEntity): UploadView => ({
     storageKey: row.storageKey,
     status: toUploadStatus(row.status),
     createdAt: row.createdAt,
+})
+
+/** Maps an upload to the public summary: the owner and the storage key stay inside. */
+export const toUploadSummary = (upload: UploadView): UploadSummary => ({
+    uploadId: upload.id,
+    taskId: upload.taskId,
+    filename: upload.filename,
+    mime: upload.mime,
+    sizeBytes: upload.sizeBytes,
+    status: upload.status,
+    createdAt: upload.createdAt,
 })

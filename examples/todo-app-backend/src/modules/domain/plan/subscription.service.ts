@@ -5,6 +5,8 @@ import type { EntityManager } from "typeorm"
 import { SubscriptionEntity } from "./persistence/entities/subscription.entity"
 import { toSubscriptionView } from "./persistence/subscription.rows"
 import type {
+    CapCheckParams,
+    CapVerdict,
     ConfirmSubscriptionParams,
     FindSubscriptionParams,
     GetOrCreateSubscriptionParams,
@@ -15,6 +17,9 @@ import type {
     TransitionSubscriptionParams,
 } from "./plan.contracts"
 import { FREE_PLAN, planOfStatus } from "./plan.policy"
+
+/** Where an owner at the cap goes to raise it. */
+const UPGRADE_PATH = "/plan/usage"
 
 @Injectable()
 /**
@@ -49,6 +54,13 @@ export class SubscriptionService {
     async readEffectivePlan(params: ReadPlanParams): Promise<PlanDefinition> {
         const row = await this.entityManager.findOneBy(SubscriptionEntity, { personId: params.personId })
         return row ? planOfStatus(row.status) : FREE_PLAN
+    }
+
+    /** Allows one more active task unless the plan of the person has a cap and the person is at it; a refusal names the cap and the upgrade path. */
+    async checkCap(params: CapCheckParams): Promise<CapVerdict> {
+        const plan = await this.readEffectivePlan({ personId: params.personId })
+        if (plan.taskCap === null || params.activeTaskCount < plan.taskCap) return { allowed: true }
+        return { allowed: false, cap: plan.taskCap, upgradePath: UPGRADE_PATH }
     }
 
     /** Checkout started: the subscription becomes pending. */
