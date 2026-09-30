@@ -8,7 +8,7 @@ import type { ProbesOptions } from "./probes.options"
 import type { Probe } from "./probes.port"
 
 @Injectable()
-/** Runs every probe of the app and reports which dependency answered; a failing probe is logged, never rethrown. */
+/** Runs every probe of the app and reports which dependency answered; a failing probe is logged with its cause, never rethrown. */
 export class ProbeChecker {
     constructor(
         @InjectProbesOptions() private readonly options: ProbesOptions,
@@ -31,7 +31,7 @@ export class ProbeChecker {
             await probe.check()
             return "ok"
         } catch (error) {
-            this.logger.warn(ProbesLogEvent.ProbeFailed, { dependency: probe.name, cause: String(error) })
+            this.logger.error(ProbesLogEvent.ProbeFailed, error, { dependency: probe.name })
             return "unreachable"
         }
     }

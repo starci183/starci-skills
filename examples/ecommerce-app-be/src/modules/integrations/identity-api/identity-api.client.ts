@@ -10,7 +10,7 @@ import type { IdentityApiOptions } from "./identity-api.options"
 /** The wire code the identity service answers when no live session matches a token. */
 const SESSION_INVALID_CODE = "SESSION_INVALID"
 
-const VERIFY_SESSION_QUERY = "query VerifySession($input: VerifySessionInput!) { verifySession(input: $input) { personId } }"
+const VERIFY_SESSION_QUERY = "query VerifySession($input: VerifySessionInput!) { verifySession(request: $input) { personId } }"
 
 /** The person behind a live session, as the identity service names them. */
 export interface IdentitySession {

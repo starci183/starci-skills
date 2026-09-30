@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { CACHE } from "./cache.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./cache.module-definition"
-import { RedisCache } from "./redis-cache.client"
+import { RedisCacheClient } from "./redis-cache.client"
 
 @Module({})
 /** Provides the Cache port backed by Redis. */
@@ -12,7 +12,7 @@ export class CacheModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []), { provide: CACHE, useClass: RedisCache }],
+            providers: [...(base.providers ?? []), { provide: CACHE, useClass: RedisCacheClient }],
             exports: [CACHE],
         }
     }

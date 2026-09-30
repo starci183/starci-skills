@@ -1,5 +1,5 @@
-import type { DomainError, DomainErrorInit, ErrorParams } from "@modules/platform/errors"
-import type { Outcome, OutcomeOk, OutcomeRefused } from "./outcome.contracts"
+import type { ErrorParams } from "@modules/platform/errors"
+import type { DomainErrorClass, Outcome, OutcomeOk, OutcomeRefused } from "./outcome.contracts"
 
 /** Wraps a produced value as a successful outcome. */
 export const ok = <V>(value: V): OutcomeOk<V> => ({ kind: "ok", value })
@@ -17,7 +17,7 @@ export const refused = <C extends string>(code: C, params?: ErrorParams): Outcom
  */
 export const unwrapOutcome = <V, C extends K, K extends string>(
     outcome: Outcome<V, C>,
-    ErrorClass: new (init: DomainErrorInit<K>) => DomainError<K>,
+    ErrorClass: DomainErrorClass<K>,
 ): V => {
     if (outcome.kind === "ok") return outcome.value
     throw new ErrorClass({ code: outcome.code, params: outcome.params })

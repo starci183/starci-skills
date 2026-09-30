@@ -19,7 +19,7 @@ export class SignInResolver {
     @Mutation(() => SignInType, { name: "signIn" })
     @Public({ reason: PublicReason.AuthHandshake })
     @RateLimit(RateTier.Strict)
-    async signIn(@Args("input") input: SignInInput): Promise<SignInType> {
+    async signIn(@Args("request") input: SignInInput): Promise<SignInType> {
         const outcome = await this.commandBus.execute(new SignInCommand({ request: toSignInRequest(input) }))
         return toSignInType(unwrapOutcome(outcome, AccountError))
     }

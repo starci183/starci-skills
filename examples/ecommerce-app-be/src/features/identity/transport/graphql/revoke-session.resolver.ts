@@ -19,7 +19,7 @@ export class RevokeSessionResolver {
     @Mutation(() => RevokeSessionType, { name: "revokeSession" })
     async revokeSession(
         @CurrentPrincipal() principal: Principal,
-        @Args("input") input: RevokeSessionInput,
+        @Args("request") input: RevokeSessionInput,
     ): Promise<RevokeSessionType> {
         const outcome = await this.commandBus.execute(
             new RevokeSessionCommand({ request: toRevokeSessionRequest(input), principal }),

@@ -9,16 +9,16 @@ import type { E2EStack, E2EServiceName } from "./e2e-stack.service"
  * answers cart, addCartItem, clearCart, placeOrder and buyerStatus.
  */
 export const GRAPHQL_DOCUMENTS = {
-    register: "mutation Register($input: RegisterInput!) { register(input: $input) { personId } }",
-    signIn: "mutation SignIn($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }",
-    verifySession: "query VerifySession($input: VerifySessionInput!) { verifySession(input: $input) { personId } }",
-    revokeSession: "mutation RevokeSession($input: RevokeSessionInput!) { revokeSession(input: $input) { revoked } }",
+    register: "mutation Register($input: RegisterInput!) { register(request: $input) { personId } }",
+    signIn: "mutation SignIn($input: SignInInput!) { signIn(request: $input) { sessionToken personId } }",
+    verifySession: "query VerifySession($input: VerifySessionInput!) { verifySession(request: $input) { personId } }",
+    revokeSession: "mutation RevokeSession($input: RevokeSessionInput!) { revokeSession(request: $input) { revoked } }",
     account: "query { account { personId email hasOrders } }",
     cart: "query { cart { items { productId quantity } catalog { id name priceMinorUnits stock } } }",
-    addCartItem: "mutation AddCartItem($input: AddCartItemInput!) { addCartItem(input: $input) { item { productId quantity } } }",
+    addCartItem: "mutation AddCartItem($input: AddCartItemInput!) { addCartItem(request: $input) { item { productId quantity } } }",
     clearCart: "mutation { clearCart { cleared } }",
     placeOrder:
-        "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(input: $input) { orderId status totalMinorUnits currency paymentId replayed } }",
+        "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(request: $input) { orderId status totalMinorUnits currency paymentId replayed } }",
     buyerStatus: "query { buyerStatus { personId hasOrders } }",
 }
 

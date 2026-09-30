@@ -20,10 +20,17 @@ const placed: PlacedOrder = {
 }
 const products = { mug: { id: "mug", name: "Mug", priceMinorUnits: 1299, stock: 5 } }
 
+interface Harness {
+    handler: PlaceOrderHandler
+    cart: CartService
+    orders: OrderService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     parts: { cart?: CartService; catalog?: CatalogService; orders?: OrderService } = {},
     inner = mockEntityManager(),
-): { handler: PlaceOrderHandler; cart: CartService; orders: OrderService; inner: ReturnType<typeof mockEntityManager> } => {
+): Harness => {
     const cart = parts.cart ?? mock<CartService>({ list: jest.fn().mockResolvedValue([{ productId: "mug", quantity: 2 }]) })
     const catalog = parts.catalog ?? mock<CatalogService>({ byIds: jest.fn().mockResolvedValue(products) })
     const orders = parts.orders ?? mock<OrderService>({ findPlaced: jest.fn().mockResolvedValue(null), place: jest.fn().mockResolvedValue(placed) })

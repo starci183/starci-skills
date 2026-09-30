@@ -1,7 +1,7 @@
 import { Secret } from "@modules/platform/config"
 import { defineCacheKey } from "./cache-key.mapper"
 import { CacheError, CacheErrorCode } from "./errors/cache.error"
-import { RedisCache } from "./redis-cache.client"
+import { RedisCacheClient } from "./redis-cache.client"
 
 const mockRedis = {
     status: "ready",
@@ -22,9 +22,9 @@ const KEY = defineCacheKey<string>({
     parse: (stored) => (typeof stored === "string" ? stored : null),
 })
 
-const cache = (): RedisCache => new RedisCache({ url: new Secret("redis://localhost:6379") })
+const cache = (): RedisCacheClient => new RedisCacheClient({ url: new Secret("redis://localhost:6379") })
 
-describe("RedisCache", () => {
+describe("RedisCacheClient", () => {
     beforeEach(() => {
         for (const command of [mockRedis.get, mockRedis.set, mockRedis.del, mockRedis.ping, mockRedis.quit, mockRedis.connect]) {
             command.mockReset()

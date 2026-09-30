@@ -13,7 +13,10 @@ export interface ProductView {
 }
 
 /** Product views by requested id; an id with no product is absent. */
-export type ProductLookup = Readonly<Record<string, ProductView | undefined>>
+export interface ProductLookup {
+    /** The product with this SKU, when the catalog has one. */
+    readonly [id: string]: ProductView | undefined
+}
 
 /** What looking products up by id needs. */
 export interface ProductsByIdsParams {

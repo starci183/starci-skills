@@ -5,7 +5,7 @@ import { CatalogService } from "@modules/domain/catalog"
 import { PaymentService } from "@modules/domain/payment"
 import { InjectOrderEntityManager } from "@modules/platform/database"
 import { OrderError, OrderErrorCode } from "./errors/order.error"
-import type { BuyerStatus, BuyerStatusParams, FindPlacedOrderParams, PlaceOrderParams, PlacedOrder } from "./order.contracts"
+import type { BuyerStatus, BuyerStatusParams, FindPlacedOrderParams, FindPlacedOrderResult, PlaceOrderParams, PlacedOrder } from "./order.contracts"
 import { OrderEntity } from "./persistence/entities/order.entity"
 import { OrderLineEntity } from "./persistence/entities/order-line.entity"
 import { toBuyerStatus, toOrderId } from "./persistence/order.rows"
@@ -27,7 +27,7 @@ export class OrderService {
     ) {}
 
     /** The order an earlier confirmation with the same key produced, marked as a replay, or null. */
-    async findPlaced(params: FindPlacedOrderParams): Promise<PlacedOrder | null> {
+    async findPlaced(params: FindPlacedOrderParams): Promise<FindPlacedOrderResult> {
         const manager = params.manager ?? this.entityManager
         const order = await manager.findOneBy(OrderEntity, { personId: params.personId, idempotencyKey: params.idempotencyKey })
         return order ? this.snapshot(order, manager) : null

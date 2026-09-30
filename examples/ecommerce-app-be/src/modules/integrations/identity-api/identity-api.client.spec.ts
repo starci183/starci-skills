@@ -1,5 +1,4 @@
 import { mock } from "@starci/jest-preset/mock"
-import { HttpError, HttpErrorCode } from "@modules/platform/http"
 import type { HttpClient } from "@modules/platform/http"
 import { IdentityApiErrorCode } from "./errors/identity-api.error"
 import { IdentityApiClient } from "./identity-api.client"
@@ -46,7 +45,7 @@ describe("IdentityApiClient", () => {
         })
 
         it("fails as unavailable, keeping the cause, when the call itself fails", async () => {
-            const cause = new HttpError({ code: HttpErrorCode.Timeout })
+            const cause = new TypeError("timed out")
             const http = mock<HttpClient>({ request: jest.fn().mockRejectedValue(cause) })
             await expect(clientFor(http).verify("tok")).rejects.toMatchObject({ code: IdentityApiErrorCode.Unavailable, cause })
         })
@@ -61,7 +60,7 @@ describe("IdentityApiClient", () => {
 
         it("fails as unavailable on another status and when the call fails", async () => {
             await expect(clientFor(answering({}, 503)).check()).rejects.toMatchObject({ code: IdentityApiErrorCode.Unavailable })
-            const http = mock<HttpClient>({ request: jest.fn().mockRejectedValue(new HttpError({ code: HttpErrorCode.Network })) })
+            const http = mock<HttpClient>({ request: jest.fn().mockRejectedValue(new TypeError("fetch failed")) })
             await expect(clientFor(http).check()).rejects.toMatchObject({ code: IdentityApiErrorCode.Unavailable })
         })
     })

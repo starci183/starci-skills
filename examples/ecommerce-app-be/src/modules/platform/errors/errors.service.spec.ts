@@ -2,24 +2,20 @@ import { mock } from "@starci/jest-preset/mock"
 import type { Logger } from "@modules/platform/logging"
 import type { MessageCatalog } from "@modules/platform/i18n"
 import { DomainError } from "./domain.error"
-import { ErrorsErrorCode } from "./errors.error"
+import { ERRORS_ERROR_KINDS, ErrorsError, ErrorsErrorCode } from "./errors.error"
 import { ErrorsLogEvent } from "./errors.log-events"
 import { ErrorsService } from "./errors.service"
 
-enum SampleErrorCode {
-    Missing = "SAMPLE_MISSING",
-    Unlisted = "SAMPLE_UNLISTED",
-}
-
-class SampleError extends DomainError<SampleErrorCode> {}
+/** A capability error whose code no composed kind table declares. */
+const UnlistedError = class extends DomainError<"SAMPLE_UNLISTED"> {}
 
 const build = (logger: Logger = mock<Logger>(), catalog: MessageCatalog = mock<MessageCatalog>()): ErrorsService =>
-    new ErrorsService({ kinds: [{ [SampleErrorCode.Missing]: "not-found" }] }, catalog, logger)
+    new ErrorsService({ kinds: [ERRORS_ERROR_KINDS] }, catalog, logger)
 
 describe("ErrorsService", () => {
     it("keeps the code, params and kind of a declared capability error", () => {
-        const description = build().describe(new SampleError({ code: SampleErrorCode.Missing, params: { id: "a" } }))
-        expect(description).toEqual({ code: "SAMPLE_MISSING", kind: "not-found", status: 404, params: { id: "a" } })
+        const description = build().describe(new ErrorsError({ code: ErrorsErrorCode.OperationInvalid, params: { id: "a" } }))
+        expect(description).toEqual({ code: ErrorsErrorCode.OperationInvalid, kind: "invalid", status: 400, params: { id: "a" } })
     })
 
     it("masks an undeclared failure as internal and logs the cause", () => {
@@ -31,7 +27,7 @@ describe("ErrorsService", () => {
     })
 
     it("masks a capability error whose code no composed table declares", () => {
-        const description = build().describe(new SampleError({ code: SampleErrorCode.Unlisted }))
+        const description = build().describe(new UnlistedError({ code: "SAMPLE_UNLISTED" }))
         expect(description.code).toBe(ErrorsErrorCode.Internal)
     })
 
@@ -41,14 +37,14 @@ describe("ErrorsService", () => {
 
     it("resolves the display text through the catalog under the errors key", () => {
         const catalog = mock<MessageCatalog>({ get: jest.fn().mockReturnValue("text") })
-        expect(build(mock<Logger>(), catalog).text("SAMPLE_MISSING", { id: "a" }, "en")).toBe("text")
-        expect(catalog.get).toHaveBeenCalledWith("errors.SAMPLE_MISSING", { id: "a" }, "en")
+        expect(build(mock<Logger>(), catalog).text(ErrorsErrorCode.OperationInvalid, { id: "a" }, "en")).toBe("text")
+        expect(catalog.get).toHaveBeenCalledWith("errors.ERRORS_OPERATION_INVALID", { id: "a" }, "en")
     })
 
     it("answers the text of the internal error for a code the catalog does not know", () => {
         const catalog = mock<MessageCatalog>({
             get: jest.fn().mockImplementation((key: string) => (key === "errors.ERRORS_INTERNAL" ? "Oops" : key)),
         })
-        expect(build(mock<Logger>(), catalog).text("SAMPLE_UNKNOWN", {}, "en")).toBe("Oops")
+        expect(build(mock<Logger>(), catalog).text("UNKNOWN_CODE", {}, "en")).toBe("Oops")
     })
 })

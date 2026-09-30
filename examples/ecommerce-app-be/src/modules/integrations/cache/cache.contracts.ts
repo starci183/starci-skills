@@ -16,10 +16,19 @@ export interface CacheKey<TValue> {
     readonly parse: (stored: unknown) => TValue | null
 }
 
+/** The stored value of an entry, or null when the entry is absent, expired or not a value of its type. */
+export type CachedValue<TValue> = TValue | null
+
 /** Identifies one cached value: the declared key plus the arguments that make it unique (an id, a token). */
 export interface CacheRequest<TValue> {
     /** The declared key. */
     readonly key: CacheKey<TValue>
     /** The arguments that make the entry unique. */
     readonly args: ReadonlyArray<string>
+}
+
+/** Identifies one entry to store: the request plus the value to keep. */
+export interface CacheEntry<TValue> extends CacheRequest<TValue> {
+    /** The value to store. */
+    readonly value: TValue
 }

@@ -22,7 +22,13 @@ const plan: CheckoutPlan = {
 const existingOrder = (): OrderEntity =>
     Object.assign(new OrderEntity(), { id: "o-0", personId: "p-1", status: "confirmed", totalMinorUnits: 5097, currency: "USD" })
 
-const collaborators = (reserved = true): { cart: CartService; catalog: CatalogService; payments: PaymentService } => ({
+interface Collaborators {
+    cart: CartService
+    catalog: CatalogService
+    payments: PaymentService
+}
+
+const collaborators = (reserved = true): Collaborators => ({
     cart: mock<CartService>({ clear: jest.fn().mockResolvedValue(undefined) }),
     catalog: mock<CatalogService>({ reserveStock: jest.fn().mockResolvedValue(reserved) }),
     payments: mock<PaymentService>({

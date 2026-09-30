@@ -23,6 +23,9 @@ export interface GraphqlAnswer {
     readonly errorCodes: ReadonlyArray<string>
 }
 
+/** What a GraphQL call yields: the answer, or null when the body is not a GraphQL response at all. */
+export type GraphqlCallResult = GraphqlAnswer | null
+
 const codesOf = (errors: unknown): Array<string> =>
     Array.isArray(errors)
         ? errors.flatMap((error): Array<string> => {
@@ -32,7 +35,7 @@ const codesOf = (errors: unknown): Array<string> =>
         : []
 
 /** Sends a GraphQL operation and reads the answer; null when the body is not a GraphQL response at all. */
-export const callGraphql = async (http: HttpClient, call: GraphqlCall): Promise<GraphqlAnswer | null> => {
+export const callGraphql = async (http: HttpClient, call: GraphqlCall): Promise<GraphqlCallResult> => {
     const response = await http.request({
         method: "POST",
         url: call.url,

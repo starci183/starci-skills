@@ -1,5 +1,4 @@
 import { mock } from "@starci/jest-preset/mock"
-import { HttpError, HttpErrorCode } from "@modules/platform/http"
 import type { HttpClient } from "@modules/platform/http"
 import { OrderApiErrorCode } from "./errors/order-api.error"
 import { OrderApiClient } from "./order-api.client"
@@ -38,7 +37,7 @@ describe("OrderApiClient", () => {
     })
 
     it("fails as unavailable, keeping the cause, when the call itself fails", async () => {
-        const cause = new HttpError({ code: HttpErrorCode.Network })
+        const cause = new TypeError("fetch failed")
         const http = mock<HttpClient>({ request: jest.fn().mockRejectedValue(cause) })
         await expect(clientFor(http).getBuyerStatus("tok")).rejects.toMatchObject({ code: OrderApiErrorCode.Unavailable, cause })
     })

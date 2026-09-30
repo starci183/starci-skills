@@ -1,9 +1,9 @@
 import "reflect-metadata"
-import { APP_GUARD } from "@nestjs/core"
+import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { CommandBus } from "@nestjs/cqrs"
 import { Test } from "@nestjs/testing"
 import type { TestingModule } from "@nestjs/testing"
-import { getDataSourceToken, getEntityManagerToken } from "@nestjs/typeorm"
+import { getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { mock } from "@starci/jest-preset/mock"
 import { AccountService } from "@modules/domain/account"
@@ -11,11 +11,10 @@ import { AuthGuard } from "@modules/domain/identity"
 import { SessionService } from "@modules/domain/session"
 import { CACHE } from "@modules/integrations/cache"
 import type { Cache } from "@modules/integrations/cache"
-import { ConfigError, EnvSource, Secret } from "@modules/platform/config"
-import { ERRORS_SERVICE } from "@modules/platform/errors"
-import { IDENTITY_CONNECTION } from "@modules/platform/database"
+import { EnvSource, Secret } from "@modules/platform/config"
+import { ERRORS_SERVICE, ErrorsFilter } from "@modules/platform/errors"
+import { DatabaseProbe, IDENTITY_CONNECTION } from "@modules/platform/database"
 import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
-import { LOGGER } from "@modules/platform/logging"
 import { mockEntityManager } from "@tests/fixtures/database"
 import { AppModule } from "./app.module"
 import { parseIdentityAppOptions } from "./identity.options"
@@ -42,7 +41,7 @@ describe("identity AppModule", () => {
     const manager = mockEntityManager()
 
     beforeAll(async () => {
-        const dataSource = mock<DataSource>({ isInitialized: false, manager, entityMetadatas: [], options: { type: "postgres" } })
+        const dataSource = mock<DataSource>({ isInitialized: false, manager, entityMetadatas: [], options: { type: "postgres", synchronize: false } })
         module = await Test.createTestingModule({ imports: [AppModule.register(options)] })
             .overrideProvider(getDataSourceToken(IDENTITY_CONNECTION))
             .useValue(dataSource)
@@ -64,11 +63,17 @@ describe("identity AppModule", () => {
         expect(module.get(SessionService)).toBeInstanceOf(SessionService)
         expect(module.get(CommandBus)).toBeInstanceOf(CommandBus)
         expect(module.get(ERRORS_SERVICE)).toBeDefined()
-        expect(module.get(LOGGER)).toBeDefined()
     })
 
-    it("binds the one identity EntityManager to the connection double", () => {
-        expect(module.get(getEntityManagerToken(IDENTITY_CONNECTION))).toBe(manager)
+    it("provides the database probe over the connection double", () => {
+        expect(module.get(DatabaseProbe)).toBeInstanceOf(DatabaseProbe)
+    })
+
+    it("binds the one errors filter of platform/errors app-wide", () => {
+        const filters = (AppModule.register(options).providers ?? []).flatMap((provider) =>
+            "provide" in provider && provider.provide === APP_FILTER && "useClass" in provider ? [provider.useClass] : [],
+        )
+        expect(filters).toEqual([ErrorsFilter])
     })
 
     it("registers the app guards in order: rate limit, origin, auth", () => {
@@ -91,6 +96,6 @@ describe("parseIdentityAppOptions", () => {
     })
 
     it("stops the boot when a required key is missing", () => {
-        expect(() => parseIdentityAppOptions(new EnvSource({}))).toThrow(ConfigError)
+        expect(() => parseIdentityAppOptions(new EnvSource({}))).toThrow("CONFIG_KEY_MISSING")
     })
 })

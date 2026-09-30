@@ -20,6 +20,9 @@ export interface CapturePaymentParams {
     readonly amountMinorUnits: number
 }
 
+/** The payment of an order, or null when none was captured. */
+export type FindPaymentResult = PaymentView | null
+
 /** What looking a payment up by order needs. */
 export interface FindPaymentParams {
     /** The order the payment settles. */

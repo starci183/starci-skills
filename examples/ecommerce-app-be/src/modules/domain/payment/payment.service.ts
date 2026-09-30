@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common"
 import { EntityManager } from "typeorm"
 import { InjectOrderEntityManager } from "@modules/platform/database"
-import type { CapturePaymentParams, FindPaymentParams, PaymentView } from "./payment.contracts"
+import type { CapturePaymentParams, FindPaymentParams, FindPaymentResult, PaymentView } from "./payment.contracts"
 import { PaymentEntity } from "./persistence/entities/payment.entity"
 
 const toPaymentView = (row: PaymentEntity): PaymentView => ({
@@ -33,7 +33,7 @@ export class PaymentService {
     }
 
     /** The payment of an order, or null when none was captured. */
-    async findByOrder(params: FindPaymentParams): Promise<PaymentView | null> {
+    async findByOrder(params: FindPaymentParams): Promise<FindPaymentResult> {
         const row = await (params.manager ?? this.entityManager).findOneBy(PaymentEntity, { orderId: params.orderId })
         return row ? toPaymentView(row) : null
     }

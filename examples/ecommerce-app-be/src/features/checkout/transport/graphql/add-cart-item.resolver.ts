@@ -19,7 +19,7 @@ export class AddCartItemResolver {
     @Mutation(() => AddCartItemType, { name: "addCartItem" })
     async addCartItem(
         @CurrentPrincipal() principal: Principal,
-        @Args("input") input: AddCartItemInput,
+        @Args("request") input: AddCartItemInput,
     ): Promise<AddCartItemType> {
         const outcome = await this.commandBus.execute(
             new AddCartItemCommand({ request: toAddCartItemRequest(input), principal }),

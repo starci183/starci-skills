@@ -1,9 +1,9 @@
 import "reflect-metadata"
-import { APP_GUARD } from "@nestjs/core"
+import { APP_FILTER, APP_GUARD } from "@nestjs/core"
 import { CommandBus } from "@nestjs/cqrs"
 import { Test } from "@nestjs/testing"
 import type { TestingModule } from "@nestjs/testing"
-import { getDataSourceToken, getEntityManagerToken } from "@nestjs/typeorm"
+import { getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
 import { mock } from "@starci/jest-preset/mock"
 import { AuthGuard } from "@modules/domain/identity"
@@ -11,11 +11,10 @@ import { CartService } from "@modules/domain/cart"
 import { CatalogService } from "@modules/domain/catalog"
 import { OrderService } from "@modules/domain/order"
 import { PaymentService } from "@modules/domain/payment"
-import { ConfigError, EnvSource, Secret } from "@modules/platform/config"
-import { ORDER_CONNECTION } from "@modules/platform/database"
-import { ERRORS_SERVICE } from "@modules/platform/errors"
+import { EnvSource, Secret } from "@modules/platform/config"
+import { DatabaseProbe, ORDER_CONNECTION } from "@modules/platform/database"
+import { ERRORS_SERVICE, ErrorsFilter } from "@modules/platform/errors"
 import { OriginGuard, RateLimitGuard } from "@modules/platform/http-security"
-import { LOGGER } from "@modules/platform/logging"
 import { mockEntityManager } from "@tests/fixtures/database"
 import { AppModule } from "./app.module"
 import { parseOrderAppOptions } from "./order.options"
@@ -41,7 +40,7 @@ describe("order AppModule", () => {
     const manager = mockEntityManager()
 
     beforeAll(async () => {
-        const dataSource = mock<DataSource>({ isInitialized: false, manager, entityMetadatas: [], options: { type: "postgres" } })
+        const dataSource = mock<DataSource>({ isInitialized: false, manager, entityMetadatas: [], options: { type: "postgres", synchronize: false } })
         module = await Test.createTestingModule({ imports: [AppModule.register(options)] })
             .overrideProvider(getDataSourceToken(ORDER_CONNECTION))
             .useValue(dataSource)
@@ -62,11 +61,17 @@ describe("order AppModule", () => {
         }
         expect(module.get(CommandBus)).toBeInstanceOf(CommandBus)
         expect(module.get(ERRORS_SERVICE)).toBeDefined()
-        expect(module.get(LOGGER)).toBeDefined()
     })
 
-    it("binds the one order EntityManager to the connection double", () => {
-        expect(module.get(getEntityManagerToken(ORDER_CONNECTION))).toBe(manager)
+    it("provides the database probe over the connection double", () => {
+        expect(module.get(DatabaseProbe)).toBeInstanceOf(DatabaseProbe)
+    })
+
+    it("binds the one errors filter of platform/errors app-wide", () => {
+        const filters = (AppModule.register(options).providers ?? []).flatMap((provider) =>
+            "provide" in provider && provider.provide === APP_FILTER && "useClass" in provider ? [provider.useClass] : [],
+        )
+        expect(filters).toEqual([ErrorsFilter])
     })
 
     it("registers the app guards in order: rate limit, origin, auth", () => {
@@ -88,6 +93,6 @@ describe("parseOrderAppOptions", () => {
     })
 
     it("stops the boot when a required key is missing", () => {
-        expect(() => parseOrderAppOptions(new EnvSource({}))).toThrow(ConfigError)
+        expect(() => parseOrderAppOptions(new EnvSource({}))).toThrow("CONFIG_KEY_MISSING")
     })
 })

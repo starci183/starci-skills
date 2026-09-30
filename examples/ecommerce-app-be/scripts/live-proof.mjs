@@ -61,13 +61,13 @@ async function health(base) {
   return { status: response.status, payload: await response.json().catch(() => null) };
 }
 
-const REGISTER = 'mutation ($input: RegisterInput!) { register(input: $input) { personId } }';
-const SIGN_IN = 'mutation ($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }';
+const REGISTER = 'mutation ($input: RegisterInput!) { register(request: $input) { personId } }';
+const SIGN_IN = 'mutation ($input: SignInInput!) { signIn(request: $input) { sessionToken personId } }';
 const ACCOUNT = '{ account { personId email hasOrders } }';
 const CART = '{ cart { items { productId quantity } catalog { id name priceMinorUnits stock } } }';
-const ADD = 'mutation ($input: AddCartItemInput!) { addCartItem(input: $input) { item { productId quantity } } }';
+const ADD = 'mutation ($input: AddCartItemInput!) { addCartItem(request: $input) { item { productId quantity } } }';
 const CLEAR = 'mutation { clearCart { cleared } }';
-const PLACE = 'mutation ($input: PlaceOrderInput!) { placeOrder(input: $input) { orderId status totalMinorUnits currency paymentId replayed } }';
+const PLACE = 'mutation ($input: PlaceOrderInput!) { placeOrder(request: $input) { orderId status totalMinorUnits currency paymentId replayed } }';
 
 async function cartLines(token, lines) {
   await gql(ORDER, CLEAR, {}, token);

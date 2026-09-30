@@ -30,6 +30,6 @@ describe("ProbeChecker", () => {
         const report = await checker.run()
         expect(report.checks).toEqual({ database: "unreachable", cache: "ok" })
         expect(report.healthy).toBe(false)
-        expect(logger.warn).toHaveBeenCalledWith(ProbesLogEvent.ProbeFailed, expect.objectContaining({ dependency: "database" }))
+        expect(logger.error).toHaveBeenCalledWith(ProbesLogEvent.ProbeFailed, expect.any(TypeError), { dependency: "database" })
     })
 })

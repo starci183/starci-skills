@@ -1,5 +1,8 @@
 /** The structured data of one log line; values are plain data, never a request, a token or a secret. */
-export type LogFields = Readonly<Record<string, unknown>>
+export interface LogFields {
+    /** The value logged under `name`. */
+    readonly [name: string]: unknown
+}
 
 /** The logging port: owners log through it with an enum member of their own `<owner>.log-events.ts`, never `console`. */
 export interface Logger {

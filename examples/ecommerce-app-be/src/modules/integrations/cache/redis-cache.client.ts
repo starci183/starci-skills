@@ -11,7 +11,7 @@ import { CacheError, CacheErrorCode } from "./errors/cache.error"
 
 @Injectable()
 /** The Redis adapter of the Cache port and the health probe of the cache; the only file that imports the Redis library. */
-export class RedisCache implements Cache, Probe, OnApplicationShutdown {
+export class RedisCacheClient implements Cache, Probe, OnApplicationShutdown {
     /** The name the health report lists this probe under. */
     readonly name = "cache"
 

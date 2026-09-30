@@ -44,6 +44,9 @@ export interface BuyerStatus {
     readonly hasOrders: boolean
 }
 
+/** The earlier confirmation with the same key, or null when there is none. */
+export type FindPlacedOrderResult = PlacedOrder | null
+
 /** What looking up an earlier confirmation needs. */
 export interface FindPlacedOrderParams {
     /** The buyer. */

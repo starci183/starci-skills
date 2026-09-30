@@ -10,7 +10,10 @@ export type ErrorKind =
     | "internal"
 
 /** Values that fill the named placeholders of an error text and travel next to the code; never prose. */
-export type ErrorParams = Readonly<Record<string, string | number>>
+export interface ErrorParams {
+    /** The value of the placeholder called `name`. */
+    readonly [name: string]: string | number
+}
 
 /** What a capability error is built from: its code, optional text parameters and the failure that caused it. */
 export interface DomainErrorInit<C extends string> {
