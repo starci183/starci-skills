@@ -1,0 +1,38 @@
+import { Injectable } from "@nestjs/common"
+import { InjectLogger } from "@modules/platform/logging"
+import type { Logger } from "@modules/platform/logging"
+import type { ProbeReport, ProbeState } from "./probes.contracts"
+import { InjectProbesOptions, InjectProbes } from "./probes.decorators"
+import { ProbesLogEvent } from "./probes.log-events"
+import type { ProbesOptions } from "./probes.options"
+import type { Probe } from "./probes.port"
+
+@Injectable()
+/** Runs every probe of the app and reports which dependency answered; a failing probe is logged, never rethrown. */
+export class ProbeChecker {
+    constructor(
+        @InjectProbesOptions() private readonly options: ProbesOptions,
+        @InjectProbes() private readonly probes: ReadonlyArray<Probe>,
+        @InjectLogger() private readonly logger: Logger,
+    ) {}
+
+    /** Probes every dependency and reports the state of each. */
+    async run(): Promise<ProbeReport> {
+        const states = await Promise.all(this.probes.map(async (probe) => [probe.name, await this.state(probe)] as const))
+        return {
+            service: this.options.service,
+            checks: Object.fromEntries(states),
+            healthy: states.every(([, state]) => state === "ok"),
+        }
+    }
+
+    private async state(probe: Probe): Promise<ProbeState> {
+        try {
+            await probe.check()
+            return "ok"
+        } catch (error) {
+            this.logger.warn(ProbesLogEvent.ProbeFailed, { dependency: probe.name, cause: String(error) })
+            return "unreachable"
+        }
+    }
+}

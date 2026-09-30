@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common"
 import type { OnApplicationShutdown } from "@nestjs/common"
 import Redis from "ioredis"
-import type { HealthProbe } from "@modules/platform/health"
+import type { Probe } from "@modules/platform/probes"
 import { cacheKeyText } from "./cache-key.mapper"
 import type { CacheRequest } from "./cache.contracts"
 import { InjectCacheOptions } from "./cache.decorators"
@@ -11,7 +11,7 @@ import { CacheError, CacheErrorCode } from "./errors/cache.error"
 
 @Injectable()
 /** The Redis adapter of the Cache port and the health probe of the cache; the only file that imports the Redis library. */
-export class RedisCache implements Cache, HealthProbe, OnApplicationShutdown {
+export class RedisCache implements Cache, Probe, OnApplicationShutdown {
     /** The name the health report lists this probe under. */
     readonly name = "cache"
 

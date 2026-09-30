@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common"
 import { callGraphql, InjectHttpClient } from "@modules/platform/http"
 import type { GraphqlAnswer, HttpClient } from "@modules/platform/http"
-import type { HealthProbe } from "@modules/platform/health"
+import type { Probe } from "@modules/platform/probes"
 import { isRecord } from "@modules/platform/primitives"
 import { IdentityApiError, IdentityApiErrorCode } from "./errors/identity-api.error"
 import { InjectIdentityApiOptions } from "./identity-api.decorators"
@@ -20,7 +20,7 @@ export interface IdentitySession {
 
 @Injectable()
 /** The order service view of the identity service: it verifies bearer tokens over the identity GraphQL door and probes its health. */
-export class IdentityApiClient implements HealthProbe {
+export class IdentityApiClient implements Probe {
     /** The name the health report lists this dependency under. */
     readonly name = "identity"
 

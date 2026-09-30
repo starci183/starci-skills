@@ -1,4 +1,4 @@
-export { DATABASE_HEALTH } from "./database.decorators"
+export { DATABASE_PROBE } from "./database.decorators"
 export { DatabaseModule } from "./database.module"
 export type {
     DatabaseConnectionConfig,

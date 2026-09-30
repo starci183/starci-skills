@@ -1,21 +1,12 @@
-import {
-    Module 
-} from "@nestjs/common"
-import {
-    CheckoutHttpModule 
-} from "./transport/http/checkout-http.module"
+import { Module } from "@nestjs/common"
+import { AddCartItemHandler } from "./application/add-cart-item.handler"
+import { ClearCartHandler } from "./application/clear-cart.handler"
+import { GetBuyerStatusHandler } from "./application/get-buyer-status.handler"
+import { GetCartHandler } from "./application/get-cart.handler"
+import { PlaceOrderHandler } from "./application/place-order.handler"
 
 @Module({
-    imports: [CheckoutHttpModule],
+    providers: [AddCartItemHandler, ClearCartHandler, PlaceOrderHandler, GetCartHandler, GetBuyerStatusHandler],
 })
-/**
- * The checkout feature of apps/order - the HTTP transport that stays HTTP for a sanctioned
- * reason: the internal buyer surface identity reads buyer status through (a machine-to-machine
- * door) and /health (a probe). The user-facing JSON API - cart, addCartItem, clearCart,
- * placeOrder - now lives in the canonical GraphQL transport under features/checkout/transport/graphql,
- * guarded there by the same session verification. Thin on purpose and import-free: the
- * capability modules (cart, catalog, order, payment, the identity integration) and the
- * platform modules are all registered app-wide at the `apps/order` composition root, so this
- * module only composes the HTTP transport, which mounts the controllers - a feature never imports a capability module.
- */
+/** The checkout feature: the handlers of the cart, the order confirmation and the buyer status. */
 export class CheckoutModule {}

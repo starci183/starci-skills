@@ -1,7 +1,1 @@
-export { IdentityModule } from "./identity.module"
 export { IdentityGraphqlModule } from "./transport/graphql/identity-graphql.module"
-export { AccountResolver } from "./transport/graphql/queries/account/account/account.resolver"
-export { RegisterResolver } from "./transport/graphql/mutations/session/register/register.resolver"
-export { SignInResolver } from "./transport/graphql/mutations/session/sign-in/sign-in.resolver"
-export { HealthController } from "./transport/http/health.controller"
-export { SessionController } from "./transport/http/session.controller"

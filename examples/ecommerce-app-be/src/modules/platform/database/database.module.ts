@@ -2,8 +2,8 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule, getEntityManagerToken } from "@nestjs/typeorm"
 import type { EntityManager } from "typeorm"
-import { DATABASE_HEALTH } from "./database.decorators"
-import { DatabaseHealth } from "./database-health.service"
+import { DATABASE_PROBE } from "./database.decorators"
+import { DatabaseProbe } from "./database-probe.service"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
 
 @Module({})
@@ -34,12 +34,12 @@ export class DatabaseModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 {
-                    provide: DATABASE_HEALTH,
+                    provide: DATABASE_PROBE,
                     inject: options.connections.map((connection) => getEntityManagerToken(connection.name)),
-                    useFactory: (...managers: Array<EntityManager>) => new DatabaseHealth(managers),
+                    useFactory: (...managers: Array<EntityManager>) => new DatabaseProbe(managers),
                 },
             ],
-            exports: [DATABASE_HEALTH],
+            exports: [DATABASE_PROBE],
         }
     }
 }
