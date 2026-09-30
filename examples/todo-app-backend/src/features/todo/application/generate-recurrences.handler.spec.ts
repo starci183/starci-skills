@@ -19,17 +19,20 @@ const due = (localDate: string, ownerId = "o1"): DueOccurrence => ({
     dueAtUtc: new Date(`${localDate}T02:00:00.000Z`),
 })
 
-const build = (
-    owed: ReadonlyArray<DueOccurrence>,
-    execute: jest.Mock,
-): {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
     handler: GenerateRecurrencesHandler
     generator: GeneratorService
     occurrences: OccurrenceService
     commandBus: CommandBus
     logger: Logger
     inner: ReturnType<typeof mockEntityManager>
-} => {
+}
+
+const build = (
+    owed: ReadonlyArray<DueOccurrence>,
+    execute: jest.Mock,
+): Built => {
     const inner = mockEntityManager()
     const generator = mock<GeneratorService>({ collectDue: jest.fn().mockResolvedValue(owed) })
     const occurrences = mock<OccurrenceService>({ materialise: jest.fn() })

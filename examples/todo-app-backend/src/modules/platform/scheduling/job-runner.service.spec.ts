@@ -3,23 +3,29 @@ import { mock } from "@starci/jest-preset/mock"
 import type { Lease } from "@modules/platform/lease"
 import type { Logger } from "@modules/platform/logging"
 import { SchedulingError } from "./errors/scheduling.error"
-import { JobRunner } from "./job-runner.service"
+import { JobRunnerService } from "./job-runner.service"
 import { SchedulingLogEvent } from "./scheduling.log-events"
 import type { ScheduledJob } from "./scheduling.port"
 
 const AT = new Date("2026-09-30T10:05:00.000Z")
 
-const build = (grant: boolean): { runner: JobRunner; lease: Lease; logger: Logger } => {
+interface Rig {
+    readonly runner: JobRunnerService
+    readonly lease: Lease
+    readonly logger: Logger
+}
+
+const build = (grant: boolean): Rig => {
     const lease = mock<Lease>({
         acquire: jest.fn().mockResolvedValue(grant ? { name: "job", holder: "h", fence: 7 } : null),
     })
     const logger = mock<Logger>()
-    return { runner: new JobRunner({ tickMs: 1_000 }, lease, new FakeClock(AT), logger), lease, logger }
+    return { runner: new JobRunnerService({ tickMs: 1_000 }, lease, new FakeClock(AT), logger), lease, logger }
 }
 
 const cronJob = (run: jest.Mock): ScheduledJob => ({ name: "job", schedule: { cron: "*/5 * * * *" }, run })
 
-describe("JobRunner", () => {
+describe("JobRunnerService", () => {
     it("runs a cron job on a minute the expression admits and leases it for one minute", async () => {
         const { runner, lease } = build(true)
         const run = jest.fn().mockResolvedValue(undefined)

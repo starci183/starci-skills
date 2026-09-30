@@ -16,13 +16,10 @@ export class ReconcilePaymentResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Asks the gateway about a payment intent of the caller and applies what a webhook would have applied. */
-    @Mutation(() => ReconcilePaymentType, {
-        name: "reconcilePayment",
-        description: "Ask the payment gateway for the state of a pending payment and apply it.",
-    })
+    @Mutation(() => ReconcilePaymentType, { name: "reconcilePayment" })
     async reconcilePayment(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: ReconcilePaymentInput,
+        @Args("input") input: ReconcilePaymentInput,
     ): Promise<ReconcilePaymentType> {
         const outcome = await this.commandBus.execute(
             new ReconcilePaymentCommand({ request: toReconcilePaymentRequest(input), principal }),

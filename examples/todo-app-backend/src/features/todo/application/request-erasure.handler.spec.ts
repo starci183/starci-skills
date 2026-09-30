@@ -22,9 +22,17 @@ const verified: ErasureRequestView = {
     completedAt: null,
 }
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: RequestErasureHandler
+    erasure: AuditErasureService
+    outbox: Outbox
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     outcome: Awaited<ReturnType<AuditErasureService["request"]>>,
-): { handler: RequestErasureHandler; erasure: AuditErasureService; outbox: Outbox; inner: ReturnType<typeof mockEntityManager> } => {
+): Built => {
     const inner = mockEntityManager()
     const erasure = mock<AuditErasureService>({ request: jest.fn().mockResolvedValue(outcome) })
     const outbox = mock<Outbox>()

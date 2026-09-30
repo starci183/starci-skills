@@ -31,7 +31,13 @@ const stored: OccurrenceView = {
     status: "materialised",
 }
 
-const build = (found: RuleView | null): { handler: UpcomingOccurrencesHandler; occurrences: OccurrenceService } => {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: UpcomingOccurrencesHandler
+    occurrences: OccurrenceService
+}
+
+const build = (found: RuleView | null): Built => {
     const rules = mock<RuleService>({ find: jest.fn().mockResolvedValue(found) })
     const occurrences = mock<OccurrenceService>({ listByRule: jest.fn().mockResolvedValue([stored]) })
     return { handler: new UpcomingOccurrencesHandler(mock<Logger>(), new FakeClock(NOW), rules, occurrences), occurrences }

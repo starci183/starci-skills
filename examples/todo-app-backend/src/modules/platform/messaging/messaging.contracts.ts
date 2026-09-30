@@ -7,7 +7,7 @@ export interface QueueDefinition<Payload extends object> {
     /** The pause after the first failed delivery; it doubles with every further failure. */
     readonly backoffMs: number
     /** Reads a stored payload back; null when it does not have the expected shape. */
-    parse(value: unknown): Payload | null
+    parse(value: unknown): ParsedPayloadResult<Payload>
 }
 
 /** A message as a consumer receives it. */
@@ -21,3 +21,6 @@ export interface ConsumedMessage<Payload extends object> {
     /** How many deliveries were started, this one included. */
     readonly attempt: number
 }
+
+/** What reading a stored payload back answers: the payload, or null when it does not have the expected shape. */
+export type ParsedPayloadResult<Payload extends object> = Payload | null

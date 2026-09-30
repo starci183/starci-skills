@@ -16,13 +16,10 @@ export class MakeRecurringResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Creates a recurrence rule owned by the caller. */
-    @Mutation(() => MakeRecurringType, {
-        name: "makeRecurring",
-        description: "Create a recurrence rule owned by the caller.",
-    })
+    @Mutation(() => MakeRecurringType, { name: "makeRecurring" })
     async makeRecurring(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: MakeRecurringInput,
+        @Args("input") input: MakeRecurringInput,
     ): Promise<MakeRecurringType> {
         const outcome = await this.commandBus.execute(
             new MakeRecurringCommand({ request: toMakeRecurringRequest(input), principal }),

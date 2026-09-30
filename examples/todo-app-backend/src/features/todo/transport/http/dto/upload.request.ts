@@ -1,7 +1,7 @@
 import { IsOptional, IsString, MaxLength, MinLength } from "class-validator"
 
 /** The query of the direct upload door: the file name; the media type is the content type of the request. */
-export class DirectUploadQuery {
+export class DirectUploadRequest {
     /** The file name; `file` when the caller sends none. */
     @IsOptional()
     @IsString()
@@ -11,7 +11,7 @@ export class DirectUploadQuery {
 }
 
 /** The path parameters of the content doors: the upload the bytes are for or come from. */
-export class UploadContentParams {
+export class UploadContentRequest {
     /** The upload id. */
     @IsString()
     @MinLength(1)

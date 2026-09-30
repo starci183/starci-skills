@@ -4,7 +4,25 @@
  */
 import type { IncomingMessage, Server as HttpServer, ServerResponse } from "node:http"
 import type { Server } from "node:net"
+import { worldClock } from "../kit/world-clock"
 import type { FailureSpec, RecordedRequest } from "./fakes-control.contracts"
+
+/** Text read as JSON: the parsed value, or the text itself with the parse failure as `cause`. */
+export interface JsonReading {
+    /** The parsed value, or the text when it is not JSON. */
+    readonly value: unknown
+    /** The parse failure, null when the text is JSON. */
+    readonly cause: unknown
+}
+
+/** Reads text as JSON without throwing; text that is not JSON answers itself. */
+export const readJson = (text: string): JsonReading => {
+    try {
+        return { value: JSON.parse(text), cause: null }
+    } catch (cause) {
+        return { value: text, cause }
+    }
+}
 
 /** Reads a whole request body as UTF-8 text. */
 export const readBody = async (request: IncomingMessage): Promise<string> => {
@@ -34,7 +52,7 @@ export class RequestLog {
 
     /** Records one call. */
     record(entry: Omit<RecordedRequest, "at">): void {
-        this.entries.push({ at: new Date().toISOString(), ...entry })
+        this.entries.push({ at: worldClock.now().toISOString(), ...entry })
     }
 
     /** Everything recorded so far. */

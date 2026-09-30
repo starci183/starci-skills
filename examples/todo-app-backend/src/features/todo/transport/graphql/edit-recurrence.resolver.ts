@@ -16,13 +16,10 @@ export class EditRecurrenceResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Edits a recurrence rule owned by the caller. */
-    @Mutation(() => EditRecurrenceType, {
-        name: "editRecurrence",
-        description: "Edit a recurrence rule owned by the caller. Only the owner may edit a rule.",
-    })
+    @Mutation(() => EditRecurrenceType, { name: "editRecurrence" })
     async editRecurrence(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: EditRecurrenceInput,
+        @Args("input") input: EditRecurrenceInput,
     ): Promise<EditRecurrenceType> {
         const outcome = await this.commandBus.execute(
             new EditRecurrenceCommand({ request: toEditRecurrenceRequest(input), principal }),

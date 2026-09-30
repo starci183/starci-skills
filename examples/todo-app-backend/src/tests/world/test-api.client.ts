@@ -5,7 +5,8 @@
  * every call resolves with the status, the body and, for GraphQL, the declared error code.
  */
 import { graphqlEnvelopeOf } from "@tests/world/kit/graphql-envelope"
-import type { GraphqlObserved } from "@tests/world/kit/graphql-envelope"
+import type { GraphqlObserved, GraphqlWire } from "@tests/world/kit/graphql-envelope"
+import { worldClock } from "@tests/world/kit/world-clock"
 import { createE2EHttpClient } from "@tests/world/kit/e2e-http-client"
 import type { E2EHttpRequestOptions, E2EResponse } from "@tests/world/kit/e2e-http-client"
 import type { SignInData } from "@tests/fixtures/views/e2e-views.contracts"
@@ -53,9 +54,9 @@ const callerOf = (baseUrl: string, sessionToken?: string): TestCaller => {
             variables?: Record<string, unknown>,
             language?: string,
         ): Promise<GraphqlObserved<TData>> => {
-            const startedAt = Date.now()
+            const startedAt = worldClock.now().getTime()
             const headers = language === undefined ? {} : { "accept-language": language }
-            const response = await http.post<Record<string, unknown>>(
+            const response = await http.post<GraphqlWire<TData> | string>(
                 "/graphql",
                 { query: TODO_OPERATIONS[operation], variables: variables ?? {} },
                 { headers },

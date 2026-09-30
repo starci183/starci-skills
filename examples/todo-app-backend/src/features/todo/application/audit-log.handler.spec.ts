@@ -13,7 +13,13 @@ const own: ResolvedAuditLine = { at: AT, action: "task.created", target: "t1", a
 const chain: ReadonlyArray<ResolvedAuditLine> = [own, { at: AT, action: "task.deleted", target: "t2", actor: null, tombstoned: true }]
 const noFilter = { action: null, target: null }
 
-const build = (): { handler: AuditLogHandler; log: AuditLogService } => {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: AuditLogHandler
+    log: AuditLogService
+}
+
+const build = (): Built => {
     const log = mock<AuditLogService>({
         findLinesForPerson: jest.fn().mockResolvedValue([own]),
         readChain: jest.fn().mockResolvedValue(chain),

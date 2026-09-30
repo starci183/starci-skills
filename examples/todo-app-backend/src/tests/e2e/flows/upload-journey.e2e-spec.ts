@@ -9,7 +9,7 @@ import type {
     DeleteUploadData,
     RestErrorBody,
     TaskUploadsData,
-    UploadView,
+    UploadEntry,
 } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
 import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
@@ -64,7 +64,7 @@ describe("upload journey (e2e)", () => {
         expect(wrongToken.status).toBe(403)
         expect(wrongToken.body.code).toBe(UploadErrorCode.TokenInvalid)
 
-        const stored = await api.put<UploadView>(url, content, { headers: { "content-type": "text/plain", ...presignedHeaders } })
+        const stored = await api.put<UploadEntry>(url, content, { headers: { "content-type": "text/plain", ...presignedHeaders } })
         expect(stored.status).toBe(200)
         expect(stored.body.status).toBe("ready")
         expect(stored.body.sizeBytes).toBe(content.length)
@@ -109,7 +109,7 @@ describe("upload journey (e2e)", () => {
         expect(strangerDelete.errorCode).toBe(UploadErrorCode.Forbidden)
 
         // The direct intake answers the same ready record in one step.
-        const direct = await caller.post<UploadView>("/uploads", Buffer.from("direct bytes", "utf8"), {
+        const direct = await caller.post<UploadEntry>("/uploads", Buffer.from("direct bytes", "utf8"), {
             params: { filename: "direct.txt" },
             headers: { "content-type": "text/plain" },
         })

@@ -15,10 +15,10 @@ export class SignOutResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Ends the session behind the given token. */
-    @Mutation(() => SignOutType, { name: "signOut", description: "End a session by its token." })
+    @Mutation(() => SignOutType, { name: "signOut" })
     @Public({ reason: PublicReason.AuthHandshake })
     @RateLimit(RateTier.Strict)
-    async signOut(@Args("request") input: SignOutInput): Promise<SignOutType> {
+    async signOut(@Args("input") input: SignOutInput): Promise<SignOutType> {
         const outcome = await this.commandBus.execute(new SignOutCommand({ request: toSignOutRequest(input) }))
         return toSignOutType(unwrapOutcome(outcome, IdentityError))
     }

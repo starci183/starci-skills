@@ -16,10 +16,10 @@ export class DeleteTaskResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Deletes a task permanently; only its owner may. */
-    @Mutation(() => DeleteTaskType, { name: "deleteTask", description: "Delete a task permanently." })
+    @Mutation(() => DeleteTaskType, { name: "deleteTask" })
     async deleteTask(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: DeleteTaskInput,
+        @Args("input") input: DeleteTaskInput,
     ): Promise<DeleteTaskType> {
         const outcome = await this.commandBus.execute(
             new DeleteTaskCommand({ request: toDeleteTaskRequest(input), principal }),

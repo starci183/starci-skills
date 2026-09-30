@@ -29,13 +29,15 @@ const walk = (rows: Array<AuditLogLineEntity>): Promise<VerifyChainResult> =>
         new AuditKeystoreService(mockEntityManager()),
     ).verifyChain()
 
+interface AppendRig {
+    readonly store: AuditKeystoreService
+    readonly manager: ReturnType<typeof mockEntityManager>
+    readonly saved: Array<AuditLogLineEntity>
+    readonly key: Buffer
+}
+
 describe("AuditLogService.append", () => {
-    const setup = (existing: Array<AuditLogLineEntity>): {
-        store: AuditKeystoreService
-        manager: ReturnType<typeof mockEntityManager>
-        saved: Array<AuditLogLineEntity>
-        key: Buffer
-    } => {
+    const setup = (existing: Array<AuditLogLineEntity>): AppendRig => {
         const key = randomBytes(32)
         const store = new AuditKeystoreService(mockEntityManager())
         jest.spyOn(store, "getOrCreateKey").mockResolvedValue({ keyId: "k1", key })

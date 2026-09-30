@@ -19,7 +19,14 @@ const skipped: OccurrenceView = {
     status: "skipped",
 }
 
-const build = (skip: jest.Mock): { handler: SkipOccurrenceHandler; occurrences: OccurrenceService; inner: ReturnType<typeof mockEntityManager> } => {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: SkipOccurrenceHandler
+    occurrences: OccurrenceService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
+const build = (skip: jest.Mock): Built => {
     const inner = mockEntityManager()
     const occurrences = mock<OccurrenceService>({ skip })
     const entityManager = mockEntityManager({ transaction: fakeTransaction(inner) })

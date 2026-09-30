@@ -40,13 +40,10 @@ describe("resilience: infra recovery", () => {
         // The worker recovered with the database: a sign-in made now writes its audit message in the transaction of the
         // session; the line only becomes readable once the worker consumer appended it.
         const session = await api.signIn(person.email, person.password)
-        await world.waitFor(
+        await world.waitUntil(
             "the audit line of the post-outage sign-in appended by the worker",
-            async () => {
-                const observed = await api.as(session.sessionToken).graphql<ExportMyDataData>("exportMyData")
-                const lines = observed.data?.exportMyData ?? []
-                return lines.some((line) => line.action === "login.signed-in") ? lines : null
-            },
+            async () => (await api.as(session.sessionToken).graphql<ExportMyDataData>("exportMyData")).data?.exportMyData ?? [],
+            (lines) => lines.some((line) => line.action === "login.signed-in"),
             { timeoutMs: 120_000, intervalMs: 1_000 },
         )
     })

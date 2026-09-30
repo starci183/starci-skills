@@ -5,10 +5,11 @@
  * generated for the run, carrying the person id as `sub`. The application client runs unchanged against it: only its
  * `KEYCLOAK_TOKEN_URL` points here.
  */
-import { createSign, generateKeyPairSync, randomUUID } from "node:crypto"
+import { createSign, generateKeyPairSync, randomUUID, timingSafeEqual } from "node:crypto"
 import { createServer } from "node:http"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import type { FailureSpec, RecordedRequest } from "../fakes-control.contracts"
+import { worldClock } from "../../kit/world-clock"
 import { FailureQueue, RequestLog, answerJson, closeServer, headersOf, listenLoopback, readBody } from "../fakes-http.service"
 import { renderPayload } from "../payload.service"
 
@@ -20,6 +21,13 @@ const FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
 interface Person {
     readonly personId: string
     readonly password: string
+}
+
+/** Compares two secrets in constant time. */
+const sameSecret = (left: string, right: string): boolean => {
+    const leftBytes = Buffer.from(left)
+    const rightBytes = Buffer.from(right)
+    return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes)
 }
 
 const base64Url = (value: string | Buffer): string => Buffer.from(value).toString("base64url")
@@ -109,7 +117,7 @@ export class KeycloakFake {
         }
         const email = form.get("username") ?? ""
         const person = this.persons.get(email)
-        if (form.get("client_id") !== CLIENT_ID || person === undefined || person.password !== form.get("password")) {
+        if (form.get("client_id") !== CLIENT_ID || person === undefined || !sameSecret(person.password, form.get("password") ?? "")) {
             answerJson(response, 401, renderPayload("keycloak", "error-invalid-grant"))
             return
         }
@@ -125,7 +133,7 @@ export class KeycloakFake {
     }
 
     private accessToken(personId: string, email: string): string {
-        const issuedAt = Math.floor(Date.now() / 1000)
+        const issuedAt = Math.floor(worldClock.now().getTime() / 1000)
         const header = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT", kid: this.keyId }))
         const claims = base64Url(
             JSON.stringify({

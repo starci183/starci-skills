@@ -10,6 +10,7 @@ import type {
     GetOrCreateSubscriptionParams,
     PlanDefinition,
     ReadPlanParams,
+    SubscriptionLookupResult,
     SubscriptionView,
     TransitionSubscriptionParams,
 } from "./plan.contracts"
@@ -39,7 +40,7 @@ export class SubscriptionService {
     }
 
     /** The subscription with this id, or null. */
-    async findById(params: FindSubscriptionParams): Promise<SubscriptionView | null> {
+    async findById(params: FindSubscriptionParams): Promise<SubscriptionLookupResult> {
         const row = await (params.manager ?? this.entityManager).findOneBy(SubscriptionEntity, { id: params.id })
         return row ? toSubscriptionView(row) : null
     }
@@ -81,9 +82,9 @@ export class SubscriptionService {
     }
 
     /** The owner downgrades: an active or past-due subscription becomes free at once, never refused, and no task is touched; any other state has nothing to downgrade from and is returned as it is. */
-    async downgrade(params: TransitionSubscriptionParams): Promise<SubscriptionView> {
+    downgrade(params: TransitionSubscriptionParams): Promise<SubscriptionView> {
         const { subscription } = params
-        if (subscription.status !== "active" && subscription.status !== "past-due") return subscription
+        if (subscription.status !== "active" && subscription.status !== "past-due") return Promise.resolve(subscription)
         return this.abandon(params)
     }
 

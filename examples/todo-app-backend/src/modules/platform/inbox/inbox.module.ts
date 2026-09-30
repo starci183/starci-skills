@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { INBOX } from "./inbox.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./inbox.module-definition"
-import { PostgresInbox } from "./inbox.service"
+import { PostgresInboxService } from "./inbox.service"
 
 @Module({})
 /** Provides the Inbox port over the primary database. */
@@ -12,7 +12,7 @@ export class InboxModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []), { provide: INBOX, useClass: PostgresInbox }],
+            providers: [...(base.providers ?? []), { provide: INBOX, useClass: PostgresInboxService }],
             exports: [INBOX],
         }
     }

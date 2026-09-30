@@ -17,13 +17,10 @@ export class AttachUploadResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Points a ready upload of the caller at a task of the caller. */
-    @Mutation(() => UploadType, {
-        name: "attachUpload",
-        description: "Attach a ready upload of the caller to a task of the caller.",
-    })
+    @Mutation(() => UploadType, { name: "attachUpload" })
     async attachUpload(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: AttachUploadInput,
+        @Args("input") input: AttachUploadInput,
     ): Promise<UploadType> {
         const outcome = await this.commandBus.execute(
             new AttachUploadCommand({ request: toAttachUploadRequest(input), principal }),

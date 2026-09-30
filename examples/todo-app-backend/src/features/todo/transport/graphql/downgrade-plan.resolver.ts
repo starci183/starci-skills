@@ -13,10 +13,7 @@ export class DowngradePlanResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Returns the caller to the free plan at once. */
-    @Mutation(() => DowngradePlanType, {
-        name: "downgradePlan",
-        description: "Return to the free plan, effective at once. Tasks are untouched; the cap applies from the next create.",
-    })
+    @Mutation(() => DowngradePlanType, { name: "downgradePlan" })
     async downgradePlan(@CurrentPrincipal() principal: Principal): Promise<DowngradePlanType> {
         const result = await this.commandBus.execute(new DowngradePlanCommand({ request: {}, principal }))
         return toDowngradePlanType(result)

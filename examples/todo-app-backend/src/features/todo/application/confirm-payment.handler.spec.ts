@@ -9,7 +9,14 @@ import { ConfirmPaymentHandler } from "./confirm-payment.handler"
 
 const AT = new Date("2026-09-30T10:00:00.000Z")
 
-const build = (apply: jest.Mock): { handler: ConfirmPaymentHandler; settlement: SettlementService; inner: ReturnType<typeof mockEntityManager> } => {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: ConfirmPaymentHandler
+    settlement: SettlementService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
+const build = (apply: jest.Mock): Built => {
     const inner = mockEntityManager()
     const settlement = mock<SettlementService>({ apply })
     const entityManager = mockEntityManager({ transaction: fakeTransaction(inner) })

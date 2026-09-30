@@ -1,24 +1,21 @@
 import { GraphQLError } from "graphql"
 import { mock } from "@starci/jest-preset/mock"
-import { DomainError } from "./domain.error"
-import type { ErrorDescription } from "./errors.contracts"
-import type { ErrorsService } from "./errors.service"
+import type { ErrorDescriber, ErrorDescription } from "./errors.contracts"
+import { ErrorsError, ErrorsErrorCode } from "./errors/errors.error"
 import { formatGraphqlError } from "./graphql-error.mapper"
-
-class SampleError extends DomainError<"SAMPLE_MISSING"> {}
 
 const described: ErrorDescription = { code: "SAMPLE_MISSING", kind: "not-found", status: 404, params: { id: "a" } }
 const invalid: ErrorDescription = { code: "ERRORS_OPERATION_INVALID", kind: "invalid", status: 400, params: {} }
 
-const errorsService = (): ErrorsService =>
-    mock<ErrorsService>({
+const errorsService = (): ErrorDescriber =>
+    mock<ErrorDescriber>({
         describe: jest.fn().mockReturnValue(described),
         describeInvalidOperation: jest.fn().mockReturnValue(invalid),
     })
 
 describe("formatGraphqlError", () => {
     it("answers the code, kind and params of a failure thrown by a resolver", () => {
-        const original = new SampleError({ code: "SAMPLE_MISSING" })
+        const original = new ErrorsError({ code: ErrorsErrorCode.Internal })
         const formatted = formatGraphqlError(errorsService(), { message: "x", path: ["cart"] }, new GraphQLError("x", { originalError: original }))
         expect(formatted).toMatchObject({
             message: "SAMPLE_MISSING",
@@ -28,7 +25,7 @@ describe("formatGraphqlError", () => {
     })
 
     it("answers an invalid operation when the GraphQL error has no original error", () => {
-        const formatted = formatGraphqlError(errorsService(), { message: "Cannot query field" }, new GraphQLError("Cannot query field"))
+        const formatted = formatGraphqlError(errorsService(), { message: ErrorsErrorCode.OperationInvalid }, new GraphQLError(ErrorsErrorCode.OperationInvalid))
         expect(formatted.extensions).toMatchObject({ code: "ERRORS_OPERATION_INVALID", kind: "invalid" })
     })
 

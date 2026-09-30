@@ -22,3 +22,6 @@ export interface ScanUploadParams {
 
 /** The answer of the content inspection: accepted, or rejected with a reason. */
 export type ScanVerdict = { readonly accepted: true } | { readonly accepted: false; readonly reason: string }
+
+/** The answer of reading an object: its bytes, or null when nothing is stored for the upload. */
+export type StoredBytesResult = Buffer | null

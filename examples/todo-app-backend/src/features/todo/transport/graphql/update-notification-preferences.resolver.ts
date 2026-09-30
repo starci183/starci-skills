@@ -19,13 +19,10 @@ export class UpdateNotificationPreferencesResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Writes the caller's subscription state and optional digest window on one channel; the next admission honors it. */
-    @Mutation(() => UpdateNotificationPreferencesType, {
-        name: "updateNotificationPreferences",
-        description: "Change the digest window and/or unsubscribed flag for one notification channel.",
-    })
+    @Mutation(() => UpdateNotificationPreferencesType, { name: "updateNotificationPreferences" })
     async updateNotificationPreferences(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: UpdateNotificationPreferencesInput,
+        @Args("input") input: UpdateNotificationPreferencesInput,
     ): Promise<UpdateNotificationPreferencesType> {
         const outcome = await this.commandBus.execute(
             new UpdateNotificationPreferencesCommand({ request: toUpdateNotificationPreferencesRequest(input), principal }),

@@ -25,6 +25,6 @@ describe("RecurGenerationJob", () => {
     it("lets a failing generation surface so the scheduler gives the lease back", async () => {
         const failure = new Error("database down")
         const commandBus = mock<CommandBus>({ execute: jest.fn().mockRejectedValue(failure) })
-        await expect(new RecurGenerationJob(commandBus, { tickCron: "*/5 * * * *" }).run(new Date())).rejects.toBe(failure)
+        await expect(new RecurGenerationJob(commandBus, { tickCron: "*/5 * * * *" }).run(new Date("2026-09-30T10:05:00.000Z"))).rejects.toBe(failure)
     })
 })

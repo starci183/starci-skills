@@ -15,10 +15,7 @@ export class RequestErasureResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Opens and verifies the erasure request of the caller, the only subject a person can ask to erase. */
-    @Mutation(() => RequestErasureType, {
-        name: "requestErasure",
-        description: "Request that everything identifying the caller be erased from the audit log.",
-    })
+    @Mutation(() => RequestErasureType, { name: "requestErasure" })
     async requestErasure(@CurrentPrincipal() principal: Principal): Promise<RequestErasureType> {
         const outcome = await this.commandBus.execute(new RequestErasureCommand({ request: {}, principal }))
         return toRequestErasureType(unwrapOutcome(outcome, AuditError))

@@ -19,7 +19,7 @@ const labelsOf = (key: string): string => {
  * The process-local registry behind the Prometheus scrape door: per (method, route, status) request counters plus a
  * duration sum, in the text exposition format. Route is the matched route template, so the label set stays bounded.
  */
-export class MetricsRegistry implements Metrics {
+export class MetricsRegistryService implements Metrics {
     private readonly requests = new Map<string, RequestMetric>()
 
     /** Records one finished request. */

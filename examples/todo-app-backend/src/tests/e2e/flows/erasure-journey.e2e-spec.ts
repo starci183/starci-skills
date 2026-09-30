@@ -10,12 +10,14 @@ import {
 } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { AuditKeyRow, AuditLineRow, CountRow, ErasureRequestRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import type {
+    AuditLineEntry,
     AuditLogData,
     CompleteErasureData,
     CreateTaskData,
     ExportMyDataData,
     RequestErasureData,
 } from "@tests/fixtures/views/e2e-views.contracts"
+import type { TestCaller } from "@tests/world/test-api.client"
 import { useTestWorld } from "@tests/world/use-test-world"
 import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 import { AppModule as WorkerApp } from "../../../../apps/worker/src/app.module"
@@ -35,6 +37,11 @@ const SEALED_BLOB = /^[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+
  */
 describe("erasure journey (e2e)", () => {
     const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } } })
+
+    const exportedLines = async (caller: TestCaller): Promise<ReadonlyArray<AuditLineEntry>> => {
+        const observed = await caller.graphql<ExportMyDataData>("exportMyData")
+        return observed.data?.exportMyData ?? []
+    }
 
     const lineCountUnderKey = async (keyId: string): Promise<number> => {
         const [row]: Array<CountRow> = await world.db.primary.query(AUDIT_LINE_COUNT_UNDER_KEY, [keyId])
@@ -58,16 +65,12 @@ describe("erasure journey (e2e)", () => {
 
         // The audit line is appended asynchronously (outbox message, then the worker consumer), so a response can beat the
         // line it triggered: wait until both of the subject lines (sign-in and task creation) are readable through the door.
-        const beforeExport = await world.waitFor(
+        const beforeExport = await world.waitUntil(
             "the audit lines of the subject readable through the door",
-            async () => {
-                const observed = await asSubject.graphql<ExportMyDataData>("exportMyData")
-                const lines = observed.data?.exportMyData ?? []
-                const complete =
-                    lines.some((line) => line.action === "task.created" && line.target === subjectTaskId) &&
-                    lines.some((line) => line.action === "login.signed-in")
-                return complete ? lines : null
-            },
+            () => exportedLines(asSubject),
+            (lines) =>
+                lines.some((line) => line.action === "task.created" && line.target === subjectTaskId) &&
+                lines.some((line) => line.action === "login.signed-in"),
             { timeoutMs: 90_000, intervalMs: 1_000 },
         )
         expect(beforeExport.length).toBeGreaterThanOrEqual(2)
@@ -124,12 +127,10 @@ describe("erasure journey (e2e)", () => {
 
         // br.audit.erasure.logged: both transitions appended lines naming the requestId, sealed under the system key, which
         // survives so the audit trail itself never orphans. The lines arrive through the outbox, so they are awaited.
-        const systemLines = await world.waitFor(
+        const systemLines = await world.waitUntil(
             "the two system erasure lines of the request",
-            async () => {
-                const lines: Array<AuditLineRow> = await world.db.primary.query(AUDIT_ERASURE_LINES_OF_REQUEST, [requestId])
-                return lines.length === 2 ? lines : null
-            },
+            (): Promise<Array<AuditLineRow>> => world.db.primary.query(AUDIT_ERASURE_LINES_OF_REQUEST, [requestId]),
+            (lines) => lines.length === 2,
             { timeoutMs: 60_000, intervalMs: 500 },
         )
         expect(systemLines.map((line) => line.action)).toEqual(["audit.erasure.requested", "audit.erasure.completed"])
@@ -138,13 +139,10 @@ describe("erasure journey (e2e)", () => {
         expect(systemKey).toEqual([{ person_id: "system", key_id: systemKeyId }])
 
         // The control is untouched: the control person still reads their own line and never the erased subject line.
-        const controlTargets = await world.waitFor(
+        const controlTargets = await world.waitUntil(
             "the control own task line readable through the door",
-            async () => {
-                const observed = await asControl.graphql<ExportMyDataData>("exportMyData")
-                const targets = (observed.data?.exportMyData ?? []).map((line) => line.target)
-                return targets.includes(controlTaskId) ? targets : null
-            },
+            async () => (await exportedLines(asControl)).map((line) => line.target),
+            (targets) => targets.includes(controlTaskId),
             { timeoutMs: 60_000, intervalMs: 1_000 },
         )
         expect(controlTargets).not.toContain(subjectTaskId)

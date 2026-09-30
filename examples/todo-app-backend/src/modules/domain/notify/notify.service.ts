@@ -15,10 +15,11 @@ import type {
     AdmitParams,
     AdmittedNotification,
     DeliveryVerdict,
-    DispatchedGroup,
     DispatchPlan,
+    DispatchedGroup,
     NotificationView,
     PrepareDispatchParams,
+    PreparedDispatchResult,
     SettleDispatchParams,
 } from "./notify.contracts"
 import { toNotifyDispatchMessage } from "./notify.mapper"
@@ -90,7 +91,7 @@ export class NotifyService {
      * closed yet); then marks the queued attempts of the group sending and renders the one message they share. Answers
      * null when there is nothing to send.
      */
-    async prepareDispatch(params: PrepareDispatchParams): Promise<DispatchPlan | null> {
+    async prepareDispatch(params: PrepareDispatchParams): Promise<PreparedDispatchResult> {
         const { manager, groupId, at } = params
         if (params.kind === "flush") {
             const flushed = await this.digest.flush({ manager, windowId: groupId, at })

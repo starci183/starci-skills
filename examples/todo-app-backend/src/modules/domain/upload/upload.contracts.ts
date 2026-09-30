@@ -146,3 +146,6 @@ export interface VerifyUploadTokenParams {
     /** The current instant, in epoch milliseconds. */
     readonly nowMs: number
 }
+
+/** The answer of an upload lookup: the upload, or null when there is none with that id. */
+export type UploadLookupResult = UploadView | null

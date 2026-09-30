@@ -16,7 +16,14 @@ const task = (id: string, complete: boolean): TaskView => ({
     completedAt: complete ? AT : null,
 })
 
-const handlerFor = (plan: PlanDefinition, owned: ReadonlyArray<TaskView>): { handler: PlanUsageHandler; subscriptions: SubscriptionService; tasks: TaskService } => {
+/** What handlerFor wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: PlanUsageHandler
+    subscriptions: SubscriptionService
+    tasks: TaskService
+}
+
+const handlerFor = (plan: PlanDefinition, owned: ReadonlyArray<TaskView>): Built => {
     const subscriptions = mock<SubscriptionService>({ readEffectivePlan: jest.fn().mockResolvedValue(plan) })
     const tasks = mock<TaskService>({ listOwnedBy: jest.fn().mockResolvedValue(owned) })
     return { handler: new PlanUsageHandler(mock<Logger>(), subscriptions, tasks), subscriptions, tasks }

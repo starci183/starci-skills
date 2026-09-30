@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common"
+import { DomainError } from "@modules/platform/errors"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import type { ProbeReport, ProbeState } from "./probes.contracts"
@@ -9,7 +10,7 @@ import type { Probe } from "./probes.port"
 
 @Injectable()
 /** Runs every probe of the app and reports which dependency answered; a failing probe is logged, never rethrown. */
-export class ProbeChecker {
+export class ProbeCheckerService {
     constructor(
         @InjectProbesOptions() private readonly options: ProbesOptions,
         @InjectProbes() private readonly probes: ReadonlyArray<Probe>,
@@ -31,7 +32,11 @@ export class ProbeChecker {
             await probe.check()
             return "ok"
         } catch (error) {
-            this.logger.warn(ProbesLogEvent.ProbeFailed, { dependency: probe.name, cause: String(error) })
+            this.logger.warn(ProbesLogEvent.ProbeFailed, {
+                dependency: probe.name,
+                code: error instanceof DomainError ? error.code : undefined,
+                cause: String(error),
+            })
             return "unreachable"
         }
     }

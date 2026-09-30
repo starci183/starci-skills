@@ -5,49 +5,49 @@
  * `errors[].extensions.code`. A spec names an operation by its key here.
  */
 export const TODO_OPERATIONS = {
-    signIn: "mutation SignIn($input: SignInInput!) { signIn(request: $input) { sessionToken personId } }",
-    signOut: "mutation SignOut($input: SignOutInput!) { signOut(request: $input) { signedOut } }",
-    createTask: "mutation CreateTask($input: CreateTaskInput!) { createTask(request: $input) { taskId title } }",
+    signIn: "mutation SignIn($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }",
+    signOut: "mutation SignOut($input: SignOutInput!) { signOut(input: $input) { signedOut } }",
+    createTask: "mutation CreateTask($input: CreateTaskInput!) { createTask(input: $input) { taskId title } }",
     tasks: "query { tasks { taskId title complete } }",
     taskCounts: "query { taskCounts { open complete } }",
-    completeTask: "mutation CompleteTask($input: CompleteTaskInput!) { completeTask(request: $input) { taskId complete } }",
-    reopenTask: "mutation ReopenTask($input: ReopenTaskInput!) { reopenTask(request: $input) { taskId complete } }",
-    deleteTask: "mutation DeleteTask($input: DeleteTaskInput!) { deleteTask(request: $input) { deleted } }",
-    invite: "mutation Invite($input: InviteInput!) { invite(request: $input) { invitationId taskId email role status } }",
+    completeTask: "mutation CompleteTask($input: CompleteTaskInput!) { completeTask(input: $input) { taskId complete } }",
+    reopenTask: "mutation ReopenTask($input: ReopenTaskInput!) { reopenTask(input: $input) { taskId complete } }",
+    deleteTask: "mutation DeleteTask($input: DeleteTaskInput!) { deleteTask(input: $input) { deleted } }",
+    invite: "mutation Invite($input: InviteInput!) { invite(input: $input) { invitationId taskId email role status } }",
     acceptInvitation:
-        "mutation Accept($input: AcceptInvitationInput!) { acceptInvitation(request: $input) { invitationId role status } }",
+        "mutation Accept($input: AcceptInvitationInput!) { acceptInvitation(input: $input) { invitationId role status } }",
     revokeCollaborator:
-        "mutation Revoke($input: RevokeCollaboratorInput!) { revokeCollaborator(request: $input) { invitationId status } }",
+        "mutation Revoke($input: RevokeCollaboratorInput!) { revokeCollaborator(input: $input) { invitationId status } }",
     collaborators:
-        "query Collaborators($input: ListCollaboratorsInput!) { collaborators(request: $input) { invitationId email role status } }",
+        "query Collaborators($input: ListCollaboratorsInput!) { collaborators(input: $input) { invitationId email role status } }",
     auditLog: "query { auditLog { at action target } }",
     exportMyData: "query { exportMyData { at action target } }",
     requestErasure: "mutation { requestErasure { requestId state } }",
     completeErasure:
-        "mutation CompleteErasure($input: CompleteErasureInput!) { completeErasure(request: $input) { requestId state } }",
+        "mutation CompleteErasure($input: CompleteErasureInput!) { completeErasure(input: $input) { requestId state } }",
     notificationPreferences:
-        "query Prefs($input: NotificationPreferencesInput) { notificationPreferences(request: $input) { channel unsubscribed digestWindowMinutes } }",
+        "query Prefs($input: NotificationPreferencesInput) { notificationPreferences(input: $input) { channel unsubscribed digestWindowMinutes } }",
     updateNotificationPreferences:
-        "mutation UpdatePrefs($input: UpdateNotificationPreferencesInput!) { updateNotificationPreferences(request: $input) { channel unsubscribed digestWindowMinutes } }",
-    unsubscribe: "mutation Unsubscribe($input: UnsubscribeInput!) { unsubscribe(request: $input) { channel unsubscribed } }",
+        "mutation UpdatePrefs($input: UpdateNotificationPreferencesInput!) { updateNotificationPreferences(input: $input) { channel unsubscribed digestWindowMinutes } }",
+    unsubscribe: "mutation Unsubscribe($input: UnsubscribeInput!) { unsubscribe(input: $input) { channel unsubscribed } }",
     planUsage: "query { planUsage { plan cap activeCount } }",
     upgradePlan: "mutation { upgradePlan { subscriptionId paymentIntentId checkoutUrl status } }",
     downgradePlan: "mutation { downgradePlan { subscriptionId plan status } }",
     makeRecurring:
-        "mutation MakeRecurring($input: MakeRecurringInput!) { makeRecurring(request: $input) { ruleId title frequency timeZone time startDate } }",
+        "mutation MakeRecurring($input: MakeRecurringInput!) { makeRecurring(input: $input) { ruleId title frequency timeZone time startDate } }",
     editRecurrence:
-        "mutation EditRecurrence($input: EditRecurrenceInput!) { editRecurrence(request: $input) { ruleId frequency timeZone time } }",
+        "mutation EditRecurrence($input: EditRecurrenceInput!) { editRecurrence(input: $input) { ruleId frequency timeZone time } }",
     endRecurrence:
-        "mutation EndRecurrence($input: EndRecurrenceInput!) { endRecurrence(request: $input) { ruleId endedAt orphanedCount } }",
+        "mutation EndRecurrence($input: EndRecurrenceInput!) { endRecurrence(input: $input) { ruleId endedAt orphanedCount } }",
     upcomingOccurrences:
-        "query Upcoming($input: UpcomingOccurrencesInput!) { upcomingOccurrences(request: $input) { ruleId materialised { occurrenceId localDate dueAtUtc status } previewDates } }",
+        "query Upcoming($input: UpcomingOccurrencesInput!) { upcomingOccurrences(input: $input) { ruleId materialised { occurrenceId localDate dueAtUtc status } previewDates } }",
     createUploadIntent:
-        "mutation CreateUploadIntent($input: CreateUploadIntentInput!) { createUploadIntent(request: $input) { uploadId method url headers { name value } expiresAt } }",
+        "mutation CreateUploadIntent($input: CreateUploadIntentInput!) { createUploadIntent(input: $input) { uploadId method url headers { name value } expiresAt } }",
     attachUpload:
-        "mutation AttachUpload($input: AttachUploadInput!) { attachUpload(request: $input) { uploadId taskId filename mime sizeBytes status createdAt } }",
+        "mutation AttachUpload($input: AttachUploadInput!) { attachUpload(input: $input) { uploadId taskId filename mime sizeBytes status createdAt } }",
     taskUploads:
-        "query TaskUploads($input: TaskUploadsInput!) { taskUploads(request: $input) { uploadId taskId filename mime sizeBytes status createdAt } }",
-    deleteUpload: "mutation DeleteUpload($input: DeleteUploadInput!) { deleteUpload(request: $input) { uploadId deleted } }",
+        "query TaskUploads($input: TaskUploadsInput!) { taskUploads(input: $input) { uploadId taskId filename mime sizeBytes status createdAt } }",
+    deleteUpload: "mutation DeleteUpload($input: DeleteUploadInput!) { deleteUpload(input: $input) { uploadId deleted } }",
 } as const
 
 /** The name of one operation of the todo api. */

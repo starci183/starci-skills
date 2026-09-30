@@ -35,14 +35,17 @@ const summary = {
 }
 const command = new CreateDirectUploadCommand({ request: { filename: "note.txt", mime: "text/plain", content }, principal })
 
-const build = (
-    created: unknown = { kind: "ok", value: pending },
-): {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
     handler: CreateDirectUploadHandler
     uploads: UploadService
     commandBus: CommandBus
     inner: ReturnType<typeof mockEntityManager>
-} => {
+}
+
+const build = (
+    created: unknown = { kind: "ok", value: pending },
+): Built => {
     const inner = mockEntityManager()
     const uploads = mock<UploadService>({
         createPending: jest.fn().mockResolvedValue(created),

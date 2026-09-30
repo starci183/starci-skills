@@ -12,6 +12,6 @@ export class EndRecurrenceType {
     endedAt!: string
 
     /** How many occurrences this call orphaned. */
-    @Field(() => Int, { description: "How many already materialised occurrences this call orphaned." })
+    @Field(() => Int)
     orphanedCount!: number
 }

@@ -1,9 +1,8 @@
 import { GraphQLError } from "graphql"
 import type { GraphQLFormattedError } from "graphql"
-import type { ErrorDescription } from "./errors.contracts"
-import type { ErrorsService } from "./errors.service"
+import type { ErrorDescription, ErrorDescriber } from "./errors.contracts"
 
-const describeGraphqlFailure = (errors: ErrorsService, error: unknown): ErrorDescription => {
+const describeGraphqlFailure = (errors: ErrorDescriber, error: unknown): ErrorDescription => {
     if (error instanceof GraphQLError) {
         return error.originalError ? errors.describe(error.originalError) : errors.describeInvalidOperation()
     }
@@ -16,7 +15,7 @@ const describeGraphqlFailure = (errors: ErrorsService, error: unknown): ErrorDes
  * response plugin localizes it.
  */
 export const formatGraphqlError = (
-    errors: ErrorsService,
+    errors: ErrorDescriber,
     formatted: GraphQLFormattedError,
     error: unknown,
 ): GraphQLFormattedError => {

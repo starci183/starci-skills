@@ -9,7 +9,7 @@ import { ACQUIRE_LEASE, RELEASE_LEASE } from "./persistence/lease.sql"
 
 @Injectable()
 /** The Lease adapter over the `job_leases` table: one atomic upsert grants or refuses. */
-export class PostgresLease implements Lease {
+export class PostgresLeaseService implements Lease {
     constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
 
     /** Grants the lease when it is free, expired, or already held by the caller. */

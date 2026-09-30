@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common"
+import type { GraphQLFormattedError } from "graphql"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { InjectMessageCatalog } from "@modules/platform/i18n"
@@ -6,7 +7,8 @@ import type { Locale, MessageCatalog } from "@modules/platform/i18n"
 import { DomainError } from "./domain.error"
 import { InjectErrorsOptions } from "./errors.decorators"
 import type { ErrorDescription, ErrorKind, ErrorParams } from "./errors.contracts"
-import { ERRORS_ERROR_KINDS, ErrorsErrorCode } from "./errors.error"
+import { ERRORS_ERROR_KINDS, ErrorsErrorCode } from "./errors/errors.error"
+import { formatGraphqlError } from "./graphql-error.mapper"
 import { ErrorsLogEvent } from "./errors.log-events"
 import type { ErrorsOptions } from "./errors.options"
 import { HTTP_STATUS_BY_KIND } from "./http-status.policy"
@@ -33,6 +35,10 @@ export class ErrorsService {
         this.logger.error(ErrorsLogEvent.Unhandled, error)
         return this.build(ErrorsErrorCode.Internal, "internal", {})
     }
+
+    /** The one GraphQL error formatter, bound to this service so Apollo can call it detached: resolver failures keep their code, everything else is masked. */
+    readonly formatError = (formatted: GraphQLFormattedError, error: unknown): GraphQLFormattedError =>
+        formatGraphqlError(this, formatted, error)
 
     /** Describes a malformed operation that failed before any capability ran (syntax or schema validation). */
     describeInvalidOperation(): ErrorDescription {

@@ -34,7 +34,7 @@ describe("task lifecycle (e2e)", () => {
             expect(observed.errors).toBeNull()
             return observed.data?.taskCounts
         }
-        const rowOf = async (taskId: string): Promise<Array<TaskRow>> => world.db.primary.query(TASK_BY_ID, [taskId])
+        const rowOf = (taskId: string): Promise<Array<TaskRow>> => world.db.primary.query(TASK_BY_ID, [taskId])
         const sessionCount = async (): Promise<number> => {
             const [row]: Array<CountRow> = await world.db.primary.query(SESSION_COUNT_BY_TOKEN, [person.sessionToken])
             return row?.count ?? 0

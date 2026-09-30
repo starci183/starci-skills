@@ -1,4 +1,4 @@
-import { ConfigError, EnvSource } from "@modules/platform/config"
+import { EnvSource } from "@modules/platform/config"
 import { parseNotifySmtpConfig } from "./notify-smtp.config"
 
 const base = { SMTP_HOST: "smtp.test", SMTP_PORT: "2525", SMTP_FROM: "notify@todo.test" }
@@ -22,10 +22,10 @@ describe("parseNotifySmtpConfig", () => {
     })
 
     it("refuses a missing host instead of falling back to one", () => {
-        expect(() => parseNotifySmtpConfig(new EnvSource({ SMTP_PORT: "25", SMTP_FROM: "a@b.c" }))).toThrow(ConfigError)
+        expect(() => parseNotifySmtpConfig(new EnvSource({ SMTP_PORT: "25", SMTP_FROM: "a@b.c" }))).toThrow("CONFIG_KEY_MISSING")
     })
 
     it("refuses a port that is not a number", () => {
-        expect(() => parseNotifySmtpConfig(new EnvSource({ ...base, SMTP_PORT: "submission" }))).toThrow(ConfigError)
+        expect(() => parseNotifySmtpConfig(new EnvSource({ ...base, SMTP_PORT: "submission" }))).toThrow("CONFIG_KEY_INVALID")
     })
 })

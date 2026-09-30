@@ -1,13 +1,4 @@
-import { OccurrenceEntity } from "./persistence/entities/occurrence.entity"
-import { RuleEntity } from "./persistence/entities/rule.entity"
-import { CreateRecurTables1758246000001 } from "./persistence/migrations/1758246000001-create-recur-tables"
-
-/** The entities of the recur capability, for the connection that holds them. */
-export const recurEntities = [RuleEntity, OccurrenceEntity]
-
-/** The migrations of the recur capability, in the order they run. */
-export const recurMigrations = [CreateRecurTables1758246000001]
-
+export { recurEntities, recurMigrations } from "./persistence/connection"
 export { addDays, datesForRule } from "./calendar.policy"
 export { RECUR_ERROR_KINDS, RecurError, RecurErrorCode } from "./errors/recur.error"
 export { GeneratorService } from "./generator.service"

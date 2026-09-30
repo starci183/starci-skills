@@ -1,25 +1,17 @@
 import { mock } from "@starci/jest-preset/mock"
 import type { Logger } from "@modules/platform/logging"
 import type { MessageCatalog } from "@modules/platform/i18n"
-import { DomainError } from "./domain.error"
-import { ErrorsErrorCode } from "./errors.error"
+import { ErrorsError, ErrorsErrorCode } from "./errors/errors.error"
 import { ErrorsLogEvent } from "./errors.log-events"
 import { ErrorsService } from "./errors.service"
 
-enum SampleErrorCode {
-    Missing = "SAMPLE_MISSING",
-    Unlisted = "SAMPLE_UNLISTED",
-}
-
-class SampleError extends DomainError<SampleErrorCode> {}
-
 const build = (logger: Logger = mock<Logger>(), catalog: MessageCatalog = mock<MessageCatalog>()): ErrorsService =>
-    new ErrorsService({ kinds: [{ [SampleErrorCode.Missing]: "not-found" }] }, catalog, logger)
+    new ErrorsService({ kinds: [] }, catalog, logger)
 
 describe("ErrorsService", () => {
     it("keeps the code, params and kind of a declared capability error", () => {
-        const description = build().describe(new SampleError({ code: SampleErrorCode.Missing, params: { id: "a" } }))
-        expect(description).toEqual({ code: "SAMPLE_MISSING", kind: "not-found", status: 404, params: { id: "a" } })
+        const description = build().describe(new ErrorsError({ code: ErrorsErrorCode.OperationInvalid, params: { id: "a" } }))
+        expect(description).toEqual({ code: "ERRORS_OPERATION_INVALID", kind: "invalid", status: 400, params: { id: "a" } })
     })
 
     it("masks an undeclared failure as internal and logs the cause", () => {
@@ -30,13 +22,14 @@ describe("ErrorsService", () => {
         expect(logger.error).toHaveBeenCalledWith(ErrorsLogEvent.Unhandled, cause)
     })
 
-    it("masks a capability error whose code no composed table declares", () => {
-        const description = build().describe(new SampleError({ code: SampleErrorCode.Unlisted }))
-        expect(description.code).toBe(ErrorsErrorCode.Internal)
-    })
-
     it("describes a malformed operation as invalid", () => {
         expect(build().describeInvalidOperation()).toMatchObject({ code: ErrorsErrorCode.OperationInvalid, status: 400 })
+    })
+
+    it("formats a GraphQL failure detached from the service, masking what no capability declared", () => {
+        const { formatError } = build()
+        const formatted = formatError({ message: ErrorsErrorCode.Internal }, new TypeError("secret detail"))
+        expect(formatted.extensions).toMatchObject({ code: ErrorsErrorCode.Internal, kind: "internal" })
     })
 
     it("resolves the display text through the catalog under the errors key", () => {

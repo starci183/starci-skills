@@ -18,7 +18,7 @@ import { BURY_MESSAGE, CLAIM_DUE_MESSAGES, COMPLETE_MESSAGE, INSERT_MESSAGE, RET
 
 @Injectable()
 /** The Outbox adapter over the outbox table: a plain insert in the caller transaction, a SKIP LOCKED claim for workers. */
-export class PostgresOutbox implements Outbox {
+export class PostgresOutboxService implements Outbox {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         @InjectClock() private readonly clock: Clock,

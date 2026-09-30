@@ -25,3 +25,6 @@ export interface ReleaseLeaseParams {
     /** The grant to release; a grant that is no longer the current one releases nothing. */
     readonly grant: LeaseGrant
 }
+
+/** The answer of an acquire: the grant, or null when another live holder has the lease. */
+export type LeaseAcquireResult = LeaseGrant | null

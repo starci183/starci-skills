@@ -15,10 +15,17 @@ const options: SepayOptions = {
 }
 const AUTHORIZED = "Bearer hook-secret"
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    controller: SepayWebhookController
+    commandBus: CommandBus
+    inbox: Inbox
+}
+
 const build = (
     execute: jest.Mock = jest.fn().mockResolvedValue({ kind: "ok", value: { applied: true, subscriptionStatus: "active" } }),
     claim: jest.Mock = jest.fn().mockResolvedValue(true),
-): { controller: SepayWebhookController; commandBus: CommandBus; inbox: Inbox } => {
+): Built => {
     const commandBus = mock<CommandBus>({ execute })
     const inbox = mock<Inbox>({ claim, release: jest.fn().mockResolvedValue(undefined) })
     return { controller: new SepayWebhookController(commandBus, inbox, options), commandBus, inbox }

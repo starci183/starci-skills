@@ -1,5 +1,4 @@
 import type { MigrationInterface, QueryRunner } from "typeorm"
-import { CREATE_INBOX_CLAIMS_TABLE, DROP_INBOX_CLAIMS_TABLE } from "../schema.sql"
 
 /** Creates the table the inbox claims events in. */
 export class CreateInboxClaims1758400000001 implements MigrationInterface {
@@ -7,11 +6,16 @@ export class CreateInboxClaims1758400000001 implements MigrationInterface {
 
     /** Creates the claims table. */
     async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(CREATE_INBOX_CLAIMS_TABLE)
+        await queryRunner.query(`CREATE TABLE inbox_claims (
+    source varchar(200) NOT NULL,
+    event_id varchar(200) NOT NULL,
+    claimed_at timestamptz NOT NULL,
+    PRIMARY KEY (source, event_id)
+)`)
     }
 
     /** Drops the claims table. */
     async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(DROP_INBOX_CLAIMS_TABLE)
+        await queryRunner.query(`DROP TABLE inbox_claims`)
     }
 }

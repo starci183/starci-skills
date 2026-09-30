@@ -16,13 +16,10 @@ export class CompleteOccurrenceResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Completes an occurrence of a rule of the caller and the task it spawned. */
-    @Mutation(() => CompleteOccurrenceType, {
-        name: "completeOccurrence",
-        description: "Complete an occurrence of a recurrence rule owned by the caller, and the task it spawned.",
-    })
+    @Mutation(() => CompleteOccurrenceType, { name: "completeOccurrence" })
     async completeOccurrence(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: CompleteOccurrenceInput,
+        @Args("input") input: CompleteOccurrenceInput,
     ): Promise<CompleteOccurrenceType> {
         const outcome = await this.commandBus.execute(
             new CompleteOccurrenceCommand({ request: toCompleteOccurrenceRequest(input), principal }),

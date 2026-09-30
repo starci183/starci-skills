@@ -1,135 +1,228 @@
 /** The response shapes the public doors answer with, as the specs read them (output types are named `<Action>Type`). */
 
-/** The signIn mutation data. */
-export interface SignInData {
-    signIn: { sessionToken: string; personId: string }
+/** What the `signIn` door answers with, before the data envelope wraps it. */
+export interface SignInAnswer {
+    sessionToken: string
+    personId: string
 }
 
-/** The signOut mutation data. */
+/** The `data` member of a `signIn` mutation response, as a spec reads it. */
+export interface SignInData {
+    signIn: SignInAnswer
+}
+
+/** What the `signOut` door answers with, before the data envelope wraps it. */
+export interface SignOutAnswer {
+    signedOut: boolean
+}
+
+/** The `data` member of a `signOut` mutation response, as a spec reads it. */
 export interface SignOutData {
-    signOut: { signedOut: boolean }
+    signOut: SignOutAnswer
 }
 
 /** One task as the tasks query answers it. */
-export interface TaskView {
+export interface TaskEntry {
     taskId: string
     title: string
     complete: boolean
 }
 
-/** The createTask mutation data. */
+/** What the `createTask` door answers with, before the data envelope wraps it. */
+export interface CreateTaskAnswer {
+    taskId: string
+    title: string
+}
+
+/** The `data` member of a `createTask` mutation response, as a spec reads it. */
 export interface CreateTaskData {
-    createTask: { taskId: string; title: string }
+    createTask: CreateTaskAnswer
 }
 
-/** The tasks query data. */
+/** The `data` member of a `tasks` query response, as a spec reads it. */
 export interface TasksData {
-    tasks: Array<TaskView>
+    tasks: Array<TaskEntry>
 }
 
-/** The taskCounts query data. */
+/** What the `taskCounts` door answers with, before the data envelope wraps it. */
+export interface TaskCountsAnswer {
+    open: number
+    complete: number
+}
+
+/** The `data` member of a `taskCounts` query response, as a spec reads it. */
 export interface TaskCountsData {
-    taskCounts: { open: number; complete: number }
+    taskCounts: TaskCountsAnswer
 }
 
-/** The completeTask mutation data. */
+/** The completeTask and reopenTask answer. */
+export interface TaskCompletionAnswer {
+    taskId: string
+    complete: boolean
+}
+
+/** The `data` member of a `completeTask` mutation response, as a spec reads it. */
 export interface CompleteTaskData {
-    completeTask: { taskId: string; complete: boolean }
+    completeTask: TaskCompletionAnswer
 }
 
-/** The reopenTask mutation data. */
+/** The `data` member of a `reopenTask` mutation response, as a spec reads it. */
 export interface ReopenTaskData {
-    reopenTask: { taskId: string; complete: boolean }
+    reopenTask: TaskCompletionAnswer
 }
 
-/** The deleteTask mutation data. */
+/** What the `deleteTask` door answers with, before the data envelope wraps it. */
+export interface DeleteTaskAnswer {
+    deleted: boolean
+}
+
+/** The `data` member of a `deleteTask` mutation response, as a spec reads it. */
 export interface DeleteTaskData {
-    deleteTask: { deleted: boolean }
+    deleteTask: DeleteTaskAnswer
 }
 
 /** One invitation as the invite, acceptInvitation, revokeCollaborator and collaborators doors answer with it. */
-export interface InvitationView {
+export interface InvitationEntry {
     invitationId: string
     email: string
     role: string
     status: string
 }
 
-/** The invite mutation data. */
+/** The invite answer: the invitation and the task it is for. */
+export interface InviteAnswer extends InvitationEntry {
+    taskId: string
+}
+
+/** The `data` member of a `invite` mutation response, as a spec reads it. */
 export interface InviteData {
-    invite: InvitationView & { taskId: string }
+    invite: InviteAnswer
 }
 
-/** The acceptInvitation mutation data. */
+/** What the `acceptInvitation` door answers with, before the data envelope wraps it. */
+export interface AcceptInvitationAnswer {
+    invitationId: string
+    role: string
+    status: string
+}
+
+/** The `data` member of a `acceptInvitation` mutation response, as a spec reads it. */
 export interface AcceptInvitationData {
-    acceptInvitation: { invitationId: string; role: string; status: string }
+    acceptInvitation: AcceptInvitationAnswer
 }
 
-/** The revokeCollaborator mutation data. */
+/** What the `revokeCollaborator` door answers with, before the data envelope wraps it. */
+export interface RevokeCollaboratorAnswer {
+    invitationId: string
+    status: string
+}
+
+/** The `data` member of a `revokeCollaborator` mutation response, as a spec reads it. */
 export interface RevokeCollaboratorData {
-    revokeCollaborator: { invitationId: string; status: string }
+    revokeCollaborator: RevokeCollaboratorAnswer
 }
 
-/** The collaborators query data. */
+/** The `data` member of a `collaborators` query response, as a spec reads it. */
 export interface CollaboratorsData {
-    collaborators: Array<InvitationView>
+    collaborators: Array<InvitationEntry>
 }
 
 /** One audit line as the auditLog and exportMyData doors answer with it: never an actor, a key id or a chain position. */
-export interface AuditLineView {
+export interface AuditLineEntry {
     at: string
     action: string
     target: string | null
 }
 
-/** The auditLog query data. */
+/** The `data` member of a `auditLog` query response, as a spec reads it. */
 export interface AuditLogData {
-    auditLog: Array<AuditLineView>
+    auditLog: Array<AuditLineEntry>
 }
 
-/** The exportMyData query data. */
+/** The `data` member of a `exportMyData` query response, as a spec reads it. */
 export interface ExportMyDataData {
-    exportMyData: Array<AuditLineView>
+    exportMyData: Array<AuditLineEntry>
 }
 
-/** The requestErasure mutation data. */
+/** The requestErasure and completeErasure answer. */
+export interface ErasureAnswer {
+    requestId: string
+    state: string
+}
+
+/** The `data` member of a `requestErasure` mutation response, as a spec reads it. */
 export interface RequestErasureData {
-    requestErasure: { requestId: string; state: string }
+    requestErasure: ErasureAnswer
 }
 
-/** The completeErasure mutation data. */
+/** The `data` member of a `completeErasure` mutation response, as a spec reads it. */
 export interface CompleteErasureData {
-    completeErasure: { requestId: string; state: string }
+    completeErasure: ErasureAnswer
 }
 
-/** The notificationPreferences query data. */
+/** The notification preferences answer of the query and of the update mutation. */
+export interface NotificationPreferencesAnswer {
+    channel: string
+    unsubscribed: boolean
+    digestWindowMinutes: number | null
+}
+
+/** The `data` member of a `notificationPreferences` query response, as a spec reads it. */
 export interface NotificationPreferencesData {
-    notificationPreferences: { channel: string; unsubscribed: boolean; digestWindowMinutes: number | null }
+    notificationPreferences: NotificationPreferencesAnswer
 }
 
-/** The updateNotificationPreferences mutation data. */
+/** The `data` member of a `updateNotificationPreferences` mutation response, as a spec reads it. */
 export interface UpdateNotificationPreferencesData {
-    updateNotificationPreferences: { channel: string; unsubscribed: boolean; digestWindowMinutes: number | null }
+    updateNotificationPreferences: NotificationPreferencesAnswer
 }
 
-/** The unsubscribe mutation data. */
+/** What the `unsubscribe` door answers with, before the data envelope wraps it. */
+export interface UnsubscribeAnswer {
+    channel: string
+    unsubscribed: boolean
+}
+
+/** The `data` member of a `unsubscribe` mutation response, as a spec reads it. */
 export interface UnsubscribeData {
-    unsubscribe: { channel: string; unsubscribed: boolean }
+    unsubscribe: UnsubscribeAnswer
 }
 
-/** The planUsage query data. */
+/** What the `planUsage` door answers with, before the data envelope wraps it. */
+export interface PlanUsageAnswer {
+    plan: string
+    cap: number | null
+    activeCount: number
+}
+
+/** The `data` member of a `planUsage` query response, as a spec reads it. */
 export interface PlanUsageData {
-    planUsage: { plan: string; cap: number | null; activeCount: number }
+    planUsage: PlanUsageAnswer
 }
 
-/** The upgradePlan mutation data. */
+/** What the `upgradePlan` door answers with, before the data envelope wraps it. */
+export interface UpgradePlanAnswer {
+    subscriptionId: string
+    paymentIntentId: string
+    checkoutUrl: string
+    status: string
+}
+
+/** The `data` member of a `upgradePlan` mutation response, as a spec reads it. */
 export interface UpgradePlanData {
-    upgradePlan: { subscriptionId: string; paymentIntentId: string; checkoutUrl: string; status: string }
+    upgradePlan: UpgradePlanAnswer
 }
 
-/** The downgradePlan mutation data. */
+/** What the `downgradePlan` door answers with, before the data envelope wraps it. */
+export interface DowngradePlanAnswer {
+    subscriptionId: string
+    plan: string
+    status: string
+}
+
+/** The `data` member of a `downgradePlan` mutation response, as a spec reads it. */
 export interface DowngradePlanData {
-    downgradePlan: { subscriptionId: string; plan: string; status: string }
+    downgradePlan: DowngradePlanAnswer
 }
 
 /** The answer of the SePay webhook door: ignored, or what the confirmation changed. */
@@ -139,36 +232,68 @@ export interface SepayWebhookBody {
     subscriptionStatus?: string
 }
 
-/** The makeRecurring mutation data. */
+/** What the `makeRecurring` door answers with, before the data envelope wraps it. */
+export interface MakeRecurringAnswer {
+    ruleId: string
+    title: string
+    frequency: string
+    timeZone: string
+    time: string
+    startDate: string
+}
+
+/** The `data` member of a `makeRecurring` mutation response, as a spec reads it. */
 export interface MakeRecurringData {
-    makeRecurring: { ruleId: string; title: string; frequency: string; timeZone: string; time: string; startDate: string }
+    makeRecurring: MakeRecurringAnswer
 }
 
-/** The editRecurrence mutation data. */
+/** What the `editRecurrence` door answers with, before the data envelope wraps it. */
+export interface EditRecurrenceAnswer {
+    ruleId: string
+    frequency: string
+    timeZone: string
+    time: string
+}
+
+/** The `data` member of a `editRecurrence` mutation response, as a spec reads it. */
 export interface EditRecurrenceData {
-    editRecurrence: { ruleId: string; frequency: string; timeZone: string; time: string }
+    editRecurrence: EditRecurrenceAnswer
 }
 
-/** The endRecurrence mutation data. */
+/** What the `endRecurrence` door answers with, before the data envelope wraps it. */
+export interface EndRecurrenceAnswer {
+    ruleId: string
+    endedAt: string
+    orphanedCount: number
+}
+
+/** The `data` member of a `endRecurrence` mutation response, as a spec reads it. */
 export interface EndRecurrenceData {
-    endRecurrence: { ruleId: string; endedAt: string; orphanedCount: number }
+    endRecurrence: EndRecurrenceAnswer
 }
 
 /** One materialised occurrence of a rule. */
-export interface OccurrenceView {
+export interface OccurrenceEntry {
     occurrenceId: string
     localDate: string
     dueAtUtc: string
     status: string
 }
 
-/** The upcomingOccurrences query data. */
+/** What the `upcomingOccurrences` door answers with, before the data envelope wraps it. */
+export interface UpcomingOccurrencesAnswer {
+    ruleId: string
+    materialised: Array<OccurrenceEntry>
+    previewDates: Array<string>
+}
+
+/** The `data` member of a `upcomingOccurrences` query response, as a spec reads it. */
 export interface UpcomingOccurrencesData {
-    upcomingOccurrences: { ruleId: string; materialised: Array<OccurrenceView>; previewDates: Array<string> }
+    upcomingOccurrences: UpcomingOccurrencesAnswer
 }
 
 /** One upload as the GraphQL control plane and the REST byte plane answer with it. */
-export interface UploadView {
+export interface UploadEntry {
     uploadId: string
     taskId: string | null
     filename: string
@@ -178,30 +303,45 @@ export interface UploadView {
     createdAt: string
 }
 
-/** The createUploadIntent mutation data: a presigned PUT the caller fulfils on the byte plane. */
+/** One header of a presigned request. */
+export interface UploadHeaderEntry {
+    name: string
+    value: string
+}
+
+/** The createUploadIntent answer: a presigned PUT the caller fulfils on the byte plane. */
+export interface CreateUploadIntentAnswer {
+    uploadId: string
+    method: string
+    url: string
+    headers: Array<UploadHeaderEntry>
+    expiresAt: string
+}
+
+/** The `data` member of a `createUploadIntent` mutation response, as a spec reads it. */
 export interface CreateUploadIntentData {
-    createUploadIntent: {
-        uploadId: string
-        method: string
-        url: string
-        headers: Array<{ name: string; value: string }>
-        expiresAt: string
-    }
+    createUploadIntent: CreateUploadIntentAnswer
 }
 
-/** The attachUpload mutation data. */
+/** The `data` member of a `attachUpload` mutation response, as a spec reads it. */
 export interface AttachUploadData {
-    attachUpload: UploadView
+    attachUpload: UploadEntry
 }
 
-/** The taskUploads query data. */
+/** The `data` member of a `taskUploads` query response, as a spec reads it. */
 export interface TaskUploadsData {
-    taskUploads: Array<UploadView>
+    taskUploads: Array<UploadEntry>
 }
 
-/** The deleteUpload mutation data. */
+/** What the `deleteUpload` door answers with, before the data envelope wraps it. */
+export interface DeleteUploadAnswer {
+    uploadId: string
+    deleted: boolean
+}
+
+/** The `data` member of a `deleteUpload` mutation response, as a spec reads it. */
 export interface DeleteUploadData {
-    deleteUpload: { uploadId: string; deleted: boolean }
+    deleteUpload: DeleteUploadAnswer
 }
 
 /** The body a REST door answers a refusal with: the declared code, the kind and the localized message. */

@@ -24,14 +24,17 @@ const upload: UploadView = {
 const task: TaskView = { id: "t1", owner: "owner-1", title: "Write", complete: false, completedAt: null }
 const command = new AttachUploadCommand({ request: { uploadId: "u1", taskId: "t1" }, principal })
 
-const build = (
-    parts: { authorized?: unknown; ready?: unknown; task?: TaskView | null } = {},
-): {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
     handler: AttachUploadHandler
     uploads: UploadService
     tasks: TaskService
     inner: ReturnType<typeof mockEntityManager>
-} => {
+}
+
+const build = (
+    parts: { authorized?: unknown; ready?: unknown; task?: TaskView | null } = {},
+): Built => {
     const inner = mockEntityManager()
     const uploads = mock<UploadService>({
         authorize: jest.fn().mockResolvedValue(parts.authorized ?? { kind: "ok", value: upload }),

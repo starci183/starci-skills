@@ -53,13 +53,10 @@ describe("export-and-log (e2e)", () => {
         await api.graphql<SignOutData>("signOut", { input: { sessionToken: second.sessionToken } })
 
         // The append path is asynchronous (outbox, then the worker consumer): wait until every tracked action shows up as a line.
-        const lines = await world.waitFor(
+        const lines = await world.waitUntil(
             "all tracked actions visible in auditLog",
-            async () => {
-                const observed = await asOwner.graphql<AuditLogData>("auditLog")
-                const read = observed.data?.auditLog ?? []
-                return TRACKED_ACTIONS.every((action) => read.some((line) => line.action === action)) ? read : null
-            },
+            async () => (await asOwner.graphql<AuditLogData>("auditLog")).data?.auditLog ?? [],
+            (read) => TRACKED_ACTIONS.every((action) => read.some((line) => line.action === action)),
             { timeoutMs: 90_000, intervalMs: 1_000 },
         )
         expect(lines.filter((line) => line.action === "task.created" && line.target === taskId)).toHaveLength(1)

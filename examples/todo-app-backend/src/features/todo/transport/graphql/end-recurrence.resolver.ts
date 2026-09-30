@@ -16,13 +16,10 @@ export class EndRecurrenceResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Ends a recurrence rule owned by the caller. */
-    @Mutation(() => EndRecurrenceType, {
-        name: "endRecurrence",
-        description: "End a recurrence rule owned by the caller: no occurrence is generated after the given date.",
-    })
+    @Mutation(() => EndRecurrenceType, { name: "endRecurrence" })
     async endRecurrence(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: EndRecurrenceInput,
+        @Args("input") input: EndRecurrenceInput,
     ): Promise<EndRecurrenceType> {
         const outcome = await this.commandBus.execute(
             new EndRecurrenceCommand({ request: toEndRecurrenceRequest(input), principal }),

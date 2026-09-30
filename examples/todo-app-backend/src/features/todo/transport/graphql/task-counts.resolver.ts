@@ -13,7 +13,7 @@ export class TaskCountsResolver {
     constructor(@InjectQueryBus() private readonly queryBus: QueryBus) {}
 
     /** How many of the caller own tasks are open and complete. */
-    @Query(() => TaskCountsType, { name: "taskCounts", description: "How many tasks of the caller are open and complete." })
+    @Query(() => TaskCountsType, { name: "taskCounts" })
     async taskCounts(@CurrentPrincipal() principal: Principal): Promise<TaskCountsType> {
         const counts = await this.queryBus.execute(new TaskCountsQuery({ request: {}, principal }))
         return toTaskCountsType(counts)

@@ -21,15 +21,18 @@ const session: SessionView = {
 const command = (email = "person@example.com", password = "correct-horse"): SignInCommand =>
     new SignInCommand({ request: { email, password } })
 
-const build = (
-    signIn: jest.Mock = jest.fn().mockResolvedValue({ subject: "person-1" }),
-): {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
     handler: SignInHandler
     keycloak: KeycloakClient
     sessions: SessionService
     outbox: Outbox
     inner: ReturnType<typeof mockEntityManager>
-} => {
+}
+
+const build = (
+    signIn: jest.Mock = jest.fn().mockResolvedValue({ subject: "person-1" }),
+): Built => {
     const inner = mockEntityManager()
     const keycloak = mock<KeycloakClient>({ signIn })
     const sessions = mock<SessionService>({ open: jest.fn().mockResolvedValue(session) })

@@ -16,13 +16,10 @@ export class CreateUploadIntentResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Opens a pending upload and answers the presigned request the client sends the bytes with. */
-    @Mutation(() => CreateUploadIntentType, {
-        name: "createUploadIntent",
-        description: "Open an upload intent; the answer is the presigned request that stores the bytes.",
-    })
+    @Mutation(() => CreateUploadIntentType, { name: "createUploadIntent" })
     async createUploadIntent(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: CreateUploadIntentInput,
+        @Args("input") input: CreateUploadIntentInput,
     ): Promise<CreateUploadIntentType> {
         const outcome = await this.commandBus.execute(
             new CreateUploadIntentCommand({ request: toCreateUploadIntentRequest(input), principal }),

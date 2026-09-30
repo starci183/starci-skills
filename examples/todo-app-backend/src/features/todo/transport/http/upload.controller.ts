@@ -23,7 +23,7 @@ import { unwrapOutcome } from "@modules/platform/primitives"
 import { AcceptUploadContentCommand } from "../../application/accept-upload-content.command"
 import { CreateDirectUploadCommand } from "../../application/create-direct-upload.command"
 import { ReadUploadContentQuery } from "../../application/read-upload-content.query"
-import { DirectUploadQuery, UploadContentParams } from "./dto/upload.request"
+import { DirectUploadRequest, UploadContentRequest } from "./dto/upload.request"
 import type { UploadResponse } from "./dto/upload.response"
 import { toUploadBody } from "./upload-body.mapper"
 import {
@@ -52,7 +52,7 @@ export class UploadController {
     @Post()
     async createDirectUpload(
         @CurrentPrincipal() principal: Principal,
-        @Query() query: DirectUploadQuery,
+        @Query() query: DirectUploadRequest,
         @Headers("content-type") contentType: string | undefined,
         @Req() request: Request,
     ): Promise<UploadResponse> {
@@ -69,7 +69,7 @@ export class UploadController {
     @RateLimit(RateTier.Strict)
     @HttpCode(HttpStatus.OK)
     async putContent(
-        @Param() params: UploadContentParams,
+        @Param() params: UploadContentRequest,
         @Headers(UPLOAD_TOKEN_HEADER) token: string | undefined,
         @Req() request: Request,
     ): Promise<UploadResponse> {
@@ -84,7 +84,7 @@ export class UploadController {
     @Get(":uploadId/content")
     async download(
         @CurrentPrincipal() principal: Principal,
-        @Param() params: UploadContentParams,
+        @Param() params: UploadContentRequest,
         @Res({ passthrough: true }) response: Response,
     ): Promise<StreamableFile> {
         const outcome = await this.queryBus.execute(

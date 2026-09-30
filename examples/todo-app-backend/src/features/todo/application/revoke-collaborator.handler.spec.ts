@@ -23,9 +23,16 @@ const revoked: InvitationView = {
     personId: "ann",
 }
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: RevokeCollaboratorHandler
+    invitations: InvitationService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     outcome: Awaited<ReturnType<InvitationService["revoke"]>>,
-): { handler: RevokeCollaboratorHandler; invitations: InvitationService; inner: ReturnType<typeof mockEntityManager> } => {
+): Built => {
     const inner = mockEntityManager()
     const invitations = mock<InvitationService>({ revoke: jest.fn().mockResolvedValue(outcome) })
     const entityManager = mockEntityManager({ transaction: fakeTransaction(inner) })

@@ -2,7 +2,7 @@ import { FakeClock } from "@starci/jest-preset/clock"
 import { mock } from "@starci/jest-preset/mock"
 import type { Logger } from "@modules/platform/logging"
 import type { Outbox, OutboxRecord } from "@modules/platform/outbox"
-import { MessageRunner } from "./message-runner.service"
+import { MessageRunnerService } from "./message-runner.service"
 import { MessagingLogEvent } from "./messaging.log-events"
 import type { MessagingOptions } from "./messaging.options"
 import { defineQueue } from "./queue.policy"
@@ -31,42 +31,92 @@ const record = (attempts: number, payload: unknown = { n: 1 }): OutboxRecord => 
     attempts,
 })
 
-const build = (claimed: ReadonlyArray<OutboxRecord>, handle: jest.Mock): { runner: MessageRunner; outbox: Outbox; logger: Logger } => {
-    const outbox = mock<Outbox>({ claimDue: jest.fn().mockResolvedValue(claimed) })
-    const logger = mock<Logger>()
-    const runner = new MessageRunner(OPTIONS, outbox, new FakeClock(AT), logger)
-    runner.add({ queue: QUEUE, handle })
-    return { runner, outbox, logger }
+interface Retry {
+    readonly id: string
+    readonly at: Date
+    readonly error: string
 }
 
-describe("MessageRunner", () => {
+interface Burial {
+    readonly id: string
+    readonly error: string
+}
+
+interface Claim {
+    readonly at: Date
+    readonly queues: ReadonlyArray<string>
+    readonly limit: number
+    readonly visibilityMs: number
+}
+
+interface Ledger {
+    readonly completed: Array<string>
+    readonly retried: Array<Retry>
+    readonly buried: Array<Burial>
+    readonly claims: Array<Claim>
+}
+
+interface Rig {
+    readonly runner: MessageRunnerService
+    readonly ledger: Ledger
+    readonly logger: Logger
+}
+
+const build = (claimed: ReadonlyArray<OutboxRecord>, handle: jest.Mock): Rig => {
+    const ledger: Ledger = { completed: [], retried: [], buried: [], claims: [] }
+    const outbox = mock<Outbox>({
+        claimDue: jest.fn().mockImplementation((params: Claim) => {
+            ledger.claims.push(params)
+            return Promise.resolve(claimed)
+        }),
+        complete: jest.fn().mockImplementation((id: string) => {
+            ledger.completed.push(id)
+            return Promise.resolve()
+        }),
+        retry: jest.fn().mockImplementation((params: Retry) => {
+            ledger.retried.push(params)
+            return Promise.resolve()
+        }),
+        bury: jest.fn().mockImplementation((params: Burial) => {
+            ledger.buried.push(params)
+            return Promise.resolve()
+        }),
+    })
+    const logger = mock<Logger>()
+    const runner = new MessageRunnerService(OPTIONS, outbox, new FakeClock(AT), logger)
+    runner.add({ queue: QUEUE, handle })
+    return { runner, ledger, logger }
+}
+
+describe("MessageRunnerService", () => {
     it("claims only the registered queues and completes a handled message", async () => {
-        const handle = jest.fn().mockResolvedValue(undefined)
-        const { runner, outbox } = build([record(1)], handle)
+        const handled: Array<unknown> = []
+        const handle = jest.fn().mockImplementation((message: unknown) => {
+            handled.push(message)
+            return Promise.resolve()
+        })
+        const { runner, ledger } = build([record(1)], handle)
         await runner.drain()
-        expect(outbox.claimDue).toHaveBeenCalledWith({ at: AT, queues: [QUEUE.name], limit: 10, visibilityMs: 60_000 })
-        expect(handle).toHaveBeenCalledWith({ id: "m1", eventId: "e1", payload: { n: 1 }, attempt: 1 })
-        expect(outbox.complete).toHaveBeenCalledWith("m1")
+        expect(ledger.claims).toEqual([{ at: AT, queues: [QUEUE.name], limit: 10, visibilityMs: 60_000 }])
+        expect(handled).toEqual([{ id: "m1", eventId: "e1", payload: { n: 1 }, attempt: 1 }])
+        expect(ledger.completed).toEqual(["m1"])
     })
 
     it("reschedules a failed message with the doubled backoff", async () => {
         const handle = jest.fn().mockRejectedValue(new TypeError("boom"))
-        const { runner, outbox, logger } = build([record(2)], handle)
+        const { runner, ledger } = build([record(2)], handle)
         await runner.drain()
-        expect(outbox.retry).toHaveBeenCalledWith({
-            id: "m1",
-            at: new Date(AT.getTime() + 2_000),
-            error: "TypeError: boom",
-        })
-        expect(outbox.complete).not.toHaveBeenCalled()
-        expect(logger.warn).toHaveBeenCalledWith(MessagingLogEvent.DeliveryRetried, expect.any(Object))
+        expect(ledger.retried).toEqual([{ id: "m1", at: new Date(AT.getTime() + 2_000), error: "TypeError: boom" }])
+        expect(ledger.completed).toEqual([])
+        expect(ledger.buried).toEqual([])
     })
 
     it("buries a message that used its last attempt", async () => {
         const handle = jest.fn().mockRejectedValue(new TypeError("boom"))
-        const { runner, outbox, logger } = build([record(3)], handle)
+        const { runner, ledger, logger } = build([record(3)], handle)
         await runner.drain()
-        expect(outbox.bury).toHaveBeenCalledWith({ id: "m1", error: "TypeError: boom" })
+        expect(ledger.buried).toEqual([{ id: "m1", error: "TypeError: boom" }])
+        expect(ledger.retried).toEqual([])
         expect(logger.error).toHaveBeenCalledWith(MessagingLogEvent.DeliveryBuried, expect.any(TypeError), {
             queue: QUEUE.name,
             attempts: 3,
@@ -75,9 +125,10 @@ describe("MessageRunner", () => {
 
     it("treats a payload of the wrong shape as a failed delivery, never as a handled one", async () => {
         const handle = jest.fn()
-        const { runner, outbox } = build([record(1, { n: "x" })], handle)
+        const { runner, ledger } = build([record(1, { n: "x" })], handle)
         await runner.drain()
-        expect(handle).not.toHaveBeenCalled()
-        expect(outbox.retry).toHaveBeenCalled()
+        expect(handle.mock.calls).toHaveLength(0)
+        expect(ledger.retried).toHaveLength(1)
+        expect(ledger.completed).toEqual([])
     })
 })

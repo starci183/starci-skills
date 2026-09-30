@@ -22,15 +22,18 @@ const intent: PaymentIntentView = {
     appliedAt: null,
 }
 
-const build = (
-    createIntent: jest.Mock = jest.fn().mockResolvedValue({ gatewayIntentId: "g1", checkoutUrl: "https://pay.test/g1" }),
-): {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
     handler: UpgradePlanHandler
     subscriptions: SubscriptionService
     payments: PaymentService
     sepay: SepayClient
     inner: ReturnType<typeof mockEntityManager>
-} => {
+}
+
+const build = (
+    createIntent: jest.Mock = jest.fn().mockResolvedValue({ gatewayIntentId: "g1", checkoutUrl: "https://pay.test/g1" }),
+): Built => {
     const inner = mockEntityManager()
     const subscriptions = mock<SubscriptionService>({
         getOrCreate: jest.fn().mockResolvedValue(free),

@@ -21,7 +21,14 @@ const edited: RuleView = {
     endedAt: null,
 }
 
-const build = (edit: jest.Mock): { handler: EditRecurrenceHandler; rules: RuleService; inner: ReturnType<typeof mockEntityManager> } => {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: EditRecurrenceHandler
+    rules: RuleService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
+const build = (edit: jest.Mock): Built => {
     const inner = mockEntityManager()
     const rules = mock<RuleService>({ edit })
     const entityManager = mockEntityManager({ transaction: fakeTransaction(inner) })

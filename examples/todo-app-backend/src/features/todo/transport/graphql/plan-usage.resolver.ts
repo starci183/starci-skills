@@ -13,10 +13,7 @@ export class PlanUsageResolver {
     constructor(@InjectQueryBus() private readonly queryBus: QueryBus) {}
 
     /** The plan of the caller against the active tasks the caller holds. */
-    @Query(() => PlanUsageType, {
-        name: "planUsage",
-        description: "The plan of the caller against the active tasks the caller holds; the cap is null on the paid plan.",
-    })
+    @Query(() => PlanUsageType, { name: "planUsage" })
     async planUsage(@CurrentPrincipal() principal: Principal): Promise<PlanUsageType> {
         const usage = await this.queryBus.execute(new PlanUsageQuery({ request: {}, principal }))
         return toPlanUsageType(usage)

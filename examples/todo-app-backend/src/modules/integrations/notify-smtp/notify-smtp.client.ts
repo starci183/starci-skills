@@ -35,13 +35,20 @@ const takeReply = (buffered: string): { readonly reply: SmtpReply; readonly rest
     return null
 }
 
+/** What a channel is built over. */
+interface SmtpChannelParams {
+    readonly socket: Socket
+}
+
 /** One SMTP conversation over one socket: commands out, replies in, silences bounded by the socket idle timeout. */
 class SmtpChannel {
     private buffer = ""
     private failure: Error | null = null
+    private readonly socket: Socket
 
-    constructor(private readonly socket: Socket) {
-        socket.on("error", (error: Error) => {
+    constructor(params: SmtpChannelParams) {
+        this.socket = params.socket
+        this.socket.on("error", (error: Error) => {
             this.failure = error
         })
     }
@@ -59,7 +66,7 @@ class SmtpChannel {
             const onConnect = (): void => {
                 cleanup()
                 socket.setTimeout(options.commandTimeoutMs)
-                resolve(new SmtpChannel(socket))
+                resolve(new SmtpChannel({ socket }))
             }
             const onError = (error: Error): void => {
                 cleanup()

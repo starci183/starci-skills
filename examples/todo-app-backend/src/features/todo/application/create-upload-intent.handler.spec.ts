@@ -24,9 +24,16 @@ const pending: UploadView = {
 }
 const request = { filename: "note.txt", mime: "text/plain", sizeBytes: 3 }
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: CreateUploadIntentHandler
+    uploads: UploadService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     created: unknown = { kind: "ok", value: pending },
-): { handler: CreateUploadIntentHandler; uploads: UploadService; inner: ReturnType<typeof mockEntityManager> } => {
+): Built => {
     const inner = mockEntityManager()
     const uploads = mock<UploadService>({
         createPending: jest.fn().mockResolvedValue(created),

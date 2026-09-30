@@ -160,8 +160,13 @@ describe("InvitationService.revoke", () => {
     })
 })
 
+interface ListingRig {
+    readonly svc: InvitationService
+    readonly manager: ReturnType<typeof mockEntityManager>
+}
+
 describe("InvitationService.listFor", () => {
-    const listing = (rows: Array<InvitationEntity>): { svc: InvitationService; manager: ReturnType<typeof mockEntityManager> } => {
+    const listing = (rows: Array<InvitationEntity>): ListingRig => {
         const manager = mockEntityManager({ find: jest.fn().mockResolvedValue(rows) })
         return { svc: new InvitationService(manager), manager }
     }

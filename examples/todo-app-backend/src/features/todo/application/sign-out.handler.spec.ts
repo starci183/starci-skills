@@ -20,16 +20,19 @@ const session: SessionView = {
 }
 const command = new SignOutCommand({ request: { sessionToken: "token-1" } })
 
-const build = (
-    parts: { found?: unknown; notify?: jest.Mock } = {},
-): {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
     handler: SignOutHandler
     sessions: SessionService
     keycloak: KeycloakClient
     outbox: Outbox
     logger: Logger
     inner: ReturnType<typeof mockEntityManager>
-} => {
+}
+
+const build = (
+    parts: { found?: unknown; notify?: jest.Mock } = {},
+): Built => {
     const inner = mockEntityManager()
     const logger = mock<Logger>()
     const sessions = mock<SessionService>({

@@ -16,13 +16,10 @@ export class TaskUploadsResolver {
     constructor(@InjectQueryBus() private readonly queryBus: QueryBus) {}
 
     /** The uploads attached to a task of the caller. */
-    @Query(() => [UploadType], {
-        name: "taskUploads",
-        description: "List the uploads attached to a task of the caller.",
-    })
+    @Query(() => [UploadType], { name: "taskUploads" })
     async taskUploads(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: TaskUploadsInput,
+        @Args("input") input: TaskUploadsInput,
     ): Promise<Array<UploadType>> {
         const outcome = await this.queryBus.execute(
             new ListTaskUploadsQuery({ request: toTaskUploadsRequest(input), principal }),

@@ -22,7 +22,7 @@ const thrownCode = (call: () => unknown): string | undefined => {
     try {
         call()
     } catch (error) {
-        if (error instanceof HttpSecurityError) return error.code
+        return error instanceof HttpSecurityError ? error.code : String(error)
     }
     return undefined
 }

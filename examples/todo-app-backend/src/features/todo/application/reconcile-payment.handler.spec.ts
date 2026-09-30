@@ -37,9 +37,17 @@ interface Parts {
     readonly settled?: unknown
 }
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: ReconcilePaymentHandler
+    sepay: SepayClient
+    settlement: SettlementService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     parts: Parts = {},
-): { handler: ReconcilePaymentHandler; sepay: SepayClient; settlement: SettlementService; inner: ReturnType<typeof mockEntityManager> } => {
+): Built => {
     const inner = mockEntityManager()
     const payments = mock<PaymentService>({ findById: jest.fn().mockResolvedValue(parts.intent === undefined ? pendingIntent : parts.intent) })
     const subscriptions = mock<SubscriptionService>({

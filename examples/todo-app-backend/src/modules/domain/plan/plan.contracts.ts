@@ -171,3 +171,9 @@ export interface SettlementView {
     /** The status of the subscription afterwards. */
     readonly subscriptionStatus: SubscriptionStatus
 }
+
+/** The answer of a subscription lookup: the subscription, or null when there is none with that id. */
+export type SubscriptionLookupResult = SubscriptionView | null
+
+/** The answer of a payment intent lookup: the intent, or null when there is none. */
+export type PaymentIntentLookupResult = PaymentIntentView | null

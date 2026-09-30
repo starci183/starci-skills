@@ -379,3 +379,6 @@ export interface NotifyDispatchMessageParams {
     /** When the message becomes due. */
     readonly dueAt: Date
 }
+
+/** The answer of preparing a dispatch: the plan to transmit, or null when there is nothing to send. */
+export type PreparedDispatchResult = DispatchPlan | null

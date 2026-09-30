@@ -16,10 +16,10 @@ export class CreateTaskResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Creates a task owned by the caller; refused when the plan of the caller is full. */
-    @Mutation(() => CreateTaskType, { name: "createTask", description: "Create a task owned by the caller." })
+    @Mutation(() => CreateTaskType, { name: "createTask" })
     async createTask(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: CreateTaskInput,
+        @Args("input") input: CreateTaskInput,
     ): Promise<CreateTaskType> {
         const outcome = await this.commandBus.execute(
             new CreateTaskCommand({ request: toCreateTaskRequest(input), principal }),

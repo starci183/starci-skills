@@ -238,3 +238,6 @@ export interface ExistingWindowKeysParams {
     /** The window keys to check. */
     readonly windowKeys: ReadonlyArray<string>
 }
+
+/** The answer of a rule lookup: the rule, or null when there is none with that id. */
+export type RuleLookupResult = RuleView | null

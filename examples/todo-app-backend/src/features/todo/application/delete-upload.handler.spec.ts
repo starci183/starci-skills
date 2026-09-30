@@ -24,14 +24,17 @@ const upload: UploadView = {
 }
 const command = new DeleteUploadCommand({ request: { uploadId: "u1" }, principal })
 
-const build = (
-    parts: { authorized?: unknown; remove?: jest.Mock } = {},
-): {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
     handler: DeleteUploadHandler
     uploads: UploadService
     storage: UploadStorage
     inner: ReturnType<typeof mockEntityManager>
-} => {
+}
+
+const build = (
+    parts: { authorized?: unknown; remove?: jest.Mock } = {},
+): Built => {
     const inner = mockEntityManager()
     const uploads = mock<UploadService>({
         authorize: jest.fn().mockResolvedValue(parts.authorized ?? { kind: "ok", value: upload }),

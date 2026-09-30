@@ -20,14 +20,18 @@ const row = (overrides: Partial<AuditErasureRequestEntity> = {}): AuditErasureRe
     ...overrides,
 })
 
-const setup = (
-    stored: AuditErasureRequestEntity | null,
-    keys: { keyId?: string | null; remaining?: number } = {},
-): {
-    service: AuditErasureService
-    keystore: AuditKeystoreService
-    manager: ReturnType<typeof mockEntityManager>
-} => {
+interface KeyOverrides {
+    readonly keyId?: string | null
+    readonly remaining?: number
+}
+
+interface Rig {
+    readonly service: AuditErasureService
+    readonly keystore: AuditKeystoreService
+    readonly manager: ReturnType<typeof mockEntityManager>
+}
+
+const setup = (stored: AuditErasureRequestEntity | null, keys: KeyOverrides = {}): Rig => {
     const keystore = mock<AuditKeystoreService>({
         getKeyIdForPerson: jest.fn().mockResolvedValue(keys.keyId === undefined ? "k1" : keys.keyId),
         getKeyMaterials: jest.fn().mockResolvedValue(new Map(Array.from({ length: keys.remaining ?? 0 }, () => ["k1", Buffer.alloc(32)] as const))),

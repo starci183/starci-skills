@@ -1,4 +1,4 @@
-import type { ErrorParams } from "@modules/platform/errors"
+import type { DomainError, DomainErrorInit, ErrorParams } from "@modules/platform/errors"
 
 /** The success half of an outcome: the value the operation produced. */
 export interface OutcomeOk<V> {
@@ -20,3 +20,6 @@ export interface OutcomeRefused<C extends string> {
 
 /** The result of an operation that can be refused for an expected business reason: returned, never thrown. */
 export type Outcome<V, C extends string> = OutcomeOk<V> | OutcomeRefused<C>
+
+/** The class of a capability error family, as `unwrapOutcome` constructs it from a refusal. */
+export type OutcomeErrorClass<K extends string> = new (init: DomainErrorInit<K>) => DomainError<K>

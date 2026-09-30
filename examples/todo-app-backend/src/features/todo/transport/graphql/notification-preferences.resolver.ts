@@ -14,10 +14,7 @@ export class NotificationPreferencesResolver {
     constructor(@InjectQueryBus() private readonly queryBus: QueryBus) {}
 
     /** The caller's subscription state and digest window on one channel; the defaults when nothing was ever written. */
-    @Query(() => NotificationPreferencesType, {
-        name: "notificationPreferences",
-        description: "The caller's own notification preferences for one channel.",
-    })
+    @Query(() => NotificationPreferencesType, { name: "notificationPreferences" })
     async notificationPreferences(
         @CurrentPrincipal() principal: Principal,
         @Args("request", { nullable: true }) input?: NotificationPreferencesInput,

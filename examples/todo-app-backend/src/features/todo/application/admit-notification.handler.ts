@@ -28,7 +28,7 @@ export class AdmitNotificationHandler extends ICQRSHandler<AdmitNotificationComm
     protected override async process(command: AdmitNotificationCommand): Promise<AdmitNotificationResult> {
         const { request } = command.params
         const at = this.clock.now()
-        return this.entityManager.transaction(async (manager) =>
+        return this.entityManager.transaction((manager) =>
             this.notify.admit({
                 manager,
                 kind: request.kind,

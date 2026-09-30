@@ -32,6 +32,6 @@ export class UpcomingOccurrencesType {
     materialised!: Array<MaterialisedOccurrenceType>
 
     /** The dates the rule fires on next, computed live; empty for an ended rule. */
-    @Field(() => [String], { description: "The dates the rule fires on next, computed live. Empty for an ended rule." })
+    @Field(() => [String])
     previewDates!: Array<string>
 }

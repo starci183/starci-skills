@@ -14,9 +14,16 @@ const principal: Principal = { id: "owner-1", roles: ["member"] }
 const done: TaskView = { id: "t1", owner: "owner-1", title: "Write", complete: true, completedAt: AT }
 const open: TaskView = { ...done, complete: false, completedAt: null }
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: ReopenTaskHandler
+    tasks: TaskService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     parts: { found?: TaskView | null; allowed?: boolean } = {},
-): { handler: ReopenTaskHandler; tasks: TaskService; inner: ReturnType<typeof mockEntityManager> } => {
+): Built => {
     const inner = mockEntityManager()
     const tasks = mock<TaskService>({
         find: jest.fn().mockResolvedValue(parts.found === undefined ? done : parts.found),

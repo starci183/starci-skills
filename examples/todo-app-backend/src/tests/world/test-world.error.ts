@@ -14,6 +14,10 @@ export enum TestWorldErrorCode {
     FakeControlFailed = "TEST_WORLD_FAKE_CONTROL_FAILED",
     /** The public sign-in door refused a person the world expected to be known to the identity provider. */
     SignInRefused = "TEST_WORLD_SIGN_IN_REFUSED",
+    /** A payload fixture of a fake is not valid JSON once its placeholders are filled. */
+    PayloadInvalid = "TEST_WORLD_PAYLOAD_INVALID",
+    /** A state the world waited for (a readiness probe, an asynchronous effect) did not arrive before its deadline. */
+    TimedOut = "TEST_WORLD_TIMED_OUT",
 }
 
 /** The one error class of the test world; `params.detail` carries what a person needs to debug the run. */

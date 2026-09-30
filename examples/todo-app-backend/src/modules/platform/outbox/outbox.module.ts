@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { OUTBOX } from "./outbox.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./outbox.module-definition"
-import { PostgresOutbox } from "./outbox.service"
+import { PostgresOutboxService } from "./outbox.service"
 
 @Module({})
 /** Provides the Outbox port over the primary database. */
@@ -12,7 +12,7 @@ export class OutboxModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []), { provide: OUTBOX, useClass: PostgresOutbox }],
+            providers: [...(base.providers ?? []), { provide: OUTBOX, useClass: PostgresOutboxService }],
             exports: [OUTBOX],
         }
     }

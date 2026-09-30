@@ -16,13 +16,10 @@ export class CompleteErasureResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Completes the verified erasure request of the caller: the subject key is destroyed and the request anonymized. */
-    @Mutation(() => CompleteErasureType, {
-        name: "completeErasure",
-        description: "Complete a verified erasure request: destroy the subject key, then confirm and log completion.",
-    })
+    @Mutation(() => CompleteErasureType, { name: "completeErasure" })
     async completeErasure(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: CompleteErasureInput,
+        @Args("input") input: CompleteErasureInput,
     ): Promise<CompleteErasureType> {
         const outcome = await this.commandBus.execute(
             new CompleteErasureCommand({ request: toCompleteErasureRequest(input), principal }),

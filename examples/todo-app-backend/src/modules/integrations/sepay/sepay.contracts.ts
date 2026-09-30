@@ -29,3 +29,6 @@ export interface SepayTransaction {
 
 /** The operations the client names in its failures. */
 export type SepayOperation = "create-intent" | "get-transaction"
+
+/** The Authorization header of a webhook delivery as presented: absent when the sender sent none. */
+export type PresentedAuthorization = string | undefined

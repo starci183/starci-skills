@@ -15,9 +15,18 @@ const AT = new Date("2026-09-30T10:00:00.000Z")
 const principal: Principal = { id: "owner-1", roles: ["member"] }
 const created: TaskView = { id: "t1", owner: "owner-1", title: "Write", complete: false, completedAt: null }
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: CreateTaskHandler
+    tasks: TaskService
+    capGuard: CapGuardPolicy
+    outbox: Outbox
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     parts: { verdict?: Awaited<ReturnType<CapGuardPolicy["check"]>>; owned?: ReadonlyArray<TaskView>; create?: jest.Mock } = {},
-): { handler: CreateTaskHandler; tasks: TaskService; capGuard: CapGuardPolicy; outbox: Outbox; inner: ReturnType<typeof mockEntityManager> } => {
+): Built => {
     const inner = mockEntityManager()
     const tasks = mock<TaskService>({
         listOwnedBy: jest.fn().mockResolvedValue(parts.owned ?? []),

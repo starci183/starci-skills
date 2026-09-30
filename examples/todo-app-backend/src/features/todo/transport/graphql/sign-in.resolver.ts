@@ -15,13 +15,10 @@ export class SignInResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Signs a person in with email and password; the answer is the session token. */
-    @Mutation(() => SignInType, {
-        name: "signIn",
-        description: "Sign in with email and password; returns a session token to send as a Bearer authorization header.",
-    })
+    @Mutation(() => SignInType, { name: "signIn" })
     @Public({ reason: PublicReason.AuthHandshake })
     @RateLimit(RateTier.Strict)
-    async signIn(@Args("request") input: SignInInput): Promise<SignInType> {
+    async signIn(@Args("input") input: SignInInput): Promise<SignInType> {
         const outcome = await this.commandBus.execute(new SignInCommand({ request: toSignInRequest(input) }))
         return toSignInType(unwrapOutcome(outcome, IdentityError))
     }

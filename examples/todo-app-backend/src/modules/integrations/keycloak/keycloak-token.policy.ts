@@ -9,15 +9,21 @@ export const readSubject = (body: unknown): string | null => {
     if (!isRecord(body) || typeof body.access_token !== "string") return null
     const payload = body.access_token.split(".")[1]
     if (payload === undefined) return null
-    const claims = parseClaims(payload)
+    const { claims } = parseClaims(payload)
     return isRecord(claims) && typeof claims.sub === "string" && claims.sub !== "" ? claims.sub : null
 }
 
-/** The claims a payload segment encodes, or null when the segment is not base64url JSON. */
-const parseClaims = (payload: string): unknown => {
+/** What a payload segment decodes to: the claims, or the cause when the segment is not base64url JSON. */
+interface ParsedClaims {
+    readonly claims: unknown
+    readonly cause: unknown
+}
+
+/** The claims a payload segment encodes; a segment that is not base64url JSON has no claims and carries the cause. */
+const parseClaims = (payload: string): ParsedClaims => {
     try {
-        return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"))
-    } catch {
-        return null
+        return { claims: JSON.parse(Buffer.from(payload, "base64url").toString("utf8")), cause: null }
+    } catch (error) {
+        return { claims: null, cause: error }
     }
 }

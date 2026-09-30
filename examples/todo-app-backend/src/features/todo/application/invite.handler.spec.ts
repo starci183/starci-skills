@@ -26,9 +26,16 @@ const pending: InvitationView = {
 }
 const request = { taskId: "t1", email: "Ann@Example.com", role: "editor" }
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: InviteHandler
+    invitations: InvitationService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     parts: { found?: TaskView | null; outcome?: Awaited<ReturnType<InvitationService["invite"]>> } = {},
-): { handler: InviteHandler; invitations: InvitationService; inner: ReturnType<typeof mockEntityManager> } => {
+): Built => {
     const inner = mockEntityManager()
     const tasks = mock<TaskService>({ find: jest.fn().mockResolvedValue(parts.found === undefined ? task : parts.found) })
     const invitations = mock<InvitationService>({

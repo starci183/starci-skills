@@ -16,10 +16,10 @@ export class ReopenTaskResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Reopens a completed task; the owner and editor collaborators may. */
-    @Mutation(() => ReopenTaskType, { name: "reopenTask", description: "Reopen a completed task." })
+    @Mutation(() => ReopenTaskType, { name: "reopenTask" })
     async reopenTask(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: ReopenTaskInput,
+        @Args("input") input: ReopenTaskInput,
     ): Promise<ReopenTaskType> {
         const outcome = await this.commandBus.execute(
             new ReopenTaskCommand({ request: toReopenTaskRequest(input), principal }),

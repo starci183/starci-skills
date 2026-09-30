@@ -19,7 +19,14 @@ const completed: OccurrenceView = {
     status: "completed",
 }
 
-const build = (complete: jest.Mock): { handler: CompleteOccurrenceHandler; occurrences: OccurrenceService; inner: ReturnType<typeof mockEntityManager> } => {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: CompleteOccurrenceHandler
+    occurrences: OccurrenceService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
+const build = (complete: jest.Mock): Built => {
     const inner = mockEntityManager()
     const occurrences = mock<OccurrenceService>({ complete })
     const entityManager = mockEntityManager({ transaction: fakeTransaction(inner) })

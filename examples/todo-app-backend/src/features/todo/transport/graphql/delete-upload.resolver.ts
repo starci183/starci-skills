@@ -16,13 +16,10 @@ export class DeleteUploadResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Deletes an upload of the caller, its row and its stored bytes. */
-    @Mutation(() => DeleteUploadType, {
-        name: "deleteUpload",
-        description: "Delete an upload of the caller together with its stored bytes.",
-    })
+    @Mutation(() => DeleteUploadType, { name: "deleteUpload" })
     async deleteUpload(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: DeleteUploadInput,
+        @Args("input") input: DeleteUploadInput,
     ): Promise<DeleteUploadType> {
         const outcome = await this.commandBus.execute(
             new DeleteUploadCommand({ request: toDeleteUploadRequest(input), principal }),

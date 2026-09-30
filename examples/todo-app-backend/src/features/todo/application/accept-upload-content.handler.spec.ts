@@ -25,14 +25,17 @@ const ready: UploadView = { ...pending, status: "ready", sizeBytes: 5 }
 const content = Buffer.from("hello")
 const command = new AcceptUploadContentCommand({ request: { uploadId: "u1", token: "signed", content } })
 
-const build = (
-    parts: { admitted?: unknown; store?: jest.Mock } = {},
-): {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
     handler: AcceptUploadContentHandler
     uploads: UploadService
     storage: UploadStorage
     inner: ReturnType<typeof mockEntityManager>
-} => {
+}
+
+const build = (
+    parts: { admitted?: unknown; store?: jest.Mock } = {},
+): Built => {
     const inner = mockEntityManager()
     const uploads = mock<UploadService>({
         admitContent: jest.fn().mockResolvedValue(parts.admitted ?? { kind: "ok", value: pending }),

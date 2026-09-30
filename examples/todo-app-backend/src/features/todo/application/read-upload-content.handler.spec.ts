@@ -23,9 +23,15 @@ const upload: UploadView = {
 }
 const query = new ReadUploadContentQuery({ request: { uploadId: "u1" }, principal })
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: ReadUploadContentHandler
+    storage: UploadStorage
+}
+
 const build = (
     parts: { authorized?: unknown; ready?: unknown; get?: jest.Mock } = {},
-): { handler: ReadUploadContentHandler; storage: UploadStorage } => {
+): Built => {
     const uploads = mock<UploadService>({
         authorize: jest.fn().mockResolvedValue(parts.authorized ?? { kind: "ok", value: upload }),
         requireReady: jest.fn().mockReturnValue(parts.ready ?? { kind: "ok", value: upload }),

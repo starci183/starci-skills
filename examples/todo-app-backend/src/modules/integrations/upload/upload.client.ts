@@ -5,7 +5,7 @@ import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { isRecord } from "@modules/platform/primitives"
 import { UploadStorageError, UploadStorageErrorCode } from "./errors/upload-storage.error"
-import type { ScanVerdict, StoreUploadParams, UploadObjectParams } from "./upload.contracts"
+import type { ScanVerdict, StoredBytesResult, StoreUploadParams, UploadObjectParams } from "./upload.contracts"
 import { InjectUploadScan, InjectUploadStorageOptions } from "./upload.decorators"
 import { UploadLogEvent } from "./upload.log-events"
 import type { UploadStorageOptions } from "./upload.options"
@@ -45,7 +45,7 @@ export class UploadClient implements UploadStorage {
     }
 
     /** Reads the object, or null when nothing is stored for the upload. */
-    async get(params: UploadObjectParams): Promise<Buffer | null> {
+    async get(params: UploadObjectParams): Promise<StoredBytesResult> {
         const path = this.pathOf(params.uploadId)
         try {
             return await readFile(path)

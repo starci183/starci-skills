@@ -3,7 +3,12 @@ import { CapGuardPolicy } from "./cap-guard.policy"
 import { FREE_PLAN, FREE_PLAN_TASK_CAP, PAID_PLAN } from "./plan.policy"
 import type { SubscriptionService } from "./subscription.service"
 
-const guardOn = (plan: typeof FREE_PLAN): { policy: CapGuardPolicy; subscriptions: SubscriptionService } => {
+interface GuardRig {
+    readonly policy: CapGuardPolicy
+    readonly subscriptions: SubscriptionService
+}
+
+const guardOn = (plan: typeof FREE_PLAN): GuardRig => {
     const subscriptions = mock<SubscriptionService>({ readEffectivePlan: jest.fn().mockResolvedValue(plan) })
     return { policy: new CapGuardPolicy(subscriptions), subscriptions }
 }

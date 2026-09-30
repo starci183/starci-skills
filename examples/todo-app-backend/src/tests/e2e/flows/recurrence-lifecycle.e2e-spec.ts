@@ -6,20 +6,23 @@ import type {
     EditRecurrenceData,
     EndRecurrenceData,
     MakeRecurringData,
-    OccurrenceView,
+    OccurrenceEntry,
     TasksData,
+    UpcomingOccurrencesAnswer,
     UpcomingOccurrencesData,
 } from "@tests/fixtures/views/e2e-views.contracts"
+import { worldClock } from "@tests/world/kit/world-clock"
 import { useTestWorld } from "@tests/world/use-test-world"
 import type { SignedInPerson } from "@tests/world/test-world.contracts"
 import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 import { AppModule as WorkerApp } from "../../../../apps/worker/src/app.module"
 
 const DAY_MS = 86_400_000
+const NO_OCCURRENCES: UpcomingOccurrencesAnswer = { ruleId: "", materialised: [], previewDates: [] }
 /** The generation job is a cron of whole minutes, so each generation waits for the next minute tick of the worker. */
 const GENERATION_WAIT_MS = 150_000
 
-const utcDateOffset = (days: number): string => new Date(Date.now() + days * DAY_MS).toISOString().slice(0, 10)
+const utcDateOffset = (days: number): string => new Date(worldClock.now().getTime() + days * DAY_MS).toISOString().slice(0, 10)
 
 const addDaysUtc = (date: string, days: number): string => {
     const [year = 0, month = 1, day = 1] = date.split("-").map(Number)
@@ -46,7 +49,7 @@ const statusAfterEnd = (localDate: string, endedAt: string): string => (localDat
  * One row after the rule edit: an occurrence the earlier cadence already materialised must stay identical (history is never
  * rewritten), while a row the new cadence produced carries the new local time.
  */
-const expectPostEditRow = (row: OccurrenceView, beforeEdit: ReadonlyArray<OccurrenceView>): void => {
+const expectPostEditRow = (row: OccurrenceEntry, beforeEdit: ReadonlyArray<OccurrenceEntry>): void => {
     const original = beforeEdit.find((old) => old.occurrenceId === row.occurrenceId)
     if (original) {
         expect(row).toEqual(original)
@@ -70,10 +73,10 @@ const expectPostEditRow = (row: OccurrenceView, beforeEdit: ReadonlyArray<Occurr
 describe("recur: recurrence lifecycle (e2e)", () => {
     const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } } })
 
-    const upcomingOf = async (person: SignedInPerson, ruleId: string): Promise<UpcomingOccurrencesData["upcomingOccurrences"] | undefined> => {
+    const upcomingOf = async (person: SignedInPerson, ruleId: string): Promise<UpcomingOccurrencesAnswer> => {
         const observed = await person.caller.graphql<UpcomingOccurrencesData>("upcomingOccurrences", { input: { ruleId } })
         expect(observed.errorCode).toBeNull()
-        return observed.data?.upcomingOccurrences
+        return observed.data?.upcomingOccurrences ?? NO_OCCURRENCES
     }
 
     it("create task -> make recurring -> occurrences -> edit rule -> occurrences reflect edit -> end rule -> no new occurrences", async () => {
@@ -107,12 +110,10 @@ describe("recur: recurrence lifecycle (e2e)", () => {
         // Step 3: the generation tick backfills [startDate, today]: -21, -14, -7, 0 at 09:00 UTC.
         const expectedBefore = expectedNDaysDates(startDate, 7, today)
         expect(expectedBefore).toHaveLength(4)
-        const beforeEdit = await world.waitFor(
+        const beforeEdit = await world.waitUntil(
             `occurrences for the n=7 rule ${ruleId}`,
-            async () => {
-                const upcoming = await upcomingOf(me, ruleId)
-                return (upcoming?.materialised.length ?? 0) >= expectedBefore.length ? upcoming : null
-            },
+            () => upcomingOf(me, ruleId),
+            (upcoming) => upcoming.materialised.length >= expectedBefore.length,
             { timeoutMs: GENERATION_WAIT_MS, intervalMs: 2_000 },
         )
         expect(beforeEdit.materialised.map((row) => row.localDate).sort()).toEqual(expectedBefore)
@@ -140,12 +141,10 @@ describe("recur: recurrence lifecycle (e2e)", () => {
         const expectedEdited = expectedNDaysDates(startDate, 3, today)
         const expectedUnion = [...new Set([...expectedBefore, ...expectedEdited])].sort()
         expect(expectedUnion).toHaveLength(10)
-        const afterEdit = await world.waitFor(
+        const afterEdit = await world.waitUntil(
             `n=3 occurrences for the rule ${ruleId}`,
-            async () => {
-                const upcoming = await upcomingOf(me, ruleId)
-                return (upcoming?.materialised.length ?? 0) >= expectedUnion.length ? upcoming : null
-            },
+            () => upcomingOf(me, ruleId),
+            (upcoming) => upcoming.materialised.length >= expectedUnion.length,
             { timeoutMs: GENERATION_WAIT_MS, intervalMs: 2_000 },
         )
         expect(afterEdit.materialised.map((row) => row.localDate).sort()).toEqual(expectedUnion)
@@ -158,9 +157,9 @@ describe("recur: recurrence lifecycle (e2e)", () => {
         expect(ended.errorCode).toBeNull()
         expect(ended.data?.endRecurrence).toMatchObject({ ruleId, endedAt: today, orphanedCount: 1 })
         const atEnd = await upcomingOf(me, ruleId)
-        expect(atEnd?.previewDates).toEqual([])
-        expect(atEnd?.materialised.map((row) => row.localDate).sort()).toEqual(expectedUnion)
-        for (const row of atEnd?.materialised ?? []) {
+        expect(atEnd.previewDates).toEqual([])
+        expect(atEnd.materialised.map((row) => row.localDate).sort()).toEqual(expectedUnion)
+        for (const row of atEnd.materialised) {
             expect(row.status).toBe(statusAfterEnd(row.localDate, today))
         }
 
@@ -172,19 +171,17 @@ describe("recur: recurrence lifecycle (e2e)", () => {
         })
         expect(controlRule.errorCode).toBeNull()
         const controlRuleId = controlRule.data?.makeRecurring.ruleId ?? ""
-        await world.waitFor(
+        await world.waitUntil(
             "a generation run after the end of the rule (the control rule materialised)",
-            async () => {
-                const upcoming = await upcomingOf(control, controlRuleId)
-                return (upcoming?.materialised.length ?? 0) >= 1 ? upcoming : null
-            },
+            () => upcomingOf(control, controlRuleId),
+            (upcoming) => upcoming.materialised.length >= 1,
             { timeoutMs: GENERATION_WAIT_MS, intervalMs: 2_000 },
         )
-        const frozenCount = atEnd?.materialised.length ?? 0
+        const frozenCount = atEnd.materialised.length
         const later = await upcomingOf(me, ruleId)
-        expect(later?.materialised).toHaveLength(frozenCount)
-        expect((later?.materialised ?? []).filter((row) => row.localDate > today)).toEqual([])
-        expect(later?.previewDates).toEqual([])
+        expect(later.materialised).toHaveLength(frozenCount)
+        expect(later.materialised.filter((row) => row.localDate > today)).toEqual([])
+        expect(later.previewDates).toEqual([])
 
         // The store agrees: the rule row is ended and no occurrence row exists past the end date.
         const endedRows: Array<RuleEndedAtRow> = await world.db.primary.query(RULE_ENDED_AT, [ruleId])

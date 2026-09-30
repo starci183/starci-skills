@@ -5,6 +5,7 @@
  */
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { TestWorldError, TestWorldErrorCode } from "../test-world.error"
 
 const escapeForJson = (value: string): string => JSON.stringify(value).slice(1, -1)
 
@@ -12,5 +13,9 @@ const escapeForJson = (value: string): string => JSON.stringify(value).slice(1, 
 export const renderPayload = (provider: string, name: string, values: Readonly<Record<string, string>> = {}): unknown => {
     const raw = readFileSync(join(__dirname, provider, "payloads", `${name}.json`), "utf8")
     const filled = Object.entries(values).reduce((text, [key, value]) => text.split(`{{${key}}}`).join(escapeForJson(value)), raw)
-    return JSON.parse(filled)
+    try {
+        return JSON.parse(filled)
+    } catch (cause) {
+        throw new TestWorldError({ code: TestWorldErrorCode.PayloadInvalid, params: { detail: `${provider}/${name} is not valid JSON` }, cause })
+    }
 }

@@ -12,6 +12,7 @@ import type {
     CreatePaymentIntentParams,
     FindPaymentIntentByGatewayParams,
     FindPaymentIntentParams,
+    PaymentIntentLookupResult,
     PaymentIntentView,
     SettleIntentParams,
 } from "./plan.contracts"
@@ -41,13 +42,13 @@ export class PaymentService {
     }
 
     /** The intent with this id, or null. */
-    async findById(params: FindPaymentIntentParams): Promise<PaymentIntentView | null> {
+    async findById(params: FindPaymentIntentParams): Promise<PaymentIntentLookupResult> {
         const row = await (params.manager ?? this.entityManager).findOneBy(PaymentIntentEntity, { id: params.id })
         return row ? toPaymentIntentView(row) : null
     }
 
     /** The intent the gateway names by its own id, or null. */
-    async findByGatewayIntentId(params: FindPaymentIntentByGatewayParams): Promise<PaymentIntentView | null> {
+    async findByGatewayIntentId(params: FindPaymentIntentByGatewayParams): Promise<PaymentIntentLookupResult> {
         const row = await (params.manager ?? this.entityManager).findOneBy(PaymentIntentEntity, {
             gatewayIntentId: params.gatewayIntentId,
         })

@@ -12,6 +12,7 @@ import type {
     DeleteTaskParams,
     FindTaskParams,
     ListTasksParams,
+    TaskLookupResult,
     TaskView,
     TransitionTaskParams,
 } from "./task.contracts"
@@ -39,7 +40,7 @@ export class TaskService {
     }
 
     /** The task with this id, or null. */
-    async find(params: FindTaskParams): Promise<TaskView | null> {
+    async find(params: FindTaskParams): Promise<TaskLookupResult> {
         const row = await this.entityManager.findOneBy(TaskEntity, { id: params.id })
         return row ? toTaskView(row) : null
     }

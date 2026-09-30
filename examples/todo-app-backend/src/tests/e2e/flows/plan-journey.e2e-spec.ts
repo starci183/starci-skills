@@ -9,6 +9,7 @@ import type {
     PlanUsageData,
     UpgradePlanData,
 } from "@tests/fixtures/views/e2e-views.contracts"
+import { worldClock } from "@tests/world/kit/world-clock"
 import { useTestWorld } from "@tests/world/use-test-world"
 import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
@@ -87,7 +88,7 @@ describe("plan journey (e2e)", () => {
 
         // The gateway half, through the real door. A delivery signed with a wrong secret is ignored, and the pending row is
         // untouched.
-        const periodEnd = new Date(Date.now() + 30 * DAY_MS).toISOString()
+        const periodEnd = new Date(worldClock.now().getTime() + 30 * DAY_MS).toISOString()
         await world.fake.sepay.failNext({ badSignature: true })
         const unsigned = await world.fake.sepay.settle({ gatewayIntentId, status: "paid", periodEnd })
         expect(unsigned).toMatchObject({ signature: "invalid", httpStatus: 200, body: { ignored: true } })

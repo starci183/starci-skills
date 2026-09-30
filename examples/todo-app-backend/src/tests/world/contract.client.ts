@@ -10,6 +10,7 @@ import type { DynamicModule, INestApplicationContext, Type } from "@nestjs/commo
 import { NestFactory } from "@nestjs/core"
 import { EnvSource } from "@modules/platform/config"
 import { HttpModule } from "@modules/platform/http"
+import { readJson } from "./fakes/fakes-http.service"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 
 const BOOT_TIMEOUT_MS = 60_000
@@ -55,25 +56,27 @@ export interface RawAnswer {
     readonly body: unknown
 }
 
-/** A raw JSON call, for comparing the real payload (not what the client parsed out of it) with a fixture. */
-export const fetchJson = async (request: {
+/** One raw JSON call to a provider. */
+export interface RawRequest {
+    /** The HTTP method. */
     readonly method: "GET" | "POST"
+    /** The absolute URL. */
     readonly url: string
+    /** Extra request headers. */
     readonly headers?: Readonly<Record<string, string>>
+    /** A JSON body, sent as `application/json`. */
     readonly body?: unknown
-}): Promise<RawAnswer> => {
+}
+
+/** A raw JSON call, for comparing the real payload (not what the client parsed out of it) with a fixture. */
+export const fetchJson = async (request: RawRequest): Promise<RawAnswer> => {
     const response = await fetch(request.url, {
         method: request.method,
         headers: { ...(request.body === undefined ? {} : { "content-type": "application/json" }), ...request.headers },
         body: request.body === undefined ? undefined : JSON.stringify(request.body),
         signal: AbortSignal.timeout(30_000),
     })
-    const text = await response.text()
-    try {
-        return { status: response.status, body: JSON.parse(text) }
-    } catch {
-        return { status: response.status, body: text }
-    }
+    return { status: response.status, body: readJson(await response.text()).value }
 }
 
 /** Builds the contract client of one provider; nothing is read or booted until the described body runs. */

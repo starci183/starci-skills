@@ -7,6 +7,7 @@
 import { createServer } from "node:net"
 import type { Socket } from "node:net"
 import type { FailureSpec, RecordedRequest, SentMail } from "../fakes-control.contracts"
+import { worldClock } from "../../kit/world-clock"
 import { FailureQueue, RequestLog, listenLoopback } from "../fakes-http.service"
 
 const CRLF = "\r\n"
@@ -20,15 +21,28 @@ const decodeWord = (value: string): string => {
 
 const addressOf = (argument: string): string => ADDRESS.exec(argument)?.[1] ?? argument.trim()
 
+/** The envelope of the message being received. */
+interface Envelope {
+    readonly from: string
+    readonly to: string
+}
+
+/** What one conversation reads and writes: the shared log, the armed failures and the accepted mails. */
+interface ConversationDeps {
+    readonly log: RequestLog
+    readonly failures: FailureQueue
+    readonly accepted: Array<SentMail>
+}
+
 /** Turns the lines of a DATA section (already un-dot-stuffed) and the envelope into a decoded mail. */
-const toMail = (envelope: { readonly from: string; readonly to: string }, lines: ReadonlyArray<string>): SentMail => {
+const toMail = (envelope: Envelope, lines: ReadonlyArray<string>): SentMail => {
     const split = lines.indexOf("")
     const headerLines = split < 0 ? lines : lines.slice(0, split)
     const bodyLines = split < 0 ? [] : lines.slice(split + 1)
     const header = (name: string): string =>
         headerLines.find((line) => line.toLowerCase().startsWith(`${name.toLowerCase()}:`))?.slice(name.length + 1) ?? ""
     return {
-        at: new Date().toISOString(),
+        at: worldClock.now().toISOString(),
         from: envelope.from,
         to: envelope.to,
         subject: decodeWord(header("Subject")),
@@ -36,91 +50,73 @@ const toMail = (envelope: { readonly from: string; readonly to: string }, lines:
     }
 }
 
-/** One conversation over one socket. */
-class Conversation {
-    private buffer = ""
-    private from = ""
-    private to = ""
-    private data: Array<string> | null = null
-    private silent = false
+/** One conversation over one socket: the greeting goes out at once, then every command is answered as an SMTP host does. */
+const converse = (socket: Socket, deps: ConversationDeps): void => {
+    let buffer = ""
+    let from = ""
+    let to = ""
+    let data: Array<string> | null = null
+    let silent = false
 
-    private constructor(
-        private readonly socket: Socket,
-        private readonly log: RequestLog,
-        private readonly failures: FailureQueue,
-        private readonly accepted: Array<SentMail>,
-    ) {
-        socket.on("data", (chunk: Buffer) => this.feed(chunk.toString("utf8")))
-        socket.on("error", () => socket.destroy())
-        this.reply("220 fake-smtp ESMTP ready")
+    const reply = (text: string): void => {
+        if (!silent) socket.write(`${text}${CRLF}`)
     }
 
-    /** Starts the conversation on an accepted socket: the greeting goes out at once. */
-    static attach(socket: Socket, log: RequestLog, failures: FailureQueue, accepted: Array<SentMail>): Conversation {
-        return new Conversation(socket, log, failures, accepted)
-    }
-
-    private reply(text: string): void {
-        if (!this.silent) this.socket.write(`${text}${CRLF}`)
-    }
-
-    private feed(chunk: string): void {
-        this.buffer += chunk
-        for (let end = this.buffer.indexOf(CRLF); end >= 0; end = this.buffer.indexOf(CRLF)) {
-            const line = this.buffer.slice(0, end)
-            this.buffer = this.buffer.slice(end + CRLF.length)
-            if (this.data === null) this.command(line)
-            else this.dataLine(line)
-        }
-    }
-
-    private dataLine(line: string): void {
-        if (line !== ".") {
-            this.data?.push(line.startsWith("..") ? line.slice(1) : line)
-            return
-        }
-        this.accepted.push(toMail({ from: this.from, to: this.to }, this.data ?? []))
-        this.data = null
-        this.reply("250 2.0.0 OK queued")
-    }
-
-    private command(line: string): void {
-        const verb = line.split(" ")[0]?.toUpperCase() ?? ""
-        const argument = line.slice(verb.length).trim()
-        this.log.record({ method: verb, path: argument, headers: {}, body: "" })
-        if (this.silent) return
-        if (verb === "EHLO" || verb === "HELO") this.socket.write(`250-fake-smtp${CRLF}250 8BITMIME${CRLF}`)
-        else if (verb === "MAIL") this.mailFrom(argument)
-        else if (verb === "RCPT") this.recipient(argument)
-        else if (verb === "DATA") this.startData()
-        else if (verb === "QUIT") this.socket.end(`221 2.0.0 Bye${CRLF}`)
-        else this.reply("502 5.5.2 Command not recognized")
-    }
-
-    private mailFrom(argument: string): void {
-        this.from = addressOf(argument)
-        this.reply("250 2.1.0 OK")
-    }
-
-    private recipient(argument: string): void {
+    const recipient = (argument: string): void => {
         const address = addressOf(argument)
-        const failure = this.failures.takeInbound(address)
+        const failure = deps.failures.takeInbound(address)
         if (failure?.timeout === true) {
-            this.silent = true
+            silent = true
             return
         }
         if (failure?.status !== undefined) {
-            this.reply(`${failure.status} injected failure`)
+            reply(`${failure.status} injected failure`)
             return
         }
-        this.to = address
-        this.reply("250 2.1.5 OK")
+        to = address
+        reply("250 2.1.5 OK")
     }
 
-    private startData(): void {
-        this.data = []
-        this.reply("354 End data with <CR><LF>.<CR><LF>")
+    const command = (line: string): void => {
+        const verb = line.split(" ")[0]?.toUpperCase() ?? ""
+        const argument = line.slice(verb.length).trim()
+        deps.log.record({ method: verb, path: argument, headers: {}, body: "" })
+        if (silent) return
+        if (verb === "EHLO" || verb === "HELO") socket.write(`250-fake-smtp${CRLF}250 8BITMIME${CRLF}`)
+        else if (verb === "MAIL") {
+            from = addressOf(argument)
+            reply("250 2.1.0 OK")
+        } else if (verb === "RCPT") recipient(argument)
+        else if (verb === "DATA") {
+            data = []
+            reply("354 End data with <CR><LF>.<CR><LF>")
+        } else if (verb === "QUIT") socket.end(`221 2.0.0 Bye${CRLF}`)
+        else reply("502 5.5.2 Command not recognized")
     }
+
+    const dataLine = (received: Array<string>, line: string): void => {
+        if (line !== ".") {
+            received.push(line.startsWith("..") ? line.slice(1) : line)
+            return
+        }
+        deps.accepted.push(toMail({ from, to }, received))
+        data = null
+        reply("250 2.0.0 OK queued")
+    }
+
+    const feed = (chunk: string): void => {
+        buffer += chunk
+        for (let end = buffer.indexOf(CRLF); end >= 0; end = buffer.indexOf(CRLF)) {
+            const line = buffer.slice(0, end)
+            buffer = buffer.slice(end + CRLF.length)
+            if (data === null) command(line)
+            else dataLine(data, line)
+        }
+    }
+
+    socket.on("data", (chunk: Buffer) => feed(chunk.toString("utf8")))
+    socket.on("error", () => socket.destroy())
+    reply("220 fake-smtp ESMTP ready")
 }
 
 /** The SMTP host fake. */
@@ -132,7 +128,7 @@ export class SmtpFake {
     private readonly server = createServer((socket) => {
         this.sockets.add(socket)
         socket.once("close", () => this.sockets.delete(socket))
-        Conversation.attach(socket, this.log, this.failures, this.accepted)
+        converse(socket, { log: this.log, failures: this.failures, accepted: this.accepted })
     })
     private listening = 0
 

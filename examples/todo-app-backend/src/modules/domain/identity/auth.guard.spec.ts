@@ -20,7 +20,12 @@ interface Rig {
     readonly sessions: SessionService
 }
 
-const build = (metadata: { readonly public?: boolean; readonly roles?: ReadonlyArray<string> }, authorization?: string): Rig => {
+interface GuardMetadata {
+    readonly public?: boolean
+    readonly roles?: ReadonlyArray<string>
+}
+
+const build = (metadata: GuardMetadata, authorization?: string): Rig => {
     const reflector = mock<Reflector>({
         getAllAndOverride: jest
             .fn()

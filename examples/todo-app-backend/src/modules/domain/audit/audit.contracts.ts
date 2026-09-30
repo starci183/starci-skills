@@ -198,3 +198,9 @@ export interface ErasureStepParams {
     /** The instant of the step. */
     readonly at: Date
 }
+
+/** What appending a line answers: the id of the line, which is its chain position. */
+export interface AppendedLineResult {
+    /** The id of the appended line. */
+    readonly lineId: string
+}

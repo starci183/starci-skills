@@ -23,7 +23,13 @@ const upload: UploadView = {
 }
 const query = new ListTaskUploadsQuery({ request: { taskId: "t1" }, principal })
 
-const build = (found: TaskView | null = task): { handler: ListTaskUploadsHandler; uploads: UploadService } => {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: ListTaskUploadsHandler
+    uploads: UploadService
+}
+
+const build = (found: TaskView | null = task): Built => {
     const uploads = mock<UploadService>({ listForTask: jest.fn().mockResolvedValue([upload]) })
     const tasks = mock<TaskService>({ find: jest.fn().mockResolvedValue(found) })
     return { handler: new ListTaskUploadsHandler(mock<Logger>(), uploads, tasks), uploads }

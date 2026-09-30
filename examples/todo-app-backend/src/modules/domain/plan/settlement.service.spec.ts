@@ -35,7 +35,13 @@ interface Parts {
     readonly failedAppliedAt?: Date | null
 }
 
-const build = (parts: Parts = {}): { service: SettlementService; payments: PaymentService; subscriptions: SubscriptionService } => {
+interface Rig {
+    readonly service: SettlementService
+    readonly payments: PaymentService
+    readonly subscriptions: SubscriptionService
+}
+
+const build = (parts: Parts = {}): Rig => {
     const found = parts.intent === undefined ? intent : parts.intent
     const payments = mock<PaymentService>({
         findByGatewayIntentId: jest.fn().mockResolvedValue(found),

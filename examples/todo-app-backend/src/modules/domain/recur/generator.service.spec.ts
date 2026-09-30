@@ -22,10 +22,13 @@ const weekday: RuleView = {
 // 2026-09-18 is a Friday; 12:00Z is 19:00 in Ho Chi Minh, the same calendar day.
 const FRIDAY = new Date("2026-09-18T12:00:00.000Z")
 
-const build = (
-    batches: ReadonlyArray<Array<RuleView>>,
-    existing: ReadonlyArray<string> = [],
-): { generator: GeneratorService; rules: RuleService; occurrences: OccurrenceService } => {
+interface Rig {
+    readonly generator: GeneratorService
+    readonly rules: RuleService
+    readonly occurrences: OccurrenceService
+}
+
+const build = (batches: ReadonlyArray<Array<RuleView>>, existing: ReadonlyArray<string> = []): Rig => {
     const listBatch = jest.fn()
     for (const batch of batches) listBatch.mockResolvedValueOnce(batch)
     const rules = mock<RuleService>({ listBatch })

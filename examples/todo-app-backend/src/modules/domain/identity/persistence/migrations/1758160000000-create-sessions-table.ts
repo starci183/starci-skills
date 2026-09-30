@@ -1,5 +1,4 @@
 import type { MigrationInterface, QueryRunner } from "typeorm"
-import { CREATE_SESSIONS_PERSON_INDEX, CREATE_SESSIONS_TABLE, DROP_SESSIONS_TABLE } from "../schema.sql"
 
 /** Creates the sessions table: one row per live session, deleted outright on revoke or purge. */
 export class CreateSessionsTable1758160000000 implements MigrationInterface {
@@ -7,12 +6,17 @@ export class CreateSessionsTable1758160000000 implements MigrationInterface {
 
     /** Creates the table and its person index. */
     async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(CREATE_SESSIONS_TABLE)
-        await queryRunner.query(CREATE_SESSIONS_PERSON_INDEX)
+        await queryRunner.query(`CREATE TABLE IF NOT EXISTS sessions (
+    token text PRIMARY KEY,
+    person_id text NOT NULL,
+    issued_at timestamptz NOT NULL,
+    expires_at timestamptz NOT NULL
+)`)
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS sessions_person_id_idx ON sessions (person_id)`)
     }
 
     /** Drops the table. */
     async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(DROP_SESSIONS_TABLE)
+        await queryRunner.query(`DROP TABLE IF EXISTS sessions`)
     }
 }

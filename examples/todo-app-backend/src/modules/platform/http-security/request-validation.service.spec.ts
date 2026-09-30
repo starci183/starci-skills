@@ -1,6 +1,6 @@
 import { IsString, MaxLength } from "class-validator"
 import { HttpSecurityError, HttpSecurityErrorCode } from "./errors/http-security.error"
-import { RequestValidationPipe } from "./request-validation.service"
+import { RequestValidationPipeService } from "./request-validation.service"
 
 class SampleInput {
     @IsString()
@@ -10,8 +10,8 @@ class SampleInput {
 
 const metadata = { type: "body" as const, metatype: SampleInput }
 
-describe("RequestValidationPipe", () => {
-    const pipe = new RequestValidationPipe()
+describe("RequestValidationPipeService", () => {
+    const pipe = new RequestValidationPipeService()
 
     it("passes a valid body", async () => {
         await expect(pipe.transform({ name: "abc" }, metadata)).resolves.toEqual({ name: "abc" })

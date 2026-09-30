@@ -18,7 +18,8 @@ import type {
     WebhookDelivery,
     WebhookTarget,
 } from "../fakes-control.contracts"
-import { FailureQueue, RequestLog, answerJson, closeServer, headersOf, listenLoopback, readBody } from "../fakes-http.service"
+import { worldClock } from "../../kit/world-clock"
+import { FailureQueue, RequestLog, answerJson, closeServer, headersOf, listenLoopback, readBody, readJson } from "../fakes-http.service"
 import { renderPayload } from "../payload.service"
 
 const CREATE_INTENT_PATH = "/userapi/transactions/qr"
@@ -39,29 +40,30 @@ interface StoredIntent extends SepayIntent {
     readonly status: "pending" | "paid" | "failed"
 }
 
-const bodyOfAnswer = (text: string): unknown => {
-    try {
-        return JSON.parse(text)
-    } catch {
-        return text
-    }
+/** What the application asked the gateway to create. */
+interface CreateRequest {
+    readonly reference: string
+    readonly amount: number
+    readonly currency: string
 }
 
-const parseCreateBody = (raw: string): { reference: string; amount: number; currency: string } => {
-    try {
-        const parsed: unknown = JSON.parse(raw)
-        if (isRecord(parsed)) {
-            const { reference, amount, currency } = parsed
-            return {
-                reference: typeof reference === "string" ? reference : "",
-                amount: typeof amount === "number" ? amount : 0,
-                currency: typeof currency === "string" ? currency : "",
-            }
-        }
-    } catch {
-        return { reference: "", amount: 0, currency: "" }
+/** What the application answered to a delivery. */
+interface DeliveryAnswer {
+    readonly status: number
+    readonly body: unknown
+}
+
+const EMPTY_CREATE: CreateRequest = { reference: "", amount: 0, currency: "" }
+
+const parseCreateBody = (raw: string): CreateRequest => {
+    const { value } = readJson(raw)
+    if (!isRecord(value)) return EMPTY_CREATE
+    const { reference, amount, currency } = value
+    return {
+        reference: typeof reference === "string" ? reference : "",
+        amount: typeof amount === "number" ? amount : 0,
+        currency: typeof currency === "string" ? currency : "",
     }
-    return { reference: "", amount: 0, currency: "" }
 }
 
 /** The payment gateway fake. */
@@ -118,9 +120,9 @@ export class SepayFake {
     }
 
     /** Sets what the gateway reports for a transaction and delivers the webhook now; answers what the application replied. */
-    async settle(params: SettleParams & WebhookTarget): Promise<WebhookDelivery> {
+    settle(params: SettleParams & WebhookTarget): Promise<WebhookDelivery> {
         const intent = this.intents.get(params.gatewayIntentId)
-        const periodEnd = params.periodEnd ?? new Date(Date.now() + DEFAULT_PERIOD_MS).toISOString()
+        const periodEnd = params.periodEnd ?? new Date(worldClock.now().getTime() + DEFAULT_PERIOD_MS).toISOString()
         this.intents.set(params.gatewayIntentId, {
             gatewayIntentId: params.gatewayIntentId,
             reference: intent?.reference ?? "",
@@ -162,14 +164,14 @@ export class SepayFake {
         return delivery
     }
 
-    private async post(deliverTo: string, secret: string, payload: unknown): Promise<{ readonly status: number; readonly body: unknown }> {
+    private async post(deliverTo: string, secret: string, payload: unknown): Promise<DeliveryAnswer> {
         const response = await fetch(`${deliverTo}${WEBHOOK_PATH}`, {
             method: "POST",
             headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
             body: JSON.stringify(payload),
             signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
         })
-        return { status: response.status, body: bodyOfAnswer(await response.text()) }
+        return { status: response.status, body: readJson(await response.text()).value }
     }
 
     private async answer(request: IncomingMessage, response: ServerResponse): Promise<void> {

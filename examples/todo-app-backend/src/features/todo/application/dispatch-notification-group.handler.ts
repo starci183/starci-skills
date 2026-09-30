@@ -33,11 +33,11 @@ export class DispatchNotificationGroupHandler extends ICQRSHandler<
     protected override async process(command: DispatchNotificationGroupCommand): Promise<DispatchNotificationGroupResult> {
         const { kind, groupId } = command.params.request
         const at = this.clock.now()
-        const plan = await this.entityManager.transaction(async (manager) =>
+        const plan = await this.entityManager.transaction((manager) =>
             this.notify.prepareDispatch({ manager, kind, groupId, at }),
         )
         if (plan === null) return { delivered: 0, retried: 0, bounced: 0 }
         const verdict = await this.notify.transmit(plan)
-        return this.entityManager.transaction(async (manager) => this.notify.settle({ manager, plan, verdict, at }))
+        return this.entityManager.transaction((manager) => this.notify.settle({ manager, plan, verdict, at }))
     }
 }

@@ -9,7 +9,15 @@ import { shapeProblemOf } from "./calendar.policy"
 import { RecurErrorCode } from "./errors/recur.error"
 import { RuleEntity } from "./persistence/entities/rule.entity"
 import { toRuleView } from "./persistence/rule.rows"
-import type { CreateRuleParams, EditRuleParams, EndRuleParams, FindRuleParams, ListRulesParams, RuleView } from "./recur.contracts"
+import type {
+    CreateRuleParams,
+    EditRuleParams,
+    EndRuleParams,
+    FindRuleParams,
+    ListRulesParams,
+    RuleLookupResult,
+    RuleView,
+} from "./recur.contracts"
 
 @Injectable()
 /**
@@ -39,9 +47,10 @@ export class RuleService {
     }
 
     /** The rule with this id, or null. */
-    async find(params: FindRuleParams): Promise<RuleView | null> {
+    async find(params: FindRuleParams): Promise<RuleLookupResult> {
         const row = await this.entityManager.findOneBy(RuleEntity, { id: params.id })
-        return row ? toRuleView(row) : null
+        if (row === null) return null
+        return toRuleView(row)
     }
 
     /** The next batch of rules in id order, at most LIST_ROWS_MAX; a batch shorter than that is the last one. */

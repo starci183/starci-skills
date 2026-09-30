@@ -1,13 +1,4 @@
 import type { MigrationInterface, QueryRunner } from "typeorm"
-import {
-    CREATE_OCCURRENCES_RULE_INDEX,
-    CREATE_OCCURRENCES_TABLE,
-    CREATE_OCCURRENCES_WINDOW_KEY_INDEX,
-    CREATE_RECURRENCE_RULES_OWNER_INDEX,
-    CREATE_RECURRENCE_RULES_TABLE,
-    DROP_OCCURRENCES_TABLE,
-    DROP_RECURRENCE_RULES_TABLE,
-} from "../schema.sql"
 
 /**
  * Creates the recurrence rules and occurrences tables. The task fields of an occurrence live on the tasks table and the
@@ -19,16 +10,34 @@ export class CreateRecurTables1758246000001 implements MigrationInterface {
 
     /** Creates both tables and their indexes. */
     async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(CREATE_RECURRENCE_RULES_TABLE)
-        await queryRunner.query(CREATE_RECURRENCE_RULES_OWNER_INDEX)
-        await queryRunner.query(CREATE_OCCURRENCES_TABLE)
-        await queryRunner.query(CREATE_OCCURRENCES_WINDOW_KEY_INDEX)
-        await queryRunner.query(CREATE_OCCURRENCES_RULE_INDEX)
+        await queryRunner.query(`CREATE TABLE IF NOT EXISTS recurrence_rules (
+    id text PRIMARY KEY,
+    owner text NOT NULL,
+    title text NOT NULL,
+    frequency text NOT NULL,
+    n integer,
+    day_of_month integer,
+    time_zone text NOT NULL,
+    time text NOT NULL,
+    start_date text NOT NULL,
+    ended_at text
+)`)
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS recurrence_rules_owner_idx ON recurrence_rules (owner)`)
+        await queryRunner.query(`CREATE TABLE IF NOT EXISTS occurrences (
+    id text PRIMARY KEY,
+    rule_id text NOT NULL,
+    window_key text NOT NULL,
+    local_date text NOT NULL,
+    due_at_utc timestamptz NOT NULL,
+    status text NOT NULL
+)`)
+        await queryRunner.query(`CREATE UNIQUE INDEX IF NOT EXISTS occurrences_window_key_key ON occurrences (window_key)`)
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS occurrences_rule_id_idx ON occurrences (rule_id)`)
     }
 
     /** Drops both tables. */
     async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(DROP_OCCURRENCES_TABLE)
-        await queryRunner.query(DROP_RECURRENCE_RULES_TABLE)
+        await queryRunner.query(`DROP TABLE IF EXISTS occurrences`)
+        await queryRunner.query(`DROP TABLE IF EXISTS recurrence_rules`)
     }
 }

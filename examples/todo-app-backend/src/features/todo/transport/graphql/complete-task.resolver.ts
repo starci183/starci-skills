@@ -16,10 +16,10 @@ export class CompleteTaskResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Marks a task complete; the owner and editor collaborators may. */
-    @Mutation(() => CompleteTaskType, { name: "completeTask", description: "Mark a task complete." })
+    @Mutation(() => CompleteTaskType, { name: "completeTask" })
     async completeTask(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: CompleteTaskInput,
+        @Args("input") input: CompleteTaskInput,
     ): Promise<CompleteTaskType> {
         const outcome = await this.commandBus.execute(
             new CompleteTaskCommand({ request: toCompleteTaskRequest(input), principal }),

@@ -13,10 +13,7 @@ export class UpgradePlanResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Starts checkout for the paid plan and returns where the caller pays. */
-    @Mutation(() => UpgradePlanType, {
-        name: "upgradePlan",
-        description: "Start checkout for the paid plan: records the pending subscription and payment intent and returns the checkout URL.",
-    })
+    @Mutation(() => UpgradePlanType, { name: "upgradePlan" })
     async upgradePlan(@CurrentPrincipal() principal: Principal): Promise<UpgradePlanType> {
         const result = await this.commandBus.execute(new UpgradePlanCommand({ request: {}, principal }))
         return toUpgradePlanType(result)

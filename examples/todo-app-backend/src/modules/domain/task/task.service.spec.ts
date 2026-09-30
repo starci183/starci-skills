@@ -52,7 +52,7 @@ describe("TaskService", () => {
 
     it("leaves a complete task untouched when it is completed again", async () => {
         const inTransaction = mockEntityManager({ save: jest.fn() })
-        const result = await new TaskService(mockEntityManager()).complete({ manager: inTransaction, task: done, at: new Date() })
+        const result = await new TaskService(mockEntityManager()).complete({ manager: inTransaction, task: done, at: AT })
         expect(result).toBe(done)
         expect(inTransaction.save).not.toHaveBeenCalled()
     })

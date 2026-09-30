@@ -7,7 +7,7 @@ import { createServer } from "node:http"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { isRecord } from "@modules/platform/primitives"
 import type { FailureSpec, FakeName } from "./fakes-control.contracts"
-import { answerJson, closeServer, listenLoopback, readBody } from "./fakes-http.service"
+import { answerJson, closeServer, listenLoopback, readBody, readJson } from "./fakes-http.service"
 import { KeycloakFake } from "./keycloak/server"
 import { SepayFake } from "./sepay/server"
 import type { SepayFakeSecrets } from "./sepay/server"
@@ -137,11 +137,15 @@ export class FakesHost {
             return
         }
         const text = await readBody(request)
+        const answer = await this.run(handler, text === "" ? undefined : readJson(text).value)
+        answerJson(response, answer.status, answer.body)
+    }
+
+    private async run(handler: Handler, body: unknown): Promise<Answer> {
         try {
-            const answer = await handler(text === "" ? undefined : JSON.parse(text))
-            answerJson(response, answer.status, answer.body)
-        } catch {
-            answerJson(response, 500, { error: "control handler failed" })
+            return await handler(body)
+        } catch (cause) {
+            return { status: 500, body: { error: "control handler failed", cause: String(cause) } }
         }
     }
 }

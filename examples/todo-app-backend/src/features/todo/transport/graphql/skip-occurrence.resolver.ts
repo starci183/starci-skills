@@ -16,13 +16,10 @@ export class SkipOccurrenceResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Skips an occurrence of a rule of the caller without completing its task. */
-    @Mutation(() => SkipOccurrenceType, {
-        name: "skipOccurrence",
-        description: "Skip an occurrence of a recurrence rule owned by the caller, without completing its task.",
-    })
+    @Mutation(() => SkipOccurrenceType, { name: "skipOccurrence" })
     async skipOccurrence(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: SkipOccurrenceInput,
+        @Args("input") input: SkipOccurrenceInput,
     ): Promise<SkipOccurrenceType> {
         const outcome = await this.commandBus.execute(
             new SkipOccurrenceCommand({ request: toSkipOccurrenceRequest(input), principal }),

@@ -1,4 +1,4 @@
-import type { Locale, MessageParams } from "./i18n.contracts"
+import type { AcceptLanguage, Locale, MessageParams } from "./i18n.contracts"
 
 /** The message catalog port: a keyed lookup with named interpolation over the bundles the app composes. */
 export interface MessageCatalog {
@@ -9,5 +9,5 @@ export interface MessageCatalog {
 /** Picks the locale of one request. */
 export interface RequestLocale {
     /** The locale of an `Accept-Language` header value: Vietnamese or English, Vietnamese when it names neither. */
-    of(acceptLanguage: string | ReadonlyArray<string> | undefined): Locale
+    of(acceptLanguage: AcceptLanguage): Locale
 }

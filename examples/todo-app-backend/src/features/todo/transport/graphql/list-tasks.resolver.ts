@@ -13,7 +13,7 @@ export class ListTasksResolver {
     constructor(@InjectQueryBus() private readonly queryBus: QueryBus) {}
 
     /** The tasks owned by the caller. */
-    @Query(() => [ListTasksType], { name: "tasks", description: "List the tasks owned by the caller." })
+    @Query(() => [ListTasksType], { name: "tasks" })
     async tasks(@CurrentPrincipal() principal: Principal): Promise<Array<ListTasksType>> {
         const result = await this.queryBus.execute(new ListTasksQuery({ request: {}, principal }))
         return toListTasksType(result)

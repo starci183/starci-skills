@@ -21,9 +21,17 @@ const ended: RuleView = {
     endedAt: "2026-09-20",
 }
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: EndRecurrenceHandler
+    rules: RuleService
+    occurrences: OccurrenceService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     end: jest.Mock,
-): { handler: EndRecurrenceHandler; rules: RuleService; occurrences: OccurrenceService; inner: ReturnType<typeof mockEntityManager> } => {
+): Built => {
     const inner = mockEntityManager()
     const rules = mock<RuleService>({ end })
     const occurrences = mock<OccurrenceService>({ orphanEnded: jest.fn().mockResolvedValue(2) })

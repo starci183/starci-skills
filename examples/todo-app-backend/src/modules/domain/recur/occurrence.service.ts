@@ -48,12 +48,14 @@ export class OccurrenceService {
     /** Which of the window keys already have an occurrence row; the keys are read in bounded chunks. */
     async existingWindowKeys(params: ExistingWindowKeysParams): Promise<Set<string>> {
         const found = new Set<string>()
-        for (let from = 0; from < params.windowKeys.length; from += LIST_ROWS_MAX) {
+        let from = 0
+        while (from < params.windowKeys.length) {
             const rows = await this.entityManager.find(OccurrenceEntity, {
                 where: { windowKey: In(params.windowKeys.slice(from, from + LIST_ROWS_MAX)) },
                 take: LIST_ROWS_MAX,
             })
             for (const row of rows) found.add(row.windowKey)
+            from += LIST_ROWS_MAX
         }
         return found
     }

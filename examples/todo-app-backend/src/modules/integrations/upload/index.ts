@@ -2,7 +2,7 @@ export { UPLOAD_STORAGE_ERROR_KINDS, UploadStorageError, UploadStorageErrorCode 
 export { UPLOAD_STORAGE_MESSAGES } from "./messages/upload-storage.messages"
 export { parseUploadStorageConfig } from "./upload.config"
 export type { ScanVerdict } from "./upload.contracts"
-export { InjectUploadStorage, UPLOAD_SCAN, UPLOAD_STORAGE } from "./upload.decorators"
+export { InjectUploadStorage } from "./upload.decorators"
 export { UploadStorageModule } from "./upload.module"
 export type { UploadStorageOptions } from "./upload.options"
 export type { UploadStorage } from "./upload.port"

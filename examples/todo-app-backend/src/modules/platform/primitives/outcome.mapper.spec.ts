@@ -7,6 +7,15 @@ enum SampleErrorCode {
 
 class SampleError extends DomainError<SampleErrorCode> {}
 
+const caught = (run: () => unknown): unknown => {
+    try {
+        run()
+    } catch (error) {
+        return error
+    }
+    return undefined
+}
+
 describe("unwrapOutcome", () => {
     it("returns the value of a successful outcome", () => {
         expect(unwrapOutcome(ok(42), SampleError)).toBe(42)
@@ -14,15 +23,8 @@ describe("unwrapOutcome", () => {
 
     it("throws the capability error carrying the code and params of a refusal", () => {
         const outcome = refused(SampleErrorCode.Missing, { id: "a" })
-        expect(() => unwrapOutcome(outcome, SampleError)).toThrow(SampleError)
-        try {
-            unwrapOutcome(outcome, SampleError)
-        } catch (error) {
-            expect(error).toBeInstanceOf(SampleError)
-            if (error instanceof SampleError) {
-                expect(error.code).toBe(SampleErrorCode.Missing)
-                expect(error.params).toEqual({ id: "a" })
-            }
-        }
+        const thrown = caught(() => unwrapOutcome(outcome, SampleError))
+        expect(thrown).toBeInstanceOf(SampleError)
+        expect(thrown).toMatchObject({ code: SampleErrorCode.Missing, params: { id: "a" } })
     })
 })

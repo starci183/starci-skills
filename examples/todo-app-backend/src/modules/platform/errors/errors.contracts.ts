@@ -10,7 +10,9 @@ export type ErrorKind =
     | "internal"
 
 /** Values that fill the named placeholders of an error text and travel next to the code; never prose. */
-export type ErrorParams = Readonly<Record<string, string | number>>
+export interface ErrorParams {
+    readonly [name: string]: string | number
+}
 
 /** What a capability error is built from: its code, optional text parameters and the failure that caused it. */
 export interface DomainErrorInit<C extends string> {
@@ -35,4 +37,12 @@ export interface ErrorDescription {
     readonly status: number
     /** Values for the placeholders of the display text. */
     readonly params: ErrorParams
+}
+
+/** What the GraphQL formatter needs of the service: describing a failure, and describing a malformed operation. */
+export interface ErrorDescriber {
+    /** Describes a failure thrown while an operation ran. */
+    describe(error: unknown): ErrorDescription
+    /** Describes an operation that was malformed before any capability ran. */
+    describeInvalidOperation(): ErrorDescription
 }

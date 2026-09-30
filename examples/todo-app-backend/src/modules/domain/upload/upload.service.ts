@@ -15,9 +15,10 @@ import type {
     FindUploadParams,
     ListTaskUploadsParams,
     MarkReadyParams,
-    PresignedToken,
     PresignParams,
+    PresignedToken,
     RemoveUploadParams,
+    UploadLookupResult,
     UploadView,
 } from "./upload.contracts"
 import { InjectUploadOptions } from "./upload.decorators"
@@ -77,7 +78,7 @@ export class UploadService {
      * The upload with this id, or null. An empty id is answered before any query: TypeORM drops an undefined
      * criterion from the WHERE clause, so a lookup on it would match an arbitrary row.
      */
-    async find(params: FindUploadParams): Promise<UploadView | null> {
+    async find(params: FindUploadParams): Promise<UploadLookupResult> {
         if (!params.uploadId) return null
         const row = await this.entityManager.findOneBy(UploadEntity, { id: params.uploadId })
         return row ? toUploadView(row) : null

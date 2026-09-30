@@ -16,13 +16,10 @@ export class AcceptInvitationResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Accepts the invitation addressed to the caller; the invitee names its own email. */
-    @Mutation(() => AcceptInvitationType, {
-        name: "acceptInvitation",
-        description: "Accept a pending invitation addressed to the caller.",
-    })
+    @Mutation(() => AcceptInvitationType, { name: "acceptInvitation" })
     async acceptInvitation(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: AcceptInvitationInput,
+        @Args("input") input: AcceptInvitationInput,
     ): Promise<AcceptInvitationType> {
         const outcome = await this.commandBus.execute(
             new AcceptInvitationCommand({ request: toAcceptInvitationRequest(input), principal }),

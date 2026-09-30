@@ -14,13 +14,10 @@ export class ListCollaboratorsResolver {
     constructor(@InjectQueryBus() private readonly queryBus: QueryBus) {}
 
     /** The invitations on a task, visible to its owner and to bound collaborators. */
-    @Query(() => [ListCollaboratorsType], {
-        name: "collaborators",
-        description: "List a task's collaborators, visible to the owner and to bound collaborators.",
-    })
+    @Query(() => [ListCollaboratorsType], { name: "collaborators" })
     async collaborators(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: ListCollaboratorsInput,
+        @Args("input") input: ListCollaboratorsInput,
     ): Promise<Array<ListCollaboratorsType>> {
         const result = await this.queryBus.execute(
             new ListCollaboratorsQuery({ request: toListCollaboratorsRequest(input), principal }),

@@ -16,13 +16,10 @@ export class UnsubscribeResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Marks the caller's channel unsubscribed, so later events are suppressed before any digest window or send. */
-    @Mutation(() => UnsubscribeType, {
-        name: "unsubscribe",
-        description: "Stop receiving notifications on one channel.",
-    })
+    @Mutation(() => UnsubscribeType, { name: "unsubscribe" })
     async unsubscribe(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: UnsubscribeInput,
+        @Args("input") input: UnsubscribeInput,
     ): Promise<UnsubscribeType> {
         const outcome = await this.commandBus.execute(
             new UnsubscribeCommand({ request: toUnsubscribeRequest(input), principal }),

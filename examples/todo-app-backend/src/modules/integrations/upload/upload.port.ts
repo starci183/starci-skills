@@ -1,4 +1,4 @@
-import type { ScanUploadParams, ScanVerdict, StoreUploadParams, UploadObjectParams } from "./upload.contracts"
+import type { ScanUploadParams, ScanVerdict, StoredBytesResult, StoreUploadParams, UploadObjectParams } from "./upload.contracts"
 
 /**
  * The byte plane: store, get and delete one object. Implementations own durability and containment; the object key is
@@ -12,7 +12,7 @@ export interface UploadStorage {
      */
     store(params: StoreUploadParams): Promise<ScanVerdict>
     /** Reads the object, or null when nothing is stored for the upload. */
-    get(params: UploadObjectParams): Promise<Buffer | null>
+    get(params: UploadObjectParams): Promise<StoredBytesResult>
     /** Removes the object; a missing object is not a failure. */
     delete(params: UploadObjectParams): Promise<void>
 }

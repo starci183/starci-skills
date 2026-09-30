@@ -20,7 +20,14 @@ const request: MakeRecurringRequest = {
 }
 const created: RuleView = { id: "r1", owner: "o1", endedAt: null, ...request }
 
-const build = (create: jest.Mock): { handler: MakeRecurringHandler; rules: RuleService; inner: ReturnType<typeof mockEntityManager> } => {
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: MakeRecurringHandler
+    rules: RuleService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
+const build = (create: jest.Mock): Built => {
     const inner = mockEntityManager()
     const rules = mock<RuleService>({ create })
     const entityManager = mockEntityManager({ transaction: fakeTransaction(inner) })

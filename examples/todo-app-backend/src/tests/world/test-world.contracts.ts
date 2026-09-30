@@ -1,12 +1,11 @@
 import type { DynamicModule } from "@nestjs/common"
-import type { CommandBus, QueryBus } from "@nestjs/cqrs"
 import type { EntityManager } from "typeorm"
 import type { TodoAppOptions } from "../../../apps/todo/src/todo.options"
 import type { WorkerAppOptions } from "../../../apps/worker/src/worker.options"
 import type { TestApi, TestCaller } from "./test-api.client"
 
 /**
- * Every typed option the test world hands to the real apps and to the capability modules of a modules world: the todo api
+ * Every typed option the test world hands to the real apps: the todo api
  * options plus the worker tick options, all pointing at the shared infrastructure of the run (the migrated database, the
  * network-edge fakes, the run-owned upload directory).
  */
@@ -34,27 +33,21 @@ export interface WorkerAppSpec {
     readonly listen?: false
 }
 
+/** Which apps an apps world boots. */
+export interface AppsToBoot {
+    /** The todo api. */
+    readonly todo?: TodoAppSpec
+    /** The worker. */
+    readonly worker?: WorkerAppSpec
+}
+
 /** An apps world: real apps booted in process through their own `AppModule.register(testOptions)`. */
 export interface AppsWorldSpec {
     /** Which apps to boot. */
-    readonly apps: { readonly todo?: TodoAppSpec; readonly worker?: WorkerAppSpec }
+    readonly apps: AppsToBoot
     /** The jest timeout of every hook and step of the spec, in milliseconds. */
     readonly testTimeoutMs?: number
 }
-
-/** Builds one capability module from the options of the run. */
-export type TestModuleFactory = (options: TestOptions) => DynamicModule
-
-/** A modules world: only these capability modules, over the platform database, on the same shared infrastructure. */
-export interface ModulesWorldSpec {
-    /** The capability modules (and the handler modules they need), each registered with the options of the run. */
-    readonly modules: ReadonlyArray<TestModuleFactory>
-    /** The jest timeout of every hook and step of the spec, in milliseconds. */
-    readonly testTimeoutMs?: number
-}
-
-/** What a spec asks the world for. */
-export type TestWorldSpec = AppsWorldSpec | ModulesWorldSpec
 
 /** The database handles of the world: one shared entity manager per connection. */
 export interface TestDb {
@@ -62,12 +55,24 @@ export interface TestDb {
     readonly primary: EntityManager
 }
 
+/** The handle of the booted todo api. */
+export interface TodoAppHandle {
+    /** The transport client of the api. */
+    readonly api: TestApi
+}
+
+/** The handle of the booted worker: no transport, nothing to call. */
+export interface WorkerAppHandle {
+    /** The name of the app. */
+    readonly name: string
+}
+
 /** The apps of an apps world; asking for one the spec did not declare is a world failure. */
 export interface TestApps {
     /** The todo api. */
-    readonly todo: { readonly api: TestApi }
+    readonly todo: TodoAppHandle
     /** The worker: no transport, nothing to call. */
-    readonly worker: { readonly name: string }
+    readonly worker: WorkerAppHandle
 }
 
 /** A person known to the identity provider fake and signed in through the public door. */
@@ -90,12 +95,4 @@ export interface WaitForOptions {
     readonly timeoutMs?: number
     /** The pause between two checks in milliseconds. */
     readonly intervalMs?: number
-}
-
-/** The buses of a modules world. */
-export interface TestBuses {
-    /** The command bus of the booted modules. */
-    readonly commandBus: CommandBus
-    /** The query bus of the booted modules. */
-    readonly queryBus: QueryBus
 }

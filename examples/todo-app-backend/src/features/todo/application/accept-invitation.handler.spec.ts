@@ -23,9 +23,16 @@ const accepted: InvitationView = {
     personId: "ann",
 }
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: AcceptInvitationHandler
+    invitations: InvitationService
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     outcome: Awaited<ReturnType<InvitationService["accept"]>>,
-): { handler: AcceptInvitationHandler; invitations: InvitationService; inner: ReturnType<typeof mockEntityManager> } => {
+): Built => {
     const inner = mockEntityManager()
     const invitations = mock<InvitationService>({ accept: jest.fn().mockResolvedValue(outcome) })
     const entityManager = mockEntityManager({ transaction: fakeTransaction(inner) })

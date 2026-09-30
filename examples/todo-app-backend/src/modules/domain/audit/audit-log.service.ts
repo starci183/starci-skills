@@ -4,7 +4,13 @@ import { MoreThan } from "typeorm"
 import type { EntityManager, FindOptionsWhere } from "typeorm"
 import { GENESIS_HASH, hashLine } from "./audit-chain.policy"
 import { AuditKeystoreService } from "./audit-keystore.service"
-import type { AppendLineParams, ReadChainParams, ResolvedAuditLine, VerifyChainResult } from "./audit.contracts"
+import type {
+    AppendLineParams,
+    AppendedLineResult,
+    ReadChainParams,
+    ResolvedAuditLine,
+    VerifyChainResult,
+} from "./audit.contracts"
 import { LOCK_AUDIT_CHAIN } from "./persistence/audit.sql"
 import { AuditLogLineEntity } from "./persistence/entities/audit-log-line.entity"
 
@@ -24,7 +30,7 @@ export class AuditLogService {
      * Appends one line in the caller transaction. The transaction first takes the chain lock, so appends are serialized
      * and each line chains onto the true last hash; the actor id is sealed under the person key, never stored in clear.
      */
-    async append(params: AppendLineParams): Promise<{ lineId: string }> {
+    async append(params: AppendLineParams): Promise<AppendedLineResult> {
         await params.manager.query(LOCK_AUDIT_CHAIN, [])
         const { keyId, key } = await this.keystore.getOrCreateKey({
             manager: params.manager,

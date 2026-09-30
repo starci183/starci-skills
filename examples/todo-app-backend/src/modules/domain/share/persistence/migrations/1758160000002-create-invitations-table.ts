@@ -1,11 +1,4 @@
 import type { MigrationInterface, QueryRunner } from "typeorm"
-import {
-    CREATE_INVITATIONS_PERSON_INDEX,
-    CREATE_INVITATIONS_TABLE,
-    CREATE_INVITATIONS_TASK_EMAIL_INDEX,
-    CREATE_INVITATIONS_TASK_INDEX,
-    DROP_INVITATIONS_TABLE,
-} from "../schema.sql"
 
 /**
  * Creates the invitations table. The unique index on (task_id, email) backs the rule that exactly one row exists per
@@ -16,14 +9,25 @@ export class CreateInvitationsTable1758160000002 implements MigrationInterface {
 
     /** Creates the table and its indexes. */
     async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(CREATE_INVITATIONS_TABLE)
-        await queryRunner.query(CREATE_INVITATIONS_TASK_EMAIL_INDEX)
-        await queryRunner.query(CREATE_INVITATIONS_TASK_INDEX)
-        await queryRunner.query(CREATE_INVITATIONS_PERSON_INDEX)
+        await queryRunner.query(`CREATE TABLE IF NOT EXISTS invitations (
+    id text PRIMARY KEY,
+    task_id text NOT NULL,
+    owner_id text NOT NULL,
+    email text NOT NULL,
+    role text NOT NULL,
+    status text NOT NULL DEFAULT 'pending',
+    sent_at timestamptz NOT NULL,
+    accepted_at timestamptz,
+    revoked_at timestamptz,
+    person_id text
+)`)
+        await queryRunner.query(`CREATE UNIQUE INDEX IF NOT EXISTS invitations_task_email_idx ON invitations (task_id, email)`)
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS invitations_task_idx ON invitations (task_id)`)
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS invitations_person_idx ON invitations (person_id)`)
     }
 
     /** Drops the table. */
     async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(DROP_INVITATIONS_TABLE)
+        await queryRunner.query(`DROP TABLE IF EXISTS invitations`)
     }
 }

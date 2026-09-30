@@ -53,3 +53,6 @@ export interface DeleteTaskParams {
     /** The task id. */
     readonly id: string
 }
+
+/** The answer of a task lookup: the task, or null when there is none with that id. */
+export type TaskLookupResult = TaskView | null

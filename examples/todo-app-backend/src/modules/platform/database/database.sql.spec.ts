@@ -22,6 +22,6 @@ describe("ident", () => {
     })
 
     it("refuses a name that is not a plain identifier even when listed", () => {
-        expect(() => ident("id; DROP TABLE persons", ["id; DROP TABLE persons"])).toThrow(DatabaseError)
+        expect(() => ident("id or 1=1", ["id or 1=1"])).toThrow(DatabaseError)
     })
 })

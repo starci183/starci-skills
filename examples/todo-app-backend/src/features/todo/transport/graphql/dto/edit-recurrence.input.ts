@@ -33,7 +33,7 @@ export class EditRecurrenceInput {
     dayOfMonth?: number | null
 
     /** The new IANA zone. */
-    @Field({ nullable: true, description: "IANA time zone, for example Asia/Ho_Chi_Minh." })
+    @Field({ nullable: true })
     @IsOptional()
     @IsString()
     @MinLength(1)
@@ -41,7 +41,7 @@ export class EditRecurrenceInput {
     timeZone?: string
 
     /** The new local time HH:MM. */
-    @Field({ nullable: true, description: "Local time HH:MM at which the rule fires, in timeZone." })
+    @Field({ nullable: true })
     @IsOptional()
     @IsString()
     @MaxLength(5)

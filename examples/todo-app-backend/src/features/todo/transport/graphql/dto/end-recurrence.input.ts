@@ -12,7 +12,7 @@ export class EndRecurrenceInput {
     ruleId!: string
 
     /** The local date the rule ends on, in the zone of the rule. */
-    @Field({ description: "Local calendar date (YYYY-MM-DD), in the zone of the rule, on which the rule ends." })
+    @Field()
     @IsString()
     @MaxLength(10)
     @Matches(/^\d{4}-\d{2}-\d{2}$/)

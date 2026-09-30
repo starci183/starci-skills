@@ -13,9 +13,17 @@ import { DeleteTaskHandler } from "./delete-task.handler"
 const AT = new Date("2026-09-30T10:00:00.000Z")
 const task: TaskView = { id: "t1", owner: "owner-1", title: "Write", complete: false, completedAt: null }
 
+/** What `build` wires: the handler and the doubles the specs assert on. */
+interface Built {
+    handler: DeleteTaskHandler
+    tasks: TaskService
+    outbox: Outbox
+    inner: ReturnType<typeof mockEntityManager>
+}
+
 const build = (
     found: TaskView | null = task,
-): { handler: DeleteTaskHandler; tasks: TaskService; outbox: Outbox; inner: ReturnType<typeof mockEntityManager> } => {
+): Built => {
     const inner = mockEntityManager()
     const tasks = mock<TaskService>({ find: jest.fn().mockResolvedValue(found), remove: jest.fn().mockResolvedValue(undefined) })
     const outbox = mock<Outbox>()

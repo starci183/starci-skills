@@ -1,18 +1,4 @@
 import type { MigrationInterface, QueryRunner } from "typeorm"
-import {
-    CREATE_DELIVERY_ATTEMPTS_STATE_INDEX,
-    CREATE_DELIVERY_ATTEMPTS_TABLE,
-    CREATE_DIGEST_WINDOWS_OPEN_INDEX,
-    CREATE_DIGEST_WINDOWS_TABLE,
-    CREATE_NOTIFICATIONS_GROUP_INDEX,
-    CREATE_NOTIFICATIONS_RECIPIENT_INDEX,
-    CREATE_NOTIFICATIONS_TABLE,
-    CREATE_PREFERENCES_TABLE,
-    DROP_DELIVERY_ATTEMPTS_TABLE,
-    DROP_DIGEST_WINDOWS_TABLE,
-    DROP_NOTIFICATIONS_TABLE,
-    DROP_PREFERENCES_TABLE,
-} from "../schema.sql"
 
 /** Creates the notification, delivery attempt, preference and digest window tables; every statement is idempotent. */
 export class CreateNotifyTables1758210000000 implements MigrationInterface {
@@ -20,21 +6,53 @@ export class CreateNotifyTables1758210000000 implements MigrationInterface {
 
     /** Creates the four tables and their indexes. */
     async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(CREATE_NOTIFICATIONS_TABLE)
-        await queryRunner.query(CREATE_NOTIFICATIONS_RECIPIENT_INDEX)
-        await queryRunner.query(CREATE_NOTIFICATIONS_GROUP_INDEX)
-        await queryRunner.query(CREATE_DELIVERY_ATTEMPTS_TABLE)
-        await queryRunner.query(CREATE_DELIVERY_ATTEMPTS_STATE_INDEX)
-        await queryRunner.query(CREATE_PREFERENCES_TABLE)
-        await queryRunner.query(CREATE_DIGEST_WINDOWS_TABLE)
-        await queryRunner.query(CREATE_DIGEST_WINDOWS_OPEN_INDEX)
+        await queryRunner.query(`CREATE TABLE IF NOT EXISTS notify_notifications (
+    id text PRIMARY KEY,
+    kind text NOT NULL,
+    recipient_id text NOT NULL,
+    payload jsonb NOT NULL,
+    digest_group_id text,
+    created_at timestamptz NOT NULL
+)`)
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS notify_notifications_recipient_idx
+    ON notify_notifications (recipient_id)`)
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS notify_notifications_digest_group_idx
+    ON notify_notifications (digest_group_id)`)
+        await queryRunner.query(`CREATE TABLE IF NOT EXISTS notify_delivery_attempts (
+    notification_id text PRIMARY KEY REFERENCES notify_notifications (id),
+    state text NOT NULL,
+    attempt integer NOT NULL DEFAULT 0,
+    failure_class text,
+    started_at timestamptz,
+    ended_at timestamptz,
+    history jsonb NOT NULL DEFAULT '[]'::jsonb
+)`)
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS notify_delivery_attempts_state_idx
+    ON notify_delivery_attempts (state)`)
+        await queryRunner.query(`CREATE TABLE IF NOT EXISTS notify_preferences (
+    person_id text NOT NULL,
+    channel text NOT NULL,
+    unsubscribed boolean NOT NULL DEFAULT false,
+    digest_window_minutes integer,
+    PRIMARY KEY (person_id, channel)
+)`)
+        await queryRunner.query(`CREATE TABLE IF NOT EXISTS notify_digest_windows (
+    id text PRIMARY KEY,
+    person_id text NOT NULL,
+    channel text NOT NULL,
+    opens_at timestamptz NOT NULL,
+    closes_at timestamptz NOT NULL,
+    flushed_at timestamptz
+)`)
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS notify_digest_windows_open_idx
+    ON notify_digest_windows (person_id, channel) WHERE flushed_at IS NULL`)
     }
 
     /** Drops the four tables, dependents first. */
     async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(DROP_DIGEST_WINDOWS_TABLE)
-        await queryRunner.query(DROP_PREFERENCES_TABLE)
-        await queryRunner.query(DROP_DELIVERY_ATTEMPTS_TABLE)
-        await queryRunner.query(DROP_NOTIFICATIONS_TABLE)
+        await queryRunner.query(`DROP TABLE IF EXISTS notify_digest_windows`)
+        await queryRunner.query(`DROP TABLE IF EXISTS notify_preferences`)
+        await queryRunner.query(`DROP TABLE IF EXISTS notify_delivery_attempts`)
+        await queryRunner.query(`DROP TABLE IF EXISTS notify_notifications`)
     }
 }

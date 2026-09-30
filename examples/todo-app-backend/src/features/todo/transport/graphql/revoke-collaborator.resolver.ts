@@ -16,13 +16,10 @@ export class RevokeCollaboratorResolver {
     constructor(@InjectCommandBus() private readonly commandBus: CommandBus) {}
 
     /** Revokes a collaborator invitation the caller owns; access ends with the commit. */
-    @Mutation(() => RevokeCollaboratorType, {
-        name: "revokeCollaborator",
-        description: "Revoke a collaborator on one of the caller's own tasks.",
-    })
+    @Mutation(() => RevokeCollaboratorType, { name: "revokeCollaborator" })
     async revokeCollaborator(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: RevokeCollaboratorInput,
+        @Args("input") input: RevokeCollaboratorInput,
     ): Promise<RevokeCollaboratorType> {
         const outcome = await this.commandBus.execute(
             new RevokeCollaboratorCommand({ request: toRevokeCollaboratorRequest(input), principal }),

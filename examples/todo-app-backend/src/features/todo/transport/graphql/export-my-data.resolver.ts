@@ -13,10 +13,7 @@ export class ExportMyDataResolver {
     constructor(@InjectQueryBus() private readonly queryBus: QueryBus) {}
 
     /** Every audit line naming the caller, decrypted; empty once a completed erasure destroyed the caller key. */
-    @Query(() => [ExportMyDataType], {
-        name: "exportMyData",
-        description: "Every log line naming the caller, decrypted, or nothing once the caller's key has been erased.",
-    })
+    @Query(() => [ExportMyDataType], { name: "exportMyData" })
     async exportMyData(@CurrentPrincipal() principal: Principal): Promise<Array<ExportMyDataType>> {
         const result = await this.queryBus.execute(new ExportMyDataQuery({ request: {}, principal }))
         return toExportMyDataType(result)

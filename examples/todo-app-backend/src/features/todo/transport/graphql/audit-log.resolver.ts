@@ -16,10 +16,7 @@ export class AuditLogResolver {
     constructor(@InjectQueryBus() private readonly queryBus: QueryBus) {}
 
     /** The audit lines the caller may read: their own, or the whole chain for an administrator. */
-    @Query(() => [AuditLogType], {
-        name: "auditLog",
-        description: "The caller's own audit log lines, oldest first; an administrator reads the whole chain.",
-    })
+    @Query(() => [AuditLogType], { name: "auditLog" })
     async auditLog(@CurrentPrincipal() principal: Principal, @Args() args: AuditLogArgs): Promise<Array<AuditLogType>> {
         const outcome = await this.queryBus.execute(new AuditLogQuery({ request: toAuditLogRequest(args), principal }))
         return toAuditLogType(unwrapOutcome(outcome, AuditError))
