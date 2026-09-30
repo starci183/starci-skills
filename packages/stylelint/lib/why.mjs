@@ -47,6 +47,11 @@ export const why = {
     vi: "`brand.css` (`<file>`) sai hình dạng (`<what>`). Lớp thương hiệu chỉ khai token của grammar, trong một khối sáng và một khối tối, mỗi token có đủ hai giá trị.",
     fixVi: "Chỉ giữ khai báo token trong `:root` và `.dark` (hoặc `@media (prefers-color-scheme: dark)`); thêm giá trị còn thiếu cho chế độ kia.",
   },
+  "status-contrast": {
+    code: "FE_STYLE_TOKEN_ONLY",
+    vi: "`brand.css` (`<file>`) có màu trạng thái không đạt chuẩn cặp mềm HeroUI (`<what>`). Mỗi tông trạng thái (success, warning, danger, info) có `--<tông>-soft` (nền nhạt) và `--<tông>-soft-foreground` (màu chữ, icon, chấm) ở cả sáng và tối; chữ mềm trên nền nhạt và trên nền trang phải đạt ≥ 3:1, chữ thân `--foreground` trên `--background` ≥ 4.5:1, và tông đặc không được dùng làm màu chữ khi dưới 4.5:1.",
+    fixVi: "Khai đủ cặp mềm cho cả sáng và tối (khối chung `:root, .light, .dark` tính cho cả hai); trộn `--<tông>-soft-foreground` về phía `--foreground` cho tới khi đạt ngưỡng; giá trị không phân giải được thì sửa thành màu đọc được (hex, rgb, hsl, oklab, oklch, color-mix).",
+  },
   "no-inline-lint-config": {
     code: "HFS_INLINE_SUPPRESSION",
     vi: "Có chú thích tắt luật ở `<file>:<line>`. HFS không cho tắt tại chỗ — sửa code, hoặc đề xuất đổi luật.",

@@ -77,6 +77,7 @@ test("every rule fires through the factory config on a stylesheet that breaks it
     [".a { color: var(--accent); }", "D:/repo/src/app/globals.css"],
     [".a { --accent: var(--muted); }", undefined],
     [":root { --accent: #fff; }", "D:/repo/src/modules/brand/brand.css"],
+    [":root { --background: oklch(97% 0 0); --foreground: oklch(70% 0 0); } .dark { --background: oklch(15% 0 0); --foreground: oklch(97% 0 0); }", "D:/repo/src/modules/brand/brand.css"],
     ["/* stylelint-disable */", undefined],
     [".a { color: var(--accent); }", FILES.css],
     ["@media (min-width: 500px) { [data-a] { color: var(--accent); } }", FILES.css],
