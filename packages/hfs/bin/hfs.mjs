@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // hfs - the HFS command line of a StarCi product repository.
-//   hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>]
+//   hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]
 //                                            every tracked path has a slot; required files exist; nothing forbidden or
 //                                            tracked-that-must-be-ignored; pins match; every managed file equals its render
 //                                            (sync/managed.mjs); no empty or ghost directory, no untracked
@@ -11,12 +11,16 @@
 //                                            overrides it, and without --fast is the base of the size-growth check); the machine
 //                                            runs on those owners without clones and dead exports. No merge-base is a refusal
 //                                            (exit 2), never a silent full pass. Exit 1 on any error-level finding.
+//                                            --sonar: also write the error findings as a Sonar Generic Issue Import file (report/sonar.mjs),
+//                                            before the verdict, so a failing check still leaves the report Sonar imports.
+//   hfs report-stylelint <in> <out> [--repo <dir>]  convert stylelint's json output into a Sonar Generic Issue Import file.
 //   hfs init    [--repo <dir>] [--stdout]   write a starter hfs.json by detecting the profile and the apps.
 //   hfs explain <path> [--repo <dir>] [--json]   which slot owns the path, its tier, allowed imports, required tests.
 //   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar, codecov); sync/cli.mjs
 //   hfs work-hygiene                              the pre-commit guard for staged .starciwork and .starcistacks paths; sync/cli.mjs
 // Every finding names a why code and carries its Vietnamese text. The command reads the repository, never writes to it
 // (init writes hfs.json only, and only when none exists). Exit codes: 0 clean, 1 error findings, 2 a refusal or bad usage.
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkRepository, explainPath, initRepo, trackedFiles } from '../runtime/scripts/lib/hfs-check.mjs';
@@ -24,15 +28,17 @@ import { HfsSlotsError } from '../runtime/scripts/lib/hfs-slots.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
 import { SyncError } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
+import { convertStylelintFile, sonarReport, sourceRootsOf, writeReport } from '../report/sonar.mjs';
 
-const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>]
+const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>] [--sonar <file>]
+hfs report-stylelint <in> <out> [--repo <dir>]
 hfs init [--repo <dir>] [--stdout]
 hfs explain <path> [--repo <dir>] [--json]
 hfs sync (--check | --write) [--root <dir>]
 hfs work-hygiene
 `;
 const PER_CODE_LIMIT = 25;
-const VALUE_FLAGS = new Set(['--repo', '--base']);
+const VALUE_FLAGS = new Set(['--repo', '--base', '--sonar']);
 const BOOL_FLAGS = new Set(['--json', '--stdout', '--fast']);
 
 function parse(argv) {
@@ -63,6 +69,13 @@ function printCheck(result, out) {
   out(`\n${counts.error} error finding${counts.error === 1 ? '' : 's'}, ${counts.info} report-only\n`);
 }
 
+/** The check's error findings as the Sonar import file: findings outside `sonar.sources` are filed on the first source file. */
+function writeSonarReport({ repoRoot, file, result }) {
+  let properties = '';
+  try { properties = fs.readFileSync(path.join(repoRoot, 'sonar-project.properties'), 'utf8'); } catch { /* no properties: every finding keeps its own path */ }
+  writeReport(file, sonarReport(result.findings, { sourceRoots: sourceRootsOf(properties), tracked: trackedFiles(repoRoot) }));
+}
+
 function printExplain(e, out) {
   out(`${e.path}\n`);
   if (e.status === 'no-slot') {
@@ -83,7 +96,7 @@ function printExplain(e, out) {
 /** `presets` is a test seam: the coverage denominators sync would load from the repository's installed preset. */
 export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets } = {}) {
   const [verb, ...rest] = argv;
-  if (!['check', 'init', 'explain', 'sync', 'work-hygiene'].includes(verb)) { stderr(USAGE); return 2; }
+  if (!['check', 'init', 'explain', 'sync', 'work-hygiene', 'report-stylelint'].includes(verb)) { stderr(USAGE); return 2; }
   try {
     if (verb === 'sync' || verb === 'work-hygiene') return await syncMain(argv);
     const opts = parse(rest);
@@ -92,8 +105,16 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
       if (opts.positional.length) throw new Error('hfs check takes no path');
       const extraFindings = await managedFindings({ repoRoot, tracked: trackedFiles(repoRoot), presets });
       const result = checkRepository({ repoRoot, fast: opts.fast === true, base: opts.base, extraFindings });
+      if (opts.sonar !== undefined) writeSonarReport({ repoRoot, file: path.resolve(opts.sonar), result });
       if (opts.json) stdout(`${JSON.stringify(result, null, 2)}\n`); else printCheck(result, stdout);
       return result.ok ? 0 : 1;
+    }
+    if (verb === 'report-stylelint') {
+      if (opts.positional.length !== 2) throw new Error('hfs report-stylelint takes an input and an output file');
+      const issues = convertStylelintFile({ input: path.resolve(opts.positional[0]), output: path.resolve(opts.positional[1]), root: repoRoot });
+      stdout(`hfs report-stylelint: ${issues} issue${issues === 1 ? '' : 's'} written to ${opts.positional[1]}
+`);
+      return 0;
     }
     if (verb === 'init') {
       if (opts.positional.length) throw new Error('hfs init takes no path');

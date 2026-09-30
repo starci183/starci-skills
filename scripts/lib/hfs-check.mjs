@@ -42,7 +42,7 @@ export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 export const CHECK_CODES = Object.freeze([
   'HFS_PATH_NO_SLOT', 'HFS_SLOT_NOT_ENABLED', 'HFS_SLOT_AMBIGUOUS', 'HFS_TRACKED_MUST_BE_IGNORED', 'HFS_FORBIDDEN_PRESENT',
   'HFS_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG', 'BE_SOURCE_FORM',
-  'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT',
+  'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT', 'HFS_SONAR_CONFIG',
   'HFS_INIT_EXISTS', 'HFS_INIT_UNDETECTED', 'HFS_REPO_UNREADABLE',
   'HFS_DECLARATION_INVALID', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
@@ -55,14 +55,14 @@ const DEP_SECTIONS = ['dependencies', 'devDependencies'];
 
 const refuse = (code, message, details = {}) => { throw new HfsSlotsError(code, message, details); };
 
-/** {code: {title_vi, meaning_vi, nextStep_vi}} for the codes asked for, read from the failure-code catalog under `root`. */
+/** {code: {title, title_vi, meaning_vi, nextStep_vi}} for the codes asked for, read from the failure-code catalog under `root`. */
 export function readWhy(root = skillRoot, codes = CHECK_CODES) {
   const catalog = parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8'));
   const why = {};
   for (const code of codes) {
     const entry = catalog?.[code];
     if (!entry) refuse('HFS_MANIFEST_INVALID', `${FAILURE_CODES_FILE} has no entry for ${code}`, { code });
-    why[code] = { titleVi: entry.title_vi, whyVi: entry.meaning_vi, nextStepVi: entry.nextStep_vi };
+    why[code] = { title: entry.title, titleVi: entry.title_vi, whyVi: entry.meaning_vi, nextStepVi: entry.nextStep_vi };
   }
   return why;
 }
@@ -168,7 +168,7 @@ const requiredOf = (slot, instance) => (slot.requires ?? []).map((entry) => {
 const appOf = (p) => /^apps\/([^/]+)\//.exec(p)?.[1];
 
 function withWhy(findings, why) {
-  return findings.map((f) => ({ ...f, titleVi: why[f.code].titleVi, whyVi: why[f.code].whyVi, nextStepVi: why[f.code].nextStepVi }));
+  return findings.map((f) => ({ ...f, title: why[f.code].title, titleVi: why[f.code].titleVi, whyVi: why[f.code].whyVi, nextStepVi: why[f.code].nextStepVi }));
 }
 
 function summarize(findings) {
