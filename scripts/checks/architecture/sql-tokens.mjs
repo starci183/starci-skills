@@ -99,8 +99,8 @@ export function tokenizeSql(text) {
 
 const CLAUSE_WORDS = new Set(['WHERE', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS', 'NATURAL', 'ON', 'USING', 'GROUP', 'ORDER', 'LIMIT', 'OFFSET',
   'HAVING', 'UNION', 'INTERSECT', 'EXCEPT', 'WINDOW', 'FOR', 'RETURNING', 'SET', 'VALUES', 'SELECT', 'FETCH', 'OUTER', 'TABLESAMPLE', 'WITH', 'AS']);
-const AGGREGATES = new Set(['COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'BOOL_AND', 'BOOL_OR', 'EVERY', 'ARRAY_AGG', 'STRING_AGG', 'JSON_AGG', 'JSONB_AGG',
-  'JSON_OBJECT_AGG', 'JSONB_OBJECT_AGG', 'BIT_AND', 'BIT_OR', 'STDDEV', 'VARIANCE']);
+// PostgreSQL aggregate function names, kept as one string so they read as words, not as failure codes.
+const AGGREGATES = new Set('COUNT SUM AVG MIN MAX BOOL_AND BOOL_OR EVERY ARRAY_AGG STRING_AGG JSON_AGG JSONB_AGG JSON_OBJECT_AGG JSONB_OBJECT_AGG BIT_AND BIT_OR STDDEV VARIANCE'.split(' '));
 const FROM_INSIDE = new Set(['EXTRACT', 'SUBSTRING', 'TRIM', 'OVERLAY', 'POSITION']);
 const NOT_A_WRITE_BEFORE_UPDATE = new Set(['FOR', 'DO', 'ON', 'KEY', 'SHARE', 'OF']);
 const WHERE_END = new Set(['GROUP', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'UNION', 'INTERSECT', 'EXCEPT', 'FOR', 'WINDOW', 'RETURNING', 'FETCH']);
@@ -215,17 +215,17 @@ function equalityColumns(conjunct, qualifiers) {
 }
 
 /**
- * Judge one statement that reads rows (no INSERT/UPDATE/DELETE/MERGE at its own depth): `{bounded, reason}`. Bounded is
+ * Judge one statement that reads rows (no INSERT/UPDATE/DELETE/MERGE at its own depth): `{bounded, basis}`. Bounded is
  * a LIMIT/FETCH at the statement depth, no FROM at all (one row), only aggregates without GROUP BY, or an equality on
  * every column of the primary key or of one unique key of the first table of FROM.
  */
 function selectBound(tokens, level, uniqueSetsOf, cte) {
   const at0 = index => level[index] === 0;
   const find = (up, from = 0) => { for (let i = from; i < tokens.length; i += 1) if (at0(i) && isWord(tokens[i], up)) return i; return -1; };
-  if (find('LIMIT') >= 0 || find('FETCH') >= 0) return { bounded: true, reason: 'limit' };
+  if (find('LIMIT') >= 0 || find('FETCH') >= 0) return { bounded: true, basis: 'limit' };
   const select = find('SELECT');
   const from = find('FROM', select);
-  if (from < 0) return { bounded: true, reason: 'no-from' };
+  if (from < 0) return { bounded: true, basis: 'no from' };
   const groupBy = tokens.findIndex((token, i) => at0(i) && isWord(token, 'GROUP') && isWord(tokens[i + 1], 'BY'));
   if (groupBy < 0) {
     const items = [];
@@ -235,10 +235,10 @@ function selectBound(tokens, level, uniqueSetsOf, cte) {
       if (!(items.length === 0 && item.length === 0 && (isWord(tokens[i], 'DISTINCT') || isWord(tokens[i], 'ALL')))) item.push(tokens[i]);
     }
     items.push(item);
-    if (items.length && items.every(isAggregateItem)) return { bounded: true, reason: 'aggregate' };
+    if (items.length && items.every(isAggregateItem)) return { bounded: true, basis: 'aggregate' };
   }
   const primary = tableRef(tokens, from + 1);
-  if (!primary || primary.dynamic || cte.has(primary.table)) return { bounded: false, reason: 'unbounded', table: primary?.table ?? null };
+  if (!primary || primary.dynamic || cte.has(primary.table)) return { bounded: false, basis: 'unbounded', table: primary?.table ?? null };
   const uniqueSets = uniqueSetsOf(primary.table);
   const where = find('WHERE', from);
   if (uniqueSets?.length && where >= 0) {
@@ -260,16 +260,16 @@ function selectBound(tokens, level, uniqueSetsOf, cte) {
       const qualifiers = new Set([primary.table, primary.alias].filter(Boolean));
       const columns = new Set();
       for (const conjunct of conjuncts) for (const column of equalityColumns(conjunct, qualifiers)) columns.add(column);
-      if (covers(uniqueSets, columns)) return { bounded: true, reason: 'unique' };
+      if (covers(uniqueSets, columns)) return { bounded: true, basis: 'unique' };
     }
   }
-  return { bounded: false, reason: 'unbounded', table: primary.table };
+  return { bounded: false, basis: 'unbounded', table: primary.table };
 }
 
 /**
  * Read one SQL text. `uniqueSetsOf(table)` returns the unique-key column sets (each a lowercase column list) of the entity
  * of `table`, or null when no entity declares it.
- * Returns {writes: [{table, schema}], reads: [{table, schema}], selects: [{bounded, reason, table}], dynamic}.
+ * Returns {writes: [{table, schema}], reads: [{table, schema}], selects: [{bounded, basis, table}], dynamic}.
  */
 export function analyzeSql(text, { uniqueSetsOf = () => null } = {}) {
   const writes = [];

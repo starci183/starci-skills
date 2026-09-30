@@ -347,7 +347,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["BE_ENTRYPOINT_ONLY_IN_APPS"]
     enforcers:
-      - {kind: machine, id: entrypoint-only-in-apps, status: planned}
+      - {kind: machine, id: entrypoint-only-in-apps, at: scripts/checks/architecture/entrypoint.mjs}
   - id: R34
     code: "BE_SCHEMA_AUTHORITY"
     title_vi: "Schema bị định nghĩa lúc chạy"
@@ -394,7 +394,7 @@ rules:
     failureCodes: ["BE_ERROR_HOME"]
     enforcers:
       - {kind: eslint-be, id: error-home}
-      - {kind: machine, id: error-home, status: planned}
+      - {kind: machine, id: error-home, at: scripts/checks/architecture/error-codes.mjs}
   - id: R39
     code: "BE_ERROR_MASKED"
     title_vi: "Lỗi nội bộ lộ ra client"
@@ -403,7 +403,7 @@ rules:
     gates: [land, ci]
     failureCodes: ["BE_ERROR_MASKED"]
     enforcers:
-      - {kind: machine, id: error-masked, status: planned}
+      - {kind: machine, id: error-masked, at: scripts/checks/architecture/error-masked.mjs}
   - id: R40
     code: "BE_LOGGER_REQUIRED"
     title_vi: "Catch nuốt lỗi"
@@ -427,7 +427,7 @@ rules:
       - {kind: eslint-be, id: no-untyped-body}
       - {kind: eslint-be, id: public-needs-reason}
       - {kind: eslint-be, id: secret-compare-timing-safe}
-      - {kind: machine, id: default-deny-app-guard, status: planned}
+      - {kind: machine, id: default-deny-app-guard, at: scripts/checks/architecture/default-deny.mjs}
       - {kind: eslint-be, id: identity-needs-guard}
   - id: R42
     code: "BE_INPUT_BOUNDED"
@@ -471,6 +471,7 @@ rules:
       - {kind: eslint-be, id: no-new-injectable}
       - {kind: eslint-be, id: no-module-let}
       - {kind: eslint-be, id: one-module-per-file}
+      - {kind: machine, id: register-once, at: scripts/checks/architecture/register-once.mjs}
       - {kind: machine, id: module-per-transport, status: planned}
   - id: R46
     code: "BE_BACKGROUND_UNOWNED"
@@ -892,7 +893,7 @@ rules:
     failureCodes: ["BE_CONNECTION_DUPLICATE"]
     enforcers:
       - {kind: eslint-be, id: one-connection-per-database}
-      - {kind: machine, id: connection-map, status: planned}
+      - {kind: machine, id: connection-map, at: scripts/checks/architecture/connection-map.mjs}
   - id: R85
     code: "BE_RAW_INJECT"
     title_vi: "Phụ thuộc hạ tầng không được tiêm qua Inject*()"
@@ -916,7 +917,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["BE_SQL_TABLE_OWNER"]
     enforcers:
-      - {kind: machine, id: sql-owner, status: planned}
+      - {kind: machine, id: sql-owner, at: scripts/checks/architecture/sql-owner.mjs}
   - id: R87
     code: "BE_CQRS_SHAPE"
     title_vi: "Tầng ứng dụng sai hình CQRS"

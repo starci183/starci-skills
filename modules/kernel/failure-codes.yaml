@@ -669,6 +669,7 @@ BE_DEFAULT_DENY:
     - "GraphQLJSON được dùng để chui dữ liệu không kiểu qua schema"
     - "@Public() thiếu reason"
     - "Token, mật khẩu hoặc chữ ký được so sánh bằng === hay !=="
+    - "Gốc app api không cung cấp APP_GUARD theo thứ tự throttler, CSRF origin guard của platform/http-security, AuthGuard của domain/identity, hoặc thiếu, lặp một guard"
   nextStep_vi: "Khai DTO hoặc kiểu hợp đồng cho từng operation, thêm reason cho @Public, và so sánh bí mật bằng crypto.timingSafeEqual; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -693,6 +694,7 @@ BE_ERROR_HOME:
     - "Lớp lỗi kế thừa Error hoặc AbstractException thay vì DomainError"
     - "throw new Error(...) hoặc throw new NotFoundException(...) thoát ra khỏi capability"
     - "Domain ném EnvError hay PersistenceError của platform"
+    - "Giá trị của enum <C>ErrorCode không phải chuỗi literal dạng <CAPABILITY>_<WHAT>, có hậu tố _ERROR hay _EXCEPTION, hoặc trùng với một mã ở nơi khác trong repo"
   nextStep_vi: "Chuyển lỗi về <capability>/errors/, kế thừa DomainError, dịch lỗi platform thành lỗi của capability; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -750,6 +752,9 @@ BE_MODULE_SHAPE:
     - "new ConfigurableModuleBuilder() không có kiểu options"
     - "register, registerAsync, forRoot hay forFeature không phải static"
     - "new XService() hoặc let ở cấp module tạo trạng thái toàn cục"
+    - "Bộ máy đồ thị module: module đại diện của capability được đăng ký hai lần trong một app, thiếu isGlobal: true ở gốc app, hoặc bị module khác import"
+    - "Module con có hơn một nơi import, hoặc vừa nằm ở gốc app vừa được module khác import"
+    - "isGlobal: true xuất hiện ngoài gốc app apps/<app>/src/app.module.ts"
   nextStep_vi: "Bỏ @Global, khai kiểu options, đặt phương thức static, tách module, để container dựng provider; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
@@ -12335,6 +12340,7 @@ BE_ENTRYPOINT_ONLY_IN_APPS:
   meaning_vi: "`<file>` là một entrypoint tiến trình nằm ngoài `apps/`."
   causes_vi:
     - "Vi phạm luật R33: Không `main.ts`/`bootstrap()`/top-level `void x()` ngoài `apps/*/src`; migrate là `apps/migrate`."
+    - "NestFactory.create* hoặc lời gọi bootstrap() cấp cao nhất nằm ngoài apps/<app>/src/main.ts"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -12355,6 +12361,8 @@ BE_ERROR_MASKED:
   meaning_vi: "App `<a>` trả thông điệp lỗi nội bộ ra client (`<where>`). Lỗi lạ phải bị che."
   causes_vi:
     - "Vi phạm luật R39: Mỗi app đăng ký đúng một filter/formatError của `platform/errors`; lỗi không khai báo → 500 + thông điệp chung, chi tiết chỉ vào log."
+    - "Gốc app api không cung cấp đúng một APP_FILTER dùng lớp khai báo trong platform/errors"
+    - "GraphQLModule.forRoot không truyền formatError của platform/errors"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding

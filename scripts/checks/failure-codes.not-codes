@@ -1,6 +1,7 @@
 # Literals that look like codes to scripts/checks/failure-codes.mjs but are not: constants, env names, schema ids, event kinds, labels.
 # One per line: <literal><TAB><why it is not a code>. Anything a checker or verb can emit as a reason belongs in modules/kernel/failure-codes.yaml instead.
 APP_FILTER	NestJS framework token name the checker looks for, not a code
+APP_GUARD	NestJS framework token name the checker looks for, not a code
 ARTIFACT_ROOT_ENV	environment variable name
 ASSET_PROMPT_ATTR	HTML attribute name constant
 ASSET_SHA_ATTR	HTML attribute name constant

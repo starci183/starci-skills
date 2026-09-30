@@ -1,0 +1,24 @@
+id: hfs-machine-composition
+effectiveAt: '2026-09-30T18:00:00+07:00'
+summary: >-
+  Lane C0 sub-lane M1 (BE-CONVENTION 1.2, 1.4, 1.7, 1.8, 2.2 and rules R33, R38, R39, R41, R45, R84, R86): the HFS
+  architecture machine gains seven backend checks that emit the rules' own codes and report under
+  coverage.hfsMachine: connection-map (BE_CONNECTION_DUPLICATE: hfs.json connections, connection, decorators and config
+  files, entity manager tokens resolved through the checker, one registration per app, stack env host/port/database
+  collisions), sql-owner (BE_SQL_TABLE_OWNER: a small SQL tokenizer reads every `sql` template of a persistence
+  `.sql.ts`; writes only own tables, reads only importable owners, every table declared by an entity, every multi-row
+  SELECT bounded), register-once (BE_MODULE_SHAPE: the module graph from the app roots, a representative registered once
+  per app with isGlobal true and imported by no module, a sub-module with one importer, isGlobal true only in app roots),
+  error-masked (BE_ERROR_MASKED: one APP_FILTER from platform/errors and its formatError), default-deny-app-guard
+  (BE_DEFAULT_DENY: APP_GUARD order throttler, CSRF origin guard, AuthGuard), entrypoint-only-in-apps
+  (BE_ENTRYPOINT_ONLY_IN_APPS) and error-codes (BE_ERROR_HOME: capability-prefixed, unique string codes). The
+  catalog names each enforcer with its file; no new failure code, the Vietnamese entries of the seven codes gain the
+  machine's causes.
+reach: new-legs
+paths:
+  - knowledge/hfs/rules.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/contract-changes/hfs-machine-composition.yaml
+  - scripts/checks/failure-codes.not-codes
+  - scripts/checks/architecture
+  - docs/architecture-check.md
