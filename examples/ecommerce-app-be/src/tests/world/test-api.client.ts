@@ -13,26 +13,23 @@ const CALL_TIMEOUT_MS = 20_000
 
 /** The operations the two apps answer, by the key a spec names them with. */
 const DOCUMENTS = new Map<string, string>([
-    ["register", "mutation Register($input: RegisterInput!) { register(request: $input) { personId } }"],
-    ["signIn", "mutation SignIn($input: SignInInput!) { signIn(request: $input) { sessionToken personId } }"],
-    [
-        "verifySession",
-        "query VerifySession($input: VerifySessionInput!) { verifySession(request: $input) { personId } }",
-    ],
+    ["register", "mutation Register($input: RegisterInput!) { register(input: $input) { personId } }"],
+    ["signIn", "mutation SignIn($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }"],
+    ["verifySession", "query VerifySession($input: VerifySessionInput!) { verifySession(input: $input) { personId } }"],
     [
         "revokeSession",
-        "mutation RevokeSession($input: RevokeSessionInput!) { revokeSession(request: $input) { revoked } }",
+        "mutation RevokeSession($input: RevokeSessionInput!) { revokeSession(input: $input) { revoked } }",
     ],
     ["account", "query { account { personId email hasOrders } }"],
     ["cart", "query { cart { items { productId quantity } catalog { id name priceMinorUnits stock } } }"],
     [
         "addCartItem",
-        "mutation AddCartItem($input: AddCartItemInput!) { addCartItem(request: $input) { item { productId quantity } } }",
+        "mutation AddCartItem($input: AddCartItemInput!) { addCartItem(input: $input) { item { productId quantity } } }",
     ],
     ["clearCart", "mutation { clearCart { cleared } }"],
     [
         "placeOrder",
-        "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(request: $input) { orderId status totalMinorUnits currency paymentId replayed } }",
+        "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(input: $input) { orderId status totalMinorUnits currency paymentId replayed } }",
     ],
     ["buyerStatus", "query { buyerStatus { personId hasOrders } }"],
 ])

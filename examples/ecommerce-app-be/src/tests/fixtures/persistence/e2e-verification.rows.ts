@@ -68,24 +68,29 @@ export interface TableRow {
     table_name: string
 }
 
-/** The statement type the `sql` tag builds. */
-type Statement = ReturnType<typeof sql>
+/** One verification statement and the shape of the rows it answers. */
+export interface RowQuery<TRow> {
+    /** The SQL text, built with the `sql` tag. */
+    readonly text: ReturnType<typeof sql>
+    /** Type-level only: the row shape the statement answers; it is never set. */
+    readonly rowShape?: TRow
+}
 
 /** Runs a read of the verification statements and answers its rows. */
 export const readRows = <TRow>(
     manager: EntityManager,
-    statement: Statement,
+    query: RowQuery<TRow>,
     params: ReadonlyArray<string | number>,
-): Promise<Array<TRow>> => manager.query(statement, [...params])
+): Promise<Array<TRow>> => manager.query(query.text, [...params])
 
 /** The count a verification statement answers for one id. */
-export const readCount = async (manager: EntityManager, statement: Statement, id?: string): Promise<number> => {
-    const rows = await readRows<CountRow>(manager, statement, id === undefined ? [] : [id])
+export const readCount = async (manager: EntityManager, query: RowQuery<CountRow>, id?: string): Promise<number> => {
+    const rows = await readRows(manager, query, id === undefined ? [] : [id])
     return rows[0]?.count ?? 0
 }
 
 /** The stock of one product of the order database; zero when the SKU is unknown. */
 export const readStock = async (manager: EntityManager, productId: string): Promise<number> => {
-    const rows = await readRows<StockRow>(manager, STOCK_OF, [productId])
+    const rows = await readRows(manager, STOCK_OF, [productId])
     return rows[0]?.stock ?? 0
 }

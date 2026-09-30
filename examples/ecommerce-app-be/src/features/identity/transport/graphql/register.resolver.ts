@@ -19,7 +19,7 @@ export class RegisterResolver {
     @Mutation(() => RegisterType, { name: "register" })
     @Public({ reason: PublicReason.AuthHandshake })
     @RateLimit(RateTier.Strict)
-    async register(@Args("request") input: RegisterInput): Promise<RegisterType> {
+    async register(@Args("input") input: RegisterInput): Promise<RegisterType> {
         const outcome = await this.commandBus.execute(new RegisterCommand({ request: toRegisterRequest(input) }))
         return toRegisterType(unwrapOutcome(outcome, AccountError))
     }

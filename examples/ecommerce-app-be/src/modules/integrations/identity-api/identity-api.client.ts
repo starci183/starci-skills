@@ -11,7 +11,7 @@ import type { IdentityApiOptions } from "./identity-api.options"
 const SESSION_INVALID_CODE = "SESSION_INVALID"
 
 const VERIFY_SESSION_QUERY =
-    "query VerifySession($input: VerifySessionInput!) { verifySession(request: $input) { personId } }"
+    "query VerifySession($input: VerifySessionInput!) { verifySession(input: $input) { personId } }"
 
 /** The person behind a live session, as the identity service names them. */
 export interface IdentitySession {

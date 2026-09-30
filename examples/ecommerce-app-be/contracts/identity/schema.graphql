@@ -5,14 +5,14 @@ type AccountType {
 }
 
 type Mutation {
-  register(request: RegisterInput!): RegisterType!
-  revokeSession(request: RevokeSessionInput!): RevokeSessionType!
-  signIn(request: SignInInput!): SignInType!
+  register(input: RegisterInput!): RegisterType!
+  revokeSession(input: RevokeSessionInput!): RevokeSessionType!
+  signIn(input: SignInInput!): SignInType!
 }
 
 type Query {
   account: AccountType!
-  verifySession(request: VerifySessionInput!): VerifySessionType!
+  verifySession(input: VerifySessionInput!): VerifySessionType!
 }
 
 input RegisterInput {

@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { CLOCK } from "./clock.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./clock.module-definition"
-import { SystemClockService } from "./system-clock.service"
+import { SystemClock } from "./system-clock.service"
 
 @Module({})
 /** Provides the Clock port backed by the system clock. */
@@ -12,7 +12,7 @@ export class ClockModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []), { provide: CLOCK, useClass: SystemClockService }],
+            providers: [...(base.providers ?? []), { provide: CLOCK, useClass: SystemClock }],
             exports: [CLOCK],
         }
     }

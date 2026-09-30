@@ -3,7 +3,6 @@ import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData, ClearCartData } from "../../fixtures/e2e-views.contracts"
-import type { PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
 import { ORDER_COUNT, PAYMENTS_OF_PERSON, PAYMENT_COUNT } from "../../fixtures/persistence/e2e-verification.sql"
 import type { TestApi } from "../../world/test-api.client"
@@ -84,7 +83,7 @@ describe("payment failure", () => {
             currency: "USD",
             replayed: false,
         })
-        expect(await readRows<PaymentRow>(world.db.order, PAYMENTS_OF_PERSON, [personId])).toEqual([
+        expect(await readRows(world.db.order, PAYMENTS_OF_PERSON, [personId])).toEqual([
             expect.objectContaining({ status: "captured", amount_minor_units: thermos.priceMinorUnits * stock }),
         ])
         expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])

@@ -1,6 +1,6 @@
 import "reflect-metadata"
 import { DataSource } from "typeorm"
-import { SystemClockService } from "@modules/platform/clock"
+import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
 import type { DatabaseConnectionOptions } from "@modules/platform/database"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
@@ -40,11 +40,9 @@ export async function bootstrap(env: EnvSource): Promise<Record<string, Readonly
 
 if (require.main === module) {
     bootstrap(EnvSource.fromProcess())
-        .then((applied) =>
-            createJsonLogger(new SystemClockService()).info(LoggingLogEvent.MigrationsApplied, { applied }),
-        )
+        .then((applied) => createJsonLogger(new SystemClock()).info(LoggingLogEvent.MigrationsApplied, { applied }))
         .catch((error: unknown) => {
-            createJsonLogger(new SystemClockService()).error(LoggingLogEvent.StartupFailed, error, {
+            createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, {
                 service: "migrate",
             })
             process.exit(1)

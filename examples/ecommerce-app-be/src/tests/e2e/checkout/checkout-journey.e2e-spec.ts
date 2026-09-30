@@ -3,7 +3,6 @@ import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { present } from "../../fixtures/present.mapper"
 import type { CartData, PlaceOrderData, AccountData, BuyerStatusData } from "../../fixtures/e2e-views.contracts"
-import type { OrderSummaryRow, PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows, readCount, readStock } from "../../fixtures/persistence/e2e-verification.rows"
 import {
     ORDER_SUMMARY,
@@ -90,11 +89,11 @@ describe("checkout journey", () => {
         })
 
         expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
-        expect(await readRows<OrderSummaryRow>(world.db.order, ORDER_SUMMARY, [order.orderId])).toEqual([
+        expect(await readRows(world.db.order, ORDER_SUMMARY, [order.orderId])).toEqual([
             { status: "confirmed", total_minor_units: expectedTotal },
         ])
         expect(await readCount(world.db.order, ORDER_LINE_COUNT, order.orderId)).toBe(2)
-        expect(await readRows<PaymentRow>(world.db.order, PAYMENTS_OF_PERSON, [personId])).toEqual([
+        expect(await readRows(world.db.order, PAYMENTS_OF_PERSON, [personId])).toEqual([
             expect.objectContaining({ status: "captured", amount_minor_units: expectedTotal }),
         ])
         expect(await readCount(world.db.order, CART_ITEM_COUNT, personId)).toBe(0)

@@ -27,9 +27,9 @@ type ClearCartType {
 }
 
 type Mutation {
-  addCartItem(request: AddCartItemInput!): AddCartItemType!
+  addCartItem(input: AddCartItemInput!): AddCartItemType!
   clearCart: ClearCartType!
-  placeOrder(request: PlaceOrderInput!): PlaceOrderType!
+  placeOrder(input: PlaceOrderInput!): PlaceOrderType!
 }
 
 input PlaceOrderInput {

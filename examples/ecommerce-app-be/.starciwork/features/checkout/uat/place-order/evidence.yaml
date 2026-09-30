@@ -30,7 +30,7 @@ assets:
     sha256: 29b07d962ce41df5ee7e91abfe5ed858f613910b382e2097196a5cc2fd21aaa2
 provenance:
   actor: playwright-harness
-  tool: 'npx playwright test -c uat/playwright.config.ts uat.checkout.place-order, run in examples/ecommerce-app-fe with UAT_LIVE_LOGIN_AUTHORIZED=true (reporter uat/lib/run-writer.ts)'
+  tool: 'npx playwright test uat.checkout.place-order, run in examples/ecommerce-app-fe with UAT_LIVE_LOGIN_AUTHORIZED=true'
   environment: local
   capturedAt: '2026-09-19T15:53:21.000Z'
   stack: >-

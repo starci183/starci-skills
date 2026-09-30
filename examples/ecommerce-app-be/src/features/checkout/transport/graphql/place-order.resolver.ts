@@ -20,7 +20,7 @@ export class PlaceOrderResolver {
     @Roles("member")
     async placeOrder(
         @CurrentPrincipal() principal: Principal,
-        @Args("request") input: PlaceOrderInput,
+        @Args("input") input: PlaceOrderInput,
     ): Promise<PlaceOrderType> {
         const outcome = await this.commandBus.execute(
             new PlaceOrderCommand({ request: toPlaceOrderRequest(input), principal }),

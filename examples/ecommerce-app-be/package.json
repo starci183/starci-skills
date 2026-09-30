@@ -9,16 +9,20 @@
     "start:order": "node dist/apps/order/src/main.js",
     "migrate": "node dist/apps/migrate/src/main.js",
     "typecheck": "tsc -p tsconfig.json",
-    "typecheck:e2e": "tsc -p src/tests/e2e/tsconfig.json",
-    "lint": "hfs lint",
-    "lint:fix": "hfs lint --fix",
+    "typecheck:tests": "tsc -p src/tests/tsconfig.json",
+    "lint": "eslint --fix .",
+    "lint:check": "eslint .",
+    "lint:report": "eslint . --format json --output-file reports/eslint.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "jest --selectProjects unit --coverage",
     "test:affected": "jest --selectProjects unit --passWithNoTests",
-    "test:e2e": "npm run typecheck:e2e && jest --selectProjects e2e",
-    "test:e2e:live": "npm run typecheck:e2e && jest --selectProjects e2e --testPathIgnorePatterns /node_modules/ --testPathPattern e2e.live",
-    "contract:emit": "hfs emit-contracts"
+    "test:integration": "npm run typecheck:tests && jest --selectProjects integration",
+    "test:e2e": "npm run typecheck:tests && jest --selectProjects e2e",
+    "test:contract": "npm run typecheck:tests && jest --selectProjects contract",
+    "contract:emit": "hfs emit-contracts",
+    "hfs:check": "hfs check",
+    "hfs:report": "hfs check --sonar reports/hfs.sonar.json"
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",
@@ -43,11 +47,11 @@
   "devDependencies": {
     "@apollo/client": "^4.3.1",
     "@nestjs/testing": "11.2.5",
-    "@starci/eslint-canon-be": "1.8.1",
-    "@starci/hfs": "1.0.1",
-    "@starci/jest-preset": "2.0.0",
+    "@starci/eslint-canon-be": "2.0.0",
+    "@starci/hfs": "2.0.0",
+    "@starci/jest-preset": "2.1.0",
     "@starci/prettier-config": "1.0.0",
-    "@starci/tsconfig": "1.0.0",
+    "@starci/tsconfig": "2.0.0",
     "@types/express": "^4.17.21",
     "@types/jest": "29.5.14",
     "@types/node": "22.20.4",
@@ -63,5 +67,8 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.0"
+  },
+  "overrides": {
+    "globals": "^17.12.0"
   }
 }

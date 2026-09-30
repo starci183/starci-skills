@@ -1,6 +1,6 @@
 import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
-import { SystemClockService } from "@modules/platform/clock"
+import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
 import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
@@ -12,13 +12,13 @@ async function bootstrap(): Promise<void> {
     const app = await NestFactory.create(AppModule.register(options))
     app.enableShutdownHooks()
     await app.listen(options.port)
-    createJsonLogger(new SystemClockService()).info(LoggingLogEvent.ServerStarted, {
+    createJsonLogger(new SystemClock()).info(LoggingLogEvent.ServerStarted, {
         service: "order",
         port: options.port,
     })
 }
 
 bootstrap().catch((error: unknown) => {
-    createJsonLogger(new SystemClockService()).error(LoggingLogEvent.StartupFailed, error, { service: "order" })
+    createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "order" })
     process.exit(1)
 })

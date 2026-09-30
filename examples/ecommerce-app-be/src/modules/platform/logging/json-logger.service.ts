@@ -7,7 +7,7 @@ import type { LogFields, Logger } from "./logging.port"
 type Level = "info" | "warn" | "error"
 
 /** The default adapter: one JSON object per line, stamped by the Clock; info goes to `out`, warn and error to `err`. */
-export class JsonLoggerService implements Logger {
+export class JsonLogger implements Logger {
     constructor(
         @InjectClock() private readonly clock: Clock,
         @InjectLogOut() private readonly out: Writable,
@@ -39,4 +39,4 @@ export class JsonLoggerService implements Logger {
 }
 
 /** Builds the JSON logger stamping lines with `clock` on stdout and stderr; main.ts uses it before the DI container exists. */
-export const createJsonLogger = (clock: Clock): Logger => new JsonLoggerService(clock, process.stdout, process.stderr)
+export const createJsonLogger = (clock: Clock): Logger => new JsonLogger(clock, process.stdout, process.stderr)

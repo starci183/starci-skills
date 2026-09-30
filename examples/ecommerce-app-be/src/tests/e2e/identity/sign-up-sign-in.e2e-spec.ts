@@ -9,7 +9,6 @@ import type {
     VerifySessionData,
     RevokeSessionData,
 } from "../../fixtures/e2e-views.contracts"
-import type { PersonRow, TableRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
 import { PUBLIC_TABLES, PERSON_BY_ID } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
@@ -81,12 +80,10 @@ describe("identity sign-up and sign-in journey", () => {
         expect(denied.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
 
         // Out-of-band verification: the person persisted, and both databases carry their migrated tables.
-        expect(await readRows<PersonRow>(world.db.identity, PERSON_BY_ID, [personId])).toEqual([
-            { id: personId, email },
-        ])
+        expect(await readRows(world.db.identity, PERSON_BY_ID, [personId])).toEqual([{ id: personId, email }])
         expect(world.fake.redis.size()).toBeGreaterThan(0)
-        const identityTables = await readRows<TableRow>(world.db.identity, PUBLIC_TABLES, [])
-        const orderTables = await readRows<TableRow>(world.db.order, PUBLIC_TABLES, [])
+        const identityTables = await readRows(world.db.identity, PUBLIC_TABLES, [])
+        const orderTables = await readRows(world.db.order, PUBLIC_TABLES, [])
         expect([...identityTables, ...orderTables].map((row) => row.table_name)).toEqual(
             expect.arrayContaining(["persons", "products", "orders"]),
         )

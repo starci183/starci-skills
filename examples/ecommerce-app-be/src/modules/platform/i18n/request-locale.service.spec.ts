@@ -1,10 +1,10 @@
 import { Test } from "@nestjs/testing"
-import { RequestLocaleService } from "./request-locale.service"
+import { AcceptLanguageRequestLocale } from "./request-locale.service"
 
-describe("RequestLocaleService", () => {
-    const build = async (): Promise<RequestLocaleService> => {
-        const moduleRef = await Test.createTestingModule({ providers: [RequestLocaleService] }).compile()
-        return moduleRef.get(RequestLocaleService)
+describe("AcceptLanguageRequestLocale", () => {
+    const build = async (): Promise<AcceptLanguageRequestLocale> => {
+        const moduleRef = await Test.createTestingModule({ providers: [AcceptLanguageRequestLocale] }).compile()
+        return moduleRef.get(AcceptLanguageRequestLocale)
     }
 
     it("picks Vietnamese when the header lists Vietnamese", async () => {

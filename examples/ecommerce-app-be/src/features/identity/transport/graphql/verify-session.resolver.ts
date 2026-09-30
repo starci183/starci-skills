@@ -19,7 +19,7 @@ export class VerifySessionResolver {
     @Query(() => VerifySessionType, { name: "verifySession" })
     @Public({ reason: PublicReason.AuthHandshake })
     @RateLimit(RateTier.Strict)
-    async verifySession(@Args("request") input: VerifySessionInput): Promise<VerifySessionType> {
+    async verifySession(@Args("input") input: VerifySessionInput): Promise<VerifySessionType> {
         const outcome = await this.queryBus.execute(new VerifySessionQuery({ request: toVerifySessionRequest(input) }))
         return toVerifySessionType(unwrapOutcome(outcome, SessionError))
     }

@@ -1,12 +1,20 @@
 import { Injectable } from "@nestjs/common"
+import { injector } from "@modules/platform/composition"
+import type { TypedParameterDecorator } from "@modules/platform/composition"
 import type { EntityManager } from "typeorm"
 import type { Probe } from "@modules/platform/probes"
-import { InjectDatabaseManagers } from "./database-probe.tokens"
 import { PING } from "./database.sql"
+
+/** Token of the managers of every connection the app opened. */
+export const DATABASE_MANAGERS: unique symbol = Symbol("platform.database.managers")
+
+/** Injects the managers of every connection the app opened. Parameter type: ReadonlyArray of EntityManager. */
+export const InjectDatabaseManagers = (): TypedParameterDecorator<ReadonlyArray<EntityManager>> =>
+    injector<ReadonlyArray<EntityManager>>(DATABASE_MANAGERS)
 
 @Injectable()
 /** The health probe of the database capability: every connection the app opened must answer a ping. */
-export class DatabaseProbeService implements Probe {
+export class DatabaseProbe implements Probe {
     /** The name the health report lists this probe under. */
     readonly name = "database"
 

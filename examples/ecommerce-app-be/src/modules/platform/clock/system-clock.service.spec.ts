@@ -1,16 +1,16 @@
 import { Test } from "@nestjs/testing"
-import { SystemClockService } from "./system-clock.service"
+import { SystemClock } from "./system-clock.service"
 
-describe("SystemClockService", () => {
+describe("SystemClock", () => {
     afterEach(() => {
         jest.useRealTimers()
     })
 
     it("returns the current instant of the host clock", async () => {
         jest.useFakeTimers({ now: new Date("2026-03-04T05:06:07.000Z") })
-        const moduleRef = await Test.createTestingModule({ providers: [SystemClockService] }).compile()
+        const moduleRef = await Test.createTestingModule({ providers: [SystemClock] }).compile()
 
-        const now = moduleRef.get(SystemClockService).now()
+        const now = moduleRef.get(SystemClock).now()
 
         expect(now.toISOString()).toBe("2026-03-04T05:06:07.000Z")
     })

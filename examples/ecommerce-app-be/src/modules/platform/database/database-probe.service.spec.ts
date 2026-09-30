@@ -1,19 +1,19 @@
 import { mockEntityManager } from "@starci/jest-preset"
 import { Test } from "@nestjs/testing"
-import { DATABASE_MANAGERS } from "./database-probe.tokens"
+import { DATABASE_MANAGERS } from "./database-probe.service"
 import { PING } from "./database.sql"
-import { DatabaseProbeService } from "./database-probe.service"
+import { DatabaseProbe } from "./database-probe.service"
 
 const build = async () => {
     const identity = mockEntityManager()
     const order = mockEntityManager()
     const moduleRef = await Test.createTestingModule({
-        providers: [DatabaseProbeService, { provide: DATABASE_MANAGERS, useValue: [identity, order] }],
+        providers: [DatabaseProbe, { provide: DATABASE_MANAGERS, useValue: [identity, order] }],
     }).compile()
-    return { probe: moduleRef.get(DatabaseProbeService), identity, order }
+    return { probe: moduleRef.get(DatabaseProbe), identity, order }
 }
 
-describe("DatabaseProbeService", () => {
+describe("DatabaseProbe", () => {
     it("is named database", async () => {
         const { probe } = await build()
 

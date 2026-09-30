@@ -2,7 +2,6 @@ import { AppModule as IdentityApp } from "../../../../apps/identity/src/app.modu
 import { AppModule as OrderApp } from "../../../../apps/order/src/app.module"
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import type { CartData, PlaceOrderData, AccountData, RevokeSessionData } from "../../fixtures/e2e-views.contracts"
-import type { OrderRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows } from "../../fixtures/persistence/e2e-verification.rows"
 import { ORDERS_OF_PERSON } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
@@ -62,7 +61,7 @@ describe("order lifecycle: identity to order boundary", () => {
         })
         expect(placed.errorCode).toBeNull()
         expect(placed.data?.placeOrder.status).toBe("confirmed")
-        expect(await readRows<OrderRow>(world.db.order, ORDERS_OF_PERSON, [session.personId])).toEqual([
+        expect(await readRows(world.db.order, ORDERS_OF_PERSON, [session.personId])).toEqual([
             expect.objectContaining({ status: "confirmed" }),
         ])
         const account = await world.apps.identity.api.bearing(resumed.sessionToken).read<AccountData>("account")

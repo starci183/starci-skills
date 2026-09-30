@@ -2,7 +2,7 @@
 # itself - schemas/work-layout.yaml's uatRun note is what check-example-work.mjs's concept 12 actually
 # checks (a `run` field naming runs/<runId>, that run having screens/, videos/ and a result.md whose
 # outcome is pass). Every byte named below was produced by the Playwright harness at
-# examples/ecommerce-app-fe/uat, which wrote runs/<runId>/ itself; this file only settles which run.
+# the ecommerce-app-fe Playwright harness (no longer in the tree), which wrote runs/<runId>/ itself; this file only settles which run.
 # Two earlier run folders (runs/20260919T151633Z-5c10a673 and runs/20260919T151937Z-5c10a673) were
 # failed spec-repair history that settled nothing; they were pruned from the tree as generated
 # artifacts and remain in git history.
@@ -35,7 +35,7 @@ provenance:
   # and example-evidence, and neither wrote this - no kernel workflow settled it and example-evidence.mjs
   # cannot emit a `run:` field. The value names the mechanism that actually produced the proof.
   actor: playwright-harness
-  tool: 'npx playwright test -c uat/playwright.config.ts uat/flows/uat.identity.sign-in.spec.ts (reporter uat/lib/run-writer.ts), run in examples/ecommerce-app-fe with UAT_LIVE_LOGIN_AUTHORIZED=true'
+  tool: 'npx playwright test uat.identity.sign-in, run in examples/ecommerce-app-fe with UAT_LIVE_LOGIN_AUTHORIZED=true'
   environment: local
   capturedAt: '2026-09-19T15:21:53.502Z'
   stack: >-

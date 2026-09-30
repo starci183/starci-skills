@@ -1,3 +1,4 @@
+import { DomainError } from "@modules/platform/errors"
 import type { ErrorKind } from "@modules/platform/errors"
 
 /** Codes of the keycloak admin integration: what an admin lookup can be refused with. */
@@ -13,3 +14,6 @@ export const KEYCLOAK_ADMIN_ERROR_KINDS: Record<KeycloakAdminErrorCode, ErrorKin
     [KeycloakAdminErrorCode.MemberMissing]: "not-found",
     [KeycloakAdminErrorCode.Unavailable]: "unavailable",
 }
+
+/** The one error class of the keycloak admin integration. */
+export class KeycloakAdminError extends DomainError<KeycloakAdminErrorCode> {}

@@ -2,8 +2,8 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
 import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
 import type { DataSource } from "typeorm"
-import { DatabaseProbeService } from "./database-probe.service"
-import { DATABASE_MANAGERS } from "./database-probe.tokens"
+import { DatabaseProbe } from "./database-probe.service"
+import { DATABASE_MANAGERS } from "./database-probe.service"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
 import { IDENTITY_CONNECTION } from "./identity.connection"
 import { IDENTITY_ENTITY_MANAGER } from "./identity.decorators"
@@ -62,9 +62,9 @@ export class DatabaseModule extends ConfigurableModuleClass {
                     useFactory: (...sources: Array<DataSource>) => sources.map((source) => source.manager),
                 },
                 ...managers,
-                DatabaseProbeService,
+                DatabaseProbe,
             ],
-            exports: [DatabaseProbeService, ...managers.map((manager) => manager.provide)],
+            exports: [DatabaseProbe, ...managers.map((manager) => manager.provide)],
         }
     }
 }

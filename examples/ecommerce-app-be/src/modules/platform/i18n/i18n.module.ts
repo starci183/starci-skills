@@ -1,9 +1,9 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { BundleMessageCatalogService } from "./bundle-message-catalog.service"
+import { BundleMessageCatalog } from "./bundle-message-catalog.service"
 import { MESSAGE_CATALOG, REQUEST_LOCALE } from "./i18n.decorators"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./i18n.module-definition"
-import { RequestLocaleService } from "./request-locale.service"
+import { AcceptLanguageRequestLocale } from "./request-locale.service"
 
 @Module({})
 /** Provides the MessageCatalog and RequestLocale ports. */
@@ -15,8 +15,8 @@ export class I18nModule extends ConfigurableModuleClass {
             ...base,
             providers: [
                 ...(base.providers ?? []),
-                { provide: MESSAGE_CATALOG, useClass: BundleMessageCatalogService },
-                { provide: REQUEST_LOCALE, useClass: RequestLocaleService },
+                { provide: MESSAGE_CATALOG, useClass: BundleMessageCatalog },
+                { provide: REQUEST_LOCALE, useClass: AcceptLanguageRequestLocale },
             ],
             exports: [MESSAGE_CATALOG, REQUEST_LOCALE],
         }

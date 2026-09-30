@@ -9,7 +9,6 @@ import type {
     AccountData,
     BuyerStatusData,
 } from "../../fixtures/e2e-views.contracts"
-import type { OrderRow, OrderLineRow, PaymentRow } from "../../fixtures/persistence/e2e-verification.rows"
 import { readRows, readCount } from "../../fixtures/persistence/e2e-verification.rows"
 import {
     ORDER_COUNT,
@@ -96,7 +95,7 @@ describe("order lifecycle: order history", () => {
         expect(secondOrder.paymentId).not.toBe(firstOrder.paymentId)
 
         // list: two orders in creation order, each confirmed and priced as answered.
-        const orders = await readRows<OrderRow>(world.db.order, ORDERS_OF_PERSON, [personId])
+        const orders = await readRows(world.db.order, ORDERS_OF_PERSON, [personId])
         expect(orders).toHaveLength(2)
         expect(orders[0]).toMatchObject({
             id: firstOrder.orderId,
@@ -113,16 +112,16 @@ describe("order lifecycle: order history", () => {
         })
 
         // detail: each order lines carry the catalog price snapshot taken at confirmation.
-        expect(await readRows<OrderLineRow>(world.db.order, LINES_OF_ORDER, [firstOrder.orderId])).toEqual([
+        expect(await readRows(world.db.order, LINES_OF_ORDER, [firstOrder.orderId])).toEqual([
             { product_id: "sku-mug", quantity: 2, unit_price_minor_units: mug.priceMinorUnits },
         ])
-        expect(await readRows<OrderLineRow>(world.db.order, LINES_OF_ORDER, [secondOrder.orderId])).toEqual([
+        expect(await readRows(world.db.order, LINES_OF_ORDER, [secondOrder.orderId])).toEqual([
             { product_id: "sku-notebook", quantity: 1, unit_price_minor_units: notebook.priceMinorUnits },
             { product_id: "sku-thermos", quantity: 1, unit_price_minor_units: thermos.priceMinorUnits },
         ])
 
         // ...and each order has exactly one captured payment, keyed by the order id.
-        const payments = await readRows<PaymentRow>(world.db.order, PAYMENTS_OF_PERSON, [personId])
+        const payments = await readRows(world.db.order, PAYMENTS_OF_PERSON, [personId])
         expect(payments).toHaveLength(2)
         expect(payments[0]).toMatchObject({
             id: firstOrder.paymentId,

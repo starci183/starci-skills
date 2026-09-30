@@ -1,11 +1,14 @@
 import { Injectable } from "@nestjs/common"
 import { InjectHttpClient } from "@modules/platform/http"
 import type { HttpClient } from "@modules/platform/http"
+import { InjectLogger } from "@modules/platform/logging"
+import type { Logger } from "@modules/platform/logging"
 import { isRecord, ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { KeycloakAdminErrorCode } from "./errors/keycloak-admin.error"
 import type { KeycloakMember } from "./keycloak-admin.contracts"
 import { InjectKeycloakAdminOptions } from "./keycloak-admin.decorators"
+import { KeycloakAdminLogEvent } from "./keycloak-admin.log-events"
 import type { KeycloakAdminOptions } from "./keycloak-admin.options"
 import type { KeycloakAdmin } from "./keycloak-admin.port"
 
@@ -20,6 +23,7 @@ export class KeycloakAdminClient implements KeycloakAdmin {
     constructor(
         @InjectHttpClient() private readonly http: HttpClient,
         @InjectKeycloakAdminOptions() private readonly options: KeycloakAdminOptions,
+        @InjectLogger() private readonly logger: Logger,
     ) {}
 
     /** The member with `memberId`, or the refusal. */
@@ -39,7 +43,8 @@ export class KeycloakAdminClient implements KeycloakAdmin {
                 headers: { authorization: `Bearer ${this.options.token.reveal()}` },
                 timeoutMs: this.options.timeoutMs,
             })
-        } catch {
+        } catch (cause) {
+            this.logger.error(KeycloakAdminLogEvent.RequestFailed, cause, { memberId })
             return null
         }
     }

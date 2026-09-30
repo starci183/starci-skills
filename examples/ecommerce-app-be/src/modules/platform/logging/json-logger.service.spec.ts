@@ -2,8 +2,9 @@ import type { Writable } from "node:stream"
 import { FakeClock, mock } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { Test } from "@nestjs/testing"
-import { createJsonLogger, JsonLoggerService } from "./json-logger.service"
+import { createJsonLogger, JsonLogger } from "./json-logger.service"
 import { LOG_ERR, LOG_OUT } from "./logging.decorators"
+import { LoggingLogEvent } from "./logging.log-events"
 
 const build = async () => {
     const clock = new FakeClock("2026-05-06T07:08:09.000Z")
@@ -22,16 +23,16 @@ const build = async () => {
     })
     const moduleRef = await Test.createTestingModule({
         providers: [
-            JsonLoggerService,
+            JsonLogger,
             { provide: CLOCK, useValue: clock },
             { provide: LOG_OUT, useValue: out },
             { provide: LOG_ERR, useValue: err },
         ],
     }).compile()
-    return { logger: moduleRef.get(JsonLoggerService), clock, written }
+    return { logger: moduleRef.get(JsonLogger), clock, written }
 }
 
-describe("JsonLoggerService", () => {
+describe("JsonLogger", () => {
     it("writes an info line to the out stream stamped by the clock", async () => {
         const { logger, written } = await build()
 
@@ -49,12 +50,12 @@ describe("JsonLoggerService", () => {
         const { logger, clock, written } = await build()
         clock.advance(1000)
 
-        logger.warn("cache.slow")
+        logger.warn(LoggingLogEvent.StartupFailed)
 
         expect(written).toEqual([
             {
                 stream: "err",
-                line: `${JSON.stringify({ level: "warn", event: "cache.slow", time: "2026-05-06T07:08:10.000Z" })}\n`,
+                line: `${JSON.stringify({ level: "warn", event: LoggingLogEvent.StartupFailed, time: "2026-05-06T07:08:10.000Z" })}\n`,
             },
         ])
     })
@@ -103,12 +104,12 @@ describe("JsonLoggerService", () => {
             jest.spyOn(process.stderr, "write").mockImplementation((chunk) => lines.push(`err:${String(chunk)}`) > 0)
             const logger = createJsonLogger(new FakeClock("2026-05-06T07:08:09.000Z"))
 
-            logger.info("server.started")
-            logger.warn("cache.slow")
+            logger.info(LoggingLogEvent.ServerStarted)
+            logger.warn(LoggingLogEvent.StartupFailed)
 
             expect(lines).toEqual([
-                `out:${JSON.stringify({ level: "info", event: "server.started", time: "2026-05-06T07:08:09.000Z" })}\n`,
-                `err:${JSON.stringify({ level: "warn", event: "cache.slow", time: "2026-05-06T07:08:09.000Z" })}\n`,
+                `out:${JSON.stringify({ level: "info", event: LoggingLogEvent.ServerStarted, time: "2026-05-06T07:08:09.000Z" })}\n`,
+                `err:${JSON.stringify({ level: "warn", event: LoggingLogEvent.StartupFailed, time: "2026-05-06T07:08:09.000Z" })}\n`,
             ])
         })
     })
