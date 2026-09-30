@@ -664,7 +664,7 @@ describe('scripts/checks/check-hfs-sync.mjs', () => {
     execFileSync('git', ['init', '-q'], { cwd: dir });
     assert.deepEqual(await checkHfsSync(dir, { presets: PRESETS.be }), { ok: true, findings: [] });
 
-    fs.writeFileSync(path.join(dir, 'sonar-project.properties'), '# hand written\n');
+    fs.writeFileSync(path.join(dir, '.prettierignore'), '# hand written\n');
     fs.mkdirSync(path.join(dir, '.starciwork', 'features', 'a', 'evidence'), { recursive: true });
     fs.writeFileSync(path.join(dir, '.starciwork', 'features', 'a', 'evidence', 'run.log'), 'log\n');
     fs.mkdirSync(path.join(dir, '.starcistacks', 'dev', 'secrets'), { recursive: true });
@@ -673,8 +673,8 @@ describe('scripts/checks/check-hfs-sync.mjs', () => {
     const result = await checkHfsSync(dir, { presets: PRESETS.be });
     assert.equal(result.ok, false);
     assert.deepEqual(result.findings.map(finding => [finding.code, finding.file]).sort(), [
+      ['HFS_MANAGED_FILE_DRIFT', '.prettierignore'],
       ['HFS_PLAINTEXT_SECRET', '.starcistacks/dev/secrets/db.txt'],
-      ['HFS_SONAR_CONFIG', 'sonar-project.properties'],
       ['HFS_WORK_AGENT_DATA', '.starciwork/features/a/evidence/run.log'],
     ]);
     assert.ok(result.findings.every(finding => CODES.includes(finding.code)));
