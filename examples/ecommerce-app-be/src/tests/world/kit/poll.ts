@@ -1,3 +1,11 @@
+import { TestWorldError, TestWorldErrorCode } from "../test-world.error"
+import { worldClock } from "./world-clock"
+
+const OBSERVATION_LIMIT = 700
+
+/** Waits `ms` milliseconds: the one timer of the test world, used only inside its poll and retry loops. */
+export const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
 /**
  * The state-poller every journey shares: a flow waits for a STATE, never a duration, so the test
  * names what it waited for and the timeout names what never arrived. `probe` answers the observed
@@ -10,29 +18,18 @@ export async function pollUntil<T>(
     timeoutMs = 20_000,
     intervalMs = 250,
 ): Promise<T> {
-    const deadline = Date.now() + timeoutMs
-    let last: T | null | undefined
+    const deadline = worldClock.now().getTime() + timeoutMs
     for (;;) {
-        last = await probe()
-        if (last) return last
-        if (Date.now() > deadline) {
-            throw new Error(
-                `timed out after ${timeoutMs}ms waiting for ${label}; last observation: ${JSON.stringify(
-                    last ?? null,
-                ).slice(0, 700)}`,
-            )
+        const observed = await probe()
+        if (observed) return observed
+        if (worldClock.now().getTime() > deadline) {
+            throw new TestWorldError({
+                code: TestWorldErrorCode.TimedOut,
+                params: {
+                    detail: `timed out after ${timeoutMs}ms waiting for ${label}; last observation: ${JSON.stringify(observed ?? null).slice(0, OBSERVATION_LIMIT)}`,
+                },
+            })
         }
-        await new Promise((resolve) => setTimeout(resolve, intervalMs))
+        await pause(intervalMs)
     }
-}
-
-/**
- * A bounded observation window for flows whose expected outcome is stillness - an ended rule that
- * must materialise nothing further, an event that must stay suppressed. There is no condition to
- * poll for when the assertion is "nothing happened", so this is the one wait that IS the state under
- * observation: it lets the world's own schedulers run for durationMs while later assertions check
- * that nothing changed.
- */
-export async function holdFor(durationMs: number): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, durationMs))
 }

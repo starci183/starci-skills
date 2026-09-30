@@ -14,7 +14,7 @@ import { renderPayload } from "@tests/world/fakes/payload.service"
 const sandbox = contractClient({
     provider: "sepay",
     keys: ["SEPAY_BASE_URL", "SEPAY_API_KEY", "SEPAY_WEBHOOK_SECRET"],
-    module: (env) => SepayModule.register({ isGlobal: true, ...parseSepayConfig(env) }),
+    module: (env, registration) => SepayModule.register({ ...registration, ...parseSepayConfig(env) }),
     client: SepayClient,
 })
 
@@ -41,7 +41,9 @@ sandbox.describe("sepay sandbox contract", () => {
             body: { reference: randomUUID(), amount: 10_000, currency: "VND" },
         })
         expect(rawCreate.status).toBe(200)
-        expect(shapeOf(rawCreate.body)).toEqual(shapeOf(renderPayload("sepay", "create-intent-response", { id: "x", checkoutUrl: "x" })))
+        expect(shapeOf(rawCreate.body)).toEqual(
+            shapeOf(renderPayload("sepay", "create-intent-response", { id: "x", checkoutUrl: "x" })),
+        )
         const rawRead = await fetchJson({
             method: "GET",
             url: `${baseUrl}/userapi/transactions/details/${encodeURIComponent(created.gatewayIntentId)}`,
@@ -51,7 +53,11 @@ sandbox.describe("sepay sandbox contract", () => {
         expect(shapeOf(rawRead.body)).toEqual(shapeOf(renderPayload("sepay", "transaction-pending", { id: "x" })))
 
         // A wrong API key is refused the way the fake refuses it.
-        const refused = await fetchJson({ method: "GET", url: `${baseUrl}/userapi/transactions/details/x`, headers: { authorization: "Bearer wrong" } })
+        const refused = await fetchJson({
+            method: "GET",
+            url: `${baseUrl}/userapi/transactions/details/x`,
+            headers: { authorization: "Bearer wrong" },
+        })
         expect(refused.status).toBe(401)
         expect(shapeOf(refused.body)).toEqual(shapeOf(renderPayload("sepay", "error-unauthorized")))
     })

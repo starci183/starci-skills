@@ -19,7 +19,7 @@ const NAME_KEY = defineCacheKey<string>({
 const sandbox = contractClient<Cache>({
     provider: "redis",
     keys: ["CACHE_REDIS_URL"],
-    module: (env) => CacheModule.register({ isGlobal: true, ...parseCacheConfig(env) }),
+    module: (env, registration) => CacheModule.register({ ...registration, ...parseCacheConfig(env) }),
     client: CACHE,
 })
 

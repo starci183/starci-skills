@@ -9,6 +9,7 @@ import { Module } from "@nestjs/common"
 import type { DynamicModule, INestApplicationContext, Type } from "@nestjs/common"
 import { NestFactory } from "@nestjs/core"
 import { EnvSource } from "@modules/platform/config"
+import type { ModuleRegistration } from "./test-world.contracts"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 
 const BOOT_TIMEOUT_MS = 60_000
@@ -19,8 +20,8 @@ export interface ContractClientSpec<T> {
     readonly provider: string
     /** The environment keys the sandbox needs; every one must be declared for the spec to run. */
     readonly keys: ReadonlyArray<string>
-    /** The integration module registered with sandbox options read from the environment. */
-    readonly module: (env: EnvSource) => DynamicModule
+    /** The integration module registered with sandbox options read from the environment, spreading the registration the world gives. */
+    readonly module: (env: EnvSource, registration: ModuleRegistration) => DynamicModule
     /** The token of the client inside that module: its class, or its injection symbol. */
     readonly client: Type<T> | symbol
 }
@@ -70,9 +71,12 @@ export const contractClient = <T>(spec: ContractClientSpec<T>): ContractClient<T
                     : `${name} (skipped: ${spec.provider} sandbox keys not declared: ${missing.join(", ")})`,
                 () => {
                     beforeAll(async () => {
-                        context = await NestFactory.createApplicationContext(ContractRoot.register(spec.module(env)), {
-                            logger: ["error"],
-                        })
+                        context = await NestFactory.createApplicationContext(
+                            ContractRoot.register(spec.module(env, { isGlobal: true })),
+                            {
+                                logger: ["error"],
+                            },
+                        )
                     }, BOOT_TIMEOUT_MS)
                     afterAll(async () => {
                         await context?.close()

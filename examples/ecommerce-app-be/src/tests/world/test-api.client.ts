@@ -5,7 +5,9 @@
  */
 import { createE2EHttpClient } from "@tests/world/kit/e2e-http-client"
 import type { E2EHttpClient, E2EResponse } from "@tests/world/kit/e2e-http-client"
-import type { GraphqlCallOptions, GraphqlObserved } from "@tests/world/kit/graphql-envelope"
+import { graphqlEnvelopeOf } from "@tests/world/kit/graphql-envelope"
+import { worldClock } from "@tests/world/kit/world-clock"
+import type { GraphqlObserved, GraphqlWire } from "@tests/world/kit/graphql-envelope"
 
 const CALL_TIMEOUT_MS = 20_000
 
@@ -35,6 +37,12 @@ const DOCUMENTS = new Map<string, string>([
     ["buyerStatus", "query { buyerStatus { personId hasOrders } }"],
 ])
 
+/** The knobs of one GraphQL call: the operation's variables. */
+export interface GraphqlCallOptions {
+    /** The variables of the operation. */
+    readonly variables?: Record<string, unknown>
+}
+
 /** The GraphQL door of one booted app: every call answers the observed envelope, so a refusal is data a spec asserts. */
 export interface TestApi {
     /** The loopback base URL the app listens on. */
@@ -49,11 +57,18 @@ export interface TestApi {
     bearing(token?: string): TestApi
 }
 
-const send = <TData>(
+const send = async <TData>(
     http: E2EHttpClient,
     document: string,
     variables?: Record<string, unknown>,
-): Promise<GraphqlObserved<TData>> => http.graphql<TData>(DOCUMENTS.get(document) ?? document, variables)
+): Promise<GraphqlObserved<TData>> => {
+    const startedAt = worldClock.now().getTime()
+    const response = await http.post<GraphqlWire<TData> | string>("/graphql", {
+        query: DOCUMENTS.get(document) ?? document,
+        variables: variables ?? {},
+    })
+    return graphqlEnvelopeOf<TData>(response.status, response.body, startedAt)
+}
 
 /** Builds the api client of the app listening at `baseUrl`, optionally riding on a bearer token. */
 export const createTestApi = (baseUrl: string, token?: string): TestApi => {

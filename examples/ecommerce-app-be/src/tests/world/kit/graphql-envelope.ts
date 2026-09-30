@@ -1,21 +1,26 @@
-/**
- * One GraphQL error as the spec observes it: the message plus the extensions the door's
- * formatError stamped - `code` carries the full *_EXCEPTION code and the refusal metadata
- * sits beside it.
- */
+import { worldClock } from "./world-clock"
+
+/** The `extensions` a door's formatError stamped on one GraphQL error: `code` carries the full code, the refusal metadata sits beside it. */
+export type GraphqlExtensionsObserved = Readonly<Record<string, unknown>>
+
+/** One GraphQL error as the spec observes it. */
 export interface GraphqlErrorObserved {
     readonly message?: string
-    readonly extensions?: Record<string, unknown>
-    readonly [key: string]: unknown
+    readonly extensions?: GraphqlExtensionsObserved
+}
+
+/** The GraphQL-over-HTTP body as the wire carries it. */
+export interface GraphqlWire<TData> {
+    readonly data?: TData | null
+    readonly errors?: ReadonlyArray<GraphqlErrorObserved> | null
 }
 
 /**
- * What one GraphQL call came back with: the parsed data (or the refusal's error code and
- * message off errors[0].extensions.code) alongside the transport facts - status, raw
- * envelope, wall time - so a spec can assert on the business outcome without losing the
- * wire's own evidence. Refusals resolve rather than reject: a GraphQL error is data.
+ * What one GraphQL call came back with: the parsed data (or the refusal's error code and message off
+ * errors[0].extensions.code) alongside the transport facts - status, raw envelope, wall time - so a spec can assert on the
+ * business outcome without losing the wire's own evidence. Refusals resolve rather than reject: a GraphQL error is data.
  */
-export interface GraphqlObserved<TData = Record<string, unknown>> {
+export interface GraphqlObserved<TData> {
     readonly httpStatus: number
     readonly data: TData | null
     readonly errors: ReadonlyArray<GraphqlErrorObserved> | null
@@ -25,40 +30,38 @@ export interface GraphqlObserved<TData = Record<string, unknown>> {
     readonly durationMs: number
 }
 
-/**
- * The knobs a single GraphQL call takes: the operation's variables, and which session's
- * bearer the call rides on - omitting token makes the call anonymous.
- */
-export interface GraphqlCallOptions {
-    readonly variables?: Record<string, unknown>
-    readonly token?: string
-}
+const UNPARSABLE_LIMIT = 2000
 
 /**
- * Folds one GraphQL-over-HTTP response into the observed envelope: the HTTP status stays
- * visible beside the parsed data/errors, and a body that is not an object degrades into an
- * `unparsableBody` note instead of failing the fold.
+ * Folds one GraphQL-over-HTTP response into the observed envelope: the HTTP status stays visible beside the parsed
+ * data/errors, and a body that is not an object degrades into an `unparsableBody` note instead of failing the fold.
  */
-export function graphqlEnvelopeOf<TData = Record<string, unknown>>(
+export function graphqlEnvelopeOf<TData>(
     httpStatus: number,
-    body: unknown,
+    body: GraphqlWire<TData> | string,
     startedAt: number,
 ): GraphqlObserved<TData> {
-    const envelope =
-        typeof body === "object" && body !== null
-            ? (body as Record<string, unknown>)
-            : {
-                  unparsableBody: String(body).slice(0, 2000),
-              }
-    const errors = Array.isArray(envelope.errors) ? (envelope.errors as Array<GraphqlErrorObserved>) : null
-    const firstExtensions = (errors?.[0]?.extensions ?? {}) as Record<string, unknown>
+    const durationMs = worldClock.now().getTime() - startedAt
+    if (typeof body === "string") {
+        return {
+            httpStatus,
+            data: null,
+            errors: null,
+            errorCode: null,
+            errorMessage: null,
+            raw: { unparsableBody: body.slice(0, UNPARSABLE_LIMIT) },
+            durationMs,
+        }
+    }
+    const errors = body.errors ?? null
+    const code = errors?.[0]?.extensions?.code
     return {
         httpStatus,
-        data: (envelope.data ?? null) as TData | null,
+        data: body.data ?? null,
         errors,
-        errorCode: (firstExtensions.code as string) ?? null,
-        errorMessage: (errors?.[0]?.message as string) ?? null,
-        raw: envelope,
-        durationMs: Date.now() - startedAt,
+        errorCode: typeof code === "string" ? code : null,
+        errorMessage: errors?.[0]?.message ?? null,
+        raw: body,
+        durationMs,
     }
 }

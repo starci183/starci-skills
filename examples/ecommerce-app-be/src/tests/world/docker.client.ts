@@ -52,7 +52,7 @@ export const runPostgres = (spec: PostgresContainerSpec): void => {
         "--name",
         spec.name,
         "--label",
-        `ecommerce-e2e-run=${spec.runId}`,
+        `todo-e2e-run=${spec.runId}`,
         "-e",
         `POSTGRES_USER=${spec.user}`,
         "-e",
@@ -65,14 +65,10 @@ export const runPostgres = (spec: PostgresContainerSpec): void => {
     ])
 }
 
-/** True once the server inside the container answers a query over TCP (the init-time server listens on a socket only). */
+/** True once the server inside the container answers a query over TCP (the init-time server listens on a socket only); throws while it does not. */
 export const postgresAccepts = (name: string, user: string, database: string): boolean => {
-    try {
-        docker(["exec", name, "psql", "-h", "127.0.0.1", "-U", user, "-d", database, "-tAc", "SELECT 1"])
-        return true
-    } catch {
-        return false
-    }
+    docker(["exec", name, "psql", "-h", "127.0.0.1", "-U", user, "-d", database, "-tAc", "SELECT 1"])
+    return true
 }
 
 /** Kills the container: the process dies with no shutdown, like a crashed host. */

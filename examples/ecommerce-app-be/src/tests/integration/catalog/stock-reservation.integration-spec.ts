@@ -1,6 +1,7 @@
-import { CatalogModule, CatalogService } from "@modules/domain/catalog"
+import { CatalogService } from "@modules/domain/catalog"
 import { readStock } from "../../fixtures/persistence/e2e-verification.rows"
 import { UPSERT_PRODUCT } from "../../fixtures/persistence/e2e-verification.sql"
+import { CATALOG_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
@@ -9,7 +10,7 @@ import { useTestWorld } from "../../world/use-test-world"
  * at zero and never below; a transaction that reserves and then fails gives the unit back.
  */
 describe("catalog: stock reservation (integration)", () => {
-    const world = useTestWorld({ modules: [() => CatalogModule.register({ isGlobal: true })] })
+    const world = useTestWorld({ modules: CATALOG_CAPABILITY_MODULES })
 
     it("two simultaneous checkouts for the last unit: exactly one takes it and stock ends at zero", async () => {
         await world.db.order.query(UPSERT_PRODUCT, ["sku-race", "Race product", 1000, 1])

@@ -96,3 +96,12 @@ export interface WaitForOptions {
     /** The pause between two checks in milliseconds. */
     readonly intervalMs?: number
 }
+
+/**
+ * How the world registers a capability module: as the app root does, global. The world passes it to the module a contract
+ * spec builds, so the spec never writes `isGlobal` itself (registration is composition, and the world is the composition root).
+ */
+export interface ModuleRegistration {
+    /** Always global: the capability is consumed through its injectors. */
+    readonly isGlobal: true
+}

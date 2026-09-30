@@ -16,6 +16,8 @@ export enum TestWorldErrorCode {
     SignInRefused = "TEST_WORLD_SIGN_IN_REFUSED",
     /** A payload fixture of a fake is not valid JSON once its placeholders are filled. */
     PayloadInvalid = "TEST_WORLD_PAYLOAD_INVALID",
+    /** A code the public kind table of an integration is expected to carry is missing from it. */
+    KindMissing = "TEST_WORLD_KIND_MISSING",
     /** A state the world waited for (a readiness probe, an asynchronous effect) did not arrive before its deadline. */
     TimedOut = "TEST_WORLD_TIMED_OUT",
 }

@@ -11,6 +11,7 @@ import { NestFactory } from "@nestjs/core"
 import { EnvSource } from "@modules/platform/config"
 import { HttpModule } from "@modules/platform/http"
 import { readJson } from "./fakes/fakes-http.service"
+import type { ModuleRegistration } from "./test-world.contracts"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 
 const BOOT_TIMEOUT_MS = 60_000
@@ -21,8 +22,8 @@ export interface ContractClientSpec<T> {
     readonly provider: string
     /** The environment keys the sandbox needs; every one must be declared for the spec to run. */
     readonly keys: ReadonlyArray<string>
-    /** The integration module registered with sandbox options read from the environment. */
-    readonly module: (env: EnvSource) => DynamicModule
+    /** The integration module registered with sandbox options read from the environment, spreading the registration the world gives. */
+    readonly module: (env: EnvSource, registration: ModuleRegistration) => DynamicModule
     /** The token of the client inside that module: its class, or its injection symbol. */
     readonly client: Type<T> | symbol
 }
@@ -88,21 +89,33 @@ export const contractClient = <T>(spec: ContractClientSpec<T>): ContractClient<T
         available: missing.length === 0,
         env: () => env,
         client: () => {
-            if (context === null) throw new TestWorldError({ code: TestWorldErrorCode.NotBooted, params: { detail: `the ${spec.provider} contract client was used outside its describe` } })
+            if (context === null)
+                throw new TestWorldError({
+                    code: TestWorldErrorCode.NotBooted,
+                    params: { detail: `the ${spec.provider} contract client was used outside its describe` },
+                })
             return context.get<T, T>(spec.client, { strict: false })
         },
         describe: (name, body) => {
             const run = missing.length === 0 ? describe : describe.skip
-            run(missing.length === 0 ? name : `${name} (skipped: ${spec.provider} sandbox keys not declared: ${missing.join(", ")})`, () => {
-                beforeAll(async () => {
-                    context = await NestFactory.createApplicationContext(ContractRoot.register(spec.module(env)), { logger: ["error"] })
-                }, BOOT_TIMEOUT_MS)
-                afterAll(async () => {
-                    await context?.close()
-                    context = null
-                })
-                body()
-            })
+            run(
+                missing.length === 0
+                    ? name
+                    : `${name} (skipped: ${spec.provider} sandbox keys not declared: ${missing.join(", ")})`,
+                () => {
+                    beforeAll(async () => {
+                        context = await NestFactory.createApplicationContext(
+                            ContractRoot.register(spec.module(env, { isGlobal: true })),
+                            { logger: ["error"] },
+                        )
+                    }, BOOT_TIMEOUT_MS)
+                    afterAll(async () => {
+                        await context?.close()
+                        context = null
+                    })
+                    body()
+                },
+            )
         },
     }
 }
