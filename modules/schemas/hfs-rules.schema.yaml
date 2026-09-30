@@ -1,5 +1,5 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: urn:starci:hfs-rules:1
+$id: urn:starci:hfs-rules:2
 title: HFS rule catalog
 description: >-
   The shape of knowledge/hfs/rules.yaml. Semantic rules JSON Schema cannot state (ids increasing, a retired id never reused, a failure code
@@ -11,7 +11,7 @@ type: object
 additionalProperties: false
 required: [schema, version, gates, enforcerKinds, rules]
 properties:
-  schema: {const: starci/hfs-rules@1}
+  schema: {const: starci/hfs-rules@2}
   version:
     type: string
     pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'

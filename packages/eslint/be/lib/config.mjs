@@ -59,7 +59,7 @@ export const buildBeConfig = async ({ hfs, plugin, recommended }) => {
     if (!hfs || typeof hfs.slotOf !== "function" || typeof hfs.repoRoot !== "string") {
         throw new Error("starciBeConfig needs { hfs: loadHfs(import.meta.url) } - the rules read the repository's slots through it")
     }
-    if (hfs.profile !== "be") throw new Error(`starciBeConfig lints a back end; hfs.json declares profile ${hfs.profile}`)
+    if (hfs.profile !== "be") throw new Error(`starciBeConfig lints the be side of an app (its eslint.config.mjs lives in be/); this view is ${hfs.side ? `the ${hfs.side} side` : "the app root"}`)
     const rules = recommended ?? {}
     if (!plugin?.rules) throw new Error("starciBeConfig needs the canon plugin")
     if (Object.keys(rules).length === 0) throw new Error("starciBeConfig received an empty recommendation - a config with no rules is not adoption")

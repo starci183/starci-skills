@@ -39,7 +39,7 @@ export const buildFeConfig = ({ hfs, plugin, source, reactHooks }) => {
   if (!hfs || typeof hfs.slotOf !== "function" || typeof hfs.repoRoot !== "string") {
     throw new Error("starciFeConfig needs { hfs: loadHfs(import.meta.url) } - the rules read the repository's slots through it")
   }
-  if (hfs.profile !== "fe") throw new Error(`starciFeConfig lints a front end; hfs.json declares profile ${hfs.profile}`)
+  if (hfs.profile !== "fe") throw new Error(`starciFeConfig lints the fe side of an app (its eslint.config.mjs lives in fe/); this view is ${hfs.side ? `the ${hfs.side} side` : "the app root"}`)
   if (Object.keys(source).length === 0) throw new Error("starciFeConfig received an empty source recommendation - a config with no rules is not adoption")
   const weak = Object.entries(source).filter(([, setting]) => levelOf(setting) !== "error").map(([name]) => name)
   if (weak.length > 0) throw new Error(`starciFeConfig refuses source rules not at error: ${weak.join(", ")}`)

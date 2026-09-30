@@ -1,5 +1,5 @@
-// Hermetic repositories for the HFS architecture machine specs: a temp git repo with hfs.json, a root tsconfig and the
-// files a spec lists, judged by checkArchitecture with the injected TypeScript compiler. No architecture.json exists any
+// Hermetic apps for the HFS architecture machine specs: a temp git repo with the app-root hfs.json, and in one side folder a
+// tsconfig and the files a spec lists, judged by checkArchitecture (the side folder as its root) with the injected TypeScript compiler. No architecture.json exists any
 // more; the declaration is hfs.json (modules/schemas/hfs-repo.schema.yaml), the direction matrix and slots are
 // knowledge/hfs/slots.yaml.
 import fs from 'node:fs';
@@ -25,26 +25,32 @@ export function writeFiles(root, files) {
 
 export function gitCommit(root, message = 'fixture', env = {}) {
   const git = (...args) => execFileSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.test', ...args], { cwd: root, stdio: 'pipe', env: { ...process.env, ...env } });
-  git('add', '-A');
+  git('add', '-A', ':/');
   git('commit', '-q', '--allow-empty', '-m', message);
   return git('rev-parse', 'HEAD').toString().trim();
 }
 
+/** The app hfs.json of a fixture about one side: `fields` (apps, optionalSlots, connections, reads) for `side`, the smallest other side. */
+export function appDeclaration(side, fields, project = 'fixture') {
+  const other = { be: { apps: [{ name: 'core', kind: 'api' }] }, fe: { apps: [{ name: 'web', kind: 'next' }] } };
+  return { hfs: 2, kind: 'app', project, sides: { ...other, [side]: fields } };
+}
+
 /**
- * profile 'be' | 'fe'. `files` maps repository-relative paths to content (null removes a default file).
- * Defaults: hfs.json, a permissive root tsconfig.json, and (be) apps/core/src/{main.ts,app.module.ts} or (fe) a Next app shell.
- * `declaration` overrides parts of hfs.json. The repository is a git repo with the files staged (not committed): call gitCommit for a base.
+ * A hermetic app whose `profile` side the machine judges: the app root holds hfs.json and the one package.json, the side folder
+ * (`<app>/<profile>`, the returned root) a permissive tsconfig.json and (be) apps/core/src/{main.ts,app.module.ts} or (fe) a Next
+ * app shell. `files` maps side-relative paths to content (null removes a default file); a path that starts with `../` is written
+ * at the app root (`../package.json` replaces the app's manifest). `declaration` overrides parts of the side's declaration. The
+ * app is a git repo with the files staged (not committed): call gitCommit(root) for a base.
  */
 export function archFixture(t, { profile = 'be', files = {}, declaration = {}, apps = DEFAULT_APPS[profile] } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), `starci-hfs-arch-${profile}-`));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), `starci-hfs-arch-${profile}-`));
+  t.after(() => fs.rmSync(appRoot, { recursive: true, force: true }));
+  const root = path.join(appRoot, profile);
   const app = apps[0].name;
-  const extraApps = Object.fromEntries(profile === 'fe'
-    ? apps.slice(1).map(other => [`apps/${other.name}/package.json`, JSON.stringify({ name: `@fixture/${other.name}`, private: true })]) : []);
   const baseline = {
-    ...extraApps,
-    'hfs.json': `${JSON.stringify({ hfs: 1, profile, project: 'fixture', apps, ...declaration }, null, 2)}\n`,
-    'package.json': JSON.stringify(profile === 'fe' ? { name: 'fixture-fe', private: true, workspaces: ['apps/*'] } : { name: 'fixture-be', private: true }),
+    '../hfs.json': `${JSON.stringify(appDeclaration(profile, { apps, ...declaration }), null, 2)}\n`,
+    '../package.json': JSON.stringify({ name: 'fixture', private: true }),
     'tsconfig.json': `${JSON.stringify({
       compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', allowJs: true, skipLibCheck: true, noEmit: true, experimentalDecorators: true },
       include: ['src/**/*', 'apps/**/*'],
@@ -53,13 +59,13 @@ export function archFixture(t, { profile = 'be', files = {}, declaration = {}, a
       [`apps/${app}/src/main.ts`]: 'void 0;\n',
       [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1;\n',
     } : {
-      [`apps/${app}/package.json`]: JSON.stringify({ name: `@fixture/${app}`, private: true }),
       [`apps/${app}/src/app/.keep`]: '',
     }),
   };
+  fs.mkdirSync(root, { recursive: true });
   writeFiles(root, { ...baseline, ...files });
-  execFileSync('git', ['init', '-q'], { cwd: root });
-  execFileSync('git', ['add', '-A'], { cwd: root });
+  execFileSync('git', ['init', '-q'], { cwd: appRoot });
+  execFileSync('git', ['add', '-A'], { cwd: appRoot });
   return root;
 }
 

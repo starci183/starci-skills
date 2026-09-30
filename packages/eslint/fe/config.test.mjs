@@ -22,9 +22,11 @@ import plugin, {
   why,
 } from "./index.mjs"
 import { hfsFromDeclaration } from "./lib/hfs.mjs"
+import { declaredHfsView } from "./runtime/scripts/lib/hfs-view.mjs"
+import { appDeclaration } from "../be/fixtures/app.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "typed")
-const FE = { hfs: 1, profile: "fe", project: "fixture", apps: [{ name: "web", kind: "next" }], optionalSlots: ["repo.packages", "fe.package.ui"] }
+const FE = appDeclaration("fe", { apps: [{ name: "web", kind: "next" }], optionalSlots: ["repo.packages", "fe.package.ui"] })
 const hfs = hfsFromDeclaration(FE, ROOT)
 const config = starciFeConfig({ hfs })
 const [ignores, ...single] = config
@@ -39,8 +41,8 @@ test("the factory returns an ignore block and a typed source block, all from the
   assert.equal(single[0].settings.starci.hfs, hfs, "every rule reads the slot view")
   assert.throws(() => starciFeConfig({}), /loadHfs/)
   assert.throws(() => starciFeConfig(), /loadHfs/)
-  const be = hfsFromDeclaration({ hfs: 1, profile: "be", project: "x", apps: [{ name: "api", kind: "api" }] }, ROOT)
-  assert.throws(() => starciFeConfig({ hfs: be }), /profile be/)
+  const be = declaredHfsView({ runtimeRoot: join(dirname(fileURLToPath(import.meta.url)), "runtime"), declaration: FE, repoRoot: ROOT, side: "be" })
+  assert.throws(() => starciFeConfig({ hfs: be }), /this view is the be side/)
 })
 
 test("every published rule is enabled at error - no rule is off, none is a warning", () => {

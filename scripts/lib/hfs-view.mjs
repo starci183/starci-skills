@@ -1,5 +1,5 @@
-// hfs-view.mjs - the frozen view of one repository's HFS slots that the lint factories hand their rules
-// (`settings.starci.hfs`). Both @starci/eslint-canon-be and @starci/eslint-canon-fe ship a byte copy of this file in their
+// hfs-view.mjs - the frozen view of one side of an app (be/ or fe/, the side folder as its root) that the lint factories hand
+// their rules (`settings.starci.hfs`). Both @starci/eslint-canon-be and @starci/eslint-canon-fe ship a byte copy of this file in their
 // runtime/ bundle (packages/hfs/scripts/sync-runtime.mjs), so a path-scoped rule in either package asks the SAME resolver the
 // architecture machine and `hfs check` use, and never tests a path with a regular expression of its own.
 import path from 'node:path';
@@ -31,6 +31,7 @@ export function hfsView(opened, repoRoot) {
   return Object.freeze({
     repoRoot,
     profile: opened.repo.profile,
+    side: opened.repo.side ?? null,
     apps: opened.repo.apps,
     connections: opened.repo.connections,
     ruleParams: opened.ruleParams(),
@@ -52,17 +53,18 @@ export function hfsView(opened, repoRoot) {
 }
 
 /**
- * The view of the repository on disk whose root is `repoRoot`, against the manifest under `runtimeRoot`.
+ * The view of the app folder on disk at `repoRoot`, against the manifest under `runtimeRoot`: a side folder (be/, fe/) finds the
+ * app-root hfs.json one level up and gets that side's view, so every linted file below it is judged by its own side's slots.
  *
- * @param {{ runtimeRoot: string, repoRoot: string }} input - Where the manifest copy lives and the repository root.
+ * @param {{ runtimeRoot: string, repoRoot: string }} input - Where the manifest copy lives and the side folder (or app root).
  * @returns {object} The frozen view.
  */
 export const openHfsView = ({ runtimeRoot, repoRoot }) => hfsView(openHfs({ root: runtimeRoot, repoRoot }), repoRoot);
 
 /**
- * The view of an in-memory declaration (rule tests): no file is read except the manifest.
+ * The view of one side of an in-memory app declaration (rule tests): no file is read except the manifest.
  *
- * @param {{ runtimeRoot: string, declaration: object, repoRoot: string }} input - Manifest root, hfs.json object, linted root.
+ * @param {{ runtimeRoot: string, declaration: object, repoRoot: string, side: string }} input - Manifest root, hfs.json object, the linted side folder, its side.
  * @returns {object} The frozen view.
  */
-export const declaredHfsView = ({ runtimeRoot, declaration, repoRoot }) => hfsView(openHfs({ root: runtimeRoot, declaration }), repoRoot);
+export const declaredHfsView = ({ runtimeRoot, declaration, repoRoot, side }) => hfsView(openHfs({ root: runtimeRoot, declaration, side }), repoRoot);

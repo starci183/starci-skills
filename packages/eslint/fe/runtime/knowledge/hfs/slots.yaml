@@ -1,13 +1,16 @@
 # HFS slot manifest (owner-approved 2026-09-29, decisions 1-10 in the owner decisions record).
-# The one place that says what may exist in a StarCi product repository and where. Every tracked path of every
+# The one place that says what may exist in a StarCi product repository and where. A product is ONE app repository
+# (hfs 4, manifest major 2): the app root holds the one package.json, lockfile and node_modules, the hfs.json of kind app,
+# the CI, the hooks and .starciwork (slots of profile `app`); `be/` and `fe/` are its two sides, each laid out as the old
+# standalone repository root (slots of profile be or fe, paths relative to the side folder). Every tracked path of every
 # repository must match exactly one slot. Checks, lint factories, the architecture machine, templates and the why
 # catalog READ this file through scripts/lib/hfs-slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
-schema: starci/hfs-slots@1
-version: 1.0.0
+schema: starci/hfs-slots@2
+version: 2.0.0
 
 versioning:
-  # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 1).
+  # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 2).
   patch: wording, why text, examples; no check result can change.
   minor: >-
     add a slot (always presence optional or opt-in), add an app kind or protocol slot, add a rule at severity warn,
@@ -24,7 +27,7 @@ versioning:
 
 # Field meaning, per slot.
 #   id          stable name, never changes meaning inside a major.
-#   profiles    be, fe, or both: the repository profiles the slot exists in.
+#   profiles    app (the app root; alone), or be, fe or both: the sides the slot exists in (its path is relative to the side folder).
 #   path        pattern. <name> is one path segment (bound to the variable name), * and ? stay inside a segment,
 #               ** spans directories, {a,b} alternates. A pattern ending in / is a directory: it owns everything
 #               below it, except what a more specific slot owns. Otherwise it names files.
@@ -54,6 +57,12 @@ versioning:
 presenceValues: [required, optional, opt-in, forbidden]
 trackedValues: [tracked, ignored, external]
 testValues: [unit-beside, e2e, none]
+
+# The two sides of an app: the folder of each is its profile name (be/, fe/). `reads` lists the only paths of the OTHER side a side
+# may read (hfs.json sides.<side>.reads names a subset); nothing else crosses sides.
+sides:
+  be: {reads: []}
+  fe: {reads: [be/contracts/]}     # the back end's committed contract snapshots, the input of the front end's codegen
 
 appKinds:
   be: [api, worker, migrate, cli]
@@ -158,25 +167,26 @@ ruleParams:
 
 slots:
 
-  # ----- repository root (both profiles) ---------------------------------------------------------------
-  - id: repo.readme
-    profiles: [be, fe]
-    path: README.md
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    rules: [HFS_README_*]
-  - id: repo.declaration
-    profiles: [be, fe]
+  # ----- app root (profile app: the one repository of a product) --------------------------------------------
+  - id: app.declaration
+    profiles: [app]
     path: hfs.json
     presence: required
     tracked: tracked
     tier: none
     tests: none
     rules: [HFS_ARCH_CONFIG_UNREAD]
-  - id: fe.package-manifest
-    profiles: [fe]
+  - id: app.readme
+    profiles: [app]
+    path: README.md
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_README_*]
+  - id: app.package-manifest
+    profiles: [app]
+    # The one package.json of the app: every dependency of both sides and every script; npm workspaces only for fe/packages/*.
     path: package.json
     presence: required
     tracked: tracked
@@ -184,53 +194,184 @@ slots:
     tests: none
     managedBy: package-scripts     # the `scripts` block only; the rest of the file is the repository's
     rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT]
-  - id: fe.lockfile
-    profiles: [fe]
+  - id: app.lockfile
+    profiles: [app]
     path: package-lock.json
     presence: required
     tracked: tracked
     tier: none
     tests: none
     rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW]
-  - id: be.package-manifest
-    profiles: [be]
-    path: package.json
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    managedBy: package-scripts     # the `scripts` block only; the rest of the file is the repository's
-    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT]
-  - id: be.lockfile
-    profiles: [be]
-    path: package-lock.json
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW]
-  - id: repo.git-meta
-    profiles: [be, fe]
+  - id: app.git-meta
+    profiles: [app]
     path: "{.gitignore,.gitattributes}"
     presence: required
     tracked: tracked
     tier: none
     tests: none
-    rules: [HFS_GITIGNORE_BLOCK_DRIFT]     # the marked block of .gitignore is rendered by hfs sync (templates/<profile>/gitignore)
-  - id: repo.tool-config
-    profiles: [be, fe]
+    rules: [HFS_GITIGNORE_BLOCK_DRIFT]     # the marked block of .gitignore is rendered by hfs sync (templates/app/gitignore)
+  - id: app.tool-config
+    profiles: [app]
     path: "{.editorconfig,.nvmrc}"
     presence: required     # plain dotfiles, the repository's own
     tracked: tracked
     tier: none
     tests: none
-  - id: repo.tool-config-optional
-    profiles: [be, fe]
+  - id: app.format-config
+    profiles: [app]
+    # The one formatter configuration of the app (prettier walks up from every file of both sides to it): .prettierrc names
+    # @starci/prettier-config, .prettierignore is the template.
+    path: "{.prettierrc,.prettierignore}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: tool-config
+    rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL]
+  - id: app.tool-config-optional
+    profiles: [app]
     path: .npmrc
     presence: optional
     tracked: tracked
     tier: none
     tests: none
+  - id: app.tool-config-local
+    profiles: [app]
+    path: "{tsconfig.json,.eslintrc,.eslintrc.*,.eslintignore,eslint.config.*,.stylelintrc,.stylelintrc.*,.stylelintignore,stylelint.config.*,.prettierrc.*,prettier.config.*,jest.config.*,lint-staged.config.*,.lintstagedrc*}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "nowhere at the app root: each side holds exactly its managed tool configuration (be.tool-config, fe.tool-config) and the root only the formatter (app.format-config)"
+    rules: [HFS_TOOL_CONFIG_LOCAL]
+  - id: app.quality-config
+    profiles: [app]
+    path: sonar-project.properties
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: quality-config
+    rules: [HFS_SONAR_CONFIG, HFS_MANAGED_FILE_DRIFT]
+  - id: app.hooks
+    profiles: [app]
+    path: ".husky/{pre-commit,pre-push}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: hooks
+    rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
+  - id: app.ci
+    profiles: [app]
+    path: ".github/workflows/ci.yml"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: ci-workflows
+    rules: [HFS_CI_E2E_AUTOMATIC, HFS_CI_MISSING_CANON, HFS_MANAGED_FILE_DRIFT]
+  - id: app.ci-e2e
+    profiles: [app]
+    path: ".github/workflows/e2e.yml"
+    presence: optional     # on: workflow_dispatch only
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: ci-workflows
+    rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
+  - id: app.github-meta
+    profiles: [app]
+    path: ".github/{CODEOWNERS,pull_request_template.md,ISSUE_TEMPLATE/**,dependabot.yml}"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: app.scripts
+    profiles: [app]
+    # The app's operational scripts only (`*.mjs`, `*.cjs`, `*.ps1`, `*.sh`), or nothing: an empty folder is `scripts/.gitkeep`, which
+    # `hfs scaffold app` writes. A spec or a test (BE_SPEC_PLACEMENT, FE_NO_TESTS), a check or lint source (`check-*`, `eslint-local-rules*`,
+    # a local eslint plugin: HFS_REPO_LOCAL_CHECK) and anything that re-implements a canon check is not an operational script and has no place here.
+    path: "scripts/{.gitkeep,*.mjs,*.cjs,*.ps1,*.sh}"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]     # one-off codemods and fix-* scripts are agent output, not tooling
+  - id: app.sides
+    profiles: [app]
+    # The two sides. Everything below be/ and fe/ is judged by the side's own slots (profiles be and fe) with the side folder as its root;
+    # this slot answers only for the side folders themselves.
+    path: "{be,fe}/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: app.starciwork
+    profiles: [app]
+    path: ".starciwork/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    requires: [.gitignore, workspace.yaml, features/index.yaml]
+    allows: [workspace.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml",
+             "features/<feature>/<family>/<name>/index.yaml", "features/<feature>/br/<rule>/ac/<name>/index.yaml",
+             "features/<feature>/ui/<name>/assets/<approved-file>", "features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml",
+             "features/<feature>/uat/<name>/{seed,cleanup}.sql", "_resources/{identities,environments,fixtures}/<slug>/resource.yaml"]
+    forbids: [evidence/, logs/, reports/, captures/, runs/, "kernel-*/", "*.sqlite*", _derived/, "work/node records"]
+    rules: [HFS_AGENT_DATA_TRACKED, HFS_WORK_NODE_RETIRED, HFS_IDENTITY_CUSTODY]
+  - id: app.build-output
+    profiles: [app]
+    path: "{**/node_modules/,coverage/,reports/,test-results/,**/*.tsbuildinfo}"
+    presence: optional
+    tracked: ignored
+    tier: none
+    tests: none
+  - id: app.tool-cache
+    profiles: [app]
+    path: "{.eslintcache,.turbo/,.scannerwork/,.sonar/,.jest-cache/,.cache/,.tools/}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "${STARCI_CACHE_HOME:-%LOCALAPPDATA%/StarCi/cache}/<repo>/<tool>/ (the canon presets set eslint --cache-location, jest cacheDirectory, turbo cacheDir, sonar.working.directory)"
+  - id: app.agent-output
+    profiles: [app]
+    path: "{report*.json,*.tmp.json,%*%,nul,.qwen*,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "agent scratchpad or the StarCi blob store (%LOCALAPPDATA%/StarCi/blobs), cited by {name, sha256}"
+    rules: [HFS_UNTRACKED_ROOT_ENTRY, HFS_AGENT_DATA_TRACKED]
+  - id: app.worktrees
+    profiles: [app]
+    path: "{.worktrees/,worktrees/,.starciwork/worktrees/}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "D:/starci-lanes/<project>/<lane>/ (outside every repository)"
+  - id: app.plaintext-env
+    profiles: [app]
+    path: "{.env,.env.*,.secrets/,**/*.pem,**/*.key}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "be/.starcistacks/<env>/secrets/<slug>.enc; decrypted values only in memory or under %LOCALAPPDATA%/StarCi/secrets/<project>/<env>/ via *_FILE"
+    rules: [HFS_PLAINTEXT_SECRET]
+
+  # ----- side root (both sides): what the old standalone repository root held, less the app-root files ----------
+  - id: repo.side-root-forbidden
+    profiles: [be, fe]
+    path: "{package.json,package-lock.json,hfs.json,README.md,.gitignore,.gitattributes,.husky/,.github/,.starciwork/,sonar-project.properties,.prettierrc,.prettierignore,scripts/}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "the app root: one package.json, lockfile, hfs.json, README, git and CI files, hooks, formatter, Sonar configuration, scripts/ and .starciwork per app"
   - id: be.tool-config
     profiles: [be]
     # Managed files (hfs sync renders them, hfs check compares them): the whole tool configuration of a back end. Each is
@@ -239,9 +380,10 @@ slots:
     # specs import them); tsconfig.build.json puts an overlay preset after it and adds only the path-relative options a
     # preset cannot hold; the tests' own src/tests/tsconfig.json (the nearest config of a world, integration, e2e or contract
     # file, so typed lint and typecheck:tests both find it) extends it with the e2e preset; eslint.config.mjs is the
-    # one-line starciBeConfig call; jest.config.js calls the @starci/jest-preset factory; .prettierrc names
-    # @starci/prettier-config; .prettierignore is the template.
-    path: "{tsconfig.json,tsconfig.build.json,src/tests/tsconfig.json,eslint.config.mjs,jest.config.js,.prettierrc,.prettierignore}"
+    # one-line starciBeConfig call; jest.config.js calls the @starci/jest-preset factory (the root scripts run it with
+    # --config be/jest.config.js). The formatter configuration is the app's (app.format-config); every preset resolves from the
+    # app root node_modules.
+    path: "{tsconfig.json,tsconfig.build.json,src/tests/tsconfig.json,eslint.config.mjs,jest.config.js}"
     presence: required
     tracked: tracked
     tier: none
@@ -270,9 +412,9 @@ slots:
     # reference to a canon package, never a configuration: tsconfig.json extends @starci/tsconfig/next.json and only
     # names the preset and nothing else (each app's own tsconfig.json, in fe.app.next, carries its aliases and include; there is
     # no test tsconfig: a front end has no tests, FE_NO_TESTS); eslint.config.mjs is the one-line starciFeConfig call;
-    # stylelint.config.mjs is the one-line starciStylelintConfig call; .prettierrc names @starci/prettier-config;
-    # .prettierignore is the template. A front end has no test configuration at all (FE_NO_TESTS).
-    path: "{tsconfig.json,eslint.config.mjs,stylelint.config.mjs,.prettierrc,.prettierignore}"
+    # stylelint.config.mjs is the one-line starciStylelintConfig call. The formatter configuration is the app's (app.format-config).
+    # A front end has no test configuration at all (FE_NO_TESTS).
+    path: "{tsconfig.json,eslint.config.mjs,stylelint.config.mjs}"
     presence: required
     tracked: tracked
     tier: none
@@ -296,60 +438,6 @@ slots:
     tests: none
     goesTo: "nowhere: a front end has exactly the managed tool configuration (fe.tool-config); a change to a rule or a flag is proposed in the .claude runtime"
     rules: [HFS_TOOL_CONFIG_LOCAL]
-  - id: repo.quality-config
-    profiles: [be, fe]
-    path: sonar-project.properties
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    managedBy: quality-config
-    rules: [HFS_SONAR_CONFIG, HFS_MANAGED_FILE_DRIFT]
-  - id: repo.hooks
-    profiles: [be, fe]
-    path: ".husky/{pre-commit,pre-push}"
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    managedBy: hooks
-    rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
-  - id: repo.ci
-    profiles: [be, fe]
-    path: ".github/workflows/ci.yml"
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    managedBy: ci-workflows
-    rules: [HFS_CI_E2E_AUTOMATIC, HFS_CI_MISSING_CANON, HFS_MANAGED_FILE_DRIFT]
-  - id: repo.ci-e2e
-    profiles: [be]
-    path: ".github/workflows/e2e.yml"
-    presence: optional     # on: workflow_dispatch only
-    tracked: tracked
-    tier: none
-    tests: none
-    managedBy: ci-workflows
-    rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
-  - id: repo.github-meta
-    profiles: [be, fe]
-    path: ".github/{CODEOWNERS,pull_request_template.md,ISSUE_TEMPLATE/**,dependabot.yml}"
-    presence: optional
-    tracked: tracked
-    tier: none
-    tests: none
-  - id: repo.scripts
-    profiles: [be, fe]
-    # The repository's operational scripts only (`*.mjs`, `*.cjs`, `*.ps1`, `*.sh`), or nothing: an empty folder is `scripts/.gitkeep`, which hfs sync --init writes
-    # when the folder is missing. A spec or a test (BE_SPEC_PLACEMENT, FE_NO_TESTS), a check or lint source (`check-*`, `eslint-local-rules*`, a local eslint
-    # plugin: HFS_REPO_LOCAL_CHECK) and anything that re-implements a canon check is not an operational script and has no place here.
-    path: "scripts/{.gitkeep,*.mjs,*.cjs,*.ps1,*.sh}"
-    presence: optional
-    tracked: tracked
-    tier: none
-    tests: none
-    rules: [HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]     # one-off codemods and fix-* scripts are agent output, not tooling
   - id: repo.docs
     profiles: [be, fe]
     path: "docs/{adr,runbooks,guides}/**/*.md"
@@ -470,15 +558,6 @@ slots:
     tier: none
     tests: none
     why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
-    rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
-  - id: fe.contract.copy
-    profiles: [fe]
-    path: "apps/<app>/src/modules/api/contract/<be-app>.{graphql,json}"
-    presence: opt-in
-    tracked: tracked
-    tier: none
-    tests: none
-    why: byte copy of the BE snapshot, refreshed by `npm run contract:pull`; the land gate compares hashes
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
 
   # ----- BE: apps (one slot per app kind; a new kind = a new slot, minor bump) ---------------------------
@@ -827,20 +906,6 @@ slots:
     goesTo: "src/tests/world/ (the only test infrastructure location; e2e/<area>/ holds only *.e2e-spec.ts)"
 
   # ----- BE: work and stacks -----------------------------------------------------------------------------
-  - id: be.starciwork
-    profiles: [be]
-    path: ".starciwork/"
-    presence: required
-    tracked: tracked
-    tier: none
-    tests: none
-    requires: [.gitignore, workspace.yaml, features/index.yaml]
-    allows: [workspace.yaml, "brand/**", shell/index.yaml, "features/<feature>/index.yaml",
-             "features/<feature>/<family>/<name>/index.yaml", "features/<feature>/br/<rule>/ac/<name>/index.yaml",
-             "features/<feature>/ui/<name>/assets/<approved-file>", "features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml",
-             "features/<feature>/uat/<name>/{seed,cleanup}.sql", "_resources/{identities,environments,fixtures}/<slug>/resource.yaml"]
-    forbids: [evidence/, logs/, reports/, captures/, runs/, "kernel-*/", "*.sqlite*", _derived/, "work/node records"]
-    rules: [HFS_AGENT_DATA_TRACKED, HFS_WORK_NODE_RETIRED, HFS_IDENTITY_CUSTODY]
   - id: be.starcistacks
     profiles: [be]
     path: ".starcistacks/"
@@ -864,13 +929,13 @@ slots:
   # ----- FE: apps ----------------------------------------------------------------------------------------
   - id: fe.app.next
     profiles: [fe]
-    path: "apps/<app>/{package.json,next.config.ts,tsconfig.json,postcss.config.mjs}"
+    path: "apps/<app>/{next.config.ts,tsconfig.json,postcss.config.mjs}"
     appKind: next
     presence: required
     tracked: tracked
     tier: none
     minInstances: 1
-    requires: [package.json, next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/,
+    requires: [next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/,
                "src/app/global-error.tsx", "src/app/[locale]/layout.tsx", "src/app/[locale]/error.tsx", "src/app/[locale]/not-found.tsx", "src/app/[locale]/loading.tsx"]
     tests: none
     rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS]

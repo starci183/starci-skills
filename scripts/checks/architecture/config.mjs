@@ -61,7 +61,12 @@ function existingRegularFile(root, relative) {
   }
 }
 
-function workspaceDirectories(root) {
+/**
+ * The npm workspaces below `root`. The one package.json of an app is at `packageRoot` (the app root; `root` is its side folder):
+ * its workspace patterns under `<side>/` are this side's, read relative to the side folder, and every other pattern is the other
+ * side's.
+ */
+function workspaceDirectories(root, { packageRoot: appPackageRoot = root, side = null } = {}) {
   const directories = new Set();
   const queue = [root];
   const visited = new Set();
@@ -89,11 +94,14 @@ function workspaceDirectories(root) {
     const packageRoot = queue.shift();
     if (visited.has(packageRoot)) continue;
     visited.add(packageRoot);
-    const pkg = readJson(path.join(packageRoot, 'package.json'));
+    const sideRoot = side !== null && packageRoot === root;
+    const pkg = readJson(path.join(sideRoot ? appPackageRoot : packageRoot, 'package.json'));
     const patterns = Array.isArray(pkg?.workspaces) ? pkg.workspaces : pkg?.workspaces?.packages;
     for (const pattern of Array.isArray(patterns) ? patterns : []) {
       if (typeof pattern !== 'string' || !pattern.trim()) throw Error('package.json workspace entries must be non-empty paths.');
-      const normalized = slash(pattern.trim()).replace(/^\.\//, '');
+      const written = slash(pattern.trim()).replace(/^\.\//, '');
+      if (sideRoot && !written.startsWith(`${side}/`)) continue;
+      const normalized = sideRoot ? written.slice(side.length + 1) : written;
       const segments = normalized.split('/');
       if (path.isAbsolute(normalized) || segments.some(segment => segment === '..' || (segment.includes('*') && segment !== '*'))) {
         throw Error(`Unsupported local workspace pattern: ${normalized}.`);
@@ -121,7 +129,9 @@ function workspaceDirectories(root) {
     for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
       for (const [name, value] of Object.entries(pkg?.[section] ?? {})) {
         if (typeof value !== 'string' || !value.startsWith('file:')) continue;
-        const absolute = path.resolve(packageRoot, value.slice('file:'.length));
+        const absolute = path.resolve(sideRoot ? appPackageRoot : packageRoot, value.slice('file:'.length));
+        // The app's one package.json also lists the other side's file dependencies: only those inside this side are its own.
+        if (sideRoot && !isInside(root, absolute)) continue;
         const label = `${section}.${name} file dependency`;
         if (isInside(root, absolute)) { admit(absolute, label, true); continue; }
         // A sibling package of the same repository: this project consumes it, so the path is real and
@@ -248,10 +258,12 @@ const GRAMMAR_PACKAGE = '@starci/grammar';
  * source, every app and every workspace package that depends on the Grammar package is a consumer. null when no app has
  * a globals.css to judge (the contract is then reported unavailable, never passed).
  */
-function derivedGrammar(root, apps, workspaces) {
+function derivedGrammar(root, packageRoot, workspaces, apps = []) {
   const styleSources = apps.map(app => `apps/${app.name}/src/app/globals.css`).filter(relative => existingRegularFile(root, relative));
   if (!styleSources.length) return null;
-  const consumerManifests = apps.map(app => `apps/${app.name}/package.json`).filter(relative => existingRegularFile(root, relative));
+  // The apps have no package.json of their own: the app root's one manifest is the consumer that declares their dependencies.
+  const appManifest = slash(path.relative(root, path.join(packageRoot, 'package.json')));
+  const consumerManifests = existingRegularFile(root, appManifest) ? [appManifest] : [];
   for (const workspace of workspaces) {
     if (!workspace.startsWith('packages/')) continue;
     const manifest = `${workspace}/package.json`;
@@ -272,10 +284,14 @@ export function loadArchitectureConfig(repositoryRoot, { hfs } = {}) {
   if (!fs.lstatSync(root).isDirectory()) throw Error('Repository root must be a directory.');
   const opened = hfs ?? openHfs({ repoRoot: root });
   const { profile, apps } = opened.repo;
-  const workspaces = workspaceDirectories(root);
-  const inferred = inferredLayout(root, [...new Set([...workspaces, ...apps.map(app => `apps/${app.name}`)])].sort());
+  // A side of an app (the side folder is the root the machine judges) keeps its dependencies in the app root's one package.json.
+  const side = opened.repo.side ?? null;
+  const packageRoot = side === null ? root : path.dirname(root);
+  const workspaces = workspaceDirectories(root, { packageRoot, side });
+  const appDirs = apps.map(app => `apps/${app.name}`);
+  const inferred = inferredLayout(root, [...new Set([...workspaces, ...appDirs])].sort());
   const kinds = [profile === 'be' ? 'backend' : 'frontend'];
-  const projects = discoveredProjects(root, workspaces);
+  const projects = discoveredProjects(root, [...new Set([...workspaces, ...appDirs])]);
   if (!projects.length) throw Error('The repository has no tsconfig.json to derive a TypeScript project from.');
   const backend = {
     modules: ['src/modules'],
@@ -290,11 +306,12 @@ export function loadArchitectureConfig(repositoryRoot, { hfs } = {}) {
     hooks: inferred.hooks,
     modules: inferred.modules,
     transport: inferred.transport,
-    grammar: profile === 'fe' ? derivedGrammar(root, apps, workspaces) : null,
+    grammar: profile === 'fe' ? derivedGrammar(root, packageRoot, workspaces, apps) : null,
   };
   if (profile === 'fe') assertFrontendRolesDisjoint(root, frontend);
   return {
     root,
+    packageRoot,
     repository: enclosingRepository(root),
     kinds,
     projects,

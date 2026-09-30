@@ -650,20 +650,20 @@ schemas:
   # CODE-PATTERN ENFORCEMENT — executable rule conformance
   # --------------------------------------------------------------------------
 
-  - id: urn:starci:hfs-slots:1
+  - id: urn:starci:hfs-slots:2
     file: modules/schemas/hfs-slots.schema.yaml
     dialect: json-schema
     subsystem: gate
-    governs: "The HFS slot manifest knowledge/hfs/slots.yaml - versioned slots (id, profiles, path pattern, presence, tracked, tier, requires, tests, budget), the app kinds and the tier direction matrix."
+    governs: "The HFS slot manifest knowledge/hfs/slots.yaml - versioned slots (id, profiles app/be/fe, path pattern, presence, tracked, tier, requires, tests, budget), the two sides of an app and what each may read of the other, the app kinds and the tier direction matrix."
     binds: knowledge/hfs/slots.yaml
     usedBy: [scripts/lib/hfs-slots.mjs (loadSlotManifest re-states this shape without ajv; tests/hfs-slots.spec.mjs proves the two agree)]
     business:
       question: "What may exist in a product repository, where, and what may import what?"
       whenNeeded: Every HFS check, lint factory and template that needs a path, tier or required file.
-      whenNot: Not per-repository - a repository declares itself in hfs.json (urn:starci:hfs-repo:1) and never edits the manifest.
+      whenNot: Not per-repository - an app declares itself in hfs.json (urn:starci:hfs-repo:2) and never edits the manifest.
       selectedBy: scripts/lib/hfs-slots.mjs; owner-approved HFS decisions.
 
-  - id: urn:starci:hfs-rules:1
+  - id: urn:starci:hfs-rules:2
     file: modules/schemas/hfs-rules.schema.yaml
     dialect: json-schema
     subsystem: gate
@@ -676,15 +676,15 @@ schemas:
       whenNot: Not per-repository - a repository never edits the catalog and switches no rule off.
       selectedBy: scripts/lib/hfs-slots.mjs; owner-approved HFS decisions.
 
-  - id: urn:starci:hfs-repo:1
+  - id: urn:starci:hfs-repo:2
     file: modules/schemas/hfs-repo.schema.yaml
     dialect: json-schema
     subsystem: gate
-    governs: "The repository-side hfs.json - pinned manifest major, profile, project, apps with kinds, opt-in slots used, database connections."
-    binds: <repository>/hfs.json
+    governs: "The app-root hfs.json - pinned manifest major, kind app, project, and per side (be, fe) the apps with kinds, opt-in slots used, database connections (be) and the other side's paths it reads."
+    binds: <app>/hfs.json
     usedBy: [scripts/lib/hfs-slots.mjs (resolveRepoDeclaration, readRepoDeclaration)]
     business:
-      question: "Which HFS does this repository follow and which optional slots does it use?"
+      question: "Which HFS does this app follow, which apps does each side hold and which optional slots does it use?"
       whenNeeded: Any check that has to know a repository's apps, connections or enabled slots.
       whenNot: Lists no owners, paths or switched-off rules - owners are derived from slots.
       selectedBy: scripts/lib/hfs-slots.mjs.

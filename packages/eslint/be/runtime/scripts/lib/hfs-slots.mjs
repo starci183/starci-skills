@@ -1,4 +1,4 @@
-// hfs-slots.mjs - the HFS slot manifest and repository declaration, loaded once and asked four questions:
+// hfs-slots.mjs - the HFS slot manifest and app declaration, loaded once and asked four questions:
 //   which slot owns path P           slotOf(P) / classifyPath(P)   (an unknown path reports its nearest slot)
 //   is import A -> B allowed         importAllowed(A, B)           (tier matrix, cross-owner entry, cross-app, layers)
 //   which files are required         requiredFiles(P) / requiredPaths()
@@ -8,6 +8,12 @@
 // list. The manifest shape is modules/schemas/hfs-slots.schema.yaml and hfs.json is modules/schemas/hfs-repo.schema.yaml;
 // the installed runtime carries no npm dependency, so this file re-states those shapes instead of loading ajv
 // (tests/hfs-slots.spec.mjs proves the two agree).
+//
+// A product is ONE app repository: hfs.json at the app root has kind `app` and declares its two sides, `be` and `fe`, each in
+// the folder of that name. The resolver of the app answers for the whole tree: a root path with the slots of profile `app`,
+// a path below a side folder with that side's resolver (profile be or fe, the side folder as its root: the side view), so
+// every check and lint rule runs unchanged with a side folder as its repository root. Nothing crosses sides except the
+// paths the declaration lists in `sides.<side>.reads` (a subset of the manifest's `sides.<side>.reads`).
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -32,11 +38,17 @@ export class HfsSlotsError extends Error {
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 const NAME = /^[a-z][a-z0-9-]*$/;
 const ENV_PREFIX = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$/;
-const SLOT_ID = /^(repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$/;
+const SLOT_ID = /^(app|repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$/;
 const PRESENCE = ['required', 'optional', 'opt-in', 'forbidden'];
 const TRACKED = ['tracked', 'ignored', 'external'];
 const TESTS = ['unit-beside', 'e2e', 'none'];
+/** The sides of an app; each lives in the folder of its name and is the profile of its slots. */
 const PROFILES = ['be', 'fe'];
+export const SIDES = Object.freeze([...PROFILES]);
+/** The profile of the app root's own slots. */
+export const APP_SCOPE = 'app';
+const SCOPES = [APP_SCOPE, ...PROFILES];
+const APP_KIND = 'app';
 const strList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0);
 
 // ------------------------------------------------------------------------------------------------ patterns
@@ -120,7 +132,7 @@ const fail = (code, message, details) => { throw new HfsSlotsError(code, message
 function manifestShapeProblems(m) {
   const bad = [];
   if (!isPlainObject(m)) return ['the manifest is not a map'];
-  const allowed = new Set(['schema', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'appKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers']);
+  const allowed = new Set(['schema', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'sides', 'appKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers']);
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
   if (!/^starci\/hfs-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/hfs-slots@<major>');
   if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
@@ -128,6 +140,11 @@ function manifestShapeProblems(m) {
   if (JSON.stringify(m.presenceValues) !== JSON.stringify(PRESENCE)) bad.push(`presenceValues must be ${PRESENCE.join(', ')}`);
   if (JSON.stringify(m.trackedValues) !== JSON.stringify(TRACKED)) bad.push(`trackedValues must be ${TRACKED.join(', ')}`);
   if (JSON.stringify(m.testValues) !== JSON.stringify(TESTS)) bad.push(`testValues must be ${TESTS.join(', ')}`);
+  if (!isPlainObject(m.sides) || Object.keys(m.sides).sort().join() !== PROFILES.join()) bad.push('sides must be a map with exactly be and fe');
+  else for (const side of PROFILES) {
+    const def = m.sides[side];
+    if (!isPlainObject(def) || Object.keys(def).join() !== 'reads' || !Array.isArray(def.reads) || !def.reads.every((r) => typeof r === 'string' && /^(be|fe)\/([^/]+\/)+$/.test(r)) || new Set(def.reads).size !== def.reads.length) bad.push(`sides.${side} must be {reads: [unique <side>/<dir>/ paths]}`);
+  }
   for (const key of ['appKinds', 'tiers']) {
     if (!isPlainObject(m[key])) { bad.push(`${key} must be a map with be and fe`); continue; }
     for (const extra of Object.keys(m[key])) if (!PROFILES.includes(extra)) bad.push(`${key}.${extra} is not a profile`);
@@ -174,7 +191,8 @@ function manifestShapeProblems(m) {
     if (!isPlainObject(slot)) { bad.push(`${at} is not a map`); return; }
     for (const key of Object.keys(slot)) if (!slotKeys.has(key)) bad.push(`${at}: unknown field ${key}`);
     if (!SLOT_ID.test(String(slot.id))) bad.push(`${at}: id must look like be.transport.http`);
-    if (!Array.isArray(slot.profiles) || !slot.profiles.length || !slot.profiles.every((p) => PROFILES.includes(p)) || new Set(slot.profiles).size !== slot.profiles.length) bad.push(`${at}: profiles must be a unique non-empty subset of be, fe`);
+    if (!Array.isArray(slot.profiles) || !slot.profiles.length || !slot.profiles.every((p) => SCOPES.includes(p)) || new Set(slot.profiles).size !== slot.profiles.length || (slot.profiles.includes(APP_SCOPE) && slot.profiles.length !== 1)) bad.push(`${at}: profiles must be [app] or a unique non-empty subset of be, fe`);
+    else if ((slot.profiles[0] === APP_SCOPE) !== String(slot.id).startsWith(`${APP_SCOPE}.`)) bad.push(`${at}: an app-root slot has profiles [app] and an id app.<name>, and only it`);
     if (typeof slot.path !== 'string' || !slot.path) bad.push(`${at}: path is required`);
     if (!PRESENCE.includes(slot.presence)) bad.push(`${at}: presence must be one of ${PRESENCE.join(', ')}`);
     if (!TRACKED.includes(slot.tracked)) bad.push(`${at}: tracked must be one of ${TRACKED.join(', ')}`);
@@ -211,9 +229,15 @@ function manifestSemanticProblems(m) {
     ids.add(slot.id);
     const pathVars = new Set(varsOf(slot.path));
     for (const profile of slot.profiles) {
-      const tiers = m.tiers[profile];
-      if (slot.tier !== 'none' && slot.tier !== 'inherit' && !(slot.tier in tiers)) bad.push(`slot ${slot.id}: tier ${slot.tier} is not a ${profile} tier`);
-      if (slot.appKind !== undefined && !m.appKinds[profile].includes(slot.appKind)) bad.push(`slot ${slot.id}: app kind ${slot.appKind} is not a ${profile} kind`);
+      if (profile === APP_SCOPE) {
+        // The app root holds no source: its slots take no part in import checks and describe no app.
+        for (const key of ['appKind', 'owner', 'layers', 'kinds', 'composedBy', 'requiredWhen', 'requiredInstances']) if (slot[key] !== undefined) bad.push(`slot ${slot.id}: an app-root slot has no ${key}`);
+        if (slot.tier !== 'none') bad.push(`slot ${slot.id}: an app-root slot has tier none`);
+      } else {
+        const tiers = m.tiers[profile];
+        if (slot.tier !== 'none' && slot.tier !== 'inherit' && !(slot.tier in tiers)) bad.push(`slot ${slot.id}: tier ${slot.tier} is not a ${profile} tier`);
+        if (slot.appKind !== undefined && !m.appKinds[profile].includes(slot.appKind)) bad.push(`slot ${slot.id}: app kind ${slot.appKind} is not a ${profile} kind`);
+      }
       if (slot.appKind === undefined) {
         for (const variant of braceVariants(slot.path)) {
           const key = `${profile}:${variant}`;
@@ -233,6 +257,12 @@ function manifestSemanticProblems(m) {
     if (slot.successor !== undefined && !m.slots.some((s) => s.id === slot.successor)) bad.push(`slot ${slot.id}: successor ${slot.successor} is not a slot`);
     for (const kind of slot.composedBy ?? []) if (!slot.profiles.every((p) => m.appKinds[p].includes(kind))) bad.push(`slot ${slot.id}: composedBy names ${kind}, which is not an app kind of every profile of the slot`);
     if (slot.layers !== undefined && slot.tier !== 'none' && !slot.profiles.every((p) => m.tiers[p][slot.tier]?.lowerLayerOnly)) bad.push(`slot ${slot.id}: layers need a lowerLayerOnly tier`);
+  }
+  for (const side of PROFILES) for (const read of m.sides[side].reads) {
+    const [owner, ...rest] = read.split('/');
+    const below = rest.join('/');
+    if (owner === side) bad.push(`sides.${side}.reads names ${read}, which is its own side`);
+    else if (!m.slots.some((s) => s.profiles.includes(owner) && s.presence !== 'forbidden' && braceVariants(s.path).some((v) => v.startsWith(below)))) bad.push(`sides.${side}.reads names ${read}, which no ${owner} slot owns`);
   }
   for (const profile of PROFILES) {
     for (const [tier, def] of Object.entries(m.tiers[profile])) {
@@ -268,79 +298,131 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 function declarationShapeProblems(d) {
   const bad = [];
   if (!isPlainObject(d)) return ['hfs.json is not an object'];
-  for (const key of Object.keys(d)) if (!['hfs', 'profile', 'project', 'apps', 'optionalSlots', 'connections', 'stacks'].includes(key)) bad.push(`unknown key ${key}`);
+  for (const key of Object.keys(d)) if (!['hfs', 'kind', 'project', 'sides'].includes(key)) bad.push(`unknown key ${key}`);
   if (!(Number.isInteger(d.hfs) && d.hfs >= 1)) bad.push('hfs must be the pinned manifest major (an integer, 1 or more)');
-  if (!PROFILES.includes(d.profile)) bad.push('profile must be be or fe');
+  if (d.kind !== APP_KIND) bad.push(`kind must be ${APP_KIND}: a product is one app repository with a be and an fe side`);
   if (!NAME.test(String(d.project))) bad.push('project must be a project name');
-  if (!Array.isArray(d.apps) || !d.apps.length) bad.push('apps must list every apps/<name> with its kind');
-  else d.apps.forEach((app, i) => {
-    if (!isPlainObject(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`apps[${i}] must be {name, kind}`);
-  });
-  if (d.stacks !== undefined && (d.profile !== 'fe' || typeof d.stacks !== 'string' || !d.stacks || /^([a-zA-Z]:)?[\/]/.test(d.stacks))) bad.push('stacks is front end only and must be a relative path to the sibling back-end repository');
-  if (d.optionalSlots !== undefined && (!Array.isArray(d.optionalSlots) || !d.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(d.optionalSlots).size !== d.optionalSlots.length)) bad.push('optionalSlots must be a unique list of slot ids');
-  if (d.connections !== undefined) {
-    // One physical database = one entry (R84): {name, envPrefix}; names and env prefixes unique, no prefix inside another's keys.
-    const list = Array.isArray(d.connections) ? d.connections : null;
-    if (!list || !list.every((c) => isPlainObject(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && Object.keys(c).length === 2)) bad.push('connections must be a list of {name: kebab-case database name, envPrefix: UPPER_SNAKE prefix of its env keys}');
-    else {
-      if (new Set(list.map((c) => c.name)).size !== list.length) bad.push('connections names must be unique');
-      for (const a of list) for (const b of list) if (a !== b && `${b.envPrefix}_`.startsWith(`${a.envPrefix}_`)) bad.push(`connections ${a.name} and ${b.name} share env keys (${a.envPrefix}_ covers ${b.envPrefix}_)`);
+  if (!isPlainObject(d.sides) || Object.keys(d.sides).sort().join() !== PROFILES.join()) { bad.push('sides must declare exactly be and fe'); return bad; }
+  const names = new Map();
+  for (const side of PROFILES) {
+    const s = d.sides[side];
+    const at = `sides.${side}`;
+    if (!isPlainObject(s)) { bad.push(`${at} must be an object`); continue; }
+    for (const key of Object.keys(s)) if (!['apps', 'optionalSlots', 'connections', 'reads'].includes(key)) bad.push(`${at} has unknown key ${key}`);
+    if (!Array.isArray(s.apps) || !s.apps.length) bad.push(`${at}.apps must list every ${side}/apps/<name> with its kind`);
+    else s.apps.forEach((app, i) => {
+      if (!isPlainObject(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`${at}.apps[${i}] must be {name, kind}`);
+      // The root scripts name every app (start:<app>), so an app name is unique across both sides.
+      else if (names.has(app.name)) bad.push(`app ${app.name} is declared twice (${names.get(app.name)} and ${side})`);
+      else names.set(app.name, side);
+    });
+    if (s.optionalSlots !== undefined && (!Array.isArray(s.optionalSlots) || !s.optionalSlots.every((v) => SLOT_ID.test(String(v))) || new Set(s.optionalSlots).size !== s.optionalSlots.length)) bad.push(`${at}.optionalSlots must be a unique list of slot ids`);
+    if (s.reads !== undefined && (!Array.isArray(s.reads) || !s.reads.every((r) => typeof r === 'string' && r.length > 0) || new Set(s.reads).size !== s.reads.length)) bad.push(`${at}.reads must be a unique list of paths`);
+    if (s.connections !== undefined) {
+      if (side !== 'be') { bad.push('connections belong to the be side'); continue; }
+      // One physical database = one entry (R84): {name, envPrefix}; names and env prefixes unique, no prefix inside another's keys.
+      const list = Array.isArray(s.connections) ? s.connections : null;
+      if (!list || !list.every((c) => isPlainObject(c) && NAME.test(String(c.name)) && ENV_PREFIX.test(String(c.envPrefix)) && Object.keys(c).length === 2)) bad.push('connections must be a list of {name: kebab-case database name, envPrefix: UPPER_SNAKE prefix of its env keys}');
+      else {
+        if (new Set(list.map((c) => c.name)).size !== list.length) bad.push('connections names must be unique');
+        for (const a of list) for (const b of list) if (a !== b && `${b.envPrefix}_`.startsWith(`${a.envPrefix}_`)) bad.push(`connections ${a.name} and ${b.name} share env keys (${a.envPrefix}_ covers ${b.envPrefix}_)`);
+      }
     }
   }
-  if (d.profile === 'fe' && d.connections !== undefined) bad.push('connections belong to a backend repository');
   return bad;
 }
 
 const declarationInvalid = (problems, file) => fail('HFS_DECLARATION_INVALID', `hfs.json is refused: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? `; and ${problems.length - 5} more` : ''}`, { file, problems });
 
+/** One side of a declaration checked against the manifest: app kinds of the profile, opt-in slots, required app kinds, reads. */
+function sideProblems(manifest, side, s) {
+  const bad = [];
+  for (const app of s.apps) if (!manifest.appKinds[side].includes(app.kind)) bad.push(`${side} app ${app.name} has kind ${app.kind}, which is not a ${side} kind (${manifest.appKinds[side].join(', ')})`);
+  for (const id of s.optionalSlots ?? []) {
+    const slot = manifest.slots.find((candidate) => candidate.id === id);
+    if (!slot || !slot.profiles.includes(side)) bad.push(`sides.${side}.optionalSlots names ${id}, which is not a ${side} slot`);
+    else if (slot.presence !== 'opt-in') bad.push(`sides.${side}.optionalSlots names ${id}, which is ${slot.presence}, not opt-in`);
+    else if (slot.appKind !== undefined) bad.push(`sides.${side}.optionalSlots names ${id}; an app of kind ${slot.appKind} enables it`);
+  }
+  for (const read of s.reads ?? []) if (!manifest.sides[side].reads.includes(read)) bad.push(`sides.${side}.reads names ${read}; ${side} may read only ${manifest.sides[side].reads.join(', ') || 'nothing of the other side'}`);
+  const connections = s.connections ?? [];
+  for (const slot of manifest.slots) {
+    if (slot.appKind === undefined || !slot.profiles.includes(side) || slot.presence !== 'required') continue;
+    if (slot.requiredWhen === 'connections' && !connections.length) continue;
+    if (!s.apps.some((a) => a.kind === slot.appKind)) bad.push(`no ${side} app of kind ${slot.appKind} is declared (${slot.id} is required${slot.requiredWhen ? ' once a connection is declared' : ''})`);
+  }
+  return bad;
+}
+
 /**
- * A declaration checked against the manifest: the pinned major must be the manifest's (HFS_MANIFEST_MAJOR_MISMATCH
- * otherwise, and there is no compatibility window), app kinds must exist for the profile, optionalSlots may name only
- * opt-in slots that no app kind implies, and every required app kind must be declared.
+ * A declaration checked against the manifest: kind app, the pinned major the manifest's (HFS_MANIFEST_MAJOR_MISMATCH otherwise,
+ * and there is no compatibility window), and per side: app kinds of that profile, optionalSlots naming only opt-in slots of the
+ * side that no app kind implies, every required app kind declared, reads within the manifest's. Returns the app (profile app,
+ * its two sides under `sides`), or with `side` that side's view: the declaration a check of the side folder runs under.
  */
-export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLARATION_FILE } = {}) {
+export function resolveRepoDeclaration(manifest, declaration, { file = HFS_DECLARATION_FILE, side = null } = {}) {
   const problems = declarationShapeProblems(declaration);
   if (problems.length) declarationInvalid(problems, file);
   if (declaration.hfs !== manifest.major)
     fail('HFS_MANIFEST_MAJOR_MISMATCH', `hfs.json pins manifest major ${declaration.hfs} but the manifest is ${manifest.version}`, { pinned: declaration.hfs, manifest: manifest.version, manifestMajor: manifest.major, file });
-  const { profile } = declaration;
-  const bad = [];
-  const names = new Set();
-  for (const app of declaration.apps) {
-    if (names.has(app.name)) bad.push(`app ${app.name} is declared twice`);
-    names.add(app.name);
-    if (!manifest.appKinds[profile].includes(app.kind)) bad.push(`app ${app.name} has kind ${app.kind}, which is not a ${profile} kind (${manifest.appKinds[profile].join(', ')})`);
-  }
-  for (const id of declaration.optionalSlots ?? []) {
-    const slot = manifest.slots.find((s) => s.id === id);
-    if (!slot || !slot.profiles.includes(profile)) bad.push(`optionalSlots names ${id}, which is not a ${profile} slot`);
-    else if (slot.presence !== 'opt-in') bad.push(`optionalSlots names ${id}, which is ${slot.presence}, not opt-in`);
-    else if (slot.appKind !== undefined) bad.push(`optionalSlots names ${id}; an app of kind ${slot.appKind} enables it`);
-  }
-  const connections = declaration.connections ?? [];
-  for (const slot of manifest.slots) {
-    if (slot.appKind === undefined || !slot.profiles.includes(profile) || slot.presence !== 'required') continue;
-    if (slot.requiredWhen === 'connections' && !connections.length) continue;
-    if (!declaration.apps.some((a) => a.kind === slot.appKind)) bad.push(`no app of kind ${slot.appKind} is declared (${slot.id} is required${slot.requiredWhen ? ' once a connection is declared' : ''})`);
-  }
+  const bad = PROFILES.flatMap((name) => sideProblems(manifest, name, declaration.sides[name]));
   if (bad.length) declarationInvalid(bad, file);
+  if (side !== null && !PROFILES.includes(side)) fail('HFS_DECLARATION_INVALID', `${side} is not a side of an app (be, fe)`, { file, side });
+  const sides = Object.fromEntries(PROFILES.map((name) => {
+    const s = declaration.sides[name];
+    return [name, Object.freeze({
+      hfs: declaration.hfs,
+      kind: APP_KIND,
+      project: declaration.project,
+      side: name,
+      profile: name,
+      apps: Object.freeze(s.apps.map((a) => Object.freeze({ name: a.name, kind: a.kind }))),
+      optionalSlots: Object.freeze([...(s.optionalSlots ?? [])]),
+      connections: Object.freeze((s.connections ?? []).map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix }))),
+      reads: Object.freeze([...(s.reads ?? [])]),
+      manifestVersion: manifest.version,
+    })];
+  }));
+  if (side !== null) return sides[side];
   return Object.freeze({
     hfs: declaration.hfs,
-    profile,
+    kind: APP_KIND,
     project: declaration.project,
-    apps: Object.freeze(declaration.apps.map((a) => Object.freeze({ name: a.name, kind: a.kind }))),
-    optionalSlots: Object.freeze([...(declaration.optionalSlots ?? [])]),
-    connections: Object.freeze(connections.map((c) => Object.freeze({ name: c.name, envPrefix: c.envPrefix }))),
+    side: null,
+    profile: APP_SCOPE,
+    // The root declares no app, opt-in slot or connection of its own: each side does.
+    apps: Object.freeze([]),
+    optionalSlots: Object.freeze([]),
+    connections: Object.freeze([]),
+    reads: Object.freeze([]),
+    sides: Object.freeze(sides),
     manifestVersion: manifest.version,
   });
 }
 
-/** hfs.json of the repository at `repoRoot`, parsed and resolved; a missing or unreadable file is a refusal, never "unavailable". */
+/**
+ * Where the declaration of `dir` lives: `dir` itself when it holds hfs.json (the app root), else its parent when `dir` is a side
+ * folder (be/ or fe/) of an app (the side view). `{ file, appRoot, side }`; side is null at the app root.
+ */
+export function locateDeclaration(dir) {
+  const own = path.join(dir, HFS_DECLARATION_FILE);
+  if (fs.existsSync(own)) return { file: own, appRoot: dir, side: null };
+  const parent = path.dirname(dir);
+  const side = path.basename(dir);
+  const up = path.join(parent, HFS_DECLARATION_FILE);
+  if (PROFILES.includes(side) && fs.existsSync(up)) return { file: up, appRoot: parent, side };
+  return { file: own, appRoot: dir, side: null };
+}
+
+/**
+ * hfs.json of the app at `repoRoot` (the app itself), or of the app whose side folder `repoRoot` is (that side's view), parsed and
+ * resolved; a missing or unreadable file is a refusal, never "unavailable".
+ */
 export function readRepoDeclaration(manifest, repoRoot) {
-  const file = path.join(repoRoot, HFS_DECLARATION_FILE);
+  const { file, side } = locateDeclaration(repoRoot);
   let declaration;
   try { declaration = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { declarationInvalid([`hfs.json cannot be read (${String(error?.code ?? error?.message ?? error).split('\n')[0]})`], file); }
-  return resolveRepoDeclaration(manifest, declaration, { file });
+  return resolveRepoDeclaration(manifest, declaration, { file, side });
 }
 
 // ------------------------------------------------------------------------------------------- resolver
@@ -348,10 +430,10 @@ export function readRepoDeclaration(manifest, repoRoot) {
 const isEntryFile = (name) => name === 'index.ts' || name === 'index.tsx';
 
 /**
- * The four questions for one repository. `repo` comes from resolveRepoDeclaration / readRepoDeclaration.
- * Paths are repository-relative (backslashes and a leading ./ are folded); a trailing / or a directory path is fine.
+ * The four questions for one scope: the app root (profile app, root paths) or one side (profile be or fe, paths relative to the
+ * side folder). createSlotResolver composes them; nothing else calls this.
  */
-export function createSlotResolver(manifest, repo) {
+function createScopeResolver(manifest, repo) {
   const profile = repo.profile;
   const slots = manifest.slots.filter((s) => s.profiles.includes(profile));
   const byId = new Map(slots.map((s) => [s.id, s]));
@@ -579,7 +661,86 @@ export function createSlotResolver(manifest, repo) {
     trackingOf,
     isTracked,
     ruleParams: () => ruleParams(manifest, profile),
-    allowedImports: (tier) => manifest.tiers[profile][tier]?.mayImport ?? null,
+    allowedImports: (tier) => manifest.tiers[profile]?.[tier]?.mayImport ?? null,
+  });
+}
+
+/**
+ * The four questions for one app, or for one side of it. `repo` comes from resolveRepoDeclaration / readRepoDeclaration.
+ * Paths are relative to the root the declaration was resolved for (backslashes and a leading ./ are folded; a trailing / or a
+ * directory path is fine): a side view (repo.side set) answers for the side folder as its root, exactly as a check of that side
+ * runs; the app (profile app) answers a root path with the app-root slots and a path below be/ or fe/ with that side's view,
+ * the side prefixed back onto every path and root it returns (and `side` added). Only the declared `reads` cross sides.
+ */
+export function createSlotResolver(manifest, repo) {
+  if (repo.profile !== APP_SCOPE) return createScopeResolver(manifest, repo);
+  const root = createScopeResolver(manifest, repo);
+  const sides = Object.fromEntries(PROFILES.map((side) => [side, createScopeResolver(manifest, repo.sides[side])]));
+  const clean = (p) => posixPath(p).replace(/\/+$/, '');
+  /** { side, rest } when `p` lies below a side folder, else null. */
+  const split = (input) => {
+    const p = clean(input);
+    const slash = p.indexOf('/');
+    const head = slash < 0 ? p : p.slice(0, slash);
+    return PROFILES.includes(head) && slash > 0 ? { side: head, rest: p.slice(slash + 1) } : null;
+  };
+  const under = (side, rel) => (rel ? `${side}/${rel}` : side);
+  const prefixed = (side, c) => ({
+    ...c,
+    path: under(side, c.path),
+    side,
+    ...(c.root !== undefined ? { root: under(side, c.root) } : {}),
+    ...(c.nearest ? { nearest: { ...c.nearest, matchedPrefix: under(side, c.nearest.matchedPrefix), matchedDepth: c.nearest.matchedDepth + 1 } } : {}),
+  });
+  const classifyPath = (input) => { const at = split(input); return at ? prefixed(at.side, sides[at.side].classifyPath(at.rest)) : root.classifyPath(input); };
+  const ownerOf = (input) => {
+    const at = split(input);
+    if (!at) return root.ownerOf(input);
+    const owner = sides[at.side].ownerOf(at.rest);
+    return owner ? { ...owner, root: under(at.side, owner.root), side: at.side } : null;
+  };
+  const allSlots = [...new Map([...root.slots(), ...PROFILES.flatMap((side) => sides[side].slots())].map((s) => [s.id, s])).values()];
+  const byId = new Map(allSlots.map((s) => [s.id, s]));
+  /** Whether `toPath`, of the other side, lies below a path `fromSide` declares it reads. */
+  const reads = (fromSide, toPath) => repo.sides[fromSide].reads.some((read) => `${clean(toPath)}/`.startsWith(read));
+  return Object.freeze({
+    repo,
+    sides: Object.freeze(sides),
+    /** The side of a path (be, fe) or null for a root path. */
+    sideOf: (input) => split(input)?.side ?? null,
+    slot: (id) => byId.get(id) ?? null,
+    slots: () => allSlots,
+    slotEnabled: (slot) => (slot.profiles.includes(APP_SCOPE) ? root.slotEnabled(slot) : PROFILES.some((side) => slot.profiles.includes(side) && sides[side].slotEnabled(slot))),
+    classifyPath,
+    slotOf: (p) => { const c = classifyPath(p); return c.slot ? byId.get(c.slot) : null; },
+    ownerOf,
+    tierOf: (input) => { const at = split(input); return at ? sides[at.side].tierOf(at.rest) : root.tierOf(input); },
+    importAllowed(fromPath, toPath) {
+      const from = split(fromPath);
+      const to = split(toPath);
+      if (from && to && from.side !== to.side) {
+        return reads(from.side, toPath) ? { allowed: true, reason: 'sideRead', fromSide: from.side, toSide: to.side } : { allowed: false, reason: 'crossSide', fromSide: from.side, toSide: to.side, reads: repo.sides[from.side].reads };
+      }
+      if (from && to) return sides[from.side].importAllowed(from.rest, to.rest);
+      return root.importAllowed(fromPath, toPath);
+    },
+    requiredFiles: (input) => { const at = split(input); return at ? sides[at.side].requiredFiles(at.rest).map((p) => under(at.side, p)) : root.requiredFiles(input); },
+    requiredPaths() {
+      const own = root.requiredPaths();
+      const paths = [...own.paths];
+      const minimums = [...own.minimums];
+      for (const side of PROFILES) {
+        const required = sides[side].requiredPaths();
+        paths.push(...required.paths.map((entry) => ({ ...entry, path: under(side, entry.path), side })));
+        minimums.push(...required.minimums.map((entry) => ({ ...entry, side })));
+      }
+      return { paths, minimums };
+    },
+    trackingOf: (p) => classifyPath(p).tracking ?? null,
+    isTracked: (p) => classifyPath(p).tracking === 'tracked',
+    // The root has no tier and no rule parameters of its own; each side has them (sides.<side>.ruleParams()).
+    ruleParams: () => null,
+    allowedImports: () => null,
   });
 }
 
@@ -590,9 +751,12 @@ export function ruleParams(manifest, profile) {
   return deepFreeze(structuredClone(manifest.ruleParams[profile]));
 }
 
-/** The manifest of this runtime plus the resolver for the repository at `repoRoot` (or for an already-parsed declaration). */
-export function openHfs({ root = skillRoot, repoRoot, declaration, manifest = loadSlotManifest({ root }) } = {}) {
-  const repo = declaration !== undefined ? resolveRepoDeclaration(manifest, declaration) : readRepoDeclaration(manifest, repoRoot);
+/**
+ * The manifest of this runtime plus the resolver for the app or side folder at `repoRoot` (a side folder gets that side's view), or
+ * for an already-parsed declaration (the app, or with `side` that side's view).
+ */
+export function openHfs({ root = skillRoot, repoRoot, declaration, side = null, manifest = loadSlotManifest({ root }) } = {}) {
+  const repo = declaration !== undefined ? resolveRepoDeclaration(manifest, declaration, { side }) : readRepoDeclaration(manifest, repoRoot);
   return { manifest, repo, ...createSlotResolver(manifest, repo), rules: () => loadRuleCatalog({ root, manifest }) };
 }
 

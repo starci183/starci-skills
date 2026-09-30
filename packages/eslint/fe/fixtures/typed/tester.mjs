@@ -9,21 +9,19 @@ import { fileURLToPath } from "node:url"
 import tsParser from "@typescript-eslint/parser"
 import { RuleTester } from "eslint"
 import { hfsFromDeclaration } from "../../lib/hfs.mjs"
+import { appDeclaration } from "../../../be/fixtures/app.mjs"
 
 /** The fixture repository root. */
 export const TYPED_ROOT = dirname(fileURLToPath(import.meta.url))
 
-/** The default front-end declaration of the fixture repository: two apps and the shared packages. */
+/** The default fe side of the fixture app (hfs.json sides.fe): two apps and the shared packages. */
 export const FE_DECLARATION = Object.freeze({
-  hfs: 1,
-  profile: "fe",
-  project: "fixture",
   apps: [{ name: "web", kind: "next" }, { name: "admin", kind: "next" }],
   optionalSlots: ["repo.packages", "fe.package.ui", "fe.package.api", "fe.package.i18n"],
 })
 
-/** The HFS view of the fixture repository. */
-export const fixtureHfs = (declaration = FE_DECLARATION) => hfsFromDeclaration(declaration, TYPED_ROOT)
+/** The HFS view of the fixture fe side (`declaration` is the fe side of the app). */
+export const fixtureHfs = (declaration = FE_DECLARATION) => hfsFromDeclaration(appDeclaration("fe", declaration), TYPED_ROOT)
 
 /** Globs of every depth a case filename may sit at (the project service refuses a `**` glob). */
 const DEPTHS = Array.from({ length: 10 }, (_, depth) => [`${"*/".repeat(depth)}*.ts`, `${"*/".repeat(depth)}*.tsx`]).flat()

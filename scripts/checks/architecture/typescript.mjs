@@ -189,7 +189,8 @@ function workspaceMetadata(config) {
         || backendAppRoots.some(appRoot => isInside(appRoot, root) || isInside(root, appRoot)) };
   };
   const roots = config.workspaces.map(create);
-  const rootPackage = readJson(path.join(config.root, 'package.json'));
+  // A side of an app has no package.json: the app root's one manifest names the package the side's root files belong to.
+  const rootPackage = readJson(path.join(config.packageRoot ?? config.root, 'package.json')) ?? {};
   roots.push({ root: canonical(config.root), relative: '.', name: typeof rootPackage.name === 'string' ? rootPackage.name : null, exports: rootPackage.exports,
     app: config.frontend.routes.some(item => isInside(config.root, path.join(config.root, ...item.split('/')))) || config.kinds.includes('backend') });
   return roots.sort((a, b) => b.root.length - a.root.length);

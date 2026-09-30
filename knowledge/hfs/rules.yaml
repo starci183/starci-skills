@@ -14,8 +14,8 @@
 #
 # Every rule is an error from 2.0. There is no baseline, allowlist or suppression file. Codes are quoted: the failure-code
 # scanner reads this file as an emitter of every code it names.
-schema: starci/hfs-rules@1
-version: 1.0.0
+schema: starci/hfs-rules@2
+version: 2.0.0
 gates:
   pre-commit: lint-staged on staged files - Prettier, ESLint canon, stylelint, secrets guard; under 10 seconds
   pre-push: typecheck, lint (hfs lint) and the affected unit specs; runs every pre-commit rule again

@@ -2,7 +2,8 @@
  * The one door between the lint rules and the HFS slot manifest of the repository being linted.
  *
  * A consuming `eslint.config.mjs` is the one line `export default starciBeConfig({ hfs: loadHfs(import.meta.url) })`.
- * `loadHfs` reads the repository's `hfs.json` beside that config file and the slot manifest this package ships in
+ * The config lives in the be/ side folder of an app; `loadHfs` finds the app-root `hfs.json` one level up and gives every file
+ * linted under that folder the view of the be side (paths relative to be/), with the slot manifest this package ships in
  * `runtime/` (a byte copy of the runtime's `knowledge/hfs/slots.yaml`, `scripts/lib/hfs-slots.mjs` and `scripts/lib/hfs-view.mjs`, refreshed by
  * `packages/hfs/scripts/sync-runtime.mjs`), and returns an object the factory puts in `settings.starci.hfs`.
  *
@@ -17,7 +18,7 @@ import { declaredHfsView, openHfsView } from "../runtime/scripts/lib/hfs-view.mj
 const RUNTIME = join(dirname(fileURLToPath(import.meta.url)), "..", "runtime")
 
 /**
- * The HFS view of the repository whose `eslint.config.mjs` calls this.
+ * The HFS view of the side whose `eslint.config.mjs` (in be/) calls this.
  *
  * @param {string} configUrl - `import.meta.url` of the repository's `eslint.config.mjs`.
  * @returns {object} The frozen HFS view (profile, apps, connections, ruleParams, slotOf, tierOf, ownerOf).
@@ -25,13 +26,13 @@ const RUNTIME = join(dirname(fileURLToPath(import.meta.url)), "..", "runtime")
 export const loadHfs = (configUrl) => openHfsView({ runtimeRoot: RUNTIME, repoRoot: dirname(fileURLToPath(configUrl)) })
 
 /**
- * The HFS view of an in-memory declaration, for rule tests: no file is read except the shipped manifest.
+ * The HFS view of the be side of an in-memory app declaration, for rule tests: no file is read except the shipped manifest.
  *
- * @param {object} declaration - An `hfs.json` object.
- * @param {string} repoRoot - The absolute root the linted filenames live under.
+ * @param {object} declaration - An app `hfs.json` object.
+ * @param {string} repoRoot - The absolute be side folder the linted filenames live under.
  * @returns {object} The frozen HFS view.
  */
-export const hfsFromDeclaration = (declaration, repoRoot) => declaredHfsView({ runtimeRoot: RUNTIME, declaration, repoRoot })
+export const hfsFromDeclaration = (declaration, repoRoot) => declaredHfsView({ runtimeRoot: RUNTIME, declaration, repoRoot, side: "be" })
 
 /**
  * The HFS view a rule runs under; a rule that needs it and gets none refuses to guess.

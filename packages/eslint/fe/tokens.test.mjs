@@ -14,6 +14,7 @@ import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import { hfsFromDeclaration } from "./lib/hfs.mjs"
 import { at, FE_DECLARATION, slotTester } from "./fixtures/typed/tester.mjs"
+import { appDeclaration } from "../be/fixtures/app.mjs"
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -121,7 +122,7 @@ const THEMED = themedRoot()
 /** The typed-fixture declaration rooted at the themed repository, so its files classify by slot there. */
 const themedTester = new RuleTester({
   languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module", parserOptions: { ecmaFeatures: { jsx: true } } },
-  settings: { starci: { hfs: hfsFromDeclaration(FE_DECLARATION, THEMED) } },
+  settings: { starci: { hfs: hfsFromDeclaration(appDeclaration("fe", FE_DECLARATION), THEMED) } },
 })
 
 test("TOKEN-9: a class naming a theme token is dead unless the theme defines it", () => {

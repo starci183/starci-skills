@@ -9,21 +9,19 @@ import { fileURLToPath } from "node:url"
 import tsParser from "@typescript-eslint/parser"
 import { RuleTester } from "eslint"
 import { hfsFromDeclaration } from "../../lib/hfs.mjs"
+import { appDeclaration } from "../app.mjs"
 
 /** The fixture repository root. */
 export const TYPED_ROOT = dirname(fileURLToPath(import.meta.url))
 
-/** The default back-end declaration of the fixture repository. */
+/** The default be side of the fixture app (hfs.json sides.be). */
 export const BE_DECLARATION = Object.freeze({
-    hfs: 1,
-    profile: "be",
-    project: "fixture",
     apps: [{ name: "api", kind: "api" }, { name: "migrate", kind: "migrate" }],
     connections: [{ name: "primary", envPrefix: "PRIMARY_DB" }],
 })
 
-/** The HFS view of the fixture repository. */
-export const fixtureHfs = (declaration = BE_DECLARATION) => hfsFromDeclaration(declaration, TYPED_ROOT)
+/** The HFS view of the fixture be side (`declaration` is the be side of the app). */
+export const fixtureHfs = (declaration = BE_DECLARATION) => hfsFromDeclaration(appDeclaration("be", declaration), TYPED_ROOT)
 
 /** Globs of every depth a case filename may sit at (the project service refuses a `**` glob). */
 const DEPTHS = ["*.ts", "*/*.ts", "*/*/*.ts", "*/*/*/*.ts", "*/*/*/*/*.ts", "*/*/*/*/*/*.ts", "*/*/*/*/*/*/*.ts", "*/*/*/*/*/*/*/*.ts"]

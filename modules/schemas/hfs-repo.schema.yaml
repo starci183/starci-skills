@@ -1,63 +1,78 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: urn:starci:hfs-repo:1
-title: HFS repository declaration (hfs.json)
+$id: urn:starci:hfs-repo:2
+title: HFS app declaration (hfs.json)
 description: >-
-  The one file a product repository adds to say which HFS it follows. Owners are derived from slots, so it lists no
-  owners, no paths and no switched-off rules. The manifest decides which app kinds and slot ids are legal
-  (scripts/lib/hfs-slots.mjs resolveRepoDeclaration): kinds must exist for the profile, optionalSlots may name only
-  opt-in slots, and a slot that an app kind implies is never listed.
+  The one file an app repository adds at its root to say which HFS it follows. A product is ONE app repository of kind `app`
+  with two sides, `be` (the folder be/) and `fe` (the folder fe/); there is no standalone back-end or front-end repository.
+  Owners are derived from slots, so it lists no owners, no paths and no switched-off rules. The manifest decides which app
+  kinds, slot ids and cross-side reads are legal (scripts/lib/hfs-slots.mjs resolveRepoDeclaration): per side, kinds must exist
+  for that profile, optionalSlots may name only opt-in slots of the side, a slot that an app kind implies is never listed, and
+  `reads` is a subset of the manifest's sides.<side>.reads. App names are unique across both sides.
 type: object
 additionalProperties: false
-required: [hfs, profile, project, apps]
+required: [hfs, kind, project, sides]
 properties:
   hfs:
     type: integer
     minimum: 1
     description: The pinned manifest MAJOR. A repository always follows the latest minor of that major; another major than the manifest's is refused.
-  profile: {enum: [be, fe]}
+  kind: {const: app}
   project:
     type: string
     pattern: '^[a-z][a-z0-9-]*$'
     description: Binds .workspaces/projects/<project>/work.json.
-  apps:
-    type: array
-    minItems: 1
-    description: Every apps/<name>, with its kind. Names are unique.
-    items:
-      type: object
-      additionalProperties: false
-      required: [name, kind]
-      properties:
-        name: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
-        kind: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
-  optionalSlots:
-    type: array
-    uniqueItems: true
-    items: {type: string, pattern: '^(repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$'}
-  connections:
-    type: array
-    uniqueItems: true
-    description: >-
-      Backend only. One entry per physical database (R84): its logical name (the connection the arrays of a be.persistence slot are registered on,
-      the <conn> of platform/database/<conn>.{connection,config,decorators}.ts, one migrate run) and the prefix of the env
-      keys its <conn>.config.ts reads. Names and prefixes are unique and no prefix covers another's keys (checked by
-      scripts/lib/hfs-slots.mjs).
-    items:
-      type: object
-      additionalProperties: false
-      required: [name, envPrefix]
-      properties:
-        name: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
-        envPrefix: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'}
-  stacks:
-    type: string
-    minLength: 1
-    pattern: '^(?![a-zA-Z]:)(?![\/])'
-    description: >-
-      Front end only. A relative path to the sibling back-end repository that owns the .starcistacks declaration
-      (for example "../nivo-backend"). hfs sync reads this repository's Sonar key from that declaration, so the key has
-      one source. A back-end repository omits it because it owns its declaration.
-allOf:
-  - if: {properties: {profile: {const: fe}}, required: [profile]}
-    then: {not: {required: [connections]}}
-    else: {not: {required: [stacks]}}
+  sides:
+    type: object
+    additionalProperties: false
+    required: [be, fe]
+    properties:
+      be:
+        allOf:
+          - {$ref: '#/$defs/side'}
+          - properties:
+              connections:
+                type: array
+                uniqueItems: true
+                description: >-
+                  One entry per physical database (R84): its logical name (the connection the arrays of a be.persistence slot are
+                  registered on, the <conn> of platform/database/<conn>.{connection,config,decorators}.ts, one migrate run) and the
+                  prefix of the env keys its <conn>.config.ts reads. Names and prefixes are unique and no prefix covers another's
+                  keys (checked by scripts/lib/hfs-slots.mjs).
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [name, envPrefix]
+                  properties:
+                    name: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+                    envPrefix: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$'}
+      fe:
+        allOf:
+          - {$ref: '#/$defs/side'}
+          - not: {required: [connections]}
+$defs:
+  side:
+    type: object
+    unevaluatedProperties: false
+    required: [apps]
+    properties:
+      apps:
+        type: array
+        minItems: 1
+        description: Every <side>/apps/<name>, with its kind. Names are unique across the app.
+        items:
+          type: object
+          additionalProperties: false
+          required: [name, kind]
+          properties:
+            name: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+            kind: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+      optionalSlots:
+        type: array
+        uniqueItems: true
+        items: {type: string, pattern: '^(app|repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$'}
+      connections: true
+      reads:
+        type: array
+        uniqueItems: true
+        description: The paths of the other side this side reads (the front end reads be/contracts/ for its codegen); nothing else crosses sides.
+        items: {type: string, minLength: 1}
