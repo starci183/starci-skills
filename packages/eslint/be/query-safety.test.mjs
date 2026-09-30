@@ -17,6 +17,7 @@ const HANDLER = at("src/features/checkout/application/place.handler.ts")
 const HANDLER_SPEC = at("src/features/checkout/application/place.handler.spec.ts")
 const SQL_FILE = at("src/modules/domain/order/persistence/order.sql.ts")
 const ROWS_FILE = at("src/modules/domain/order/persistence/order.rows.ts")
+const REPOSITORY_FILE = at("src/modules/domain/order/persistence/order.repository.ts")
 const MIGRATION = at("src/modules/domain/order/persistence/migrations/1730000000000-create-orders.ts")
 
 const HEAD = [
@@ -62,6 +63,9 @@ test("R36: `.query` takes a SqlText, and only a persistence <name>.sql.ts calls 
             { filename: HANDLER, code: code("type SqlText = string\ndeclare const forged: SqlText\nawait manager.query(forged)"), errors: [{ messageId: "notSqlText" }] },
             // a spec is not exempt
             { filename: HANDLER_SPEC, code: code("await manager.query('SELECT 1')"), errors: [{ messageId: "notSqlText" }] },
+            // a `*.repository.ts` is no home for SQL text: raw text and the tag are refused there exactly as in a handler
+            { filename: REPOSITORY_FILE, code: code("await manager.query('SELECT 1')"), errors: [{ messageId: "notSqlText" }] },
+            { filename: REPOSITORY_FILE, code: code("export const FIND_OPEN = sql`SELECT id FROM orders`"), errors: [{ messageId: "tagOutsideSqlFile" }] },
             // the tag outside a persistence sql file
             { filename: HANDLER, code: code("const text = sql`SELECT 1`"), errors: [{ messageId: "tagOutsideSqlFile" }] },
             { filename: ROWS_FILE, code: code("const text = sql`SELECT 1`"), errors: [{ messageId: "tagOutsideSqlFile" }] },
