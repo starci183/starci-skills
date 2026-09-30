@@ -5,7 +5,7 @@ Two test kinds, kept apart on purpose - one root `jest.config.js` with exactly t
 | Suite | Command | What it is |
 |---|---|---|
 | Unit | `npm test` / `npm run test:unit` | In-process `TestingModule` specs, colocated `*.spec.ts` beside the source they cover. Fakes at provider boundaries - no docker, no network. |
-| E2E | `npm run test:e2e` | `*.e2e-spec.ts` journeys under `src/tests/e2e/`. Each spec boots its own run-owned docker compose stack (postgres + keycloak + redis) plus the api child process through `TestingInfraModule`, drives the public doors over HTTP/GraphQL, then tears the stack down and verifies cleanup. |
+| E2E | `npm run test:e2e` | `*.e2e-spec.ts` journeys under `src/tests/e2e/`. Each spec boots its own run-owned docker compose stack (postgres + keycloak) plus the compiled api and worker as child processes, after `apps/migrate` applied the schema, drives the public doors over HTTP/GraphQL, then tears the stack down and verifies cleanup. |
 
 ## Unit tests
 
@@ -31,7 +31,7 @@ npm run test:coverage       # jest --coverage -> coverage/lcov.info (+ text summ
 
 E2E runs MANUALLY only (owner ruling 2026-09-29): husky, `typecheck`, `lint`/`lint:check`, coverage (`test:coverage`, Codecov, Sonar) and automatic CI never touch `src/tests/e2e/**`. `npm run typecheck:e2e` (`tsconfig.e2e.json`), `npm run lint:e2e` and `npm run test:e2e` are run by hand when asked; any e2e CI job is `workflow_dispatch` only.
 
-Requires a running Docker daemon (`docker info` must succeed). First run pulls `postgres:16`, `quay.io/keycloak/keycloak:26.0`, `redis:7` if not cached.
+Requires a running Docker daemon (`docker info` must succeed). First run pulls `postgres:16`, `quay.io/keycloak/keycloak:26.0` if not cached.
 
 ```bash
 npm run test:e2e                            # whole e2e suite, serial (--runInBand)
@@ -73,15 +73,13 @@ describe('area/flow - one A->Z journey', () => {
 
 ## Observability
 
-The api exposes three anonymous probe doors plus per-request structured logging:
+The api exposes two anonymous probe doors plus per-request structured logging:
 
 - `GET /health` - dependency-checked health: 200 `{ "status": "ok" }` while primary Postgres answers, 503 when it cannot. The e2e stack's boot probe waits on this door.
-- `GET /ready` - the explicit readiness name for orchestrators; same postgres dependency check as `/health`.
 - `GET /metrics` - Prometheus text exposition: `http_requests_total{method,route,status}` counters and `http_request_duration_ms_{sum,count}` summaries. Route labels are the matched route template (`/uploads/:uploadId/content`), never concrete ids; unmatched paths collapse to `route="unmatched"`.
 - Every response echoes `x-request-id` - the inbound value when sent, a minted uuid otherwise. Each finished request writes one structured `http.request.completed` line (requestId, method, route, status, durationMs; never headers, body or query, so no secret can ride it).
 
 ```bash
-curl -s localhost:3001/ready
 curl -s localhost:3001/metrics | findstr http_requests_total   # or: grep http_requests_total
 curl -si -H "x-request-id: demo-1" localhost:3001/health | findstr x-request-id
 ```
