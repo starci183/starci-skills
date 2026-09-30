@@ -11,6 +11,10 @@
  * describes an action is not its business.
  */
 
+import { hfsOf } from "./lib/hfs.mjs"
+import { NEXT_RESERVED_EXPORTS, NEXT_ROUTE_SEGMENT_STEMS } from "./lib/next.mjs"
+import { stem } from "./lib/scope.mjs"
+
 /** Parents that make a function declaration module-level rather than nested. */
 const MODULE_LEVEL_PARENTS = new Set(["Program", "ExportNamedDeclaration", "ExportDefaultDeclaration"])
 
@@ -86,10 +90,15 @@ export const noDirectConstAlias = {
     },
   },
   create(context) {
+    const file = context.filename || context.getFilename()
+    const hfs = hfsOf(context)
+    // A route segment file is the one place Next dictates the exported name; `export const generateMetadata = x` is the contract.
+    const segmentFile = hfs.slotOf(file) === "fe.route" && NEXT_ROUTE_SEGMENT_STEMS.has(stem(file))
     return {
       VariableDeclarator(node) {
         if (node.parent?.kind !== "const") return
         if (node.id?.type !== "Identifier" || node.init?.type !== "Identifier") return
+        if (segmentFile && NEXT_RESERVED_EXPORTS.has(node.id.name) && node.parent.parent?.type === "ExportNamedDeclaration") return
         context.report({
           node: node.id,
           messageId: "alias",

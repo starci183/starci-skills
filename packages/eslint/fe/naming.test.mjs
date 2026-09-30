@@ -12,6 +12,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import { handlerOnPrefix, noDirectConstAlias, preferArrowExport, rules } from "./naming.mjs"
 
 const tester = new RuleTester({
@@ -104,13 +105,21 @@ test("NAMING-3: a path names its file in the one language every reader shares", 
 })
 
 test("machine-only: a const introduces a value instead of renaming one identifier", () => {
-  tester.run("no-direct-const-alias", noDirectConstAlias, {
+  const PAGE = at("apps/web/src/app/[locale]/(app)/subscriptions/checkout/page.tsx")
+  const LAYOUT = at("apps/web/src/app/[locale]/layout.tsx")
+  const ROUTE_HELPER = at("apps/web/src/app/[locale]/(app)/helper.ts")
+  const COMPONENT = at("apps/web/src/components/leaves/Thing/index.tsx")
+  slotTester().run("no-direct-const-alias", noDirectConstAlias, {
     valid: [
       "const Apollo = createApolloClient()",
       "const Apollo = clients.ApolloClient",
       "const Apollo = await ApolloClient",
       "const { ApolloClient: Apollo } = clients",
       "let Apollo = ApolloClient",
+      // Next reserves these names in a route segment file: the alias IS the contract (live: starci-next-fe subscriptions/checkout/page.tsx).
+      { filename: PAGE, code: "export const generateMetadata = subscriptionCheckoutMetadata" },
+      { filename: PAGE, code: "export const dynamic = forceDynamic" },
+      { filename: LAYOUT, code: "export const viewport = appViewport" },
     ],
     invalid: [
       {
@@ -125,6 +134,13 @@ test("machine-only: a const introduces a value instead of renaming one identifie
         code: "const first = source, second = source",
         errors: [{ messageId: "alias" }, { messageId: "alias" }],
       },
+      // A non-reserved alias in a route file still fires.
+      { filename: PAGE, code: "export const title = pageTitle", errors: [{ messageId: "alias" }] },
+      // A reserved name that is not exported from a segment file is an ordinary alias.
+      { filename: PAGE, code: "const metadata = shared", errors: [{ messageId: "alias" }] },
+      // A reserved name outside a route segment file still fires (a helper under app/, a component).
+      { filename: ROUTE_HELPER, code: "export const generateMetadata = build", errors: [{ messageId: "alias" }] },
+      { filename: COMPONENT, code: "export const metadata = shared", errors: [{ messageId: "alias" }] },
     ],
   })
 })

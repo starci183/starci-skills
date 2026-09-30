@@ -16,8 +16,14 @@
 - **Breaking: `no-direct-heroicon-import` is deleted.** It was a second name for a second copy of
   `no-vendor-icon-outside-icon-leaf` (icon law); one obligation has one rule (redundancy RED20). The copy in
   `vendor-boundary.mjs` is gone; `no-vendor-icon-outside-icon-leaf` is unchanged.
-- `no-internal-starci-href` gained its RuleTester cases.
 - New law `size-growth` (R20 `HFS_SIZE_GROWTH`): `file-size-growth` refuses a new source file over the line budget and an existing file over it that is longer than at the parent commit. The budget is `ruleParams.fe.fileLines` of the slot manifest, read through the slot view (`hfsOf(context).ruleParams`, the package's own `runtime/` copy) (`packages/hfs/scripts/sync-runtime.mjs` keeps it equal to the runtime's); the rule takes no option.
+- **Breaking: `no-internal-starci-href` is deleted.** It was a second, weaker copy of `no-hardcoded-route` (which already refuses a
+  route literal in any JSX `href` and any navigation call, specs excluded); one obligation has one rule. `no-hardcoded-route` gained a
+  passing case for `mailto:` on `<a>` and a violating case for `<a href="/tasks">`. R93 no longer lists it.
+- **Fix: `no-direct-const-alias` fired on `export const generateMetadata = x` in a Next route segment file.** The names Next reserves
+  (`generateMetadata`, `metadata`, `viewport`, `dynamic`, ... in `lib/next.mjs`, the list of the architecture machine's
+  `NEXT_RESERVED_EXPORTS`) are exempt when the file is a route segment file (slot `fe.route`, stem `page`/`layout`/`template`/...);
+  a non-reserved alias in a route file and a reserved name elsewhere still fire. The rule now needs the slot view (`hfsOf`).
 - Every rule is catalogued under an HFS rule id (R91 FE_SOURCE_FORM, R92 FE_COMPONENT_API, R93 FE_VENDOR_BOUNDARY added).
 
 ## 5.1.2 - 2026-09-30
