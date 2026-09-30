@@ -245,7 +245,7 @@ BE_APP_BUSINESS_ROLE:
 BE_APP_COMPOSITION_ONLY:
   title: "Composition root has stray source"
   title_vi: "Gốc ghép nối có tệp lạc chỗ"
-  meaning_vi: "Mã trong ứng dụng gốc không phải entry, module gốc hay bootstrap được cho phép."
+  meaning_vi: "Mã trong ứng dụng gốc không phải tệp mà slot ứng dụng cho phép (main.ts, app.module.ts, <app>.options.ts, <app>.composition.spec.ts)."
   causes_vi:
     - "Thêm tệp không đúng tên vào thư mục ứng dụng gốc"
     - "Composition spec của app tự khai AppModule, import AppModule từ tệp khác app.module, hoặc không gọi AppModule.register( — module thật không bao giờ được khởi chạy"
@@ -463,6 +463,9 @@ BE_SOURCE_FORM:
   meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji hay tiếng Việt ngoài catalog messages/."
   causes_vi:
     - "Tệp dùng hậu tố bị cấm (use-case, repository, store, util, helper, types, constants)"
+    - "Lớp export không kết thúc bằng hậu tố vai trò của tệp và cũng không kết thúc bằng tên port (interface trong *.port.ts hoặc *.contracts.ts) mà nó implements"
+    - "Interface trong tệp *.input.ts, *.request.ts, *.response.ts, *.type.ts, *.args.ts hoặc *.rows.ts không kết thúc bằng Input, Request, Response, Type, Args hoặc Row"
+    - "@Args dùng tên khác \"input\""
     - "Export default"
     - "Thiếu JSDoc trên export"
     - "Chú thích tiếng Việt trong mã"
@@ -876,7 +879,7 @@ HFS_APPS_REQUIRED:
 HFS_APP_LAYOUT_INVALID:
   title: "App directory layout invalid"
   title_vi: "Bố cục thư mục ứng dụng chưa đúng"
-  meaning_vi: "Mục dưới apps/ không phải thư mục, hoặc thiếu các tệp bắt buộc của bố cục HFS."
+  meaning_vi: "Mục dưới apps/ không phải thư mục, hoặc thiếu các tệp mà slot của loại ứng dụng đó yêu cầu (requires; ví dụ ứng dụng migrate không cần app.module.ts)."
   causes_vi:
     - "Có tệp lẻ trong apps/"
     - "Ứng dụng thiếu tệp bắt buộc"
@@ -1178,7 +1181,7 @@ HFS_README_DESCRIPTION_INVALID:
 HFS_README_DEVELOPMENT_INCOMPLETE:
   title: "README Development section incomplete"
   title_vi: "Mục Development trong README chưa đủ lệnh"
-  meaning_vi: "Mục Development chưa nêu đủ các lệnh cài đặt, typecheck, lint:check, build và test:unit."
+  meaning_vi: "Mục Development chưa nêu đủ các lệnh cài đặt, typecheck, lint:check, build và test (các script do hfs sync quản lý; test chạy bằng npm test)."
   causes_vi:
     - "Quên một hoặc vài lệnh"
     - "Viết bằng lệnh của trình quản lý khác"
@@ -1267,7 +1270,7 @@ HFS_REQUIRED_FILE_MISSING:
 HFS_ROOT_ENTRY_FORBIDDEN:
   title: "Root entry not on HFS allowlist"
   title_vi: "Mục ở thư mục gốc không được phép"
-  meaning_vi: "Ở thư mục gốc của repo có một tệp hoặc thư mục không nằm trong danh sách được phép của cấu trúc chuẩn."
+  meaning_vi: "Ở thư mục gốc của repo có một tệp hoặc thư mục không nằm trong các gốc mà slot của repo khai báo (ví dụ contracts/ cho ảnh chụp hợp đồng)."
   causes_vi:
     - "Worker tạo thêm tệp hoặc thư mục ngay ở gốc repo"
     - "Tệp cũ chưa được dời vào đúng chỗ của nó"
@@ -1401,7 +1404,7 @@ HFS_SONAR_CONFIG:
 HFS_SRC_LAYOUT_INVALID:
   title: "Backend src holds unexpected folders"
   title_vi: "Thư mục src của backend có mục lạ"
-  meaning_vi: "Trong src của repo backend có thư mục nằm ngoài ba nơi cho phép là features, modules và tests."
+  meaning_vi: "Trong src của repo backend có thư mục nằm ngoài ba nơi cho phép là features, modules và tests, hoặc trong src/tests có thư mục ngoài các slot be.tests.* (world, fixtures, integration, e2e, contract)."
   causes_vi:
     - "Worker tạo thư mục mới ngay dưới src"
     - "Mã cũ chưa được dời về đúng feature hoặc module"
@@ -1423,7 +1426,7 @@ HFS_STACKS_IN_FE:
 HFS_STACKS_SHAPE:
   title: "`.starcistacks` has the standard shape and the host Sonar owner"
   title_vi: "Hình dạng .starcistacks sai"
-  meaning_vi: "`.starcistacks` có `<path>` ngoài hình dạng chuẩn (hoặc còn trỏ `.stacks`)."
+  meaning_vi: "`.starcistacks` có `<path>` ngoài hình dạng chuẩn (danh sách allows của slot be.starcistacks, gồm cả infra/metadata.json) (hoặc còn trỏ `.stacks`)."
   causes_vi:
     - "Vi phạm luật R10: `.starcistacks/<env>/` chỉ có `README.md`, `environment.json`, `infra/{compose,k8s,terraform}`, `runtime/{config,env}`, `secrets/`, `seeds/`; khối sonar là `owner: host` trỏ `.claude/ext/sonar`; không còn gốc `.stacks`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import { slotAdmitsFile } from './slot-allows.mjs';
+import { slotAdmitsFile } from '../../lib/hfs-allows.mjs';
 import { reachableViolation, relativePath, sourceLocation } from './typescript.mjs';
 
 const FORBIDDEN_APP_ROLE = /(?:^|\.)(?:service|provider|providers|resolver|controller|handler|repository|entity|use-case|command|query|listener|consumer|processor)\.[cm]?[jt]sx?$/i;

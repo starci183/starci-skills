@@ -13,10 +13,20 @@
  * same file pair and offset merge into one maximal block. A block whose lines are mostly type declarations
  * (fewer than N/2 lines outside interface and type alias declarations) or of fewer than N/3 distinct line shapes
  * (a decorated DTO field list repeating one shape) is ignored.
+ *
+ * Two kinds of file are uniform by design and are not compared, both found through the slot resolver: the entry main.ts of
+ * an app (slot appKind + its required main.ts) and the transport doors of a feature (a *.controller.ts, *.resolver.ts,
+ * *.gateway.ts, *.consumer.ts, *.job.ts or *.cli.ts of a slot that a protocol app composes). This is not a loophole: logic
+ * cannot live in either. A door body is dispatch only (eslint transport-dispatch-only, R88), and main.ts cannot share a
+ * helper because NestFactory is allowed only in main.ts (BE_ENTRYPOINT_ONLY_IN_APPS), so what repeats there is the
+ * canonical shape of section 5 of BE-CONVENTION. A door or main.ts that grows logic is refused by those enforcers, not
+ * excused here; every other file of the same slots (mappers, dto, app.module.ts) stays compared.
  */
 export const CLONE_RULE_IDS = ['HFS_DUPLICATE_CODE'];
 
 const MAX_VIOLATIONS = 200;
+const DOOR_ROLES = new Set(['controller', 'resolver', 'gateway', 'consumer', 'job', 'cli']);
+const APP_ENTRY = 'main.ts';
 const ID = -1;
 const LIT = -2;
 
@@ -58,6 +68,17 @@ function tokenize(ts, sourceFile) {
 /** The app a file belongs to, by the slot binding of the manifest; null for a file of no app. */
 const appOfFile = (resolver, rel) => resolver.classifyPath(rel).bindings?.app ?? null;
 
+/** True for the app entry and the transport doors: their shape is fixed by the convention and their body cannot hold logic. */
+function uniformByDesign(resolver, rel) {
+  const classified = resolver.classifyPath(rel);
+  if (classified.status !== 'owned' || !classified.slot) return false;
+  const slot = resolver.slot(classified.slot);
+  const base = rel.slice(rel.lastIndexOf('/') + 1);
+  if (slot.appKind !== undefined) return base === APP_ENTRY && (slot.requires ?? []).includes(APP_ENTRY);
+  const role = base.split('.').at(-2);
+  return (slot.composedBy?.length ?? 0) > 0 && DOOR_ROLES.has(role) && base.endsWith('.ts');
+}
+
 function homeText(profile, sameOwner, crossApp) {
   if (crossApp) return 'move it to a package (packages/<pkg>, the shared-code slot of the repository) and import it from both apps';
   if (sameOwner) return 'extract it once inside the owner and call it from both places';
@@ -70,7 +91,7 @@ export function checkClones({ config, context, graph } = {}) {
   const ts = context.ts ?? context.loaded.ts;
   const entries = [];
   for (const rel of [...graph.files.keys()].sort()) {
-    if (/\.d\.[cm]?tsx?$/.test(rel)) continue;
+    if (/\.d\.[cm]?tsx?$/.test(rel) || uniformByDesign(graph.resolver, rel)) continue;
     const unit = graph.unit(rel);
     if (!unit) continue;
     entries.push({ rel, unit, ...tokenize(ts, graph.files.get(rel).sourceFile) });

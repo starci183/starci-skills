@@ -4,7 +4,7 @@ import { allowsFile } from '../../lib/hfs-allows.mjs';
 /**
  * R47 `test-world-files` (BE_TEST_TOPOLOGY). `src/tests/world/` is the only test infrastructure location, and it holds only
  * what its slot `allows` (knowledge/hfs/slots.yaml be.tests.world: global-setup.ts, global-teardown.ts, use-test-world.ts,
- * fakes/ and kit/) plus files at its root whose role suffix is in ruleParams.be.suffixes (`stripe.client.ts`,
+ * and fakes/; kit/ is its own slot, be.tests.world.kit) plus files at its root whose role suffix is in ruleParams.be.suffixes (`stripe.client.ts`,
  * `checkout.contracts.ts`, ...). Every tracked file below the world root is matched by the slot's own entries through
  * `allowsFile`; nothing else is listed here.
  */
@@ -31,7 +31,7 @@ export function checkTestWorldFiles({ config, graph }) {
     if (roleFileAtRoot) continue;
     violations.push({
       ruleId: RULE, path: file, line: 1, column: 1,
-      message: `${file} is not allowed in the test world; src/tests/world/ holds only ${verdict.allows.join(', ')} and role-suffixed files (<name>.<role>.ts) at its root. Move it to fakes/ or kit/, give it a role suffix, or delete it.`,
+      message: `${file} is not allowed in the test world; src/tests/world/ holds only ${verdict.allows.join(', ')} and role-suffixed files (<name>.<role>.ts) at its root. Move it to fakes/ or kit/ (be.tests.world.kit), give it a role suffix, or delete it.`,
       slot: verdict.slot,
     });
   }

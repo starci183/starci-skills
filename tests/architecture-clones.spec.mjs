@@ -10,19 +10,21 @@ const A2 = 'src/modules/domain/alpha/alpha.contracts.ts';
 
 /** A function of `statements + 4` lines: signature, accumulator, the body statements, return and the closing brace. */
 function helper(name, statements, { literal = 1, variable = 'value' } = {}) {
-  // Eleven different line shapes: a block of one repeated shape is boilerplate and is deliberately ignored by the check.
+  // Eleven line shapes, each lengthened by a chain of 0-6 operands chosen by the statement index: the shape sequence never repeats
+  // inside a body of up to 77 statements, so a body is one block. A run that repeated would be a clone of the file with itself.
+  const chain = (i) => ` + ${literal}`.repeat(i % 7);
   const patterns = [
-    (i) => `  const ${variable}${i} = input.items[${i}] ?? ${literal};`,
-    (i) => `  if (${variable}${i - 1} > ${literal + i}) total += ${variable}${i - 1};`,
-    (i) => `  total = total * ${literal + 2} + ${i};`,
-    (i) => `  for (const entry of input.items) { total += entry * ${literal + i}; }`,
-    (i) => `  while (total > ${literal + i}) total -= ${i};`,
-    (i) => `  total = Math.max(total, input.items.length + ${literal + i});`,
-    (i) => `  input.items.push(total % ${literal + i + 1});`,
-    (i) => `  total += input.items.reduce((sum, item) => sum + item * ${literal + i}, 0);`,
-    (i) => `  if (!input.items.length) return ${literal + i};`,
-    (i) => `  total = input.items.map((item) => item + ${literal + i}).length;`,
-    (i) => `  try { total += JSON.parse(String(${i})); } catch { total = ${literal}; }`,
+    (i) => `  const ${variable}${i} = input.items[${i}] ?? ${literal}${chain(i)};`,
+    (i) => `  if (${variable}${i - 1} > ${literal + i}${chain(i)}) total += ${variable}${i - 1};`,
+    (i) => `  total = total * ${literal + 2} + ${i}${chain(i)};`,
+    (i) => `  for (const entry of input.items) { total += entry * ${literal + i}${chain(i)}; }`,
+    (i) => `  while (total > ${literal + i}${chain(i)}) total -= ${i};`,
+    (i) => `  total = Math.max(total, input.items.length + ${literal + i}${chain(i)});`,
+    (i) => `  input.items.push(total % ${literal + i + 1}${chain(i)});`,
+    (i) => `  total += input.items.reduce((sum, item) => sum + item * ${literal + i}${chain(i)}, 0);`,
+    (i) => `  if (!input.items.length) return ${literal + i}${chain(i)};`,
+    (i) => `  total = input.items.map((item) => item + ${literal + i}${chain(i)}).length;`,
+    (i) => `  try { total += JSON.parse(String(${i}${chain(i)})); } catch { total = ${literal}; }`,
   ];
   const body = Array.from({ length: statements }, (_, i) => patterns[i % patterns.length](i));
   return `export function ${name}(input: { items: number[] }) {\n  let total = 0;\n${body.join('\n')}\n  return total;\n}\n`;
@@ -87,7 +89,7 @@ test('the frontend message names the app modules and hooks homes', (t) => {
   const root = archFixture(t, { profile: 'fe', files: { [first]: cloneOf(26), [second]: helper('calculate', 26, { variable: 'item' }) } });
   const { hits } = run(root);
   assert.equal(hits.length, 1);
-  assert.match(hits[0].message, /apps\/web\/src\/modules\/<capability>\/ \(pure\) or apps\/web\/src\/hooks\/<domain>\/ \(React hook\)/);
+  assert.match(hits[0].message, /apps\/<app>\/src\/modules\/<capability>\/ when pure, apps\/<app>\/src\/hooks\/<domain>\/ for a React hook/);
 });
 
 const FE_APPS = [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }];
@@ -113,4 +115,26 @@ test('a block copied between two apps of a front end says to move it to a packag
     assert.match(hit.message, /extract it once inside the app/);
     assert.doesNotMatch(hit.message, /package/);
   }
+});
+
+const API_APPS = [{ name: 'core', kind: 'api' }, { name: 'other', kind: 'api' }];
+
+test('the main.ts of two api apps and thin resolvers of two features are uniform by design: not compared; the same bodies in app.module.ts and mappers are still a clone', (t) => {
+  const entries = runArch(archFixture(t, { apps: API_APPS, files: {
+    'apps/core/src/main.ts': helper('boot', 26),
+    'apps/other/src/main.ts': helper('start', 26, { variable: 'item' }),
+    'src/features/a/transport/graphql/a.resolver.ts': helper('resolveA', 26),
+    'src/features/b/transport/graphql/b.resolver.ts': helper('resolveB', 26, { variable: 'item' }),
+  } }));
+  assert.deepEqual(findings(entries, 'HFS_DUPLICATE_CODE'), []);
+  assert.equal(entries.coverage.hfsMachine.clones.cloneBlocks, 0);
+  const shared = runArch(archFixture(t, { apps: API_APPS, files: {
+    'apps/core/src/app.module.ts': helper('composeCore', 26),
+    'apps/other/src/app.module.ts': helper('composeOther', 26, { variable: 'item' }),
+    'src/features/a/transport/graphql/a.mapper.ts': helper('mapA', 26),
+    'src/features/b/transport/graphql/b.mapper.ts': helper('mapB', 26, { variable: 'item' }),
+  } }));
+  const paths = findings(shared, 'HFS_DUPLICATE_CODE').flatMap((hit) => [hit.path, hit.twin.path]);
+  assert.ok(paths.includes('apps/core/src/app.module.ts'), paths.join(', '));
+  assert.ok(paths.includes('src/features/a/transport/graphql/a.mapper.ts'), paths.join(', '));
 });

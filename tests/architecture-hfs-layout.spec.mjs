@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from './_hfs-arch-fixture.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { checkRepoPresentation } from '../scripts/checks/architecture/hfs.mjs';
 
 // The repository-tree rules of the HFS machine (knowledge/hfs/README.md): HFS_APPS_REQUIRED, HFS_APP_LAYOUT_INVALID,
 // HFS_ROOT_ENTRY_MISSING, HFS_ROOT_SRC_FORBIDDEN_FE, HFS_SRC_LAYOUT_INVALID, HFS_PACKAGE_MANAGER_MIXED, HFS_ROOT_MARKDOWN_FORBIDDEN.
@@ -62,4 +66,43 @@ test('HFS_ROOT_MARKDOWN_FORBIDDEN: a root Markdown file other than README.md is 
   assert.deepEqual(ids(bad, 'HFS_ROOT_MARKDOWN_FORBIDDEN'), ['CHANGELOG.md', 'NOTES.md']);
   const good = run(t, 'fe', { ...ROOT_FE, ...APP_FE, 'docs/notes.md': '# notes\n' });
   assert.deepEqual(ids(good, 'HFS_ROOT_MARKDOWN_FORBIDDEN'), []);
+});
+
+// The app layout, the root allowlist and the tests/ children are read from the slots (knowledge/hfs/slots.yaml), not from a list in the check.
+const MIGRATE_APPS = [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }];
+const CORE_FILES = { 'apps/core/src/core.composition.spec.ts': 'export {};\n' };
+const withMigrate = (t, files) => runArch(archFixture(t, { profile: 'be', apps: MIGRATE_APPS, declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY' }] }, files: { ...ROOT_BE, ...CORE_FILES, ...files } }));
+
+test('HFS_APP_LAYOUT_INVALID: a migrate app needs only main.ts and its composition spec (no app.module.ts); an api app still needs app.module.ts', t => {
+  const migrate = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n', 'apps/migrate/src/migrate.composition.spec.ts': 'export {};\n' });
+  assert.deepEqual(ids(migrate, 'HFS_APP_LAYOUT_INVALID'), []);
+  const incomplete = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n' });
+  assert.deepEqual(ids(incomplete, 'HFS_APP_LAYOUT_INVALID'), ['apps/migrate']);
+  assert.match(findings(incomplete, 'HFS_APP_LAYOUT_INVALID')[0].message, /migrate\.composition\.spec\.ts/);
+  assert.doesNotMatch(findings(incomplete, 'HFS_APP_LAYOUT_INVALID')[0].message, /app\.module\.ts/);
+  const api = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n', 'apps/migrate/src/migrate.composition.spec.ts': 'export {};\n', 'apps/core/src/app.module.ts': null });
+  assert.deepEqual(ids(api, 'HFS_APP_LAYOUT_INVALID'), ['apps/core']);
+  assert.match(findings(api, 'HFS_APP_LAYOUT_INVALID')[0].message, /app\.module\.ts/);
+});
+
+test('HFS_ROOT_ENTRY_FORBIDDEN: contracts/ (slot be.contract.graphql) is a root entry; a root entry no slot names is still a finding', t => {
+  const declaration = { optionalSlots: ['be.contract.graphql'] };
+  const report = runArch(archFixture(t, { profile: 'be', declaration, files: { ...ROOT_BE, ...CORE_FILES, 'contracts/core/schema.graphql': 'type Query { a: Int }\n', 'stray/x.txt': 'x\n' } }));
+  assert.deepEqual(ids(report, 'HFS_ROOT_ENTRY_FORBIDDEN'), ['stray']);
+});
+
+test('HFS_README_DEVELOPMENT_INCOMPLETE: the Development section shows the managed scripts (npm test), not a literal test:unit', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-hfs-readme-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const readme = commands => `# ${path.basename(root)}\n\nA fixture.\n\n## Overview\n\nx\n\n## Stack\n\nx\n\n## Repository layout\n\nx\n\n## Development\n\n\`\`\`\n${commands.join('\n')}\n\`\`\`\n`;
+  const judged = commands => {
+    fs.writeFileSync(path.join(root, 'README.md'), readme(commands));
+    fs.writeFileSync(path.join(root, '.gitattributes'), '* text=auto\n');
+    return checkRepoPresentation({ root, profile: 'be' }).violations.filter(item => item.ruleId === 'HFS_README_DEVELOPMENT_INCOMPLETE');
+  };
+  const managed = ['npm ci', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm test'];
+  assert.deepEqual(judged(managed), []);
+  assert.equal(judged(['npm ci', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm run test:unit']).length, 1, 'test:unit is not a managed script');
+  assert.equal(judged(managed.slice(0, 4)).length, 1, 'a missing test command is a finding');
+  assert.deepEqual(judged(['npm install', 'npm run typecheck', 'npm run lint:check', 'npm run build', 'npm run test']), []);
 });

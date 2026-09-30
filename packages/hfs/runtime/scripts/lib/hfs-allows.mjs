@@ -27,6 +27,21 @@ export function relativeToRoot(file, root) {
 }
 
 /**
+ * Whether the slot that owns `file` names it in `requires` or `allows` (and does not forbid it); null when no enabled slot
+ * owns it. Unlike allowsFile it judges a slot that lists only `requires` too, so a folder closed by its slot (an app's
+ * src/) is read from the slot and never from a check's own list.
+ */
+export function slotAdmitsFile(resolver, file) {
+  const classified = resolver.classifyPath(file);
+  if (classified.status === 'no-slot' || classified.status === 'ambiguous' || !classified.slot) return null;
+  const slot = resolver.slot(classified.slot);
+  const relative = relativeToRoot(classified.path, classified.root);
+  const hit = matchersOf([...(slot.requires ?? []), ...(slot.allows ?? [])], classified.bindings).find(matcher => matcher.expression.test(relative));
+  const forbidden = matchersOf(slot.forbids, classified.bindings).find(matcher => matcher.expression.test(relative) || matcher.expression.test(`${relative}/`));
+  return Boolean(hit) && !forbidden;
+}
+
+/**
  * {slot, root, relative, allowed, entry?, forbiddenBy?} for a repository-relative file, or null when no enabled slot owns
  * it or the slot names no `allows`. `allowed` is true when the relative path matches a `requires` or `allows` entry.
  */

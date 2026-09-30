@@ -41,6 +41,7 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { ARCHITECTURE_RULE_IDS, checkArchitecture } from '../checks/architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { HFS_DECLARATION_FILE, HfsSlotsError, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './hfs-slots.mjs';
+import { allowsFile } from './hfs-allows.mjs';
 import { isDir } from './fs-kind.mjs';
 import { gitOutput } from './git.mjs';
 import { posixPath } from './path-key.mjs';
@@ -140,6 +141,7 @@ function pinFindings({ repoRoot, files, profile, pins, only }) {
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SOURCE_ROOT = /^(?:src|apps)\//;
 const FREE_NAMES = new Set(['index.ts', 'main.ts']);
+const PLAIN_ENTRY = /^<[a-z][a-z0-9-]*>.ts$/;
 
 /**
  * BE_SOURCE_FORM (R89): every tracked src/ or apps/ TypeScript file of a back end is index.ts, main.ts, a migration of
@@ -159,6 +161,9 @@ function sourceFormFindings({ files, resolver }) {
     // A literal file name the owning slot itself requires or allows (persistence/connection.ts, fixtures/database.ts) is its role.
     const slot = resolver.slot(c.slot);
     if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].some((entry) => entry === base)) continue;
+    // A slot whose `allows` holds a bare <name>.ts entry (be.tests.world.kit) names its files plainly, as platform/primitives does: kebab-case is the whole form.
+    const admitted = allowsFile(resolver, file);
+    if (admitted?.allowed && PLAIN_ENTRY.test(admitted.entry ?? '') && KEBAB.test(base.slice(0, -'.ts'.length))) continue;
     if (c.slot === 'be.persistence' && path.posix.basename(path.posix.dirname(file)) === 'migrations') continue;
     const parts = base.slice(0, -'.ts'.length).split('.');
     const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));

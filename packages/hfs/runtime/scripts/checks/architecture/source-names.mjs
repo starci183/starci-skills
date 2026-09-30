@@ -8,23 +8,29 @@ const FRAMEWORK_EXPORTS = new Map([
   ['@nestjs/graphql', new Set(['Args', 'ArgsType', 'InputType', 'Mutation', 'ObjectType', 'Query', 'registerEnumType'])],
   ['typeorm', new Set(['Entity', 'EntitySchema', 'MigrationInterface', 'ViewEntity'])],
 ]);
-const APPLICATION_ROLES = new Set(['command', 'contracts', 'handler', 'query', 'use-case']);
-const TRANSPORT_ROLES = new Set(['consumer', 'controller', 'input', 'request', 'resolver', 'response']);
+const APPLICATION_ROLES = new Set(['command', 'contracts', 'handler', 'query']);
+const TRANSPORT_ROLES = new Set(['args', 'cli', 'consumer', 'controller', 'gateway', 'input', 'job', 'request', 'resolver', 'response', 'type']);
 const APPLICATION_LAYER_ROLES = new Set([...APPLICATION_ROLES, 'mapper']);
 const TRANSPORT_LAYER_ROLES = new Set([...TRANSPORT_ROLES, 'enum', 'filter', 'guard', 'interceptor', 'mapper']);
+// Class-bearing roles of the CLOSED suffix list of BE-CONVENTION 1.15 (class name = PascalCase of file + role). A role that is
+// not in that list (adapter, exception, processor, provider, repository, strategy, use-case) is never an allowed role here.
 const CLASS_ROLE_SUFFIX = new Map([
-  ['adapter', 'Adapter'], ['client', 'Client'], ['command', 'Command'], ['consumer', 'Consumer'],
-  ['controller', 'Controller'], ['entity', 'Entity'], ['exception', 'Exception'], ['filter', 'Filter'], ['guard', 'Guard'],
-  ['handler', 'Handler'], ['input', 'Input'], ['interceptor', 'Interceptor'], ['mapper', 'Mapper'],
-  ['module', 'Module'], ['module-definition', 'Module'], ['policy', 'Policy'], ['processor', 'Processor'],
-  ['provider', 'Provider'], ['query', 'Query'], ['repository', 'Repository'], ['request', 'Request'],
-  ['resolver', 'Resolver'], ['response', 'Response'], ['service', 'Service'], ['strategy', 'Strategy'],
-  ['use-case', 'UseCase'],
+  ['args', 'Args'], ['cli', 'Cli'], ['client', 'Client'], ['command', 'Command'], ['consumer', 'Consumer'],
+  ['controller', 'Controller'], ['entity', 'Entity'], ['error', 'Error'], ['filter', 'Filter'], ['gateway', 'Gateway'],
+  ['guard', 'Guard'], ['handler', 'Handler'], ['input', 'Input'], ['interceptor', 'Interceptor'], ['job', 'Job'],
+  ['mapper', 'Mapper'], ['module', 'Module'], ['module-definition', 'Module'], ['policy', 'Policy'], ['query', 'Query'],
+  ['request', 'Request'], ['resolver', 'Resolver'], ['response', 'Response'], ['service', 'Service'], ['type', 'Type'],
 ]);
+// Transport object contracts (interfaces and object aliases) named by their file role: <Action>Input in *.input.ts,
+// <Action>Request in *.request.ts, <Name>Row in *.rows.ts ... Domain values in *.contracts.ts and *.options.ts carry no suffix.
+const TRANSPORT_OBJECT_SUFFIX = new Map([
+  ['args', 'Args'], ['input', 'Input'], ['request', 'Request'], ['response', 'Response'], ['rows', 'Row'], ['type', 'Type'],
+]);
+// A class that implements an interface declared in a file with one of these roles may be named <Qualifier><InterfaceName>.
+const PORT_DECLARATION_ROLES = new Set(['contracts', 'port']);
 const NON_CLASS_ROLES = new Set(['constants', 'contracts', 'decorators', 'enum', 'providers', 'types']);
 const KNOWN_HYPHEN_ROLES = [...CLASS_ROLE_SUFFIX.keys()].sort((a, b) => b.length - a.length);
 const SPECIAL_BASENAMES = new Set(['config', 'configuration', 'constants', 'decorators', 'env', 'environment', 'index', 'main', 'types']);
-const OBJECT_CONTRACT_SUFFIX = /(?:Params|Result|Options|ExceptionMetadata)$/;
 const SOURCE_EXTENSION = /\.[cm]?[jt]sx?$/i;
 
 function absoluteRoots(root, relatives) {
@@ -202,7 +208,6 @@ function sourceRole(ts, sourceFile) {
   if (known) return { base, role: known, spec: base !== file };
   const topLevel = sourceFile.statements;
   if (topLevel.some(statement => ts.isEnumDeclaration(statement))) return { base, role: 'enum', spec: base !== file };
-  if (topLevel.some(statement => ts.isClassDeclaration(statement) && statement.name?.text.endsWith('Exception'))) return { base, role: 'exception', spec: base !== file };
   return { base, role: null, spec: base !== file };
 }
 
@@ -343,14 +348,14 @@ function graphqlField(config, context, sourceFile, node, decorator, kind, naming
 function graphqlArgument(config, context, sourceFile, node, decorator, namingReasons, violations) {
   const call = decorator.expression;
   if (!context.ts.isCallExpression(call) || call.arguments.length === 0) {
-    namingReasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot prove the @Args request name`);
+    namingReasons.push(`${relativePath(config.root, sourceFile.fileName)} cannot prove the @Args input name`);
     return;
   }
   const selected = unwrapExpression(context.ts, call.arguments[0]);
   if (!context.ts.isStringLiteralLike(selected)) {
-    namingReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a dynamic @Args request name`);
-  } else if (selected.text !== 'request') violations.push(violation(config, sourceFile, selected, SOURCE_NAME_RULE_ID,
-    'GraphQL request arguments use the literal name request.'));
+    namingReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a dynamic @Args input name`);
+  } else if (selected.text !== 'input') violations.push(violation(config, sourceFile, selected, SOURCE_NAME_RULE_ID,
+    'GraphQL request arguments use the literal name input.'));
 }
 
 function graphqlEnumRegistration(config, context, sourceFile, call, namingReasons, violations) {
@@ -381,6 +386,22 @@ function callsNamedHelper(ts, checker, call, name) {
 function implementsFramework(ts, checker, declaration, targets, name) {
   return (declaration.heritageClauses ?? []).some(clause => clause.token === ts.SyntaxKind.ImplementsKeyword
     && clause.types.some(type => targets.get(valueSymbol(ts, checker, type.expression)) === name));
+}
+
+/** Names of the interfaces a class implements that are declared in a *.port.ts or *.contracts.ts file (resolved by the type checker). */
+function implementedPortNames(ts, checker, declaration) {
+  const names = [];
+  for (const clause of declaration.heritageClauses ?? []) if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
+    for (const type of clause.types) {
+      const symbol = normalizedSymbol(ts, checker, type.expression);
+      for (const target of symbol?.getDeclarations?.() ?? []) {
+        if (!ts.isInterfaceDeclaration(target) && !ts.isTypeAliasDeclaration(target)) continue;
+        const declaredRole = path.basename(target.getSourceFile().fileName).replace(SOURCE_EXTENSION, '').split('.').at(-1);
+        if (PORT_DECLARATION_ROLES.has(declaredRole)) names.push(target.name.text);
+      }
+    }
+  }
+  return names;
 }
 
 function locatedRoot(roots, fileName) {
@@ -477,9 +498,10 @@ export function checkBackendSourceShape(config, context) {
         'TypeORM entities and migrations cannot be owned by a feature; place schema under its declared persistence module.'));
       const classSuffix = role.role && !NON_CLASS_ROLES.has(role.role) ? CLASS_ROLE_SUFFIX.get(role.role) : null;
       if (publicDeclarations.has(declaration) && !declaration.name) namingReasons.push(`${relative} exports an anonymous class whose role name cannot be proved`);
-      else if (publicDeclarations.has(declaration) && declaration.name && classSuffix && !declaration.name.text.endsWith(classSuffix)) {
+      else if (publicDeclarations.has(declaration) && declaration.name && classSuffix && !declaration.name.text.endsWith(classSuffix)
+        && !implementedPortNames(ts, checker, declaration).some(port => declaration.name.text.endsWith(port))) {
         violations.push(violation(config, sourceFile, declaration.name, SOURCE_NAME_RULE_ID,
-          `Exported class ${declaration.name.text} must end in ${classSuffix} for a ${role.role} source file.`));
+          `Exported class ${declaration.name.text} must end in ${classSuffix} for a ${role.role} source file, or in the name of the port it implements.`));
       } else if (publicDeclarations.has(declaration) && declaration.name && role.role && !NON_CLASS_ROLES.has(role.role) && !classSuffix) {
         namingReasons.push(`${relative} declares exported class ${declaration.name.text} with unclassified file role ${role.role}`);
       }
@@ -520,20 +542,11 @@ export function checkBackendSourceShape(config, context) {
         }
       }
       const contractStatus = objectContractStatus(ts, checker, statement);
-      if (publicDeclarations.has(statement) && contractStatus === 'unavailable') {
-        namingReasons.push(`${relative} exports ${statement.name?.text ?? 'a type'} whose object contract identity is not statically proved`);
-      }
-      if (contractStatus === 'object' && publicDeclarations.has(statement)
-        && !OBJECT_CONTRACT_SUFFIX.test(statement.name.text) && !companionInterfaceAllowed(ts, sourceFile, statement.name.text)) {
-        const transportSuffix = role.role && ['input', 'request', 'response'].includes(role.role)
-          ? `${role.role[0].toUpperCase()}${role.role.slice(1)}` : null;
-        if (role.role === 'contracts' || role.role === 'options' || (inApplication && role.role === 'use-case')
-          || (inTransport && transportSuffix && !statement.name.text.endsWith(transportSuffix))) {
-          violations.push(violation(config, sourceFile, statement.name, SOURCE_NAME_RULE_ID,
-            `Public object contract ${statement.name.text} must use the suffix selected by its application or transport role.`));
-        } else if (!inTransport || !transportSuffix) {
-          namingReasons.push(`${relative} exports object contract ${statement.name.text} whose public contract role is not statically selected`);
-        }
+      const transportSuffix = TRANSPORT_OBJECT_SUFFIX.get(role.role);
+      if (contractStatus === 'object' && publicDeclarations.has(statement) && transportSuffix && !role.spec
+        && !statement.name.text.endsWith(transportSuffix) && !companionInterfaceAllowed(ts, sourceFile, statement.name.text)) {
+        violations.push(violation(config, sourceFile, statement.name, SOURCE_NAME_RULE_ID,
+          `Public object contract ${statement.name.text} in a ${role.role} source file must end in ${transportSuffix}.`));
       }
     }
 

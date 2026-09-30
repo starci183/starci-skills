@@ -485,6 +485,7 @@ slots:
     tier: app
     owner: true
     requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
+    allows: [main.ts, app.module.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
     tests: unit-beside
     rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED]
   - id: be.app.migrate
@@ -497,6 +498,7 @@ slots:
     tier: app
     owner: true
     requires: [main.ts, "<app>.composition.spec.ts"]
+    allows: [main.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
     tests: unit-beside
     rules: [BE_SCHEMA_AUTHORITY, BE_ENTRYPOINT_ONLY_IN_APPS]
   - id: be.app.cli
@@ -508,6 +510,7 @@ slots:
     tier: app
     owner: true
     requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
+    allows: [main.ts, app.module.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
     tests: unit-beside
 
   # ----- BE: features ------------------------------------------------------------------------------------
@@ -716,7 +719,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: e2e
-    allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, fakes/, kit/]   # jest globalSetup/globalTeardown default-export (Jest API); plus root files with a role suffix (test-world-files, R47)
+    allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, fakes/]   # jest globalSetup/globalTeardown default-export (Jest API); plus root files with a role suffix (test-world-files, R47)
     tests: none
     why: >-
       the ONLY test infrastructure location, shared by integration and e2e: global-setup.ts starts the shared
@@ -726,6 +729,15 @@ slots:
       failNext/replayWebhook/delay), world.waitFor; fakes/<provider>/ holds the fake servers and payload fixtures, kit/ the inlined test helpers, and the world root may hold role-suffixed helpers (<name>.client.ts, <name>.contracts.ts, ...). Nothing is
       overridden in the DI container. It is the only test location that may import typeorm's DataSource or testcontainers,
       call migrate/runMigrations/synchronize, or write process.env.
+  - id: be.tests.world.kit
+    profiles: [be]
+    path: "src/tests/world/kit/"
+    presence: optional
+    tracked: tracked
+    tier: e2e
+    allows: ["<name>.ts", "*.spec.ts"]    # plain kebab names, like platform/primitives (BE-CONVENTION 1.11 names primitives/time.ts): the world's inlined test helpers (poll, free-ports)
+    tests: none
+    why: the helpers the test world needs (polling, free ports, transports), inlined so the world imports no other repository; a bare <name>.ts entry in allows is what admits a plain name in BE_SOURCE_FORM
   - id: be.tests.fixtures
     profiles: [be]
     path: "src/tests/fixtures/"
@@ -794,7 +806,7 @@ slots:
     tier: none
     tests: none
     requires: [application-stacks.yaml]
-    allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform}/**",
+    allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform}/**", "<env>/infra/metadata.json",
              "<env>/runtime/{config,env}/**", "<env>/runtime/env/KEYS.md", "<env>/secrets/<slug>.enc", "<env>/seeds/**"]
     forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
     rules: [HFS_STACKS_SHAPE, HFS_PLAINTEXT_SECRET, HFS_IDENTITY_CUSTODY]

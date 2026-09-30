@@ -6,6 +6,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { braceVariants } from '../scripts/lib/glob.mjs';
 import path from 'node:path';
 import { parseYaml } from '../engine/yaml.mjs';
 import { checkRepo } from '../scripts/lib/hfs-check.mjs';
@@ -67,7 +69,7 @@ test('HFS_PLAINTEXT_SECRET: a sops envelope, a stand-in value and a spec file ar
 // ------------------------------------------------------------------------------------------------ R10 HFS_STACKS_SHAPE
 
 const STANDARD_TREE = ['.starcistacks/dev/README.md', '.starcistacks/dev/environment.json', '.starcistacks/dev/infra/compose/compose.yaml', '.starcistacks/dev/runtime/env/KEYS.md',
-  '.starcistacks/dev/runtime/config/app.json', '.starcistacks/dev/seeds/01-schema.sql'];
+  '.starcistacks/dev/runtime/config/app.json', '.starcistacks/dev/seeds/01-schema.sql', '.starcistacks/dev/infra/metadata.json'];
 
 test('HFS_STACKS_SHAPE: runtime/files, a sealed file outside secrets/, DESIGN.md, a root k8s and a non-host Sonar are refused', () => {
   const result = checkRepo({ repoRoot: repoOf(BE, (dir) => {
@@ -75,10 +77,10 @@ test('HFS_STACKS_SHAPE: runtime/files, a sealed file outside secrets/, DESIGN.md
     put(dir, '.starcistacks/dev/runtime/env/app.env.enc', SOPS_ENVELOPE);
     put(dir, '.starcistacks/DESIGN.md', '# design\n');
     put(dir, '.starcistacks/k8s/pod.yaml', 'kind: Pod\n');
-    put(dir, '.starcistacks/dev/infra/metadata.json', '{}\n');
+    put(dir, '.starcistacks/dev/infra/notes.json', '{}\n');
     put(dir, '.starcistacks/application-stacks.yaml', STACKS_DECLARATION.replace('owner: host', 'owner: repository'));
   }) });
-  assert.deepEqual(pathsOf(result, 'HFS_STACKS_SHAPE'), ['.starcistacks/DESIGN.md', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/infra/metadata.json',
+  assert.deepEqual(pathsOf(result, 'HFS_STACKS_SHAPE'), ['.starcistacks/DESIGN.md', '.starcistacks/application-stacks.yaml', '.starcistacks/dev/infra/notes.json',
     '.starcistacks/dev/runtime/env/app.env.enc', '.starcistacks/dev/runtime/files/key.enc', '.starcistacks/k8s/pod.yaml']);
   assert.match(only(result, 'HFS_STACKS_SHAPE').find((f) => f.path.endsWith('application-stacks.yaml')).message, /not owned by the host/);
 });
@@ -97,6 +99,22 @@ test('HFS_STACKS_SHAPE: the standard tree with a host-owned Sonar is clean', () 
   }) });
   assert.deepEqual(only(result, 'HFS_STACKS_SHAPE'), []);
   assert.equal(result.ok, true, JSON.stringify(result.findings.slice(0, 3)));
+});
+
+test('HFS_STACKS_SHAPE: the slot allows list and the custody .gitignore rules (stacks-layout.yaml gitignoreRules) agree: every tracked member the shape allows is un-ignored', () => {
+  const slots = parseYaml(fs.readFileSync(path.join(root, 'knowledge/hfs/slots.yaml'), 'utf8')).slots;
+  const layout = parseYaml(fs.readFileSync(path.join(root, 'modules/schemas/stacks-layout.yaml'), 'utf8'));
+  const allows = slots.find((slot) => slot.id === 'be.starcistacks').allows;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-stacks-ignore-'));
+  made.push(dir);
+  execFileSync('git', ['init', '-q'], { cwd: dir });
+  fs.writeFileSync(path.join(dir, '.gitignore'), `${layout.custody.gitignoreRules.join('\n')}\n`);
+  // A custody member (runtime/{config,env}, secrets) is ignored by design; every other allowed entry is a tracked source file.
+  const tracked = allows.filter((entry) => !/^<env>\/(?:runtime|secrets)\//.test(entry)).flatMap((entry) => braceVariants(entry))
+    .map((entry) => `.starcistacks/${entry.replace('<env>', 'dev').replace('**', 'sub/file.yaml')}`);
+  assert.ok(tracked.includes('.starcistacks/dev/infra/metadata.json') && tracked.length > 5, tracked.join(', '));
+  for (const file of tracked) assert.equal(spawnSync('git', ['check-ignore', '-q', '--no-index', '--', file], { cwd: dir }).status, 1, `${file} is allowed by the be.starcistacks slot but the custody rules ignore it`);
+  assert.equal(spawnSync('git', ['check-ignore', '-q', '--no-index', '--', '.starcistacks/dev/infra/compose/.env'], { cwd: dir }).status, 0, 'a value file stays ignored');
 });
 
 // ------------------------------------------------------------------------------------------------ R13 HFS_CI_MISSING_CANON

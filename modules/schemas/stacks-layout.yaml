@@ -30,7 +30,7 @@ shape:
   seeds: .starcistacks/<environment>/seeds/**
   infra: .starcistacks/<environment>/infra/**
   compose: .starcistacks/<environment>/infra/compose/*.yaml (one fragment per backing service, composed by include)
-  metadata: .starcistacks/<environment>/infra/metadata.json (the resolved port projection: value-free, tracked, read by the front end)
+  metadata: .starcistacks/<environment>/infra/metadata.json (the resolved port projection, value-free, tracked, read by the front end)
   keyRoster: .starcistacks/<environment>/runtime/env/KEYS.md and .starcistacks/<environment>/infra/KEYS.md (names and custody paths, never values)
   services: the declaration's `services` block (application-stacks.schema.yaml $defs.service) - sonar, codecov and every other delivery/quality service, with custody references into runtime/files
 

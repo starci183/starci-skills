@@ -125,10 +125,14 @@ test('BE_SOURCE_FORM: a back-end source name outside the closed suffix vocabular
     put(repo, 'src/modules/domain/stock/persistence/migrations/20260101000000-create-stock.ts');
     for (const bad of ['cancel-order.use-case.ts', 'order.types.ts', 'CancelOrder.handler.ts', 'helpers.ts', 'order.repository.ts']) put(repo, `src/features/orders/application/${bad}`);
     put(repo, 'apps/core/src/core.options.ts');
+    // kit/ is a slot whose allows names plain <name>.ts files: kebab plain names pass there (not at the world root, not unless kebab).
+    for (const ok of ['poll.ts', 'free-ports.ts']) put(repo, `src/tests/world/kit/${ok}`);
+    for (const bad of ['Bad_Name.ts']) put(repo, `src/tests/world/kit/${bad}`);
+    put(repo, 'src/tests/world/poll.ts');
   });
   const result = checkRepo({ repoRoot: dir });
   const refused = only(result, 'BE_SOURCE_FORM');
-  assert.deepEqual(refused.map((f) => path.posix.basename(f.path)).sort(), ['CancelOrder.handler.ts', 'cancel-order.use-case.ts', 'helpers.ts', 'order.repository.ts', 'order.types.ts']);
+  assert.deepEqual(refused.map((f) => path.posix.basename(f.path)).sort(), ['Bad_Name.ts', 'CancelOrder.handler.ts', 'cancel-order.use-case.ts', 'helpers.ts', 'order.repository.ts', 'order.types.ts', 'poll.ts']);
   assert.ok(refused.every((f) => f.level === 'error'));
   assert.equal(refused.find((f) => f.path.endsWith('order.types.ts')).suffix, 'types');
   assert.equal(result.ok, false);
