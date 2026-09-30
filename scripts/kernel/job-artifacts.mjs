@@ -173,7 +173,7 @@ export function writeJobPatch({ repo, job, envelope, result, payload, placements
     const parts = [];
     for (const batch of paths.length ? specBatches(paths) : [[]]) {
       const run = runGit(['format-patch', '--stdout', '--binary', '--full-index', ...revs, ...(batch.length ? ['--', ...batch.map((s) => `:(literal)${s}`)] : [])],
-        { dir: root, timeout, encoding: 'buffer', maxBuffer: 1024 * 1024 * 1024 });
+        { dir: root, timeout, encoding: null, maxBuffer: 1024 * 1024 * 1024 });
       if (run.error || run.status !== 0) return run;
       if (run.stdout?.length) parts.push(run.stdout);
     }

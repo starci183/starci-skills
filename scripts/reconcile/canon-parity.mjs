@@ -133,7 +133,7 @@ export function baseBlobsOf(root, base, ownedRels, { run = git } = {}) {
   const names = String(listed.stdout).split('\0').filter(Boolean);
   const blobs = new Map();
   if (!names.length) return { ok: true, blobs };
-  const batch = run(gitRoot, ['cat-file', '--batch'], { input: names.map((n) => `${base}:${n}`).join('\n') + '\n', encoding: 'buffer' });
+  const batch = run(gitRoot, ['cat-file', '--batch'], { input: names.map((n) => `${base}:${n}`).join('\n') + '\n', encoding: null });
   if (!batch.ok) return { ok: false, reason: 'git cat-file --batch failed' };
   const buf = batch.stdout;
   let at = 0;
