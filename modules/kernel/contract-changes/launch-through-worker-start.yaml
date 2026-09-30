@@ -1,0 +1,22 @@
+id: launch-through-worker-start
+effectiveAt: '2026-10-01T09:00:00+07:00'
+summary: >-
+  DESIGN (owner decision 2026-10-01, lane dv-c0-launch; implementation follows lead review). Every agent launch in the
+  runtime - Kernel, Supervisor, [Worker] and [Op] - goes through `orca orchestration worker-start --agent <provider>
+  [--model <id> --effort <level>]` (scripts/api/orca/worker-start.mjs); there is no terminal-create launch and no
+  worker-start --terminal adoption. Kernel bootstrap: `node scripts/kernel/start-workflow.mjs <wf>` (run by the owner's
+  chat, the [Supervisor] or a run-create caller) ensures the workflow Run (run-create from the invoking terminal: that
+  terminal is the Run coordinator), then starts the Kernel as a worker of that Run (worker-start --spec, task title
+  "[Kernel] <wf>", --worktree path:<repo>), attests agent/model with worker-show and records payload.managed
+  {runId, taskId, dispatchId, agentTerminalHandle}. The Kernel starts its ops from its own terminal (--from <kernel
+  handle>, Task parent = the Kernel Task) and is the coordinator of their Dispatches; their worker_done/escalations
+  are bridged by Run id and dispatch id through the non-consuming inbox, never by recipient. No run-use re-binding.
+  Restart: worker-show live/unverifiable -> no second Kernel; exited/failed -> worker-stop + worker-release, then
+  worker-start --task <kernel task> --retry-of <old dispatch>. An old-style terminal Kernel (seat launch 'terminal')
+  is retired once (quit + close, event kernel-retired-terminal-launch) and replaced, with a fresh Run (old id kept in
+  orca.previousRunIds). Requires Orca Settings -> Orchestration -> Nested worker depth >= 3 (Supervisor -> Kernel ->
+  Op); at the default 1 worker-start refuses nested_worker_depth_exceeded. Full design:
+  D:/starci-tmp/hfs/devin/c0/launch.report.md "Kernel bootstrap design".
+paths:
+  - modules/kernel/contract-changes/launch-through-worker-start.yaml
+reach: new-legs
