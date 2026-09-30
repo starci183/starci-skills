@@ -8,8 +8,10 @@ import test from "node:test"
 import { RuleTester } from "eslint"
 import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import tsParser from "@typescript-eslint/parser"
+import { at, typedTester } from "./fixtures/typed/tester.mjs"
 import {
   clientNoServerImport,
+  serverModuleMarksServerOnly,
   noDangerousHtml,
   rules,
   useClientOnlyAtBoundary,
@@ -92,6 +94,8 @@ test("FE-CLIENT-2: a client component imports nothing that exists only on the se
       { filename: CLIENT, code: '"use client"\nimport "server-only"', errors: [{ messageId: "server" }] },
       { filename: CLIENT, code: '"use client"\nimport { cookies } from "next/headers"', errors: [{ messageId: "server" }] },
       { filename: CLIENT, code: '"use client"\nimport fs from "node:fs"', errors: [{ messageId: "server" }] },
+      { filename: CLIENT, code: '"use client"\nimport { getTranslations } from "next-intl/server"', errors: [{ messageId: "server" }] },
+      { filename: CLIENT, code: '"use client"\nimport { NextResponse } from "next/server"', errors: [{ messageId: "server" }] },
       { filename: CLIENT, code: '"use client"\nimport { join } from "path"', errors: [{ messageId: "server" }] },
       {
         filename: CLIENT,
@@ -131,6 +135,63 @@ test("FE-CLIENT-4: raw HTML only on a script", () => {
       { code: "const A = () => <div dangerouslySetInnerHTML={{ __html: html }} />", errors: [{ messageId: "html" }] },
       { code: "const A = () => <Article dangerouslySetInnerHTML={{ __html: html }} />", errors: [{ messageId: "html" }] },
       { code: "const A = () => <span dangerouslySetInnerHTML={{ __html: t('x') }} />", errors: [{ messageId: "html" }] },
+    ],
+  })
+})
+
+// -- FE-CLIENT-2b: the server marker -----------------------------------------------------------------
+
+const typed = typedTester()
+const MODULE = at("apps/web/src/modules/kernel/read-things.ts")
+const HOOK = at("apps/web/src/hooks/lesson/useLesson.ts")
+const FEATURE = at("apps/web/src/features/pages/home/index.tsx")
+const MARKED = 'import "server-only"\n'
+
+test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () => {
+  typed.run("server-module-marks-server-only", serverModuleMarksServerOnly, {
+    valid: [
+      // marked, whatever it imports
+      { filename: MODULE, code: MARKED + 'import { headers } from "next/headers"\nexport const read = () => headers()' },
+      { filename: MODULE, code: MARKED + 'import { getTranslations } from "next-intl/server"\nexport const t = () => getTranslations()' },
+      { filename: MODULE, code: MARKED + 'import { readFile } from "node:fs/promises"\nexport const r = readFile' },
+      { filename: MODULE, code: '/** The reader. */\nimport "server-only"\nimport { NextResponse } from "next/server"\nexport const r = NextResponse' },
+      // importing a marked module from a marked module
+      { filename: MODULE, code: MARKED + 'import { readMarked } from "../marked/read-marked"\nexport const r = readMarked' },
+      // a module with no server import needs no marker; importing an unmarked module does not make one
+      { filename: MODULE, code: 'import { plain } from "../marked/plain"\nexport const r = plain' },
+      { filename: MODULE, code: 'import { useState } from "react"\nexport const r = useState' },
+      // type-only imports carry no runtime
+      { filename: MODULE, code: 'import type { NextRequest } from "next/server"\nexport type R = NextRequest' },
+      { filename: MODULE, code: 'import { type NextRequest } from "next/server"\nexport type R = NextRequest' },
+      { filename: MODULE, code: 'import type { readMarked } from "../marked/read-marked"\nexport type R = typeof readMarked' },
+      // route files are server components by construction: decided by the slot, not the name
+      { filename: at("apps/web/src/app/[locale]/page.tsx"), code: 'import { headers } from "next/headers"\nexport default async function Page() { await headers(); return null }' },
+      { filename: at("apps/web/src/app/[locale]/api/x/route.ts"), code: 'import { NextResponse } from "next/server"\nexport const GET = () => NextResponse.json({})' },
+      { filename: at("apps/web/src/proxy.ts"), code: 'import { NextResponse } from "next/server"\nexport const proxy = () => NextResponse.next()' },
+      // a client file is client-no-server-import's business
+      { filename: HOOK, code: '"use client"\nimport { headers } from "next/headers"\nexport const useX = () => headers' },
+      // specs and files no slot owns are not judged
+      { filename: at("apps/web/src/modules/kernel/read-things.spec.ts"), code: 'import fs from "node:fs"\nexport const r = fs' },
+      { filename: at("docs/scratch.ts"), code: 'import fs from "node:fs"\nexport const r = fs' },
+    ],
+    invalid: [
+      { filename: MODULE, code: 'import { headers } from "next/headers"\nexport const read = () => headers()', errors: [{ messageId: "mark" }] },
+      { filename: MODULE, code: 'import { cookies } from "next/headers"\nexport const read = () => cookies()', errors: [{ messageId: "mark" }] },
+      { filename: MODULE, code: 'import { NextResponse } from "next/server"\nexport const r = NextResponse', errors: [{ messageId: "mark" }] },
+      { filename: MODULE, code: 'import { getTranslations } from "next-intl/server"\nexport const t = () => getTranslations()', errors: [{ messageId: "mark" }] },
+      { filename: MODULE, code: 'import { readFile } from "node:fs/promises"\nexport const r = readFile', errors: [{ messageId: "mark" }] },
+      { filename: MODULE, code: 'import fs from "fs"\nexport const r = fs', errors: [{ messageId: "mark" }] },
+      // the marker must come first: after other imports it is not "starts with"
+      { filename: MODULE, code: 'import { headers } from "next/headers"\nimport "server-only"\nexport const r = headers', errors: [{ messageId: "mark" }] },
+      // a module reached through a resolved import that is itself server-only
+      { filename: MODULE, code: 'import { readMarked } from "../marked/read-marked"\nexport const r = readMarked', errors: [{ messageId: "mark" }] },
+      { filename: HOOK, code: 'import { readMarked } from "../../modules/marked/read-marked"\nexport const useX = () => readMarked()', errors: [{ messageId: "mark" }] },
+      { filename: MODULE, code: 'export { readMarked } from "../marked/read-marked"', errors: [{ messageId: "mark" }] },
+      { filename: MODULE, code: 'export * from "../marked/read-marked"', errors: [{ messageId: "mark" }] },
+      // a server component below the route files marks itself too
+      { filename: FEATURE, code: 'import { getTranslations } from "next-intl/server"\nexport default async function Home() { await getTranslations(); return null }', errors: [{ messageId: "mark" }] },
+      // one report per server import
+      { filename: MODULE, code: 'import { headers } from "next/headers"\nimport fs from "node:fs"\nexport const r = [headers, fs]', errors: [{ messageId: "mark" }, { messageId: "mark" }] },
     ],
   })
 })

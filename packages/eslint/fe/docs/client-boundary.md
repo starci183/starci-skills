@@ -32,7 +32,7 @@ export const Feed = () => null
 
 ## `starci-fe/client-no-server-import`
 
-A `"use client"` file does not import `server-only`, `next/headers`, a Node built-in or a server reader (sub-check `FE_CLIENT_SERVER_IMPORT`).
+A `"use client"` file does not import `server-only`, `next/headers`, `next/server`, `next-intl/server`, a Node built-in or a server reader (sub-check `FE_CLIENT_SERVER_IMPORT`).
 
 **Invalid** (`src/components/blocks/Feed/index.tsx`)
 
@@ -53,6 +53,31 @@ import useSWR from "swr"
 **Vì sao (why):** Client component ở `<file>` nhập mã chỉ tồn tại ở server (`server-only`, `next/headers`, module Node, server reader).
 
 **Cách sửa:** Đọc dữ liệu ở server component hoặc server reader rồi truyền xuống bằng props; hoặc dùng SWR gọi client của app.
+
+## `starci-fe/server-module-marks-server-only`
+
+A module that imports `next/headers`, `next/server` (a value import), `next-intl/server`, a Node built-in, or a module that is itself server-only starts with `import "server-only"` (sub-check `FE_SERVER_ONLY_MARK`). A module is server-only when the TypeScript module resolution of the import specifier reaches a source file whose first statement is `import "server-only"`; `import type` and `import { type X }` carry no runtime and are not judged. Route files are server components by construction and need no marker: they are recognized by their slot (`fe.route`, `fe.source-root-pinned`), not by their name. A `"use client"` file that imports the server is `client-no-server-import`'s finding. The multi-hop client reachability (a client block reaching a marked module through a hook) is the architecture machine's.
+
+**Invalid** (`src/modules/api/courses/read-courses.ts`)
+
+```ts
+import { headers } from "next/headers"
+export const readCourses = async () => (await headers()).get("x-locale")
+```
+
+**Valid** (`src/modules/api/courses/read-courses.ts`)
+
+```ts
+import "server-only"
+import { headers } from "next/headers"
+export const readCourses = async () => (await headers()).get("x-locale")
+```
+
+**Finding code:** `FE_SERVER_ONLY_MARK`
+
+**Vì sao (why):** Module `<file>` nhập API chỉ có ở server (`next/headers`, `next/server`, `next-intl/server`, module Node hoặc module đã là server-only) nhưng không mở đầu bằng `import "server-only"`.
+
+**Cách sửa:** Đặt `import "server-only"` làm câu lệnh đầu tiên của tệp; tệp route (`page`, `layout`, `route`, `proxy`) là server component sẵn nên không cần.
 
 ## `starci-fe/web-storage-only-in-modules`
 

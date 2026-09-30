@@ -15,9 +15,11 @@
  * above it is a server component and must not have one.
  */
 
+import ts from "typescript"
 import { hfsOf } from "./lib/hfs.mjs"
 import { ROUTE_SLOTS, isSpecFile, stem } from "./lib/scope.mjs"
 import { normalizePath } from "./lib/path.mjs"
+import { typed } from "./lib/types.mjs"
 
 /** The framework's own client-only files. */
 const FRAMEWORK_CLIENT = new Set(["error", "global-error"])
@@ -95,12 +97,20 @@ export const useClientOnlyAtBoundary = {
 /** Node built-ins a browser bundle cannot carry. */
 const NODE_BUILTINS = /^(?:node:.+|fs|fs\/promises|path|os|net|tls|http|https|http2|child_process|cluster|crypto|stream|zlib|dns|worker_threads)$/
 
-/** A server-only source: the marker package, the request-scoped Next APIs, a Node built-in, a server reader. */
-const serverOnlyReason = (source) => {
-  if (source === "server-only") return "`server-only`"
+/** A server API: the request-scoped Next APIs, the server half of next-intl, a Node built-in; null for anything else. */
+const serverApiReason = (source) => {
   if (source === "next/headers") return "`next/headers`"
   if (source === "next/server") return "`next/server`"
+  if (source === "next-intl/server") return "`next-intl/server`"
   if (NODE_BUILTINS.test(source)) return `\`${source}\``
+  return null
+}
+
+/** A server-only source: the marker package, a server API, a server reader. */
+const serverOnlyReason = (source) => {
+  if (source === "server-only") return "`server-only`"
+  const api = serverApiReason(source)
+  if (api) return api
   if (/(?:^|\/)modules\/api\/(?:.+\/)?read-[^/]+$/.test(source)) return `the server reader \`${source}\``
   return null
 }
@@ -128,6 +138,81 @@ export const clientNoServerImport = {
         if (!client || node.importKind === "type") return
         const what = serverOnlyReason(String(node.source.value))
         if (what) context.report({ node, messageId: "server", data: { what } })
+      },
+    }
+  },
+}
+
+// -- FE-CLIENT-2b ----------------------------------------------------------------------------------
+
+/** The slots whose files are Next route files: server components by construction, so the framework decides, not a marker. */
+const ROUTE_FILE_SLOTS = new Set(["fe.route", "fe.source-root-pinned"])
+
+/** True when a statement is `import "server-only"`: an import with no bindings from the marker package. */
+const isMarkerStatement = (statement) =>
+  statement?.type === "ImportDeclaration" && statement.specifiers.length === 0 && statement.source.value === "server-only"
+
+/** True when a TypeScript source file opens with `import "server-only"`. */
+const tsFileIsMarked = (file) => {
+  const first = file.statements[0]
+  return Boolean(first) && ts.isImportDeclaration(first) && !first.importClause && ts.isStringLiteral(first.moduleSpecifier) && first.moduleSpecifier.text === "server-only"
+}
+
+/**
+ * The source file an import specifier resolves to: the checker's module symbol, so path aliases, extensions and index
+ * files resolve as the compiler resolves them. Null for a declaration file, a package or an unresolved specifier.
+ */
+const resolvedSourceFile = (context, specifier) => {
+  const { checker, toTs } = typed(context)
+  const tsNode = toTs(specifier)
+  if (!tsNode) return null
+  const symbol = checker.getSymbolAtLocation(tsNode)
+  const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0]
+  return declaration && ts.isSourceFile(declaration) && !declaration.isDeclarationFile ? declaration : null
+}
+
+/** A module that uses a server-only API, or imports a module that is itself server-only, opens with `import "server-only"`. */
+export const serverModuleMarksServerOnly = {
+  meta: {
+    type: "problem",
+    docs: { description: "A module importing `next/headers`, `next/server`, `next-intl/server`, a Node built-in or a server-only module starts with `import \"server-only\"`." },
+    schema: [],
+    messages: {
+      mark:
+        "This module imports {{what}}, which exists only on the server, but it does not start with `import \"server-only\"`. Without the marker nothing stops a client component from importing this module (directly or through a hook): the build then fails far from the cause, or ships server code toward the browser. Make `import \"server-only\"` the first statement of the file. Route files (`page`, `layout`, `route`, `proxy`) are server components by construction and need no marker.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (isSpecFile(file)) return {}
+    const slot = hfsOf(context).slotOf(file)
+    if (!slot || ROUTE_FILE_SLOTS.has(slot)) return {}
+    let client = false
+    let marked = false
+    const uses = []
+    return {
+      Program(program) {
+        client = clientDirective(program) !== null
+        marked = isMarkerStatement(program.body[0])
+      },
+      "ImportDeclaration, ExportNamedDeclaration, ExportAllDeclaration"(node) {
+        if (!node.source || node.importKind === "type" || node.exportKind === "type") return
+        const onlyTypes = node.specifiers?.length > 0 && node.specifiers.every((specifier) => specifier.importKind === "type" || specifier.exportKind === "type")
+        if (onlyTypes) return
+        const specifier = String(node.source.value)
+        if (specifier === "server-only") return
+        const api = serverApiReason(specifier)
+        if (api) {
+          uses.push({ node, what: api })
+          return
+        }
+        const target = resolvedSourceFile(context, node.source)
+        if (target && tsFileIsMarked(target)) uses.push({ node, what: `\`${specifier}\` (a module that is itself server-only)` })
+      },
+      "Program:exit"() {
+        // a "use client" file that imports the server is client-no-server-import's finding, not a missing marker
+        if (client || marked) return
+        for (const use of uses) context.report({ node: use.node, messageId: "mark", data: { what: use.what } })
       },
     }
   },
@@ -200,6 +285,7 @@ export const noDangerousHtml = {
 export const rules = {
   "use-client-only-at-boundary": useClientOnlyAtBoundary,
   "client-no-server-import": clientNoServerImport,
+  "server-module-marks-server-only": serverModuleMarksServerOnly,
   "web-storage-only-in-modules": webStorageOnlyInModules,
   "no-dangerous-html": noDangerousHtml,
 }
