@@ -24,6 +24,13 @@
   (`generateMetadata`, `metadata`, `viewport`, `dynamic`, ... in `lib/next.mjs`, the list of the architecture machine's
   `NEXT_RESERVED_EXPORTS`) are exempt when the file is a route segment file (slot `fe.route`, stem `page`/`layout`/`template`/...);
   a non-reserved alias in a route file and a reserved name elsewhere still fire. The rule now needs the slot view (`hfsOf`).
+- **Fix: `no-barrel-spec` fired on every `index.spec.ts`.** It now reads and parses the sibling `index.ts(x)` and fires only when the
+  sibling holds nothing but import and export declarations (a barrel); an `index.ts` with a function, class or value (starci-next-fe
+  `modules/browser-storage`) may have its spec, and a missing sibling is no finding. It also covers `.tsx`.
+- **Fix: `no-mocked-translations` refused a `next-intl/server` mock that serves the real catalogue.** A server helper has no provider to
+  render inside; the mock is allowed when its factory (or a `vi.hoisted` block it reads) uses an import that resolves into the app's
+  `modules/i18n/messages/`. Client `next-intl` mocks, literal/key-echoing server mocks and automocks still fire, now with a
+  server-specific message (`mockedServer`) naming `createTranslator` over the real messages. The rule needs the slot view (`hfsOf`).
 - Every rule is catalogued under an HFS rule id (R91 FE_SOURCE_FORM, R92 FE_COMPONENT_API, R93 FE_VENDOR_BOUNDARY added).
 
 ## 5.1.2 - 2026-09-30

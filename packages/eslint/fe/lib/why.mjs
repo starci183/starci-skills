@@ -163,7 +163,7 @@ export const why = {
   },
   "no-barrel-spec": {
     code: "FE_SPEC_QUALITY",
-    vi: "Spec `<file>` đặt cạnh một barrel. Barrel không có hành vi để test.",
+    vi: "Spec `<file>` đặt cạnh một `index` chỉ có import và re-export (barrel). Barrel không có hành vi để test.",
     fixVi: "Xóa spec; test từng đơn vị mà barrel xuất lại, cạnh chính đơn vị đó.",
   },
   "no-double-cast-in-spec": {
@@ -179,7 +179,7 @@ export const why = {
   "no-mocked-translations": {
     code: "FE_I18N_CATALOG",
     vi: "Spec `<file>` giả lập `next-intl`, nên chỉ kiểm khóa chứ không kiểm catalog thật.",
-    fixVi: "Render trong `NextIntlClientProvider` với `messages/<locale>.json` thật.",
+    fixVi: "Component client: render trong `NextIntlClientProvider` với `messages/<locale>.json` thật. Helper server (`next-intl/server`): factory của mock dựng translator từ catalog thật (`createTranslator` với `modules/i18n/messages/<locale>.json`).",
   },
   "no-inline-lint-config": {
     code: "HFS_INLINE_SUPPRESSION",

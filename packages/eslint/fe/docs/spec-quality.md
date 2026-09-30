@@ -52,18 +52,18 @@ import { Chip } from "./Chip"
 
 ## `starci-fe/no-barrel-spec`
 
-No `index.test.ts` beside an `index.ts` barrel.
+No `index.spec.ts(x)` beside an `index.ts(x)` that holds only imports and re-exports. The sibling is read and parsed: an `index.ts` that declares a function, class or value (implementation) may have its spec; a missing sibling is no finding.
 
-**Invalid** (`src/hooks/index.test.ts`)
+**Invalid** (`src/hooks/index.spec.ts`, beside `src/hooks/index.ts` = `export * from "./useFeed"`)
 
 ```ts
-// file: src/hooks/index.test.ts
+// file: src/hooks/index.spec.ts
 ```
 
-**Valid** (`src/hooks/feed/useFeed.test.ts`)
+**Valid** (`src/modules/browser-storage/index.spec.ts`, beside an `index.ts` that declares `createStore` and exports two stores)
 
 ```ts
-// file: src/hooks/feed/useFeed.test.ts
+// file: src/modules/browser-storage/index.spec.ts
 ```
 
 **Finding code:** `FE_SPEC_QUALITY`
@@ -118,7 +118,7 @@ it("a11y", async () => { expect(await axe(container)).toHaveNoViolations() })
 
 ## `starci-fe/no-mocked-translations`
 
-A spec renders with the real catalogue; it never mocks `next-intl`.
+A spec renders with the real catalogue; it never mocks `next-intl`. A `vi.mock("next-intl/server", factory)` in the spec of a server helper (no provider exists for it) is allowed when the factory - or a `vi.hoisted` block it reads - uses the app's real catalogue (an import that resolves into `modules/i18n/messages/`); a literal or key-echoing server mock, an automock, and any mock of the client `next-intl` stay findings.
 
 **Invalid** (`any spec`)
 
@@ -132,8 +132,16 @@ vi.mock("next-intl", () => ({}))
 render(<NextIntlClientProvider messages={messages} locale="vi" />)
 ```
 
+```ts
+import messages from "@/modules/i18n/messages/vi.json"
+vi.mock("next-intl/server", async () => {
+  const { createTranslator } = await import("next-intl")
+  return { getTranslations: async () => createTranslator({ locale: "vi", messages }) }
+})
+```
+
 **Finding code:** `FE_I18N_CATALOG`
 
 **Vì sao (why):** Spec `<file>` giả lập `next-intl`, nên chỉ kiểm khóa chứ không kiểm catalog thật.
 
-**Cách sửa:** Render trong `NextIntlClientProvider` với `messages/<locale>.json` thật.
+**Cách sửa:** Component client: render trong `NextIntlClientProvider` với `messages/<locale>.json` thật. Helper server (`next-intl/server`): factory của mock dựng translator từ catalog thật (`createTranslator` với `modules/i18n/messages/<locale>.json`).

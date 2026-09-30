@@ -6,7 +6,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import tsParser from "@typescript-eslint/parser"
+import { at, slotTester } from "./fixtures/typed/tester.mjs"
 import {
   connectedSpecHasAxe,
   noBarrelSpec,
@@ -25,6 +28,8 @@ const tester = new RuleTester({
     parserOptions: { ecmaFeatures: { jsx: true } },
   },
 })
+
+const BARRELS = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "spec-barrel")
 
 const LEAF_SPEC = "D:/repo/src/components/leaves/Chip/Chip.test.tsx"
 const BLOCK_SPEC = "D:/repo/src/components/blocks/Feed/index.test.tsx"
@@ -75,15 +80,20 @@ test("SPEC-2: a spec imports the unit beside it", () => {
   })
 })
 
-test("SPEC-3: no spec for a barrel", () => {
+test("SPEC-3: no spec for a barrel, but a spec for an index that holds implementation is fine", () => {
   tester.run("no-barrel-spec", noBarrelSpec, {
     valid: [
       { filename: BLOCK_SPEC, code: "import { Feed } from \"./index\"" },
       { filename: "D:/repo/src/hooks/feed/useFeed.test.ts", code: "export {}" },
+      // live: starci-next-fe modules/browser-storage/index.ts declares createStore and two stores - it is not a barrel
+      { filename: join(BARRELS, "implementation", "index.spec.ts"), code: "export {}" },
+      // no sibling index: nothing to call a barrel
+      { filename: join(BARRELS, "missing", "index.spec.ts"), code: "export {}" },
+      { filename: "D:/repo/src/hooks/index.test.ts", code: "export {}" },
     ],
     invalid: [
-      { filename: "D:/repo/src/hooks/index.test.ts", code: "export {}", errors: [{ messageId: "barrel" }] },
-      { filename: "D:/repo/src/modules/api/index.spec.ts", code: "export {}", errors: [{ messageId: "barrel" }] },
+      { filename: join(BARRELS, "barrel", "index.spec.ts"), code: "export {}", errors: [{ messageId: "barrel" }] },
+      { filename: join(BARRELS, "barrel-tsx", "index.spec.tsx"), code: "export {}", errors: [{ messageId: "barrel" }] },
     ],
   })
 })
@@ -119,17 +129,41 @@ test("SPEC-5: a connected screen's spec runs an axe assertion", () => {
   })
 })
 
-test("SPEC-6: a spec never mocks next-intl", () => {
-  tester.run("no-mocked-translations", noMockedTranslations, {
+test("SPEC-6: a spec never mocks next-intl; a next-intl/server mock must serve the real catalogue", () => {
+  const SERVER_SPEC = at("apps/web/src/modules/i18n/server.spec.ts")
+  const CLIENT_SPEC = at("apps/web/src/components/leaves/Chip/index.spec.tsx")
+  const CATALOG = 'import vi_messages from "@/modules/i18n/messages/vi.json"\n'
+  slotTester().run("no-mocked-translations", noMockedTranslations, {
     valid: [
-      { filename: LEAF_SPEC, code: "vi.mock(\"@/modules/api/client\", () => ({}))" },
-      { filename: LEAF_SPEC, code: "render(<NextIntlClientProvider messages={messages} locale=\"vi\" />)" },
-      { filename: COMPONENT, code: "vi.mock(\"next-intl\")" },
+      { filename: CLIENT_SPEC, code: "vi.mock(\"@/modules/api/client\", () => ({}))" },
+      { filename: CLIENT_SPEC, code: "render(<NextIntlClientProvider messages={messages} locale=\"vi\" />)" },
+      { filename: at("apps/web/src/components/blocks/Feed/index.tsx"), code: "vi.mock(\"next-intl\")" },
+      // a server helper has no provider: the mock is legitimate when its factory serves the app's real catalogue
+      {
+        filename: SERVER_SPEC,
+        code: CATALOG + "vi.mock(\"next-intl/server\", async () => { const { createTranslator } = await import(\"next-intl\"); return { getTranslations: async () => createTranslator({ locale: \"vi\", messages: vi_messages }) } })",
+      },
+      {
+        filename: SERVER_SPEC,
+        code: 'vi.mock("next-intl/server", async () => { const messages = (await import("../i18n/messages/vi.json")).default; return { getMessages: async () => messages } })',
+      },
+      {
+        filename: SERVER_SPEC,
+        code: CATALOG + 'const runtime = vi.hoisted(() => ({ messages: vi_messages }))\nvi.mock("next-intl/server", () => ({ getMessages: async () => runtime.messages }))',
+      },
     ],
     invalid: [
-      { filename: LEAF_SPEC, code: "vi.mock(\"next-intl\", () => ({ useTranslations: () => (k) => k }))", errors: [{ messageId: "mocked" }] },
-      { filename: LEAF_SPEC, code: "jest.mock(\"next-intl/server\")", errors: [{ messageId: "mocked" }] },
-      { filename: LEAF_SPEC, code: "vi.doMock(\"next-intl\", () => ({}))", errors: [{ messageId: "mocked" }] },
+      { filename: CLIENT_SPEC, code: "vi.mock(\"next-intl\", () => ({ useTranslations: () => (k) => k }))", errors: [{ messageId: "mocked" }] },
+      { filename: CLIENT_SPEC, code: "vi.doMock(\"next-intl\", () => ({}))", errors: [{ messageId: "mocked" }] },
+      // the client hooks stay a finding even when the spec imports the catalogue
+      { filename: CLIENT_SPEC, code: CATALOG + "vi.mock(\"next-intl\", () => ({ useTranslations: () => () => vi_messages }))", errors: [{ messageId: "mocked" }] },
+      // a server mock that answers with literals (live: starci-next-fe modules/i18n/server.spec.ts) does not serve the catalogue
+      { filename: SERVER_SPEC, code: "vi.mock(\"next-intl/server\", () => ({ getTranslations: async () => (key) => `translated:${key}` }))", errors: [{ messageId: "mockedServer" }] },
+      { filename: SERVER_SPEC, code: "jest.mock(\"next-intl/server\")", errors: [{ messageId: "mockedServer" }] },
+      // importing the catalogue without using it in the factory is not serving it
+      { filename: SERVER_SPEC, code: CATALOG + "vi.mock(\"next-intl/server\", () => ({ getMessages: async () => ({}) }))", errors: [{ messageId: "mockedServer" }] },
+      // a JSON import from anywhere but the i18n module's messages is not the app's catalogue
+      { filename: SERVER_SPEC, code: 'import other from "@/modules/config/other.json"\nvi.mock("next-intl/server", () => ({ getMessages: async () => other }))', errors: [{ messageId: "mockedServer" }] },
     ],
   })
 })

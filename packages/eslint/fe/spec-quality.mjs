@@ -19,6 +19,10 @@
  *     entry is invisible until a reader sees `course.titel`.
  */
 
+import { existsSync, readFileSync } from "node:fs"
+import { dirname, join, resolve } from "node:path"
+import ts from "typescript"
+import { hfsOf } from "./lib/hfs.mjs"
 import { baseName, isSpecFile } from "./lib/scope.mjs"
 import { normalizePath } from "./lib/path.mjs"
 
@@ -116,20 +120,34 @@ export const specTestsItsNeighbour = {
 
 // -- SPEC-3 ----------------------------------------------------------------------------------------
 
-/** No spec for a barrel. */
+/** The siblings `index.spec.ts(x)` can be the spec of. */
+const INDEX_SIBLINGS = ["index.ts", "index.tsx"]
+
+/** A statement that holds no behaviour: an import or an export declaration (a re-export, `export {}`, `export type {}`). */
+const isBarrelStatement = (statement) => ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)
+
+/** True when the file holds nothing but import and export declarations. */
+const isBarrelSource = (text) => {
+  const source = ts.createSourceFile("index.tsx", text, ts.ScriptTarget.Latest, false, ts.ScriptKind.TSX)
+  return source.statements.every(isBarrelStatement)
+}
+
+/** No spec for a barrel: the spec's `index.ts(x)` sibling holds only imports and re-exports. */
 export const noBarrelSpec = {
   meta: {
     type: "problem",
-    docs: { description: "No `index.test.ts` beside an `index.ts` barrel." },
+    docs: { description: "No `index.spec.ts` beside an `index.ts` that is only a barrel." },
     schema: [],
     messages: {
       barrel:
-        "A spec for a barrel. `index.ts` holds re-exports, which have no behaviour; a spec beside one asserts that the language works. Test the units the barrel re-exports, beside each of them.",
+        "A spec for a barrel. The sibling `index.ts` holds only imports and re-exports, which have no behaviour; a spec beside one asserts that the language works. Test the units the barrel re-exports, beside each of them. (An `index.ts` that holds implementation - a function, a class or a value - may have this spec.)",
     },
   },
   create(context) {
     const file = normalizePath(context.filename || context.getFilename())
-    if (!/(?:^|\/)index\.(?:test|spec)\.[cm]?ts$/.test(file)) return {}
+    if (!/(?:^|\/)index\.(?:test|spec)\.[cm]?tsx?$/.test(file)) return {}
+    const sibling = INDEX_SIBLINGS.map((name) => join(dirname(file), name)).find((candidate) => existsSync(candidate))
+    if (!sibling || !isBarrelSource(readFileSync(sibling, "utf8"))) return {}
     return { Program: (node) => context.report({ node, messageId: "barrel" }) }
   },
 }
@@ -199,27 +217,87 @@ export const connectedSpecHasAxe = {
 
 // -- SPEC-6 ----------------------------------------------------------------------------------------
 
-/** No mock of the translation runtime. */
+/** The functions a spec mocks a module with. */
+const MOCK_CALLS = new Set(["mock", "doMock", "unstable_mockModule"])
+
+/** Every node under `root` (inclusive), through the parser's visitor keys. */
+const walk = (root, keys, visit) => {
+  if (!root || typeof root.type !== "string") return
+  visit(root)
+  for (const key of keys[root.type] ?? []) {
+    const child = root[key]
+    for (const item of Array.isArray(child) ? child : [child]) walk(item, keys, visit)
+  }
+}
+
+/** Where an import specifier points, as an absolute path: a relative path, or `@/` from the owning app's `src/`. */
+const resolveSpecifier = (hfs, file, specifier) => {
+  if (specifier.startsWith(".")) return resolve(dirname(file), specifier)
+  if (!specifier.startsWith("@/")) return null
+  const owner = hfs.ownerOf(file)
+  return owner ? join(hfs.repoRoot, owner, "src", specifier.slice(2)) : null
+}
+
+/** True when the specifier is the app's message catalogue: a file under `messages/` of the i18n module slot. */
+const isCatalogSpecifier = (hfs, file, specifier) => {
+  const target = resolveSpecifier(hfs, file, specifier)
+  if (!target) return false
+  const path = normalizePath(target)
+  return hfs.slotOf(path) === "fe.modules.i18n" && /\/modules\/i18n\/messages(?:\/|$)/.test(path)
+}
+
+/** A spec renders with the real catalogue; a server helper's mock serves it. */
 export const noMockedTranslations = {
   meta: {
     type: "problem",
-    docs: { description: "A spec renders with the real catalogue; it never mocks `next-intl`." },
+    docs: { description: "A spec renders with the real catalogue; it never mocks `next-intl` (a `next-intl/server` mock must serve the real catalogue)." },
     schema: [],
     messages: {
       mocked:
         "A mocked `next-intl`. The spec then passes on the KEY, so a missing or misspelled catalogue entry is invisible until a reader sees `course.titel`. Render inside `NextIntlClientProvider` with the real `messages/<locale>.json`.",
+      mockedServer:
+        "A `next-intl/server` mock that does not serve the real catalogue. A server helper has no provider to render inside, so the mock is allowed - but its factory must build the translator from the app's real messages (import `modules/i18n/messages/<locale>.json` and pass it to `createTranslator` from `next-intl`); a literal or key-echoing translator passes on the KEY and hides a missing or misspelled entry.",
     },
   },
   create(context) {
-    if (!isSpecFile(context.filename || context.getFilename())) return {}
+    const file = context.filename || context.getFilename()
+    if (!isSpecFile(file)) return {}
+    const source = context.sourceCode ?? context.getSourceCode()
+    const keys = source.visitorKeys
+    const catalogBindings = new Set()
+    const mocks = []
+    const hoisted = []
     return {
+      ImportDeclaration(node) {
+        if (!isCatalogSpecifier(hfsOf(context), file, String(node.source.value))) return
+        for (const specifier of node.specifiers) catalogBindings.add(specifier.local.name)
+      },
       CallExpression(node) {
         const callee = node.callee
         if (callee.type !== "MemberExpression" || callee.computed) return
-        if (!["mock", "doMock", "unstable_mockModule"].includes(callee.property.name)) return
-        if (!["vi", "jest"].includes(callee.object.name)) return
+        if (["vi", "jest"].includes(callee.object.name) && callee.property.name === "hoisted") hoisted.push(node)
+        if (!MOCK_CALLS.has(callee.property.name) || !["vi", "jest"].includes(callee.object.name)) return
         const target = staticString(node.arguments[0])
-        if (target !== null && /^next-intl(?:\/|$)/.test(target)) context.report({ node, messageId: "mocked" })
+        if (target !== null && /^next-intl(?:\/|$)/.test(target)) mocks.push({ node, target })
+      },
+      "Program:exit"() {
+        // The catalogue is served when a catalogue binding, or a dynamic import of the catalogue, is used by the factory or by a `vi.hoisted` block.
+        const serves = (root) => {
+          let found = false
+          walk(root, keys, (inner) => {
+            if (inner.type === "Identifier" && catalogBindings.has(inner.name)) found = true
+            const specifier = inner.type === "ImportExpression" ? staticString(inner.source) : null
+            if (specifier !== null && isCatalogSpecifier(hfsOf(context), file, specifier)) found = true
+          })
+          return found
+        }
+        for (const { node, target } of mocks) {
+          if (target === "next-intl/server") {
+            const factory = node.arguments[1]
+            if (factory && (serves(factory) || hoisted.some(serves))) continue
+            context.report({ node, messageId: "mockedServer" })
+          } else context.report({ node, messageId: "mocked" })
+        }
       },
     }
   },
