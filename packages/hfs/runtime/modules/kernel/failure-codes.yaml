@@ -896,9 +896,9 @@ HFS_CANON_PIN_DRIFT:
   kind: check-finding
 
 HFS_CI_MISSING_CANON:
-  title: "CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint"
+  title: "CI runs the pinned `@starci/hfs check`, the one lint gate and typecheck; pre-push runs typecheck and lint"
   title_vi: "CI thiếu bước canon"
-  meaning_vi: "Workflow/husky thiếu bước `<step>`. Cấu trúc chỉ được kiểm khi agent chạy — CI phải tự kiểm."
+  meaning_vi: "Workflow hoặc husky pre-push không còn chạy bước `<step>` (`hfs check`, `lint:check` gồm ESLint trên apps, packages, e2e/ và stylelint, hoặc `typecheck`) mà bản render có. Cấu trúc chỉ được kiểm khi agent chạy — CI phải tự kiểm."
   causes_vi:
     - "Vi phạm luật R13: CI phải chạy `npx @starci/hfs check` (bản pin); pre-push phải có `typecheck` + `lint:check`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -997,7 +997,7 @@ HFS_FORBIDDEN_PRESENT:
 HFS_FORMAT:
   title: "Prettier is the only formatter"
   title_vi: "Chưa format bằng Prettier"
-  meaning_vi: "`<file>` chưa được format. Chạy `npm run format`."
+  meaning_vi: "`<file>` không còn chạy bước format (`format:check` trong CI hoặc pre-push, `prettier --check` trong pre-commit) mà bản render có. Prettier là formatter duy nhất; cổng chạy nó không được bỏ."
   causes_vi:
     - "Vi phạm luật R19: Prettier (config `@starci/prettier-config`) là formatter duy nhất; ESLint không còn luật định dạng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
@@ -1071,7 +1071,7 @@ HFS_MANAGED_FILE_DRIFT:
   title_vi: "Tệp do .claude quản lý bị lệch"
   meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch bản render từ template. Chạy `hfs sync --write`, không sửa tay."
   causes_vi:
-    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js, .prettierrc, .prettierignore, husky, workflows, sonar, codecov, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
+    - "Vi phạm luật R05: Tệp trong slot có `managedBy` của slots.yaml (tsconfig, jest.config.js hoặc vitest.config.ts, .prettierrc, .prettierignore, husky, workflows, sonar, codecov, khối `scripts` của package.json) phải bằng bản render từ template; danh sách tệp nằm trong slots.yaml, không nằm trong mã."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -1298,9 +1298,9 @@ HFS_ROOT_SRC_FORBIDDEN_FE:
   kind: check-finding
 
 HFS_RULE_OFF_WITHOUT_REPLACEMENT:
-  title: "The ESLint configuration is the rendered one-liner, so no rule is off, warned or redefined in a repository"
-  title_vi: "Cấu hình ESLint lệch bản render"
-  meaning_vi: "`eslint.config.mjs` khác bản render (một dòng gọi `starciBeConfig`). Factory không nhận tham số ghi đè, nên một luật chỉ có thể bị tắt, hạ mức hoặc định nghĩa lại trong repo khi tệp này khác bản render. Chạy `hfs sync --write`, không sửa tay."
+  title: "The ESLint configuration (and a front end's stylelint configuration) is the rendered one-liner, so no rule is off, warned or redefined in a repository"
+  title_vi: "Cấu hình ESLint hoặc stylelint lệch bản render"
+  meaning_vi: "`eslint.config.mjs` (hoặc `stylelint.config.mjs` của front end) khác bản render (một dòng gọi `starciBeConfig`, `starciFeConfig` hoặc `starciStylelintConfig`). Factory không nhận tham số ghi đè, nên một luật chỉ có thể bị tắt, hạ mức hoặc định nghĩa lại trong repo khi tệp này khác bản render. Chạy `hfs sync --write`, không sửa tay."
   causes_vi:
     - "Vi phạm luật R17: `eslint.config.mjs` phải đúng bằng bản render; luật thay thế nằm trong plugin của `.claude`, không bao giờ tắt trong repo."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
@@ -1433,7 +1433,7 @@ HFS_TEST_KIND_RETIRED:
 HFS_TOOL_CONFIG_LOCAL:
   title: "Configs only call the factories; no local rules"
   title_vi: "Kho tự đặt luật cục bộ"
-  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` thứ hai), tệp tự định nghĩa luật ESLint, hoặc lệnh chạy eslint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
+  meaning_vi: "Repo có cấu hình công cụ cục bộ ở `<file>`: tệp cấu hình ngoài bộ được quản lý (`.eslintrc*`, `.eslintignore`, `eslint.config.*` hay `stylelint.config.*` thứ hai, cấu hình prettier/vitest/jest/lint-staged khác), tệp tự định nghĩa luật ESLint hoặc plugin stylelint, khóa cấu hình công cụ trong `package.json` (`eslintConfig`, `stylelint`, `prettier`, `lint-staged`, `jest`), hoặc lệnh chạy eslint/stylelint/prettier với cờ đổi cấu hình (`--rule`, `--no-inline-config`, `--no-eslintrc`, `--config`, `--ignore-pattern`). Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
   causes_vi:
     - "Vi phạm luật R16: Cấu hình của repo chỉ gọi factory của `.claude`; cấm tệp cấu hình công cụ khác, tệp luật cục bộ (vd một tệp eslint-local trong thư mục scripts) và cờ dòng lệnh đổi hoặc tắt cấu hình trong hook, workflow, script."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."

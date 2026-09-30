@@ -155,14 +155,23 @@ slots:
     tier: none
     tests: none
     rules: [HFS_ARCH_CONFIG_UNREAD]
-  - id: repo.package-manifest
+  - id: fe.package-manifest
     profiles: [fe]
-    path: "{package.json,package-lock.json}"
+    path: package.json
     presence: required
     tracked: tracked
     tier: none
     tests: none
-    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT]
+    managedBy: package-scripts     # the `scripts` block only; the rest of the file is the repository's
+    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT]
+  - id: fe.lockfile
+    profiles: [fe]
+    path: package-lock.json
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW]
   - id: be.package-manifest
     profiles: [be]
     path: package.json
@@ -234,21 +243,41 @@ slots:
     tests: none
     goesTo: "nowhere: a back end has exactly the managed tool configuration (be.tool-config); a change to a rule or a flag is proposed in the .claude runtime"
     rules: [HFS_TOOL_CONFIG_LOCAL]
-  - id: fe.thin-config
+  - id: fe.tool-config
     profiles: [fe]
-    path: "{tsconfig.json,eslint.config.mjs,.prettierignore}"
-    presence: required     # each file is a thin extends of a canon package
+    # Managed files (hfs sync renders them, hfs check compares them): the tool configuration of a front end. Each is a
+    # reference to a canon package, never a configuration: tsconfig.json extends @starci/tsconfig/next.json and only
+    # excludes the e2e tree (each app's own tsconfig.json, in fe.app.next, carries its aliases and include);
+    # tsconfig.e2e.json extends the e2e preset over e2e/ and playwright.config.ts; eslint.config.mjs is the one-line
+    # starciFeConfig call (it lints apps, packages and e2e/ in one run, so there is no separate e2e lint); stylelint.config.mjs
+    # is the one-line starciStylelintConfig call; vitest.config.ts is the one-line starciVitestWorkspace call;
+    # .prettierrc names @starci/prettier-config; .prettierignore is the template.
+    path: "{tsconfig.json,tsconfig.e2e.json,eslint.config.mjs,stylelint.config.mjs,vitest.config.ts,.prettierrc,.prettierignore}"
+    presence: required
     tracked: tracked
     tier: none
     tests: none
-    rules: [HFS_TOOL_CONFIG_LOCAL]
-  - id: fe.tool-config
+    managedBy: tool-config
+    rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_RULE_OFF_WITHOUT_REPLACEMENT, HFS_TS_STRICT]
+  - id: fe.tool-config-repo
     profiles: [fe]
-    path: "{tsconfig.build.json,tsconfig.e2e.json,vitest.config.ts,vitest.setup.ts,playwright.config.ts,turbo.json}"
+    # The three tool files a preset cannot render because they carry the repository's own facts: vitest.setup.ts (its
+    # setup), playwright.config.ts (its web servers, ports and projects: @starci/playwright-preset returns the shared
+    # defaults and the repository adds what only it knows) and turbo.json (its task graph).
+    path: "{vitest.setup.ts,playwright.config.ts,turbo.json}"
     presence: optional
     tracked: tracked
     tier: none
     tests: none
+  - id: fe.tool-config-local
+    profiles: [fe]
+    path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.stylelintrc,.stylelintrc.*,.stylelintignore,stylelint.config.js,stylelint.config.cjs,stylelint.config.ts,stylelint.config.json,prettier.config.*,.prettierrc.*,vitest.config.js,vitest.config.mjs,vitest.config.cjs,vitest.workspace.*,jest.config.*,lint-staged.config.*,.lintstagedrc*}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "nowhere: a front end has exactly the managed tool configuration (fe.tool-config); a change to a rule or a flag is proposed in the .claude runtime"
+    rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: repo.quality-config
     profiles: [be, fe]
     path: "{sonar-project.properties,codecov.yml}"

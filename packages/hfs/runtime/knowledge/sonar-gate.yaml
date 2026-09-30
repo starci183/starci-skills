@@ -38,8 +38,10 @@ newCode:
 # (packages/hfs, contract change hfs-sonar-import) and the gate holds the open-issue count of the whole project at zero:
 #   starci-hfs   `hfs check --sonar reports/hfs.sonar.json` (repository, managed-file and architecture-machine findings;
 #                the rule id is the finding code) -> sonar.externalIssuesReportPaths
-#   eslint       `eslint -f json -o reports/eslint.json` (the BE and FE canon plugins alike) -> sonar.eslint.reportPaths
-#   stylelint    `stylelint --formatter json` converted by `hfs report-stylelint` -> sonar.externalIssuesReportPaths
+#   eslint       `eslint -f json -o reports/eslint.json` (the BE and FE canon plugins alike) converted by `hfs report eslint` -> sonar.externalIssuesReportPaths
+#   stylelint    `stylelint --formatter json` converted by `hfs report stylelint` -> sonar.externalIssuesReportPaths
+# The three imports share ONE placement rule (a finding on a file Sonar does not index is filed on the first source file); Sonar's own
+# ESLint import (sonar.eslint.reportPaths) is not used because it drops such issues.
 # A SonarQube gate condition cannot filter issues by engine, so the condition is the project's open issues (`violations`,
 # overall code): the three engines above are the imports it counts, and every native Sonar issue counts with them. That is
 # stricter than the engines alone and it is intended: a project that meets this gate has no open issue of any origin.
