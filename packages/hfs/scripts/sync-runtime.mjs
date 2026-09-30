@@ -30,6 +30,8 @@ const SLOT_FILES = [
 const CHECK_ENTRIES = ['scripts/lib/hfs-check.mjs', 'scripts/checks/architecture.mjs'];
 /** Static imports and `new URL(<relative>.yaml, import.meta.url)` reads (the framework-pinned knowledge file) are followed. */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;
+/** A read of the migration DDL of one store: `migrations/runtime` or `migrations/machine`. */
+const MIGRATION_STORE = /migrations[\/'", ]+(runtime|machine)/g;
 const URL_SPEC = /new URL\(\s*['"](\.[^'"]+\.ya?ml)['"]\s*,\s*import\.meta\.url/g;
 
 /** The runtime-relative files reachable from `entries` through relative imports and `new URL(..., import.meta.url)` reads. */
@@ -42,6 +44,11 @@ export function importClosure(entries) {
     if (!file.endsWith('.mjs')) return;
     const text = fs.readFileSync(path.join(runtimeRoot, file), 'utf8');
     for (const match of [...text.matchAll(IMPORT_SPEC), ...text.matchAll(URL_SPEC)]) visit(path.posix.normalize(path.posix.join(path.posix.dirname(file), match[1])));
+    // A module that reads its DDL from engine/migrations/<store>/ (ledger-db, machine-db) carries every migration of that store.
+    for (const store of new Set([...text.matchAll(MIGRATION_STORE)].map((match) => match[1]))) {
+      const dir = `engine/migrations/${store}`;
+      if (fs.existsSync(path.join(runtimeRoot, dir))) for (const sql of fs.readdirSync(path.join(runtimeRoot, dir)).filter((name) => name.endsWith('.sql')).sort()) visit(`${dir}/${sql}`);
+    }
   };
   for (const entry of entries) visit(entry);
   return [...seen].sort();

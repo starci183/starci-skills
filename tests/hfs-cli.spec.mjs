@@ -176,10 +176,12 @@ test('pin drift: a range, an old version and a file: link are drift; the exact r
   assert.equal(drift(withPackage({ devDependencies: { '@starci/tsconfig': `^${tsconfig}` } })).length, 1, 'a range is drift');
   assert.equal(drift(withPackage(linked)).length, 1, 'a file: link is drift');
   const grammar = pins['@starci/grammar'].version;
+  assert.equal(pins['@starci/grammar'].side, 'fe', '@starci/grammar is a front-end pin: a back-end repository is not judged on it');
+  const withFePackage = (pkg) => repoOf(FE, (dir) => put(dir, 'package.json', `${JSON.stringify({ name: 'demo', ...pkg })}\n`));
   assert.equal(pins['@starci/grammar'].install, 'registry', '@starci/grammar is a published package');
-  assert.deepEqual(drift(withPackage({ dependencies: { '@starci/grammar': grammar } })), [], 'grammar installs from the registry at the pinned version');
-  assert.equal(drift(withPackage({ dependencies: { '@starci/grammar': `^${grammar}` } })).length, 1, 'a range is drift');
-  assert.equal(drift(withPackage({ dependencies: { '@starci/grammar': 'file:.starci/packages/grammar' } })).length, 1, 'grammar is not a file: link');
+  assert.deepEqual(drift(withFePackage({ dependencies: { '@starci/grammar': grammar } })), [], 'grammar installs from the registry at the pinned version');
+  assert.equal(drift(withFePackage({ dependencies: { '@starci/grammar': `^${grammar}` } })).length, 1, 'a range is drift');
+  assert.equal(drift(withFePackage({ dependencies: { '@starci/grammar': 'file:.starci/packages/grammar' } })).length, 1, 'grammar is not a file: link');
 });
 
 test('pins of the other side are not judged, and every package.json of a workspace repository is', () => {
