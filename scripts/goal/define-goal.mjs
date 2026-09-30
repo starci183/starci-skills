@@ -15,11 +15,9 @@
 // refuses params-invalid. A leg the chain does not hold is an error here.
 //
 // --project resolves <source>/.workspaces/projects/<name>/work.json
-// (starci/workspace-binding@1), where <source> is the repository that owns this
-// .claude runtime. Every repositories.<role>.pathFromSource resolves to a
-// project repository the plan cold-scans, and work.ownerRole names the
-// repository that owns the project ledger: the goal persists to
-// <owner-repo>/.starciwork/runtime.sqlite — project-owned, never the host repo.
+// (starci/workspace-binding@2), where <source> is the repository that owns this
+// .claude runtime. The app repository owns the ledger and each side folder is
+// cold-scanned by --plan.
 // --repo keeps the single-repo behavior (the ledger sits under it). The two
 // options are mutually exclusive.
 import fs from 'node:fs';
@@ -90,25 +88,26 @@ if (!text) { console.error(usage); process.exit(2); }
 { const refusal = goalTextRefusal(text); if (refusal) { console.error(refusal); process.exit(2); } }
 if (approveRevision && !reviseWorkflowId) { console.error('--approve-revision requires --revise <workflow-id>'); process.exit(2); }
 
-// --project: resolve the workspace binding. work.ownerRole picks the ledger
-// owner out of the declared repositories; every declared repository is a
-// cold-scan target for --plan.
+// --project: resolve the app binding. Its repository owns Work and the ledger;
+// each declared side is a cold-scan target for --plan.
 function resolveProject(name) {
   const file = path.join(sourceRoot, '.workspaces', 'projects', name, 'work.json');
   if (!fs.existsSync(file)) { console.error(`unknown project '${name}': no ${file}`); process.exit(2); }
   let binding;
   try { binding = JSON.parse(fs.readFileSync(file, 'utf8')); }
   catch (e) { console.error(`${file}: ${e.message}`); process.exit(2); }
-  const repos = Object.entries(binding?.repositories ?? {})
-    .filter(([, r]) => typeof r?.pathFromSource === 'string' && r.pathFromSource.trim())
-    .map(([role, r]) => ({ role, path: path.resolve(sourceRoot, r.pathFromSource) }));
-  const ownerRole = binding?.work?.ownerRole ?? null;
-  const owner = repos.find(r => r.role === ownerRole);
-  if (!owner) { console.error(`${file}: work.ownerRole '${ownerRole}' names no repository with a pathFromSource`); process.exit(2); }
-  const workPath = typeof binding?.work?.pathFromRepository === 'string' && binding.work.pathFromRepository.trim()
-    ? binding.work.pathFromRepository.trim() : '.starciwork';
+  if (binding?.schema !== 'starci/workspace-binding@2'
+    || typeof binding?.repository?.pathFromSource !== 'string' || !binding.repository.pathFromSource.trim()
+    || typeof binding?.repository?.gitRepository !== 'string' || !binding.repository.gitRepository.trim()
+    || binding?.sides?.be !== 'be' || binding?.sides?.fe !== 'fe'
+    || binding?.work?.pathFromRepository !== '.starciwork') {
+    console.error(`${file}: expected starci/workspace-binding@2 with one repository, sides be/fe and app-root .starciwork`); process.exit(2);
+  }
+  const ownerRepo = path.resolve(sourceRoot, binding.repository.pathFromSource);
+  const repos = ['be', 'fe'].map(role => ({ role, path: path.join(ownerRepo, binding.sides[role]) }));
+  const workPath = binding.work.pathFromRepository;
   return { project: typeof binding?.project === 'string' && binding.project.trim() ? binding.project.trim() : name,
-    displayName: typeof binding?.displayName === 'string' && binding.displayName.trim() ? binding.displayName.trim() : null, file, ownerRole, ownerRepo: owner.path, workRoot: path.resolve(owner.path, workPath), repos };
+    displayName: typeof binding?.displayName === 'string' && binding.displayName.trim() ? binding.displayName.trim() : null, file, ownerRepo, workRoot: path.resolve(ownerRepo, workPath), repos };
 }
 
 const project = projectName ? resolveProject(projectName) : null;
@@ -378,7 +377,7 @@ if (planOnly) {
     displayName: revisionBase ? undefined : displayName,
     prompt: text,
     goalIdentity: revisionBase ? revisionBase.goal.goal_identity : goalIdentity,
-    project: project ? { name: project.project, ownerRole: project.ownerRole, ownerRepo: project.ownerRepo, repos: project.repos, binding: project.file } : undefined,
+    project: project ? { name: project.project, repository: project.ownerRepo, sides: project.repos, binding: project.file } : undefined,
     opChain: chain?.legs?.map(l => l.op) ?? null,
     underivable: underivable ?? undefined,
     legs,
@@ -396,7 +395,7 @@ if (planOnly) {
   if (asJson) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
   const lines = [`PLAN — ${revisionBase ? `revise ${reviseWorkflowId} to rev ${preview.nextRevision}` : `goal "${out.title}"`}`, ...(out.displayName ? [`  name: ${out.displayName}`] : []), `  identity: ${out.goalIdentity}${revisionBase ? ' (preserved)' : ''}`];
   lines.push(project
-    ? `  scope: project '${project.project}' — owner role '${project.ownerRole}' → ${project.ownerRepo}`
+    ? `  scope: project '${project.project}' → ${project.ownerRepo}`
     : `  scope: repo ${repo}`);
   lines.push('STATE (cold scan):');
   for (const r of scanRepos) {

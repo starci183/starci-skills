@@ -1,8 +1,7 @@
 // The repository each owned path of a job lands in — one resolver for api
 // enqueue (records payload.repository), api dispatch (names the checkout per
 // owned path in the packet) and api settle (runs the landed proof there).
-// Repositories come from the project binding whose Work owner is the ledger
-// repo (modules/schemas/workspace-routing.yaml registry + bindingShape).
+// Side folders come from the app binding whose repository owns Work and the ledger.
 // Contract: modules/kernel/api.yaml commands.enqueue / commands.settle landed.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,8 +23,8 @@ const inside = (root, abs) => {
 };
 
 
-// The binding (.workspaces/projects/<p>/work.json) whose work.ownerRole
-// repository is `repo`, or null — no binding means --repo is authoritative.
+// The binding (.workspaces/projects/<p>/work.json) whose app repository is
+// `repo`, or null — no binding means --repo is authoritative.
 export function projectBinding(repo, { sourceRoot = starciSourceRoot() } = {}) {
   const projects = path.join(sourceRoot, '.workspaces', 'projects');
   let entries = [];
@@ -34,28 +33,30 @@ export function projectBinding(repo, { sourceRoot = starciSourceRoot() } = {}) {
     if (!entry.isDirectory()) continue;
     const file = path.join(projects, entry.name, 'work.json');
     const doc = readJsonFile(file);
-    const repos = Object.entries(doc?.repositories ?? {})
-      .filter(([, r]) => typeof r?.pathFromSource === 'string' && r.pathFromSource.trim())
-      .map(([role, r]) => ({ role, root: path.resolve(sourceRoot, r.pathFromSource), gitRepository: r.gitRepository ?? null }));
-    const ownerRole = doc?.work?.ownerRole ?? 'be';
-    const owner = repos.find((r) => r.role === ownerRole);
-    if (!owner || !samePath(owner.root, repo)) continue;
-    const workDir = typeof doc?.work?.pathFromRepository === 'string' && doc.work.pathFromRepository.trim()
-      ? doc.work.pathFromRepository.trim().replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '') : '.starciwork';
-    return { file, project: doc.project ?? entry.name, ownerRole, workDir, repos };
+    if (doc?.schema !== 'starci/workspace-binding@2'
+      || typeof doc?.repository?.pathFromSource !== 'string' || !doc.repository.pathFromSource.trim()
+      || typeof doc?.repository?.gitRepository !== 'string' || !doc.repository.gitRepository.trim()
+      || doc?.sides?.be !== 'be' || doc?.sides?.fe !== 'fe'
+      || doc?.work?.pathFromRepository !== '.starciwork') continue;
+    const appRoot = path.resolve(sourceRoot, doc.repository.pathFromSource);
+    if (!samePath(appRoot, repo)) continue;
+    const repos = ['be', 'fe'].map((role) => ({ role, root: path.join(appRoot, doc.sides[role]), appRoot, gitRepository: doc.repository.gitRepository }));
+    const workDir = doc.work.pathFromRepository;
+    return { file, project: doc.project ?? entry.name, appRoot, workDir, repos };
   }
   return null;
 }
 
 const repoName = (url) => (typeof url === 'string' ? url.replace(/[\\/]+$/, '').split(/[\\/:]/).pop().replace(/\.git$/i, '') : null);
 
-// A repo id is a binding role (be, fe, grammar), the repository's name (its
-// gitRepository or directory basename), or a path to its root.
+// A repo id is a side (be or fe), or the app repository's name or path.
 export function bindingRepo(binding, id) {
   if (!binding || typeof id !== 'string' || !id.trim()) return null;
   const want = id.trim();
   return binding.repos.find((r) => r.role === want)
-    ?? binding.repos.find((r) => repoName(r.gitRepository) === want || path.basename(r.root) === want)
+    ?? binding.repos.find((r) => path.basename(r.root) === want)
+    ?? (binding.appRoot && (repoName(binding.repos[0]?.gitRepository) === want || path.basename(binding.appRoot) === want || samePath(binding.appRoot, path.resolve(starciSourceRoot(), want)))
+      ? { role: 'app', root: binding.appRoot, appRoot: binding.appRoot, gitRepository: binding.repos[0]?.gitRepository ?? null } : null)
     ?? binding.repos.find((r) => samePath(r.root, path.resolve(starciSourceRoot(), want)))
     ?? null;
 }
@@ -78,13 +79,12 @@ export const FRONTEND_OPS = (() => {
 })();
 
 const REPO_PREFIX = /^repository:([^/\\]+)[/\\]?(.*)$/;
-// A repository-relative path without the trailing glob a directory grant is
-// sometimes spelled with (miamia-fe/* is the whole miamia-fe checkout).
+// A side-relative path without the trailing glob a directory grant may use.
 const tidy = (p) => String(p).replace(/(^|\/)\*{1,2}$/, '').replace(/\/+$/, '') || '.';
 
 // The repository a job's bare owned paths target, or null when nothing
 // overrides where dispatch placed the worker: payload.repository when set,
-// else the binding's fe root for a frontend op. An unresolvable
+// else the side of a role-specific op. An unresolvable
 // payload.repository is {unresolved}.
 export function jobTargetRepository({ op, payload, binding }) {
   const id = typeof payload?.repository === 'string' ? payload.repository.trim() : '';
@@ -94,13 +94,15 @@ export function jobTargetRepository({ op, payload, binding }) {
     if (path.isAbsolute(id) && isDir(id)) return { id, role: null, root: path.resolve(id), via: 'payload.repository' };
     return { id, unresolved: true, via: 'payload.repository' };
   }
-  const fe = FRONTEND_OPS.has(op) ? bindingRepo(binding, 'fe') : null;
-  return fe ? { id: 'fe', role: 'fe', root: fe.root, via: 'op-frontend' } : null;
+  const role = FRONTEND_OPS.has(op) ? 'fe' : String(op ?? '').startsWith('backend.') ? 'be' : null;
+  if (!role) return null;
+  const side = bindingRepo(binding, role);
+  return side ? { id: role, role, root: side.root, via: 'op-side' } : null;
 }
 
 // The repository id enqueue records on a new job's payload: an explicit
-// --repository (refused when the binding cannot resolve it), else fe for a
-// frontend op of a bound project, else none (the job targets where dispatch
+// --repository (refused when the binding cannot resolve it), else the side
+// of a bound project's op, else none (the job targets where dispatch
 // places it). Also refuses a repository:<id>/ owned path the binding lacks.
 export function enqueueRepository({ op, repository, ownedPaths, repo, siblingRepositories = [] }) {
   const binding = projectBinding(repo);
@@ -122,21 +124,20 @@ export function enqueueRepository({ op, repository, ownedPaths, repo, siblingRep
       const norm = String(owned).replace(/\\/g, '/');
       if (REPO_PREFIX.test(norm) || path.isAbsolute(owned) || norm.startsWith('../') || norm === workDir || norm.startsWith(`${workDir}/`)) return false;
       const [head, ...rest] = norm.split('/');
-      return !(rest.length && binding.repos.some((r) => repoName(r.gitRepository) === head || path.basename(r.root) === head));
+      return !(rest.length && (binding.repos.some((r) => path.basename(r.root) === head) || path.basename(binding.appRoot) === head));
     });
     const siblings = [...new Set(siblingRepositories.map((id) => bindingRepo(binding, id)?.role).filter(Boolean))];
-    if (siblings.length > 1) return { ok: false, reason: 'path-repository-ambiguous', detail: `cut siblings bind multiple repositories: ${siblings.join(', ')}` };
     const roles = new Set();
     for (const owned of bare) {
       const rel = tidy(String(owned).replace(/\\/g, '/'));
-      const existing = binding.repos.filter((r) => fs.existsSync(path.join(r.root, rel)));
-      const found = [...new Set(existing.map((r) => r.root))];
-      const selected = siblings.length ? siblings[0] : found.length === 1 ? existing[0].role : null;
+      const existing = [...binding.repos, { role: 'app', root: binding.appRoot }].filter((r) => fs.existsSync(path.join(r.root, rel)));
+      const found = [...new Set(existing.filter((r) => r.role !== 'app' || !binding.repos.some((side) => fs.existsSync(path.join(side.root, rel)))).map((r) => r.role))];
+      const selected = siblings.length === 1 ? siblings[0] : found.length === 1 ? found[0] : null;
       if (!selected) return { ok: false, reason: found.length ? 'path-repository-ambiguous' : 'path-repository-missing',
         detail: `owned path ${owned} ${found.length ? 'exists in multiple' : 'exists in no'} bound repositories (${binding.repos.map((r) => r.role).join(', ')}); qualify its repository` };
       roles.add(selected);
     }
-    if (roles.size > 1) return { ok: false, reason: 'path-repository-ambiguous', detail: `bare owned paths bind multiple repositories (${[...roles].join(', ')}); qualify them` };
+    if (roles.size > 1 || siblings.length > 1) return { ok: true, repository: 'app' };
     if (roles.size) return { ok: true, repository: [...roles][0] };
   }
   const target = jobTargetRepository({ op, payload: {}, binding });
@@ -168,21 +169,30 @@ export function ownedPathPlacements({ op, payload, ownedPaths, repo, worktree, t
   const binding = projectBinding(repo);
   const placement = worktree && isDir(worktree) ? worktree : repo;
   const wtCommon = worktree && isDir(worktree) ? gitCommonDir(worktree, timeoutMs) : null;
+  const top = wtCommon ? runGit(['rev-parse', '--show-toplevel'], { dir: worktree, timeout: timeoutMs }) : null;
+  const checkoutRoot = top && !top.error && top.status === 0 && top.stdout.trim() ? path.resolve(top.stdout.trim()) : placement;
   const common = new Map();
   const commonOf = (root) => {
     if (!common.has(root)) common.set(root, isDir(root) ? gitCommonDir(root, timeoutMs) : null);
     return common.get(root);
   };
-  const checkoutFor = (root) => (wtCommon && commonOf(root) === wtCommon ? worktree : root);
+  const checkoutFor = (root) => {
+    const side = binding?.repos.find((r) => samePath(r.root, root));
+    const gitRoot = side?.appRoot ?? root;
+    return wtCommon && commonOf(gitRoot) === wtCommon
+      ? (side ? path.join(checkoutRoot, path.relative(gitRoot, root)) : checkoutRoot) : root;
+  };
   const target = jobTargetRepository({ op, payload, binding });
   const workRoot = checkoutFor(repo);
   const workDir = binding?.workDir ?? '.starciwork';
   const roleOf = (root) => binding?.repos.find((r) => samePath(r.root, root))?.role ?? null;
   const deepest = [...(binding?.repos ?? [])].sort((a, b) => key(b.root).length - key(a.root).length);
-  const holderOf = (abs) => deepest.find((r) => inside(r.root, abs)) ?? null;
+  const holderOf = (abs) => deepest.find((r) => inside(r.root, abs))
+    ?? (binding?.appRoot && inside(binding.appRoot, abs) ? { role: 'app', root: binding.appRoot } : null);
   const rel = (root, abs) => path.relative(root, abs).replace(/\\/g, '/') || '.';
   const named = (head) => (head && head !== '.' && head !== '..' && head !== workDir
-    ? binding?.repos.find((r) => repoName(r.gitRepository) === head || path.basename(r.root) === head) ?? null : null);
+    ? binding?.repos.find((r) => path.basename(r.root) === head)
+      ?? (binding && path.basename(binding.appRoot) === head ? { role: 'app', root: binding.appRoot } : null) : null);
   return ownedPaths.map((owned) => {
     const norm = String(owned).replace(/\\/g, '/');
     const m = REPO_PREFIX.exec(norm);
@@ -206,9 +216,13 @@ export function ownedPathPlacements({ op, payload, ownedPaths, repo, worktree, t
     const [head, ...rest] = norm.split('/');
     const byName = rest.length ? named(head) : null;
     if (byName) return { owned, base: checkoutFor(byName.root), path: tidy(rest.join('/')), role: byName.role, via: 'path-repository-name' };
+    if (binding && target?.role === 'app' && !norm.startsWith('../') && !norm.startsWith(workDir)) {
+      const matching = binding.repos.filter((r) => fs.existsSync(path.join(r.root, tidy(norm))));
+      if (matching.length === 1) return { owned, base: checkoutFor(matching[0].root), path: tidy(norm), role: matching[0].role, via: 'path-side' };
+    }
     if (target?.unresolved) return { owned, unresolved: true, repository: target.id, via: target.via };
     const workPath = norm === workDir || norm.startsWith(`${workDir}/`);
-    if (workPath && (target || (binding && path.resolve(workRoot) !== path.resolve(placement)))) return { owned, base: workRoot, path: owned, role: binding?.ownerRole ?? null, via: 'work-owner' };
+    if (workPath && binding) return { owned, base: workRoot, path: owned, role: null, via: 'work-owner' };
     if (target) return { owned, base: checkoutFor(target.root), path: owned, role: target.role, via: target.via };
     return { owned, base: placement, path: owned, role: samePath(placement, repo) ? roleOf(repo) : null, via: 'placement' };
   });

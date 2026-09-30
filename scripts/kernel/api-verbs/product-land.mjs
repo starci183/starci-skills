@@ -18,7 +18,7 @@ const refuse = (message, code) => Object.assign(new Error(message), { code });
 export function workflowRepos(db, { workflowId, repository = null, repo }) {
   if (repository) {
     const bound = bindingRepo(projectBinding(repo), String(repository));
-    const root = bound?.root ?? (path.isAbsolute(String(repository)) ? path.resolve(String(repository)) : null);
+    const root = bound?.appRoot ?? (path.isAbsolute(String(repository)) ? path.resolve(String(repository)) : null);
     if (!root || !fs.existsSync(path.join(root, '.git'))) throw refuse(`--repository ${repository} names no bound product checkout`, 'repository-unknown');
     return [root];
   }

@@ -54,10 +54,12 @@ function makeUnregisteredLedger(file, { workflowId = 'wf-orphan-fixture-one', so
 }
 
 /** A .workspaces/projects/<name>/work.json under `sourceRoot` (modules/schemas/workspace-routing.yaml bindingShape). */
-function makeWorkspaceBinding(sourceRoot, name, repositories) {
+function makeWorkspaceBinding(sourceRoot, name, pathFromSource) {
   const dir = path.join(sourceRoot, '.workspaces', 'projects', name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'work.json'), JSON.stringify({ schema: 'starci/workspace-binding@1', project: name, repositories, work: { ownerRole: 'be', pathFromRepository: '.starciwork' } }));
+  fs.writeFileSync(path.join(dir, 'work.json'), JSON.stringify({ schema: 'starci/workspace-binding@2', project: name,
+    repository: pathFromSource === undefined ? undefined : { pathFromSource, gitRepository: `https://example.test/${name}.git` },
+    sides: { be: 'be', fe: 'fe' }, work: { pathFromRepository: '.starciwork' } }));
 }
 
 test('orphanReason: no roots, every root unreachable, and at least one reachable', () => {
@@ -166,16 +168,16 @@ test('starciSourceRoot: STARCI_SOURCE_ROOT overrides it, else it is the director
   assert.equal(starciSourceRoot({ STARCI_SOURCE_ROOT: 'D:/somewhere/else' }), path.resolve('D:/somewhere/else'));
 });
 
-test('workspaceBoundRepoRoots resolves every role of every .workspaces/projects/*/work.json, pathFromSource "." included', (t) => {
+test('workspaceBoundRepoRoots resolves one app root per binding, pathFromSource "." included', (t) => {
   const sourceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-workspace-source-'));
   t.after(() => fs.rmSync(sourceRoot, { recursive: true, force: true }));
-  makeWorkspaceBinding(sourceRoot, 'starci-academy', { be: { pathFromSource: '.' }, fe: { pathFromSource: '../starci-academy-fe' } });
-  makeWorkspaceBinding(sourceRoot, 'broken', undefined); // no `repositories` at all: skipped, never a crash
+  makeWorkspaceBinding(sourceRoot, 'starci-academy', '.');
+  makeWorkspaceBinding(sourceRoot, 'broken', undefined); // no `repository` at all: skipped, never a crash
   fs.mkdirSync(path.join(sourceRoot, '.workspaces', 'projects', 'unreadable'), { recursive: true });
   fs.writeFileSync(path.join(sourceRoot, '.workspaces', 'projects', 'unreadable', 'work.json'), '{not json');
 
   const roots = workspaceBoundRepoRoots({ env: { STARCI_SOURCE_ROOT: sourceRoot } });
-  assert.deepEqual(roots.sort(), [path.resolve(sourceRoot).replace(/\\/g, '/'), path.resolve(sourceRoot, '..', 'starci-academy-fe').replace(/\\/g, '/')].sort());
+  assert.deepEqual(roots, [path.resolve(sourceRoot).replace(/\\/g, '/')]);
 });
 
 test('workspaceBoundRepoRoots: no .workspaces/projects directory yields [] rather than throwing', (t) => {
@@ -192,8 +194,8 @@ test('boundRepoRoots merges machine.sqlite repositories with every .workspaces b
   // The same repo is bound both ways: registered in machine.sqlite (forward-slash, repoKey-normalized) and in a
   // workspace binding resolved natively (backslash on Windows) — it must land in the merged list exactly once.
   makeLedger(env, { ledgerId: 'shared-repo-ledger', repoRoot: REPO_ROOT });
-  makeWorkspaceBinding(sourceRoot, 'shared', { be: { pathFromSource: REPO_ROOT } });
-  makeWorkspaceBinding(sourceRoot, 'workspace-only', { fe: { pathFromSource: '.' } });
+  makeWorkspaceBinding(sourceRoot, 'shared', REPO_ROOT);
+  makeWorkspaceBinding(sourceRoot, 'workspace-only', '.');
 
   const roots = boundRepoRoots({ env });
   const repoRootCount = roots.filter((r) => r.replace(/\\/g, '/').toLowerCase() === REPO_ROOT.replace(/\\/g, '/').toLowerCase()).length;

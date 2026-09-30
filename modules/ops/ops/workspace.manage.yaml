@@ -200,9 +200,9 @@ policy:
           purpose:
             en: Read explicit task location/repository selection, the portable repository identities
               workspace.yaml repositories[] already lists ({role, name}), and the project binding
-              (starci/workspace-binding@1, modules/schemas/workspace-routing.yaml bindingShape) that
-              maps each role to its checkout (pathFromSource) and declared remote (gitRepository).
-              These two are the one source of repository identity; a directory name, cwd or similar
+              (starci/workspace-binding@2, modules/schemas/workspace-routing.yaml bindingShape) that
+              maps each role to a side folder of its one app checkout and declared remote (gitRepository).
+              The binding is the source of Git identity; a directory name, cwd or similar
               remote is only a hint when identity is unresolved.
       writes:
         - id: workspace
@@ -211,12 +211,12 @@ policy:
           content:
             en: "Initialize only an explicitly new canonical workspace (schema work/workspace@1: id,
               project, description and repositories[]); reuse an existing workspace unchanged except
-              to append a selected verified repository its repositories[] does not list yet.
-              repositories[] is the tree's repository binding: one {role, name} per selected
-              repository, role as the project binding keys it (be, fe) and name as the repository's
-              directory name, the name implementation records, `repository:<name>/` paths and
-              evidence servedVersions resolve against. The Work owner repository is always listed,
-              so a source-free purpose lists only it. No _resources repository record exists
+              to append a selected verified side its repositories[] does not list yet.
+              repositories[] names the app's selected sides: one {role, name} per side,
+              role as the project binding keys it (be, fe) and name as the side's
+              directory name. Implementation records, `repository:<name>/` paths and
+              evidence servedVersions resolve against the side folder. The app repository owns Work.
+              No _resources repository record exists
               (work-layout.yaml shape.resources admits environments, identities and fixtures only);
               remote, HEAD, default ref and dirty state are observations for
               evidence/repository-observation.yaml. Never invent repository/environment resources merely
@@ -286,11 +286,11 @@ policy:
           action:
             en: Inspect exact Git root/common-dir, remote identity, full HEAD, worktree registration, links and
               dirty paths with read-only commands, and verify each actual remote against the project
-              binding's gitRepository. Bind only selected verified repositories, by listing them in
+              binding's gitRepository. Bind only selected verified sides, by listing them in
               workspace.yaml repositories[] of the existing canonical .starciwork root. Do not
               reset, clean, stash, switch or create another canonical tree. Retain sanitized
-              repository-observation.yaml (remote, full HEAD, default ref, dirty state per
-              repository); source-free setup explicitly records no source repository yet.
+              repository-observation.yaml (one remote, full HEAD, default ref and dirty state);
+              source-free setup explicitly records no source repository yet.
         - reads:
             - intent
             - target
@@ -337,9 +337,9 @@ policy:
               non-applicability; setup completion never rolls implementation forward.
         - id: identity
           requirement:
-            en: Selected repositories have verified identities, each listed once in workspace.yaml
-              repositories[] under the role and name the project binding resolves, and one canonical
-              Work root; an explicitly source-free purpose lists only the Work owner repository.
+            en: The selected app repository has a verified identity, each selected side is listed once
+              in workspace.yaml repositories[] under the role and folder the project binding resolves,
+              and the app has one canonical Work root.
       blockers:
         - code: PURPOSE_AMBIGUOUS
           condition:

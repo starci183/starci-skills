@@ -34,11 +34,12 @@ const tmp=(t,prefix)=>{
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   return dir;
 };
-const bind=(sourceRoot,project,pathFromSource,ownerRole='be')=>{
+const bind=(sourceRoot,project,pathFromSource)=>{
   const dir=path.join(sourceRoot,'.workspaces','projects',project);
   fs.mkdirSync(dir,{recursive:true});
-  fs.writeFileSync(path.join(dir,'work.json'),JSON.stringify({schema:'starci/workspace-binding@1',project,
-    repositories:{[ownerRole]:{pathFromSource},fe:{pathFromSource:'../elsewhere-fe'}},work:{ownerRole,pathFromRepository:'.starciwork'}}));
+  fs.writeFileSync(path.join(dir,'work.json'),JSON.stringify({schema:'starci/workspace-binding@2',project,
+    repository:{pathFromSource,gitRepository:`https://example.test/${project}.git`},
+    sides:{be:'be',fe:'fe'},work:{pathFromRepository:'.starciwork'}}));
 };
 
 test('the default snapshots dir is benchmark/snapshots at the runtime root',()=>{
@@ -46,7 +47,7 @@ test('the default snapshots dir is benchmark/snapshots at the runtime root',()=>
   assert.equal(snapshotName('2026-09-25',72),'2026-09-25-72h.json');
 });
 
-test('bound repos come from .workspaces bindings: the Work owner, once, only with a ledger',t=>withLedger(t,({repoRoot})=>{
+test('bound app repos come from .workspaces bindings, once, only with a ledger',t=>withLedger(t,({repoRoot})=>{
   const sourceRoot=tmp(t,'starci-bench-src-');
   bind(sourceRoot,'alpha',repoRoot);
   bind(sourceRoot,'alpha-again',repoRoot);                       // the same repo bound twice counts once

@@ -3,10 +3,10 @@ source: The StarCi host directory containing this .claude checkout and its paire
 registry: .workspaces/projects/<project>/work.json
 rules:
   - .claude and .workspaces are a host pair. They are not default directories for every source;
-    routed frontend and ordinary source repositories must not receive copies.
+    app repositories must not receive copies.
   - AGENTS.md is the host bootstrap file installed from .claude/init (CLAUDE.md/DEVIN.md only on
     opt-in hosts). Project setup does not create these files or another .claude in routed
-    backend/frontend sources.
+    app sources.
   - Read the selected project's binding before resolving Work or target code. Preserve Source when
     entering another repository or worktree.
   - Resolve source-relative repository paths from Source, not from .claude or the current target
@@ -17,41 +17,31 @@ rules:
   - All product features are owned below features/<feature>/; business, architecture, UI,
     implementation and UAT belong inside that feature. Never bind a feature as a separate workspace
     or place feature business at .starciwork/business/ or .starciwork/features/business/.
-  - The project's backend repository owns .starciwork. FE and other sources share that Work via the
-    registry; do not create duplicate Work in the central registry or frontend.
-  - A combined repository may explicitly bind both be and fe to the same real repository root. Its
-    backend owner role still owns exactly one .starciwork; source packages do not become separate
-    StarCi workspaces. A split-repository binding remains separate and cannot duplicate Work.
-  - The same backend owns the one runtime ledger for both BE and FE workflow state, a runtime.sqlite under
-    the host's LOCALAPPDATA StarCi/projects/<ledger_id> directory, keyed by the backend's Work root
+  - The one app repository owns .starciwork at its root. Backend and frontend code live in the
+    declared side folders, and both share that Work.
+  - The app owns the one runtime ledger for both BE and FE workflow state, a runtime.sqlite under
+    the host's LOCALAPPDATA StarCi/projects/<ledger_id> directory, keyed by the app's Work root
     (engine/ledger-db.mjs ledgerFileFor, registered in the machine.sqlite ledgers table), never inside
     .starciwork. The
-    host registry is not project state; a host may also be a backend only when the selected binding
-    explicitly names it as that role.
+    host registry is not project state; the host is an app only when its binding explicitly names it.
   - Tasks launched outside the host must receive its absolute project skill path and selected
-    binding explicitly. Directory changes and AGENTS.md discovery in a frontend do not discover
+    binding explicitly. Directory changes and AGENTS.md discovery in an app do not discover
     instructions in a separate host automatically.
-  - Each backend project retains its own durable Work tree. .workspaces stores routing references,
+  - Each app project retains its own durable Work tree. .workspaces stores routing references,
     never business progress, evidence or workflow history.
   - If a binding or target is missing, inspect existing project route files and propose the exact
     mapping; never silently use an illustrative outputs workspace as project Work.
-  - Use the resolved backend Work root for schema validation, workflow goals, external local
+  - Use the resolved app Work root for schema validation, workflow goals, external local
     workflow records, evidence and completion.
-  - Validate the resolved backend/frontend pair against this routing contract before workflow
-    effects. A failed source binding never authorizes creating a second runtime, stack or
-    workspace in frontend.
-  - Before new workspace creation, inspect backend storage for `.work`/`.starci` names —
+  - Validate the app checkout and both side directories against this routing contract before workflow
+    effects. A failed source binding never authorizes creating another runtime, stack or Work tree.
+  - Before new workspace creation, inspect app storage for `.work`/`.starci` names —
     they mean the tree predates `.starciwork`, mixed names mean conflict. Coordinate the rename
     before new planning, never create a parallel tree; never relocate active records or rewrite
     approvals silently. Runtime state lives in the project's runtime.sqlite only, outside .starciwork.
 bindingShape:
-  schema: starci/workspace-binding@1
+  schema: starci/workspace-binding@2
   project: project identifier
-  repositories: role -> {pathFromSource, gitRepository}
-  optionalRoles:
-    grammar: "{pathFromSource, gitRepository, package?: @scope/grammar} - the repository that owns the installed
-      design grammar: the published package the frontend imports and the canon that names its units. It delivers
-      no side of the product, takes no Work node and owns no .starciwork; it exists so a reported grammar-gap has
-      a repository to be grown in. A binding that declares no grammar role is a product whose grammar this
-      workflow may not change: the gap becomes a question for the user, never a guessed repository root."
-  work: "{ownerRole: be, pathFromRepository: .starciwork}"
+  repository: "{pathFromSource, gitRepository} - the one app checkout and its declared remote"
+  sides: "{be: be, fe: fe} - side directories within the app checkout"
+  work: "{pathFromRepository: .starciwork} - Work at the app root"

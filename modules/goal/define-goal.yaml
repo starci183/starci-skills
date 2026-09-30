@@ -29,11 +29,11 @@ input:
   project: >-
     project mode: a name resolved through
     <source>/.workspaces/projects/<name>/work.json
-    (starci/workspace-binding@1), where <source> is the repository containing
-    this .claude, or STARCI_SOURCE_ROOT when set. Each repositories.<role>.pathFromSource resolves to a project
-    repository — all of them are cold-scanned by --plan — and work.ownerRole
-    names the repository that owns the project ledger: the goal persists to
-    <owner-repo>/.starciwork/runtime.sqlite, never to the host repo that holds
+    (starci/workspace-binding@2), where <source> is the repository containing
+    this .claude, or STARCI_SOURCE_ROOT when set. repository.pathFromSource resolves to one app
+    repository; its sides.be and sides.fe folders are cold-scanned by --plan.
+    The app owns the project ledger: the goal persists to
+    <app-repo>/.starciwork/runtime.sqlite, never to the host repo that holds
     .claude/.workspaces. Mutually exclusive with repo.
   title: optional short name; derived from the prompt when absent
   plan: >-
@@ -99,7 +99,7 @@ rules:
   - 'define-goal never dispatches — it only queues'
   - 'one prompt → one workflow; amendments → goals.revision+1 via goal.revise'
   - 'when the workflow finishes, the goal is finished (workflows.phase=finished, inbox consumed) — a completed goal leaves the queue forever'
-  - '--project and --repo are mutually exclusive; --project binds the ledger to work.ownerRole''s repository, not the host'
+  - '--project and --repo are mutually exclusive; --project binds the ledger to the app repository, not the host'
   - 'the flow is plan → owner ok → persist: --plan exits 0 having written nothing; only the ok re-run without --plan opens the ledger transaction'
   - 'revision preserves workflow_id and goal_identity, increments revision by exactly one, records explicit lineage, and never duplicates the workflow or kind=goal inbox row'
   - 'finished/archived workflows and revisions with open operation jobs are refused; checkpoint or settle the operations first'

@@ -12,7 +12,7 @@ import { priorAttemptFailures } from '../prior-failures.mjs';
 import { withLessons } from '../../supervisor/lessons-file.mjs';
 import { ownerAnswersOf } from '../owner-answers.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
-import { enqueueRepository, ownedPathPlacements, projectBinding } from '../target-repo.mjs';
+import { enqueueRepository, ownedPathPlacements, projectBinding, jobTargetRepository } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
 import { ensureOpWorktree, layoutOf as productLayoutOf, planIsolation, worktreePromptRules } from '../product-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
@@ -219,7 +219,7 @@ export default {
   const dispatchParams = resolveOpParams(briefDoc, {}).params;
   for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
   // Product worktrees (DESIGN §16.7, scripts/kernel/product-worktree.mjs): an op whose policy.isolation is `worktree` and
-  // whose owned paths land in ONE bound product repository (not the Work owner) runs in its OWN worktree
+  // whose owned paths land in the bound app repository runs in ONE app worktree
   // <repo>/.starciwork/worktrees/<wf>/<op> on op/<op>, off the workflow's integration branch wf/<wf>. Only a --spawn
   // makes it (reused by a requeued attempt; a continuation starts from its predecessor's archived commits).
   const productIsolation = (() => {
@@ -246,16 +246,19 @@ export default {
   } else if (productIsolation.isolate) {
     productWorktree = { ...productLayoutOf({ repoRoot: productIsolation.repoRoot, workflowId: job.workflow_id, jobId }), preview: true };
   }
-  const worktree = args.worktree ?? productWorktree?.op.path ?? repo;
+  const checkoutRoot = args.worktree ?? productWorktree?.op.path ?? repo;
+  const side = jobTargetRepository({ op, payload, binding: projectBinding(repo) });
+  const sideDir = side?.role === 'be' || side?.role === 'fe' ? path.join(checkoutRoot, side.role) : checkoutRoot;
+  const worktree = fs.existsSync(sideDir) && fs.statSync(sideDir).isDirectory() ? sideDir : checkoutRoot;
   // Orca lists terminals only under the worktrees it manages (the repository roots), so an op terminal created ON its
   // product worktree showed under no project (owner-visible, 2026-09-28): the command terminal is created on the product
   // repository's ROOT Orca worktree and its shell changes into the op worktree first (agent/lib.mjs cwdCommand), so it
   // shows under that project while the agent runs in its own tree.
-  const orcaWorktree = productWorktree ? productWorktree.repoRoot : worktree;
+  const orcaWorktree = productWorktree ? productWorktree.repoRoot : checkoutRoot;
   const workerCwd = (() => { const abs = path.resolve(repo, worktree); try { return fs.statSync(abs).isDirectory() ? abs : repo; } catch { return repo; } })();
   const placements = (() => {
     try {
-      return ownedPathPlacements({ op, payload, ownedPaths: ownedPathsOf(payload), repo, worktree: workerCwd, timeoutMs: allocationMs('settleGit.commandMs') });
+      return ownedPathPlacements({ op, payload, ownedPaths: ownedPathsOf(payload), repo, worktree: checkoutRoot, timeoutMs: allocationMs('settleGit.commandMs') });
     } catch { return []; }
   })();
   // The asks this job's retry lineage already had answered ride in the packet, so an owner-answer
@@ -300,7 +303,7 @@ export default {
   // The job scratch (a3-3 evidence contract): the op writes its report and attachments there and api report reads them
   // only from op_attempts.scratch_dir / STARCI_JOB_SCRATCH. Created fresh right before the launch.
   const scratchDir = repo ? jobScratchDirOf(repo, job.workflow_id, jobId) : null;
-  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir }) + worktreePromptRules(productWorktree);
+  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir }) + worktreePromptRules(productWorktree, workerCwd);
   const packetFile = repo ? packetFileOf(jobDirOf(repo, job.workflow_id, jobId), job.try_no) : null;
   // The names a person reads (owner request 2026-09-27, scripts/lib/display-names.mjs): the Task display
   // name, the managed worker's tab (terminal-rename after dispatch-show) and the command terminal's title

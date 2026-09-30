@@ -28,20 +28,21 @@ const write=(root,rel,text)=>{fs.mkdirSync(path.dirname(path.join(root,rel)),{re
 const brandYaml=(family,sources)=>['schema: work/brand@1','kind: brand','brand:','  identity:',`    family: ${family}`,'  sources:',
   ...sources.map(s=>`    - {${Object.entries(s).map(([k,v])=>`${k}: ${JSON.stringify(v)}`).join(', ')}}`),''].join('\n');
 
-// <source>/.workspaces/projects/p/work.json binds be (Work owner) and fe.
+// <source>/.workspaces/projects/p/work.json binds one app with be/ and fe/ sides.
 const product=(t,{family='starci',sources=[],grammarExports=null,captures=false}={})=>{
   const source=tmp(t);
-  const be=path.join(source,'app-backend');const fe=path.join(source,'app-fe');
+  const app=path.join(source,'app');const be=path.join(app,'be');const fe=path.join(app,'fe');
   fs.mkdirSync(be,{recursive:true});fs.mkdirSync(fe,{recursive:true});
-  write(source,'.workspaces/projects/p/work.json',JSON.stringify({schema:'starci/workspace-binding@1',project:'p',
-    repositories:{be:{pathFromSource:'app-backend'},fe:{pathFromSource:'app-fe'}},work:{ownerRole:'be',pathFromRepository:'.starciwork'}}));
-  write(be,'.starciwork/brand/index.yaml',brandYaml(family,sources));
+  write(source,'.workspaces/projects/p/work.json',JSON.stringify({schema:'starci/workspace-binding@2',project:'p',
+    repository:{pathFromSource:'app',gitRepository:'https://example.test/app.git'},
+    sides:{be:'be',fe:'fe'},work:{pathFromRepository:'.starciwork'}}));
+  write(app,'.starciwork/brand/index.yaml',brandYaml(family,sources));
   if(grammarExports){
     write(fe,'node_modules/@starci/grammar/package.json',JSON.stringify({name:'@starci/grammar',exports:grammarExports}));
     for(const target of Object.values(grammarExports))write(fe,path.join('node_modules/@starci/grammar',target),':root{}\n');
   }
-  if(captures)write(be,'.starciwork/_resources/grammar-captures/index.json','{}');
-  return {source,be,fe,binding:projectBinding(be,{sourceRoot:source})};
+  if(captures)write(app,'.starciwork/_resources/grammar-captures/index.json','{}');
+  return {source,app,be,fe,binding:projectBinding(app,{sourceRoot:source})};
 };
 
 test('interface.implement and interface.audit declare grammarContext: required',()=>{
@@ -55,12 +56,12 @@ test('interface.implement and interface.audit declare grammarContext: required',
 
 test('the family CSS resolves from brand.sources and the installed grammar family export; knowledge and captures ride along',t=>{
   const p=product(t,{family:'starci',captures:true,
-    sources:[{repository:'app-fe',path:'src/family.css',kind:'tokens'},{path:'src/app/globals.css',kind:'css'},
-      {path:'D:/legacy/globals.css',kind:'reference'},{repository:'app-fe',path:'src/Brand.tsx',kind:'component'}],
+    sources:[{repository:'fe',path:'src/family.css',kind:'tokens'},{path:'src/app/globals.css',kind:'css'},
+      {path:'D:/legacy/globals.css',kind:'reference'},{repository:'fe',path:'src/Brand.tsx',kind:'component'}],
     grammarExports:{'./core.css':'./dist/core/styles.css','./offset-pop.css':'./dist/offset-pop/styles.css'}});
   write(p.fe,'src/family.css',':root{}');
   write(p.fe,'src/app/globals.css',':root{}');
-  const g=resolveGrammarContext({skillRoot:ROOT,repo:p.be,binding:p.binding});
+  const g=resolveGrammarContext({skillRoot:ROOT,repo:p.app,binding:p.binding});
   assert.deepEqual(g.missing,[]);
   assert.equal(g.family,'starci');
   const css=g.sources.filter(s=>s.role==='family-css').map(s=>path.relative(p.fe,s.path).replace(/\\/g,'/'));
@@ -69,7 +70,7 @@ test('the family CSS resolves from brand.sources and the installed grammar famil
   assert.deepEqual(g.sources.filter(s=>s.role==='grammar-knowledge').map(s=>path.basename(s.path)),['family.yaml','DNA.yaml','playbook.yaml','idioms.yaml']);
   assert.deepEqual(g.sources.filter(s=>s.role==='ui-knowledge').map(s=>path.basename(s.path)),['presentation','composition','proof']);
   assert.ok(g.sources.find(s=>s.role==='ui-knowledge').files.every(f=>f.endsWith('.yaml')));
-  assert.equal(g.sources.find(s=>s.role==='grammar-captures').path,slash(path.join(p.be,'.starciwork/_resources/grammar-captures')));
+  assert.equal(g.sources.find(s=>s.role==='grammar-captures').path,slash(path.join(p.app,'.starciwork/_resources/grammar-captures')));
 
   const lines=renderGrammarContext(g).join('\n');
   assert.match(lines,/^grammar_context \(family starci\): read every source below before any action/);
@@ -78,14 +79,14 @@ test('the family CSS resolves from brand.sources and the installed grammar famil
 });
 
 test('a declared CSS source not on disk, or no brand record, is a missing source - never a silent omission',t=>{
-  const p=product(t,{family:'nivo',sources:[{repository:'app-fe',path:'packages/ui/nivo.css',kind:'tokens'}]});
-  const g=resolveGrammarContext({skillRoot:ROOT,repo:p.be,binding:p.binding});
+  const p=product(t,{family:'nivo',sources:[{repository:'fe',path:'packages/ui/nivo.css',kind:'tokens'}]});
+  const g=resolveGrammarContext({skillRoot:ROOT,repo:p.app,binding:p.binding});
   assert.equal(g.missing.length,1);
   assert.equal(g.missing[0].role,'family-css');
-  assert.equal(g.missing[0].path,'app-fe:packages/ui/nivo.css');
+  assert.equal(g.missing[0].path,'fe:packages/ui/nivo.css');
 
   const bare=product(t,{family:'nivo',sources:[]});
-  const none=resolveGrammarContext({skillRoot:ROOT,repo:bare.be,binding:bare.binding});
+  const none=resolveGrammarContext({skillRoot:ROOT,repo:bare.app,binding:bare.binding});
   assert.match(none.missing[0].detail,/declares no CSS in brand\.sources and no bound repository installs a @starci\/grammar CSS export for family nivo/);
 
   const empty=tmp(t);
