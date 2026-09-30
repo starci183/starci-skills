@@ -897,6 +897,18 @@ const releasedOf = (db, row, payload) => hasEvent(db, row.job_id, 'job-settle-re
   || payload?.workerReleased?.custody?.state === 'closed-verified' || payload?.managedWorker?.custody?.state === 'released'
   || (!row.worker_id && !payload?.orca?.agentTerminalHandle && !payload?.managed);
 
+/**
+ * A workflow's end as the ledger sees it: {ended, refused}. `refused` - archived: events_refuse_archived refuses every
+ * event of it, so a write would throw on every pass. `ended` - archived or finished: its jobs' worktrees are still
+ * removed and verified, but no job event is written for them (nothing reads it any more, and a refused write retried
+ * each pass is a hot loop).
+ */
+export function workflowEndOf(db, workflowId) {
+  const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(workflowId);
+  const refused = w?.phase === 'archived' || Boolean(w?.archived_at);
+  return { ended: refused || w?.phase === 'finished', refused };
+}
+
 /** Where a job's worktree salvage goes: the ledger repo's durable evidence dir of the job. */
 export const salvageDirOf = (ledgerRepo, workflowId, jobId) => path.join(ledgerRepo, '.starciwork', 'evidence', workflowId, jobId);
 
@@ -913,10 +925,16 @@ export function reapJobWorktree({ ledger, ledgerRepo, jobId, now = Date.now(), f
   if (!record || (record.jobId && record.jobId !== jobId)) return { jobId, skipped: 'not-isolated' };
   if (!SETTLED.includes(row.status)) return { jobId, skipped: `job-${row.status}` };
   if (hasEvent(db, jobId, EVENTS.removed)) return { jobId, skipped: 'already-removed' };
+  const { ended } = workflowEndOf(db, row.workflow_id);
+  // An ended workflow's job records no event, so "done" is the disk: folder, registration and branch all gone.
+  if (ended && !fs.existsSync(record.op.path) && !registeredAt(record.repoRoot, record.op.path) && !revParse(record.repoRoot, `refs/heads/${record.op.branch}`))
+    return { jobId, skipped: 'workflow-ended' };
   const released = releasedOf(db, row, payload);
   const settledAgo = now - Number(row.updated_at ?? now);
   if (!released && !force && settledAgo < settings.worktrees.opRemoveSlaMs) return { jobId, skipped: 'awaiting-release' };
   const r = removeOpWorktree({ record, salvageTo: salvageDirOf(ledgerRepo, row.workflow_id, jobId), settings });
+  if (ended) return r.ok ? { jobId, removed: true, workflowEnded: true, branch: r.branch, verified: r.verified, settledAgoMs: settledAgo }
+    : { jobId, removed: false, workflowEnded: true, reason: r.reason, errors: r.errors ?? null };
   const ev = (kind, p) => ledger.transaction(() => ledger.appendEvent({ workflowId: row.workflow_id, entityType: 'job', entityId: jobId, kind, payload: p }));
   if (!r.ok) {
     const prior = db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(jobId, EVENTS.removeFailed);
@@ -949,8 +967,10 @@ export function isolatedJobs(db, { statuses = null, workflowId = null } = {}) {
 export function productWorktreeDuty({ ledger, ledgerRepo, now = Date.now(), settings = productSettings(), sync = true } = {}) {
   const db = ledger.db;
   const out = { reaped: [], workflows: [], synced: [], leftovers: [], errors: [] };
-  for (const { row } of isolatedJobs(db, { statuses: SETTLED })) {
+  for (const { row, record } of isolatedJobs(db, { statuses: SETTLED })) {
     if (hasEvent(db, row.job_id, EVENTS.removed)) continue;
+    // An ended workflow's job writes no event: its folder gone is its done mark (no git call per pass for history).
+    if (!fs.existsSync(record.op.path) && workflowEndOf(db, row.workflow_id).ended) continue;
     try { const r = reapJobWorktree({ ledger, ledgerRepo, jobId: row.job_id, now, settings }); if (!r.skipped) out.reaped.push(r); }
     catch (error) { out.errors.push({ jobId: row.job_id, error: String(error?.message ?? error).slice(0, 300) }); }
   }
@@ -970,7 +990,7 @@ export function productWorktreeDuty({ ledger, ledgerRepo, now = Date.now(), sett
         if (db.prepare('SELECT 1 FROM events WHERE entity_id=? AND kind=? AND json_extract(payload_json,\'$.repoRoot\')=? LIMIT 1').get(w.workflowId, EVENTS.wfRemoved, w.repoRoot)) continue;
         const abandoned = Boolean(db.prepare("SELECT 1 FROM events WHERE entity_id=? AND kind='workflow-branch-abandoned' LIMIT 1").get(w.workflowId));
         const r = removeWorkflowWorktree({ repoRoot: w.repoRoot, workflowId: w.workflowId, abandoned, salvageTo: salvageDirOf(ledgerRepo, w.workflowId, '_workflow'), settings });
-        if (r.ok) ledger.transaction(() => ledger.appendEvent({ workflowId: w.workflowId, entityType: 'workflow', entityId: w.workflowId, kind: EVENTS.wfRemoved,
+        if (r.ok && !workflowEndOf(db, w.workflowId).refused) ledger.transaction(() => ledger.appendEvent({ workflowId: w.workflowId, entityType: 'workflow', entityId: w.workflowId, kind: EVENTS.wfRemoved,
           payload: { repoRoot: w.repoRoot, path: lay.workflow.path, branch: r.branch, verified: r.verified, landed: r.landed, abandoned } }));
         out.workflows.push({ workflowId: w.workflowId, repoRoot: w.repoRoot, removed: r.ok, reason: r.reason ?? null });
       } else if (!done && sync && revParse(w.repoRoot, `refs/heads/${lay.workflow.branch}`)) {
@@ -1022,11 +1042,12 @@ export function sweepLeftovers({ ledger, ledgerRepo, repoRoot, now = Date.now(),
       const record = jobWorktreeOf(parse(row.payload_json) ?? {});
       if (!record) continue;
       const r = removeOpWorktree({ record, salvageTo: salvageDirOf(ledgerRepo, row.workflow_id, jobId), settings });
+      out.push({ path: dir, jobId, removed: r.ok, reason: r.reason ?? null });
+      if (workflowEndOf(db, row.workflow_id).ended) continue; // no event for an ended workflow (reapJobWorktree)
       ledger.transaction(() => ledger.appendEvent({ workflowId: row.workflow_id, entityType: 'job', entityId: jobId, kind: EVENTS.leftover,
         payload: { bug: true, path: dir, status: row.status, settledAgoMs: now - Number(row.updated_at ?? now), removed: r.ok, reason: r.reason ?? null } }));
       if (r.ok && !hasEvent(db, jobId, EVENTS.removed)) ledger.transaction(() => ledger.appendEvent({ workflowId: row.workflow_id, entityType: 'job', entityId: jobId, kind: EVENTS.removed,
         payload: { from: 'leftover', to: 'worktree-removed', path: dir, branch: r.branch, verified: r.verified } }));
-      out.push({ path: dir, jobId, removed: r.ok, reason: r.reason ?? null });
     }
     removeDirIfEmpty(wfDir);
   }

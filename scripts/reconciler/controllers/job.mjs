@@ -149,9 +149,13 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
     worktree: payload.productWorktree?.op?.path ? (() => {
       const event = db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(PRODUCT_EVENTS.worktreeRemoved, jobId) != null;
       const gone = !fs.existsSync(payload.productWorktree.op.path);
+      const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(row.workflow_id);
+      const ended = w?.phase === 'finished' || w?.phase === 'archived' || Boolean(w?.archived_at);
       // Removed when the event exists OR the folder is gone (a failed first removal may have finished later); a
-      // gone folder with no event still gets the reap, which writes the missing job-worktree-removed.
-      return { path: payload.productWorktree.op.path, removed: event || gone, eventMissing: !event };
+      // gone folder with no event still gets the reap, which writes the missing job-worktree-removed - unless the
+      // workflow has ended: its reap removes the folder but writes no event (an archived ledger refuses it), so the
+      // folder gone is the end of the duty.
+      return { path: payload.productWorktree.op.path, removed: event || gone, eventMissing: !event && !(ended && gone), workflowEnded: ended };
     })() : null,
     dispatchedAt: lastEventAt('op-dispatched'), questionAt: lastEventAt('worker-question-bridged'), now, windowMs: settings.settledWindowMs,
   };
@@ -325,6 +329,18 @@ async function keepClocks(ctx, ledgerId, jobId, clocks) {
   for (const state of CLOCK_CODES) if (!on.has(state)) ctx.clear(entity, state);
 }
 
+/**
+ * A run refused because the job's workflow is archived (events_refuse_archived): terminal, never transient - retrying
+ * it only repeats the refusal. Per engine process, per key and step; a new pass with other facts plans afresh.
+ */
+const ARCHIVED_REFUSAL = /workflow-archived: no further writes/;
+const terminalRuns = new Map(); // jobKey -> step kind whose run was refused as workflow-archived
+export const isArchivedRefusal = (r) => ARCHIVED_REFUSAL.test(`${r?.error ?? ''}
+${r?.stderr ?? ''}
+${r?.stdout ?? ''}
+${JSON.stringify(r?.value ?? null)}`);
+export const _terminalRuns = terminalRuns;
+
 async function reconcileJob(ctx, ledgerId, jobId, settings) {
   const f = ctx.read(ledgerId, (db) => jobFacts(db, jobId, { now: ctx.now(), settings }));
   if (!f) { for (const state of CLOCK_CODES) ctx.clear(jobKey(ledgerId, jobId), state); return { ok: true, action: 'gone' }; }
@@ -335,6 +351,18 @@ async function reconcileJob(ctx, ledgerId, jobId, settings) {
   const s = plan.step;
   if (!s) return { ok: true, action: 'idle', clocks: plan.clocks.map((c) => c.state) };
   if (!may(ctx, s.concern)) return { ok: true, action: 'not-owned', step: s.kind };
+  const key = jobKey(ledgerId, jobId);
+  if (terminalRuns.get(key) === s.kind) return { ok: true, action: 'terminal', step: s.kind, why: 'workflow-archived' };
+  const r = await actJob(ctx, ledgerId, jobId, f, s, settings);
+  if (r && r.ok === false && isArchivedRefusal(r)) {
+    terminalRuns.set(key, s.kind);
+    ctx.log('reconciler.event', `job ${key} ${s.kind}: workflow-archived refused the write; terminal, not retried`, { kind: 'reconciler.terminal-refusal', key, step: s.kind });
+    return { ...r, ok: true, action: s.kind, terminal: 'workflow-archived' };
+  }
+  return r;
+}
+
+async function actJob(ctx, ledgerId, jobId, f, s, settings) {
   const repo = ledgerOf(ctx, ledgerId)?.repo;
   switch (s.kind) {
     case 'dead-worker': case 'release-worker': case 'effect-unknown':
