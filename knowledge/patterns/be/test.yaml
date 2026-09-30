@@ -596,3 +596,47 @@ rules:
         - BE_SOURCE_FORM
       manual: []
     relatedExamples: []
+  - id: BE-TEST-16
+    title: Test data builders
+    kind: mandatory
+    hfsRules: [R48, R89]
+    requirement: |-
+      Test data is arranged by builders. A builder lives in `src/tests/fixtures/builders/<area>.builder.ts` (slot
+      `be.tests.fixtures.builders`), one file per area, shared by every spec of that area. The file name is exactly `<area>.builder.ts`;
+      a `*.repository.ts`, `*.fixture.ts` or `*.factory.ts` file is a finding anywhere, and a `*.builder.ts` outside that folder is a
+      finding. Two kinds exist. (a) Pure object builders, for example `commissionRow(overrides)` and `accrueInput(overrides)`: they
+      return typed objects with valid defaults, the spec overrides only what matters, and unit specs use them as inputs and as
+      `mockEntityManager` results. (b) Persisting builders, for example `orderBuilder(world.db.primary).pending().build(overrides)`: they
+      insert real rows through the entity classes, create their own parent chain, and integration and e2e specs use them to arrange
+      state. Rules: (a) no spec hand-builds a long row chain or writes a raw INSERT/UPDATE/DELETE or a direct `save`, `insert`,
+      `upsert`, `update`, `delete` or `remove` on an EntityManager, DataSource or QueryRunner (reading stays allowed, since a spec
+      asserts persisted state); rows go through builders. (b) Builders run with database constraints ON: no FK disabling, no
+      `session_replication_role`, no `DISABLE TRIGGER`, no deferred or dropped constraints. (c) Builders arrange data only and never
+      assert: no `expect`, no jest globals. (d) Defaults are deterministic: fixed ids or `fakeIds`, fixed dates, no `Date.now()`,
+      no argument-less `new Date()`, no `Math.random()`, `randomUUID()` or `crypto.random*`, unless seeded. (e) Raw SQL inside a builder is
+      allowed only when the area has no entity classes, and it goes in `<area>.sql.ts` beside the builder once canon-be 2.0.0 permits it.
+    rationale: |-
+      A row chain written by hand in each spec drifts from the schema and hides which value the test depends on. One builder per area
+      gives every spec the same valid defaults, a builder that fails when the entity changes, and specs that name only the field that
+      matters. Constraints stay on so an invalid arrangement fails at the builder instead of passing on an impossible database.
+    cases:
+      - id: case-1
+        when: A unit spec needs an input and a stored row
+        write: 'em = mockEntityManager({ findOne: [Commission, commissionRow({ status: "accrued" })] }); await service.accrue(accrueInput({ paid: 1000 }))'
+      - id: case-2
+        when: An e2e or integration spec needs an order in a state
+        write: 'const order = await orderBuilder(world.db.primary).pending().build({ total: 500 })'
+      - id: case-3
+        when: A builder needs a timestamp or an id
+        write: 'const CREATED_AT = new Date("2026-01-01T00:00:00.000Z"); ids from constants or fakeIds(), never Date.now() or randomUUID()'
+      - id: case-4
+        when: A spec needs a row inserted
+        write: 'never `await world.db.primary.query("INSERT INTO orders ...")` or `em.save(Order, ...)` in the spec; extend the area builder'
+    verification:
+      automated:
+        - BE_SOURCE_FORM
+        - spec-no-raw-insert
+        - builder-arranges-only
+      manual:
+        - Confirm a persisting builder creates its parent chain through entity classes and that no unit spec builds a long object literal by hand where a builder exists.
+    relatedExamples: []

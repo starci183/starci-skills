@@ -140,6 +140,19 @@ test('BE_SOURCE_FORM: a back-end source name outside the closed suffix vocabular
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(FE, (repo) => put(repo, 'apps/web/src/modules/api/helpers.ts')) }), 'BE_SOURCE_FORM'), [], 'a front-end repository is not judged by the back-end suffix list');
 });
 
+test('BE_SOURCE_FORM: a test data builder is <area>.builder.ts under src/tests/fixtures/builders/ only; .fixture, .factory and .repository are banned', () => {
+  const dir = repoOf(BE, (repo) => {
+    put(repo, 'src/tests/fixtures/builders/order.builder.ts');
+    for (const bad of ['order.builder.ts', 'order.fixture.ts', 'order.factory.ts', 'order.repository.ts']) put(repo, `src/tests/fixtures/${bad}`);
+    put(repo, 'src/tests/fixtures/builders/order.fixture.ts');
+    put(repo, 'src/features/orders/application/order.builder.ts');
+  });
+  const refused = only(checkRepo({ repoRoot: dir }), 'BE_SOURCE_FORM').map((f) => f.path).sort();
+  assert.ok(!refused.includes('src/tests/fixtures/builders/order.builder.ts'));
+  for (const bad of ['src/tests/fixtures/order.builder.ts', 'src/tests/fixtures/order.fixture.ts', 'src/tests/fixtures/order.factory.ts', 'src/tests/fixtures/order.repository.ts', 'src/features/orders/application/order.builder.ts']) assert.ok(refused.includes(bad), bad);
+  assert.deepEqual(only(checkRepo({ repoRoot: repoOf(BE, (repo) => put(repo, 'src/tests/fixtures/builders/order.builder.ts')) }), 'BE_SOURCE_FORM'), []);
+});
+
 test('an opt-in slot the repository did not declare is HFS_SLOT_NOT_ENABLED, and declaring it clears the finding', () => {
   const mutate = (dir) => put(dir, 'docs/adr/0001-record.md', '# ADR\n');
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(BE, mutate) }), 'HFS_SLOT_NOT_ENABLED').map((f) => f.slot), ['repo.docs']);

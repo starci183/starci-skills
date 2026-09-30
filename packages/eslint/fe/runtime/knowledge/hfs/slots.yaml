@@ -146,8 +146,8 @@ ruleParams:
     # R89 BE_SOURCE_FORM: the closed role-suffix vocabulary of a source file name (<kebab-name>.<suffix>.ts; BE-CONVENTION 1.15)
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
-    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup]
-    bannedSuffixes: [use-case, repository, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
+    suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
     fileLines: {soft: 500, hardGrowth: true}
@@ -763,7 +763,20 @@ slots:
     tracked: tracked
     tier: fixtures
     tests: none
-    why: data builders and payload fixtures with a role suffix (the doubles come from @starci/jest-preset, not from here); importable by unit specs, integration and e2e; never imports a feature
+    why: payload fixtures with a role suffix (the doubles come from @starci/jest-preset, not from here); the test data builders live in its builders/ slot; importable by unit specs, integration and e2e; never imports a feature
+  - id: be.tests.fixtures.builders
+    profiles: [be]
+    path: "src/tests/fixtures/builders/*.builder.ts"
+    presence: optional
+    tracked: tracked
+    tier: fixtures
+    tests: none
+    why: >-
+      the ONLY home of test data builders, one <area>.builder.ts per area, shared by every spec of that area: pure object builders
+      (commissionRow(overrides), accrueInput(overrides)) for unit specs and persisting builders (orderBuilder(world.db.primary).pending().build(overrides))
+      for integration and e2e; arrange only, constraints on, deterministic defaults. A .builder.ts anywhere else, and a *.repository.ts,
+      *.fixture.ts or *.factory.ts anywhere, is a BE_SOURCE_FORM finding
+    rules: [BE_SOURCE_FORM]
   - id: be.tests.integration
     profiles: [be]
     path: "src/tests/integration/<capability>/*.integration-spec.ts"

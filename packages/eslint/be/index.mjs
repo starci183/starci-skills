@@ -19,6 +19,7 @@
 import { buildBeConfig } from "./lib/config.mjs"
 import { recommended as asyncDisciplineRecommended, rules as asyncDisciplineRules } from "./async-discipline.mjs"
 import { recommended as authorizationRecommended, rules as authorizationRules } from "./authorization.mjs"
+import { recommended as buildersRecommended, rules as buildersRules } from "./builders.mjs"
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
 import { recommended as configOwnerRecommended, rules as configOwnerRules } from "./config-owner.mjs"
 import { recommended as connectionsRecommended, rules as connectionsRules } from "./connections.mjs"
@@ -54,6 +55,7 @@ import { recommended as userCopyRecommended, rules as userCopyRules } from "./us
 const CONTRIBUTIONS = [
     { law: "async-discipline", rules: asyncDisciplineRules, recommended: asyncDisciplineRecommended },
     { law: "authorization", rules: authorizationRules, recommended: authorizationRecommended },
+    { law: "builders", rules: buildersRules, recommended: buildersRecommended },
     { law: "comments", rules: commentsRules, recommended: commentsRecommended },
     { law: "config-owner", rules: configOwnerRules, recommended: configOwnerRecommended },
     { law: "connections", rules: connectionsRules, recommended: connectionsRecommended },

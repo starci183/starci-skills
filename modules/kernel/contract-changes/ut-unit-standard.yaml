@@ -17,6 +17,11 @@ summary: >-
   rules and the Codecov/Sonar coverage-denominator rule are gone); the R47, R48, R87 and R88 law text and README rows state
   the standard; BE-CONVENTION 1.5, 1.6 and 1.16 are rewritten. Retires the failure code NEST_TEST_SUBJECT_FORM (the older code-pattern checker accepted or required direct construction of a Nest subject in a spec, contradicting the standard) with its checker branch, tests and catalogue entries; NEST_TEST_NAME_FORM stays, now limited to `*.service.spec.ts` and judging only title form (outer suite, action-verb titles, callback layout); docs/nest-test-code-check.md is rewritten to that. Adds no failure code; the enforcers of the standard are
   added by the rule and machine-check sub-lanes of lane UT.
+  Test data builders (owner-locked addendum, BE-TEST-16): builders live in `src/tests/fixtures/builders/<area>.builder.ts` (new slot
+  `be.tests.fixtures.builders`; `builder` joins `ruleParams.be.suffixes` and is bound to that slot, `fixture` and `factory` join
+  `bannedSuffixes`, all read by BE_SOURCE_FORM). The eslint-be rules `spec-no-raw-insert` (no raw INSERT/UPDATE/DELETE or direct write on a
+  typeorm EntityManager, DataSource or QueryRunner in a service, integration or e2e spec) and `builder-arranges-only` (no assertion, no
+  non-deterministic default, no constraint switched off) are catalogued under R48. Adds no failure code.
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/ut-unit-standard.yaml

@@ -151,6 +151,13 @@ const PLAIN_ENTRY = /^<[a-z][a-z0-9-]*>.ts$/;
  */
 function sourceFormFindings({ files, resolver }) {
   const { suffixes, bannedSuffixes } = resolver.ruleParams();
+  // A suffix a slot names in its own file pattern (`*.builder.ts` of be.tests.fixtures.builders) is that slot's role: a file with it
+  // anywhere else is refused, so a builder cannot live beside a service or in the fixtures root.
+  const boundSuffixes = new Map();
+  for (const slot of resolver.slots()) {
+    const bound = /\*\.([a-z0-9-]+)\.ts$/.exec(slot.path ?? '')?.[1];
+    if (bound && suffixes.includes(bound)) boundSuffixes.set(bound, slot);
+  }
   const findings = [];
   for (const file of files) {
     if (!file.endsWith('.ts') || !SOURCE_ROOT.test(file)) continue;
@@ -169,6 +176,8 @@ function sourceFormFindings({ files, resolver }) {
     const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));
     if (banned) {
       findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})` });
+    } else if (boundSuffixes.has(parts.at(-1)) && parts.length >= 2 && boundSuffixes.get(parts.at(-1)).id !== c.slot) {
+      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: parts.at(-1), message: `${file}: the suffix .${parts.at(-1)}.ts belongs to ${boundSuffixes.get(parts.at(-1)).path} only; move the file there` });
     } else if (parts.length < 2 || !parts.every((part) => KEBAB.test(part)) || !suffixes.includes(parts.at(-1))) {
       findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, message: `${file}: the name must be <kebab-name>.<suffix>.ts with a suffix from the closed list (${suffixes.join(', ')}), or index.ts, main.ts or a migration` });
     }
