@@ -5,7 +5,7 @@ summary: >-
   rules, all errors, registered in knowledge/hfs/rules.yaml under the catalogue rule each enforces with 16 new
   Vietnamese failure codes (FE_TYPE_ESCAPE, FE_LIST_KEY, FE_EFFECT_CLEANUP, FE_EFFECT_FETCH, FE_SWALLOWED_ERROR,
   FE_CONSOLE_CALL, FE_PAGE_METADATA_MISSING, FE_SUSPENSE_NULL_FALLBACK, FE_I18N_NAVIGATION, FE_I18N_FORMATTER,
-  FE_ROUTE_HARDCODED, FE_CLIENT_SERVER_IMPORT, FE_STORAGE_OUTSIDE_MODULES, FE_DANGEROUS_HTML, FE_NATIVE_IMAGE,
+  FE_ROUTE_HARDCODED, FE_CLIENT_SERVER_IMPORT, FE_SERVER_ONLY_MARK, FE_STORAGE_OUTSIDE_MODULES, FE_DANGEROUS_HTML, FE_NATIVE_IMAGE,
   FE_OUTCOME_KIND_UNHANDLED). No catalogue rule is added and none renumbered. @starci/stylelint-canon 1.1.0 lets
   brand-layer-shape accept the grammar family root selector as the light, dark and system scopes of brand.css. The
   architecture machine declares HFS_HOOKS_PATH_REDIRECTED (rule R13): a clone whose repository-local core.hooksPath is

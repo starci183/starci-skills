@@ -608,10 +608,11 @@ rules:
     law: "Server first; `\"use client\"` only where allowed."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["FE_CLIENT_BOUNDARY", "FE_CLIENT_SERVER_IMPORT", "FE_CLIENT_REACHES_SERVER", "FE_STORAGE_OUTSIDE_MODULES", "FE_DANGEROUS_HTML"]
+    failureCodes: ["FE_CLIENT_BOUNDARY", "FE_CLIENT_SERVER_IMPORT", "FE_CLIENT_REACHES_SERVER", "FE_SERVER_ONLY_MARK", "FE_STORAGE_OUTSIDE_MODULES", "FE_DANGEROUS_HTML"]
     enforcers:
       - {kind: eslint-fe, id: use-client-only-at-boundary}
       - {kind: eslint-fe, id: client-no-server-import}
+      - {kind: eslint-fe, id: server-module-marks-server-only}
       - {kind: eslint-fe, id: web-storage-only-in-modules}
       - {kind: eslint-fe, id: no-dangerous-html}
       - {kind: machine, id: client-reaches-server, at: scripts/checks/architecture/client-reaches-server.mjs}
@@ -731,7 +732,7 @@ rules:
   - id: R65
     code: "FE_SIZE_AND_STATE_BUDGET"
     title_vi: "Vượt ngân sách hook và state"
-    law: "Hook and state budgets; no hand-written poll loop; keyed lists; timers cleared; no swallowed error or console."
+    law: "Hook and state budgets; no hand-written poll loop; keyed lists; everything an effect starts is released by its cleanup; no swallowed error or console."
     kinds: [lint, design]
     gates: [settle, land, ci]
     failureCodes: ["FE_SIZE_AND_STATE_BUDGET", "FE_LIST_KEY", "FE_EFFECT_CLEANUP", "FE_SWALLOWED_ERROR", "FE_CONSOLE_CALL"]
@@ -742,7 +743,7 @@ rules:
       - {kind: eslint-fe, id: list-item-has-key}
       - {kind: eslint-fe, id: no-index-key}
       - {kind: eslint-fe, id: no-inline-literal-prop-in-list}
-      - {kind: eslint-fe, id: timer-needs-effect-cleanup}
+      - {kind: eslint-fe, id: effect-subscription-needs-cleanup}
       - {kind: eslint-fe, id: no-empty-catch}
       - {kind: eslint-fe, id: no-console}
   - id: R66

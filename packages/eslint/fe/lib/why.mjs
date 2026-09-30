@@ -221,15 +221,15 @@ export const why = {
     vi: "Component trong `.map` ở `<file>` nhận object hoặc array literal làm prop: mỗi hàng mỗi lần render một giá trị mới, memo không bao giờ trúng.",
     fixVi: "Nâng hằng số ra ngoài component hoặc dựng một lần trước `.map`.",
   },
-  "timer-needs-effect-cleanup": {
+  "effect-subscription-needs-cleanup": {
     code: "FE_EFFECT_CLEANUP",
-    vi: "`<timer>` ở `<file>` chạy ngoài effect hoặc trong effect không có cleanup gọi `clearTimeout`/`clearInterval`.",
-    fixVi: "Đặt timer trong `useEffect` và trả `() => clearTimeout(id)`; hoặc chuyển vào một hook làm việc đó.",
+    vi: "`<what>` ở `<file>` (timer, frame, listener, observer, socket hoặc subscription) được effect hoặc `subscribe` khởi động nhưng cleanup trả về không giải phóng đúng handle/target/listener đó.",
+    fixVi: "Giữ handle và trả cleanup gọi `clearTimeout(id)`, `cancelAnimationFrame(id)`, `removeEventListener` cùng type và listener, `.disconnect()`, `.close()` hoặc `.unsubscribe()` trên đúng đối tượng.",
   },
   "no-data-fetch-in-effect": {
     code: "FE_EFFECT_FETCH",
-    vi: "`useEffect` ở `<file>` tải dữ liệu (`await`, `fetch`, `.then`): không cache, không gộp request, không trạng thái loading/lỗi, không huỷ.",
-    fixVi: "Đọc phía client bằng SWR gọi client của app (`hooks/`), phía route bằng server reader `modules/api/<domain>/read-*.ts`.",
+    vi: "`useEffect` ở `<file>` khởi động một promise (`await`, `fetch`, `.then`, `void load()`, `mutate()`/`refresh()` gọi thẳng): không cache, không gộp request, không trạng thái loading/lỗi, không huỷ. Độ tươi của dữ liệu đến từ key của SWR, không đến từ effect.",
+    fixVi: "Đọc phía client bằng SWR gọi client của app (`hooks/`) với key theo thứ thay đổi; gọi `mutate()` từ sự kiện làm dữ liệu đổi (handler, message socket); phía route dùng server reader `modules/api/<domain>/read-*.ts`.",
   },
   "no-empty-catch": {
     code: "FE_SWALLOWED_ERROR",
@@ -275,6 +275,11 @@ export const why = {
     code: "FE_CLIENT_SERVER_IMPORT",
     vi: "Client component ở `<file>` nhập mã chỉ tồn tại ở server (`server-only`, `next/headers`, module Node, server reader).",
     fixVi: "Đọc dữ liệu ở server component hoặc server reader rồi truyền xuống bằng props; hoặc dùng SWR gọi client của app.",
+  },
+  "server-module-marks-server-only": {
+    code: "FE_SERVER_ONLY_MARK",
+    vi: "Module `<file>` nhập API chỉ có ở server (`next/headers`, `next/server`, `next-intl/server`, module Node hoặc module đã là server-only) nhưng không mở đầu bằng `import \"server-only\"`.",
+    fixVi: "Đặt `import \"server-only\"` làm câu lệnh đầu tiên của tệp; tệp route (`page`, `layout`, `route`, `proxy`) là server component sẵn nên không cần.",
   },
   "web-storage-only-in-modules": {
     code: "FE_STORAGE_OUTSIDE_MODULES",

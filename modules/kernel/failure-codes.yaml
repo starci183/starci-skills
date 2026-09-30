@@ -12685,6 +12685,16 @@ FE_CLIENT_SERVER_IMPORT:
   owner: op-retry
   kind: check-finding
 
+FE_SERVER_ONLY_MARK:
+  title: "A module that uses the server starts with import server-only"
+  title_vi: "Module dùng API server không có dấu server-only"
+  meaning_vi: "Module `<file>` nhập `<what>` (`next/headers`, `next/server`, `next-intl/server`, module Node hoặc một module đã là server-only) nhưng không mở đầu bằng `import \"server-only\"`, nên không gì chặn client component nhập nó trực tiếp hoặc qua hook."
+  causes_vi:
+    - "Vi phạm luật R55: Module dùng API chỉ có ở server mở đầu bằng `import \"server-only\"` (tệp route `page`/`layout`/`route`/`proxy` là server component sẵn, không cần)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
 FE_STORAGE_OUTSIDE_MODULES:
   title: "Web storage only inside modules"
   title_vi: "Dùng localStorage/sessionStorage ngoài modules/"
@@ -12756,11 +12766,11 @@ FE_LIST_KEY:
   kind: check-finding
 
 FE_EFFECT_CLEANUP:
-  title: "Timers live in an effect that clears them"
-  title_vi: "Timer không được dọn"
-  meaning_vi: "`<timer>` ở `<file>` chạy ngoài effect hoặc trong effect không trả hàm dọn `clearTimeout`/`clearInterval`, nên nó nổ sau khi component đã gỡ và set state vào chỗ không còn."
+  title: "What an effect starts, its cleanup releases"
+  title_vi: "Effect khởi động thứ không được dọn"
+  meaning_vi: "`<what>` ở `<file>` (timer, frame, listener, observer, socket hoặc subscription) do effect hoặc `subscribe` khởi động, nhưng cleanup trả về không giải phóng đúng handle, target và listener đó; nó chạy tiếp sau khi component đã gỡ và set state vào chỗ không còn."
   causes_vi:
-    - "Vi phạm luật R65: `setTimeout`/`setInterval` nằm trong `useEffect` hoặc hook, và cleanup gọi `clearTimeout`/`clearInterval`."
+    - "Vi phạm luật R65: mọi thứ effect hoặc `subscribe` khởi động được cleanup trả về giải phóng cùng handle, target và listener (`clearTimeout(id)`, `cancelAnimationFrame(id)`, `removeEventListener` cùng type và listener, `.disconnect()`, `.close()`, `.unsubscribe()`)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
   owner: op-retry
   kind: check-finding

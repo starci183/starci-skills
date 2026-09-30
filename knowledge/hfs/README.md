@@ -559,7 +559,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R62 | `FE_NATIVE_FORM_CONTROL` | No raw form controls, native images or raw structural tags in product tiers; the grammar renders them. |
 | R63 | `FE_PACKAGE_SHAPE` | Packages build to `dist` with explicit exports and no dead unit. |
 | R64 | `FE_APP_ISOLATION` | Apps never import apps; ui-screen declares `app`. |
-| R65 | `FE_SIZE_AND_STATE_BUDGET` | Hook and state budgets; no hand-written poll loop; keyed lists; timers cleared; no swallowed error or console. |
+| R65 | `FE_SIZE_AND_STATE_BUDGET` | Hook and state budgets; no hand-written poll loop; keyed lists; everything an effect starts is released by its cleanup; no swallowed error or console. |
 | R66 | `FE_E2E_SHAPE` | Playwright shape, three viewports, no environment coupling. |
 | R67 | `FE_SPEC_QUALITY` | No class pinning, no barrel specs, axe per connected screen. |
 | R91 | `FE_SOURCE_FORM` | Front-end files sit in their tier folder with the fixed names, export arrow functions named after the folder, carry English JSDoc and no emoji. |
