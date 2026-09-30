@@ -1,0 +1,25 @@
+id: hfs-app-monorepo
+effectiveAt: '2026-10-01T23:59:00+07:00'
+summary: >-
+  hfs 4.0.0 (manifest major 2), eslint-canon-be 3.0.0, eslint-canon-fe 8.0.0: a product is ONE app repository. The app root holds
+  the one package.json (every dependency and script of both sides; npm workspaces only for fe/packages/*), the one lockfile and
+  node_modules, hfs.json of kind app ({ hfs: 2, kind: app, project, sides: { be: { apps, optionalSlots, connections }, fe: { apps,
+  optionalSlots, reads: [be/contracts/] } } }), README, CI, .husky, scripts/ and .starciwork (slots of profile app, ids app.*).
+  be/ and fe/ hold what the old standalone repository roots held except package.json and the lockfile, and every check, eslint
+  rule and machine check judges a side with its folder as the root (the side view of scripts/lib/hfs-slots.mjs); nothing crosses
+  sides except the declared reads. `hfs lint`, `hfs check` and `hfs sync` run at the app root with app-relative finding paths;
+  `hfs scaffold app <name>` replaces `hfs init`. The standalone be and fe repository kinds (profile, stacks), the front-end
+  contract copy and its hash comparison are deleted with no alias; a pre-4 hfs.json is refused (HFS_DECLARATION_INVALID /
+  HFS_MANIFEST_MAJOR_MISMATCH). The failure code HFS_SYNC_SKELETON_MISSING (`hfs sync --init`) is retired. One version per
+  dependency: a conflict between the sides takes its canon pin, otherwise the higher (graphql 16.14.2 pinned).
+reach: new-legs
+paths:
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/canon-pins.yaml
+  - modules/schemas/hfs-repo.schema.yaml
+  - modules/schemas/hfs-slots.schema.yaml
+  - modules/schemas/hfs-rules.schema.yaml
+  - modules/schemas/canon-pins.schema.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/contract-changes/hfs-app-monorepo.yaml

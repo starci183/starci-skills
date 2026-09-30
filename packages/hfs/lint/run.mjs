@@ -102,7 +102,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     const linted = runLinter({ cwd: path.join(repoRoot, side), pkg: 'eslint', bin: 'eslint', args: ['--format', 'json', ...(opts.fix ? ['--fix'] : []), ...(changed ? sources : ['.'])] });
     if (linted.error) errors.push(linted.error);
     else { raw.eslint.push(...linted.results); findings.push(...eslintFindings(linted.results, repoRoot)); }
-    engines.eslint.sides[side] = { files: changed ? sources.length : null };
+    engines.eslint.sides[side] = { files: linted.results?.length ?? 0 };
   }
 
   // 3. stylelint over the fe side's stylesheets.
@@ -113,7 +113,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
       if (linted.error) errors.push(linted.error);
       else { raw.stylelint = linted.results; findings.push(...stylelintFindings(linted.results, repoRoot)); }
     }
-    engines.stylelint = { side: STYLE_SIDE, files: changed ? styles.length : null };
+    engines.stylelint = { side: STYLE_SIDE, files: raw.stylelint.length };
   }
 
   // 2. The app check: root and sides.

@@ -55,7 +55,7 @@ $defs:
         description: What the dependency is for. Every group is installed from the npm registry at the exact version; `starci` packages are published from this runtime.
       side:
         enum: [be, fe, both]
-        description: Which repository kind pins it. `both` is every back-end and front-end repository.
+        description: Which side of an app uses it (be/ or fe/; `both` for both). The app root package.json carries every pin; a package.json of a side folder (fe/packages/*) carries only its side's.
       source:
         type: string
         pattern: ^packages/[a-z0-9/-]+/package\.json$

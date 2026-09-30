@@ -80,25 +80,25 @@ test('the schema itself accepts a minimal valid document and pins the required n
   assert.ok(schema().properties.pins.required.includes('@heroui/react'));
 });
 
-test('checkRepoPins judges a repository: every pin, @starci packages included, by its declared exact spec', (t) => {
+test('checkRepoPins judges the app root package.json: every pin of both sides, @starci packages included, by its declared exact spec', (t) => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-pins-repo-'));
   t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({
     devDependencies: { typescript: '^5.7.3', jest: '29.7.0', vitest: '3.2.7', '@starci/tsconfig': 'file:.starci/packages/tsconfig' },
   }));
-  const before = checkRepoPins({ repo, side: 'be', root: ROOT });
+  const before = checkRepoPins({ repo, root: ROOT });
   assert.equal(before.ok, false);
   assert.match(before.errors.join('\n'), /typescript: declared \^5\.7\.3, pinned 5\.9\.3/);
   assert.match(before.errors.join('\n'), new RegExp(literal(`@starci/tsconfig: declared file:.starci/packages/tsconfig, pinned ${TSCONFIG_VERSION}`)));
-  assert.doesNotMatch(before.errors.join('\n'), /vitest/, 'a front-end pin is not judged on a back-end repository');
+  assert.doesNotMatch(before.errors.join('\n'), /vitest/, 'an unpinned dependency is not judged');
   assert.doesNotMatch(before.errors.join('\n'), /jest:/, 'an exact declared pin passes');
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ devDependencies: { typescript: '5.9.3', '@starci/tsconfig': loadPins(ROOT).pins['@starci/tsconfig'].version } }));
-  assert.deepEqual(checkRepoPins({ repo, side: 'be', root: ROOT }).errors, []);
+  assert.deepEqual(checkRepoPins({ repo, root: ROOT }).errors, []);
   const grammar = loadPins(ROOT).pins['@starci/grammar'];
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ dependencies: { '@starci/grammar': grammar.version } }));
-  assert.deepEqual(checkRepoPins({ repo, side: 'fe', root: ROOT }).errors, [], 'a registry-installed @starci pin passes by its declared version');
+  assert.deepEqual(checkRepoPins({ repo, root: ROOT }).errors, [], 'a registry-installed @starci pin passes by its declared version');
   fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ dependencies: { '@starci/grammar': `^${grammar.version}` } }));
-  assert.match(checkRepoPins({ repo, side: 'fe', root: ROOT }).errors.join(' '), /CANON_PIN_DRIFT @starci\/grammar: declared \^/);
+  assert.match(checkRepoPins({ repo, root: ROOT }).errors.join(' '), /CANON_PIN_DRIFT @starci\/grammar: declared \^/);
 });
 
 test('the checker CLI exits 0 on the shipped pins and 1 with a code on a broken tree', (t) => {

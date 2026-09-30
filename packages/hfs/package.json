@@ -1,7 +1,7 @@
 {
   "name": "@starci/hfs",
-  "version": "3.0.0",
-  "description": "The HFS command line of a StarCi product repository: hfs check, init, explain, sync and work-hygiene. Self-contained: it carries the runtime files it reads.",
+  "version": "4.0.0",
+  "description": "The HFS command line of a StarCi app (one repository: the root, be/ and fe/): hfs lint, check, scaffold app, explain, sync and work-hygiene. Self-contained: it carries the runtime files it reads.",
   "type": "module",
   "license": "UNLICENSED",
   "private": false,

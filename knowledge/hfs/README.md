@@ -504,7 +504,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R20 | `HFS_SIZE_GROWTH` | Over-budget files do not grow; new files are inside budget. |
 | R21 | `HFS_DUPLICATE_CODE` | No duplicated blocks or twice-defined helpers. |
 | R22 | `HFS_TS_STRICT` | tsconfig extends `@starci/tsconfig` and lowers no flag; no assertion, `!` or `any` in product source. |
-| R23 | `HFS_CONTRACT_SNAPSHOT_DRIFT` | Contract snapshot equals the emit, the FE copy equals the BE. |
+| R23 | `HFS_CONTRACT_SNAPSHOT_DRIFT` | The be side commits its contract snapshot and it equals the emit; the fe side reads it in place (be/contracts/). |
 | R24 | `HFS_ARCH_CONFIG_UNREAD` | The machine reads `hfs.json`; zero files analysed is red. |
 | R25 | `HFS_UNUSED_EXPORT` | No public export without a consumer; no source file nothing reaches. |
 

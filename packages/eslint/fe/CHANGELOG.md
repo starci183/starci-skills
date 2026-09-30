@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 8.0.0 - 2026-10-01
 
+- Breaking: the app monorepo standard (hfs 4.0.0). `loadHfs(import.meta.url)` in `fe/eslint.config.mjs` finds the app-root `hfs.json` (kind `app`) one level up and gives every linted file the view of the fe side (paths relative to `fe/`); a standalone front-end `hfs.json` (`profile: fe`) is refused. The project graph (`project-graph` law) is built per side from the side folder. The config stays the managed one-liner.
 - New (lane c0-orphan): `props-fields-readonly` (R110 `FE_PROPS_MUTABLE`, law props-and-slots). The props type of an exported rendering function in product source is readonly all the way down: every field and index signature is `readonly`, and every collection it holds, directly or in a nested object declared in the file, is `readonly T[]`, `readonly [A, B]` or `ReadonlyArray<T>`. Replaces the unrun readonly-props script adapter of the retired code-pattern folder.
 - New (lane AUTHCHK): `response-cookie-attributes` (R107 `FE_COOKIE_ATTRIBUTES`, law client-boundary). A `set` on Next's `ResponseCookies` (`response.cookies.set`, `(await cookies()).set`), identified by the method's declaring class of `next`, must state `httpOnly` as a literal, carry `secure` and use `sameSite` `lax` or `strict`, judged on the TYPE of the options. The typed fixture's `next/server` and `next/headers` stubs gain the cookie classes.
 

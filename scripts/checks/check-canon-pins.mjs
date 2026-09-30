@@ -7,11 +7,11 @@
 //   CANON_PIN_NO_SOURCE  a `starci` pin names no source, or a non-starci pin names one
 //
 //   node scripts/checks/check-canon-pins.mjs [--json]
-//   node scripts/checks/check-canon-pins.mjs --repo <product repo> [--side be|fe] [--json]
+//   node scripts/checks/check-canon-pins.mjs --repo <app root> [--json]
 //
-// With --repo the same pins judge a product repository: every pinned dependency it declares must be that exact
-// version (every pin, @starci packages included, is installed from the npm registry) and a
-// dependency the side owns but the repo does not declare is reported by the repo's own lint, not here.
+// With --repo the same pins judge the one package.json at an app root (it carries the dependencies of both sides): every
+// pinned dependency it declares must be that exact version (every pin, @starci packages included, is installed from the
+// npm registry); a dependency the app needs but does not declare is reported by the app's own lint, not here.
 // Exit 0 is clean; any finding exits 1.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,13 +55,12 @@ export function checkCanonPins({ root = skillRoot } = {}) {
   return { ok: errors.length === 0, errors, pins: Object.keys(doc?.pins ?? {}).length };
 }
 
-/** Judge one product repository against the pins. `side` limits the pins to that repository kind. */
-export function checkRepoPins({ repo, side, root = skillRoot }) {
+/** Judge the root package.json of one app against every pin. */
+export function checkRepoPins({ repo, root = skillRoot }) {
   const errors = [];
   const doc = loadPins(root);
   const pkg = readJson(path.join(repo, 'package.json'));
   for (const [name, pin] of Object.entries(doc.pins)) {
-    if (side && pin.side !== 'both' && pin.side !== side) continue;
     const specs = DEP_KEYS.map((key) => pkg[key]?.[name]).filter((spec) => spec !== undefined);
     if (!specs.length) continue;
     for (const spec of specs) if (spec !== pin.version) errors.push(`CANON_PIN_DRIFT ${name}: declared ${spec}, pinned ${pin.version}`);
@@ -73,7 +72,7 @@ export function canonPinsMain(argv = []) {
   const json = argv.includes('--json');
   const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
   const repo = flag('--repo');
-  const result = repo ? checkRepoPins({ repo: path.resolve(repo), side: flag('--side') }) : checkCanonPins();
+  const result = repo ? checkRepoPins({ repo: path.resolve(repo) }) : checkCanonPins();
   if (json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   else if (result.ok) process.stdout.write(repo ? `canon pins: ${repo} matches\n` : `canon pins: ${result.pins} pins valid\n`);
   else for (const message of result.errors) process.stderr.write(`${message}\n`);

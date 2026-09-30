@@ -5,7 +5,11 @@ purpose: >-
   then the repositories' own upgrade lane (each sets the exact version and reinstalls; nothing else installs a @starci package). Read on 2026-09-29 from the packages under
   .claude/packages and from the installed node_modules of nivo-backend, nivo-fe, starci-next, starci-next-fe,
   mia-mia-backend and miamia-fe; where they disagreed the newest version installed in more than one repository
-  won, and the runtime's own version won for @starci packages.
+  won, and the runtime's own version won for @starci packages. An app (hfs 4) has ONE package.json for both sides, so a
+  dependency both sides declared at different versions takes one: its pin where it has one, otherwise the higher of the
+  two, pinned here with a why (2026-10-01, from nivo-backend/nivo-fe, starci-next/starci-next-fe and
+  mia-mia-backend/miamia-fe: every such conflict but graphql was already pinned). `side` names the side whose code uses
+  the dependency; the app root package.json carries the pins of both.
 pins:
   # --- @starci packages. Every @starci package is a PUBLISHED npm package (install: registry): a product repository
   # installs the exact pinned version from the npm registry in the root and every workspace package.json, never `file:`.
@@ -17,19 +21,19 @@ pins:
     source: packages/grammar/package.json
     why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.8.0 (the brand layer sets `--font-sans` and `--font-mono`; the grammar reads them; 0.7.2 added the Input tel kind and IconButton disclosure props).
   '@starci/eslint-canon-be':
-    version: 2.1.2
+    version: 3.0.0
     group: starci
     install: registry
     side: be
     source: packages/eslint/be/package.json
-    why: '2.0.0 (C0 release): starciBeConfig({ hfs: loadHfs(import.meta.url) }) typed factory and the BE-CONVENTION laws (R36 sql-text-only, R83 no-repository-class, R85/R87/R89 service-deps, R43 config-parsed-in-main, R47/R48 test world, R95 operations, R98-R101 builders).'
+    why: '3.0.0: `loadHfs(import.meta.url)` of be/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the be side; the project graph is built per side. 2.0.0 (C0 release): starciBeConfig({ hfs: loadHfs(import.meta.url) }) typed factory and the BE-CONVENTION laws.'
   '@starci/eslint-canon-fe':
-    version: 7.1.2
+    version: 8.0.0
     group: starci
     install: registry
     side: fe
     source: packages/eslint/fe/package.json
-    why: '7.0.0: the front end has no tests (test rules removed, FE_NO_TESTS R97 in hfs); no-vietnamese-in-source (R91).'
+    why: '8.0.0: `loadHfs(import.meta.url)` of fe/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the fe side; the project graph is built per side. 7.0.0: the front end has no tests (FE_NO_TESTS R97 in hfs); no-vietnamese-in-source (R91).'
   '@starci/stylelint-canon':
     version: 2.0.1
     group: starci
@@ -57,12 +61,12 @@ pins:
     source: packages/jest-preset/package.json
     why: '2.1.0: four projects on the test world, the unit kit (mockEntityManager, fakeTransaction, fakeIds, FakeClock, Outcome matchers) and the recordingOutbox claim side.'
   '@starci/hfs':
-    version: 3.0.0
+    version: 4.0.0
     group: starci
     install: registry
     side: both
     source: packages/hfs/package.json
-    why: '2.0.0 (C0 release): the BE-CONVENTION machine, emit-contracts (GraphQL SDL and OpenAPI from the typed operation table), the four-project test layout, FE has no tests, repo.scripts slot, secrets guard in work-hygiene, rule ids R<2-3 digits>.'
+    why: '4.0.0: the app monorepo standard: one app repository with the root package.json, lockfile and hfs.json of kind app, and the be/ and fe/ sides; `hfs scaffold app <name>` makes it, `hfs lint` at the root lints be/** with the BE canon and fe/** with the FE canon; the standalone be/fe repository kinds and `hfs init` are deleted.'
   # --- tooling
   typescript:
     version: 5.9.3
@@ -152,6 +156,11 @@ pins:
     group: framework
     side: fe
     why: every HFS front end uses next-intl with the [locale] segment (hfs sync --init writes it); nivo-fe resolves 4.13.6.
+  graphql:
+    version: 16.14.2
+    group: framework
+    side: both
+    why: 'one app package.json for both sides (hfs 4): nivo-backend declares ^16.14.1 and nivo-fe ^16.14.2, the higher wins; all four product installs resolve 16.14.2.'
   supertest:
     version: 7.3.0
     group: tooling

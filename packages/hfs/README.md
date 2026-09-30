@@ -1,15 +1,17 @@
 # @starci/hfs
 
-The HFS command line of a StarCi product repository. It is installed from the npm registry at the exact version in `knowledge/hfs/canon-pins.yaml` (see [`packages/README.md`](../README.md)),
+The HFS command line of a StarCi app: the one repository of a product, `<app>/` with its root (the one `package.json`, lockfile and `node_modules`, `hfs.json` of kind `app`, CI, hooks, `.starciwork`) and its two sides `be/` and `fe/`. It is installed from the npm registry at the exact version in `knowledge/hfs/canon-pins.yaml` (see [`packages/README.md`](../README.md)),
 and it is self-contained: `runtime/` carries the slot manifest, the canon pins, the Vietnamese why
 catalog slice, the loader and the architecture machine with every file it imports, so it runs where there is no runtime
-checkout. The machine loads `typescript` from the repository it checks (never its own copy), so run `npm ci` first.
+checkout. The machine loads `typescript` from the app it checks (never its own copy), so run `npm ci` first.
+
+Every command runs at the app root. A side is judged with its folder as the root it was when products were split in two repositories (the "side view" of `scripts/lib/hfs-slots.mjs`): the root slots (`app.*`) are judged once, the `be.*` slots under `be/` and the `fe.*` slots under `fe/`, and nothing crosses sides except `sides.fe.reads` (`be/contracts/`, the input of the front end's codegen). Every finding path is app-relative (`be/src/...`, `fe/apps/...`).
 
 ```sh
-npx hfs lint    [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>] [--stylelint <glob>]   # THE lint entry (`npm run lint`): exit 0 clean, 1 findings, 2 a tool could not run
+npx hfs lint    [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>] [--stylelint <glob>]   # THE lint entry (`npm run lint`): ESLint over be/ with the BE canon and over fe/ with the FE canon, stylelint over fe/, the hfs checks; exit 0 clean, 1 findings, 2 a tool could not run
 npx hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>]   # the repository pass alone (what `hfs lint` runs for the findings that have no TypeScript file); exit 1 on any error-level finding
-npx hfs init    [--repo <dir>] [--stdout]     # write a starter hfs.json (never overwrites); --stdout only prints
-npx hfs emit-contracts [--repo <dir>]         # write contracts/<app>/schema.graphql of every api app that serves GraphQL and contracts/<app>/openapi.json of every api app with a typed operation table (the managed script contract:emit)
+npx hfs scaffold app <name> [--into <dir>]   # a new app <dir>/<name>/: the root, be/ and fe/ skeletons and the app hfs.json; refuses an existing directory
+npx hfs emit-contracts [--repo <dir>]         # write be/contracts/<app>/schema.graphql of every api app that serves GraphQL and be/contracts/<app>/openapi.json of every api app with a typed operation table (the managed script contract:emit)
 npx hfs explain <path> [--repo <dir>] [--json]
 npx hfs sync (--check | --write) [--root <dir>]   # generated files: the managedBy slots of slots.yaml, the .gitignore block (sync/, templates/)
 npx hfs work-hygiene                              # pre-commit guard: staged .starciwork / .starcistacks paths, and the secrets guard over every staged file (read from the index)
@@ -26,8 +28,8 @@ Only `*.service.ts` files are unit-tested (unit test standard), each with exactl
 
 The spec skeleton is `Test.createTestingModule({ providers: [Service, { provide: TOKEN, useValue: double }, ...] }).compile()` and `moduleRef.get(Service)`, with one provider per constructor dependency and nothing else, every double imported from `@starci/jest-preset` (the root), and one placeholder `it` per public method. The double of a token comes from `ruleParams.be.specDoubles` of the slot manifest, the table the lint law `spec-infra-double-from-kit` holds a spec to (`*_ENTITY_MANAGER` -> `mockEntityManager()`, `CLOCK` -> `new FakeClock(...)`, `OUTBOX` -> `recordingOutbox()`, `CACHE` -> `fakeCache(clock)`, lock, lease, fence and hold -> `fakeLock(clock)`, ids -> `fakeIds()`, `*_OPTIONS` -> a literal to fill in, everything else and every class -> `mock<T>()`), so the skeleton satisfies the law by construction: no cast, no `new` of the service, no ambient clock. A back end only (a front end has no services); the files are written for prettier (print width 120).
 
-`hfs check` reads the repository's `hfs.json` and the tracked paths (`git ls-files`), checks the work tree, and then runs the
-whole architecture machine over the repository. Every finding carries a why code and its Vietnamese text
+`hfs check` reads the app's `hfs.json` and the tracked paths (`git ls-files`), checks the work tree (the root rules once, the side rules per side), and then runs the
+whole architecture machine over each side folder. Every finding carries a why code and its Vietnamese text
 (`modules/kernel/failure-codes.yaml`).
 
 Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rendered-file checks (`sync/managed.mjs`) and the prettier check (`sync/format.mjs`) live in `sync/` because they read the templates and the repository's own install, and reach `hfs check` as `extraFindings`; the jest / vitest preset the coverage exclusions come from and prettier are read from the repository's `node_modules`, so run `npm ci` first):
@@ -55,7 +57,7 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 | `HFS_STACKS_SHAPE` | error | a `.starcistacks` path outside the standard shape (a sealed file outside `<env>/secrets/`, `runtime/files/`, root `DESIGN.md` or `k8s/`), a local Sonar not owned by the host, a service still rooted at `.stacks` (R10) |
 | `HFS_CI_MISSING_CANON` | error | `ci.yml` without a `run:` step of `hfs lint` (`npm run lint`, or `npx hfs lint` at the pinned version), or `.husky/pre-push` without `npm run typecheck` and `npm run lint` (R13) |
 | `HFS_DEP_VERSION_SKEW` | error | a dependency at two specs across the root and workspace `package.json` files, a dependency declared at another version than the root `overrides` pin, or a nested copy of a declared dependency in `package-lock.json` (R14) |
-| `HFS_CONTRACT_SNAPSHOT_DRIFT` | error / info | a back end serving GraphQL without `contracts/<app>/schema.graphql`, a front-end contract copy that differs by hash from the sibling back end named by `hfs.json` `stacks` (info when the sibling is not checked out) (R23) |
+| `HFS_CONTRACT_SNAPSHOT_DRIFT` | error | a back-end api app serving GraphQL without `be/contracts/<app>/schema.graphql` (R23); the front end reads that snapshot in place, so there is no copy to drift |
 | `BE_TEST_TOPOLOGY` | error | a `*.test.*` file, a `testing/` folder, a second jest configuration or a `jest` key in `package.json` (R47; `int-spec`, `harness-spec` and the retired test folders are the machine's `HFS_TEST_KIND_RETIRED`) |
 | `BE_SPEC_PLACEMENT` | error | a `*.spec.*`, `*.test.*` or `*-spec.*` file outside the four test layers, `scripts/` and `tools/` included (R102) |
 | `HFS_REPO_LOCAL_CHECK` | error | a `check-*` file in `scripts/` or `tools/`, an `eslint-local-rules*` file or local eslint plugin, or a script that runs a local check (R103) |
@@ -74,9 +76,8 @@ Its own checks (`scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-rules/`; the rende
 The managed files are judged by `sync/managed.mjs` and `sync/ts-strict.mjs` (the package renders the templates; the runtime copy does not). The list of managed
 files is the `managedBy` slots of `slots.yaml`; `hfs sync --write` renders them and `hfs check` compares them, so a hand edit and a forgotten `sync` are the same finding.
 Each finding is reported once: the eslint and stylelint one-liners under R17, `tsconfig.json` under R22 when it names a flag, a workflow or hook that lost a canon step under R13 (or R19 for the format step), everything else under R05.
-A front end is rendered by the same mechanism as a back end: `tsconfig.json`, `eslint.config.mjs`, `stylelint.config.mjs`, `.prettierrc`, `.prettierignore`, the hooks, the workflow, the Sonar file
-and the `scripts` block (`lint` is the one lint gate, `hfs lint`: ESLint over the repository, the repository check and, for a front end, stylelint; `lint:fix` is the same with `--fix`; a front end has no test script, no test configuration and no e2e or coverage file: it has no tests, and `FE_NO_TESTS` (R97) refuses any spec, e2e file, test tool, test script or test dependency, `scripts/` included). `turbo.json` stays the repository's own
-(`fe.tool-config-repo`): it carries the repository's task graph, which no preset can render.
+The root and both sides are rendered by the one mechanism. The root: `package.json` `scripts` (`dev:be`, `dev:fe`, `build:be`, `build:fe`, `start:<app>`, `lint`, `lint:fix`, `test`, `test:integration`, `test:e2e`, `test:contract`, `test:stack`, `codegen`, `contract:emit`, `migrate`, `typecheck`, ...; a be script runs from `be/`, where its tsconfig and jest configuration are), `.prettierrc`, `.prettierignore`, the `.husky` hooks, the CI workflows, the Sonar file and the `.gitignore` block. A side: its `tsconfig.json` (resolving `@starci/tsconfig` from the root `node_modules`), its `eslint.config.mjs` one-liner, and for be `tsconfig.build.json`, `src/tests/tsconfig.json` and `jest.config.js`, for fe `stylelint.config.mjs`. `lint` is the one lint gate, `hfs lint`: ESLint over each side with its canon, the app check and stylelint over fe; `lint:fix` is the same with `--fix`. The front end has no test script, no test configuration and no e2e or coverage file: it has no tests, and `FE_NO_TESTS` (R97) refuses any spec, e2e file, test tool or test script under `fe/`. `turbo.json` stays the app's own
+(`fe.tool-config-repo`): it carries the task graph, which no preset can render.
 
 The architecture machine (`scripts/checks/architecture.mjs` of the runtime, the same code bundled here): tiers and import
 direction, owner public API, cycles, module registration and composition, clones, dead exports, required files,
@@ -90,26 +91,26 @@ of the changed source files without clones and dead exports, and no file-system 
 checks still cover the whole tree. With no merge-base `--fast` is a refusal (exit 2) that names the fix, never a silent full
 pass.
 
-Exit codes: 0 clean, 1 an error finding, 2 a refusal (not a Git work tree, bad flag, `--fast` with no merge-base). The command never writes to the repository
-except `hfs init`, which writes `hfs.json` only when none exists.
+Exit codes: 0 clean, 1 an error finding, 2 a refusal (not a Git work tree, bad flag, `--fast` with no merge-base). `hfs check` and `hfs lint` never write to the app
+(`hfs lint --fix` lets ESLint and stylelint fix in place).
 
 ## Sonar
 
-One mechanism, the same for a back end and a front end: every finding of the canon is imported into Sonar, and the quality gate
-fails while any is open. Nothing is configured per repository; the pieces are managed files (`hfs sync`) and this package.
+One mechanism for both sides: every finding of the canon is imported into Sonar, and the quality gate
+fails while any is open. Nothing is configured per app; the pieces are managed files (`hfs sync`) and this package.
 
-One entry, one report, one file: `npm run lint` is `hfs lint`; `npm run lint -- --sonar reports/lint.sonar.json` writes the ONE Sonar file, read through `sonar.externalIssuesReportPaths`. It carries three engines: `starci-hfs` (the repository findings of `hfs check`, rule id = the finding code), `eslint` (the BE and FE canon plugins alike, rule id = the ESLint rule) and, for a front end, `stylelint` (rule id = the stylelint rule). `hfs lint --format json` prints the same findings as the one report `starci/lint@1` (`{ schema, ok, changed, counts.error, engines, errors[], findings[{ engine, rule, code, severity, path, line, column, message }] }`); `--changed <files...>` restricts ESLint and stylelint to those files and keeps of the repository findings the ones on a listed file or on no file. The exit code is 0 clean, 1 findings, 2 a tool could not run (a missing ESLint install is never a pass).
+One entry, one report, one file: `npm run lint` is `hfs lint`; `npm run lint -- --sonar reports/lint.sonar.json` writes the ONE Sonar file, read through `sonar.externalIssuesReportPaths`. It carries three engines: `starci-hfs` (the repository findings of `hfs check`, rule id = the finding code), `eslint` (the BE and FE canon plugins alike, rule id = the ESLint rule) and `stylelint` over fe (rule id = the stylelint rule). `hfs lint --format json` prints the same findings as the one report `starci/lint@1` (`{ schema, ok, changed, counts.error, engines, errors[], findings[{ engine, rule, code, severity, path, line, column, message }] }`); `--changed <files...>` restricts ESLint and stylelint to those files and keeps of the repository findings the ones on a listed file or on no file. The exit code is 0 clean, 1 findings, 2 a tool could not run (a missing ESLint install is never a pass).
 
 `--sonar` writes the findings as a Generic Issue Import document (SonarQube 10.3+ format: `{ rules, issues }`) before the verdict, so a
 failing lint still leaves its report. A rule's name and description are the catalog's English title and Vietnamese title, meaning and next step;
 impacts are HIGH (maintainability). `info` findings (the soft-size backlog) are report-only and not imported. The output is sorted, so two runs
 over one tree are byte-identical. Sonar drops an issue on a file it does not index (a tracked source file or stylesheet under `sonar.sources`), so the ONE placement rule of the three engines files a finding on
 any other path (hfs.json, a workflow, a config file, `e2e/`, a package the sources do not list) and a finding with no path on the first source file, its message starting with the real path.
-Sonar's own ESLint import (`sonar.eslint.reportPaths`) is not used: it drops those issues silently. A front end's `sonar.sources` and `sonar.tests` are `apps`, plus `packages` when hfs.json opts into `repo.packages` or an `fe.package.*` slot.
+Sonar's own ESLint import (`sonar.eslint.reportPaths`) is not used: it drops those issues silently. `sonar.sources` lists `be/apps`, `be/src` and `fe/apps` (plus `fe/packages` when the front end opts into an `fe.package.*` slot); `sonar.tests` is the back end's.
 
 The managed `sonar-project.properties` carries `sonar.externalIssuesReportPaths` (`reports/lint.sonar.json` only) and no `sonar.host.url` (the host is
 `SONAR_HOST_URL`); the managed CI workflow produces the report and runs the scan and the gate action with `!cancelled()`, so a failed lint step still
-reaches Sonar while the job stays failed. There is no `continue-on-error`. Both profiles run `npm run lint -- --sonar reports/lint.sonar.json` once, before the scan. The duplicate-block threshold (`ruleParams.<profile>.duplicateBlock`) has no Sonar property for TypeScript (SonarJS detects
+reaches Sonar while the job stays failed. There is no `continue-on-error`. CI runs `npm run lint -- --sonar reports/lint.sonar.json` once at the app root, before the scan. The duplicate-block threshold (`ruleParams.<side>.duplicateBlock`) has no Sonar property for TypeScript (SonarJS detects
 clones with its own token rule), so the machine enforces it (R21) and its findings are imported like every other.
 
 The gate is `knowledge/sonar-gate.yaml`, the one declaration: the new-code conditions (duplication, blocker and critical issues, hotspots; no coverage condition) and an `overall` part (0 open issues on the whole code,
@@ -117,7 +118,7 @@ duplicated lines density, cognitive complexity through the S3776 rule). A SonarQ
 open issue, imported or native; that is stricter than the three imports alone and is intended. `hfs check` reports `HFS_SONAR_CONFIG` (R11) when the
 properties file is not its render or the stack declaration names another gate. R20 and R21 have their Sonar enforcers as conditions of that file.
 
-Sonar does not depend on coverage: the managed properties file has no `sonar.*.lcov.reportPaths` and no `sonar.coverage.*`, the gate has no coverage condition, and the managed CI workflow uploads no coverage anywhere (no Codecov). A back end's unit coverage is the runner's: the managed `test` script is `jest --selectProjects unit --coverage`, which fails below the per-file 100 threshold on `src/**/*.service.ts`.
+Sonar does not depend on coverage: the managed properties file has no `sonar.*.lcov.reportPaths` and no `sonar.coverage.*`, the gate has no coverage condition, and the managed CI workflow uploads no coverage anywhere (no Codecov). The back end's unit coverage is the runner's: the managed `test` script is `jest --selectProjects unit --coverage`, which fails below the per-file 100 threshold on `src/**/*.service.ts`.
 
 ## Maintaining the bundle
 

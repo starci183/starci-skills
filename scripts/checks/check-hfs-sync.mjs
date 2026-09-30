@@ -17,7 +17,6 @@
 //   HFS_SYNC_TEMPLATE_VARIABLE  a template names a variable sync does not provide (runtime defect)
 //   HFS_SYNC_TEMPLATE_MISSING   a managedBy slot lists a file no template renders (runtime defect)
 //   HFS_SYNC_MANIFEST_MANAGED   a managedBy slot path is not a list of literal files (runtime defect)
-//   HFS_SYNC_SKELETON_MISSING   `hfs sync --init` found no skeleton templates (runtime defect)
 //   HFS_WORK_AGENT_DATA         a tracked .starciwork file is agent output the allowlist refuses
 //   HFS_PLAINTEXT_SECRET        a tracked .starcistacks file is a plaintext secret
 // Exit 0 clean, 1 findings, 2 bad arguments.
@@ -32,7 +31,7 @@ import { judge, trackedFiles } from '../../packages/hfs/sync/hygiene.mjs';
 export const CODES = Object.freeze([
   'HFS_MANAGED_FILE_DRIFT', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_TS_STRICT', 'HFS_SYNC_HFS_INVALID',
   'HFS_SYNC_DRIFT', 'HFS_SYNC_TEMPLATE_MISSING', 'HFS_SYNC_MANIFEST_MANAGED', 'HFS_SYNC_PRESET_MISSING', 'HFS_SYNC_SONAR_KEY',
-  'HFS_SYNC_TEMPLATE_VARIABLE', 'HFS_SYNC_SKELETON_MISSING', 'HFS_WORK_AGENT_DATA', 'HFS_PLAINTEXT_SECRET',
+  'HFS_SYNC_TEMPLATE_VARIABLE', 'HFS_WORK_AGENT_DATA', 'HFS_PLAINTEXT_SECRET',
 ]);
 
 /** { ok, findings: [{ code, file, message }] } for the repository at `root`. */

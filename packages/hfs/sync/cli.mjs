@@ -8,7 +8,7 @@ export async function main(argv) {
   const [command, ...rest] = argv;
   if (command === 'sync') return runSync(rest);
   if (command === 'work-hygiene') return runWorkHygiene();
-  process.stdout.write('usage: hfs sync (--check | --write | --init) [--root <dir>] | hfs work-hygiene\n');
+  process.stdout.write('usage: hfs sync (--check | --write) [--root <dir>] | hfs work-hygiene\n');
   return 2;
 }
 

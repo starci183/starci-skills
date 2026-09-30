@@ -2694,7 +2694,7 @@ HFS_SYNC_DRIFT:
   meaning_vi: "Một tệp mà hfs sync sinh (mọi tệp thuộc slot có managedBy trong slots.yaml, khối .gitignore, .starciwork/.gitignore) có nội dung khác bản sinh từ mẫu và hfs.json, hoặc bị xóa."
   causes_vi:
     - "Tệp được sửa tay thay vì sửa mẫu"
-    - "hfs.json đổi (app, profile) mà chưa chạy hfs sync --write"
+    - "hfs.json đổi (sides, apps) mà chưa chạy hfs sync --write"
     - "Preset jest đổi danh sách loại trừ độ phủ"
   nextStep_vi: "Chạy npx hfs sync --write để sinh lại tệp; nếu cần khác mẫu thì đổi mẫu trong .claude, không sửa tay. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
@@ -2703,11 +2703,11 @@ HFS_SYNC_DRIFT:
 HFS_SYNC_HFS_INVALID:
   title: "hfs.json unreadable for sync"
   title_vi: "hfs.json không đọc được cho hfs sync"
-  meaning_vi: "hfs sync cần hfs.json hợp lệ (hfs bằng major của slots.yaml, profile be hoặc fe, mỗi app back end có kind, project kebab-case, ít nhất một app) nhưng tệp thiếu hoặc sai."
+  meaning_vi: "hfs sync cần hfs.json hợp lệ ở gốc app (hfs bằng major của slots.yaml, kind app, project kebab-case, sides.be và sides.fe mỗi bên ít nhất một app có kind) nhưng tệp thiếu hoặc sai."
   causes_vi:
-    - "Thiếu hfs.json ở gốc repository"
-    - "profile không phải be hoặc fe"
-    - "Danh sách apps rỗng hoặc trùng tên"
+    - "Thiếu hfs.json ở gốc app"
+    - "kind không phải app, hoặc thiếu sides.be / sides.fe"
+    - "Danh sách apps của một bên rỗng hoặc trùng tên giữa hai bên"
   nextStep_vi: "Sửa hfs.json cho đúng khuôn rồi chạy lại hfs sync. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -2721,16 +2721,6 @@ HFS_SYNC_PRESET_MISSING:
     - "node_modules chưa được cài sau khi khai báo"
   nextStep_vi: "Đặt @starci/jest-preset về đúng phiên bản chính xác trong knowledge/hfs/canon-pins.yaml, cài lại rồi chạy lại hfs sync. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
-  kind: check-finding
-
-HFS_SYNC_SKELETON_MISSING:
-  title: "Skeleton templates missing"
-  title_vi: "Thiếu mẫu khung nguồn"
-  meaning_vi: "hfs sync --init không tìm thấy thư mục mẫu khung nguồn cho profile của repository; bản cài @starci/hfs thiếu templates."
-  causes_vi:
-    - "Gói @starci/hfs được xuất bản mà không kèm thư mục templates"
-  nextStep_vi: "Người bảo trì runtime cần sửa danh sách files của gói @starci/hfs rồi xuất bản lại phiên bản mới; sự cố runtime, không phải lỗi của repository sản phẩm."
-  owner: runtime-core
   kind: check-finding
 
 HFS_SYNC_SONAR_KEY:
