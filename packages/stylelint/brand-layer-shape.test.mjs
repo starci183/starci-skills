@@ -75,7 +75,40 @@ test("a family-root brand still needs the same token set in light and dark", asy
 
 test("a family-root selector with anything else attached is still not the brand layer", async () => {
   const warnings = await rule(`${FAMILY} .card { --offset-pop-accent: #fff; } ${FAMILY}[data-grammar-theme="dark"] { --offset-pop-accent: #000; }`)
+  // The rejected block sets nothing, so the dark block's token also has no light value.
+  assert.equal(warnings.length, 2)
+  assert.match(warnings[0].text, /in brand\.css/)
+  assert.match(warnings[1].text, /--offset-pop-accent.*no light value/)
+  const bare = await rule(`.grammar-common-root { --offset-pop-accent: #fff; } .dark { --offset-pop-accent: #000; }`)
+  assert.equal(bare.length, 2)
+  assert.match(bare[0].text, /in brand\.css/)
+})
+
+test("a compound selector of light and dark scopes is one block that counts for both themes", async () => {
+  const code = `
+:root, .light { --accent: #fff; }
+.dark { --accent: #000; }
+:root,
+.light,
+.dark { --success-soft: color-mix(in oklab, var(--success) 15%, transparent); --success-soft-foreground: var(--success); }
+`
+  assert.deepEqual(await rule(code), [])
+})
+
+test("a shared block does not excuse a token the other block lacks", async () => {
+  const warnings = await rule(":root, .light { --accent: #fff; --muted: #888; } .dark { --accent: #000; }")
+  assert.equal(warnings.length, 1)
+  assert.match(warnings[0].text, /--muted.*no dark value/)
+})
+
+test("a compound selector with one selector that is no theme scope is still refused", async () => {
+  const warnings = await rule(":root, .card, .dark { --accent: #fff; } :root { --accent: #fff; } .dark { --accent: #000; }")
   assert.equal(warnings.length, 1)
   assert.match(warnings[0].text, /in brand\.css/)
-  assert.equal((await rule(`.grammar-common-root { --offset-pop-accent: #fff; } .dark { --offset-pop-accent: #000; }`)).length, 1)
+})
+
+test("accepts the soft pair of every status tone, info included", async () => {
+  const tones = ["success", "warning", "danger", "info"]
+  const block = tones.flatMap((tone) => [`--${tone}-soft: #eee;`, `--${tone}-soft-foreground: #111;`, `--${tone}-soft-hover: #ddd;`]).join(" ")
+  assert.deepEqual(await rule(`:root { ${block} } .dark { ${block} }`), [])
 })

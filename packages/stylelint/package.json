@@ -15,6 +15,7 @@
     "!*.test.mjs",
     "!testing.mjs",
     "!lib/write-vocabulary.mjs",
+    "!lib/extract-values.mjs",
     "CHANGELOG.md",
     "README.md"
   ],
@@ -26,6 +27,7 @@
     "postcss-value-parser": ">=4"
   },
   "devDependencies": {
+    "postcss": "8.5.28",
     "stylelint": "17.15.0",
     "postcss-value-parser": "4.2.0"
   },
