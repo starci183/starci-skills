@@ -33,8 +33,8 @@ const TS_TRANSFORM = String.raw`^.+\.ts$`
 
 /**
  * ts-jest without a type check (`diagnostics: false`; `isolatedModules: true` comes from @starci/tsconfig, which is where
- * ts-jest 29.4 reads it — the ts-jest option of the same name is deprecated): types are checked once, by `typecheck` / `typecheck:e2e`, never per test file.
- * `npm run test:e2e` must be `npm run typecheck:e2e && jest --selectProjects e2e` so nobody runs e2e on code that
+ * ts-jest 29.4 reads it — the ts-jest option of the same name is deprecated): types are checked once, by `typecheck` / `typecheck:tests`, never per test file.
+ * `npm run test:e2e` (and `test:integration`, `test:contract`) runs `npm run typecheck:tests` first so nobody runs a world spec on code that
  * does not type-check.
  */
 function transform(tsconfig) {

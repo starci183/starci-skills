@@ -11,13 +11,17 @@ module.exports = require("@starci/jest-preset").starciJestConfig()
 
 ## What it sets
 
-- **Two projects**: `unit` (`**/*.spec.ts`, mocked, `clearMocks`) and `e2e` (`src/tests/e2e/**/*.e2e-spec.ts`, one worker, 120 s).
-  The e2e project never runs `src/tests/e2e/live/`; `test:e2e:live` names it on the command line
-  (`jest --selectProjects e2e --testPathIgnorePatterns /node_modules/ --testPathPattern e2e.live`).
+- **Four projects, one per test kind**: `unit` (`**/*.spec.ts` beside the subject, mocked, `clearMocks`; ignores
+  `src/tests/{world,integration,e2e,contract}/`), `integration` (`src/tests/integration/**/*.integration-spec.ts`), `e2e`
+  (`src/tests/e2e/**/*.e2e-spec.ts`) and `contract` (`src/tests/contract/**/*.contract-spec.ts`). The last three compile against
+  `src/tests/tsconfig.json`, run one worker, and start the one test world through `globalSetup`/`globalTeardown`
+  (`src/tests/world/global-setup.ts`, `global-teardown.ts`); there is no `setupFilesAfterEnv`. The managed scripts select one
+  project each: `test`, `test:integration`, `test:e2e`, `test:contract`; a contract spec skips itself without sandbox config.
 - **The three path aliases** `@features/*`, `@modules/*`, `@tests/*` (`MODULE_NAME_MAPPER`), the same ones the managed `tsconfig.json` declares.
-- **ts-jest with `diagnostics: false`** in both. `isolatedModules: true` comes from `@starci/tsconfig` (ts-jest 29.4 reads it
-  there; its own option is deprecated). Types are checked once, by `typecheck` (unit specs included) and `typecheck:e2e`, and
-  `test:e2e` is `npm run typecheck:e2e && jest --selectProjects e2e`, so nobody runs e2e on code that does not type-check.
+- **ts-jest with `diagnostics: false`** in every project. `isolatedModules: true` comes from `@starci/tsconfig` (ts-jest 29.4 reads it
+  there; its own option is deprecated). Types are checked once, by `typecheck` (unit specs included) and `typecheck:tests`
+  (`src/tests/tsconfig.json`), and `test:integration`/`test:e2e`/`test:contract` run `typecheck:tests` first, so no world spec
+  runs on code that does not type-check.
 - **Coverage that matches Sonar.** `collectCoverageFrom` is `src/**/*.ts` and `apps/**/*.ts` minus specs, e2e specs, `dist`,
   `coverage`, `src/tests/**`, `*.d.ts` and `main.ts`: the same set Sonar counts. `sonarExclusions()` and
   `sonarCoverageExclusions()` render the two `sonar-project.properties` values from the same lists, so the denominators

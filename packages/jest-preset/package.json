@@ -1,7 +1,7 @@
 {
   "name": "@starci/jest-preset",
   "version": "1.1.0",
-  "description": "The StarCi jest config for Nest repositories (unit and e2e projects, ts-jest with diagnostics off, coverage matching the Sonar denominators), the typed mock<T>() helper and the FakeClock test double for the platform/clock Clock port.",
+  "description": "The StarCi jest config for Nest repositories (unit, integration, e2e and contract projects, ts-jest with diagnostics off, coverage matching the Sonar denominators), the typed mock<T>() helper and the FakeClock test double for the platform/clock Clock port.",
   "license": "UNLICENSED",
   "private": false,
   "main": "index.cjs",
