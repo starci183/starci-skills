@@ -8,8 +8,8 @@
  * type-checks against `Repo["find"]`. Values passed in `overrides` win over the generated functions and may be
  * partial: the return type is still `T`.
  *
- * `createMock` takes the function factory as an argument so the helper has no hard dependency on a global
- * `jest`; `mock` binds it to `jest.fn`.
+ * `createMock` takes the function factory as an argument (called with the property name) so the helper has no hard
+ * dependency on a global `jest`; `mock` binds it to `jest.fn`.
  */
 
 // Probed by promise resolution, jest matchers and serializers: they must read as absent, not as a mock function.
@@ -24,7 +24,7 @@ function createMock(makeFn) {
         if (Object.hasOwn(target, property)) return Reflect.get(target, property, receiver)
         if (typeof property === "symbol" || property in Object.prototype) return Reflect.get(target, property, receiver)
         if (ABSENT.has(property)) return undefined
-        if (!own.has(property)) own.set(property, makeFn())
+        if (!own.has(property)) own.set(property, makeFn(property))
         return own.get(property)
       },
       set(target, property, value) {
@@ -41,13 +41,13 @@ function createMock(makeFn) {
 
 // jest-runtime hands every module it loads, this one included, a module-scoped `jest` object; it is not a property
 // of globalThis, so it is read as a free identifier. @jest/globals is the fallback for a runner that does not.
-function jestFn() {
-  if (typeof jest !== "undefined" && typeof jest.fn === "function") return jest.fn()
+function jestFn(implementation) {
+  if (typeof jest !== "undefined" && typeof jest.fn === "function") return jest.fn(implementation)
   try {
-    return require("@jest/globals").jest.fn()
+    return require("@jest/globals").jest.fn(implementation)
   } catch {
     throw new Error("@starci/jest-preset mock<T>() needs the jest runtime; call it from a jest test")
   }
 }
 
-module.exports = { mock: createMock(jestFn), createMock }
+module.exports = { mock: createMock(() => jestFn()), createMock, jestFn }

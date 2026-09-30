@@ -1,29 +1,31 @@
 "use strict"
 
 const { mock, createMock } = require("./mock.cjs")
+const { mockEntityManager, fakeTransaction } = require("./entity-manager.cjs")
+const { FakeClock } = require("./clock.cjs")
+const { fakeCache } = require("./cache.cjs")
+const { fakeLock } = require("./lock.cjs")
+const { recordingOutbox } = require("./outbox.cjs")
+const { builder } = require("./builders.cjs")
+const { fakeIds, FakeIds } = require("./ids.cjs")
 
 /**
- * What Sonar counts as production code, expressed once. `sonarCoverageExclusions` renders the same list for
- * `sonar.coverage.exclusions`, so the jest denominator and the Sonar denominator cannot drift.
- *
- * Sonar side (canon sonar-project.properties): sources = src,apps; exclusions = specs, e2e specs, dist, coverage;
- * coverage.exclusions = src/tests/**, e2e specs, entrypoints and declaration files.
+ * Coverage is measured on services only: the one place business logic lives (owner-locked unit standard). Handlers,
+ * resolvers, controllers and consumers are thin, and helpers called by a service are covered through the service's own
+ * spec, so every `*.service.ts` under `src` is the whole denominator and every file in it must reach 100 on every metric.
+ * Sonar does not read coverage at all (the gate fails on imported issues only), so there is no second list to keep in step.
  */
-const COVERAGE_SOURCES = ["src/**/*.ts", "apps/**/*.ts"]
-/** Sonar `sonar.exclusions`: not analysed at all, so neither counted nor covered. */
-const SONAR_EXCLUSIONS = ["**/*.spec.ts", "**/*.e2e-spec.ts", "**/dist/**", "**/coverage/**"]
-/** Sonar `sonar.coverage.exclusions`: analysed, but outside the coverage denominator. */
-const COVERAGE_ONLY_EXCLUSIONS = ["src/tests/**", "**/*.d.ts", "**/main.ts"]
-const COVERAGE_EXCLUDES = [...SONAR_EXCLUSIONS, ...COVERAGE_ONLY_EXCLUSIONS]
+const COVERAGE_SOURCES = ["src/**/*.service.ts"]
+const COVERAGE_EXCLUDES = ["src/tests/**", "**/dist/**", "**/coverage/**"]
+/** The four metrics, each held at 100 per file. */
+const COVERAGE_THRESHOLD = Object.freeze({ lines: 100, branches: 100, functions: 100, statements: 100 })
 
 function collectCoverageFrom() {
   return [...COVERAGE_SOURCES, ...COVERAGE_EXCLUDES.map((glob) => `!${glob}`)]
 }
 
-/** The `sonar.coverage.exclusions` value that matches `collectCoverageFrom`; `sonar.exclusions` is `sonarExclusions()`. */
-function sonarCoverageExclusions() {
-  return COVERAGE_ONLY_EXCLUSIONS.join(",")
-}
+/** Sonar `sonar.exclusions`: specs, e2e specs, dist and coverage output are not analysed at all. */
+const SONAR_EXCLUSIONS = ["**/*.spec.ts", "**/*.e2e-spec.ts", "**/dist/**", "**/coverage/**"]
 
 function sonarExclusions() {
   return SONAR_EXCLUSIONS.join(",")
@@ -65,8 +67,9 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  * contract project is never part of `test` or `test:e2e`, and a contract spec skips itself without sandbox config. The
  * test tree compiles against `src/tests/tsconfig.json`, the nearest config of every file under `src/tests/`. The
  * integration, e2e and contract projects share the world's `global-setup.ts`/`global-teardown.ts` (`src/tests/world/`) and
- * run one worker; there is no `setupFilesAfterEnv`.
- * Coverage uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
+ * run one worker; the unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
+ * Coverage is collected from every `*.service.ts` only, with a per-file threshold of 100 on lines, branches, functions and
+ * statements: the `test` script runs the unit project with `--coverage` and fails below it. It uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
  * as thousands of branches no spec can cover, while v8 measures the real source.
  */
 function starciJestConfig() {
@@ -91,14 +94,18 @@ function starciJestConfig() {
     testTimeout: 120_000,
     coverageProvider: "v8",
     collectCoverageFrom: collectCoverageFrom(),
+    // A glob key is applied to every matching file on its own: each service file must reach 100, not the average.
+    coverageThreshold: { "./src/**/*.service.ts": { ...COVERAGE_THRESHOLD } },
     coverageDirectory: "coverage",
-    coverageReporters: ["lcov", "text-summary"],
+    coverageReporters: ["text-summary", "text"],
     projects: [
       {
         ...shared,
         transform: transform("tsconfig.json"),
         displayName: "unit",
         clearMocks: true,
+        // The Outcome matchers (`toBeRefused`, `toSucceedWith`) exist in the unit project only.
+        setupFilesAfterEnv: [require.resolve("./matchers.cjs")],
         testMatch: ["**/*.spec.ts"],
         testPathIgnorePatterns: ["/node_modules/", ...TEST_KIND_FOLDERS.map(underTests)],
       },
@@ -115,9 +122,18 @@ module.exports = {
   MODULE_NAME_MAPPER,
   mock,
   createMock,
+  mockEntityManager,
+  fakeTransaction,
+  FakeClock,
+  fakeCache,
+  fakeLock,
+  recordingOutbox,
+  builder,
+  fakeIds,
+  FakeIds,
   collectCoverageFrom,
-  sonarCoverageExclusions,
   sonarExclusions,
   COVERAGE_SOURCES,
   COVERAGE_EXCLUDES,
+  COVERAGE_THRESHOLD,
 }

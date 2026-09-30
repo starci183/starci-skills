@@ -1,7 +1,7 @@
 {
   "name": "@starci/jest-preset",
-  "version": "1.1.0",
-  "description": "The StarCi jest config for Nest repositories (unit, integration, e2e and contract projects, ts-jest with diagnostics off, coverage matching the Sonar denominators), the typed mock<T>() helper and the FakeClock test double for the platform/clock Clock port.",
+  "version": "2.0.0",
+  "description": "The StarCi jest config for Nest repositories (unit, integration, e2e and contract projects, ts-jest with diagnostics off, per-file 100 coverage of *.service.ts only) and the one shared unit-test double kit: typed mock<T>(), mockEntityManager(), fakeTransaction(), fakeCache(), fakeLock(), recordingOutbox(), FakeClock, fakeIds(), builder() and the Outcome matchers toBeRefused/toSucceedWith.",
   "license": "UNLICENSED",
   "private": false,
   "main": "index.cjs",
@@ -18,6 +18,34 @@
     "./clock": {
       "types": "./clock.d.ts",
       "default": "./clock.cjs"
+    },
+    "./entity-manager": {
+      "types": "./entity-manager.d.ts",
+      "default": "./entity-manager.cjs"
+    },
+    "./ids": {
+      "types": "./ids.d.ts",
+      "default": "./ids.cjs"
+    },
+    "./matchers": {
+      "types": "./matchers.d.ts",
+      "default": "./matchers.cjs"
+    },
+    "./cache": {
+      "types": "./cache.d.ts",
+      "default": "./cache.cjs"
+    },
+    "./lock": {
+      "types": "./lock.d.ts",
+      "default": "./lock.cjs"
+    },
+    "./outbox": {
+      "types": "./outbox.d.ts",
+      "default": "./outbox.cjs"
+    },
+    "./builders": {
+      "types": "./builders.d.ts",
+      "default": "./builders.cjs"
     }
   },
   "files": [
@@ -33,9 +61,15 @@
   "peerDependencies": {
     "@types/jest": ">=29",
     "jest": ">=29",
-    "ts-jest": ">=29"
+    "ts-jest": ">=29",
+    "typeorm": ">=0.3"
   },
   "scripts": {
     "test": "node --test \"*.test.mjs\""
+  },
+  "peerDependenciesMeta": {
+    "typeorm": {
+      "optional": true
+    }
   }
 }
