@@ -212,15 +212,19 @@ export function applyAttemptUsage(ledger, plan, { at = Date.now() } = {}) {
   return ledger.write.recordAttemptUsage({ attemptId: plan.attemptId, rows: plan.rows, source: plan.source, provider: plan.provider, sessions: plan.sessions, at });
 }
 
-/** Settled attempts with no usage yet since `sinceMs`. */
-export function attemptsMissingUsage(db, { sinceMs = 0 } = {}) {
-  return db.prepare(`SELECT a.*
-    FROM op_attempts a
+const MISSING_ATTEMPT_USAGE = `FROM op_attempts a JOIN workflows w ON w.workflow_id=a.workflow_id
     WHERE (a.settled_at IS NOT NULL OR a.end_state IS NOT NULL) AND a.dispatched_at >= ?
       AND NOT EXISTS (SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=a.attempt_id)
-      AND NOT (COALESCE(a.usage_source,'')='unavailable' AND COALESCE(a.usage_reason,'') LIKE 'no usage adapter%')
-    ORDER BY a.attempt_id`).all(sinceMs);
+      AND NOT (COALESCE(a.usage_source,'')='unavailable' AND COALESCE(a.usage_reason,'') LIKE 'no usage adapter%')`;
+const ARCHIVED_WORKFLOW = `(w.archived_at IS NOT NULL OR w.phase='archived')`;
+const archivedRefusal = (error) => message(error).includes('workflow-archived: no further writes');
+
+/** Settled attempts with no usage yet in workflows that still accept usage writes. */
+export function attemptsMissingUsage(db, { sinceMs = 0 } = {}) {
+  return db.prepare(`SELECT a.* ${MISSING_ATTEMPT_USAGE} AND NOT ${ARCHIVED_WORKFLOW} ORDER BY a.attempt_id`).all(sinceMs);
 }
+
+const archivedAttemptsMissingUsage = (db, sinceMs) => db.prepare(`SELECT count(*) AS n ${MISSING_ATTEMPT_USAGE} AND ${ARCHIVED_WORKFLOW}`).get(sinceMs).n;
 
 /**
  * The settle hook: usage of the one attempt of a just-settled job, taken from its attributed session files BEFORE they
@@ -284,7 +288,7 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
     import('../../engine/machine-db.mjs'), import('../../engine/ledger-db.mjs'),
   ]);
   const since = now - lookbackMs;
-  const out = { ok: true, dryRun, lookbackMs, attempts: { pending: 0, recorded: 0, unavailable: 0 }, kernels: { sessions: 0, recorded: 0, rows: 0, unmatched: 0 }, supervisor: { sessions: 0, recorded: 0, rows: 0 }, errors: [], unavailable: [], ...(detail ? { detail: { attempts: [], kernels: [], supervisor: [] } } : {}) };
+  const out = { ok: true, dryRun, lookbackMs, attempts: { pending: 0, recorded: 0, unavailable: 0, skippedEnded: 0 }, kernels: { sessions: 0, recorded: 0, rows: 0, unmatched: 0, skippedEnded: 0 }, supervisor: { sessions: 0, recorded: 0, rows: 0 }, errors: [], unavailable: [], ...(detail ? { detail: { attempts: [], kernels: [], supervisor: [] } } : {}) };
   let ledgers = [];
   const reader = ledgerFiles ? null : openMachineReader({ env });
   if (!reader && !ledgerFiles) return { ...out, ok: false, errors: ['machine.sqlite not found'] };
@@ -297,16 +301,21 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
     try {
       db = openLedgerReader(l.file);
       const pending = attemptsMissingUsage(db, { sinceMs: since });
-      const workflows = new Set(db.prepare('SELECT workflow_id FROM workflows').all().map((r) => r.workflow_id));
-      perLedger.push({ ledger: l, pending, workflows });
+      const skippedAttempts = archivedAttemptsMissingUsage(db, since);
+      const workflowRows = db.prepare('SELECT workflow_id,phase,archived_at FROM workflows').all();
+      const workflows = new Set(workflowRows.map((r) => r.workflow_id));
+      const writableWorkflows = new Set(workflowRows.filter((r) => r.archived_at == null && r.phase !== 'archived').map((r) => r.workflow_id));
+      perLedger.push({ ledger: l, pending, skippedAttempts, workflows, writableWorkflows });
     } catch (error) { out.errors.push(`${l.name}: ${message(error).slice(0, 160)}`); } finally { try { db?.close(); } catch { /* closed */ } }
   }
   const wantedAgents = new Set(['claude', 'codex']);
   const index = indexSessions({ agents: [...wantedAgents], sinceMs: Math.min(since, ...perLedger.flatMap((p) => p.pending.map((a) => (a.dispatched_at ?? since) - SESSION_LEAD_MS)).concat(since)), env, home, archiveRoot });
 
-  for (const { ledger: l, pending, workflows } of perLedger) {
+  for (const { ledger: l, pending, skippedAttempts, workflows, writableWorkflows } of perLedger) {
     out.attempts.pending += pending.length;
-    const kernelEntries = index.filter((e) => e.role === 'kernel' && workflows.has(e.workflowId));
+    out.attempts.skippedEnded += skippedAttempts;
+    const kernelEntries = index.filter((e) => e.role === 'kernel' && writableWorkflows.has(e.workflowId));
+    out.kernels.skippedEnded += index.filter((e) => e.role === 'kernel' && workflows.has(e.workflowId) && !writableWorkflows.has(e.workflowId)).length;
     let handle = null;
     try {
       const plans = pending.map((a) => planAttemptUsage(a, entriesOfAttempt(index, a)));
@@ -324,12 +333,12 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
       if (dryRun) { out.attempts.recorded += work.filter((p) => p.ok).length; out.kernels.recorded += seatWork.length; out.kernels.rows += seatWork.reduce((n, s) => n + s.plan.rows.length, 0); continue; }
       if (!work.length && !seatWork.length) continue;
       handle = openLedger({ file: l.file, repoRoot: l.repoRoot ?? null });
-      for (const p of work) { try { if (applyAttemptUsage(handle, p, { at: now }).recorded) out.attempts.recorded += 1; } catch (error) { out.errors.push(`${l.name} attempt ${p.attemptId}: ${message(error).slice(0, 160)}`); } }
+      for (const p of work) { try { if (applyAttemptUsage(handle, p, { at: now }).recorded) out.attempts.recorded += 1; } catch (error) { if (archivedRefusal(error)) out.attempts.skippedEnded += 1; else out.errors.push(`${l.name} attempt ${p.attemptId}: ${message(error).slice(0, 160)}`); } }
       for (const { e, plan } of seatWork) {
         try {
           const r = handle.write.recordKernelUsage({ workflowId: e.workflowId, turnRef: plan.turnRef, rows: plan.rows, provider: e.agent, at: now });
           if (r.recorded) { out.kernels.recorded += 1; out.kernels.rows += r.rows; }
-        } catch (error) { out.errors.push(`${l.name} kernel ${e.workflowId}: ${message(error).slice(0, 160)}`); }
+        } catch (error) { if (archivedRefusal(error)) out.kernels.skippedEnded += 1; else out.errors.push(`${l.name} kernel ${e.workflowId}: ${message(error).slice(0, 160)}`); }
       }
     } catch (error) { out.errors.push(`${l.name}: ${message(error).slice(0, 160)}`); } finally { try { handle?.close(); } catch { /* closed */ } }
   }
