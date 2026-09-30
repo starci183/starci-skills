@@ -61,6 +61,7 @@ A sample, not the list:
 | **Comments · naming · type safety** | Comments say why; no double cast through `unknown` |
 | **User copy** | A literal exception message, notification text or response copy comes from the per-capability messages catalog through the typed `MessageCatalog` port (`user-copy-through-catalog`) |
 | **Temporal** | `Date.now()`, a bare `new Date()` and `performance.now()` are read only inside `platform/clock` (`no-ambient-clock`) |
+| **Dependency injection** | Raw `Inject(`, `InjectEntityManager(`, `InjectDataSource(`, `InjectQueue(`, `InjectRepository(` and any third-party `Inject*` are called only in a `<owner>.decorators.ts` at an owner root, and injectors decorate constructor parameters only; an injector is zero-argument, typed `TypedParameterDecorator<T>`, built with `injector<T>(token)`, documented, over a `unique symbol` token; `T` equals the parameter type; a parameter typed by a platform, integrations or package declaration carries an injector (only domain services and the same owner are class-injected); no `ModuleRef`, no `forwardRef`, no string token (`injector-only`, `injector-shape`, `injector-type-match`, `infra-needs-injector`, `no-module-ref`, `no-forward-ref`, `no-string-token`) |
 | **Idempotency** | A `@Public()` webhook handler and an outbox/queue consumer claim the event through the shared inbox before they act (`inbox-dedupe-required`) |
 
 Every rule names the law that declares it — `ruleOwners` maps rule name to law, so a failing build

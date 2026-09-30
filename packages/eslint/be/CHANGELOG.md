@@ -17,6 +17,11 @@
 - Dependencies: `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` ^8.70; peer `typescript` >=5.9; node >=22.13.
   The 1.7.1 dependency on `@starci/hfs` (and its sibling-workspace fallback) is gone: the package carries its own
   manifest copy in `runtime/`, one resolution path, no fallback.
+- New law `injection` (R85 `BE_RAW_INJECT`, type-aware: a callee is identified by where its function is declared, never by a variable name; specs are not exempt):
+  `injector-only` (`Inject(`, `InjectEntityManager(`, `InjectDataSource(`, `InjectQueue(`, `InjectRepository(` and any package function named `Inject*` are called only in a `*.decorators.ts` at an owner root; a raw `@Inject(...)` decorator, property injection and an injector on a non-constructor parameter are findings),
+  `injector-shape` (zero-parameter, `TypedParameterDecorator<T>` from `platform/composition`, body `injector<T>(token)`, PascalCase name, JSDoc naming `T`; exported tokens are `unique symbol = Symbol("<owner>.<thing>")`; `provide:` is a class or a `unique symbol`),
+  `injector-type-match` (the `T` of the injector equals the parameter annotation), `infra-needs-injector` (a constructor parameter typed by a platform/integrations declaration or a package carries an injector; only domain services and same-owner types are class-injected),
+  `no-module-ref`, `no-forward-ref`, `no-string-token` (a string or template literal, or a string-typed value, as `Inject(...)`/`injector(...)`/`provide:` token; a string literal argument of `getEntityManagerToken`/`getDataSourceToken` outside `<conn>.connection.ts`).
 
 ## 1.7.1 - 2026-09-30
 
