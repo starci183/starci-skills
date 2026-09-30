@@ -2,8 +2,9 @@
  * The rules that hold `transport.md` (HFS R50 `FE_TRANSPORT_OWNER`, R51 `FE_HTTP_STATUS_COLLAPSE`,
  * R52 `FE_WIRE_GENERATED`).
  *
- * ONE WIRE, ONE VOCABULARY. An app talks to its backend through exactly one module,
- * `modules/api/client.ts`, and that module answers in exactly one vocabulary, `Outcome<T>`. The
+ * ONE WIRE, ONE VOCABULARY. A repository talks to its backend through exactly one module, the api client (HFS slot
+ * `fe.transport.client`: `modules/api/client.ts`, or `fe.package.api.client`: the shared api package's `src/client.ts`),
+ * and that module answers in exactly one vocabulary, `Outcome<T>` (slot `fe.transport.outcome` / `fe.package.api.outcome`). The
  * defects the three halves prevent were measured on real apps: seven transports and six result
  * shapes in one repository, and in another a client that folded every non-2xx into "could not
  * read", so the state a real backend produces for a signed-out reader - 401, which must become
@@ -16,23 +17,80 @@
  * it, no shared mutable state, a 401/403 branch, and no null standing in for a status.
  */
 
-import { isApiClient, isSpecFile } from "./lib/scope.mjs"
+import ts from "typescript"
+import { hfsOf } from "./lib/hfs.mjs"
+import { globalReferences, inSlot, isApiClient, isOutcomeModule, isSpecFile } from "./lib/scope.mjs"
 import { normalizePath } from "./lib/path.mjs"
+import { typed } from "./lib/types.mjs"
 
-/** Any other way to send an HTTP request: a second transport is a second owner. */
-const OTHER_TRANSPORTS = /^(?:axios|ky|ky-universal|got|node-fetch|undici|cross-fetch|isomorphic-fetch|superagent|ofetch|whatwg-fetch)$/
+/** Packages that send an HTTP request: a second transport is a second owner. Matched on the module specifier, never on a file name. */
+const TRANSPORT_PACKAGES = new Set([
+  "axios", "ky", "ky-universal", "got", "node-fetch", "undici", "cross-fetch", "isomorphic-fetch", "superagent", "ofetch",
+  "whatwg-fetch", "graphql-request", "urql", "next-urql", "apollo-client",
+])
 
-/** `fetch`, `globalThis.fetch`, `window.fetch`, `self.fetch`. */
-const isFetchCall = (node) => {
-  const callee = node.callee
-  if (callee.type === "Identifier") return callee.name === "fetch"
-  return (
-    callee.type === "MemberExpression" &&
-    !callee.computed &&
-    callee.property.name === "fetch" &&
-    callee.object.type === "Identifier" &&
-    ["globalThis", "window", "self", "global"].includes(callee.object.name)
-  )
+/** Package scopes and prefixes whose every package is a GraphQL/HTTP client of its own (`@apollo/client`, `@urql/core`, `apollo-link-http`). */
+const TRANSPORT_SCOPES = ["@apollo/", "@urql/", "apollo-"]
+
+/** True when a module specifier resolves to an HTTP client library. */
+const isTransportLibrary = (specifier) => {
+  const parts = String(specifier).split("/")
+  const name = specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0]
+  return TRANSPORT_PACKAGES.has(name) || TRANSPORT_SCOPES.some((prefix) => name.startsWith(prefix))
+}
+
+/** The global objects that carry the same globals as the bare names. */
+const GLOBAL_OBJECTS = new Set(["globalThis", "window", "self", "global"])
+
+/** The bare globals that open a connection. */
+const TRANSPORT_GLOBALS = new Set(["fetch", "Request", "EventSource", "XMLHttpRequest", "navigator"])
+
+/** The static name of a member's property, else null. */
+const propertyName = (member) => {
+  if (!member.computed) return member.property.type === "Identifier" ? member.property.name : null
+  return member.property.type === "Literal" && typeof member.property.value === "string" ? member.property.value : null
+}
+
+/**
+ * Every use of a global transport in the file, found by scope resolution (an imported, declared or parameter `fetch` is not
+ * one): `fetch` however it is reached (`fetch(...)`, `globalThis.fetch`, `window.fetch`, `const f = fetch`,
+ * `const { fetch } = globalThis`), `new Request`, `new EventSource`, `navigator.sendBeacon`, `new XMLHttpRequest`.
+ *
+ * @param {object} context - The ESLint rule context.
+ * @returns {Array<{ node: object, kind: "fetch" | "channel" | "xhr", name: string, call: object | null }>} The uses; `call` is the call of `fetch` when it is called there.
+ */
+const transportUses = (context) => {
+  const uses = []
+  const calledBy = (node) => (node.parent?.type === "CallExpression" && node.parent.callee === node ? node.parent : null)
+  const constructedBy = (node) => node.parent?.type === "NewExpression" && node.parent.callee === node
+  const classify = (node, name) => {
+    if (name === "fetch") uses.push({ node, kind: "fetch", name, call: calledBy(node) })
+    else if ((name === "Request" || name === "EventSource") && constructedBy(node)) uses.push({ node, kind: "channel", name, call: null })
+    else if (name === "XMLHttpRequest" && constructedBy(node)) uses.push({ node, kind: "xhr", name, call: null })
+    else if (name === "navigator" && node.parent?.type === "MemberExpression" && node.parent.object === node && propertyName(node.parent) === "sendBeacon") {
+      uses.push({ node: node.parent, kind: "channel", name: "navigator.sendBeacon", call: calledBy(node.parent) })
+    }
+  }
+  for (const id of globalReferences(context, new Set([...TRANSPORT_GLOBALS, ...GLOBAL_OBJECTS]))) {
+    // `typeof fetch` names the type of the function; it does not call it.
+    if (id.parent?.type === "TSTypeQuery") continue
+    if (!GLOBAL_OBJECTS.has(id.name)) {
+      classify(id, id.name)
+      continue
+    }
+    const parent = id.parent
+    if (parent?.type === "MemberExpression" && parent.object === id) {
+      const name = propertyName(parent)
+      if (name !== null && TRANSPORT_GLOBALS.has(name)) classify(parent, name)
+    } else if (parent?.type === "VariableDeclarator" && parent.init === id && parent.id.type === "ObjectPattern") {
+      for (const property of parent.id.properties) {
+        if (property.type === "Property" && !property.computed && property.key.type === "Identifier" && property.key.name === "fetch") {
+          uses.push({ node: property, kind: "fetch", name: "fetch", call: null })
+        }
+      }
+    }
+  }
+  return uses
 }
 
 /** Files under `modules/api/` that the wire law governs (the contract copy and generated output are data). */
@@ -43,37 +101,60 @@ const isApiModuleFile = (filename) => {
 
 // -- FE-TRANSPORT-1 --------------------------------------------------------------------------------
 
-/** `fetch` is called in one module, and no other HTTP library exists. */
+/**
+ * `fetch` is reached in one file per repository, and no other HTTP library exists.
+ *
+ * The one file is the one whose HFS slot is `fe.transport.client` (`apps/<app>/src/modules/api/client.ts`, a one-app repository)
+ * or `fe.package.api.client` (`packages/<family>-api/src/client.ts`, the shared client of a multi-app repository). Every other
+ * file, including another file of the same package, is a finding.
+ */
 export const fetchOnlyInApiClient = {
   meta: {
     type: "problem",
-    docs: { description: "The app's single `fetch` lives in `modules/api/client.ts`." },
+    docs: { description: "The repository's single `fetch` (and `Request`, `EventSource`, `sendBeacon`) lives in the api client slot." },
     schema: [],
     messages: {
       outside:
-        "`fetch` outside `modules/api/client.ts`. The app has exactly one transport; a second one is a second place that must remember the timeout, the credential and the status mapping, and it will forget one. Call the client and take its `Outcome`.",
+        "`fetch` outside the api client (`modules/api/client.ts`, or the shared api package's `src/client.ts`). The repository has exactly one transport; a second one is a second place that must remember the timeout, the credential and the status mapping, and it will forget one. Call the client and take its `Outcome`.",
+      channel:
+        "`{{name}}` opens a connection outside the api client. `Request`, `EventSource` and `navigator.sendBeacon` are transports of their own; the repository's one client owns every request. Call the client and take its `Outcome`.",
       library:
-        "`{{name}}` is a second HTTP transport. The app's one client is `modules/api/client.ts`, built on `fetch`; another library there is another set of timeout, retry and error rules. Use the client.",
-      xhr: "`XMLHttpRequest` is a second transport. Use `modules/api/client.ts`.",
+        "`{{name}}` is a second HTTP transport. The repository's one client (`modules/api/client.ts` or the api package's `src/client.ts`) is built on `fetch`; another library is another set of timeout, retry and error rules. Use the client.",
+      xhr: "`XMLHttpRequest` is a second transport. Use the repository's api client.",
     },
   },
   create(context) {
     const filename = context.filename || context.getFilename()
     if (isSpecFile(filename)) return {}
-    const client = isApiClient(filename)
+    const client = isApiClient(context)
+    const library = (node, source) => {
+      if (typeof source === "string" && isTransportLibrary(source)) context.report({ node, messageId: "library", data: { name: source } })
+    }
     return {
-      CallExpression(node) {
-        if (!client && isFetchCall(node)) context.report({ node, messageId: "outside" })
-      },
-      NewExpression(node) {
-        if (node.callee.type === "Identifier" && node.callee.name === "XMLHttpRequest") {
-          context.report({ node, messageId: "xhr" })
+      "Program:exit"() {
+        for (const use of transportUses(context)) {
+          if (use.kind === "xhr") context.report({ node: use.node, messageId: "xhr" })
+          else if (client) continue
+          else if (use.kind === "fetch") context.report({ node: use.node, messageId: "outside" })
+          else context.report({ node: use.node, messageId: "channel", data: { name: use.name } })
         }
       },
       ImportDeclaration(node) {
-        const source = String(node.source.value)
-        const name = source.split("/")[0]
-        if (OTHER_TRANSPORTS.test(name)) context.report({ node, messageId: "library", data: { name: source } })
+        if (node.importKind !== "type") library(node, node.source.value)
+      },
+      ExportNamedDeclaration(node) {
+        if (node.source && node.exportKind !== "type") library(node, node.source.value)
+      },
+      ExportAllDeclaration(node) {
+        if (node.exportKind !== "type") library(node, node.source.value)
+      },
+      ImportExpression(node) {
+        if (node.source.type === "Literal") library(node, node.source.value)
+      },
+      CallExpression(node) {
+        // `require("axios")` where `require` is the CommonJS global.
+        if (node.callee.type !== "Identifier" || node.callee.name !== "require" || node.arguments[0]?.type !== "Literal") return
+        if (globalReferences(context, new Set(["require"])).includes(node.callee)) library(node, node.arguments[0].value)
       },
     }
   },
@@ -93,23 +174,39 @@ export const clientFetchHasSignal = {
     },
   },
   create(context) {
-    if (!isApiClient(context.filename || context.getFilename())) return {}
+    if (!isApiClient(context)) return {}
     return {
-      CallExpression(node) {
-        if (!isFetchCall(node)) return
-        const options = node.arguments[1]
-        if (!options) return context.report({ node, messageId: "signal" })
-        // A spread or a computed value may carry it; only a literal object that plainly lacks it is wrong.
-        if (options.type !== "ObjectExpression") return
-        const carries = options.properties.some(
-          (property) =>
-            property.type === "SpreadElement" ||
-            (property.type === "Property" && property.key.type === "Identifier" && property.key.name === "signal"),
-        )
-        if (!carries) context.report({ node, messageId: "signal" })
+      "Program:exit"() {
+        // The global `fetch` however it is reached; a request built as `new Request(url, init)` carries its signal in `init`.
+        for (const { call } of transportUses(context)) {
+          if (!call) continue
+          const options = call.arguments[1]
+          if (!options) {
+            context.report({ node: call, messageId: "signal" })
+            continue
+          }
+          // A spread or a computed value may carry it; only a literal object that plainly lacks it is wrong.
+          if (options.type !== "ObjectExpression") continue
+          const carries = options.properties.some(
+            (property) =>
+              property.type === "SpreadElement" ||
+              (property.type === "Property" && property.key.type === "Identifier" && property.key.name === "signal"),
+          )
+          if (!carries) context.report({ node: call, messageId: "signal" })
+        }
       },
     }
   },
+}
+
+/** The slots that make up the API layer: the app's `modules/api` and the shared api package. */
+const API_LAYER_SLOTS = ["fe.modules.api", "fe.transport.client", "fe.transport.outcome", "fe.package.api", "fe.package.api.client", "fe.package.api.outcome"]
+
+/** True for a file of the API layer, except the contract copy and generated output, which are data. */
+const isTransportFile = (context) => {
+  if (!inSlot(context, ...API_LAYER_SLOTS)) return false
+  const segments = hfsOf(context).relative(context.filename || context.getFilename()).split("/")
+  return !segments.includes("contract") && !segments.includes("__generated__")
 }
 
 // -- FE-TRANSPORT-3 --------------------------------------------------------------------------------
@@ -127,7 +224,7 @@ export const noSharedTransportState = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (!isApiModuleFile(filename) || isSpecFile(filename)) return {}
+    if (!isTransportFile(context) || isSpecFile(filename)) return {}
     const check = (node) => {
       const declaration = node.type === "VariableDeclaration" ? node : node.declaration
       if (!declaration || declaration.type !== "VariableDeclaration" || declaration.kind === "const") return
@@ -142,34 +239,169 @@ export const noSharedTransportState = {
 
 // -- FE-TRANSPORT-4 --------------------------------------------------------------------------------
 
-/** The client maps 401/403 to `refused`, so "sign in" is a state a reader can reach. */
+/** Removes the wrappers that do not change what an expression is. */
+const unwrap = (node) => {
+  let current = node
+  while (
+    current &&
+    (current.type === "TSAsExpression" || current.type === "TSNonNullExpression" || current.type === "TSSatisfiesExpression" || current.type === "ChainExpression")
+  ) {
+    current = current.expression
+  }
+  return current
+}
+
+/** The variable a name binds to, walking up from the scope of a node. */
+const variableOf = (context, identifier) => {
+  let scope = (context.sourceCode ?? context.getSourceCode()).getScope(identifier)
+  while (scope) {
+    const variable = scope.set.get(identifier.name)
+    if (variable) return variable
+    scope = scope.upper
+  }
+  return null
+}
+
+/** True when the type of an expression is a fetch `Response`: it has `ok`, `status` and `headers`. */
+const isResponseLike = (context, node) => {
+  const { checker, toTs } = typed(context)
+  const tsNode = toTs(node)
+  if (!tsNode) return false
+  const type = checker.getTypeAtLocation(tsNode)
+  const parts = type.isUnion?.() ? type.types : [type]
+  return parts.some((part) => ["ok", "status", "headers"].every((name) => part.getProperty?.(name)))
+}
+
+/**
+ * True when an expression is the HTTP status of a fetch response: `response.status` where the object's type is a Response, or a
+ * local bound to one (`const status = response.status`, `const { status } = response`). A parameter that is only typed `number` is
+ * not: the rule does not guess what a bare number means.
+ */
+const isResponseStatus = (context, node, depth = 0) => {
+  const expression = unwrap(node)
+  if (!expression || depth > 4) return false
+  if (expression.type === "MemberExpression") return propertyName(expression) === "status" && isResponseLike(context, unwrap(expression.object))
+  if (expression.type !== "Identifier") return false
+  const definition = variableOf(context, expression)?.defs[0]
+  if (!definition || definition.type !== "Variable") return false
+  const declarator = definition.node
+  if (declarator.id === definition.name) return declarator.init ? isResponseStatus(context, declarator.init, depth + 1) : false
+  if (declarator.id.type !== "ObjectPattern" || !declarator.init) return false
+  const bound = declarator.id.properties.find(
+    (property) => property.type === "Property" && (property.value === definition.name || (property.value.type === "AssignmentPattern" && property.value.left === definition.name)),
+  )
+  const key = bound?.key
+  const keyName = key?.type === "Identifier" ? key.name : key?.type === "Literal" ? key.value : null
+  return keyName === "status" && isResponseLike(context, unwrap(declarator.init.type === "AwaitExpression" ? declarator.init.argument : declarator.init))
+}
+
+/** The numbers a literal list stands for (`[401, 403]`, `new Set([401, 403])`, or a const bound to one), else null. */
+const numbersOf = (context, node, depth = 0) => {
+  const expression = unwrap(node)
+  if (!expression || depth > 3) return null
+  if (expression.type === "ArrayExpression") {
+    const values = expression.elements.map((element) => (element && element.type === "Literal" && typeof element.value === "number" ? element.value : null))
+    return values.includes(null) ? null : new Set(values)
+  }
+  if (expression.type === "NewExpression" && expression.callee.type === "Identifier" && expression.callee.name === "Set" && expression.arguments.length === 1) {
+    return numbersOf(context, expression.arguments[0], depth + 1)
+  }
+  if (expression.type === "Identifier") {
+    const declarator = variableOf(context, expression)?.defs[0]?.node
+    return declarator?.type === "VariableDeclarator" && declarator.init ? numbersOf(context, declarator.init, depth + 1) : null
+  }
+  return null
+}
+
+/**
+ * The status codes a test is true for, when it is a plain status comparison: `status === 401`, `a || b` of such, or a literal list
+ * containing the status (`[401, 403].includes(status)`, `new Set([401, 403]).has(status)`). Null for anything else.
+ */
+const codesOf = (context, test) => {
+  const expression = unwrap(test)
+  if (!expression) return null
+  if (expression.type === "LogicalExpression" && expression.operator === "||") {
+    const left = codesOf(context, expression.left)
+    const right = codesOf(context, expression.right)
+    return left && right ? new Set([...left, ...right]) : null
+  }
+  if (expression.type === "BinaryExpression" && (expression.operator === "===" || expression.operator === "==")) {
+    for (const [side, other] of [[expression.left, expression.right], [expression.right, expression.left]]) {
+      const literal = unwrap(other)
+      if (literal?.type === "Literal" && typeof literal.value === "number" && isResponseStatus(context, side)) return new Set([literal.value])
+    }
+    return null
+  }
+  if (expression.type === "CallExpression" && expression.callee.type === "MemberExpression" && expression.arguments.length === 1) {
+    const method = propertyName(expression.callee)
+    if ((method === "includes" || method === "has") && isResponseStatus(context, expression.arguments[0])) return numbersOf(context, expression.callee.object)
+  }
+  return null
+}
+
+/** True when a subtree builds an object whose `kind` is the literal `"refused"`. */
+const buildsRefused = (node) => {
+  let found = false
+  const visit = (current) => {
+    if (found || !current || typeof current.type !== "string") return
+    if (current.type === "Property" && !current.computed) {
+      const key = current.key
+      const named = (key.type === "Identifier" && key.name === "kind") || (key.type === "Literal" && key.value === "kind")
+      const value = unwrap(current.value)
+      if (named && value?.type === "Literal" && value.value === "refused") found = true
+    }
+    for (const [name, child] of Object.entries(current)) {
+      if (name === "parent") continue
+      if (Array.isArray(child)) child.forEach(visit)
+      else if (child && typeof child.type === "string") visit(child)
+    }
+  }
+  visit(node)
+  return found
+}
+
+/**
+ * The client maps 401 and 403 to `refused`, so "sign in" is a state a reader can reach.
+ *
+ * It judges a real branch in the client file: a comparison of the fetch response's status (typed as a `Response`) with 401 and with
+ * 403 (`===`, `||`, a literal list, a `switch` with both cases), whose consequent builds an object with `kind: "refused"`. The three
+ * literals lying anywhere in the file do not pass. A mapping delegated to a function in another file is not visible here and does
+ * not pass either: the client is the one file that owns the status meaning.
+ */
 export const clientMapsAuthToRefused = {
   meta: {
     type: "problem",
-    docs: { description: "`modules/api/client.ts` handles 401 and 403 and produces `refused`." },
+    docs: { description: "The api client branches on the response status 401 and 403 and builds a `refused` outcome there." },
     schema: [],
     messages: {
       refused:
-        "This client calls `fetch` but does not map 401 and 403 to a `refused` outcome. Without that branch a signed-out reader is reported as \"could not load\" and never reaches the sign-in state.",
+        "This client calls `fetch` but has no branch that turns a 401 and a 403 status of the response into an outcome of kind `refused`. Without that branch a signed-out reader is reported as \"could not load\" and never reaches the sign-in state. Compare `response.status` with 401 and 403 and return `{ ok: false, kind: \"refused\" }` there.",
     },
   },
   create(context) {
-    if (!isApiClient(context.filename || context.getFilename())) return {}
-    let fetches = false
-    const seen = { refused: false, 401: false, 403: false }
+    if (!isApiClient(context)) return {}
+    const covered = new Set()
+    const cover = (test, consequent) => {
+      const codes = codesOf(context, test)
+      if (codes && buildsRefused(consequent)) codes.forEach((code) => covered.add(code))
+    }
     return {
-      CallExpression(node) {
-        if (isFetchCall(node)) fetches = true
-      },
-      Literal(node) {
-        if (node.value === "refused") seen.refused = true
-        if (node.value === 401) seen[401] = true
-        if (node.value === 403) seen[403] = true
+      IfStatement: (node) => cover(node.test, node.consequent),
+      ConditionalExpression: (node) => cover(node.test, node.consequent),
+      SwitchStatement(node) {
+        if (!isResponseStatus(context, node.discriminant)) return
+        let pending = new Set()
+        for (const entry of node.cases) {
+          const label = unwrap(entry.test)
+          if (label?.type === "Literal" && typeof label.value === "number") pending.add(label.value)
+          if (entry.consequent.length === 0) continue
+          if (entry.consequent.some(buildsRefused)) pending.forEach((code) => covered.add(code))
+          pending = new Set()
+        }
       },
       "Program:exit"(program) {
-        if (fetches && !(seen.refused && seen[401] && seen[403])) {
-          context.report({ node: program, messageId: "refused" })
-        }
+        const fetches = transportUses(context).some((use) => use.kind === "fetch")
+        if (fetches && !(covered.has(401) && covered.has(403))) context.report({ node: program, messageId: "refused" })
       },
     }
   },
@@ -414,6 +646,77 @@ export const outcomeKindsExhaustive = {
   },
 }
 
+// -- FE-OUTCOME-1 ---------------------------------------------------------------------------------
+
+/** The `kind` values of an Outcome failure (HFS section 6.2, plus the session-accepted-but-denied `forbidden`): a `kind` union that carries one is a result union. */
+const RESULT_KINDS = new Set([...OUTCOME_KINDS, "forbidden"])
+
+const LITERAL_FLAGS = ts.TypeFlags.StringLiteral | ts.TypeFlags.BooleanLiteral
+
+/** The literal values of a property of an object type, or null when the property is missing or not literal-typed. */
+const literalsOf = (checker, type, name, location) => {
+  const property = type.getProperty?.(name)
+  if (!property) return null
+  const propertyType = checker.getTypeOfSymbolAtLocation(property, location)
+  const parts = propertyType.isUnion?.() ? propertyType.types : [propertyType]
+  if (!parts.every((part) => (part.flags & LITERAL_FLAGS) !== 0)) return null
+  return parts.map((part) => (part.flags & ts.TypeFlags.BooleanLiteral ? part.intrinsicName === "true" : part.value))
+}
+
+/**
+ * A result union is declared once per repository: `Outcome<T>` in the `fe.transport.outcome` / `fe.package.api.outcome` file.
+ *
+ * A union type alias is a result union when its members are object types that ALL carry the same literal-typed discriminant, in the
+ * result vocabulary: `ok` (both `true` and `false` among the members) or `kind` (at least one literal of the Outcome vocabulary:
+ * ok, refused, forbidden, invalid, not-found, unavailable). The check reads the resolved members through the checker, so
+ * `Ok<T> | Failure` and an intersection are seen as what they are, and no name (`*Outcome`, `*Result`) decides anything.
+ * A UI state union (`{ status: "idle" } | { status: "saving" }`, `{ type: ... }`, a `kind` of menu items) is not result
+ * vocabulary and passes. An alias that only composes the one union (`type Read = Outcome<Course>`, `Extract<Outcome<T>, ...>`) is not
+ * a union type node and passes; `Outcome<T> | { ok: false; kind: "conflict" }` adds an arm to the one union and is refused.
+ */
+export const oneOutcomeUnion = {
+  meta: {
+    type: "problem",
+    docs: { description: "A result union (`ok` / `kind` discriminant) is declared only in the outcome slot; elsewhere the code composes `Outcome<T>`." },
+    schema: [],
+    messages: {
+      second:
+        "`{{name}}` is a second result union ({{discriminant}}). The repository has one vocabulary, `Outcome<T>`, declared in `modules/api/outcome.ts` (or the api package's `src/outcome.ts`); a bespoke union here is a result shape the client, the status mapping and `outcome-kinds-exhaustive` know nothing about. Compose `Outcome<T>` (add the domain detail as its second parameter) instead of declaring another.",
+    },
+  },
+  create(context) {
+    if (isSpecFile(context.filename || context.getFilename()) || isOutcomeModule(context)) return {}
+    const { checker, toTs } = typed(context)
+    return {
+      TSTypeAliasDeclaration(node) {
+        let annotation = node.typeAnnotation
+        while (annotation.type === "TSParenthesizedType") annotation = annotation.typeAnnotation
+        if (annotation.type !== "TSUnionType") return
+        const tsNode = toTs(node)
+        if (!tsNode) return
+        const type = checker.getTypeAtLocation(tsNode.name)
+        if (!type.isUnion?.() || type.types.length < 2) return
+        // The members must all be object types (an object, or an intersection of them).
+        if (!type.types.every((member) => (member.flags & (ts.TypeFlags.Object | ts.TypeFlags.Intersection)) !== 0)) return
+        for (const discriminant of ["ok", "kind"]) {
+          const values = type.types.map((member) => literalsOf(checker, member, discriminant, tsNode))
+          if (values.some((entry) => entry === null)) continue
+          const flat = values.flat()
+          // `ok` is a discriminant only when each member pins it to one value; `{ ok: boolean }` on every member is a flag, not a tag.
+          const isResult =
+            discriminant === "ok"
+              ? values.every((entry) => entry.length === 1) && flat.includes(true) && flat.includes(false)
+              : flat.some((value) => RESULT_KINDS.has(value))
+          if (isResult) {
+            context.report({ node: node.id, messageId: "second", data: { name: node.id.name, discriminant: `\`${discriminant}\` discriminant` } })
+            return
+          }
+        }
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "fetch-only-in-api-client": fetchOnlyInApiClient,
@@ -423,6 +726,7 @@ export const rules = {
   "no-http-status-collapse": noHttpStatusCollapse,
   "no-hand-typed-wire": noHandTypedWire,
   "outcome-kinds-exhaustive": outcomeKindsExhaustive,
+  "one-outcome-union": oneOutcomeUnion,
 }
 
 /** Every rule is an error: a second transport or a status collapse is the defect, not a style. */
