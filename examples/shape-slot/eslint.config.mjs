@@ -3,7 +3,7 @@
  * only which globs the law applies to. This is an HFS FE repository (apps/<app>/src), so the canon
  * attaches with layout "monorepo"; every block is scoped to APP_GLOBS.
  */
-import { starciFeConfig } from "@starci/eslint-canon-fe"
+import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"
 
 import js from "@eslint/js"
 import globals from "globals"
@@ -60,7 +60,7 @@ export default defineConfig([
             "react/prop-types": "off",
         },
     },
-    ...starciFeConfig({ layout: "monorepo" }),
+    ...starciFeConfig({ hfs: loadHfs(import.meta.url) }),
     {
         // A connected block and its pure twin are an architectural boundary, not a local lint
         // preference. Inline config is disabled in both halves so neither `eslint-disable` nor

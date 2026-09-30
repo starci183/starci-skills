@@ -6,7 +6,7 @@
  * layout "monorepo" - its component tree lives at `apps/<app>/src/**`, which is exactly the
  * glob the monorepo branch governs. "single-app" would match nothing here.
  */
-import { starciFeConfig } from "@starci/eslint-canon-fe"
+import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"
 
 import js from "@eslint/js"
 import globals from "globals"
@@ -61,7 +61,7 @@ export default defineConfig([{
         "@typescript-eslint/array-type": ["error", { default: "generic", readonly: "generic" }],
         "react/prop-types": "off",
     },
-}, ...starciFeConfig({ layout: "monorepo" }), {
+}, ...starciFeConfig({ hfs: loadHfs(import.meta.url) }), {
     /*
      * Lang/dictionary files are the ONE place Vietnamese and non-ASCII content belongs. The
      * exemption lives in the config (not inline comments, which noInlineConfig refuses) so a

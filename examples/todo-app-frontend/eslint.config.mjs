@@ -4,7 +4,7 @@
  * starci-academy-fe/eslint.config.mjs, with every block scoped to APP_GLOBS - this example tree
  * also holds out-of-lane scratch (scripts/ harnesses, e2e/) that lint must not govern.
  */
-import { starciFeConfig } from "@starci/eslint-canon-fe"
+import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"
 
 import js from "@eslint/js"
 import globals from "globals"
@@ -61,7 +61,7 @@ export default defineConfig([
             "react/prop-types": "off",
         },
     },
-    ...starciFeConfig({ layout: "monorepo" }),
+    ...starciFeConfig({ hfs: loadHfs(import.meta.url) }),
     {
         // A connected block and its pure twin are an architectural boundary, not a local lint
         // preference. Inline config is disabled in both halves so neither `eslint-disable` nor
