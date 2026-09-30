@@ -37,6 +37,11 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       { filename: "D:/repo/src/components/blocks/Feed/index.tsx", code: DIRECTIVE },
       { filename: "D:/repo/src/components/leaves/Menu/index.tsx", code: DIRECTIVE },
       { filename: "D:/repo/src/features/overlays/Compose/index.tsx", code: DIRECTIVE },
+      // a workspace package keeps its grammar tiers at src/<tier>, with no components/ folder
+      { filename: "D:/repo/packages/nivo-ui/src/leaves/NivoIcon/index.tsx", code: DIRECTIVE },
+      { filename: "D:/repo/packages/nivo-ui/src/leaves/NivoGrammar/index.ts", code: DIRECTIVE },
+      { filename: "D:/repo/packages/nivo-ui/src/branches/Rail/component.tsx", code: DIRECTIVE },
+      { filename: "D:/repo/packages/ui/src/branches/Rail/index.tsx", code: DIRECTIVE },
       { filename: "D:/repo/src/app/error.tsx", code: DIRECTIVE },
       { filename: "D:/repo/src/app/global-error.tsx", code: DIRECTIVE },
       { filename: "D:/repo/src/app/[locale]/error.tsx", code: DIRECTIVE },
@@ -57,6 +62,10 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       { filename: "D:/repo/src/features/layouts/Shell/index.tsx", code: DIRECTIVE, errors: [{ messageId: "slot" }] },
       { filename: "D:/repo/src/features/pages/Home/index.tsx", code: DIRECTIVE, errors: [{ messageId: "slot" }] },
       { filename: "D:/repo/src/components/composites/Row/index.tsx", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      // the package layout does not widen the app layout, and a package composite is not a boundary
+      { filename: "D:/repo/packages/nivo-ui/src/composites/Row/index.tsx", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: "D:/repo/apps/app/src/leaves/Menu/index.tsx", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: "D:/repo/apps/app/src/components/branches/Rail/index.tsx", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: "D:/repo/src/components/blocks/Feed/component.tsx", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: "D:/repo/src/hooks/session/useSession.ts", code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: "D:/repo/src/modules/api/client.ts", code: "'use client'\nexport const x = 1", errors: [{ messageId: "elsewhere" }] },

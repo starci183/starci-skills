@@ -15,7 +15,7 @@
  * above it is a server component and must not have one.
  */
 
-import { ROUTE_SLOTS, isSpecFile, stem } from "./lib/scope.mjs"
+import { PACKAGE_TIERS, ROUTE_SLOTS, isSpecFile, stem } from "./lib/scope.mjs"
 import { normalizePath } from "./lib/path.mjs"
 
 /** The framework's own client-only files. */
@@ -27,12 +27,22 @@ const clientDirective = (program) =>
     (statement) => statement.type === "ExpressionStatement" && statement.directive === "use client",
   ) ?? null
 
+/**
+ * The component tiers of a workspace package sit directly under `src/` (grammar tier names,
+ * `slots.yaml` `fe.package.ui`: composites, branches, leaves), with no `components/` folder above
+ * them. A package has no data layer, so its interactive tiers, branches and leaves, are where the
+ * directive is legitimate; a composite is presentation and stays a server-safe component.
+ */
+const PACKAGE_CLIENT_TIERS = PACKAGE_TIERS.filter((tier) => tier !== "composites")
+const PACKAGE_TIER = new RegExp(`/packages/[^/]+/src/(?:${PACKAGE_CLIENT_TIERS.join("|")})/`)
+
 /** Where the directive is a legitimate boundary. */
 const isBoundary = (file) =>
   FRAMEWORK_CLIENT.has(stem(file)) ||
   (/\/components\/blocks\//.test(file) && stem(file) === "index") ||
   (/\/features\/overlays\//.test(file) && stem(file) === "index") ||
-  /\/components\/leaves\//.test(file)
+  /\/components\/leaves\//.test(file) ||
+  PACKAGE_TIER.test(file)
 
 /** The slot a file fills in the route tree, when it fills one. */
 const slotOf = (file) => {

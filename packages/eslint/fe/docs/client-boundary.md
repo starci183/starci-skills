@@ -2,7 +2,7 @@
 
 Law module: `client-boundary.mjs`. Catalogue: R55 FE_CLIENT_BOUNDARY.
 
-Server first. `"use client"` appears only on the `index.tsx` of an interactive block (or overlay), on a leaf whose interaction is intrinsic, and on `error.tsx` / `global-error.tsx`, which Next requires to be client components. Routes, pages and layouts are server components.
+Server first. `"use client"` appears only on the `index.tsx` of an interactive block (or overlay), on a leaf whose interaction is intrinsic, on a branch or leaf of a workspace package (`packages/<pkg>/src/{branches,leaves}/`, where the grammar tiers sit directly under `src/`), and on `error.tsx` / `global-error.tsx`, which Next requires to be client components. Routes, pages and layouts are server components.
 
 Every rule below is an error in `starciFeConfig`; none can be switched off or suppressed inline.
 

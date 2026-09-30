@@ -37,3 +37,6 @@ export const baseName = (filename) => normalizePath(filename).split("/").pop() ?
 
 /** The file name with its extension removed. */
 export const stem = (filename) => baseName(filename).replace(/\.[cm]?[jt]sx?$/, "")
+
+/** The component tiers a workspace package holds directly under `src/` (`slots.yaml` `fe.package.ui`). */
+export const PACKAGE_TIERS = ["composites", "branches", "leaves"]
