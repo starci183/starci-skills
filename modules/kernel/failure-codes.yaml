@@ -934,11 +934,23 @@ CANON_INSTALL_MISMATCH:
 CANON_INSTALL_MISSING:
   title: "Canon is not installed in the app"
   title_vi: "Ứng dụng chưa cài canon"
-  meaning_vi: "Gói canon của một hồ sơ không phân giải được từ thư mục phía tương ứng của ứng dụng; gate không chạy được (thoát 2), không bao giờ coi là đạt."
+  meaning_vi: "Gói canon của một hồ sơ không phân giải được từ thư mục phía tương ứng của ứng dụng, bên trong gốc ứng dụng (node_modules của repository bao ngoài không được tính); gate không chạy được (thoát 2), không bao giờ coi là đạt."
   causes_vi:
     - "Chưa cài phụ thuộc của ứng dụng"
     - "package.json của ứng dụng không khai báo gói canon"
   nextStep_vi: "Khai báo và cài đúng phiên bản canon đã ghim từ npm registry rồi chạy lại gate."
+  owner: op-retry
+  kind: check-finding
+
+GATE_INSTALL_MISSING:
+  title: "The gate cannot type-check an app with no install"
+  title_vi: "Gate không kiểm tra kiểu được vì ứng dụng chưa cài phụ thuộc"
+  meaning_vi: "Gốc ứng dụng của một dự án tsconfig (gốc có hfs.json loại app, hoặc gốc có lockfile gần nhất) hoặc phía của nó không có node_modules, hoặc typescript không được cài bên trong gốc đó. Gate chỉ đọc trong gốc ứng dụng, không bao giờ dùng node_modules của repository bao ngoài, nên không đo được; gate thoát 2, không so sánh và không bao giờ coi là đạt."
+  causes_vi:
+    - "Chưa cài phụ thuộc của ứng dụng (hoặc của phía be/, fe/)"
+    - "Ứng dụng nằm trong một repository khác và trước đây chỉ chạy nhờ node_modules của repository đó"
+    - "typescript không có trong phụ thuộc của ứng dụng"
+  nextStep_vi: "Cài phụ thuộc của chính ứng dụng (khai báo typescript và mọi gói nó import) rồi chạy lại gate."
   owner: op-retry
   kind: check-finding
 

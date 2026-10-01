@@ -11,7 +11,13 @@
 //   2. before any tsc: the root `codegen` script and the build of every workspace package that exposes a `dist` export
 //      (each skipped while its inputs are unchanged since its last run in this worktree);
 //   3. tsc, one incremental program per tsconfig that owns a changed file (be/, each fe app or package), through the compiler
-//      API, its buildinfo in this worktree's git dir; the worktree's own stale *.tsbuildinfo files are deleted first;
+//      API, its buildinfo in this worktree's git dir; the worktree's own stale *.tsbuildinfo files are deleted first. Both the
+//      head and the base program are BOUNDED to the project's app root (appRootOf: the root of hfs.json of kind app, else the
+//      nearest lockfile root): their host answers no path above it except TypeScript's own lib directory, and realpath is the
+//      identity (preserveSymlinks), so a junctioned install inside the app stays inside it. An app nested in another repository
+//      (the runtime's examples inside the host repo) never resolves the enclosing node_modules: an import the app does not
+//      install is TS2307. An app root (or side) with no node_modules is a tool that could not run (exit 2,
+//      GATE_INSTALL_MISSING), never measured; the installed canon below is resolved inside the same app root;
 //   4. with --tests, the slice's unit/integration specs (jest --maxWorkers=2);
 //   0. first, the INSTALLED CANON: for every profile of modules/models/code-patterns.yaml, the canon package its pin's side (be/, fe/)
 //      resolves must carry the bound canon.version and canon.contentDigest (scripts/lib/canon-digest.mjs over the installed
@@ -40,7 +46,8 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { runGit } from '../lib/git.mjs';
-import { posixPath } from '../lib/path-key.mjs';
+import { pathKey, posixPath } from '../lib/path-key.mjs';
+import { APP_SCOPE, HFS_DECLARATION_FILE, locateDeclaration } from '../lib/hfs-slots.mjs';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { isMain, walkFiles } from './common.mjs';
@@ -57,6 +64,11 @@ const TS_SOURCE = /\.(?:[cm]?tsx?)$/;
 const ESLINT_CONFIGS = ['eslint.config.mjs', 'eslint.config.js', 'eslint.config.cjs', 'eslint.config.ts', 'eslint.config.mts', 'eslint.config.cts'];
 const JEST_CONFIGS = ['jest.config.js', 'jest.config.ts', 'jest.config.mjs', 'jest.config.cjs', 'jest.config.json'];
 const LINT_CHUNK = 150;
+const LOCKFILES = ['package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock'];
+/** The bound method of the tsc programs; part of every tsc cache key, so a result measured unbounded is never reused. */
+const TSC_BOUND = 'bounded-v1';
+/** A tsc project whose app root (or side) has no install, or no typescript inside it: never measured (exit 2). */
+const INSTALL_MISSING = 'GATE_INSTALL_MISSING';
 const LISTED_MAX = 500;
 const USAGE = 'usage: gate.mjs --root <app> [--base <commit>] [--main <ref>] [--changed <file>...] [--tests <pattern>] [--out <file>] | gate.mjs --profile docs [--tree <work root>] [--out <file>]';
 export const DOC_PROFILE = 'docs';
@@ -353,20 +365,84 @@ const errorsOf = (ts, diagnostics, root) => diagnostics.filter((d) => d.category
 const programDiagnostics = (program) => [...program.getConfigFileParsingDiagnostics(), ...program.getOptionsDiagnostics(), ...program.getGlobalDiagnostics(), ...program.getSyntacticDiagnostics(), ...program.getSemanticDiagnostics()];
 const NO_OUTPUT = { noEmit: true, composite: false, declaration: false, declarationMap: false, emitDeclarationOnly: false, sourceMap: false };
 
-function loadTypeScript(root, project) {
-  const require = createRequire(path.join(root, path.dirname(project), 'package.json'));
-  return require(require.resolve('typescript'));
+const isAppDeclaration = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, HFS_DECLARATION_FILE), 'utf8'))?.kind === APP_SCOPE; } catch { return false; } };
+
+/**
+ * The app root of `project` (the root-relative path of a file in it, e.g. its tsconfig.json): the nearest directory from the
+ * project up to `root` that holds hfs.json of kind app, else the app whose side folder `root` is, else the nearest lockfile
+ * root on that walk, else `root`. Nothing a type-check of the project reads may lie above it.
+ */
+export function appRootOf(root, project) {
+  const top = path.resolve(root);
+  let lockRoot = null;
+  for (let dir = path.dirname(path.resolve(top, project)); ; dir = path.dirname(dir)) {
+    if (isAppDeclaration(dir)) return dir;
+    if (!lockRoot && LOCKFILES.some((name) => fs.existsSync(path.join(dir, name)))) lockRoot = dir;
+    if (pathKey(dir) === pathKey(top) || path.dirname(dir) === dir) break;
+  }
+  const { appRoot } = locateDeclaration(top);
+  if (pathKey(appRoot) !== pathKey(top) && isAppDeclaration(appRoot)) return appRoot;
+  return lockRoot ?? top;
 }
 
-/** The head program of one project: incremental, its buildinfo in the worktree's git dir. */
-function headTsc(ts, root, project, cache) {
+/** Whether `project` has an install: a node_modules in its folder or one above it, up to `bound` (the app root or the side). */
+function hasInstall(bound, root, project) {
+  for (let dir = path.dirname(path.resolve(root, project)); ; dir = path.dirname(dir)) {
+    if (fs.existsSync(path.join(dir, 'node_modules'))) return true;
+    if (pathKey(dir) === pathKey(bound) || path.dirname(dir) === dir) return false;
+  }
+}
+
+/**
+ * `base` (a ts.sys shape) answering only for paths inside `bound`, TypeScript's lib directory and the `allow`ed files; realpath
+ * is the identity. Every program of the gate reads through one, so nothing above the app root satisfies an import.
+ */
+export function boundedSys(ts, bound, base = ts.sys, allow = []) {
+  const roots = [pathKey(bound), pathKey(path.dirname(ts.getDefaultLibFilePath({})))];
+  const extra = new Set(allow.map(pathKey));
+  const inside = (p) => { const key = pathKey(p); return extra.has(key) || roots.some((r) => key === r || key.startsWith(`${r}/`)); };
+  return { ...base,
+    fileExists: (p) => inside(p) && base.fileExists(p),
+    directoryExists: (p) => inside(p) && base.directoryExists(p),
+    readFile: (p, encoding) => (inside(p) ? base.readFile(p, encoding) : undefined),
+    getDirectories: (p) => (inside(p) ? base.getDirectories(p) : []),
+    readDirectory: (dir, ext, exclude, include, depth) => (inside(dir) ? base.readDirectory(dir, ext, exclude, include, depth).filter(inside) : []),
+    realpath: (p) => p,
+    onUnRecoverableConfigFileDiagnostic: () => {} };
+}
+
+/** The compiler host of `host` rewired onto a bounded sys: every lookup, and every source file, goes through it. */
+function boundHost(ts, host, sys) {
+  return Object.assign(host, {
+    fileExists: sys.fileExists, directoryExists: sys.directoryExists, readFile: sys.readFile, getDirectories: sys.getDirectories, realpath: sys.realpath,
+    getSourceFile: (fileName, languageVersion) => { const text = sys.readFile(fileName); return text === undefined ? undefined : ts.createSourceFile(fileName, text, languageVersion); },
+  });
+}
+
+/** The app's own TypeScript: the first node_modules/typescript from the project's folder up to `bound`, never above it. */
+function loadTypeScript(bound, root, project) {
+  for (let dir = path.dirname(path.resolve(root, project)); ; dir = path.dirname(dir)) {
+    const candidate = path.join(dir, 'node_modules', 'typescript');
+    if (fs.existsSync(path.join(candidate, 'package.json'))) return createRequire(import.meta.url)(candidate);
+    if (pathKey(dir) === pathKey(bound) || path.dirname(dir) === dir) break;
+  }
+  throw new Error(`${INSTALL_MISSING} typescript is not installed under the app root ${posixPath(path.relative(root, bound)) || '.'}`);
+}
+
+/**
+ * The head program of one project, bounded to `bound`: incremental, its buildinfo in the worktree's git dir (the one file
+ * outside the bound it may read). The incremental host is built over the bounded sys, so its own versioned getSourceFile
+ * reads through it.
+ */
+function headTsc(ts, root, project, { bound, cache }) {
   const configPath = path.join(root, project);
-  const parsed = ts.getParsedCommandLineOfConfigFile(configPath, {}, { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => {} });
-  if (!parsed) throw new Error(`${project} could not be read`);
-  const buildInfo = path.join(cache.worktree, 'tsbuildinfo', `${sha256(`${project}\0${ts.version}\0${fs.readFileSync(configPath, 'utf8')}`).slice(0, 24)}.tsbuildinfo`);
+  const buildInfo = path.join(cache.worktree, 'tsbuildinfo', `${sha256(`${TSC_BOUND}\0${project}\0${ts.version}\0${fs.readFileSync(configPath, 'utf8')}`).slice(0, 24)}.tsbuildinfo`);
   fs.mkdirSync(path.dirname(buildInfo), { recursive: true });
-  const options = { ...parsed.options, ...NO_OUTPUT, incremental: true, tsBuildInfoFile: buildInfo };
-  const program = ts.createIncrementalProgram({ rootNames: parsed.fileNames, options, projectReferences: parsed.projectReferences, configFileParsingDiagnostics: ts.getConfigFileParsingDiagnostics(parsed), host: ts.createIncrementalCompilerHost(options) });
+  const sys = boundedSys(ts, bound, ts.sys, [buildInfo]);
+  const parsed = ts.getParsedCommandLineOfConfigFile(configPath, {}, sys);
+  if (!parsed) throw new Error(`${project} could not be read`);
+  const options = { ...parsed.options, ...NO_OUTPUT, incremental: true, tsBuildInfoFile: buildInfo, preserveSymlinks: true };
+  const program = ts.createIncrementalProgram({ rootNames: parsed.fileNames, options, projectReferences: parsed.projectReferences, configFileParsingDiagnostics: ts.getConfigFileParsingDiagnostics(parsed), host: ts.createIncrementalCompilerHost(options, sys) });
   const findings = errorsOf(ts, programDiagnostics(program), root);
   program.emit();
   return findings;
@@ -375,10 +451,10 @@ function headTsc(ts, root, project, cache) {
 /**
  * The base program of one project, read-only: a host whose files are the working tree's except every path the delta changed,
  * which reads its base blob (an added or renamed-to file does not exist, a deleted or renamed-from one comes back). A base
- * finding on a rename source is keyed at its new path. Cached per (base, project, renames).
+ * finding on a rename source is keyed at its new path. Bounded to `bound` like the head. Cached per (base, project, bound, renames).
  */
-function baseTsc(ts, root, project, { base, delta, readBase, cache }) {
-  const cacheFile = path.join(cache.shared, 'tsc', `${sha256(`${base}\0${project}\0${ts.version}\0${JSON.stringify([...delta.renamed])}`)}.json`);
+function baseTsc(ts, root, project, { bound, base, delta, readBase, cache }) {
+  const cacheFile = path.join(cache.shared, 'tsc', `${sha256(`${TSC_BOUND}\0${base}\0${project}\0${posixPath(path.relative(root, bound))}\0${ts.version}\0${JSON.stringify([...delta.renamed])}`)}.json`);
   const cached = readCache(cacheFile);
   if (cached) return cached;
   const abs = (rel) => posixPath(path.resolve(root, rel));
@@ -392,17 +468,13 @@ function baseTsc(ts, root, project, { base, delta, readBase, cache }) {
   };
   const exists = (fileName) => { const rel = overlay.get(posixPath(path.resolve(fileName))); return rel === undefined ? ts.sys.fileExists(fileName) : !absent(rel) && readBase(rel) !== null; };
   const deletedSources = [...delta.deleted].filter((rel) => TS_SOURCE.test(rel)).map((rel) => path.resolve(root, rel));
-  const sys = { ...ts.sys, readFile: read, fileExists: exists, onUnRecoverableConfigFileDiagnostic: () => {},
+  const sys = boundedSys(ts, bound, { ...ts.sys, readFile: read, fileExists: exists,
     readDirectory: (dir, ext, exclude, include, depth) => [...ts.sys.readDirectory(dir, ext, exclude, include, depth).filter((f) => exists(f)),
-      ...deletedSources.filter((f) => posixPath(f).startsWith(`${posixPath(path.resolve(dir))}/`))] };
+      ...deletedSources.filter((f) => posixPath(f).startsWith(`${posixPath(path.resolve(dir))}/`))] });
   const parsed = ts.getParsedCommandLineOfConfigFile(path.join(root, project), {}, sys);
   if (!parsed) return writeBack(cacheFile, []);
-  const options = { ...parsed.options, ...NO_OUTPUT, incremental: false };
-  const host = ts.createCompilerHost(options);
-  Object.assign(host, {
-    readFile: read, fileExists: exists,
-    getSourceFile: (fileName, languageVersion) => { const text = read(fileName); return text === undefined ? undefined : ts.createSourceFile(fileName, text, languageVersion); },
-  });
+  const options = { ...parsed.options, ...NO_OUTPUT, incremental: false, preserveSymlinks: true };
+  const host = boundHost(ts, ts.createCompilerHost(options), sys);
   const program = ts.createProgram({ rootNames: [...new Set(parsed.fileNames)], options, projectReferences: parsed.projectReferences, host });
   const movedTo = new Map([...delta.renamed].map(([to, from]) => [from, to]));
   const moved = (finding) => (finding.path && movedTo.has(finding.path)
@@ -542,9 +614,13 @@ export function mergeGuard(root, { base, head = 'HEAD', mainTip = mainTipOf(root
 
 const INSTALL = Object.freeze({ missing: 'CANON_INSTALL_MISSING', mismatch: 'CANON_INSTALL_MISMATCH', unjudged: 'CANON_INSTALL_UNJUDGED' });
 
-/** The installed root of package `name` as node resolves it from `directory` (its node_modules walk), or null. */
-function installedPackageRoot(directory, name) {
-  const searched = createRequire(path.join(directory, 'package.json')).resolve.paths(name) ?? [];
+/**
+ * The installed root of package `name` as node resolves it from `directory` (its node_modules walk), never above `bound` (the
+ * app root, appRootOf): a canon in an enclosing repository's node_modules is not this app's install. Null when none.
+ */
+function installedPackageRoot(directory, name, bound) {
+  const top = pathKey(bound);
+  const searched = (createRequire(path.join(directory, 'package.json')).resolve.paths(name) ?? []).filter((modules) => pathKey(modules).startsWith(`${top}/`));
   for (const modules of searched) {
     const candidate = path.join(modules, ...name.split('/'));
     if (fs.existsSync(path.join(candidate, 'package.json'))) return fs.realpathSync(candidate);
@@ -567,7 +643,7 @@ export function installedCanonFindings(root, { runtime = runtimeRoot } = {}) {
   for (const [profile, value] of Object.entries(profiles)) {
     const canon = value?.canon, side = pins[canon?.package]?.side;
     if (!canon?.package || typeof side !== 'string') { out.errors.push(`${INSTALL.unjudged} profile ${profile}: canon.package ${canon?.package} has no pinned side`); continue; }
-    const installed = installedPackageRoot(path.join(root, side), canon.package);
+    const installed = installedPackageRoot(path.join(root, side), canon.package, appRootOf(root, path.join(side, 'package.json')));
     if (!installed) { out.errors.push(`${INSTALL.missing} profile ${profile}: ${canon.package} does not resolve from ${side}/ of the app; install the pinned ${canon.version}`); continue; }
     const where = posixPath(path.relative(root, installed));
     let version, digest;
@@ -640,10 +716,16 @@ export async function runGate({ root, base = null, changed = null, tests = null,
     report.errors.push(...prepared.errors);
     if (!prepared.errors.length) for (const project of projects) {
       const started = Date.now();
+      // No install, no measurement: a program over an app with no node_modules would only count its missing imports.
+      const bound = appRootOf(root, project);
+      if (!hasInstall(bound, root, project)) {
+        report.errors.push(`${INSTALL_MISSING} tsc cannot measure ${project}: its app root ${posixPath(path.relative(root, bound)) || '.'} (or its side) has no install (node_modules); install it and re-run`);
+        continue;
+      }
       try {
-        const ts = typescript ?? loadTypeScript(root, project);
-        const head = headTsc(ts, root, project, cache);
-        const baseFindings = head.length ? baseTsc(ts, root, project, { base: report.base, delta, readBase, cache }) : [];
+        const ts = typescript ?? loadTypeScript(bound, root, project);
+        const head = headTsc(ts, root, project, { bound, cache });
+        const baseFindings = head.length ? baseTsc(ts, root, project, { bound, base: report.base, delta, readBase, cache }) : [];
         const judged = newTscFindings(head, baseFindings);
         report.steps.tsc.push({ project, errors: head.length, new: judged.fresh.length, preexisting: judged.preexisting, ms: Date.now() - started });
         fresh.push(...judged.fresh.map(({ key, ...finding }) => finding));

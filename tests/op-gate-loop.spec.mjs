@@ -11,7 +11,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { fileReport, inspectLedger, ledgerFileFor, openLedger, writeContract, recordCheckRun } from '../engine/ledger-db.mjs';
-import { GATE_EXIT, GATE_SCHEMA, droppedMainChanges, mergeGuard, newLintFindings, newTscFindings, parseGateArgs, runGate } from '../scripts/checks/gate.mjs';
+import { GATE_EXIT, GATE_SCHEMA, appRootOf, droppedMainChanges, mergeGuard, newLintFindings, newTscFindings, parseGateArgs, runGate } from '../scripts/checks/gate.mjs';
 import { DIGEST_SCHEMA } from '../scripts/checks/read-digest.mjs';
 import { OP_GATE_CHANGE, judgeLoop } from '../scripts/kernel/gate-settle.mjs';
 import { loadContractChanges } from '../scripts/kernel/contract-version.mjs';
@@ -38,8 +38,9 @@ function hfsStub(t, findings = []) {
  * package.json and hfs.json of kind app, a be/ side and an fe/ app - committed on main, with a lane branch checked out. The
  * published canons are installed under node_modules (ignored), as the registry installs them; the gate judges that install.
  */
-function appFixture(t, { baseFiles = {} } = {}) {
-  const root = tmp(t);
+function appFixture(t, { baseFiles = {}, within = null, install = true } = {}) {
+  const root = within ? path.join(within, 'app') : tmp(t);
+  fs.mkdirSync(root, { recursive: true });
   const git = gitIn(root);
   git('init', '-q', '-b', 'main');
   for (const [k, v] of [['user.email', 'spec@starci.test'], ['user.name', 'spec'], ['core.autocrlf', 'false'], ['commit.gpgsign', 'false']]) git('config', k, v);
@@ -54,7 +55,7 @@ function appFixture(t, { baseFiles = {} } = {}) {
   put(root, 'fe/apps/web/tsconfig.json', JSON.stringify({ compilerOptions: { ...strict, jsx: 'preserve' }, include: ['src'] }));
   put(root, 'fe/apps/web/src/page.tsx', 'export const title: string = "home";\n');
   for (const [rel, body] of Object.entries(baseFiles)) put(root, rel, body);
-  installCanons(root);
+  if (install) installCanons(root);
   git('add', '-A'); git('commit', '-q', '-m', 'scaffold');
   const base = git('rev-parse', 'HEAD');
   git('checkout', '-q', '-b', 'lane');
@@ -114,6 +115,59 @@ test('a tool that could not run is exit 2, never a pass', async (t) => {
   assert.equal(report.exit, GATE_EXIT.toolFailed);
   assert.equal(report.ok, false);
   assert.match(report.errors.join(' '), /hfs lint produced no starci\/lint@1 report/);
+});
+
+/* --------------------------------------------- the bound: no type-check resolves above the app root */
+
+/** A package `leaky` (declarations only) installed under `dir`/node_modules. */
+const installLeaky = (dir) => {
+  put(dir, 'node_modules/leaky/package.json', JSON.stringify({ name: 'leaky', version: '1.0.0', types: 'index.d.ts' }));
+  put(dir, 'node_modules/leaky/index.d.ts', 'export declare const leak: number;\n');
+};
+/** A directory standing for the enclosing repository: its own lockfile and node_modules holding `leaky`. */
+const hostRepo = (t) => { const host = tmp(t, 'starci-op-gate-host-'); put(host, 'package-lock.json', '{}\n'); installLeaky(host); return host; };
+const IMPORTS_LEAKY = "import { leak } from 'leaky';\nexport const a: number = leak;\n";
+
+test('BOUND: an app nested in a repository whose node_modules holds a package the app does not install gets TS2307 for it', async (t) => {
+  const { root, git, base } = appFixture(t, { within: hostRepo(t) });
+  put(root, 'be/src/a.ts', IMPORTS_LEAKY);
+  git('commit', '-qam', 'import a package only the enclosing repository installs');
+  const report = await runGate({ root, base, changed: ['be/src/a.ts'], hfs: hfsStub(t), ts });
+  assert.equal(report.exit, GATE_EXIT.findings, JSON.stringify(report.errors));
+  assert.deepEqual(report.findings.map((f) => [f.engine, f.rule, f.path]), [['tsc', 'TS2307', 'be/src/a.ts']]);
+  assert.match(report.findings[0].message, /'leaky'/);
+});
+
+test('BOUND: the same nested app that installs the package itself is clean', async (t) => {
+  const { root, git, base } = appFixture(t, { within: hostRepo(t) });
+  installLeaky(root);
+  put(root, 'be/src/a.ts', IMPORTS_LEAKY);
+  git('commit', '-qam', 'import a package the app installs');
+  const report = await runGate({ root, base, changed: ['be/src/a.ts'], hfs: hfsStub(t), ts });
+  assert.equal(report.exit, GATE_EXIT.clean, JSON.stringify([report.errors, report.findings]));
+  assert.deepEqual(report.steps.tsc.map((s) => [s.project, s.errors]), [['be/tsconfig.json', 0]]);
+});
+
+test('BOUND: an app with no node_modules is never measured: exit 2, no tsc step, even inside a repository that has an install', async (t) => {
+  const { root, git, base } = appFixture(t, { within: hostRepo(t), install: false });
+  put(root, 'be/src/a.ts', 'export const a: number = 5;\n');
+  git('commit', '-qam', 'slice');
+  const report = await runGate({ root, base, changed: ['be/src/a.ts'], hfs: hfsStub(t), ts });
+  assert.equal(report.exit, GATE_EXIT.toolFailed);
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.steps.tsc, []);
+  assert.ok(report.errors.some((e) => /^GATE_INSTALL_MISSING tsc cannot measure be\/tsconfig\.json: its app root \. \(or its side\) has no install \(node_modules\)/.test(e)), JSON.stringify(report.errors));
+  assert.ok(report.errors.some((e) => e.startsWith('CANON_INSTALL_MISSING')), "the canon in the enclosing node_modules is not the app's install either");
+});
+
+test('BOUND: appRootOf is the hfs.json app root, else the nearest lockfile root, never above the gate root', (t) => {
+  const { root } = appFixture(t, { within: hostRepo(t), install: false });
+  assert.equal(appRootOf(root, 'be/tsconfig.json'), root);
+  assert.equal(appRootOf(path.join(root, 'be'), 'tsconfig.json'), root, 'a side root resolves to its app');
+  const plain = tmp(t);
+  put(plain, 'pkg/package-lock.json', '{}\n');
+  assert.equal(appRootOf(plain, 'pkg/src/tsconfig.json'), path.join(plain, 'pkg'));
+  assert.equal(appRootOf(plain, 'other/tsconfig.json'), plain);
 });
 
 /* ------------------------------------------------------------------ the merge guard (merge 9958cce38) */
