@@ -61,6 +61,10 @@ test("a source file name is index.ts, main.ts, a migration or <kebab-name>.<suff
         "src/tests/world/kit/free-ports.ts",
         "src/tests/world/kit/Bad_Name.ts",
         "src/tests/world/poll.ts",
+        "src/tests/world/fakes/sepay/server.ts",
+        "src/tests/world/fakes/sepay/sepay.server.ts",
+        "src/tests/world/fakes/sepay/payload.service.ts",
+        "src/tests/world/fakes/server.ts",
         "src/tests/fixtures/builders/order.builder.ts",
         "src/tests/fixtures/order.fixture.ts",
         "src/tests/fixtures/order.factory.ts",
@@ -81,6 +85,9 @@ test("a source file name is index.ts, main.ts, a migration or <kebab-name>.<suff
             s.good("src/modules/domain/stock/persistence/migrations/20260101000000-create-stock.ts"),
             s.good("src/tests/world/kit/poll.ts"),
             s.good("src/tests/world/kit/free-ports.ts"),
+            // the fake server of a provider: be.tests.world allows the literal fakes/<provider>/server.ts
+            s.good("src/tests/world/fakes/sepay/server.ts"),
+            s.good("src/tests/world/fakes/sepay/payload.service.ts"),
             s.good("src/tests/fixtures/builders/order.builder.ts"),
             // a path no slot owns is slot-undeclared's, not this rule's
             s.good("src/stray/Not_Owned.ts"),
@@ -94,6 +101,9 @@ test("a source file name is index.ts, main.ts, a migration or <kebab-name>.<suff
             "src/features/orders/application/order.builder.ts",
             "src/tests/world/kit/Bad_Name.ts",
             "src/tests/world/poll.ts",
+            // server is no role suffix, and server.ts is the provider folder's literal name only
+            "src/tests/world/fakes/sepay/sepay.server.ts",
+            "src/tests/world/fakes/server.ts",
             "src/tests/fixtures/order.fixture.ts",
             "src/tests/fixtures/order.factory.ts",
             "src/tests/fixtures/order.repository.ts",

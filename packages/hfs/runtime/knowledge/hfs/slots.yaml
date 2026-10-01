@@ -818,7 +818,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: e2e
-    allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, fakes/]   # jest globalSetup/globalTeardown default-export (Jest API); plus root files with a role suffix (test-world-files, R47)
+    allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, "fakes/<provider>/server.ts", fakes/]   # jest globalSetup/globalTeardown default-export (Jest API); fakes/<provider>/server.ts is the fake server of a provider, a literal file name BE_SOURCE_FORM reads as its role; plus root files with a role suffix (test-world-files, R47)
     tests: none
     why: >-
       the ONLY test infrastructure location, shared by integration and e2e: global-setup.ts starts the shared
