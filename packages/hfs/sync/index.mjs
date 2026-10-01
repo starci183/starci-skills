@@ -146,9 +146,9 @@ export function appScripts(app) {
   const watch = entry => `cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/${entry.name}/src/main.ts`;
   return [
     ...(apis.length === 1 ? [line('dev:be', watch(apis[0]))] : apis.map(entry => line(`dev:be:${entry.name}`, watch(entry)))),
-    ...(fe.length === 1 ? [line('dev:fe', `npm run codegen --silent && cd fe && next dev apps/${fe[0].name}`)] : fe.map(entry => line(`dev:fe:${entry.name}`, `npm run codegen --silent && cd fe && next dev apps/${entry.name}`))),
+    ...(fe.length === 1 ? [line('dev:fe', `npm run codegen --silent && cd fe/apps/${fe[0].name} && next dev`)] : fe.map(entry => line(`dev:fe:${entry.name}`, `npm run codegen --silent && cd fe/apps/${entry.name} && next dev`))),
     ...be.map(entry => line(entry.kind === 'migrate' ? (migrates.length === 1 ? 'migrate' : `migrate:${entry.name}`) : `start:${entry.name}`, `node be/dist/apps/${entry.name}/src/main.js`)),
-    ...fe.map(entry => line(`start:${entry.name}`, `cd fe && next start apps/${entry.name}`)),
+    ...fe.map(entry => line(`start:${entry.name}`, `cd fe/apps/${entry.name} && next start`)),
   ].join('\n    ');
 }
 
@@ -167,7 +167,7 @@ export function variables(app, scope, presets, sonarKey) {
   return {
     header: HEADER(scope),
     appScripts: appScripts(app),
-    buildFe: ['npm run codegen --silent', ...(packages ? ['npm run build --workspaces --if-present'] : []), `cd fe && ${fe.apps.map(entry => `next build apps/${entry.name}`).join(' && ')}`].join(' && '),
+    buildFe: ['npm run codegen --silent', ...(packages ? ['npm run build --workspaces --if-present'] : []), fe.apps.map(entry => `(cd fe/apps/${entry.name} && next build)`).join(' && ')].join(' && '),
     // The fe apps import the workspace packages from their dist/, so the packages are built before the apps are type-checked.
     typecheck: ['npm run codegen --silent', 'tsc -p be/tsconfig.json', ...(packages ? ['npm run build --workspaces --if-present'] : []), ...feTsconfigs.filter(file => !file.includes('*')).map(file => `tsc -p ${file} --noEmit`), ...(packages ? ['npm run typecheck --workspaces --if-present'] : [])].join(' && '),
     nodeMajor: String(NODE_MAJOR),

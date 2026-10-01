@@ -17,7 +17,7 @@ import { createRequire } from 'node:module';
 import { main } from '../packages/hfs/bin/hfs.mjs';
 import { scaffoldApp } from '../packages/hfs/scaffold/app.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
-import { LINT_DEPENDENCIES, installInto, missingFrom, runtimeInstalls, uninstall } from './_hfs-app-install.mjs';
+import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, uninstall } from './_hfs-app-install.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index.cjs');
 /** What sync loads from the installed jest preset: the Sonar exclusions and the coverage sources (the one coverage scope). */
@@ -312,4 +312,43 @@ test('the scaffolded be unit run (the test script) writes the lcov Sonar and Cod
   const files = fs.readFileSync(lcov, 'utf8').split(/\r?\n/).filter((line) => line.startsWith('SF:')).map((line) => line.slice(3).replace(/\\/g, '/'));
   assert.ok(files.length > 0, 'the lcov names the services it measured');
   for (const file of files) assert.match(file, /\/src\/.*\.service\.ts$/, `${file}: only services are measured`);
+});
+
+/** What the fe build loads besides the lint set: the server-only marker the skeleton's request config imports. */
+const FE_BUILD_DEPENDENCIES = Object.freeze(['server-only']);
+const feBuildGate = gate('scaffold fe build', missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).length ? `no install holds ${missingFrom(installs, [...LINT_DEPENDENCIES, ...FE_BUILD_DEPENDENCIES]).join(', ')}; set STARCI_APP_INSTALLS to an app's node_modules` : false);
+
+/** The SWC native-binding cache of `next build`: a directory under the user's home (STARCI_SWC_CACHE overrides), because SWC refuses a cache ancestor whose ACL grants write to other accounts. */
+const swcCache = () => { const dir = process.env.STARCI_SWC_CACHE ?? path.join(os.homedir(), 'starci-swc-cache'); fs.mkdirSync(dir, { recursive: true }); return dir; };
+
+/** The environment `next build` runs in. */
+const buildEnv = () => ({ ...process.env, NEXT_TELEMETRY_DISABLED: '1', SWC_NATIVE_BINDING_CACHE: swcCache() });
+
+test('the scaffolded fe builds with the root build:fe script: next-intl finds its request config from the directory the build runs in', { skip: feBuildGate.skip, timeout: 900_000 }, async (t) => {
+  if (feBuildGate.required) assert.fail(feBuildGate.required);
+  // The app sits inside the runtime checkout: the borrowed install links packages from the runtime and its examples, and Turbopack
+  // compiles only what lies under its workspace root, so the spec widens that root (below) to the checkout that holds every link target.
+  const into = fs.mkdtempSync(path.join(RUNTIME, '.tmp-hfs-fe-build-'));
+  const app = path.join(into, 'demo');
+  let links = [];
+  t.after(() => { uninstall(app, links); fs.rmSync(into, { recursive: true, force: true }); });
+  assert.equal((await run(['scaffold', 'app', 'demo', '--into', into])).code, 0);
+  links = installInto(app, installs);
+  const toRuntime = path.relative(path.join(app, 'fe', 'apps', 'web'), RUNTIME).split(path.sep).join('/');
+  edit(app, 'fe/apps/web/next.config.ts', '"..", "..", "..")', `${JSON.stringify(toRuntime)})`);
+
+  // The root `build:fe` script as npm runs it, step by step: the codegen script, then `(cd <app dir> && next build)` per Next app.
+  const script = JSON.parse(fs.readFileSync(path.join(app, 'package.json'), 'utf8')).scripts['build:fe'];
+  const next = path.join(app, 'node_modules', 'next', 'dist', 'bin', 'next');
+  const dirs = [...script.matchAll(/\(cd (\S+) && next build\)/g)].map((match) => match[1]);
+  assert.equal(script.replace(/\(cd \S+ && next build\)/g, '').replace(/[\s&]/g, ''), 'npmruncodegen--silent', `build:fe runs only codegen and one (cd <app dir> && next build) per app: ${script}`);
+  execFileSync(process.execPath, ['scripts/codegen.mjs'], { cwd: app, stdio: 'pipe' });
+  let built = 0;
+  for (const dir of dirs) {
+    const build = spawnSync(process.execPath, [next, 'build'], { cwd: path.join(app, dir), encoding: 'utf8', env: buildEnv(), timeout: 840_000 });
+    assert.equal(build.status, 0, `(cd ${dir} && next build) must build: ${build.stdout}${build.stderr}`);
+    assert.ok(fs.existsSync(path.join(app, dir, '.next', 'BUILD_ID')), `${dir} wrote its build output`);
+    built += 1;
+  }
+  assert.ok(built >= 1, 'build:fe built at least one app');
 });

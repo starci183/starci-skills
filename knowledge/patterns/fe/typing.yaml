@@ -144,8 +144,8 @@ rules:
     hfsRules: [R18, R52, R67]
     requirement: |
       Double casts, `as GraphqlResult<T>` and any cast of a response are forbidden; `@ts-ignore` and `@ts-expect-error` do
-      not exist. Ignoring a props parameter uses `void props`, not an
-      underscore or a cast.
+      not exist. A component that ignores its props declares no parameter; `void props`, an underscore
+      parameter and a cast are not used.
     rationale: |
       A cast asserts what the compiler cannot verify, and a generated wire type makes it unnecessary.
     cases:
@@ -153,8 +153,8 @@ rules:
         when: "A response"
         write: "use the generated wire type from modules/api; do not cast a response"
       - id: case-3
-        when: "Ignoring a prop"
-        write: "void props"
+        when: "A component takes no input"
+        write: "Declare it with no parameter (export const EmptyState = () => ...); never void props or an unused props parameter."
     verification:
       automated:
         - FE_WIRE_GENERATED

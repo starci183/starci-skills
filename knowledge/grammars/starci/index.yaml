@@ -29,7 +29,7 @@ topics:
     path: DNA.yaml
     title: DNA
     summary: |
-      dna.ts values, root tokens with dark/forced-colours values, the 96 renderers with closed prop
+      dna.ts values, root tokens with dark/forced-colours values, the 100 renderers with closed prop
       values, classes and rule ids, and gaps at the pinned version (generated, drift-checked).
   - id: idioms
     path: idioms.yaml

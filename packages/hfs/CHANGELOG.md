@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Changed: the managed fe scripts (`dev:fe`, `start:<app>`, `build:fe`) run `next` from the app directory (`cd fe/apps/<app> && next ...`) so next-intl finds its request config; the fe skeleton reads the request locale through `next/root-params` (`experimental.rootParams`), pins the workspace root three levels above the app and uses the `.*[.].*` proxy matcher; the bundled runtime carries the `&&`/`||`-aware FE_SWR_KEY_IDENTITY check.
+
 ## 4.0.7 - 2026-10-01
 
 - Changed: the runtime layer check (scripts/api/<system>, a pure scripts/lib) in its bundled runtime.

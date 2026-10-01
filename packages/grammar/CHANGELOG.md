@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+Minor, additive (lane C0-CANON).
+
+- **Semantic structure primitives.** `Region` (a named, non-card `<section>` landmark: `label` or `labelledBy` names it, `id` is its anchor, `spacing` is `spaced` or `flush`), `NavLandmark` (a named `<nav>` row of links: `label`, `layout` `bar` or `scrolling`), `List` (`<ul>`, or `<ol>` with `as="ol"`) and `ListItem` (`<li>`) are exported from every entry, with specs and stories, so app code that must not draw raw structural tags still renders semantic elements.
+
 ## 0.8.1 - 2026-10-01
 
 - Changed: declares its build tool vite as a devDependency (lane PKGT clean proof); no source change. The published package.json differs from 0.8.0, so the version moves.

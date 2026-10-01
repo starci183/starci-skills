@@ -215,6 +215,10 @@ test('tracks value identity on every active path and rejects mutable or overwrit
     ['mutated array key', sourceWithQueryKey('params.courseId===undefined?null:key', 'const key=[QUERY_COURSE,params.courseId,viewer]; key.pop();'), 'unavailable'],
     ['overwritten object identity', sourceWithQueryKey("()=>params.courseId===undefined?null:{operation:QUERY_COURSE,courseId:params.courseId,viewer,viewer:'same'}"), 'unavailable'],
     ['transparent identity alias', sourceWithQueryKey('()=>params.courseId===undefined?null:[QUERY_COURSE,params.courseId,viewerAlias]', 'const viewerAlias=viewer;'), 'checked'],
+    ['conjunction gates the identity on its true branch', sourceWithQueryKey("()=>params.courseId!==undefined&&viewer?[QUERY_COURSE,params.courseId,viewer]:null"), 'checked'],
+    ['disjunction gates the identity on its false branch', sourceWithQueryKey("()=>params.courseId===undefined||!viewer?null:[QUERY_COURSE,params.courseId,viewer]"), 'checked'],
+    ['conjunction false branch proves nothing', sourceWithQueryKey("()=>params.courseId===undefined&&viewer?null:[QUERY_COURSE,params.courseId,viewer]"), 'finding'],
+    ['disjunction true branch proves nothing', sourceWithQueryKey("()=>params.courseId!==undefined||viewer?[QUERY_COURSE,params.courseId,viewer]:null"), 'finding'],
     ['transparent object alias', sourceWithQueryKey('()=>p.courseId===undefined?null:[QUERY_COURSE,p.courseId,viewer]', 'const p=params;'), 'checked'],
   ];
   for (const [name, source, expected] of cases) await t.test(name, () => {

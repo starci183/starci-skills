@@ -30,9 +30,17 @@ rules:
       `as-needed`, so the default locale is served without a prefix and other locales with one. `modules/i18n/` holds
       `config.ts` (the locale list and default), `routing.ts` (`defineRouting`), `navigation.ts` (`createNavigation`),
       `request.ts` (`getRequestConfig`) and `messages/<locale>.json`. `next.config.ts` wraps the config with the next-intl
-      plugin pointing at `modules/i18n/request.ts`. An app with one language still uses `next-intl` with one locale and the
-      same files; there is no copy-module variant.
+      plugin pointing at `modules/i18n/request.ts` and turns on `experimental.rootParams`. `request.ts` reads the request
+      locale as `const requested: unknown = await locale()` with `import { locale } from "next/root-params"`, never as the
+      `requestLocale` parameter of `getRequestConfig`, which next-intl 4.13 deprecates. An app with one
+      language still uses `next-intl` with one locale and the same files; there is no copy-module variant.
     rationale: |-
+      Decision (next-intl 4.13.6 on Next 16.1): the `requestLocale` parameter of `getRequestConfig` is deprecated, and the only
+      replacement the installed types and runtime offer is `next/root-params`, which Next still gates behind
+      `experimental.rootParams`. No stable, non-deprecated API reads the `[locale]` segment, so the flag is adopted and this
+      is the one sanctioned form. Next 16.3 makes root params default and only warns about the flag; when the pinned Next
+      reaches it, drop the flag and keep the import.
+
       One placement lets tooling, agents and checks find and check every catalog the same way, and a single-language app can
       add a language without restructuring.
     cases:
@@ -41,13 +49,16 @@ rules:
         write: 'export const routing = defineRouting({ locales: ["vi", "en"], defaultLocale: "vi", localePrefix: "as-needed" })'
       - id: case-2
         when: The proxy
-        write: 'fe/apps/<app>/src/proxy.ts is `export default createMiddleware(routing)` with `export const config = { matcher: ["/((?!api|_next|.*\\..*).*)"] }`; middleware.ts is not used on Next 16.'
+        write: 'fe/apps/<app>/src/proxy.ts is `export default createMiddleware(routing)` with `export const config = { matcher: ["/((?!api|_next|.*[.].*).*)"] }`; middleware.ts is not used on Next 16.'
       - id: case-3
         when: A layout
         write: 'app/[locale]/layout.tsx sets `<html lang={locale}>` and wraps children in NextIntlClientProvider with only the needed namespaces.'
       - id: case-4
         when: A single-language landing app
         write: 'routing.locales is ["vi"], messages/vi.json exists, and the same modules/i18n files are present.'
+      - id: case-5
+        when: The request locale
+        write: 'request.ts is `getRequestConfig(async () => { const requested: unknown = await locale(); const resolved = hasLocale(routing.locales, requested) ? requested : routing.defaultLocale; return { locale: resolved, messages } })` with `import { locale } from "next/root-params"`; next.config.ts sets `experimental: { rootParams: true }`.'
     verification:
       automated:
         - FE_I18N_PLACEMENT

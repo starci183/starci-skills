@@ -2623,6 +2623,48 @@
         background: var(--border, var(--separator, var(--starci-core-separator, GrayText)));
     }
 
+    /* Region, List, ListItem: semantic page structure that draws nothing of its own. */
+    .starci-core-region {
+        display: block;
+        min-width: 0;
+    }
+
+    .starci-core-region[data-grammar-region-spacing="spaced"] {
+        padding-block-end: 2rem;
+    }
+
+    .starci-core-nav-landmark {
+        display: flex;
+        align-items: center;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+
+    .starci-core-nav-landmark[data-grammar-nav-layout="bar"] {
+        gap: 1rem;
+    }
+
+    .starci-core-nav-landmark[data-grammar-nav-layout="scrolling"] {
+        gap: 0.25rem;
+        overflow-x: auto;
+    }
+
+    .starci-core-semantic-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .starci-core-semantic-list-item {
+        display: block;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+    }
+
     /* The unlabelled hairline (0.6.0): BOUNDARY-1, one pixel of --separator across its container, no margin. */
     .starci-core-divider-bare {
         display: block;

@@ -40,15 +40,18 @@ test("exported React components use one props parameter with the matching type",
       { filename: COMPONENT, code: "export const RankMarkIconId = (rank: number) => rank > 0 ? 'up' : 'down'" },
       // a folder named components inside a module is no component owner; a package branch is one
       { filename: NOT_A_COMPONENT, code: "export const SurfaceCard = ({ children }: SurfaceCardProps) => <div>{children}</div>" },
+      // a component with no input declares no parameter; `void props` is not required
+      { filename: COMPONENT, code: "export const EmptyCard = () => <div />" },
+      { filename: PACKAGE_BRANCH, code: "export const EmptyCard = () => <div />" },
       { filename: COMPONENT, code: "export const GenericCard = <T,>(props: GenericCardProps<T>) => <div>{props.value}</div>" },
     ],
     invalid: [
       { filename: COMPONENT, code: "export const SurfaceCard = ({ children }: SurfaceCardProps) => <div>{children}</div>", errors: [{ messageId: "parameter" }] },
       { filename: COMPONENT, code: "export const SurfaceCard = (input: SurfaceCardProps) => <div>{input.children}</div>", errors: [{ messageId: "parameter" }] },
-      { filename: COMPONENT, code: "export const SurfaceCard = () => <div />", errors: [{ messageId: "parameter" }] },
+      { filename: COMPONENT, code: "export const SurfaceCard = (_input: SurfaceCardProps, other: number) => <div />", errors: [{ messageId: "parameter" }] },
       { filename: COMPONENT, code: "export const SurfaceCard = (props: OtherProps) => <div>{props.children}</div>", errors: [{ messageId: "type" }] },
       { filename: COMPONENT, code: "export const SurfaceCardBase = (props: OtherProps) => <div>{props.children}</div>", errors: [{ messageId: "type" }] },
-      { filename: PACKAGE_BRANCH, code: "export const SurfaceCard = () => <div />", errors: [{ messageId: "parameter" }] },
+      { filename: PACKAGE_BRANCH, code: "export const SurfaceCard = (props: SurfaceCardProps, extra: number) => <div />", errors: [{ messageId: "parameter" }] },
       { filename: COMPONENT, code: "export function SurfaceCard(props: SurfaceCardProps) { return <div>{props.children}</div> }", errors: [{ messageId: "parameter" }] },
     ],
   })

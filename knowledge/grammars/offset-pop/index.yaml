@@ -31,7 +31,7 @@ topics:
     title: DNA
     summary: |
       dna.ts values (Core's shape plus `accentText`, `offset` and `palette`), root tokens with dark,
-      narrow, reduced-motion and forced-colours values, contrast table, the 96 renderers with closed
+      narrow, reduced-motion and forced-colours values, contrast table, the 100 renderers with closed
       prop values, classes and rule ids, and gaps (generated, drift-checked).
   - id: family
     path: family.yaml

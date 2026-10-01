@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Changed: `public-component-signature` accepts a component with no parameter; `no-raw-structural-element` names `Region`, `NavLandmark`, `List` and `ListItem` as owners of section, nav, ul/ol and li; FE-I18N-1 and FE-TYPING-6 canon text (request locale through `next/root-params`, no `void props`); the FE_SWR_KEY_IDENTITY check reads `&&` and `||` gates in its bundled runtime.
+
 ## 8.0.7 - 2026-10-01
 
 - Changed: the same bundled runtime layer move.

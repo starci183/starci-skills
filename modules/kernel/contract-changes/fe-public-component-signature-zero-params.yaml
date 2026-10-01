@@ -1,0 +1,12 @@
+id: fe-public-component-signature-zero-params
+effectiveAt: '2026-10-01T18:00:00+07:00'
+summary: >-
+  starci-fe/public-component-signature accepts an exported component with no parameter and still requires exactly one
+  parameter named props, typed XProps, when it takes any. FE-TYPING-6 case-3 no longer teaches `void props`; it agrees
+  with FE-FUNCTION-3 case-3 (a component that takes no input declares no parameter). No finding code changes.
+reach: new-legs
+paths:
+  - packages/eslint/fe/props-and-slots.mjs
+  - packages/eslint/fe/props-and-slots.test.mjs
+  - knowledge/patterns/fe/typing.yaml
+  - modules/kernel/contract-changes/fe-public-component-signature-zero-params.yaml

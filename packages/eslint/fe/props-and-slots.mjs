@@ -44,14 +44,14 @@ const componentNameOf = (node) => {
   return node.id.name
 }
 
-/** Require exported React components to expose one named props parameter. */
+/** Require exported React components to take no parameter, or one named props parameter. */
 export const publicComponentSignature = {
   meta: {
     type: "problem",
-    docs: { description: "Exported React components use one parameter named props with a matching XProps type (XBase may also take XBaseProps)." },
+    docs: { description: "Exported React components take no parameter, or one parameter named props with a matching XProps type (XBase may also take XBaseProps)." },
     schema: [],
     messages: {
-      parameter: "Exported component {{name}} must be an arrow const with exactly one parameter named props.",
+      parameter: "Exported component {{name}} must be an arrow const with no parameter, or exactly one parameter named props.",
       type: "Exported component {{name}} must type props as {{expected}}.",
     },
   },
@@ -59,6 +59,7 @@ export const publicComponentSignature = {
     const check = (node, name, fn) => {
       if (!name || !fn) return
       const params = fn.params || []
+      if (params.length === 0) return
       if (params.length !== 1 || params[0].type !== "Identifier" || params[0].name !== "props") {
         context.report({ node: fn, messageId: "parameter", data: { name } })
         return
