@@ -170,7 +170,7 @@ export function feAppOf(appRoot) {
 }
 /** The bytes an op role writes into its owned file. */
 export const ownedTextOf = (role, workflowId) => (ROLES[role].side === 'be'
-  ? `${JSON.stringify({ schema: SMOKE_SCHEMA, workflowId, role })}\n`
+  ? `${JSON.stringify({ schema: SMOKE_SCHEMA, workflowId, role }, null, 2)}\n`
   : `${SMOKE_SCHEMA} ${workflowId} ${role}\n`);
 /** The op record the dispatcher judges (sideOf, canDispatchConcurrently): its owned paths, app-relative. */
 export const opRecordOf = (role, workflowId, feApp) => ({ jobId: `${workflowId}:${role}`, opId: role, owned_paths: [ownedFileOf(role, workflowId, feApp)] });

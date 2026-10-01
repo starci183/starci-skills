@@ -571,3 +571,13 @@ test('the Kernel stage holds until the driver releases it, so opFail starts unde
   assert.equal(await holdStage({ state: other, role: 'kernel', holdMs: 5000, sleep: async () => { clock += 1000; }, now: () => clock }), false, 'never released: bounded by holdMs');
   assert.equal(await holdStage({ state: other, role: 'kernel', holdMs: 0, sleep }), false, 'holdMs 0 waits for nothing');
 });
+
+test('the be op payload is prettier-clean, so the finish gate (HFS_FORMAT) never reds on the smoke\'s own file', async () => {
+  const prettier = await import('prettier');
+  for (const role of ['op', 'opFail']) {
+    const text = ownedTextOf(role, 'smoke-abcdef12');
+    const file = ownedFileOf(role, 'smoke-abcdef12', 'web');
+    assert.equal(await prettier.format(text, { filepath: file }), text, `${role}'s payload is already what prettier writes`);
+    assert.equal(JSON.parse(text).role, role);
+  }
+});
