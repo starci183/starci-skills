@@ -32,8 +32,8 @@ export interface DefinedTestWorld<
 
 /**
  * The ONE declaration of a repository's test world, written in `src/tests/world/test-world.config.ts`:
- * `export default defineTestWorld({ stack, stacks, fakedBy, k3d, services, fakes, apps, migrate, identity })`; `use-test-world.ts` re-exports
- * its `useTestWorld` and `useSandbox`, the entry the specs import.
+ * `export const { useTestWorld, useSandbox } = defineTestWorld({ stack, stacks, k3d, services, fakes, apps, migrate, identity })`, the one
+ * named form R47 reads (R89 refuses a default export); `use-test-world.ts` re-exports `useTestWorld` and `useSandbox`, the entry the specs import.
  * Selection and overrides only: service list and image versions come from the stack definition. The jest globalSetup
  * (`@starci/test-world/global-setup`) loads this file, attaches to (or starts) the shared warm stack, migrates once and
  * publishes the run; specs then only call `useTestWorld`.

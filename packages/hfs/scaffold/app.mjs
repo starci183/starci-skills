@@ -66,7 +66,7 @@ const STARTER_DEPENDENCIES = Object.freeze({
   },
   devDependencies: {
     '@nestjs/testing': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/hfs': null, '@starci/jest-preset': null,
-    '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/tsconfig': null, '@tailwindcss/postcss': '^4', '@types/express': '^4.17.21',
+    '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/test-world': null, '@starci/tsconfig': null, '@tailwindcss/postcss': '^4', '@types/express': '^4.17.21',
     '@types/jest': null, '@types/node': null, '@types/react': '^19.0.0', '@types/react-dom': '^19.0.0', eslint: null, 'eslint-plugin-react-hooks': null,
     husky: '^9.1.7', jest: null, 'postcss-value-parser': null, prettier: null, stylelint: null, tailwindcss: '^4', 'ts-jest': null,
     'ts-node-dev': '^2.0.0', 'tsc-alias': '^1.8.10', 'tsconfig-paths': '^4.2.0', typescript: null,

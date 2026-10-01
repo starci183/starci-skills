@@ -40,7 +40,7 @@ rules:
       `useTestWorld({ apps })`). Contract is `be/src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped
       without sandbox config). `be/src/tests/world/` is the only test infrastructure (`global-setup.ts`, `global-teardown.ts`,
       `use-test-world.ts`, `fakes/<provider>/` network-edge fakes of external SaaS with `failNext`, `replayWebhook`, `delay`,
-      and `test-world.config.ts`, the declaration of the test-world library with `stacks` and `fakedBy`); every service of the
+      and `test-world.config.ts`, the declaration of the test-world library, `export const { useTestWorld, useSandbox } = defineTestWorld({ stack, stacks, fakes, ... })`); every service of the
       app's own stack (`be/.starcistacks/<env>`) runs real in the world, started or attached (warm-stack mode) by the
       library behind toxiproxy, with images and versions read from the stack at run time; `be/src/tests/fixtures/` holds typed
       doubles and builders. There is no `live/` folder and no `be/src/tests/e2e/world`. One `be/jest.config.js` uses the
@@ -515,7 +515,7 @@ rules:
         write: 'await world.infra.postgres.cut(); await world.waitFor("api answers 503", ...); await world.infra.postgres.restore(); await world.infra.keycloak.latency(6_000)'
       - id: case-5
         when: A stack service that is stateless GPU or model compute
-        write: 'fakes/inference/ plus fakedBy: { inference: { fake: "inference", reason: "Serves a GPU model" } } in test-world.config.ts; a database, cache, identity provider, mail host or queue is never faked'
+        write: 'fakes/inference/ plus stacks: { inference: { fakedBy: "inference", reason: "Serves a GPU model" } } in test-world.config.ts; a database, cache, identity provider, mail host or queue is never faked'
     verification:
       automated:
         - BE_APP_COMPOSITION_ONLY

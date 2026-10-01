@@ -4,8 +4,8 @@ The shared e2e library of every StarCi back end. It owns everything that touches
 
 ```
 be/src/tests/world/
-  test-world.config.ts   the declaration (repo-owned): export default defineTestWorld({ stack, stacks, fakedBy, ... })
-  use-test-world.ts      the spec entry: import world from "./test-world.config"; export const { useTestWorld, useSandbox } = world
+  test-world.config.ts   the declaration (repo-owned): export const { useTestWorld, useSandbox } = defineTestWorld({ stack, stacks, fakes, ... })
+  use-test-world.ts      the spec entry: export { useTestWorld, useSandbox } from "./test-world.config"
   global-setup.ts        export { default } from "@starci/test-world/global-setup"
   global-teardown.ts     export { default } from "@starci/test-world/global-teardown"
   fakes/<provider>/      repo-specific network-edge fakes (SaaS we do not operate, not shared by the library)
@@ -21,7 +21,7 @@ Nothing in a spec reads or writes `process.env`, starts a container, imports `Da
 import { openaiCompatibleFake, sepayFake, smtpFake } from "@starci/test-world/fakes"
 import { defineTestWorld } from "@starci/test-world"
 
-export default defineTestWorld({
+export const { useTestWorld, useSandbox } = defineTestWorld({
     stack: ".starcistacks/dev",                       // service list and image versions come from its compose files
     stacks: {
         postgresql: { connections: [{ name: "primary", seeds: [".starcistacks/dev/seeds/01.sql"] }] },

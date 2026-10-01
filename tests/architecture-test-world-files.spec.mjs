@@ -41,8 +41,9 @@ test('a stray file, a file without a role suffix, an unknown folder or a role fi
 });
 
 // R47 test-world-files, owner refinement 2026-09-30: every service the dev stack (.starcistacks/dev) declares runs real in the
-// world, so a fakes/<provider>/ of one is refused; the one exception is stateless GPU/model compute declared in the world
-// config (test-world.config.ts, `fakedBy`) with a reason.
+// world, so a fake of one (a fakes/<provider>/ folder or a fakes entry of the declaration) is refused; the one exception is
+// stateless GPU/model compute whose stacks entry in the declaration (test-world.config.ts) says { fakedBy, reason }. The
+// declaration is read in @starci/test-world's shape and in its one named form: export const { ... } = defineTestWorld({ ... }).
 const STACK = (services, extra = {}) => ({
   '.starcistacks/application-stacks.yaml': [
     'schema: starci/application-stacks@1',
@@ -61,16 +62,17 @@ const STACK_SERVICES = { postgres: 'postgres:16', redis: 'redis:7', keycloak: 'q
 const runStack = (t, files, services = STACK_SERVICES, extra = {}) => runArch(archFixture(t, { files: { ...GOOD, ...STACK(services, extra), ...files }, ...DECLARE }));
 const messages = report => hits(report).map(item => item.message);
 const FAKE = name => ({ [`src/tests/world/fakes/${name}/server.ts`]: E });
-const CONFIG = body => ({ 'src/tests/world/test-world.config.ts': `export default defineTestWorld(${body});\n` });
+const IMPORT = 'import { defineTestWorld } from "@starci/test-world";\n';
+const CONFIG = body => ({ 'src/tests/world/test-world.config.ts': `${IMPORT}export const { useTestWorld, useSandbox } = defineTestWorld(${body});\n` });
 const INFERENCE = { ...STACK_SERVICES, inference: 'ghcr.io/acme/vllm-proxy:1.0' };
 
-test('a world that fakes only an external SaaS the stack does not declare raises nothing', t => {
-  const report = runStack(t, { ...FAKE('sepay'), ...CONFIG("{ stacks: ['dev'] }") });
+test('a world that fakes only an external SaaS the stack does not declare raises nothing, as a folder or as a fakes entry', t => {
+  const report = runStack(t, { ...FAKE('sepay'), ...CONFIG("{ stack: '.starcistacks/dev', stacks: { postgresql: {}, redis: {} }, fakes: { sepay: sepayFake(), momo: momoFake() } }") });
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
 });
 
 test('without a mail host in the stack the smtp fake stays legal', t => {
-  const report = runStack(t, FAKE('smtp'));
+  const report = runStack(t, { ...FAKE('smtp'), ...CONFIG('{ fakes: { smtp: smtpFake() } }') });
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
 });
 
@@ -80,22 +82,34 @@ test('a fake of a service the stack declares (by name, image repository or alias
   assert.match(messages(report).join('\n'), /fakes\/smtp\/ fakes mailpit \(axllent\/mailpit:v1\.20\)/);
 });
 
-test('a stateless GPU/model service the stack declares may be faked when the config declares it in fakedBy with a reason', t => {
-  const report = runStack(t, { ...FAKE('inference'), ...CONFIG("{ stacks: ['dev'], fakedBy: { inference: { fake: 'inference', reason: 'Serves a GPU model; the fake speaks the same protocol.' } } }") }, INFERENCE);
+test('a fakes entry of the declaration that fakes a stack service is refused on the declaration, the library fakes included', t => {
+  const report = runStack(t, CONFIG("{ stacks: { postgresql: {} }, fakes: { smtp: smtpFake(), sepay: sepayFake() } }"), { ...STACK_SERVICES, mailpit: 'axllent/mailpit:v1.20' });
+  assert.deepEqual(paths(report), ['src/tests/world/test-world.config.ts']);
+  assert.match(messages(report)[0], /the fakes entry smtp fakes mailpit/);
+  assert.match(messages(report)[0], /mail holds data|stateful/);
+});
+
+test('a stateless GPU/model service the stack declares may be faked when its stacks entry says fakedBy with a reason', t => {
+  const report = runStack(t, { ...FAKE('inference'), ...CONFIG("{ stack: '.starcistacks/dev', stacks: { inference: { fakedBy: 'inference', reason: 'Serves a GPU model; the fake speaks the same protocol.' } } }") }, INFERENCE);
   assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
 });
 
-test('the fakedBy of a stack service is read from the literal config only: an undeclared fake is refused and names the config', t => {
-  const report = runStack(t, { ...FAKE('inference'), ...CONFIG("{ stacks: ['dev'] }") }, INFERENCE);
-  assert.deepEqual(paths(report), ['src/tests/world/fakes/inference/server.ts']);
-  assert.match(messages(report)[0], /declares it in fakedBy with a reason/);
+test('the faked service may name a fakes entry of the declaration instead of a fakes/ folder', t => {
+  const report = runStack(t, CONFIG("{ stacks: { inference: { fakedBy: 'llm', reason: 'GPU inference.' } }, fakes: { llm: openaiCompatibleFake() } }"), INFERENCE);
+  assert.deepEqual(hits(report), [], JSON.stringify(hits(report), null, 1));
 });
 
-test('a fakedBy of a stateful service (database, cache, queue, or one with a persistent volume) is refused on its config entry', t => {
+test('a faked stack service without its stacks entry is refused and names where to declare it', t => {
+  const report = runStack(t, { ...FAKE('inference'), ...CONFIG("{ stacks: { postgresql: {} } }") }, INFERENCE);
+  assert.deepEqual(paths(report), ['src/tests/world/fakes/inference/server.ts']);
+  assert.match(messages(report)[0], /declares it in its stacks entry \(\{ fakedBy, reason \}\)/);
+});
+
+test('a fakedBy of a stateful service (database, cache, queue, or one with a persistent volume) is refused on its stacks entry', t => {
   const services = { ...STACK_SERVICES, kafka: 'apache/kafka:3.8.0', worker: 'ghcr.io/acme/embedder:2' };
   const report = runStack(t, {
     ...FAKE('postgres'), ...FAKE('kafka'), ...FAKE('worker'),
-    ...CONFIG("{ fakedBy: { postgres: { fake: 'postgres', reason: 'Slow.' }, kafka: { fake: 'kafka', reason: 'Broker.' }, worker: { fake: 'worker', reason: 'GPU embeddings.' } } }"),
+    ...CONFIG("{ stacks: { postgres: { fakedBy: 'postgres', reason: 'Slow.' }, kafka: { fakedBy: 'kafka', reason: 'Broker.' }, worker: { fakedBy: 'worker', reason: 'GPU embeddings.' } } }"),
   }, services, { worker: '    volumes:\n      - embeddings:/data\n' });
   const all = hits(report);
   assert.equal(all.length, 3, JSON.stringify(all, null, 1));
@@ -106,27 +120,42 @@ test('a fakedBy of a stateful service (database, cache, queue, or one with a per
   assert.match(text, /worker is stateful \(the stack gives it a persistent volume\)/);
 });
 
-test('a fakedBy entry with an empty reason, or naming a stack service or fake folder that does not exist, is refused as empty or stale', t => {
+test('a fakedBy entry with an empty reason, or naming a stack service or fake that does not exist, is refused as empty or stale', t => {
   const report = runStack(t, {
     ...FAKE('inference'),
-    ...CONFIG("{ fakedBy: { inference: { fake: 'inference', reason: '' }, ghost: { fake: 'inference', reason: 'GPU.' }, embedder: { fake: 'missing', reason: 'GPU.' } } }"),
+    ...CONFIG("{ stacks: { inference: { fakedBy: 'inference', reason: '' }, ghost: { fakedBy: 'inference', reason: 'GPU.' }, embedder: { fakedBy: 'missing', reason: 'GPU.' } } }"),
   }, { ...INFERENCE, embedder: 'ghcr.io/acme/embedder:2' });
   const all = hits(report);
   assert.equal(all.length, 3, JSON.stringify(all, null, 1));
   const text = all.map(item => item.message).join(' ');
   assert.match(text, /the reason is empty/);
   assert.match(text, /declares no service ghost/);
-  assert.match(text, /no fakes\/missing\/ folder/);
+  assert.match(text, /no fakes entry and no fakes\/missing\/ folder/);
 });
 
-test('the config stacks list names the environments the world runs: a service of a listed non-dev stack is judged too', t => {
+test('the declaration stack names the environment the world runs: a service of a non-dev stack is judged, the dev one is not', t => {
   const files = {
-    ...FAKE('cache'),
-    ...CONFIG("{ stacks: ['dev', 'uat'] }"),
+    ...FAKE('cache'), ...FAKE('postgres'),
+    ...CONFIG("{ stack: '.starcistacks/uat', stacks: { redis: {} } }"),
     '.starcistacks/uat/infra/compose/compose.yaml': 'services:\n  redis:\n    image: redis:7\n',
   };
   const stack = STACK(STACK_SERVICES);
   stack['.starcistacks/application-stacks.yaml'] = stack['.starcistacks/application-stacks.yaml'].replace('environments:\n', 'environments:\n  uat:\n    status: supported\n    runtime: docker-compose\n    composeFiles: [infra/compose/compose.yaml]\n');
   const report = runArch(archFixture(t, { files: { ...GOOD, ...stack, ...files }, ...DECLARE }));
   assert.deepEqual(paths(report), ['src/tests/world/fakes/cache/server.ts']);
+});
+
+test('the declaration has one form, the named export R89 allows: a default export or a non-defineTestWorld export is refused and not read', t => {
+  const named = runStack(t, { ...FAKE('inference'), ...CONFIG("{ stacks: { inference: { fakedBy: 'inference', reason: 'GPU.' } } }") }, INFERENCE);
+  assert.deepEqual(hits(named), [], JSON.stringify(hits(named), null, 1));
+  for (const text of [
+    `${IMPORT}export default defineTestWorld({ stacks: { inference: { fakedBy: 'inference', reason: 'GPU.' } } });\n`,
+    `${IMPORT}const world = defineTestWorld({ stacks: { inference: { fakedBy: 'inference', reason: 'GPU.' } } });\nexport { world };\n`,
+    `${IMPORT}export let world = defineTestWorld({ stacks: { inference: { fakedBy: 'inference', reason: 'GPU.' } } });\n`,
+    `${IMPORT}export const world = defineTestWorld(declaration);\n`,
+  ]) {
+    const report = runStack(t, { ...FAKE('inference'), 'src/tests/world/test-world.config.ts': text }, INFERENCE);
+    assert.deepEqual(paths(report), ['src/tests/world/fakes/inference/server.ts', 'src/tests/world/test-world.config.ts'], text);
+    assert.match(messages(report).find(message => message.includes('declares no world')), /export const \{ useTestWorld, useSandbox \} = defineTestWorld/);
+  }
 });

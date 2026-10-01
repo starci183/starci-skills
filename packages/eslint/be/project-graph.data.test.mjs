@@ -53,8 +53,8 @@ test("test-world-files: the test world holds its fixed files, fakes/, kit/ and r
         ...fake("sepay"),
         ...fake("inference"),
         ...fake("postgres"),
-        // a fakedBy of a stateful service, or of a service the stack does not declare, is refused on its config entry
-        "src/tests/world/test-world.config.ts": "export default defineTestWorld({ stacks: ['dev'], fakedBy: { inference: { fake: 'inference', reason: 'Serves a GPU model; the fake speaks the same protocol.' }, postgres: { fake: 'postgres', reason: 'Slow.' }, ghost: { fake: 'postgres', reason: 'GPU.' } } });\n",
+        // a stacks entry faking a stateful service, or a service the stack does not declare, is refused on the declaration
+        "src/tests/world/test-world.config.ts": "export const { useTestWorld, useSandbox } = defineTestWorld({ stack: '.starcistacks/dev', stacks: { inference: { fakedBy: 'inference', reason: 'Serves a GPU model; the fake speaks the same protocol.' }, postgres: { fakedBy: 'postgres', reason: 'Slow.' }, ghost: { fakedBy: 'postgres', reason: 'GPU.' } } });\n",
     }
     const f = projectFixture({ files, declaration: { optionalSlots: [] } })
     t.after(f.cleanup)
@@ -92,7 +92,7 @@ test("test-world-files: without a mail host in the stack the smtp fake stays leg
         ...stack({ postgres: "postgres:16", redis: "redis:7" }),
         ...fake("smtp"),
         ...fake("cache"),
-        "src/tests/world/test-world.config.ts": "export default defineTestWorld({ stacks: ['dev'] });\n",
+        "src/tests/world/test-world.config.ts": "export const { useTestWorld, useSandbox } = defineTestWorld({ stack: '.starcistacks/dev', stacks: { redis: {} } });\n",
     }
     const f = projectFixture({ files, declaration: { optionalSlots: [] } })
     t.after(f.cleanup)

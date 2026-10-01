@@ -500,6 +500,11 @@ describe('hfs scaffold app: the first tree', () => {
       'fe/tsconfig.json', 'fe/apps/web/next.config.ts', 'fe/apps/web/tsconfig.json', 'fe/apps/web/src/proxy.ts', 'fe/apps/web/src/app/[locale]/layout.tsx']) assert.ok(files.includes(file), file);
     assert.ok(!files.some(file => /^(be|fe)\/(.*\/)?package(-lock)?\.json$/.test(file)), 'no side and no app holds a package.json or lockfile');
     assert.equal(JSON.parse(read(root, 'hfs.json')).kind, 'app');
+    // The managed test:stack script runs the starci-test-stack bin, so the root pins its package, @starci/test-world, at its canon pin.
+    const manifest = JSON.parse(read(root, 'package.json'));
+    assert.match(manifest.scripts['test:stack'], /starci-test-stack/);
+    assert.equal(manifest.devDependencies['@starci/test-world'], parseYaml(fs.readFileSync(path.join(ROOT, 'knowledge/hfs/canon-pins.yaml'), 'utf8')).pins['@starci/test-world'].version);
+    assert.equal(JSON.parse(read(root, 'package-lock.json')).packages[''].devDependencies['@starci/test-world'], manifest.devDependencies['@starci/test-world']);
     // The Work tree names the two sides of the app as its repositories, the form of the examples and the work-layout contract.
     const workspace = parseYaml(read(root, '.starciwork/workspace.yaml'));
     assert.deepEqual(workspace.repositories, [{ role: 'be', name: 'be' }, { role: 'fe', name: 'fe' }]);

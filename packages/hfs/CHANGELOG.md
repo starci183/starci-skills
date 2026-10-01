@@ -2,6 +2,8 @@
 
 ## 4.0.0 - 2026-10-01
 
+- Added: the scaffolded root `package.json` (and its lockfile root entry) pins `@starci/test-world` from `knowledge/hfs/canon-pins.yaml` (1.0.0), the package whose `starci-test-stack` bin the managed `test:stack` script runs.
+- Changed: R47 `test-world-files` reads `test-world.config.ts` in the shape `@starci/test-world` defines and in its one named form `export const { useTestWorld, useSandbox } = defineTestWorld({ ... })` (the form R89 allows): `stack` names the environment, a stack service is faked only by its own `stacks` entry `{ fakedBy, reason }`, and a `fakes` entry of the declaration that fakes a stack service is refused like a `fakes/<provider>/` folder. A config with no readable named declaration (a default export included) is refused. The top-level `fakedBy` and the `stacks` list of environment names are no longer read.
 - New (lane SHAPE): `HFS_PEER_INTEGRATION_MISSING` (R111). The app root package.json that depends on every package of a pair of `knowledge/hfs/peer-integrations.yaml` (at the named major) declares the pair's peer in its dependencies; the first pair is `@nestjs/apollo` on `@nestjs/platform-express` 11, which requires `@as-integrations/express5`.
 - Changed (lane SHAPE): `HFS_PROOF_COMMAND_FILE_MISSING` (R105) judges the records naming a side (`repository: be` or `fe`) from the app root, where their proof commands run; a record naming another repository is still not judged.
 - Changed (lane SHAPE): the managed `typecheck` script of an app with fe packages runs `npm run build --workspaces --if-present` before it type-checks the fe apps, which import the packages from `dist/`.

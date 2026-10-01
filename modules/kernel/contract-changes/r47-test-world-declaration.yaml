@@ -1,0 +1,27 @@
+id: r47-test-world-declaration
+effectiveAt: '2026-10-01T20:00:00+07:00'
+summary: >-
+  R47 test-world-files (BE_TEST_TOPOLOGY) reads test-world.config.ts in the shape @starci/test-world 1.0.0 defines and in ONE
+  form, the named export R89 allows: export const { useTestWorld, useSandbox } = defineTestWorld({ ... }). `stack`
+  (".starcistacks/<env>") names the environment whose services run real; a stack service is faked only through its own `stacks`
+  entry { fakedBy: "<fake>", reason: "<non-empty>" } naming a fakes entry or a fakes/<provider>/ folder, and only when it is
+  stateless compute; a `fakes` entry of the declaration (smtp: smtpFake(), ...) that fakes a stack service is refused like a
+  fakes/ folder; a config without a readable named declaration (a default export, a non-literal argument, a let, an export list)
+  is refused. The default-export reader, the top-level `fakedBy` map and `stacks` as a list of environment names are deleted.
+  The R47 law text, the HFS README, the BE test pattern and the BE_TEST_TOPOLOGY cause follow. The hfs 4.0.0 scaffold pins
+  @starci/test-world at its canon pin in the root package.json.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/r47-test-world-declaration.yaml
+  - scripts/checks/architecture/test-world-files.mjs
+  - tests/architecture-test-world-files.spec.mjs
+  - packages/eslint/be/project-graph.data.test.mjs
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/be/test.yaml
+  - modules/kernel/failure-codes.yaml
+  - packages/hfs/scaffold/app.mjs
+  - packages/hfs/CHANGELOG.md
+  - tests/hfs-sync.spec.mjs
+  - packages/test-world/README.md
+  - packages/test-world/src/config/define.ts
