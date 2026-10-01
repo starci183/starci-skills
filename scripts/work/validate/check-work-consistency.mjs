@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
-import {walk} from '../../checks/check-example-work.mjs';
+import {walk} from './check-example-work.mjs';
 import {loadRecords, inlineCriteriaOf, INLINE_CRITERION_FIELDS, indexInlineCriteria, resolveRecordRef} from '../../example/example-ownership.mjs';
 
 /**

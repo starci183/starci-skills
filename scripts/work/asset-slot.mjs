@@ -17,7 +17,7 @@
 // brand style - so a master may stand in only as the placeholder. A slot is FILLED only when data-asset-sha256 names
 // the sha256 of the file its src resolves to, those bytes are not byte-identical to any brand master, and its prompt
 // (data-asset-prompt, else <file>.prompt.txt beside it) exists; anything else is OWED. A done ui record with an owed
-// slot is refused (ASSET_SLOT_UNFILLED, scripts/checks/check-example-work.mjs).
+// slot is refused (ASSET_SLOT_UNFILLED, scripts/work/validate/check-example-work.mjs).
 //
 // The ledger: settling an interface.draw or interface.asset job records one `asset-slot-owed` event per owed slot of
 // the files it binds and one `asset-slot-filled` per filled one; `api status` lists the open ones as assetSlotsOwed[]

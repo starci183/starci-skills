@@ -57,9 +57,9 @@ test('pathUnder is the path-prefix test both scripts spelt locally', () => {
 
 test('the dedupe and check scripts read the shared facts', () => {
   const dedupe = fs.readFileSync(new URL('../../scripts/kernel/terminal-dedupe.mjs', import.meta.url), 'utf8');
-  const check = fs.readFileSync(new URL('../../scripts/checks/check-orca-tree.mjs', import.meta.url), 'utf8');
+  const check = fs.readFileSync(new URL('../../scripts/supervisor/orca-tree.mjs', import.meta.url), 'utf8');
   for (const src of [dedupe, check]) {
-    assert.match(src, /from '\.\.\/lib\/terminal-ledger\.mjs'/, 'imports the shared lib');
+    assert.match(src, /from '\.\.\/machine\/terminal-ledger\.mjs'/, 'imports the shared module');
     assert.doesNotMatch(src, /hierarchy\?\.runtime\?\.terminalHandle/, 'no local field list remains');
   }
 });

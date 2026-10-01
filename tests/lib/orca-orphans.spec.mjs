@@ -14,11 +14,12 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { withMachine } from '../../engine/db/machine.mjs';
 import { gcWorktrees } from '../../scripts/machine/worktrees.mjs';
-import { reserveOrcaSlot, createOrcaWorktree } from '../../scripts/api/orca/worktree-provision.mjs';
+import { reserveOrcaSlot, createOrcaWorktree } from '../../scripts/machine/worktree-orca.mjs';
 import { ENDED_WORKFLOW_PHASES } from '../../scripts/machine/worktree-registry.mjs';
-import { ensureWorkflowWorktree, workflowWorktreeOf } from '../../scripts/kernel/workflow-worktree.mjs';
+import { ensureWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { runtimeStampOf, parseRuntimeStamp, psCoverage, orphanVerdict, orphanPreserveName } from '../../scripts/lib/orca-orphans.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
+import { workflowWorktreeOf } from '../../scripts/machine/workflow-tree.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 const HOUR = 3_600_000;

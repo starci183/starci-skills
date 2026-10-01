@@ -7,7 +7,7 @@
 // compile: every Work record in the walked scope is validated against the catalogued work-tree schema that
 // its `schema:` const names, and every violation is a refusal.
 //
-// Membership is the tree walk's own (scripts/checks/check-example-work.mjs): kernel custody roots and
+// Membership is the tree walk's own (scripts/work/validate/check-example-work.mjs): kernel custody roots and
 // _derived projections are skipped, a foreign schema is an artifact payload, an evidence manifest is proof
 // payload checked by check-work-artifacts.mjs, and a retired recursive `work/node@*` record is refused as
 // HFS_WORK_NODE_RETIRED by check-example-work.mjs, not compiled here.

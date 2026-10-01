@@ -40,9 +40,8 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { CONTRACT_CHANGES_SCHEMA, readContractChangesDoc } from './contract-changes-store.mjs';
 import {sha256} from '../../engine/digest.mjs';
-import { normWork } from './work-ownership.mjs';
+import { normWork } from '../lib/path-key.mjs';
 import { parseJson, withPayload } from '../lib/json.mjs';
-import { latestContractOf } from './verbs/shared/rows.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
 export const CHANGE_REACH = ['new-legs', 'follow-up'];
@@ -155,7 +154,7 @@ const knownOpsOf = (root) => {
 
 /**
  * Every registered contract change, oldest first: {schema, changes[], problems[]}. The registry is one file per
- * entry under modules/kernel/contract-changes/ (scripts/kernel/contract-changes-store.mjs). A missing registry registers none. `file` (or
+ * entry under modules/kernel/contract-changes/ (scripts/machine/contract-changes-store.mjs). A missing registry registers none. `file` (or
  * STARCI_CONTRACT_CHANGES, the spec seam) reads one fixture document `{schema, changes: [...]}` instead.
  */
 export function loadContractChanges(root, { file = process.env.STARCI_CONTRACT_CHANGES ? path.resolve(process.env.STARCI_CONTRACT_CHANGES) : null, freezeFile = defaultFreezeFile(root) } = {}) {
@@ -221,6 +220,9 @@ export function loadContractFreeze(root, { file = defaultFreezeFile(root), known
 }
 const defaultFreezeFile = (root) => (process.env.STARCI_CONTRACT_FREEZE ? path.resolve(process.env.STARCI_CONTRACT_FREEZE)
   : process.env.STARCI_CONTRACT_CHANGES ? null : path.join(root, CONTRACT_FREEZE_FILE));
+
+/** The contracts row of a job's newest attempt, or null. */
+export const latestContractOf = (db, jobId) => db.prepare('SELECT c.*, a.dispatch_id FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(jobId) ?? null;
 
 export const changeById = (registry, id) => registry?.changes?.find((change) => change.id === id) ?? null;
 

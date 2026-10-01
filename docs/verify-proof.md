@@ -54,7 +54,7 @@ attempt spent, nothing waits on it), and `api run-deferred-tests --kind integrat
 3. The proof commands run there (cwd = the temporary worktree), then the same commands run in the operation's
    worktree at `opHead`. Each result carries `exitCode`, a `tail` of the output and `timedOut`; `timeoutMs`
    defaults to 20 minutes per command.
-4. In a `finally`, whatever happened above, `safeRemoveWorktree` (`scripts/api/fs/safe-remove.mjs`) removes every link
+4. In a `finally`, whatever happened above, `safeRemoveWorktree` (`scripts/machine/worktree-git.mjs`) removes every link
    inside the temporary worktree as a link, then the tree, and prunes its registration; never a forced `git worktree remove`,
    which would follow a junction into the live tree.
 
@@ -103,4 +103,4 @@ Evidence that carries `stale: true` is passed over: it has already said it no lo
 product, and refusing it for pointing at the past would punish the tree for being honest. Declared artifacts
 - record `assets[]`, `ui.assets[]`, evidence `assets[]`, receipts and run manifests - are
 `scripts/work/validate/check-work-artifacts.mjs`'s ground, and `recordDigest` plus the aggregate `codeDigest.digest`
-are `scripts/checks/check-example-work.mjs`'s; this check opens neither.
+are `scripts/work/validate/check-example-work.mjs`'s; this check opens neither.

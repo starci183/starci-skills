@@ -18,7 +18,7 @@
 // ([Worker] terminal on the attempt) -> reported (sup_reports row) -> succeeded (landed by scripts/supervisor/land.mjs,
 // checkout removed) | failed | cancelled. The job's working state (cluster, files, staging, routing, result) is
 // its payload_json. The staging checkout is an EPHEMERAL Orca worktree of the runtime (an agent works in it, so Orca
-// owns it: `orca worktree create --name sup-<job> --base-branch main` through scripts/api/orca/worktree-provision.mjs
+// owns it: `orca worktree create --name sup-<job> --base-branch main` through scripts/machine/worktree-orca.mjs
 // createOrcaWorktree, which stamps it `starci:supervisor-staging:sup-<job>;sup=<job>` (scripts/lib/orca-orphans.mjs
 // runtimeStampOf); registry kind supervisor-staging keyed by Orca's worktree id). Orca picks
 // its path and its branch; payload.staging records {path, branch, base, orcaId} as Orca reported them, and every reader
@@ -49,10 +49,8 @@ import {
   SKILL_ROOT, FIX_KIND, WORKER_TITLE_PREFIX, readSupervisor,
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
 } from '../machine/home.mjs';
-import { openMachine } from '../../engine/db/machine.mjs';
-import { createOrcaWorktree } from '../api/orca/worktree-provision.mjs';
-import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
-import { orcaWorktreeClient } from '../api/orca/worktree-client.mjs';
+import { openMachine, starciLocalRoot } from '../../engine/db/machine.mjs';
+import { createOrcaWorktree, removeOrcaWorktree, orcaWorktreeClient } from '../machine/worktree-orca.mjs';
 import { ci } from '../api/npm/ci.mjs';
 import { closeSelfSafe, releaseSelfSafe } from '../machine/close-verify.mjs';
 import { machineLoad } from '../machine/host-resources.mjs';
@@ -403,7 +401,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     const guard = (deps.guard ?? workerGuard)(job.job_id, { root, staging: staging.path, files: job.payload.files ?? [] });
     if (typeof guard.receipt?.jobFile !== 'string') supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
     const spawned = await startWorkerAgent({ route, worktree: staging.path, title, prompt,
-      specFile: path.join(root, 'runtime', 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
+      specFile: path.join(starciLocalRoot(env), 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
       onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
       start: deps.start ?? null });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: stagingRecord(staging),

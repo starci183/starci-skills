@@ -3,7 +3,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {isPlainObject} from '../../engine/plain-object.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
-import {walk} from '../checks/check-example-work.mjs';
+import {walk} from '../work/validate/check-example-work.mjs';
 import {computeDerived} from './example-derive.mjs';
 import {APP_SIDES, appRootOf, indexInlineCriteria, repoRootFor, resolveRecordRef} from './example-ownership.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';

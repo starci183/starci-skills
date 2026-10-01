@@ -23,7 +23,7 @@ test('interface.draw renders parts with draw-render and keeps ImageGen for raste
   // Owner ruling 2026-09-27: the drawing is the real XBase (<XBase>.draw.tsx) rendered in the product's CSS; an older
   // hand-written html part is only re-measured.
   assert.match(steps, /--component <XBase>\.draw\.tsx --export <XBase> --props\s+<fixture\.json> --css <product global css> --product <app dir>/);
-  assert.match(steps, /node scripts\/checks\/draw-source\.mjs <XBase>\.draw\.tsx/);
+  assert.match(steps, /node scripts\/work\/draw\/draw-source\.mjs <XBase>\.draw\.tsx/);
   assert.match(steps, /--html <file> --out <dir>\s+--viewports <w>x<h>\) is re-measured, never drawn anew/);
   assert.match(steps, /@2x/);
   assert.match(steps, /--tool draw-render/);
@@ -38,8 +38,8 @@ test('interface.draw renders parts with draw-render and keeps ImageGen for raste
 });
 
 test('the brief carries the geometry, proof and grammar inputs verbatim', () => {
-  assert.match(steps, /node scripts\/checks\/grammar-geometry\.mjs --prompt --repo\s+<repo>/);
-  assert.match(steps, /node scripts\/checks\/ui-proof-brief\.mjs --surface <ui-record-dir> --repo <repo>/);
+  assert.match(steps, /node scripts\/work\/ui\/grammar-geometry\.mjs --prompt --repo\s+<repo>/);
+  assert.match(steps, /node scripts\/work\/ui\/ui-proof-brief\.mjs --surface <ui-record-dir> --repo <repo>/);
   assert.match(steps, /brand-palette\.mjs --prompt/);
   assert.match(steps, /no number it does not\s+carry is invented/);
   assert.equal(draw.grammarContext, 'required');

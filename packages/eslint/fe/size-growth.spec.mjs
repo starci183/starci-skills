@@ -13,7 +13,7 @@ import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import { fixtureHfs } from "./fixtures/typed/tester.mjs"
 import { fileSizeGrowth, rules } from "./size-growth.mjs"
-import { recordedLines } from "./runtime/scripts/lib/recorded-lines.mjs"
+import { recordedLines } from "./runtime/scripts/api/git/recorded-lines.mjs"
 
 const tester = new RuleTester({
   languageOptions: {

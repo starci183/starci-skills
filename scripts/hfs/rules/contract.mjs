@@ -93,7 +93,8 @@ export function contractEmitFindings({ repoRoot, files, repo, emit }) {
       }
     }
   } finally {
-    safeRemoveTree(scratch);
+    // A temp directory this rule made itself, in no ledger's repository: no indexed job artifact can live in it.
+    safeRemoveTree(scratch, { hold: () => null });
   }
   return { findings, apps };
 }

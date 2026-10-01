@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ALL_CHECK_CODES } from './check.mjs';
+import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** The runtime files the slot resolver needs; both bundles carry them. */
@@ -66,8 +67,8 @@ const MACHINE_DATA = Object.freeze(['packages/hfs/templates/app/package-scripts/
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
   'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml'])].sort()), catalog: true }),
-  'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/lib/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
-  'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/lib/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
+  'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
+  'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/api/git/recorded-lines.mjs', 'scripts/lib/next-contract.mjs', 'scripts/lib/language.mjs', 'scripts/hfs/project-rule.mjs']), ...MACHINE_DATA])].sort()), catalog: false }),
 });
 
 /** The catalog entries for `codes`, in the catalog's own text, keyed by top-level line. */
@@ -121,7 +122,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     let count = 0;
     for (const bundle of Object.keys(BUNDLES)) {
       const bundleRoot = path.join(runtimeRoot, bundle);
-      fs.rmSync(bundleRoot, { recursive: true, force: true });
+      // A generated copy is never a held artifact: nothing but this script writes it.
+      const removed = safeRemoveTree(bundleRoot, { hold: () => null });
+      if (!removed.ok) throw new Error(`cannot clear ${bundle}: ${removed.errors.map((e) => e.message).join("; ")}`);
       for (const [file, text] of expectedBundle(bundle)) {
         const target = path.join(bundleRoot, file);
         fs.mkdirSync(path.dirname(target), { recursive: true });

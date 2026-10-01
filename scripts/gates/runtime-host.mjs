@@ -7,8 +7,8 @@
 // (D:/starci-lanes/<lane>/<name>) resolves to the same host as the main checkout. STARCI_SOURCE_ROOT overrides it.
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { isDir } from './fs-kind.mjs';
-import { repositoryHome, repositoryName } from './repo-identity.mjs';
+import { isDir } from '../lib/fs-kind.mjs';
+import { repositoryHome, repositoryName } from '../hfs/repo-identity.mjs';
 
 /** The repository hosting this runtime: STARCI_SOURCE_ROOT, else the folder holding the runtime's main checkout. */
 export function runtimeHostRoot(env = process.env) {

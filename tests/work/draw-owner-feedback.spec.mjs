@@ -5,7 +5,7 @@
 // as proposed until the owner next accepts the direction; auto-accept never touches a draw review; the owner answers
 // on Telegram by replying.
 import test from 'node:test';
-import { putBundle } from '../../engine/db/blob-lookup.mjs';
+import { putBundle } from '../../engine/db/blob.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';

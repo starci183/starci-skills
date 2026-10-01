@@ -95,7 +95,7 @@ sha256. The token is looked up in the declared sources as usual - never in the r
 ### 2. `contrast-aa`
 
 **Inputs:** `brand.color.tokens[]` (`value`, `foreground`, `role`), `brand.color.policy.minContrast`,
-`brand.color.policy.contrastExceptions[]`, and the owner answer receipts in the project ledger (blob + `decisions` row, `scripts/kernel/ask-receipts.mjs`).
+`brand.color.policy.contrastExceptions[]`, and the owner answer receipts in the project ledger (blob + `decisions` row, `scripts/machine/ask-receipts.mjs`).
 
 Every token that declares a `foreground` is a text pair and must reach `policy.minContrast`, defaulting to
 the WCAG AA floor of 4.5:1. The `primary` token against a declared `surface` token is a non-text indicator

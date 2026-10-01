@@ -6,7 +6,7 @@ import {sha256, sha256File} from '../../engine/digest.mjs';
 /**
  * Shared resolution of "what directories does this record's code live under" - the question concepts 1
  * (codeDigest), 3 (OWNER_PATH_MISSING/PROVES_TARGET_NOT_DONE) and 4 (SDS owners) all ask, so it is answered
- * once here rather than three times with three chances to disagree. Used by scripts/checks/check-example-work.mjs,
+ * once here rather than three times with three chances to disagree. Used by scripts/work/validate/check-example-work.mjs,
  * scripts/example/example-evidence.mjs and scripts/example/example-derive.mjs.
  *
  * Design note (owner, 2026-09-18): `work/implementation@1.owners[].path`, `work/sds-component@1.owners[].path`
@@ -268,7 +268,7 @@ export function resolveRecordRef(records, ref, inline = indexInlineCriteria(reco
 }
 
 /** A minimal records map (id -> {id, schema, data, dir}) for a `.starciwork` tree, built the same way
- * scripts/checks/check-example-work.mjs's own walk does, for callers (scripts/example/example-evidence.mjs) that need
+ * scripts/work/validate/check-example-work.mjs's own walk does, for callers (scripts/example/example-evidence.mjs) that need
  * `resolveOwnedDirs`'s prover-fallback but do not already have a records map of their own. */
 export function loadRecords(workRoot, walk) {
   const records = new Map();

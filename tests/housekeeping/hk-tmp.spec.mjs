@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sweepTmp } from '../../scripts/housekeeping/hk-tmp.mjs';
 import { forbiddenRoot, safeRemoveTree } from '../../scripts/api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs';
 
 // STORAGE-PROMPT item 1.tmp: top-level %TEMP% entries matching a declared prefix and older than
 // tmpMaxAgeMs go through safeRemoveTree; links, ${TEMP}/claude and live-process dirs are skipped. Every
@@ -16,7 +17,7 @@ const NOW = Date.parse('2026-09-26T12:00:00Z');
 
 function sandbox(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-hk-tmp-spec-')));
-  t.after(() => { safeRemoveTree(root); });
+  t.after(() => { safeRemoveTree(root, { hold: artifactHoldReason }); });
   return { root, env: { TEMP: root } };
 }
 /** A temp entry (dir with a payload file, or a plain file) aged to `mtimeMs`. */
@@ -183,19 +184,19 @@ test('sweepTmp skips a temp checkout whose git metadata changed within tmpMaxAge
 test('the temp-root allowance never reaches a checkout outside the temp root or one reached through a link', (t) => {
   const { root } = sandbox(t);
   const outside = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hk-outside-checkout-')));
-  t.after(() => { safeRemoveTree(outside, { checkoutsUnder: path.dirname(outside) }); });
+  t.after(() => { safeRemoveTree(outside, { hold: artifactHoldReason, checkoutsUnder: path.dirname(outside) }); });
   fs.mkdirSync(path.join(outside, '.git'));
   fs.writeFileSync(path.join(outside, 'live.txt'), 'do-not-lose\n');
   const temp = path.join(root, 'temp-root');
   fs.mkdirSync(temp);
-  const refused = safeRemoveTree(outside, { checkoutsUnder: temp });
+  const refused = safeRemoveTree(outside, { hold: artifactHoldReason, checkoutsUnder: temp });
   assert.equal(refused.ok, false);
   assert.match(refused.errors[0].message, /refusing to remove a git checkout/);
   const link = path.join(temp, 'starci-linked-checkout');
   makeLink(outside, link);
   const viaLink = path.join(link, '.');
-  assert.equal(forbiddenRoot(viaLink, { checkoutsUnder: temp }), 'a git checkout', 'a checkout reached through a link is not inside the temp root');
+  assert.equal(forbiddenRoot(viaLink, { hold: artifactHoldReason, checkoutsUnder: temp }), 'a git checkout', 'a checkout reached through a link is not inside the temp root');
   fs.mkdirSync(path.join(temp, '.git'));
-  assert.equal(forbiddenRoot(temp, { checkoutsUnder: temp }), 'a git checkout', 'the temp root itself is never a disposable fixture');
+  assert.equal(forbiddenRoot(temp, { hold: artifactHoldReason, checkoutsUnder: temp }), 'a git checkout', 'the temp root itself is never a disposable fixture');
   assert.equal(fs.readFileSync(path.join(outside, 'live.txt'), 'utf8'), 'do-not-lose\n');
 });

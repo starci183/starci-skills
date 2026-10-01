@@ -28,7 +28,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { validateAgainstSchema } from './check-op-manifest.mjs';
+import { validateAgainstSchema } from '../lib/json-schema.mjs';
 import { canonContentDigest, packedFiles } from '../gates/canon-digest.mjs';
 import { PINS_FILE, PROFILES_FILE, SCHEMA_FILE, loadPins } from '../gates/canon-pins.mjs';
 

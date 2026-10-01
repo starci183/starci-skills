@@ -34,7 +34,7 @@ import {
 import { GRAPH_EDIT_KIND, OPEN_JOB, opJobsOf, unitsOf } from '../progress-rca.mjs';
 import { canonCutPlanOf } from '../cut-seam.mjs';
 import { readCanonScan, unfixableSlicesOf } from '../canon-plan-gate.mjs';
-import { putArtifact, stageBlob } from '../evidence-store.mjs';
+import { putArtifact, stageBlob } from '../../machine/evidence-store.mjs';
 import { latestReportOf } from './shared/rows.mjs';
 
 const EDITS = ['drop', 'widen', 'wire', 'continue', 'retry', 'reorder', 'split', 'merge', 'params', 'scan', 'recut', 'undo'];

@@ -28,7 +28,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parseJson } from '../lib/json.mjs';
-import { latestContractOf } from './verbs/shared/rows.mjs';
+import { latestContractOf } from '../machine/contract-version.mjs';
 import { orcaCodexHome } from '../agent/trust.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 

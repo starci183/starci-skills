@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {orcaTreeFindings,readTerminals,FINDING_CODES} from '../../scripts/checks/check-orca-tree.mjs';
+import {orcaTreeFindings,readTerminals,FINDING_CODES} from '../../scripts/supervisor/orca-tree.mjs';
 
 // scripts/checks/check-orca-tree.mjs is the only thing that reads the ledger
 // and Orca's terminal listing at once. modules/kernel/start-workflow.yaml

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { checkApiSurface, checkApiSurfaceMain } from '../../scripts/checks/check-api-surface.mjs';
 
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), '..');
+const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), '..', '..');
 const MIRRORED = ['scripts/kernel/cli.mjs', 'modules/kernel/api.yaml', 'bin/starci.mjs'];
 // Extension verbs and their contracts live in directories (scripts/kernel/api-extensions.mjs): the
 // fixture mirrors them too or the copied cli.mjs switch is not the whole implemented surface.

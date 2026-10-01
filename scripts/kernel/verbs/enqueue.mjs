@@ -12,7 +12,7 @@ import { familyGuardOf, familyViolations, familyOwners } from '../write-families
 import { ownedPathPlacements, enqueueRepository } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
 import { lineageHeadById } from '../gate-conditions.mjs';
-import { loadContractChanges, changeById } from '../contract-version.mjs';
+import { loadContractChanges, changeById } from '../../machine/contract-version.mjs';
 import { normalizeFoundationName, readFoundation } from '../foundations.mjs';
 import { admitUnit, writeUnitTry } from '../units.mjs';
 import { isCanonSlice, requirePlannedCanonSlice } from '../canon-plan-gate.mjs';

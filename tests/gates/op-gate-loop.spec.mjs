@@ -14,7 +14,7 @@ import { fileReport, inspectLedger, ledgerFileFor, openLedger, writeContract, re
 import { GATE_EXIT, GATE_SCHEMA, appRootOf, droppedMainChanges, mergeGuard, newLintFindings, newTscFindings, parseGateArgs, runGate } from '../../scripts/gates/gate.mjs';
 import { DIGEST_SCHEMA } from '../../scripts/gates/read-digest.mjs';
 import { OP_GATE_CHANGE, judgeLoop } from '../../scripts/kernel/gate-settle.mjs';
-import { loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
+import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { installCanons } from '../helpers/canon-install-fixture.mjs';
 

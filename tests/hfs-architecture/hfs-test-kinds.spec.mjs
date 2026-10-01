@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { checkHfs, checkHfsWithoutConfig } from '../../scripts/hfs/architecture/hfs.mjs';
 import { appDeclarationText, DEFAULT_APPS } from '../helpers/hfs-arch-fixture.mjs';
-import { repositoryName } from '../../scripts/lib/repo-identity.mjs';
+import { repositoryName } from '../../scripts/hfs/repo-identity.mjs';
 
 const tree = (t, files) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-test-kinds-'));

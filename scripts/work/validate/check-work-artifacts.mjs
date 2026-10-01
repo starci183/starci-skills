@@ -4,10 +4,10 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
 import {sha256File} from '../../../engine/digest.mjs';
-import {ID_RE, walk} from '../../checks/check-example-work.mjs';
+import {ID_RE, walk} from './check-example-work.mjs';
 import {appRootOf, loadRecords, indexInlineCriteria, resolveRecordRef} from '../../example/example-ownership.mjs';
 import {slash} from '../../lib/path-key.mjs';
-import {resolveBlob} from '../../../engine/db/blob-lookup.mjs';
+import {resolveBlob} from '../../../engine/db/blob.mjs';
 
 /**
  * The gate verifies declarations, not bytes. check-example-work.mjs asks whether a done uat-flow has a
@@ -431,7 +431,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
   // Every path a record holds is app-relative (be/..., fe/..., a directory of the app root): the base `repo` is the app root.
   const appRoot = appRootOf(workRoot);
   // `counts` is what the script looked at, not only what it flagged: the CLI prints it so a clean code can
-  // say how many candidates were opened and found whole, the way scripts/checks/check-example-work.mjs's summary does.
+  // say how many candidates were opened and found whole, the way scripts/work/validate/check-example-work.mjs's summary does.
   const counts = {declarations: 0, digests: 0, digestsCompared: 0, filesOpened: 0, generatedAssets: 0,
     prompts: 0, runs: 0, receipts: 0, mediaFiles: 0, receiptCalls: 0, accountsFiles: 0};
 

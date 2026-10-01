@@ -1,4 +1,4 @@
-import fs from 'node:fs';import path from 'node:path';import {stringifyYaml} from '../../engine/yaml.mjs';import {checkWorkTree} from '../checks/check-example-work.mjs';import {checkWorkSchemas} from '../work/validate/check-work-schemas.mjs';import {starciworkGitignoreText} from '../lib/starciwork-boundary.mjs';
+import fs from 'node:fs';import path from 'node:path';import {stringifyYaml} from '../../engine/yaml.mjs';import {checkWorkTree} from '../work/validate/check-example-work.mjs';import {checkWorkSchemas} from '../work/validate/check-work-schemas.mjs';import {starciworkGitignoreText} from '../lib/starciwork-boundary.mjs';
 // A small synthetic .starciwork tree in the flat layout: workspace, catalog, one feature and two flat family
 // records (business rules). It claims no investigation, implementation or
 // acceptance: both records are `todo`. The tree is checked by the same gate every example tree passes.

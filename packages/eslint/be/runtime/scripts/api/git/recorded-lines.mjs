@@ -1,16 +1,8 @@
-// recorded-lines.mjs - the one home of the file-size ratchet's arithmetic (R20 HFS_SIZE_GROWTH), shared by the back-end
-// and front-end lint canons (each ships a byte copy in its runtime/ bundle, kept by scripts/hfs/sync-runtime.mjs).
+// recorded-lines.mjs - the line count a file had at a git revision (git show <ref>:<file>): the recorded size a
+// size-growth rule compares the working file with.
 import path from 'node:path';
-import { runGit } from '../api/git/lib.mjs';
-
-/** The line count of a text; a trailing newline does not open a line. */
-export const lineCount = (text) => {
-  const lines = String(text).split(/\r?\n/);
-  return lines.at(-1) === '' ? lines.length - 1 : lines.length;
-};
-
-/** The line count above which a file may not grow: the soft budget when `hardGrowth` holds, else no limit. */
-export const hardGrowthLines = ({ soft, hardGrowth }) => (hardGrowth ? soft : Number.POSITIVE_INFINITY);
+import { runGit } from './lib.mjs';
+import { lineCount } from '../../lib/line-count.mjs';
 
 /**
  * The line count of a file at a git revision, or null when the file did not exist there or git is absent.

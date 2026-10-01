@@ -12,7 +12,7 @@ shape:
   familiesNote: "The array above is the executable form of this shape block: every record lives in a flat
     family folder directly under its feature - features/<feature>/<family>/<name>/index.yaml - with no
     business/, architecture/, business/srs/ or architecture/sds/ segment anywhere.
-    scripts/checks/check-example-work.mjs reads shape.families from this file at gate time and refuses
+    scripts/work/validate/check-example-work.mjs reads shape.families from this file at gate time and refuses
     (FAMILIES_DRIFT) the moment its own FAMILIES set and this list disagree, so the two cannot drift apart
     silently. A work/node@N record (the retired recursive envelope, e.g. under business/{overview,srs} or
     architecture/{overview,sds}) is refused by the gate (HFS_WORK_NODE_RETIRED): restate it as these flat
@@ -111,7 +111,7 @@ shape:
     - "Agent output is never product content. It lives in the project ledger (reports, check_runs, job_artifacts,
       logs, interface_audits, ask_requests) and in the content-addressed blob store outside every repository,
       and a product record cites it by artifact id + sha256 (ARCHITECTURE-DB §5.2, §5.3). The categories below
-      are scripts/lib/starciwork-boundary.mjs agentDataCategory, which scripts/checks/check-example-work.mjs
+      are scripts/lib/starciwork-boundary.mjs agentDataCategory, which scripts/work/validate/check-example-work.mjs
       refuses in a .starciwork tree [HFS_AGENT_DATA_TRACKED], and shape.starciworkIgnore keeps them out of git."
     - kernel-evidence/**, kernel-strays/**, kernel-approvals/** (retired custody)
     - evidence/<workflow>.<mode>/** and any <node>/evidence/<id>/** bundle
@@ -123,7 +123,7 @@ shape:
       (modules/ops/_common.yaml Path and field contract): artifacts of the attempt, the audit an interface_audits row.
       Draw-loop rounds are one blob bundle generation.loop cites {sha256, round}; impl running-page captures are blobs
       the implementation record's assets[] cites {artifact?, name, role, sha256}; layout captures and lockups are blobs
-      shell/index.yaml cites {name, sha256}. Every reader resolves them through engine/db/blob-lookup.mjs. The final
+      shell/index.yaml cites {name, sha256}. Every reader resolves them through engine/db/blob.mjs. The final
       directions the owner accepts stay product content under ui/<screen>/assets (decision Q2)."
   starciworkIgnore:
     - "The .starciwork/.gitignore of an app repository (starciwork-boundary.mjs

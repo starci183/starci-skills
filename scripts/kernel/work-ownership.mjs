@@ -42,6 +42,7 @@ import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readFoundations } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { normWork } from '../lib/path-key.mjs';
 import { recordRecordChange } from '../../engine/db/ledger.mjs';
 
 export const TRANSFER_SCOPE = 'ownership-transfer';
@@ -59,7 +60,6 @@ const FOUNDATION_ROOTS = { brand: '.starciwork/brand', 'layout-tree': '.starciwo
 const READ_ONLY_NODE_KINDS = new Set(['foundation-dependency']);
 const HISTORY_MAX = 20;
 
-export const normWork = (p) => String(p ?? '').trim().replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/+$/, '');
 /** A record path as its directory: `<dir>/index.yaml` and `<dir>/resource.yaml` are the record at <dir>. */
 export const recordDirOf = (p) => normWork(p).replace(/\/(?:index|resource)\.yaml$/, '');
 /** True when `file` is `dir` or sits under it. */

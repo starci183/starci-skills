@@ -9,7 +9,7 @@ import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import * as poll from '../../scripts/supervisor/poll.mjs';
 import {reportsSince,openAsks,orcaTree,orphanKernelJobs} from '../../scripts/supervisor/poll.mjs';
 import {DEFAULTS,supervisorSettings} from '../../scripts/machine/home.mjs';
-import {orcaTreeFindings,readTerminals} from '../../scripts/checks/check-orca-tree.mjs';
+import {orcaTreeFindings,readTerminals} from '../../scripts/supervisor/orca-tree.mjs';
 
 // scripts/supervisor/poll.mjs is the supervisor's mechanism: a pure observer
 // over the durable ledger. modules/supervisor/supervise.yaml is its contract.

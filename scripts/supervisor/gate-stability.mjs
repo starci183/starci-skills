@@ -20,7 +20,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 import { machineFileFor, readMachine } from '../../engine/db/machine.mjs';
-import { loadContractFreeze } from '../kernel/contract-version.mjs';
+import { loadContractFreeze } from '../machine/contract-version.mjs';
 import { parseJson } from '../lib/json.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);

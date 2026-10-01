@@ -35,7 +35,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { COMPONENT_ATTR, PART_ATTR, componentRootOf, loadDna, parseHtml, visibleElement, walkElements, classesOf } from './draw-dna.mjs';
-import { readContractChangesDoc } from '../../kernel/contract-changes-store.mjs';
+import { readContractChangesDoc } from '../../machine/contract-changes-store.mjs';
 import { list } from '../../lib/list.mjs';
 import { isFile } from '../../lib/fs-kind.mjs';
 
@@ -57,7 +57,7 @@ export const REDLINE_LEAF_COMPONENTS = Object.freeze(['Text', 'Heading', 'Icon',
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const KNOWLEDGE = path.join(ROOT, 'knowledge');
 const OWNER_RULINGS = path.join(ROOT, 'modules', 'kernel', 'owner-rulings.yaml');
-// null: the runtime registry (the entry files, scripts/kernel/contract-changes-store.mjs).
+// null: the runtime registry (the entry files, scripts/machine/contract-changes-store.mjs).
 const CONTRACT_CHANGES = null;
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return undefined; } };
 const readYamlOr = (f) => { try { return parseYaml(fs.readFileSync(f, 'utf8')); } catch { return null; } };

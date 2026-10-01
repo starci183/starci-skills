@@ -406,7 +406,7 @@ test('discover-chat lists chat ids, types and names only',async()=>{
 });
 
 test('the one send point is the kernel api\'s parkAsk; serve-ask binding and the supervisor send nothing',()=>{
-  const read=p=>fs.readFileSync(new URL(`../${p}`,import.meta.url),'utf8');
+  const read=p=>fs.readFileSync(new URL(`../../${p}`,import.meta.url),'utf8');
   const serveAsk=read('scripts/kernel/ask-server.mjs');
   assert.match(serveAsk,/export async function parkAsk\(\{[^}]*notify = notifyAsk/,'parkAsk is where an ask is told');
   assert.doesNotMatch(serveAsk,/notifyAsk\(\{ ledgerFile: file/,'a binding form never sends a message (the bridge edits the notice)');

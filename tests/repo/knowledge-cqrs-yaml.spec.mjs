@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import YAML from 'yaml';
 
-const patternSource=name=>fs.readFileSync(fileURLToPath(new URL(`../knowledge/patterns/be/${name}.yaml`,import.meta.url)),'utf8');
+const patternSource=name=>fs.readFileSync(fileURLToPath(new URL(`../../knowledge/patterns/be/${name}.yaml`,import.meta.url)),'utf8');
 
 test('backend pattern files with comma-separated TypeScript names parse without changing CQRS case text',()=>{
   for(const name of ['folder','naming','test']){

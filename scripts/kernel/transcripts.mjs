@@ -20,7 +20,7 @@
 //     one pass over the repo ledger's open attempts; a periodic caller (the reconciler) runs it every minute.
 import path from 'node:path';
 import { workerOutput } from '../api/orca/worker-read.mjs';
-import { stageText, registerBlob, recordAttemptSnapshot, recordFinalTranscript, TRANSCRIPT_SNAPSHOT_MS } from './evidence-store.mjs';
+import { stageText, registerBlob, recordAttemptSnapshot, recordFinalTranscript, TRANSCRIPT_SNAPSHOT_MS } from '../machine/evidence-store.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { operationDispatchOf } from './verbs/shared/rows.mjs';
 

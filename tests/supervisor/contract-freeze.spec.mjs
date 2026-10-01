@@ -10,7 +10,7 @@ import {inspectLedger,ledgerFileFor,openLedger,jobResult} from '../../engine/db/
 import {
   admittedBeforeChange,advisoryCodesFor,carriesChange,contractFollowUpsOf,frozenChangesFor,laterChangesFor,loadContractChanges,loadContractFreeze,
   releasedChangesOf,withheldChangesFor,
-} from '../../scripts/kernel/contract-version.mjs';
+} from '../../scripts/machine/contract-version.mjs';
 import {gateFamiliesTouched} from '../../scripts/supervisor/land.mjs';
 import {compareSides,gateSide} from '../../scripts/supervisor/gate-stability.mjs';
 

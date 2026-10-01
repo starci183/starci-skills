@@ -61,8 +61,7 @@ import {
 } from '../../engine/db/ledger.mjs';
 import { machineFileFor, openMachine } from '../../engine/db/machine.mjs';
 import { recordWhy } from './why-record.mjs';
-import { gateBaseOf } from './workflow-checkpoint.mjs';
-import { workflowWorktreeOf } from './workflow-worktree.mjs';
+import { gateBaseOf, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
   AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot,
@@ -88,9 +87,7 @@ import { parseJson } from '../lib/json.mjs';
 // The reads and guards the split-out verbs share with what stays here (lane slim-api):
 // one definition per helper, in scripts/kernel/verbs/shared/, imported back under the same names.
 import {
-  csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf,
-  latestGoal, ownedPathsOf, workDirOf, JOB_ROW, jobResultSql, latestContractOf, latestReportOf, latestAttemptOf,
-  operationTaskOf, operationDispatchOf,
+  csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, JOB_ROW, jobResultSql, latestReportOf, latestAttemptOf, operationTaskOf, operationDispatchOf,
 } from './verbs/shared/rows.mjs';
 import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './verbs/shared/kernel-seat.mjs';
 import { dispatchEvidenceOf } from './verbs/shared/dispatch-state.mjs';
@@ -140,8 +137,8 @@ import { HANDOVER_OP } from './handover.mjs';
 import { baselineWorkInputs, inputDrift } from './input-digests.mjs';
 import {
   admittedContractOf, admittedBeforeChange, advisoryCodesFor, changeById, withheldChangesFor, classifyChecks,
-  contractVersionOf, laterChangesFor, loadContractChanges,
-} from './contract-version.mjs';
+  contractVersionOf, laterChangesFor, latestContractOf, loadContractChanges,
+} from '../machine/contract-version.mjs';
 import { queueSettleMedia } from '../connectors/telegram-media.mjs';
 import { guardLaunch } from '../guards/hook-install.mjs';
 
@@ -218,7 +215,7 @@ const isCheckResultEnvelope = (value) => {
     if (!Number.isInteger(check.exitCode)) return false;
     if (check.command != null && typeof check.command !== 'string') return false;
     if (check.evidence != null && typeof check.evidence !== 'string') return false;
-    // codes: the finding codes that made a red check red (scripts/kernel/contract-version.mjs
+    // codes: the finding codes that made a red check red (scripts/machine/contract-version.mjs
     // classifyChecks reads them against the leg's admitted contract).
     if (check.codes != null && (!Array.isArray(check.codes) || !check.codes.every((code) => typeof code === 'string'))) return false;
     // failing: the files a red check's failure implicates (scripts/kernel/gate-attribution.mjs).
@@ -2244,7 +2241,7 @@ const reserveOpLeases = (ledger, job, payload, { ttlMs = DISPATCH_LEASE_TTL_MS, 
 // command-terminal launches, Dispatch id for managed ones).
 const buildContractMarkdown = ({ op, jobId, prompt, packet }) =>
   `# dispatch contract — [Op] ${op} (job ${jobId})\n\n${prompt}\n\n## packet\n\n\`\`\`json\n${JSON.stringify(packet, null, 2)}\n\`\`\`\n`;
-// context.contract is the contract version the leg is admitted under (scripts/kernel/contract-version.mjs):
+// context.contract is the contract version the leg is admitted under (scripts/machine/contract-version.mjs):
 // the leg is judged against it for life, whatever lands on main after (modules/kernel/contract-changes.yaml).
 // A frozen family's batched changes not yet released for this workflow are WITHHELD from the leg (contract.withheld,
 // modules/kernel/contract-freeze.yaml): it is judged as if admitted before them, for life.

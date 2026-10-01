@@ -3,7 +3,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {walk} from '../checks/check-example-work.mjs';
+import {walk} from '../work/validate/check-example-work.mjs';
 import {loadRecords, resolveRecordRef} from './example-ownership.mjs';
 
 /**
@@ -18,7 +18,7 @@ import {loadRecords, resolveRecordRef} from './example-ownership.mjs';
  *
  * Exit 0 when every assertion's replayed outcome matches the outcome the evidence already claims. Exit 1
  * (PROOF_STALE) the moment any assertion's replayed outcome differs, or lacks a `command` to replay at all
- * (the same condition scripts/checks/check-example-work.mjs's gate refuses as PROOF_NOT_REPLAYABLE - this script
+ * (the same condition scripts/work/validate/check-example-work.mjs's gate refuses as PROOF_NOT_REPLAYABLE - this script
  * treats it as a verification failure rather than duplicating that gate's own refusal wording).
  */
 

@@ -32,7 +32,7 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { openMachine, pidAlive } from '../../engine/db/machine.mjs';
+import { openMachine, pidAlive, starciLocalRoot } from '../../engine/db/machine.mjs';
 import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_TITLE, SUPERVISOR_MARKER, WORKER_MARKER, STARTUP_RESERVATION_MS,
@@ -273,7 +273,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
       settings, restart: previous ? (reason ?? `the previous Supervisor terminal ${previous.terminal} failed its liveness check (${previous.reason})`) : null,
     });
     const spawned = d.start({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT, title: SUPERVISOR_TITLE, prompt,
-      specFile: path.join(SKILL_ROOT, 'runtime', 'supervisor', `prompt.a${attempt}.md`), objective: `${SUPERVISOR_TITLE} — ${SUPERVISOR_ID}`,
+      specFile: path.join(starciLocalRoot(), 'supervisor', `prompt.a${attempt}.md`), objective: `${SUPERVISOR_TITLE} — ${SUPERVISOR_ID}`,
       entry: env.ORCA_TERMINAL_HANDLE || null, priorRunId: seat?.value?.runId ?? null });
     if (!spawned?.ok) {
       m.transaction(() => {

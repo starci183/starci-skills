@@ -38,7 +38,7 @@ const stopRuns=async assisted=>{
 };
 
 const write=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,typeof value==='string'?value:stringifyYaml(value));};
-const schemaValidator=name=>new Ajv2020({allErrors:true,strict:false,formats:{'date-time':true}}).compile(parseYaml(fs.readFileSync(new URL(`../modules/schemas/${name}.schema.yaml`,import.meta.url),'utf8')));
+const schemaValidator=name=>new Ajv2020({allErrors:true,strict:false,formats:{'date-time':true}}).compile(parseYaml(fs.readFileSync(new URL(`../../modules/schemas/${name}.schema.yaml`,import.meta.url),'utf8')));
 const fixture=t=>{
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-assisted-uat-'));
   const assisted=path.join(temp,'evidence','assisted-uat'),requestFile=path.join(assisted,'request.yaml');

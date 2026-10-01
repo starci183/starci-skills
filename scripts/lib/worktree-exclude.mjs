@@ -1,5 +1,5 @@
 // worktree-exclude.mjs — where a product repository keeps the runtime's own git worktrees (scratch trees made by
-// scripts/api/git/worktree-add.mjs createScratchWorktree), and the one test every scanner uses to stay out of them.
+// scripts/machine/worktree-git.mjs createScratchWorktree), and the one test every scanner uses to stay out of them.
 //
 // Layout inside a product repository:
 //   <repo>/.starciwork/worktrees/<name>    one runtime scratch tree

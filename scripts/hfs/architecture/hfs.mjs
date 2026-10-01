@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isIP } from 'node:net';
 import { gitOutput } from '../../api/git/lib.mjs';
-import { repositoryName } from '../../lib/repo-identity.mjs';
+import { repositoryName } from '../repo-identity.mjs';
 import { braceVariants } from '../../lib/glob.mjs';
 import { createSlotResolver, loadSlotManifest, openHfs } from '../slots.mjs';
 import { isFeTestPath } from '../rules/fe-no-tests.mjs';

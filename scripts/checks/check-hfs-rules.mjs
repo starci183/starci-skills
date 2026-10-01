@@ -49,7 +49,7 @@ export const RULES_README = 'knowledge/hfs/README.md';
 export const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/hfs/architecture.mjs', 'scripts/hfs/architecture'],
   hfs: ['scripts/hfs/check.mjs', 'scripts/hfs/rules', 'scripts/hfs/slots.mjs', 'packages/hfs/bin', 'packages/hfs/sync'],
-  'work-validate': ['scripts/work/validate/work-validate.mjs', 'scripts/checks/check-example-work.mjs', 'scripts/work/validate/check-work-artifacts.mjs'],
+  'work-validate': ['scripts/work/validate/work-validate.mjs', 'scripts/work/validate/check-example-work.mjs', 'scripts/work/validate/check-work-artifacts.mjs'],
   runtime: ['scripts/hfs/runtime-check.mjs', 'scripts/hfs/runtime-rules', 'scripts/checks/check-contract-cites.mjs', 'scripts/hfs/sync-runtime.mjs'],
 });
 /** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */

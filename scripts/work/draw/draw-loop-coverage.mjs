@@ -3,7 +3,7 @@
 // (starci/draw-loop@1) that installed exactly its bytes. A part drawn outside the loop, or edited after the loop
 // installed it, is DRAW_LOOP_MISSING (run by scripts/work/draw/draw-quality.mjs, so by api settle).
 import fs from 'node:fs';
-import { bundleDir } from '../../../engine/db/blob-lookup.mjs';
+import { bundleDir } from '../../../engine/db/blob.mjs';
 /** The loop.json of a generation.loop citation {sha256: <bundle manifest>, round}, materialized from the blob store; null when absent. */
 export const loopFileOfRef = (ref) => { const dir = ref?.sha256 ? bundleDir(ref.sha256) : null; return dir ? path.join(dir, 'loop.json') : null; };
 /** How a loop citation is named in findings and gate evidence. */

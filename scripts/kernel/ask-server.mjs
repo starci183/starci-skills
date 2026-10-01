@@ -48,7 +48,7 @@
 // the owner asked for that drawing (drawOwnerRequestOf, from the ledger).
 
 import '../api/process/hide-child-windows.mjs';
-import { writeAskReceipt } from './ask-receipts.mjs';
+import { writeAskReceipt } from '../machine/ask-receipts.mjs';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { checkWorkTree } from '../../scripts/checks/check-example-work.mjs';
+import { checkWorkTree } from '../../scripts/work/validate/check-example-work.mjs';
 
 // mia inc-96ff77d86a77: architecture.decide listed `owners` as an SDS field while forbidding repository
 // roles and paths in an SDS; the checker then refused a done component without owners even though no

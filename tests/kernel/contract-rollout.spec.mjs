@@ -9,7 +9,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {
   CONTRACT_VERSION_SCHEMA,advisoryCodesFor,classifyChecks,contractFilesOf,contractVersionOf,laterChangesFor,loadContractChanges,runtimeShaOf,
-} from '../../scripts/kernel/contract-version.mjs';
+} from '../../scripts/machine/contract-version.mjs';
 import {checkShellConformance} from '../../scripts/work/ui/shell-conformance.mjs';
 
 // Owner, 2026-09-24: most blocks came from contract changes rolled onto running workflows mid-flight

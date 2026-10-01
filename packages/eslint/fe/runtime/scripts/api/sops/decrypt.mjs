@@ -1,4 +1,4 @@
-// decrypt.mjs — one `sops` decryption: the custody reads (scripts/api/sops/exec-env.mjs readCustody) and the test
+// decrypt.mjs — one `sops` decryption: the custody reads (scripts/api/sops/exec-env.mjs execEnv) and the test
 // secrets (scripts/lib/test-secrets.mjs testSecret). The plaintext stays in this process's memory (stdout over a pipe).
 import os from 'node:os';
 import path from 'node:path';

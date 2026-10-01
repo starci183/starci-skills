@@ -16,7 +16,7 @@ import { brokenImports } from '../import-scan.mjs';
 import { fileURLToPath } from 'node:url';
 import { runGit } from '../../api/git/lib.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
-import { workflowWorktreeOf } from '../workflow-worktree.mjs';
+import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 
 const cache = new Map();
 const LIVE = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];

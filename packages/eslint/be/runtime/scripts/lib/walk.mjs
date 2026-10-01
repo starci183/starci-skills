@@ -1,4 +1,4 @@
-// walk.mjs - split from scripts/lib/walk.mjs (isInside, walkFiles).
+// walk.mjs - filesystem walking helpers: isInside (containment) and walkFiles (depth-first file listing).
 import fs from 'node:fs';
 import path from 'node:path';
 

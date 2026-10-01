@@ -3,7 +3,7 @@
 # Owner, 2026-09-28: "Freeze the drawing rules: stop changing the draw gates while a workflow is running; batch the changes,
 # apply them once, and owe a redraw only once." On 2026-09-27 eight contract changes with reach follow-up hit
 # interface.draw; each one made running and settled draw legs owe another redo (draws failed 18/37, attempts
-# reached 9-11 per node). So, for a family listed here (scripts/kernel/contract-version.mjs):
+# reached 9-11 per node). So, for a family listed here (scripts/machine/contract-version.mjs):
 #
 #   family     the op the freeze governs; a change governs it when the family is in its ops or its followUp
 #              op/ops (modules/kernel/contract-changes/<id>.yaml)

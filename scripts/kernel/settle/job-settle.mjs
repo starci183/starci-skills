@@ -218,7 +218,7 @@ export async function canonSliceCheck(item, { repo }) {
   const { ownedPathPlacements } = await import('../target-repo.mjs');
   const owned = item.payload.owned_paths ?? [];
   // The slice is measured in its workflow's worktree (part A's registry), where it worked, never the live checkout.
-  const { workflowWorktreeOf } = await import('../workflow-worktree.mjs');
+  const { workflowWorktreeOf } = await import('../../machine/workflow-tree.mjs');
   const tree = workflowWorktreeOf({ env: process.env }, item.workflowId);
   const worktree = tree?.path && fs.existsSync(tree.path) ? tree.path : undefined;
   const places = ownedPathPlacements({ op: item.op, payload: item.payload, ownedPaths: owned, repo, worktree });
@@ -236,12 +236,12 @@ export async function canonSliceCheck(item, { repo }) {
 
 /**
  * Persist each settler measurement before its verdict is used, including failed re-runs: one check_runs row
- * (scripts/kernel/evidence-store.mjs recordCheck) with the RAW exit this runner observed, stdout/stderr/output as
+ * (scripts/machine/evidence-store.mjs recordCheck) with the RAW exit this runner observed, stdout/stderr/output as
  * redacted blobs. A checker that could not run (exit 124 timeout / 127 spawn failure, or status 'unavailable') is
  * 'unavailable', never red (H7). Returns the check id.
  */
 export async function recordSettlerCheck(ledger, item, run, { now = Date.now } = {}) {
-  const { stageBlob, recordCheck, CHECK_STATUSES } = await import('../evidence-store.mjs');
+  const { stageBlob, recordCheck, CHECK_STATUSES } = await import('../../machine/evidence-store.mjs');
   const bytes = (content) => (content == null ? null : Buffer.isBuffer(content) ? content : Buffer.from(typeof content === 'string' ? content : JSON.stringify(content)));
   const blob = (content, mediaType) => { const b = bytes(content); return b && b.length ? stageBlob(b, { mediaType, repoRoots: [item.repo].filter(Boolean) }) : null; };
   const stdout = blob(run.stdout, 'text/plain'), stderr = blob(run.stderr, 'text/plain'), output = blob(run.output, 'application/json');

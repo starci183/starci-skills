@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // check-work-citations.mjs — every citation of agent output in a product's Work records resolves in its ledger
-// (alpha.3, ARCHITECTURE-DB §5.3; scripts/kernel/work-citations.mjs).
+// (alpha.3, ARCHITECTURE-DB §5.3; scripts/work/validate/work-citations.mjs).
 //
 //   node scripts/work/validate/check-work-citations.mjs --repo <repo> [--json]
 //
@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { ledgerFileFor, openLedgerReader } from '../../../engine/db/ledger.mjs';
-import { citationsOf, resolveCitations } from '../../kernel/work-citations.mjs';
+import { citationsOf, resolveCitations } from './work-citations.mjs';
 import { isMain } from '../../lib/is-main.mjs'; import { walkFiles } from '../../lib/walk.mjs';
 
 const SKIP = new Set(['node_modules', '.git', '_derived']);

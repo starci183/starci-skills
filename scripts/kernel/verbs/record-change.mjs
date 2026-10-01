@@ -3,9 +3,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getWorkflow, workDirOf, workflowRunning } from './shared/rows.mjs';
 import { createWorkDigester, inputDrift, isWorkInput } from '../input-digests.mjs';
-import { RECORD_CHANGE_REACHES, changeNoteOf, committedMatches, committedReader, createOwnership, normWork, readRecordChange, writeRecordChange } from '../work-ownership.mjs';
+import { RECORD_CHANGE_REACHES, changeNoteOf, committedMatches, committedReader, createOwnership, readRecordChange, writeRecordChange } from '../work-ownership.mjs';
+import { normWork } from '../../lib/path-key.mjs';
 import { RECORD_CHANGE_REFUSED } from '../dependency-graph.mjs';
-import { loadContractChanges } from '../contract-version.mjs';
+import { loadContractChanges } from '../../machine/contract-version.mjs';
 
 export default {
   verb: 'record-change',

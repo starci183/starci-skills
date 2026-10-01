@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { openIncident, resolveIncident } from '../../engine/db/ledger.mjs';
-import { recordCheck } from './evidence-store.mjs';
+import { recordCheck } from '../machine/evidence-store.mjs';
 import { judgeSummary, loadSonarGate, SCAN_SCHEMA_PREFIX } from '../gates/sonar-gate.mjs';
 import { inspectOwnerConfig, specsSettings } from '../../engine/config.mjs';
 

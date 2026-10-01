@@ -1447,7 +1447,7 @@ foundations:
 
 # ============================================================================
 # CONTRACT ROLLOUT — a contract change never lands on running work
-#    (modules/kernel/contract-changes/<id>.yaml; scripts/kernel/contract-version.mjs).
+#    (modules/kernel/contract-changes/<id>.yaml; scripts/machine/contract-version.mjs).
 # ============================================================================
 contractRollout:
   admitted: >-

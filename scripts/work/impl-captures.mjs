@@ -2,9 +2,9 @@
 // A capture is agent output: interface.implement files it from STARCI_JOB_SCRATCH/captures with api report, and the
 // record's assets[] cites each file {artifact?, name, role, sha256} - never a file under the record's assets/.
 // capturesOf pairs every cited PNG with the markup cited under the same stem (<stem>.html), resolved through the blob
-// store (engine/db/blob-lookup.mjs assetFileOf).
+// store (engine/db/blob.mjs assetFileOf).
 import path from 'node:path';
-import { assetFileOf } from '../../engine/db/blob-lookup.mjs';
+import { assetFileOf } from '../../engine/db/blob.mjs';
 
 const nameOf = (a) => String(a?.name ?? a?.path ?? '');
 const stemOf = (name) => name.replace(/\.[^./]+$/, '');

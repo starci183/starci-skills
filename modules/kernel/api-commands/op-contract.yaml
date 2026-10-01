@@ -15,7 +15,7 @@ op-contract:
   admission: >-
     --json also returns admission {admittedAt, source:recorded|contract-row, runtimeSha, digest,
     laterChanges[], advisoryChecks[], advisoryCodes[]}: the contract version dispatch admitted
-    this attempt under (context.contract, scripts/kernel/contract-version.mjs; a leg dispatched
+    this attempt under (context.contract, scripts/machine/contract-version.mjs; a leg dispatched
     before versions were recorded is admitted at its row's created_at) and what contract
     changes landed after it (modules/kernel/contract-changes/). The leg is judged against
     its admitted contract: those checks and codes are suspects for it, never refusals, and a

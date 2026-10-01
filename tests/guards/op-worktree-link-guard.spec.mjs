@@ -8,6 +8,7 @@ import { classifyGit } from '../../scripts/guards/git-policy.mjs';
 import { bindGuardTerminal, ensureHistoryHook, writeJobGuard } from '../../scripts/guards/hook-install.mjs';
 import { scanFootprint } from '../../scripts/guards/footprint-scan.mjs';
 import { linksUnder, safeRemoveTree } from '../../scripts/api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs';
 import { guardsRoot } from '../../scripts/guards/guards-root.mjs';
 
 // nivo-fe inc-c8fbf76aa499 (2026-09-25 05:47): Devin op worker op-interface.implement-2a43f63c6c ran, through Git Bash,
@@ -55,7 +56,7 @@ test('the history hook refuses a worktree an op creates with ANY git binary, and
   t.after(() => fs.rmSync(bound, { force: true }));
   const op = { ORCA_TERMINAL_HANDLE: handle };
   const beside = path.join(path.dirname(repo), `${path.basename(repo)}-wt-r4`);
-  t.after(() => safeRemoveTree(beside));
+  t.after(() => safeRemoveTree(beside, { hold: artifactHoldReason }));
   // `git` here is the real binary, run by nothing that checks it first: exactly the Git Bash case.
   for (const args of [['worktree', 'add', '--detach', beside, 'HEAD'], ['worktree', 'add', '-b', 'op-side', beside]]) {
     const added = sh(repo, args, op);
@@ -90,7 +91,7 @@ test('the history hook applies an op\'s rules to a managed agent found by its bo
   assert.equal(JSON.parse(fs.readFileSync(bound, 'utf8')).jobId, 'op-docs.author-managed');
   const managed = { ORCA_TERMINAL_HANDLE: handle };
   const beside = path.join(path.dirname(repo), path.basename(repo) + '-wt-managed');
-  t.after(() => safeRemoveTree(beside));
+  t.after(() => safeRemoveTree(beside, { hold: artifactHoldReason }));
   const added = sh(repo, ['worktree', 'add', '--detach', beside, 'HEAD'], managed);
   assert.notEqual(added.status, 0, 'a managed op creates no worktree');
   assert.match(added.stderr, /an op worker never creates a git worktree/);

@@ -1,6 +1,6 @@
 // Landing throughput (lane land-throughput, 2026-09-28): the append-only registries lanes used to edit at the same
 // tail are one file per thing, so parallel lanes stop invalidating each other at the land gate.
-//   scripts/kernel/contract-changes-store.mjs - modules/kernel/contract-changes/<id>.yaml, one file per entry
+//   scripts/machine/contract-changes-store.mjs - modules/kernel/contract-changes/<id>.yaml, one file per entry
 //   scripts/kernel/api-extensions.mjs         - api verbs, status fields and boolean flags as files
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,9 +9,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { mergeContractChanges, readContractChangesDoc, readContractChangesDocAt } from '../../scripts/kernel/contract-changes-store.mjs';
+import { mergeContractChanges, readContractChangesDoc, readContractChangesDocAt } from '../../scripts/machine/contract-changes-store.mjs';
 import { isContractChangesPath, entryFileOf, CONTRACT_CHANGES_DIR } from '../../scripts/lib/contract-changes-path.mjs';
-import { loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
+import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 import { landCommits, runChecks, governedPaths } from '../../scripts/supervisor/land.mjs';
 import { loadApiExtensions, statusExtras, readFlagsFile, extensionVerbNames } from '../../scripts/kernel/api-extensions.mjs';
 import { checkApiSurface } from '../../scripts/checks/check-api-surface.mjs';

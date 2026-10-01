@@ -25,7 +25,7 @@ import { mkdtemp } from '../helpers/tmpdir.mjs';
 // it. Nest loads that driver dynamically, so this scan alone would not have caught it - the clean-install proof
 // (tests/gates/package-clean-test.spec.mjs) does - but every import the source does name is held here, without an install.
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // The land gate runs this spec for any change under these roots (land.mjs invariantRootsOf): declared once, here.
 export const INVARIANT_ROOTS = ['packages'];
 

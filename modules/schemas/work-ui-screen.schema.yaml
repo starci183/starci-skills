@@ -1682,7 +1682,7 @@ $defs:
         name:
           $ref: "#/$defs/prose"
           description: The artifact name of a blob citation - agent output (a draw round, a capture, a lockup) lives in
-            the blob store, never on disk; engine/db/blob-lookup.mjs resolves it by sha256.
+            the blob store, never on disk; engine/db/blob.mjs resolves it by sha256.
         role:
           $ref: "#/$defs/slug"
           description: "What the file is - a direction, the exact prompt beside it, an input a later
@@ -1764,7 +1764,7 @@ $defs:
               properties:
                 sha256:
                   $ref: "#/$defs/sha256"
-                  description: The manifest digest of the loop's blob bundle (engine/db/blob-lookup.mjs putBundle).
+                  description: The manifest digest of the loop's blob bundle (engine/db/blob.mjs putBundle).
                 path:
                   $ref: "#/$defs/prose"
                 round:

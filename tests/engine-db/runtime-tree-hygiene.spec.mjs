@@ -19,7 +19,7 @@ const SPEC=/\.spec\.mjs$/;
 
 test('no spec builds its fixture inside the runtime tree',()=>{
   const offenders=[];
-  for(const name of fs.readdirSync(path.join(runtimeRoot,'tests')).filter(file=>SPEC.test(file))){
+  for(const name of fs.readdirSync(path.join(runtimeRoot,'tests'),{recursive:true}).map(String).filter(file=>SPEC.test(file))){
     const body=fs.readFileSync(path.join(runtimeRoot,'tests',name),'utf8');
     if(/mkdtempSync\(\s*(?:path\.join\(\s*)?process\.cwd\(\)/.test(body)||/mkdirSync\(\s*path\.join\(\s*process\.cwd\(\)\s*,\s*['"`]\./.test(body))
       offenders.push(name);

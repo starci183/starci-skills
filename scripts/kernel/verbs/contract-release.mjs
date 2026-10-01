@@ -2,7 +2,7 @@
 import { JOB_ROW, getWorkflow, jobPayloadOf } from './shared/rows.mjs';
 import { recordJobResult, setJobStatus, updateJob } from '../../../engine/db/ledger.mjs';
 import { dispatchEvidenceOf } from './shared/dispatch-state.mjs';
-import { CONTRACT_RELEASE_EVENT, contractFollowUpsOf, frozenChangesFor, loadContractChanges, releasedChangesOf } from '../contract-version.mjs';
+import { CONTRACT_RELEASE_EVENT, contractFollowUpsOf, frozenChangesFor, loadContractChanges, releasedChangesOf } from '../../machine/contract-version.mjs';
 import { currentRuntimeRev, revRootOf } from '../runtime-rev.mjs';
 
 export default {

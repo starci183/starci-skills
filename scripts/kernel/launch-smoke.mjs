@@ -56,6 +56,7 @@ import { fileURLToPath } from 'node:url';
 import { runtimeProfile } from '../../engine/config.mjs';
 import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { gitResult } from '../api/git/lib.mjs';
 
 export const SMOKE_SCHEMA = 'starci/launch-smoke@2';
@@ -117,11 +118,11 @@ export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices() }
  * the context those two modules take; `git` runs one git command ({ok, stdout, error}).
  */
 export async function defaultClient() {
-  const [lib, workers, critic, show, read, stop, release, update, list, wt, cp] = await Promise.all([
+  const [lib, workers, critic, show, read, stop, release, update, list, wt, cp, tree] = await Promise.all([
     import('../agent/lib.mjs'), import('../supervisor/workers.mjs'), import('../work/draw-critic.mjs'),
     import('../api/orca/worker-show.mjs'), import('../api/orca/worker-read.mjs'), import('../api/orca/worker-stop.mjs'),
     import('../api/orca/worker-release.mjs'), import('../api/orca/task-update.mjs'),
-    import('../api/orca/worktree-list.mjs'), import('./workflow-worktree.mjs'), import('./workflow-checkpoint.mjs')]);
+    import('../api/orca/worktree-list.mjs'), import('./workflow-worktree.mjs'), import('./workflow-checkpoint.mjs'), import('../machine/workflow-tree.mjs')]);
   return {
     startAgent: lib.startAgent, startWorkerAgent: workers.startWorkerAgent,
     criticWorkspace: critic.criticWorkspace, removeCriticWorkspace: critic.removeCriticWorkspace, launchCriticWorker: critic.launchCriticWorker,
@@ -131,9 +132,9 @@ export async function defaultClient() {
     // step itself through part B's `verify` seam, and the result says so (workflow.finish.steps).
     ctx: { verify: () => ({ ok: true, jobId: null, detail: 'launch smoke: its ops are no-op agents, no review.verify op runs' }) },
     workflow: {
-      spec: wt.workflowWorktreeSpec, ensure: wt.ensureWorkflowWorktree, of: wt.workflowWorktreeOf, opArgs: wt.opWorktreeArgs,
+      spec: wt.workflowWorktreeSpec, ensure: wt.ensureWorkflowWorktree, of: tree.workflowWorktreeOf, opArgs: wt.opWorktreeArgs,
       sideOf: wt.sideOf, canDispatchConcurrently: wt.canDispatchConcurrently, release: wt.releaseWorkflowWorktree,
-      checkpointOp: cp.checkpointOp, gateBaseOf: cp.gateBaseOf, preserveAndReset: cp.preserveAndReset, finish: cp.finishWorkflow,
+      checkpointOp: cp.checkpointOp, gateBaseOf: tree.gateBaseOf, preserveAndReset: cp.preserveAndReset, finish: cp.finishWorkflow,
     },
     git: (args, dir) => gitResult(args, { dir }),
   };
@@ -612,7 +613,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
     // A workflow that never finished, or a worktree the controller never removed, is still given back (link check,
     // Orca's worktree removal, the row closed).
     if (wf.registered && !(wf.removed?.listed === false && wf.removed?.pathExists === false)) wf.released = await settleAsync(() => orca.workflow.release(orca.ctx, workflowId));
-    safeRemoveTree(state);
+    safeRemoveTree(state, { hold: artifactHoldReason });
   }
   for (const [name, roles] of Object.entries(PATHS)) {
     const problems = [];

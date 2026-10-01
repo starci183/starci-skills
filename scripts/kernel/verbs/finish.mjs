@@ -7,7 +7,7 @@ import { closeHeldTasks, closeKernelTerminal, releaseKernelSeat, retainAfterEnd 
 import { handoverGateOf } from '../handover.mjs';
 import { closeWorkflowDecisions } from '../../machine/decisions.mjs';
 import { CHECKPOINT_EVENTS, finishWorkflow } from '../workflow-checkpoint.mjs';
-import { workflowWorktreeOf } from '../workflow-worktree.mjs';
+import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 
 export default {
   verb: 'finish',

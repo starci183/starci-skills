@@ -2,11 +2,11 @@
 // Kernel workflow; never write it ourselves when Orca has it).
 //
 // Two homes, decided by who works in the tree, each created and removed only through its api:
-//   Orca     an agent's workspace (kind workflow, critic, supervisor-staging): scripts/api/orca/worktree-provision.mjs creates and binds it,
-//            scripts/api/orca/worktree-remove.mjs removes it (links first, then `orca worktree rm`). Never git.
-//   git      a runtime-internal scratch tree no agent ever works in: scripts/api/git/worktree-add.mjs createScratchWorktree
-//            holds the only `git worktree add` of the runtime (scripts/checks/check-worktree-add.mjs fails any other),
-//            scripts/api/git/worktree-remove.mjs removeScratchWorktree the git removal.
+//   Orca     an agent's workspace (kind workflow, critic, supervisor-staging): scripts/machine/worktree-orca.mjs creates and binds it,
+//            scripts/machine/worktree-orca.mjs removes it (links first, then `orca worktree rm`). Never git.
+//   git      a runtime-internal scratch tree no agent ever works in: scripts/machine/worktree-git.mjs createScratchWorktree
+//            (the one caller of the only `git worktree add`, scripts/api/git/worktree-add.mjs; check-worktree-add.mjs fails any other),
+//            scripts/machine/worktree-git.mjs removeScratchWorktree the git removal.
 // The registry rows, kinds, settings and the collect judgement are scripts/machine/worktree-registry.mjs.
 //
 //   gc       gcWorktrees removes a live tree whose owner ended - a workflow: its phase is stopped, finished or archived;
@@ -32,17 +32,16 @@ import { fileURLToPath } from 'node:url';
 import { isLinkLike } from '../api/fs/safe-remove.mjs';
 import {
   worktreeSettings, withRegistry, markRemoved, isPendingRow, stalePending, releaseOrcaSlot, collectReason, pendingPathOf,
-  treeKey, sameTree, insideTree, worktreesRootOf, SETTLED_JOBS, ORCA_KINDS, ENDED_WORKFLOW_PHASES,
+  treeKey, sameTree, insideTree, worktreesRootOf, SETTLED_JOBS, ENDED_WORKFLOW_PHASES,
 } from './worktree-registry.mjs';
+import { ORCA_KINDS } from '../lib/worktree-kinds.mjs';
 import { parseRuntimeStamp, psCoverage, orphanPreserveName, orphanVerdict } from '../lib/orca-orphans.mjs';
-import { gitWorktreeList, mainRootOf, registeredAt } from '../api/git/worktree-list.mjs';
+import { worktreeListPorcelain } from '../api/git/worktree-list-porcelain.mjs';
+import { mainRootOf, registeredAt, removeScratchWorktree } from './worktree-git.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { isAncestor } from '../api/git/merge-base.mjs';
 import { branchDescription } from '../api/git/branch-description.mjs';
-import { removeScratchWorktree } from '../api/git/worktree-remove.mjs';
-import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
-import { orcaWorktreeClient } from '../api/orca/worktree-client.mjs';
-import { bindOrcaWorktree } from '../api/orca/worktree-provision.mjs';
+import { removeOrcaWorktree, bindOrcaWorktree, orcaWorktreeClient } from './worktree-orca.mjs';
 import { pidAlive, machineLog } from '../../engine/db/machine.mjs';
 import { openLedgerReader } from '../../engine/db/ledger.mjs';
 
@@ -51,7 +50,7 @@ const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 /* ------------------------------------------------------------ counts */
 
 /** Registered linked worktrees under the runtime's git worktrees root of `repoRoot`. */
-const runtimeTreesOf = (repoRoot, opts) => { const root = worktreesRootOf(repoRoot); return gitWorktreeList(repoRoot, opts).filter((w) => insideTree(w.path, root)); };
+const runtimeTreesOf = (repoRoot, opts) => { const root = worktreesRootOf(repoRoot); return worktreeListPorcelain(repoRoot, opts).filter((w) => insideTree(w.path, root)); };
 
 /**
  * Each repo's live worktree count against its cap, with its orphans: a live row whose directory is gone (a pending Orca
@@ -70,7 +69,7 @@ export function worktreeCounts({ repos = [], env = process.env, settings = workt
     const orphans = mine.filter((r) => (isPendingRow(r) ? stalePending(r, now, settings.ownerGoneMs) : !fs.existsSync(r.path)))
       .map((r) => ({ path: r.path, why: isPendingRow(r) ? 'Orca slot reserved, never bound' : 'registered, directory gone' }));
     for (const w of runtimeTreesOf(repoRoot, { git })) if (!mine.some((r) => sameTree(r.path, w.path))) orphans.push({ path: w.path, why: w.prunable ? 'prunable registration' : 'no live registry row' });
-    const linked = Math.max(0, gitWorktreeList(repoRoot, { git }).length - 1);
+    const linked = Math.max(0, worktreeListPorcelain(repoRoot, { git }).length - 1);
     out.push({ repoRoot, live: mine.length, linked, cap: settings.capPerRepo, orphans, over: Math.max(mine.length, linked) > settings.capPerRepo });
   }
   return out;

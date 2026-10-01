@@ -476,7 +476,7 @@ moved:
   - {from: tests/grammar-context.spec.mjs, to: tests/kernel/grammar-context.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/grammar-contracts.spec.mjs, to: tests/work-ui/grammar-contracts.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/grammar-dist-rebuild.spec.mjs, to: tests/supervisor/grammar-dist-rebuild.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/grammar-dist.spec.mjs, to: tests/checks/grammar-dist.spec.mjs, movedIn: C7, quiesced: false}
+  - {from: tests/grammar-dist.spec.mjs, to: tests/gates/grammar-dist.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/grammar-geometry.spec.mjs, to: tests/work-ui/grammar-geometry.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/grammar-knowledge.spec.mjs, to: tests/work-ui/grammar-knowledge.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/grammar-registry-pin.spec.mjs, to: tests/work-ui/grammar-registry-pin.spec.mjs, movedIn: C7, quiesced: false}
@@ -901,6 +901,21 @@ moved:
   - {from: scripts/supervisor/sup-log.mjs, to: scripts/machine/sup-log.mjs, movedIn: C3, quiesced: false}
   - {from: scripts/kernel/log-writer.mjs, to: scripts/machine/log-writer.mjs, movedIn: C3, quiesced: false}
   - {from: scripts/kernel/owner-claim.mjs, to: scripts/machine/owner-claim.mjs, movedIn: C3, quiesced: false}
+  - {from: scripts/checks/check-example-work.mjs, to: scripts/work/validate/check-example-work.mjs, movedIn: C4, quiesced: false}
+  - {from: scripts/kernel/work-citations.mjs, to: scripts/work/validate/work-citations.mjs, movedIn: C6, quiesced: false}
+  - {from: scripts/kernel/ask-receipts.mjs, to: scripts/machine/ask-receipts.mjs, movedIn: C3, quiesced: false}
+  - {from: scripts/kernel/evidence-store.mjs, to: scripts/machine/evidence-store.mjs, movedIn: C3, quiesced: false}
+  - {from: scripts/kernel/contract-version.mjs, to: scripts/machine/contract-version.mjs, movedIn: C3, quiesced: false}
+  - {from: scripts/kernel/contract-changes-store.mjs, to: scripts/machine/contract-changes-store.mjs, movedIn: C3, quiesced: false}
+  - {from: engine/db/blob-lookup.mjs, to: engine/db/blob.mjs, movedIn: C3, quiesced: false}
+  - {from: scripts/api/git/worktree-list.mjs, to: scripts/api/git/worktree-list-porcelain.mjs, movedIn: C5, quiesced: false}
+  - {from: scripts/api/git/preserve-work.mjs, to: scripts/machine/worktree-git.mjs, movedIn: C5, quiesced: false}
+  - {from: scripts/api/orca/worktree-provision.mjs, to: scripts/machine/worktree-orca.mjs, movedIn: C5, quiesced: true}
+  - {from: scripts/api/orca/worktree-remove.mjs, to: scripts/machine/worktree-orca.mjs, movedIn: C5, quiesced: true}
+  - {from: scripts/api/orca/worktree-client.mjs, to: scripts/machine/worktree-orca.mjs, movedIn: C5, quiesced: true}
+  - {from: scripts/lib/repo-identity.mjs, to: scripts/hfs/repo-identity.mjs, movedIn: C5, quiesced: false}
+  - {from: scripts/lib/runtime-host.mjs, to: scripts/gates/runtime-host.mjs, movedIn: C5, quiesced: false}
+  - {from: scripts/lib/recorded-lines.mjs, to: scripts/api/git/recorded-lines.mjs + scripts/lib/line-count.mjs, movedIn: C5, quiesced: false}
 # Each Orca REPLACE deletion of the deep map lands with its entries here (dispatchShow, closeOperationTask, TASK_CLOSED_STATUS,
 # staleTasks, CLOSED_TASK_STATUSES, INBOX_NOISE_TYPES, quitWorkerTerminal, custodyOf, releaseSelfSafe), in the commit that
 # deletes the symbol.

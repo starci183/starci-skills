@@ -45,7 +45,7 @@ test('a plain refactor keeps its chain: no scan leg, and work.author remaps the 
 test('the kernel cuts a canon code.refactor leg by canon-scan slices, each still sized by api estimate', () => {
   const cut = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'driver-loop.yaml'), 'utf8')).tick.enqueue.cutExecution;
   const text = cut.replace(/\s+/g, ' ');
-  assert.match(text, /params\.canonFamilies is set takes its partition from `node scripts\/checks\/canon-scan\.mjs --root ROOT --families <value> \[--exclude <paths other workflows own>\] --json` -> `slices`/);
+  assert.match(text, /params\.canonFamilies is set takes its partition from `node scripts\/gates\/canon-scan\.mjs --root ROOT --families <value> \[--exclude <paths other workflows own>\] --json` -> `slices`/);
   assert.match(text, /each wave enqueued `--after` every job of the wave before it; each slice is still sized by `api estimate --paths`/);
 });
 

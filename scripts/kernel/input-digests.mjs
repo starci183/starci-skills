@@ -10,7 +10,7 @@
 //           reads[].path, context[].path, knowledge[] or the selected
 //           executionModes.<mode>.reads[].path, plus any the packet's params cite.
 //           A settled job is judged against the Source it was ADMITTED under
-//           (scripts/kernel/contract-version.mjs). A later Source edit is
+//           (scripts/machine/contract-version.mjs). A later Source edit is
 //           `sourceDrift` - advisory, never stale: work that must catch up is a
 //           change registered `reach: follow-up` in
 //           modules/kernel/contract-changes.yaml, which status lists as
@@ -37,14 +37,14 @@
 // work directory counts only its record files, index.yaml/resource.yaml, and
 // never evidence/ or assets/), and a path that resolves to nothing is `absent`.
 // The record rides in contracts.context_json.inputs (INPUT_DIGEST_SCHEMA); a
-// contract without it never reports stale input or drift. An entry recorded
-// before `kind` existed is classified by its path.
+// contract without it never reports stale input or drift. An entry recorded before `kind` existed is classified by its path.
 import fs from 'node:fs';
 import path from 'node:path';
 import { JOB_STATUSES } from '../../engine/db/ledger.mjs';
 import {sha256} from '../../engine/digest.mjs';
-import { admittedContractOf } from './contract-version.mjs';
-import { changeNoteOf, committedMatches, committedReader, createOwnership, inside, normWork, ownedOf, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
+import { admittedContractOf } from '../machine/contract-version.mjs';
+import { changeNoteOf, committedMatches, committedReader, createOwnership, inside, ownedOf, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
+import { normWork } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { underWorktrees } from '../lib/worktree-exclude.mjs';
 

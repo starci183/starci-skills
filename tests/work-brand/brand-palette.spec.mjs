@@ -7,7 +7,7 @@ import path from 'node:path';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { brandPalette, measurePalette, paletteFindings, promptPaletteBlock, readImage } from '../../scripts/work/brand/brand-palette.mjs';
 import { checkShellConformance } from '../../scripts/work/ui/shell-conformance.mjs';
-import { advisoryCodesFor, loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
+import { advisoryCodesFor, loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 import { blankImage, drawOver, encodePng } from '../../scripts/work/png.mjs';
 import { NIVO_BRAND, drawnPart, redAccentPart, bluePrimaryPart } from '../fixtures/brand-palette.mjs';
 import { drawUi, settledProduct, uiSkeleton } from '../fixtures/layout-tree.mjs';

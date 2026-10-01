@@ -24,9 +24,10 @@ import { landingRepos, specBatches } from './settle-landed.mjs';
 import { projectBinding } from './target-repo.mjs';
 import { recordArtifactProofs } from './proof-integrity.mjs';
 import { writePatchJson, patchJsonFileOf, patchAssetsDirOf } from './patch-json.mjs';
-import { kindOf, mediaTypeOf, roleOf, stageBlob, putArtifact, attemptOf, ARTIFACT_KINDS, ARTIFACT_SUBKINDS } from './evidence-store.mjs';
+import { kindOf, mediaTypeOf, roleOf, stageBlob, putArtifact, attemptOf, ARTIFACT_KINDS, ARTIFACT_SUBKINDS } from '../machine/evidence-store.mjs';
 import { jobScratchDirOf } from './op-prompt.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 export { kindOf, mediaTypeOf as mimeOf };
 export const ARTIFACTS_INDEXED = 'artifacts-indexed';
@@ -261,7 +262,7 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
       walk(recordings, found, (file) => kindOf(file) !== 'file');
       for (const abs of found) stage(abs, { name: `recordings/${slashed(path.relative(recordings, abs))}`, role: roleOf(abs) });
     }
-  } finally { safeRemoveTree(tmp); }
+  } finally { safeRemoveTree(tmp, { hold: artifactHoldReason }); }
   const byKind = {}, bySubkind = {};
   for (const item of staged) { byKind[item.kind] = (byKind[item.kind] ?? 0) + 1; const sk = item.subkind ?? 'unknown'; bySubkind[sk] = (bySubkind[sk] ?? 0) + 1; }
   let added = 0, proofs = 0;

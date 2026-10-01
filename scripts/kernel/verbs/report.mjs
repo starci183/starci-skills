@@ -17,7 +17,7 @@ import { HANDOVER_OP, handoverAskProblem } from '../handover.mjs';
 import { autopilotOn, autopilotBundle } from '../autopilot.mjs';
 import { DRAW_REVIEW_OP, DRAW_REVIEW_CHANGE, DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../../work/draw-review.mjs';
 import { DRAW_FEEDBACK_CHANGE, reportFeedbackFindings } from '../../work/draw-feedback.mjs';
-import { admittedContractOf, loadContractChanges, changeById, admittedBeforeChange } from '../contract-version.mjs';
+import { admittedContractOf, loadContractChanges, changeById, admittedBeforeChange } from '../../machine/contract-version.mjs';
 import { ownerAskConflict } from '../../gates/starcistacks.mjs';
 import { repeatedAnswerOf, ownerAnswersOf } from '../owner-answers.mjs';
 import { renderReportBlock } from '../report-render.mjs';

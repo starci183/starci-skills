@@ -65,22 +65,22 @@ import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../eng
 import { git, normPath, finishLanded, selfJobsLandedBy, recordLandFailed } from './workers.mjs';
 import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/db/machine.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
-import { safeRemoveTree, safeRemoveWorktree, unlinkNodeModulesLink } from '../api/fs/safe-remove.mjs';
-import { createScratchWorktree } from '../api/git/worktree-add.mjs';
+import { safeRemoveTree, unlinkNodeModulesLink } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-git.mjs';
 import { ci } from '../api/npm/ci.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../machine/ram-throttle.mjs';
 import { grammarDistStatus } from '../gates/grammar-dist.mjs';
 import { specsDependingOn } from '../lib/spec-deps.mjs';
-import { readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
+import { readContractChangesDocAt } from '../machine/contract-changes-store.mjs';
 import { CONTRACT_CHANGES_DIR, isContractChangesPath } from '../lib/contract-changes-path.mjs';
 import { SKILL_ROOT, lanesRoot, landRoot, supervisorSettings } from '../machine/home.mjs';
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
 import { DEFAULT_DUE_MS } from '../machine/decisions.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
-export { CONTRACT_CHANGES_DIR };
 export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs', 'scripts/checks/check-worktree-add.mjs']);
 export const MAX_MAIN_RETRIES = 3;
@@ -388,7 +388,7 @@ export function runSpecFiles({ dir, files, concurrency, timeout = specTimeoutMs(
       failures = uniqFailures(fs.readFileSync(out, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)).map((f) => ({ file: rel(String(f.file)), name: String(f.name) })));
     } catch { failures = null; }
     return { ...r, failures };
-  } finally { try { safeRemoveTree(tmpDir); } catch { /* temp */ } }
+  } finally { try { safeRemoveTree(tmpDir, { hold: artifactHoldReason }); } catch { /* temp */ } }
 }
 
 /**
@@ -487,7 +487,7 @@ export function packageProofCheck({ dir, base, runner = run }) {
 const readSpecs = (dir) => {
   const tests = path.join(dir, 'tests');
   let names = [];
-  try { names = fs.readdirSync(tests).filter((n) => n.endsWith('.spec.mjs')); } catch { return []; }
+  try { names = fs.readdirSync(tests, { recursive: true }).map((n) => String(n).split(path.sep).join('/')).filter((n) => n.endsWith('.spec.mjs')); } catch { return []; }
   return names.map((n) => ({ file: `tests/${n}`, text: (() => { try { return fs.readFileSync(path.join(tests, n), 'utf8'); } catch { return ''; } })() }));
 };
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { loadContractChanges, changeById } from '../../scripts/kernel/contract-version.mjs';
+import { loadContractChanges, changeById } from '../../scripts/machine/contract-version.mjs';
 
 const ROOT = new URL('../..', import.meta.url);
 

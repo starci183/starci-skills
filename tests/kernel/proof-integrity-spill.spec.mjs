@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {ledgerFileFor,openLedger,ensureWorkflow,appendEvent,storeBlob} from '../../engine/db/ledger.mjs';
-import {putArtifact,stageBlob} from '../../scripts/kernel/evidence-store.mjs';
+import {putArtifact,stageBlob} from '../../scripts/machine/evidence-store.mjs';
 import {verifyProofs} from '../../scripts/kernel/proof-integrity.mjs';
 // An event over EVENT_PAYLOAD_MAX keeps its payload whole in the blob store (events.payload_sha): the row holds a stub
 // {spilled:true, sha256, bytes, count} in place of each spilled field (engine/db/ledger.mjs appendEvent, 22ed953c5), or

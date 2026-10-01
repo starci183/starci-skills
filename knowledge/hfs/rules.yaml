@@ -100,7 +100,7 @@ rules:
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["HFS_AGENT_DATA_TRACKED"]
     enforcers:
-      - {kind: work-validate, id: agent-data-tracked, at: scripts/checks/check-example-work.mjs}
+      - {kind: work-validate, id: agent-data-tracked, at: scripts/work/validate/check-example-work.mjs}
   - id: R08
     code: "HFS_WORK_NODE_RETIRED"
     law: "Only flat family records, never `work/node`."
@@ -108,7 +108,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["HFS_WORK_NODE_RETIRED"]
     enforcers:
-      - {kind: work-validate, id: work-node-retired, at: scripts/checks/check-example-work.mjs}
+      - {kind: work-validate, id: work-node-retired, at: scripts/work/validate/check-example-work.mjs}
   - id: R09
     code: "HFS_IDENTITY_CUSTODY"
     law: "An identity points its secret at `secrets/identity-<slug>.enc`; UAT chooses by role."
@@ -117,7 +117,7 @@ rules:
     failureCodes: ["HFS_IDENTITY_CUSTODY", "SEALED_CUSTODY_LOCATION", "SEALED_FILE_IN_WORK"]
     enforcers:
       - {kind: work-validate, id: sealed-custody-location, at: scripts/work/validate/check-work-artifacts.mjs}
-      - {kind: work-validate, id: identity-custody-role, at: scripts/checks/check-example-work.mjs}
+      - {kind: work-validate, id: identity-custody-role, at: scripts/work/validate/check-example-work.mjs}
   - id: R10
     code: "HFS_STACKS_SHAPE"
     law: "`.starcistacks` has the standard shape and the host Sonar owner."

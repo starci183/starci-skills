@@ -2,13 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {walk} from './check-example-work.mjs';
+import {walk} from '../work/validate/check-example-work.mjs';
 import {runDerive} from '../example/example-derive.mjs';
 import {runCritique} from '../example/example-critique.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
 
 /**
- * A separate gate rather than a line inside scripts/checks/check-example-work.mjs: another lane owns that file's
+ * A separate gate rather than a line inside scripts/work/validate/check-example-work.mjs: another lane owns that file's
  * concept rules right now, and this gate's own two checks (derived index freshness, and the "no authored
  * field shaped like a derived one" rule) do not need anything check-example-work.mjs's `checkWorkTree`
  * already computes. Keeping this in its own file keeps both diffs small and independent to merge.

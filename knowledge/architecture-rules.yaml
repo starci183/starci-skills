@@ -131,7 +131,7 @@ rules:
     rationale: Source observation, product intent and execution progress are different facts.
     verification:
       automated:
-        - scripts/checks/check-example-work.mjs
+        - scripts/work/validate/check-example-work.mjs
       manual:
         - Review canonical ownership, actual scope and impact closure; use the canonical Work validator.
   - id: ARCH-DEPLOYMENT

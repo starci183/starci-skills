@@ -3,7 +3,8 @@ import path from 'node:path';
 import { recordWhy } from '../why-record.mjs';
 import { recordJobResult, releaseLeases, setJobStatus, updateAttempt } from '../../../engine/db/ledger.mjs';
 import { parseJson } from '../../lib/json.mjs';
-import { jobPayloadOf, jobRowOf, latestAttemptOf, latestContractOf, operationTerminalHandleOf } from './shared/rows.mjs';
+import { jobPayloadOf, jobRowOf, latestAttemptOf, operationTerminalHandleOf } from './shared/rows.mjs';
+import { latestContractOf } from '../../machine/contract-version.mjs';
 import { leaseCanonOf } from './shared/peers.mjs';
 
 export default {

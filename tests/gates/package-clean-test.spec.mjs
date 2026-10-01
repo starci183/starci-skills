@@ -12,7 +12,7 @@ import { mkdtemp } from '../helpers/tmpdir.mjs';
 // scripts/gates/package-clean-test.mjs: a published package proves itself from a clean install. The fixture packages
 // install offline (npm_config_offline, one local file: dependency), so the spec needs no network.
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OFFLINE = { ...process.env, npm_config_offline: 'true' };
 
 test('the publish set is every starci pin with a source, read from canon-pins.yaml', () => {

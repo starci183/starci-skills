@@ -38,7 +38,7 @@ const orcaWorld=t=>{
     command:'claude --model claude-opus-5-5',screen:IDLE,...fields}};});
   // Run one exported function of a runtime module in a child process against the fake Orca.
   const call=(module,fn,input)=>{
-    const code=`const m=await import(${JSON.stringify(new URL(`../${module}`,import.meta.url).href)});const input=JSON.parse(process.argv[1]);
+    const code=`const m=await import(${JSON.stringify(new URL(`../../${module}`,import.meta.url).href)});const input=JSON.parse(process.argv[1]);
       process.stdout.write(JSON.stringify(await m[${JSON.stringify(fn)}](input)));`;
     const r=spawnSync(process.execPath,['--input-type=module','-e',code,JSON.stringify(input)],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
     assert.equal(r.status,0,r.stderr);

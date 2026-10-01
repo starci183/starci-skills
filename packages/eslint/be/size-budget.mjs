@@ -16,7 +16,8 @@
  */
 import { basename } from "node:path"
 import { hfsOf } from "./lib/hfs.mjs"
-import { hardGrowthLines, lineCount, recordedLines } from "./runtime/scripts/lib/recorded-lines.mjs"
+import { recordedLines } from "./runtime/scripts/api/git/recorded-lines.mjs"
+import { hardGrowthLines, lineCount } from "./runtime/scripts/lib/line-count.mjs"
 
 /** A migration is a file of the persistence slot named `<timestamp>-<name>.ts`. */
 const isMigration = (hfs, filename) => hfs.slotOf(filename) === "be.persistence" && /^\d{13,14}-[^/]+\.[cm]?ts$/.test(basename(filename))

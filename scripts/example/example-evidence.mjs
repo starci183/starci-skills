@@ -32,7 +32,7 @@ import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveReco
  * `owners[].path`/`module` name (resolved via scripts/example/example-ownership.mjs - the record's own repository,
  * or, when it names no owners/module itself, every work/implementation@1 whose `proves` names this record)
  * and writes `codeDigest: {algorithm, files: [{path, sha256}], digest}`. This is what lets a later code
- * change stale a proof without anyone touching the record: scripts/checks/check-example-work.mjs refuses an
+ * change stale a proof without anyone touching the record: scripts/work/validate/check-example-work.mjs refuses an
  * evidence.yaml whose codeDigest no longer matches the code on disk unless it carries `stale: true`.
  * `codeDigest` is omitted entirely when the record owns no resolvable directory at all (a specification
  * with nothing yet built against it, and no implementation proving it either) - there is nothing to

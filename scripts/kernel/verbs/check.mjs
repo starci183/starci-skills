@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseJson } from '../../lib/json.mjs';
 import { jobOpOf } from './shared/rows.mjs';
-import { admittedContractOf, laterChangesFor, loadContractChanges, classifyChecks } from '../contract-version.mjs';
+import { admittedContractOf, laterChangesFor, loadContractChanges, classifyChecks } from '../../machine/contract-version.mjs';
 import { isMeasurementLeg } from '../verify-failure.mjs';
 import { classifyCheck, rerunCheck, settlerSettings } from '../settle/job-settle.mjs';
 import { checkVerdictOf } from '../settle/check-verdict.mjs';
@@ -64,7 +64,7 @@ export default {
   }
   // The leg is judged against the contract it was admitted under: a red check (or finding code) a
   // contract change added after that admission is recorded advisory, a suspect and not a refusal
-  // (scripts/kernel/contract-version.mjs; modules/kernel/contract-changes.yaml).
+  // (scripts/machine/contract-version.mjs; modules/kernel/contract-changes.yaml).
   const admitted = admittedContractOf(db, { ...job, op_id: op });
   const laterChanges = laterChangesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op, withheld: admitted.withheld });
   parsed.checks = attributeChecks(db, { repo, job: { ...job, op_id: op }, checks: classifyChecks(parsed.checks, laterChanges) });

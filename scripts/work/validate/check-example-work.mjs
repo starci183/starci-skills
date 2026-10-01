@@ -1,17 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {parseYaml} from '../../engine/yaml.mjs';
-import {sha256File} from '../../engine/digest.mjs';
-import {readWorkspace, resolveOwnedDirs, ownerPathProblems, appRootOf, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
-import {renderProofProblems} from '../example/example-render-proof.mjs';
-import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings} from '../work/ui/ui-shapes.mjs';
-import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../work/asset-slot.mjs';
-import { walkFiles } from '../lib/walk.mjs';
-import {blobPath} from '../../engine/db/blob.mjs';
-import {isProductPath, agentDataCategory} from '../lib/starciwork-boundary.mjs';
-import { runGit } from '../api/git/lib.mjs';
-import {sealedLocationProblem} from '../work/validate/check-work-artifacts.mjs';
+import {parseYaml} from '../../../engine/yaml.mjs';
+import {sha256File} from '../../../engine/digest.mjs';
+import {readWorkspace, resolveOwnedDirs, ownerPathProblems, appRootOf, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs, isWorkRecordSchema, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from '../../example/example-ownership.mjs';
+import {renderProofProblems} from '../../example/example-render-proof.mjs';
+import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings} from '../ui/ui-shapes.mjs';
+import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../asset-slot.mjs';
+import { walkFiles } from '../../lib/walk.mjs';
+import {blobPath} from '../../../engine/db/blob.mjs';
+import {isProductPath, agentDataCategory} from '../../lib/starciwork-boundary.mjs';
+import { runGit } from '../../api/git/lib.mjs';
+import {sealedLocationProblem} from './check-work-artifacts.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -27,7 +27,7 @@ import {sealedLocationProblem} from '../work/validate/check-work-artifacts.mjs';
  * owners) came from five lanes independently hitting the same handful of places the layout had no home
  * for what they needed. Each gets one rule here, not a field bolted on per complaint.
  */
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
 // `work/node@*` is the retired recursive specification envelope from the pre-flat business/srs and
 // architecture/sds layouts. It has no reader: a record carrying it is refused (HFS_WORK_NODE_RETIRED) and
@@ -154,7 +154,7 @@ export function checkStarciworkBoundary(workRoot, problems, warnings = [], resol
   const groups = new Map();
   for (const file of trackedFilesUnder(workRoot)) {
     const rel = path.relative(resolveRoot, file).replaceAll('\\', '/');
-    if (!rel || rel.startsWith('../') || isProductPath(rel)) continue;
+    if (!rel || rel.startsWith('../../') || isProductPath(rel)) continue;
     const category = agentDataCategory(rel);
     const parts = rel.split('/');
     // Group a directory of agent data under its first denied segment (runs/<id>, evidence, assets, draw-loop, operations/<name>).

@@ -14,7 +14,7 @@ import {
   WORKFLOW_NAME_MAX, JOB_WHAT_MAX, deriveWorkflowDisplayName, jobDisplayName, jobDisplayNameOf, jobWhat, nodeLabel,
   normalizeDisplayName, opLabel, opLabelMap, pathLabel, productName, workflowDisplayName,
 } from '../../scripts/lib/display-names.mjs';
-import { orcaTreeFindings } from '../../scripts/checks/check-orca-tree.mjs';
+import { orcaTreeFindings } from '../../scripts/supervisor/orca-tree.mjs';
 import { askState } from '../../scripts/connectors/lib.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');

@@ -42,7 +42,7 @@ properties:
     description: "The source this record's proof covers, hashed file by file at capture time - written by
       scripts/example/example-evidence.mjs from the directories the record's own `owners[].path`/`module`
       name. It is what lets a code change expire a proof without anybody touching the record:
-      scripts/checks/check-example-work.mjs recomputes the aggregate and refuses a mismatch (CODE_DIGEST_STALE),
+      scripts/work/validate/check-example-work.mjs recomputes the aggregate and refuses a mismatch (CODE_DIGEST_STALE),
       and scripts/work/validate/check-evidence-binding.mjs opens the per-file rows underneath it. It is omitted
       entirely when the record owns no resolvable directory at all - nothing to digest is a different fact
       from an empty digest of nothing."
@@ -111,7 +111,7 @@ properties:
           $ref: "#/$defs/prose"
           description: "The exact command that was run, as run. It is required and not merely nice to have:
             scripts/example/example-verify.mjs replays it and compares outcomes, and
-            scripts/checks/check-example-work.mjs refuses an assertion without one (PROOF_NOT_REPLAYABLE).
+            scripts/work/validate/check-example-work.mjs refuses an assertion without one (PROOF_NOT_REPLAYABLE).
             A prose observation alone cannot be replayed, only read."
         exit:
           type: integer
@@ -150,7 +150,7 @@ properties:
         description: The outcome the run's result recorded, repeated so a reader without the blob store sees it.
       bundle:
         $ref: "#/$defs/sha256"
-        description: The starci/blob-bundle@1 manifest of every file of the run (engine/db/blob-lookup.mjs putBundle).
+        description: The starci/blob-bundle@1 manifest of every file of the run (engine/db/blob.mjs putBundle).
       result:
         $ref: "#/$defs/blobCitation"
       screens:

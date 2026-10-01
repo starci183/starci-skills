@@ -4,7 +4,7 @@
 // to the Supervisor, credentials / real money / shared systems are deferred to handover, and provision.ask is only
 // the one end-of-flow checklist.
 import test from 'node:test';
-import { putBundle } from '../../engine/db/blob-lookup.mjs';
+import { putBundle } from '../../engine/db/blob.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';

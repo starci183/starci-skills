@@ -10,7 +10,7 @@ import {
   findDeclaration,isolatedKey,isolationDefines,parseDiffNewLines,projectTokenRef,readSonarDeclaration,resolveConfig,
   resolveScanCwd,scannerCommand,scrub,sliceChanges,sonarLocalMain,sourceHostStackDir,
 } from '../../scripts/gates/sonar-local.mjs';
-import {resolveCustodyFile,runtimeHostRoot} from '../../scripts/lib/runtime-host.mjs';
+import {resolveCustodyFile,runtimeHostRoot} from '../../scripts/gates/runtime-host.mjs';
 
 // Fake values only: no real token is ever read by this spec.
 const ADMIN='fake-admin-token-0001';

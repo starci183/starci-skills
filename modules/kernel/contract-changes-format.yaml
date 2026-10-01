@@ -1,12 +1,12 @@
 # contract-changes-format.yaml — the field documentation of the contract change registry.
 #
 # ONE FILE PER ENTRY: a change is its own file modules/kernel/contract-changes/<id>.yaml holding one map with
-# the keys below (no `- ` item, no `changes:`); the id is the file name (scripts/kernel/contract-changes-store.mjs).
+# the keys below (no `- ` item, no `changes:`); the id is the file name (scripts/machine/contract-changes-store.mjs).
 # There is no single-file list.
 #
 # Owner, 2026-09-24: a contract change is never rolled onto running work. A running or already
 # settled leg is judged and checked against the contract it was ADMITTED under (the contracts row
-# api dispatch filed, with its recorded version: scripts/kernel/contract-version.mjs); new legs use
+# api dispatch filed, with its recorded version: scripts/machine/contract-version.mjs); new legs use
 # the current contract. Each entry is one change that ADDED checks or finding codes, or that
 # must reach in-flight work:
 #

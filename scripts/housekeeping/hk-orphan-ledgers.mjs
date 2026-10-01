@@ -37,6 +37,7 @@ import { inspectLedger, projectsRootFor } from '../../engine/db/ledger.mjs';
 import { isUnderTempDir, machineFileFor, readMachine, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 export const ORPHAN_LEDGER_CODE = 'LEDGER_ORPHAN_STATE_ROOT';
 export const LEGACY_WORK_SQLITE_CODE = 'LEDGER_LEGACY_WORK_SQLITE';
@@ -223,7 +224,7 @@ export function archiveOrphanLedger(finding, { env = process.env, now = Date.now
     const copied = fs.readdirSync(to).sort();
     if (wanted.length !== copied.length || wanted.some((name, i) => name !== copied[i]))
       throw Error(`orphan ledger archive copy did not verify: ${to} holds [${copied.join(', ')}], expected [${wanted.join(', ')}]`);
-    const removed = safeRemoveTree(from);
+    const removed = safeRemoveTree(from, { hold: artifactHoldReason });
     if (!removed.ok) throw Error(`orphan ledger source was not fully removed after a verified copy (${from}): ${removed.errors.map((e) => `${e.code} ${e.message}`).join('; ')}`);
   }
   withMachine((m) => m.setLedgerState(finding.ledgerId, 'retired', { reason: `orphan ledger archived (${finding.reason})` }), { env });

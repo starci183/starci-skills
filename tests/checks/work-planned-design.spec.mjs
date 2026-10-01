@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { stringifyYaml } from '../../engine/yaml.mjs';
-import { checkWorkTree, plannedDesignPointers } from '../../scripts/checks/check-example-work.mjs';
+import { checkWorkTree, plannedDesignPointers } from '../../scripts/work/validate/check-example-work.mjs';
 
 // mia inc-fc946155a081: brand.decide plans each visible layout of a product with no frontend and names, with
 // `layout-tree.mjs plan --design`, the surface-layout ui record interface.draw draws first. The validator

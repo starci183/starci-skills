@@ -1,7 +1,7 @@
 // api op-contract: split from cli.mjs.
 import { parseJson } from '../../lib/json.mjs';
 import { jobOpOf } from './shared/rows.mjs';
-import { admittedContractOf, advisoryCodesFor, loadContractChanges } from '../contract-version.mjs';
+import { admittedContractOf, advisoryCodesFor, loadContractChanges } from '../../machine/contract-version.mjs';
 import { sleepSync } from '../../lib/sleep-sync.mjs';
 const OP_CONTRACT_WAIT_MS = 120_000;
 

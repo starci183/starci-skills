@@ -30,8 +30,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
-import { putBlob } from '../../engine/db/blob.mjs';
-import { blobAsFile } from '../../engine/db/blob-lookup.mjs';
+import { putBlob, blobAsFile } from '../../engine/db/blob.mjs';
 import { cropImage, decodePng, encodePng, keyRect } from './png.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, drawingAcceptance } from './direction-part.mjs';
 import {

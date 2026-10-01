@@ -54,7 +54,7 @@ import { isMain } from '../lib/is-main.mjs'; import { walkFiles } from '../lib/w
 import { parseYaml } from '../../engine/yaml.mjs';
 import { canonContentDigest, installedFiles } from './canon-digest.mjs';
 import { PROFILES_FILE, loadPins } from './canon-pins.mjs';
-import { gateBaseAt } from '../kernel/workflow-checkpoint.mjs';
+import { gateBaseAt } from '../machine/workflow-tree.mjs';
 
 export const GATE_SCHEMA = 'starci/gate@1';
 export const LINT_SCHEMA = 'starci/lint@1';

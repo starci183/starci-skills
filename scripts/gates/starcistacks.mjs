@@ -28,7 +28,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runGit } from '../api/git/lib.mjs';
-import { repositoryName, repositoryHome } from '../lib/repo-identity.mjs';
+import { repositoryName, repositoryHome } from '../hfs/repo-identity.mjs';
 import { fileURLToPath } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import {isPlainObject as plain} from '../../engine/plain-object.mjs';
@@ -36,7 +36,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { list } from '../lib/list.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { loadSonarGate } from './sonar-gate.mjs';
-import { resolveCustodyFile, resolveDeclaredRepository, runtimeHostRoot } from '../lib/runtime-host.mjs';
+import { resolveCustodyFile, resolveDeclaredRepository, runtimeHostRoot } from './runtime-host.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { DECLARATION, STACK_ROOT, declaredStack, findStackDeclaration, readDeclaration, readText, text } from '../lib/stack-declaration.mjs';
 
@@ -493,7 +493,7 @@ async function admittedCodes(argv) {
   const admittedAt = /^\d+$/.test(String(raw)) ? Number(raw) : Date.parse(String(raw));
   if (!Number.isFinite(admittedAt)) return { ok: false };
   const opAt = argv.indexOf('--op');
-  const { advisoryCodesFor, loadContractChanges } = await import('../kernel/contract-version.mjs');
+  const { advisoryCodesFor, loadContractChanges } = await import('../machine/contract-version.mjs');
   const { codes } = advisoryCodesFor(loadContractChanges(skillRoot), { admittedAt, op: opAt >= 0 ? argv[opAt + 1] : null });
   return { ok: true, codes, drop: [at, at + 1, ...(opAt >= 0 ? [opAt, opAt + 1] : [])] };
 }

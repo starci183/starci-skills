@@ -84,7 +84,7 @@ jobs:
       - name: Example YAML parses under the runtime's own loader
         run: node scripts/checks/check-example-yaml.mjs
       - name: Example Work-tree layout (ids, refs, evidence)
-        run: node scripts/checks/check-example-work.mjs
+        run: node scripts/work/validate/check-example-work.mjs
       - name: Example Work-gate fixture suite
         run: node --test tests/checks/example-work-gate.spec.mjs
 

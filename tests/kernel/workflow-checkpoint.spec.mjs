@@ -12,7 +12,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { resolveGateBase, GATE_SCHEMA } from '../../scripts/gates/gate.mjs';
 import { judgeLoop } from '../../scripts/kernel/gate-settle.mjs';
-import { checkpointOp, gateBaseAt, gateBaseOf, preserveAndReset, finishWorkflow, rebaseWorkflow, reviewVerifiedOf, FINISH_STEPS } from '../../scripts/kernel/workflow-checkpoint.mjs';
+import { gateBaseAt, gateBaseOf } from '../../scripts/machine/workflow-tree.mjs';
+import { checkpointOp, preserveAndReset, finishWorkflow, rebaseWorkflow, reviewVerifiedOf, FINISH_STEPS } from '../../scripts/kernel/workflow-checkpoint.mjs';
 
 const WF = 'wf-nivo-checkpoint-k1';
 const BRANCH = `wf-${WF}`; // Orca's own name for the worktree branch; B reads it from the registry only

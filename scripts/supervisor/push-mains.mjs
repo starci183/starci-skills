@@ -38,8 +38,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { safeRemoveTree, safeRemoveWorktree } from '../api/fs/safe-remove.mjs';
-import { createScratchWorktree } from '../api/git/worktree-add.mjs';
+import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+import { safeRemoveWorktree, createScratchWorktree } from '../machine/worktree-git.mjs';
 import { ci } from '../api/npm/ci.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { getBlob, putBlob } from '../../engine/db/blob.mjs';
@@ -148,7 +149,7 @@ export function scanRange({ cwd, from, to }) {
     const scanner = diffScanner(files, { encText });
     forEachFileLine(out, (l) => scanner.line(l));
     return { ok: scanner.findings.length === 0, findings: scanner.findings, files };
-  } finally { safeRemoveTree(dir); }
+  } finally { safeRemoveTree(dir, { hold: artifactHoldReason }); }
 }
 
 const SCAN_ALLOW_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'push-scan-allow.yaml');
@@ -413,7 +414,7 @@ export function pushFromScratch(repo, { run = git, scratch = null, hooksOnly = f
     // safeRemoveWorktree: every link left (recorded or not) removed as a link, found without following one; zero links
     // asserted; only then `git worktree remove`; the main checkout asserted untouched (nivo-fe inc-c8fbf76aa499).
     try { safeRemoveWorktree(worktree, { repo, git: run }); } catch { /* best effort */ }
-    try { safeRemoveTree(base); } catch { /* best effort */ }
+    try { safeRemoveTree(base, { hold: artifactHoldReason }); } catch { /* best effort */ }
     if (!fs.existsSync(worktree)) markRemoved(worktree);
   };
   const unavailable = (error) => { cleanup(); return { ok: false, unavailable: true, error, scratch: base }; };

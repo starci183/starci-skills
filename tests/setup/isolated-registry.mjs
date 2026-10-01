@@ -28,5 +28,6 @@ if (!process.env[TEST_REGISTRY_ENV] || !process.env[ARTIFACT_ROOT_ENV]) {
   if (!process.env[TEST_REGISTRY_ENV]) process.env[TEST_REGISTRY_ENV] = path.join(dir, 'machine.sqlite');
   if (!process.env[ARTIFACT_ROOT_ENV]) process.env[ARTIFACT_ROOT_ENV] = path.join(dir, 'artifacts');
   if (!process.env.STARCI_PROJECTS_ROOT) process.env.STARCI_PROJECTS_ROOT = path.join(dir, 'projects');
+  if (!process.env.STARCI_LOCAL_ROOT) process.env.STARCI_LOCAL_ROOT = path.join(dir, 'local');
   process.on('exit', () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* a detached child may still hold it */ } });
 }

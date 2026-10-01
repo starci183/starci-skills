@@ -42,10 +42,10 @@ reads:
         availability proof. Capabilities are the intersection of actual tools, selected profile
         policy, op permissions and existing task authority.
   - id: worktree-api
-    path: scripts/machine/worktrees.mjs + scripts/api/fs/safe-remove.mjs + modules/kernel/product-land.yaml
+    path: scripts/machine/worktrees.mjs + scripts/machine/worktree-git.mjs + modules/kernel/product-land.yaml
     purpose:
-      en: "The runtime's worktree API and agent launcher: scripts/machine/worktrees.mjs (createWorktree with its machine.sqlite registry row and per-repo cap from modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/api/fs/safe-remove.mjs (safeRemoveWorktree: every link removed as a link first, then the tree) and the Orca orchestration worker commands (worker-start, worker-show, worker-read, worker-stop, worker-release)."
-      vi: "API worktree và bộ khởi chạy agent của runtime: scripts/machine/worktrees.mjs (createWorktree với dòng registry trong machine.sqlite và giới hạn theo repo từ modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/api/fs/safe-remove.mjs (safeRemoveWorktree: gỡ mọi liên kết như liên kết trước, rồi tới cây) và các lệnh worker điều phối của Orca (worker-start, worker-show, worker-read, worker-stop, worker-release)."
+      en: "The runtime's worktree API and agent launcher: scripts/machine/worktrees.mjs (createWorktree with its machine.sqlite registry row and per-repo cap from modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/machine/worktree-git.mjs (safeRemoveWorktree: every link removed as a link first, then the tree) and the Orca orchestration worker commands (worker-start, worker-show, worker-read, worker-stop, worker-release)."
+      vi: "API worktree và bộ khởi chạy agent của runtime: scripts/machine/worktrees.mjs (createWorktree với dòng registry trong machine.sqlite và giới hạn theo repo từ modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/machine/worktree-git.mjs (safeRemoveWorktree: gỡ mọi liên kết như liên kết trước, rồi tới cây) và các lệnh worker điều phối của Orca (worker-start, worker-show, worker-read, worker-stop, worker-release)."
 writes:
   - id: node
     path: .starciwork/index.yaml extensions.work3.setup.<workflow>.<mode>

@@ -29,6 +29,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
 import { isLinkLike, safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { foldCase } from '../lib/path-key.mjs';
 
 
@@ -101,7 +102,7 @@ export async function sweepTmp({
 }
 
 function sweepRoot({ root: tempRoot, prefixes }, { apply, now, maxAgeMs, remove, out }) {
-  const removeEntry = remove ?? ((target) => safeRemoveTree(target, { checkoutsUnder: tempRoot }));
+  const removeEntry = remove ?? ((target) => safeRemoveTree(target, { hold: artifactHoldReason, checkoutsUnder: tempRoot }));
 
   let parentReal = null;
   try { parentReal = fs.realpathSync.native(tempRoot); } catch { /* isLinkLike resolves it per entry */ }

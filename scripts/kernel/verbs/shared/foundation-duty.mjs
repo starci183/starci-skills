@@ -2,7 +2,7 @@
 import { getWorkflow, workflowRunning } from './rows.mjs';
 import { peerWorkflowsOf } from './peers.mjs';
 import { FOUNDATION_CHANGE_ID, declarationsOf, readFoundations } from '../../foundations.mjs';
-import { changeById, loadContractChanges } from '../../contract-version.mjs';
+import { changeById, loadContractChanges } from '../../../machine/contract-version.mjs';
 
 const foundationBriefOf = (db, foundation) => ({
   name: foundation.name, kind: foundation.kind, state: foundation.state, version: foundation.version ?? null,

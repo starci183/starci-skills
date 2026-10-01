@@ -13,7 +13,7 @@ import { ownerAnswersOf } from '../owner-answers.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
 import { enqueueRepository, ownedPathPlacements } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
-import { workflowWorktreeOf, workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, WORKFLOW_WORKTREE_MISSING } from '../workflow-worktree.mjs';
+import { workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, WORKFLOW_WORKTREE_MISSING } from '../workflow-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
 import { spawnAgent } from '../../agent/lib.mjs';
 import { DISPATCHES, requirePhase } from './shared/lifecycle.mjs';
@@ -38,6 +38,7 @@ import { kernelOverrideFor, refuseSettleBacklog } from '../kernel-authority.mjs'
 import { jobDirOf } from '../job-artifacts.mjs';
 import { packetFileOf } from '../task-spec.mjs';
 import { ENV_GATED_OPS } from '../verify-failure.mjs';
+import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { bindGuardTerminal } from '../../guards/hook-install.mjs';
 
 export default {

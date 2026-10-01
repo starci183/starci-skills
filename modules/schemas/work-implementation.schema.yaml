@@ -144,7 +144,7 @@ properties:
             guessing by filename.
         sha256:
           $ref: "#/$defs/sha256"
-          description: The blob's digest - the citation itself (engine/db/blob-lookup.mjs resolves it).
+          description: The blob's digest - the citation itself (engine/db/blob.mjs resolves it).
         provenance:
           $ref: "#/$defs/prose"
           description: How the capture was taken - which route, served by which build, at which viewport.

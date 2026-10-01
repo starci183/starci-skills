@@ -13,7 +13,8 @@
  * needs the previous revision.
  */
 import { hfsOf } from "./lib/hfs.mjs"
-import { hardGrowthLines, lineCount, recordedLines } from "./runtime/scripts/lib/recorded-lines.mjs"
+import { recordedLines } from "./runtime/scripts/api/git/recorded-lines.mjs"
+import { hardGrowthLines, lineCount } from "./runtime/scripts/lib/line-count.mjs"
 
 /** Whether a file is a source file this budget governs. */
 const governed = (filename) => /\.[cm]?tsx?$/.test(filename) && !/\.d\.[cm]?ts$/.test(filename)

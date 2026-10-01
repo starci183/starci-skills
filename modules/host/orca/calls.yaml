@@ -294,7 +294,7 @@ calls:
     kind: mutation
     replay: none
     timeoutMs: 60000
-    note: Registers a git repository with Orca by its path; idempotent (the same path answers the same repo id). scripts/api/orca/worktree-provision.mjs createOrcaWorktree issues it once when worktree-create answers repo_not_found, then creates again.
+    note: Registers a git repository with Orca by its path; idempotent (the same path answers the same repo id). scripts/machine/worktree-orca.mjs createOrcaWorktree issues it once when worktree-create answers repo_not_found, then creates again.
     flags: [path]
     required: [path]
     receipt: [result.repo.id]
@@ -306,7 +306,7 @@ calls:
     note: |-
       A runtime-owned agent workspace that is not a Kernel's (the draw critic's placement; the [Worker] staging checkout,
       scripts/supervisor/workers.mjs createStaging, name sup-<job>, --comment starci:supervisor-staging:sup-<job>;sup=<job>;
-      both through scripts/api/orca/worktree-provision.mjs createOrcaWorktree): a git worktree of the named repository on a branch Orca creates, as a top-level row
+      both through scripts/machine/worktree-orca.mjs createOrcaWorktree): a git worktree of the named repository on a branch Orca creates, as a top-level row
       (--no-parent). --setup skip keeps the creation a git operation only. Orca names the branch after --name with
       every '/' turned into '-' and a -2, -3 suffix when the name is taken, and places the tree under its own
       workspace root, so result.worktree carries what the runtime records: the Orca id (<repo-id>::<path>), the path and
@@ -322,7 +322,7 @@ calls:
     replay: none
     timeoutMs: 120000
     note: |-
-      Removes the worktree from Orca and from git (scripts/api/orca/worktree-remove.mjs removeOrcaWorktree, after the runtime removed
+      Removes the worktree from Orca and from git (scripts/machine/worktree-orca.mjs removeOrcaWorktree, after the runtime removed
       every link in it as a link and proved none is left). Orca also deletes the checked-out local branch when it can
       prove the branch merged and keeps it otherwise, so a caller that deletes the branch itself first checks it still
       exists. Measured 2026-10-01 (lane ORCAWT): with node_modules and packages/node_modules junctions into a fake main

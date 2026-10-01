@@ -4,7 +4,7 @@
 // commands, internal ids and jargon in the copy ("Nguồn: hệ thống lõi", installation-1), and an untoned "installed"
 // badge - green on checks alone. scripts/work/draw/draw-quality.mjs refuses each; draw-render names the content-only part.
 import test from 'node:test';
-import { putBundle } from '../../engine/db/blob-lookup.mjs';
+import { putBundle } from '../../engine/db/blob.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';

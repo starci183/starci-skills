@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileReport, inspectLedger, ledgerFileFor, openLedger, recordCheckRun, writeContract } from '../../engine/db/ledger.mjs';
-import { loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
+import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 import { ensureWorkHook, guardReceiptErrors, WORK_HOOK_MARKER } from '../../scripts/guards/hook-install.mjs';
 import {
   WORK_ACCOUNT_LITERAL, WORK_HYGIENE_CHANGE, WORK_SECRET_FILE, WORK_SECRET_LITERAL, WORK_SECRET_PATTERN, WORK_YAML_UNPARSEABLE,

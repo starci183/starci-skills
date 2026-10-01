@@ -2,6 +2,7 @@
 // Pure projections: a db handle in, a row or a parsed field out; nothing writes and nothing
 // opens a ledger of its own.
 import { parseJson } from '../../../lib/json.mjs';
+import { latestContractOf } from '../../../machine/contract-version.mjs';
 import { projectBinding } from '../../target-repo.mjs';
 
 export const getWorkflow = (db, workflowId) => db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(workflowId);
@@ -27,8 +28,6 @@ export const JOB_ROW = `jobs.*, jobs.try_no AS attempt, ${jobResultSql('jobs')} 
 export const jobRowOf = (db, jobId) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
 /** The newest op_attempts row of a job (its current or last dispatch), or null. */
 export const latestAttemptOf = (db, jobId) => db.prepare('SELECT * FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId) ?? null;
-/** The contracts row of a job's newest attempt, or null. */
-export const latestContractOf = (db, jobId) => db.prepare('SELECT c.*, a.dispatch_id FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(jobId) ?? null;
 /** The reports row of a job's newest attempt, or null. */
 export const latestReportOf = (db, jobId) => db.prepare('SELECT r.* FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE a.job_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(jobId) ?? null;
 export const csvList = (v) => (v == null ? [] : (Array.isArray(v) ? v : String(v).split(','))

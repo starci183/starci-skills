@@ -15,3 +15,5 @@ export const foldCase = (p) => (WIN ? p.toLowerCase() : p);
 export const samePath = (a, b) => foldCase(a) === foldCase(b);
 /** A path's comparable identity: absolute, forward slashes, no trailing slash, case-folded on Windows. */
 export const pathKey = (p) => foldCase(slash(path.resolve(p)).replace(/\/+$/, ''));
+/** A work-relative path in one spelling: forward slashes, no leading ./, no trailing slash. */
+export const normWork = (p) => String(p ?? '').trim().replaceAll('\\', '/').replace(/^\.\/+/, '').replace(/\/+$/, '');

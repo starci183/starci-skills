@@ -46,7 +46,7 @@
 // (direction-part.mjs drawingAcceptance, read by layout-tree.mjs for the lockup crop and the planned layout's settlement).
 import { opContextOf } from '../kernel/op-context.mjs';
 import fs from 'node:fs';
-import { isBlobFile, receiptFileOf, receiptRefOf } from '../kernel/ask-receipts.mjs';
+import { isBlobFile, receiptFileOf, receiptRefOf } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';

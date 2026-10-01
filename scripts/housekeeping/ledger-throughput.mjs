@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { openLedger, appendEvent, appendLog, createUnit, createWorkflow, changeWorkflowPhase, enqueueJob, setJobStatus } from '../../engine/db/ledger.mjs';
 import { logWriterFor } from '../machine/log-writer.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const WF = 'wf-throughput';
@@ -97,7 +98,7 @@ export async function runScenario(scenario, { writers = 30, seconds = 8, burst =
   const check = openLedger({ file });
   const storedLogs = Number(check.db.prepare('SELECT count(*) n FROM logs').get().n);
   check.close();
-  safeRemoveTree(root, { retries: 20 });
+  safeRemoveTree(root, { hold: artifactHoldReason, retries: 20 });
   return {
     scenario, writers, seconds, burst, interval,
     ledgerWrites: lat.length, txnPerSec: round(lat.length / elapsed),

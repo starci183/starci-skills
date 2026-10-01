@@ -35,7 +35,7 @@ schemas:
       carries (shape: maps family -> `schema work/<kind>`). The tree, not the record bodies.
     binds: .starciwork/** (workspace.yaml, index.yaml, features/<feature>/<family>/<name>/index.yaml)
     usedBy:
-      - scripts/checks/check-example-work.mjs (reads shape.families; FAMILIES_DRIFT if gate and schema disagree)
+      - scripts/work/validate/check-example-work.mjs (reads shape.families; FAMILIES_DRIFT if gate and schema disagree)
       - scripts/work/validate/check-work-consistency.mjs, scripts/example/work-example.mjs
     business:
       question: "Is this .starciwork tree laid out the way every checker, gate and agent assumes?"
@@ -295,7 +295,7 @@ schemas:
     subsystem: work-tree
     governs: "One synchronous request/response seam between a provider feature and a consumer feature — its surface points, what the provider guarantees, what the consumer owes back, and a proof demand on BOTH halves."
     binds: .starciwork/features/<feature>/contract/<name>/index.yaml
-    usedBy: [scripts/checks/check-example-work.mjs (ref resolution on between/surface), scripts/example/example-derive.mjs (contractProvider/contractConsumer edge kinds)]
+    usedBy: [scripts/work/validate/check-example-work.mjs (ref resolution on between/surface), scripts/example/example-derive.mjs (contractProvider/contractConsumer edge kinds)]
     business:
       question: "What have two features agreed at the seam, and has each side proved its own half?"
       whenNeeded: Any cross-feature call — the seam is where each side's own records stop being enough.
@@ -308,7 +308,7 @@ schemas:
     subsystem: work-tree
     governs: "One fire-and-forget signal, its payload fields, and the delivery guarantee plus ordering the transport promises — the two facts a consumer cannot read off the payload."
     binds: .starciwork/features/<feature>/event/<name>/index.yaml
-    usedBy: [scripts/checks/check-example-work.mjs (producer resolves, payload non-empty, delivery vocabulary; `subscribes` must name a work/event@1)]
+    usedBy: [scripts/work/validate/check-example-work.mjs (producer resolves, payload non-empty, delivery vocabulary; `subscribes` must name a work/event@1)]
     business:
       question: "What did the product announce, to whom, and how many times may they hear it?"
       whenNeeded: Any broadcast a consumer reacts to; the id is the whole of the coupling between the two sides.
@@ -347,7 +347,7 @@ schemas:
     subsystem: work-tree
     governs: "A known absence as a record — `statement` of what is missing and `closedBy` naming every record whose done actually closes it; done only once EVERY closer is done."
     binds: .starciwork/features/<feature>/gap/<name>/index.yaml
-    usedBy: [scripts/checks/check-example-work.mjs (closedBy resolution + all-closers-done), scripts/example/example-derive.mjs (blocker roots, unbuiltModuleGaps tally)]
+    usedBy: [scripts/work/validate/check-example-work.mjs (closedBy resolution + all-closers-done), scripts/example/example-derive.mjs (blocker roots, unbuiltModuleGaps tally)]
     business:
       question: "What is not there, and what would have to land for it to be?"
       whenNeeded: Whenever a blocker's real root is an absence — `blockedBy` points at the gap's id instead of restating the sentence.
@@ -360,7 +360,7 @@ schemas:
     subsystem: work-tree
     governs: "Typed UAT custody in three kinds — environment (origins + probes), identity (disposable, sealed custody path, never a password), fixture (schema/seed files, namespace, preconditions)."
     binds: .starciwork/_resources/{environments,identities,fixtures}/<name>/resource.yaml
-    usedBy: [scripts/checks/check-example-work.mjs (a uat-flow's environment/fixtures/accounts identity must resolve to a resource of the MATCHING kind)]
+    usedBy: [scripts/work/validate/check-example-work.mjs (a uat-flow's environment/fixtures/accounts identity must resolve to a resource of the MATCHING kind)]
     business:
       question: "Where does a walk run, who does it sign in as, and what seeds its prerequisites?"
       whenNeeded: Every UAT flow — the three edges out of a flow all land here.
@@ -399,7 +399,7 @@ schemas:
     subsystem: work-tree
     governs: "One append-only UAT run — its assertions (expected/observed, with not-run as a real third value), every capture's exact bytes, and the two commits that were being served."
     binds: .starciwork/features/<feature>/uat/<flow>/runs/<runId>/manifest.yaml
-    usedBy: [scripts/example/example-ownership.mjs (isWorkRecordSchema — a non-work/ stamp is artifact payload), scripts/checks/check-example-work.mjs (PAYLOAD_SKIPPED)]
+    usedBy: [scripts/example/example-ownership.mjs (isWorkRecordSchema — a non-work/ stamp is artifact payload), scripts/work/validate/check-example-work.mjs (PAYLOAD_SKIPPED)]
     business:
       question: "What did a walk against the running product actually observe, and against which build?"
       whenNeeded: Every uat.verify run; a done uat-flow's evidence.yaml settles on exactly one runId.
@@ -863,7 +863,7 @@ moduleLocalDocumentKinds:
     governs: "The tick the kernel agent runs."
     files: [modules/kernel/driver-loop.yaml]
   - id: starci/contract-changes@1
-    governs: "The registry of contract changes (one entry file per change under modules/kernel/contract-changes/, fields in contract-changes-format.yaml): what each added (checks, finding codes), when, and whether it reaches in-flight work (scripts/kernel/contract-version.mjs)."
+    governs: "The registry of contract changes (one entry file per change under modules/kernel/contract-changes/, fields in contract-changes-format.yaml): what each added (checks, finding codes), when, and whether it reaches in-flight work (scripts/machine/contract-version.mjs)."
     files: [modules/kernel/contract-changes-format.yaml]
   - id: starci/contract-freeze@1
     governs: "The frozen op families and gate paths used to batch contract changes for running workflows."

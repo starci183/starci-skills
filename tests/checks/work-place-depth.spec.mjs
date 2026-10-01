@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { checkWorkTree, DEFAULT_MIN_ID_SEGMENTS, FAMILIES, MIN_ID_SEGMENTS, placeDepthFinding } from '../../scripts/checks/check-example-work.mjs';
+import { checkWorkTree, DEFAULT_MIN_ID_SEGMENTS, FAMILIES, MIN_ID_SEGMENTS, placeDepthFinding } from '../../scripts/work/validate/check-example-work.mjs';
 
 // starci-next inc-f2cfd86685a3: the place rule derived impl.<feature> for impl/index.yaml and
 // impl.<feature>.<repository> for impl/<repository>/index.yaml, while work/implementation@1 admits only

@@ -31,13 +31,14 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runGit } from '../api/git/lib.mjs';
-import { mainRootOf } from '../api/git/worktree-list.mjs';
+import { mainRootOf } from '../machine/worktree-git.mjs';
 import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { mergeGuard } from '../gates/gate.mjs';
 import { fastForwardLive } from '../supervisor/land.mjs';
 import { claimManager } from '../connectors/lib.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
+import { setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
+import { gateBaseOf, workflowWorktreeAt, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { ownedPathsOf } from './verbs/shared/rows.mjs';
 
@@ -174,28 +175,6 @@ export function requireCheckpointChain(ctx, rec, workflowId) {
   if (head === base) return base;
   const foreign = lines(git(rec.path, ['rev-list', '--max-count=20', head, `^${base}`]).stdout);
   throw Object.assign(fail({ code: 'workflow-foreign-commit' }, `${rec.branch} carries ${foreign.length || 'a'} commit(s) the runtime did not make past its checkpoint ${base.slice(0, 12)} (${foreign.slice(0, 3).map((c) => c.slice(0, 12)).join(', ') || head.slice(0, 12)}): only checkpointOp commits on a workflow branch`), { commits: foreign });
-}
-
-/**
- * The gate base of the workflow worktree that holds `dir` (part A's workflowWorktreeAt over the registry), or null when
- * `dir` is no workflow worktree: scripts/gates/gate.mjs measures an op there against its previous checkpoint.
- */
-export function gateBaseAt(ctx, dir) {
-  const rec = wt(ctx).workflowWorktreeAt(ctx, dir);
-  return rec ? gateBaseOf(ctx, rec.workflowId) : null;
-}
-
-/** The base an op's gate measures against: the previous checkpoint, else the merge-base of the workflow branch with main. */
-export function gateBaseOf(ctx, workflowId) {
-  const rec = recordOf(ctx, workflowId);
-  if (rec.checkpoint) {
-    const sha = revParse(rec.path, rec.checkpoint);
-    if (!sha) throw fail({ code: 'workflow-gate-base-unknown' }, `the checkpoint ${rec.checkpoint} of workflow ${workflowId} is not a commit of ${rec.path}`);
-    return sha;
-  }
-  const base = git(rec.path, ['merge-base', `refs/heads/${mainOf(ctx)}`, 'HEAD']).stdout;
-  if (!SHA.test(base)) throw fail({ code: 'workflow-gate-base-unknown' }, `workflow ${workflowId} has no checkpoint and ${rec.branch} has no merge-base with ${mainOf(ctx)}`);
-  return base;
 }
 
 /**

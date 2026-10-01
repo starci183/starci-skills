@@ -3,7 +3,7 @@
 // into the main checkout and deleted 490 tracked files). scripts/machine/worktrees.mjs is the one home: an agent's workspace
 // (the workflow worktree, the critic) is created and removed by Orca (tests/kernel/workflow-worktree.spec.mjs), a runtime
 // scratch tree by createScratchWorktree, the GC reclaims whatever outlives its owner through the home that made it, and
-// every git removal goes through scripts/api/fs/safe-remove.mjs safeRemoveWorktree: links found without following one,
+// every git removal goes through scripts/machine/worktree-git.mjs safeRemoveWorktree: links found without following one,
 // removed as links, zero asserted, only then `git worktree remove`, and the main checkout asserted untouched. The per-op
 // land is deleted (part B: the workflow lands at api finish); the reap is exercised on a tree the spec makes itself.
 import test from 'node:test';
@@ -18,15 +18,14 @@ import { openLedger, ledgerFileFor } from '../../engine/db/ledger.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
 import { CHECKPOINT_EVENTS } from '../../scripts/kernel/workflow-checkpoint.mjs';
 import { evaluateCondition } from '../../scripts/kernel/gate-conditions.mjs';
-import { createScratchWorktree } from '../../scripts/api/git/worktree-add.mjs';
-import { removeScratchWorktree } from '../../scripts/api/git/worktree-remove.mjs';
+import { createScratchWorktree, removeScratchWorktree, mainCheckoutDamage } from '../../scripts/machine/worktree-git.mjs';
 import { gcWorktrees, worktreeCounts } from '../../scripts/machine/worktrees.mjs';
 import { worktreesRootOf } from '../../scripts/machine/worktree-registry.mjs';
 import { snapshotCommit } from '../../scripts/api/git/snapshot-commit.mjs';
-import { reserveOrcaSlot } from '../../scripts/api/orca/worktree-provision.mjs';
+import { reserveOrcaSlot } from '../../scripts/machine/worktree-orca.mjs';
 import { ensureWorkflowWorktree } from '../../scripts/kernel/workflow-worktree.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
-import { linksUnder, mainCheckoutDamage } from '../../scripts/api/fs/safe-remove.mjs';
+import { linksUnder } from '../../scripts/api/fs/safe-remove.mjs';
 import { scanWorktreeAdd, strayLines } from '../../scripts/checks/check-worktree-add.mjs';
 import { collectLanes, readLaneCursor, writeLaneCursor } from '../../scripts/supervisor/gc.mjs';
 import { createGcController } from '../../scripts/reconciler/controllers/gc.mjs';
@@ -173,7 +172,7 @@ test('the ban check fires on a stray `git worktree add` and on nothing else', (t
     'scripts/tool.ps1': 'git worktree add $dir main\n',
     'scripts/message.mjs': "return { ok: false, error: added.stderr || 'git worktree add failed' };\n",
     'scripts/prose.mjs': "const rule = 'never create a worktree (git worktree add, mklink): report a need';\n// git(['worktree', 'add', x]) in a comment\n",
-    'scripts/api/git/worktree-add.mjs': "export function createScratchWorktree() {\n  run(['worktree', 'add', target, branch]);\n}\nexport function createOrcaWorktree() {\n  run(['worktree', 'add', target, branch]);\n}\n",
+    'scripts/api/git/worktree-add.mjs': "export function worktreeAdd() {\n  run(['worktree', 'add', target, branch]);\n}\nexport function createOrcaWorktree() {\n  run(['worktree', 'add', target, branch]);\n}\n",
     'tests/fixture.spec.mjs': "git(root, 'worktree', 'add', lane);\ngit(['worktree', 'add', lane]);\n",
   };
   for (const [rel, text] of Object.entries(files)) write(root, rel, text);

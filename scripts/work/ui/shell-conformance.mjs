@@ -53,7 +53,7 @@ import {
 } from '../layout-tree.mjs';
 import { decodePng } from '../png.mjs';
 import { pixelSha256, recompose, resolveHost } from '../compose-direction.mjs';
-import { advisoryCodesFor, loadContractChanges } from '../../kernel/contract-version.mjs';
+import { advisoryCodesFor, loadContractChanges } from '../../machine/contract-version.mjs';
 import { brandOf, brandPalette, paletteFindings } from '../brand/brand-palette.mjs';
 import { isPartName } from '../direction-part.mjs';
 import { generatedDrawingsOf } from './ui-shapes.mjs';

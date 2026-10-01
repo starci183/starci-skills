@@ -37,7 +37,8 @@
 import { blockingJobs } from './waiter-priority.mjs';
 import { typedIncidents } from './gate-conditions.mjs';
 import { readFoundations } from './foundations.mjs';
-import { TRANSFER_SCHEMA, TRANSFER_SCOPE, createOwnership, normWork, ownedOf, readTransfers } from './work-ownership.mjs';
+import { TRANSFER_SCHEMA, TRANSFER_SCOPE, createOwnership, ownedOf, readTransfers } from './work-ownership.mjs';
+import { normWork } from '../lib/path-key.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { recordPathTransfer } from '../../engine/db/ledger.mjs';

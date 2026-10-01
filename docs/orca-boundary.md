@@ -56,7 +56,7 @@ Each adapter carries a one-line `// Deep map WRAP <IDs>: <reason>` comment namin
 | M6 | `worker-show.mjs` | Lease renewal from `dispatch.lastHeartbeatAt`. |
 | R1 | `run-show.mjs`, `run-use.mjs`, `run-create.mjs` | The rebind-once guard, because a repeated `run-use` fences live consumers. |
 | R2 | `run-create.mjs`, `worker-start.mjs` | Which Run a seat or [Worker] launch reuses. |
-| WT1 | `worktree-create.mjs`, `worktree-list.mjs`, `worktree-provision.mjs`, `worktree-client.mjs`, `worktree-rm.mjs`, `worktree-remove.mjs` | The per-repo cap, the ownership registry, links-first removal and the main-checkout assertion. |
+| WT1 | `worktree-create.mjs`, `worktree-list.mjs`, `worktree-rm.mjs` (scripts/api/orca/) and `scripts/machine/worktree-orca.mjs` | The per-repo cap, the ownership registry, links-first removal and the main-checkout assertion. |
 | WT5 | `worktree-ps.mjs` | Merged, clean and idle stay git facts. The owner test reads Orca resources, not titles. |
 | WT6 | `worktree-rm.mjs`, `worktree-remove.mjs` | The `git branch -d` fallback. Orca deletes a branch only when it proves the merge. |
 | P1 | none yet | The workspace binding keeps sides and the work path. Resolving the checkout through Orca's project setup is pending (no `project setups` adapter yet). |

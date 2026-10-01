@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// draw-render.mjs — the capture interface.draw uses for code-native regions: the drawing is a real render, not an
-// image model's guess.
+// draw-render.mjs — the capture interface.draw uses for code-native regions: the drawing is a real render, not an image model's guess.
 //
 //   node scripts/work/draw-render.mjs --html <file> --out <dir> --viewports 390x844,1440x900
 //        [--full-page] [--name <base>] [--theme light|dark] [--json]
@@ -57,6 +56,7 @@ import {sha256} from '../../engine/digest.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { ACCENT_EXEMPT_SELECTOR } from './draw/draw-taste.mjs';
 import { LAYER_PROBE, measureLayer } from './draw/draw-layer.mjs';
 import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRedlines, loadRationale, measureRationale, rationaleFileOf, redlineLabelsOf } from './draw/draw-rationale.mjs';
@@ -664,7 +664,7 @@ export async function run(argv, { cwd = process.cwd() } = {}) {
     if (o.harnessOut) { fs.mkdirSync(o.harnessOut, { recursive: true }); fs.cpSync(workDir, o.harnessOut, { recursive: true }); }
     return records;
   } finally {
-    safeRemoveTree(workDir);
+    safeRemoveTree(workDir, { hold: artifactHoldReason });
   }
 }
 

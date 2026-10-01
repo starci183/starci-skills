@@ -19,7 +19,7 @@ import {
   OP_PROOF_CHANGE, REVIEW_DEFECTS_SCHEMA, SECURITY_FINDINGS_SCHEMA, judgeDocGate, judgeJobProofs, judgeKnowledgeRead, judgeLint, judgeRelease, judgeReviewDefects,
   judgeReviewGate, judgeSecurityLint, judgeTestWorld, judgeTestWorlds, judgeUnitRun, feRelevant, proofsOf, securityRelevant,
 } from '../../scripts/kernel/gate-settle.mjs';
-import { loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
+import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 import { readCatalog } from '../../scripts/checks/check-failure-codes.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { greenDocGate, greenGate, greenLint, greenReadDigest, greenReleaseProof, greenReviewDefects, greenTestWorldRun, greenUnitRun } from '../helpers/sonar-scan.mjs';

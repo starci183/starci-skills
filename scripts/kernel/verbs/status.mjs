@@ -21,7 +21,7 @@ import { OP_REV_DRIFT, kernelRevState, opRevDrift, revRootOf, shortRev } from '.
 import { ownerSpecs, deferredTestsOf, specsOff } from '../spec-deferral.mjs';
 import { HANDOVER_OP, handoverProjection, handoverReason } from '../handover.mjs';
 import { peerDriftSummaryOf, sourceDriftSummaryOf, staleOperationsOf } from '../input-digests.mjs';
-import { frozenChangesFor, loadContractChanges, pendingContractFollowUps } from '../contract-version.mjs';
+import { frozenChangesFor, loadContractChanges, pendingContractFollowUps } from '../../machine/contract-version.mjs';
 import { dependenciesOf, dependencyGraph, shortWorkflow } from '../dependency-graph.mjs';
 import { jobDisplayNameOf, nameWithId, opLabel, workflowDisplayName } from '../../lib/display-names.mjs';
 import { LOG_TYPED_MISSING, typedLogGaps } from '../typed-logs.mjs';
@@ -104,7 +104,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   const legOps = approvedLegOps(goalJson);
   const planAncestors = planAncestorsOf(goalJson ?? {});
   // A contract change registered reach: follow-up owes each older leg a follow-up leg (never a hold on
-  // the running one): work the Kernel can enqueue now (scripts/kernel/contract-version.mjs). The leg it follows up is
+  // the running one): work the Kernel can enqueue now (scripts/machine/contract-version.mjs). The leg it follows up is
   // rework: its op's leg and the work-graph nodes it covers read red until the follow-up is enqueued.
   const contractFollowUps = wf.phase === 'finished' ? [] : (() => { try { return pendingContractFollowUps(db, workflowId, loadContractChanges(skillRoot)); } catch { return []; } })();
   const workGraph = wf.phase === 'finished' ? null : workGraphStatus(db, workflowId, { rework: new Set(contractFollowUps.map((item) => item.jobId)) });

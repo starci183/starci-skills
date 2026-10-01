@@ -91,7 +91,7 @@ reads:
     path: .starciwork/shell/index.yaml
     purpose:
       en: "The product's layout tree (work/layout-tree@1) with its rev, nodes, per-layout revs and captures
-        (cited blobs, engine/db/blob-lookup.mjs). Absent until the tree is first scanned or planned; this op then writes it at rev 1."
+        (cited blobs, engine/db/blob.mjs). Absent until the tree is first scanned or planned; this op then writes it at rev 1."
   - id: shellSource
     path: <app>/<bound-paths>
     purpose:

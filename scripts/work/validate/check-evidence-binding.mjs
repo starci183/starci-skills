@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
-import {walk} from '../../checks/check-example-work.mjs';
+import {walk} from './check-example-work.mjs';
 import {appRootOf, readWorkspace, resolveOwnedDirs, loadRecords} from '../../example/example-ownership.mjs';
 import {slash, sameOrUnder} from '../../lib/path-key.mjs';
 import { runGit } from '../../api/git/lib.mjs';
@@ -27,7 +27,7 @@ import {sha256File} from '../../../engine/digest.mjs';
  *   `codeDigest.{algorithm,files[].path,files[].sha256,digest}`
  *                              declared by no schema under modules/schemas/ - it exists in the example
  *                              trees only, written by scripts/example/example-evidence.mjs and read by
- *                              scripts/checks/check-example-work.mjs (CODE_DIGEST_STALE) and
+ *                              scripts/work/validate/check-example-work.mjs (CODE_DIGEST_STALE) and
  *                              scripts/example/example-derive.mjs. That is a schema gap, not a licence to
  *                              invent: the shape below is the one on disk. The nearest declared shape is
  *                              modules/schemas/work-evidence.schema.yaml's `assets[]` items ({path, sha256}).
@@ -39,7 +39,7 @@ import {sha256File} from '../../../engine/digest.mjs';
  *     `ui.assets[]`, evidence `assets[]`, receipts and run manifests (ASSET_MISSING, ASSET_DIGEST,
  *     EVIDENCE_ARTIFACT_GHOST). This script opens none of them, and it is that script's own
  *     CODE_DIGEST_NOT_MINE note that leaves `codeDigest` to somebody else.
- *   scripts/checks/check-example-work.mjs owns `recordDigest` staleness and the AGGREGATE
+ *   scripts/work/validate/check-example-work.mjs owns `recordDigest` staleness and the AGGREGATE
  *     `codeDigest.digest` recomputed over the record's owner directories (CODE_DIGEST_STALE). This script
  *     owns the per-file rows underneath that aggregate, which nothing else opens, and the time edge
  *     between a capture and the source it covers, which nothing else measures.

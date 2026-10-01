@@ -9,7 +9,7 @@ import {
 } from '../../scripts/work/draw/draw-layer.mjs';
 import { parseHtml, walkElements } from '../../scripts/work/draw/draw-dna.mjs';
 import { machineMetrics } from '../../scripts/work/draw-loop.mjs';
-import { loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
+import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 
 // Owner, 2026-09-28, StarCi Next SignInBase#signed-out round 2 (D:/starci-tmp/starci-draw10/loop/SignInBase/round-2):
 // the sign-in card stretched the whole 1184px content region, and on that Surface the "Remember me" Checkbox kept

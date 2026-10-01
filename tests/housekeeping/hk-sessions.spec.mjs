@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { sweepAgentSessions, archiveSessionFiles, sessionSweepRoots } from '../../scripts/housekeeping/hk-sessions.mjs';
 import { safeRemoveTree } from '../../scripts/api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -17,7 +18,7 @@ const DAY = 24 * 60 * 60 * 1000;
 // os.tmpdir(), so a sweep can only ever see the fixture's own trees.
 const fixture = (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-sessions-'));
-  t.after(() => { safeRemoveTree(root); });
+  t.after(() => { safeRemoveTree(root, { hold: artifactHoldReason }); });
   const profile = path.join(root, 'profile');
   const appData = path.join(root, 'appdata');
   const archiveRoot = path.join(root, 'archive');

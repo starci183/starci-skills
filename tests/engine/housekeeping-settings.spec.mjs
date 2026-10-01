@@ -68,9 +68,12 @@ test('engine/config.mjs allocationSettings exposes both blocks to the scripts th
 test('housekeeping.tmpPrefixes covers every temp prefix the spec suite creates under os.tmpdir()', () => {
   const prefixes = new Set();
   const testsDir = path.join(ROOT, 'tests');
-  const self = path.basename(fileURLToPath(import.meta.url));
-  for (const file of fs.readdirSync(testsDir).filter((name) => name.endsWith('.mjs') && name !== self)) {
-    const src = fs.readFileSync(path.join(testsDir, file), 'utf8');
+  const self = fileURLToPath(import.meta.url);
+  // Specs live at tests/<area>/<module>.spec.mjs and helpers at tests/helpers/: walk every .mjs below tests/.
+  const files = fs.readdirSync(testsDir, { recursive: true }).map((name) => path.join(testsDir, String(name)))
+    .filter((file) => file.endsWith('.mjs') && file !== self && !file.includes(`${path.sep}fixtures${path.sep}`));
+  for (const file of files) {
+    const src = fs.readFileSync(file, 'utf8');
     // Direct fixtures: fs.mkdtempSync(path.join(os.tmpdir(), ... with a string literal or the
     // static head of a template literal.
     for (const m of src.matchAll(/mkdtempSync\(\s*path\.join\(\s*os\.tmpdir\(\)\s*,\s*'([^']+)'/g)) prefixes.add(m[1]);

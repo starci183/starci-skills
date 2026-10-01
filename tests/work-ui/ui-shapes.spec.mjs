@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { DATA_STATUS_DRAWN, DRAW_TOOL, RASTER_TOOL, SHAPE_DUPLICATE, dataStatusOf, drawingsOf, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings } from '../../scripts/work/ui/ui-shapes.mjs';
-import { checkWorkTree } from '../../scripts/checks/check-example-work.mjs';
+import { checkWorkTree } from '../../scripts/work/validate/check-example-work.mjs';
 
 // Owner model (examples/shape-slot/README.md): a ui record's state is a SHAPE - one layout, one drawing - and a
 // slot's data status (loading, skeleton, empty, error, 401/403/404) renders by recipe and is never drawn.

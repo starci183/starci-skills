@@ -15,7 +15,7 @@ import { withMachine, openMachine } from '../../engine/db/machine.mjs';
 import { createStaging, removeStaging, stagingNameOf, createJob, jobOf, spawnWorkers, STAGING_KIND } from '../../scripts/supervisor/workers.mjs';
 import { gcWorktrees } from '../../scripts/machine/worktrees.mjs';
 import { ORCA_KINDS, SCRATCH_KINDS } from '../../scripts/lib/worktree-kinds.mjs';
-import { createScratchWorktree } from '../../scripts/api/git/worktree-add.mjs';
+import { createScratchWorktree } from '../../scripts/machine/worktree-git.mjs';
 import { strayLines } from '../../scripts/checks/check-worktree-add.mjs';
 import { parseRuntimeStamp, runtimeStampOf } from '../../scripts/lib/orca-orphans.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';

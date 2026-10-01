@@ -137,7 +137,7 @@ evidence's digest to make it match, since "staleness is never cleared by editing
 only a fresh run... clears it" (`modules/schemas/work-layout.yaml`).
 
 A `done` record with no sibling `evidence.yaml` and no `verificationSource: authored-claim` is refused by the
-gate. `scripts/checks/check-example-work.mjs` enforces exactly this: "state is done with no sibling evidence.yaml
+gate. `scripts/work/validate/check-example-work.mjs` enforces exactly this: "state is done with no sibling evidence.yaml
 and no verificationSource: authored-claim + because."
 
 **`todo` by design.** `features/share/` is specified and mostly `done` — what remains `todo` there is proof,
@@ -169,7 +169,7 @@ named by `gap.task.no-load-harness`.
 strings naming the source path(s) that carry it — `br.task.complete.once`'s `module:
 [src/modules/domain/task]`. A
 `work/implementation@1`'s `owners` is a list of `{role, path}` pairs, one entry per real artifact a screen or
-flow spans — never a single `directory`/`files` pair, which `scripts/checks/check-example-work.mjs` refuses outright
+flow spans — never a single `directory`/`files` pair, which `scripts/work/validate/check-example-work.mjs` refuses outright
 ("work/implementation@1 carries directory/files/targetFiles; use owners: [{role, path}] instead").
 
 **Test names quote acceptance criteria and business rules verbatim.** In
@@ -188,7 +188,7 @@ sibling `evidence.yaml` files written by `scripts/example/example-evidence.mjs`,
 assertion command against `--cwd` and stamps that in the header; UAT flows
 carry evidence that names the real `runs/<runId>` directory a run produced. Each file's
 `recordDigest` is a sha256 over the sibling `index.yaml`'s exact bytes — the same digest
-`scripts/checks/check-example-work.mjs` recomputes to refuse a mismatched, non-stale evidence file.
+`scripts/work/validate/check-example-work.mjs` recomputes to refuse a mismatched, non-stale evidence file.
 
 **`interface.draw` and `uat.verify` attach to `ui` and `uat` through assets, not prose.** Per
 `modules/schemas/work-layout.yaml`'s `moduleUI` and `nodeAssets` shapes, retained design drawings and real
@@ -240,7 +240,7 @@ secret is ever written into the tracked tree.
 | Command | What it refuses |
 | --- | --- |
 | `node scripts/checks/check-example-yaml.mjs examples` | Any `.yaml`/`.yml` under `examples` the runtime's own strict loader cannot parse — a permissive parser accepting silently-invented keys is exactly the bug this gate exists to catch |
-| `node scripts/checks/check-example-work.mjs` | An id that doesn't match its directory place; a `ref`/`blockedBy`/`conflictsWith`/`appliesTo`/`subscribes`/`extends` pointing at an id nothing owns; a stale `blockedBy` (target already `done` at or past the cited rev); `blockedBy` authored as prose instead of `{record, rev?, because}`; a `work/gap@1` missing `state`/`statement`; a `work/policy-decision@1` with an invented `outcome` or a `chosen` not in `options`, or a `targetModule`; an unclosed `change.kind`; a `done` record with no evidence and no authored-claim declaration; `appliesTo` on the wrong schema or pointing nowhere; a malformed `work/event@1` or a `subscribes`/`extends` pointing at the wrong schema; `work/implementation@1` using `directory`/`files` instead of `owners`; and an `evidence.yaml` whose `recordDigest` no longer matches its sibling's current bytes without `stale: true` |
+| `node scripts/work/validate/check-example-work.mjs` | An id that doesn't match its directory place; a `ref`/`blockedBy`/`conflictsWith`/`appliesTo`/`subscribes`/`extends` pointing at an id nothing owns; a stale `blockedBy` (target already `done` at or past the cited rev); `blockedBy` authored as prose instead of `{record, rev?, because}`; a `work/gap@1` missing `state`/`statement`; a `work/policy-decision@1` with an invented `outcome` or a `chosen` not in `options`, or a `targetModule`; an unclosed `change.kind`; a `done` record with no evidence and no authored-claim declaration; `appliesTo` on the wrong schema or pointing nowhere; a malformed `work/event@1` or a `subscribes`/`extends` pointing at the wrong schema; `work/implementation@1` using `directory`/`files` instead of `owners`; and an `evidence.yaml` whose `recordDigest` no longer matches its sibling's current bytes without `stale: true` |
 | `node scripts/hfs/architecture.mjs <repo-root>` | Backend/frontend dependency direction crossing a resolved responsibility boundary (app→feature→module, component/hook/module tiers), thin-app violations, undeclared package exports, unresolved internal imports (errors, not violations) |
 | `npm test` (backend, jest) | Any spec whose assertions do not hold against current source; a front end has no tests |
 | `npm run typecheck` (frontend, `tsc --noEmit`) | Any type error across the checked TypeScript program |

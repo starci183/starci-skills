@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { checkCanonPins, checkRepoPins } from '../../scripts/checks/check-canon-pins.mjs';
 import { loadPins, PINS_FILE, SCHEMA_FILE } from '../../scripts/gates/canon-pins.mjs';
-import { validateAgainstSchema } from '../../scripts/checks/check-op-manifest.mjs';
+import { validateAgainstSchema } from '../../scripts/lib/json-schema.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const schema = () => parseYaml(fs.readFileSync(path.join(ROOT, SCHEMA_FILE), 'utf8'));

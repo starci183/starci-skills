@@ -7,7 +7,7 @@
 //   kernel-proposal --workflow <wf> --title <t> --evidence <t> [--patch <file.diff>] [--files <csv>] [--decision <id>]
 //   kernel-proposal --workflow <wf> --list
 import fs from 'node:fs';
-import { stageBlob, putArtifact } from '../evidence-store.mjs';
+import { stageBlob, putArtifact } from '../../machine/evidence-store.mjs';
 import path from 'node:path';
 import { PROPOSAL_KIND, csv, newId, recordKernel, refuse } from '../kernel-authority.mjs';
 import { parseJsonOr } from '../../lib/json.mjs';

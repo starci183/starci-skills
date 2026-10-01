@@ -201,7 +201,8 @@ const PROPOSE_PATHS = [
   [/^modules\/ops\/registry\.yaml$|^scripts\/route\/plan-edges\.mjs$/, 'op graph'],
   [/^config(\.example)?\.yaml$/, 'owner caps / budgets'],
 ];
-const CHECKER = /^scripts\/checks\//;
+// Where checks and gates live: the runtime self-checks, the product gates, the HFS engine and the Work judges.
+const CHECKER = /^scripts\/(checks|gates|hfs|work\/(validate|draw|ui|brand))\//;
 
 /**
  * The tier of a change from its files ({path, status: A|M|D|R}): 'auto' or 'propose' with the reasons. A deleted
@@ -220,7 +221,7 @@ export function tierOf(files) {
 /**
  * The hard guardrails for an autonomous land. Pure over its inputs; {ok, refusals}.
  *   - tier propose -> refused (send a proposal instead)
- *   - a modified checker (scripts/checks/**) needs `wronglyBlocked`: a changed spec under tests/ whose text shows the
+ *   - a modified checker (CHECKER: checks, gates, hfs, work judges) needs `wronglyBlocked`: a changed spec under tests/ whose text shows the
  *     correct example the check wrongly blocked ("wrongly blocked" / "wrongly-blocked"); never relax a check to green
  *   - the daily cap on autonomous landings
  */

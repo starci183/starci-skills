@@ -12,8 +12,8 @@
 // A citation to an owner's word (receipt, ownerAcceptance) names decisions.decision_id or an ask id, not a blob.
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseYaml } from '../../engine/yaml.mjs';
-import { citeBlob } from '../../engine/db/ledger.mjs';
+import { parseYaml } from '../../../engine/yaml.mjs';
+import { citeBlob } from '../../../engine/db/ledger.mjs';
 
 export const CITATION_UNRESOLVED = 'CITATION_UNRESOLVED';
 export const CITATION_ROLES = Object.freeze(['direction', 'capture', 'uat-screen', 'uat-video', 'uat-result', 'render', 'layout-capture']);

@@ -225,7 +225,7 @@ docChecks:
   - {id: doc-language, script: scripts/checks/check-doc-language.mjs}
   - {id: check-work-surfaces, script: scripts/work/validate/check-work-surfaces.mjs, tree: true}
   - {id: check-work-deep, script: scripts/work/validate/check-work-deep.mjs, tree: true}
-  - {id: check-example-work, script: scripts/checks/check-example-work.mjs}
+  - {id: check-example-work, script: scripts/work/validate/check-example-work.mjs}
   - {id: check-contract-cites, script: scripts/checks/check-contract-cites.mjs}
   - {id: check-json-exceptions, script: scripts/checks/check-json-exceptions.mjs}
 # The finding codes of the authentication and security canon (lane AUTHCHK and its neighbours) a security verdict is judged on.

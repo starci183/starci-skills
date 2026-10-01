@@ -11,14 +11,12 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { withMachine } from '../../engine/db/machine.mjs';
-import {
-  workflowWorktreeSpec, ensureWorkflowWorktree, registerWorkflowWorktree, workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, opWorktreeArgs, sideOf,
-  canDispatchConcurrently, workflowSideWait, releaseWorkflowWorktree, markReleasePending, workflowAppRepo, workflowWorktreePromptRules, WORKFLOW_SIDE_BUSY,
-} from '../../scripts/kernel/workflow-worktree.mjs';
-import { createScratchWorktree } from '../../scripts/api/git/worktree-add.mjs';
-import { createOrcaWorktree } from '../../scripts/api/orca/worktree-provision.mjs';
+import { workflowWorktreeSpec, ensureWorkflowWorktree, registerWorkflowWorktree, setCheckpoint, opWorktreeArgs, sideOf, canDispatchConcurrently, workflowSideWait, releaseWorkflowWorktree, markReleasePending, workflowAppRepo, workflowWorktreePromptRules, WORKFLOW_SIDE_BUSY } from '../../scripts/kernel/workflow-worktree.mjs';
+import { createScratchWorktree } from '../../scripts/machine/worktree-git.mjs';
+import { createOrcaWorktree } from '../../scripts/machine/worktree-orca.mjs';
 import { isPendingRow } from '../../scripts/machine/worktree-registry.mjs';
 import { gcWorktrees } from '../../scripts/machine/worktrees.mjs';
+import { workflowWorktreeAt, workflowWorktreeOf } from '../../scripts/machine/workflow-tree.mjs';
 import { fakeOrcaWorktrees } from '../helpers/fake-orca-worktrees.mjs';
 
 const require = createRequire(import.meta.url);

@@ -23,6 +23,7 @@ import { guardsRoot } from './guards-root.mjs';
 import { fileURLToPath } from 'node:url';
 import { gitSpawn } from '../api/git/lib.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -196,7 +197,7 @@ function hookTarget(repoRoot, name) {
       fs.mkdirSync(hooksDir, { recursive: true });
       fs.writeFileSync(path.join(hooksDir, '.gitignore'), '*\n');
       if (!isIgnored()) {
-        if (absent) safeRemoveTree(hooksDir);
+        if (absent) safeRemoveTree(hooksDir, { hold: artifactHoldReason });
         else fs.rmSync(path.join(hooksDir, '.gitignore'), { force: true });
         return { installed: false, reason: 'hooks-dir-tracked', path: file };
       }

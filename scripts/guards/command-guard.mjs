@@ -42,7 +42,7 @@
 //  - launches: `orca terminal create` and a headless agent CLI (codex exec, claude|cursor-agent|devin -p/--print,
 //    gemini -p, opencode run) - an agent Orca does not supervise; every agent starts through orca orchestration
 //    worker-start. A heredoc body, an echo or a commit message that only mentions a command runs nothing and passes.
-// Before an allowed git command, a stale shared .git/index.lock is recovered (scripts/api/git/index-lock.mjs).
+// Before an allowed git command, a stale shared .git/index.lock is recovered (scripts/machine/lock-recovery.mjs preflightIndexLock).
 // Fail-open on the guard's OWN faults: a bug here must never take the shell away from a worker.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -432,7 +432,7 @@ async function gitVerdict({ args, cwd, env, guard, deps }) {
 }
 
 const loadDeps = async () => {
-  const [policy, npm, git, indexLock] = await Promise.all([import('./git-policy.mjs'), import('./deps-guard.mjs'), import('../api/git/lib.mjs'), import('../api/git/index-lock.mjs')]);
+  const [policy, npm, git, indexLock] = await Promise.all([import('./git-policy.mjs'), import('./deps-guard.mjs'), import('../api/git/lib.mjs'), import('../machine/lock-recovery.mjs')]);
   return { policy, npm, git, indexLock, say: (line) => process.stderr.write(`${line}\n`) };
 };
 

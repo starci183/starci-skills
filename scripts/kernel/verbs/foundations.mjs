@@ -2,7 +2,7 @@
 import { getWorkflow } from './shared/rows.mjs';
 import { openPeerWaits } from './shared/peers.mjs';
 import { readFoundations } from '../foundations.mjs';
-import { loadContractChanges } from '../contract-version.mjs';
+import { loadContractChanges } from '../../machine/contract-version.mjs';
 
 export default {
   verb: 'foundations',

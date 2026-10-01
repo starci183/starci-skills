@@ -20,6 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classesOf, parseHtml, walkElements } from './draw-dna.mjs';
 import { safeRemoveTree } from '../../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../../machine/artifact-hold.mjs';
 import {isFile} from '../../lib/fs-kind.mjs';
 
 export const DRAW_NESTED_VARIANT = 'DRAW_NESTED_VARIANT';
@@ -231,7 +232,7 @@ export async function layerFindingsForParts(parts, { playwright = null } = {}) {
       results.push({ part: part.png, viewport, dom, measured: measured ?? 'unmeasured (no record layer, no re-render source or Playwright)', forms: layer?.forms ?? null, findings });
     }
   } finally {
-    if (scratch) safeRemoveTree(scratch);
+    if (scratch) safeRemoveTree(scratch, { hold: artifactHoldReason });
   }
   return results;
 }

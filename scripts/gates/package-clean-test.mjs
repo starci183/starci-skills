@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { isMain } from '../lib/is-main.mjs';
 import { loadPins } from './canon-pins.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { runGit } from '../api/git/lib.mjs';
 
@@ -206,7 +207,7 @@ export function proveUnit(unit, { root = runtimeRoot, env = process.env, npm = n
   } catch (error) {
     return every('unrun', PROOF_CODES.unrun, { output: String(error?.stack ?? error) });
   } finally {
-    safeRemoveTree(temp);
+    safeRemoveTree(temp, { hold: artifactHoldReason });
   }
 }
 

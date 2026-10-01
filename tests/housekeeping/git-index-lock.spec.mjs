@@ -9,7 +9,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { recoverStaleIndexLock, preflightIndexLock, processOnRepo, reposNamed, gitDirOf, checkoutOf, LOCK_EVENT } from '../../scripts/api/git/index-lock.mjs';
+import { indexLock } from '../../scripts/api/git/index-lock.mjs';
+import { preflightIndexLock, LOCK_EVENT } from '../../scripts/machine/lock-recovery.mjs';
+import { processOnRepo, reposNamed, gitDirOf, checkoutOf } from '../../scripts/lib/git-dir.mjs';
 import { sweepGitLocks } from '../../scripts/housekeeping/hk-git-locks.mjs';
 import { AREAS } from '../../scripts/housekeeping/housekeeping.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
@@ -40,7 +42,7 @@ const proc = (commandLine, name = 'git.exe') => ({ pid: 4242, name, commandLine 
 
 test('runtimes.yaml declares the stale window and housekeeping runs the gitlocks area', () => {
   assert.ok(Number(allocationSettings().housekeeping.gitIndexLockStaleMs) > 0);
-  assert.deepEqual(AREAS.gitlocks, { module: '../lib/hk-git-locks.mjs', sweep: 'sweepGitLocks' });
+  assert.deepEqual(AREAS.gitlocks, { module: './hk-git-locks.mjs', sweep: 'sweepGitLocks' });
 });
 
 test('a git process holds the repo when it names it or names none; one naming only another repo does not', () => {
@@ -56,32 +58,32 @@ test('a git process holds the repo when it names it or names none; one naming on
 
 test('a lock younger than the window, or a git process that may hold it, keeps the lock', (t) => {
   const { repo, lock } = repoWithLock(t, 2);
-  assert.equal(recoverStaleIndexLock({ repo, staleMs: STALE, list: () => [] }).state, 'fresh');
+  assert.equal(indexLock({ repo, staleMs: STALE, list: () => [] }).state, 'fresh');
   const old = repoWithLock(t, 9);
-  const held = recoverStaleIndexLock({ repo: old.repo, staleMs: STALE, list: () => [proc('git.exe commit -m wip')] });
+  const held = indexLock({ repo: old.repo, staleMs: STALE, list: () => [proc('git.exe commit -m wip')] });
   assert.equal(held.state, 'held');
   assert.equal(held.holders[0].pid, 4242);
-  assert.equal(recoverStaleIndexLock({ repo: old.repo, staleMs: STALE, list: () => [proc(`git.exe -C ${old.repo} add x`)] }).state, 'held');
-  assert.equal(recoverStaleIndexLock({ repo: old.repo, staleMs: STALE, list: () => null }).state, 'probe-failed', 'an unread process table removes nothing');
-  assert.equal(recoverStaleIndexLock({ repo: old.repo, staleMs: STALE }).state, 'probe-failed', 'a spec never reads the host process table');
+  assert.equal(indexLock({ repo: old.repo, staleMs: STALE, list: () => [proc(`git.exe -C ${old.repo} add x`)] }).state, 'held');
+  assert.equal(indexLock({ repo: old.repo, staleMs: STALE, list: () => null }).state, 'probe-failed', 'an unread process table removes nothing');
+  assert.equal(indexLock({ repo: old.repo, staleMs: STALE }).state, 'probe-failed', 'a spec never reads the host process table');
   assert.ok(fs.existsSync(lock) && fs.existsSync(old.lock));
 });
 
 test('a lock that changed during the probe stays; a dry run only reports', (t) => {
   const { repo, lock } = repoWithLock(t, 9);
-  const touched = recoverStaleIndexLock({ repo, staleMs: STALE, list: () => { fs.appendFileSync(lock, 'y'); return []; } });
+  const touched = indexLock({ repo, staleMs: STALE, list: () => { fs.appendFileSync(lock, 'y'); return []; } });
   assert.equal(touched.state, 'changed');
-  assert.equal(recoverStaleIndexLock({ repo, staleMs: STALE, list: () => [], apply: false }).state, 'fresh', 'the rewrite made it young again');
+  assert.equal(indexLock({ repo, staleMs: STALE, list: () => [], apply: false }).state, 'fresh', 'the rewrite made it young again');
   const at = new Date(Date.now() - 9 * MIN);
   fs.utimesSync(lock, at, at);
-  assert.equal(recoverStaleIndexLock({ repo, staleMs: STALE, apply: false, list: () => [] }).state, 'would-remove');
+  assert.equal(indexLock({ repo, staleMs: STALE, apply: false, list: () => [] }).state, 'would-remove');
   assert.ok(fs.existsSync(lock));
 });
 
 test('a stale lock with no git process on the repository is removed and recorded once', (t) => {
   const { repo, lock } = repoWithLock(t, 9);
   const recorded = [];
-  const r = recoverStaleIndexLock({ repo, staleMs: STALE, list: () => [proc('git.exe -C D:/elsewhere status'), proc('node.exe x', 'node.exe')].filter((p) => /^git/.test(p.name)), record: (x) => recorded.push(x) });
+  const r = indexLock({ repo, staleMs: STALE, list: () => [proc('git.exe -C D:/elsewhere status'), proc('node.exe x', 'node.exe')].filter((p) => /^git/.test(p.name)), record: (x) => recorded.push(x) });
   assert.equal(r.state, 'removed');
   assert.equal(fs.existsSync(lock), false);
   assert.equal(recorded.length, 1);

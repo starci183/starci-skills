@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {openLedgerReader,ledgerFileFor} from '../../../engine/db/ledger.mjs';
-import {receiptsAnswering,receiptFileOf,receiptRefOf} from '../../kernel/ask-receipts.mjs';
+import {receiptsAnswering,receiptFileOf,receiptRefOf} from '../../machine/ask-receipts.mjs';
 import {sha256} from '../../../engine/digest.mjs';
 import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../../engine/yaml.mjs';
@@ -506,7 +506,7 @@ function ledgerReceiptsOf(repoRoot,dispatchId){
 
 /**
  * The owner's answer an exception cites, read from its starci/ask-answer@1 receipt: the named `receipt`
- * (`blob:<sha256>` - the answer serve-ask stored, scripts/kernel/ask-receipts.mjs - or a path inside the
+ * (`blob:<sha256>` - the answer serve-ask stored, scripts/machine/ask-receipts.mjs - or a path inside the
  * repository), else the newest receipt answering `acceptedBy` in the project ledger. Only an answer the owner
  * gave counts: an auto-accepted recommendation is not the owner accepting a sub-AA pair.
  */

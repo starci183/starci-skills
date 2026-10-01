@@ -31,7 +31,7 @@ import { settleDrawMetricFindings, DRAW_LOOP_CHANGE } from '../../scripts/work/d
 import { ARCHETYPES, archetypeOf, directionReadiness } from '../../scripts/work/ui-archetype.mjs';
 import { DIRECTION_ARCHETYPES } from '../../scripts/work/brand/brand.mjs';
 import { checkPrerequisites, directionPrerequisiteOn, directionVerdicts } from '../../scripts/kernel/prerequisites.mjs';
-import { loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
+import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 import { drawQualityFindings } from '../../scripts/work/draw/draw-quality.mjs';
 import { withRationale, writeRationale } from '../helpers/draw-rationale-fixture.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';

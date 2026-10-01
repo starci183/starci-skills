@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {safeRemoveTree,safeRemoveWorktree} from '../api/fs/safe-remove.mjs';
-import { createScratchWorktree } from '../api/git/worktree-add.mjs';
+import {safeRemoveTree} from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+import {safeRemoveWorktree,createScratchWorktree} from '../machine/worktree-git.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import {posixPath,slash} from '../lib/path-key.mjs';
 
@@ -107,7 +108,7 @@ export function runAtBase({worktree,baseHead,opHead=null,specs=[],commands=[],gi
     // (a dependency link) would be followed into its target (nivo-fe inc-c8fbf76aa499). safeRemoveTree never
     // descends into a link; prune drops the registration.
     try{safeRemoveWorktree(scratch,{repo:worktree,git:args=>run(args)});}catch{/* the temporary worktree is best-effort */}
-    try{safeRemoveTree(parent);}catch{/* nothing to keep */}
+    try{safeRemoveTree(parent, { hold: artifactHoldReason });}catch{/* nothing to keep */}
     if(!fs.existsSync(scratch))markRemoved(scratch);
   };
   try{

@@ -35,7 +35,7 @@
 // Every runtime decision is an `autopilot-*` event `by: autopilot`; nothing here ever writes answeredBy owner.
 import fs from 'node:fs';
 import { loopFileOfRef, loopLabelOf } from '../work/draw/draw-loop-coverage.mjs';
-import { fileAskReceipt, stageReceipt } from './ask-receipts.mjs';
+import { fileAskReceipt, stageReceipt } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
 import { openIncident, updateIncident } from '../../engine/db/ledger.mjs';

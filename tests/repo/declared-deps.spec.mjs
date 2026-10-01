@@ -15,7 +15,7 @@ import { needsDeclaration, packageName, runtimeSpecifiers, sourceFiles } from '.
 // counts as runtime-bound are tests/helpers/declared-deps.mjs. packages/ carry their own manifests
 // (tests/gates/package-declared-deps.spec.mjs); examples/ and ui/ carry theirs; tests/ embeds fixture specifiers.
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const declared = new Set([...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.devDependencies ?? {})]);
 

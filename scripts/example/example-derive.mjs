@@ -3,7 +3,7 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {isPlainObject} from '../../engine/plain-object.mjs';import {sha256File} from '../../engine/digest.mjs';
-import {ID_RE, walk as walkAll} from '../checks/check-example-work.mjs';
+import {ID_RE, walk as walkAll} from '../work/validate/check-example-work.mjs';
 import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from './example-ownership.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
@@ -291,7 +291,7 @@ export function computeDerived(workRoot) {
   }
 
   // closedBy is a list of record ids (schemas/work-layout.yaml, concept 7); a bare string is the common
-  // one-closer case and is normalised the same way here as scripts/checks/check-example-work.mjs's gate treats it.
+  // one-closer case and is normalised the same way here as scripts/work/validate/check-example-work.mjs's gate treats it.
   const normalizeClosedBy = v => v == null ? null : Array.isArray(v) ? v : [v];
   const gaps = [...records.values()].filter(r => r.schema === 'work/gap@1')
     .map(r => ({id: r.id, feature: r.feature, state: r.state, closedBy: normalizeClosedBy(r.data.closedBy)}))

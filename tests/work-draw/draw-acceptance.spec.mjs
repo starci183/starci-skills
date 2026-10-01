@@ -3,7 +3,7 @@
 // finished workflow committed 40 image-gen files (whole-screen ui-mockup prompts, an imagegen-provenance evidence
 // record) of three pre-token-render draws unchanged, settled pass on 3/3 git checks, and the draw node went green.
 import test from 'node:test';
-import { putBundle } from '../../engine/db/blob-lookup.mjs';
+import { putBundle } from '../../engine/db/blob.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,7 +15,7 @@ import {sha256} from '../../engine/digest.mjs';
 import {
   DATA_STATUS_DRAWN,DRAW_ACCEPTANCE_CHANGE,DRAW_ASSET_NOT_TOKEN_RENDERED,DRAW_NOT_REDRAWN,DRAW_NOT_SHAPES,RENDER_RECORD_SCHEMA,drawAcceptanceFindings,
 } from '../../scripts/work/draw/draw-acceptance.mjs';
-import {loadContractChanges} from '../../scripts/kernel/contract-version.mjs';
+import {loadContractChanges} from '../../scripts/machine/contract-version.mjs';
 import {colorsFromJobs} from '../../scripts/work/work-graph-store.mjs';
 import { withRationale } from '../helpers/draw-rationale-fixture.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';

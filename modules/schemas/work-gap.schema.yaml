@@ -49,7 +49,7 @@ properties:
     description: "The records whose completion actually closes this gap. A bare string is accepted and read
       as a one-element list, for the many gaps that only ever needed one closer. A gap reaches done only
       once every id here is itself done: a statement that named two missing things is not honestly closed
-      by building one of them, and scripts/checks/check-example-work.mjs refuses the claim that it was."
+      by building one of them, and scripts/work/validate/check-example-work.mjs refuses the claim that it was."
   verificationSource:
     $ref: "#/$defs/verificationSource"
   because:

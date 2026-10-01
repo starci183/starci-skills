@@ -4,7 +4,7 @@
 //   create     ensureWorkflowWorktree, before the Kernel launch (scripts/kernel/start-workflow.mjs): Orca creates and owns
 //              the tree - `orca worktree create --repo path:<app repo> --name wf-<workflowId> --base-branch main
 //              --setup run --no-parent` (the repository's setup hook runs a real `npm ci`; there are no node_modules
-//              junctions) - through scripts/api/orca/worktree-provision.mjs createOrcaWorktree, which takes the per-repo cap slot
+//              junctions) - through scripts/machine/worktree-orca.mjs createOrcaWorktree, which takes the per-repo cap slot
 //              first (worktrees.capPerRepo: a full repository refuses worktree-cap and the Kernel launch waits) and
 //              registers the row keyed by Orca's worktree id (kind workflow). Orca names the branch after the worktree
 //              (wf-<id>, its '/' rule): that branch IS the workflow branch, recorded as Orca reported it; every reader
@@ -25,17 +25,16 @@
 //              deletes a branch it can prove merged itself; -d runs only when the branch is still there).
 //
 // ctx: {env, orca, git} - env selects machine.sqlite (the registry), orca the Orca worktree client
-// (scripts/api/orca/worktree-client.mjs orcaWorktreeClient; specs pass a fake), git the caller's git runner.
+// (scripts/machine/worktree-orca.mjs orcaWorktreeClient; specs pass a fake), git the caller's git runner.
 import fs from 'node:fs';
 import path from 'node:path';
 import { runGit } from '../api/git/lib.mjs';
 import { withMachine } from '../../engine/db/machine.mjs';
-import { createOrcaWorktree, bindOrcaWorktree } from '../api/orca/worktree-provision.mjs';
-import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
-import { mainRootOf } from '../api/git/worktree-list.mjs';
-import { orcaWorktreeClient } from '../api/orca/worktree-client.mjs';
+import { createOrcaWorktree, bindOrcaWorktree, removeOrcaWorktree, orcaWorktreeClient } from '../machine/worktree-orca.mjs';
+import { mainRootOf } from '../machine/worktree-git.mjs';
 import { TERMINAL_JOB_STATUSES } from '../machine/worktree-registry.mjs';
 import { projectBinding } from './target-repo.mjs';
+import { workflowRecordOf, workflowWorktreeOf } from '../machine/workflow-tree.mjs';
 
 export const WORKFLOW_WORKTREE_KIND = 'workflow';
 /** The typed dispatch wait of an op whose side is busy in its workflow worktree (modules/kernel/failure-codes.yaml). */
@@ -79,33 +78,6 @@ export function workflowAppRepo(repo, { binding = undefined } = {}) {
   return top.ok && top.stdout ? mainRootOf(path.resolve(top.stdout)) : null;
 }
 
-const recordOf = (row) => (row ? { workflowId: row.workflow_id, orcaWorktreeId: row.orca_id, path: path.resolve(row.path), branch: row.branch ?? null,
-  checkpoint: row.checkpoint_sha ?? null, repoRoot: row.repo_root, ledgerId: row.ledger_id ?? null, createdAt: row.created_at,
-  releasePending: row.release_pending_at != null } : null);
-
-/** The live workflow worktree of `workflowId`: {workflowId, orcaWorktreeId, path, branch, checkpoint, repoRoot}, or null. */
-export function workflowWorktreeOf(ctx, workflowId) {
-  const { env } = ctxOf(ctx);
-  try {
-    return recordOf(withMachine((m) => m.db.prepare("SELECT * FROM worktrees WHERE kind='workflow' AND workflow_id=? AND orca_id IS NOT NULL AND removed_at IS NULL ORDER BY created_at DESC LIMIT 1").get(workflowId), { env }));
-  } catch { return null; }
-}
-
-/**
- * The live workflow worktree whose directory is `dir` (or holds it), or null: how a tool run inside a worktree
- * (scripts/gates/gate.mjs) finds its workflow through the registry, never by parsing a branch or folder name.
- */
-export function workflowWorktreeAt(ctx, dir) {
-  const { env } = ctxOf(ctx);
-  const at = path.resolve(dir);
-  const key = (p) => { let r = path.resolve(p); try { r = fs.realpathSync.native(r); } catch { /* missing */ } return process.platform === 'win32' ? r.toLowerCase() : r; };
-  try {
-    const rows = withMachine((m) => m.db.prepare("SELECT * FROM worktrees WHERE kind='workflow' AND orca_id IS NOT NULL AND removed_at IS NULL ORDER BY created_at DESC").all(), { env });
-    const row = rows.find((r) => key(r.path) === key(at)) ?? rows.find((r) => insidePath(key(at), key(r.path)));
-    return recordOf(row ?? null);
-  } catch { return null; }
-}
-
 /**
  * Register a workflow worktree Orca created (a row keyed by its Orca id, kind workflow, uncapped: the slot is taken by
  * ensureWorkflowWorktree before the creation). {workflowId, orcaWorktreeId, path, branch, checkpoint, repoRoot}
@@ -115,7 +87,7 @@ export function registerWorkflowWorktree(ctx, { workflowId, orcaWorktreeId, path
   const bound = bindOrcaWorktree({ pending, repoRoot: mainRootOf(dir, { git }), kind: WORKFLOW_WORKTREE_KIND, orcaId: orcaWorktreeId, dir, branch: branch ?? null,
     owner: { workflowId, ledgerId }, env, git });
   if (!bound.ok) throw Object.assign(new Error(`workflow worktree ${workflowId}: ${bound.detail}`), { code: bound.reason });
-  return recordOf(bound.row);
+  return workflowRecordOf(bound.row);
 }
 
 /**
@@ -233,7 +205,7 @@ export function markReleasePending(ctx, workflowId, { at = Date.now() } = {}) {
 /**
  * Release the workflow's worktree, from the host (the GC; never from inside the worktree: refused release-from-inside):
  * every link removed as a link and zero asserted, `orca worktree rm`, the main checkout asserted untouched, the registry
- * row closed (scripts/api/orca/worktree-remove.mjs removeOrcaWorktree), then `git branch -d` of the workflow branch when Orca kept it.
+ * row closed (scripts/machine/worktree-orca.mjs removeOrcaWorktree), then `git branch -d` of the workflow branch when Orca kept it.
  * {ok, released, path?, links?, branch?} | {ok:false, reason, fatal?, ...}
  */
 export function releaseWorkflowWorktree(ctx, workflowId, { cwd = process.cwd() } = {}) {

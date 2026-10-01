@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { checkFamiliesDrift, checkStarciworkBoundary, checkWorkTree, walk } from '../../checks/check-example-work.mjs';
+import { checkFamiliesDrift, checkStarciworkBoundary, checkWorkTree, walk } from './check-example-work.mjs';
 import { checkWorkConsistencyTree } from './check-work-consistency.mjs';
 import { checkWorkArtifacts } from './check-work-artifacts.mjs';
 import { checkWorkSchemas } from './check-work-schemas.mjs';

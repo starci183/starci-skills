@@ -19,10 +19,10 @@ import {
 import {
   ASSET_OP, ASSET_SLOT_FILLED, ASSET_SLOT_OWED, ASSET_SLOT_UNFILLED, assetRequestIdsFor, assetSlotsOf, openAssetSlots, readAssetRequests, recordAssetSlots, slotsOfHtml,
 } from '../../scripts/work/asset-slot.mjs';
-import { checkWorkTree } from '../../scripts/checks/check-example-work.mjs';
+import { checkWorkTree } from '../../scripts/work/validate/check-example-work.mjs';
 import { DEFAULT_RUBRIC } from '../../scripts/work/draw-critic.mjs';
 import { directionReviewQuestion } from '../../scripts/work/brand-direction.mjs';
-import { loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
+import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-alert-asset-')); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };

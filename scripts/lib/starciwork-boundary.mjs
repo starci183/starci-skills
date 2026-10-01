@@ -98,7 +98,7 @@ const ROOT_CACHE_FILE = /^(.*\.tmp\.json|tmp-.*\.json|scan-i18n.*\.json|runtime-
 
 /**
  * The §5.2 category of a KNOWN agent-data path, or null when the path is not one. Known agent data — the
- * categories scripts/checks/check-example-work.mjs refuses in a .starciwork tree [HFS_AGENT_DATA_TRACKED]:
+ * categories scripts/work/validate/check-example-work.mjs refuses in a .starciwork tree [HFS_AGENT_DATA_TRACKED]:
  * ledger, logs-db, worktrees, kernel-evidence, kernel-strays, evidence-bundle, capture (impl captures),
  * layout-capture (shell/assets), uat-run, draw-round, interface-audit (features/<f>/operations/), stray-report,
  * cache. A path that is neither known agent data nor on the §5.1 list

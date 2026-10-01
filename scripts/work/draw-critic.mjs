@@ -28,8 +28,7 @@ import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import crypto from 'node:crypto';
 import { gitResult } from '../api/git/lib.mjs';
-import { createOrcaWorktree } from '../api/orca/worktree-provision.mjs';
-import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
+import { createOrcaWorktree, removeOrcaWorktree } from '../machine/worktree-orca.mjs';
 import { opContextOf } from '../kernel/op-context.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { ownerRubricChecks } from './draw-feedback.mjs';
@@ -209,7 +208,7 @@ function clientOf(orca) {
 /**
  * The critic's placement: Orca places a worker only on a worktree it resolves (a git worktree of a known repository;
  * a bare temp directory is refused selector_not_found - launch smoke 2026-10-01). So the clean directory is an Orca
- * worktree (scripts/api/orca/worktree-provision.mjs createOrcaWorktree, kind critic, owned by the op job running the loop when there
+ * worktree (scripts/machine/worktree-orca.mjs createOrcaWorktree, kind critic, owned by the op job running the loop when there
  * is one) of the repository the loop runs in, at a commit of the EMPTY tree: it holds nothing but its `.git` file until
  * the round's images, HTML and rubric are copied in. Orca creates it, lists it and removes it; the registry keys it by
  * Orca's id. Never capped (the workflow's own worktree already counts). {ok, dir, repoRoot, orcaId} | {ok:false, error}.
@@ -226,7 +225,7 @@ export function criticWorkspace({ repoRoot = gitRootOf(process.cwd()), context =
   return made.ok ? { ok: true, dir: made.path, repoRoot: path.resolve(repoRoot), orcaId: made.id, branch: made.branch } : { ok: false, error: `${made.reason}: ${made.detail ?? ''}`.trim() };
 }
 
-/** Remove the critic's placement through Orca (scripts/api/orca/worktree-remove.mjs removeOrcaWorktree, its branch with it). {ok, ...}. */
+/** Remove the critic's placement through Orca (scripts/machine/worktree-orca.mjs removeOrcaWorktree, its branch with it). {ok, ...}. */
 export function removeCriticWorkspace({ dir, repoRoot, orcaId, branch = null, env = process.env, orca = undefined }) {
   return removeOrcaWorktree({ repoRoot, orcaId, dir, branch, deleteBranch: branch ? 'force' : null, env, ...(orca ? { orca } : {}) });
 }

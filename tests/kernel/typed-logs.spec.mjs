@@ -12,7 +12,7 @@ import {
 import { SECRET_PATTERNS } from '../../scripts/supervisor/push-mains.mjs';
 import { SECRET_PATTERNS as SHARED } from '../../scripts/lib/secret-patterns.mjs';
 import { artifactHoldOf } from '../../scripts/machine/artifact-hold.mjs';
-import { recordCheck } from '../../scripts/kernel/evidence-store.mjs';
+import { recordCheck } from '../../scripts/machine/evidence-store.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
 // Typed logs (scripts/kernel/typed-logs.mjs): rows in the ledger's logs table (<repo>/.starciwork/runtime.sqlite since

@@ -13,7 +13,7 @@ import {
 } from '../../scripts/work/draw/draw-rationale.mjs';
 import { DRAW_QUALITY_CODES } from '../../scripts/work/draw/draw-quality.mjs';
 import { machineMetrics } from '../../scripts/work/draw-loop.mjs';
-import { loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
+import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rationale-')); t.after(() => fs.rmSync(d, { recursive: true, force: true })); return d; };

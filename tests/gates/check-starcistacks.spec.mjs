@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { checkStarciStacks, checkStarciStacksMain, ownerAskConflict, resolveStackService, schemaErrors, CODES } from '../../scripts/gates/starcistacks.mjs';
-import { loadContractChanges } from '../../scripts/kernel/contract-version.mjs';
+import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const schema = parseYaml(fs.readFileSync(path.join(root, 'modules', 'schemas', 'application-stacks.schema.yaml'), 'utf8'));

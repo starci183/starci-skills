@@ -29,7 +29,7 @@
 // (modules/kernel/failure-codes.yaml).
 import fs from 'node:fs';
 import path from 'node:path';
-import { recordCheck } from './evidence-store.mjs';
+import { recordCheck } from '../machine/evidence-store.mjs';
 import { DOC_PROFILE, GATE_EXIT, GATE_SCHEMA, LINT_SCHEMA } from '../gates/gate.mjs';
 import { DIGEST_SCHEMA, judgeKnowledgeDigest, judgeReadDigest, kindsOf, loadOpGate, loopOps } from '../gates/read-digest.mjs';
 import { TEST_WORLD_RUN_SCHEMA, testWorldFindings } from '../gates/test-world-run.mjs';

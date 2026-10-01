@@ -50,7 +50,7 @@ test('git worktree list and prune pass', async () => {
 });
 
 test('a recursive delete is refused in every spelling, wrapper and shell, with safeRemoveTree as the remedy', async () => {
-  await refusedAll('RECURSIVE_DELETE', /safeRemoveTree \(scripts\/lib\/safe-remove\.mjs\)/, [
+  await refusedAll('RECURSIVE_DELETE', /safeRemoveTree \(scripts\/api\/fs\/safe-remove\.mjs\)/, [
     ['rm -r build', 'bash'],
     ['rm -rf node_modules', 'bash'],
     ['rm -fr dist', 'bash'],

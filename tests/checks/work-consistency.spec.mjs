@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {checkWorkConsistencyTree, checkTreeParity, declaredStateValues} from '../../scripts/work/validate/check-work-consistency.mjs';
 import {loadRecords} from '../../scripts/example/example-ownership.mjs';
-import {walk} from '../../scripts/checks/check-example-work.mjs';
+import {walk} from '../../scripts/work/validate/check-example-work.mjs';
 
 /**
  * One fixture tree per cross-record rule in scripts/work/validate/check-work-consistency.mjs, proving each rule fires on the

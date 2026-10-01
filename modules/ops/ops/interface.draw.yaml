@@ -79,7 +79,7 @@ reads:
     path: .starciwork/shell/index.yaml
     layoutFoundation: true
     purpose:
-      en: "May be absent or todo when the op starts (step 1 creates and settles it). The product's layout tree (work/layout-tree@1) with the captures it cites (blobs, engine/db/blob-lookup.mjs): one node per
+      en: "May be absent or todo when the op starts (step 1 creates and settles it). The product's layout tree (work/layout-tree@1) with the captures it cites (blobs, engine/db/blob.mjs): one node per
         app/ segment of each app the frontend declares (`apps[]`: a monorepo may hold several, apps/app and apps/landing; a node id is a
         route within its app) - route groups, parallel slots @x, intercepting routes (.)x, loading/error/not-found
         files - each layout with its chrome (visible or passthrough), rev, navigation with labels per

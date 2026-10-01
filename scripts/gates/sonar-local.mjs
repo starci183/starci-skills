@@ -9,8 +9,9 @@ import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {safeRemoveTree} from '../api/fs/safe-remove.mjs';
-import {repositoryName,repositoryHome} from '../lib/repo-identity.mjs';
-import {resolveCustodyFile,resolveDeclaredRepository,runtimeHostRoot} from '../lib/runtime-host.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
+import {repositoryName,repositoryHome} from '../hfs/repo-identity.mjs';
+import {resolveCustodyFile,resolveDeclaredRepository,runtimeHostRoot} from './runtime-host.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
 import { runGit } from '../api/git/lib.mjs';
@@ -166,7 +167,7 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   const doc=parseYaml(fs.readFileSync(file,'utf8'));
   const sonar=[doc?.services?.sonar,doc?.quality?.sonar,doc?.services?.quality?.sonar].find(plain);
   if(!sonar)return null;
-  // A named repository resolves by identity (scripts/lib/runtime-host.mjs): the declaring repository, the runtime host or a
+  // A named repository resolves by identity (scripts/gates/runtime-host.mjs): the declaring repository, the runtime host or a
   // sibling checkout; one not checked out here is named where its sibling checkout would be, so its custody reads as missing.
   const repoDir=name=>!name?repoRoot:resolveDeclaredRepository(name,{fromRepo:repoRoot})??path.join(path.dirname(repositoryHome(repoRoot)),name);
   let stackDir=null,composeFile=null,container=null;
@@ -266,7 +267,7 @@ export function readCustody(cfg,ref){
   // A relative reference is a member of the configured stack; an absolute one (a declaration credential,
   // resolved from its repository root) must still sit inside a custody tree - a repository's
   // .starcistacks or a runtime's extension tree (.claude/ext/<service>, or this runtime's own ext/ when it is a
-  // lane worktree, where a host custody path resolves - scripts/lib/runtime-host.mjs resolveCustodyFile).
+  // lane worktree, where a host custody path resolves - scripts/gates/runtime-host.mjs resolveCustodyFile).
   const plainFile=path.resolve(cfg.stackDir,ref);
   const name=String(ref).replace(/\\/g,'/');
   const inside=path.isAbsolute(String(ref))
@@ -1156,7 +1157,7 @@ export async function scan(cfg,options={}){
     if(judged.result.verdict==='pass')return finish('pass');
     return finish('fail',`the slice fails on new code: ${judged.result.failures.join('; ')}`);
   }finally{
-    safeRemoveTree(workDir);
+    safeRemoveTree(workDir,{hold:artifactHoldReason});
     // The throwaway slice project is judged and gone: the next scan of the same scope re-creates it.
     if(isolated&&!options.keepSliceProject){
       const removed=await call(cfg,'POST','/api/projects/delete',{token:admin.value,form:{project:isolated.projectKey}}).catch(error=>({status:0,error:String(error?.message??error)}));

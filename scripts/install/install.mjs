@@ -410,7 +410,7 @@ export function update(opts, log = console.log) {
 
 // The installed tree validates itself: every spec the payload ships is a contract the install can
 // check. `--quick` prefers the core kernel/ledger subset when those specs are present.
-const QUICK_SPECS = ['kernel-api.spec.mjs', 'goal-entry.spec.mjs', 'ledger-schema-parity.spec.mjs', 'route-model.spec.mjs', 'verdict-contract.spec.mjs'];
+const QUICK_SPECS = ['engine-db/kernel-api.spec.mjs', 'kernel-verbs-shared/goal-entry.spec.mjs', 'engine-db/ledger-schema-parity.spec.mjs', 'kernel/route-model.spec.mjs', 'repo/verdict-contract.spec.mjs'];
 export function doctor(opts, log = console.log) {
   const target = path.join(opts.dir, '.claude');
   const manifest = readManifest(target);
@@ -420,8 +420,8 @@ export function doctor(opts, log = console.log) {
     throw new Error(`${target} is not an installed StarCi runtime: missing scripts/kernel/cli.mjs; run init first`);
   }
   const testsDir = path.join(target, 'tests');
-  const specs = existsSync(testsDir) ? readdirSync(testsDir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith('.spec.mjs')).map((e) => e.name).sort() : [];
-  if (!specs.length) throw new Error('installed tree has no tests/*.spec.mjs to validate against');
+  const specs = existsSync(testsDir) ? readdirSync(testsDir, { recursive: true }).map((name) => String(name).split(path.sep).join('/')).filter((name) => name.endsWith('.spec.mjs')).sort() : [];
+  if (!specs.length) throw new Error('installed tree has no tests/**/*.spec.mjs to validate against');
   let tests = opts.quick ? specs.filter((name) => QUICK_SPECS.includes(name)) : specs;
   if (!tests.length) tests = specs;
   if (manifest) {

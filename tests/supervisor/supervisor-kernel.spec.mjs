@@ -24,7 +24,7 @@ import { tell, replies, sinceMs } from '../../scripts/supervisor/tell.mjs';
 import { replyToOwner, registrationRefusal } from '../../scripts/supervisor/channel.mjs';
 import { appendInbox, readInbox, registerSupervisor, readOutbox, createBridge } from '../../scripts/supervisor/telegram-bridge.mjs';
 import { planWake, busyScreen, watchdogPass, sweepWorkers } from '../../scripts/supervisor/supervisor-watchdog.mjs';
-import { orcaTreeFindings, readTerminals, supervisorWorkerHandles } from '../../scripts/checks/check-orca-tree.mjs';
+import { orcaTreeFindings, readTerminals, supervisorWorkerHandles } from '../../scripts/supervisor/orca-tree.mjs';
 import { withLedger } from '../helpers/ledger-fixture.mjs';
 import { clusterOwed } from '../../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../../scripts/supervisor/status-block.mjs';

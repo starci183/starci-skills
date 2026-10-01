@@ -160,7 +160,7 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
   out.report.notes = [
     'orchestration.db is Orca-owned: size reported only, never opened/edited/vacuumed; orca CLI 1.4.209 has no retention or prune command (`orchestration reset` wipes state — not used).',
     'cap mechanism: rename to <file>.1 through rotateLog (the codebase\'s one cap convention); keep-tail truncation exists nowhere here; the .1 sibling is age-deleted on a later sweep.',
-    'gap: append-only runtime jsonl under <skillRoot>/runtime/guards/ (refusals.jsonl, footprint.jsonl) lives in the checkout, outside these roots — uncapped by this sweep.',
+    'gap: append-only guard jsonl under <starciLocalRoot>/guards/ (refusals.jsonl, footprint.jsonl) lies outside these roots — uncapped by this sweep.',
   ];
   if (Object.values(overflow).some((n) => n)) out.report.overflow = overflow;
   return out;

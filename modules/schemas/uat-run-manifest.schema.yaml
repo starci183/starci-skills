@@ -5,7 +5,7 @@ additionalProperties: false
 description: "One append-only UAT run, written by the Playwright harness into
   features/<feature>/uat/<flow>/runs/<runId>/manifest.yaml. It is an artifact payload rather than a Work
   record - it has no lifecycle, no refs and no place-derived identity, and
-  scripts/checks/check-example-work.mjs walks past it as PAYLOAD_SKIPPED - but it is the evidence a
+  scripts/work/validate/check-example-work.mjs walks past it as PAYLOAD_SKIPPED - but it is the evidence a
   `work/uat-flow@1` settles on, so its shape is contracted here rather than left to whatever the harness
   happened to write. A run is never edited once settled: a re-run adds a new runId, which is why this file
   records what was observed, the exact bytes of every capture, and the commits that were serving at the

@@ -9,8 +9,7 @@
 //          (scripts/work/draw-critic.mjs: a fresh Orca worker started by worker-start on an empty-tree runtime worktree with only the PNGs, the
 //          HTML and the product's brand.direction rubric), and records round-<n>/{source.html, <part>.png + its
 //          draw-render .json, <part>.score.json, metrics.json, critique.json} and <out>/loop.json. It prints the
-//          failures, the beauty, whether the round progressed and whether the loop stops; fix the source and run
-//          round again until it does
+//          failures, the beauty, whether the round progressed and whether the loop stops; fix the source and run round again until it does
 //   round  --source <XBase>.draw.tsx --fixture <fixture.json> [--fixture <width>=<fixture.json>]... --product <app dir>
 //          [--css <product global css>]... [--grammar auto|product|claude-dist] [--grammar-dist <package root>]
 //          --base <XBase> --state <state> --viewports <WxH,WxH> --repo <product repo> [--ui ...] [--out ...] [...]
@@ -49,7 +48,7 @@
 // A metric that cannot run is DRAW_METRICS_UNVERIFIED - a failure, never a pass.
 import { opContextOf } from '../kernel/op-context.mjs';
 import fs from 'node:fs';
-import { putBundle } from '../../engine/db/blob-lookup.mjs';
+import { putBundle } from '../../engine/db/blob.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,6 +59,7 @@ import { readJsonFile } from '../lib/json.mjs';
 import { buildFixtureHarness, captureHtml, loadPlaywright, parseViewports } from './draw-render.mjs';
 import { DRAW_OFF_GRAMMAR_COMPONENT as DOM_OFF_GRAMMAR, DRAW_SOURCE_SUFFIX, checkDrawSource, rationaleFileFor } from './draw/draw-source.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
+import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 import { anatomyFindings, dnaFindings, loadDna, proposalFilesFor, proposalNamesIn } from './draw/draw-dna.mjs';
 import { measureFindings, nestedVariantFindings } from './draw/draw-layer.mjs';
 import { assetRequestIdsFor } from './asset-slot.mjs';
@@ -231,7 +231,7 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
 export const loopFileOf = (out) => path.join(out, 'loop.json');
 // The loop is agent data (ARCHITECTURE-DB §5.1): its rounds live in the op's job scratch (op-context.mjs; else an OS-temp
 // folder keyed by the ui record), never in .starciwork. finish puts the whole loop in the blob store as one bundle
-// (blob-lookup.mjs putBundle) and generation.loop cites it {sha256: <bundle manifest>, round}.
+// (engine/db/blob.mjs putBundle) and generation.loop cites it {sha256: <bundle manifest>, round}.
 export const defaultOutOf = (uiDir, base, state, context = opContextOf()) => path.join(
   context?.scratchDir ? path.resolve(context.scratchDir) : path.join(os.tmpdir(), 'starci-draw-loop', sha256(path.resolve(uiDir)).slice(0, 16)),
   LOOP_DIR, `${base}--${state}`);
@@ -307,7 +307,7 @@ async function defaultComponentRender({ source, fixtures, css = [], productDir, 
       records.push(...await captureHtml({ html: built.html, out, viewports: vps, theme: 'light', fullPage, name, source: built.source, playwright, rationale }));
       if (harnessDir && !fs.existsSync(path.join(harnessDir, 'index.html'))) { fs.mkdirSync(harnessDir, { recursive: true }); fs.cpSync(workDir, harnessDir, { recursive: true }); }
     } finally {
-      safeRemoveTree(workDir);
+      safeRemoveTree(workDir, { hold: artifactHoldReason });
     }
   }
   return records;
@@ -730,7 +730,7 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
           detail: `re-measured by the runtime, ${path.basename(source)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((f) => f.detail).join(' | ').slice(0, 900)}` });
       }
     } finally {
-      safeRemoveTree(dir);
+      safeRemoveTree(dir, { hold: artifactHoldReason });
     }
   }
   for (const { html, parts: group } of byHtml.values()) {
@@ -752,7 +752,7 @@ export async function verifyRecordParts({ recordDir, record = null, repo, family
           detail: `re-measured by the runtime, ${path.basename(html)} fails ${doc.failures} machine metric finding(s) (${doc.codes.join(', ')}): ${all.slice(0, 4).map((f) => f.detail).join(' | ').slice(0, 900)}` });
       }
     } finally {
-      safeRemoveTree(dir);
+      safeRemoveTree(dir, { hold: artifactHoldReason });
     }
   }
   return { findings, parts };

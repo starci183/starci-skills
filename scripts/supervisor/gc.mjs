@@ -74,7 +74,7 @@ import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned 
 import { gitResult } from '../api/git/lib.mjs';
 import { killProcessTree } from '../api/process/kill-tree.mjs';
 import { parseWorktreeList, laneActivity, treeBytes } from '../housekeeping/hk-lanes.mjs';
-import { safeRemoveWorktree } from '../api/fs/safe-remove.mjs';
+import { safeRemoveWorktree } from '../machine/worktree-git.mjs';
 import { markRemoved } from '../machine/worktree-registry.mjs';
 import { pathKey } from '../lib/path-key.mjs';
 import { parseJson } from '../lib/json.mjs';

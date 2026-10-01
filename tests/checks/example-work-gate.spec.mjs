@@ -5,11 +5,11 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { checkWorkTree, checkFamiliesDrift, checkStarciworkBoundary, FAMILIES } from '../../scripts/checks/check-example-work.mjs';
+import { checkWorkTree, checkFamiliesDrift, checkStarciworkBoundary, FAMILIES } from '../../scripts/work/validate/check-example-work.mjs';
 import { validateWork } from '../../scripts/work/validate/work-validate.mjs';
 
 /**
- * One fixture tree per new-concept rule in scripts/checks/check-example-work.mjs, proving each rule refuses the
+ * One fixture tree per new-concept rule in scripts/work/validate/check-example-work.mjs, proving each rule refuses the
  * exact malformed shape it targets - and, where useful, that the corrected shape is accepted. Fixtures live
  * under one %TEMP% root that the file removes when its tests end (MB-16).
  */

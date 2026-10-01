@@ -101,7 +101,7 @@ export function installTypeScript(dir) {
   const target = path.join(dir, 'node_modules', 'typescript');
   fs.mkdirSync(target, { recursive: true });
   fs.writeFileSync(path.join(target, 'package.json'), '{"name":"typescript","main":"index.js"}\n');
-  fs.writeFileSync(path.join(target, 'index.js'), `module.exports = require(${JSON.stringify(path.resolve(import.meta.dirname, '..', 'node_modules', 'typescript'))});\n`);
+  fs.writeFileSync(path.join(target, 'index.js'), `module.exports = require(${JSON.stringify(path.resolve(import.meta.dirname, '..', '..', 'node_modules', 'typescript'))});\n`);
   fs.cpSync(path.resolve(import.meta.dirname, '..', '..', 'packages', 'tsconfig'), path.join(dir, 'node_modules', '@starci', 'tsconfig'), { recursive: true, filter: (source) => !source.endsWith('.test.mjs') });
   return dir;
 }
