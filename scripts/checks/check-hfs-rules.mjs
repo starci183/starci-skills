@@ -41,7 +41,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { ALL_CHECK_CODES, REFUSAL_CODES } from '../lib/hfs-check.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../lib/hfs-slots.mjs';
 import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from './architecture/index.mjs';
-import { isMain } from './common.mjs';
+import { isMain, walkFiles } from './common.mjs';
 
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 export const RULES_README = 'knowledge/hfs/README.md';
@@ -81,7 +81,9 @@ export function readEmitters(root) {
 /** The test sources that prove the enforcers: {'eslint-be': text, 'eslint-fe': text, stylelint: [text], specs: [text]}. */
 export function readTests(root) {
   const texts = (dir, re) => (fs.existsSync(path.join(root, dir)) ? fs.readdirSync(path.join(root, dir)).filter((f) => re.test(f)).sort().map((f) => fs.readFileSync(path.join(root, dir, f), 'utf8')) : []);
-  return { 'eslint-be': texts('packages/eslint/be', /\.test\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.test\.mjs$/).join('\n'), stylelint: texts('packages/stylelint', /\.test\.mjs$/), specs: texts('tests', /\.spec\.mjs$/) };
+  // Runtime specs are read at any depth: tests/<area>/<module>.spec.mjs is their layout (RT_SPEC_PLACEMENT).
+  const specs = walkFiles(path.join(root, 'tests'), { sorted: true, filter: (name) => /\.spec\.mjs$/.test(name), exclude: (name) => name === 'node_modules' || name === 'fixtures' }).map((file) => fs.readFileSync(file, 'utf8'));
+  return { 'eslint-be': texts('packages/eslint/be', /\.test\.mjs$/).join('\n'), 'eslint-fe': texts('packages/eslint/fe', /\.test\.mjs$/).join('\n'), stylelint: texts('packages/stylelint', /\.test\.mjs$/), specs };
 }
 
 /** True when a RuleTester run of `id` carries both valid and invalid cases. */
