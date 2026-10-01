@@ -6,7 +6,7 @@
 //   round  --ui <ui-record-dir> --html <source.html> --base <XBase> --state <state> --viewports <WxH,WxH>
 //          --repo <product repo> [--out <dir>] [--family starci] [--no-full-page] [--no-critic] [--json]
 //          renders the source with draw-render into <out>/round-<n>/, runs every machine metric, then the critic
-//          (scripts/work/draw-critic.mjs: a fresh `codex exec` session in a clean temp dir with only the PNGs, the
+//          (scripts/work/draw-critic.mjs: a fresh Orca worker started by worker-start in a clean temp dir with only the PNGs, the
 //          HTML and the product's brand.direction rubric), and records round-<n>/{source.html, <part>.png + its
 //          draw-render .json, <part>.score.json, metrics.json, critique.json} and <out>/loop.json. It prints the
 //          failures, the beauty, whether the round progressed and whether the loop stops; fix the source and run
@@ -323,7 +323,7 @@ const loadUi = (uiDir) => {
 
 /**
  * One round of the loop. Options: {ui, html, base, state, viewports:[{width,height}], repo, out?, family?, fullPage?,
- * critic? (false: no critic), render? probes? criticRunner? (tests)}. Returns {loop, round, stop}.
+ * critic? (false: no critic), render? probes? criticOrca? (tests: a fake Orca client for the critic worker)}. Returns {loop, round, stop}.
  */
 export async function runRound(o) {
   if (o.source) return runComponentRound(o);
@@ -358,7 +358,7 @@ export async function runRound(o) {
 
   let critique = null;
   if (o.critic !== false) {
-    critique = await critiqueRound({ loop, n, roundDir, captures, html, uiDir, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name, settings, drawer: o.drawer, runner: o.criticRunner ?? null });
+    critique = await critiqueRound({ loop, n, roundDir, captures, html, uiDir, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name, settings, drawer: o.drawer, orca: o.criticOrca ?? null });
   }
   const beauty = critique?.verdict?.beauty ?? null;
   const round = { n, dir: `round-${n}`, at: new Date().toISOString(), htmlSha256: metrics.htmlSha256, failures: metrics.failures, codes: metrics.codes, allPass: metrics.allPass,
@@ -379,7 +379,7 @@ export async function runRound(o) {
  * picked or cannot answer is a critique with `error` and no verdict (the round then has no beauty and finish reports
  * DRAW_CRITIC_MISSING, not a low score).
  */
-export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir = null, archetype = null, record = null, shape, settings, drawer = undefined, runner = null }) {
+export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir = null, archetype = null, record = null, shape, settings, drawer = undefined, orca = null }) {
   const { rubric, ownerChecks } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype, record, shape });
   // The owner's notes this shape must address ride as gate checks (draw-feedback.mjs); the loop records which.
   if (ownerChecks.length) loop.ownerChecks = ownerChecks;
@@ -388,10 +388,10 @@ export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir =
   let critique;
   try {
     critique = pick.error
-      ? { schema: 'starci/draw-critique@1', critic: { independent: false }, verdict: null, error: pick.error }
-      : await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html, rubric, critic: pick.critic, runner });
+      ? { schema: 'starci/draw-critique@1', outcome: 'not-configured', critic: { independent: false }, verdict: null, error: pick.error }
+      : await runCritic({ images: captures.map((c) => ({ path: c.png, label: `${breakpointOf(c.viewport)} ${c.viewport.width}px` })), html, rubric, critic: pick.critic, orca });
   } catch (error) {
-    critique = { schema: 'starci/draw-critique@1', critic: { independent: false }, verdict: null, error: String(error?.message ?? error) };
+    critique = { schema: 'starci/draw-critique@1', outcome: 'launch-failed', critic: { independent: false }, verdict: null, error: String(error?.message ?? error) };
   }
   critique.critic = { ...(critique.critic ?? {}), drawer: who };
   critique.round = n;
@@ -402,9 +402,9 @@ export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir =
 /**
  * The best round's critique, run now when that round has none (a round drawn with --no-critic, or one whose critic
  * errored): finish never reports a drawing blocked on a beauty nobody scored. Updates the round's beauty and critic in
- * loop.json. Returns {ran, critique|null, round}. `runner` replaces the critic process (tests).
+ * loop.json. Returns {ran, critique|null, round}. `orca` replaces the Orca client of the critic worker (tests).
  */
-export async function critiqueBest({ out, settings = drawLoopSettings(), drawer = undefined, runner = null }) {
+export async function critiqueBest({ out, settings = drawLoopSettings(), drawer = undefined, orca = null }) {
   const loop = readLoop(out);
   if (!loop?.rounds?.length) return { ran: false, critique: null, round: null };
   const best = bestRound(loop.rounds);
@@ -416,7 +416,7 @@ export async function critiqueBest({ out, settings = drawLoopSettings(), drawer 
   const html = dom ?? [path.join(roundDir, 'source.html'), path.join(roundDir, 'source.tsx')].find(isFile);
   const uiDir = loop.ui != null ? path.resolve(out, loop.ui) : null;
   const ui = loadUi(uiDir);
-  const critique = await critiqueRound({ loop, n: best.n, roundDir, captures, html, uiDir, archetype: loop.archetype ?? null, record: ui?.record ?? null, shape: `${loop.base}#${loop.state}`, settings, drawer, runner });
+  const critique = await critiqueRound({ loop, n: best.n, roundDir, captures, html, uiDir, archetype: loop.archetype ?? null, record: ui?.record ?? null, shape: `${loop.base}#${loop.state}`, settings, drawer, orca });
   const beauty = critique?.verdict?.beauty ?? null;
   Object.assign(best, { beauty, criticFailed: critique?.verdict?.failed ?? null, critic: { model: critique.critic?.model ?? null, independent: critique.critic?.independent ?? false, error: critique.error ?? null, late: true },
     ...(loop.ownerChecks?.length ? { ownerFailed: loop.ownerChecks.filter((id) => critique?.verdict?.checks?.find((c) => c.id === id)?.pass !== true) } : {}) });
@@ -465,7 +465,7 @@ export async function componentMeasure({ source, fixtures, fixtureFiles, product
 /**
  * One round of a real-component drawing. Options: {source (<XBase>.draw.tsx), fixtures ({default, byWidth}) or fixture,
  * product (app dir), css [], grammar ('auto'), grammarDist, ui, base, state, viewports, repo, out?, family?, fullPage?,
- * critic?, render? probes? criticRunner? sourceCheck? (tests)}.
+ * critic?, render? probes? criticOrca? sourceCheck? (tests)}.
  */
 export async function runComponentRound(o) {
   const settings = o.settings ?? drawLoopSettings();
@@ -504,7 +504,7 @@ export async function runComponentRound(o) {
     // The critic reads the rendered DOM (what the images show), never the bundle harness; it is picked by criticFor
     // exactly as for an html round - a real-component round used to hand settings.critic straight to runCritic, so a
     // Codex drawer was judged by Codex and a missing critic threw (no critique.json, DRAW_BEAUTY_BELOW with no score).
-    critique = await critiqueRound({ loop, n, roundDir, captures, html: domFile ?? source, uiDir, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name, settings, drawer: o.drawer, runner: o.criticRunner ?? null });
+    critique = await critiqueRound({ loop, n, roundDir, captures, html: domFile ?? source, uiDir, archetype: archetype?.archetype ?? null, record: ui?.record ?? null, shape: name, settings, drawer: o.drawer, orca: o.criticOrca ?? null });
   }
   const beauty = critique?.verdict?.beauty ?? null;
   const round = { n, dir: `round-${n}`, at: new Date().toISOString(), mode: 'component', sourceSha256: gate.sha256, grammarSource: gate.grammar.grammarSource ?? null,

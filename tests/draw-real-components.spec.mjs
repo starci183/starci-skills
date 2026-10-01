@@ -20,6 +20,7 @@ import { drawAcceptanceFindings } from '../scripts/checks/draw-acceptance.mjs';
 import { renderSourceOf } from '../scripts/checks/draw-quality.mjs';
 import { DRAW_CRITIC_MISSING, critiqueBest, finishLoop, fixturesByWidth, readLoop, runRound } from '../scripts/work/draw-loop.mjs';
 import { DEFAULT_RUBRIC } from '../scripts/work/draw-critic.mjs';
+import { fakeCriticOrca, passingVerdict } from './helpers/fake-critic-orca.mjs';
 import { resolveGrammarContext, grammarInputsOf } from '../scripts/kernel/grammar-context.mjs';
 import { withRationale } from './_draw-rationale-fixture.mjs';
 
@@ -229,9 +230,9 @@ test('a component round keeps source.tsx, fixtures and the grammar resolution, j
     return rec;
   });
   const probes = { geometry: async () => ({ findings: [] }), score: async (html, viewport) => ({ schema: 'starci/ui-proof-score@1', viewport, summary: { pass: 5, fail: 0, unmeasurable: 0 }, cases: [], spacing: [] }) };
-  const critic = async () => ({ code: 0, lastMessage: JSON.stringify({ checks: DEFAULT_RUBRIC.checks.map((c) => ({ id: c.id, pass: true, evidence: 'ok' })), beauty: 9 }) });
+  const critic = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9) });
   const base = { source, fixtures: fixturesByWidth([fixture]), product: dir, base: 'LedgerBase', state: 'installed', viewports: [{ width: 1184, height: 60 }, { width: 390, height: 60 }],
-    repo: dir, out, render, probes, criticRunner: critic, sourceCheck: async () => ({ findings: [], grammar }) };
+    repo: dir, out, render, probes, criticOrca: critic, sourceCheck: async () => ({ findings: [], grammar }) };
   const r1 = await runRound(base);
   assert.equal(r1.round.mode, 'component');
   assert.equal(r1.round.grammarSource, 'claude-dist@0.5.2');
@@ -333,13 +334,13 @@ test('a component round picks an independent critic; finish critiques an uncriti
   });
   const probes = { geometry: async () => ({ findings: [] }), score: async (html, viewport) => ({ schema: 'starci/ui-proof-score@1', viewport, summary: { pass: 5, fail: 0, unmeasurable: 0 }, cases: [], spacing: [] }) };
   const seen = [];
-  const critic = (beauty) => async ({ argv, dir: clean }) => { seen.push(argv[0]); assert.ok(fs.existsSync(path.join(clean, 'screen.html'))); return { code: 0, lastMessage: JSON.stringify({ checks: DEFAULT_RUBRIC.checks.map((c) => ({ id: c.id, pass: true, evidence: 'ok' })), beauty }) }; };
+  const critic = (beauty) => fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, beauty), onStart: (a) => { seen.push([a.agent, a.model]); assert.ok(fs.existsSync(path.join(a.worktree, 'screen.html'))); } });
   const base = { source, fixtures: fixturesByWidth([fixture]), product: dir, base: 'LedgerBase', state: 'installed', viewports: [{ width: 1184, height: 60 }, { width: 390, height: 60 }],
     repo: dir, render, probes, sourceCheck: async () => ({ findings: [], grammar }) };
 
   // Codex drawing (the draw order's fallback): the component round is judged by criticWhenDrawer.codex, never Codex.
-  const judged = await runRound({ ...base, out: path.join(dir, 'loop-a'), drawer: 'codex', criticRunner: critic(9) });
-  assert.equal(seen.at(-1), '-p', 'the claude critic argv');
+  const judged = await runRound({ ...base, out: path.join(dir, 'loop-a'), drawer: 'codex', criticOrca: critic(9) });
+  assert.deepEqual(seen.at(-1), ['claude', 'claude-opus-5-5'], 'the claude critic worker');
   assert.equal(judged.critique.critic.provider, 'claude');
   assert.equal(judged.critique.critic.drawer, 'codex');
   assert.equal(judged.stop.reason, 'passed');
@@ -349,7 +350,7 @@ test('a component round picks an independent critic; finish critiques an uncriti
   const r = await runRound({ ...base, out, critic: false });
   assert.equal(r.round.beauty, null);
   assert.equal(r.stop, null);
-  const late = await critiqueBest({ out, runner: critic(9) });
+  const late = await critiqueBest({ out, orca: critic(9) });
   assert.equal(late.ran, true);
   assert.equal(readLoop(out).rounds[0].beauty, 9);
   assert.equal(readLoop(out).rounds[0].critic.late, true);
@@ -360,12 +361,13 @@ test('a component round picks an independent critic; finish critiques an uncriti
   // A critic that cannot answer leaves no beauty: DRAW_CRITIC_MISSING with its error, never DRAW_BEAUTY_BELOW.
   const out3 = path.join(dir, 'loop-c');
   await runRound({ ...base, out: out3, critic: false });
-  const failed = await critiqueBest({ out: out3, runner: async () => ({ code: 1, lastMessage: 'rate limited' }) });
-  assert.match(failed.critique.error, /no verdict JSON/);
+  const failed = await critiqueBest({ out: out3, orca: fakeCriticOrca({ mode: 'done-no-verdict' }) });
+  assert.equal(failed.critique.outcome, 'verdict-missing');
+  assert.match(failed.critique.error, /without a verdict/);
   const done = finishLoop({ out: out3, parts: path.join(dir, 'parts-c'), force: true });
   assert.equal(done.outcome, 'blocked');
   assert.deepEqual(done.remaining.map((f) => f.code), [DRAW_CRITIC_MISSING]);
-  assert.match(done.remaining[0].detail, /no verdict JSON/);
+  assert.match(done.remaining[0].detail, /without a verdict/);
 });
 
 // The reference draw (D:/starci-tmp/draw-components, lane op-draw): passed every loop metric, then settle's
@@ -402,7 +404,7 @@ test('a component draw installed by finish passes settle draw-acceptance on ever
   const out = path.join(uiDir, 'assets', 'directions', 'draw-loop', 'LedgerBase--installed');
   await runRound({ source, fixtures: fixturesByWidth([fixture]), product: src, ui: uiDir, base: 'LedgerBase', state: 'installed', viewports: [{ width: 1184, height: 60 }, { width: 390, height: 60 }],
     repo, out, render, probes, sourceCheck: async () => ({ findings: [], grammar }),
-    criticRunner: async () => ({ code: 0, lastMessage: JSON.stringify({ checks: DEFAULT_RUBRIC.checks.map((c) => ({ id: c.id, pass: true, evidence: 'ok' })), beauty: 9 }) }) });
+    criticOrca: fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9) }) });
   const done = finishLoop({ out, parts: path.join(uiDir, 'assets', 'directions') });
   assert.equal(done.outcome, 'passed');
   assert.ok(done.assets.some((a) => a.role === 'render-asset'), 'the art placeholder travels with the source');

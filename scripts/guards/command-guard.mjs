@@ -335,7 +335,7 @@ const launchRefusal = (program, args, how) => ({ command: [program, ...args].joi
 const launchVerdict = (program, args) => {
   if (program === 'orca') {
     const words = args.filter((a) => !/^-/.test(a));
-    if (words[0] === 'terminal' && words[1] === 'create') return { code: 'RAW_TERMINAL_CREATE', ...launchRefusal(program, args, 'orca terminal create starts a raw terminal') };
+    if (words[0] === 'terminal' && words[1] === 'create') return { code: 'RAW_TERMINAL_CREATE', ...launchRefusal(program, args, 'a raw terminal create starts a terminal outside worker-start') };
     return null;
   }
   let how = null;

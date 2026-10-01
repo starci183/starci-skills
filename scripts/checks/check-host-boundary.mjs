@@ -18,6 +18,7 @@ import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
+import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {walkFiles} from './common.mjs';
 
@@ -81,6 +82,116 @@ const TERMINAL_LAUNCH=[
   [/['"`]terminal['"`]\s*,\s*['"`]create['"`]/,"a ['terminal','create'] argv"],
   [/['"`][^'"`\n]*\borca(?:\.exe)?\s+terminal\s+create\b/,'an `orca terminal create` command'],
 ];
+// (d) agent-cli-spawn: an agent never runs as a child process of a runtime script - the PreToolUse hook cannot see it
+// and Orca cannot supervise it (modules/kernel/contract-changes/draw-critic-worker-start.yaml). Read structurally with
+// the TypeScript AST: a call whose callee is bound to node:child_process (spawn, spawnSync, exec, execSync, execFile,
+// execFileSync, fork) and whose command - a literal, a const resolving to one, either branch of a conditional, or the
+// first program word of a shell string / a cmd|sh|powershell argv - names an agent CLI (or its .cmd/.exe shim).
+// Prose, comments and messages that mention `claude -p` are not calls; git, node and npm spawns pass.
+export const AGENT_CLI_SPAWN='AGENT_CLI_SPAWN';
+export const AGENT_CLIS=Object.freeze(['codex','claude','cursor-agent','devin','gemini','opencode']);
+const AGENT_SPAWN_ROOTS=['scripts','engine','modules','bin'];
+const AGENT_SPAWN_EXT=/\.(?:mjs|cjs|js|ts)$/;
+const CHILD_PROCESS=new Set(['child_process','node:child_process']);
+const SPAWN_FNS=new Set(['spawn','spawnSync','exec','execSync','execFile','execFileSync','fork']);
+const SHELLS=new Set(['cmd','sh','bash','powershell','pwsh']);
+let typescript=null;
+const ts=()=>(typescript??=createRequire(import.meta.url)('typescript'));
+/** The program a command word names: basename, lower case, without a .cmd/.exe/.bat/.ps1 shim suffix. */
+const programOf=word=>path.posix.basename(String(word??'').replace(/^["']|["']$/g,'').replaceAll('\\','/')).toLowerCase().replace(/\.(?:cmd|exe|bat|ps1)$/,'');
+const firstWord=text=>String(text??'').trim().split(/\s+/)[0]??'';
+
+/** The agent-CLI spawns in one source text: [{line, callee, program}]. Pure. */
+export function agentCliSpawns(text,file='x.mjs'){
+  if(!/child_process/.test(text))return [];
+  const t=ts();
+  const source=t.createSourceFile(file,text,t.ScriptTarget.Latest,true,/\.ts$/.test(file)?t.ScriptKind.TS:t.ScriptKind.JS);
+  const fnBinding=new Map();   // local name -> child_process function name
+  const nsBinding=new Set();   // local names bound to the module itself
+  const consts=new Map();      // const name -> [initializer]
+  const moduleOf=node=>Boolean(node&&t.isStringLiteralLike(node)&&CHILD_PROCESS.has(node.text));
+  const requireOf=node=>{
+    let n=node;
+    if(n&&t.isAwaitExpression(n))n=n.expression;
+    if(!n||!t.isCallExpression(n))return false;
+    const callee=n.expression;
+    const isRequire=t.isIdentifier(callee)&&callee.text==='require';
+    const isImport=callee.kind===t.SyntaxKind.ImportKeyword;
+    return (isRequire||isImport)&&moduleOf(n.arguments[0]);
+  };
+  const bindPattern=pattern=>{
+    for(const el of pattern.elements){
+      const imported=el.propertyName&&t.isIdentifier(el.propertyName)?el.propertyName.text:t.isIdentifier(el.name)?el.name.text:null;
+      if(imported&&SPAWN_FNS.has(imported)&&t.isIdentifier(el.name))fnBinding.set(el.name.text,imported);
+    }
+  };
+  const collect=node=>{
+    if(t.isImportDeclaration(node)&&moduleOf(node.moduleSpecifier)&&node.importClause){
+      const c=node.importClause;
+      if(c.name)nsBinding.add(c.name.text);
+      const b=c.namedBindings;
+      if(b&&t.isNamespaceImport(b))nsBinding.add(b.name.text);
+      if(b&&t.isNamedImports(b))for(const el of b.elements){
+        const imported=(el.propertyName??el.name).text;
+        if(SPAWN_FNS.has(imported))fnBinding.set(el.name.text,imported);
+      }
+    }
+    if(t.isVariableDeclaration(node)&&node.initializer){
+      if(requireOf(node.initializer)){
+        if(t.isIdentifier(node.name))nsBinding.add(node.name.text);
+        else if(t.isObjectBindingPattern(node.name))bindPattern(node.name);
+      }
+      const list=node.parent;
+      if(t.isIdentifier(node.name)&&list&&t.isVariableDeclarationList(list)&&(list.flags&t.NodeFlags.Const))
+        consts.set(node.name.text,[...(consts.get(node.name.text)??[]),node.initializer]);
+    }
+    t.forEachChild(node,collect);
+  };
+  collect(source);
+  if(!fnBinding.size&&!nsBinding.size)return [];
+  // Every string a command expression can be: literals, consts (cycle-safe), both branches of a conditional or a ||/??.
+  const valuesOf=(node,seen=new Set())=>{
+    if(!node)return [];
+    if(t.isParenthesizedExpression(node)||t.isAsExpression(node))return valuesOf(node.expression,seen);
+    if(t.isStringLiteralLike(node))return [node.text];
+    if(t.isTemplateExpression(node))return [node.head.text];
+    if(t.isConditionalExpression(node))return [...valuesOf(node.whenTrue,seen),...valuesOf(node.whenFalse,seen)];
+    if(t.isBinaryExpression(node)&&[t.SyntaxKind.BarBarToken,t.SyntaxKind.QuestionQuestionToken].includes(node.operatorToken.kind))
+      return [...valuesOf(node.left,seen),...valuesOf(node.right,seen)];
+    if(t.isIdentifier(node)&&consts.has(node.text)&&!seen.has(node.text)){
+      seen.add(node.text);
+      return consts.get(node.text).flatMap(init=>valuesOf(init,seen));
+    }
+    return [];
+  };
+  const calleeOf=call=>{
+    const e=call.expression;
+    if(t.isIdentifier(e)&&fnBinding.has(e.text))return fnBinding.get(e.text);
+    if(t.isPropertyAccessExpression(e)&&t.isIdentifier(e.expression)&&nsBinding.has(e.expression.text)&&SPAWN_FNS.has(e.name.text))return e.name.text;
+    return null;
+  };
+  const found=[];
+  const visit=node=>{
+    if(t.isCallExpression(node)){
+      const callee=calleeOf(node);
+      if(callee){
+        const [cmd,args]=node.arguments;
+        const programs=valuesOf(cmd).map(v=>programOf(firstWord(v)));
+        // A shell running the agent: cmd /c codex ..., sh -c 'claude -p', powershell -Command codex.
+        if(programs.some(p=>SHELLS.has(p))&&args&&t.isArrayLiteralExpression(args)){
+          const program=args.elements.flatMap(el=>valuesOf(el).slice(0,1)).find(w=>!/^[-/]/.test(w));
+          if(program!=null)programs.push(programOf(firstWord(program)));
+        }
+        const hit=programs.find(p=>AGENT_CLIS.includes(p));
+        if(hit)found.push({line:source.getLineAndCharacterOfPosition(node.getStart(source)).line+1,callee,program:hit});
+      }
+    }
+    t.forEachChild(node,visit);
+  };
+  visit(source);
+  return found;
+}
+
 const COMMENT_LINE=/^\s*(?:\/\/|\/?\*|#)/;
 const IMPORTS_RUNNER=/import\s*\{[^}]*\b(?:ORCA|orcaRun|orcaCall)\b[^}]*\}\s*from\s*['"][^'"]*orca\/lib\.mjs['"]/;
 
@@ -89,10 +200,10 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
   const verbs=orcaVerbs(root);
   const allow=readAllowList(root);
   const found=[];
-  const flag=(file,lineNo,rule,detail)=>{
+  const flag=(file,lineNo,rule,detail,code=null)=>{
     const key=`${rel(root,file)}:${lineNo}`;
     if(allow.has(key))return;
-    found.push({where:key,rule,detail});
+    found.push({where:key,rule,...(code?{code}:{}),detail});
   };
 
   // (a) code: one place spawns orca and one place builds its argv.
@@ -122,6 +233,14 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
     }
   }
 
+  // (d) agent-cli-spawn: no runtime script runs an agent CLI as its child process.
+  for(const dir of AGENT_SPAWN_ROOTS){
+    for(const file of walk(path.join(root,dir),f=>AGENT_SPAWN_EXT.test(f))){
+      for(const hit of agentCliSpawns(fs.readFileSync(file,'utf8'),file))
+        flag(file,hit.line,'agent-cli-spawn',`${AGENT_CLI_SPAWN}: ${hit.callee}() runs the agent CLI ${hit.program} as a child process — launch it through ${WRAPPER_DIR}/worker-start.mjs (scripts/agent/lib.mjs startAgent) and supervise it with worker-show / worker-stop / worker-release`,AGENT_CLI_SPAWN);
+    }
+  }
+
   // (b) prose: no agent is told to run orca or to read the host contract.
   for(const entry of PROSE_ROOTS){
     const target=path.join(root,entry);
@@ -148,7 +267,7 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
 }
 
 export function hostBoundaryMain(argv=[]){
-  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/host-boundary-check-help@1',help:`Usage: node scripts/checks/check-host-boundary.mjs [--root <dir>]\n\nFails when a .mjs outside ${WRAPPER_DIR}/ spawns orca or imports its runner, or when agent-facing prose (${PROSE_ROOTS.join(', ')}) tells an agent to run an orca command, to run a node path that is not a ${WRAPPER_DIR}/<verb>.mjs wrapper, or to load modules/host/orca/. ${ALLOW_FILE} lists path:line exemptions with a reason. Exit 0 is clean, 1 lists the violations.`}};
+  if(argv.includes('--help')||argv.includes('-h'))return {exitCode:0,report:{schema:'starci/host-boundary-check-help@1',help:`Usage: node scripts/checks/check-host-boundary.mjs [--root <dir>]\n\nFails when a .mjs outside ${WRAPPER_DIR}/ spawns orca or imports its runner, when runtime code (${AGENT_SPAWN_ROOTS.join(', ')}) spawns an agent CLI (${AGENT_CLIS.join(', ')}) as a child process (${AGENT_CLI_SPAWN}), or when agent-facing prose (${PROSE_ROOTS.join(', ')}) tells an agent to run an orca command, to run a node path that is not a ${WRAPPER_DIR}/<verb>.mjs wrapper, or to load modules/host/orca/. ${ALLOW_FILE} lists path:line exemptions with a reason. Exit 0 is clean, 1 lists the violations.`}};
   const rootIndex=argv.indexOf('--root');
   const root=rootIndex>=0?argv[rootIndex+1]:skillRoot;
   const result=findHostBoundaryViolations({root});

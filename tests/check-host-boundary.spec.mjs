@@ -124,6 +124,49 @@ test('the allow file exempts one path:line and records why',t=>{
   assert.deepEqual(rules(run(root).report),['CONTEXT.md:1 reads-host-contract']);
 });
 
+test('an agent CLI spawned as a child process is red, through a literal, a constant, a shim, a shell string or a cmd argv',t=>{
+  const root=fixture(t,{
+    'scripts/work/critic.mjs':[
+      "import { spawn, execSync } from 'node:child_process';",
+      "const CODEX = 'codex';",
+      "const CLAUDE = process.platform === 'win32' ? 'claude.cmd' : 'claude';",
+      "spawn(CODEX, ['exec', '-s', 'read-only']);",
+      "spawn(CLAUDE, ['-p', '--model', 'm']);",
+      "execSync('devin -p \"judge\"');",
+    ].join('\n'),
+    'engine/runner.cjs':"const cp = require('child_process');\ncp.spawnSync('cmd', ['/c', 'cursor-agent', '-p']);\n",
+    'bin/x.mjs':"import * as cp from 'node:child_process';\nconst GEMINI = 'C:/tools/gemini.exe';\ncp.execFile(GEMINI, []);\n",
+  });
+  const r=run(root);
+  assert.equal(r.status,1);
+  const hits=r.report.violations.filter(v=>v.rule==='agent-cli-spawn');
+  assert.deepEqual(hits.map(v=>v.where).sort(),['bin/x.mjs:3','engine/runner.cjs:2','scripts/work/critic.mjs:4','scripts/work/critic.mjs:5','scripts/work/critic.mjs:6']);
+  for(const v of hits)assert.equal(v.code,'AGENT_CLI_SPAWN');
+  assert.match(hits.find(v=>v.where==='scripts/work/critic.mjs:4').detail,/agent CLI codex/);
+  assert.match(hits.find(v=>v.where==='scripts/work/critic.mjs:5').detail,/agent CLI claude/);
+});
+
+test('a mention of an agent CLI is not a spawn; git, node and npm spawns pass',t=>{
+  const root=fixture(t,{
+    'scripts/work/ok.mjs':[
+      "import { spawn, spawnSync } from 'node:child_process';",
+      "// the critic used to run `claude -p` and `codex exec` here",
+      "const why = 'never run claude -p or codex exec: launch through worker-start';",
+      "const CLAUDE = 'claude';",
+      "console.error(`refused: ${CLAUDE} -p is a headless launch`);",
+      "spawnSync('git', ['status']);",
+      "spawn(process.execPath, ['scripts/x.mjs', '--agent', 'claude']);",
+      "spawnSync('npm', ['run', 'check'], { shell: true });",
+      "spawnSync('node', ['-e', 'codex']);",
+      "workerStart({ agent: 'codex', model: 'gpt-6-sol' });",
+    ].join('\n'),
+    'scripts/work/local.mjs':"const spawn = (cmd) => cmd;\nspawn('claude');\n",
+    'tests/fixture.spec.mjs':"import { spawn } from 'node:child_process';\nspawn('codex', ['exec']);\n",
+  });
+  const r=run(root);
+  assert.equal(r.status,0,JSON.stringify(r.report.violations));
+});
+
 test('this repo is clean once its allow file is applied',()=>{
   const r=spawnSync(process.execPath,[CHECK],{cwd:ROOT,encoding:'utf8',timeout:60000,windowsHide:true});
   const report=JSON.parse(r.stdout.trim());
