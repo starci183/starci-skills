@@ -143,7 +143,7 @@ Storage states. Ignored (may exist, must be gitignored): `node_modules/`, `dist/
 rounds, UAT captures: the scratchpad or the blob store, cited by `{name, sha256}`) and plaintext
 secrets (`.env*`, `.secrets/`, `*.pem`, `*.key`, `runtime/files/*`). The runtime's op worktrees live
 under `.starciwork/worktrees/<op>`, git-excluded, and are removed when their op settles
-([workflow kernel](workflow-kernel.md#op-worktrees-and-the-landing)). Anything else moves to its
+([workflow kernel](workflow-kernel.md), op worktrees). Anything else moves to its
 owner: infrastructure, compose, docker and env templates plus seeds and database init to
 `be/.starcistacks/<environment>/`; migrations to the owning capability's `persistence/`; product
 docs and workflow notes to `.starciwork` records or a side's `docs/`; code generators to the root

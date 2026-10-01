@@ -76,8 +76,9 @@ on its declared cadence; its report is `starci/housekeeping-report@1`.
 Every runtime-launched Claude seat (Kernels, the `[Supervisor]` seat, op and Supervisor workers) runs the one
 npm-global `claude.exe`, which cannot be replaced while any seat holds it (`update_apply_exe_locked`). The
 runtime therefore launches every seat with `DISABLE_AUTOUPDATER=1` (`modules/models/agents/claude.yaml`
-`launchEnv`: set in a terminal launch's shell, and asserted under `env` in the launch worktree's `.claude/settings.local.json` for
-the managed workers Orca launches, never in a user-global settings file; an owner-set value is kept). Updates are applied deliberately while no seat runs:
+`launchEnv`: every seat is an `orchestration worker-start` worker whose command Orca composes, so `scripts/agent/trust.mjs`
+asserts the key under `env` in the launch worktree's `.claude/settings.local.json` before every Claude launch, never in a
+user-global settings file; an owner-set value is kept). Updates are applied deliberately while no seat runs:
 after a reboot, or with the seats stopped, run `npm i -g @anthropic-ai/claude-code`, check `claude --version`,
 then `/start` relaunches every seat on the new binary.
 

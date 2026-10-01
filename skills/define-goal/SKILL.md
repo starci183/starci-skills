@@ -49,7 +49,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    `bias.mjs "<text>"` is the no-agent fallback for automation. Keep the JSON:
    it lands as `routing_bias` at the persist step. An empty
    `{prefer:[], avoid:[]}` is valid — persist it anyway.
-3. **Assess BEFORE drafting** — cold-scan the bound project repositories:
+3. **Assess BEFORE drafting** — cold-scan the bound app (its root, `be/` and `fe/`):
 
    ```
    node .claude/scripts/goal/assess.mjs --repo <project-repos> --json
@@ -115,6 +115,7 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
 - The op chain is derived by `route-plan.mjs` — underivable chains are shown as such,
   never guessed.
 - Do NOT start the workflow here. Starting is the `start-kernel` skill, which
-  spawns ONE long-lived `[Kernel]` agent; each op it runs is one ephemeral
-  `[Op]` terminal that `api dispatch` opens and `api settle` closes — a
-  settled job never leaves a live worker behind.
+  starts ONE long-lived `[Kernel]` worker; each op it runs is one ephemeral
+  `[Op]` worker (`orchestration worker-start`, in its own op worktree) that
+  `api dispatch` starts and `api settle` releases — a settled job never leaves
+  a live worker or worktree behind.
