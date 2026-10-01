@@ -16,7 +16,7 @@ import {checkWorkChange,classifyChange,normativeDigest,normative,readWorkTree,CH
  * test succeeded is not cleanup.
  */
 const runtime=path.resolve(import.meta.dirname,'..');
-const EXAMPLE=path.join(runtime,'examples/todo-app-backend/.starciwork');
+const EXAMPLE=path.join(runtime,'examples/todo-app/.starciwork');
 const AT='2026-01-01T00:00:00.000Z';
 const LATER='2026-02-01T00:00:00.000Z';
 /** What a proof was captured against; these stand in for the capturing kernel's own tokens. */

@@ -25,10 +25,10 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
     ...['.starcistacks/vps/infra/compose/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1','.gitignore',
       '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml',
       '.starcistacks/vps/README.md','.starcistacks/vps/infra/stack.yaml']
-      .map(name=>'examples/todo-app-backend/'+name)])assert.ok(files.has(file),file);
-  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend/')&&
+      .map(name=>'examples/todo-app/'+(name.startsWith('.starcistacks/')?'be/':'')+name)])assert.ok(files.has(file),file);
+  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app/')&&
     (/\/(runtime|generated|\.runtime)\//.test(file)||/\.(enc|agekey)$/.test(file))),false);
-  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend/')&&file.endsWith('.mjs')),false);
+  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app/')&&file.endsWith('.mjs')),false);
 });
 
 test('stacks check refuses missing or malformed evidence without echoing file contents or mutation',t=>{
@@ -51,7 +51,7 @@ test('runtime packaging excludes accidental generated example plaintext and ciph
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-package-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-package-'));fs.rmSync(directory,{recursive:true,force:true});});
   // Minimal stack-kit fixture: only the authored compose input plus planted materialized/secret files.
-  const base='examples/todo-app-backend/.starcistacks/dev/';
+  const base='examples/todo-app/be/.starcistacks/dev/';
   for(const suffix of ['infra/compose/compose.yaml','secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml']){
     const target=path.join(directory,base,suffix);fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.writeFileSync(target,'synthetic-credential-must-not-ship');

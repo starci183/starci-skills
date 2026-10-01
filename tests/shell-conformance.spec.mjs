@@ -52,7 +52,7 @@ test('work/layout-tree@1 and the ui-screen route/surface/overlay/composite field
   assert.ok(errorsAt({ ...base, route: 'photos' }, 'route').length, 'a route is a layout tree node id');
   assert.ok(errorsAt({ ...base, host: 'photos list' }, 'host').length);
   assert.deepEqual(errorsAt({ ...base, shell: { ref: 'shell', rev: 2, layouts: [{ node: CONSOLE, rev: 1 }] } }, 'shell'), []);
-  const example = readYaml('examples/todo-app-backend/.starciwork/features/task/ui/list/index.yaml');
+  const example = readYaml('examples/todo-app/.starciwork/features/task/ui/list/index.yaml');
   delete example.shell;
   ui(example);
   assert.deepEqual((ui.errors ?? []).filter((e) => /^\/(route|surface|shell|direction|routed|host)/.test(e.instancePath)), [], 'a historical ui record without the new fields still compiles');

@@ -11,7 +11,7 @@ import { validateWork } from '../scripts/checks/work-validate.mjs';
 // because live trees still carry records written before it, and ops run strict on what they write.
 
 const root = path.resolve(import.meta.dirname, '..');
-const exampleRule = fs.readFileSync(path.join(root, 'examples', 'todo-app-backend', '.starciwork', 'features', 'task', 'br', 'complete', 'once', 'index.yaml'), 'utf8');
+const exampleRule = fs.readFileSync(path.join(root, 'examples', 'todo-app', '.starciwork', 'features', 'task', 'br', 'complete', 'once', 'index.yaml'), 'utf8');
 
 function tree(t, files) {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-strict-'));

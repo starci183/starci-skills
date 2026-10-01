@@ -10,7 +10,7 @@ import {computeCritique, runCritique} from '../scripts/example/example-critique.
  * under one %TEMP% root that the file removes when its tests end (MB-16: the drive-root starci-tmp leaked).
  *
  * Each fixture's own `.starciwork` sits directly under a throwaway repo directory (`root`), mirroring the
- * real example's shape (`examples/todo-app-backend/.starciwork`) closely enough for path resolution (a
+ * real example's shape (`examples/todo-app/.starciwork`) closely enough for path resolution (a
  * fixture record's `owners`/`module` path is resolved against `root` unless a test needs a second
  * repository, in which case it declares one in workspace.yaml exactly like the real tree does).
  */

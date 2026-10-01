@@ -8,7 +8,7 @@ import {parseYaml} from '../engine/yaml.mjs';
 /**
  * One schema per Work record family, checked against the tree that is the readable statement of the shape.
  *
- * The example is the subject, not a sample: every record file under `examples/todo-app-backend/.starciwork` is
+ * The example is the subject, not a sample: every record file under `examples/todo-app/.starciwork` is
  * validated against the schema its own `schema:` key names, and a file naming a schema that does not exist
  * fails as loudly as a file the schema rejects. A spec that walked only the families it remembered would go
  * green the day somebody added a family nobody wrote a schema for, which is the one failure this file is
@@ -22,7 +22,7 @@ import {parseYaml} from '../engine/yaml.mjs';
  */
 const root = path.resolve(import.meta.dirname, '..');
 const schemaDir = path.join(root, 'modules', 'schemas');
-const workRoot = path.join(root, 'examples', 'todo-app-backend', '.starciwork');
+const workRoot = path.join(root, 'examples', 'todo-app', '.starciwork');
 
 const ajv = new Ajv2020({strict: true, allErrors: true});
 
@@ -285,10 +285,10 @@ test('evidence records what was observed, and refuses a pass that contradicts it
 test('an implementation names owners, plural, and labels a verification it did not run', () => {
   const module = () => ({
     schema: 'work/implementation@1',
-    id: 'impl.task.todo-app-backend.ownership',
+    id: 'impl.task.be.ownership',
     title: 'Ownership binding and its guard',
     state: 'done',
-    repository: 'todo-app-backend',
+    repository: 'be',
     owners: [{role: 'module', path: 'src/task/ownership'}, {role: 'route', path: 'src/app/tasks'}],
     revision: '6'.repeat(40),
     proves: ['br.task.single-owner'],
@@ -397,7 +397,7 @@ test('every family schema that carries change.rev also accepts the decisionLog a
 // block declared no such key, so every draw failed either the schema or the op. The flow map is a declared,
 // closed shape; a screen drawn before the op demanded it stays valid without one.
 test('a ui-screen carries the interaction-flow map interface.draw writes, and the map is closed', () => {
-  const screen = () => parseYaml(fs.readFileSync(path.join(root, 'examples', 'ecommerce-app-be', '.starciwork', 'features', 'identity', 'ui', 'sign-in', 'index.yaml'), 'utf8'));
+  const screen = () => parseYaml(fs.readFileSync(path.join(root, 'examples', 'ecommerce-app', '.starciwork', 'features', 'identity', 'ui', 'sign-in', 'index.yaml'), 'utf8'));
   const validate = validatorFor('work/ui-screen@1');
   assert.equal(validate(screen()), true, `a ui record without ui.flow stays valid: ${errorText(validate)}`);
   const flow = () => ({

@@ -19,7 +19,7 @@ import { DRAW_LOOP_MISSING, LOOP_SCHEMA, loopCoverageFindings } from '../scripts
  */
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SCHEMA = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'schemas', 'work-ui-screen.schema.yaml'), 'utf8'));
-const EXAMPLE = path.join(ROOT, 'examples', 'todo-app-backend', '.starciwork', 'features', 'login', 'ui', 'sign-in', 'index.yaml');
+const EXAMPLE = path.join(ROOT, 'examples', 'todo-app', '.starciwork', 'features', 'login', 'ui', 'sign-in', 'index.yaml');
 const validate = new Ajv2020({ strict: true, allErrors: true }).compile(SCHEMA);
 const errorText = () => (validate.errors ?? []).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ');
 

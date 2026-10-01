@@ -1,12 +1,15 @@
 #!/usr/bin/env node
-// check-example-architecture.mjs - the examples meet their own standard (RED14). Runs `hfs check` (the published CLI over its
-// runtime copy, the full check: slots, pins, tree, and the whole architecture machine) on every examples/<name> directory that
-// has an hfs.json, prints per example the findings by code, and fails when any example has an error-level finding.
+// check-example-architecture.mjs - the examples meet their own standard (RED14). Runs `hfs lint` (the published CLI over its
+// runtime copy, THE lint of an app: ESLint over be/ and fe/ with the two canons, which judge the architecture machine's source
+// findings, stylelint over fe/ and `hfs check`) on every examples/<name> app that has an hfs.json, prints per example the
+// findings by code (the catalog code a finding carries, else its rule) and fails when any example has a finding or a tool that
+// could not run. `hfs check` alone is not the standard: the machine's source rules (BE_FEATURE_NOT_COMPOSED, HFS_UNUSED_FILE,
+// ...) sit on the lint surface (scripts/checks/architecture/surface.mjs) and reach an app only through `hfs lint`.
 //
 //   node scripts/checks/check-example-architecture.mjs [--examples <dir>] [--only <name>]
 //
-// It is deliberately NOT part of `npm run check`: the lead wires it in when the example migrations land. Run it by hand
-// before landing an example change. It is heavy (one TypeScript program per example): run it once, never in a loop.
+// It is deliberately NOT part of `npm run check`: run it by hand, after `npm ci` in each example app, before landing an
+// example change. It is heavy (one TypeScript program per side of each example): run it once, never in a loop.
 // Exit 0: every example is clean. Exit 1: an example has findings or its check could not run. Exit 2: bad arguments.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,14 +27,21 @@ export function exampleDirs(examplesDir, only) {
     .map((e) => e.name).sort();
 }
 
-/** {name, status, errors, byCode} of one example: status is `clean`, `findings` or `unrunnable` (the CLI refused or printed no report). */
+/**
+ * {name, status, errors, byCode} of one example: status is `clean`, `findings` or `unrunnable` (the CLI refused, printed no
+ * report, or a tool of the lint could not run - a lint that did not run is never clean).
+ */
 export function checkExample(examplesDir, name, { bin = HFS_BIN } = {}) {
-  const run = spawnSync(process.execPath, [bin, 'check', '--repo', path.join(examplesDir, name), '--json'], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  const run = spawnSync(process.execPath, [bin, 'lint', '--repo', path.join(examplesDir, name), '--format', 'json'], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   let report;
   try { report = JSON.parse(run.stdout); } catch { report = null; }
-  if (!report?.counts) return { name, status: 'unrunnable', errors: 1, byCode: {}, detail: (run.stderr || run.stdout || `exit ${run.status}`).trim().split('\n')[0] };
+  if (!report?.counts || !Array.isArray(report.findings)) return { name, status: 'unrunnable', errors: 1, byCode: {}, detail: (run.stderr || run.stdout || `exit ${run.status}`).trim().split('\n')[0] };
+  if (report.errors?.length) return { name, status: 'unrunnable', errors: report.errors.length, byCode: {}, detail: String(report.errors[0]).split('\n')[0] };
   const byCode = {};
-  for (const [code, { level, count }] of Object.entries(report.counts.byCode)) if (level === 'error') byCode[code] = count;
+  for (const finding of report.findings) {
+    const code = finding.code ?? finding.rule;
+    byCode[code] = (byCode[code] ?? 0) + 1;
+  }
   return { name, status: report.counts.error === 0 ? 'clean' : 'findings', errors: report.counts.error, byCode };
 }
 
@@ -50,7 +60,8 @@ export function formatResults(results) {
   return `${lines.join('\n')}\n`;
 }
 
-export function main(argv, { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s) } = {}) {
+/** The CLI: `bin` is the hfs CLI the examples are linted with (the runtime's own by default; a spec passes a stub). */
+export function main(argv, { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s), bin = HFS_BIN } = {}) {
   let examplesDir = path.join(skillRoot, 'examples');
   let only;
   for (let i = 0; i < argv.length; i += 1) {
@@ -58,7 +69,7 @@ export function main(argv, { out = (s) => process.stdout.write(s), err = (s) => 
     else if (argv[i] === '--only' && argv[i + 1]) { only = argv[i + 1]; i += 1; }
     else { err(`unexpected argument ${argv[i]}; ${USAGE}\n`); return 2; }
   }
-  const results = checkExamples({ examplesDir, only });
+  const results = checkExamples({ examplesDir, only, bin });
   out(formatResults(results));
   return results.length && results.every((r) => r.status === 'clean') ? 0 : 1;
 }

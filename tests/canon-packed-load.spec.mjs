@@ -12,8 +12,8 @@ import { APP, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-
 
 const RUNTIME = path.resolve(import.meta.dirname, '..');
 const NEEDED = ['eslint', 'typescript', '@typescript-eslint/eslint-plugin', '@typescript-eslint/parser', 'eslint-plugin-react-hooks', 'globals'];
-/** An install that carries every peer and dependency the canons load (a front-end example installs the fullest set). */
-const DEPS = ['examples/ecommerce-app-fe', 'examples/shape-slot', 'examples/todo-app-frontend', 'packages']
+/** An install that carries every peer and dependency the canons load (an example app installs the fullest set at its root). */
+const DEPS = ['examples/ecommerce-app', 'examples/shape-slot', 'examples/todo-app', 'packages']
   .map((dir) => path.join(RUNTIME, ...dir.split('/'), 'node_modules'))
   .find((dir) => NEEDED.every((dep) => fs.existsSync(path.join(dir, ...dep.split('/'), 'package.json'))));
 const made = [];
@@ -48,7 +48,7 @@ for (const [label, dir, name, entry, file] of [
   ['be', 'eslint/be', 'eslint-canon-be', 'starciBeConfig', 'src/modules/platform/config/index.ts'],
   ['fe', 'eslint/fe', 'eslint-canon-fe', 'starciFeConfig', null],
 ]) {
-  test(`the packed ${name} loads every rule and lints a file of the ${label} side of an app`, { skip: DEPS ? false : `no local install carries ${NEEDED.join(', ')}; install an FE example to run this check` }, async () => {
+  test(`the packed ${name} loads every rule and lints a file of the ${label} side of an app`, { skip: DEPS ? false : `no local install carries ${NEEDED.join(', ')}; install an example app to run this check` }, async () => {
     const repo = gitAdd(installTypeScript(writeCleanRepo(APP)));
     made.push(repo);
     const side = path.join(repo, label);

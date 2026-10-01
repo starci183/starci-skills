@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {checkApplicationStacks} from '../scripts/checks/stacks.mjs';
 
-const source=path.resolve(import.meta.dirname,'../examples/todo-app-backend');
+const source=path.resolve(import.meta.dirname,'../examples/todo-app/be');
 
 test('portable application-stack kit is complete and statically safe in dev and vps',t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-application-kit-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));

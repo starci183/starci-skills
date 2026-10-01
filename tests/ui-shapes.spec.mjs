@@ -15,7 +15,7 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const MIGRATE = path.join(ROOT, 'scripts', 'work', 'migrate-ui-shapes.mjs');
 const validate = new Ajv2020({ strict: true, allErrors: true }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-ui-screen.schema.yaml'), 'utf8')));
 const errors = () => (validate.errors ?? []).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ');
-const example = () => parseYaml(fs.readFileSync(path.join(ROOT, 'examples/ecommerce-app-be/.starciwork/features/identity/ui/sign-in/index.yaml'), 'utf8'));
+const example = () => parseYaml(fs.readFileSync(path.join(ROOT, 'examples/ecommerce-app/.starciwork/features/identity/ui/sign-in/index.yaml'), 'utf8'));
 const sha = 'a'.repeat(64);
 const codes = (findings) => findings.map((f) => f.code);
 

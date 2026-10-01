@@ -129,8 +129,10 @@ derived from the machine's rule id lists). After changing any of those files, `k
 `knowledge/hfs/canon-pins.yaml`, `knowledge/patterns/fe/folder.yaml` or the catalog entries of those codes, run `node packages/hfs/scripts/sync-runtime.mjs`;
 `tests/hfs-cli.spec.mjs` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
 
-The examples gate `node scripts/checks/check-example-architecture.mjs` runs this CLI (full check) on every `examples/*` directory
-with an `hfs.json` and fails on any error-level finding (it is heavy: run it once, by hand).
+The examples gate `node scripts/checks/check-example-architecture.mjs` runs `hfs lint` of this CLI at the root of every `examples/*`
+app with an `hfs.json` (`examples/todo-app`, `examples/ecommerce-app`) and fails on any finding or any tool that could not run;
+`hfs check` alone would miss the machine's source rules, which the canons judge. It is heavy: run it once, by hand, after `npm ci`
+in each app.
 
 ## Serving knowledge to other packages
 

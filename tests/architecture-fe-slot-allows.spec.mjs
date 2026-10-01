@@ -10,14 +10,12 @@ const CLEAN = {
   'apps/web/src/hooks/orders/index.ts': "export { useOrders } from './useOrders';\n",
   'apps/web/src/hooks/orders/useOrders.ts': 'export const useOrders = () => 1;\n',
   'apps/web/src/hooks/orders/orders.shared.ts': 'export const key = 1;\n',
-  'apps/web/src/hooks/orders/useOrders.spec.ts': 'export {};\n',
   'apps/web/src/app/[locale]/courses/[slug]/page.tsx': 'export default () => null;\n',
   'apps/web/src/app/[locale]/courses/[slug]/default.tsx': 'export default () => null;\n',
   'apps/web/src/app/health/live/route.ts': 'export const GET = () => new Response();\n',
   'apps/web/src/components/leaves/Chip/index.tsx': 'export const Chip = () => null;\n',
   'apps/web/src/components/leaves/Chip/component.tsx': 'export const ChipView = () => null;\n',
   'apps/web/src/components/leaves/Chip/classNames.ts': 'export const chip = 1;\n',
-  'apps/web/src/components/leaves/Chip/index.spec.tsx': 'export {};\n',
   'apps/web/src/modules/components/x.ts': 'export const x = 1;\n',
 };
 const hits = report => findings(report, 'FE_SLOT_FILE_ROLE');

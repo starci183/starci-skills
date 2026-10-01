@@ -10,7 +10,7 @@ import {appDeclarationText} from './_hfs-arch-fixture.mjs';
  * A checked project is routinely one package of a repository that also ships the packages it consumes.
  * `--root` is that project, not the repository, so a `file:` dependency pointing at a sibling package
  * resolves outside `--root` while still being an ordinary, resolvable part of the same checkout - which is
- * exactly the shape `examples/todo-app-backend` and `examples/todo-app-frontend` have against
+ * exactly the shape the example apps once had against
  * `packages/shared-kit` and `packages/fe-kit`. Refusing it failed the whole architecture check closed
  * (ARCH_CONFIG_INVALID) over a monorepo layout nobody had done anything wrong in.
  *
