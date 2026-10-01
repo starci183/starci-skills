@@ -22,7 +22,7 @@ export interface IdentityAppOptions {
     readonly cache: CacheOptions
     /** The realm's password grant shoppers sign in with. */
     readonly keycloak: KeycloakOptions
-    /** The Keycloak admin API the member profiles are read from. */
+    /** The Keycloak admin API shoppers are created through. */
     readonly keycloakAdmin: KeycloakAdminOptions
     /** Where the order service answers. */
     readonly orderApi: OrderApiOptions
