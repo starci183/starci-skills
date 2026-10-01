@@ -57,6 +57,7 @@ import { runtimeProfile } from '../../engine/config.mjs';
 import { loadPrices, priceOf } from '../lib/llm-usage.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { gitResult } from '../api/git/lib.mjs';
+import { holdStage, releaseStageHold } from './launch-smoke-hold.mjs';
 
 export const SMOKE_SCHEMA = 'starci/launch-smoke@2';
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -320,7 +321,7 @@ export function markResult({ role, state, now = Date.now }) {
  * result line. The Kernel's stage first waits for the workflow worktree to be recorded and asks the dispatcher whether
  * its children may run together. {ok, role, children, entry, error?}; also written to stages/<role>.json.
  */
-export async function runStage({ role, state, orca, env = process.env, root = SKILL_ROOT, script = SCRIPT, waitMs = 60000, sleep = defaultSleep, now = Date.now }) {
+export async function runStage({ role, state, orca, env = process.env, root = SKILL_ROOT, script = SCRIPT, waitMs = 60000, holdMs = 0, sleep = defaultSleep, now = Date.now }) {
   const children = CHILDREN[role];
   const done = (receipt) => { writeJson(stageFile(state, role), receipt); return receipt; };
   if (!children) return done({ ok: false, role, error: `${role} has no child to start` });
@@ -343,7 +344,7 @@ export async function runStage({ role, state, orca, env = process.env, root = SK
     if (!concurrent) return done({ ok: false, role, entry, concurrent, error: `the dispatcher refuses ${ops.join(' and ')} together (they must run in parallel across sides)` });
   }
   const launched = await Promise.all(children.map((c) => launchRole({ role: c, state, entry, orca, root, script })));
-  markResult({ role, state, now });
+  markResult({ role, state, now }); if (role === 'kernel') await holdStage({ state, role, holdMs, sleep, now });
   const failed = children.filter((c, i) => launched[i]?.ok !== true);
   return done({ ok: failed.length === 0, role, children, entry, ...(concurrent === null ? {} : { concurrent }),
     dispatchIds: Object.fromEntries(children.map((c, i) => [c, launched[i]?.dispatchId ?? null])),
@@ -421,7 +422,7 @@ function workflowProblems(wf, spec) {
   if (!wf.listed) p.push(`the workflow worktree ${spec.name} never appeared in orca worktree list${wf.listError ? ` (${wf.listError})` : ''}`);
   if (!wf.parallel) p.push('the be op and the fe op did not run in parallel in the workflow worktree');
   for (const role of ['op', 'opFe']) if (!wf.checkpoints[role]) p.push(`${role}: no checkpoint`);
-  const first = wf.gateBases.op;
+  const first = Object.values(wf.gateBases)[0];
   if (first && first.before !== wf.baseHead) p.push(`the first op's gate base ${first.before} is not the merge-base with main ${wf.baseHead}`);
   for (const role of ['op', 'opFe']) {
     const g = wf.gateBases[role];
@@ -542,7 +543,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
         if (ROLES[role].by === 'smoke') {
           const blocked = wf.failLaunched || !agentOf(state, parent)?.dispatchId || readJson(stageFile(state, parent))?.ok === false
             || ['op', 'opFe'].some((r) => (seen[r] && settledOf(seen[r]) && !GREEN_STATUS.has(String(seen[r].status))) || (r in wf.checkpoints && !wf.checkpoints[r]));
-          if (!blocked) open += 1;
+          if (!blocked) open += 1; else if (!wf.failLaunched) releaseStageHold(state, 'kernel');
           continue;
         }
         const parentAgent = agentOf(state, parent);
@@ -552,7 +553,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
       }
       // Both green ops alive at once: they ran in parallel in the one worktree.
       if (['op', 'opFe'].every((r) => agentOf(state, r)?.dispatchId) && readJson(stageFile(state, 'kernel'))?.concurrent === true) wf.parallel = true;
-      await driveWorkflow({ wf, state, orca, seen, entry, root, script });
+      await driveWorkflow({ wf, state, orca, seen, entry, root, script }); if (wf.reset) releaseStageHold(state, 'kernel');
       if (wf.failLaunched && agentOf(state, 'opFail')?.dispatchId && !wf.reset) open += 1;
       if (!open) break;
       if (now() >= deadline) { out.error = `timed out after ${timeoutMs}ms waiting for every smoke agent to settle`; break; }
@@ -646,7 +647,7 @@ async function main(argv) {
     if (!ROLES[role]) { console.error(`usage: launch-smoke.mjs ${verb} --as <${Object.keys(ROLES).join('|')}>`); return 2; }
     const { state, error } = await resolveState({ role });
     if (!state) { console.log(JSON.stringify({ ok: false, role, error })); return 1; }
-    const r = verb === 'mark' ? markResult({ role, state }) : await runStage({ role, state, orca: await defaultClient() });
+    const r = verb === 'mark' ? markResult({ role, state }) : await runStage({ role, state, orca: await defaultClient(), holdMs: 240000 });
     console.log(JSON.stringify(r));
     return r.ok ? 0 : 1;
   }
