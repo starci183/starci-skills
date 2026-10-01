@@ -558,3 +558,18 @@ test('a release_unknown is retried once under a fresh request; a second refusal 
   assert.match(r2.paths['supervisor-worker'].problems.join(), /supervisor: not released/);
   assert.deepEqual([r2.cleanup.find((c) => c.role === 'supervisor').releaseState, r2.cleanup.find((c) => c.role === 'supervisor').releaseError], ['release_unknown', 'not verified']);
 });
+
+test('the Kernel stage holds until the driver releases it, so opFail starts under a live Kernel; the hold is bounded', async (t) => {
+  const { holdStage, releaseStageHold } = await import('../scripts/kernel/launch-smoke-hold.mjs');
+  const state = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-hold-'));
+  t.after(() => fs.rmSync(state, { recursive: true, force: true }));
+  let ticks = 0;
+  const sleep = async () => { ticks += 1; if (ticks === 3) releaseStageHold(state, 'kernel'); };
+  assert.equal(await holdStage({ state, role: 'kernel', holdMs: 60000, sleep }), true, 'released by the driver');
+  assert.equal(ticks, 3, 'it waited until the release, no longer');
+  const other = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-hold-'));
+  t.after(() => fs.rmSync(other, { recursive: true, force: true }));
+  let clock = 0;
+  assert.equal(await holdStage({ state: other, role: 'kernel', holdMs: 5000, sleep: async () => { clock += 1000; }, now: () => clock }), false, 'never released: bounded by holdMs');
+  assert.equal(await holdStage({ state: other, role: 'kernel', holdMs: 0, sleep }), false, 'holdMs 0 waits for nothing');
+});
