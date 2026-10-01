@@ -352,7 +352,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "D:/starci-lanes/<project>/<lane>/ (outside every repository)"
+    goesTo: "D:/starci-lanes/<project>/<lane>/ (outside every repository) for a lane; a runtime op worktree (.starciwork/worktrees/<op>) is git-excluded, never tracked, and removed when its op settles"
   - id: app.plaintext-env
     profiles: [app]
     path: "{.env,.env.*,.secrets/,**/*.pem,**/*.key}"
