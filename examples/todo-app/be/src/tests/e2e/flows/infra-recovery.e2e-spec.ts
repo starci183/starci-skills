@@ -2,19 +2,18 @@ import { PUBLIC_TABLES } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { TableRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import type { ExportMyDataData } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
-import { AppModule as WorkerApp } from "../../../../apps/worker/src/app.module"
 
 /**
- * Infra-down recovery. The world kills the database container mid-run (the one dependency the api /health probe checks; the
- * worker polls the same database), the spec asserts the api stays alive and answers /health with a clean 503 instead of
- * hanging or crashing, the world starts the same container back (identical port and data), and the spec asserts the api
- * recovers to 200, the persisted world is intact, and the worker recovered too: a sign-in made after the outage gets its
+ * Infra-down recovery. The world cuts the database of the primary connection mid-run (the one dependency the api /health
+ * probe checks; the worker polls the same database): every live session on it is terminated and new ones are refused. The
+ * spec asserts the api stays alive and answers /health with a clean 503 instead of hanging or crashing, the world lets the
+ * database accept connections again (same data), and the spec asserts the api recovers to 200, the persisted world is
+ * intact, and the worker recovered too: a sign-in made after the outage gets its
  * audit line appended through the outbox and the worker consumer.
  */
 describe("resilience: infra recovery", () => {
     const world = useTestWorld({
-        apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } },
+        apps: ["todo", "worker"],
         testTimeoutMs: 900_000,
     })
 
@@ -30,7 +29,7 @@ describe("resilience: infra recovery", () => {
         // Baseline: the data channel answers and the persisted world holds its migrated tables.
         expect(await tables()).toEqual(expect.arrayContaining(["sessions", "tasks", "outbox_messages", "inbox_claims"]))
 
-        await world.interruptDatabase(async () => {
+        await world.infra.postgresql.connection("primary").during(async () => {
             // The api tolerates the outage: still answering HTTP, with a declared dependency error.
             await world.waitFor("api /health answers 503", async () => (await api.get("/health")).status === 503, {
                 timeoutMs: 90_000,

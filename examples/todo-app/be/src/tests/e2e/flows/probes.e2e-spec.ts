@@ -5,7 +5,6 @@ import { PING_DATABASE } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { AliveRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import type { TasksData } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 interface HealthBody {
     status: string
@@ -22,7 +21,7 @@ const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * when a client sends it, a minted uuid when it does not.
  */
 describe("observability probes (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+    const world = useTestWorld({ apps: ["todo"] })
 
     it("health answers ok, metrics counts the own traffic of the suite, and x-request-id round-trips", async () => {
         const { api } = world.apps.todo

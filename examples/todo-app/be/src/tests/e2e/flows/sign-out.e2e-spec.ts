@@ -2,8 +2,8 @@ import { IdentityErrorCode } from "@modules/domain/identity"
 import { SESSION_COUNT_BY_TOKEN } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { CountRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import type { SignOutData, TasksData } from "@tests/fixtures/views/e2e-views.contracts"
+import { TODO_KEYCLOAK_CLIENT } from "@tests/world/todo-identity.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 /**
  * session/sign-out end to end: a session that answers calls ends by its own token through the public signOut door (the
@@ -13,7 +13,7 @@ import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
  * manager, every step of the journey itself travels /graphql.
  */
 describe("session sign-out (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+    const world = useTestWorld({ apps: ["todo"] })
 
     const sessionCount = async (token: string): Promise<number> => {
         const [row]: Array<CountRow> = await world.db.primary.query(SESSION_COUNT_BY_TOKEN, [token])
@@ -30,9 +30,9 @@ describe("session sign-out (e2e)", () => {
         expect(await sessionCount(person.sessionToken)).toBe(1)
 
         // The sign-in opened a provider session of the person through the api's client.
-        const { keycloak } = world.infra
+        const { keycloak } = world
         const liveThroughApi = async (personId: string): Promise<boolean> =>
-            (await keycloak.sessions(personId)).some((session) => session.clientIds.includes(keycloak.clientId))
+            (await keycloak.sessions(personId)).some((session) => session.clientIds.includes(TODO_KEYCLOAK_CLIENT))
         expect(await liveThroughApi(person.personId)).toBe(true)
 
         const signedOut = await api.graphql<SignOutData>("signOut", { input: { sessionToken: person.sessionToken } })
@@ -41,11 +41,14 @@ describe("session sign-out (e2e)", () => {
 
         // The identity provider ended the session too: the real Keycloak recorded a LOGOUT of the person and holds no live
         // session of the person through the api's client any more.
-        const ended = await world.waitFor("keycloak ends the session of the person", async () => {
-            const loggedOut = (await keycloak.events(person.personId)).some((event) => event.type === "LOGOUT")
-            const live = await liveThroughApi(person.personId)
-            return loggedOut && !live ? { loggedOut, live } : null
-        })
+        const ended = await world.waitUntil(
+            "keycloak ends the session of the person",
+            async () => ({
+                loggedOut: (await keycloak.events(person.personId)).some((event) => event.type === "LOGOUT"),
+                live: await liveThroughApi(person.personId),
+            }),
+            (observed) => observed.loggedOut && !observed.live,
+        )
         expect(ended).toEqual({ loggedOut: true, live: false })
 
         const refused = await person.caller.graphql<TasksData>("tasks")

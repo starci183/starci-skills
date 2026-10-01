@@ -13,7 +13,6 @@ import type {
     TasksData,
 } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 /**
  * fr.share.* as one A->Z journey over the real api: the owner invites a collaborator, who before accepting is a stranger
@@ -23,7 +22,7 @@ import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
  * The stored row at the end is read through the shared entity manager.
  */
 describe("share journey (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+    const world = useTestWorld({ apps: ["todo"] })
 
     it("invite -> accept -> collaborator sees and edits the task -> revoke -> access gone", async () => {
         const run = `e2e-share-${randomUUID()}`

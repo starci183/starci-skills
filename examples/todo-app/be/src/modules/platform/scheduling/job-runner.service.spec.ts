@@ -197,6 +197,24 @@ describe("JobRunnerService", () => {
             expect(job.run).toHaveBeenLastCalledWith(new Date("2026-05-01T10:00:01.000Z"))
         })
 
+        it("logs a tick whose lease store fails and keeps ticking", async () => {
+            jest.useFakeTimers()
+            const { runner, clock, lease, logger } = await build()
+            const failure = new Error("connection reset")
+            const job = jobOf("purge", { everyMs: 1000 })
+            runner.add(job)
+            jest.spyOn(lease, "acquire").mockRejectedValueOnce(failure)
+
+            runner.onApplicationBootstrap()
+            await jest.advanceTimersByTimeAsync(1000)
+            clock.advance(1000)
+            await jest.advanceTimersByTimeAsync(1000)
+
+            expect(logger.error).toHaveBeenCalledWith(SchedulingLogEvent.TickFailed, failure)
+            expect(job.run).toHaveBeenCalledTimes(1)
+            expect(jest.getTimerCount()).toBe(1)
+        })
+
         it("stops ticking on shutdown", async () => {
             jest.useFakeTimers()
             const { runner } = await build()

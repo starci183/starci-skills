@@ -21,9 +21,7 @@ import type {
 } from "@tests/fixtures/views/e2e-views.contracts"
 import { worldClock } from "@tests/world/kit/world-clock"
 import { useTestWorld } from "@tests/world/use-test-world"
-import type { SignedInPerson } from "@tests/world/test-world.contracts"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
-import { AppModule as WorkerApp } from "../../../../apps/worker/src/app.module"
+import type { SignedInPerson } from "@starci/test-world"
 
 const DAY_MS = 86_400_000
 const NO_OCCURRENCES: UpcomingOccurrencesAnswer = { ruleId: "", materialised: [], previewDates: [] }
@@ -81,7 +79,7 @@ const expectPostEditRow = (row: OccurrenceEntry, beforeEdit: ReadonlyArray<Occur
  * started after the end, and the ended rule must still be frozen once that run finished.
  */
 describe("recur: recurrence lifecycle (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } } })
+    const world = useTestWorld({ apps: ["todo", "worker"] })
 
     const upcomingOf = async (person: SignedInPerson, ruleId: string): Promise<UpcomingOccurrencesAnswer> => {
         const observed = await person.caller.graphql<UpcomingOccurrencesData>("upcomingOccurrences", {

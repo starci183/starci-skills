@@ -2,7 +2,6 @@ import { IdentityErrorCode } from "@modules/domain/identity"
 import { EXPIRE_SESSION } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { TasksData } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 /**
  * Session expiry end to end (the api exposes no token-refresh door, so expiry is the session terminal journey). Expiry is
@@ -11,7 +10,7 @@ import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
  * behavior under test (refuse, then recover through a fresh sign-in) travels the real /graphql door.
  */
 describe("session expiry (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+    const world = useTestWorld({ apps: ["todo"] })
 
     it("live session -> expiry passes -> SESSION_EXPIRED -> re-sign-in recovers", async () => {
         const { api } = world.apps.todo

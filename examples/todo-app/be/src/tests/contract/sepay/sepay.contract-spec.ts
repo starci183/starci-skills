@@ -1,21 +1,23 @@
 import { randomUUID } from "node:crypto"
+import { SEPAY_ERROR_UNAUTHORIZED, sepayCreateResponse, sepayTransactionPending } from "@starci/test-world/fakes"
 import { SEPAY, SepayModule, parseSepayConfig } from "@modules/integrations/sepay"
 import type { SepayClient } from "@modules/integrations/sepay"
-import { contractClient, fetchJson } from "@tests/world/contract.client"
+import { EnvSource } from "@modules/platform/config"
 import { shapeOf } from "@tests/world/payload-shape.policy"
-import { renderPayload } from "@tests/world/fakes/payload.service"
+import { useSandbox } from "@tests/world/use-test-world"
 
 /**
  * Contract of the payment gateway: the REAL SePay client against the SePay sandbox, compared with the fake the e2e world
- * serves at the network edge. It proves the client still speaks the provider (create an intent, read it back) and that the
- * payload fixtures under `world/fakes/sepay/payloads/` still have the shape of what the sandbox answers. Runs only when the
+ * serves at the network edge (the SePay fake of `@starci/test-world`). It proves the client still speaks the provider (create
+ * an intent, read it back) and that the payloads the fake answers still have the shape of what the sandbox answers. Runs only when the
  * sandbox keys are declared in the environment (`SEPAY_BASE_URL`, `SEPAY_API_KEY`, `SEPAY_WEBHOOK_SECRET` of the sandbox
  * account); otherwise skipped. No secret is read from or written to the repository.
  */
-const sandbox = contractClient<SepayClient>({
+const sandbox = useSandbox<SepayClient>({
     provider: "sepay",
     keys: ["SEPAY_BASE_URL", "SEPAY_API_KEY", "SEPAY_WEBHOOK_SECRET"],
-    module: (env, registration) => SepayModule.register({ ...registration, ...parseSepayConfig(env) }),
+    module: (values, registration) =>
+        SepayModule.register({ ...registration, ...parseSepayConfig(new EnvSource(values)) }),
     client: SEPAY,
 })
 
@@ -32,34 +34,31 @@ sandbox.describe("sepay sandbox contract", () => {
         expect(read.status).toBe("pending")
 
         // The raw bodies, not what the client parsed out of them, against the fixtures the fake serves.
-        const env = sandbox.env()
-        const headers = { accept: "application/json", authorization: `Bearer ${env.string("SEPAY_API_KEY")}` }
-        const baseUrl = env.url("SEPAY_BASE_URL")
-        const rawCreate = await fetchJson({
+        const headers = { accept: "application/json", authorization: `Bearer ${sandbox.value("SEPAY_API_KEY")}` }
+        const baseUrl = sandbox.value("SEPAY_BASE_URL").replace(/\/+$/, "")
+        const rawCreate = await sandbox.fetchJson({
             method: "POST",
             url: `${baseUrl}/userapi/transactions/qr`,
             headers,
             body: { reference: randomUUID(), amount: 10_000, currency: "VND" },
         })
         expect(rawCreate.status).toBe(200)
-        expect(shapeOf(rawCreate.body)).toEqual(
-            shapeOf(renderPayload("sepay", "create-intent-response", { id: "x", checkoutUrl: "x" })),
-        )
-        const rawRead = await fetchJson({
+        expect(shapeOf(rawCreate.body)).toEqual(shapeOf(sepayCreateResponse("x", "x")))
+        const rawRead = await sandbox.fetchJson({
             method: "GET",
             url: `${baseUrl}/userapi/transactions/details/${encodeURIComponent(created.gatewayIntentId)}`,
             headers,
         })
         expect(rawRead.status).toBe(200)
-        expect(shapeOf(rawRead.body)).toEqual(shapeOf(renderPayload("sepay", "transaction-pending", { id: "x" })))
+        expect(shapeOf(rawRead.body)).toEqual(shapeOf(sepayTransactionPending("x")))
 
         // A wrong API key is refused the way the fake refuses it.
-        const refused = await fetchJson({
+        const refused = await sandbox.fetchJson({
             method: "GET",
             url: `${baseUrl}/userapi/transactions/details/x`,
             headers: { authorization: "Bearer wrong" },
         })
         expect(refused.status).toBe(401)
-        expect(shapeOf(refused.body)).toEqual(shapeOf(renderPayload("sepay", "error-unauthorized")))
+        expect(shapeOf(refused.body)).toEqual(shapeOf(SEPAY_ERROR_UNAUTHORIZED))
     })
 })

@@ -11,7 +11,6 @@ import type {
     TasksData,
 } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 /**
  * br.task.single-owner end to end: two signed-in people on one api, and one person task stays invisible and untouchable to
@@ -20,7 +19,7 @@ import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
  * personId, untouched by the stranger refused attempts.
  */
 describe("task isolation (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+    const world = useTestWorld({ apps: ["todo"] })
 
     it("two users on one api: one user task is invisible and untouchable to the other", async () => {
         const { api } = world.apps.todo

@@ -20,8 +20,6 @@ import type {
     SignOutData,
 } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
-import { AppModule as WorkerApp } from "../../../../apps/worker/src/app.module"
 
 /** The five tracked actions of contract.audit.emitted-events, as the log records them. */
 const TRACKED_ACTIONS = ["login.signed-in", "login.signed-out", "task.created", "task.completed", "task.deleted"]
@@ -37,7 +35,7 @@ const SEALED_BLOB = /^[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+
  * every stored actor stays sealed and the hash chain the lines were appended into is recomputed link by link.
  */
 describe("export-and-log (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } } })
+    const world = useTestWorld({ apps: ["todo", "worker"] })
 
     it("tracked activity -> audit lines appended -> exportMyData returns them -> auditLog agrees", async () => {
         const { api } = world.apps.todo

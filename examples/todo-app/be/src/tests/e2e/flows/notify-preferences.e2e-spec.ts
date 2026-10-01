@@ -17,9 +17,7 @@ import type {
     UpdateNotificationPreferencesData,
 } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import type { SignedInPerson } from "@tests/world/test-world.contracts"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
-import { AppModule as WorkerApp } from "../../../../apps/worker/src/app.module"
+import type { SignedInPerson } from "@starci/test-world"
 
 const CHANNEL = "email"
 /** The mail host answers a temporary refusal: the transient class the notify retry policy knows. */
@@ -37,7 +35,7 @@ const SMTP_TRANSIENT_REFUSAL = 451
  * The digest window is at least one minute and the retry backoff is thirty seconds, so the mail wait is measured in minutes.
  */
 describe("notify preferences journey (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } } })
+    const world = useTestWorld({ apps: ["todo", "worker"] })
 
     const completeFreshTask = async (person: SignedInPerson, title: string): Promise<string> => {
         const created = await person.caller.graphql<CreateTaskData>("createTask", { input: { title } })
@@ -91,7 +89,10 @@ describe("notify preferences journey (e2e)", () => {
 
         // The mail host refuses the first send of this recipient with a temporary refusal, so the first dispatch must end
         // classified transient and back in the queue with a retry scheduled.
-        await world.fake.smtp.failNext({ status: SMTP_TRANSIENT_REFUSAL, recipient: me.personId })
+        await world.fake.smtp.failNext({
+            status: SMTP_TRANSIENT_REFUSAL,
+            match: { method: "RCPT", pathStartsWith: `TO:<${me.personId}>` },
+        })
         const retried = await world.waitFor(
             "the first dispatch classified transient and queued for retry",
             async () => {
@@ -113,7 +114,8 @@ describe("notify preferences journey (e2e)", () => {
         // attempt settles delivered.
         const mail = await world.waitFor(
             "the digest mail accepted by the mail host",
-            async () => (await world.fake.smtp.mails()).find((accepted) => accepted.to === me.personId) ?? null,
+            async () =>
+                (await world.fake.smtp.mails()).find((accepted) => accepted.envelope.to.includes(me.personId)) ?? null,
             { timeoutMs: 120_000, intervalMs: 1_000 },
         )
         expect(mail.subject).not.toBe("")

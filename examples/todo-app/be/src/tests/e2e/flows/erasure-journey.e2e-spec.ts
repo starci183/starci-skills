@@ -22,10 +22,8 @@ import type {
     ExportMyDataData,
     RequestErasureData,
 } from "@tests/fixtures/views/e2e-views.contracts"
-import type { TestCaller } from "@tests/world/test-api.client"
+import type { TestCaller } from "@starci/test-world"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
-import { AppModule as WorkerApp } from "../../../../apps/worker/src/app.module"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
@@ -41,7 +39,7 @@ const SEALED_BLOB = /^[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+
  * so a second person is only ever the control reader.
  */
 describe("erasure journey (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } } })
+    const world = useTestWorld({ apps: ["todo", "worker"] })
 
     const exportedLines = async (caller: TestCaller): Promise<ReadonlyArray<AuditLineEntry>> => {
         const observed = await caller.graphql<ExportMyDataData>("exportMyData")

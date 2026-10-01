@@ -1,10 +1,9 @@
-import { isRecord } from "@modules/platform/primitives"
 import { PAYMENT_INTENT_BY_ID, SUBSCRIPTIONS_OF_PERSON } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { PaymentIntentRow, SubscriptionRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import type { UpgradePlanData } from "@tests/fixtures/views/e2e-views.contracts"
+import { webhookAnswerOf } from "@tests/world/kit/webhook-answer"
 import { worldClock } from "@tests/world/kit/world-clock"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 const CONCURRENT_DELIVERIES = 8
 const PERIOD_MS = 30 * 86_400_000
@@ -16,7 +15,7 @@ const PERIOD_MS = 30 * 86_400_000
  * gateway fake sends to the real webhook door over HTTP; the stored rows verify the outcome.
  */
 describe("plan: concurrent payment confirmation (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+    const world = useTestWorld({ apps: ["todo"] })
 
     it("one checkout, eight simultaneous paid confirmations: exactly one applies, the subscription is active once", async () => {
         const person = await world.signedInPerson("payment-race")
@@ -39,12 +38,10 @@ describe("plan: concurrent payment confirmation (e2e)", () => {
         )
 
         // Every delivery was accepted by the door, and exactly one of them activated the subscription.
-        expect(deliveries.map((delivery) => delivery.httpStatus)).toEqual(
+        expect(deliveries.map((delivery) => delivery?.status)).toEqual(
             Array.from({ length: CONCURRENT_DELIVERIES }, () => 200),
         )
-        expect(deliveries.filter((delivery) => isRecord(delivery.body) && delivery.body.applied === true)).toHaveLength(
-            1,
-        )
+        expect(deliveries.filter((delivery) => webhookAnswerOf(delivery).applied === true)).toHaveLength(1)
 
         // The store holds one active paid subscription and one paid intent.
         const subscriptions: Array<SubscriptionRow> = await world.db.primary.query(SUBSCRIPTIONS_OF_PERSON, [

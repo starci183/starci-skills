@@ -3,8 +3,8 @@ import { IdentityErrorCode } from "@modules/domain/identity"
 import { SESSION_BY_TOKEN } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { SessionRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import type { CreateTaskData, SignInData, TasksData } from "@tests/fixtures/views/e2e-views.contracts"
+import { TODO_KEYCLOAK_CLIENT } from "@tests/world/todo-identity.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 const WRONG_PASSWORD = "definitely-not-the-password"
 
@@ -18,13 +18,13 @@ const WRONG_PASSWORD = "definitely-not-the-password"
  * through the shared entity manager.
  */
 describe("auth/sign-in", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+    const world = useTestWorld({ apps: ["todo"] })
 
     it("sign in -> use session -> refuse wrong pairs -> localized refusal -> provider silent is a declared refusal", async () => {
         const { api } = world.apps.todo
         const email = `e2e-${randomUUID()}@todo.dev`
         const password = "e2e-pass-1"
-        const personId = await world.infra.keycloak.person(email, password)
+        const personId = await world.keycloak.person(email, password)
 
         const first = await api.signIn(email, password)
         // A person is the identity provider subject (the realm's user id the password grant vouches for): stable across
@@ -33,8 +33,8 @@ describe("auth/sign-in", () => {
 
         // The real provider recorded the password grant: a LOGIN event of this person through the api's client.
         const login = await world.waitFor("keycloak records the LOGIN", async () =>
-            (await world.infra.keycloak.events(personId)).find(
-                (event) => event.type === "LOGIN" && event.clientId === world.infra.keycloak.clientId,
+            (await world.keycloak.events(personId)).find(
+                (event) => event.type === "LOGIN" && event.clientId === TODO_KEYCLOAK_CLIENT,
             ),
         )
         expect(login.userId).toBe(personId)
@@ -89,7 +89,7 @@ describe("auth/sign-in", () => {
 
         // An identity provider that goes silent runs the client into its own deadline: a declared refusal, and the door
         // recovers when it answers again.
-        world.infra.keycloak.cut()
+        await world.infra.keycloak.cut()
         try {
             const silent = await api.graphql<SignInData>("signIn", { input: { email, password } })
             expect(silent.errorCode).toBe(IdentityErrorCode.ProviderUnavailable)

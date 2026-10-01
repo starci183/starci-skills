@@ -13,7 +13,6 @@ import type {
     TasksData,
 } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 /**
  * fr.task.* as one A->Z journey over the real api: sign in, create a task, read it back out of the list, complete it,
@@ -21,7 +20,7 @@ import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
  * reads go through the shared entity manager; every step of the journey itself travels the real /graphql door.
  */
 describe("task lifecycle (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+    const world = useTestWorld({ apps: ["todo"] })
 
     it("sign-in -> create -> list -> complete -> reopen -> counts -> delete -> sign-out", async () => {
         const { api } = world.apps.todo

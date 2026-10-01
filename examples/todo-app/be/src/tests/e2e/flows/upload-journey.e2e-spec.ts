@@ -12,7 +12,6 @@ import type {
     UploadEntry,
 } from "@tests/fixtures/views/e2e-views.contracts"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 /**
  * The upload slice journey over the real api. The control plane is GraphQL (createUploadIntent, attachUpload, taskUploads,
@@ -24,7 +23,7 @@ import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
  * download. The stored rows are read through the shared entity manager.
  */
 describe("upload journey (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+    const world = useTestWorld({ apps: ["todo"] })
 
     it("intent -> presigned PUT -> attach -> list -> download -> delete", async () => {
         const { api } = world.apps.todo

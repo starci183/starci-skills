@@ -9,9 +9,9 @@ import type {
     PlanUsageData,
     UpgradePlanData,
 } from "@tests/fixtures/views/e2e-views.contracts"
+import { webhookAnswerOf } from "@tests/world/kit/webhook-answer"
 import { worldClock } from "@tests/world/kit/world-clock"
 import { useTestWorld } from "@tests/world/use-test-world"
-import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 const FREE_CAP = 20
 const DAY_MS = 86_400_000
@@ -27,7 +27,7 @@ const DAY_MS = 86_400_000
  * (the inbox claim). Nothing is seeded out-of-band: every row is written by the api.
  */
 describe("plan journey (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+    const world = useTestWorld({ apps: ["todo"] })
 
     it("free cap refuses -> upgrade checkout -> gateway confirm -> cap lifts -> downgrade freezes -> completing below the cap reopens creation", async () => {
         const run = `e2e-plan-${randomUUID()}`
@@ -95,16 +95,14 @@ describe("plan journey (e2e)", () => {
         const periodEnd = new Date(worldClock.now().getTime() + 30 * DAY_MS).toISOString()
         await world.fake.sepay.failNext({ badSignature: true })
         const unsigned = await world.fake.sepay.settle({ gatewayIntentId, status: "paid", periodEnd })
-        expect(unsigned).toMatchObject({ signature: "invalid", httpStatus: 200, body: { ignored: true } })
+        expect(unsigned?.status).toBe(200)
+        expect(webhookAnswerOf(unsigned)).toMatchObject({ ignored: true })
         expect(await subscriptionStatuses()).toEqual(["pending"])
 
         // The delivery signed with the shared secret applies the confirmation.
         const signed = await world.fake.sepay.settle({ gatewayIntentId, status: "paid", periodEnd })
-        expect(signed).toMatchObject({
-            signature: "valid",
-            httpStatus: 200,
-            body: { ignored: false, applied: true, subscriptionStatus: "active" },
-        })
+        expect(signed?.status).toBe(200)
+        expect(webhookAnswerOf(signed)).toMatchObject({ ignored: false, applied: true, subscriptionStatus: "active" })
         const paidIntent: Array<PaymentIntentRow> = await world.db.primary.query(PAYMENT_INTENT_BY_ID, [
             checkout?.paymentIntentId,
         ])
@@ -116,7 +114,8 @@ describe("plan journey (e2e)", () => {
 
         // A replay of the same delivery is ignored: the inbox claim already holds it.
         const replay = await world.fake.sepay.replayWebhook(gatewayIntentId)
-        expect(replay).toMatchObject({ signature: "valid", httpStatus: 200, body: { ignored: true } })
+        expect(replay.status).toBe(200)
+        expect(webhookAnswerOf(replay)).toMatchObject({ ignored: true })
 
         // Paid: no cap, over-cap creates succeed now.
         expect(await usageNow()).toEqual({ plan: "paid", cap: null, activeCount: FREE_CAP })

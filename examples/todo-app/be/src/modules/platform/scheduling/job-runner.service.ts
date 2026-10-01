@@ -94,6 +94,9 @@ export class JobRunnerService implements JobRegistry, OnApplicationBootstrap, On
     private async loop(): Promise<void> {
         try {
             await this.tick(this.clock.now())
+        } catch (error) {
+            // The lease store can drop the connection (a database restart): the worker keeps ticking instead of crashing.
+            this.logger.error(SchedulingLogEvent.TickFailed, error)
         } finally {
             if (!this.stopped) this.schedule()
         }
