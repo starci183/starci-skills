@@ -29,7 +29,7 @@ rules:
       A constructor parameter whose declared type is infrastructure - declared under `platform/**`, `integrations/**` or a
       package (`EntityManager`, `CommandBus`, `Cache`, `Clock`, `Logger`, SDK clients, module options) - carries an
       `Inject<Thing>()` decorator. Class injection without a decorator is allowed only for a type declared in
-      `src/modules/domain/**` (a domain service) and in the same owner. The parameter name is the camelCase of the port
+      `be/src/modules/domain/**` (a domain service) and in the same owner. The parameter name is the camelCase of the port
       (`clock`, `logger`, `cache`, `commandBus`); an EntityManager is `entityManager`, or `<conn>EntityManager` when one class
       injects two connections. The rule reads the parameter's type and where it is declared, never the variable name.
     rationale: |-
@@ -97,7 +97,7 @@ rules:
     cases:
       - id: case-1
         when: A new integration client
-        write: 'src/modules/integrations/payos/payos.decorators.ts exports PAYOS and InjectPayOS; payos.client.ts is the only file that calls the SDK.'
+        write: 'be/src/modules/integrations/payos/payos.decorators.ts exports PAYOS and InjectPayOS; payos.client.ts is the only file that calls the SDK.'
     verification:
       automated:
         - BE_RAW_INJECT

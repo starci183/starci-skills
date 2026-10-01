@@ -15,7 +15,7 @@ provenance:
     - knowledge/patterns/fe/architecture-check.yaml
     - https://www.typescriptlang.org/docs/handbook/modules/reference.html
   limitations: |
-    Static analysis resolves aliases, relative paths, literals, re-exports and packages through the repository's TypeScript
+    Static analysis resolves aliases, relative paths, literals, re-exports and packages through the app's TypeScript
     project. Verify installed Grammar exports at the public entry @starci/grammar/common.
 rules:
   - id: FE-IMPORTS-1
@@ -45,7 +45,7 @@ rules:
         write: "./component, ./classNames, ./index"
       - id: case-5
         when: "A workspace package"
-        write: 'import { StatusChip } from "@nivo/ui" through package.json exports; never reach packages/nivo-ui/src through @/ or a tsconfig path'
+        write: 'import { StatusChip } from "@nivo/ui" through package.json exports; never reach fe/packages/nivo-ui/src through @/ or a tsconfig path'
     verification:
       automated:
         - ARCH_OWNER_EXPORT_BYPASS
@@ -89,7 +89,7 @@ rules:
     cases:
       - id: case-1
         when: "Authentication owns a browser request lifecycle"
-        write: 'import { useAuthentication } from "@/hooks/authentication"; its declaration is under src/hooks/authentication/useAuthentication.ts'
+        write: 'import { useAuthentication } from "@/hooks/authentication"; its declaration is under fe/apps/<app>/src/hooks/authentication/useAuthentication.ts'
       - id: case-2
         when: "A hook reaches GraphQL"
         write: "Import the typed operation and client through @/modules/api; do not import transport from presentation."
@@ -177,7 +177,7 @@ rules:
     requirement: |
       Feature, module and package public entries use explicit named exports for their supported contract, never `export *`
       across ownership boundaries. Grammar family entries use named re-exports with the package's emitted suffix convention.
-      An export with no consumer outside its own spec is deleted.
+      An export with no consumer is deleted.
     rationale: |
       Explicit named re-exports keep the public surface auditable.
     cases:

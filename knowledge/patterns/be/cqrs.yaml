@@ -26,7 +26,7 @@ rules:
     kind: mandatory
     hfsRules: [R87, R29]
     requirement: |-
-      `src/features/<feature>/application/` holds `<action>.command.ts` or `<action>.query.ts`, `<action>.handler.ts`,
+      `be/src/features/<feature>/application/` holds `<action>.command.ts` or `<action>.query.ts`, `<action>.handler.ts`,
       `<action>.contracts.ts` and the opt-in `support/` folder of helpers local to the feature. A
       `*.use-case.ts` file, a forwarder `<op>.service.ts` and a folder named after a protocol do not exist. A read is a
       query and a write is a command; a handler never serves both.

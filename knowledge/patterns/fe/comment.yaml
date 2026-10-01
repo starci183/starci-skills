@@ -37,7 +37,7 @@ rules:
         write: '/** Messenger-like visual roles owned by the course-advisor surface. */'
       - id: case-4
         when: "A constant"
-        write: '/** Canonical state inventory shared by connected owners and presentation tests. */'
+        write: '/** Canonical state inventory shared by connected owners and their presentational twins. */'
       - id: case-5
         when: "A route"
         write: '/** The routed authentication screen. The route mounts one page and makes no drawing decision. */'
@@ -113,9 +113,6 @@ rules:
       - id: case-2
         when: "Copy decision"
         write: '// the transport case does not say the details were wrong, because nobody knows that: the request never got an answer'
-      - id: case-3
-        when: "Test stand-in"
-        write: '// jsdom implements ranges but not their geometry, so a fixed rect is the honest stand-in'
     verification:
       automated:
         - HFS_INLINE_SUPPRESSION
@@ -136,7 +133,7 @@ rules:
     cases:
       - id: case-1
         when: "A second language"
-        write: "English only in identifiers, string literals, comments and test titles (lint no-vietnamese-in-source); copy lives in the catalogs and a real localized test string lives in e2e/fixtures/i18n/"
+        write: "English only in identifiers, string literals, comments and test titles (lint no-vietnamese-in-source); copy lives in the i18n catalogs (modules/i18n/messages/<locale>.json)"
       - id: case-2
         when: "Emoji"
         write: "none (lint no-emoji-in-source)"

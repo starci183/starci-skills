@@ -25,13 +25,13 @@ rules:
     kind: mandatory
     hfsRules: [R01, R02, R29, R89]
     requirement: |-
-      Every backend repository is an `apps/<app>/` monorepo even with one app. Apps own process composition only.
-      `src/features/<feature>` owns the application layer and the transport adapters. `src/modules/<tier>/<capability>` owns
+      The back end of every app (`be/`) is a `be/apps/<app>/` monorepo even with one app. Apps own process composition only.
+      `be/src/features/<feature>` owns the application layer and the transport adapters. `be/src/modules/<tier>/<capability>` owns
       cohesive reusable capabilities where `<tier>` is exactly `domain` (business rules), `platform` (technical runtime) or
-      `integrations` (third-party provider or protocol). `src/tests/{e2e,fixtures}` holds non-unit tests and shared test data.
-      Nothing else exists at `src/` level, and no teaching, mock or sandbox code lives under `src/`. No folder named `types`,
-      `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or `exceptions` exists under `src/modules` or
-      `src/features`: types live in `<name>.contracts.ts`, constants in the file that owns them, and a helper with no owner goes
+      `integrations` (third-party provider or protocol). `be/src/tests/{e2e,fixtures}` holds non-unit tests and shared test data.
+      Nothing else exists at `be/src/` level, and no teaching, mock or sandbox code lives under `be/src/`. No folder named `types`,
+      `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or `exceptions` exists under `be/src/modules` or
+      `be/src/features`: types live in `<name>.contracts.ts`, constants in the file that owns them, and a helper with no owner goes
       to the platform capability that uses it. A feature above 250 source files is split by product capability. A module may
       have one consumer.
     rationale: |-
@@ -40,13 +40,13 @@ rules:
     cases:
       - id: case-1
         when: A new business rule with owned state
-        write: 'src/modules/domain/<capability>/ with index.ts, <capability>.module.ts, <capability>.module-definition.ts, <capability>.options.ts and colocated specs.'
+        write: 'be/src/modules/domain/<capability>/ with index.ts, <capability>.module.ts, <capability>.module-definition.ts, <capability>.options.ts and colocated specs.'
       - id: case-2
         when: A technical runtime facility such as scheduling or messaging
-        write: src/modules/platform/<capability>/ with index.ts and its port, decorators and module files.
+        write: be/src/modules/platform/<capability>/ with index.ts and its port, decorators and module files.
       - id: case-3
         when: A payment or LLM provider client
-        write: 'src/modules/integrations/<provider>/ with index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts and errors/.'
+        write: 'be/src/modules/integrations/<provider>/ with index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts and errors/.'
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
@@ -155,7 +155,7 @@ rules:
     cases:
       - id: case-1
         when: The purchase capability refuses a state change
-        write: src/modules/domain/purchase/errors/purchase.error.ts with PurchaseErrorCode, PURCHASE_ERROR_KINDS and PurchaseError.
+        write: be/src/modules/domain/purchase/errors/purchase.error.ts with PurchaseErrorCode, PURCHASE_ERROR_KINDS and PurchaseError.
     verification:
       automated:
         - BE_ERROR_HOME
@@ -179,7 +179,7 @@ rules:
     cases:
       - id: case-1
         when: The purchase capability adds a table
-        write: src/modules/domain/purchase/persistence/entities/purchase.entity.ts and an epoch-named migration beside it, and its SQL in persistence/purchase.sql.ts.
+        write: be/src/modules/domain/purchase/persistence/entities/purchase.entity.ts and an epoch-named migration beside it, and its SQL in persistence/purchase.sql.ts.
     verification:
       automated:
         - BE_SCHEMA_OWNER
@@ -194,17 +194,17 @@ rules:
     hfsRules: [R47, R48]
     requirement: |-
       Unit specs are `<name>.service.spec.ts` beside their `<name>.service.ts` and nothing else has a unit spec. Integration specs are
-      `src/tests/integration/<capability>/*.integration-spec.ts`, e2e specs `src/tests/e2e/<area>/*.e2e-spec.ts` and provider
-      contract specs `src/tests/contract/<provider>/*.contract-spec.ts`; the folder and the suffix agree. Test infrastructure
-      (containers, boot of the real apps, network-edge fakes) lives only in `src/tests/world/` and typed doubles and builders in
-      `src/tests/fixtures/`. There is no other test kind. Fixtures never import a feature and no `testing/` folder exists under
-      `src/modules`.
+      `be/src/tests/integration/<capability>/*.integration-spec.ts`, e2e specs `be/src/tests/e2e/<area>/*.e2e-spec.ts` and provider
+      contract specs `be/src/tests/contract/<provider>/*.contract-spec.ts`; the folder and the suffix agree. Test infrastructure
+      (containers, boot of the real apps, network-edge fakes) lives only in `be/src/tests/world/` and typed doubles and builders in
+      `be/src/tests/fixtures/`. There is no other test kind. Fixtures never import a feature and no `testing/` folder exists under
+      `be/src/modules`.
     rationale: |-
       Useful evidence checks invariants at their real boundary, and one placement rule keeps discovery mechanical.
     cases:
       - id: case-1
         when: A flow across GraphQL and the database
-        write: src/tests/e2e/checkout/place-order.e2e-spec.ts using useTestWorld({ apps }) from src/tests/world/ to boot the real apps.
+        write: be/src/tests/e2e/checkout/place-order.e2e-spec.ts using useTestWorld({ apps }) from be/src/tests/world/ to boot the real apps.
     verification:
       automated:
         - BE_TEST_TOPOLOGY

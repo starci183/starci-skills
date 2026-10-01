@@ -73,25 +73,25 @@ rules:
         - Confirm every refused outcome leads somewhere the user can act, such as sign-in.
     relatedExamples: []
   - id: FE-TRANSPORT-3
-    title: Wire types are generated from the contract copy
+    title: Wire types are generated from be/contracts
     kind: mandatory
     hfsRules: [R52, R23]
     requirement: |-
-      The backend commits `contracts/<app>/schema.graphql` (or `openapi.json`). The frontend keeps a byte copy at
-      `modules/api/contract/<be-app>.graphql`, refreshed by `contract:pull` and compared by hash at the land gate. `codegen`
-      writes the ignored `modules/api/__generated__/` from that copy before `build` and `typecheck`. GraphQL documents live in
-      `.graphql` files. A handwritten wire type, `as GraphqlResult<T>` and an enum typed as `string` are forbidden. The e2e
-      doubles are generated from the same schema.
+      The back end commits `be/contracts/<app>/schema.graphql` (or `openapi.json`), written by `hfs emit-contracts`
+      (`npm run contract:emit`). The front end reads it in place (`hfs.json` `sides.fe.reads: [be/contracts/]`) and keeps no
+      copy. The root `codegen` script (`scripts/codegen.mjs`) writes the ignored `modules/api/__generated__/` from it; `lint`,
+      `typecheck`, `build:fe` and the op gate run `codegen` first. GraphQL documents live in `.graphql` files. A handwritten
+      wire type, `as GraphqlResult<T>` and an enum typed as `string` are forbidden.
     rationale: |-
-      Types written by hand drift from the backend without a signal, and the copy makes the interface between repositories
-      an explicit reviewable artifact.
+      Types written by hand drift from the back end without a signal; the committed snapshot makes the interface between the
+      sides an explicit reviewable artifact in the same commit as the change that moved it.
     cases:
       - id: case-1
         when: A new read
         write: Add sales/summary.graphql, run codegen, and call the generated typed document from modules/api/sales/read-sales-summary.ts.
       - id: case-2
-        when: The backend contract changed
-        write: Run contract:pull, review the diff of the copy, then codegen; the land gate fails on a hash mismatch.
+        when: The back-end contract changed
+        write: Run npm run contract:emit, review the diff of be/contracts/, then npm run codegen; HFS_CONTRACT_SNAPSHOT_DRIFT fails a stale or missing snapshot.
     verification:
       automated:
         - FE_WIRE_GENERATED

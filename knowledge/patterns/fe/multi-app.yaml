@@ -2,8 +2,8 @@ schema: starci/knowledge-source@1
 id: fe.multi-app
 title: Frontend multiple apps
 purpose: |-
-  Given a frontend repository that serves several audiences, how are the apps separated and how does a design record
-  name the app it belongs to? Each app is independent under apps/<app>; sharing is through packages.
+  Given a front end that serves several audiences, how are the apps separated and how does a design record
+  name the app it belongs to? Each app is independent under fe/apps/<app>; sharing is through packages.
 appliesTo:
   - frontend
 family: fe
@@ -22,16 +22,16 @@ rules:
     kind: mandatory
     hfsRules: [R64, R01]
     requirement: |-
-      Each app is `apps/<app>/` with its own `package.json`, `next.config.ts`, `tsconfig.json`, `postcss.config.mjs` and
-      `src/`, declared in `hfs.json` `apps` with kind `next`. An app never imports another app. Code that two apps need is a
-      `packages/<pkg>` (see packages.yaml). Each app has its own `modules/{api,config,i18n,routes}`; a catalog shared across
+      Each app is `fe/apps/<app>/` with its own `next.config.ts`, `tsconfig.json`, `postcss.config.mjs` and `src/` (no
+      `package.json`: the app root holds the one manifest), declared in `hfs.json` `sides.fe.apps` with kind `next`. An app never imports another app. Code that two apps need is a
+      `fe/packages/<pkg>` (see packages.yaml). Each app has its own `modules/{api,config,i18n,routes}`; a catalog shared across
       apps is exported by a package, and each app still declares its own default locale in `modules/i18n`.
     rationale: |-
       Independent apps build, deploy and fail separately, and a hidden import between apps makes one deploy break another.
     cases:
       - id: case-1
         when: Two apps need the same translated legal text
-        write: Put the catalog namespace in packages/content and import it in each app's modules/i18n/request.ts.
+        write: Put the catalog namespace in fe/packages/content and import it in each app's modules/i18n/request.ts.
     verification:
       automated:
         - FE_APP_ISOLATION
@@ -50,7 +50,7 @@ rules:
     cases:
       - id: case-1
         when: A landing redesign in progress
-        write: Work on a branch of apps/landing and use a preview deployment for review.
+        write: Work on a branch of fe/apps/landing and use a preview deployment for review.
     verification:
       automated:
         - HFS_DUPLICATE_CODE
@@ -62,16 +62,16 @@ rules:
     kind: mandatory
     hfsRules: [R64]
     requirement: |-
-      Every `work/ui-screen@2` record declares `app`, a name from `hfs.json` `apps`, and its implementation records point to
-      `repository:<fe>/apps/<app>`. Drawing and implementation read the app from the record and never guess it from the
+      Every `work/ui-screen@2` record declares `app`, a name from `hfs.json` `sides.fe.apps`, and its implementation records
+      point to `fe/apps/<app>` of the app repository. Drawing and implementation read the app from the record and never guess it from the
       screen name or the route.
     rationale: |-
-      With several apps in one repository, a screen with no declared app forces the draw and implement operations to guess
+      With several apps in one front end, a screen with no declared app forces the draw and implement operations to guess
       where it belongs.
     cases:
       - id: case-1
         when: A screen of the console app
-        write: 'a ui-screen record with `app: console` whose implementation cites repository fe/apps/console.'
+        write: 'a ui-screen record with `app: console` whose implementation cites fe/apps/console.'
     verification:
       automated:
         - FE_APP_ISOLATION

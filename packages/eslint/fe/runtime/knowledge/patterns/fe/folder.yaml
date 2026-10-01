@@ -17,7 +17,7 @@ provenance:
     - packages/grammar/src/**
   limitations: |
     Folder rules place code by responsibility. They do not prove rendered behavior or accessibility. Inspect the
-    selected repository's actual source, manifests, aliases and lint and test configuration. Verify installed Grammar
+    selected app's actual source, manifests, aliases and lint configuration. Verify installed Grammar
     exports at @starci/grammar/common.
 rules:
   - id: FE-FOLDER-1
@@ -25,9 +25,9 @@ rules:
     kind: mandatory
     hfsRules: [R01, R02, R59, R64]
     requirement: |
-      Every frontend repository is an apps/<app>/ monorepo even with one app, named by its role (for example web), and
-      all product source lives under apps/<app>/src. A repository-root src/ does not exist. Each Next source root
-      (apps/<app>/src) uses app/ for framework adapters; features/{pages,layouts,overlays} for route-facing product
+      The front end of every app (`fe/`) is an fe/apps/<app>/ monorepo even with one app, named by its role (for example
+      web), and all product source lives under fe/apps/<app>/src. An fe/src/ does not exist. Each Next source root
+      (fe/apps/<app>/src) uses app/ for framework adapters; features/{pages,layouts,overlays} for route-facing product
       composition; components/{blocks,composites,branches,leaves} for product visuals; hooks/<domain> for React hooks;
       and modules/<capability> for cohesive reusable technical and domain capabilities. Every app has the modules api,
       config, i18n and routes, and one brand.css under modules/brand when it sets brand tokens. No other empty role
@@ -70,39 +70,39 @@ rules:
       instrumentation: [register, onRequestError]
       instrumentation-client: [onRouterTransitionStart]
     rationale: |
-      One fixed source root per app keeps every repository the same shape while preventing app helpers, component-local
+      One fixed source root per app keeps every front end the same shape while preventing app helpers, component-local
       hooks and feature-local transport buckets from becoming undeclared owners.
     cases:
       - id: case-1
         when: "A routed authentication scenario"
-        write: "apps/<app>/src/features/pages/AuthenticationPage/index.tsx"
+        write: "fe/apps/<app>/src/features/pages/AuthenticationPage/index.tsx"
       - id: case-2
         when: "A reusable API client, reader or session capability"
         write: >
-          apps/<app>/src/modules/api/ or apps/<app>/src/modules/session/ with one explicit public index.ts entry
+          fe/apps/<app>/src/modules/api/ or fe/apps/<app>/src/modules/session/ with one explicit public index.ts entry
       - id: case-3
         when: "A reusable product visual without scenario ownership"
-        write: "apps/<app>/src/components/{blocks,composites,branches,leaves}/<Name>/index.tsx"
+        write: "fe/apps/<app>/src/components/{blocks,composites,branches,leaves}/<Name>/index.tsx"
       - id: case-4
         when: "A React hook"
-        write: "apps/<app>/src/hooks/<domain>/useAutoScroll.ts; built-in React hook calls may remain in visuals"
+        write: "fe/apps/<app>/src/hooks/<domain>/useAutoScroll.ts; built-in React hook calls may remain in visuals"
       - id: case-5
         kind: exception
         when: "Next.js only loads the file from the source root (proxy, instrumentation, instrumentation-client, next-env.d.ts)"
         write: >
-          apps/<app>/src/proxy.ts beside apps/<app>/src/app/ as a thin adapter; locale routing logic lives in
-          apps/<app>/src/modules/i18n/ and the adapter imports it; the names the framework mandates there
+          fe/apps/<app>/src/proxy.ts beside fe/apps/<app>/src/app/ as a thin adapter; locale routing logic lives in
+          fe/apps/<app>/src/modules/i18n/ and the adapter imports it; the names the framework mandates there
           (frameworkPinnedRootExports, for example export const config = { matcher }) keep their framework spelling
       - id: case-6
-        when: "Any other file or folder directly under the source root (apps/<app>/src/i18n/request.ts, apps/<app>/src/config.ts), and a repository-root src/"
+        when: "Any other file or folder directly under the source root (fe/apps/<app>/src/i18n/request.ts, fe/apps/<app>/src/config.ts), and an fe/src/"
         write: >
-          Move it to its owner, for example apps/<app>/src/modules/i18n/request.ts, and point framework configuration
-          (apps/<app>/next.config.ts) at the new path
+          Move it to its owner, for example fe/apps/<app>/src/modules/i18n/request.ts, and point framework configuration
+          (fe/apps/<app>/next.config.ts) at the new path
       - id: case-7
         when: "The per-slot data-status recipe"
         write: >
-          apps/<app>/src/components/composites/SlotView/index.tsx, apps/<app>/src/modules/slot/index.ts (Slot, toSlot,
-          SlotLabels) and apps/<app>/src/hooks/slot/useSlotLabels.ts, one copy each (examples/shape-slot)
+          fe/apps/<app>/src/components/composites/SlotView/index.tsx, fe/apps/<app>/src/modules/slot/index.ts (Slot, toSlot,
+          SlotLabels) and fe/apps/<app>/src/hooks/slot/useSlotLabels.ts, one copy each (examples/shape-slot)
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
@@ -125,12 +125,12 @@ rules:
     requirement: |
       A split unit (a connected block, and a feature page, layout or overlay) uses index.tsx for the connected X and
       sibling component.tsx for the pure XBase, its XBaseProps and xDefaultState, plus XState when the shape is its own union
-      (a shape that is a domain status is typed with that status, never a second name for it). Only that index.tsx and the
-      unit's specs import component.tsx. Pure blocks, composites, branches and leaves use index.tsx only and never gain an
+      (a shape that is a domain status is typed with that status, never a second name for it). Only that index.tsx imports
+      component.tsx. Pure blocks, composites, branches and leaves use index.tsx only and never gain an
       empty twin. classNames.ts is present only when the unit owns class strings. Budgets: component.tsx 300 lines,
       connected index.tsx 200 lines, at most 6 data hooks and 6 useState per connected unit.
     rationale: |
-      Stable basenames make class, tests and the connected and presentational split discoverable without forwarding
+      Stable basenames make class names and the connected and presentational split discoverable without forwarding
       twins, and budgets keep a unit reviewable.
     cases:
       - id: case-1
@@ -209,7 +209,7 @@ rules:
       non-hook helpers of that domain (key builders, token readers). A file in hooks/ that is not a hook and is not the shared
       file is a finding. Server-side readers (fetch and map, no React) live in modules/api/<domain>/read-*.ts and are
       wrapped in React cache() when several blocks call them in one request. Generic client plumbing, the Outcome type,
-      the contract copy and generated wire types live in modules/api; environment reading lives in modules/config; every
+      the generated wire types (from be/contracts/, through the root codegen) live in modules/api; environment reading lives in modules/config; every
       href builder lives in modules/routes; locale routing lives in modules/i18n; colour values live in modules/brand.
       A helper name defined twice across hook files is a finding.
     rationale: |
@@ -218,19 +218,19 @@ rules:
     cases:
       - id: case-1
         when: "Authentication request lifecycle"
-        write: "apps/<app>/src/hooks/authentication/useAuthentication.ts"
+        write: "fe/apps/<app>/src/hooks/authentication/useAuthentication.ts"
       - id: case-2
         when: "A helper shared by the hooks of one domain"
-        write: "apps/<app>/src/hooks/sales/sales.shared.ts, for example useSalesAccessToken's token reader"
+        write: "fe/apps/<app>/src/hooks/sales/sales.shared.ts, for example useSalesAccessToken's token reader"
       - id: case-3
         when: "A server read used by several blocks"
-        write: "apps/<app>/src/modules/api/sales/read-sales-summary.ts, exported through modules/api/index.ts"
+        write: "fe/apps/<app>/src/modules/api/sales/read-sales-summary.ts, exported through modules/api/index.ts"
       - id: case-4
         when: "The API client"
-        write: "apps/<app>/src/modules/api/client.ts and apps/<app>/src/modules/api/outcome.ts"
+        write: "fe/apps/<app>/src/modules/api/client.ts and fe/apps/<app>/src/modules/api/outcome.ts"
       - id: case-5
         when: "Intrinsic custom helper"
-        write: "apps/<app>/src/hooks/ui/useAutoScroll.ts; direct useRef and useState calls may remain in their visual owner"
+        write: "fe/apps/<app>/src/hooks/ui/useAutoScroll.ts; direct useRef and useState calls may remain in their visual owner"
     verification:
       automated:
         - FE_HOOKS_ARE_HOOKS
@@ -247,21 +247,22 @@ rules:
     kind: mandatory
     hfsRules: [R63]
     requirement: |
-      A shared package is packages/<pkg>/ with package.json (explicit exports), src/index.ts, tsconfig.json and colocated
-      specs, built to dist. Grammar components live under packages/grammar/src/core/<tier>/<Name>/ with collocated class
-      strings and specs; family entries and built-output proof stay at the package roots. See packages.yaml for the shared
-      UI package shape.
+      A shared front-end package is fe/packages/<pkg>/ with package.json (explicit exports), src/index.ts and tsconfig.json,
+      built to dist, and no spec (the front end has no tests, FE_NO_TESTS). The design system is the runtime's own
+      `@starci/grammar` package (`.claude/packages/grammar`, installed from the npm registry): its components live under
+      packages/grammar/src/core/<tier>/<Name>/ of the runtime with collocated class strings and specs, and its family
+      entries and built-output proof stay at its package roots. See packages.yaml for the shared UI package shape.
     rationale: |
       Package layout separates primitives from app composition and keeps public entry verification against dist.
     cases:
       - id: case-1
-        when: "A Grammar component"
+        when: "A Grammar component (runtime package)"
         write: "packages/grammar/src/core/<primitive|composite|branch|composition>/<Name>/index.tsx"
       - id: case-2
-        when: "A Grammar component's class strings and spec"
+        when: "A Grammar component's class strings and spec (runtime package)"
         write: "sibling classNames.ts and index.spec.tsx"
       - id: case-3
-        when: "Built-output proof"
+        when: "Grammar built-output proof (runtime package)"
         write: "common/index.test.mjs, core/index.test.mjs, package-boundary.test.mjs (node:test against dist/)"
     verification:
       automated:
@@ -295,7 +296,7 @@ rules:
       - id: case-4
         when: "A deployment constant"
         write: >
-          Never. process.env.NEXT_PUBLIC_* is read only in apps/<app>/src/modules/config and reached through that module,
+          Never. process.env.NEXT_PUBLIC_* is read only in fe/apps/<app>/src/modules/config and reached through that module,
           with no localhost fallback; a missing value in production throws when the module loads.
     verification:
       automated:

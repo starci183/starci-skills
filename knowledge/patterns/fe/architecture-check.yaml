@@ -18,7 +18,7 @@ provenance:
     - https://www.typescriptlang.org/docs/handbook/modules/reference.html
   limitations: |-
     Static TypeScript analysis does not prove rendered behavior, accessibility, request ownership or whether a client
-    boundary is usefully split. The selected repository's manifests, tsconfig, installed TypeScript, framework
+    boundary is usefully split. The selected app's manifests, tsconfig, installed TypeScript, framework
     conventions and package exports are the resolution authority.
 rules:
   - id: FE-ARCHITECTURE-1
@@ -72,8 +72,8 @@ rules:
       barrels obey the same direction, and a cycle between owners is a finding. Every import across owners targets the owner's
       index.ts or index.tsx; there is no export *.
     rationale: |-
-      A partial responsibility graph stays valid across a single-app repository and a monorepo, and cycles prevent
-      separate testing.
+      A partial responsibility graph stays valid across a one-app front end and several apps, and cycles prevent separate
+      reasoning about each unit.
     cases:
       - id: case-1
         when: A reusable unit needs product state
@@ -114,7 +114,7 @@ rules:
         write: Put that ownership in the connected entry and hook and pass resolved props and actions to presentation.
       - id: case-2
         when: A component only owns its DOM ref, focus, disclosure, measurement or motion
-        write: Keep one client visual component unless reuse or testing reveals a meaningful separate contract.
+        write: Keep one client visual component unless reuse reveals a meaningful separate contract.
       - id: case-3
         when: A hook sends a request
         write: Call a function of modules/api, never fetch directly.
@@ -148,11 +148,11 @@ rules:
       deployed separately.
     cases:
       - id: case-1
-        when: A repository uses npm workspaces
+        when: The app root declares npm workspaces (fe/packages/*)
         write: Resolve each matched package manifest and its exports before checking cross-package imports.
       - id: case-2
         when: Two apps need the same component
-        write: Move it to packages/<family>-ui, built to dist, and import it by its declared export.
+        write: Move it to fe/packages/<family>-ui, built to dist, and import it by its declared export.
       - id: case-3
         when: Logic has one cohesive owner and one consumer
         write: Keep it with that owner; sharing never requires two consumers.
@@ -174,7 +174,7 @@ rules:
       Features/{pages,layouts,overlays} own product composition. hooks/<domain> own React lifecycle functions and map
       module results to the product-facing contract. A module owns one cohesive reusable technical or domain capability and
       exposes a declared public entry. Framework routes adapt to a feature; Grammar stays product-agnostic. Wire types
-      generated from the contract copy stay inside modules/api and are mapped before presentation or Grammar.
+      generated from be/contracts/ stay inside modules/api and are mapped before presentation or Grammar.
     rationale: |-
       Ownership stays legible with one hooks root and without a wrapper per file, and a transport revision then affects
       its mapper instead of every render contract.

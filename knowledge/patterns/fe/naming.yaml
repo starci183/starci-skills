@@ -223,7 +223,7 @@ rules:
     hfsRules: [R01, R56]
     requirement: |
       Hook files are camelCase equal to the export (`useSessionToken.ts`). Module files are kebab-case (`read-sales-summary.ts`,
-      `create-client.ts`). Spec files add `.spec` to the basename. describe uses the export under test.
+      `create-client.ts`). There are no spec files under `fe/` (FE_NO_TESTS).
     rationale: |
       The file name states what the slot check and a reader expect to find in it.
     cases:
@@ -233,9 +233,6 @@ rules:
       - id: case-2
         when: "Module file"
         write: "read-sales-summary.ts, sales-summary.mapper.ts, create-client.ts"
-      - id: case-3
-        when: "Spec file"
-        write: "useQuerySalesSummarySwr.spec.ts, component.spec.tsx, index.spec.tsx"
     verification:
       automated:
         - HFS_SLOT_UNDECLARED

@@ -34,23 +34,23 @@ rules:
     kind: mandatory
     hfsRules: [R12, R47, R48]
     requirement: |-
-      Four test kinds exist and the folder and the file suffix always agree. Unit is `<name>.service.spec.ts` beside its `<name>.service.ts` and no other file is unit-tested (BE-TEST-7, BE-TEST-8): any other `*.spec.ts` outside `src/tests/{e2e,integration,contract,world}` is a finding, including specs in apps.
-      Integration is `src/tests/integration/<capability>/*.integration-spec.ts` (one capability module on the real database, no
-      HTTP, through `useTestWorld({ modules })`). E2E is `src/tests/e2e/<area>/*.e2e-spec.ts` (through
-      `useTestWorld({ apps })`). Contract is `src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped
-      without sandbox config). `src/tests/world/` is the only test infrastructure (`global-setup.ts`, `global-teardown.ts`,
+      Four test kinds exist and the folder and the file suffix always agree. Unit is `<name>.service.spec.ts` beside its `<name>.service.ts` and no other file is unit-tested (BE-TEST-7, BE-TEST-8): any other `*.spec.ts` outside `be/src/tests/{e2e,integration,contract,world}` is a finding, including specs in apps.
+      Integration is `be/src/tests/integration/<capability>/*.integration-spec.ts` (one capability module on the real database, no
+      HTTP, through `useTestWorld({ modules })`). E2E is `be/src/tests/e2e/<area>/*.e2e-spec.ts` (through
+      `useTestWorld({ apps })`). Contract is `be/src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped
+      without sandbox config). `be/src/tests/world/` is the only test infrastructure (`global-setup.ts`, `global-teardown.ts`,
       `use-test-world.ts`, `fakes/<provider>/` network-edge fakes of external SaaS with `failNext`, `replayWebhook`, `delay`,
       and `test-world.config.ts`, the declaration of the test-world library with `stacks` and `fakedBy`); every service of the
-      repository's own stack (`.starcistacks/<env>`) runs real in the world, started or attached (warm-stack mode) by the
-      library behind toxiproxy, with images and versions read from the stack at run time; `src/tests/fixtures/` holds typed
-      doubles and builders. There is no `live/` folder and no `src/tests/e2e/world`. One root `jest.config.js` uses the
+      app's own stack (`be/.starcistacks/<env>`) runs real in the world, started or attached (warm-stack mode) by the
+      library behind toxiproxy, with images and versions read from the stack at run time; `be/src/tests/fixtures/` holds typed
+      doubles and builders. There is no `live/` folder and no `be/src/tests/e2e/world`. One `be/jest.config.js` uses the
       preset `@starci/jest-preset` and declares exactly four projects: `unit`, `integration`, `e2e` and `contract`. The unit
-      project maps no module into `src/tests/{world,integration,e2e,contract}`. Scripts are `test` (unit), `test:integration`,
+      project maps no module into `be/src/tests/{world,integration,e2e,contract}`. Scripts are `test` (unit), `test:integration`,
       `test:e2e` and `test:contract`, each of the last three `npm run typecheck:tests && jest --selectProjects <name>`;
       `test:contract` is never part of `test` or `test:e2e`. Integration, e2e and contract run by hand: none of their specs,
       code or dependencies enters husky, lint-staged, the default typecheck, coverage, or an automatic CI
-      trigger; a kept e2e workflow is `workflow_dispatch` only. `tsconfig.json` excludes `src/tests/world`,
-      `src/tests/integration`, `src/tests/e2e` and `src/tests/contract`, `src/tests/tsconfig.json` backs `typecheck:tests`,
+      trigger; a kept e2e workflow is `workflow_dispatch` only. `be/tsconfig.json` excludes `be/src/tests/world`,
+      `be/src/tests/integration`, `be/src/tests/e2e` and `be/src/tests/contract`, `be/src/tests/tsconfig.json` backs `typecheck:tests`,
       and coverage and `test:ci` read the unit project only (BE-TEST-13).
     rationale: |-
       One placement rule makes discovery mechanical, and keeping integration, e2e and contract out of the automatic gates keeps the routine
@@ -61,16 +61,16 @@ rules:
         write: 'commission.service.spec.ts beside commission.service.ts, the only unit spec kind'
       - id: case-2
         when: Integration
-        write: src/tests/integration/inbox/claim-once.integration-spec.ts calling useTestWorld({ modules }) and asserting rows through world.db
+        write: be/src/tests/integration/inbox/claim-once.integration-spec.ts calling useTestWorld({ modules }) and asserting rows through world.db
       - id: case-3
         when: E2E
-        write: src/tests/e2e/checkout/place-order.e2e-spec.ts calling useTestWorld({ apps }) with globalSetup in src/tests/world/
+        write: be/src/tests/e2e/checkout/place-order.e2e-spec.ts calling useTestWorld({ apps }) with globalSetup in be/src/tests/world/
       - id: case-4
         when: Projects
-        write: 'jest.config.js is `module.exports = require("@starci/jest-preset").starciJestConfig()`, declaring the projects unit, integration, e2e and contract, with no second jest config and no per-lane script.'
+        write: 'be/jest.config.js is `module.exports = require("@starci/jest-preset").starciJestConfig()`, declaring the projects unit, integration, e2e and contract, with no second jest config and no per-lane script.'
       - id: case-5
         when: Type checking
-        write: '`typecheck` covers app, unit specs and fixtures at pre-push and CI; `typecheck:tests` runs `tsc -p src/tests/tsconfig.json` and `test:integration`, `test:e2e` and `test:contract` depend on it, so they never run on code that does not compile.'
+        write: '`typecheck` covers app, unit specs and fixtures at pre-push and CI; `typecheck:tests` runs `tsc -p be/src/tests/tsconfig.json` and `test:integration`, `test:e2e` and `test:contract` depend on it, so they never run on code that does not compile.'
     verification:
       automated:
         - unit-test-colocated
@@ -433,7 +433,7 @@ rules:
     hfsRules: [R48]
     requirement: |-
       Do not ship call-only specs, e2e steps that only check a success flag, sleep-based waits (wait with `waitFor` deadlines),
-      guard overrides, provider or DI overrides under `src/tests`, live model calls in e2e, or branched outcomes inside one flow step. The e2e canon rules apply to `src/tests/e2e/**` through `lint`.
+      guard overrides, provider or DI overrides under `be/src/tests`, live model calls in e2e, or branched outcomes inside one flow step. The e2e canon rules apply to `be/src/tests/e2e/**` through `lint`.
     rationale: |-
       A test that cannot fail for the wrong reason is not evidence, and time-based waiting hides races.
     cases:
@@ -448,7 +448,7 @@ rules:
         write: poll for state; never sleep in a flow
       - id: case-4
         when: A provider call
-        write: only a contract spec under src/tests/contract/<provider>/ may call a provider sandbox
+        write: only a contract spec under be/src/tests/contract/<provider>/ may call a provider sandbox
       - id: case-5
         when: Branching
         write: one step proves one outcome
@@ -486,10 +486,10 @@ rules:
     hfsRules: [R32, R47, R48]
     requirement: |-
       Integration and e2e specs boot through `useTestWorld`; the unit kind has no module of its own beyond BE-TEST-2. An e2e boots
-      the real apps through `useTestWorld({ apps })` against the repository's own stack running real (Postgres, Redis, Keycloak
+      the real apps through `useTestWorld({ apps })` against the app's own stack running real (Postgres, Redis, Keycloak
       with its realm imported, a mail host, k3s through k3d with a local registry when the app drives Kubernetes; `global-setup.ts`
       attaches to a warm stack that answers and otherwise starts its own, and `global-teardown.ts` stops only what it started),
-      runs the real migrations through the `apps/migrate` runner function once in `global-setup.ts`, fakes only external SaaS the
+      runs the real migrations through the `be/apps/migrate` runner function once in `global-setup.ts`, fakes only external SaaS the
       team does not operate at the network edge (`world.fake.<provider>`), fails a real service on purpose through
       `world.infra.<service>.latency(ms)`, `.cut()` and `.restore()` (toxiproxy), overrides no provider or DI token and never a
       guard, authenticates through an identity fixture that issues real tokens, asserts persisted state and waits with `waitFor`
@@ -529,10 +529,10 @@ rules:
     hfsRules: [R11, R47]
     requirement: |-
       ts-jest runs with `diagnostics: false` in every project (`isolatedModules: true` comes from `@starci/tsconfig`); types are checked once, by `typecheck`
-      and `typecheck:tests`. The unit project collects coverage from `src/**/*.service.ts` ONLY (`src/tests`, `dist` and `coverage` excluded), with a per-file threshold of 100 for lines, branches, functions and statements. `test` runs the unit project
+      and `typecheck:tests`. The unit project collects coverage from `be/src/**/*.service.ts` ONLY (`be/src/tests`, `dist` and `coverage` excluded), with a per-file threshold of 100 for lines, branches, functions and statements. `test` runs the unit project
       with `--coverage` and fails below the threshold. The unit project overlays `isolatedModules: false` and `importHelpers: true`
-      on the repository tsconfig and the repository lists `tslib` in its devDependencies, so neither the `design:paramtypes`
-      guards TypeScript emits under isolated modules nor inlined decorator helpers add branches: counts measure only source. The managed jest config and preset render all of this; a repository
+      on `be/tsconfig.json` and the app root `package.json` lists `tslib` in its devDependencies, so neither the `design:paramtypes`
+      guards TypeScript emits under isolated modules nor inlined decorator helpers add branches: counts measure only source. The managed jest config and preset render all of this; an app
       never edits the coverage settings, and no file carries an inline coverage ignore.
     rationale: |-
       Services are the only place decisions live (BE-TEST-7), so a per-file 100 on exactly those files is a meaningful bar. A
@@ -600,7 +600,7 @@ rules:
     kind: mandatory
     hfsRules: [R98, R99, R100, R101, R89]
     requirement: |-
-      Test data is arranged by builders. A builder lives in `src/tests/fixtures/builders/<area>.builder.ts` (slot
+      Test data is arranged by builders. A builder lives in `be/src/tests/fixtures/builders/<area>.builder.ts` (slot
       `be.tests.fixtures.builders`), one file per area, shared by every spec of that area. The file name is exactly `<area>.builder.ts`;
       a `*.repository.ts`, `*.fixture.ts` or `*.factory.ts` file is a finding anywhere, and a `*.builder.ts` outside that folder is a
       finding; so is any other module of the test tree that exports a function creating persisted rows through an EntityManager (R97). Two kinds exist. (a) Pure object builders, for example `commissionRow(overrides)` and `accrueInput(overrides)`: they
@@ -609,7 +609,7 @@ rules:
       insert real rows through the entity classes, create their own parent chain, and integration and e2e specs use them to arrange
       state. Rules: (a) no spec hand-builds a long row chain or writes a raw INSERT/UPDATE/DELETE or a direct `save`, `insert`,
       `upsert`, `update`, `delete` or `remove` on an EntityManager, DataSource or QueryRunner (reading stays allowed, since a spec
-      asserts persisted state), and no spec builds the same persistence entity as an object literal twice; rows go through builders. (b) Builders, and every file under `src/tests`, run with database constraints ON: no FK disabling, no
+      asserts persisted state), and no spec builds the same persistence entity as an object literal twice; rows go through builders. (b) Builders, and every file under `be/src/tests`, run with database constraints ON: no FK disabling, no
       `session_replication_role`, no `DISABLE TRIGGER`, no deferred or dropped constraints. (c) Builders arrange data only and never
       assert: no `expect`, no jest globals. (d) Defaults are deterministic: fixed ids or `fakeIds`, fixed dates, no `Date.now()`,
       no argument-less `new Date()`, no `Math.random()`, `randomUUID()` or `crypto.random*`, unless seeded. (e) Raw SQL inside a builder is

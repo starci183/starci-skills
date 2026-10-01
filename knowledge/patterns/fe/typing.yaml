@@ -3,7 +3,7 @@ id: fe.typing
 title: Typing
 purpose: |
   Given a frontend value, contract or boundary, which type expresses it? Wire, feature and presentation contracts are
-  distinct, and wire types are generated from the contract copy.
+  distinct, and wire types are generated from be/contracts.
 appliesTo:
   - frontend
 family: fe
@@ -14,19 +14,19 @@ provenance:
     - knowledge/patterns/fe/transport.yaml
     - https://www.typescriptlang.org/tsconfig
   limitations: |
-    Static checks do not establish behavior. The compiler flags come from `@starci/tsconfig/fe.json`; a repository never
-    lowers one.
+    Static checks do not establish behavior. The compiler flags come from `@starci/tsconfig/next.json` through the managed
+    `fe/tsconfig.json`; an app never lowers one.
 rules:
   - id: FE-TYPING-1
     title: type for shapes
     kind: mandatory
     hfsRules: [R22]
     requirement: |
-      Props and data shapes use `export type`. Hook params may use `export interface`. The tsconfig extends
-      `@starci/tsconfig/fe.json` (`strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`,
+      Props and data shapes use `export type`. Hook params may use `export interface`. `fe/tsconfig.json` extends
+      `@starci/tsconfig/next.json` (`strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`,
       `allowJs: false`) and lowers no flag. Grammar uses type throughout.
     rationale: |
-      One default keeps declarations uniform, and one flag set makes every repository read the same.
+      One default keeps declarations uniform, and one flag set makes every app read the same.
     cases:
       - id: case-1
         when: "Props and data shapes"
@@ -144,7 +144,7 @@ rules:
     hfsRules: [R18, R52, R67]
     requirement: |
       Double casts, `as GraphqlResult<T>` and any cast of a response are forbidden; `@ts-ignore` and `@ts-expect-error` do
-      not exist. Specs use typed doubles, never `as unknown as`. Ignoring a props parameter uses `void props`, not an
+      not exist. Ignoring a props parameter uses `void props`, not an
       underscore or a cast.
     rationale: |
       A cast asserts what the compiler cannot verify, and a generated wire type makes it unnecessary.
@@ -152,9 +152,6 @@ rules:
       - id: case-1
         when: "A response"
         write: "use the generated wire type from modules/api; do not cast a response"
-      - id: case-2
-        when: "A spec double"
-        write: "a typed factory or vi.mocked, not as unknown as"
       - id: case-3
         when: "Ignoring a prop"
         write: "void props"
@@ -195,7 +192,7 @@ rules:
     hfsRules: [R52, R23]
     requirement: |
       Schema-derived result and variable types and typed operation documents belong to the transport boundary and are
-      generated from the contract copy by `codegen` into the ignored `__generated__/`. A feature owns framework-neutral input,
+      generated from `be/contracts/` by the root `codegen` into the ignored `__generated__/`. A feature owns framework-neutral input,
       result, failure and view models. A mapper translates wire values to that feature contract. Presentation consumes resolved
       feature and view types; Grammar consumes only product-agnostic visual contracts. A handwritten wire type does not exist.
     rationale: |

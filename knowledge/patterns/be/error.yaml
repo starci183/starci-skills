@@ -155,7 +155,7 @@ rules:
     cases:
       - id: case-1
         when: Registration
-        write: 'apps/api/src/app.module.ts provides { provide: APP_FILTER, useClass: ErrorFilter } and passes formatError to the GraphQL module options.'
+        write: 'be/apps/api/src/app.module.ts provides { provide: APP_FILTER, useClass: ErrorFilter } and passes formatError to the GraphQL module options.'
       - id: case-2
         when: An unknown error
         write: 'the filter answers { code: "INTERNAL", message: <generic text> } with status 500 and logs the original with its stack.'

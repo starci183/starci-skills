@@ -42,7 +42,7 @@ rules:
         write: '@Public({ reason: PublicReason.SignedWebhook }) async handle(@Body() body: PayosWebhookRequest): Promise<void> { if (!(await this.inbox.claim(PAYOS_SOURCE, body.eventId))) return; await this.commandBus.execute(new SettlePaymentCommand({ request: toSettleRequest(body) })) }'
       - id: case-2
         when: A consumer
-        write: 'src/features/billing/transport/message/payment-captured.consumer.ts claims (source, eventId) as its first awaited expression, then dispatches one command.'
+        write: 'be/src/features/billing/transport/message/payment-captured.consumer.ts claims (source, eventId) as its first awaited expression, then dispatches one command.'
     verification:
       automated:
         - BE_INBOX_DEDUPE_MISSING
@@ -65,7 +65,7 @@ rules:
     cases:
       - id: case-1
         when: The migration
-        write: 'src/modules/platform/inbox/persistence/migrations/1790000000000-create-inbox-claims.ts creates inbox_claims with CONSTRAINT inbox_claims_source_event_id_key UNIQUE (source, event_id).'
+        write: 'be/src/modules/platform/inbox/persistence/migrations/1790000000000-create-inbox-claims.ts creates inbox_claims with CONSTRAINT inbox_claims_source_event_id_key UNIQUE (source, event_id).'
       - id: case-2
         when: The adapter
         write: 'async claim(source, eventId) { try { await this.entityManager.insert(InboxClaimEntity, { source, eventId, claimedAt: this.clock.now() }); return true } catch (error) { if (isUniqueViolation(error)) return false; throw error } }'
