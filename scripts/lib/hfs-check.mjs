@@ -38,6 +38,8 @@
 //   HFS_EMPTY_DIR                 a directory with no file below it (git never tracks one), outside .git, node_modules and ignored slots
 //   HFS_GHOST_TREE                an empty directory beside a sibling within two edits of its name (business / bussiness)
 //   HFS_UNTRACKED_ROOT_ENTRY      an entry git neither tracks nor ignores, outside an `ignored` slot (R03)
+// A runtime repository (hfs.json kind runtime, judged with knowledge/hfs/runtime-slots.yaml) gets the per-path slot findings,
+// the required files and minimum instances and the tree findings only; scripts/hfs/runtime-check.mjs adds the runtime rules.
 // checkRepository() is the whole `hfs check`: checkRepo() plus the architecture machine (scripts/checks/architecture.mjs, one
 // implementation; the published bundle carries a byte copy), its violations and errors reported as findings under their own
 // codes; `fast` limits both to the owners changed since the merge-base. Every finding carries its code and the Vietnamese why text of modules/kernel/failure-codes.yaml. Only `error`
@@ -47,7 +49,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { ARCHITECTURE_RULE_IDS, checkArchitecture } from '../checks/architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './hfs-slots.mjs';
+import { APP_SCOPE, HFS_DECLARATION_FILE, RUNTIME_KIND, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './hfs-slots.mjs';
 import { allowsFile } from './hfs-allows.mjs';
 import { gitOutput } from '../api/git/lib.mjs';
 import { posixPath } from './path-key.mjs';
@@ -253,6 +255,8 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
     const count = instances.filter((i) => i.slot === slot).length;
     if (count < min) findings.push({ code: 'HFS_MIN_INSTANCES', level: 'error', path: resolver.slot(slot).path, slot, min, count, message: `${slot} needs at least ${min} instance${min === 1 ? '' : 's'} (${resolver.slot(slot).path}), found ${count}` });
   }
+  // The runtime repository (kind runtime) is judged here by its tree law only; its own rules run in scripts/hfs/runtime-check.mjs.
+  if (repo.kind === RUNTIME_KIND) return findings;
 
   const pins = readPins(root);
   findings.push(...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }));

@@ -1,0 +1,626 @@
+# knowledge/hfs/runtime-slots.yaml - the one place that says what may exist in the StarCi runtime repository (.claude) and
+# where. The same loader as the product manifest knowledge/hfs/slots.yaml (scripts/lib/hfs-slots.mjs, manifest `kind`
+# runtime) and the same machinery: scripts/hfs/runtime-check.mjs runs the tree check (checkRepo) with this manifest, then
+# the runtime rules of knowledge/hfs/rules.yaml (gate runtime) under scripts/hfs/runtime-rules/. Every tracked path of the
+# runtime matches exactly one slot. The slots describe the CURRENT tree and the TARGET tree of the runtime HFS design: a
+# current path the target moves is a forbidden slot whose goesTo names its successor, and its presence is a `pending` entry.
+# The `pending` block at the end is the ONLY allowlist of the runtime check and only shrinks.
+schema: starci/runtime-slots@1
+kind: runtime
+version: 1.0.0
+
+versioning:
+  patch: wording, why text, examples; no check result can change.
+  minor: add a slot (optional), add a rule, add an api system.
+  major: change or remove a slot, change the tier matrix or infraOwners, move a pinned path. Owner approval; no compatibility window.
+  retire: a moved or deleted path is recorded in modules/kernel/retired-paths.yaml (retired[] or moved[]); its slot becomes forbidden with goesTo naming the successor.
+  pins: the runtime has no pins of its own; the packages it publishes are pinned in knowledge/hfs/canon-pins.yaml.
+
+presenceValues: [required, optional, opt-in, forbidden]
+trackedValues: [tracked, ignored, external, generated]
+testValues: [unit-beside, e2e, none]
+profiles: [runtime]
+
+# Tiers and the direction matrix (owner granularity; dynamic imports count; no owner cycles). Importing inside the same
+# owner is always allowed. tests/** takes no part (tier none).
+tiers:
+  runtime:
+    entry:      {mayImport: [checks, reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base]}
+    checks:     {mayImport: [reconciler, supervisor, kernel, domain, gates, machine, hfs, api, db, base, package]}
+    reconciler: {mayImport: [supervisor, kernel, domain, gates, machine, hfs, api, db, base]}
+    supervisor: {mayImport: [kernel, domain, gates, machine, hfs, api, db, base]}
+    kernel:     {mayImport: [domain, gates, machine, hfs, api, db, base]}
+    domain:     {mayImport: [domain, gates, machine, hfs, api, db, base], acyclic: true}
+    gates:      {mayImport: [machine, hfs, api, db, base, package]}
+    machine:    {mayImport: [api, db, base]}
+    hfs:        {mayImport: [api, base, package]}
+    api:        {mayImport: [base]}
+    db:         {mayImport: [base]}
+    base:       {mayImport: [base], acyclic: true}
+    package:    {mayImport: [package]}
+crossOwner: inside a tier, a domain owner imports another owner's files directly (no index.mjs required); cycles between owners are refused (ARCH_OWNER_CYCLE).
+crossSystem: an api system never imports another api system; a domain composes two systems (RT_API_SHAPE).
+
+ruleParams:
+  runtime:
+    # HFS_SIZE_GROWTH: a runtime source file above soft may not grow against the base revision; a new file stays within soft.
+    fileLines: {soft: 500, hardGrowth: true}
+    # The runtime's production source: what the external-owner, tier, base-purity and source-name rules read.
+    sourceRoots: [bin, engine, scripts, ui/api, ui/server.mjs, ui/start.mjs]
+    # RT_EXTERNAL_OWNER: a module specifier, a global or a spawned program word -> the owners allowed to use it ([] means
+    # nowhere in runtime production code). An owner is api/<system> (the folder scripts/api/<system>/), api/* (any api
+    # system) or engine/db (the DB tier). A program word is read from the spawn's command with the TypeScript AST
+    # (scripts/lib/spawn-calls.mjs); process.execPath reads as node. Agent CLIs are AGENT_CLI_SPAWN's
+    # (scripts/checks/check-host-boundary.mjs), not listed here.
+    infraOwners:
+      modules:
+        "node:child_process": [api/*]
+        child_process: [api/*]
+        "node:http": [api/http, api/sonar, api/telegram, api/windsurf]
+        http: [api/http, api/sonar, api/telegram, api/windsurf]
+        "node:https": [api/http, api/sonar, api/telegram, api/windsurf]
+        https: [api/http, api/sonar, api/telegram, api/windsurf]
+        "node:net": [api/http]
+        net: [api/http]
+        "node:dgram": []
+        "node:sqlite": [engine/db]
+        "node:worker_threads": [api/node]
+        undici: [api/http]
+      globals:
+        fetch: [api/http, api/sonar, api/telegram, api/windsurf]
+        WebSocket: []
+      programs:
+        orca: [api/orca]
+        git: [api/git]
+        npm: [api/npm]
+        npx: [api/npm]
+        docker: [api/docker]
+        docker-compose: [api/docker]
+        sonar-scanner: [api/sonar]
+        sonar: [api/sonar]
+        sops: [api/sops]
+        cloudflared: [api/cloudflared]
+        node: [api/node]
+        powershell: [api/process]
+        pwsh: [api/process]
+        schtasks: [api/process]
+        taskkill: [api/process]
+        tasklist: [api/process]
+        wmic: [api/process]
+        ps: [api/process]
+        netstat: [api/process]
+        lsof: [api/process]
+        sh: [api/process]
+        bash: [api/process]
+        where: [api/orca, api/process]
+        cmd: [api/fs, api/process]
+    # RT_BASE_IMPURE: the base tier never writes the filesystem; it reads process.env only in these declared seams.
+    baseWriteMembers: [writeFileSync, appendFileSync, rmSync, rmdirSync, renameSync, unlinkSync, mkdirSync, copyFileSync, cpSync, symlinkSync, linkSync, truncateSync, writeFile, appendFile, rm, rmdir, rename, unlink, mkdir, copyFile, cp, symlink, link, truncate, mkdtempSync, mkdtemp, createWriteStream]
+    baseEnvSeams: [scripts/lib/sleep-sync.mjs, scripts/lib/runtime-host.mjs, engine/config.mjs, engine/runtime-root.mjs]
+    # RT_API_SHAPE: the systems that carry a calls contract; every call file of such a system is a calls id and vice versa.
+    apiContracts:
+      orca: modules/host/orca/calls.yaml
+    # RT_SOURCE_NAME: the basename stem of a runtime source file; the one-off names it may never carry; the basenames that
+    # may repeat inside a tier.
+    sourceName: "^[a-z0-9]+(-[a-z0-9]+)*$"
+    oneOffNames: ["_*", "tmp-*", "fix-*", "*-backfill", "backfill-*", "migrate-*", "*-old", "*.bak*", "repair-*"]
+    sharedBasenames: [lib.mjs, index.mjs]
+    # RT_GENERATED_DRIFT: the generated copies, declared once.
+    generated:
+      - {root: packages/hfs/runtime, generatedBy: packages/hfs/scripts/sync-runtime.mjs}
+      - {root: packages/eslint/be/runtime, generatedBy: packages/hfs/scripts/sync-runtime.mjs}
+      - {root: packages/eslint/fe/runtime, generatedBy: packages/hfs/scripts/sync-runtime.mjs}
+    # RT_PINNED_PATH_MOVED: paths persisted outside git (provider hooks, settings, the scheduled task, rendered prompts).
+    pinned:
+      - {path: bin/starci.mjs, why: the npm bin}
+      - {path: scripts/kernel/api.mjs, why: every Kernel and op prompt runs it}
+      - {path: scripts/kernel/start-workflow.mjs, why: the start-kernel skill and the bin}
+      - {path: scripts/supervisor/start-supervisor.mjs, why: the supervisor seat launch}
+      - {path: scripts/reconciler/boot.mjs, why: the StarCi-Reconciler scheduled task}
+      - {path: scripts/guards/command-guard.mjs, why: the PreToolUse hook written into every lane worktree by scripts/agent/trust.mjs}
+      - {path: scripts/guards/seat-tools.mjs, why: the .claude/settings.json hook}
+      - {path: "scripts/api/orca/<call>.mjs", why: the only Orca form agent prose may cite (scripts/checks/check-host-boundary.mjs)}
+    # The retained runtime self-checks `starci check` (bin/starci.mjs) runs after the runtime check, in this order.
+    selfChecks:
+      - {id: ops-registry, run: scripts/route/build-ops-registry.mjs, args: [--check]}
+      - {id: providers, run: scripts/checks/providers.mjs}
+      - {id: api-surface, run: scripts/checks/check-api-surface.mjs}
+      - {id: schema-catalog, run: scripts/checks/check-schema-catalog.mjs}
+      - {id: json-exceptions, run: scripts/checks/check-json-exceptions.mjs}
+      - {id: work-deep, run: scripts/checks/check-work-deep.mjs}
+      - {id: host-boundary, run: scripts/checks/check-host-boundary.mjs}
+      - {id: module-yaml, run: scripts/checks/check-module-yaml.mjs}
+      - {id: op-manifest, run: scripts/checks/check-op-manifest.mjs}
+      - {id: failure-codes, run: scripts/checks/failure-codes.mjs}
+      - {id: hfs-rules, run: scripts/checks/check-hfs-rules.mjs}
+      - {id: doc-language, run: scripts/checks/check-doc-language.mjs}
+      - {id: grammar-dist, run: scripts/checks/grammar-dist.mjs}
+      - {id: canon-pins, run: scripts/checks/check-canon-pins.mjs}
+      - {id: dead-scripts, run: scripts/checks/check-dead-scripts.mjs}
+      - {id: helper-once, run: scripts/checks/check-helper-once.mjs}
+      - {id: worktree-add, run: scripts/checks/check-worktree-add.mjs}
+      - {id: examples-ci, run: scripts/checks/examples-ci.mjs}
+      - {id: guidance-commands, run: scripts/checks/check-guidance-commands.mjs}
+
+slots:
+
+  # ----- root -----------------------------------------------------------------------------------------------
+  - id: runtime.declaration
+    profiles: [runtime]
+    path: hfs.json
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    why: '{"hfs": 1, "kind": "runtime", "project": "starci"}: the runtime is judged by this manifest'
+  - id: runtime.package-manifest
+    profiles: [runtime]
+    path: "{package.json,package-lock.json}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: runtime.root-docs
+    profiles: [runtime]
+    path: "{README.md,CHANGELOG.md,CONTRIBUTING.md,CONTEXT.md,LICENSE,THIRD_PARTY_NOTICES.md}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING]
+  - id: runtime.config-example
+    profiles: [runtime]
+    path: config.example.yaml
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: runtime.git-meta
+    profiles: [runtime]
+    path: "{.gitignore,.gitattributes}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: runtime.ci
+    profiles: [runtime]
+    path: ".github/workflows/<workflow>.yml"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: runtime.coverage-config
+    profiles: [runtime]
+    path: codecov.yml
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: runtime.agent-settings
+    profiles: [runtime]
+    path: .claude/settings.json
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [RT_PINNED_PATH_MOVED]
+  - id: runtime.local-config
+    profiles: [runtime]
+    path: "{config.yaml,config.json,settings.local.json,scheduled_tasks.lock}"
+    presence: optional
+    tracked: ignored
+    tier: none
+    tests: none
+  - id: runtime.build-output
+    profiles: [runtime]
+    path: "{**/node_modules/,**/dist/,**/coverage/,**/storybook-static/,**/reference-renders/,**/*.tsbuildinfo}"
+    presence: optional
+    tracked: ignored
+    tier: none
+    tests: none
+  - id: runtime.state-in-tree
+    profiles: [runtime]
+    path: "{runtime/,worktrees/,mcp/,.starciwork/,.secrets/,.venv/,ex-testing/,ui/.secrets/,ui/.git-starci-status-backup}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "the state root: guards under %LOCALAPPDATA%/StarCi/guards (scripts/guards/guards-root.mjs), lanes under D:/starci-lanes/<project>/<lane>, workflow worktrees owned by Orca, secrets under %LOCALAPPDATA%/StarCi/secrets"
+    rules: [HFS_FORBIDDEN_PRESENT, HFS_UNTRACKED_ROOT_ENTRY]
+  - id: runtime.agent-output
+    profiles: [runtime]
+    path: "{_*.mjs,_*.cjs,_*.py,tmp-*,**/tmp-*.mjs,*.bak*,nul,3-jobs,LEAD.md,*.log,report*.json,*.tmp.json,.experiments/}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "the agent scratchpad or D:/starci-tmp/<lane>/; a durable finding goes to benchmark/findings/<date>-<topic>.md or docs/<topic>.md"
+    rules: [HFS_FORBIDDEN_PRESENT, HFS_UNTRACKED_ROOT_ENTRY]
+
+  # ----- entry ----------------------------------------------------------------------------------------------
+  - id: runtime.cli
+    profiles: [runtime]
+    path: bin/starci.mjs
+    presence: required
+    tracked: tracked
+    tier: entry
+    tests: none
+    rules: [RT_PINNED_PATH_MOVED, RT_TIER_DIRECTION]
+  - id: runtime.ui
+    profiles: [runtime]
+    # The harness UI app: a node API server (server.mjs, start.mjs, api/**) and a Vite client (src/**), with its own package.json.
+    path: "ui/"
+    presence: required
+    tracked: tracked
+    tier: entry
+    owner: true
+    requires: [package.json, server.mjs, README.md, CONTRACT.md]
+    allows: [package.json, package-lock.json, .gitignore, README.md, CONTRACT.md, DESIGN.md, DEPLOYMENT.md, components.json, eslint.config.mjs, index.html, tsconfig.json, vite.config.ts, server.mjs, start.mjs, start.cmd, "api/**", "src/**", "public/**", "fixtures/**"]
+    forbids: [run-cloudflared.ps1]
+    tests: none
+    rules: [RT_EXTERNAL_OWNER, RT_TIER_DIRECTION]
+
+  # ----- engine ---------------------------------------------------------------------------------------------
+  - id: runtime.foundation
+    profiles: [runtime]
+    path: "engine/{runtime-root,config,yaml,plain-object,canonical-json,constants,digest,admission}.mjs"
+    presence: required
+    tracked: tracked
+    tier: base
+    tests: none
+    rules: [RT_TIER_DIRECTION, RT_BASE_IMPURE, RT_EXTERNAL_OWNER]
+  - id: runtime.foundation-data
+    profiles: [runtime]
+    path: engine/yaml-license.json
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: runtime.db
+    profiles: [runtime]
+    # The ONLY node:sqlite openers and blob-store writers. No api import: a value a store needs from git is passed in.
+    path: "engine/db/{ledger,machine,blob}.mjs"
+    presence: required
+    tracked: tracked
+    tier: db
+    tests: none
+    rules: [RT_EXTERNAL_OWNER, RT_TIER_DIRECTION]
+  - id: runtime.db-migrations
+    profiles: [runtime]
+    path: "engine/db/migrations/{runtime,machine}/<migration>.sql"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    why: "<migration> is <nnnn>-<kebab-name>; English comments only"
+  - id: runtime.engine-retired
+    profiles: [runtime]
+    path: "{engine/ledger-db.mjs,engine/machine-db.mjs,engine/migrations/}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "engine/db/ledger.mjs, engine/db/machine.mjs, engine/db/migrations/ (chunk C3)"
+
+  # ----- scripts: api (the only external-system callers) ------------------------------------------------------
+  - id: runtime.api-system
+    profiles: [runtime]
+    # One folder per external system: its lib.mjs runner and one file per call (<object>-<verb>.mjs, mirroring the
+    # external command words), each exporting exactly one call function named after the file.
+    path: "scripts/api/<system>/"
+    presence: required
+    tracked: tracked
+    tier: api
+    owner: true
+    minInstances: 1
+    requires: [lib.mjs]
+    allows: [lib.mjs, "<call>.mjs"]
+    forbids: ["*/", index.mjs]
+    tests: none
+    rules: [RT_API_SHAPE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_SOURCE_NAME]
+  - id: runtime.api-retired
+    profiles: [runtime]
+    path: "scripts/api/quota/"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "scripts/agent/quota/ (provider dispatch and viability) + scripts/api/windsurf/seat-quota.mjs (the one external call); Orca accounts through scripts/api/orca/account-list.mjs (chunk C2a)"
+
+  # ----- scripts: base, hfs, machine ----------------------------------------------------------------------------
+  - id: runtime.lib
+    profiles: [runtime]
+    path: "scripts/lib/<name>.mjs"
+    presence: required
+    tracked: tracked
+    tier: base
+    tests: none
+    rules: [RT_BASE_IMPURE, RT_EXTERNAL_OWNER, RT_TIER_DIRECTION, RT_HELPER_REDEFINED, RT_SOURCE_NAME]
+  - id: runtime.lib-retired
+    profiles: [runtime]
+    path: "scripts/lib/{hfs-*.mjs,hfs-rules/,project-graph.mjs,project-rule.mjs,git.mjs,git-index-lock.mjs,low-priority.mjs,safe-remove.mjs,rename-over.mjs,zip-archive.mjs,sops-exec-env.mjs,test-secrets.mjs,canon-digest.mjs,self-reload.mjs,artifact-store.mjs,blob-lookup.mjs,worktrees.mjs,worktree-registry.mjs,lane-owner.mjs,host-resources.mjs,ram-throttle.mjs,pool-backoff.mjs,artifact-hold.mjs,terminal-ledger.mjs,close-verify.mjs,hk-*.mjs,yaml.mjs}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "scripts/hfs/ (hfs-*, project-*: C1), scripts/api/<system>/ (git: C5; low-priority, safe-remove, rename-over, zip-archive, sops-exec-env, test-secrets, canon-digest, self-reload: C2a), engine/db/blob.mjs (artifact-store, blob-lookup: C3), scripts/machine/ (worktrees ... close-verify: C3), scripts/housekeeping/ (hk-*: C3), scripts/lib/read-yaml.mjs (yaml: C6); the exact map lands in modules/kernel/retired-paths.yaml moved[]"
+  - id: runtime.hfs
+    profiles: [runtime]
+    # The ONE standard engine: product HFS (slots, check, architecture machine) and this runtime HFS. Bundled into the
+    # published packages by sync-runtime.mjs, so it imports nothing but base, api and packages/hfs.
+    path: "scripts/hfs/"
+    presence: required
+    tracked: tracked
+    tier: hfs
+    owner: true
+    requires: [slots.mjs, check.mjs, runtime-check.mjs, sync-runtime.mjs, architecture.mjs, architecture/, rules/, runtime-rules/]
+    allows: ["<name>.mjs", "rules/<rule>.mjs", "runtime-rules/<rule>.mjs", "architecture/<check>.mjs"]
+    tests: none
+    rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
+  - id: runtime.machine
+    profiles: [runtime]
+    path: "scripts/machine/<name>.mjs"
+    presence: required
+    tracked: tracked
+    tier: machine
+    tests: none
+    why: host-wide services over machine.sqlite shared by kernel, supervisor and reconciler (decisions, home, lessons, op-metrics, worktrees, lane-owner, host-resources, ram-throttle, pool-backoff, artifact-hold, terminal-ledger, close-verify)
+    rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
+
+  # ----- scripts: kernel, supervisor, reconciler ------------------------------------------------------------------
+  - id: runtime.kernel
+    profiles: [runtime]
+    path: "scripts/kernel/"
+    presence: required
+    tracked: tracked
+    tier: kernel
+    owner: true
+    requires: [api.mjs, start-workflow.mjs, verbs/, settle/]
+    allows: ["<name>.mjs", "verbs/<verb>.mjs", "verbs/shared/<name>.mjs", "status/<view>.mjs", "settle/<name>.mjs", api-boolean-flags.txt]
+    forbids: [api-verbs/, api-lib/, api-status/]
+    tests: none
+    rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH, RT_PINNED_PATH_MOVED]
+  - id: runtime.kernel-verbs
+    profiles: [runtime]
+    # One file per modules/kernel/api-commands/<verb>.yaml (check-api-surface).
+    path: "scripts/kernel/verbs/<verb>.mjs"
+    presence: required
+    tracked: tracked
+    tier: inherit
+    tests: none
+    requires: ["/modules/kernel/api-commands/<verb>.yaml"]
+    rules: [RT_TIER_DIRECTION]
+  - id: runtime.supervisor
+    profiles: [runtime]
+    path: "scripts/supervisor/<name>.mjs"
+    presence: required
+    tracked: tracked
+    tier: supervisor
+    tests: none
+    rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH, RT_PINNED_PATH_MOVED]
+  - id: runtime.reconciler
+    profiles: [runtime]
+    path: "scripts/reconciler/"
+    presence: required
+    tracked: tracked
+    tier: reconciler
+    owner: true
+    requires: [boot.mjs, start.mjs, engine.mjs, controllers/]
+    allows: ["<name>.mjs", "controllers/<controller>.mjs"]
+    tests: none
+    rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, RT_PINNED_PATH_MOVED]
+  - id: runtime.reconcile-retired
+    profiles: [runtime]
+    path: "scripts/reconcile/"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "scripts/kernel/settle/ (job-settle, check-verdict, canon-parity: chunk C3)"
+
+  # ----- scripts: domain owners -------------------------------------------------------------------------------
+  - id: runtime.domain
+    profiles: [runtime]
+    # One capability per folder; owners import each other without cycles.
+    path: "scripts/{agent,route,goal,context,connectors,guards,uat,example,install,housekeeping,work}/"
+    presence: required
+    tracked: tracked
+    tier: domain
+    owner: true
+    allows: ["<name>.mjs", "<part>/<name>.mjs"]
+    tests: none
+    rules: [RT_TIER_DIRECTION, ARCH_OWNER_CYCLE, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH]
+  - id: runtime.migrate-retired
+    profiles: [runtime]
+    path: "scripts/migrate/"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "nowhere: no migration or backfill (owner ruling, clean slate); schema changes are engine/db/migrations/<store>/<nnnn>-<name>.sql"
+
+  # ----- scripts: gates and runtime self-checks ---------------------------------------------------------------
+  - id: runtime.gates
+    profiles: [runtime]
+    # Product op/land gates and proof producers (schema starci/<gate>@N).
+    path: "scripts/gates/<gate>.mjs"
+    presence: required
+    tracked: tracked
+    tier: gates
+    tests: none
+    rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME, HFS_SIZE_GROWTH]
+  - id: runtime.checks
+    profiles: [runtime]
+    # Runtime self-checks only: each judges the runtime tree with catalogued codes; run by `starci check`.
+    path: "scripts/checks/check-<topic>.mjs"
+    presence: required
+    tracked: tracked
+    tier: checks
+    tests: none
+    rules: [RT_TIER_DIRECTION, RT_EXTERNAL_OWNER, RT_SOURCE_NAME]
+  - id: runtime.checks-retired
+    profiles: [runtime]
+    path: "scripts/checks/{architecture.mjs,architecture/,typescript-programs.mjs,common.mjs,gate.mjs,read-digest.mjs,proof.mjs,unit-run.mjs,test-world-run.mjs,release-proof.mjs,release-app-installs.mjs,acceptance.mjs,stacks.mjs,sonar-gate.mjs,sonar-local.mjs,canon-scan.mjs,repo-presentation.mjs,package-clean-test.mjs,output.mjs,probe-reference-conventions.mjs,draw-*.mjs,brand*.mjs,grammar-*.mjs,render.mjs,shell-conformance.mjs,ui-*.mjs,work-*.mjs,ledger-*.mjs,owner-claims-audit.mjs,providers.mjs,failure-codes.mjs,examples-ci.mjs,check-db-openers.mjs,check-starcistacks.mjs,check-hfs-sync.mjs,check-work-artifacts.mjs,check-work-citations.mjs,check-work-consistency.mjs,check-work-deep.mjs,check-work-schemas.mjs,check-work-surfaces.mjs,check-evidence-binding.mjs,host-boundary.allow,failure-codes.not-codes,spec/}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "scripts/hfs/ (architecture machine, typescript-programs: C1), scripts/lib/{is-main,walk}.mjs (common: C1), scripts/gates/ (gates and proofs: C4), scripts/work/{draw,brand,ui,validate}/ (Work judges and validators: C4), scripts/housekeeping/ (ledger tools: C4), scripts/checks/check-{providers,failure-codes,examples-ci,grammar-dist}.mjs (renamed self-checks: C4); check-db-openers is superseded by RT_EXTERNAL_OWNER (C3); allow files fold into pending (C4)"
+
+  # ----- contracts, knowledge, docs, skills ---------------------------------------------------------------------
+  - id: runtime.contracts
+    profiles: [runtime]
+    path: "modules/{kernel,goal,ops,host,models,reconciler,schemas,supervisor}/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [RT_CITED_PATH_MISSING]
+  - id: runtime.contract-history
+    profiles: [runtime]
+    # Append-only history; may cite retired and moved paths (modules/kernel/retired-paths.yaml).
+    path: "modules/kernel/contract-changes/<change>.yaml"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: runtime.host-contract
+    profiles: [runtime]
+    path: "modules/host/<system>/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    allows: ["<name>.yaml"]
+    rules: [RT_API_SHAPE]
+  - id: runtime.knowledge
+    profiles: [runtime]
+    path: "knowledge/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING]
+  - id: runtime.hfs-manifests
+    profiles: [runtime]
+    path: "knowledge/hfs/{slots.yaml,rules.yaml,runtime-slots.yaml,canon-pins.yaml,peer-integrations.yaml,README.md}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: runtime.docs
+    profiles: [runtime]
+    path: "docs/{<topic>.md,examples/<topic>.md}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_DOC_NOT_ENGLISH, RT_CITED_PATH_MISSING]
+  - id: runtime.skill
+    profiles: [runtime]
+    path: "skills/<skill>/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    requires: [SKILL.md]
+    allows: [SKILL.md, "references/**"]
+    rules: [RT_CITED_PATH_MISSING, RT_GUIDANCE_REFUSED_COMMAND]
+  - id: runtime.init
+    profiles: [runtime]
+    path: init/AGENTS.md
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+
+  # ----- tests ----------------------------------------------------------------------------------------------
+  - id: runtime.tests
+    profiles: [runtime]
+    # Specs at tests/<area>/<module>[.<topic>].spec.mjs, shared spec code in tests/helpers/, data in tests/fixtures/,
+    # --import preloads in tests/setup/; RT_SPEC_PLACEMENT judges the layout inside.
+    path: "tests/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [RT_SPEC_PLACEMENT]
+
+  # ----- packages, generated copies -----------------------------------------------------------------------------
+  - id: runtime.packages-meta
+    profiles: [runtime]
+    path: "packages/{README.md,KNOWN-DEFECTS.md,package.json,package-lock.json,eslint/.gitignore,eslint/CHANGELOG.md,eslint/README.md}"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: runtime.package
+    profiles: [runtime]
+    # A published @starci package: its own layout under its own package.json; specs beside the source as <name>.spec.*.
+    path: "packages/{fe-kit,grammar,heroicons,hfs,jest-preset,prettier-config,stylelint,test-world,tsconfig,eslint/be,eslint/fe}/"
+    presence: required
+    tracked: tracked
+    tier: package
+    owner: true
+    requires: [package.json]
+    forbids: [scripts/sync-runtime.mjs]
+    tests: unit-beside
+    rules: [RT_TIER_DIRECTION, RT_SPEC_PLACEMENT]
+  - id: runtime.package-runtime-copy
+    profiles: [runtime]
+    # Byte copies of runtime files a published package needs in a product repository; never edited, never imported by
+    # runtime code. The roots are ruleParams.runtime.generated.
+    path: "packages/{hfs,eslint/be,eslint/fe}/runtime/"
+    presence: required
+    tracked: generated
+    generatedBy: packages/hfs/scripts/sync-runtime.mjs
+    tier: none
+    tests: none
+    rules: [RT_GENERATED_DRIFT]
+
+  # ----- dev stacks, examples, benchmark ---------------------------------------------------------------------
+  - id: runtime.ext
+    profiles: [runtime]
+    path: "ext/<service>/"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    allows: [compose.yaml, cloudflared.yaml, README.md, .gitignore, "secrets/*.enc", secrets/KEYS.md]
+  - id: runtime.example
+    profiles: [runtime]
+    # A product example app; its inside is judged by the PRODUCT HFS (hfs.json kind app; check-example-architecture).
+    path: "examples/<app>/"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    requires: [hfs.json]
+  - id: runtime.example-data
+    profiles: [runtime]
+    path: "examples/starcistacks-services/"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+    why: a .starcistacks services fixture, not an app (no hfs.json)
+  - id: runtime.benchmark
+    profiles: [runtime]
+    path: "benchmark/{README.md,expectations.yaml,findings/<finding>.md,snapshots/<snapshot>.json}"
+    presence: optional
+    tracked: tracked
+    tier: none
+    tests: none
+
+# pending - the ONE explicit allowlist of the runtime check. A finding matching an entry (its path glob and its finding
+# code) reports at level `pending` (printed, never failing). An entry that matches no finding is RT_PENDING_STALE, and an
+# entry that allows a finding the base revision's list did not allow is RT_PENDING_ADDED, so the list only shrinks. Each
+# entry names the chunk of the runtime HFS migration that deletes it.
+pending: []
+
+consumers:
+  - scripts/lib/hfs-slots.mjs
+  - scripts/hfs/runtime-check.mjs
+  - scripts/checks/check-host-boundary.mjs
+  - scripts/checks/check-contract-cites.mjs
+  - bin/starci.mjs

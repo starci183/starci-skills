@@ -1,125 +1,296 @@
 $schema: https://json-schema.org/draft/2020-12/schema
 $id: urn:starci:hfs-slots:2
-title: HFS slot manifest
+title: HFS slot manifest (kind app or runtime)
 description: >-
   The shape of knowledge/hfs/slots.yaml. Semantic rules JSON Schema cannot state (unique ids, every tier named by a
   slot or mayImport exists in the profile, a retired slot has a successor, an app-kind slot names a declared kind)
-  are checked by scripts/lib/hfs-slots.mjs loadSlotManifest.
-type: object
-additionalProperties: false
-required: [schema, version, versioning, presenceValues, trackedValues, testValues, sides, appKinds, tiers, ruleParams, slots]
-properties:
-  schema: {const: starci/hfs-slots@2}
-  version:
-    type: string
-    pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
-    description: MAJOR.MINOR.PATCH. The major must equal the number after @ in `schema`; a repository pins only the major.
-  versioning:
+  are checked by scripts/lib/hfs-slots.mjs loadSlotManifest. Two kinds share the loader: `app` (knowledge/hfs/slots.yaml,
+  no `kind` key) for product apps, and `runtime` (knowledge/hfs/runtime-slots.yaml) for the StarCi runtime repository.
+if: {required: [kind], properties: {kind: {const: runtime}}}
+then: {$ref: '#/$defs/runtimeManifest'}
+else: {$ref: '#/$defs/appManifest'}
+$defs:
+  appManifest:
     type: object
     additionalProperties: false
-    required: [patch, minor, major, retire, pins]
+    required: [schema, version, versioning, presenceValues, trackedValues, testValues, sides, appKinds, tiers, ruleParams, slots]
     properties:
-      patch: {type: string}
-      minor: {type: string}
-      major: {type: string}
-      retire: {type: string}
-      pins: {type: string}
-  presenceValues: {const: [required, optional, opt-in, forbidden]}
-  trackedValues: {const: [tracked, ignored, external]}
-  testValues: {const: [unit-beside, e2e, none]}
-  sides:
-    type: object
-    additionalProperties: false
-    required: [be, fe]
-    description: The two sides of an app, each in the folder of its name; reads lists the only paths of the other side it may read.
-    properties:
-      be: {$ref: '#/$defs/side'}
-      fe: {$ref: '#/$defs/side'}
-  appKinds:
-    type: object
-    additionalProperties: false
-    required: [be, fe]
-    properties:
-      be: {$ref: '#/$defs/nameList'}
-      fe: {$ref: '#/$defs/nameList'}
-  tiers:
-    type: object
-    additionalProperties: false
-    required: [be, fe]
-    properties:
-      be: {$ref: '#/$defs/tierMap'}
-      fe: {$ref: '#/$defs/tierMap'}
-  ruleParams:
-    type: object
-    additionalProperties: false
-    required: [be, fe]
-    properties:
-      be:
+      schema: {const: starci/hfs-slots@2}
+      kind: {const: app}
+      version:
+        type: string
+        pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+        description: MAJOR.MINOR.PATCH. The major must equal the number after @ in `schema`; a repository pins only the major.
+      versioning:
         type: object
         additionalProperties: false
-        required: [fileLines, duplicateBlock, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape]
+        required: [patch, minor, major, retire, pins]
         properties:
-          fileLines: {$ref: '#/$defs/fileLines'}
-          duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
-          infraOwners:
-            type: object
-            minProperties: 1
-            description: R90 BE_INFRA_OWNER. Raw library specifier or global reference -> the capabilities allowed to use it; [] means nowhere.
-            additionalProperties:
-              type: array
-              uniqueItems: true
-              items: {type: string, pattern: '^(platform|integrations)/[a-z][a-z0-9-]*$'}
-          specDoubles:
+          patch: {type: string}
+          minor: {type: string}
+          major: {type: string}
+          retire: {type: string}
+          pins: {type: string}
+      presenceValues: {const: [required, optional, opt-in, forbidden]}
+      trackedValues: {const: [tracked, ignored, external]}
+      testValues: {const: [unit-beside, e2e, none]}
+      sides:
+        type: object
+        additionalProperties: false
+        required: [be, fe]
+        description: The two sides of an app, each in the folder of its name; reads lists the only paths of the other side it may read.
+        properties:
+          be: {$ref: '#/$defs/side'}
+          fe: {$ref: '#/$defs/side'}
+      appKinds:
+        type: object
+        additionalProperties: false
+        required: [be, fe]
+        properties:
+          be: {$ref: '#/$defs/nameList'}
+          fe: {$ref: '#/$defs/nameList'}
+      tiers:
+        type: object
+        additionalProperties: false
+        required: [be, fe]
+        properties:
+          be: {$ref: '#/$defs/tierMap'}
+          fe: {$ref: '#/$defs/tierMap'}
+      ruleParams:
+        type: object
+        additionalProperties: false
+        required: [be, fe]
+        properties:
+          be:
             type: object
             additionalProperties: false
-            required: [kit, doubles, fallback]
-            description: R48 BE_SPEC_QUALITY spec-infra-double-from-kit. The kit package, the ordered token-pattern -> double table and the fallback double a service spec provider takes its useValue from.
+            required: [fileLines, duplicateBlock, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape]
             properties:
-              kit: {type: string, minLength: 1}
-              doubles:
+              fileLines: {$ref: '#/$defs/fileLines'}
+              duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
+              infraOwners:
+                type: object
+                minProperties: 1
+                description: R90 BE_INFRA_OWNER. Raw library specifier or global reference -> the capabilities allowed to use it; [] means nowhere.
+                additionalProperties:
+                  type: array
+                  uniqueItems: true
+                  items: {type: string, pattern: '^(platform|integrations)/[a-z][a-z0-9-]*$'}
+              specDoubles:
+                type: object
+                additionalProperties: false
+                required: [kit, doubles, fallback]
+                description: R48 BE_SPEC_QUALITY spec-infra-double-from-kit. The kit package, the ordered token-pattern -> double table and the fallback double a service spec provider takes its useValue from.
+                properties:
+                  kit: {type: string, minLength: 1}
+                  doubles:
+                    type: array
+                    minItems: 1
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [token, double, forms]
+                      properties:
+                        token: {type: string, minLength: 1, description: A regular expression over the UPPER_SNAKE form of the provider token name.}
+                        double: {type: string, pattern: '^[A-Za-z][A-Za-z0-9]*$'}
+                        forms: {$ref: '#/$defs/doubleForms'}
+                  fallback:
+                    type: object
+                    additionalProperties: false
+                    required: [double, forms]
+                    properties:
+                      double: {type: string, pattern: '^[A-Za-z][A-Za-z0-9]*$'}
+                      forms: {$ref: '#/$defs/doubleForms'}
+              suffixes: {$ref: '#/$defs/roleSuffixes'}
+              bannedSuffixes: {$ref: '#/$defs/roleSuffixes'}
+              contractShape:
+                type: object
+                additionalProperties: false
+                required: [helper]
+                description: R47 BE_CONTRACT_UNGUARDED. The world vocabulary of a contract spec; helper is the imported function that erases payload values (shapeOf).
+                properties:
+                  helper: {type: string, pattern: '^[A-Za-z_$][A-Za-z0-9_$]*$'}
+          fe:
+            type: object
+            additionalProperties: false
+            required: [fileLines, duplicateBlock]
+            properties:
+              fileLines: {$ref: '#/$defs/fileLines'}
+              duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
+      crossOwner: {type: string}
+      crossApp: {type: string}
+      slots:
+        type: array
+        minItems: 1
+        items: {$ref: '#/$defs/slot'}
+      consumers:
+        type: array
+        items: {type: string}
+  runtimeManifest:
+    type: object
+    additionalProperties: false
+    required: [schema, kind, version, versioning, presenceValues, trackedValues, testValues, profiles, tiers, ruleParams, slots]
+    properties:
+      schema: {type: string, pattern: '^starci/runtime-slots@[0-9]+$'}
+      kind: {const: runtime}
+      version: {$ref: '#/$defs/semver'}
+      versioning:
+        type: object
+        additionalProperties: false
+        required: [patch, minor, major, retire, pins]
+        properties:
+          patch: {type: string}
+          minor: {type: string}
+          major: {type: string}
+          retire: {type: string}
+          pins: {type: string}
+      presenceValues: {const: [required, optional, opt-in, forbidden]}
+      trackedValues: {const: [tracked, ignored, external, generated]}
+      testValues: {const: [unit-beside, e2e, none]}
+      profiles: {const: [runtime]}
+      tiers:
+        type: object
+        additionalProperties: false
+        required: [runtime]
+        properties:
+          runtime: {$ref: '#/$defs/tierMap'}
+      ruleParams:
+        type: object
+        additionalProperties: false
+        required: [runtime]
+        properties:
+          runtime:
+            type: object
+            additionalProperties: false
+            required: [fileLines, sourceRoots, infraOwners, baseWriteMembers, baseEnvSeams, apiContracts, sourceName, oneOffNames, sharedBasenames, generated, pinned, selfChecks]
+            properties:
+              fileLines: {$ref: '#/$defs/fileLines'}
+              sourceRoots: {$ref: '#/$defs/uniqueNames'}
+              infraOwners:
+                type: object
+                additionalProperties: false
+                required: [modules, globals, programs]
+                description: RT_EXTERNAL_OWNER. A module specifier, a global or a spawned program word -> the owners allowed to use it (api/<system>, api/* or engine/db); [] means nowhere.
+                properties:
+                  modules: {$ref: '#/$defs/ownerMap'}
+                  globals: {$ref: '#/$defs/ownerMap'}
+                  programs: {$ref: '#/$defs/ownerMap'}
+              baseWriteMembers: {$ref: '#/$defs/uniqueNames'}
+              baseEnvSeams: {$ref: '#/$defs/stringList'}
+              apiContracts:
+                type: object
+                propertyNames: {pattern: '^[a-z][a-z0-9-]*$'}
+                additionalProperties: {type: string, minLength: 1}
+              sourceName: {type: string, minLength: 1}
+              oneOffNames: {$ref: '#/$defs/uniqueNames'}
+              sharedBasenames: {$ref: '#/$defs/uniqueNames'}
+              generated:
                 type: array
                 minItems: 1
                 items:
                   type: object
                   additionalProperties: false
-                  required: [token, double, forms]
+                  required: [root, generatedBy]
                   properties:
-                    token: {type: string, minLength: 1, description: A regular expression over the UPPER_SNAKE form of the provider token name.}
-                    double: {type: string, pattern: '^[A-Za-z][A-Za-z0-9]*$'}
-                    forms: {$ref: '#/$defs/doubleForms'}
-              fallback:
-                type: object
-                additionalProperties: false
-                required: [double, forms]
-                properties:
-                  double: {type: string, pattern: '^[A-Za-z][A-Za-z0-9]*$'}
-                  forms: {$ref: '#/$defs/doubleForms'}
-          suffixes: {$ref: '#/$defs/roleSuffixes'}
-          bannedSuffixes: {$ref: '#/$defs/roleSuffixes'}
-          contractShape:
-            type: object
-            additionalProperties: false
-            required: [helper]
-            description: R47 BE_CONTRACT_UNGUARDED. The world vocabulary of a contract spec; helper is the imported function that erases payload values (shapeOf).
-            properties:
-              helper: {type: string, pattern: '^[A-Za-z_$][A-Za-z0-9_$]*$'}
-      fe:
-        type: object
-        additionalProperties: false
-        required: [fileLines, duplicateBlock]
-        properties:
-          fileLines: {$ref: '#/$defs/fileLines'}
-          duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
-  crossOwner: {type: string}
-  crossApp: {type: string}
-  slots:
+                    root: {type: string, minLength: 1}
+                    generatedBy: {type: string, minLength: 1}
+              pinned:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [path, why]
+                  properties:
+                    path: {type: string, minLength: 1}
+                    why: {type: string, minLength: 1}
+              selfChecks:
+                type: array
+                minItems: 1
+                description: The retained runtime self-checks `starci check` runs after the runtime check, in order.
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [id, run]
+                  properties:
+                    id: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+                    run: {type: string, minLength: 1}
+                    args: {$ref: '#/$defs/stringList'}
+      crossOwner: {type: string}
+      crossSystem: {type: string}
+      slots:
+        type: array
+        minItems: 1
+        items: {$ref: '#/$defs/runtimeSlot'}
+      pending:
+        type: array
+        description: The one shrink-only allowlist of the runtime check. A finding matching an entry is reported at level pending; an entry that matches no finding is RT_PENDING_STALE, and an entry that covers a finding the base revision did not allow is RT_PENDING_ADDED.
+        items:
+          type: object
+          additionalProperties: false
+          required: [path, rule, lane, since, reason]
+          properties:
+            path: {type: string, minLength: 1}
+            rule: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$'}
+            lane: {type: string, pattern: '^C[1-8][ab]?$'}
+            since: {type: string, pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'}
+            reason: {type: string, minLength: 1}
+      consumers:
+        type: array
+        items: {type: string}
+  ownerMap:
+    type: object
+    additionalProperties:
+      type: array
+      uniqueItems: true
+      items: {type: string, pattern: '^(api/(\*|[a-z][a-z0-9-]*)|engine/db)$'}
+  uniqueNames:
     type: array
     minItems: 1
-    items: {$ref: '#/$defs/slot'}
-  consumers:
-    type: array
-    items: {type: string}
-$defs:
+    uniqueItems: true
+    items: {type: string, minLength: 1}
+  runtimeSlot:
+    type: object
+    additionalProperties: false
+    required: [id, profiles, path, presence, tracked, tier, tests]
+    properties:
+      id: {type: string, pattern: '^runtime\.[a-z0-9-]+(\.[a-z0-9-]+)*$'}
+      profiles: {const: [runtime]}
+      path: {type: string, minLength: 1}
+      presence: {enum: [required, optional, opt-in, forbidden]}
+      tracked: {enum: [tracked, ignored, external, generated]}
+      tier: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+      tests: {enum: [unit-beside, e2e, none]}
+      owner: {type: boolean}
+      minInstances: {type: integer, minimum: 1}
+      requires: {$ref: '#/$defs/stringList'}
+      allows: {$ref: '#/$defs/stringList'}
+      forbids: {$ref: '#/$defs/stringList'}
+      budget:
+        type: object
+        minProperties: 1
+        additionalProperties: {type: integer, minimum: 1}
+      rules:
+        type: array
+        uniqueItems: true
+        items: {type: string, pattern: '^[A-Z][A-Z0-9_]*\*?$'}
+      goesTo: {type: string, minLength: 1}
+      why: {type: string, minLength: 1}
+      since: {$ref: '#/$defs/semver'}
+      retiredIn: {$ref: '#/$defs/major'}
+      successor: {type: string}
+      generatedBy: {type: string, minLength: 1, description: 'the one writer of a generated slot (tracked: generated)'}
+    allOf:
+      - if: {properties: {tracked: {const: external}}, required: [tracked]}
+        then: {required: [goesTo], properties: {presence: {const: forbidden}}}
+      - if: {properties: {presence: {const: forbidden}}, required: [presence]}
+        then: {properties: {tracked: {const: external}}}
+      - if: {properties: {tracked: {const: generated}}, required: [tracked]}
+        then: {required: [generatedBy]}
+      - if: {required: [generatedBy]}
+        then: {properties: {tracked: {const: generated}}}
+      - if: {required: [retiredIn]}
+        then: {required: [successor]}
   side:
     type: object
     additionalProperties: false
