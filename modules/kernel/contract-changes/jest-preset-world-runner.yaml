@@ -2,12 +2,14 @@ id: jest-preset-world-runner
 effectiveAt: '2026-10-01T18:00:00+07:00'
 summary: >-
   @starci/jest-preset 2.2.0. The integration, e2e and contract projects run on the preset's world runner (world-runner.cjs,
-  exported as WORLD_RUNNER): every spec file in a fresh worker process, --maxWorkers files at a time, never in band. Before it,
-  every e2e file after the first failed to boot with "Cannot determine a GraphQL output type" in one npm run test:e2e, because
-  @nestjs/graphql keeps its type registry on the process global and the test world's globalSetup loads application code in
-  jest's main process. The project-level maxWorkers: 1 (a global option jest never applied per project) is removed; outage specs
-  are serialized by the test world's outage lock. canon-pins.yaml pins 2.2.0. The preset spec runs two e2e files that each
-  register a GraphQL type of the same name in one preset run and shows both pass (and that the stock in-band runner fails).
+  exported as WORLD_RUNNER): every spec file in a fresh worker process, never in band, and ONE FILE AT A TIME, enforced by the
+  runner whatever --maxWorkers says (every file shares the run's data and the test world resets it when a file boots;
+  per-worker data namespaces are the known limitation for alpha.5). Before it, every e2e file after the first failed to boot
+  with "Cannot determine a GraphQL output type" in one npm run test:e2e, because @nestjs/graphql keeps its type registry on the
+  process global and the test world's globalSetup loads application code in jest's main process. The project-level
+  maxWorkers: 1 (a global option jest never applied per project) is removed. canon-pins.yaml pins 2.2.0. The preset spec runs
+  three e2e files that each register a GraphQL type of the same name in one preset run and shows all pass (and that the stock
+  in-band runner fails), and that under --maxWorkers=3 they run strictly one after another, each in its own process.
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/jest-preset-world-runner.yaml
