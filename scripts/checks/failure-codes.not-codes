@@ -2,45 +2,18 @@
 # One per line: <literal><TAB><why it is not a code>. Anything a checker or verb can emit as a reason belongs in modules/kernel/failure-codes.yaml instead.
 APP_FILTER	NestJS framework token name the checker looks for, not a code
 APP_GUARD	NestJS framework token name the checker looks for, not a code
-ARTIFACT_ROOT_ENV	environment variable name
-ASSET_PROMPT_ATTR	HTML attribute name constant
-ASSET_SHA_ATTR	HTML attribute name constant
-ASSET_SLOT_ATTR	HTML attribute name constant
 BAND_TOKEN_NAMES	export name of a token table in the grammar knowledge
-BASE_VIEW_ENV	environment variable name
 BLOCK_FOLDED	YAML scalar type name, not an error code
 BLOCK_LITERAL	YAML scalar type name, not an error code
-CHILD_ENV	env var name STARCI_API_CHILD constant, not an emitted code
 COMMON_GRAMMAR_COMPONENTS	name of a registry constant in the grammar package, not a code
-COMPONENT_ATTR	attribute-name constant in draw-dna, not a code
 ENGINE_SCHEMA	constant naming the engine protocol marker (starci/engine@1), not an emitted code
-FALLBACK_SCRIPT	constant naming the package.json script lint:check used as a push-gate fallback
-FAN_OUT_ORDER	constant naming a model order key (scaffold), not a code
 GLOBAL_ANALYSIS_TOKEN	SonarQube token type label passed when minting a token, not a failure code
-GRAMMAR_PACKAGE	constant holding the @starci/grammar package name for tsconfig paths
-HOST_RESOURCES_ENV	env var name constant (STARCI_HOST_RESOURCES_JSON), not a code
-IMAGEGEN_ASSERTION	assertion id label constant (imagegen-provenance), not an emitted code (its finding is DRAW_ASSET_NOT_TOKEN_RENDERED)
 IO_DRIFT	only named in a comment in kinds.yaml; no emit site found in scripts/engine/modules
-LEADER_NAME	constant naming the reconciler leader row, not a code
 LEDGER_SCHEMA	schema id constant, not a code
 LEDGER_VERSION	schema version constant, not a code
-LOCAL_ROOT_ENV	constant naming the STARCI_LOCAL_ROOT env var
-LOG_TRUNCATED	typed log row kind (log.truncated), not a failure code
 MACHINE_SCHEMA	schema id constant, not a code
 MACHINE_VERSION	schema version constant, not a code
-PART_ATTR	name of the data-grammar-part HTML attribute constant
-PROJECTS_ROOT_ENV	constant naming the STARCI_PROJECTS_ROOT env var
 PROJECT_ANALYSIS_TOKEN	SonarQube token type label passed when minting a token
-PROPOSAL_ATTR	name of the data-grammar-proposal HTML attribute constant
-PUBLIC_CONTRACT_RULE_ID	JS constant name; the emitted rule id is BE_PUBLIC_CONTRACT_FORM
-RATE_LIMITED_EVENT	event-kind constant that routes a re-read of quota pools, not a failure code
-READONLY_BOUNDARY_RULE_ID	JS constant name; the emitted rule id is BE_READONLY_BOUNDARY
-RECORDINGS_ROOT_ENV	constant naming the STARCI_UAT_RECORDINGS_ROOT env var
-REDLINE_ATTR	name of the data-draw-redline HTML attribute constant
-SKILL_ROOT	constant naming the runtime root directory (an array element [SKILL_ROOT], not a code)
-SOURCE_LAYOUT_RULE_ID	constant naming a lint rule id in architecture coverage, not an emitted code
-SOURCE_NAME_RULE_ID	constant naming a lint rule id in architecture coverage, not an emitted code
-STACK_ROOT	constant, the .starcistacks directory name
 STARCI_API_CHILD	env var name marking api child processes
 STARCI_ENGINE_START_REASON	env var name
 STARCI_HOST_RESOURCES_JSON	env var name (resource probe override)
@@ -50,14 +23,9 @@ STARCI_LOCAL_ROOT	env var name (overrides the whole %LOCALAPPDATA%/StarCi state 
 STARCI_PROJECTS_ROOT	env var name
 STARCI_RELOADED_AT	env var name
 STARCI_RELOAD_HANDOVER_FROM	env var name
-STARCI_SCOPED_LINT_BASE_VIEW	env var name
 STARCI_TEST_MACHINE_FILE	env var name for specs
 STARCI_UAT_RECORDINGS_ROOT	env var name
-START_REASON_ENV	JS constant naming an env var
 STRICT_MODE	info label on a strict schema validation count line, not a failure
-TEST_REGISTRY_ENV	JS constant naming an env var
-UNPROVEN_FRAMEWORK	nhan hang so noi bo "(unproven framework identity)" cua bo kiem kien truc, khong phai ma phat ra
-WHY_ATTR	ten thuoc tinh HTML data-why (hang so), khong phai ma loi
 artifacts-indexed	ten su kien (event kind) ghi nhan da lap chi muc artifact, khong phai loi
 ask-answered	ten su kien (event kind) chu so huu da tra loi cau hoi, khong phai loi
 brief-gap	nhan nhom nguyen nhan (cause class) cua bai hoc Supervisor, khong phai ma phat ra
@@ -133,19 +101,13 @@ workflow-finished	phase-transition reason (success)
 worktree-flag	product-isolation skip reason (operator flag)
 BYTE_CENSUS	constant, parser token or key name, not an emitted code
 CACHE_MANAGER	constant, parser token or key name, not an emitted code
-DECLARED_SUSPENSION	constant, parser token or key name, not an emitted code
 ENV_VAR_OR_CUSTODY_KEY	constant, parser token or key name, not an emitted code
-LINT_MESSAGE	constant, parser token or key name, not an emitted code
 MEMORY_CACHE_MANAGER	constant, parser token or key name, not an emitted code
 MISSING_CHAR	constant, parser token or key name, not an emitted code
-NA_REASON	constant, parser token or key name, not an emitted code
 PHASE_REASON	constant, parser token or key name, not an emitted code
 QUOTE_DOUBLE	constant, parser token or key name, not an emitted code
 QUOTE_SINGLE	constant, parser token or key name, not an emitted code
 REDIS_CACHE_MANAGER	constant, parser token or key name, not an emitted code
-SUPPRESSED_MESSAGE	constant, parser token or key name, not an emitted code
-SUSPENSION_REASON	constant, parser token or key name, not an emitted code
 TOKEN_TOLERANCE	constant, parser token or key name, not an emitted code
 UNEXPECTED_TOKEN	constant, parser token or key name, not an emitted code
 X_FILE	constant, parser token or key name, not an emitted code
-AWAITING_OWNER_STATUS	an identifier used as a computed object key, not a code

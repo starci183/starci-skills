@@ -1,5 +1,6 @@
-// scripts/checks/failure-codes.mjs counts a bracketed UPPER_SNAKE name as an emitted code only in text (a message
-// prefix or a flow list), never in a computed member access that reads a constant.
+// scripts/checks/failure-codes.mjs counts a bracketed UPPER_SNAKE name as an emitted code only in text (a message,
+// a template, a comment), never where JavaScript code reads a constant: an element access, an array literal or a
+// computed key holding one identifier.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,16 +10,14 @@ import { emittedCodes } from '../scripts/checks/failure-codes.mjs';
 
 function fixture(source) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'failure-codes-scan-'));
-  fs.mkdirSync(path.join(base, 'scripts/checks'), { recursive: true });
-  fs.writeFileSync(path.join(base, 'scripts/checks/failure-codes.not-codes'), '# none\n');
-  fs.writeFileSync(path.join(base, 'scripts/land.mjs'), source);
-  fs.mkdirSync(path.join(base, 'modules/models'), { recursive: true });
-  fs.writeFileSync(path.join(base, 'modules/models/kinds.yaml'), 'vocabularies: {}\n');
-  fs.mkdirSync(path.join(base, 'engine/migrations/runtime'), { recursive: true });
-  fs.writeFileSync(path.join(base, 'engine/migrations/runtime/0001-init.sql'), '');
+  const write = (rel, text) => { fs.mkdirSync(path.dirname(path.join(base, rel)), { recursive: true }); fs.writeFileSync(path.join(base, rel), text); };
+  write('scripts/checks/failure-codes.not-codes', '# none\n');
+  write('scripts/land.mjs', source);
+  write('modules/models/kinds.yaml', 'vocabularies: {}\n');
+  write('engine/migrations/runtime/0001-init.sql', '');
   return base;
 }
-const codes = (source) => emittedCodes(fixture(source)).map((e) => e.code);
+const codes = (lines) => emittedCodes(fixture(lines.join('\n'))).map((e) => e.code);
 
 test('a computed member access with a constant key is not an emitted code', () => {
   const found = codes([
@@ -27,15 +26,24 @@ test('a computed member access with a constant key is not an emitted code', () =
     '  baseline[MIRROR_CHECK] = r;',
     '  return [baseline?.[MIRROR_CHECK], read()[MIRROR_CHECK], baseline[0][MIRROR_CHECK]];',
     '}',
-  ].join('\n'));
+  ]);
   assert.ok(!found.includes('MIRROR_CHECK'), found.join(', '));
 });
 
-test('a bracketed code in a message or a flow list is still an emitted code', () => {
+test('an array literal or a computed key holding one constant is not an emitted code', () => {
   const found = codes([
-    "export const fail = (detail) => { throw new Error(`[TARGET_MISSING] ${detail}`); };",
-    'export const listed = [PLAN_STALE];',
-  ].join('\n'));
-  assert.ok(found.includes('TARGET_MISSING'), found.join(', '));
-  assert.ok(found.includes('PLAN_STALE'), found.join(', '));
+    "export const SKILL_ROOT = 'D:/runtime';",
+    'export const plan = { repos: [SKILL_ROOT], byRoot: { [SKILL_ROOT]: true } };',
+  ]);
+  assert.ok(!found.includes('SKILL_ROOT'), found.join(', '));
+});
+
+test('a bracketed code in a message, a multi-line template or a comment is still an emitted code', () => {
+  const found = codes([
+    'export const fail = (detail) => { throw new Error(`[TARGET_MISSING] ${detail}`); };',
+    'export const explain = (n) => `refused because',
+    '  the record is ${n} days old [PLAN_STALE]`;',
+    '/** A JSDoc line naming [DOC_CODE] is text. */',
+  ]);
+  for (const code of ['TARGET_MISSING', 'PLAN_STALE', 'DOC_CODE']) assert.ok(found.includes(code), `${code} in ${found.join(', ')}`);
 });

@@ -18,6 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { FAILURE_CODE_VIETNAMESE_FIELDS } from '../lib/language.mjs';
+import { createRequire } from 'node:module';
 import { isMain } from './common.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -49,10 +50,10 @@ function* walk(dir) {
 
 const UPPER_RE = /(['"`])([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\1/g;
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)+';
-// A bracketed code in text ('[TARGET_MISSING] ...', a flow list `[A_B]`). A computed member access (`baseline[KEY]`,
-// `x?.[KEY]`, `f()[KEY]`, `a[0][KEY]`) reads a constant and emits nothing, so a bracket right after an identifier,
-// `)`, `]` or `?.` is not a code.
-const BRACKET_RE = /(?<![\w$)\]]|\?\.)\[([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\]/g;
+// A bracketed code in text: a message prefix ('[TARGET_MISSING] ...'), a comment or a YAML flow list. In JavaScript a
+// bracket around one identifier is code, not text: an element access (`baseline[KEY]`), an array literal (`[ROOT]`)
+// or a computed key (`{ [KEY]: v }`) reads a constant and emits nothing; `codeBrackets` finds those by parsing.
+const BRACKET_RE = /\[([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\]/g;
 const KEBAB_RES = [
   new RegExp(`\\b(?:code|reason|rejected|failureCode|failureKind|signal|blocker)\\s*:\\s*(['"])(${KEBAB})\\1`, 'g'),
   new RegExp(`\\breason\\s*:\\s*\`(${KEBAB})(?=[:\`$])`, 'g'),
@@ -81,6 +82,24 @@ export function vocabularyCodes(base = root) {
 const relOf = (file) => path.relative(root, file).split(path.sep).join('/');
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
+let typescript = null;
+/** Offsets of the `[` of every element access, array literal or computed key whose only content is an identifier. */
+function codeBrackets(rel, text) {
+  typescript ??= createRequire(import.meta.url)('typescript');
+  const ts = typescript;
+  const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS);
+  const out = new Set();
+  const bracketBefore = (node) => text.lastIndexOf('[', node.getStart(source));
+  const visit = (node) => {
+    if (ts.isElementAccessExpression(node) && ts.isIdentifier(node.argumentExpression)) out.add(bracketBefore(node.argumentExpression));
+    else if (ts.isArrayLiteralExpression(node) && node.elements.length === 1 && ts.isIdentifier(node.elements[0])) out.add(node.getStart(source));
+    else if (ts.isComputedPropertyName(node) && ts.isIdentifier(node.expression)) out.add(node.getStart(source));
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return out;
+}
+
 /** Every emitted code: {code, kind: 'upper'|'kebab', sites: [{file, line}]}. Sorted by code. */
 export function emittedCodes(base = root) {
   const found = new Map();
@@ -105,7 +124,10 @@ export function emittedCodes(base = root) {
       if (NOT_CODES.has(code) || NOT_CODE_PREFIX.test(code) || envNames.has(code)) continue;
       add(code, 'upper', rel, lineOf(text, m.index));
     }
-    for (const m of text.matchAll(BRACKET_RE)) {
+    const brackets = [...text.matchAll(BRACKET_RE)];
+    const inCode = rel.endsWith('.mjs') && brackets.length ? codeBrackets(rel, text) : null;
+    for (const m of brackets) {
+      if (inCode?.has(m.index)) continue;
       if (NOT_CODES.has(m[1]) || NOT_CODE_PREFIX.test(m[1]) || envNames.has(m[1])) continue;
       add(m[1], 'upper', rel, lineOf(text, m.index));
     }
