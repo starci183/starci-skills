@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common"
+import { Injectable, NotFoundException } from "@nestjs/common"
 import type { GraphQLFormattedError } from "graphql"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
@@ -26,8 +26,12 @@ export class ErrorsService {
         this.kinds = new Map([...options.kinds, ERRORS_ERROR_KINDS].flatMap((table) => Object.entries(table)))
     }
 
-    /** Describes `error`: a DomainError of a composed capability keeps its code; anything else is logged and masked as internal. */
+    /**
+     * Describes `error`: a DomainError of a composed capability keeps its code; the framework's not-found (no route matches
+     * the request) is a plain not-found; anything else is logged and masked as internal.
+     */
     describe(error: unknown): ErrorDescription {
+        if (error instanceof NotFoundException) return this.build(ErrorsErrorCode.RouteNotFound, "not-found", {})
         if (error instanceof DomainError) {
             const kind = this.kinds.get(error.code)
             if (kind !== undefined) return this.build(error.code, kind, error.params)

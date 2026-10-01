@@ -1,3 +1,4 @@
+import { NotFoundException } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import { mock } from "@starci/jest-preset"
 import { GraphQLError } from "graphql"
@@ -59,6 +60,18 @@ describe("ErrorsService", () => {
                 params: {},
             })
             expect(logger.error).toHaveBeenCalledWith(ErrorsLogEvent.Unhandled, error)
+        })
+
+        it("answers the framework's not-found of an unmatched route as not-found, without logging it", async () => {
+            const { service, logger } = await build()
+
+            expect(service.describe(new NotFoundException())).toEqual({
+                code: ErrorsErrorCode.RouteNotFound,
+                kind: "not-found",
+                status: 404,
+                params: {},
+            })
+            expect(logger.error).not.toHaveBeenCalled()
         })
 
         it("masks any other failure as internal, and logs it", async () => {

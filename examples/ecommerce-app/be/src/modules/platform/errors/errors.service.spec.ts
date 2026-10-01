@@ -5,6 +5,7 @@ import type { Logger } from "@modules/platform/logging"
 import { MESSAGE_CATALOG } from "@modules/platform/i18n"
 import type { MessageCatalog } from "@modules/platform/i18n"
 import { PROBES_ERROR_KINDS, ProbesError, ProbesErrorCode } from "@modules/platform/probes"
+import { NotFoundException } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import { ERRORS_OPTIONS } from "./errors.decorators"
 import { ErrorsError, ErrorsErrorCode } from "./errors/errors.error"
@@ -65,6 +66,18 @@ describe("ErrorsService", () => {
                 params: {},
             })
             expect(logger.error).toHaveBeenCalledWith(ErrorsLogEvent.Unhandled, undeclared)
+        })
+
+        it("answers the framework's not-found of an unmatched route as not-found, without logging it", async () => {
+            const { errors, logger } = await build([])
+
+            expect(errors.describe(new NotFoundException())).toEqual({
+                code: ErrorsErrorCode.RouteNotFound,
+                kind: "not-found",
+                status: 404,
+                params: {},
+            })
+            expect(logger.error).not.toHaveBeenCalled()
         })
 
         it("masks any other failure and logs it", async () => {
