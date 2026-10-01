@@ -17,10 +17,13 @@
 // sup_events): queued -> spawning (staging checkout + file leases, one sup_attempts row per spawn) -> running
 // ([Worker] terminal on the attempt) -> reported (sup_reports row) -> succeeded (landed by scripts/supervisor/land.mjs,
 // checkout removed) | failed | cancelled. The job's working state (cluster, files, staging, routing, result) is
-// its payload_json. The staging checkout is an EPHEMERAL git worktree of the runtime on a
-// temp branch sup/<job> under <lanesRoot>/staging (the one lanes root, scripts/lib/hk-lanes.mjs lanesRoot:
-// runtimes.yaml allocation.housekeeping.lanesRoot, default D:/starci-lanes), outside the live tree (the
-// owner-approved narrow exception to "main only, no worktrees"). It lives only until its commit lands (or the job is cancelled).
+// its payload_json. The staging checkout is an EPHEMERAL Orca worktree of the runtime (an agent works in it, so Orca
+// owns it: `orca worktree create --name sup-<job> --base-branch main --comment starci:supervisor-staging:<job>` through
+// scripts/api/orca/worktree-provision.mjs createOrcaWorktree, registry kind supervisor-staging keyed by Orca's worktree id). Orca picks
+// its path and its branch; payload.staging records {path, branch, base, orcaId} as Orca reported them, and every reader
+// (the land gate, the GCs, the reports) takes the RECORDED branch and path, never a name built from the job id. It lives
+// only until its commit lands (or the job is cancelled), then goes through removeOrcaWorktree (links unlinked, `orca
+// worktree rm`, the row closed, the branch deleted).
 //
 // Cap: adaptive, at most 10. base (config.yaml supervisor.workers.base, default 4) grows by one per two queued
 // jobs up to max (default 10) and is halved while the machine is loaded (CPU busy >= 85% or free memory < 12%),
@@ -43,13 +46,13 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, loadConfig, DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
 import {
-  SKILL_ROOT, FIX_KIND, WORKER_TITLE_PREFIX, stagingRoot, readSupervisor,
+  SKILL_ROOT, FIX_KIND, WORKER_TITLE_PREFIX, readSupervisor,
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
 } from './home.mjs';
 import { openMachine } from '../../engine/machine-db.mjs';
-import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
-import { createScratchWorktree } from '../api/git/worktree-add.mjs';
-import { markRemoved } from '../lib/worktree-registry.mjs';
+import { createOrcaWorktree } from '../api/orca/worktree-provision.mjs';
+import { removeOrcaWorktree } from '../api/orca/worktree-remove.mjs';
+import { orcaWorktreeClient } from '../api/orca/worktree-client.mjs';
 import { closeSelfSafe, releaseSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
@@ -67,7 +70,7 @@ import { outageInText } from '../agent/provider-outage.mjs';
  * hook (repos []): a [Worker] commits only in its runtime staging branch, and that checkout is a linked worktree of
  * the live runtime repo, so `git rev-parse --git-path hooks` there is the live repo's SHARED hooks dir - a hook
  * installed "for the staging checkout" lands in the live repo and refuses every branch deletion and ref rewrite
- * there (the land gate's sup/* cleanup, lanes; land run 26 refused 3a9558930). Its owned paths are the job's leased
+ * there (the land gate's staging-branch cleanup, lanes; land run 26 refused 3a9558930). Its owned paths are the job's leased
  * files resolved against its staging checkout, absolute like op leases (scripts/kernel/api.mjs opGuardLaunch): a
  * directory lease (a trailing `/**` dropped) covers its subtree. With none, or with paths left relative (resolved
  * against the Supervisor's cwd), the command guard refuses every `git add`/commit (PATH_NOT_OWNED) and no worker can
@@ -216,27 +219,35 @@ export const releaseLeases = (m, jobId) => m.releaseSupLeases(jobId);
 
 /* ------------------------------------------------------------ staging */
 
-export const stagingPathOf = (jobId, env = process.env) => path.join(stagingRoot(env), jobId);
-export const branchOf = (jobId) => `sup/${jobId}`;
+/** The registry kind of a [Worker] staging checkout (scripts/lib/worktree-registry.mjs ORCA_KINDS). */
+export const STAGING_KIND = 'supervisor-staging';
+/** The Orca worktree name of a job's staging checkout; Orca derives the branch from it (the receipt is what counts). */
+export const stagingNameOf = (jobId) => `sup-${jobId}`;
+/** The ownership stamp Orca keeps on the worktree (`--comment`): the orphan scan tells a runtime tree from a foreign one. */
+export const stagingStampOf = (jobId) => `starci:${STAGING_KIND}:${jobId}`;
 
 /**
- * Create the job's staging checkout: a worktree on sup/<job> at <base> of the runtime, made by the one worktree API
- * (scripts/api/git/worktree-add.mjs, registered with its [Worker] job for the GC), plus a node_modules junction and a copy of
- * the owner config so specs run there as they do live.
+ * Create the job's staging checkout through Orca: createOrcaWorktree (the slot registered with its [Worker] job for the
+ * GC, `orca worktree create --repo path:<runtime> --name sup-<job> --base-branch main --setup skip --comment <stamp>`,
+ * the row bound to Orca's id), plus a node_modules junction and a copy of the owner config so specs run there as they do
+ * live. {ok, path, branch, base, orcaId} as Orca reported them | {ok:false, reason, code, error}
  */
-export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, base = null }) {
-  const dir = stagingPathOf(jobId, env);
-  const baseSha = base ?? git(['rev-parse', 'main'], { cwd: root }).stdout;
-  if (!baseSha) return { ok: false, error: 'cannot resolve main' };
-  fs.mkdirSync(path.dirname(dir), { recursive: true });
-  if (fs.existsSync(dir)) return { ok: false, error: `staging path ${dir} already exists` };
-  const added = createScratchWorktree({ repoRoot: root, dir, kind: 'supervisor-staging', branch: branchOf(jobId), newBranch: true, base: baseSha, owner: { lane: jobId }, env, git });
-  if (!added.ok) return { ok: false, error: added.detail || added.reason || 'git worktree add failed' };
+export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient }) {
+  const made = createOrcaWorktree({ repoRoot: root, kind: STAGING_KIND, name: stagingNameOf(jobId), base: 'main', comment: stagingStampOf(jobId), owner: { lane: jobId }, env, orca });
+  if (!made.ok) return { ok: false, reason: made.reason, code: 'WORKER_STAGING_CREATE_FAILED', error: `${made.reason}: ${made.detail ?? ''}`.trim() };
+  if (!made.branch || !made.head) {
+    // The land gate cherry-picks from the recorded branch above the recorded base: a receipt without them is useless.
+    removeOrcaWorktree({ repoRoot: root, orcaId: made.id, dir: made.path, env, orca });
+    return { ok: false, reason: 'orca-worktree-create-failed', code: 'WORKER_STAGING_CREATE_FAILED', error: `orca worktree create reported no ${made.branch ? 'head' : 'branch'} for ${made.path}` };
+  }
   const nm = path.join(root, 'node_modules');
-  try { if (fs.existsSync(nm)) fs.symlinkSync(nm, path.join(dir, 'node_modules'), 'junction'); } catch { /* specs without deps still run */ }
-  try { const cfg = path.join(root, 'config.yaml'); if (fs.existsSync(cfg)) fs.copyFileSync(cfg, path.join(dir, 'config.yaml')); } catch { /* optional */ }
-  return { ok: true, path: dir, branch: branchOf(jobId), base: baseSha };
+  try { if (fs.existsSync(nm)) fs.symlinkSync(nm, path.join(made.path, 'node_modules'), 'junction'); } catch { /* specs without deps still run */ }
+  try { const cfg = path.join(root, 'config.yaml'); if (fs.existsSync(cfg)) fs.copyFileSync(cfg, path.join(made.path, 'config.yaml')); } catch { /* optional */ }
+  return { ok: true, path: made.path, branch: made.branch, base: made.head, orcaId: made.id };
 }
+
+/** The payload.staging record of a created checkout. */
+export const stagingRecord = (staging) => ({ path: staging.path, branch: staging.branch, base: staging.base, orcaId: staging.orcaId });
 
 /**
  * Unlink `<dir>/node_modules` when it is a link (the junction createStaging/land make to the live one).
@@ -252,32 +263,28 @@ export function unlinkNodeModulesLink(dir) {
 }
 
 /**
- * Remove a job's staging checkout. The temp branch goes too when its work landed (`landed`) or it holds no
- * commit beyond its base; otherwise it is kept so nothing a worker committed is lost. Idempotent.
+ * Remove a job's staging checkout (`staging`: its payload.staging record) through Orca: removeOrcaWorktree unlinks every
+ * link (the node_modules junction included) and asserts none is left, runs `orca worktree rm`, asserts the main checkout
+ * untouched and closes the registry row. Its recorded branch goes too when its work landed (`landed`: `git branch -D`)
+ * or it holds no commit beyond main (`git branch -d`); otherwise it is kept so nothing a worker committed is lost.
+ * Idempotent. {jobId, path, removed, branchDeleted, branchKept?} | {..., removed:false, code, reason?, error, fatal?}
  */
-export function removeStaging({ jobId, root = SKILL_ROOT, env = process.env, landed = false, base = null }) {
-  const dir = stagingPathOf(jobId, env);
-  const out = { jobId, path: dir, removed: false, branchDeleted: false };
-  if (fs.existsSync(dir)) {
-    // safeRemoveWorktree: every link (the node_modules junction included) removed as a link, found without following
-    // one; zero links asserted; only then `git worktree remove`; the main checkout asserted untouched.
-    const registered = git(['rev-parse', '--git-dir'], { cwd: dir }).ok;
-    const r = safeRemoveWorktree(dir, { repo: root, git });
-    out.removed = r.ok;
-    if (r.fatal) { out.fatal = true; out.damage = r.damage; }
-    if (!r.ok) out.error = r.errors.slice(0, 3).map((e) => `${e.code} ${e.path}: ${e.message}`).join('; ');
-    else if (!registered) out.unregistered = true;
-  } else out.removed = true;
-  git(['worktree', 'prune'], { cwd: root });
-  if (out.removed) markRemoved(dir, { env });
-  const branch = branchOf(jobId);
-  const exists = git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: root }).ok;
-  if (exists) {
-    const ahead = base ? Number(git(['rev-list', '--count', `${base}..${branch}`], { cwd: root }).stdout) || 0 : 1;
-    if (landed || ahead === 0) out.branchDeleted = git(['branch', '-D', branch], { cwd: root }).ok;
-    else out.branchKept = branch;
+export function removeStaging({ jobId, staging, root = SKILL_ROOT, env = process.env, landed = false, orca = orcaWorktreeClient }) {
+  const out = { jobId, path: staging?.path ?? null, removed: false, branchDeleted: false };
+  if (!staging?.path || !staging?.orcaId) return { ...out, code: 'WORKER_STAGING_REMOVE_FAILED', error: `job ${jobId} records no Orca staging checkout (path and orcaId)` };
+  const r = removeOrcaWorktree({ repoRoot: root, orcaId: staging.orcaId, dir: staging.path, branch: staging.branch ?? null,
+    deleteBranch: staging.branch ? (landed ? 'force' : 'merged') : null, env, orca });
+  if (r.ok || r.reason === 'branch-delete-failed') {
+    // branch-delete-failed: the tree is gone and the branch holds commits main lacks - it is kept, never forced.
+    out.removed = true;
+    out.branchDeleted = r.branch?.deleted === true;
+    if (staging.branch && !out.branchDeleted) out.branchKept = staging.branch;
+    return out;
   }
-  return out;
+  const detail = typeof r.detail === 'string' ? r.detail : r.detail ? JSON.stringify(r.detail).slice(0, 200) : '';
+  const errors = (r.errors ?? []).map((e) => `${e.code ?? ''} ${e.path ?? ''}`.trim()).join('; ');
+  return { ...out, reason: r.reason, code: 'WORKER_STAGING_REMOVE_FAILED', error: [r.reason, detail, errors].filter(Boolean).join(': '),
+    ...(r.fatal ? { fatal: true, damage: r.damage } : {}) };
 }
 
 /* ------------------------------------------------------------ routing */
@@ -385,9 +392,10 @@ export async function startWorkerAgent({ route, worktree, title, prompt, specFil
  * startAgent): a staging checkout is a git worktree of the runtime repository, which Orca resolves under the runtime's
  * project. Its guard is bound to the worker's terminal (bindGuardTerminal). A failed launch releases its leases,
  * removes its checkout and requeues the job (failed after MAX_SPAWN_ATTEMPTS).
- * `deps`: {start, bindGuard, route, load, staging, unstage} for specs.
+ * `deps`: {start, bindGuard, route, load, staging, unstage, orca} for specs (orca: the Orca worktree client).
  */
 export async function spawnWorkers(m, { jobId = null, dryRun = false, settings = supervisorSettings(), deps = {}, env = process.env, root = SKILL_ROOT, now = Date.now } = {}) {
+  const orca = deps.orca ?? orcaWorktreeClient;
   const queuedJobs = jobsOf(m, ['queued']).filter((j) => !j.payload.self && (!jobId || j.job_id === jobId));
   const running = jobsOf(m, ACTIVE_STATUSES).filter((j) => !j.payload.self).length;
   const load = (deps.load ?? machineLoad)();
@@ -405,8 +413,8 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     const route = await (deps.route ?? ((opts) => routeWorker(opts)))({ m, prefer, avoid, env });
     if (route.error) { result.skipped.push({ jobId: job.job_id, reason: route.error, routeSkipped: route.skipped }); continue; }
     if (dryRun) { result.launched.push({ jobId: job.job_id, wouldLaunch: true, agent: route.agent, model: route.model, pool: route.pool }); live += 1; continue; }
-    const staging = (deps.staging ?? createStaging)({ jobId: job.job_id, root, env });
-    if (!staging.ok) { result.failed.push({ jobId: job.job_id, step: 'staging', error: staging.error }); continue; }
+    const staging = (deps.staging ?? createStaging)({ jobId: job.job_id, root, env, orca });
+    if (!staging.ok) { result.failed.push({ jobId: job.job_id, step: 'staging', code: staging.code ?? 'WORKER_STAGING_CREATE_FAILED', error: staging.error }); continue; }
     // One sup_attempts row per spawn: who (agent/model), where (staging checkout, branch, base).
     const leased = m.transaction(() => {
       const held = takeLeases(m, job);
@@ -417,7 +425,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
       return { ok: true, attemptId };
     });
     if (!leased.ok) {
-      (deps.unstage ?? removeStaging)({ jobId: job.job_id, root, env, base: staging.base });
+      (deps.unstage ?? removeStaging)({ jobId: job.job_id, staging: stagingRecord(staging), root, env, orca });
       result.skipped.push({ jobId: job.job_id, reason: `files leased by ${[...new Set(leased.conflicts.map((c) => c.holder))].join(', ')}` });
       continue;
     }
@@ -429,7 +437,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
       specFile: path.join(root, 'runtime', 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
       onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); },
       start: deps.start ?? null });
-    const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: { path: staging.path, branch: staging.branch, base: staging.base },
+    const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: stagingRecord(staging),
       spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1, guard: guard.receipt,
       ...(spawned?.ok ? { dispatch: spawned.dispatchId, runId: spawned.runId, taskId: spawned.taskId } : {}) };
     if (!spawned?.ok) {
@@ -449,7 +457,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
           result: exhausted ? { reason: 'spawn-failed', step: spawned?.step ?? null, error: spawned?.error ?? null } : null } });
         supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { agent: route.agent, step: spawned?.step ?? null, error: spawned?.error ?? null, exhausted, ...(outage ? { outage: outage.failureKind } : {}) }, now: now() });
       });
-      (deps.unstage ?? removeStaging)({ jobId: job.job_id, root, env, base: staging.base });
+      (deps.unstage ?? removeStaging)({ jobId: job.job_id, staging: stagingRecord(staging), root, env, orca });
       result.failed.push({ jobId: job.job_id, step: spawned?.step ?? 'spawn', error: spawned?.error ?? null, agent: route.agent, requeued: !exhausted });
       continue;
     }
@@ -465,24 +473,24 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
 }
 
 /** The Supervisor's own staging checkout: a self job (no terminal) holding leases, landed through land.mjs. */
-export function stageSelf(m, { name, files, root = SKILL_ROOT, env = process.env, now = Date.now() }) {
+export function stageSelf(m, { name, files, root = SKILL_ROOT, env = process.env, now = Date.now(), orca = orcaWorktreeClient }) {
   const created = createJob(m, { cluster: `self-${slug(name)}`, title: name, files, self: true, now });
   const job = created.job;
   if (job.status === 'running' && job.payload.staging?.path && fs.existsSync(job.payload.staging.path)) return { ok: true, reused: true, jobId: job.job_id, ...job.payload.staging };
   const conflicts = leaseConflicts(m, job.payload.files, job.job_id);
   if (conflicts.length) return { ok: false, jobId: job.job_id, error: `files leased by ${[...new Set(conflicts.map((c) => c.jobId))].join(', ')}`, conflicts };
-  const staging = createStaging({ jobId: job.job_id, root, env });
-  if (!staging.ok) return { ok: false, jobId: job.job_id, error: staging.error };
+  const staging = createStaging({ jobId: job.job_id, root, env, orca });
+  if (!staging.ok) return { ok: false, jobId: job.job_id, code: staging.code, error: staging.error };
   const held = m.transaction(() => {
     const leased = takeLeases(m, job);
     if (!leased.ok) return leased;
     m.startSupAttempt({ jobId: job.job_id, worktreePath: staging.path, branch: staging.branch, baseSha: staging.base });
-    setJob(m, job.job_id, { status: 'running', payload: { ...job.payload, staging: { path: staging.path, branch: staging.branch, base: staging.base } } });
+    setJob(m, job.job_id, { status: 'running', payload: { ...job.payload, staging: stagingRecord(staging) } });
     supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'supervisor-staged', payload: { staging: staging.path, files: job.payload.files }, now });
     return { ok: true };
   });
   if (!held.ok) {
-    removeStaging({ jobId: job.job_id, root, env, base: staging.base });
+    removeStaging({ jobId: job.job_id, staging: stagingRecord(staging), root, env, orca });
     return { ok: false, jobId: job.job_id, error: `files leased by ${[...new Set(held.conflicts.map((c) => c.holder))].join(', ')}` };
   }
   return { ok: true, jobId: job.job_id, ...staging };
@@ -561,7 +569,7 @@ export function fileReport(m, { jobId, outcome, commit = null, specs = [], summa
 }
 
 /** Cancel a job: leases released, checkout removed (its branch kept when it holds commits). */
-export function cancelJob(m, { jobId, reason = 'cancelled by the Supervisor', root = SKILL_ROOT, env = process.env, now = Date.now(), closeDeps = {} }) {
+export function cancelJob(m, { jobId, reason = 'cancelled by the Supervisor', root = SKILL_ROOT, env = process.env, now = Date.now(), closeDeps = {}, orca = orcaWorktreeClient }) {
   const job = jobOf(m, jobId);
   if (!job) return { ok: false, error: `no job ${jobId}` };
   if (!OPEN_STATUSES.includes(job.status)) return { ok: false, error: `job ${jobId} is already ${job.status}` };
@@ -571,7 +579,7 @@ export function cancelJob(m, { jobId, reason = 'cancelled by the Supervisor', ro
     setJob(m, jobId, { status: 'cancelled', payload: { ...job.payload, result: { reason } } });
     supervisorEvent(m, { entityType: 'job', entityId: jobId, kind: 'worker-cancelled', payload: { reason }, now });
   });
-  const staged = job.payload.staging ? removeStaging({ jobId, root, env, base: job.payload.staging.base }) : null;
+  const staged = job.payload.staging ? removeStaging({ jobId, staging: job.payload.staging, root, env, orca }) : null;
   const terminalClosed = closeWorkerTerminal(m, { jobId, env, now, ...closeDeps });
   return { ok: true, jobId, terminal: job.worker_id ?? null, staged, ...(terminalClosed ? { terminalClosed } : {}) };
 }
@@ -595,7 +603,7 @@ export function ackReport(m, { jobId, reason, now = Date.now() }) {
 }
 
 /** Mark a landed job succeeded, release its leases and remove its checkout and temp branch. */
-export function finishLanded(m, { jobId, landedSha, root = SKILL_ROOT, env = process.env, now = Date.now(), closeDeps = {} }) {
+export function finishLanded(m, { jobId, landedSha, root = SKILL_ROOT, env = process.env, now = Date.now(), closeDeps = {}, orca = orcaWorktreeClient }) {
   const job = jobOf(m, jobId);
   if (!job) return { ok: false, error: `no job ${jobId}` };
   m.transaction(() => {
@@ -604,7 +612,7 @@ export function finishLanded(m, { jobId, landedSha, root = SKILL_ROOT, env = pro
     setJob(m, jobId, { status: 'succeeded', payload: { ...job.payload, result: { landed: landedSha ?? null } } });
     for (const r of m.supReports({ jobId, unconsumed: true })) m.consumeSupReport(r.report_id);
   });
-  const staged = job.payload.staging ? removeStaging({ jobId, root, env, landed: true, base: job.payload.staging.base }) : null;
+  const staged = job.payload.staging ? removeStaging({ jobId, staging: job.payload.staging, root, env, landed: true, orca }) : null;
   const terminalClosed = closeWorkerTerminal(m, { jobId, env, now, ...closeDeps });
   return { ok: true, jobId, staged, terminal: job.worker_id ?? null, ...(terminalClosed ? { terminalClosed } : {}) };
 }
@@ -618,7 +626,7 @@ export function recordLandFailed(m, { jobId, reason, startedAt = Date.now() }) {
 
 /**
  * The running self jobs (workers.mjs stage --self) a `--commit` land just completed: a landed commit is on the
- * job's branch sup/<job> beyond its base, and `git cherry main <branch> <base>` finds no commit of that branch
+ * job's recorded staging branch beyond its base, and `git cherry main <branch> <base>` finds no commit of that branch
  * still missing from main. A branch only partly landed stays open ({jobId, pending}). Returns {done: [jobId], partial}.
  */
 export function selfJobsLandedBy(m, commits, { root = SKILL_ROOT } = {}) {
@@ -636,9 +644,9 @@ export function selfJobsLandedBy(m, commits, { root = SKILL_ROOT } = {}) {
 }
 
 /** Remove the checkouts of every finished job that still has one. */
-export function cleanupStaging(m, { jobId = null, root = SKILL_ROOT, env = process.env } = {}) {
-  const done = jobsOf(m, FINAL_STATUSES).filter((j) => (!jobId || j.job_id === jobId) && j.payload.staging && fs.existsSync(stagingPathOf(j.job_id, env)));
-  return done.map((j) => removeStaging({ jobId: j.job_id, root, env, landed: j.status === 'succeeded', base: j.payload.staging.base }));
+export function cleanupStaging(m, { jobId = null, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient } = {}) {
+  const done = jobsOf(m, FINAL_STATUSES).filter((j) => (!jobId || j.job_id === jobId) && j.payload.staging?.path && fs.existsSync(j.payload.staging.path));
+  return done.map((j) => removeStaging({ jobId: j.job_id, staging: j.payload.staging, root, env, landed: j.status === 'succeeded', orca }));
 }
 
 /* ------------------------------------------------------------ listing */

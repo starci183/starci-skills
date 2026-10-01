@@ -1,6 +1,6 @@
 // worktree-add.mjs — the only `git worktree add` of the runtime (scripts/checks/check-worktree-add.mjs fails any other,
 // in this file outside createScratchWorktree too): a runtime-internal scratch tree no agent ever works in (land/push
-// scratch, the verify-proof base tree, the supervisor's revert lane, the [Worker] staging checkout until it moves to Orca).
+// scratch, the verify-proof base tree, the supervisor's revert lane).
 // Such a tree is created and removed (worktree-remove.mjs) by the same process; Orca never needs to see it. An agent's
 // workspace is an Orca kind: scripts/api/orca/worktree-provision.mjs.
 import fs from 'node:fs';

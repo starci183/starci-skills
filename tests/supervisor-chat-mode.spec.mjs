@@ -18,7 +18,6 @@ import { drainRefusal, registrationRefusal, replyToOwner } from '../scripts/supe
 import { supervisorMode, supervisorSettings } from '../scripts/supervisor/home.mjs';
 import { launchSupervisor, CHAT_MODE_REASON } from '../scripts/supervisor/start-supervisor.mjs';
 import { watchdogPass } from '../scripts/supervisor/watchdog.mjs';
-import { removeStaging, stagingPathOf } from '../scripts/supervisor/workers.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const CHANNEL = path.join(ROOT, 'scripts', 'supervisor', 'channel.mjs');
@@ -141,28 +140,4 @@ test('chat mode reply: a Telegram message is answered on Telegram; a runtime ale
   assert.equal(sent.length, 1, 'a runtime alert is never answered on Telegram');
   assert.equal(readInbox('main', env).find((m) => m.id === alert.id).read, true);
   assert.deepEqual(readOutbox('main', env).map((o) => o.via), ['telegram', 'local']);
-});
-
-test('workers cleanup removes a staging directory whose worktree registration is gone (prune, then remove)', (t) => {
-  const root = tmp(t, 'sup-chat-git-');
-  const repo = path.join(root, 'repo');
-  const git = (...args) => { const r = spawnSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
-  fs.mkdirSync(repo);
-  git('init', '-q', '-b', 'main');
-  fs.writeFileSync(path.join(repo, 'a.txt'), 'a\n');
-  git('add', '.');
-  git('-c', 'user.email=spec@example.com', '-c', 'user.name=spec', 'commit', '-q', '-m', 'init');
-  const env = { STARCI_LANES_ROOT: path.join(root, 'lanes') };
-  const jobId = 'fix-gone-registration-000001';
-  const dir = stagingPathOf(jobId, env);
-  fs.mkdirSync(path.dirname(dir), { recursive: true });
-  git('worktree', 'add', '-q', '-b', `sup/${jobId}`, dir, 'main');
-  // The registration disappears (its admin dir removed); the checkout directory stays behind.
-  fs.rmSync(path.join(repo, '.git', 'worktrees', path.basename(dir)), { recursive: true, force: true });
-  const out = removeStaging({ jobId, root: repo, env, landed: true });
-  assert.equal(out.removed, true, out.error);
-  assert.equal(out.unregistered, true);
-  assert.equal(fs.existsSync(dir), false, 'the directory is gone');
-  assert.equal(out.branchDeleted, true);
-  assert.doesNotMatch(git('worktree', 'list'), /fix-gone-registration/);
 });

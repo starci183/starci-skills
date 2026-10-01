@@ -36,9 +36,9 @@ export const DEFAULTS = Object.freeze({
   pollIntervalMs: 600_000,
 });
 
-// The worktrees live under the one lanes root (scripts/lib/hk-lanes.mjs: runtimes.yaml
-// allocation.housekeeping.lanesRoot, STARCI_LANES_ROOT, default D:/starci-lanes), never on C:.
-export const stagingRoot = (env = process.env) => path.join(lanesRoot({ env }), 'staging');
+// The land scratch trees live under the one lanes root (scripts/lib/hk-lanes.mjs: runtimes.yaml
+// allocation.housekeeping.lanesRoot, STARCI_LANES_ROOT, default D:/starci-lanes), never on C:. A [Worker] staging
+// checkout is an Orca worktree (workers.mjs createStaging): Orca places it, the job records where.
 export const landRoot = (env = process.env) => path.join(lanesRoot({ env }), 'land');
 
 /** fn(machine handle) over a writer, closed afterwards. */

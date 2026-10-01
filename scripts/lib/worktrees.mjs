@@ -2,7 +2,7 @@
 // Kernel workflow; never write it ourselves when Orca has it).
 //
 // Two homes, decided by who works in the tree, each created and removed only through its api:
-//   Orca     an agent's workspace (kind workflow, critic): scripts/api/orca/worktree-provision.mjs creates and binds it,
+//   Orca     an agent's workspace (kind workflow, critic, supervisor-staging): scripts/api/orca/worktree-provision.mjs creates and binds it,
 //            scripts/api/orca/worktree-remove.mjs removes it (links first, then `orca worktree rm`). Never git.
 //   git      a runtime-internal scratch tree no agent ever works in: scripts/api/git/worktree-add.mjs createScratchWorktree
 //            holds the only `git worktree add` of the runtime (scripts/checks/check-worktree-add.mjs fails any other),

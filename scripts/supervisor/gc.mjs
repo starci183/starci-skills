@@ -34,9 +34,10 @@
 //             nothing, whose screen holds nothing but prompts, older than gcMinAgeMs (by first sight, or by the age of
 //             every child-less `powershell -NoExit` under the Orca daemon). 322 of them held ~20 GB on 2026-09-28.
 //   lanes     worktrees under the lanes root (hk-lanes.mjs lanesRoot): a lane/* branch landed by patch, ledger or
-//             file content with a clean tree, idle for gcLaneGraceMs; a sup/<job> staging checkout whose job is finished;
-//             a detached land scratch while no land runs; an empty leftover directory. The node_modules junction is
-//             unlinked first, then the tree goes through safeRemoveTree (links unlinked, never followed; never
+//             file content with a clean tree, idle for gcLaneGraceMs; a detached land scratch while no land runs; an
+//             empty leftover directory. A [Worker] staging checkout is an Orca worktree registered as supervisor-staging:
+//             the worktree GC (scripts/lib/worktrees.mjs gcWorktrees) removes it once its job settled, never this one.
+//             The node_modules junction is unlinked first, then the tree goes through safeRemoveTree (links unlinked, never followed; never
 //             `git worktree remove --force`, nivo-fe inc-c8fbf76aa499), then the registration is pruned. Lane branches
 //             are kept as commit evidence. Unmerged or dirty lanes are kept and reported.
 //   (ended workflows are NOT purged here: housekeeping is the only purger — 30 days, zipped and verified first, Q6 —
@@ -80,8 +81,8 @@ import { parseJson } from '../lib/json.mjs';
 import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows } from '../lib/terminal-ledger.mjs';
-import { SKILL_ROOT, landRoot, productRepos, seatOf, stagingRoot, readSupervisor, withSupervisor } from './home.mjs';
-import { jobsOf, removeStaging } from './workers.mjs';
+import { SKILL_ROOT, landRoot, productRepos, seatOf, readSupervisor, withSupervisor } from './home.mjs';
+import { jobsOf } from './workers.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { pidAlive } from '../../engine/machine-db.mjs';
 import { LANE_IDLE_MS, laneOwnerOf } from '../lib/lane-owner.mjs';
@@ -104,7 +105,6 @@ const SETTLED_JOB = new Set(SETTLED_JOB_LIST);
 const LANE_LOG = /\.(err|json|log)$/i;
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
 const SUP_LIVE = new Set(['queued', 'spawning', 'running', 'reported']);
-const SUP_FINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const ORCA_DAEMON = /[\\/]daemon-host[\\/]/i;
 const SHELL_TITLE = /^Terminal \d+$/;
 const PROMPT = /PS [A-Za-z]:\\[^>\r\n]*>/g;
@@ -248,14 +248,14 @@ export function onlyPrompts(screen) {
 
 /* ------------------------------------------------------------ registry: what the ledgers own */
 
-/** The Supervisor's view (machine.sqlite): {seat, jobs: [{jobId, status, cluster, handle, stagingPath, branch, base, runId, dispatch}], leases}. */
+/** The Supervisor's view (machine.sqlite): {seat, jobs: [{jobId, status, cluster, handle, staging, stagingPath, branch, base, runId, dispatch}], leases}. */
 export function supervisorView({ env = process.env, now = Date.now() } = {}) {
   return readSupervisor((m) => {
     const seat = seatOf(m, now);
     const jobs = jobsOf(m).map((r) => {
       const p = r.payload ?? {};
       return { jobId: r.job_id, status: r.status, cluster: p.cluster ?? null, handle: r.worker_id ?? null, self: p.self === true,
-        stagingPath: p.staging?.path ?? null, branch: p.staging?.branch ?? null, base: p.staging?.base ?? null, runId: p.runId ?? null, dispatch: p.dispatch ?? null, updatedAt: r.updated_at };
+        staging: p.staging ?? null, stagingPath: p.staging?.path ?? null, branch: p.staging?.branch ?? null, base: p.staging?.base ?? null, runId: p.runId ?? null, dispatch: p.dispatch ?? null, updatedAt: r.updated_at };
     });
     return { seat: seat ? { handle: seat.value?.terminal ?? null, live: !seat.expired && !seat.starting } : null, jobs, leases: supLeaseRowsOf(m) };
   }, { seat: null, jobs: [], leases: [] }, { env });
@@ -608,20 +608,6 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     }
     const d = dirty(w.path);
     if (d === null) { item('keep', w.path, 'status unreadable', { branch }); continue; }
-    if (branch.startsWith('sup/')) {
-      const jobId = branch.slice(4);
-      const job = sup.jobs.find((j) => j.jobId === jobId);
-      if (job && SUP_LIVE.has(job.status)) { item('keep', w.path, `staging of ${job.status} job ${jobId}`, { branch }); continue; }
-      if (d > 0) { item('keep', w.path, `${d} uncommitted change(s)`, { branch, unmerged: true }); continue; }
-      if (job && SUP_FINAL.has(job.status)) {
-        const bytes = treeBytes(w.path);
-        if (!apply) { item('collect', w.path, `would remove staging of ${job.status} job ${jobId}`, { bytes, branch, worktree: true }); freedBytes += bytes; continue; }
-        const r = removeStaging({ jobId, root, env, landed: job.status === 'succeeded', base: job.base });
-        if (r.removed) { item('collect', w.path, `removed staging of ${job.status} job ${jobId}${r.branchKept ? ` (branch ${r.branchKept} kept: it holds commits)` : ''}`, { bytes, branch, ok: true, branchDeleted: r.branchDeleted === true, worktree: true }); freedBytes += bytes; }
-        else { errors.push(`${w.path}: ${r.error ?? 'staging removal failed'}`); item('refuse', w.path, r.error ?? 'staging removal failed', { ok: false }); }
-        continue;
-      }
-    }
     if (d > 0) { item('keep', w.path, `${d} uncommitted change(s)`, { branch, unmerged: true }); continue; }
     const cherry = run(['cherry', 'main', branch], { cwd: root });
     if (!cherry.ok) { item('keep', w.path, 'merge check failed', { branch }); continue; }
@@ -646,8 +632,8 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
   }
   if (fatal) return { items, freedBytes, errors, progress, fatal };
   if (apply) run(['worktree', 'prune'], { cwd: root });
-  // Leftover empty directories of removed checkouts (staging/<job>, land/<scratch>) whose registration is gone.
-  for (const parent of [stagingRoot(env), landRoot(env)]) {
+  // Leftover empty directories of removed land scratch checkouts whose registration is gone.
+  for (const parent of [landRoot(env)]) {
     let names = [];
     try { names = fs.readdirSync(parent); } catch { continue; }
     for (const name of names) {

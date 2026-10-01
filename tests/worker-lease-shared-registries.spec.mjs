@@ -24,7 +24,7 @@ const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', re
 const fakeDeps = (into) => ({
   load: () => ({ cpuBusy: 0, freeMem: 1 }),
   route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
-  staging: ({ jobId }) => ({ ok: true, path: path.join(into.stagingRoot, jobId), branch: `sup/${jobId}`, base: 'abc' }),
+  staging: ({ jobId }) => ({ ok: true, path: path.join(into.stagingRoot, jobId), branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::${jobId}` }),
   unstage: () => ({}),
   guard: (jobId, opts) => workerGuard(jobId, { ...opts, launch: (args) => { into.guards.push(args); return { env: {}, pathPrefix: 'bin', receipt: {} }; } }),
   start: (opts) => { into.spawned.push(opts); return { ok: true, terminal: `term_${into.spawned.length}`, dispatchId: `ctx_${into.spawned.length}` }; },

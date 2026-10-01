@@ -1,7 +1,8 @@
 // worktree-provision.mjs — an agent's workspace made by Orca and registered (owner decision WFWT: never write it
 // ourselves when Orca has it). The Kernel's workflow worktree (kind workflow) is created by Orca itself - the Kernel's
 // `orchestration worker-start --worktree new-child ...` (scripts/kernel/workflow-worktree.mjs), which binds it here - and
-// the draw critic's placement (kind critic) by `orca worktree create` (createOrcaWorktree). Orca owns the resource and
+// the draw critic's placement (kind critic) and the [Worker] staging checkout (kind supervisor-staging,
+// scripts/supervisor/workers.mjs createStaging) by `orca worktree create` (createOrcaWorktree). Orca owns the resource and
 // lists it in its sidebar; the registry keys the row by Orca's worktree id (orca_id) and the path Orca reported.
 // reserveOrcaSlot takes the per-repo cap slot BEFORE Orca creates anything (a pending row); bindOrcaWorktree turns it
 // into the real row. Its removal is worktree-remove.mjs.
@@ -60,7 +61,7 @@ export function bindOrcaWorktree({ pending = null, repoRoot, kind, orcaId, dir, 
 }
 
 /**
- * Create an Orca worktree (a Kernel workflow's, scripts/kernel/workflow-worktree.mjs; the draw critic's placement): the
+ * Create an Orca worktree (a Kernel workflow's, scripts/kernel/workflow-worktree.mjs; the draw critic's placement; a [Worker] staging checkout): the
  * slot reserved, `orca worktree create --repo path:<repo> --name <name> --base-branch <base> --setup <setup> --no-parent`,
  * the row bound to what Orca returned (its id, path and branch).
  * {ok, id, path, branch, head} | {ok:false, reason:'worktree-cap'|'worktree-registry-unavailable'|'orca-worktree-create-failed', detail}

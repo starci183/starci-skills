@@ -61,7 +61,7 @@ test('spawnWorkers: the default guard call passes the job\'s leased files and it
   const deps = {
     load: () => ({ cpuBusy: 0, freeMem: 1 }),
     route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
-    staging: ({ jobId }) => ({ ok: true, path: stagingPath, branch: `sup/${jobId}`, base: 'abc' }),
+    staging: ({ jobId }) => ({ ok: true, path: stagingPath, branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::${jobId}` }),
     unstage: () => ({}), command: () => null,
     guard: (jobId, opts) => workerGuard(jobId, { ...opts, launch: fakeLaunch(launched) }),
     bindGuard: (args) => { bound.push(args); return 'bound.json'; },

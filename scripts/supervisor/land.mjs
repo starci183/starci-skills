@@ -887,16 +887,16 @@ export function specsRedOnMainDecision({ redOnMain, root, commits, now }) {
     evidence: redOnMain.inherited.slice(0, 20).map((f) => ({ ref: `spec:${f.file}`, why: f.name.slice(0, 300) })), payload: { base: redOnMain.base, inherited: redOnMain.inherited, commits } };
 }
 /** The machine records of one land: the core outcome (landOutcomeOf), then the job, self-job and push-owed follow-ups. */
-function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt, outcome = null }) {
+function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt, outcome = null, orca = undefined }) {
   const { runId } = m.recordLandOutcome(outcome ?? landOutcomeOf(result, { root, ticketId, lane, commits, jobId, specMode, startedAt }));
   // A landed job is succeeded, its leases released, its checkout, branch and [Worker] terminal gone (finishLanded).
   // --commit of a self checkout's commits closes that self job as --job would: left open, it kept its file leases
   // and blocked every worker needing them. A red gate keeps the failure on the job.
   const landedSha = result.landed ?? result.alreadyLanded ?? null;
-  if (result.ok && jobId && m.supJob(jobId)) result.finished = finishLanded(m, { jobId, landedSha, root, env });
+  if (result.ok && jobId && m.supJob(jobId)) result.finished = finishLanded(m, { jobId, landedSha, root, env, ...(orca ? { orca } : {}) });
   if (result.ok && !jobId) {
     const self = selfJobsLandedBy(m, commits, { root });
-    if (self.done.length) result.finished = self.done.map((id) => finishLanded(m, { jobId: id, landedSha, root, env }));
+    if (self.done.length) result.finished = self.done.map((id) => finishLanded(m, { jobId: id, landedSha, root, env, ...(orca ? { orca } : {}) }));
     if (self.partial.length) result.selfPending = self.partial;
   }
   if (!result.ok && jobId) recordLandFailed(m, { jobId, reason: result.reason ?? null, startedAt });
@@ -945,7 +945,7 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
   const health = (deps.gitHealth ?? waitGitHealthy)({ root });
   if (!health.ok) {
     const result = { ok: false, commits, reason: 'git-unusable', preflight: true, detail: health.detail, hint: health.hint };
-    try { withMachine((m) => recordLand(m, { result, root, env, lane, commits, jobId, startedAt }), { env }); } catch { /* the answer carries it */ }
+    try { withMachine((m) => recordLand(m, { result, root, env, lane, commits, jobId, startedAt, orca: deps.orca }), { env }); } catch { /* the answer carries it */ }
     return result;
   }
   if (lane) withMachine((m) => { if (!m.laneOf(lane)) m.upsertLane({ name: lane, worktreePath: path.join(lanesRoot({ env }), lane), branch: `lane/${lane}`, owner: jobId ? `worker:${jobId}` : 'owner-chat' }); }, { env });
@@ -956,7 +956,7 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
     if (!pre.ok) {
       const result = { ok: false, commits, reason: 'conflict', preflight: true, base: pre.onto ?? null, conflicts: pre.conflicts, hint: conflictHint(pre.conflicts, pre.conflicts[0]?.commit),
         detail: `does not apply on main ${String(pre.onto ?? '').slice(0, 9)}: ${pre.conflicts.map((c) => c.file).join(', ')}` };
-      withMachine((m) => recordLand(m, { result, root, env, lane, commits, jobId, startedAt }), { env });
+      withMachine((m) => recordLand(m, { result, root, env, lane, commits, jobId, startedAt, orca: deps.orca }), { env });
       return result;
     }
   }
@@ -965,7 +965,7 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
   const branch = (deps.liveBranch ?? (() => git(['symbolic-ref', '-q', 'HEAD'], { cwd: root }).stdout))();
   if (branch !== 'refs/heads/main') {
     const result = { ok: false, commits, reason: 'live-not-on-main', preflight: true, detail: branch || 'detached' };
-    try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt }), { env }); } catch { /* the answer carries it */ }
+    try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt, orca: deps.orca }), { env }); } catch { /* the answer carries it */ }
     return result;
   }
   let fullAllowed = false;
@@ -977,7 +977,7 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
     // MB-10: a busy gate is a visible, recorded outcome that names the lane, its commits, the wait and the holder.
     const result = { ok: false, commits, lane, reason: 'gate-busy', why: lock.why ?? 'gate-held', holder: lock.holder ?? null, ahead: lock.ahead ?? 0, waitedMs: Date.now() - startedAt,
       detail: `${lock.why === 'db-busy' ? 'machine.sqlite locked; ' : ''}waited ${Math.round((Date.now() - startedAt) / 1000)}s${lock.holder ? ` behind ${lock.holder.lane ?? lock.holder.ticketId ?? 'a land'} (${String(lock.holder.commit ?? '').slice(0, 9)})` : ''}` };
-    try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt }), { env }); } catch { /* the answer carries it */ }
+    try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt, orca: deps.orca }), { env }); } catch { /* the answer carries it */ }
     return result;
   }
   let state = 'cancelled';
@@ -992,7 +992,7 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
     // main already moved: a failed record never turns a landed change into a failed land; it is reported instead
     // (recordError) and the core record is written again, or queued in the outbox for the next land (recordDeferred).
     const outcome = landOutcomeOf(result, { root, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt });
-    try { result.landRun = withMachine((m) => recordLand(m, { result, root, env, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt, outcome }), { env }); }
+    try { result.landRun = withMachine((m) => recordLand(m, { result, root, env, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt, outcome, orca: deps.orca }), { env }); }
     catch (error) {
       result.recordError = String(error?.message ?? error);
       const again = writeOrDefer('recordLandOutcome', [outcome], { env });

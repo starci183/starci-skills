@@ -22,7 +22,7 @@ export const PRESERVED_PREFIX = 'preserved';
 /** The registry kinds (machine.sqlite worktrees.kind CHECK, 0003-worktrees-workflow-orca). */
 export const WORKTREE_KINDS = Object.freeze(['workflow', 'critic', 'land-scratch', 'push-scratch', 'supervisor-staging', 'lane']);
 /** The kinds Orca creates and removes: an agent's workspace. */
-export const ORCA_KINDS = Object.freeze(['workflow', 'critic']);
+export const ORCA_KINDS = Object.freeze(['workflow', 'critic', 'supervisor-staging']);
 /** The kinds the runtime creates with git: a runtime-internal scratch tree no agent works in. */
 export const SCRATCH_KINDS = Object.freeze(WORKTREE_KINDS.filter((k) => !ORCA_KINDS.includes(k)));
 /** The workflow phases after which its worktree is collectable (runtime 0001-init workflows.phase). */

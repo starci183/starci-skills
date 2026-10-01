@@ -6013,6 +6013,30 @@ WORKER_RELEASE_REFUSED:
   owner: runtime-core
   kind: runtime-fault
 
+WORKER_STAGING_CREATE_FAILED:
+  title: "Worker staging checkout could not be created through Orca"
+  title_vi: "Không tạo được bản checkout tạm của Worker qua Orca"
+  meaning_vi: "Runtime xin Orca tạo worktree tạm cho một job [Worker] (hoặc lane tự sửa của Supervisor) nhưng Orca từ chối, sổ worktree đang bận, hoặc biên nhận của Orca thiếu nhánh hay commit gốc; job chưa được khởi chạy và không có worktree nào bị bỏ lại."
+  causes_vi:
+    - "Orca không chạy hoặc từ chối lệnh worktree create"
+    - "Sổ worktree trong machine.sqlite đang bị khóa"
+    - "Biên nhận của Orca không có nhánh hoặc commit gốc"
+  nextStep_vi: "Supervisor xem lỗi trong kết quả spawn hoặc stage, kiểm tra Orca đang chạy rồi spawn lại; job vẫn ở hàng đợi nên không mất việc."
+  owner: supervisor
+  kind: runtime-fault
+
+WORKER_STAGING_REMOVE_FAILED:
+  title: "Worker staging checkout could not be removed through Orca"
+  title_vi: "Không gỡ được bản checkout tạm của Worker qua Orca"
+  meaning_vi: "Runtime gỡ worktree tạm của một job [Worker] theo đường an toàn (bỏ liên kết trước, rồi orca worktree rm, rồi đóng dòng sổ) nhưng bị dừng: job không ghi worktree Orca nào, còn liên kết không bỏ được, Orca từ chối, hoặc bản checkout chính bị đụng tới."
+  causes_vi:
+    - "Job không có bản ghi staging với mã worktree của Orca"
+    - "Một liên kết như node_modules không bỏ được"
+    - "Orca từ chối lệnh worktree rm"
+  nextStep_vi: "Bộ dọn worktree (gcWorktrees) thử lại ở lượt sau; nếu vẫn lỗi thì Supervisor xem worktree đó trong Orca và lỗi đã ghi trên dòng sổ."
+  owner: supervisor
+  kind: runtime-fault
+
 WORKER_STALLED:
   title: "Worker is stalled"
   title_vi: "Worker đang đứng yên"
