@@ -72,6 +72,7 @@ import { markRemoved } from '../lib/worktree-registry.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
 import { grammarDistStatus } from '../checks/grammar-dist.mjs';
+import { specsDependingOn } from '../lib/spec-deps.mjs';
 import { CONTRACT_CHANGES_DIR, isContractChangesPath, readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
 import { SKILL_ROOT, landRoot, supervisorSettings } from './home.mjs';
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
@@ -142,11 +143,14 @@ export const specsInvariant = (changed, { specs }) => {
 };
 /** Specs that name a changed file (its last two path segments, or its name for a top-level file), the invariant specs
  *  scanning a changed file's root, plus changed specs. */
-export function specsTouching(changed, { specs }) {
+export function specsTouching(changed, { specs, root = null }) {
   const needles = changed.map(normPath).filter((f) => !f.startsWith('tests/')).map((f) => f.split('/').slice(-2).join('/'));
   const own = changed.map(normPath).filter((f) => /^tests\/[^/]+\.spec\.mjs$/.test(f));
   const hits = specs.filter(({ file, text }) => needles.some((n) => text.includes(n)) && file).map((s) => s.file);
-  return [...new Set([...own, ...hits, ...specsInvariant(changed, { specs })])];
+  // By dependency too: every spec whose relative-import graph reaches a changed file (scripts/lib/spec-deps.mjs), so a
+  // clash between two lanes is refused at land time, not found at the final full run.
+  const deps = root ? specsDependingOn(root, changed.map(normPath), specs.map((s) => s.file).filter(Boolean)) : [];
+  return [...new Set([...own, ...hits, ...deps, ...specsInvariant(changed, { specs })])];
 }
 
 /** --specs keywords: `touching` = the named specs plus every spec naming a changed file (the default); `all` = every spec
@@ -565,7 +569,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   };
   let extra = [];
   if (specMode === 'all') extra = pool.map((s) => s.file);
-  else if (specMode === 'touching') extra = specsTouching(changed, { specs: pool });
+  else if (specMode === 'touching') extra = specsTouching(changed, { specs: pool, root: dir });
   else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, symbolsOf }); extra = [...d.files, ...specsInvariant(changed, { specs: pool })]; narrowed = d.narrowed; }
   const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
   if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: '--specs none with an explicit --reason: no spec ran (the reason is recorded as specReason on the land run)' });
