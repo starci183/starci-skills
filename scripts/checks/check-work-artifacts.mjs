@@ -5,7 +5,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {sha256File} from '../../engine/digest.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
-import {readWorkspace, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
+import {appRootOf, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
 import {resolveBlob} from '../lib/blob-lookup.mjs';
 
@@ -184,7 +184,7 @@ const SEALED_FILE_RE = /\.enc(?:\.ya?ml|\.json|\.env)?$|\.(?:ya?ml|json|env)\.en
 function declarationsOf(doc, table, ctx) {
   const found = [];
   const baseFor = (rule, entry) => {
-    if (rule.base === 'repo') return {dir: ctx.repoRoot, name: `${path.basename(ctx.repoRoot)} repository root`};
+    if (rule.base === 'repo') return {dir: ctx.repoRoot, name: 'the app root'};
     if (rule.base === 'run') return {dir: ctx.runDir ?? ctx.recordDir, name: `${slash(path.relative(ctx.workRoot, ctx.runDir ?? ctx.recordDir))} run dir`};
     if (rule.base === 'named-record') {
       // Compact format: a `record:` naming `P#frag` or a collapsed `ac.*` id resolves to the record
@@ -198,7 +198,7 @@ function declarationsOf(doc, table, ctx) {
   };
   const resolve = (rule, text, entry) => {
     if (text.startsWith('examples/') || text.startsWith('knowledge/')) return {abs: path.join(root, text), base: 'the skill root'};
-    if (text.startsWith('be/.starcistacks/')) return {abs: path.join(ctx.repoRoot, text), base: `${path.basename(ctx.repoRoot)} repository root`};
+    if (text.startsWith('be/.starcistacks/')) return {abs: path.join(ctx.repoRoot, text), base: 'the app root'};
     const {dir, name} = baseFor(rule, entry);
     return {abs: path.join(dir, text), base: name};
   };
@@ -418,8 +418,8 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     return !custodyRoots.has(relative.split('/')[0]);
   });
   const records = loadRecords(workRoot, canonicalWalk);
-  const workspaceDoc = readWorkspace(workRoot);
-  const backendRoot = path.dirname(workRoot);
+  // Every path a record holds is app-relative (be/..., fe/..., a directory of the app root): the base `repo` is the app root.
+  const appRoot = appRootOf(workRoot);
   // `counts` is what the script looked at, not only what it flagged: the CLI prints it so a clean code can
   // say how many candidates were opened and found whole, the way scripts/checks/check-example-work.mjs's summary does.
   const counts = {declarations: 0, digests: 0, digestsCompared: 0, filesOpened: 0, generatedAssets: 0,
@@ -442,7 +442,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     info: (file, code, msg) => emit.info(file, code, msg),
   };
   const inline = indexInlineCriteria(records);
-  const ctxFor = recordDir => ({workRoot, records, inline, recordDir, repoRoot: backendRoot, ownerDirOf});
+  const ctxFor = recordDir => ({workRoot, records, inline, recordDir, repoRoot: appRoot, ownerDirOf});
 
   // evidence docs by the record directory beside them; the run each one settles on is a claim in bytes
   const evidenceByDir = new Map();
@@ -486,7 +486,7 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     const data = rec.data ?? {};
     if (typeof data.schema === 'string' && !data.schema.startsWith('work/')) continue;
     const indexFile = path.join(rec.dir, 'index.yaml');
-    const ctx = {...ctxFor(rec.dir), repoRoot: repoRootFor(workRoot, data.repository, workspaceDoc)};
+    const ctx = ctxFor(rec.dir);
     const table = data.schema === 'work/resource@1' ? RESOURCE_DECLARATIONS : RECORD_DECLARATIONS;
     const custody = data.schema === 'work/resource@1' && data.custody && typeof data.custody === 'object' ? data.custody : null;
     const sealed = custody?.sealed;

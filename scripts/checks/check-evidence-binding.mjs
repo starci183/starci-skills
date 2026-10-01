@@ -4,7 +4,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
-import {readWorkspace, repoRootFor, resolveOwnedDirs, loadRecords} from '../example/example-ownership.mjs';
+import {appRootOf, readWorkspace, resolveOwnedDirs, loadRecords} from '../example/example-ownership.mjs';
 import {slash, sameOrUnder} from '../lib/path-key.mjs';
 import {runGit} from '../lib/git.mjs';
 import {isDir} from '../lib/fs-kind.mjs';
@@ -50,7 +50,7 @@ import {sha256File} from '../../engine/digest.mjs';
 
 const CODES = ['EVIDENCE_PATH_MISSING', 'EVIDENCE_DIGEST_MISMATCH', 'EVIDENCE_OLDER_THAN_SOURCE', 'EVIDENCE_ASSERTED_NOT_OBSERVED'];
 
-const HELP = `Usage: node scripts/checks/check-evidence-binding.mjs --work <.starciwork root> [--repo <id>=<git root>]... [--json]
+const HELP = `Usage: node scripts/checks/check-evidence-binding.mjs --work <.starciwork root> [--json]
 
 Proves that every \`state: done\` leaf's evidence still binds to the source it claims to prove.
 Findings: ${CODES.join(', ')}.
@@ -70,27 +70,16 @@ export class EvidenceBindingInputError extends Error {
 // ---------- arguments ----------
 
 export function parseArgs(argv) {
-  const out = {workRoot: null, repositories: new Map(), json: false, help: false};
+  const out = {workRoot: null, json: false, help: false};
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
     if (key === '--help' || key === '-h') return {...out, help: true};
     if (key === '--json') { out.json = true; continue; }
-    if (key !== '--work' && key !== '--repo') throw new EvidenceBindingInputError(`Unknown argument ${key}`);
+    if (key !== '--work') throw new EvidenceBindingInputError(`Unknown argument ${key}`);
     const value = argv[++i];
     if (value === undefined) throw new EvidenceBindingInputError(`Missing value for ${key}`);
-    if (key === '--work') {
-      if (out.workRoot !== null) throw new EvidenceBindingInputError('Use --work exactly once');
-      out.workRoot = path.resolve(value);
-      continue;
-    }
-    if (key === '--repo') {
-      const split = value.indexOf('=');
-      if (split < 1 || split === value.length - 1) throw new EvidenceBindingInputError('--repo must be <id>=<git root>');
-      const id = value.slice(0, split), root = path.resolve(value.slice(split + 1));
-      if (out.repositories.has(id)) throw new EvidenceBindingInputError(`Duplicate repository mapping ${id}`);
-      if (!isDir(root)) throw new EvidenceBindingInputError(`Repository ${id} does not map to a readable directory`);
-      out.repositories.set(id, root);
-    }
+    if (out.workRoot !== null) throw new EvidenceBindingInputError('Use --work exactly once');
+    out.workRoot = path.resolve(value);
   }
   if (out.workRoot === null) throw new EvidenceBindingInputError('--work is required');
   if (!isDir(out.workRoot)) throw new EvidenceBindingInputError(`--work ${slash(out.workRoot)} is not a readable directory`);
@@ -188,8 +177,8 @@ function repoRootBehind(dir) {
 }
 
 /** Where a `codeDigest.files[].path` lands on disk: through the owner directory whose key prefixes it,
- * falling back to the record's own repository root for a row no owner claims. */
-function resolveCodeDigestPath(rel, dirs, fallbackRoot) {
+ * falling back to the app root for a row no owner claims. */
+function resolveCodeDigestPath(rel, dirs, appRoot) {
   for (const dir of dirs) {
     const key = slash(dir.rel);
     if (sameOrUnder(rel, key)) {
@@ -202,20 +191,14 @@ function resolveCodeDigestPath(rel, dirs, fallbackRoot) {
 
 // ---------- the four bindings ----------
 
-export function checkEvidenceBinding({workRoot, repositories = new Map()}) {
+export function checkEvidenceBinding({workRoot}) {
   const findings = [];
   const add = (code, node, file, detail) => findings.push({code, node, path: slash(file), detail});
   const workspaceDoc = readWorkspace(workRoot);
   const records = loadRecords(workRoot, walk);
   const gitCache = new Map();
-  const repoRootOf = name => repositories.get(name ?? '') ?? repoRootFor(workRoot, name, workspaceDoc);
-  // `--repo` renames a root, and `resolveOwnedDirs` resolves against the workspace's own layout, so the
-  // directories it returns are rewritten here rather than resolved twice by two different rules.
-  const overrides = new Map([...repositories].map(([name, target]) => [slash(repoRootFor(workRoot, name, workspaceDoc)), slash(target)]));
-  const rehome = dirs => (overrides.size === 0 ? dirs : dirs.map(dir => {
-    const target = overrides.get(repoRootBehind(dir));
-    return target ? {...dir, abs: path.join(target, slash(dir.abs).slice(repoRootBehind(dir).length + 1))} : dir;
-  }));
+  // Every codeDigest path and owner path is app-relative (be/..., fe/...), so a row no owner claims resolves under the app root.
+  const appRoot = appRootOf(workRoot);
 
   for (const [id, record] of [...records].sort((a, b) => a[0].localeCompare(b[0]))) {
     const data = record.data;
@@ -242,8 +225,7 @@ export function checkEvidenceBinding({workRoot, repositories = new Map()}) {
     if (evidence.stale === true) continue;
 
     const evidenceShown = slash(path.relative(workRoot, evidenceFile));
-    const fallbackRoot = repoRootOf(data.repository);
-    const dirs = rehome(resolveOwnedDirs(id, record, records, workspaceDoc, workRoot));
+    const dirs = resolveOwnedDirs(id, record, records, workspaceDoc, workRoot);
     const owned = ownedIndex(dirs);
     const rows = list(evidence.codeDigest?.files).filter(row => row && typeof row.path === 'string');
     const proven = new Set();
@@ -251,7 +233,7 @@ export function checkEvidenceBinding({workRoot, repositories = new Map()}) {
     for (const row of rows) {
       const rel = slash(row.path);
       proven.add(rel);
-      const found = owned.get(rel) ?? resolveCodeDigestPath(rel, dirs, fallbackRoot);
+      const found = owned.get(rel) ?? resolveCodeDigestPath(rel, dirs, appRoot);
       let stat;
       try { stat = fs.statSync(found.abs); } catch { stat = null; }
       if (!stat?.isFile()) {

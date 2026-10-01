@@ -5,7 +5,7 @@ import {isPlainObject} from '../../engine/plain-object.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {walk} from '../checks/check-example-work.mjs';
 import {computeDerived} from './example-derive.mjs';
-import {indexInlineCriteria, repoRootFor, resolveRecordRef} from './example-ownership.mjs';
+import {APP_SIDES, appRootOf, indexInlineCriteria, repoRootFor, resolveRecordRef} from './example-ownership.mjs';
 import {isProductPath} from '../lib/starciwork-boundary.mjs';
 import { canonicalJSON } from '../../engine/canonical-json.mjs';
 
@@ -71,40 +71,31 @@ function readRawTree(workRoot) {
 }
 
 /**
- * The workspace's declared repositories, resolved to a directory on disk. `role: be` always resolves to the
- * repository that owns `workRoot` (the layout's "one project owns one canonical .starciwork in its bound
- * source repository" rule) regardless of its declared name; every other role uses the same bound sibling
- * resolution as Work ownership, including when the backend is an isolated Git worktree. A name that resolves to nothing is left absent
- * from the map rather than guessed at - callers report that as an unresolved repository, not a false path.
+ * The app a Work tree belongs to: its root (where every owner path, app-relative, resolves) and the sides workspace.yaml
+ * declares whose folder is on disk (be, fe). A record naming a repository that is no such side is left unresolved - callers
+ * report that as an unresolved repository, not a false path.
  */
 function resolveRepositories(workRoot) {
-  const backendDir = path.dirname(workRoot);
+  const appRoot = appRootOf(workRoot);
   let workspace = null;
   try { workspace = parseYaml(fs.readFileSync(path.join(workRoot, 'workspace.yaml'), 'utf8')); } catch { workspace = null; }
-  const repositories = Array.isArray(workspace?.repositories) ? workspace.repositories : [];
-  const dirByName = new Map();
-  for (const repo of repositories) {
-    if (!isPlainObject(repo) || typeof repo.name !== 'string' || !repo.name) continue;
-    if (repo.role === 'be') { dirByName.set(repo.name, backendDir); continue; }
-    const candidate = repoRootFor(workRoot, repo.name, workspace);
-    if (fs.existsSync(candidate)) dirByName.set(repo.name, candidate);
-  }
-  return {dirByName, backendDir};
+  const sides = new Set(APP_SIDES.filter(side => {
+    const root = repoRootFor(workRoot, side, workspace);
+    return root && fs.existsSync(root);
+  }));
+  return {sides, appRoot};
 }
 
 /**
- * Whether `ownerOrModulePath`, authored on `record`, resolves to something real on disk. `work/implementation@1`
- * names its own `repository`; `work/business-rule@1` names none (the layout gives it `module` but no sibling
- * `repository` field), so a rule's module is resolved against the backend repository that owns this
- * `.starciwork` tree by default - the same default the layout gives current code in general. Either way, an
- * unresolved *repository name* (declared but not found on disk) is reported distinctly from a resolved
- * repository whose path is simply missing, because the two are different failures.
+ * Whether `ownerOrModulePath`, authored on `record`, resolves to something real on disk. Owner paths are app-relative, so
+ * every path resolves under the app root; a record's `repository` (work/implementation@1 names the side it is delivered on,
+ * work/business-rule@1 names none) must be a side of the app. An unresolved *repository name* is reported distinctly from a
+ * path that is simply missing, because the two are different failures.
  */
 function resolveAnchor(repos, record, relPath) {
   const repoName = typeof record.data.repository === 'string' ? record.data.repository : null;
-  const repoDir = repoName ? repos.dirByName.get(repoName) : repos.backendDir;
-  if (!repoDir) return {exists: false, note: `repository "${repoName}" does not resolve to a directory on disk`};
-  const abs = path.join(repoDir, relPath);
+  if (repoName && !repos.sides.has(repoName)) return {exists: false, note: `repository "${repoName}" is not a side (be, fe) of the app on disk`};
+  const abs = path.join(repos.appRoot, relPath);
   return {exists: fs.existsSync(abs), note: null, abs};
 }
 

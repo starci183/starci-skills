@@ -1,9 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {sha256, sha256File} from '../../engine/digest.mjs';
-import {bindingRepo, projectBinding} from '../kernel/target-repo.mjs';
 
 /**
  * Shared resolution of "what directories does this record's code live under" - the question concepts 1
@@ -50,38 +48,17 @@ export function isWorkRecordSchema(schema, workspaceDoc) {
 }
 
 /**
- * The real directory `repositoryName` (a `work/implementation@1.repository`: the side a record is delivered on, where its
- * proof commands run) names: the side folder the app binding gives that role or name, else the app root. Owner paths do
- * not use it: they are app-relative (ownerPathProblem) and resolve under the app root.
+ * The side folder `repositoryName` (a record's `repository`: be or fe, the repositories workspace.yaml declares, the sides of
+ * hfs.json) names under the app root, or the app root itself when the record names none; null for a name that is not a side
+ * the workspace declares (a record of no folder of this app). Owner paths do not use it: they are app-relative
+ * (ownerPathProblem) and resolve under the app root. The one package.json and every proof command are the app root's.
  */
-function mainCheckoutRoot(repoRoot) {
-  try {
-    const gitFile = path.join(repoRoot, '.git');
-    if (!fs.statSync(gitFile).isFile()) return repoRoot;
-    const pointer = /^gitdir:\s*(.+)\s*$/m.exec(fs.readFileSync(gitFile, 'utf8'))?.[1];
-    if (!pointer) return repoRoot;
-    const gitDir = path.resolve(repoRoot, pointer);
-    const commonDir = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim());
-    return path.dirname(commonDir);
-  } catch { return repoRoot; }
-}
-
-const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const sourceRoot = process.env.STARCI_SOURCE_ROOT
-  ? path.resolve(process.env.STARCI_SOURCE_ROOT) : path.dirname(mainCheckoutRoot(runtimeRoot));
-const bindingByBackend = new Map();
-
 export function repoRootFor(workRoot, repositoryName, workspaceDoc) {
-  const backendRoot = path.dirname(workRoot);
-  if (!repositoryName) return backendRoot;
-  const backendMain = mainCheckoutRoot(backendRoot);
-  if (!bindingByBackend.has(backendMain)) bindingByBackend.set(backendMain, projectBinding(backendMain, {sourceRoot}));
-  const bound = bindingRepo(bindingByBackend.get(backendMain), repositoryName);
-  if (bound) return bound.root;
-  // Unbound: the workspace names the side; a side is the folder of its role under the app root.
+  const appRoot = appRootOf(workRoot);
+  if (!repositoryName) return appRoot;
   const repos = Array.isArray(workspaceDoc?.repositories) ? workspaceDoc.repositories : [];
-  const role = repos.find(r => r?.name === repositoryName)?.role ?? repositoryName;
-  return ['be', 'fe'].includes(role) && fs.existsSync(path.join(backendRoot, role)) ? path.join(backendRoot, role) : backendRoot;
+  const declared = repos.some(r => r?.name === repositoryName && r?.role === repositoryName);
+  return declared && APP_SIDES.includes(repositoryName) ? path.join(appRoot, repositoryName) : null;
 }
 
 function ownedRelPaths(data) {

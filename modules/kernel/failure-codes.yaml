@@ -3697,17 +3697,6 @@ PROMPT_MISSING:
   owner: other-op:interface.asset
   kind: check-finding
 
-PROOF_COMMAND_AMBIGUOUS:
-  title: "Proof npm script in another repo"
-  title_vi: "Lệnh chứng minh chỉ có ở kho khác"
-  meaning_vi: "Lệnh npm chứng minh chỉ tồn tại ở kho khác, không phải kho của bản ghi, nên không rõ chạy ở đâu."
-  causes_vi:
-    - "Kho ghi trong bản ghi sai"
-    - "Script nằm ở kho khác"
-  nextStep_vi: "Ghi ở mức nghi ngờ; op tác giả bản ghi phải ghi đúng kho hoặc script."
-  owner: other-op:work.author
-  kind: check-finding
-
 PROOF_COMMAND_DEAD:
   title: "Proof npm script does not exist"
   title_vi: "Lệnh chứng minh trỏ tới script không tồn tại"

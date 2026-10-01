@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {computeCritique, runCritique} from '../scripts/example/example-critique.mjs';
+import {repoRootFor} from '../scripts/example/example-ownership.mjs';
 
 /**
  * One fixture tree per section this lane was asked to compute, plus its freshness gate. Fixtures live
@@ -34,12 +35,11 @@ function write(root, rel, content) {
   return file;
 }
 
-/** A minimal `.starciwork` tree with a declared backend repository named after `root`'s own basename, so
- * work/implementation@1 and work/business-rule@1 anchor-path checks resolve against real files under `root`. */
+/** A minimal `.starciwork` tree at an app root declaring its two sides, so work/implementation@1 and work/business-rule@1
+ * anchor-path checks resolve app-relative owner paths (be/...) against real files under `root`. */
 function tree(root, extra) {
   const workRoot = path.join(root, '.starciwork');
-  const repoName = path.basename(root);
-  write(workRoot, 'workspace.yaml', `schema: work/workspace@1\nid: fixture\nrepositories:\n  - {role: be, name: ${repoName}}\n`);
+  write(workRoot, 'workspace.yaml', `schema: work/workspace@1\nid: fixture\nrepositories:\n  - {role: be, name: be}\n  - {role: fe, name: fe}\n`);
   for (const [rel, content] of Object.entries(extra)) write(workRoot, rel, content);
   return workRoot;
 }
@@ -120,19 +120,19 @@ test('section 3: candidate anchors already in the tree name a same-feature gap o
 test('section 4: a done implementation record whose owners path does not exist on disk is flagged', () => {
   const root = freshRoot();
   const workRoot = tree(root, {
-    'features/f/impl/x/index.yaml': `schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/does-not-exist.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\n`,
+    'features/f/impl/x/index.yaml': `schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nrepository: be\nowners:\n  - {role: module, path: be/src/does-not-exist.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\n`,
   });
   const critique = computeCritique(workRoot);
   const finding = findingsOf(critique, 'done-without-anchor').find(f => f.records[0] === 'impl.f.x');
   assert.ok(finding);
-  assert.match(finding.because, /src\/does-not-exist\.ts/);
+  assert.match(finding.because, /be\/src\/does-not-exist\.ts/);
 });
 
 test('section 4: a done implementation record whose owners path DOES exist on disk is not flagged', () => {
   const root = freshRoot();
-  write(root, 'src/real.ts', '// real file\n');
+  write(root, 'be/src/real.ts', '// real file\n');
   const workRoot = tree(root, {
-    'features/f/impl/x/index.yaml': `schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/real.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\n`,
+    'features/f/impl/x/index.yaml': `schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nrepository: be\nowners:\n  - {role: module, path: be/src/real.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\n`,
   });
   const critique = computeCritique(workRoot);
   assert.equal(findingsOf(critique, 'done-without-anchor').filter(f => f.records[0] === 'impl.f.x').length, 0);
@@ -140,15 +140,31 @@ test('section 4: a done implementation record whose owners path DOES exist on di
 
 test('section 4: a done implementation record proving a target that is not itself done is flagged', () => {
   const root = freshRoot();
-  write(root, 'src/real.ts', '// real file\n');
+  write(root, 'be/src/real.ts', '// real file\n');
   const workRoot = tree(root, {
     'features/f/br/a/index.yaml': 'schema: work/business-rule@1\nid: br.f.a\ntitle: A\nstate: todo\n',
-    'features/f/impl/x/index.yaml': `schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/real.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\nproves: [br.f.a]\n`,
+    'features/f/impl/x/index.yaml': `schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nrepository: be\nowners:\n  - {role: module, path: be/src/real.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\nproves: [br.f.a]\n`,
   });
   const critique = computeCritique(workRoot);
   const finding = findingsOf(critique, 'done-proves-not-done').find(f => f.records[0] === 'impl.f.x');
   assert.ok(finding);
   assert.deepEqual(finding.records, ['impl.f.x', 'br.f.a']);
+});
+
+test('section 4: a record naming a repository that is not a side of the app resolves to nothing, never to the app root', () => {
+  const root = freshRoot();
+  write(root, 'be/src/real.ts', '// real file\n');
+  const workRoot = tree(root, {
+    'features/f/impl/x/index.yaml': `schema: work/implementation@1\nid: impl.f.x\ntitle: X\nstate: done\nrepository: demo-backend\nowners:\n  - {role: module, path: be/src/real.ts}\nrevision: deadbeef\nverificationSource: kernel-observed\nverification: [ok]\n`,
+  });
+  const finding = findingsOf(computeCritique(workRoot), 'done-without-anchor').find(f => f.records[0] === 'impl.f.x');
+  assert.ok(finding, 'the old repository name of a two-repository product is not a side');
+  assert.match(finding.because, /repository "demo-backend" is not a side/);
+  const workspace = {repositories: [{role: 'be', name: 'be'}, {role: 'fe', name: 'fe'}]};
+  assert.equal(repoRootFor(workRoot, 'be', workspace), path.join(root, 'be'));
+  assert.equal(repoRootFor(workRoot, undefined, workspace), root);
+  assert.equal(repoRootFor(workRoot, 'demo-backend', {repositories: [{role: 'be', name: 'demo-backend'}]}), null, 'no role-to-folder fallback');
+  assert.equal(repoRootFor(workRoot, 'fe', {repositories: [{role: 'be', name: 'be'}]}), null, 'a side the workspace does not declare');
 });
 
 test('section 5: an sds-component with no owners is unbound', () => {
@@ -164,9 +180,9 @@ test('section 5: an sds-component with no owners is unbound', () => {
 
 test('section 5: an sds-component whose owners resolve to a real module directory is not flagged', () => {
   const root = freshRoot();
-  fs.mkdirSync(path.join(root, 'src', 'mod'), {recursive: true});
+  fs.mkdirSync(path.join(root, 'be', 'src', 'mod'), {recursive: true});
   const workRoot = tree(root, {
-    'features/f/sds/c/index.yaml': `schema: work/sds-component@1\nid: sds.f.c\ntitle: C\nstate: todo\nresponsibility: r\nrepository: ${path.basename(root)}\nowners:\n  - {role: module, path: src/mod}\n`,
+    'features/f/sds/c/index.yaml': `schema: work/sds-component@1\nid: sds.f.c\ntitle: C\nstate: todo\nresponsibility: r\nrepository: be\nowners:\n  - {role: module, path: be/src/mod}\n`,
   });
   const critique = computeCritique(workRoot);
   assert.equal(findingsOf(critique, 'unbound-sds').filter(f => f.records[0] === 'sds.f.c').length, 0);
