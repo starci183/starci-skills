@@ -13,8 +13,12 @@
  *
  * How: the stock jest-runner, driven one file at a time with a single-worker farm (`maxWorkers: 1` per file), which forks a
  * fresh child, runs the file there and ends the child. Never in band, even when jest would choose it (one worker, one test,
- * `--runInBand`): the main process holds the globalSetup's state. Files still run `--maxWorkers` at a time; the outage specs
- * of a run are serialized by the test world's outage lock (@starci/test-world), not by the runner.
+ * `--runInBand`): the main process holds the globalSetup's state.
+ *
+ * ONE FILE AT A TIME, whatever `--maxWorkers` says: every file of a run shares the run's data (the test world resets the run's
+ * databases, realm users, Redis DB and fakes when a file boots), so a second file running beside the first would wipe what the
+ * first is using. The runner enforces it, so no flag or script can turn it off. Per-worker data namespaces are the known
+ * limitation that lifts it (see CHANGELOG 2.2.0).
  */
 
 const { createRequire } = require("node:module")
@@ -46,24 +50,19 @@ class WorldRunner extends StockRunner {
     }
   }
 
-  /** Runs each file in a fresh worker process, at most `maxWorkers` at a time; `serial` (in band) is never honoured. */
+  /** Runs the files one after another, each in a fresh worker process; `--maxWorkers` and `serial` (in band) are never honoured. */
   async runTests(tests, watcher) {
     const perFile = { ...this._globalConfig, maxWorkers: 1 }
-    const queue = [...tests]
-    const lane = async () => {
-      for (let test = queue.shift(); test !== undefined; test = queue.shift()) {
-        if (watcher.isInterrupted()) return
-        const runner = new StockRunner(perFile, this._context)
-        const unsubscribe = this.#listeners.map(({ eventName, listener }) => runner.on(eventName, listener))
-        try {
-          await runner.runTests([test], watcher, { serial: false })
-        } finally {
-          for (const stop of unsubscribe) stop()
-        }
+    for (const test of tests) {
+      if (watcher.isInterrupted()) return
+      const runner = new StockRunner(perFile, this._context)
+      const unsubscribe = this.#listeners.map(({ eventName, listener }) => runner.on(eventName, listener))
+      try {
+        await runner.runTests([test], watcher, { serial: false })
+      } finally {
+        for (const stop of unsubscribe) stop()
       }
     }
-    const lanes = Math.max(1, Math.min(this._globalConfig.maxWorkers, tests.length))
-    await Promise.all(Array.from({ length: lanes }, lane))
   }
 }
 

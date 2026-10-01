@@ -84,8 +84,8 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  * contract project is never part of `test` or `test:e2e`, and a contract spec skips itself without sandbox config. The
  * test tree compiles against `src/tests/tsconfig.json`, the nearest config of every file under `src/tests/`. The
  * integration, e2e and contract projects share the world's `global-setup.ts`/`global-teardown.ts` (`src/tests/world/`) and
- * run each spec file in a worker process of its own (`world-runner.cjs`, `--maxWorkers` files at a time; outage specs are
- * serialized by the test world's outage lock); the unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
+ * run their spec files one at a time, each in a worker process of its own (`world-runner.cjs`; every file shares the
+ * run's data, so the runner never runs two at once); the unit project alone has a `setupFilesAfterEnv` (the Outcome matchers).
  * Coverage is collected from every `*.service.ts` only, with a per-file threshold of 100 on lines, branches, functions and
  * statements: the `test` script runs the unit project with `--coverage` and fails below it. It uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
  * as thousands of branches no spec can cover, while v8 measures the real source.

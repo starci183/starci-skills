@@ -535,11 +535,18 @@ const globalRef = global
 exports.TypeMetadataStorage = globalRef.GqlTypeMetadataStorage || (globalRef.GqlTypeMetadataStorage = new TypeMetadataStorageHost())
 exports.ObjectType = (name) => (target) => { exports.TypeMetadataStorage.add(name, target); return target }
 `;
+// Each file logs `start <label> <pid>` and, a little later, `end <label> <pid>` to timeline.log at the repository root, so a
+// spec can see whether two files ever ran at the same time and in which process.
 const E2E_SPEC = (label) => `const { ObjectType } = require("fake-graphql")
+const fs = require("fs")
+const log = (event) => fs.appendFileSync(require("path").join(process.cwd(), "timeline.log"), event + " ${label} " + process.pid + String.fromCharCode(10))
 class Person {}
 ObjectType("Person")(Person)
-test("${label} boots with its own Person type", () => {
+test("${label} boots with its own Person type", async () => {
+  log("start")
+  await new Promise((resolve) => setTimeout(resolve, 400))
   expect(require("fake-graphql").TypeMetadataStorage.types.get("Person")).toBe(Person)
+  log("end")
 })
 `;
 
@@ -564,6 +571,7 @@ module.exports = config
   put('apps/.keep', ''); // the preset's roots are src/ and apps/
   put('src/tests/e2e/people/first.e2e-spec.ts', E2E_SPEC('the first file'));
   put('src/tests/e2e/people/second.e2e-spec.ts', E2E_SPEC('the second file'));
+  put('src/tests/e2e/people/third.e2e-spec.ts', E2E_SPEC('the third file'));
   return root;
 }
 
@@ -585,13 +593,13 @@ function runE2e(root, extra) {
 
 const resultsOf = (report) => Object.fromEntries(report.testResults.map((file) => [path.basename(file.name), { status: file.status, message: file.message }]));
 
-test('e2e isolation: in one preset run, two e2e files that each register a GraphQL type named Person both pass, even with --runInBand', () => {
+test('e2e isolation: in one preset run, three e2e files that each register a GraphQL type named Person all pass, even with --runInBand', () => {
   const root = isolationRepo({ stockRunner: false });
   try {
     for (const extra of [[], ['--runInBand'], ['--maxWorkers=2']]) {
       const { status, report, output } = runE2e(root, extra);
       const results = resultsOf(report);
-      assert.deepEqual(Object.keys(results).sort(), ['first.e2e-spec.ts', 'second.e2e-spec.ts'], `${extra.join(' ')}\n${output}`);
+      assert.deepEqual(Object.keys(results).sort(), ['first.e2e-spec.ts', 'second.e2e-spec.ts', 'third.e2e-spec.ts'], `${extra.join(' ')}\n${output}`);
       for (const [file, result] of Object.entries(results)) assert.equal(result.status, 'passed', `${extra.join(' ') || 'default'}: ${file}: ${result.message}`);
       assert.equal(status, 0, output);
     }
@@ -600,16 +608,40 @@ test('e2e isolation: in one preset run, two e2e files that each register a Graph
   }
 });
 
-test('e2e isolation is the runner: on the stock in-band runner the same two files collide on the process-global registry', () => {
+test('e2e isolation is the runner: on the stock in-band runner the same files collide on the process-global registry', () => {
   const root = isolationRepo({ stockRunner: true });
   try {
     const { status, report } = runE2e(root, ['--runInBand']);
     const results = resultsOf(report);
     // jest orders the files itself: whichever runs first passes, the one after it inherits the registry and fails to boot.
     const outcomes = Object.values(results).map((result) => result.status).sort();
-    assert.deepEqual(outcomes, ['failed', 'passed']);
+    assert.deepEqual(outcomes, ['failed', 'failed', 'passed']);
     assert.match(Object.values(results).find((result) => result.status === 'failed').message, /Cannot determine a GraphQL output type/);
     assert.equal(status, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the world runner runs one file at a time, each in its own process, even when --maxWorkers allows more', () => {
+  const root = isolationRepo({ stockRunner: false });
+  try {
+    for (const extra of [['--maxWorkers=3'], []]) {
+      fs.rmSync(path.join(root, 'timeline.log'), { force: true });
+      const { status, output } = runE2e(root, extra);
+      assert.equal(status, 0, output);
+      const events = fs.readFileSync(path.join(root, 'timeline.log'), 'utf8').trim().split(/\r?\n/).map((line) => {
+        const [event, ...rest] = line.split(' ');
+        return { event, label: rest.slice(0, -1).join(' '), pid: rest.at(-1) };
+      });
+      assert.equal(events.length, 6, output);
+      // strictly start, end, start, end, ...: no file starts before the one before it ended
+      for (const [index, entry] of events.entries()) {
+        assert.equal(entry.event, index % 2 === 0 ? 'start' : 'end', `${extra.join(' ') || 'default'}: ${events.map((e) => `${e.event} ${e.label}`).join(', ')}`);
+        if (index % 2 === 1) assert.equal(entry.label, events[index - 1].label);
+      }
+      assert.equal(new Set(events.map((entry) => entry.pid)).size, 3, 'each file ran in a process of its own');
+    }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

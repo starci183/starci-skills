@@ -6,12 +6,15 @@
   `@nestjs/graphql` keeps its type registry on the process global, the test world's globalSetup loads application code in jest's
   main process, and jest-environment-node exposes the host process's globals to every file it runs there (or in a reused worker).
   The integration, e2e and contract projects now run on the preset's world runner (`runner: WORLD_RUNNER`, `world-runner.cjs`):
-  every spec file in a fresh worker process, `--maxWorkers` files at a time, never in band (not even with `--runInBand` or one
+  every spec file in a fresh worker process, never in band (not even with `--runInBand` or one
   test), so each file boots clean whatever framework keeps state on a global. The runner drives the stock jest-runner of the jest
   that loads it (jest -> @jest/core -> jest-runner), one single-worker farm per file.
-- Removed: `maxWorkers: 1` from the integration, e2e and contract projects. It is a global jest option that a project config
-  never applied; the number of files at a time is the run's `--maxWorkers`, and outage specs are serialized by the test world's
-  outage lock (`@starci/test-world` 1.0.0).
+- Changed: the world runner runs the files of the integration, e2e and contract projects ONE AT A TIME, enforced by the runner
+  (`--maxWorkers` is not honoured there): every file shares the run's data and the test world resets it when a file boots, so
+  two files at once would wipe each other's state. The project-level `maxWorkers: 1` is removed: it is a global jest option a
+  project config never applied (so e2e files used to run cores-1 at a time).
+- Known limitation (lifted in alpha.5): world files cannot run in parallel until each worker has its own data namespace (a
+  database schema, a Keycloak realm prefix, a Redis key prefix and its own fakes per worker).
 - Added: `WORLD_RUNNER` (the runner's resolved path) on the package root.
 
 ## 2.1.1 - 2026-10-01

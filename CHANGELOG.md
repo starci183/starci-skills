@@ -7,6 +7,8 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- Lane TW2: `@starci/test-world` 1.0.0 (the shared e2e library, with the run's outage lock that every outage call takes itself) and `@starci/jest-preset` 2.2.0. The integration, e2e and contract projects run on the preset's world runner: each spec file runs in a fresh worker process, so no process-global framework registry such as `@nestjs/graphql`'s type metadata leaks between files. The runner enforces ONE FILE AT A TIME, because every file shares the run's data and the test world resets it when a file boots. Contract changes `test-world-library` and `jest-preset-world-runner`.
+  - Known limitation, lifted in alpha.5: world files cannot run in parallel until each worker has its own data namespace (a database schema, a Keycloak realm prefix, a Redis key prefix and its own fakes).
 - A scaffold proof never passes by skipping. `tests/hfs-scaffold-app.spec.mjs` prints `SKIPPED: no installs - <proof>: <reason>` when it has no installs. With `STARCI_REQUIRE_APP_INSTALLS=1` a missing install fails the test instead. `scripts/checks/release-app-installs.mjs` does the following, and CI runs it as its own step:
   1. scaffolds `release-app`;
   2. installs it from the npm registry;
