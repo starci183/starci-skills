@@ -135,7 +135,7 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
    `config.yaml`) only when the engine is being harmed, and record it.
 2. One lane per disjoint file set, each a staged checkout made by the runtime worktree API: from the live `.claude`,
    `node scripts/supervisor/workers.mjs stage --self --name <lane> --files <csv>` creates an ephemeral checkout on
-   `sup/<job>` under `<lanesRoot>/staging` (default `D:/starci-lanes/staging`) with its `node_modules` link and
+   `sup/<job>` under `<lanesRoot>/staging` (default `<lanes root>/staging`) with its `node_modules` link and
    `config.yaml` already in place, and prints its path; copy `packages/grammar/dist` from the live checkout. A lane never
    makes its own worktree or link and never deletes a tree recursively; a missing `packages/node_modules` is reported as
    a blocked environment.

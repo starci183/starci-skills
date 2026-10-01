@@ -15,6 +15,14 @@ sections:
       - "owner_language: everything a person reads as a log - terminal narration and progress lines,
         orchestration message subjects and bodies (worker_done, status, ask), report summary and
         notes, incident details, owner asks and the handover package."
+  - title: Evidence is portable - no host path in anything you file
+    blocks:
+      - "Every evidence file, draw prompt (.prompt.txt), visual review (visual-review.md), assets JSON and recorded command
+        you file under .starciwork is written with repo-relative paths. A path outside the repository is written as a
+        placeholder: <worktree>, <runtime>, <tmp> or <home>; a command is recorded as the command line you wrote
+        (bash -c ..., never the host path of its shell). api settle refuses a pass (EVIDENCE_HOST_PATH) while any of
+        those files holds a drive path, a user-profile path or an expanded AppData path, and names the file and line; rewrite
+        the file and settle again. scripts/lib/host-path.mjs normalizeHostPaths does the rewrite."
   - title: Product UI copy follows the shell record's productLocale (default - the brand record's voice.locales default), not owner_language
     blocks:
       - "Product UI copy - every label, heading, button, message, empty state and sample datum a product

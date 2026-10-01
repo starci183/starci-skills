@@ -16,7 +16,7 @@ import { MACHINE_VERSION, openMachine } from '../../engine/db/machine.mjs';
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const WRAPPER = path.join(ROOT, 'scripts', 'api', 'orca', 'worker-list.mjs');
 
-const row = (dispatchId, { run = 'run_a', terminalState = 'reclaimable', liveness = 'exited', argv = null, worktree = 'D:/lanes/x' } = {}) => ({
+const row = (dispatchId, { run = 'run_a', terminalState = 'reclaimable', liveness = 'exited', argv = null, worktree = 'lanes/x' } = {}) => ({
   dispatchId, runId: run, workerState: 'succeeded', terminalState, agentTerminalHandle: `term_${dispatchId}`,
   resource: { terminalHandle: `term_${dispatchId}`, worktreeId: `repo-1::${worktree}` },
   projection: { liveness: { verdict: liveness }, nextAction: { kind: argv ? 'release' : 'none', argv: argv ?? [] } },
@@ -78,8 +78,8 @@ test('releasePlan: release only a reclaimable, verifiable worker whose nextActio
 test('workerTerminalHandles names every terminal Orca has not released; worktreePathOf reads Orca\'s worktree id', () => {
   const handles = workerTerminalHandles([row('a', { terminalState: 'active' }), row('b'), row('c', { terminalState: 'released' }), row('d', { terminalState: 'release_unknown' })]);
   assert.deepEqual([...handles].sort(), ['term_a', 'term_b', 'term_d']);
-  assert.equal(worktreePathOf(row('a', { worktree: 'D:/starci-lanes/dv/c0-wlist' })), 'D:/starci-lanes/dv/c0-wlist');
-  assert.equal(worktreePathOf({ projection: { workspace: { id: 'repo::D:/x' } } }), 'D:/x');
+  assert.equal(worktreePathOf(row('a', { worktree: 'starci-lanes/dv/c0-wlist' })), 'starci-lanes/dv/c0-wlist');
+  assert.equal(worktreePathOf({ projection: { workspace: { id: 'repo::wt-x' } } }), 'wt-x');
   assert.equal(worktreePathOf({}), null);
 });
 

@@ -7,9 +7,9 @@ import path from 'node:path';
 import { createGcController, parseKey, ROUTES } from '../../scripts/reconciler/controllers/gc.mjs';
 import { classifyLeases, planLaneLogs, collectLaneLogs, runGc, COLLECTORS } from '../../scripts/supervisor/gc.mjs';
 
-import { fakeCtx } from '../../scripts/reconciler/testing.mjs';
+import { fakeCtx } from '../../scripts/reconciler/testing.mjs'; import os from 'node:os';
 const T = 2_000_000_000_000;
-const REPO = 'D:/Repositories/todo-app-be';
+const REPO = path.join(os.tmpdir(), 'Repositories', 'todo-app-be').replace(/\\/g, '/');
 
 /** A ctx per the reconciler contract (lane A testing.mjs fakeCtx shape), recording every actuator call. */
 function ctxOf(mode, extra = {}) {
@@ -196,7 +196,7 @@ test('lane logs: young files, directories and other names kept; old logs archive
   assert.deepEqual(plan.move, ['land1.json', 'npmci.err']);
   assert.deepEqual(plan.purge, ['old.log']);
   const moved = [], removed = [];
-  const r = collectLaneLogs({ apply: true, now: T, env: { STARCI_LANES_ROOT: 'D:/lanes-spec' }, settings: { archiveRoot: 'D:/archive-spec', laneLogMinAgeMs: day, laneLogRetentionMs: 14 * day },
+  const r = collectLaneLogs({ apply: true, now: T, env: { STARCI_LANES_ROOT: path.join(os.tmpdir(), 'lanes-spec') }, settings: { archiveRoot: path.join(os.tmpdir(), 'archive-spec'), laneLogMinAgeMs: day, laneLogRetentionMs: 14 * day },
     fsx: { list: (d) => (/archive-spec/.test(d) ? archived : top), move: (a, b) => moved.push([path.basename(a), b]), remove: (f) => removed.push(path.basename(f)) } });
   assert.deepEqual(moved.map(([n]) => n), ['land1.json', 'npmci.err']);
   assert.ok(moved.every(([, to]) => to.includes(path.join('archive-spec', 'lane-logs'))));

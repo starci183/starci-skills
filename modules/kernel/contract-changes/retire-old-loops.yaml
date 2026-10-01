@@ -6,7 +6,7 @@ summary: >-
   is git revert. modules/kernel/retired-paths.yaml lists every deleted file with the controller that replaced it, and
   scripts/checks/check-contract-cites.mjs accepts a retired path only as history (a contract-change entry,
   owner-rulings.yaml or the registry itself); live contract text must cite what runs now. Lane rc-cleanup,
-  D:/starci-tmp/reconciler-design/CLEANUP.md (c).
+  <tmp>/reconciler-design/CLEANUP.md (c).
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/retire-old-loops.yaml

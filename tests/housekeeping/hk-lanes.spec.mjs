@@ -1,5 +1,5 @@
-// hk-lanes: the lanes root authority (allocation.housekeeping.lanesRoot, STARCI_LANES_ROOT,
-// default D:/starci-lanes) and sweepLanes — merged lane worktrees of a real repo are removed only
+// hk-lanes: the lanes root authority (the owner config roots.lanes, STARCI_LANES_ROOT,
+// default <starciLocalRoot>/lanes) and sweepLanes — merged lane worktrees of a real repo are removed only
 // after the tree proves link-free and idle for allocation.housekeeping.laneGraceMs; the main
 // checkout, dirty, detached, unmerged and link-holding worktrees, a fresh lane with no commit yet
 // (no-work-yet) and a landed lane still in use (recent-activity) are skipped with a reason.
@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { lanesRoot, DEFAULT_LANES_ROOT } from '../../scripts/machine/home.mjs';
+import { lanesRoot } from '../../scripts/machine/home.mjs';
 import { sweepLanes, parseWorktreeList } from '../../scripts/housekeeping/hk-lanes.mjs';
 import { pathKey } from '../../scripts/lib/path-key.mjs';
 
@@ -54,12 +54,14 @@ const graceOf = (extra = {}) => ({ housekeeping: { laneGraceMs: GRACE_MS, ...ext
 const pastGrace = () => Date.now() + 2 * GRACE_MS;
 const samePathAs = (a, b) => assert.equal(pathKey(a), pathKey(b));
 
-test('lanesRoot: the env override wins, then the runtimes.yaml key, then the declared default', () => {
-  assert.equal(lanesRoot({ env: {} }), path.resolve(DEFAULT_LANES_ROOT), 'no key anywhere: the declared default');
-  assert.equal(lanesRoot({ env: {}, allocation: {} }), path.resolve(DEFAULT_LANES_ROOT), 'the yaml key absent: same default');
-  assert.equal(lanesRoot({ env: {}, allocation: { housekeeping: { lanesRoot: 'E:/fleet-lanes' } } }), path.resolve('E:/fleet-lanes'));
-  assert.equal(lanesRoot({ env: { STARCI_LANES_ROOT: 'F:/one-off' }, allocation: { housekeeping: { lanesRoot: 'E:/fleet-lanes' } } }),
-    path.resolve('F:/one-off'), 'a one-off/spec env still overrides the config');
+test('lanesRoot: the env override wins, then the owner config roots.lanes, then <starciLocalRoot>/lanes', () => {
+  const state = path.join(os.tmpdir(), 'hk-lanes-state');
+  const fleet = path.join(os.tmpdir(), 'fleet-lanes');
+  const oneOff = path.join(os.tmpdir(), 'one-off');
+  assert.equal(lanesRoot({ env: { STARCI_LOCAL_ROOT: state }, config: {} }), path.join(state, 'lanes'), 'no key anywhere: <starciLocalRoot>/lanes');
+  assert.equal(lanesRoot({ env: {}, config: { roots: { lanes: fleet } } }), path.resolve(fleet));
+  assert.equal(lanesRoot({ env: { STARCI_LANES_ROOT: oneOff }, config: { roots: { lanes: fleet } } }),
+    path.resolve(oneOff), 'a one-off/spec env still overrides the owner config');
 });
 
 test('sweepLanes: a merged lane goes away with its branch; dirty, unmerged, linked and outside trees stay; the main checkout is never touched', (t) => {
@@ -111,11 +113,11 @@ test('sweepLanes: a merged lane goes away with its branch; dirty, unmerged, link
   assert.equal(git(root, 'rev-parse', 'HEAD'), git(root, 'rev-parse', 'main'), 'the main checkout still stands on its merge');
 });
 
-test('sweepLanes: allocation.housekeeping.lanesRoot is the authority when no env override is set', (t) => {
+test('sweepLanes: the owner config roots.lanes is the authority when no env override is set', (t) => {
   const root = repoFixture(t);
   const lanes = path.join(tmp(t, 'hk-lanes-'), 'lanes');
   const done = addWorktree(root, path.join(lanes, 'done'), 'lane/done');
-  const out = sweepLanes({ apply: true, now: pastGrace(), env: {}, allocation: graceOf({ lanesRoot: lanes }), root });
+  const out = sweepLanes({ apply: true, now: pastGrace(), env: {}, allocation: graceOf(), config: { roots: { lanes } }, root });
   assert.equal(out.ok, true, JSON.stringify(out.errors));
   assert.equal(out.lanesRoot, path.resolve(lanes));
   assert.equal(out.removed.length, 1, 'a lane with no commit, idle past laneGraceMs, is removed');

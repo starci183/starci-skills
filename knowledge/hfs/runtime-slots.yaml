@@ -226,7 +226,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "the state root: guards under %LOCALAPPDATA%/StarCi/guards (scripts/guards/guards-root.mjs), lanes under D:/starci-lanes/<project>/<lane>, workflow worktrees owned by Orca, secrets under %LOCALAPPDATA%/StarCi/secrets"
+    goesTo: "the state root: guards under %LOCALAPPDATA%/StarCi/guards (scripts/guards/guards-root.mjs), lanes under <lanes root>/<project>/<lane>, workflow worktrees owned by Orca, secrets under %LOCALAPPDATA%/StarCi/secrets"
     rules: [HFS_FORBIDDEN_PRESENT, HFS_UNTRACKED_ROOT_ENTRY]
   - id: runtime.agent-output
     profiles: [runtime]
@@ -235,7 +235,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "the agent scratchpad or D:/starci-tmp/<lane>/; a durable finding goes to benchmark/findings/<date>-<topic>.md or docs/<topic>.md"
+    goesTo: "the agent scratchpad or <tmp>/<lane>/; a durable finding goes to benchmark/findings/<date>-<topic>.md or docs/<topic>.md"
     rules: [HFS_FORBIDDEN_PRESENT, HFS_UNTRACKED_ROOT_ENTRY]
 
   # ----- entry ----------------------------------------------------------------------------------------------

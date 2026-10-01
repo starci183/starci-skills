@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { sweepClaudeTranscripts, claudeProjectSlug, claudeProjectsRoots } from '../../scripts/housekeeping/hk-claude.mjs';
 import { safeRemoveTree } from '../../scripts/api/fs/safe-remove.mjs';
-import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs';
+import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs'; const DRIVE = path.parse(os.tmpdir()).root, F = DRIVE.replace(/\\/g, '/');
 
 // STORAGE-PROMPT.md item 10 on fake trees: ~/.claude/projects/<slug>/*.jsonl older than the archive
 // window moves to <archiveRoot>/claude/<slug>/<file>, except the supervisor's live session (the newest
@@ -136,9 +136,9 @@ test('archive keeps the project slug as the relative path and apply=false only r
 });
 
 test('claudeProjectSlug spells a cwd the way ~/.claude/projects does', () => {
-  assert.equal(claudeProjectSlug('D:/Repositories/ecommerce-app/.claude'),
-    'D--Repositories-ecommerce-app--claude');
-  assert.equal(claudeProjectSlug('C:\\Users\\Hi\\AppData\\Roaming\\Claude\\scratch-workspaces\\u1\\u2\\scratch-2026-09-22-059e29'),
-    'C--Users-Hi-AppData-Roaming-Claude-scratch-workspaces-u1-u2-scratch-2026-09-22-059e29');
+  assert.equal(claudeProjectSlug(`${F}Repositories/ecommerce-app/.claude`),
+    `${DRIVE[0]}--Repositories-ecommerce-app--claude`);
+  assert.equal(claudeProjectSlug(`${DRIVE}scratch-root\\Claude\\scratch-workspaces\\u1\\u2\\scratch-2026-09-22-059e29`),
+    `${DRIVE[0]}--scratch-root-Claude-scratch-workspaces-u1-u2-scratch-2026-09-22-059e29`);
   assert.deepEqual(claudeProjectsRoots({ STARCI_CLAUDE_PROJECTS_ROOT: 'x' + path.delimiter + 'y' }).map((p) => path.basename(p)), ['x', 'y']);
 });

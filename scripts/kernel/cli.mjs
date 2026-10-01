@@ -174,7 +174,7 @@ import { recordGrammarProposals } from '../work/grammar-proposal.mjs';
 import { ASSET_OP, recordAssetSlots } from '../work/asset-slot.mjs';
 import { judgeJob, SONAR_ENFORCE_CHANGE } from './sonar-settle.mjs';
 import { judgeJobLoop, judgeJobProofs, OP_GATE_CHANGE, OP_PROOF_CHANGE } from './gate-settle.mjs';
-import { PROOF_MEDIA_CHANGE, collectJobFiles, filedReportOf, indexJobArtifacts, jobShasOf, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
+import { EVIDENCE_HOST_PATH_CHANGE, PROOF_MEDIA_CHANGE, collectJobFiles, evidenceHostPathGate, filedReportOf, indexJobArtifacts, jobShasOf, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
 import { WORK_HYGIENE_CHANGE, checkWorkFilesAbs, inSecretScope, rangeFiles } from '../work/validate/work-hygiene.mjs';
 import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageOf } from './proof-integrity.mjs';
@@ -3529,23 +3529,23 @@ function reportOwnedPaths(db, job, repo) {
   return [...new Set([...declared, ...resolved])];
 }
 
-// The visual proof a pass owes (job-artifacts.mjs proofMediaGate over the op's policy.proofMedia): read-only,
-// before anything is written. A leg admitted before the job-proof-media change settles on its old contract.
+// The visual proof a pass owes (proofMediaGate over policy.proofMedia) and the host-path-free evidence it keeps (evidenceHostPathGate): read-only,
+// before anything is written. A leg admitted before the job-proof-media or evidence-host-path change settles on its old contract.
 function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
   const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
   const op = jobOpOf(job), policy = proofMediaPolicyOf(skillRoot, op);
-  if (!policy) return null;
-  const admitted = admittedContractOf(db, job);
-  const change = changeById(loadContractChanges(skillRoot), PROOF_MEDIA_CHANGE);
-  if (admittedBeforeChange(admitted, change)) return null;
+  const admitted = admittedContractOf(db, job), changes = loadContractChanges(skillRoot);
+  const mediaOwed = Boolean(policy) && !admittedBeforeChange(admitted, changeById(changes, PROOF_MEDIA_CHANGE));
+  const hostOwed = !admittedBeforeChange(admitted, changeById(changes, EVIDENCE_HOST_PATH_CHANGE));
+  if (!mediaOwed && !hostOwed) return null;
   const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
   const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
   let roots = [];
   try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
   const { files } = collectJobFiles({ repo, envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });
   const recorded = independentChecksOf(db, { jobId: job.job_id })?.checks;
-  const gate = proofMediaGate({ policy, files, checks: [...(Array.isArray(recorded) ? recorded : []), ...(Array.isArray(envelope?.checks) ? envelope.checks : [])] });
+  const gate = (hostOwed ? evidenceHostPathGate({ files }) : null) ?? (mediaOwed ? proofMediaGate({ policy, files, checks: [...(Array.isArray(recorded) ? recorded : []), ...(Array.isArray(envelope?.checks) ? envelope.checks : [])] }) : null);
   return gate ? { ...gate, op, status: job.status } : null;
 }
 // The Sonar gate a code-writing op's settle owes (scripts/kernel/sonar-settle.mjs over knowledge/sonar-gate.yaml): the
@@ -3760,7 +3760,7 @@ async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
   const settledVerdict = verdict ?? jobResult(db, jobId)?.verdict ?? payload.verdict ?? null;
   let sessionReleased = null;
   try {
-    sessionReleased = await releaseSettledSession({ db, job, payload, repo, archiveRoot: allocationSettings()?.housekeeping?.archiveRoot ?? null,
+    sessionReleased = await releaseSettledSession({ db, job, payload, repo, archiveRoot: null,
       beforeArchive: ({ agent, files }) => { recordSettledAttemptUsage(ledger, { jobId, agent, files }); } });
   } catch (error) { sessionReleased = { released: false, reason: String(error?.message ?? error) }; }
   if (sessionReleased) {

@@ -84,7 +84,7 @@ test('supervisor.repos names the ledgers resume-all resumes: a list of repositor
   const fs = await import('node:fs');
   const base = parseYaml(fs.readFileSync(new URL('../../config.example.yaml', import.meta.url), 'utf8'));
   assert.deepEqual(base.supervisor.repos, [], 'the example resumes no ledger until the owner lists one');
-  assert.doesNotThrow(() => validateConfig({ ...base, supervisor: { pollIntervalMs: null, repos: ['../todo-app-be', 'D:/Repositories/ecommerce-app'] } }));
+  assert.doesNotThrow(() => validateConfig({ ...base, supervisor: { pollIntervalMs: null, repos: ['../todo-app-be', process.cwd()] } }));
   assert.doesNotThrow(() => validateConfig({ ...base, supervisor: { repos: null } }));
   assert.throws(() => validateConfig({ ...base, supervisor: { repos: '../todo-app-be' } }), /supervisor\.repos/);
   assert.throws(() => validateConfig({ ...base, supervisor: { repos: ['  '] } }), /supervisor\.repos/);

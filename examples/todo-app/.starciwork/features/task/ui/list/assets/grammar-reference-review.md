@@ -25,7 +25,7 @@ The old reference set is superseded and remains recoverable at Git revision 4147
 
 ## Rule source and authority
 
-The canonical knowledge file is absent from this checkout. The coordinator version was read at C:/Users/Hi/orca/workspaces/.claude/ex-lint/knowledge/ui/proof/anatomy-source.yaml and its exact bytes retained as [anatomy-source.accepted.yaml.txt](anatomy-source.accepted.yaml.txt), SHA256 db4352239c7991a58e8d970e2373858c3ef9ed34f37b369a15563bb94e60d48f. No knowledge or operator source was modified. ANATOMY-1 through ANATOMY-4 are bound in each prompt and record.
+The canonical knowledge file is absent from this checkout. The coordinator version was read at <worktree>/knowledge/ui/proof/anatomy-source.yaml and its exact bytes retained as [anatomy-source.accepted.yaml.txt](anatomy-source.accepted.yaml.txt), SHA256 db4352239c7991a58e8d970e2373858c3ef9ed34f37b369a15563bb94e60d48f. No knowledge or operator source was modified. ANATOMY-1 through ANATOMY-4 are bound in each prompt and record.
 
 ADDENDUM 2 explicitly requires white primary label ink and actual component anatomy. This supersedes earlier agent-derived black label, dark Input-error, custom disabled, danger-outline and auth-card treatments. Brand rev 3 stays byte-identical; its conflicting foreground/contrast prescriptions are recorded as unresolved specification differences, not used to recolour component internals. No accessibility contrast pass is claimed.
 

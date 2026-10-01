@@ -1,7 +1,7 @@
 id: rc-fleet-ui
 effectiveAt: '2026-09-28T19:00:00+07:00'
 summary: >-
-  Reconciler lane G, harness part (D:/starci-tmp/reconciler-design/LANES.md "Lane G", DESIGN.md §17.2, §19, §20),
+  Reconciler lane G, harness part (<tmp>/reconciler-design/LANES.md "Lane G", DESIGN.md §17.2, §19, §20),
   plus the owner's UI redesign of 2026-09-28 ("fix the .claude UX/UI so it is easy to track, the information is too chaotic now"). The
   harness (ui/server.mjs, 127.0.0.1:4547, harness.starci.org) now builds ONE snapshot per tick
   (STARCI_STATUS_TICK_MS, default 20 s) and answers every request from it at once; `api status` of each live workflow

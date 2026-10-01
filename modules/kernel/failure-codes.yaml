@@ -4005,6 +4005,17 @@ PROOF_MEDIA_MISSING:
   owner: op-retry
   kind: verb-refusal
 
+EVIDENCE_HOST_PATH:
+  title: "Evidence names a host path at settle"
+  title_vi: "Bằng chứng còn đường dẫn tuyệt đối của máy"
+  meaning_vi: "Lần báo xong đính kèm hoặc nêu tệp bằng chứng Work (evidence.yaml, prompt vẽ, nhận xét thị giác, JSON trong assets) vẫn chứa đường dẫn tuyệt đối của máy chủ: đường dẫn có chữ cái ổ đĩa, đường dẫn hồ sơ người dùng hoặc đường dẫn AppData đã khai triển. Bằng chứng phải chạy lại được trên mọi máy nên chỉ giữ đường dẫn tương đối."
+  causes_vi:
+    - "Op ghi nguyên dòng lệnh của shell (kèm đường dẫn bash.exe) hoặc đường dẫn worktree của nó vào bằng chứng"
+    - "Prompt hoặc nhận xét trích một tệp đọc từ thư mục ngoài kho bằng đường dẫn đầy đủ"
+  nextStep_vi: "Kernel từ chối báo xong, công việc giữ nguyên trạng thái; op viết lại các tệp bằng chứng được nêu với đường dẫn tương đối hoặc các tên giữ chỗ <worktree>, <runtime>, <tmp>, <home> (scripts/lib/host-path.mjs normalizeHostPaths) rồi báo xong lại."
+  owner: op-retry
+  kind: verb-refusal
+
 PROOF_NOT_REPLAYABLE:
   title: "Assertion has no replay command"
   title_vi: "Khẳng định không có lệnh chạy lại"
@@ -4652,6 +4663,17 @@ RT_CONTROL_CHARACTER:
   causes_vi:
     - "Một lần sửa bằng script ghi chuỗi \\b hoặc \\0 thành ký tự thật"
   nextStep_vi: "Người giám sát thay ký tự đó bằng dạng thoát của nó (\\0, \\b, \\u001b) để tệp giữ đúng nghĩa ban đầu."
+  owner: supervisor
+  kind: check-finding
+
+RT_ABSOLUTE_PATH:
+  title: "Hard-coded absolute host path"
+  title_vi: "Đường dẫn tuyệt đối của máy bị ghi cứng"
+  meaning_vi: "Một tệp được git theo dõi của runtime chứa đường dẫn tuyệt đối của máy chủ: đường dẫn có ổ đĩa (chữ cái ổ đĩa, dấu hai chấm và dấu gạch), đường dẫn hồ sơ người dùng (/Users/<tên>/, /home/<tên>/) hoặc đường dẫn AppData đã khai triển. Kho .claude dùng đường dẫn tương đối; đường dẫn ghi cứng chỉ chạy trên một máy và làm lộ tên người dùng."
+  causes_vi:
+    - "Một lane ghi đường dẫn máy của nó vào mã, tài liệu, tri thức, ví dụ hoặc dữ liệu thử"
+    - "Một spec dựng fixture từ ổ đĩa ghi cứng thay vì thư mục tạm của nó"
+  nextStep_vi: "Người giám sát đổi đường dẫn thành đường dẫn tương đối hoặc tên giữ chỗ (<runtime>/..., %LOCALAPPDATA% chưa khai triển), cho mã lấy đường dẫn từ gốc runtime, os.tmpdir(), cấu hình hoặc hàm gốc trạng thái, và cho spec dựng fixture từ thư mục tạm; vector kiểm thử phân tích đường dẫn thật thì ghi vào pending kèm lý do."
   owner: supervisor
   kind: check-finding
 
@@ -11366,7 +11388,7 @@ HFS_SLOT_REQUIRED_MISSING:
 HFS_UNTRACKED_ROOT_ENTRY:
   title: "No untracked or ignored entry outside an `ignored` slot"
   title_vi: "Mục lạ ở gốc kho"
-  meaning_vi: "Có mục chưa được git theo dõi, cũng không nằm trong `.gitignore` hay slot `ignored`, nên HFS không cho phép nó tồn tại trong cây làm việc. Theo dõi nó vào đúng slot, hoặc lưu trữ ra `D:/starci-archive/` rồi xóa."
+  meaning_vi: "Có mục chưa được git theo dõi, cũng không nằm trong `.gitignore` hay slot `ignored`, nên HFS không cho phép nó tồn tại trong cây làm việc. Theo dõi nó vào đúng slot, hoặc lưu trữ ra `<archive root>/` rồi xóa."
   causes_vi:
     - "Vi phạm luật R03: Thư mục làm việc không được có mục untracked/ignored ngoài slot `ignored` (vd `nul`, `.worktrees/`, `design-plans/`, `express`)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."

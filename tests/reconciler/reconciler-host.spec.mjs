@@ -156,16 +156,16 @@ test('null goal -> no seat, one DI goal-text-missing for the Supervisor', async 
 });
 
 test('an orphan watchdog of a temp repo -> stop planned + ORPHAN_PROCESS clock; a listed repo -> never', async () => {
-  const old = T0 - 45 * 60_000;
+  const old = T0 - 45 * 60_000; const DRIVE = path.parse(os.tmpdir()).root; const D = DRIVE.replace(/\\/g, '/'); const KNOWN = `${D}Repositories/todo-app-be`;
   const procs = [
-    { pid: 101, created: old, cmd: '"C:\\Program Files\\nodejs\\node.exe" D:\\Repositories\\ecommerce-app\\.claude\\scripts\\kernel\\watchdog.mjs --repo C:\\Users\\Hi\\AppData\\Local\\Temp\\starci-host-outage-Ab12\\repo --workflow wf-test-outage --repair' },
-    { pid: 102, created: old, cmd: 'node D:\\Repositories\\ecommerce-app\\.claude\\scripts\\kernel\\watchdog.mjs --repo D:\\Repositories\\todo-app-be --workflow wf-todo-app-fe-canon --repair' },
-    { pid: 103, created: old, cmd: 'node D:/Repositories/ecommerce-app/.claude/scripts/supervisor/supervisor-watchdog.mjs' },
-    { pid: 104, created: T0 - 5 * 60_000, cmd: 'node scripts/kernel/ask-server.mjs --repo C:/Users/Hi/AppData/Local/Temp/starci-x/repo --workflow wf-y' },
-    { pid: 105, created: old, cmd: 'node scripts/kernel/start-workflow.mjs --repo "C:/Users/Hi/AppData/Local/Temp/starci-host-outage-Zz/repo" --workflow wf-z' },
-    { pid: 106, created: old, cmd: 'node D:/tools/other-watchdog.mjs.bak --repo C:/Temp/x' },
+    { pid: 101, created: old, cmd: `"${DRIVE}Program Files\\nodejs\\node.exe" ${DRIVE}Repositories\\ecommerce-app\\.claude\\scripts\\kernel\\watchdog.mjs --repo ${DRIVE}Temp\\starci-host-outage-Ab12\\repo --workflow wf-test-outage --repair` },
+    { pid: 102, created: old, cmd: `node ${DRIVE}Repositories\\ecommerce-app\\.claude\\scripts\\kernel\\watchdog.mjs --repo ${DRIVE}Repositories\\todo-app-be --workflow wf-todo-app-fe-canon --repair` },
+    { pid: 103, created: old, cmd: `node ${D}Repositories/ecommerce-app/.claude/scripts/supervisor/supervisor-watchdog.mjs` },
+    { pid: 104, created: T0 - 5 * 60_000, cmd: `node scripts/kernel/ask-server.mjs --repo ${D}Temp/starci-x/repo --workflow wf-y` },
+    { pid: 105, created: old, cmd: `node scripts/kernel/start-workflow.mjs --repo "${D}Temp/starci-host-outage-Zz/repo" --workflow wf-z` },
+    { pid: 106, created: old, cmd: `node ${D}tools/other-watchdog.mjs.bak --repo ${D}Temp/x` },
   ];
-  const pure = findOrphans(procs, { knownRepos: ['D:/Repositories/todo-app-be'], runningWorkflows: new Set(['wf-todo-app-fe-canon']), now: T0, minAgeMs: S.processes.orphanMinAgeMs });
+  const pure = findOrphans(procs, { knownRepos: [KNOWN], runningWorkflows: new Set(['wf-todo-app-fe-canon']), now: T0, minAgeMs: S.processes.orphanMinAgeMs });
   assert.deepEqual(pure.map((o) => o.pid), [101, 105], 'the listed repo, the repo-less Supervisor watchdog and a young loop are never orphans');
 
   const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: GOAL }] }) };

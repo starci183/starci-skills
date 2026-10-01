@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import fs from 'node:fs'; import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
-import {jobResult} from '../../engine/db/ledger.mjs';
+import {jobResult} from '../../engine/db/ledger.mjs'; const DRIVE=path.parse(os.tmpdir()).root;
 
 // A host shutdown kills every Orca terminal while the ledger still says an op
 // is running. These specs pin the saga recovery:
@@ -182,11 +182,11 @@ test('a commit on the owned paths since dispatch fences the job even with a clea
 // stray PowerShell tab per dead op. The recovery now closes that terminal with its
 // tab, but only on fresh proof: disconnected, or a frame that ends in a bare shell prompt.
 // A captured Codex op whose agent exited mid-turn.
-const DEAD_CODEX=['','• Ran node \'D:\\Repositories\\ecommerce-app\\.claude\\bin\\starci.mjs\' validate \'.starciwork\' --json','  └ {',
+const DEAD_CODEX=['',`• Ran node '${DRIVE}Repositories\\ecommerce-app\\.claude\\bin\\starci.mjs' validate '.starciwork' --json`,'  └ {',
   '      "schema": "starci/work-validate-report@1",','    … +29 lines (ctrl + t to view transcript)','      }',
   '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
   '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',
-  'PS D:\\Repositories\\todo-app-be>'].join('\n');
+  `PS ${DRIVE}Repositories\\todo-app-be>`].join('\n');
 const EXITED={connected:true,writable:true,sent:true,command:'codex --model gpt-6-sol',screen:DEAD_CODEX};
 const closeEvents=events=>events('dead-worker-terminal-closed').map(r=>JSON.parse(r.payload_json));
 
@@ -197,7 +197,7 @@ test('an exited worker is requeued and its bare-shell terminal is closed with it
   const body=out(r);
   assert.equal(body.recovery,'requeued');
   assert.deepEqual([body.terminalClosed.handle,body.terminalClosed.closed,body.terminalClosed.proof,body.terminalClosed.shellPrompt],
-    [HANDLE,true,'shell-prompt','PS D:\\Repositories\\todo-app-be>']);
+    [HANDLE,true,'shell-prompt',`PS ${DRIVE}Repositories\\todo-app-be>`]);
   assert.deepEqual(orcaState().closedTabs,[HANDLE],'closed with its tab, so Orca never restores the shell');
   assert.equal(orcaState().terminals[HANDLE].closed,true);
   assert.equal(job().status,'queued','the close follows the requeue');
@@ -256,12 +256,12 @@ test('closeExitedTerminal closes only on proof: a bare shell or a disconnected t
   const up={ok:true,connected:true,writable:true};
   const probe=(shown,screen)=>closeExitedTerminal('t1',{show:()=>shown,read:()=>screen==null?{ok:false}:{ok:true,screen},close});
   let r=probe(up,DEAD_CODEX);
-  assert.deepEqual([r.closed,r.proof,r.shellPrompt],[true,'shell-prompt','PS D:\\Repositories\\todo-app-be>']);
+  assert.deepEqual([r.closed,r.proof,r.shellPrompt],[true,'shell-prompt',`PS ${DRIVE}Repositories\\todo-app-be>`]);
   r=probe({ok:true,connected:false,writable:false},null);
   assert.deepEqual([r.closed,r.proof],[true,'disconnected']);
   assert.equal(closes.length,2);
   closes.length=0;
-  const live=['• Ran git status','  └ PS D:\\x> git status','› Ask Codex to do anything','  gpt-6-sol high · 70% left · ~\\x'].join('\n');
+  const live=['• Ran git status',`  └ PS ${DRIVE}x> git status`,'› Ask Codex to do anything','  gpt-6-sol high · 70% left · ~\\x'].join('\n');
   r=probe(up,live);assert.deepEqual([r.closed,r.proof,r.reason],[false,null,'agent-screen']);
   r=probe(up,null);assert.deepEqual([r.closed,r.reason],[false,'unreadable']);
   r=probe({ok:false,hostUnavailable:true,errorCode:'runtime_unavailable',error:'Start the Orca app first.'});

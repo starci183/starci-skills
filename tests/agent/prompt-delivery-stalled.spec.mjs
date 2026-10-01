@@ -32,8 +32,8 @@ const codex = loadAdapter('codex').card;
 const PREAMBLE = 'Orca Task preamble: you are the operation agent for op-interface.draw. Read the contract with api op-contract.';
 const HEADER = ['╭──────────────────────────────╮', '│ >_ OpenAI Codex (v0.155.1)   │', '╰──────────────────────────────╯',
   '  Tip: This is GPT-6, a new generation of intelligence.'];
-const IDLE = [...HEADER, '› Ask Codex to do anything', '  gpt-6-sol high · D:\\Repositories\\ecommerce-app'].join('\n');
-const BARE = [...HEADER, '›', '  gpt-6-sol high · D:\\Repositories\\ecommerce-app'].join('\n');
+const IDLE = [...HEADER, '› Ask Codex to do anything', `  gpt-6-sol high · ${path.join(os.tmpdir(), 'ecommerce-app')}`].join('\n');
+const BARE = [...HEADER, '›', `  gpt-6-sol high · ${path.join(os.tmpdir(), 'ecommerce-app')}`].join('\n');
 const STALLED = { ok: false, errorCode: 'agent_prompt_stalled', error: 'agent_prompt_stalled' };
 
 // A scripted terminal: `sends` answer in order; every read returns `frame()`.

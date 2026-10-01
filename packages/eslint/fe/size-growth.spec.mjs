@@ -41,13 +41,13 @@ test("the parameters come from the shipped manifest, and the law declares its on
 test("a new file over the manifest budget is refused, in a component and a hook alike", () => {
   tester.run("file-size-growth", fileSizeGrowth, {
     valid: [
-      { filename: "D:/repo/src/components/Card/index.tsx", code: lines(BUDGET) },
+      { filename: "repo/src/components/Card/index.tsx", code: lines(BUDGET) },
       // a declaration file carries no behaviour
-      { filename: "D:/repo/src/types/wire.d.ts", code: lines(BUDGET + 40) },
+      { filename: "repo/src/types/wire.d.ts", code: lines(BUDGET + 40) },
     ],
     invalid: [
-      { filename: "D:/repo/src/components/Card/index.tsx", code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
-      { filename: "D:/repo/src/hooks/useFeed.ts", code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
+      { filename: "repo/src/components/Card/index.tsx", code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
+      { filename: "repo/src/hooks/useFeed.ts", code: lines(BUDGET + 1), errors: [{ messageId: "born" }] },
     ],
   })
 })

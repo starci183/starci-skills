@@ -1,6 +1,6 @@
 // ledger-files.mjs — which product ledgers the machine arbiter (machine.sqlite `ledgers`) registered and still counts:
 // present on disk and not a fixture (under the OS temp directory, or under a directory named `fixture`/`fixtures`; a spec
-// that once enrolled C:/fixture/.starciwork/runtime.sqlite left a real-path fixture registered for good). Read by the
+// that once enrolled <fixture>/.starciwork/runtime.sqlite left a real-path fixture registered for good). Read by the
 // allocation balance (scripts/agent/balance.mjs) and the RAM throttle's fleet census (ram-throttle.mjs).
 import fs from 'node:fs';
 import os from 'node:os';

@@ -13,7 +13,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 // headless agent CLI (AGENT_HEADLESS_LAUNCH). Each refusal names the sanctioned API. No false positives: a plain file
 // delete, `git worktree list`, a single-junction rmdir, a PID kill, worker-start, and any text that only MENTIONS a
 // refused command (echo, commit message, heredoc) pass. No command below is ever run: the guard judges the text.
-const cwd = os.tmpdir();
+const cwd = os.tmpdir(), DRIVE = path.parse(cwd).root, DRV = DRIVE.replace(/\\/g, '/');
 const verdict = (command, dialect = 'bash') => commandVerdict({ command, cwd, guard: { owned: [cwd] }, env: process.env, dialect });
 const refusedAll = async (code, remedy, cases) => {
   for (const [command, dialect] of cases) {
@@ -35,10 +35,10 @@ test('a raw git worktree add or remove is refused with the runtime worktree API 
   await refusedAll('WORKTREE_NOT_OPS', /runtime worktree API \(scripts\/.*safeRemoveWorktree/, [
     ['git worktree add ../wt HEAD', 'bash'],
     ['git worktree add -b lane/x ../wt main', 'bash'],
-    ['git -C D:/repo worktree add --detach D:/repo-wt HEAD', 'bash'],
+    [`git -C ${DRV}repo worktree add --detach ${DRV}repo-wt HEAD`, 'bash'],
     ['git worktree remove --force ../wt', 'bash'],
-    ['git -C D:/repo worktree remove D:/repo-wt', 'bash'],
-    ['cd D:/repo && git worktree remove ../wt', 'bash'],
+    [`git -C ${DRV}repo worktree remove ${DRV}repo-wt`, 'bash'],
+    [`cd ${DRV}repo && git worktree remove ../wt`, 'bash'],
     ['cmd //c git worktree add ../wt HEAD', 'bash'],
     ['powershell -NoProfile -Command "git worktree remove ../wt"', 'bash'],
     ['git worktree add ../wt HEAD; git status', 'powershell'],
@@ -46,7 +46,7 @@ test('a raw git worktree add or remove is refused with the runtime worktree API 
 });
 
 test('git worktree list and prune pass', async () => {
-  await passedAll([['git worktree list', 'bash'], ['git worktree list --porcelain', 'powershell'], ['git -C D:/repo worktree list', 'bash']]);
+  await passedAll([['git worktree list', 'bash'], ['git worktree list --porcelain', 'powershell'], [`git -C ${DRV}repo worktree list`, 'bash']]);
 });
 
 test('a recursive delete is refused in every spelling, wrapper and shell, with safeRemoveTree as the remedy', async () => {
@@ -59,25 +59,25 @@ test('a recursive delete is refused in every spelling, wrapper and shell, with s
     ['rm --recursive --force dist', 'bash'],
     ['npm test && rm -rf coverage', 'bash'],
     ['bash -c "rm -rf /d/wt"', 'bash'],
-    ['cmd /c rmdir /s /q D:\\wt', 'bash'],
-    ['cmd //c rmdir //s //q D:\\wt', 'bash'],
-    ['cmd /c rd /s/q D:\\wt', 'bash'],
-    ['cmd /c del /s /q D:\\wt\\*', 'bash'],
+    [`cmd /c rmdir /s /q ${DRIVE}wt`, 'bash'],
+    [`cmd //c rmdir //s //q ${DRIVE}wt`, 'bash'],
+    [`cmd /c rd /s/q ${DRIVE}wt`, 'bash'],
+    [`cmd /c del /s /q ${DRIVE}wt\\*`, 'bash'],
     ['cmd /c erase /S x', 'bash'],
-    ['robocopy C:\\empty D:\\wt /MIR', 'bash'],
-    ['robocopy C:\\empty D:\\wt //PURGE', 'bash'],
-    ['Remove-Item -Recurse -Force D:\\wt', 'powershell'],
-    ['Remove-Item D:\\wt -r', 'powershell'],
-    ['Remove-Item D:\\wt -Recurse:$true', 'powershell'],
-    ['ri D:\\wt -Recurse', 'powershell'],
-    ['rm D:\\wt -Recurse -Force', 'powershell'],
-    ['rm -r D:\\wt', 'powershell'],
-    ['del D:\\wt -Recurse', 'powershell'],
-    ['erase D:\\wt -rec', 'powershell'],
-    ['rd D:\\wt -Recurse', 'powershell'],
-    ['rmdir D:\\wt -Recurse -Force', 'powershell'],
-    ['powershell -NoProfile -Command "Remove-Item -Recurse -Force D:\\wt"', 'bash'],
-    ['pwsh -c "rm D:\\wt -Recurse"', 'bash'],
+    [`robocopy ${DRIVE}empty ${DRIVE}wt /MIR`, 'bash'],
+    [`robocopy ${DRIVE}empty ${DRIVE}wt //PURGE`, 'bash'],
+    [`Remove-Item -Recurse -Force ${DRIVE}wt`, 'powershell'],
+    [`Remove-Item ${DRIVE}wt -r`, 'powershell'],
+    [`Remove-Item ${DRIVE}wt -Recurse:$true`, 'powershell'],
+    [`ri ${DRIVE}wt -Recurse`, 'powershell'],
+    [`rm ${DRIVE}wt -Recurse -Force`, 'powershell'],
+    [`rm -r ${DRIVE}wt`, 'powershell'],
+    [`del ${DRIVE}wt -Recurse`, 'powershell'],
+    [`erase ${DRIVE}wt -rec`, 'powershell'],
+    [`rd ${DRIVE}wt -Recurse`, 'powershell'],
+    [`rmdir ${DRIVE}wt -Recurse -Force`, 'powershell'],
+    [`powershell -NoProfile -Command "Remove-Item -Recurse -Force ${DRIVE}wt"`, 'bash'],
+    [`pwsh -c "rm ${DRIVE}wt -Recurse"`, 'bash'],
   ]);
 });
 
@@ -87,14 +87,14 @@ test('a plain file delete and a single-junction rmdir pass', async () => {
     ['rm -f file.txt', 'bash'],
     ['rm -- -r', 'bash'],
     ['rmdir empty-dir', 'bash'],
-    ['cmd /c rmdir D:\\wt\\node_modules', 'bash'],
-    ['cmd //c rmdir D:\\wt\\packages\\node_modules', 'bash'],
-    ['cmd /c rmdir D:\\wt\\node_modules', 'powershell'],
+    [`cmd /c rmdir ${DRIVE}wt\\node_modules`, 'bash'],
+    [`cmd //c rmdir ${DRIVE}wt\\packages\\node_modules`, 'bash'],
+    [`cmd /c rmdir ${DRIVE}wt\\node_modules`, 'powershell'],
     ['Remove-Item file.txt -Force', 'powershell'],
-    ['Remove-Item D:\\wt -Recurse:$false', 'powershell'],
+    [`Remove-Item ${DRIVE}wt -Recurse:$false`, 'powershell'],
     ['rm file.txt -Force', 'powershell'],
     ['del /q file.txt', 'bash'],
-    ['robocopy C:\\src D:\\dst /E', 'bash'],
+    [`robocopy ${DRIVE}src ${DRIVE}dst /E`, 'bash'],
     ['git rm -r --cached dist', 'bash'],
   ]);
 });
@@ -112,13 +112,13 @@ test('a kill by image name is refused (taskkill /IM, pkill) and a PID kill passe
 
 test('orca terminal create is refused with worker-start as the remedy; worker-start passes', async () => {
   await refusedAll('RAW_TERMINAL_CREATE', /orca orchestration worker-start --agent <provider>/, [
-    ['orca terminal create --worktree path:D:/wt --command "codex"', 'bash'],
+    [`orca terminal create --worktree path:${DRV}wt --command "codex"`, 'bash'],
     ['orca.cmd terminal create --command claude', 'powershell'],
     ['cmd /c orca terminal create --command "claude"', 'bash'],
-    ['cd D:/wt && orca terminal create', 'bash'],
+    [`cd ${DRV}wt && orca terminal create`, 'bash'],
   ]);
   await passedAll([
-    ['orca orchestration worker-start --agent codex --model sol --worktree path:D:/wt --spec "do it" --task-title "sol · repo · task"', 'bash'],
+    [`orca orchestration worker-start --agent codex --model sol --worktree path:${DRV}wt --spec "do it" --task-title "sol · repo · task"`, 'bash'],
     ['orca orchestration worker-show --worker w1', 'powershell'],
     ['orca terminal read --terminal t1', 'bash'],
     ['orca terminal list', 'bash'],

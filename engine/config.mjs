@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {skillRoot} from './runtime-root.mjs';
 import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
-import {invalid} from './invalid-config.mjs';
+import {invalid,validateRoots} from './invalid-config.mjs';
 import {validateOrca} from './orca-config.mjs';
 
 export const configRoot=skillRoot;
@@ -276,11 +276,12 @@ function validateAllocationBalance(allocation,runtimes){
   }
 }
 export function validateConfig(config){
-  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','claudeDebug','orca'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
+  const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','claudeDebug','orca','roots'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
   if(config?.asks!==undefined)validateAsks(config.asks);
   if(config?.uat!==undefined)validateUat(config.uat);
   if(config?.orca!==undefined)validateOrca(config.orca);
+  if(config?.roots!==undefined)validateRoots(config.roots);
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
   // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
@@ -471,7 +472,6 @@ export function loadConfig(root=configRoot,{initialize=false}={}){
   return readOwnerConfig(root)??readExample(root);
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){try{process.stdout.write(JSON.stringify(loadConfig(configRoot,{initialize:true}))+'\n');}catch(error){process.stderr.write(error.message+'\n');process.exitCode=1;}}
-
 /** The owner's standing delegation of ask answers (config.yaml `delegation`), or null when absent or expired. */
 export function activeDelegation(config=loadConfig(),now=Date.now()){const d=config?.delegation;if(!d||Date.parse(d.until)<=now)return null;return {asks:d.asks,until:d.until,excludes:d.excludes??[],note:d.note??null};}
 

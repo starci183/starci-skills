@@ -43,7 +43,7 @@ test('a change only under docs/ selects no invariant spec', () => {
 test('the specs-red-on-main DI has a due time in the future (the Supervisor decider default)', () => {
   const now = 1_790_000_000_000;
   const redOnMain = { name: 'specs', base: 'a'.repeat(40), inherited: [{ file: 'tests/api-fs/safe-remove.spec.mjs', name: 'no raw rm' }] };
-  const di = specsRedOnMainDecision({ redOnMain, root: 'D:/x/.claude', commits: ['b'.repeat(40)], now });
+  const di = specsRedOnMainDecision({ redOnMain, root: path.join(root, 'x', '.claude'), commits: ['b'.repeat(40)], now });
   assert.equal(di.kind, 'runtime-defect');
   assert.equal(di.keyParts.kind, 'specs-red-on-main');
   assert.equal(di.dueAt, now + DEFAULT_DUE_MS.supervisor);

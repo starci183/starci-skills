@@ -482,8 +482,9 @@ allocation:
     sessionArchiveAfterMs: 259200000
     claudeTranscriptArchiveAfterMs: 604800000
     archiveMaxAgeMs: 2592000000
-    archiveRoot: 'D:/starci-archive'
-    lanesRoot: 'D:/starci-lanes'
+    # archiveRoot and lanesRoot are unset on purpose: no host location lives in a tracked file. The defaults are
+    # <starciLocalRoot>/archive and <starciLocalRoot>/lanes (scripts/machine/home.mjs archiveRoot, lanesRoot); the owner
+    # relocates them with STARCI_ARCHIVE_ROOT and STARCI_LANES_ROOT or by setting these keys on the host.
     laneGraceMs: 86400000
     logMaxAgeMs: 1209600000
     gitIndexLockStaleMs: 300000

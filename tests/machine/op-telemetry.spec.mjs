@@ -138,7 +138,7 @@ test('stuckOf: every wait gets an age, a severity and the owner of its next acti
   assert.equal(stuck[0].severity, 'critical', 'critical first');
   const counts = stuckCounts(stuck);
   assert.equal(counts.critical, 2);
-  const owed = stuckOwedItems(stuck, { repo: 'D:/r' });
+  const owed = stuckOwedItems(stuck, { repo: path.join(os.tmpdir(), 'r') });
   assert.equal(owed.length, counts.warn + counts.critical, 'every wait past its SLA is an owed action, none below it');
   assert.ok(owed.every((i) => i.class === 'supervisor' && /^stuck-/.test(i.kind) && i.severity !== 'ok' && i.action && i.line.startsWith('STUCK ')));
 });

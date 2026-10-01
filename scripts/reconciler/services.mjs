@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { openMachine } from '../../engine/db/machine.mjs';
 import { allocationSettings, loadConfig } from '../../engine/config.mjs';
-
+import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
 export const HOST_YAML = path.join(SKILL_ROOT, 'modules', 'reconciler', 'host.yaml');
@@ -86,7 +86,7 @@ export function hostSettings(raw = parseYaml(fs.readFileSync(HOST_YAML, 'utf8'))
     ledgerHealth: {
       ...section('ledgerHealth', ['quickCheckEveryMs', 'keep', 'backupTimeoutMs']),
       backupHour: Number(h?.ledgerHealth?.backupHour ?? 3),
-      backupDir: String(h?.ledgerHealth?.backupDir ?? 'D:/starci-archive/ledger-backups'),
+      backupDir: String(h?.ledgerHealth?.backupDir ?? path.join(archiveRootOf(), 'ledger-backups')),
     },
   };
 }

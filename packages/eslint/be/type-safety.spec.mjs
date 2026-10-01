@@ -27,9 +27,9 @@ const tester = new RuleTester({
   },
 })
 
-const SRC = "D:/repo/src/modules/domain/user/user.service.ts"
-const SPEC = "D:/repo/src/modules/domain/user/user.service.spec.ts"
-const TESTS = "D:/repo/src/tests/fixtures/create-user.ts"
+const SRC = "src/modules/domain/user/user.service.ts"
+const SPEC = "src/modules/domain/user/user.service.spec.ts"
+const TESTS = "src/tests/fixtures/create-user.ts"
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {

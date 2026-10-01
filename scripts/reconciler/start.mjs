@@ -309,11 +309,11 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   let ledgers = [];
   try {
     const q = readMachine((m) => ({ check: m.db.prepare('PRAGMA quick_check').get()?.quick_check, ledgers: m.listLedgers() }), null, { env });
-    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'node engine/db/machine.mjs (initialises it) or restore from D:/starci-archive/ledger-backups'));
+    if (!q) push(red('preflight', 'machine-db', 'machine.sqlite', 'not found or unreadable', 'node engine/db/machine.mjs (initialises it) or restore from <archive root>/ledger-backups'));
     else { ledgers = q.ledgers; push(q.check === 'ok' ? green('preflight', 'machine-db', 'machine.sqlite quick_check', `ok, ${ledgers.length} ledger(s) registered`) : red('preflight', 'machine-db', 'machine.sqlite quick_check', String(q.check), 'restore machine.sqlite (owner-approved)')); }
   } catch (error) { push(red('preflight', 'machine-db', 'machine.sqlite quick_check', String(error?.message ?? error).slice(0, 200), 'restore machine.sqlite (owner-approved)')); }
   const integrity = ledgerIntegrity(ledgers);
-  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledgers quick_check', integrity.bad.map((b) => `${b.name}: ${b.result}`).join('; ').slice(0, 400), 'node scripts/reconciler/ledger-health.mjs --check --file <ledger> (restore the ledger from D:/starci-archive/ledger-backups, owner-approved)')
+  push(integrity.bad.length ? red('preflight', 'ledger-integrity', 'registered ledgers quick_check', integrity.bad.map((b) => `${b.name}: ${b.result}`).join('; ').slice(0, 400), 'node scripts/reconciler/ledger-health.mjs --check --file <ledger> (restore the ledger from <archive root>/ledger-backups, owner-approved)')
     : green('preflight', 'ledger-integrity', 'registered ledgers quick_check', `${integrity.checked} ledger file(s) ok`, { required: false }));
   const found = ledgerFindings(ledgers);
   push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${(f.problem === 'missing-repo' ? f.repoRoot : f.file) ?? '-'})`).join('; ').slice(0, 400), 'node scripts/reconciler/start.mjs --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')

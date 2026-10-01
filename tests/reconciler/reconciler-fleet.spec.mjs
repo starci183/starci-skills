@@ -21,7 +21,7 @@ const HERE = fileURLToPath(import.meta.url);
 const NOW = Date.parse('2026-09-28T10:00:00Z');
 const MIN = 60_000;
 // A ledger whose file exists (this spec) and a reader that is never queried: the deps/owed helpers are injected.
-const ledgers = [{ ledgerId: 'todo-app-be', repo: 'D:/Repositories/todo-app-be', file: HERE }, { ledgerId: 'supervisor', repo: null, file: HERE }];
+const ledgers = [{ ledgerId: 'todo-app-be', repo: 'todo-app-be', file: HERE }, { ledgerId: 'supervisor', repo: null, file: HERE }];
 const ctxOf = (over = {}) => fakeCtx({ controller: 'fleet', now: () => NOW, ledgers, openReader: () => ({ close() {} }), ...over });
 
 test('the controller module follows the shared contract', () => {
@@ -108,8 +108,8 @@ test('push: shadow only records the run; a refused repo is one push-refused DI',
   const r = await reconcileFleet(KEYS.push, ctx, { settings: DEFAULTS, deps: { force: true } });
   assert.equal(r.shadow, true);
   assert.equal(ctx.calls.run[0].args[0], 'scripts/supervisor/push-mains.mjs');
-  const plan = planPush({ now: NOW, results: [{ repo: 'D:/Repositories/todo-app-fe', pushed: false, refused: 'secret scan found candidates', head: 'abcdef1234567890', signature: 'secret-scan:aws-key' },
-    { repo: 'D:/Repositories/todo-app-be', pushed: false, error: 'failed', head: '' }, { repo: 'D:/x', pushed: true }] });
+  const plan = planPush({ now: NOW, results: [{ repo: 'todo-app-fe', pushed: false, refused: 'secret scan found candidates', head: 'abcdef1234567890', signature: 'secret-scan:aws-key' },
+    { repo: 'todo-app-be', pushed: false, error: 'failed', head: '' }, { repo: 'x', pushed: true }] });
   assert.equal(plan.length, 1);
   assert.match(plan[0].idempotencyKey, /^push-refused:todo-app-fe:[0-9a-f]{10}:abcdef123456$/);
   assert.deepEqual(plan[0].keyParts, { kind: 'push-refused', repo: 'todo-app-fe', signature: 'secret-scan:aws-key', head: 'abcdef1234567890' });

@@ -163,7 +163,7 @@ each ledger read-only (`forEachLedger`) and merge in JavaScript. Attaching a bat
   `gc_marks`; do the same for machine; sweep a file only when it is unmarked in this run, unpinned in
   every database, archived, and older than 24 h (the grace against put-before-insert). Every item
   is a `gc_items` row with its outcome. `scripts/housekeeping/blob-gc.mjs` runs it (dry by default);
-  an unmarked blob past the grace is first zipped to `D:/starci-archive/blob-retention-<date>/`,
+  an unmarked blob past the grace is first zipped to `<archive root>/blob-retention-<date>/`,
   re-read and re-hashed, recorded in `archives` and marked `archived_at` in every DB that holds it.
   An old-schema or unreadable source sweeps nothing (fail closed).
 - **Blob retention (Q4).** Retention drops a reference from the mark set, never a row by itself:
@@ -185,7 +185,7 @@ record cites agent output by artifact id and sha256 (`work_citations`); the byte
 
 Rows stay while a workflow lives. A finished workflow is purged only as a unit, with the owner's
 approval, by `scripts/work/purge-workflow.mjs`: the workflow's rows and referenced blobs are zipped to
-`D:/starci-archive`, the archive is re-read and verified entry by entry, `workflow_purges` records
+`<archive root>`, the archive is re-read and verified entry by entry, `workflow_purges` records
 the archive, and only then does `DELETE FROM workflows` cascade through every table of that
 workflow. Blob files leave only through the GC sweep above. Machine sample tables keep 14–30 days,
 `machine_logs` 14 days for debug and 90 days otherwise.

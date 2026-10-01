@@ -1,0 +1,18 @@
+id: evidence-host-path
+effectiveAt: '2026-10-02T12:00:00+07:00'
+summary: >-
+  Work evidence is portable: a pass whose evidence files (a record's evidence.yaml, a draw prompt, a visual review, an assets JSON
+  under .starciwork) hold a hard-coded absolute host path is refused at settle (EVIDENCE_HOST_PATH), and the example evidence recorder
+  writes commands and observations without the host shell prefix and with repo-relative paths. One matcher (scripts/lib/host-path.mjs)
+  serves the settle refusal and the runtime HFS rule RT_ABSOLUTE_PATH. A leg admitted before this change settles on its old contract.
+reach: new-legs
+adds:
+  codes: [EVIDENCE_HOST_PATH]
+paths:
+  - modules/kernel/api-commands/settle.yaml
+  - modules/kernel/failure-codes.yaml
+  - scripts/example/example-evidence.mjs
+  - scripts/kernel/cli.mjs
+  - scripts/kernel/job-artifacts.mjs
+  - scripts/kernel/verbs/settle.mjs
+  - scripts/lib/host-path.mjs

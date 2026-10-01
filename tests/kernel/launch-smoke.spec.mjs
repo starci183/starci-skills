@@ -478,12 +478,12 @@ test('the no-op agent is the cheapest priced model a runtimes.yaml pool pins, wi
 });
 
 test('a parent spec runs its stage then worker_done; a leaf spec marks its line then worker_done', () => {
-  const parent = noopSpec({ role: 'op', script: 'D:/r/scripts/kernel/launch-smoke.mjs' });
-  assert.match(parent, /node "D:\/r\/scripts\/kernel\/launch-smoke.mjs" stage --as op$/m, 'the command names only the role: nothing random to mistype');
+  const parent = noopSpec({ role: 'op', script: 'scripts/kernel/launch-smoke.mjs' });
+  assert.match(parent, /node "scripts\/kernel\/launch-smoke\.mjs" stage --as op$/m, 'the command names only the role: nothing random to mistype');
   assert.match(parent, /timeout of at least 300 seconds/);
   assert.deepEqual(CHILDREN, { supervisor: ['worker'], kernel: ['op', 'opFe'], op: ['critic'] }, 'the smoke itself starts opFail, never a stage');
   for (const role of ['critic', 'opFe', 'opFail']) {
-    const leaf = noopSpec({ role, script: 'D:/r/scripts/kernel/launch-smoke.mjs' });
+    const leaf = noopSpec({ role, script: 'scripts/kernel/launch-smoke.mjs' });
     assert.match(leaf, new RegExp(` mark --as ${role}$`, 'm'));
     assert.doesNotMatch(leaf, / stage /);
   }
@@ -494,7 +494,7 @@ test('a parent spec runs its stage then worker_done; a leaf spec marks its line 
 });
 
 test('worker-start worktree arguments map to the launcher options; main manifests diff by bytes', (t) => {
-  assert.deepEqual(worktreeParamsOf(['--worktree', 'D:/wt']), { worktree: 'D:/wt' });
+  assert.deepEqual(worktreeParamsOf(['--worktree', 'wt']), { worktree: 'wt' });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-launch-smoke-manifest-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
   const app = scratchApp(tmp);

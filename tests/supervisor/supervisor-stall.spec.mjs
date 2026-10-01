@@ -199,7 +199,7 @@ test('wakeKernel: no seat, a busy or gated Kernel and a shell refuse; an idle Ke
     read:()=>({ok:true,screen:screens[Math.min(i++,screens.length-1)]}),send:(a)=>{sends.push(a);return {ok:true};},sleep:()=>{}};};
   assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:{...deps([IDLE]),show:()=>({ok:true,connected:false,writable:true})}}).action,'kernel-unavailable');
   assert.deepEqual([wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([ACTIVE])})].map(r=>[r.action,r.state]),[['kernel-busy','active']]);
-  assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps(['PS D:\\repo> '])}).action,'kernel-exited');
+  assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([`PS ${path.parse(process.cwd()).root}repo> `])}).action,'kernel-exited');
   assert.equal(sends.length,0,'nothing typed into a busy Kernel or a shell');
   const r=wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([IDLE,IDLE,ACTIVE])});
   assert.equal(r.action,'kernel-woken');

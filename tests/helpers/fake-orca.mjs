@@ -161,7 +161,7 @@ import path from 'node:path';
 const FAKE_ORCA_SOURCE = String.raw`// fake orca — canned terminal + orchestration API for the dispatch specs.
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
-const ROOT = __STARCI_ROOT__;
+const ROOT = __STARCI_ROOT__, FAKE_REPO = process.cwd().replaceAll('\\', '/');
 const argv = process.argv.slice(2);
 const log = process.env.STARCI_FAKE_ORCA_LOG;
 const stateFile = process.env.STARCI_FAKE_ORCA_STATE;
@@ -176,11 +176,11 @@ const gateScreens = {
 };
 // Multi-line launch menus (STARCI_FAKE_ORCA_GATE_SCREEN): [lead text, options, accept index].
 const menuGates = {
-  'claude-trust': ['Accessing workspace:\n\n' + 'D:/fake/repo' + "\n\nQuick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source\nproject, or work from your team). If not, take a moment to review what's in this folder first.\n\nClaude Code'll be able to read, edit, and execute files here.\n\nSecurity guide\n",
+  'claude-trust': ['Accessing workspace:\n\n' + FAKE_REPO + "\n\nQuick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source\nproject, or work from your team). If not, take a moment to review what's in this folder first.\n\nClaude Code'll be able to read, edit, and execute files here.\n\nSecurity guide\n",
     ['No, exit', 'Yes, I trust this folder'], 1, 'Enter to confirm · Esc to cancel', '❯'],
   'claude-bypass': ['WARNING: Claude Code running in Bypass Permissions mode\n\nIn Bypass Permissions mode, Claude Code will not ask for your approval before running potentially dangerous commands.\n\nBy proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.\n',
     ['No, exit', 'Yes, I accept'], 1, 'Enter to confirm · Esc to cancel', '❯'],
-  'codex-trust': ['> You are in D:/fake/repo\n\n  Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt injection.\n',
+  'codex-trust': ['> You are in ' + FAKE_REPO + '\n\n  Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt injection.\n',
     ['1. Yes, continue', '2. No, quit'], 0, '  Press enter to continue', '›'],
   'claude-onboarding': ["Let's get started.\n\nChoose the text style that looks best with your terminal\nTo change this later, run /theme\n",
     ['1. Dark mode ✔', '2. Light mode'], 0, '', '❯'],
@@ -242,9 +242,9 @@ const hasSent = handle => { const r = record(handle); return r ? !!r.sent : stat
 const createTimeout = process.env.STARCI_FAKE_ORCA_CREATE_TIMEOUT || '';
 const bootScreen = process.env.STARCI_FAKE_ORCA_BOOT_SCREEN || '';
 const bootExits = Number(process.env.STARCI_FAKE_ORCA_BOOT_EXIT || 0);
-const CLAUDE_HINT = h => [' ▐▛███▜▌   Claude Code v2.1.280', '▝▜█████▛▘  Opus 5.5 with high effort · Claude Max', '  ▘▘ ▝▝    D:\\fake\\repo', '',
+const CLAUDE_HINT = h => [' ▐▛███▜▌   Claude Code v2.1.280', '▝▜█████▛▘  Opus 5.5 with high effort · Claude Max', '  ▘▘ ▝▝    ' + FAKE_REPO, '',
   '─────', '❯\u00a0Try "write a test for <filepath>"', '─────', '  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
-const BOOT_EXIT = h => ['PS D:\\fake\\repo> ' + String(record(h)?.command ?? '').slice(0, 60), 'Error: fake startup crash (ECONNRESET reading settings)', 'PS D:\\fake\\repo> '].join('\n');
+const BOOT_EXIT = h => ['PS ' + FAKE_REPO + '> ' + String(record(h)?.command ?? '').slice(0, 60), 'Error: fake startup crash (ECONNRESET reading settings)', 'PS ' + FAKE_REPO + '> '].join('\n');
 const stuckPaste = process.env.STARCI_FAKE_ORCA_STUCK_PASTE || '';
 const INLINE_STAGED = h => 'Codex\nmodel: ' + renderedModel(h) + '\n\n' + String(record(h)?.prompt ?? '').split(/\r?\n/).filter(Boolean).slice(-8)
   .map((line, i) => (i === 0 ? '› ' : '  ') + line).join('\n') + '\n';
@@ -283,7 +283,7 @@ const hostDown = (process.env.STARCI_FAKE_ORCA_HOST || state.hostDown || '') ===
   || (hostDownCalls > 0 && (state.hostDownServed || 0) < hostDownCalls);
 if (hostDown) {
   state.hostDownServed = (state.hostDownServed || 0) + 1; save();
-  fail({ ok: false, error: { code: 'runtime_unavailable', message: 'Could not read Orca runtime metadata at C:\\Users\\fake\\AppData\\Roaming\\orca\\orca-runtime.json. Start the Orca app first.' } });
+  fail({ ok: false, error: { code: 'runtime_unavailable', message: 'Could not read Orca runtime metadata at <home>/orca/orca-runtime.json. Start the Orca app first.' } });
 }
 // The live-schema listing scripts/api/orca/lib.mjs compares against, derived
 // from calls.yaml so the stub can never disagree with the contract by accident.

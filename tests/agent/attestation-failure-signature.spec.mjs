@@ -8,7 +8,7 @@ const card = { attestation: {}, knownFailures: [{ signal: 'Throttling\\.Allocati
 
 test('a 401 inside an id, an epoch or a token count is no failure', () => {
   for (const screen of [
-    "Set-Location -LiteralPath 'C:\\staging\\fix-dispatch-attestation-false-401-8eb12e'",
+    "Set-Location -LiteralPath 'staging\\fix-dispatch-attestation-false-401-8eb12e'",
     'observedAt 1790264010118',
     '↓ 14015 tokens · esc to interrupt',
   ]) assert.equal(failureOnScreen(card, screen), null, screen);

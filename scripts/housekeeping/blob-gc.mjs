@@ -35,6 +35,7 @@ import { zipRead } from '../api/fs/zip-read.mjs';
 import { hasLedgerTable, openLedgerReader } from '../../engine/db/ledger.mjs';
 import { machineFileFor, openMachineReader } from '../../engine/db/machine.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
+import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
 export const RETENTION = Object.freeze({ graceMs: 86_400_000, passMs: 30 * 86_400_000, failMs: 90 * 86_400_000, seatMs: 90 * 86_400_000 });
 const SHA = /^[a-f0-9]{64}$/;
@@ -209,7 +210,7 @@ function archiveBlobs(items, dir) {
 }
 
 /** Run one sweep. Dry by default; apply needs the writers and the host GC lock. */
-export async function runBlobGc({ apply = false, env = process.env, now = Date.now(), archiveRoot = 'D:/starci-archive', retention = RETENTION, writers = null } = {}) {
+export async function runBlobGc({ apply = false, env = process.env, now = Date.now(), archiveRoot = archiveRootOf({ env }), retention = RETENTION, writers = null } = {}) {
   const plan = await planBlobGc({ env, now, retention });
   if (!apply) return { ...plan, apply: false };
   if (plan.blocked.length) return { ...plan, apply: true, ok: false, refused: `a source could not be read, so nothing is swept: ${plan.blocked.join('; ')}` };
@@ -286,7 +287,7 @@ function describe(r) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
   const archiveAt = argv.indexOf('--archive-root');
-  runBlobGc({ apply: argv.includes('--apply'), archiveRoot: archiveAt >= 0 ? argv[archiveAt + 1] : 'D:/starci-archive' }).then((r) => {
+  runBlobGc({ apply: argv.includes('--apply'), ...(archiveAt >= 0 ? { archiveRoot: argv[archiveAt + 1] } : {}) }).then((r) => {
     const { marksBySource, ...shown } = r;
     console.log(argv.includes('--json') ? JSON.stringify({ ...shown, marksBySource: Object.fromEntries(Object.entries(marksBySource).map(([k, v]) => [k, v.length])) }, null, 2) : describe(r));
     process.exitCode = r.refused ? 1 : 0;

@@ -334,7 +334,7 @@ ui:
   assets:
     - path: assets/schedule-refused.prompt.txt
       role: prompt
-      sha256: 2c2d892e2e493785fd8250fc5899df299da50b14b719740f252019547c6bdd13
+      sha256: ac492ce68b2bd136de794b2daaad8763f33dcf9c4cc58b7d604d681aaadc4c9a
       provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
     - path: assets/schedule-refused.png
       role: direction
@@ -495,7 +495,7 @@ ui:
 assets:
   - path: assets/schedule-refused.prompt.txt
     role: prompt
-    sha256: 2c2d892e2e493785fd8250fc5899df299da50b14b719740f252019547c6bdd13
+    sha256: ac492ce68b2bd136de794b2daaad8763f33dcf9c4cc58b7d604d681aaadc4c9a
     provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
   - path: assets/schedule-refused.png
     role: direction

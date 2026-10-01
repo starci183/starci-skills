@@ -13,8 +13,8 @@
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allocationSettings, loadConfig } from '../../engine/config.mjs';
-import { machineLog, readMachine, withMachine } from '../../engine/db/machine.mjs';
+import { loadConfig } from '../../engine/config.mjs';
+import { machineLog, readMachine, starciLocalRoot, withMachine } from '../../engine/db/machine.mjs';
 import { headTime } from '../api/git/head-time.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -47,21 +47,27 @@ export const DEFAULTS = Object.freeze({
   pollIntervalMs: 600_000,
 });
 
-// The land scratch trees live under the one lanes root (scripts/machine/home.mjs lanesRoot: runtimes.yaml
-// allocation.housekeeping.lanesRoot, STARCI_LANES_ROOT, default D:/starci-lanes), never on C:. A [Worker] staging
-// checkout is an Orca worktree (workers.mjs createStaging): Orca places it, the job records where.
-export const DEFAULT_LANES_ROOT = 'D:/starci-lanes';
+// The land scratch trees live under the one lanes root (lanesRoot below), never on C: unless the owner puts it there. A [Worker]
+// staging checkout is an Orca worktree (workers.mjs createStaging): Orca places it, the job records where.
+
+/** The host-state sub-root `name` ("lanes", "archive") a root defaults to: <starciLocalRoot>/<name>, the state root behind %LOCALAPPDATA%/StarCi. */
+const stateRootChild = (name, env) => path.join(starciLocalRoot(env), name);
+/** The owner's relocation of a host root (config.yaml `roots.<key>`, validated by engine/config.mjs), or null. `config` is the owner config (default: loadConfig()). */
+const ownerRoot = (key, config) => {
+  try { return (config === undefined ? loadConfig() : config)?.roots?.[key] ?? null; } catch { return null; }
+};
 
 /**
- * The one lane-worktree root. `env.STARCI_LANES_ROOT` wins (specs, a one-off run); then the
- * runtimes.yaml key — pass `allocation` (allocationSettings()) when the caller already holds it,
- * else it is read here; the declared default applies while the key is absent.
+ * The one lane-worktree root: env STARCI_LANES_ROOT (specs, a one-off run), then the owner config `roots.lanes`
+ * (config.yaml, gitignored), else <starciLocalRoot>/lanes. No host location is written in a tracked file.
  */
-export function lanesRoot({ env = process.env, allocation = undefined } = {}) {
-  let configured = null;
-  if (allocation !== undefined) configured = allocation?.housekeeping?.lanesRoot ?? null;
-  else { try { configured = allocationSettings()?.housekeeping?.lanesRoot ?? null; } catch { configured = null; } }
-  return path.resolve(String(env?.STARCI_LANES_ROOT || configured || DEFAULT_LANES_ROOT));
+export function lanesRoot({ env = process.env, config = undefined } = {}) {
+  return path.resolve(String(env?.STARCI_LANES_ROOT || ownerRoot('lanes', config) || stateRootChild('lanes', env)));
+}
+
+/** The one archive root (session files, blob retention, ledger backups): env STARCI_ARCHIVE_ROOT, then the owner config `roots.archive`, else <starciLocalRoot>/archive. */
+export function archiveRoot({ env = process.env, config = undefined } = {}) {
+  return path.resolve(String(env?.STARCI_ARCHIVE_ROOT || ownerRoot('archive', config) || stateRootChild('archive', env)));
 }
 
 export const landRoot = (env = process.env) => path.join(lanesRoot({ env }), 'land');

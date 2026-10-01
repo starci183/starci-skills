@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { grammarPinsOf, grammarPinsIn } from '../../scripts/work/ui/grammar-registry-pin.mjs';
+import { grammarPinsOf, grammarPinsIn } from '../../scripts/work/ui/grammar-registry-pin.mjs'; const DRIVE = path.parse(os.tmpdir()).root;
 
 // The owner ruled consumers take @starci/grammar from npm: a file: link in one
 // product and stale registry pins in others both hid 0.5.0.
 test('a registry semver range passes; a file:, link or path spec fails', () => {
   assert.deepEqual(grammarPinsOf({ dependencies: { '@starci/grammar': '^0.5.0' } }).map((p) => p.ok), [true]);
-  for (const spec of ['file:../ecommerce-app/.claude/packages/grammar', 'link:../grammar', 'workspace:*', '../grammar', String.raw`D:\grammar`, 'D:/grammar'])
+  for (const spec of ['file:../ecommerce-app/.claude/packages/grammar', 'link:../grammar', 'workspace:*', '../grammar', `${DRIVE}grammar`, `${DRIVE.replace(/\\/g, '/')}grammar`])
     assert.equal(grammarPinsOf({ devDependencies: { '@starci/grammar': spec } })[0].ok, false, spec);
   assert.deepEqual(grammarPinsOf({ dependencies: { react: '19' } }), []);
 });

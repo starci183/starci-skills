@@ -12,8 +12,8 @@ import { asyncNeedsAwait, rules } from "./async-discipline.mjs"
 const tester = new RuleTester({
   languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
 })
-const SRC = "D:/repo/src/modules/domain/plan/plan.service.ts"
-const SPEC = "D:/repo/src/modules/domain/plan/plan.service.spec.ts"
+const SRC = "src/modules/domain/plan/plan.service.ts"
+const SPEC = "src/modules/domain/plan/plan.service.spec.ts"
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)

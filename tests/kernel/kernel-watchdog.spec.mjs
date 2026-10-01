@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyAgentScreen } from '../../scripts/lib/terminal-liveness.mjs';
-import { buildWakePrompt } from '../../scripts/kernel/kernel-watchdog.mjs';
+import { buildWakePrompt } from '../../scripts/kernel/kernel-watchdog.mjs'; const F = path.parse(os.tmpdir()).root.replace(/\\/g, '/');
 
 test('provider input prompt is turn-idle even when it carries an Orca message',()=>{
   const screen=`Worked for 18m 4s · done 6:56 AM
@@ -128,7 +128,7 @@ test('any Claude spinner row and a still-executing tool call are active; finishe
     '✢ Transmuting… (running PreToolUse hook · 1m 26s · ↓ 3.9k tokens)',
     "  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's current work",...chrome].join('\n');
   assert.equal(classifyAgentScreen(pre).state,'active','PreToolUse hook spinner');
-  const post=['❯ Read D:/Repositories/todo-app-be/.orca/orca-dispatch-ctx_3dedd02ae7c5.md completely and follow it exactly.',
+  const post=[`❯ Read ${F}Repositories/todo-app-be/.orca/orca-dispatch-ctx_3dedd02ae7c5.md completely and follow it exactly.`,
     '✻ Moseying… (running PostToolUse hook · 3s)',...chrome].join('\n');
   assert.equal(classifyAgentScreen(post).state,'active','PostToolUse hook spinner right after launch');
   assert.equal(classifyAgentScreen(['✳ Moseying… (running SessionStart hook)',...chrome].join('\n')).state,'active','a hook spinner with no timer yet');

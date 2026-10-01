@@ -308,7 +308,7 @@ test('badges pair within one container only: two cards\' status badges on one ro
   assert.equal(checks.filter((c) => c.id === 'badge to badge').length, 0);
 });
 
-// The critic always runs on a real-component drawing (lane op-draw). The prototype D:/starci-tmp/draw-components passed
+// The critic always runs on a real-component drawing (lane op-draw). The prototype <tmp>/draw-components passed
 // every machine gate yet finished blocked "DRAW_BEAUTY_BELOW: the critic scored beauty nothing": its round ran
 // --no-critic, and a component round handed settings.critic straight to runCritic (no criticFor, so a Codex drawer was
 // judged by Codex). finish now critiques an uncritiqued best round; a critic that cannot answer is DRAW_CRITIC_MISSING.
@@ -370,7 +370,7 @@ test('a component round picks an independent critic; finish critiques an uncriti
   assert.match(done.remaining[0].detail, /without a verdict/);
 });
 
-// The reference draw (D:/starci-tmp/draw-components, lane op-draw): passed every loop metric, then settle's
+// The reference draw (<tmp>/draw-components, lane op-draw): passed every loop metric, then settle's
 // draw-acceptance refused it - DRAW_SCORE_BELOW "no render source (.html)" (a component part's source is <part>.dom.html
 // + <part>.draw.tsx), DRAW_OFF_GRAMMAR_COMPONENT on 127 grammar-rendered elements (the html DNA attribute gate read the
 // rendered DOM), and DRAW_ASSET_NOT_TOKEN_RENDERED on the redline and the art placeholder finish installs.

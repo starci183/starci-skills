@@ -18,12 +18,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { isLinkLike } from '../api/fs/safe-remove.mjs';
 import { samePath } from '../lib/path-key.mjs';
+import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Contract defaults when the injected allocation omits them (runtimes.yaml declares the live values). */
 const DEFAULT_ARCHIVE_AFTER_MS = 7 * DAY_MS;
 const DEFAULT_RECENT_MS = DAY_MS;
-const DEFAULT_ARCHIVE_ROOT = 'D:/starci-archive';
 
 /** The positive number `value` carries, else null. */
 const positiveMs = (value) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : null);
@@ -129,7 +129,7 @@ export async function sweepClaudeTranscripts({ apply = false, now = Date.now(), 
   const hk = housekeepingOf(allocation);
   const archiveAfterMs = positiveMs(hk.claudeTranscriptArchiveAfterMs) ?? DEFAULT_ARCHIVE_AFTER_MS;
   const recentMs = positiveMs(hk.claudeTranscriptRecentMs) ?? DEFAULT_RECENT_MS;
-  const archiveRoot = path.resolve(String(env?.STARCI_ARCHIVE_ROOT || hk.archiveRoot || DEFAULT_ARCHIVE_ROOT));
+  const archiveRoot = archiveRootOf({ env });
   const out = { ok: true, apply, freedBytes: 0, movedBytes: 0, deleted: 0, moved: [], skipped: [], errors: [] };
 
   const dirs = projectDirs(claudeProjectsRoots(env), out);

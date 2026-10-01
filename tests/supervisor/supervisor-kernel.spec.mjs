@@ -931,7 +931,7 @@ test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervi
   sup.close();
   assert.deepEqual([...supervisorWorkerHandles({ env })], ['term_wk']);
   // The Orca-tree check: the worker sits in the runtime project's worktree, its job in machine.sqlite sup_jobs.
-  const repo = 'D:/Repositories/starci-academy-backend/.claude';
+  const repo = path.join(os.tmpdir(), 'starci-academy-backend', '.claude').replace(/\\/g, '/');
   withLedger(t, ({ ledger }) => {
     const rows = readTerminals([
       { handle: 'term_wk', title: '◐ Worker terminals orphaned in Orca', connected: true, worktreePath: repo },

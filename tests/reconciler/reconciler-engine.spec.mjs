@@ -89,7 +89,7 @@ test('a shadow controller\'s ctx.api spawns nothing and writes one reconciler.wo
   t.after(() => st.close());
   const spawned = [], rows = [];
   const spawnChild = async (cmd, args, opts) => { spawned.push({ cmd, args, env: opts.env }); return { ok: true, code: 0, value: { ok: true } }; };
-  const ledgers = [{ ledgerId: 'todo-app-be', repo: 'D:/Repositories/todo-app-be', file: 'none' }];
+  const ledgers = [{ ledgerId: 'todo-app-be', repo: 'todo-app-be', file: 'none' }];
   const shared = { statusCache: new Map(), wouldSeen: new Map() };
   const shadow = createCtx({ controller: 'job', mode: 'shadow', key: 'job:todo-app-be:j1', state: st.db, epoch: 3, ledgers, spawnChild, writeLog: (r) => rows.push(r), shared });
   const r = await shadow.api('todo-app-be', 'settle', ['--job', 'j1', '--verdict', 'pass']);
@@ -117,7 +117,7 @@ test('a shadow controller\'s ctx.api spawns nothing and writes one reconciler.wo
   assert.equal(spawned.length, 1);
   assert.equal(spawned[0].env.STARCI_ACTOR, 'reconciler/job');
   assert.equal(spawned[0].env.STARCI_RECONCILER_EPOCH, '3');
-  assert.deepEqual(spawned[0].args.slice(1, 4), ['settle', '--repo', 'D:/Repositories/todo-app-be']);
+  assert.deepEqual(spawned[0].args.slice(1, 4), ['settle', '--repo', 'todo-app-be']);
   const journal = st.db.db.prepare('SELECT state, epoch, verb FROM engine_actions ORDER BY started_at').all();
   assert.deepEqual(journal.map((a) => [a.state, a.epoch, a.verb]), [['done', 3, 'api settle']]);
   current = false;
@@ -331,7 +331,7 @@ test('a failed action is classified by exit and JSON ok, never by stderr; result
   const answers = [
     { ok: true, code: 0, value: { ok: true }, stderr: warn },
     { ok: false, code: 1, value: null, stderr: `${warn}file:///x/api.mjs:1\r\n  x\r\n  ^\r\n\r\nReferenceError: staleInputProjection is not defined\r\n    at file:///x` },
-    { ok: false, code: 1, value: [{ repo: 'D:/Repositories/todo-app-be', pushed: false, scan: { ok: false, findings: [1, 2] } }], stderr: '' },
+    { ok: false, code: 1, value: [{ repo: 'todo-app-be', pushed: false, scan: { ok: false, findings: [1, 2] } }], stderr: '' },
   ];
   let envSeen = null;
   const ctx = createCtx({ controller: 'host', mode: 'active', state: st.db, ledgers: [], writeLog: () => {},

@@ -46,13 +46,13 @@ test('runtimes.yaml declares the stale window and housekeeping runs the gitlocks
 });
 
 test('a git process holds the repo when it names it or names none; one naming only another repo does not', () => {
-  const repo = path.resolve('D:/Repositories/ecommerce-app');
-  assert.deepEqual(reposNamed('"C:\\Program Files\\Git\\cmd\\git.exe" -C "D:\\Repositories\\ecommerce-app" status'), ['D:\\Repositories\\ecommerce-app']);
+  const repo = path.join(os.tmpdir(), 'ecommerce-app'), fwd = repo.replace(/\\/g, '/'), other = path.join(os.tmpdir(), 'todo-app-be').replace(/\\/g, '/');
+  assert.deepEqual(reposNamed(`"${path.parse(repo).root}Program Files\\Git\\cmd\\git.exe" -C "${repo}" status`), [repo]);
   assert.deepEqual(reposNamed('git --git-dir=/r/.git --work-tree /r log'), ['/r/.git', '/r']);
-  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/ecommerce-app commit -m x'), repo), 'this');
-  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/ecommerce-app/src add a'), repo), 'this');
-  assert.equal(processOnRepo(proc('git.exe --git-dir=D:/Repositories/ecommerce-app/.git status'), repo), 'this');
-  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/todo-app-be status'), repo), 'other');
+  assert.equal(processOnRepo(proc(`git.exe -C ${fwd} commit -m x`), repo), 'this');
+  assert.equal(processOnRepo(proc(`git.exe -C ${fwd}/src add a`), repo), 'this');
+  assert.equal(processOnRepo(proc(`git.exe --git-dir=${fwd}/.git status`), repo), 'this');
+  assert.equal(processOnRepo(proc(`git.exe -C ${other} status`), repo), 'other');
   assert.equal(processOnRepo(proc('git.exe commit -m x'), repo), 'unknown', 'its cwd may be this repo');
 });
 
@@ -83,7 +83,7 @@ test('a lock that changed during the probe stays; a dry run only reports', (t) =
 test('a stale lock with no git process on the repository is removed and recorded once', (t) => {
   const { repo, lock } = repoWithLock(t, 9);
   const recorded = [];
-  const r = indexLock({ repo, staleMs: STALE, list: () => [proc('git.exe -C D:/elsewhere status'), proc('node.exe x', 'node.exe')].filter((p) => /^git/.test(p.name)), record: (x) => recorded.push(x) });
+  const r = indexLock({ repo, staleMs: STALE, list: () => [proc(`git.exe -C ${path.join(os.tmpdir(), 'elsewhere').replace(/\\/g, '/')} status`), proc('node.exe x', 'node.exe')].filter((p) => /^git/.test(p.name)), record: (x) => recorded.push(x) });
   assert.equal(r.state, 'removed');
   assert.equal(fs.existsSync(lock), false);
   assert.equal(recorded.length, 1);

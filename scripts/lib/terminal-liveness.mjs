@@ -214,9 +214,9 @@ export function draftOwnership(draft, { texts = [], stagedPattern = DEFAULT_STAG
 
 // A terminal whose agent process exited shows its host shell again: the frame ENDS in a bare prompt row.
 // A nudge typed there on 2026-09-24 02:23 (term_8a556567, a dead mm-work op) was run by PowerShell as a
-// command. Agents that run shell tools print "PS D:\x> cmd" rows in their transcript too, but an agent TUI
+// command. Agents that run shell tools print "PS <drive>:\x> cmd" rows in their transcript too, but an agent TUI
 // always ends its frame with its own input box or footer, so only a bare prompt as the LAST non-empty row
-// counts - and only a bare one: "PS D:\x> claude ..." is a launch still starting, not an exit.
+// counts - and only a bare one: "PS <drive>:\x> claude ..." is a launch still starting, not an exit.
 const SHELL_PROMPT_ROWS = [
   /^PS(?:\s+\S[^>]*)?>$/,                    // PowerShell: "PS D:\Repositories\x>"
   /^[A-Za-z]:\\[^<>|*?"\r\n]*>$/,           // cmd.exe: "D:\Repositories\x>"
@@ -244,14 +244,14 @@ const AGENT_LAUNCH = /^(?:&\s*)?["']?[\w:\\/.~-]*?\b(?:claude|codex|devin)(?:\.e
 export const isAgentLaunch = (text) => String(text ?? '').split(';').some((statement) => AGENT_LAUNCH.test(statement.trim()));
 /**
  * The shell prompt row a frame ends in because its agent exited, or null. Two shapes:
- *  - the LAST non-empty row is a bare prompt ("PS D:\x>");
+ *  - the LAST non-empty row is a bare prompt ("PS <drive>:\x>");
  *  - the LAST non-empty row STARTS with a prompt and the rows just above it are the agent's own input
  *    row or footer. A Codex op killed mid-turn (nivo term_8f9e0611, 2026-09-24 03:56) froze its frame at
  *    "• Working (10m 46s • esc to interrupt)" / "› Ask Codex to do anything", and PowerShell printed its
- *    prompt over the footer row without clearing it: "PS D:\x> <what is left of the footer>". No agent
+ *    prompt over the footer row without clearing it: "PS <drive>:\x> <what is left of the footer>". No agent
  *    draws a shell prompt BELOW its own input box, so that row is the host shell. The frame read
  *    stale-active turn-idle, and the nudge typed into it was run by PowerShell (ParserError).
- * A prompt followed by an agent command ("PS D:\x> codex --model ...") is a launch, not an exit.
+ * A prompt followed by an agent command ("PS <drive>:\x> codex --model ...") is a launch, not an exit.
  */
 export function exitedAgentPromptRow(screen) {
   const rows = String(screen ?? '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);

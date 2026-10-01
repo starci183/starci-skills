@@ -28,12 +28,12 @@ const kernelEnv = {};
 test('an open, unclaimed Kernel DI older than 2 min refuses new work with the top item and its commands', (t) => {
   const { ledger } = fixture(t);
   const di = stall(ledger);
-  assert.throws(() => refuseDecisionsFirst(ledger.db, WF, 'dispatch', { env: kernelEnv, resolves: null, repo: 'D:/r' }), (e) => {
+  assert.throws(() => refuseDecisionsFirst(ledger.db, WF, 'dispatch', { env: kernelEnv, resolves: null, repo: 'repo-r' }), (e) => {
     assert.equal(e.code, 'decisions-first');
     assert.equal(e.decision.id, di.id);
     assert.match(e.message, new RegExp(`Oldest: ${di.id}`));
     assert.match(e.message, /dispatch-ready --workflow wf-first/, 'the item\'s own command is in the refusal');
-    assert.match(e.message, new RegExp(`decisions --repo D:/r --resolve ${di.id}`));
+    assert.match(e.message, new RegExp(`decisions --repo repo-r --resolve ${di.id}`));
     return true;
   });
 });
@@ -70,12 +70,12 @@ test('the doorbell carries the oldest item in copy-paste form', (t) => {
   const { ledger } = fixture(t);
   const di = stall(ledger);
   const sent = [];
-  const r = ringDoorbellWith({ ledger, workflowId: WF, wake: ({ text }) => { sent.push(text); return { action: 'kernel-woken', delivered: true }; }, repo: 'D:/r' });
+  const r = ringDoorbellWith({ ledger, workflowId: WF, wake: ({ text }) => { sent.push(text); return { action: 'kernel-woken', delivered: true }; }, repo: 'repo-r' });
   assert.equal(r.action, 'rung');
   assert.match(sent[0], /^\[decide\] 1 waiting: api decisions --workflow wf-first \| oldest /);
   assert.match(sent[0], new RegExp(`oldest ${di.id}`));
   assert.match(sent[0], /pick ONE: \(a\) push the ready units: node scripts\/kernel\/cli\.mjs dispatch-ready/);
-  assert.match(sent[0], new RegExp(`then: node scripts/kernel/cli.mjs decisions --repo D:/r --resolve ${di.id}`));
+  assert.match(sent[0], new RegExp(`then: node scripts/kernel/cli.mjs decisions --repo repo-r --resolve ${di.id}`));
 });
 
 test('api enqueue and dispatch-ready refuse decisions-first through the CLI; api decisions --next prints the commands', (t) => {

@@ -21,6 +21,7 @@ import { tierFindings } from '../../scripts/hfs/runtime-rules/tier-direction.mjs
 import { applyPending, pendingMatcher } from '../../scripts/hfs/runtime-rules/pending.mjs';
 import { fileLinkFindings } from '../../scripts/hfs/runtime-rules/node-modules-link.mjs';
 import { controlCharFinding } from '../../scripts/hfs/runtime-rules/control-chars.mjs';
+import { absolutePathFindings, absolutePathRepoFindings } from '../../scripts/hfs/runtime-rules/absolute-path.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** An old (moved or retired) runtime path, spelled in segments so the move codemod never rewrites a fixture. */
@@ -227,6 +228,67 @@ test('RT_CONTROL_CHARACTER: a raw backspace, NUL or DEL in tracked text source i
 
 test('RT_CONTROL_CHARACTER: tab, CR, LF and an escaped \\b are clean', () => {
   assert.equal(controlCharFinding('scripts/x.mjs', Buffer.from('const r = /\\bx\\b/;\r\n\tok\n')), null);
+});
+
+// ------------------------------------------------------------------------------------------- RT_ABSOLUTE_PATH
+
+// The fixtures below build their drive letters from parts: this spec is itself tracked and judged by the rule.
+const DR = 'D';
+const CR = 'C';
+const BS = String.fromCharCode(92);
+const abs = (file, text) => absolutePathFindings(file, text);
+
+test('RT_ABSOLUTE_PATH: a drive literal in a .mjs string, a template, a comment or a spec fixture is refused', () => {
+  assert.deepEqual(codesOf(abs('scripts/a.mjs', `export const root = '${DR}:/Repositories/x';\n`)), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('scripts/b.mjs', `export const p = (n) => \`${CR}:${BS}${BS}Users${BS}${BS}Hi${BS}${BS}\${n}\`;\n`)), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('scripts/c.mjs', `// lanes live under ${DR}:/starci-lanes\nexport const c = 1;\n`)), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('tests/x.spec.mjs', `test('x', () => { const prompt = 'PS ${CR}:${BS}${BS}work> '; });\n`)), ['RT_ABSOLUTE_PATH']);
+  assert.equal(abs('scripts/a.mjs', `\n\nexport const root = '${DR}:/x';\n`)[0].line, 3);
+  assert.deepEqual(codesOf(abs('packages/x/a.ts', `const p: string = '${DR}:/x';\n`)), ['RT_ABSOLUTE_PATH']);
+});
+
+test('RT_ABSOLUTE_PATH: a drive path in a yaml value, a json value or a doc line is refused', () => {
+  assert.deepEqual(codesOf(abs('knowledge/x.yaml', `root: ${DR}:/starci-tmp/x\n`)), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('examples/e.json', `{"cwd": "${CR}:${BS}${BS}Users${BS}${BS}Hi"}\n`)), ['RT_ABSOLUTE_PATH']);
+  const doc = abs('docs/x.md', `# x\n\nRun it from ${DR}:/Repositories/x.\n`);
+  assert.deepEqual(codesOf(doc), ['RT_ABSOLUTE_PATH']);
+  assert.equal(doc[0].line, 3);
+});
+
+test('RT_ABSOLUTE_PATH: a user-profile path and an expanded AppData path are refused, once per path', () => {
+  assert.deepEqual(codesOf(abs('docs/a.md', ['', 'Users', 'someone', 'work', 'x'].join('/'))), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('docs/b.md', ['', 'home', 'someone', 'work', 'x'].join('/'))), ['RT_ABSOLUTE_PATH']);
+  assert.deepEqual(codesOf(abs('docs/c.md', `under ${['AppData', 'Local', 'starci'].join('/')}`)), ['RT_ABSOLUTE_PATH']);
+  assert.equal(abs('docs/d.md', [`${CR}:`, 'Users', 'someone', 'AppData', 'Local', 'x'].join('/')).length, 1, 'the profile and AppData parts of a drive path are one finding');
+});
+
+test('RT_ABSOLUTE_PATH: a URL, a generic drive regular expression, a relative path, an unexpanded name are clean', () => {
+  assert.deepEqual(abs('scripts/a.mjs', "export const u = 'http://localhost:3000/x';\nexport const f = 'file:///tmp/x';\nexport const h = 'https://example.com/a';\n"), []);
+  assert.deepEqual(abs('scripts/b.mjs', "export const isDrive = (p) => /^[A-Za-z]:[\\/]/.test(p);\nexport const rx = new RegExp('^[a-z]:[\\\\/]');\n"), []);
+  assert.deepEqual(abs('docs/c.md', 'Set %LOCALAPPDATA% to the state root; use <runtime>/scripts and <lanes root>/dv.\n'), []);
+  assert.deepEqual(abs('docs/d.md', 'key: value\nnote: a:b and 12:30 and e.g. ratio 1:2\n'), []);
+  assert.deepEqual(abs('package-lock.json', `{"resolved": "${DR}:/x"}\n`), [], 'a lock file is not judged');
+  assert.deepEqual(abs('scripts/goal.mjs', "// Goal Grüße:\\n\\nnull\nexport const goal = 'Goal Grüße:\\n';\n"), [], 'a letter that ends a non-ASCII word is not a drive');
+  assert.deepEqual(abs('assets/x.png', `${DR}:/x`), [], 'a binary extension is not read');
+});
+
+test('RT_ABSOLUTE_PATH: a path built from os.tmpdir() or the runtime root is clean', () => {
+  assert.deepEqual(abs('tests/y.spec.mjs', "import os from 'node:os';\nimport path from 'node:path';\nconst tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-'));\nconst prompt = `PS ${tmp}> `;\nconst repo = path.join(tmp, 'repo');\n"), []);
+});
+
+test('RT_ABSOLUTE_PATH: a real path-parsing vector is allowed only by a pending entry with a reason', () => {
+  const findings = absolutePathFindings('tests/path-parse.spec.mjs', `assert.equal(parse('${CR}:${BS}${BS}x'), 1);\n`);
+  assert.deepEqual(codesOf(findings), ['RT_ABSOLUTE_PATH']);
+  const pending = [{ path: 'tests/path-parse.spec.mjs', rule: 'RT_ABSOLUTE_PATH', lane: 'ABSPATH', since: '2026-10-02', reason: 'feeds the Windows path parser its drive input' }];
+  const judged = applyPending({ findings, pending, basePending: pending, codes: new Set(['RT_ABSOLUTE_PATH']) });
+  assert.deepEqual(judged.errors, []);
+  assert.equal(judged.allowed[0].level, 'pending');
+});
+
+test('RT_ABSOLUTE_PATH: the repo scan reads tracked files through ctx.read', () => {
+  const texts = { 'scripts/a.mjs': `export const a = '${DR}:/x';\n`, 'scripts/b.mjs': "export const b = 'ok';\n" };
+  const found = absolutePathRepoFindings({ files: Object.keys(texts), read: (p) => texts[p] ?? null });
+  assert.deepEqual(found.map((f) => f.path), ['scripts/a.mjs']);
 });
 
 // ------------------------------------------------------------------------------------------- the whole check on a fixture tree

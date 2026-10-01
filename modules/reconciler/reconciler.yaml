@@ -2,9 +2,9 @@ schema: starci/reconciler@1
 purpose: |-
   The contract of the host's ONE reconciler engine (scripts/reconciler/engine.mjs). Level-triggered controllers read the
   ledgers and converge them through the existing api verbs; the old loops yield a duty only while the engine owns it.
-  Design: D:/starci-tmp/reconciler-design/DESIGN.md (approved 2026-09-28) §5, §7 (engine), §8 (controllers),
+  Design: <tmp>/reconciler-design/DESIGN.md (approved 2026-09-28) §5, §7 (engine), §8 (controllers),
   §8.8 (SLA/Invariant), §10.3 (Decision Item), §11 (decider contract), §12 (liveness). Lanes: LANES.md "Shared contract".
-design: D:/starci-tmp/reconciler-design/DESIGN.md
+design: <tmp>/reconciler-design/DESIGN.md
 
 engine:
   process: one per host (DESIGN §7.1); boot.mjs is the only way in (`ensure | --restart | --status | --install-task`)

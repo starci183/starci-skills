@@ -4,7 +4,7 @@
 // Agent CLIs pile session data on C: and nothing removes it: ~/.codex/sessions alone
 // measured 4.8 GB, Orca's own CODEX_HOME another 4.8 GB. sweepAgentSessions moves
 // every file older than allocation.housekeeping.sessionArchiveAfterMs (3 days) out of
-// the agents' session/log roots into allocation.housekeeping.archiveRoot under
+// the agents' session/log roots into the archive root (scripts/machine/home.mjs archiveRoot) under
 // <archiveRoot>/<agent>/, keeping the path relative to the agent's home
 // (~/.codex/sessions/2026/09/rollout-x.jsonl → <archiveRoot>/codex/sessions/2026/09/
 // rollout-x.jsonl). It then deletes archive files older than
@@ -25,13 +25,13 @@ import { isLinkLike } from '../api/fs/safe-remove.mjs';
 import { pathKey, samePath, slash } from '../lib/path-key.mjs';
 import { artifactHoldOf } from '../machine/artifact-hold.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
+import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The windows the spec names; allocation.housekeeping.* wins whenever it is set. */
 export const HK_SESSION_DEFAULTS = Object.freeze({
   sessionArchiveAfterMs: 3 * DAY_MS,
   archiveMaxAgeMs: 30 * DAY_MS,
-  archiveRoot: 'D:/starci-archive',
 });
 
 const message = (error) => String(error?.message ?? error);
@@ -54,10 +54,6 @@ const housekeepingOf = (allocation) => {
   return allocationSettings()?.housekeeping ?? {};
 };
 
-/** `~` expands against the injected env's home; anything else resolves as given. */
-const expandHome = (p, home) => String(p).replace(/^~(?=[\\/])/, home);
-const resolveArchiveRoot = (value, home) =>
-  path.resolve(expandHome(typeof value === 'string' && value.trim() ? value : HK_SESSION_DEFAULTS.archiveRoot, home));
 
 /** Orca's CODEX_HOME, resolved the way Orca does it (scripts/agent/trust.mjs orcaCodexHome). */
 const orcaHome = (env, home, platform = process.platform) => {
@@ -169,8 +165,7 @@ export async function sweepAgentSessions({ apply = false, now = Date.now(), env 
   const hk = housekeepingOf(allocation);
   const archiveAfterMs = positiveMs(hk.sessionArchiveAfterMs, HK_SESSION_DEFAULTS.sessionArchiveAfterMs);
   const archiveMaxAgeMs = positiveMs(hk.archiveMaxAgeMs, HK_SESSION_DEFAULTS.archiveMaxAgeMs);
-  const home = env.USERPROFILE || env.HOME || os.homedir();
-  const archiveRoot = resolveArchiveRoot(hk.archiveRoot, home);
+  const archiveRoot = archiveRootOf({ env });
   const skip = (p, reason) => out.skipped.push({ path: p, reason });
   const fail = (p, error) => out.errors.push({ path: p, error: message(error) });
 

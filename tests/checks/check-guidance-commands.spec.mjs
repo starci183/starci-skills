@@ -16,9 +16,9 @@ test('a refused command in an instruction is caught, in every command form', asy
     // The original supervise.yaml runtime-defect text: an unquoted command in parentheses.
     'a runtime/Source defect gate or OWED cluster: open a fix - an Opus lane (git worktree add <lanesRoot>/<name> -b lane/<name> main; land.mjs --commit <sha> --lane <name>) or ONE [Worker] job per cluster.',
     // The original chatSeat line.
-    'fixes through Opus lanes: an ephemeral worktree (git worktree add <lanesRoot>/<name> -b lane/<name> main; <lanesRoot> is runtimes.yaml allocation.housekeeping.lanesRoot), commits there.',
+    'fixes through Opus lanes: an ephemeral worktree (git worktree add <lanesRoot>/<name> -b lane/<name> main; <lanesRoot> is the owner config roots.lanes), commits there.',
     // The original claude-debug step: backticked commands.
-    'Worktree under `D:/starci-lanes/<lane>`: `git -C D:/x/.claude worktree add D:/starci-lanes/<lane> -b lane/<lane> origin/main`; junction `node_modules` with `cmd /c mklink /J`.',
+    'Worktree under `<lanesRoot>/<lane>`: `git -C ../.claude worktree add <lanesRoot>/<lane> -b lane/<lane> origin/main`; junction `node_modules` with `cmd /c mklink /J`.',
     'Clean the scratch tree with `rm -rf <dir>` before the next run.',
     'If the tree is stuck, run taskkill /F /IM node.exe and start again.',
     'Hand the critique to a second agent: "codex exec --model gpt-5 <prompt>".',

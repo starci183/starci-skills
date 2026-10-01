@@ -35,7 +35,7 @@ const initRepo = (t) => {
 const tempDir = (t, prefix) => { const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix))); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); return dir; };
 
 test('an op worker never creates, moves or removes a worktree: the git policy refuses it with the dispatched-checkout remedy', () => {
-  for (const argv of [['worktree', 'add', '--detach', '../x', 'HEAD'], ['worktree', 'add', '-b', 'side', '../x'], ['-C', 'D:/r', 'worktree', 'add', 'x'],
+  for (const argv of [['worktree', 'add', '--detach', '../x', 'HEAD'], ['worktree', 'add', '-b', 'side', '../x'], ['-C', 'r', 'worktree', 'add', 'x'],
     ['worktree', 'remove', '../x'], ['worktree', 'remove', '--force', '../x'], ['worktree', 'move', '../x', '../y']]) {
     const verdict = classifyGit(argv);
     assert.equal(verdict.allow, false, `expected refusal: git ${argv.join(' ')}`);
@@ -157,15 +157,15 @@ test('the command guard hook refuses the incident\'s worktree and link commands 
 test('the footprint watch flags a new worktree or cross-repository link under the root, never a workspace link', (t) => {
   const root = tempDir(t, 'footprint-root-');
   for (const name of ['todo-app-fe', 'todo-app-fe-wt-r4', 'other']) fs.mkdirSync(path.join(root, name, '.git'), { recursive: true });
-  const at = (...parts) => path.join(root, ...parts);
-  let links = [{ link: at('todo-app-fe', 'node_modules', '@todo-app', 'ui'), target: null, real: at('todo-app-fe', 'packages', 'ui'), mtime: 'x' }];
+  const at = (...parts) => path.join(root, ...parts);const foreignBin = `${String.fromCharCode(path.parse(os.tmpdir()).root.charCodeAt(0) ^ 1)}:\\elsewhere\\bin`;
+  let links = [{ link: at('todo-app-fe','node_modules', '@todo-app', 'ui'), target: null, real: at('todo-app-fe', 'packages', 'ui'), mtime: 'x' }];
   let trees = '';
   const git = (cwd) => ({ status: 0, stdout: path.basename(cwd) === 'todo-app-fe' ? `worktree ${at('todo-app-fe')}\nHEAD 1\n\n${trees}` : `worktree ${cwd}\n` });
   const listLinks = () => links;
   const first = scanFootprint({ root, state: null, git, listLinks, now: 't0' });
   assert.deepEqual([first.links, first.worktrees, first.fresh], [[], [], []], 'a workspace link inside its own repository is not a footprint');
   links = [...links, { link: at('todo-app-fe-wt-r4', 'node_modules'), target: null, real: at('todo-app-fe', 'node_modules'), mtime: 'y' },
-    { link: at('other', 'bin'), target: 'E:\\elsewhere\\bin', real: 'E:\\elsewhere\\bin', mtime: 'z' }];
+    { link: at('other', 'bin'), target: foreignBin, real: foreignBin, mtime: 'z' }];
   trees = `worktree ${at('todo-app-fe-wt-r4')}\nHEAD 2\ndetached\n\nworktree ${path.join(os.tmpdir(), 'kernel-scratch')}\nHEAD 3\n`;
   const second = scanFootprint({ root, state: first.state, git, listLinks, now: 't1' });
   assert.deepEqual(second.fresh.map((entry) => [entry.type, entry.link ?? entry.worktree]), [['link', at('todo-app-fe-wt-r4', 'node_modules')], ['worktree', at('todo-app-fe-wt-r4')]],

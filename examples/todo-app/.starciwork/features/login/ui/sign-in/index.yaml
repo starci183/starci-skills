@@ -265,7 +265,7 @@ ui:
   assets:
     - path: assets/sign-in-refused.prompt.txt
       role: prompt
-      sha256: 578e4a0218319ea8a20a10bd1cdf51d6e5cf401399d28353631d25e882ef154d
+      sha256: 11aed57ac9b28387f3231ee026bfd63abf1d0e12ae84c2d04a8bc11fad19ba84
       provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
     - path: assets/sign-in-refused.png
       role: direction
@@ -400,7 +400,7 @@ ui:
 assets:
   - path: assets/sign-in-refused.prompt.txt
     role: prompt
-    sha256: 578e4a0218319ea8a20a10bd1cdf51d6e5cf401399d28353631d25e882ef154d
+    sha256: 11aed57ac9b28387f3231ee026bfd63abf1d0e12ae84c2d04a8bc11fad19ba84
     provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
   - path: assets/sign-in-refused.png
     role: direction

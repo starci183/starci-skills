@@ -129,7 +129,7 @@ const mountsOf = (value, directory) => {
       continue;
     }
     const parts = String(entry).split(':');
-    // A Windows drive letter is not a separator: `C:\x:/y` keeps its drive.
+    // A Windows drive letter is not a separator: a `<drive>:<path>:/y` mount keeps its drive.
     const source = /^[A-Za-z]$/u.test(parts[0]) && parts.length > 2 ? `${parts.shift()}:${parts.shift()}` : parts.shift();
     const target = parts.shift();
     if (!source || !target || !(source.startsWith('.') || path.isAbsolute(source))) continue;

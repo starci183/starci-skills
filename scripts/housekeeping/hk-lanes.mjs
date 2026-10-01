@@ -1,11 +1,11 @@
 // hk-lanes.mjs — the lane-worktree root and the merged-worktree sweep of host housekeeping
-// (modules/models/runtimes.yaml allocation.housekeeping.*).
+// (modules/models/runtimes.yaml allocation.housekeeping.*; the lanes root itself: the owner config roots.lanes).
 //
 // Every ephemeral checkout the runtime's lanes make — agent lane worktrees, worker staging
 // (workers.mjs), the land gate's scratch (land.mjs) — lives under ONE root, lanesRoot():
 //   1. STARCI_LANES_ROOT            a one-off/spec override
-//   2. allocation.housekeeping.lanesRoot   runtimes.yaml (allocationSettings)
-//   3. DEFAULT_LANES_ROOT           D:/starci-lanes — lanes stay off C:, which filled 2026-09-26
+//   2. roots.lanes                  the owner config (config.yaml, gitignored)
+//   3. <starciLocalRoot>/lanes      the state-root default (the owner moves it off C: with STARCI_LANES_ROOT or the key)
 //
 // sweepLanes removes the registered worktrees under that root whose branch is fully landed on main
 // (git cherry finds no '+') and that stayed idle for allocation.housekeeping.laneGraceMs, after
@@ -117,9 +117,9 @@ export function laneActivity({ worktree, branch, root, run }) {
  * nothing. `git` is an injectable runner `(args, {cwd}) -> {ok, stdout, error}`.
  * Returns {ok, apply, at, lanesRoot, freedBytes, removed, wouldRemove, skipped, errors}.
  */
-export function sweepLanes({ apply = false, now = Date.now(), env = process.env, allocation = undefined, root = SKILL_ROOT, git = null, owners = undefined } = {}) {
+export function sweepLanes({ apply = false, now = Date.now(), env = process.env, allocation = undefined, config = undefined, root = SKILL_ROOT, git = null, owners = undefined } = {}) {
   const run = git ?? ((args, { cwd }) => gitResult(args, { cwd }));
-  const base = lanesRoot({ env, allocation });
+  const base = lanesRoot({ env, config });
   const out = { ok: true, apply: apply === true, at: new Date(now).toISOString(), lanesRoot: base, freedBytes: 0, removed: [], wouldRemove: [], skipped: [], errors: [] };
   const skip = (p, reason, detail = null) => out.skipped.push({ path: p, reason, ...(detail ? { detail } : {}) });
   const fail = (p, error) => { out.ok = false; out.errors.push({ path: p ?? null, error: String(error ?? 'error') }); };

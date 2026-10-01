@@ -20,7 +20,7 @@ import { OP_REV_DRIFT, opRevDrift, shortRev } from '../runtime-rev.mjs';
 import { HANDOVER_APPROVED, HANDOVER_OP, handoverApprovalOf, handoverGateOf } from '../handover.mjs';
 import { unbindGuardTerminal } from '../../guards/hook-install.mjs';
 import { SEAM_RECONCILED_EVENT } from '../cut-seam.mjs';
-import { PROOF_MEDIA_MISSING } from '../job-artifacts.mjs';
+import { EVIDENCE_HOST_PATH } from '../job-artifacts.mjs';
 import { isMeasurementLeg, measurementSplit } from '../verify-failure.mjs';
 import { citeRecords } from '../../work/validate/work-citations.mjs';
 import { captureWorker, finalizeAttemptTranscript } from '../transcripts.mjs';
@@ -83,8 +83,8 @@ export default {
 
   const media = verdict === 'pass' ? settleProofMedia(db, jobId, repo, null, null) : null;
   if (media) {
-    emit({ ok: false, jobId, op: media.op, reason: PROOF_MEDIA_MISSING, code: PROOF_MEDIA_MISSING, missing: media.missing, detail: media.detail },
-      `settle REFUSED for ${jobId} (${media.op}): ${PROOF_MEDIA_MISSING} — missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. Re-dispatch the op to capture its screenshots${media.detail.browserRan ? ' and its browser video' : ''} into its evidence and name them in report.files, then settle again`, args.json);
+    emit({ ok: false, jobId, op: media.op, reason: media.code, code: media.code, missing: media.missing, detail: media.detail },
+      `settle REFUSED for ${jobId} (${media.op}): ${media.code} — missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. ${media.code === EVIDENCE_HOST_PATH ? 'Rewrite the named evidence with repo-relative paths or <worktree>, <runtime>, <tmp>, <home>, then settle again' : `Re-dispatch the op to capture its screenshots${media.detail.browserRan ? ' and its browser video' : ''} into its evidence and name them in report.files, then settle again`}`, args.json);
     process.exit(1);
   }
 

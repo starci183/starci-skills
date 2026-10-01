@@ -18,7 +18,7 @@ const tester = new RuleTester({
   },
 })
 
-const BLOCK = "D:/repo/src/components/blocks/Feed/index.tsx"
+const BLOCK = "src/components/blocks/Feed/index.tsx"
 
 test("every rule this law declares is a rule", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -38,7 +38,7 @@ test("NATIVE-1: no bare select, input, textarea or button in product source", ()
       { filename: BLOCK, code: "const E = () => <input value={v} />", errors: [{ messageId: "native" }] },
       { filename: BLOCK, code: "const E = () => <select><option /></select>", errors: [{ messageId: "native" }] },
       { filename: BLOCK, code: "const E = () => <textarea />", errors: [{ messageId: "native" }] },
-      { filename: "D:/repo/src/components/leaves/Toggle/index.tsx", code: "const E = () => <button />", errors: [{ messageId: "native" }] },
+      { filename: "src/components/leaves/Toggle/index.tsx", code: "const E = () => <button />", errors: [{ messageId: "native" }] },
     ],
   })
 })

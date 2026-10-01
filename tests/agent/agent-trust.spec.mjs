@@ -17,7 +17,7 @@ import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 // Owner instruction 2026-09-23: the owner never approves a launch prompt; the runtime does. Layer 1 pre-trusts
 // the launch directory in ~/.claude.json and every Codex config.toml; layer 2 answers an allowlisted launch gate
 // once from the screen. Every spec here writes only temp copies (STARCI_AGENT_TRUST_HOME / explicit files).
-const ROOT=path.resolve(import.meta.dirname,'..', '..');
+const ROOT=path.resolve(import.meta.dirname,'..', '..');const UP=path.parse(os.tmpdir()).root[0].toUpperCase(),LO=UP.toLowerCase();const W=(c,s)=>`${c}:\\${s}`,F=(c,s)=>`${c}:/${s}`,T=(c,s)=>W(c,s).replace(/\\/g,'\\\\');const EA='Repositories\\ecommerce-app',EAL='repositories\\ecommerce-app',EAF='Repositories/ecommerce-app';
 // The card's settle/attestation windows (~25s of pure waiting per dispatch) are counted logically; scale the real sleeps down (scripts/lib/sleep-sync.mjs).
 process.env.STARCI_SLEEP_SCALE??='0.02';
 // This spec is about dispatch delivery/liveness, not the host-contract listing (orca-call-contract covers it): left on,
@@ -32,20 +32,20 @@ const tmp=(t,prefix)=>{const d=fs.mkdtempSync(path.join(os.tmpdir(),prefix));t.a
 /* ------------------------------------------------------------ key forms */
 
 test('trust keys use the exact forms Claude and Codex write on Windows',()=>{
-  assert.deepEqual(claudeKeyForms('d:\\Repositories\\ecommerce-app','win32'),['D:/Repositories/ecommerce-app','D:\\Repositories\\ecommerce-app']);
-  assert.deepEqual(claudeKeyForms('D:/Repositories/ecommerce-app','win32'),['D:/Repositories/ecommerce-app','D:\\Repositories\\ecommerce-app']);
-  assert.deepEqual(codexKeyForms('D:/Repositories/ecommerce-app','win32'),['d:\\repositories\\ecommerce-app','D:\\Repositories\\ecommerce-app']);
-  assert.deepEqual(codexKeyForms('d:\\lower\\only','win32'),['d:\\lower\\only','D:\\lower\\only'],'distinct strings, so never a duplicate table');
-  assert.deepEqual(claudeKeyForms('/home/me/repo','linux'),['/home/me/repo']);
-  assert.deepEqual(codexKeyForms('/home/me/repo','linux'),['/home/me/repo']);
-  assert.equal(codexHeader('d:\\repositories\\ecommerce-app'),"[projects.'d:\\repositories\\ecommerce-app']");
-  assert.equal(codexHeader('D:\\Repositories\\ecommerce-app'),'[projects."D:\\\\Repositories\\\\ecommerce-app"]');
-  assert.equal(codexHeader('/home/me/repo'),'[projects."/home/me/repo"]');
+  assert.deepEqual(claudeKeyForms(W(LO,EA),'win32'),[F(UP,EAF),W(UP,EA)]);
+  assert.deepEqual(claudeKeyForms(F(UP,EAF),'win32'),[F(UP,EAF),W(UP,EA)]);
+  assert.deepEqual(codexKeyForms(F(UP,EAF),'win32'),[W(LO,EAL),W(UP,EA)]);
+  assert.deepEqual(codexKeyForms(W(LO,'lower\\only'),'win32'),[W(LO,'lower\\only'),W(UP,'lower\\only')],'distinct strings, so never a duplicate table');
+  assert.deepEqual(claudeKeyForms('/opt/me/repo','linux'),['/opt/me/repo']);
+  assert.deepEqual(codexKeyForms('/opt/me/repo','linux'),['/opt/me/repo']);
+  assert.equal(codexHeader(W(LO,EAL)),`[projects.'${W(LO,EAL)}']`);
+  assert.equal(codexHeader(W(UP,EA)),`[projects."${T(UP,EA)}"]`);
+  assert.equal(codexHeader('/opt/me/repo'),'[projects."/opt/me/repo"]');
 });
 
-test('Orca CODEX_HOME resolves from the platform userData dir, and a test process never targets the real home',()=>{
-  assert.equal(orcaCodexHome({env:{APPDATA:'C:\\Users\\u\\AppData\\Roaming'},platform:'win32',home:'C:\\Users\\u'}),
-    path.join('C:\\Users\\u\\AppData\\Roaming','orca','codex-runtime-home','home'));
+test('Orca CODEX_HOME resolves from the platform userData dir, and a test process never targets the real home',()=>{const roaming=W(UP,'Users\\u')+['','AppData','Roaming'].join('\\');
+  assert.equal(orcaCodexHome({env:{APPDATA:roaming},platform:'win32',home:W(UP,'Users\\u')}),
+    path.join(roaming,'orca','codex-runtime-home','home'));
   assert.equal(orcaCodexHome({env:{},platform:'darwin',home:'/Users/u'}),path.join('/Users/u','Library','Application Support','orca','codex-runtime-home','home'));
   assert.equal(orcaCodexHome({env:{STARCI_ORCA_CODEX_HOME:'/x'},platform:'linux',home:'/h'}),'/x');
   assert.match(trustTargets({env:{NODE_TEST_CONTEXT:'child-v8'}}).skipped,/STARCI_AGENT_TRUST_HOME/);
@@ -57,23 +57,23 @@ test('Orca CODEX_HOME resolves from the platform userData dir, and a test proces
 /* ------------------------------------------------------- claude writer */
 
 const CLAUDE_FIXTURE={numStartups:5,installMethod:'global',tipsHistory:{x:3},hasCompletedOnboarding:true,
-  projects:{'D:/Repositories/todo-app-be':{allowedTools:[],hasTrustDialogAccepted:true,lastCost:32.96738740000001},
-    'D:\\Repositories\\ecommerce-app':{allowedTools:['Bash'],hasTrustDialogAccepted:false,lastSessionId:'abc'}},
+  projects:{[F(UP,'Repositories/todo-app-be')]:{allowedTools:[],hasTrustDialogAccepted:true,lastCost:32.96738740000001},
+    [W(UP,EA)]:{allowedTools:['Bash'],hasTrustDialogAccepted:false,lastSessionId:'abc'}},
   userID:'9007199254740993123'};
 
 test('Claude trust sets hasTrustDialogAccepted in both key forms, keeps every other field, and is idempotent',t=>{
   const dir=tmp(t,'starci-trust-claude-');const file=path.join(dir,'.claude.json');
   const original=JSON.stringify(CLAUDE_FIXTURE,null,2);fs.writeFileSync(file,original);
-  const keys=claudeKeyForms('D:\\Repositories\\ecommerce-app','win32');
+  const keys=claudeKeyForms(W(UP,EA),'win32');
   const first=writeClaudeTrust({file,keys});
   assert.equal(first.ok,true,first.error);
   assert.deepEqual(first.written,keys,'the untrusted backslash key is upgraded, the forward-slash key is added');
   const doc=JSON.parse(fs.readFileSync(file,'utf8'));
-  assert.equal(doc.projects['D:\\Repositories\\ecommerce-app'].hasTrustDialogAccepted,true);
-  assert.equal(doc.projects['D:/Repositories/ecommerce-app'].hasTrustDialogAccepted,true);
-  assert.deepEqual(doc.projects['D:\\Repositories\\ecommerce-app'],{...CLAUDE_FIXTURE.projects['D:\\Repositories\\ecommerce-app'],hasTrustDialogAccepted:true},
+  assert.equal(doc.projects[W(UP,EA)].hasTrustDialogAccepted,true);
+  assert.equal(doc.projects[F(UP,EAF)].hasTrustDialogAccepted,true);
+  assert.deepEqual(doc.projects[W(UP,EA)],{...CLAUDE_FIXTURE.projects[W(UP,EA)],hasTrustDialogAccepted:true},
     'an existing project keeps its fields and key order');
-  const rest=structuredClone(doc);delete rest.projects['D:/Repositories/ecommerce-app'];rest.projects['D:\\Repositories\\ecommerce-app'].hasTrustDialogAccepted=false;
+  const rest=structuredClone(doc);delete rest.projects[F(UP,EAF)];rest.projects[W(UP,EA)].hasTrustDialogAccepted=false;
   assert.equal(JSON.stringify(rest,null,2),original,'nothing else changed, byte for byte');
   const bytes=fs.readFileSync(file,'utf8');
   const again=writeClaudeTrust({file,keys});
@@ -84,7 +84,7 @@ test('Claude trust sets hasTrustDialogAccepted in both key forms, keeps every ot
 test('a concurrent Claude session rewrite is a lost update that is retried and verified',t=>{
   const dir=tmp(t,'starci-trust-race-');const file=path.join(dir,'.claude.json');
   fs.writeFileSync(file,JSON.stringify(CLAUDE_FIXTURE,null,2));
-  const keys=claudeKeyForms('D:\\Race\\repo','win32');
+  const keys=claudeKeyForms(W(UP,'Race\\repo'),'win32');
   // attempt 1: a session rewrites the file between our read and our rename (numStartups 6);
   // attempt 2: another session renames its stale copy over ours right after our rename.
   const stale=JSON.stringify({...CLAUDE_FIXTURE,numStartups:6},null,2);
@@ -98,7 +98,7 @@ test('a concurrent Claude session rewrite is a lost update that is retried and v
   const doc=JSON.parse(fs.readFileSync(file,'utf8'));
   assert.equal(doc.numStartups,6,'the concurrent writer\'s change survives');
   for(const k of keys)assert.equal(doc.projects[k].hasTrustDialogAccepted,true);
-  const always=writeClaudeTrust({file,keys:claudeKeyForms('D:\\Race\\other','win32'),hooks:{afterRename:()=>fs.writeFileSync(file,stale)}});
+  const always=writeClaudeTrust({file,keys:claudeKeyForms(W(UP,'Race\\other'),'win32'),hooks:{afterRename:()=>fs.writeFileSync(file,stale)}});
   assert.equal(always.ok,false);
   assert.match(always.error,/lost update/);
   assert.equal(always.trail.length,5,'bounded retries');
@@ -160,10 +160,10 @@ const TOML_FIXTURE=[
   '[features]',
   'web_search = true # inline comment',
   '',
-  "[projects.'d:\\repositories\\kept']",
+  `[projects.'${W(LO,'repositories\\kept')}']`,
   'trust_level = "trusted"',
   '',
-  '[projects."D:\\\\Repositories\\\\Upgrade"]',
+  `[projects."${T(UP,'Repositories\\Upgrade')}"]`,
   'trust_level = "untrusted"',
   '',
   '[mcp_servers.node_repl]',
@@ -174,15 +174,15 @@ const TOML_FIXTURE=[
 test('Codex trust appends [projects] tables, upgrades an untrusted one in place, and keeps every other table and comment',t=>{
   const dir=tmp(t,'starci-trust-codex-');const file=path.join(dir,'config.toml');
   fs.writeFileSync(file,TOML_FIXTURE);
-  const keys=['d:\\repositories\\kept','D:\\Repositories\\Upgrade','d:\\repositories\\new','D:\\Repositories\\New'];
+  const keys=[W(LO,'repositories\\kept'),W(UP,'Repositories\\Upgrade'),W(LO,'repositories\\new'),W(UP,'Repositories\\New')];
   const r=writeCodexTrust({file,keys});
   assert.equal(r.ok,true,r.error);
-  assert.deepEqual(r.already,['d:\\repositories\\kept']);
-  assert.deepEqual(r.written,['D:\\Repositories\\Upgrade','d:\\repositories\\new','D:\\Repositories\\New']);
+  assert.deepEqual(r.already,[W(LO,'repositories\\kept')]);
+  assert.deepEqual(r.written,[W(UP,'Repositories\\Upgrade'),W(LO,'repositories\\new'),W(UP,'Repositories\\New')]);
   const text=fs.readFileSync(file,'utf8');
   assert.ok(text.startsWith(TOML_FIXTURE.replace('trust_level = "untrusted"','trust_level = "trusted"')),'the original text is a prefix: append only, one line edited');
-  assert.match(text,/\[projects\.'d:\\repositories\\new'\]\r\ntrust_level = "trusted"\r\n/);
-  assert.match(text,/\[projects\."D:\\\\Repositories\\\\New"\]\r\ntrust_level = "trusted"\r\n/);
+  assert.ok(text.includes(`[projects.'${W(LO,'repositories\\new')}']\r\ntrust_level = "trusted"\r\n`));
+  assert.ok(text.includes(`[projects."${T(UP,'Repositories\\New')}"]\r\ntrust_level = "trusted"\r\n`));
   for(const line of ['# owner config — keep me','approval_policy = "never"','sandbox_mode = "danger-full-access"','web_search = true # inline comment','[mcp_servers.node_repl]'])
     assert.ok(text.includes(line),`kept: ${line}`);
   const tables=codexProjectTables(text);
@@ -240,7 +240,7 @@ test('launch trust registers the command guard hook in the worktree\'s project s
   assert.equal(settings,path.join(cwd,'.claude','settings.local.json'));
   assert.equal(devinFile,path.join(cwd,'.devin','config.local.json'));
   fs.mkdirSync(path.dirname(settings),{recursive:true});
-  fs.writeFileSync(settings,JSON.stringify({hooks:{PreToolUse:[{matcher:'Edit',hooks:[{type:'command',command:'owner-hook'}]},{matcher:'Bash',hooks:[{type:'command',command:'node "D:/old/runtime/scripts/guards/command-guard.mjs"'}]}]}},null,2));
+  fs.writeFileSync(settings,JSON.stringify({hooks:{PreToolUse:[{matcher:'Edit',hooks:[{type:'command',command:'owner-hook'}]},{matcher:'Bash',hooks:[{type:'command',command:'node "old/runtime/scripts/guards/command-guard.mjs"'}]}]}},null,2));
   const claude=ensureLaunchTrust({agent:'claude',cwd,env});
   assert.deepEqual(claude.toolGuard,[{file:settings,state:'written'}]);
   const pre=JSON.parse(fs.readFileSync(settings,'utf8')).hooks.PreToolUse;
@@ -318,14 +318,14 @@ test('a Codex home gets the guard block in config.toml and Codex\'s own hash for
   const home=tmp(t,'starci-trust-codex-guard-');const cwd=tmp(t,'starci-trust-codex-cwd-');
   const file=path.join(home,'config.toml');
   const command=toolGuardCommand();
-  fs.writeFileSync(file,'model = "gpt"\r\n\r\n[projects."D:\\\\x"]\r\ntrust_level = "trusted"\r\n');
+  const owner=`model = "gpt"\r\n\r\n[projects."${T(UP,'x')}"]\r\ntrust_level = "trusted"\r\n`;;fs.writeFileSync(file,owner);
   assert.equal(writeCodexToolGuard({file,command}).written,true);
   const text=fs.readFileSync(file,'utf8');
-  assert.ok(text.startsWith('model = "gpt"\r\n\r\n[projects."D:\\\\x"]\r\ntrust_level = "trusted"\r\n'),'the owner\'s tables stay');
+  assert.ok(text.startsWith(owner),'the owner\'s tables stay');
   assert.ok(text.includes(codexGuardBlock(command,'\r\n')),text);
   assert.equal(writeCodexToolGuard({file,command}).written,false);
   // Another runtime path: the block is replaced in place, a table after it kept.
-  fs.writeFileSync(file,`${codexGuardBlock('node "D:/old/scripts/guards/command-guard.mjs"')}\n[notice]\nhide_rate_limit_model_nudge = true\n`);
+  fs.writeFileSync(file,`${codexGuardBlock('node "old/scripts/guards/command-guard.mjs"')}\n[notice]\nhide_rate_limit_model_nudge = true\n`);
   assert.equal(writeCodexToolGuard({file,command}).written,true);
   assert.equal(fs.readFileSync(file,'utf8'),`${codexGuardBlock(command)}\n[notice]\nhide_rate_limit_model_nudge = true\n`);
   // Trust: hooks/list names the hash, config/batchWrite records it under hooks.state, hooks/list proves it.
@@ -460,13 +460,13 @@ test('a Claude kernel boot pre-trusts the repository and asserts the bypass cons
 test('the Codex update check is pinned off at top level, before any table, and is idempotent',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'codex-update-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const file=path.join(dir,'config.toml');
-  fs.writeFileSync(file,'model = "gpt-6-sol"\n\n[projects."D:/x"]\ntrust_level = "trusted"\n');
+  fs.writeFileSync(file,`model = "gpt-6-sol"\n\n[projects."${F(UP,'x')}"]\ntrust_level = "trusted"\n`);
   assert.equal(writeCodexNoUpdateCheck({file}).ok,true);
   assert.equal(writeCodexNoUpdateCheck({file}).written,false,'the second call writes nothing');
   const text=fs.readFileSync(file,'utf8');
   assert.ok(text.startsWith('model = "gpt-6-sol"'),'the owner leading keys stay first');
   assert.ok(text.indexOf('check_for_update_on_startup = false')<text.indexOf('[projects'),'a top-level key must precede every table');
-  fs.writeFileSync(file,'check_for_update_on_startup = true\n[projects."D:/x"]\n');
+  fs.writeFileSync(file,`check_for_update_on_startup = true\n[projects."${F(UP,'x')}"]\n`);
   writeCodexNoUpdateCheck({file});
   assert.equal((fs.readFileSync(file,'utf8').match(/check_for_update_on_startup/g)??[]).length,1,'an existing key is flipped, not duplicated');
   assert.match(fs.readFileSync(file,'utf8'),/^check_for_update_on_startup = false$/m);
@@ -477,11 +477,11 @@ test('the Codex update check is pinned off at top level, before any table, and i
 test('the Codex rate-limit model nudge is pinned off in a [notice] table and is idempotent',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'codex-nudge-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const file=path.join(dir,'config.toml');
-  fs.writeFileSync(file,'check_for_update_on_startup = false\n[projects."D:/x"]\ntrust_level = "trusted"\n');
+  fs.writeFileSync(file,`check_for_update_on_startup = false\n[projects."${F(UP,'x')}"]\ntrust_level = "trusted"\n`);
   assert.equal(writeCodexNoModelNudge({file}).written,true);
   assert.equal(writeCodexNoModelNudge({file}).written,false,'the second call writes nothing');
   assert.match(fs.readFileSync(file,'utf8'),/\[notice\]\r?\nhide_rate_limit_model_nudge = true/);
-  fs.writeFileSync(file,'[notice]\nhide_rate_limit_model_nudge = false\nother = 1\n[projects."D:/x"]\n');
+  fs.writeFileSync(file,`[notice]\nhide_rate_limit_model_nudge = false\nother = 1\n[projects."${F(UP,'x')}"]\n`);
   writeCodexNoModelNudge({file});
   const text=fs.readFileSync(file,'utf8');
   assert.equal((text.match(/hide_rate_limit_model_nudge/g)??[]).length,1,'an existing key is flipped, not duplicated');

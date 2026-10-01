@@ -870,7 +870,7 @@ test('--cwd takes a bare repository name as the directory beside or above the cu
   assert.equal(resolveScanCwd('ecommerce-app',repo),repo,'from inside the repository itself');
   assert.equal(resolveScanCwd('ecommerce-app',path.join(repo,'src','deep')),repo);
   assert.equal(resolveScanCwd('ecommerce-app-fe',repo),path.join(root,'ecommerce-app-fe'),'a sibling repository');
-  assert.equal(resolveScanCwd(repo,'C:/elsewhere'),repo,'an absolute root as given');
+  assert.equal(resolveScanCwd(repo,path.join(os.tmpdir(),'elsewhere')),repo,'an absolute root as given');
   assert.equal(resolveScanCwd('missing-repo',repo),path.join(repo,'missing-repo'),'nothing found: the value as a path');
 });
 
@@ -1054,7 +1054,7 @@ test('the runtime host holds the runtime main checkout; .claude/ custody paths o
   const root=path.resolve(import.meta.dirname,'..', '..');
   const host=runtimeHostRoot({});
   assert.notEqual(path.basename(host).toLowerCase(),'.claude');
-  assert.equal(runtimeHostRoot({STARCI_SOURCE_ROOT:'D:/elsewhere/host'}),path.resolve('D:/elsewhere/host'));
+  assert.equal(runtimeHostRoot({STARCI_SOURCE_ROOT:path.join(os.tmpdir(),'elsewhere','host')}),path.resolve(path.join(os.tmpdir(),'elsewhere','host')));
   const before=process.env.STARCI_SOURCE_ROOT;
   const fake=temporary(t,'host');
   process.env.STARCI_SOURCE_ROOT=fake;

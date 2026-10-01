@@ -1523,7 +1523,7 @@ failureHandling:
   agentChildExit:
     symptom: >-
       The spawned agent's process is gone but no verdict arrived — the
-      terminal shows a bare shell ('exited', `PS D:\>`), or the screen still
+      terminal shows a bare shell ('exited', `PS <worktree>>`), or the screen still
       shows activity while nothing moves.
     detection-output-staleness: >-
       The api classifies each worker from its screen and output age

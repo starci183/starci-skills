@@ -48,7 +48,7 @@ test('the checker refuses an emitted code missing from the catalog, and a retire
 
 const catalog=readCatalog();
 const attemptRow=over=>({attempt_id:13,workflow_id:'wf',op_id:'scope.define',try_no:2,verdict:'fail',report_outcome:'done',end_state:'settled',settled_at:1,reported_at:1,head_sha:'abc123',next_step:null,settle_json:null,...over});
-const scratch='C:\\Users\\Hi\\AppData\\Local\\Temp\\starci-job-scratch\\4a40\\iso\\.starciwork\\features\\collab';
+const scratch=path.join(os.tmpdir(),'starci-job-scratch','4a40','iso','.starciwork','features','collab');
 
 test('an op that claimed done but whose re-run check is red: headline, cause, disagreement, next in Vietnamese',()=>{
   const blob=json({refused:[`${scratch}: target does not exist [TARGET_MISSING]`]});

@@ -1,13 +1,13 @@
 // supervisor-gc.spec.mjs — the garbage collection's decisions (scripts/supervisor/gc.mjs) and the verified close
 // (scripts/machine/close-verify.mjs). Pure: every host seam is injected; nothing touches Orca, git or the ledgers.
-import test from 'node:test';
+import test from 'node:test'; import os from 'node:os'; import path from 'node:path';
 import assert from 'node:assert/strict';
 import { classifyTerminals, onlyPrompts, isShellTitle, tabTitles, gcLine } from '../../scripts/supervisor/gc.mjs';
 import { closeAndVerify, closeSelfSafe } from '../../scripts/machine/close-verify.mjs';
 import { translator } from '../../scripts/lib/i18n.mjs';
 
-const RT = 'D:/Repositories/x/.claude';
-const REPO_PATH = 'D:/Repositories/todo-app-be';
+const DRIVE = path.parse(os.tmpdir()).root, F = DRIVE.replace(/\\/g, '/'); const RT = `${F}Repositories/x/.claude`;
+const REPO_PATH = `${F}Repositories/todo-app-be`;
 const term = (handle, title, extra = {}) => ({ handle, title, connected: true, worktreePath: RT, ...extra });
 const sup = { seat: { handle: 'term_seat', live: true }, jobs: [
   { jobId: 'fix-a-aaaaaa', status: 'failed', cluster: 'a', handle: 'term_old' },
@@ -22,7 +22,7 @@ const ledger = { repo: REPO_PATH, workflows: [
   { jobId: 'op-2', workflowId: 'wf-live', kind: 'op', status: 'succeeded', handles: ['term_op2'] },
   { jobId: 'kernel-wf-live', workflowId: 'wf-live', kind: 'kernel', status: 'running', handles: ['term_k'] },
 ] };
-const PROMPTS = 'PS D:\\Repositories\\x\\.claude> PS D:\\Repositories\\x\\.cl\naude>';
+const PROMPTS = `PS ${DRIVE}Repositories\\x\\.claude> PS ${DRIVE}Repositories\\x\\.cl\naude>`;
 
 const decide = (terminals, { screens = {}, seen = {}, ledgers = [ledger], procs = null, workers = new Set() } = {}) => Object.fromEntries(classifyTerminals({
   terminals, titles: new Map(), sup, ledgers, workers, screenOf: (h) => screens[h] ?? null, procs, seen, now: 1_000_000_000, minAgeMs: 600_000,
@@ -58,7 +58,7 @@ test('a runtime title or a staging path on screen identifies nothing: an unbound
   // Former false positives: title-regex identification closed an owner's own tab named like a runtime tab.
   const d = decide([term('term_w', '[Worker] a'), term('term_untitled', 'Fix dead worker question row'), term('term_dup', '[Op] c · Nivo · Live', { worktreePath: REPO_PATH }),
     term('term_sup2', '[Supervisor] main'), term('term_k2', '[Kernel] Nivo · Old', { worktreePath: REPO_PATH })],
-  { screens: { term_untitled: '› 1. Use session directory (D:\\starci-lanes\\staging\\fix-dead-row-cccccc)' }, seen: { term_dup: 0, term_w: 0 } });
+  { screens: { term_untitled: `› 1. Use session directory (${DRIVE}starci-lanes\\staging\\fix-dead-row-cccccc)` }, seen: { term_dup: 0, term_w: 0 } });
   for (const h of ['term_w', 'term_untitled', 'term_dup', 'term_sup2', 'term_k2']) assert.deepEqual([h, d[h].verdict], [h, 'keep']);
 });
 
@@ -75,7 +75,7 @@ test('idle shells: only prompts, no agent, old enough', () => {
   assert.equal(young.term_s1.verdict, 'refuse');
   assert.equal(young.term_s2.verdict, 'keep');
   assert.equal(young.term_s3.verdict, 'keep');
-  const procs = [{ pid: 1, ppid: 0, name: 'Orca.exe', exe: 'C:\\Orca\\daemon-host\\1\\Orca.exe' },
+  const procs = [{ pid: 1, ppid: 0, name: 'Orca.exe', exe: `${DRIVE}Orca\\daemon-host\\1\\Orca.exe` },
     { pid: 2, ppid: 1, name: 'powershell.exe', cmd: 'powershell.exe -NoLogo -NoExit', created: 1 }];
   assert.equal(decide(t, { screens, procs }).term_s1.verdict, 'collect');
 });
@@ -98,7 +98,7 @@ test('closeAndVerify proves the close; closeSelfSafe detaches from its own termi
 test('leaked processes: orphan agent CLIs and PowerShell no tab owns; never the Claude desktop app', async () => {
   const { orphanProcesses } = await import('../../scripts/supervisor/gc.mjs');
   const { isAgentProcess, orcaAgents } = await import('../../scripts/machine/close-verify.mjs');
-  const D = 'C:/Orca/daemon-host/1/Orca.exe';
+  const D = `${F}Orca/daemon-host/1/Orca.exe`;
   const table = [
     { pid: 1, ppid: 0, name: 'Orca.exe', exe: D, created: 1 },
     { pid: 2, ppid: 1, name: 'powershell.exe', cmd: 'powershell.exe -NoExit', created: 2 },
@@ -106,8 +106,8 @@ test('leaked processes: orphan agent CLIs and PowerShell no tab owns; never the 
     { pid: 4, ppid: 3, name: 'codex.exe', cmd: 'codex.exe', created: 4 },
     { pid: 5, ppid: 1, name: 'powershell.exe', cmd: 'powershell.exe -NoExit', created: 5 },
     { pid: 6, ppid: 99, name: 'devin.exe', cmd: 'devin.exe', created: 6 },
-    { pid: 7, ppid: 98, name: 'claude.exe', exe: 'C:/Program Files/WindowsApps/Claude/app/Claude.exe', cmd: 'Claude.exe', created: 7 },
-    { pid: 8, ppid: 97, name: 'node.exe', cmd: 'node D:/x/.claude/scripts/supervisor/land.mjs --job fix-a', created: 8 },
+    { pid: 7, ppid: 98, name: 'claude.exe', exe: `${F}Program Files/WindowsApps/Claude/app/Claude.exe`, cmd: 'Claude.exe', created: 7 },
+    { pid: 8, ppid: 97, name: 'node.exe', cmd: `node ${F}x/.claude/scripts/supervisor/land.mjs --job fix-a`, created: 8 },
   ];
   assert.equal(isAgentProcess(table[3]), true);
   assert.equal(isAgentProcess(table[7]), false);

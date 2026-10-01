@@ -288,7 +288,7 @@ ui:
   assets:
     - path: assets/usage-over-cap-frozen.prompt.txt
       role: prompt
-      sha256: 86bda549cf92152b0e9f0bc65f052fcc836cb86f22925323b8cfd37ef691a4d4
+      sha256: 35c099aff0455c35691e6659001af2d7bdfe8ef24fe3e24d2d9b2ffba5b3a611
       provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
     - path: assets/usage-over-cap-frozen.png
       role: direction
@@ -432,7 +432,7 @@ ui:
 assets:
   - path: assets/usage-over-cap-frozen.prompt.txt
     role: prompt
-    sha256: 86bda549cf92152b0e9f0bc65f052fcc836cb86f22925323b8cfd37ef691a4d4
+    sha256: 35c099aff0455c35691e6659001af2d7bdfe8ef24fe3e24d2d9b2ffba5b3a611
     provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
   - path: assets/usage-over-cap-frozen.png
     role: direction

@@ -1589,7 +1589,7 @@ HFS_TS_STRICT:
 HFS_UNTRACKED_ROOT_ENTRY:
   title: "No untracked or ignored entry outside an `ignored` slot"
   title_vi: "Mục lạ ở gốc kho"
-  meaning_vi: "Có mục chưa được git theo dõi, cũng không nằm trong `.gitignore` hay slot `ignored`, nên HFS không cho phép nó tồn tại trong cây làm việc. Theo dõi nó vào đúng slot, hoặc lưu trữ ra `D:/starci-archive/` rồi xóa."
+  meaning_vi: "Có mục chưa được git theo dõi, cũng không nằm trong `.gitignore` hay slot `ignored`, nên HFS không cho phép nó tồn tại trong cây làm việc. Theo dõi nó vào đúng slot, hoặc lưu trữ ra `<archive root>/` rồi xóa."
   causes_vi:
     - "Vi phạm luật R03: Thư mục làm việc không được có mục untracked/ignored ngoài slot `ignored` (vd `nul`, `.worktrees/`, `design-plans/`, `express`)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."

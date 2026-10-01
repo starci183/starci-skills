@@ -139,7 +139,7 @@ Storage states. Ignored (may exist, must be gitignored): `node_modules/`, `dist/
 `coverage/`, `reports/`, `test-results/`, `next-env.d.ts`, `*.tsbuildinfo`, and generated code
 (`__generated__/`, Nest `schema.gql`). External (must not exist in the working tree): tool caches
 (redirected to `%LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/` by the canon presets), lane worktrees
-(`D:/starci-lanes/<project>/<lane>/`), agent output (reports, logs, `nul`, `.artifacts`, draw
+(`<lanes root>/<project>/<lane>/`), agent output (reports, logs, `nul`, `.artifacts`, draw
 rounds, UAT captures: the scratchpad or the blob store, cited by `{name, sha256}`) and plaintext
 secrets (`.env*`, `.secrets/`, `*.pem`, `*.key`, `runtime/files/*`). A Kernel workflow's worktree is
 created and owned by Orca outside the app checkout, one per workflow, and is removed through
@@ -238,5 +238,5 @@ level pending and never fails. The list only shrinks:
 - `RT_PENDING_ADDED`: an entry that allows a finding the base revision's list did not allow (the base is the merge-base
   of HEAD with main). A file moved through `modules/kernel/retired-paths.yaml` `moved[]` keeps its allowance.
 
-Files move with the codemod of the migration (`D:/starci-tmp/hfs/devin/c0/rh-move.mjs`, outside the repository), which
+Files move with the codemod of the migration (`<tmp>/rh-move.mjs`, outside the repository), which
 runs `git mv`, rewrites relative imports and cited paths, rewrites the pending paths, and appends the `moved[]` entries.

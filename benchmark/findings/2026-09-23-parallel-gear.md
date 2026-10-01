@@ -15,7 +15,7 @@ that knob to mean anything:
 
 ### Ledger source
 
-Read-only copy of `D:/Repositories/nivo-backend/.starciwork/runtime.sqlite` (6 033 408 bytes,
+Read-only copy of `nivo-backend/.starciwork/runtime.sqlite` (6 033 408 bytes,
 20 tables), taken 2026-09-23. The live tree was never opened.
 
 **There is no measured closure in the ledger.** No `estimate` or `preflight` event kind exists

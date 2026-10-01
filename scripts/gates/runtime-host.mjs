@@ -4,7 +4,7 @@
 //
 // The runtime host is the repository whose checkout holds the runtime's MAIN checkout (`<host>/.claude`), found from git
 // identity, never from the folder this runtime tree happens to sit in: a lane worktree of the runtime
-// (D:/starci-lanes/<lane>/<name>) resolves to the same host as the main checkout. STARCI_SOURCE_ROOT overrides it.
+// (<lanes root>/<lane>/<name>) resolves to the same host as the main checkout. STARCI_SOURCE_ROOT overrides it.
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isDir } from '../lib/fs-kind.mjs';

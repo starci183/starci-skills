@@ -22,7 +22,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractUsage, costOfRow, loadPrices, sumRows, promptTokens, deltaRows, USAGE_AGENTS, USAGE_SOURCE, USAGE_UNAVAILABLE } from '../lib/llm-usage.mjs';
-import { sessionHomes, sessionAgentOf, DEFAULT_SESSION_ARCHIVE_ROOT } from './op-session.mjs';
+import { sessionHomes, sessionAgentOf } from './op-session.mjs';
+import { archiveRoot as archiveRootOf } from '../machine/home.mjs';
 
 export const SESSION_HEAD_BYTES = 256 * 1024;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -97,7 +98,7 @@ const jsonlIn = (dir, sinceMs, out, where, agent, depth = 0) => {
 export function listSessionFiles({ agents = USAGE_AGENTS, sinceMs, env = process.env, home = os.homedir(), archiveRoot = null } = {}) {
   const homes = sessionHomes({ env, home });
   const out = [];
-  const root = archiveRoot ?? env.STARCI_SESSION_ARCHIVE_ROOT ?? DEFAULT_SESSION_ARCHIVE_ROOT;
+  const root = archiveRoot ?? env.STARCI_SESSION_ARCHIVE_ROOT ?? archiveRootOf({ env });
   if (!homes.skipped) {
     if (agents.includes('claude')) {
       let dirs = [];

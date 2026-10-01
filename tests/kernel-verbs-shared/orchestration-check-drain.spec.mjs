@@ -83,9 +83,9 @@ test('a Delivery replayed after a lost ack writes nothing twice', (t) => {
 
 test('worker_done is handed to settlement with its job, outcome and report path', (t) => {
   const ledger = fixture(t), trace = [];
-  drainWorkflowMessages(ledger, WF, { check: fakeCheck([[msg('m9', 'worker_done', { outcome: 'succeeded', reportPath: 'D:/w/report.json' })]], trace) });
+  drainWorkflowMessages(ledger, WF, { check: fakeCheck([[msg('m9', 'worker_done', { outcome: 'succeeded', reportPath: 'w/report.json' })]], trace) });
   assert.deepEqual(workerDoneOf(ledger.db, WF).map(({ messageId, jobId, dispatchId, outcome, reportPath }) => ({ messageId, jobId, dispatchId, outcome, reportPath })),
-    [{ messageId: 'm9', jobId: JOB, dispatchId: DISPATCH, outcome: 'succeeded', reportPath: 'D:/w/report.json' }]);
+    [{ messageId: 'm9', jobId: JOB, dispatchId: DISPATCH, outcome: 'succeeded', reportPath: 'w/report.json' }]);
 });
 
 test("a consumer_fenced Kernel Run is re-bound once and checked again; another Run is never re-bound", (t) => {

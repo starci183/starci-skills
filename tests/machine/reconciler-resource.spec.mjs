@@ -22,7 +22,7 @@ const SETTINGS = { resources: { minFreeRamPct: 10, ramThrottle: { heavyResumeAbo
 function ctxOf(mode, extra = {}) {
   const calls = { api: [], log: [], decisions: [], clocks: [] };
   let now = T;
-  const ctx = fakeCtx({ mode, now: () => now, ledgers: [{ ledgerId: 'todo-app-be', repo: 'D:/r' }, { ledgerId: 'supervisor' }], read: () => null,
+  const ctx = fakeCtx({ mode, now: () => now, ledgers: [{ ledgerId: 'todo-app-be', repo: path.join(TMP, 'r') }, { ledgerId: 'supervisor' }], read: () => null,
     api: async (...a) => { calls.api.push(a); return { ok: true, shadow: mode !== 'active' }; }, run: async () => ({ ok: true }),
     clock: (...a) => calls.clocks.push(['clock', ...a]), clear: (...a) => calls.clocks.push(['clear', ...a]),
     openDecision: async (di) => { calls.decisions.push(di); return { ok: true }; }, log: (kind, msg, data) => calls.log.push({ kind, msg, data }), owns: () => false, ...extra });

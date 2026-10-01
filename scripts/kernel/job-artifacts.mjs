@@ -19,6 +19,7 @@ import { allocationMs } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list as arr } from '../lib/list.mjs';
+import { hostPathHits } from '../lib/host-path.mjs';
 import { gitResult, runGit } from '../api/git/lib.mjs';
 import { landingRepos, specBatches } from './settle-landed.mjs';
 import { projectBinding } from './target-repo.mjs';
@@ -34,6 +35,9 @@ export const ARTIFACTS_INDEXED = 'artifacts-indexed';
 export const PROOF_MEDIA_MISSING = 'PROOF_MEDIA_MISSING';
 /** The contract change that made visual proof mandatory (modules/kernel/contract-changes.yaml, reach new-legs). */
 export const PROOF_MEDIA_CHANGE = 'job-proof-media';
+export const EVIDENCE_HOST_PATH = 'EVIDENCE_HOST_PATH';
+/** The contract change that made a host path in Work evidence a settle refusal (reach new-legs). */
+export const EVIDENCE_HOST_PATH_CHANGE = 'evidence-host-path';
 
 const SHA = /^[0-9a-f]{7,40}$/i;
 // The runtime's own checkout: a Supervisor job lands its commits there (scripts/supervisor/land.mjs).
@@ -196,6 +200,45 @@ export function proofMediaPolicyOf(skillRoot, op) {
     const policy = doc?.policy?.proofMedia;
     return policy && typeof policy === 'object' ? policy : null;
   } catch { return null; }
+}
+
+// EVIDENCE_HOST_PATH, the settle refusal for evidence that still names a host path: a pass whose Work evidence files (text under a
+// .starciwork tree that the report names or the attempt filed: a record's evidence.yaml, a draw prompt, a visual review, an assets
+// JSON) hold a hard-coded absolute host path - a drive path, a user-profile path or an expanded AppData path - is refused; the op
+// rewrites the evidence with repo-relative paths or the placeholders <worktree>, <runtime>, <tmp>, <home> (scripts/lib/host-path.mjs
+// normalizeHostPaths) and settles again. The matcher is the one the runtime HFS rule RT_ABSOLUTE_PATH uses (hostPathHits).
+const EVIDENCE_TEXT = /\.(?:ya?ml|json|md|txt)$/i;
+const WORK_TREE = /(?:^|[\\/])\.starciwork[\\/]/;
+const MAX_BYTES = 2 * 1024 * 1024;
+const MAX_OFFENDERS = 20;
+
+const readText = (abs) => { try { const stat = fs.statSync(abs); return stat.isFile() && stat.size <= MAX_BYTES ? fs.readFileSync(abs, 'utf8') : null; } catch { return null; } };
+
+/**
+ * The EVIDENCE_HOST_PATH refusal over a job's files ([{abs, name?}] from job-artifacts.mjs collectJobFiles), or null when no
+ * evidence file holds a host path. `read(abs)` returns a file's text or null (default: the file system). Returns
+ * {code, missing: ['<file>:<line> <sample>', ...], detail: {files, hits}}.
+ */
+export function evidenceHostPathGate({ files, read = readText }) {
+  const offenders = [];
+  let hits = 0, filesWith = 0;
+  for (const file of files ?? []) {
+    const abs = file?.abs;
+    if (typeof abs !== 'string' || !EVIDENCE_TEXT.test(abs) || !WORK_TREE.test(abs)) continue;
+    const text = read(abs);
+    if (typeof text !== 'string') continue;
+    const found = hostPathHits(text);
+    if (!found.length) continue;
+    filesWith += 1;
+    hits += found.length;
+    for (const hit of found) {
+      if (offenders.length >= MAX_OFFENDERS) break;
+      const line = text.slice(0, hit.offset).split('\n').length;
+      offenders.push(`${String(file.name ?? abs).replace(/\\/g, '/')}:${line} ${hit.sample}`);
+    }
+  }
+  if (!offenders.length) return null;
+  return { code: EVIDENCE_HOST_PATH, missing: offenders, detail: { files: filesWith, hits, advice: 'write evidence with repo-relative paths or the placeholders <worktree>, <runtime>, <tmp>, <home>' } };
 }
 
 const BROWSER = /playwright|chromium|puppeteer|webkit|firefox|browser/i;

@@ -11,7 +11,7 @@ import { parseHtml, walkElements } from '../../scripts/work/draw/draw-dna.mjs';
 import { machineMetrics } from '../../scripts/work/draw-loop.mjs';
 import { loadContractChanges } from '../../scripts/machine/contract-version.mjs';
 
-// Owner, 2026-09-28, StarCi Next SignInBase#signed-out round 2 (D:/starci-tmp/starci-draw10/loop/SignInBase/round-2):
+// Owner, 2026-09-28, StarCi Next SignInBase#signed-out round 2 (<tmp>/starci-draw10/loop/SignInBase/round-2):
 // the sign-in card stretched the whole 1184px content region, and on that Surface the "Remember me" Checkbox kept
 // the default primary variant while the two Inputs were secondary. "This is KNOWLEDGE, not golden rules": the
 // runtime catches both from knowledge/ui (MEASURE-4, ANATOMY-2) and these gates. The fixture is that round's

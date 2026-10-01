@@ -64,8 +64,8 @@ test('every Claude Code 2.1.282 notice row under a live spinner reads active', (
   for (const notice of notices) assert.deepEqual(both(frame('● Reading the frontier.',SPINNER,notice)),['active','active'],notice);
   // The two-row restore failure: its second row names the preserved copy.
   assert.deepEqual(both(frame(SPINNER,
-    '  ✘ Update failed and C:\\Users\\Hi\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe could not be restored — it was preserved at:',
-    '  C:\\Users\\Hi\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe.old.1790280018689 · rename it back to claude.exe or run npm i -g @anthropic-ai/claude-code')),['active','active']);
+    '  ✘ Update failed and ~/npm/node_modules/@anthropic-ai/claude-code/bin/claude.exe could not be restored — it was preserved at:',
+    '  ~/npm/node_modules/@anthropic-ai/claude-code/bin/claude.exe.old.1790280018689 · rename it back to claude.exe or run npm i -g @anthropic-ai/claude-code')),['active','active']);
   // Stacked notices, as a session that has both an updater and an IDE notice draws them.
   assert.deepEqual(both(frame(SPINNER,EXE_IN_USE,'  Visual Studio Code disconnected')),['active','active']);
 });

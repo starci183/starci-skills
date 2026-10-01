@@ -129,7 +129,7 @@ test('an agent CLI spawned as a child process is red, through a literal, a const
       "execSync('devin -p \"judge\"');",
     ].join('\n'),
     'engine/runner.cjs':"const cp = require('child_process');\ncp.spawnSync('cmd', ['/c', 'cursor-agent', '-p']);\n",
-    'bin/x.mjs':"import * as cp from 'node:child_process';\nconst GEMINI = 'C:/tools/gemini.exe';\ncp.execFile(GEMINI, []);\n",
+    'bin/x.mjs':"import * as cp from 'node:child_process';\nconst GEMINI = '/opt/tools/gemini.exe';\ncp.execFile(GEMINI, []);\n",
   });
   const r=run(root);
   assert.equal(r.status,1);

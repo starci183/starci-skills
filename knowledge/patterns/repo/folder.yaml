@@ -158,7 +158,7 @@ rules:
       (`__generated__/`, Nest schema.gql) produced by `codegen`. External, meaning they must not exist in the working tree
       at all, are: tool caches (.eslintcache, .turbo, .scannerwork, .sonar, .jest-cache, .cache, .tools), which the canon
       presets redirect to %LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/; lane worktrees (.worktrees, worktrees), which live
-      under D:/starci-lanes/<project>/<lane>/ (a Kernel workflow's worktree is created and owned by Orca outside the app
+      under <lanes root>/<project>/<lane>/ (a Kernel workflow's worktree is created and owned by Orca outside the app
       checkout, is never tracked, and is removed by the runtime after its workflow finishes); agent output (report*.json, *.tmp.json, %*% names, nul, .artifacts,
       .tmp-*, *-lint.json, design-plans/, draw rounds, UAT captures), which lives in the scratchpad or the blob store and is
       cited by `{name, sha256}`; and plaintext secrets (.env*, .secrets/, *.pem, *.key, runtime/files/*). An entry that is

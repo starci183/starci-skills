@@ -4,7 +4,7 @@ import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import path from 'node:path';
 import { workflowProgress, progressMessages, LEG_VI, reportRepos } from '../../scripts/supervisor/progress-report.mjs';
 import { SKILL_ROOT } from '../../scripts/machine/home.mjs';
-import { translator } from '../../scripts/lib/i18n.mjs';
+import { translator } from '../../scripts/lib/i18n.mjs'; import os from 'node:os';
 
 // Owner, 2026-09-23: every 10 minutes the supervisor sends the progress and the
 // remaining estimate to Telegram, and a terse table was rejected ("write
@@ -66,7 +66,7 @@ test('a long report is split under the Telegram message limit', () => {
 });
 
 test('the report covers --repo, else config supervisor.repos resolved like the rest of the supervisor; no host-specific fallback', () => {
-  assert.deepEqual(reportRepos(['D:/x']), ['D:/x']);
+  assert.deepEqual(reportRepos([path.join(os.tmpdir(), 'x')]), [path.join(os.tmpdir(), 'x')]);
   assert.deepEqual(reportRepos([], { supervisor: { repos: ['todo-app-be'] } }), [path.resolve(path.dirname(SKILL_ROOT), 'todo-app-be')]);
   assert.deepEqual(reportRepos([], { supervisor: { repos: [] } }), [], 'an empty list reports nothing');
   assert.deepEqual(reportRepos([], null), []);

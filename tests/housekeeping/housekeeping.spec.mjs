@@ -103,15 +103,15 @@ test('a sweep returning ok:false keeps its errors and fails the run', async () =
   const sweeps = allSweeps({
     devin: async () => ({
       ok: false,
-      skipped: [{ path: 'C:/x/y.db', reason: 'devin.exe running' }],
-      errors: [{ path: 'C:/x/z', code: 'EBUSY', message: 'held open' }, 'plain string error'],
+      skipped: [{ path: 'x/y.db', reason: 'devin.exe running' }],
+      errors: [{ path: 'x/z', code: 'EBUSY', message: 'held open' }, 'plain string error'],
       report: { sessionsDbBytes: 4_000_000 },
     }),
   });
   const report = await runHousekeeping({ sweeps, allocation: {} });
   assert.equal(report.areas.devin.ok, false);
   assert.deepEqual(report.areas.devin.errors, ['held open', 'plain string error']);
-  assert.deepEqual(report.areas.devin.skipped, [{ path: 'C:/x/y.db', reason: 'devin.exe running' }]);
+  assert.deepEqual(report.areas.devin.skipped, [{ path: 'x/y.db', reason: 'devin.exe running' }]);
   assert.equal(report.areas.devin.report.sessionsDbBytes, 4_000_000);
 });
 

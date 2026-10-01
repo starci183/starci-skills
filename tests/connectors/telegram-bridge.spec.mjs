@@ -96,7 +96,7 @@ test('an update whose chat or sender is not the owner is dropped and logged by n
 test('/choose shows one button per supervisor with its online state; the callback routes and releases the held message', async (t) => {
   const bot = await fakeBot(t);
   const { env, bridge } = setup(t, bot);
-  registerSupervisor({ id: 'sup-a', label: 'Alpha', repos: ['D:/r/a'] }, { env });
+  registerSupervisor({ id: 'sup-a', label: 'Alpha', repos: ['r/a'] }, { env });
   registerSupervisor({ id: 'sup-b', label: 'Beta' }, { env, now: Date.now() - ONLINE_MS - 60_000 });
   assert.deepEqual(listSupervisors({ env }).map((s) => [s.id, s.online]), [['sup-a', true], ['sup-b', false]]);
 
@@ -279,9 +279,9 @@ test('the registry heartbeats, validates ids, and ignores files that are not sup
   const home = tmp(t, 'starci-tg-registry-');
   const env = { LOCALAPPDATA: home };
   const old = Date.now() - 2 * ONLINE_MS;
-  registerSupervisor({ id: 'sup-a', label: '  ', repos: [' D:/x ', ''] }, { env, now: old });
+  registerSupervisor({ id: 'sup-a', label: '  ', repos: [' x ', ''] }, { env, now: old });
   let [sup] = listSupervisors({ env });
-  assert.deepEqual([sup.label, sup.repos, sup.online], ['sup-a', ['D:/x'], false]);
+  assert.deepEqual([sup.label, sup.repos, sup.online], ['sup-a', ['x'], false]);
   heartbeatSupervisor('sup-a', { env });
   [sup] = listSupervisors({ env });
   assert.equal(sup.online, true);

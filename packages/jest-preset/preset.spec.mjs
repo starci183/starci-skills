@@ -131,7 +131,7 @@ test('the unit project matches *.spec.ts only and never a file of src/tests/{wor
   const ignored = (file) => unit.testPathIgnorePatterns.some((pattern) => new RegExp(pattern).test(file));
   for (const folder of ['world', 'integration', 'e2e', 'contract']) {
     assert.equal(ignored(`/r/src/tests/${folder}/a/x.spec.ts`), true, folder);
-    assert.equal(ignored(`C:\\r\\src\\tests\\${folder}\\a\\x.spec.ts`), true, folder);
+    assert.equal(ignored(`${path.parse(withWorld).root}r\\src\\tests\\${folder}\\a\\x.spec.ts`), true, folder);
   }
   assert.equal(ignored('/r/src/features/x/y.spec.ts'), false);
   assert.equal(ignored('/r/src/tests/fixtures/database.spec.ts'), false);

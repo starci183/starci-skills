@@ -1,6 +1,6 @@
 # sla.yaml — the SLA / Invariant catalogue of the reconciler (lane rc-sla-workflow).
 #
-# Design: D:/starci-tmp/reconciler-design/DESIGN.md §8.8 (SLA and Invariant layer), Appendix A (violation codes),
+# Design: <tmp>/reconciler-design/DESIGN.md §8.8 (SLA and Invariant layer), Appendix A (violation codes),
 # §9.1-§9.7 (the state tables each number comes from). Code: scripts/reconciler/sla.mjs slaPass(ctx), the engine's
 # built-in pass (lane rc-engine calls it every passMs through a guarded optional import).
 #

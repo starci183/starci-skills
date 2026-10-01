@@ -213,8 +213,8 @@ test('the quick tunnel URL and the connection registration parse from cloudflare
 });
 
 test('cloudflared always runs on a generated config; a named token rides the child env, never argv',()=>{
-  const configFile='C:/state/connectors/cloudflared.yml';
-  const named={mode:'named',auth:'credentials-file',tunnel:'21e1ba7c-9bef-4154-b59a-0151f4efd9db',credentialsFile:'C:\\Users\\o\\.cloudflared\\21e1.json',hostname:'response.example.org'};
+  const configFile='state/connectors/cloudflared.yml';
+  const named={mode:'named',auth:'credentials-file',tunnel:'21e1ba7c-9bef-4154-b59a-0151f4efd9db',credentialsFile:path.win32.join(path.parse(os.tmpdir()).root,'Users','o','.cloudflared','21e1.json'),hostname:'response.example.org'};
   const plan=cloudflaredPlan(named,{port:7070,configFile,env:{}});
   assert.deepEqual(plan.args,['tunnel','--config',configFile,'--no-autoupdate','run','21e1ba7c-9bef-4154-b59a-0151f4efd9db']);
   const text=cloudflaredConfigText(named,7070),doc=parseYaml(text);

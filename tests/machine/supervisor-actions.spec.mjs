@@ -21,29 +21,29 @@ const envOf = (t) => {
 
 test('owed actions: each stuck item gets one class and one action; an incident a cluster carries is not listed twice', () => {
   const clusters = [
-    { id: 'runtime-api-mjs', size: 1, oldestMin: 90, summary: 'cli.mjs dead-end', incidents: ['inc-aaaaaaaaaaaa'], workflows: ['wf-a'], items: [{ repo: 'D:/r', kind: 'source-runtime-defect' }] },
-    { id: 'runtime-pattern-retry-loop-op-x', size: 1, oldestMin: 300, summary: 'x: 4 failed', incidents: [], workflows: ['wf-a'], items: [{ repo: 'D:/r', pattern: 'retry-loop' }] },
-    { id: 'decision-failed-retries-the-same-op', size: 1, oldestMin: 60, summary: 'route failed-retries-the-same-op already fired 3 of 3 times', incidents: ['inc-bbbbbbbbbbbb'], workflows: ['wf-b'], items: [{ repo: 'D:/r', kind: 'decision' }] },
-    { id: 'checker-fixed', size: 1, oldestMin: 30, summary: 'fixed', fixedBy: 'abcdef1234567', incidents: ['inc-cccccccccccc'], workflows: ['wf-b'], items: [{ repo: 'D:/r' }] },
+    { id: 'runtime-api-mjs', size: 1, oldestMin: 90, summary: 'cli.mjs dead-end', incidents: ['inc-aaaaaaaaaaaa'], workflows: ['wf-a'], items: [{ repo: 'repos/r', kind: 'source-runtime-defect' }] },
+    { id: 'runtime-pattern-retry-loop-op-x', size: 1, oldestMin: 300, summary: 'x: 4 failed', incidents: [], workflows: ['wf-a'], items: [{ repo: 'repos/r', pattern: 'retry-loop' }] },
+    { id: 'decision-failed-retries-the-same-op', size: 1, oldestMin: 60, summary: 'route failed-retries-the-same-op already fired 3 of 3 times', incidents: ['inc-bbbbbbbbbbbb'], workflows: ['wf-b'], items: [{ repo: 'repos/r', kind: 'decision' }] },
+    { id: 'checker-fixed', size: 1, oldestMin: 30, summary: 'fixed', fixedBy: 'abcdef1234567', incidents: ['inc-cccccccccccc'], workflows: ['wf-b'], items: [{ repo: 'repos/r' }] },
   ];
   const stalls = [
-    { type: 'STALE-GATE', workflowId: 'wf-a', repo: 'D:/r', incidentId: 'inc-aaaaaaaaaaaa', line: 'STALE-GATE dup' },
-    { type: 'STALE-GATE', workflowId: 'wf-c', repo: 'D:/r', incidentId: 'inc-dddddddddddd', line: 'STALE-GATE wf-c record landed' },
-    { type: 'STALE-PEER-WAIT', workflowId: 'wf-c', repo: 'D:/r', incidentId: 'inc-eeeeeeeeeeee', peer: 'wf-a', line: 'STALE-PEER-WAIT wf-c on wf-a' },
-    { type: 'GATE', workflowId: 'wf-c', repo: 'D:/r', incidentId: 'inc-ffffffffffff', young: false, asks: [], waits: [], text: 'waits on the supervisor ruling', line: 'GATE wf-c no condition' },
-    { type: 'GATE', workflowId: 'wf-c', repo: 'D:/r', incidentId: 'inc-111111111111', young: false, asks: [], waits: [], text: 'needs the production credentials', line: 'GATE wf-c creds' },
-    { type: 'STALLED', workflowId: 'wf-d', repo: 'D:/r', actionable: true, alert: true, line: 'STALLED wf-d idle 50m' },
-    { type: 'PEER-WAIT', workflowId: 'wf-c', repo: 'D:/r', incidentId: 'inc-222222222222', alert: false, line: 'justified' },
+    { type: 'STALE-GATE', workflowId: 'wf-a', repo: 'repos/r', incidentId: 'inc-aaaaaaaaaaaa', line: 'STALE-GATE dup' },
+    { type: 'STALE-GATE', workflowId: 'wf-c', repo: 'repos/r', incidentId: 'inc-dddddddddddd', line: 'STALE-GATE wf-c record landed' },
+    { type: 'STALE-PEER-WAIT', workflowId: 'wf-c', repo: 'repos/r', incidentId: 'inc-eeeeeeeeeeee', peer: 'wf-a', line: 'STALE-PEER-WAIT wf-c on wf-a' },
+    { type: 'GATE', workflowId: 'wf-c', repo: 'repos/r', incidentId: 'inc-ffffffffffff', young: false, asks: [], waits: [], text: 'waits on the supervisor ruling', line: 'GATE wf-c no condition' },
+    { type: 'GATE', workflowId: 'wf-c', repo: 'repos/r', incidentId: 'inc-111111111111', young: false, asks: [], waits: [], text: 'needs the production credentials', line: 'GATE wf-c creds' },
+    { type: 'STALLED', workflowId: 'wf-d', repo: 'repos/r', actionable: true, alert: true, line: 'STALLED wf-d idle 50m' },
+    { type: 'PEER-WAIT', workflowId: 'wf-c', repo: 'repos/r', incidentId: 'inc-222222222222', alert: false, line: 'justified' },
   ];
   const flows = {
     workflows: [
-      { workflowId: 'wf-d', repo: 'D:/r', ready: 2, deadWorkerJobs: ['op-x-1'], wedgedJobs: [], kernelRevStale: { current: 'b'.repeat(40), acked: 'a'.repeat(40), fileCount: 3 }, ownerAsks: ['ctx_1'] },
-      { workflowId: 'wf-e', repo: 'D:/r', error: 'status unreadable' },
+      { workflowId: 'wf-d', repo: 'repos/r', ready: 2, deadWorkerJobs: ['op-x-1'], wedgedJobs: [], kernelRevStale: { current: 'b'.repeat(40), acked: 'a'.repeat(40), fileCount: 3 }, ownerAsks: ['ctx_1'] },
+      { workflowId: 'wf-e', repo: 'repos/r', error: 'status unreadable' },
     ],
-    deadKernels: [{ workflowId: 'wf-e', repo: 'D:/r', action: 'restart-failed', count: 3 }],
-    orphaned: [{ workflowId: 'wf-f', repo: 'D:/r', reason: 'nothing open' }],
+    deadKernels: [{ workflowId: 'wf-e', repo: 'repos/r', action: 'restart-failed', count: 3 }],
+    orphaned: [{ workflowId: 'wf-f', repo: 'repos/r', reason: 'nothing open' }],
   };
-  const pushes = [{ repo: 'D:/x/.claude', refused: 'secret scan', scan: { findings: [{ file: 'a.env', line: 1, pattern: 'token' }] } }, { repo: 'D:/y', pushed: true }];
+  const pushes = [{ repo: 'repos/x/.claude', refused: 'secret scan', scan: { findings: [{ file: 'a.env', line: 1, pattern: 'token' }] } }, { repo: 'repos/y', pushed: true }];
   const items = owedActions({ clusters, stalls, flows, pushes });
   const byKey = Object.fromEntries(items.map((i) => [i.key, i.class]));
   assert.deepEqual(byKey, {

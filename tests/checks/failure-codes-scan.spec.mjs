@@ -34,7 +34,7 @@ test('a computed member access with a constant key is not an emitted code', (t) 
 
 test('an array literal or a computed key holding one constant is not an emitted code', (t) => {
   const found = codes(t, [
-    "export const SKILL_ROOT = 'D:/runtime';",
+    "export const SKILL_ROOT = 'runtime';",
     'export const plan = { repos: [SKILL_ROOT], byRoot: { [SKILL_ROOT]: true } };',
   ]);
   assert.ok(!found.includes('SKILL_ROOT'), found.join(', '));

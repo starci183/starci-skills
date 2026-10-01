@@ -42,7 +42,7 @@ import { taskUpdate } from '../api/orca/task-update.mjs';
 export const CRITIQUE_SCHEMA = 'starci/draw-critique@1';
 export const RUBRIC_SCHEMA = 'starci/draw-rubric@1';
 
-/** The built-in rubric: the r5 bake-off critic sheet (D:/starci-tmp/draw-bakeoff/r5/inputs/08-RUBRIC.md), brand-neutral. */
+/** The built-in rubric: the r5 bake-off critic sheet (<tmp>/draw-bakeoff/r5/inputs/08-RUBRIC.md), brand-neutral. */
 export const DEFAULT_RUBRIC = Object.freeze({
   schema: RUBRIC_SCHEMA,
   source: 'built-in default (scripts/work/draw-critic.mjs)',

@@ -389,13 +389,13 @@ test('the author of a review is the latest settled non-verify op - implementatio
 });
 
 test('a fixture-shaped path is never a product ledger: temp roots and fixture/fixtures directories',()=>{
-  const env={TEMP:'C:/Users/u/AppData/Local/Temp',TMP:'C:/Users/u/AppData/Local/Temp'};
-  assert.equal(isFixtureLedgerPath('C:/fixture/.starciwork/runtime.sqlite',{env}),true,'the stale C:/fixture ledger');
-  assert.equal(isFixtureLedgerPath('D:/work/tests/fixtures/repo/.starciwork/runtime.sqlite',{env}),true);
-  assert.equal(isFixtureLedgerPath('C:/Users/u/AppData/Local/Temp/w1-x/repo/.starciwork/runtime.sqlite',{env}),true);
+  const T=os.tmpdir().replace(/\\/g,'/'),DRV=path.parse(os.tmpdir()).root.replace(/\\/g,'/'),env={TEMP:T,TMP:T};
+  assert.equal(isFixtureLedgerPath(`${DRV}fixture/.starciwork/runtime.sqlite`,{env}),true,'the stale fixture-root ledger');
+  assert.equal(isFixtureLedgerPath(`${DRV}work/tests/fixtures/repo/.starciwork/runtime.sqlite`,{env}),true);
+  assert.equal(isFixtureLedgerPath(`${T}/w1-x/repo/.starciwork/runtime.sqlite`,{env}),true);
   assert.equal(isFixtureLedgerPath(path.join(os.tmpdir(),'starci-x','.starciwork','runtime.sqlite')),true);
-  assert.equal(isFixtureLedgerPath('D:/Repositories/todo-app-be/.starciwork/runtime.sqlite',{env}),false);
-  assert.equal(isFixtureLedgerPath('D:/Repositories/fixture-shop/.starciwork/runtime.sqlite',{env}),false,'only a whole segment names a fixture');
+  assert.equal(isFixtureLedgerPath(`${DRV}Repositories/todo-app-be/.starciwork/runtime.sqlite`,{env}),false);
+  assert.equal(isFixtureLedgerPath(`${DRV}Repositories/fixture-shop/.starciwork/runtime.sqlite`,{env}),false,'only a whole segment names a fixture');
   assert.equal(isFixtureLedgerPath(null,{env}),false);
 });
 

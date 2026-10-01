@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
 import { JOB_HANDLE_FIELDS, WORKER_HOLDING_STATUSES, jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder } from '../../scripts/machine/terminal-ledger.mjs';
 import { ledgerBindings } from '../../scripts/kernel/terminal-dedupe.mjs';
 
@@ -47,12 +47,12 @@ test('ledgerBindings binds kernel-signal terminals and held-job handles; leased 
   assert.ok(typeof ledgerBindings === 'function', 'the dedupe copy now builds on the same primitives');
 });
 
-test('pathUnder is the path-prefix test both scripts spelt locally', () => {
-  assert.ok(pathUnder('C:\\Repo\\x\\sub', 'c:/repo/x'));
-  assert.ok(pathUnder('D:/a/', 'D:/a'));
-  assert.ok(!pathUnder('D:/ab', 'D:/a'));
-  assert.ok(!pathUnder(null, 'D:/a'));
-  assert.ok(!pathUnder('D:/a', null));
+test('pathUnder is the path-prefix test both scripts spelt locally', () => { const DRIVE = path.parse(os.tmpdir()).root, FW = DRIVE.replace(/\\/g, '/');
+  assert.ok(pathUnder(`${DRIVE}Repo\\x\\sub`, `${FW.toLowerCase()}repo/x`));
+  assert.ok(pathUnder(`${FW}a/`, `${FW}a`));
+  assert.ok(!pathUnder(`${FW}ab`, `${FW}a`));
+  assert.ok(!pathUnder(null, `${FW}a`));
+  assert.ok(!pathUnder(`${FW}a`, null));
 });
 
 test('the dedupe and check scripts read the shared facts', () => {

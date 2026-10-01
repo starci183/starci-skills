@@ -79,7 +79,7 @@ import { parseJson } from '../lib/json.mjs';
 import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows } from '../machine/terminal-ledger.mjs';
-import { SKILL_ROOT, lanesRoot, landRoot, productRepos, seatOf, readSupervisor, withSupervisor } from '../machine/home.mjs';
+import { SKILL_ROOT, archiveRoot as archiveRootOf, lanesRoot, landRoot, productRepos, seatOf, readSupervisor, withSupervisor } from '../machine/home.mjs';
 import { jobsOf } from './workers.mjs';
 import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
@@ -114,7 +114,7 @@ export function gcSettings(allocation = allocationSettings()) {
   const gc = allocation?.gc ?? {};
   const keepTitles = (Array.isArray(gc.keepTitles) ? gc.keepTitles : []).map((p) => { try { return new RegExp(String(p)); } catch { return null; } }).filter(Boolean);
   return { minAgeMs: num(hk.gcMinAgeMs, DEFAULTS.gcMinAgeMs), laneGraceMs: num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs),
-    archiveRoot: hk.archiveRoot || 'D:/starci-archive', housekeeping: hk,
+    archiveRoot: archiveRootOf(), housekeeping: hk,
     sweepMs: num(gc.sweepMs, DEFAULTS.sweepMs), keepTitles,
     leaseMinAgeMs: num(gc.leaseMinAgeMs, DEFAULTS.leaseMinAgeMs), laneLogMinAgeMs: num(gc.laneLogMinAgeMs, DEFAULTS.laneLogMinAgeMs),
     laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),

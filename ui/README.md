@@ -13,8 +13,8 @@ From `.claude/ui`:
 ```powershell
 npm ci
 npm run build
-$env:STARCI_MACHINE_DB = 'D:/starci-lanes/ui/ui/fixtures/seed/machine.sqlite'
-$env:STARCI_ARTIFACT_ROOT = 'D:/starci-tmp/ui-seed-artifacts'
+$env:STARCI_MACHINE_DB = '<lanes root>/ui/ui/fixtures/seed/machine.sqlite'
+$env:STARCI_ARTIFACT_ROOT = '<tmp>/ui-seed-artifacts'
 $env:STARCI_STATUS_PORT = '4556'
 node server.mjs
 ```

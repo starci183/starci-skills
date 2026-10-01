@@ -44,10 +44,10 @@ async function fakeBot(t, { fail = null } = {}) {
 
 test('register and heartbeat record the supervisor and report the bridge; inbox prints unread messages and marks them read', (t) => {
   const home = tmp(t, 'starci-channel-cli-');
-  const reg = cli(home, ['register', '--id', 'sup-a', '--label', 'Alpha sup', '--repos', 'D:/a, D:/b']);
+  const reg = cli(home, ['register', '--id', 'sup-a', '--label', 'Alpha sup', '--repos', 'repo-a, repo-b']);
   assert.equal(reg.status, 0, reg.stderr);
   const answer = JSON.parse(reg.stdout);
-  assert.deepEqual([answer.supervisor.id, answer.supervisor.label, answer.supervisor.repos], ['sup-a', 'Alpha sup', ['D:/a', 'D:/b']]);
+  assert.deepEqual([answer.supervisor.id, answer.supervisor.label, answer.supervisor.repos], ['sup-a', 'Alpha sup', ['repo-a', 'repo-b']]);
   assert.equal(answer.bridge.skipped, 'STARCI_CONNECTORS_OFF', 'register ensures the bridge (here: connectors off)');
   const beat = cli(home, ['heartbeat', '--id', 'sup-a']);
   assert.equal(beat.status, 0, beat.stderr);

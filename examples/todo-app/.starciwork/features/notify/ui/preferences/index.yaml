@@ -364,7 +364,7 @@ ui:
   assets:
     - path: assets/preferences-refused.prompt.txt
       role: prompt
-      sha256: 7da31f08c337fcebdf262b5d9d5a604614d8656013349aa8175da53cac86a1b4
+      sha256: bb4ad7d5e57e4ebdc6ed364a6abe362a1ceeff7656b21bf8483519a2f4977482
       provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
     - path: assets/preferences-refused.png
       role: direction
@@ -396,7 +396,7 @@ ui:
         modelDisclosure: Tool response did not expose a model field; no model claimed.
     - path: assets/preferences-refused.full-screen-initial.prompt.txt
       role: prompt
-      sha256: c87b99da9bdb9aafd254e2764efdfe29a0b10dbbc924ada593ce1a8dc5ed1783
+      sha256: b38aa78c124c23b02a31df3abb459a7efdf10343db123c69374156571c1174f2
       provenance: Exact first full-screen generation prompt; retained with the input to the final focused edit.
     - path: assets/preferences-refused.full-screen-initial.png
       role: iteration-input
@@ -526,7 +526,7 @@ ui:
 assets:
   - path: assets/preferences-refused.prompt.txt
     role: prompt
-    sha256: 7da31f08c337fcebdf262b5d9d5a604614d8656013349aa8175da53cac86a1b4
+    sha256: bb4ad7d5e57e4ebdc6ed364a6abe362a1ceeff7656b21bf8483519a2f4977482
     provenance: Exact prompt sent to image_gen.imagegen; ADDENDUM 2 current full-screen anatomy sources.
   - path: assets/preferences-refused.png
     role: direction
@@ -558,7 +558,7 @@ assets:
       modelDisclosure: Tool response did not expose a model field; no model claimed.
   - path: assets/preferences-refused.full-screen-initial.prompt.txt
     role: prompt
-    sha256: c87b99da9bdb9aafd254e2764efdfe29a0b10dbbc924ada593ce1a8dc5ed1783
+    sha256: b38aa78c124c23b02a31df3abb459a7efdf10343db123c69374156571c1174f2
     provenance: Exact first full-screen generation prompt; retained with the input to the final focused edit.
   - path: assets/preferences-refused.full-screen-initial.png
     role: iteration-input

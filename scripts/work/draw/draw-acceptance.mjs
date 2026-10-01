@@ -265,7 +265,7 @@ export function drawAcceptanceFindings({ repo, files }) {
       if (sha && receipts.has(sha)) { drawn = true; continue; }
       if (asset && !DRAWING_ROLES.has(asset.role) && asset.generation?.tool === RASTER_TOOL && owner.drawn) continue;
       // What draw-loop finish installs beside a token-rendered part is evidence, not a drawing: the annotated redline
-      // and the art placeholder the draw source imports (reference draw D:/starci-tmp/draw-components was refused on both).
+      // and the art placeholder the draw source imports (reference draw <tmp>/draw-components was refused on both).
       if (asset && EVIDENCE_ROLES.has(asset.role) && owner.drawn) continue;
       if (asset && DRAWING_ROLES.has(asset.role)) continue; // judged with its record above
       if (recordFound.has(rel.toLowerCase())) continue; // its record already refused this file (coverage.map)

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -23,7 +24,7 @@ fs.rmSync(root, { recursive: true, force: true });
 fs.mkdirSync(root, { recursive: true });
 const fixedNow = 1790550000000;
 const now = () => fixedNow;
-const artifactRoot = safeGeneratedTarget('D:/starci-tmp', 'ui-seed-artifacts');
+const artifactRoot = safeGeneratedTarget(os.tmpdir(), 'ui-seed-artifacts');
 fs.rmSync(artifactRoot, { recursive:true, force:true });
 fs.mkdirSync(artifactRoot, { recursive:true });
 process.env.STARCI_ARTIFACT_ROOT = artifactRoot;

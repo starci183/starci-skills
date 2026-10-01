@@ -12,7 +12,7 @@ test('owned paths normalize to concrete workspace-relative prefixes',()=>{
   assert.equal(ownedPathLeaseKey('./.starciwork/migration/'),'path:.starciwork/migration');
   assert.throws(()=>normalizeOwnedPath('../todo-app-fe'),/must not traverse/);
   assert.throws(()=>normalizeOwnedPath('todo-app-fe/apps/*'),/concrete prefix/);
-  assert.throws(()=>normalizeOwnedPath('C:\\repo\\file'),/repository-relative/);
+  assert.throws(()=>normalizeOwnedPath(`${path.parse(process.cwd()).root}repo\\file`),/repository-relative/);
 });
 
 test('owned path sets collapse duplicate descendants but preserve disjoint product slices',()=>{

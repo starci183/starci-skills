@@ -22,37 +22,37 @@ process.env.STARCI_SLEEP_SCALE??='0.02';
 // every mutation spawns the fake orca's agent-context under a 15s timeout that misses under full-suite load.
 process.env.STARCI_ORCA_SKIP_LIVE_CHECK??='1';
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
-const json=text=>{try{return JSON.parse(text);}catch{return null;}};
+const json=text=>{try{return JSON.parse(text);}catch{return null;}};const DRIVE=path.parse(os.tmpdir()).root,BE=path.join(os.tmpdir(),'todo-app-be'),APPDIR=path.join(os.tmpdir(),'ecommerce-app');
 
 // A captured Codex op whose agent exited mid-turn. The
 // spinner residue ("Working", "Running hook") is still on screen; the last row is the shell prompt.
-const DEAD_CODEX=['','• Ran node \'D:\\Repositories\\ecommerce-app\\.claude\\bin\\starci.mjs\' validate \'.starciwork\' --json','  └ {',
+const DEAD_CODEX=['',`• Ran node '${APPDIR}\\.claude\\bin\\starci.mjs' validate '.starciwork' --json`,'  └ {',
   '      "schema": "starci/work-validate-report@1",','    … +29 lines (ctrl + t to view transcript)','      }',
   '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
   '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',
-  'PS D:\\Repositories\\todo-app-be>'].join('\n');
+  `PS ${BE}>`].join('\n');
 // A live Devin op running a shell tool, with the PowerShell rows a shell tool prints in the transcript; the frame
 // still ends in Devin's own input box and footer.
-const LIVE_DEVIN=['  ✓ Shell cd /d D:\\Repositories\\todo-app-be && npm test -- --runInBand src/modules/integrations/mail/',
-  '    PS D:\\Repositories\\todo-app-be> npm test','    PS D:\\Repositories\\todo-app-be>',
+const LIVE_DEVIN=[`  ✓ Shell cd /d ${BE} && npm test -- --runInBand src/modules/integrations/mail/`,
+  `    PS ${BE}> npm test`,`    PS ${BE}>`,
   '⠙ Running tools · 12m 48s (esc twice to interrupt)','─'.repeat(40),
   '❭ Guide Devin while it works','─'.repeat(40),
   'SWE-2 Max                             Context: 35k / 262k tokens (13%)'].join('\n');
 // A Claude Kernel at rest, plus a Bash tool row that printed a prompt.
-const IDLE_CLAUDE=['● Bash(pwsh -c "Get-Location")','  ⎿  PS D:\\Repositories\\todo-app-be>',
+const IDLE_CLAUDE=['● Bash(pwsh -c "Get-Location")',`  ⎿  PS ${BE}>`,
   '✻ Saut\u00e9ed for 19s · done 3:12 AM','─'.repeat(40),'❯','─'.repeat(40),'  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
-const IDLE_CODEX=['• Ran git status','  └ PS D:\\x> git status','› Ask Codex to do anything','  gpt-6-sol high · 70% left · ~\\x'].join('\n');
+const IDLE_CODEX=['• Ran git status',`  └ PS ${DRIVE}x> git status`,'› Ask Codex to do anything','  gpt-6-sol high · 70% left · ~\\x'].join('\n');
 
 /* ------------------------------------------------------------------ units */
 
 test('only a frame that ends in a bare shell prompt is agent-exited',()=>{
-  assert.equal(exitedAgentPromptRow(DEAD_CODEX),'PS D:\\Repositories\\todo-app-be>');
+  assert.equal(exitedAgentPromptRow(DEAD_CODEX),`PS ${BE}>`);
   // The classifier alone calls it unknown, which api liveness turned into live-idle - and nudge typed into it.
   assert.equal(classifyAgentScreen(DEAD_CODEX).state,'unknown');
   for(const frame of [LIVE_DEVIN,IDLE_CLAUDE,IDLE_CODEX]) assert.equal(exitedAgentPromptRow(frame),null,frame.split('\n').at(-1));
   // A launch still starting shows the command after the prompt: not an exit.
-  assert.equal(exitedAgentPromptRow('PS D:\\x> devin --model swe-2-max --permission-mode dangerous'),null);
-  for(const prompt of ['PS D:\\Repositories\\x>','PS C:\\>','D:\\Repositories\\x>','$','Hi@DESKTOP MINGW64 /d/x (main)\n$ ',
+  assert.equal(exitedAgentPromptRow(`PS ${DRIVE}x> devin --model swe-2-max --permission-mode dangerous`),null);
+  for(const prompt of [`PS ${DRIVE}Repositories\\x>`,`PS ${DRIVE}>`,`${DRIVE}Repositories\\x>`,'$','Hi@DESKTOP MINGW64 /d/x (main)\n$ ',
     'user@host:~/repo$','user@host ~ %','bash-5.2$','(venv) user@host:~/x$','root@box:/#'])
     assert.ok(exitedAgentPromptRow(`some output\n${prompt}\n\n`),prompt);
   for(const row of ['100%','> ','❯','*   Type your message or @path/to/file','# Heading','Total: 5$'])
@@ -68,7 +68,7 @@ const stub=screens=>{
 test('no wake and no Enter is typed into an exited agent',()=>{
   let s=stub([DEAD_CODEX]);
   const woke=sendWakeWithProof({terminal:'t',text:'Operation liveness wake for durable job j1.',deps:s.deps});
-  assert.deepEqual([woke.ok,woke.delivery,woke.evidence,woke.shellPrompt],[false,'agent-exited','shell-prompt','PS D:\\Repositories\\todo-app-be>']);
+  assert.deepEqual([woke.ok,woke.delivery,woke.evidence,woke.shellPrompt],[false,'agent-exited','shell-prompt',`PS ${BE}>`]);
   assert.equal(s.calls.length,0,'nothing sent');
   s=stub([IDLE_CLAUDE]);
   assert.equal(sendWakeWithProof({terminal:'t',text:'Operation liveness wake for durable job j1.',before:DEAD_CODEX,deps:s.deps}).delivery,'agent-exited');
@@ -130,7 +130,7 @@ test('status reads an exited worker dead, observe names it, and nudge refuses wi
 
   const status=json(fx.run(['status','--repo',fx.repo,'--workflow',fx.workflowId,'--json']).stdout);
   const worker=status.workers.find(w=>w.jobId===fx.jobId);
-  assert.deepEqual([worker.screenState,worker.liveness,worker.shellPrompt],['agent-exited','agent-exited','PS D:\\Repositories\\todo-app-be>']);
+  assert.deepEqual([worker.screenState,worker.liveness,worker.shellPrompt],['agent-exited','agent-exited',`PS ${BE}>`]);
   assert.equal(status.frontier.state,'worker-dead');
 
   const observed=json(fx.run(['observe','--repo',fx.repo,'--job',fx.jobId,'--json']).stdout);
@@ -155,14 +155,14 @@ test('status reads an exited worker dead, observe names it, and nudge refuses wi
 const APP_TRANSCRIPT=['    … +18 lines (ctrl + t to view transcript)','      }','    }',
   '• Ran orca orchestration check --terminal term_8f9e0611-1faa-415b-a343-4a2c2e3e8','24f --json','  └ {',
   '      "id": "e1790393-c1bf-437a-b6a9-146c93d5b9be",','    … +19 lines (ctrl + t to view transcript)','      }','    }',
-  '• Ran node D:\\Repositories\\ecommerce-app\\.claude\\scripts\\kernel\\cli.mjs',' op-contract --repo D:',
-  '  │ \\Repositories\\todo-app-be --job op-architecture.decide-e64bfaaea3',
+  `• Ran node ${APPDIR}\\.claude\\scripts\\kernel\\cli.mjs`,` op-contract --repo ${DRIVE.slice(0,2)}`,
+  `  │ ${BE.slice(2)} --job op-architecture.decide-e64bfaaea3`,
   '  └ # dispatch contract — [Op] architecture.decide (job op-architecture.decide-e','64bfaaea3)',
   '    … +107 lines (ctrl + t to view transcript)','    (node:39400) ExperimentalWarning: SQLite is an experimental feature and migh',
   't change at any time','    (Use `node --trace-warnings ...` to show where the warning was created)',
   '• Working (10m 46s • esc to interrupt) · 1 background terminal running · /ps to','view · /stop to close',
   '› Ask Codex to do anything'];
-const APP_PS='PS D:\\Repositories\\todo-app-be>';
+const APP_PS=`PS ${BE}>`;
 const APP_WAKE='Operation liveness wake for durable job op-architecture.decide-e64bfaaea3 (architecture.decide) attempt 11. Your accepted contract remains running but no durable report is filed. Re-read the exact contract with api op-contract, continue only inside its existing authority, and file exactly one api report. Report done, partial, failed, ask or blocked truthfully; do not wait for another chat prompt and do not widen scope.';
 const wrap80=line=>{const rows=[];for(let i=0;i<line.length;i+=80)rows.push(line.slice(i,i+80));return rows;};
 const APP_AFTER=[...APP_TRANSCRIPT,...wrap80(`${APP_PS} ${APP_WAKE}`),'At line:1 char:366',
@@ -191,8 +191,8 @@ test('a Codex frame frozen at Working with a shell prompt under its input row is
   assert.equal(exitedAgentPromptRow([...APP_TRANSCRIPT,`${APP_PS} $env:DISABLE_AUTOUPDATER='1'; & claude --model 'claude-opus-5-5' --dangerously-skip-permissions`].join('\n')),null);
   assert.equal(exitedAgentPromptRow([...APP_TRANSCRIPT,`${APP_PS} $env:DISABLE_AUTOUPDATER='1'; Get-ChildItem`].join('\n')),`${APP_PS} $env:DISABLE_AUTOUPDATER='1'; Get-ChildItem`,'an env statement alone is no launch');
   for(const frame of [LIVE_DEVIN,IDLE_CLAUDE,IDLE_CODEX,APP_FROZEN]) assert.equal(exitedAgentPromptRow(frame),null);
-  assert.equal(shellPromptPrefix('PS D:\\Repositories\\todo-app-be> Operation liveness'),APP_PS);
-  assert.equal(shellPromptPrefix('  └ PS D:\\x> git status'),null,'a transcript row is not the shell');
+  assert.equal(shellPromptPrefix(`PS ${BE}> Operation liveness`),APP_PS);
+  assert.equal(shellPromptPrefix(`  └ PS ${DRIVE}x> git status`),null,'a transcript row is not the shell');
 });
 
 test('text a shell received is never a delivered wake',()=>{

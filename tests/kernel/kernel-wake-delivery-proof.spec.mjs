@@ -262,7 +262,7 @@ const FROZEN_KERNEL=[
   '    … +77 lines (ctrl + t to view transcript)',
   '• Working (5m 30s • esc to interrupt)',
   '› Ask Codex to do anything',
-  '  gpt-6-sol high · D:\\Repositories\\todo-app-be · Report task outcome',
+  `  gpt-6-sol high · ${path.join(os.tmpdir(), 'todo-app-be')} · Report task outcome`,
 ].join('\n');
 
 const unwritableDeps=(lastOutputAt,screen=FROZEN_KERNEL)=>({

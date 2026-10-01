@@ -71,7 +71,7 @@ test('notify.mjs opens a supervisor-ruling DI and rings; a busy Kernel is queued
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite') };
   const opened = [];
   const open = (repo, di) => { opened.push(di); return { ok: true, json: { ok: true, decision: { id: 'di-0000beef' }, superseded: ['di-0000cafe'] } }; };
-  const busy = await notifyKernel({ repo: 'D:/fixture', workflowId: WF, text: 'fixed by .claude abc123: resolve inc-1', item: `gate|${WF}|inc-1`, env, open, ring: () => ({ action: 'deferred', wake: 'kernel-busy' }) });
+  const busy = await notifyKernel({ repo: path.join(home, 'repo'), workflowId: WF, text: 'fixed by .claude abc123: resolve inc-1', item: `gate|${WF}|inc-1`, env, open, ring: () => ({ action: 'deferred', wake: 'kernel-busy' }) });
   assert.equal(busy.action, 'queued');
   assert.equal(busy.delivered, true);
   assert.equal(busy.decision, 'di-0000beef');
@@ -79,9 +79,9 @@ test('notify.mjs opens a supervisor-ruling DI and rings; a busy Kernel is queued
   assert.equal(opened[0].kind, 'supervisor-ruling');
   assert.equal(opened[0].decider, 'kernel');
   assert.match(opened[0].summary, /^\[supervisor\] fixed by/);
-  const idle = await notifyKernel({ repo: 'D:/fixture', workflowId: WF, text: 'second', env, open, ring: () => ({ action: 'rung' }) });
+  const idle = await notifyKernel({ repo: path.join(home, 'repo'), workflowId: WF, text: 'second', env, open, ring: () => ({ action: 'rung' }) });
   assert.equal(idle.action, 'kernel-woken');
-  const failed = await notifyKernel({ repo: 'D:/fixture', workflowId: WF, text: 'third', env, open: () => ({ ok: false, json: { ok: false, error: 'ledger-missing', code: 'ledger-missing' } }), ring: () => { throw new Error('never rung'); } });
+  const failed = await notifyKernel({ repo: path.join(home, 'repo'), workflowId: WF, text: 'third', env, open: () => ({ ok: false, json: { ok: false, error: 'ledger-missing', code: 'ledger-missing' } }), ring: () => { throw new Error('never rung'); } });
   assert.equal(failed.action, 'decision-open-failed');
   assert.equal(failed.delivered, false);
   const events = readMachine((m) => m.supEvents({ kinds: ['supervisor-action', 'supervisor-notice'], order: 'asc' }), [], { env });
@@ -95,7 +95,7 @@ test('notify.mjs awaits an async DI writer (openDecision returns a Promise): del
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite') };
   const rings = [];
   const open = async () => ({ ok: true, json: { ok: true, decision: { id: 'di-c5685028' }, superseded: [] } });
-  const r = await notifyKernel({ repo: 'D:/fixture', workflowId: WF, text: '[supervisor] ruling: retry the held job', item: `gate|${WF}|inc-2`, env, open,
+  const r = await notifyKernel({ repo: path.join(home, 'repo'), workflowId: WF, text: '[supervisor] ruling: retry the held job', item: `gate|${WF}|inc-2`, env, open,
     ring: (args) => { rings.push(args.workflowId); return { action: 'rung' }; } });
   assert.equal(r.action, 'kernel-woken');
   assert.equal(r.delivered, true);
@@ -104,7 +104,7 @@ test('notify.mjs awaits an async DI writer (openDecision returns a Promise): del
   const events = readMachine((m) => m.supEvents({ kinds: ['supervisor-action', 'supervisor-notice'], order: 'asc' }), [], { env });
   assert.deepEqual(events.filter((e) => e.kind === 'supervisor-action').map((e) => e.payload.item), [`gate|${WF}|inc-2`]);
   assert.equal(events.find((e) => e.kind === 'supervisor-notice')?.payload.delivered, true);
-  const rejected = await notifyKernel({ repo: 'D:/fixture', workflowId: WF, text: 'x', env, open: async () => { throw new Error('child died'); }, ring: () => { throw new Error('never rung'); } });
+  const rejected = await notifyKernel({ repo: path.join(home, 'repo'), workflowId: WF, text: 'x', env, open: async () => { throw new Error('child died'); }, ring: () => { throw new Error('never rung'); } });
   assert.equal(rejected.action, 'decision-open-failed');
   assert.match(String(rejected.error), /child died/);
 });

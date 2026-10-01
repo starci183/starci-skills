@@ -290,8 +290,8 @@ test('the lanes sweep is bounded: a large backlog is judged in budgeted passes t
   assert.ok(passes > 1, 'more than one pass was needed');
   assert.equal(seen.size, N, 'every lane was judged by the time a pass reached the end');
   // The cursor lives in machine.sqlite between sweeps.
-  writeLaneCursor('d:/somewhere/l07', env);
-  assert.equal(readLaneCursor(env), 'd:/somewhere/l07');
+  writeLaneCursor('somewhere/l07', env);
+  assert.equal(readLaneCursor(env), 'somewhere/l07');
   writeLaneCursor(null, env);
   assert.equal(readLaneCursor(env), null);
 });

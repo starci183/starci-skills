@@ -51,7 +51,7 @@ function fixture({ status = 'running', payload = {}, report = null, handover = n
   const db = new DatabaseSync(file, { readOnly: true });
   return { dir, file, db, close: () => { try { db.close(); } catch { /* closed */ } fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); } };
 }
-const ledgers = (fx) => [{ ledgerId: 'todo-app-be', repo: 'D:/Repositories/todo-app-be', file: fx.file }];
+const ledgers = (fx) => [{ ledgerId: 'todo-app-be', repo: 'todo-app-be', file: fx.file }];
 const ctxFor = (fx, over = {}) => fakeCtx({ controller: 'job', now: () => NOW, ledgers: ledgers(fx), dbs: { 'todo-app-be': fx.db }, ...over });
 
 test('keys parse and route', () => {
@@ -72,7 +72,7 @@ test('a green done report -> exactly one settler run for the job (a would-row in
     const r = await job.reconcile('job:todo-app-be:op-a', ctx);
     assert.equal(r.action, 'settle'); assert.equal(r.shadow, true);
     assert.equal(ctx.calls.run.length, 1);
-    assert.deepEqual(ctx.calls.run[0].args, [SETTLER_SCRIPT, '--repo', 'D:/Repositories/todo-app-be', '--job', 'op-a', '--json']);
+    assert.deepEqual(ctx.calls.run[0].args, [SETTLER_SCRIPT, '--repo', 'todo-app-be', '--job', 'op-a', '--json']);
     assert.equal(ctx.calls.api.length, 0);
     assert.ok(ctx.calls.clock.some((c) => c.state === 'SETTLE_OVERDUE' && c.entity === 'job:todo-app-be:op-a'));
   } finally { fx.close(); }
