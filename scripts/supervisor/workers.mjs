@@ -18,8 +18,9 @@
 // ([Worker] terminal on the attempt) -> reported (sup_reports row) -> succeeded (landed by scripts/supervisor/land.mjs,
 // checkout removed) | failed | cancelled. The job's working state (cluster, files, staging, routing, result) is
 // its payload_json. The staging checkout is an EPHEMERAL Orca worktree of the runtime (an agent works in it, so Orca
-// owns it: `orca worktree create --name sup-<job> --base-branch main --comment starci:supervisor-staging:<job>` through
-// scripts/api/orca/worktree-provision.mjs createOrcaWorktree, registry kind supervisor-staging keyed by Orca's worktree id). Orca picks
+// owns it: `orca worktree create --name sup-<job> --base-branch main` through scripts/api/orca/worktree-provision.mjs
+// createOrcaWorktree, which stamps it `starci:supervisor-staging:sup-<job>;sup=<job>` (scripts/lib/orca-orphans.mjs
+// runtimeStampOf); registry kind supervisor-staging keyed by Orca's worktree id). Orca picks
 // its path and its branch; payload.staging records {path, branch, base, orcaId} as Orca reported them, and every reader
 // (the land gate, the GCs, the reports) takes the RECORDED branch and path, never a name built from the job id. It lives
 // only until its commit lands (or the job is cancelled), then goes through removeOrcaWorktree (links unlinked, `orca
@@ -223,17 +224,15 @@ export const releaseLeases = (m, jobId) => m.releaseSupLeases(jobId);
 export const STAGING_KIND = 'supervisor-staging';
 /** The Orca worktree name of a job's staging checkout; Orca derives the branch from it (the receipt is what counts). */
 export const stagingNameOf = (jobId) => `sup-${jobId}`;
-/** The ownership stamp Orca keeps on the worktree (`--comment`): the orphan scan tells a runtime tree from a foreign one. */
-export const stagingStampOf = (jobId) => `starci:${STAGING_KIND}:${jobId}`;
 
 /**
  * Create the job's staging checkout through Orca: createOrcaWorktree (the slot registered with its [Worker] job for the
- * GC, `orca worktree create --repo path:<runtime> --name sup-<job> --base-branch main --setup skip --comment <stamp>`,
- * the row bound to Orca's id), plus a node_modules junction and a copy of the owner config so specs run there as they do
+ * GC, `orca worktree create --repo path:<runtime> --name sup-<job> --base-branch main --setup skip`, stamped
+ * `starci:supervisor-staging:sup-<job>;sup=<job>`, the row bound to Orca's id), plus a node_modules junction and a copy of the owner config so specs run there as they do
  * live. {ok, path, branch, base, orcaId} as Orca reported them | {ok:false, reason, code, error}
  */
 export function createStaging({ jobId, root = SKILL_ROOT, env = process.env, orca = orcaWorktreeClient }) {
-  const made = createOrcaWorktree({ repoRoot: root, kind: STAGING_KIND, name: stagingNameOf(jobId), base: 'main', comment: stagingStampOf(jobId), owner: { lane: jobId }, env, orca });
+  const made = createOrcaWorktree({ repoRoot: root, kind: STAGING_KIND, name: stagingNameOf(jobId), base: 'main', owner: { lane: jobId }, env, orca });
   if (!made.ok) return { ok: false, reason: made.reason, code: 'WORKER_STAGING_CREATE_FAILED', error: `${made.reason}: ${made.detail ?? ''}`.trim() };
   if (!made.branch || !made.head) {
     // The land gate cherry-picks from the recorded branch above the recorded base: a receipt without them is useless.

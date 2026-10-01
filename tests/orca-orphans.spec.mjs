@@ -225,10 +225,38 @@ test('a registry row whose tree Orca no longer lists: reported, marked and left 
   assert.notEqual(rowsAt(env, rec.path)[0].removed_at, null);
 });
 
-test('a stamped staging tree is left alone while supervisor-staging is not an Orca kind of this runtime', (t) => {
+test('a stamped [Worker] staging tree with no row: its Supervisor job settled -> preserved and removed; live -> adopted; unknown -> waits out the grace, then collected', (t) => {
   const { repo, env, orca } = fixture(t);
-  const tree = orca.create({ repo: `path:${posix(repo)}`, name: 'sup-old', baseBranch: 'main', comment: runtimeStampOf({ kind: 'supervisor-staging', slot: 'sup-old', owner: { supJobId: 'sup-old' } }) }).worktree;
-  const items = gcWorktrees({ env, now: Date.now() + 9 * HOUR, repos: [repo], jobStatusOf: phases({}), supStatusOf: () => 'succeeded', orca });
-  assert.deepEqual(at(items, tree.path), [], JSON.stringify(items));
-  assert.ok(fs.existsSync(tree.path));
+  const staged = (job) => {
+    const made = orca.create({ repo: `path:${posix(repo)}`, name: `sup-${job}`, baseBranch: 'main', comment: runtimeStampOf({ kind: 'supervisor-staging', slot: `sup-${job}`, owner: { supJobId: job } }) });
+    assert.ok(made.ok);
+    return { tree: made.worktree, dir: path.resolve(made.worktree.path) };
+  };
+  const done = staged('fix-done-1'), live = staged('fix-live-2'), lost = staged('fix-lost-3');
+  write(done.dir, 'src/wip.ts', 'export const wip = 1;\n');
+  const sup = { 'fix-done-1': 'succeeded', 'fix-live-2': 'running' };
+  const supStatusOf = (jobId) => sup[jobId] ?? null;
+  const items = gcWorktrees({ env, now: Date.now(), repos: [repo], jobStatusOf: phases({}), supStatusOf, orca });
+  // settled: the row created, the work preserved to preserved/orphan/<id>, removed through Orca, the row closed
+  const [gone] = at(items, done.dir);
+  assert.deepEqual([gone?.reason, gone?.action, gone?.owner, gone?.home, gone?.ok], ['orca-orphan', 'remove', 'ended', 'orca', true], JSON.stringify(items));
+  assert.match(gone.preserved, /^refs\/heads\/preserved\/orphan\/sup-fix-done-1-[0-9a-f]{10}$/);
+  assert.equal(git(repo, 'show', `${gone.preserved.replace('refs/heads/', '')}:src/wip.ts`), 'export const wip = 1;');
+  assert.ok(!fs.existsSync(done.dir));
+  assert.ok(orca.calls.some(([verb, a]) => verb === 'remove' && a.worktree === `id:${done.tree.id}`));
+  assert.deepEqual(rowsAt(env, done.dir).map((r) => [r.kind, r.lane, r.orca_id, r.removed_at != null]), [['supervisor-staging', 'fix-done-1', done.tree.id, true]]);
+  // live: adopted as a registered supervisor-staging row of its job, the tree untouched
+  assert.deepEqual(at(items, live.dir).map((i) => [i.reason, i.action, i.owner, i.ok]), [['orca-orphan-adopted', 'adopt', 'live', true]]);
+  assert.ok(fs.existsSync(live.dir));
+  assert.deepEqual(rowsAt(env, live.dir).map((r) => [r.kind, r.lane, r.orca_id, r.removed_at]), [['supervisor-staging', 'fix-live-2', live.tree.id, null]]);
+  // unknown job within ownerGoneMs: not judged
+  assert.deepEqual(at(items, lost.dir), [], 'an unknown Supervisor job is not judged gone before ownerGoneMs');
+  assert.ok(fs.existsSync(lost.dir));
+  assert.equal(rowsAt(env, lost.dir).length, 0);
+  // past the grace: collected as owner unknown, preserved first
+  const later = gcWorktrees({ env, now: Date.now() + 9 * HOUR, repos: [repo], jobStatusOf: phases({}), supStatusOf, orca });
+  assert.deepEqual(at(later, lost.dir).map((i) => [i.reason, i.owner, i.ok]), [['orca-orphan', 'unknown', true]], JSON.stringify(later));
+  assert.ok(!fs.existsSync(lost.dir));
+  assert.ok(fs.existsSync(live.dir), 'the adopted tree of a running job stays: its job still owns it');
+  assert.equal(incidents(env).length, 3, 'one incident per adopted or removed tree');
 });
