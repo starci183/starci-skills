@@ -1,5 +1,5 @@
 mutation ShopPlaceOrder($input: PlaceOrderInput!) {
-    placeOrder(request: $input) {
+    placeOrder(input: $input) {
         orderId
         status
         totalMinorUnits

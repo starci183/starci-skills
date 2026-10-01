@@ -1,3 +1,5 @@
 export { useAddToCart } from "./useAddToCart"
 export { useClearCart } from "./useClearCart"
 export { useConfirmOrder } from "./useConfirmOrder"
+export { useDownloadReceipt } from "./useDownloadReceipt"
+export type { ReceiptFailure } from "./useDownloadReceipt"

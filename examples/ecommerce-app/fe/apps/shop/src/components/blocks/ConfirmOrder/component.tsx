@@ -1,5 +1,6 @@
 import { Button, SurfaceCard, Text } from "@starci/grammar/common"
 import type { Outcome } from "@ecommerce/api"
+import type { ReceiptFailure } from "../../../hooks/cart"
 import type { OrderConfirmation } from "../../../modules/types"
 
 /** Resolved checkout copy and the answer of one confirmation attempt. */
@@ -13,6 +14,10 @@ export type ConfirmOrderBaseProps = {
         readonly confirmedTitle: string
         readonly confirmedDetail: string
         readonly replayedNote: string
+        readonly receiptLabel: string
+        readonly receiptPendingLabel: string
+        readonly receiptNotReady: string
+        readonly receiptRefused: string
         readonly accountCta: string
         readonly accountHref: string
         readonly refusedCartEmpty: string
@@ -25,8 +30,15 @@ export type ConfirmOrderBaseProps = {
         /** The confirmed order's total, formatted in the reader's language. */
         readonly confirmedTotal: string
         readonly pending: boolean
+        /** Why the last receipt press did not download, `null` before a press or after a download. */
+        readonly receiptFailure: ReceiptFailure
+        readonly receiptPending: boolean
     }
-    readonly on: { readonly onPress: () => void }
+    readonly on: {
+        readonly onPress: () => void
+        /** Downloads the receipt of the confirmed order. */
+        readonly onReceipt: () => void
+    }
 }
 
 const interpolate = (template: string, values: Record<string, string>): string =>
@@ -63,11 +75,21 @@ const refusalLine = (
     })
 }
 
-/** Draws the service's confirmation or refusal and keeps the confirm button available for replay. */
+/** The line that names why the last receipt press did not download, or `null`. */
+const receiptFailureLine = (props: ConfirmOrderBaseProps["props"]): string | null => {
+    if (props.receiptFailure === "notReady") return props.receiptNotReady
+    return props.receiptFailure === "refused" ? props.receiptRefused : null
+}
+
+/**
+ * Draws the service's confirmation or refusal and keeps the confirm button available for replay. A confirmed order offers
+ * its receipt download beside the way to the account.
+ */
 export const ConfirmOrderBase = (props: ConfirmOrderBaseProps) => {
     const values = props.props
     const confirmed = values.outcome?.kind === "ok" ? values.outcome.data : null
     const refusal = values.outcome !== null && values.outcome.kind !== "ok" ? refusalLine(values.outcome, values) : null
+    const receiptFailure = receiptFailureLine(values)
     return (
         <>
             {confirmed ? (
@@ -83,6 +105,20 @@ export const ConfirmOrderBase = (props: ConfirmOrderBaseProps) => {
                     {confirmed.replayed ? (
                         <Text as="p" size="sm" tone="muted">
                             {values.replayedNote}
+                        </Text>
+                    ) : null}
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        onPress={props.on.onReceipt}
+                        isPending={values.receiptPending}
+                        isDisabled={values.receiptPending}
+                    >
+                        {values.receiptPending ? values.receiptPendingLabel : values.receiptLabel}
+                    </Button>
+                    {receiptFailure ? (
+                        <Text as="p" size="sm" live="polite">
+                            {receiptFailure}
                         </Text>
                     ) : null}
                     <Button href={values.accountHref} variant="secondary" size="sm">

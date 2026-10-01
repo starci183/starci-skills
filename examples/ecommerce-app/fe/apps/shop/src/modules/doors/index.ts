@@ -6,6 +6,7 @@ const DOORS = {
     cartItems: "/api/cart/items",
     cart: "/api/cart",
     orders: "/api/orders",
+    orderReceipt: "/api/orders/receipt",
 } as const
 
 /** Which door a call goes through. */
