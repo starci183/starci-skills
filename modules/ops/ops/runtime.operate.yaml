@@ -49,6 +49,11 @@ reads:
         active profiles. Use current host model configuration; historical model names are not
         availability proof. Capabilities are the intersection of actual tools, selected profile
         policy, op permissions and existing task authority.
+  - id: worktree-api
+    path: scripts/lib/worktrees.mjs + scripts/lib/safe-remove.mjs + modules/kernel/product-land.yaml
+    purpose:
+      en: "The runtime's worktree API and agent launcher: scripts/lib/worktrees.mjs (createWorktree with its machine.sqlite registry row and per-repo cap from modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/lib/safe-remove.mjs (safeRemoveWorktree: every link removed as a link first, then the tree) and the Orca orchestration worker commands (worker-start, worker-show, worker-read, worker-stop, worker-release)."
+      vi: "API worktree và bộ khởi chạy agent của runtime: scripts/lib/worktrees.mjs (createWorktree với dòng registry trong machine.sqlite và giới hạn theo repo từ modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/lib/safe-remove.mjs (safeRemoveWorktree: gỡ mọi liên kết như liên kết trước, rồi tới cây) và các lệnh worker điều phối của Orca (worker-start, worker-show, worker-read, worker-stop, worker-release)."
 writes:
   - id: node
     path: N/index.yaml
@@ -71,7 +76,8 @@ steps:
     writes: []
     action:
       en: "Resolve the exact named operation and load only its contract. Its reads/writes, effect ceiling
-        and completion profile replace this selector envelope; the union of modes never grants
+        and completion profile replace this selector envelope, except the worktree and agent-launch step
+        below, which every mode keeps; the union of modes never grants
         authority. Resolve the execution profile and actual tool availability before selecting
         instruments; this does not switch the model/runtime or spawn workers. For an explicitly new
         target, absence is expected: inspect the nearest existing ancestor/workspace, then create
@@ -85,11 +91,21 @@ steps:
         per-criterion results and real output refs; no other mode, source repair or successor is
         implied. This handoff is conditional and does not change standalone or named frontend
         response contracts.
+  - reads: [worktree-api, selection]
+    writes: [evidence]
+    action:
+      en: "Every worktree action goes through the runtime's worktree API, whatever the mode: a new tree through createWorktree (its registry row and the per-repo cap; a worktree-cap refusal waits, it is never worked around), the inventory through worktreeList and worktreeCounts, a retirement through removeWorktree (uncommitted work preserved to refs/heads/preserved/<name>, every junction or symlink removed as a link, then the tree, pruned and verified) or the GC (node scripts/lib/worktrees.mjs gc --plan first), and a registered git worktree the registry does not know through safeRemoveWorktree. Never git worktree add or remove by hand, never rm -rf, rmdir /s or robocopy over a tree, never a junction or symlink made by hand, and never kill a process by image name - only a PID this op started. An agent this op needs is launched only through orca orchestration worker-start --agent <provider> [--model <id>] --worktree <selector> --spec <brief> --task-title <title>, and supervised through worker-show, worker-read, worker-stop and worker-release; never a raw terminal running an agent CLI or a headless -p run. A provider that is not an enabled Orca agent id on this host is reported, never replaced by a raw terminal."
+      vi: "Mọi thao tác với worktree đều đi qua API worktree của runtime, ở mọi chế độ: cây mới qua createWorktree (dòng registry và giới hạn theo repo; lời từ chối worktree-cap thì chờ, không bao giờ lách), danh sách qua worktreeList và worktreeCounts, gỡ bỏ qua removeWorktree (việc chưa commit được giữ vào refs/heads/preserved/<name>, mọi junction hay symlink được gỡ như liên kết, rồi tới cây, prune và xác minh) hoặc GC (node scripts/lib/worktrees.mjs gc --plan trước), và git worktree đã đăng ký mà registry không biết thì qua safeRemoveWorktree. Không bao giờ tự tay git worktree add hay remove, không bao giờ rm -rf, rmdir /s hay robocopy trên một cây, không tự tạo junction hay symlink, và không bao giờ kill tiến trình theo tên image - chỉ PID do op này khởi chạy. Agent mà op cần chỉ được khởi chạy qua orca orchestration worker-start --agent <provider> [--model <id>] --worktree <selector> --spec <brief> --task-title <title>, và được giám sát qua worker-show, worker-read, worker-stop và worker-release; không bao giờ là terminal thô chạy CLI agent hay một lần chạy headless -p. Provider không phải agent id Orca đang bật trên máy này thì được báo, không bao giờ thay bằng terminal thô."
 proofs:
   - id: mode-result
     requirement:
       en: Exactly the selected mode contract and all requested criteria pass with real evidence before
         delivery.
+  - id: worktree-api
+    requirement:
+      en: "The evidence names the worktree API call behind every worktree the op created, inspected or retired (the registry row or the removeWorktree result) and the worker-start id behind every agent it launched; a raw git worktree, a recursive delete or a raw agent terminal makes the run a defect."
+      vi: "Bằng chứng nêu lệnh API worktree đứng sau mọi worktree op đã tạo, xem hoặc gỡ (dòng registry hoặc kết quả removeWorktree) và id worker-start đứng sau mọi agent op đã khởi chạy; git worktree thô, xóa đệ quy hoặc terminal agent thô khiến lần chạy thành lỗi."
+    check: scripts/lib/worktrees.mjs
 blockers:
   - code: OPERATION_REQUIRED
     condition:

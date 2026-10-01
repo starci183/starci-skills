@@ -134,8 +134,9 @@ steps:
       - repo
     writes: [evidence]
     action:
-      en: Execute only separately authorized exact end-of-life effects, preferring reversible operations
-        and appropriate Git worktree lifecycle. Preserve uncommitted/untracked user work; uncertain
+      en: Execute only separately authorized exact end-of-life effects, preferring reversible operations;
+        a worktree is retired only through scripts/lib/worktrees.mjs (removeWorktree or the GC), never git
+        worktree remove or a recursive delete. Preserve uncommitted/untracked user work; uncertain
         ownership stops removal.
   - reads:
       - target

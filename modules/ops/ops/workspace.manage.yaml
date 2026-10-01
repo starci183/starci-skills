@@ -41,6 +41,11 @@ reads:
         active profiles. Use current host model configuration; historical model names are not
         availability proof. Capabilities are the intersection of actual tools, selected profile
         policy, op permissions and existing task authority.
+  - id: worktree-api
+    path: scripts/lib/worktrees.mjs + scripts/lib/safe-remove.mjs + modules/kernel/product-land.yaml
+    purpose:
+      en: "The runtime's worktree API and agent launcher: scripts/lib/worktrees.mjs (createWorktree with its machine.sqlite registry row and per-repo cap from modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/lib/safe-remove.mjs (safeRemoveWorktree: every link removed as a link first, then the tree) and the Orca orchestration worker commands (worker-start, worker-show, worker-read, worker-stop, worker-release)."
+      vi: "API worktree và bộ khởi chạy agent của runtime: scripts/lib/worktrees.mjs (createWorktree với dòng registry trong machine.sqlite và giới hạn theo repo từ modules/kernel/product-land.yaml, worktreeList, worktreeCounts, removeWorktree, gcWorktrees), scripts/lib/safe-remove.mjs (safeRemoveWorktree: gỡ mọi liên kết như liên kết trước, rồi tới cây) và các lệnh worker điều phối của Orca (worker-start, worker-show, worker-read, worker-stop, worker-release)."
 writes:
   - id: node
     path: .starciwork/index.yaml extensions.work3.setup.<workflow>.<mode>
@@ -74,7 +79,7 @@ steps:
         revised Work purpose, or import for an existing source/worktree pilot; stacks runs only when
         named. Resolve one canonical destination, then load exactly that operation
         contract. Repository binding, inventory, preservation and validation are internal steps, not
-        separate operators. Mode permissions never combine. Resolve the execution profile and actual
+        separate operators. Mode permissions never combine; the worktree and agent-launch step below binds every mode. Resolve the execution profile and actual
         tool availability before selecting instruments; this does not switch the model/runtime or
         spawn workers. For an explicitly new target, absence is expected: inspect the existing
         workspace/catalog, then create only that selected scope."
@@ -87,6 +92,11 @@ steps:
         actual repository/source bindings, evidence and unresolved intent. Import never approves
         inferred business or executes product work. No deletion or unrelated docs/site removal is
         implied.
+  - reads: [worktree-api, selection]
+    writes: [evidence]
+    action:
+      en: "Every worktree action goes through the runtime's worktree API, whatever the mode: a new tree through createWorktree (its registry row and the per-repo cap; a worktree-cap refusal waits, it is never worked around), the inventory through worktreeList and worktreeCounts, a retirement through removeWorktree (uncommitted work preserved to refs/heads/preserved/<name>, every junction or symlink removed as a link, then the tree, pruned and verified) or the GC (node scripts/lib/worktrees.mjs gc --plan first), and a registered git worktree the registry does not know through safeRemoveWorktree. Never git worktree add or remove by hand, never rm -rf, rmdir /s or robocopy over a tree, never a junction or symlink made by hand, and never kill a process by image name - only a PID this op started. An agent this op needs is launched only through orca orchestration worker-start --agent <provider> [--model <id>] --worktree <selector> --spec <brief> --task-title <title>, and supervised through worker-show, worker-read, worker-stop and worker-release; never a raw terminal running an agent CLI or a headless -p run. A provider that is not an enabled Orca agent id on this host is reported, never replaced by a raw terminal."
+      vi: "Mọi thao tác với worktree đều đi qua API worktree của runtime, ở mọi chế độ: cây mới qua createWorktree (dòng registry và giới hạn theo repo; lời từ chối worktree-cap thì chờ, không bao giờ lách), danh sách qua worktreeList và worktreeCounts, gỡ bỏ qua removeWorktree (việc chưa commit được giữ vào refs/heads/preserved/<name>, mọi junction hay symlink được gỡ như liên kết, rồi tới cây, prune và xác minh) hoặc GC (node scripts/lib/worktrees.mjs gc --plan trước), và git worktree đã đăng ký mà registry không biết thì qua safeRemoveWorktree. Không bao giờ tự tay git worktree add hay remove, không bao giờ rm -rf, rmdir /s hay robocopy trên một cây, không tự tạo junction hay symlink, và không bao giờ kill tiến trình theo tên image - chỉ PID do op này khởi chạy. Agent mà op cần chỉ được khởi chạy qua orca orchestration worker-start --agent <provider> [--model <id>] --worktree <selector> --spec <brief> --task-title <title>, và được giám sát qua worker-show, worker-read, worker-stop và worker-release; không bao giờ là terminal thô chạy CLI agent hay một lần chạy headless -p. Provider không phải agent id Orca đang bật trên máy này thì được báo, không bao giờ thay bằng terminal thô."
 proofs:
   - id: mode-result
     requirement:
@@ -98,6 +108,11 @@ proofs:
         pathspecs in the checkout that holds it, and the report `head` names that commit. Settle
         refuses not-landed while one of them is untracked or dirty; authored Work never settles
         outside the repository history.
+  - id: worktree-api
+    requirement:
+      en: "The evidence names the worktree API call behind every worktree the op created, inspected or retired (the registry row or the removeWorktree result) and the worker-start id behind every agent it launched; a raw git worktree, a recursive delete or a raw agent terminal makes the run a defect."
+      vi: "Bằng chứng nêu lệnh API worktree đứng sau mọi worktree op đã tạo, xem hoặc gỡ (dòng registry hoặc kết quả removeWorktree) và id worker-start đứng sau mọi agent op đã khởi chạy; git worktree thô, xóa đệ quy hoặc terminal agent thô khiến lần chạy thành lỗi."
+    check: scripts/lib/worktrees.mjs
 blockers:
   - code: OPERATION_REQUIRED
     condition:
@@ -368,8 +383,8 @@ policy:
       sideEffects:
         - selected canonical workspace/resource/scope writes
         - scoped documentation commits only when authorized
-        - optional explicitly authorized exact preserved artifact-directory removal; registered Git
-          worktree removal only through Git
+        - optional explicitly authorized exact preserved artifact-directory removal; a worktree is
+          removed only through scripts/lib/worktrees.mjs removeWorktree or safeRemoveWorktree
       graphPolicy:
         mode: selected-scope-only
         location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
@@ -513,12 +528,13 @@ policy:
               after all preservation/retrieval hashes, committed history reachability, recoverable
               dirty/untracked/ignored data, ownership and inactive-worker checks pass. The target
               cannot be a repository root, canonical .starciwork root, broad parent or symlink; use
-              actual registered worktree inventory, not its folder name. Registered Git worktrees
-              require git worktree remove for the exact target without force; custom artifact
+              actual registered worktree inventory, not its folder name. A worktree is removed
+              only through the runtime's worktree API (removeWorktree, else safeRemoveWorktree for a registered
+              git worktree the registry does not know); custom artifact
               directories use a recoverable same-shell move/removal at the exact verified target. If
               the target is outside the bound selected repository ceiling or any check is uncertain,
               do not delete; leave blocked cleanup. No accounts, deployments, broad cleanup, force
-              or raw recursive deletion of Git worktrees."
+              raw git worktree remove or recursive deletion of a worktree."
       steps:
         - reads:
             - intent
@@ -583,7 +599,8 @@ policy:
             en: If and only if exact cleanup is selected, re-inspect worktree registration, source/dirty
               inventory and active-worker ownership immediately before removal. Require explicit
               deletion authority, verified durable bytes and recoverable commits/uncommitted data.
-              Remove a registered worktree with Git without force, or remove a verified custom
+              Retire a worktree only through scripts/lib/worktrees.mjs removeWorktree (or safeRemoveWorktree for a
+              registered one the registry does not know), or remove a verified custom
               artifact directory recoverably. If any check fails, leave original untouched and
               record the cleanup blocked in evidence. Do not run a successor op.
         - reads:
@@ -649,7 +666,7 @@ policy:
         importCompletion: forbidden
         intentAuthority: approved-intent-not-inferred-source
         cleanup: explicit-exact-preserved-inactive-only
-        registeredWorktreeRemoval: git-without-force
+        registeredWorktreeRemoval: worktrees-api-removeWorktree
     stacks:
       id: workspace.manage
       goal:
