@@ -26,18 +26,19 @@ export const packetFileOf = (jobDir, attempt) => path.join(jobDir, `packet.a${Nu
 /**
  * The spec to create the operation's Task with.
  * Returns {spec, spilled:false} for a prompt that fits, else writes it to `file` and returns
- * {spec: <pointer>, spilled:true, file, chars}. A spill with no file to write to returns the prompt
+ * {spec: <pointer>, spilled:true, file, chars}; `heading` replaces the [Op] first line (a Kernel, Supervisor or
+ * [Worker] spec). A spill with no file to write to returns the prompt
  * inline (spilled:false, tooLong:true) so the caller's task-create error stays the real one.
  */
-export function taskSpecOf({ prompt, file, op, jobId, attempt = 1, max = TASK_SPEC_MAX_CHARS, write = fs.writeFileSync, mkdir = fs.mkdirSync }) {
+export function taskSpecOf({ prompt, file, op, jobId, attempt = 1, heading = null, max = TASK_SPEC_MAX_CHARS, write = fs.writeFileSync, mkdir = fs.mkdirSync }) {
   const text = String(prompt ?? '');
   if (text.length <= max) return { spec: text, spilled: false };
   if (!file) return { spec: text, spilled: false, tooLong: true, chars: text.length };
   mkdir(path.dirname(file), { recursive: true });
   write(file, text, 'utf8');
   const spec = [
-    `[Op] ${op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel (job ${jobId}, attempt ${attempt}).`,
-    `PACKET FILE: your operation packet is ${text.length} characters, more than the host passes on a command line, so the Kernel wrote it verbatim to:`,
+    heading ?? `[Op] ${op} — one operation, one verdict. You are an ephemeral op agent spawned by the workflow kernel (job ${jobId}, attempt ${attempt}).`,
+    `PACKET FILE: your ${heading ? 'prompt' : 'operation packet'} is ${text.length} characters, more than the host passes on a command line, so the runtime wrote it verbatim to:`,
     `  ${path.resolve(file)}`,
     `Read that whole file now, before any other action - every line, to the end. It IS your spec: brief, owned_paths, commit, logging and report rules.`,
     `Nothing in this message replaces or narrows it; never write to that file.`,

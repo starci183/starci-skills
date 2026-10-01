@@ -23,6 +23,8 @@ import {walkFiles} from './common.mjs';
 
 const WRAPPER_DIR='scripts/api/orca';
 const ALLOW_FILE='scripts/checks/host-boundary.allow';
+// This check names the patterns it bans.
+const ALLOW_SELF='scripts/checks/check-host-boundary.mjs';
 
 // Agent-facing prose: what a kernel, op, chat or supervisor agent is told to do.
 const PROSE_ROOTS=['CONTEXT.md','modules/kernel','modules/ops','modules/supervisor',
@@ -68,6 +70,18 @@ const COMMAND_POSITION=/(?:^|[`'"($]|\|\||&&|;|\|)\s*orca\s+([a-z][a-z-]*)/;
 const NODE_PATH=/node\s+(\S*orca\S*)/g;
 const LOADS_HOST=/\b(load|loads|loading|read|reads|reading)\b[^.\n]{0,100}modules\/host\/orca/i;
 const SPAWNS_ORCA=/\b(?:spawnSync|spawn|execFileSync|execFile|execSync|exec)\s*\(\s*['"]orca(?:\.exe|\.cmd)?['"]/;
+// (c) agent-launch: every agent launch is orchestration worker-start (modules/kernel/contract-changes/
+// launch-through-worker-start.yaml). A terminal the runtime creates itself is the bypass: the terminalCreate wrapper,
+// the calls.yaml `terminal-create` call, a `terminal create` argv or an `orca terminal create` command string. Only
+// code is read, comment lines skipped; a plain shell that is not an agent needs a reviewed host-boundary.allow entry.
+const LAUNCH_ROOTS=['engine','scripts','bin','init','modules','packages'];
+const TERMINAL_LAUNCH=[
+  [/\bterminalCreate\b/,'the terminalCreate wrapper'],
+  [/['"`]terminal-create['"`]/,"the calls.yaml 'terminal-create' call"],
+  [/['"`]terminal['"`]\s*,\s*['"`]create['"`]/,"a ['terminal','create'] argv"],
+  [/['"`][^'"`\n]*\borca(?:\.exe)?\s+terminal\s+create\b/,'an `orca terminal create` command'],
+];
+const COMMENT_LINE=/^\s*(?:\/\/|\/?\*|#)/;
 const IMPORTS_RUNNER=/import\s*\{[^}]*\b(?:ORCA|orcaRun|orcaCall)\b[^}]*\}\s*from\s*['"][^'"]*orca\/lib\.mjs['"]/;
 
 /** Every host-boundary violation in `root`, allow-list applied. */
@@ -92,6 +106,18 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
           flag(file,i+1,'spawns-orca',`spawns orca outside ${WRAPPER_DIR}/ — call the verb's wrapper`);
         if(IMPORTS_RUNNER.test(line))
           flag(file,i+1,'imports-runner',`imports the Orca runner outside ${WRAPPER_DIR}/ — call the verb's wrapper`);
+      });
+    }
+  }
+
+  // (c) agent-launch: no runtime code creates an agent terminal - the wrappers under scripts/api/orca/ included.
+  for(const dir of LAUNCH_ROOTS){
+    for(const file of walk(path.join(root,dir),f=>f.endsWith('.mjs'))){
+      if(rel(root,file)===ALLOW_SELF)continue;
+      fs.readFileSync(file,'utf8').split(/\r?\n/).forEach((line,i)=>{
+        if(COMMENT_LINE.test(line))return;
+        const hit=TERMINAL_LAUNCH.find(([re])=>re.test(line));
+        if(hit)flag(file,i+1,'agent-launch',`creates a terminal (${hit[1]}) — every agent launch is ${WRAPPER_DIR}/worker-start.mjs; a plain non-agent shell needs a reviewed ${ALLOW_FILE} entry`);
       });
     }
   }

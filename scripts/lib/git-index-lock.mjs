@@ -13,8 +13,8 @@
 //     names no repository at all (its cwd cannot be read, so it may be this repo's) keeps the lock;
 //   - the lock is the same file (mtime and size) after the probe as before it.
 // A removal is recorded as a `git-index-lock-removed` Supervisor audit event (machine.sqlite sup_events) (the caller passes
-// `record`); every other outcome is returned, never thrown. Callers: the op worker's git shim before running git
-// (scripts/guards/shim.mjs) and the housekeeping area `gitlocks` (scripts/supervisor/housekeeping.mjs).
+// `record`); every other outcome is returned, never thrown. Callers: the command guard before an op worker's git
+// command runs (scripts/guards/command-guard.mjs) and the housekeeping area `gitlocks` (scripts/supervisor/housekeeping.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -122,9 +122,9 @@ export async function supervisorLockRecorder({ env = process.env, by, jobId = nu
 }
 
 /**
- * The git shim's pre-flight (scripts/guards/shim.mjs): when the checkout `cwd` is in holds an index lock older
- * than the declared window, try the recovery once and say what happened on stderr. Costs one stat when no lock
- * stands. Never throws: the shim runs git either way.
+ * The command guard's git pre-flight (scripts/guards/command-guard.mjs): when the checkout `cwd` is in holds an index
+ * lock older than the declared window, try the recovery once and say what happened on stderr. Costs one stat when no
+ * lock stands. Never throws: the command runs either way.
  */
 export async function preflightIndexLock({ cwd = process.cwd(), guard = null, env = process.env, say = () => {}, now = Date.now(), list = listGitProcesses } = {}) {
   try {
@@ -135,7 +135,7 @@ export async function preflightIndexLock({ cwd = process.cwd(), guard = null, en
     const { allocationMs } = await import('../../engine/config.mjs');
     const staleMs = allocationMs('housekeeping.gitIndexLockStaleMs');
     if (now - st.mtimeMs < staleMs) return null;
-    const record = await supervisorLockRecorder({ env, by: 'git-shim', jobId: guard?.jobId ?? null, workflowId: guard?.workflowId ?? null });
+    const record = await supervisorLockRecorder({ env, by: 'command-guard', jobId: guard?.jobId ?? null, workflowId: guard?.workflowId ?? null });
     const result = recoverStaleIndexLock({ repo, staleMs, now, list, record, env });
     const age = `${Math.round((result.ageMs ?? 0) / 60000)} min`;
     if (result.state === 'removed') say(`starci guard: removed a stale ${result.lock} (${age} old, no git process on this repository); recorded as ${LOCK_EVENT}.`);

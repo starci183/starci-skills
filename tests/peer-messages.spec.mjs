@@ -237,7 +237,10 @@ test('enqueue names owned_paths overlapping a running peer and sends each such p
 
 test('an op caller is refused every peer verb',t=>{
   const fx=fixture(t);
-  const asOp={STARCI_ROLE:'op',STARCI_OP_JOB:'job-collab-chat'};
+  // An op caller is the Orca terminal the ledger binds to its job.
+  const l=openLedger({file:ledgerFileFor(fx.repo)});
+  try{l.db.prepare('UPDATE jobs SET worker_id=? WHERE job_id=?').run('term_collab-chat','job-collab-chat');}finally{l.close();}
+  const asOp={ORCA_TERMINAL_HANDLE:'term_collab-chat'};
   for(const args of [
     ['peers','--workflow',COLLAB],
     ['notify','--workflow',COLLAB,'--to',LOGIN,'--kind','request','--subject','s','--body','b'],

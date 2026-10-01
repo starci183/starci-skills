@@ -96,3 +96,13 @@ retired:
   - {path: tests/nest-identity-aggregate.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-ops, replacedBy: 'the spec of what it tested retired with check-scoped-lint.mjs (op-gate-loop); tests/op-gate-loop.spec.mjs judges the gate'}
   - {path: tests/next-adapter-aggregate.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-ops, replacedBy: 'the spec of what it tested retired with check-scoped-lint.mjs (op-gate-loop); tests/op-gate-loop.spec.mjs judges the gate'}
   - {path: tests/next-required-value-aggregate.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-ops, replacedBy: 'the spec of what it tested retired with check-scoped-lint.mjs (op-gate-loop); tests/op-gate-loop.spec.mjs judges the gate'}
+  - {path: scripts/api/orca/terminal-create.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'scripts/api/orca/worker-start.mjs: every agent launch is an Orca worker-start (launch-through-worker-start)'}
+  - {path: scripts/api/orca/orch-dispatch.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'scripts/api/orca/worker-start.mjs on an existing Task (launch-through-worker-start)'}
+  - {path: scripts/guards/shim.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'scripts/guards/command-guard.mjs, a PreToolUse hook bound by the Orca terminal (guards-hooks-op-context-binding)'}
+  - {path: scripts/guards/launcher.cs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'none: worker-start owns the agent environment, so no PATH shim reaches an agent (guards-hooks-op-context-binding)'}
+  - {path: tests/kernel-launch-readiness.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'tests/launch-through-worker-start.spec.mjs (worker-show attestation replaces screen readiness)'}
+  - {path: tests/terminal-create-recovery.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'tests/launch-through-worker-start.spec.mjs (a failed worker-start is reconciled by its effect state)'}
+  - {path: tests/agent-spawn.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'tests/launch-through-worker-start.spec.mjs'}
+  - {path: tests/agent-readiness-pattern.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'tests/launch-through-worker-start.spec.mjs'}
+  - {path: tests/codex-unattended-ops.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'tests/launch-through-worker-start.spec.mjs (Orca applies the per-agent default args)'}
+  - {path: tests/guard-shim-reentry.spec.mjs, retiredAt: 2026-10-01, removedIn: dv-c0-launch, replacedBy: 'the command-guard hook specs'}

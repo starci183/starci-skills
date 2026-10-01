@@ -26,7 +26,7 @@ const world=(t,fn)=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
     [KERNEL_TERM]:{handle:KERNEL_TERM,connected:true,writable:true},[OP_TERM]:{handle:OP_TERM,connected:true,writable:true}}}));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_LOG:callsFile,LOCALAPPDATA:machineHome};
-  delete env.ORCA_TERMINAL_HANDLE;delete env.STARCI_ROLE;delete env.STARCI_OP_JOB;
+  delete env.ORCA_TERMINAL_HANDLE;
   const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repoRoot,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const calls=()=>fs.existsSync(callsFile)?fs.readFileSync(callsFile,'utf8').trim().split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line).argv):[];
   const at=Date.now();
@@ -121,7 +121,7 @@ test('the Kernel watchdog ends on an archived workflow and never replaces its Ke
   assert.equal(r.status,0,r.stderr||r.stdout);
   const last=JSON.parse(r.stdout.trim().split(/\r?\n/).pop());
   assert.equal(last.action,'archived','the pass reports archived');
-  assert.ok(!calls().slice(before).some(a=>a.slice(0,2).join(' ')==='terminal create'),'no Kernel terminal is created');
+  assert.ok(!calls().slice(before).some(a=>['terminal create','orchestration worker-start'].includes(a.slice(0,2).join(' '))),'no Kernel is started');
 }));
 
 test('finish is still refused for open jobs and for a handover the owner never approved',t=>world(t,({ledger,run})=>{

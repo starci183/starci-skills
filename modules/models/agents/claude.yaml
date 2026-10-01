@@ -12,33 +12,15 @@ name:
   api: terminal.rename
 release:
   api: orchestration.worker-release
-hostLaunchPrefix:
-  win32: '&'
-  posix: 'command'
-  reason: >-
-    Orca's CLI sends a terminal-create command whose first word is `claude` down its renderer-backed tab path, which
-    waits at most 10s for the UI to publish a handle and otherwise fails with "Timed out waiting for terminal handle after
-    creation" while the tab still spawns later, untracked (starci-next op-workspace.manage-55001e2623, 2026-09-23). A
-    leading shell call operator runs the same binary on the runtime-owned PTY path devin already uses; reproduced
-    against Orca: bare `claude` timed out at 10.4s, `& claude` returned its handle in 0.5s.
 launchEnv:
   DISABLE_AUTOUPDATER: '1'
 launchEnvReason: >-
   Every runtime-launched Claude seat (Kernel, Supervisor seat, op and Supervisor workers) runs the one npm-global
   claude.exe, so Claude Code's own auto-update can never replace it while seats run (update_apply_exe_locked) and
-  every seat showed "✘ Auto-update failed: claude.exe in use". The runtime therefore turns the updater off: a
-  terminal launch sets the variable in its own shell (scripts/agent/lib.mjs buildSpawnCommand), and because Orca's
-  orchestration worker-start composes a managed worker's command itself, scripts/agent/trust.mjs also asserts
-  the same key under env in ~/.claude/settings.json before every Claude launch - only when the key is missing, an
-  owner-set value is kept. Updates are applied deliberately while no seat runs (docs/supervisor.md "Claude Code
+  every seat showed "✘ Auto-update failed: claude.exe in use". The runtime therefore turns the updater off: Orca's
+  orchestration worker-start composes every worker's command itself, so scripts/agent/trust.mjs asserts the key under
+  env in the launch worktree's .claude/settings.local.json (project scope, never a user-global settings file) before every Claude launch - only when the key is missing, an owner-set value is kept. Updates are applied deliberately while no seat runs (docs/supervisor.md "Claude Code
   updates"): stop the seats, `npm i -g @anthropic-ai/claude-code`, then /start.
-terminalFallback:
-  when: orchestration.worker-start is unavailable or a plain command terminal is wanted
-  command: claude
-  modelArgs: ['--model', '<model>']
-  effortArgs: ['--effort', '<effort>']
-  bypassArgs: ['--dangerously-skip-permissions']
-  bypassReason: An unattended agent stalls on per-tool permission menus; same rule as devin bypass mode.
 launchTrust: >-
   Owner instruction 2026-09-23: the runtime, never the owner, approves launch prompts. Before every launch
   scripts/agent/trust.mjs sets ~/.claude.json projects[<cwd>].hasTrustDialogAccepted (keys `D:/…` and `D:\…`) and
@@ -53,35 +35,6 @@ gateAutoAnswer:
       select: 'Yes, I trust this folder'
     claude-bypass-permissions-consent:
       select: 'Yes, I accept'
-modelAttestation:
-  reason: >-
-    Claude Code renders the model display name in its banner ("Opus 5.5 with high effort"), not the
-    model id, so screen attestation matches the display name declared per id here.
-  displayNames:
-    claude-opus-5-5: Opus 5.5
-    claude-sonnet-5-5: Sonnet 5.5
-# Frame shapes for scripts/kernel/terminal-liveness.mjs (cardLivenessPatterns). The spinner row itself
-# ("✽ Garnishing… (15m 29s · ↓ 5.1k tokens)", "* Galloping… (8s · ↓ 288 tokens)") is also read by the
-# classifier's built-in markers; its timer-and-tokens tail is declared here as the busy row it is.
-# chromePatterns: the effort indicator Claude Code draws between its spinner and the ❯ input box
-# ("◐ medium · /effort"); it read as a finished answer, so a working op read turn-idle and
-# nudge-ready (mia op-handover.review-a12ce7ea00, inc-fcd1c1c10d8a).
-# Claude Code's notice rows sit in the same place and are chrome too. Captured 2026-09-25 (claude CLI
-# 2.1.281/2.1.282) on sn-learn-content term_2cd5a276, nivo term_e5c715f9 and term_7cf0a1ec, sn term_04016f5e:
-#   "     ✘ Auto-update failed: claude.exe in use (close other Claude Code sessions, including VS Code) · Run claude doctor"
-#   "  ✘ Auto-update failed: claude.exe in use (close other Claude Code …"      (truncated to the width)
-#   "                               ✔ Update installed · Restart to apply"
-# With one of them under "* Caramelizing… (1m 25s · ↓ 2.4k tokens)" a running Kernel read turn-idle.
-# The other texts are the 2.1.282 binary's own: the updater ("Auto-update failed · Try claude doctor or
-# npm i -g …", "… no write permission to npm prefix · Run claude doctor", "Update failed and <path> could not
-# be restored …" and its "· rename it back to / · reinstall with" row, "Auto-updating…", "Update available!
-# Run: …", "Claude Code can't auto-update · run `claude doctor`", "globalVersion: … · latestVersion: …"),
-# the IDE ("<IDE> disconnected", "IDE extension install failed (see /status for info)", "⧉ In <file>",
-# "⧉ 3 lines selected") and MCP notices ("MCP 2 servers blocked by enterprise policy: …", the .mcp.json
-# approval notices). Each pattern is anchored on the notice's own words, so an answer row stays an answer.
-# The context indicator sits there too: "                                               0% until auto-compact"
-# under "✶ Julienning… (1m 57s · ↓ 1.4k tokens)" read turn-idle (nivo term_7cf0a1ec, 2026-09-25); the binary
-# also draws "N% context used" and "Context low (N% remaining) · Run /compact to compact & continue".
 liveness:
   busyPatterns:
     - '\((?:running \S+ hook · )?(?:\d+h\s)?(?:\d+m\s)?\d+s\s·\s[↓↑]\s[\d.]+k?\s+tokens'

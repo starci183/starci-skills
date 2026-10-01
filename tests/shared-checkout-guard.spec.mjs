@@ -6,19 +6,34 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { classifyGit, envConfig, pathspecsWithinOwned, parsePathspecList, PATHSPEC_LIST_COMMIT } from '../scripts/guards/git-policy.mjs';
-import { classifyNpm, acquireDepsLock as acquireWith, depsLockWindows, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
-import { ensureGuardBin, ensureHistoryHook, writeJobGuard, historyHookBody, guardLaunch } from '../scripts/guards/install.mjs';
+import { classifyNpm, peerLeasedJobs } from '../scripts/guards/deps-guard.mjs';
+import { ensureHistoryHook, writeJobGuard, historyHookBody, guardLaunch, bindGuardTerminal } from '../scripts/guards/install.mjs';
+import { commandVerdict } from '../scripts/guards/command-guard.mjs';
 import { mkdtemp } from './helpers/tmpdir.mjs';
 
 // nivo, 2026-09-23/24: four workflows share nivo-backend main. A Collab worker ran
 // `git reset --soft HEAD~1` over the workspace-provision commit 1ed65948 (inc-40fed684fff8,
 // inc-cb721b99fdd1), a commit swept a hook-restaged foreign file (inc-5d7ce049e810), and
 // node_modules was deleted and recreated under running checks (inc-7faca0d4d632,
-// inc-3de1d5efdea6). scripts/guards/ refuses those in front of the worker (shims) and in
-// git itself (reference-transaction hook).
+// inc-3de1d5efdea6). scripts/guards/ refuses those before the worker's command runs (command-guard.mjs, a
+// PreToolUse hook) and in git itself (reference-transaction hook).
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const refused = (argv, ctx) => classifyGit(argv, ctx);
+// An op, to the history hook: its guard bound to the Orca terminal its agent runs in.
+const boundOp = (t, file, tag) => {
+  const handle = `term_spec-shared-${tag}-${process.pid}`;
+  const bound = bindGuardTerminal({ skillRoot: ROOT, handle, jobFile: file });
+  t.after(() => fs.rmSync(bound, { force: true }));
+  return { ORCA_TERMINAL_HANDLE: handle };
+};
+// An agent's shell call: the command guard decides first, and only an allowed command reaches git.
+const guarded = (repo, file) => async (args, input) => {
+  const quote = (a) => `'${String(a).replace(/'/g, `'\\''`)}'`;
+  const verdict = await commandVerdict({ command: `git ${args.map(quote).join(' ')}`, cwd: repo, guard: JSON.parse(fs.readFileSync(file, 'utf8')), env: process.env });
+  if (verdict) return { status: 2, stderr: `starci guard: refused \`git ${verdict.command}\` [${verdict.code}] ${verdict.reason}`, verdict };
+  return spawnSync('git', args, { cwd: repo, encoding: 'utf8', ...(input == null ? {} : { input }) });
+};
 
 test('history-rewriting git is refused; append-only git passes', () => {
   for (const argv of [
@@ -125,7 +140,7 @@ test('discarding, staging and committing are scoped to the op owned paths', () =
   assert.equal(pathspecsWithinOwned([':/src'], ctx).ok, false);
 });
 
-test('npm install-family commands take the lock; npm ci is the node_modules delete', () => {
+test('npm install-family commands are installs; npm ci is the node_modules delete', () => {
   assert.equal(classifyNpm(['ci']).kind, 'clean-install');
   assert.equal(classifyNpm(['install']).kind, 'install');
   assert.equal(classifyNpm(['i', '-D', 'x']).kind, 'install');
@@ -139,37 +154,6 @@ test('npm install-family commands take the lock; npm ci is the node_modules dele
   // npm's aliases of ci-and-test delete node_modules too
   for (const sub of ['cit', 'install-ci-test', 'clean-install-test', 'sit']) assert.equal(classifyNpm([sub]).kind, 'clean-install', sub);
   for (const sub of ['it', 'install-test']) assert.equal(classifyNpm([sub]).kind, 'install', sub);
-});
-
-test('the repository dependency lock serializes installs and takes over a dead holder', async (t) => {
-  const windows = await depsLockWindows();
-  const acquireDepsLock = (options) => acquireWith({ ...windows, ...options });
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deps-lock-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const lockFile = path.join(dir, 'starci-deps.lock');
-  const first = acquireDepsLock({ lockFile, holder: { jobId: 'job-a', command: 'npm install' } });
-  assert.equal(first.ok, true);
-  let waited = null;
-  const second = acquireDepsLock({ lockFile, holder: { jobId: 'job-b' }, waitMs: 50, pollMs: 10, onWait: (h) => { waited = h; } });
-  assert.equal(second.ok, false);
-  assert.equal(second.holder.jobId, 'job-a');
-  assert.equal(waited.jobId, 'job-a');
-  first.release();
-  const third = acquireDepsLock({ lockFile, holder: { jobId: 'job-c' }, waitMs: 50, pollMs: 10 });
-  assert.equal(third.ok, true);
-  third.release();
-  fs.writeFileSync(lockFile, JSON.stringify({ jobId: 'dead', pid: 2 ** 22 + 7, at: new Date().toISOString() }));
-  const takeover = acquireDepsLock({ lockFile, holder: { jobId: 'job-d' }, waitMs: 50, pollMs: 10 });
-  assert.equal(takeover.ok, true, 'a lock whose holder process is gone is taken over');
-  takeover.release();
-  // A live holder's long install keeps its lock (an hour in), and a holder releases only its own lock.
-  fs.writeFileSync(lockFile, JSON.stringify({ jobId: 'long-install', pid: process.pid, at: new Date(Date.now() - 3_600_000).toISOString() }));
-  assert.equal(acquireDepsLock({ lockFile, holder: { jobId: 'job-e' }, waitMs: 50, pollMs: 10 }).ok, false, 'an hour-long live install is not stolen');
-  fs.rmSync(lockFile);
-  const owner = acquireDepsLock({ lockFile, holder: { jobId: 'job-f' }, waitMs: 50, pollMs: 10 });
-  fs.writeFileSync(lockFile, JSON.stringify({ jobId: 'job-g', pid: process.pid, at: new Date().toISOString() }));
-  owner.release();
-  assert.equal(JSON.parse(fs.readFileSync(lockFile, 'utf8')).jobId, 'job-g', 'release never deletes another holder\'s lock');
 });
 
 test('peer leases are read from the ledger, never this workflow\'s own jobs', async (t) => {
@@ -246,12 +230,13 @@ test('an op commit that carries a foreign path is refused by the hook', (t) => {
   fs.writeFileSync(path.join(repo, 'src', 'peer', 'b.txt'), 'peer uncommitted\n');
   sh(repo, ['add', 'src/mine/a.txt', 'src/peer/b.txt']);
   const head = sh(repo, ['rev-parse', 'HEAD']).stdout.trim();
-  const swept = sh(repo, ['commit', '-q', '-m', 'mine'], { STARCI_GUARD_FILE: file });
+  const op = boundOp(t, file, 'foreign');
+  const swept = sh(repo, ['commit', '-q', '-m', 'mine'], op);
   assert.notEqual(swept.status, 0);
   assert.match(swept.stderr, /COMMIT_FOREIGN_PATHS/);
   assert.match(swept.stderr, /src\/peer\/b\.txt/);
   assert.equal(sh(repo, ['rev-parse', 'HEAD']).stdout.trim(), head);
-  const scoped = sh(repo, ['commit', '-q', '-m', 'mine', '--', 'src/mine'], { STARCI_GUARD_FILE: file });
+  const scoped = sh(repo, ['commit', '-q', '-m', 'mine', '--', 'src/mine'], op);
   assert.equal(scoped.status, 0, scoped.stderr);
   assert.deepEqual(sh(repo, ['diff-tree', '-r', '--name-only', '--no-commit-id', 'HEAD']).stdout.trim().split('\n'), ['src/mine/a.txt']);
 });
@@ -264,7 +249,7 @@ test('an op that merges a foreign branch is refused by the hook; integrating the
   assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
   const guardRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-merge-root-'));
   t.after(() => fs.rmSync(guardRoot, { recursive: true, force: true }));
-  const op = { STARCI_GUARD_FILE: writeJobGuard({ skillRoot: guardRoot, jobId: 'op-backend.implement-merge', workflowId: 'wf-collab', ledgerRepo: null, owned: [path.join(repo, 'src', 'mine')] }) };
+  const op = boundOp(t, writeJobGuard({ skillRoot: guardRoot, jobId: 'op-backend.implement-merge', workflowId: 'wf-collab', ledgerRepo: null, owned: [path.join(repo, 'src', 'mine')] }), 'merge');
   const branchWith = (name, file, body) => {
     assert.equal(sh(repo, ['checkout', '-q', '-b', name, 'main']).status, 0);
     fs.writeFileSync(path.join(repo, file), body);
@@ -302,63 +287,46 @@ test('a hook of another tool is never overwritten', (t) => {
   fs.mkdirSync(hooks, { recursive: true });
   fs.writeFileSync(path.join(hooks, 'reference-transaction'), '#!/bin/sh\nexit 0\n');
   assert.deepEqual(ensureHistoryHook(repo, { skillRoot: ROOT }).reason, 'foreign-hook');
-  assert.match(historyHookBody({ branches: ['develop', 'bad branch'], shim: '/x/shim.mjs', nodePath: '/n/node' }), /PROTECTED=" main master develop "/);
+  assert.match(historyHookBody({ branches: ['develop', 'bad branch'], verify: '/x/verify-commit.mjs', nodePath: '/n/node' }), /PROTECTED=" main master develop "/);
 });
 
-test('the git shim in front of the worker refuses and passes through with exact arguments', { skip: false }, (t) => {
+test('the command guard refuses before git runs and passes the command as written', async (t) => {
   const repo = initRepo(t);
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-bin-'));
-  t.after(() => fs.rmSync(bin, { recursive: true, force: true }));
-  const built = ensureGuardBin({ skillRoot: ROOT, binDir: bin });
-  assert.equal(built.ok, true, JSON.stringify(built));
-  const file = writeJobGuard({ skillRoot: bin, jobId: 'op-x', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src', 'mine')] });
-  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, STARCI_GUARD_FILE: file, STARCI_GUARD_BIN: bin };
-  const gitShim = path.join(bin, process.platform === 'win32' ? 'git.exe' : 'git');
-  const run = (args) => spawnSync(gitShim, args, { cwd: repo, encoding: 'utf8', env });
-  const reset = run(['reset', '--soft', 'HEAD~1']);
-  assert.equal(reset.status, 3);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-root-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = writeJobGuard({ skillRoot: root, jobId: 'op-x', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src', 'mine')] });
+  const run = guarded(repo, file);
+  const reset = await run(['reset', '--soft', 'HEAD~1']);
+  assert.equal(reset.status, 2);
   assert.match(reset.stderr, /starci guard: refused `git reset --soft HEAD~1` \[HISTORY_REWRITE\]/);
-  const discard = run(['checkout', '--', 'src/peer/b.txt']);
-  assert.equal(discard.status, 3);
+  const discard = await run(['checkout', '--', 'src/peer/b.txt']);
+  assert.equal(discard.status, 2);
   assert.match(discard.stderr, /PATH_NOT_OWNED/);
   fs.writeFileSync(path.join(repo, 'src', 'peer', 'b.txt'), 'a peer\'s uncommitted work\n');
-  const sweep = run(['stash', 'push']);
-  assert.equal(sweep.status, 3);
+  const sweep = await run(['stash', 'push']);
+  assert.equal(sweep.status, 2);
   assert.match(sweep.stderr, /SHARED_WORKTREE_DISCARD/);
   assert.equal(fs.readFileSync(path.join(repo, 'src', 'peer', 'b.txt'), 'utf8'), 'a peer\'s uncommitted work\n', 'the peer\'s change stays');
-  assert.equal(run(['stash', 'create']).status, 0, 'a lint-staged backup copy passes');
-  assert.equal(run(['rev-parse', '--abbrev-ref', 'HEAD']).stdout.trim(), 'main', 'stdout passes through');
-  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'shimmed\n');
-  const commit = run(['commit', '-q', '-m', 'subject line\n\nbody line with -- and "quotes"', '--', 'src/mine']);
+  assert.equal((await run(['stash', 'create'])).status, 0, 'a lint-staged backup copy passes');
+  assert.equal((await run(['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim(), 'main');
+  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'guarded\n');
+  const commit = await run(['commit', '-q', '-m', 'subject line\n\nbody line with -- and "quotes"', '--', 'src/mine']);
   assert.equal(commit.status, 0, commit.stderr);
   assert.equal(sh(repo, ['log', '-1', '--format=%B']).stdout.trim(), 'subject line\n\nbody line with -- and "quotes"');
-  const input = spawnSync(gitShim, ['hash-object', '--stdin'], { cwd: repo, encoding: 'utf8', env, input: 'x\n' });
-  const expected = spawnSync('git', ['hash-object', '--stdin'], { cwd: repo, encoding: 'utf8', input: 'x\n' }).stdout.trim();
-  assert.equal(input.stdout.trim(), expected, 'stdin passes through');
-  assert.equal(run(['status', '--no-such-flag']).status, 129, 'the real exit code comes back');
 });
 
-test('guardLaunch puts the shim first and names the job guard file; a layer can be switched off', (t) => {
+test('guardLaunch writes the job guard file the launch binds to the worker terminal; a hook layer can be switched off', (t) => {
   const repo = initRepo(t);
-  const off = guardLaunch({ skillRoot: mkdtemp(t, 'guard-off-'), jobId: 'op-y', workflowId: 'wf-y', ledgerRepo: repo, owned: [path.join(repo, 'src/mine')], repos: [repo], config: { guards: { shims: false, historyHook: false } } });
-  assert.equal(off.pathPrefix, null);
-  assert.deepEqual(off.receipt.shims, { disabled: true });
-  assert.ok(fs.existsSync(off.env.STARCI_GUARD_FILE));
-  const guard = JSON.parse(fs.readFileSync(off.env.STARCI_GUARD_FILE, 'utf8'));
+  const off = guardLaunch({ skillRoot: mkdtemp(t, 'guard-off-'), jobId: 'op-y', workflowId: 'wf-y', ledgerRepo: repo, owned: [path.join(repo, 'src/mine')], repos: [repo], config: { guards: { historyHook: false, workHook: false } } });
+  assert.deepEqual(Object.keys(off), ['receipt'], 'nothing reaches the agent\'s environment');
+  assert.deepEqual(off.receipt.hooks, [{ disabled: true }]);
+  assert.deepEqual(off.receipt.workHooks, [{ disabled: true }]);
+  assert.ok(fs.existsSync(off.receipt.jobFile));
+  const guard = JSON.parse(fs.readFileSync(off.receipt.jobFile, 'utf8'));
   assert.equal(guard.schema, 'starci/op-guard@1');
   assert.deepEqual(guard.owned, [path.resolve(repo, 'src/mine').replace(/\\/g, '/')]);
 });
 
-test('the op launch command puts the guard directory first on the worker PATH', async () => {
-  const { pathPrefixCommand, buildSpawnCommand } = await import('../scripts/agent/lib.mjs');
-  assert.equal(pathPrefixCommand('C:/x/runtime/guards/bin', 'win32'), "$env:PATH='C:/x/runtime/guards/bin;'+$env:PATH;");
-  assert.equal(pathPrefixCommand('/x/runtime/guards/bin', 'posix'), "export PATH='/x/runtime/guards/bin':\"$PATH\";");
-  assert.equal(pathPrefixCommand("bad'dir", 'posix'), null);
-  const built = buildSpawnCommand({ provider: 'codex', model: 'gpt-x', env: { STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-x' }, pathPrefix: path.join(ROOT, 'runtime', 'guards', 'bin') });
-  assert.ok(!built.error, built.error);
-  assert.ok(built.command.includes(path.join(ROOT, 'runtime', 'guards', 'bin')), built.command);
-  assert.ok(built.command.indexOf('STARCI_OP_JOB') < built.command.indexOf('codex'), 'the environment is set before the agent starts');
-});
 
 // nivo inc-d1833bc89c1f: the commit-only (Work debt) packet commits a long owned list with
 // --pathspec-from-file, which the guard refused (COMMIT_NOT_SCOPED), so the batched repair could never
@@ -401,7 +369,7 @@ test('a --pathspec-from-file list is scoped line by line like named pathspecs', 
   assert.equal(classifyGit(['add', '--pathspec-from-file=-'], { ...ctx, stdin: 'src/features/collab/chat/a.ts\n\nsrc/x\n' }).code, 'PATH_NOT_OWNED');
   assert.equal(classifyGit(['commit', '-m', 'x', `--pathspec-from-file=${empty}`], ctx).code, 'COMMIT_NOT_SCOPED', 'an empty list commits the whole index');
   assert.equal(classifyGit(['commit', '-m', 'x', '--pathspec-from-file=missing.txt'], ctx).code, 'PATHSPEC_FILE_UNREADABLE');
-  assert.equal(classifyGit(['commit', '-m', 'x', '--pathspec-from-file=-'], ctx).code, 'PATHSPEC_FILE_UNREADABLE', 'stdin the shim did not read');
+  assert.equal(classifyGit(['commit', '-m', 'x', '--pathspec-from-file=-'], ctx).code, 'PATHSPEC_FILE_UNREADABLE', 'stdin the guard cannot read before the command runs');
   assert.equal(classifyGit(['commit', '-a', '-m', 'x', `--pathspec-from-file=${mine}`], ctx).code, 'COMMIT_NOT_SCOPED', '-a still refuses');
   assert.equal(classifyGit(['reset', '--soft', `--pathspec-from-file=${mine}`], ctx).code, 'HISTORY_REWRITE');
   assert.equal(classifyGit(['add', 'src/app/[id]/page.tsx'], ctx).allow, true, 'an App Router segment is a literal name (inc-21f76abb6d10)');
@@ -426,16 +394,13 @@ test('the commit-only packet\'s pathspec-list commands are the ones the guard pa
   assert.match(prompt, /commit_only: this attempt authors nothing[^\n]*\$\{PATHSPEC_LIST_COMMIT\.join\('; '\)\}/, 'the packet renders the commands the guard is tested against');
 });
 
-test('the git shim commits a pathspec list (file or stdin) of owned paths and refuses a foreign one', (t) => {
+test('through the command guard, a pathspec list file of owned paths commits and a foreign or stdin one is refused', async (t) => {
   const repo = initRepo(t);
   assert.equal(ensureHistoryHook(repo, { skillRoot: ROOT }).installed, true);
-  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-bin-'));
-  t.after(() => fs.rmSync(bin, { recursive: true, force: true }));
-  assert.equal(ensureGuardBin({ skillRoot: ROOT, binDir: bin }).ok, true);
-  const file = writeJobGuard({ skillRoot: bin, jobId: 'op-interface.draw-x', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src', 'mine')] });
-  const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, STARCI_GUARD_FILE: file, STARCI_GUARD_BIN: bin };
-  const gitShim = path.join(bin, process.platform === 'win32' ? 'git.exe' : 'git');
-  const run = (args, input) => spawnSync(gitShim, args, { cwd: repo, encoding: 'utf8', env, ...(input == null ? {} : { input }) });
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-root-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = writeJobGuard({ skillRoot: root, jobId: 'op-interface.draw-x', workflowId: 'wf-x', ledgerRepo: null, owned: [path.join(repo, 'src', 'mine')] });
+  const run = guarded(repo, file);
   const lists = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-lists-'));
   t.after(() => fs.rmSync(lists, { recursive: true, force: true }));
   const mine = path.join(lists, 'mine.txt'), foreign = path.join(lists, 'foreign.txt');
@@ -445,21 +410,21 @@ test('the git shim commits a pathspec list (file or stdin) of owned paths and re
   fs.writeFileSync(mine, 'src/mine/a.txt\nsrc/mine/c.txt\n');
   fs.writeFileSync(foreign, 'src/mine/a.txt\nsrc/peer/b.txt\n');
   const head = sh(repo, ['rev-parse', 'HEAD']).stdout.trim();
-  const addForeign = run(['add', `--pathspec-from-file=${foreign}`]);
-  assert.equal(addForeign.status, 3);
+  const addForeign = await run(['add', `--pathspec-from-file=${foreign}`]);
+  assert.equal(addForeign.status, 2);
   assert.match(addForeign.stderr, /PATH_NOT_OWNED[\s\S]*src\/peer\/b\.txt/);
   assert.equal(sh(repo, ['diff', '--cached', '--name-only']).stdout.trim(), '', 'nothing staged');
-  const commitForeign = run(['commit', '-q', '-m', 'x', '--pathspec-from-file=-'], 'src/peer/b.txt\n');
-  assert.equal(commitForeign.status, 3);
+  // A stdin list is not readable before the command runs: refused with the list-file remedy, owned or not.
+  for (const list of ['src/peer/b.txt\n', 'src/mine/a.txt\n']) {
+    const viaStdin = await run(['commit', '-q', '-m', 'x', '--pathspec-from-file=-'], list);
+    assert.equal(viaStdin.verdict?.code, 'PATHSPEC_FILE_UNREADABLE');
+    assert.match(viaStdin.verdict.remedy, /--pathspec-from-file=<file>/);
+  }
   assert.equal(sh(repo, ['rev-parse', 'HEAD']).stdout.trim(), head);
-  const add = run(['add', `--pathspec-from-file=${mine}`]);
+  const add = await run(['add', `--pathspec-from-file=${mine}`]);
   assert.equal(add.status, 0, add.stderr);
-  const commit = run(['commit', '-q', '-m', 'commit-only: work debt', `--pathspec-from-file=${mine}`]);
+  const commit = await run(['commit', '-q', '-m', 'commit-only: work debt', `--pathspec-from-file=${mine}`]);
   assert.equal(commit.status, 0, commit.stderr);
   assert.deepEqual(sh(repo, ['diff-tree', '-r', '--name-only', '--no-commit-id', 'HEAD']).stdout.trim().split('\n'), ['src/mine/a.txt', 'src/mine/c.txt']);
-  fs.writeFileSync(path.join(repo, 'src', 'mine', 'a.txt'), 'debt a 2\n');
-  const viaStdin = run(['commit', '-q', '-m', 'commit-only: stdin list', '--pathspec-from-file=-'], 'src/mine/a.txt\n');
-  assert.equal(viaStdin.status, 0, viaStdin.stderr);
-  assert.deepEqual(sh(repo, ['diff-tree', '-r', '--name-only', '--no-commit-id', 'HEAD']).stdout.trim().split('\n'), ['src/mine/a.txt'], 'git read the list the shim handed on');
   assert.equal(sh(repo, ['status', '--porcelain', '--', 'src/peer']).stdout.trim(), 'M src/peer/b.txt', 'the peer\'s change stays uncommitted');
 });

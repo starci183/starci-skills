@@ -14,7 +14,7 @@ import {kernelTerminalVerdict,settledKernelVerdict,awaitOrcaHost} from '../scrip
 // the terminal daemon kept every kernel alive. The watchdogs read it as dead
 // kernels: five kernel jobs were stopped with their signals deleted, and one
 // workflow got a second kernel beside its live one. An Orca outage is never a
-// dead kernel; a live kernel whose seat was lost is adopted, never duplicated.
+// dead kernel; a live kernel worker whose seat was lost is left running, never duplicated.
 const ROOT=path.resolve(import.meta.dirname,'..');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
 const START_WORKFLOW=path.join(ROOT,'scripts','kernel','start-workflow.mjs');
@@ -137,14 +137,14 @@ const fixture=t=>{
 
 test('start-workflow refuses to replace a kernel while Orca answers runtime_unavailable, and touches nothing',t=>{
   const f=fixture(t);
-  const before=f.ledgerRows();const creates=f.calls().filter(c=>c==='terminal create').length;
+  const before=f.ledgerRows();const creates=f.calls().filter(c=>c==='orchestration worker-start').length;
   const r=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json'],{STARCI_FAKE_ORCA_HOST:'runtime_unavailable'});
   assert.equal(r.status,75,r.stderr||r.stdout);
   const out=lastJson(r.stdout);
   assert.deepEqual([out.ok,out.step,out.terminal],[false,'host-unavailable',f.kernel]);
   assert.match(out.error,/runtime_unavailable|Start the Orca app first/);
   assert.deepEqual(f.ledgerRows(),before,'no signal deleted, no job released, no event, no incident');
-  assert.equal(f.calls().filter(c=>c==='terminal create').length,creates,'no second kernel');
+  assert.equal(f.calls().filter(c=>c==='orchestration worker-start').length,creates,'no second kernel');
 });
 
 test('start-workflow refuses while orca.exe cannot be spawned (ENOENT), and touches nothing',t=>{
@@ -158,66 +158,23 @@ test('start-workflow refuses while orca.exe cannot be spawned (ENOENT), and touc
   assert.deepEqual(f.ledgerRows(),before);
 });
 
-test('a kernel whose seat was lost is never duplicated: start-workflow refuses, --adopt binds it back',t=>{
+test('a kernel whose seat was lost is never duplicated: its live worker refuses a second one until it is stopped',t=>{
   const f=fixture(t);
   f.loseSeat();
-  const creates=f.calls().filter(c=>c==='terminal create').length;
+  const starts=f.calls().filter(c=>c==='orchestration worker-start').length;
   const refused=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json']);
   assert.equal(refused.status,3,refused.stderr||refused.stdout);
-  assert.deepEqual([lastJson(refused.stdout)?.step,lastJson(refused.stdout)?.terminal],['kernel-terminal-alive',f.kernel]);
-  assert.equal(f.calls().filter(c=>c==='terminal create').length,creates,'no second kernel beside the live one');
-
-  const adopted=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--adopt',f.kernel,'--json']);
-  assert.equal(adopted.status,0,adopted.stderr||adopted.stdout);
-  const out=lastJson(adopted.stdout);
-  assert.deepEqual([out.ok,out.adopted,out.terminal,out.agent,out.model,out.screenState,out.previousJobStatus],
-    [true,true,f.kernel,'codex','gpt-6-sol','turn-idle','ready']);
-  assert.deepEqual(out.resolvedIncidents,['inc-unclosed-1']);
+  assert.deepEqual([lastJson(refused.stdout)?.step,lastJson(refused.stdout)?.terminal],['kernel-worker-alive',f.kernel]);
+  assert.equal(f.calls().filter(c=>c==='orchestration worker-start').length,starts,'no second kernel beside the live one');
+  // Once Orca shows the worker ended, the next start launches the replacement - attempt 2, a new worker.
+  f.writeState(s=>{s.workerStates={...(s.workerStates||{}),'dispatch-fake-1':'stopped'};});
+  const started=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json']);
+  assert.equal(started.status,0,started.stderr||started.stdout);
+  const out=json(started.stdout);
+  assert.notEqual(out.terminal,f.kernel);
+  assert.equal(out.launch,'worker');
   const rows=f.ledgerRows();
-  assert.equal(rows.signal.terminal,f.kernel);assert.equal(rows.signal.adopted,true);assert.equal(rows.signal.model,'gpt-6-sol');
-  assert.deepEqual(rows.job,{status:'running',worker_id:f.kernel,attempt:1},'same seat, same attempt');
-  assert.ok(rows.kinds.includes('kernel-adopted'));
-  assert.deepEqual(rows.incidents,[{incident_id:'inc-unclosed-1',status:'resolved'}]);
-  assert.equal(f.calls().filter(c=>c==='terminal send').length,1,'adopt types nothing into the kernel (only the boot prompt was sent)');
-
-  const again=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json']);
-  assert.equal(again.status,0,again.stderr);
-  assert.equal(json(again.stdout)?.terminal,f.kernel,'the adopted kernel is the live seat');
-});
-
-test('--adopt refuses a terminal that is not this kernel and a bare shell; re-adopting the live seat is a no-op',t=>{
-  const f=fixture(t);
-  f.writeState(s=>{s.terminals['stranger']={handle:'stranger',connected:true,writable:true,sent:false,command:'codex',screen:'› Ask Codex to do anything'};});
-  const stranger=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--adopt','stranger','--json']);
-  assert.equal(stranger.status,1);assert.equal(lastJson(stranger.stdout)?.step,'adopt-terminal-not-this-kernel');
-
-  const live=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--adopt',f.kernel,'--json']);
-  assert.equal(live.status,0,'re-adopting the live seat itself is a no-op repair');
-
-  f.loseSeat();
-  f.writeState(s=>{s.terminals[f.kernel].screen='PS D:\\repo>';});
-  const shell=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--adopt',f.kernel,'--json']);
-  assert.equal(shell.status,1);assert.equal(lastJson(shell.stdout)?.step,'adopt-terminal-agent-exited','a bare shell is an exited kernel, not one to adopt');
-  assert.equal(f.ledgerRows().job.status,'ready','a refused adopt changes nothing');
-});
-
-test('--adopt never binds a second kernel over a live one: the duplicate is quit and closed first',t=>{
-  // wf-miamia-work-and-stacks: the 02:38 restart launched a new kernel while the
-  // old one kept running. The old one may be adopted only once the new one is gone.
-  const f=fixture(t);
-  f.writeState(s=>{s.terminals[f.kernel].connected=false;s.terminals[f.kernel].writable=false;});
-  const restarted=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json']);
-  assert.equal(restarted.status,0,restarted.stderr);
-  const second=json(restarted.stdout)?.terminal;assert.notEqual(second,f.kernel);
-  f.writeState(s=>{Object.assign(s.terminals[f.kernel],{connected:true,writable:true,closed:false});});
-  const refused=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--adopt',f.kernel,'--json']);
-  assert.equal(refused.status,1);
-  assert.deepEqual([lastJson(refused.stdout)?.step,lastJson(refused.stdout)?.liveTerminal],['kernel-already-live',second]);
-  f.writeState(s=>{Object.assign(s.terminals[second],{connected:false,writable:false,closed:true});});
-  const adopted=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--adopt',f.kernel,'--json']);
-  assert.equal(adopted.status,0,adopted.stderr||adopted.stdout);
-  const rows=f.ledgerRows();
-  assert.deepEqual([rows.signal.terminal,rows.job.worker_id,rows.job.status],[f.kernel,f.kernel,'running']);
+  assert.deepEqual([rows.signal.terminal,rows.job.status,rows.job.attempt],[out.terminal,'running',2]);
 });
 
 const tick=(f,more={})=>{
@@ -227,7 +184,7 @@ const tick=(f,more={})=>{
 
 test('watchdog: an Orca outage is host-unavailable, never a restart',t=>{
   const f=fixture(t);
-  const before=f.ledgerRows();const creates=f.calls().filter(c=>c==='terminal create').length;
+  const before=f.ledgerRows();const creates=f.calls().filter(c=>c==='orchestration worker-start').length;
   for(const more of [{STARCI_FAKE_ORCA_HOST:'runtime_unavailable'},{STARCI_ORCA_COMMAND:MISSING_ORCA_COMMAND,STARCI_ORCA_ARGS:'[]'}]){
     // api status/survey read only the ledger; the kernel probe is the Orca call that fails.
     const {status,result,stderr}=tick(f,more);
@@ -235,27 +192,26 @@ test('watchdog: an Orca outage is host-unavailable, never a restart',t=>{
     assert.deepEqual([result.ok,result.action,result.terminal],[true,'host-unavailable',f.kernel],JSON.stringify(result));
   }
   assert.deepEqual(f.ledgerRows(),before);
-  assert.equal(f.calls().filter(c=>c==='terminal create').length,creates);
+  assert.equal(f.calls().filter(c=>c==='orchestration worker-start').length,creates);
 });
 
-test('watchdog: a seat lost while the kernel lived is adopted back, not relaunched',t=>{
+test('watchdog: a seat lost while the kernel worker lived is left running, not relaunched',t=>{
   const f=fixture(t);
   f.loseSeat();
-  const creates=f.calls().filter(c=>c==='terminal create').length;
+  const starts=f.calls().filter(c=>c==='orchestration worker-start').length;
   const {status,result,stderr}=tick(f);
   assert.equal(status,0,stderr||JSON.stringify(result));
-  assert.deepEqual([result.action,result.terminal],['adopted',f.kernel],JSON.stringify(result));
-  assert.equal(f.calls().filter(c=>c==='terminal create').length,creates,'exactly one kernel terminal');
-  const rows=f.ledgerRows();
-  assert.deepEqual([rows.signal.terminal,rows.job.status,rows.job.worker_id],[f.kernel,'running',f.kernel]);
+  assert.equal(result.action,'already-live',JSON.stringify(result));
+  assert.equal(f.calls().filter(c=>c==='orchestration worker-start').length,starts,'exactly one kernel worker');
 });
 
-test('watchdog: a kernel a responding Orca proves dead is still replaced',t=>{
+test('watchdog: a kernel a responding Orca proves dead is fenced and replaced',t=>{
   const f=fixture(t);
   f.writeState(s=>{s.terminals[f.kernel].connected=false;s.terminals[f.kernel].writable=false;});
   const {status,result,stderr}=tick(f);
   assert.equal(status,0,stderr||JSON.stringify(result));
   assert.equal(result.action,'restarted',JSON.stringify(result));
+  assert.equal(result.fenced?.ok,true,'the dead Kernel\'s Dispatch is stopped and released before the replacement');
   assert.notEqual(result.replacementTerminal,f.kernel);
   const rows=f.ledgerRows();
   assert.deepEqual([rows.job.status,rows.job.worker_id,rows.job.attempt],['running',result.replacementTerminal,2]);
@@ -263,42 +219,29 @@ test('watchdog: a kernel a responding Orca proves dead is still replaced',t=>{
 
 /* ------------------------------------------------ kernel agent exited */
 
-// A kernel whose agent exited leaves its host shell: Orca (responding) shows the
-// terminal connected and writable, the frame ends in a bare PowerShell prompt. The
-// watchdog read it 'observed' and the workflow sat without a kernel. It is a dead
-// kernel: replaced through start-workflow, and its shell closed only after the
-// replacement holds the seat. Shaped on a Codex kernel's exit (token usage and
-// resume line) with the idle frame still above it.
+// A kernel whose agent exited leaves its host shell: Orca (responding) shows the terminal connected and writable
+// and may still call the worker ready, the frame ends in a bare PowerShell prompt. The watchdog proves it from the
+// frame (two reads), fences the worker's Dispatch and has start-workflow replace it. Shaped on a Codex kernel's
+// exit (token usage and resume line) with the idle frame still above it.
 const EXITED_KERNEL=['• Yielding - waiting on the op report.','› Ask Codex to do anything','  gpt-6-sol high · repo','',
   'Token usage: total=1,204,331 input=1,150,002 (+ 9,876,544 cached) output=54,329 (reasoning 31,020)',
   'To continue this session, run codex resume 0199a7c2-5b1e-7d40-9c1f-3e2a8b6d4f10','','PS D:\\Repositories\\mia-mia-backend>'].join('\n');
 const exitKernel=f=>f.writeState(s=>{s.terminals[f.kernel].screen=EXITED_KERNEL;});
-// Every call in order with its terminal argument: 'terminal create' / 'terminal close:<handle>'.
-const callLog=f=>{
-  const file=path.join(path.dirname(f.repo),'calls.jsonl');
-  return fs.readFileSync(file,'utf8').trim().split('\n').filter(Boolean).map(l=>json(l).argv).map(a=>{
-    const verb=a.slice(0,2).join(' '),i=a.indexOf('--terminal');
-    return i>=0&&verb==='terminal close'?`${verb}:${a[i+1]}`:verb;
-  });
-};
 
-test('watchdog: a kernel whose agent exited to a shell is replaced, and its shell closed after the replacement',t=>{
+test('watchdog: a kernel whose agent exited to a shell is fenced and replaced by a new worker',t=>{
   const f=fixture(t);
   exitKernel(f);
   const {status,result,stderr}=tick(f);
   assert.equal(status,0,stderr||JSON.stringify(result));
   assert.deepEqual([result.action,result.state,result.shellPrompt],['restarted','agent-exited','PS D:\\Repositories\\mia-mia-backend>'],JSON.stringify(result));
+  assert.equal(result.fenced?.ok,true);
   const next=result.replacementTerminal;
   assert.ok(next&&next!==f.kernel);
-  assert.deepEqual(result.exitedTerminalsClosed.map(c=>[c.handle,c.closed,c.proof]),[[f.kernel,true,'shell-prompt']]);
-  const calls=callLog(f);
-  const created=calls.lastIndexOf('terminal create'),closed=calls.indexOf(`terminal close:${f.kernel}`);
-  assert.ok(closed>created&&created>=0,`the old shell is closed after the replacement launched: ${calls.join(', ')}`);
-  assert.deepEqual(f.readState().closedTabs,[f.kernel],'closed with its tab');
+  assert.equal(f.readState().workerStates['dispatch-fake-1'],'released','the exited Kernel\'s worker is released');
+  assert.equal(f.calls().includes('terminal create'),false);
   const rows=f.ledgerRows();
   assert.deepEqual([rows.signal.terminal,rows.job.status,rows.job.worker_id,rows.job.attempt],[next,'running',next,2]);
-  assert.ok(rows.kinds.includes('kernel-stale-cleared')&&rows.kinds.includes('kernel-restarted')&&rows.kinds.includes('kernel-exited-terminal-closed'),rows.kinds.join(','));
-  assert.deepEqual(rows.incidents,[],'a closed shell leaves no residue incident');
+  assert.ok(rows.kinds.includes('kernel-stale-cleared')&&rows.kinds.includes('kernel-restarted'),rows.kinds.join(','));
 });
 
 test('watchdog without --repair reports an exited kernel as restart-needed and touches nothing',t=>{
@@ -309,61 +252,30 @@ test('watchdog without --repair reports an exited kernel as restart-needed and t
   const result=lastJson(r.stdout);
   assert.deepEqual([result.action,result.state],['restart-needed','agent-exited'],JSON.stringify(result));
   assert.deepEqual(f.ledgerRows(),before);
-  assert.equal(f.readState().closed,undefined,'nothing closed');
+  assert.equal(f.calls().some(c=>c==='orchestration worker-stop'||c==='orchestration worker-release'),false,'nothing fenced');
 });
 
 test('an Orca outage is still host-unavailable while the kernel frame shows a shell',t=>{
   const f=fixture(t);
   exitKernel(f);
-  const before=f.ledgerRows();const creates=f.calls().filter(c=>c==='terminal create').length;
+  const before=f.ledgerRows();const starts=f.calls().filter(c=>c==='orchestration worker-start').length;
   const {result}=tick(f,{STARCI_FAKE_ORCA_HOST:'runtime_unavailable'});
   assert.deepEqual([result.ok,result.action],[true,'host-unavailable'],JSON.stringify(result));
   const started=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json'],{STARCI_FAKE_ORCA_HOST:'runtime_unavailable'});
   assert.equal(started.status,75);
   assert.deepEqual(f.ledgerRows(),before);
-  assert.equal(f.calls().filter(c=>c==='terminal create').length,creates);
+  assert.equal(f.calls().filter(c=>c==='orchestration worker-start').length,starts);
 });
 
-test('start-workflow: an exited kernel is not a live seat; a failed launch leaves its shell for the next start to close',t=>{
-  const f=fixture(t);
-  exitKernel(f);
-  // The pinned kernel agent is dead: the launch fails after the seat was cleared.
-  const failed=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json'],{STARCI_FAKE_ORCA_DEAD:'codex'});
-  assert.equal(failed.status,1,failed.stdout);
-  assert.equal(f.readState().closed,undefined,'no replacement, so the old shell is not closed');
-  assert.equal(f.ledgerRows().signal,null);
-  // The next start finds the shell through the kernel job, launches, then closes it.
-  const started=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--json']);
-  assert.equal(started.status,0,started.stderr||started.stdout);
-  const out=json(started.stdout);
-  assert.notEqual(out.terminal,f.kernel,'an exited kernel job terminal is not kernel-terminal-alive');
-  assert.deepEqual(out.exitedTerminalsClosed.map(c=>[c.handle,c.closed,c.proof]),[[f.kernel,true,'shell-prompt']]);
-  assert.deepEqual(f.readState().closedTabs,[f.kernel]);
-});
-
-test('--adopt refuses a kernel terminal whose agent exited',t=>{
-  const f=fixture(t);
-  f.loseSeat();
-  exitKernel(f);
-  const r=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--adopt',f.kernel,'--json']);
-  assert.equal(r.status,1);
-  const out=lastJson(r.stdout);
-  assert.deepEqual([out.step,out.screenState,out.shellPrompt],['adopt-terminal-agent-exited','agent-exited','PS D:\\Repositories\\mia-mia-backend>']);
-  assert.equal(f.ledgerRows().job.status,'ready','a refused adopt changes nothing');
-  assert.equal(f.readState().closed,undefined);
-});
-
-test('watchdog: a lost seat whose kernel terminal is a bare shell is relaunched, never adopted',t=>{
+test('watchdog: a lost seat whose kernel worker exited to a bare shell is fenced and relaunched',t=>{
   const f=fixture(t);
   f.loseSeat();
   exitKernel(f);
   const {status,result,stderr}=tick(f);
   assert.equal(status,0,stderr||JSON.stringify(result));
   assert.equal(result.action,'restarted',JSON.stringify(result));
+  assert.equal(result.fenced?.ok,true,'the lost seat\'s exited worker is released first');
   assert.notEqual(result.terminal,f.kernel);
-  assert.deepEqual(result.exitedTerminalsClosed.map(c=>[c.handle,c.closed]),[[f.kernel,true]]);
   const rows=f.ledgerRows();
   assert.deepEqual([rows.signal.terminal,rows.job.status],[result.terminal,'running']);
-  assert.deepEqual(rows.incidents,[{incident_id:'inc-unclosed-1',status:'resolved'}],'the closed shell is no longer residue');
-  assert.deepEqual(result.exitedTerminalsClosed[0].resolvedIncidents,['inc-unclosed-1']);
 });

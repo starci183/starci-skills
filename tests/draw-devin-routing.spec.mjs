@@ -67,6 +67,6 @@ test('the critic is a different model from the drawer: Codex when Devin draws, C
   const argv = criticArgv({ critic: alt.critic, dir: 'C:/clean', images: [{ file: 'render-1.png' }], lastMessage: 'x' });
   assert.deepEqual(argv.slice(0, 3), ['-p', '--model', 'claude-opus-5-5']);
   assert.ok(argv.includes('--disallowedTools'), 'a read-only critic');
-  const api = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'api.mjs'), 'utf8');
-  assert.match(api, /STARCI_OP_PROVIDER/, 'the op launch names its provider so the loop knows the drawer');
+  const loop = fs.readFileSync(path.join(ROOT, 'scripts', 'work', 'draw-loop.mjs'), 'utf8');
+  assert.match(loop, /opContextOf\(\)\?\.provider/, 'the loop knows the drawer from the op its Orca terminal is bound to');
 });

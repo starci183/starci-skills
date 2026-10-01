@@ -24,21 +24,7 @@ capacity:
   roles: [implement, verify, write]            # NO decide, NO plan
 
 launch:
-  orca:
-    kind: command-terminal
-    command: "devin --model swe-2-max --permission-mode dangerous --respect-workspace-trust false"
-    reasoningCommand: same command shape
-    dispatch: return-preamble-and-send
-    adapter: devin
-    nestedAgents: forbidden   # forbids Devin subagents / cloud handoff (modules/models/registry.yaml)
-    capacityGate: explicit-workflow-quota
-  adapterPreflight: >-
-    modules/models/registry.yaml: the adapter runs read-only `devin models list --format json`
-    BEFORE the interactive CLI, because `auth status` exits zero even while logged
-    out. dangerous is the unattended operation mode: authority remains bounded
-    by the approved operation contract, owned-path leases and Kernel settlement;
-    the workspace-trust dialog is disabled because Orca already selected the
-    workflow worktree.
+  orca: {agent: devin}   # the one launch: orca orchestration worker-start --agent (modules/kernel/contract-changes/launch-through-worker-start.yaml)
 
 position: modules/models/runtimes.yaml allocation.tiers and roleOfKind; modules/models/registry.yaml operators.<op>.chain
 

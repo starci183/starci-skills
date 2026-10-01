@@ -58,15 +58,15 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 ## 2. Boot the kernel — through the entry skill
 
 - Follow the `start-kernel` skill verbatim: `--plan` preview (goal revision,
-  inbox status, `host=orca`, Kernel agent/concrete model, exact terminal
-  command, or "already live"), the owner's exact `ok`, then boot. Keep the
-  attested `[Kernel]` terminal handle the result prints — it is your relay
-  channel for the rest of the workflow's life.
-- Kernel boot is terminal-create/read/send/attest. It never requires an
-  orchestration run to exist in the launcher chat. A configured agent/model
-  pin that is unavailable, or a ready terminal that does not render the exact
-  requested model, fails closed and returns to the owner; never accept an
-  implicit Devin substitution.
+  inbox status, `host=orca`, Kernel agent/concrete model and `launch=worker`,
+  or "already live"), the owner's exact `ok`, then boot. Keep the attested
+  `[Kernel]` terminal handle and Dispatch the result prints — the terminal is
+  your relay channel for the rest of the workflow's life.
+- Kernel boot is worker-start: the boot creates the Kernel's entry Run from this
+  chat's terminal (this chat coordinates it), files the Kernel Task and starts the
+  Kernel as a worker, attested from worker-show. A configured agent/model pin that
+  is unavailable, or a worker whose effective model is not the exact requested one,
+  fails closed and returns to the owner; never accept an implicit Devin substitution.
 - A live kernel refuses a second boot; a dead one is rebound as a replacement (kernel attempt+1,
   same workflow) — re-running the boot is the resume path, never a duplicate.
 

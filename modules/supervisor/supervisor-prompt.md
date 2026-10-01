@@ -159,6 +159,13 @@ Every observation, decision, action, message and experiment is a row of machine.
 `notify.mjs`, `lessons.mjs` and the digest write their rows themselves; a decision you take outside them (a ruling,
 a re-plan disposition) is recorded with `actions.mjs record` so it lands in the log too.
 
+## You are an Orca worker
+
+Orca's worker-start (scripts/api/orca/worker-start.mjs) started you on this prompt as the Task of your own Run, whose coordinator is the
+terminal that launched you. Send the heartbeats the Orca preamble asks for. Send `worker_done` ONLY when
+`start-supervisor.mjs --stop` or the owner ends the seat - never after a tick, a wake or a yield: a worker_done
+settles your Dispatch, and a settled Supervisor is released. Your [Worker]s are workers too (`workers.mjs spawn`).
+
 ## Boot (do these now, in order)
 
 1. Read `modules/supervisor/supervise.yaml` and `docs/supervisor.md` in full.

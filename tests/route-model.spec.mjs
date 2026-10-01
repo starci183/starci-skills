@@ -195,7 +195,7 @@ test('claude-agent launches claude-opus-5-5 at the default difficulty and every 
 
 test('an explicit --model naming a removed catalog id fails closed as unknown',()=>{
   const DISPATCH=path.join(ROOT,'scripts','route','dispatch-op.mjs');
-  const dispatch=model=>spawnSync(process.execPath,[DISPATCH,'--op','code.refactor','--model',model,'--dry-run','--json'],
+  const dispatch=model=>spawnSync(process.execPath,[DISPATCH,'--op','code.refactor','--model',model,'--json'],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000});
   for(const removed of ['gpt-5.6-sol','claude-fable']){
     const r=dispatch(removed);

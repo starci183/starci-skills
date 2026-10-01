@@ -10,12 +10,9 @@ recipes:
       - assert-explicit-capacity-gated-candidate
       - orchestration.task-create
       - assert-canonical-task-display-name
-      - terminal.create-devin-read-only-auth-preflight-then-declared-command
-      - terminal.read-screen-until-input-prompt-and-devin-identity
-      - orchestration.dispatch-return-preamble
-      - terminal.send-preamble-with-enter
-      - terminal.read-screen-verify-submission-or-one-more-enter
-      - orchestration.dispatch-show-attest-assignee-and-logical-runtime
+      - orchestration.worker-start-agent-devin
+      - orchestration.dispatch-show-attest-assignee
+      - orchestration.worker-show-attest-effective-agent
     terminalName: "[Op] <operation> a<attempt> · <Workflow>"
     taskCardinality: one
     dispatchCardinality: one
@@ -57,15 +54,6 @@ recipes:
       - orchestration.worker-release
       - schedule-ready-operation-or-report-workflow-boundary
 
-  spawn-plain-terminal:
-    mode: direct
-    actor: any
-    sequence:
-      - terminal.create-without-worktree
-      - terminal.read-screen-until-input-prompt
-      - terminal.send-with-enter
-    terminalName: "[<role>] <name>"
-    note: 'terminal.create accepts --command and optionally --worktree; omitting --worktree spawns in the runtime default cwd. Use for probes/diagnostics; operation agents always bind a worktree.'
   unstick-permission-prompt:
     mode: direct
     actor: launcher-or-kernel
@@ -80,12 +68,11 @@ recipes:
     sequence:
       - terminal.read-screen-detect-child-exit
       - terminal.close
-      - terminal.create-fresh-agent-terminal
-      - redeliver-brief-via-file
+      - orchestration.worker-stop-and-release
+      - orchestration.worker-start-fresh-attempt
     signal: 'Agent connection lost: agent child exited'
     note: 'A dead child never drains queued sends. The fresh agent must survey the tree for partial work — markers, not memory, carry state.'
 cliGotchas:
-  - 'orca terminal create flag is --title, not --name.'
   - 'orca worktree rm removes the worktree from Orca AND git — it deletes files on disk; never use it to "unregister" a path that must be kept.'
   - 'terminal read --screen shows tail only; idle detection uses lastOutputAt freshness, not scrollback.'
 forbiddenSequences:

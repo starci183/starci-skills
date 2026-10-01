@@ -68,7 +68,7 @@ test('a restarted Kernel re-binds the durable Run once and dispatches; a later d
   const second=fx.dispatch('job-b');
   assert.equal(second.status,0,second.stderr||second.stdout);
   assert.equal(fx.state().runUses.length,1,'a bound Run is never re-bound again (a repeated run-use invalidates live Dispatches)');
-  assert.equal(fx.read(db=>db.prepare("SELECT json_extract(payload_json,'$.orca.runId') r FROM jobs WHERE job_id='job-b'").get().r),'run-fake-1');
+  assert.equal(fx.read(db=>db.prepare("SELECT json_extract(payload_json,'$.managed.runId') r FROM jobs WHERE job_id='job-b'").get().r),'run-fake-1');
 });
 
 test('a Run Orca no longer knows is replaced by a new Run bound to the current Kernel, and the old id is kept',t=>{

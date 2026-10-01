@@ -71,11 +71,17 @@ calls:
   task-create:
     command: orchestration task-create
     kind: mutation
-    flags: [spec, task-title, display-name, deps, parent, run, from]
+    flags: [spec, task-title, display-name, deps, run, from]
     required: [spec, run]
     receipt: [result.task.id, result.task.display_name]
     creates: task
-    values: {parent: task-id, deps: task-id-list, run: run-id, from: terminal-handle}
+    values: {deps: task-id-list, run: run-id, from: terminal-handle}
+    note: >-
+      THE NESTED RUN RULE (smoke 2026-10-01 on Orca 1.4.209, Orca's own SUB-DISPATCH preamble): an agent that starts
+      agents binds its OWN Run (run-create --from <its terminal>, which makes it that Run's coordinator), files each
+      Task there and starts it with worker-start --task --run --from <its terminal>. There is no --parent: Orca takes a
+      parent only from the same Run (runtime_error "Parent task ... must belong to run"), and a Task in the Run the
+      agent is a worker of is refused consumer_fenced. Orca nests the Run under the agent's Dispatch (worker-show depth).
   run-show:
     command: orchestration run-show
     kind: read
@@ -125,16 +131,16 @@ calls:
     command: orchestration worker-start
     kind: mutation
     timeoutMs: 150000
-    flags: [task, worktree, agent, model, effort, name, repo, base-branch, display-name, setup, retry-of, timeout-ms, run, from, terminal]
-    # exactly one of --agent (Orca launches the agent) or --terminal (adopt a terminal the runtime launched the agent in:
-    # a product op worktree's agent, created on the repository's root Orca worktree so the sidebar lists it, DESIGN §16.7)
-    required: [task, worktree, run]
+    flags: [task, worktree, agent, model, effort, name, repo, base-branch, display-name, setup, retry-of, timeout-ms, run, from]
+    # The one agent launch (contract-changes/launch-through-worker-start.yaml): Orca launches the agent itself; the
+    # runtime never adopts a terminal (--terminal is not a declared flag, so orcaCall refuses it).
+    required: [task, worktree, agent, run]
     forbidden: [on]
     forbiddenValues:
       on: [windows, macos, linux]
     receipt: [result.dispatchId]
     creates: dispatch
-    note: "--from is resolved by Orca from the calling terminal when omitted; the canonical launcher always passes the exact Monitor or Coordinator handle. Receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1. For a fresh worker in an existing worktree, creation labels do not set the terminal title: after dispatch-show resolves the exact assignee, use terminal-rename to apply the semantic [Op] title."
+    note: "--from is resolved by Orca from the calling terminal when omitted; the runtime always passes the exact coordinator handle (the entry terminal for the Kernel, the Kernel terminal for an op). Receipts are flat (result.runId, result.taskId, result.dispatchId, result.state, result.stage, result.failedStage, result.lastError, result.setup, result.launch.effective, result.effects, result.residualResources) on both success and failure; a failed start still exits 1. For a fresh worker in an existing worktree, creation labels do not set the terminal title: after dispatch-show resolves the exact assignee, use terminal-rename to apply the semantic [Op] title."
     classify:
       - when: {exitCode: 0, path: result.state, in: [ready]}
         outcome: ok
@@ -344,14 +350,6 @@ calls:
     required: [url, page, worktree]
     receipt: [result]
     note: Rebind only the workflow's persisted input page after helper restart. Never navigate an unrelated owner tab.
-  terminal-create:
-    command: terminal create
-    kind: mutation
-    replay: none
-    flags: [worktree, title, command]
-    required: [title, command]
-    receipt: [result.terminal.handle]
-    note: Command-terminal launch only; the command is the declared target command prefixed with the credential refresh. Never used to attach a shell to a managed agent. Orca's CLI sends a command whose first word is codex or claude down the renderer-backed tab path (10s handle wait, "Timed out waiting for terminal handle after creation", tab spawns later), so those cards carry hostLaunchPrefix; any handle-less create whose effect is unknown is reconciled with terminal-list --include-visual-layouts by its tab title (scripts/agent/lib.mjs recoverCreatedTerminal).
   terminal-list:
     command: terminal list
     kind: read
@@ -378,8 +376,7 @@ calls:
     required: [terminal]
     receipt: [result]
     note: |-
-      Canonical launcher only: submits a dispatch --return-preamble Task to the terminal the same attempt created, and
-      carries Coordinator -> Monitor notices (launcher `notify`). Orca fences a terminal to the one Run it consumes
+      Follow-up input to a live agent (a prompt nudge, a Coordinator -> Monitor notice); never a launch. Orca fences a terminal to the one Run it consumes
       (consumer_fenced), so parent-Run mail never reaches a Monitor bound to its nested Run; typed input does. A busy
       agent queues the text and Orca answers agent_prompt_stalled, so delivery is proven from the screen, not this receipt.
       agent_prompt_blocked means Orca typed the text into an idle agent prompt but refused the Enter sent with it;
@@ -402,14 +399,6 @@ calls:
       (the flags absent from agent-context, or incompatible_runtime): terminal-send.mjs sends through
       terminal-send instead. An ambiguous failure names orchestrationRequestId: the exact command is re-issued
       once with --retry-request <id>.
-  dispatch:
-    command: orchestration dispatch
-    kind: mutation
-    flags: [task, to, from, run, return-preamble]
-    required: [task, to, return-preamble]
-    forbidden: [inject, dry-run]
-    receipt: [result.dispatch.id, result.preamble]
-    creates: dispatch
   dispatch-show:
     command: orchestration dispatch-show
     kind: read

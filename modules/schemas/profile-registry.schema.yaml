@@ -112,35 +112,10 @@ $defs:
         items:
           enum: [orca]
       orcaLaunch:
-        oneOf:
-          - type: object
-            additionalProperties: false
-            required: [kind, agent]
-            properties:
-              kind: {const: managed-agent}
-              agent: {type: string, minLength: 1}
-              startup:
-                enum: [direct-native-worker-start]
-              supervision:
-                enum: [worker-start-agent]
-          - type: object
-            additionalProperties: false
-            required: [kind, command, dispatch, adapter, nestedAgents]
-            properties:
-              kind: {const: command-terminal}
-              command: {type: string, minLength: 1}
-              reasoningCommand: {type: string, minLength: 1}
-              dispatch: {const: return-preamble-and-send}
-              adapter: {type: string, minLength: 1}
-              nestedAgents: {const: forbidden}
-              capacityGate: {const: explicit-workflow-quota}
-          - type: object
-            additionalProperties: false
-            required: [kind, dispatch, adapter, composition]
-            properties:
-              kind: {const: command-terminal}
-              dispatch: {const: return-preamble-and-send}
-              adapter: {type: string, minLength: 1}
-              # The command is composed from the adapter card's terminalFallback:
-              # routed model/effort through modelArgs/effortArgs plus bypassArgs.
-              composition: {const: card-terminal-fallback}
+        # The one launch (modules/kernel/contract-changes/launch-through-worker-start.yaml):
+        # orca orchestration worker-start --agent <agent>.
+        type: object
+        additionalProperties: false
+        required: [agent]
+        properties:
+          agent: {type: string, minLength: 1}

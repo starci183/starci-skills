@@ -429,8 +429,7 @@ const QUIET_MS = allocationMs('liveness.quietMs');
 // managed worker can read an idle prompt for tens of seconds before its first turn is visible - and
 // was nudged in front of the arriving Task (inc-bc0b90a7ec70, inc-9ae771781252). For launchGraceMs
 // after its latest op-dispatched event such a worker is `starting`, never nudge-ready
-// (allocation.liveness.launchGraceMs). A command-terminal dispatch already proved its prompt's
-// submission before the event was written, so it carries no grace.
+// (allocation.liveness.launchGraceMs). Every op is a worker-start worker, so every dispatch carries it.
 const LAUNCH_GRACE_MS = allocationMs('liveness.launchGraceMs');
 // A provider card may set its own liveness.activeStaleMs / liveness.quietMs
 // (modules/models/agents/<provider>.yaml): Devin redraws nothing while a long tool call runs, so the
@@ -1955,8 +1954,7 @@ const resolveModel = (target) => {
   const file = path.join(skillRoot, 'modules', 'models', 'profiles', `${target}.yaml`);
   if (!fs.existsSync(file)) return { error: `no model profile ${target} at ${path.relative(skillRoot, file)}` };
   const doc = parseYaml(fs.readFileSync(file, 'utf8'));
-  const orca = doc?.launch?.orca ?? {};
-  return { target, provider: doc?.provider ?? null, kind: orca.kind ?? 'unknown', command: orca.command ?? null,
+  return { target, provider: doc?.provider ?? null,
     requestedModel: doc?.identity?.requestedModel ?? null, profile: path.relative(skillRoot, file) };
 };
 
@@ -2015,14 +2013,12 @@ const buildPacket = ({ job, payload, model, goal, params, placements, productLoc
 // NEVER stand 'running' on a launch that failed. Job → failed with a typed
 // result, lease rows released, one event — and when `incident` is set (the
 // post-launch attestation failures) a typed infra-provider incident so survey
-// sees it without parsing events. `terminal` is the launch's handle: a
-// terminal handle for command-terminal jobs, a Dispatch id for managed ones.
+// sees it without parsing events. `terminal` is the launch's handle: the worker's Dispatch id.
 const bestEffort = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
 
-// A refusal must leave no live terminal, worker or open Task behind. Whatever
-// this attempt created before the host said no is closed exactly once here:
-// a command terminal with terminal-close, a managed worker with worker-stop +
-// worker-release. It runs before the rejection is written so the answer —
+// A refusal must leave no live worker or open Task behind. Whatever this
+// attempt created before the host said no is closed exactly once here: its
+// worker with worker-stop + worker-release. It runs before the rejection is written so the answer —
 // terminalClosed: true | false | null when the attempt created nothing to
 // close — is part of the dispatch-rejected record rather than a second
 // unrecorded effect. `settled` is a cleanup the caller already performed
@@ -2032,15 +2028,8 @@ const bestEffort = (fn) => { try { return fn(); } catch (e) { return { ok: false
 // reconcile-then-stop says the job is fenced at effect_unknown until `api
 // reconcile` proves the state. terminalClosed is false there — outstanding,
 // not silent.
-const closeRejectedLaunch = ({ model, terminal, closeTerminal, alreadyClosed, settled, effectState }) => {
-  if (closeTerminal) {
-    if (alreadyClosed)
-      return { terminalClosed: true, closed: { kind: 'terminal', handle: closeTerminal, ok: true, by: 'launcher' } };
-    const r = bestEffort(() => closeOperationTerminal(closeTerminal));
-    return { terminalClosed: r?.ok === true,
-      closed: { kind: 'terminal', handle: closeTerminal, ok: r?.ok === true, ...(r?.error ? { error: String(r.error) } : {}) } };
-  }
-  if (!terminal || !MANAGED_KINDS.includes(model?.kind)) return { terminalClosed: null, closed: null };
+const closeRejectedLaunch = ({ terminal, settled, effectState }) => {
+  if (!terminal) return { terminalClosed: null, closed: null };
   if (!settled && effectState === 'unknown')
     return { terminalClosed: false, closed: { kind: 'managed', dispatchId: terminal, deferred: 'reconcile-then-stop' } };
   const stop = settled ? settled.stop : bestEffort(() => workerStop({ dispatch: terminal }));
@@ -2067,7 +2056,7 @@ export const dispatchRejectedMessage = ({ step, signal = null, error = null }) =
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false, attemptId = null,
   effectState = 'none', details = null, providerHealthEvidence = null,
-  closeTerminal = null, alreadyClosed = false, settled = null, createRecovery = null, trust = null, task = null,
+  settled = null, trust = null, task = null,
 }) => {
   // A provider whose card declares an outage key: its outage codes in the failure text, or its outage
   // error row on the refused terminal's screen, open that outage circuit (not the auth one).
@@ -2076,7 +2065,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       ?? outageOnScreen(model.provider, typeof details?.screen === 'string' ? details.screen : ''))
     : null;
   const authFailure = !outageFailure && (Boolean(providerHealthEvidence) || confirmedAuthFailure({ step, signal, error, details }));
-  const { terminalClosed, closed } = closeRejectedLaunch({ model, terminal, closeTerminal, alreadyClosed, settled, effectState });
+  const { terminalClosed, closed } = closeRejectedLaunch({ terminal, settled, effectState });
   // The Orca Task the refused attempt opened is closed with its terminal (the retry opens its own): a refusal leaves
   // no open worker-task entry behind. An unknown effect keeps its Task: reconcile proves the state first.
   const taskClosed = task?.taskId && effectState === 'none'
@@ -2105,16 +2094,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       providerHealth = providerHealthEvidence ?? writeProviderCircuit(ledger.db, {
         provider: model.provider, model: model.target, jobId, step, signal, error, now, credential,
       });
-    } else if (step === 'readiness' && model?.provider) {
-      // A spawned terminal that never reaches readiness means the provider's
-      // launch path is broken, not the job. Open the same typed circuit (with
-      // the shorter non-auth cooldown) so route/dispatch skip the dead pool
-      // instead of burning attempts on repeated readiness timeouts.
-      providerHealth = writeProviderCircuit(ledger.db, {
-        provider: model.provider, model: model.target, jobId, step, signal, error, now,
-        failureKind: 'readiness',
-      });
-    } else if ((step === 'worker-start' || signal === PROMPT_DELIVERY_STALLED) && model?.provider) {
+        } else if ((step === 'worker-start' || signal === PROMPT_DELIVERY_STALLED) && model?.provider) {
       // A managed launch the host refused without saying why, or a prompt
       // lost on two stalled sends (scripts/agent/lib.mjs deliverPrompt), is
       // still the provider's launch path failing. Left unclassified it fed nothing, so
@@ -2133,7 +2113,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     // a valid report from the live retry was refused because the payload
     // still pointed at the dispatch that never got a contract. The rejected
     // id goes on its own list; reconcile reads it there.
-    if (terminal && MANAGED_KINDS.includes(model.kind)) {
+    if (terminal) {
       priorPayload.rejectedDispatches = [
         ...(Array.isArray(priorPayload.rejectedDispatches) ? priorPayload.rejectedDispatches : []),
         { dispatchId: terminal, step, at: now, effectState },
@@ -2162,7 +2142,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
         effectState, attemptConsumed: false, retryable: reusable, leasesReleased, providerHealth,
         terminalClosed, ...(closed ? { closed } : {}), ...(taskClosed ? { taskClosed } : {}), ...(attemptId != null ? { attemptId } : {}),
-        ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}),
+        ...(trust ? { trust } : {}),
         ...(screenTailOf(details?.screen) ? { screenTail: screenTailOf(details.screen) } : {}) },
     });
     if (providerHealth) {
@@ -2185,21 +2165,9 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     terminalClosed, ...(closed ? { closed } : {}), ...(taskClosed ? { taskClosed } : {}) };
 };
 
-// gate-auto-approved: one event per launch gate the runtime answered
-// (scripts/agent/lib.mjs awaitReadiness), whether or not the gate then cleared.
-function recordGateAnswers(ledger, { workflowId, entityType, entityId, provider, terminal, answers }) {
-  const sent = (Array.isArray(answers) ? answers : []).filter((a) => a?.keystroke);
-  if (!sent.length) return;
-  ledger.transaction(() => {
-    for (const a of sent) ledger.appendEvent({ workflowId, entityType, entityId, kind: 'gate-auto-approved',
-      payload: { gate: a.gate, keystroke: a.keystroke, answered: a.answered === true, cleared: a.cleared === true,
-        provider, terminal, ...(a.reason ? { reason: a.reason } : {}) } });
-  });
-}
-
 /* ------------------------------------------------------ op IPC helpers */
 // §6 admission for an op dispatch. The durable fence is taken BEFORE anything
-// launches, on both launch kinds: one `path:<normalized owned_path>` resource
+// launches: one `path:<normalized owned_path>` resource
 // per payload.owned_paths entry (capacity 1 = exclusive write ownership —
 // seeded OR IGNORE so an operator-declared capacity is never overwritten),
 // then reserveTwoPhase flips the job queued → leased with its fencing token
@@ -2355,10 +2323,6 @@ function raiseEnvironmentIncident(ledger, job, health) {
 
 
 
-// launch.orca.kind values that take the managed pipeline — profiles write
-// 'managed-agent', agent cards write 'native-managed-agent'; both mean
-// orchestration worker-start, never terminal create.
-const MANAGED_KINDS = ['native-managed-agent', 'managed-agent'];
 
 // One Orca Run per workflow, bound to the dedicated Kernel terminal. The Run
 // is created lazily by the first operation so Kernel boot stays independent of
@@ -2450,11 +2414,10 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflo
   return { ok: true, runId, kernelJob, kernelPayload, kernelHandle: kernelJob?.worker_id ?? null };
 }
 
-// Every operation Task is created in the workflow's Run with the CURRENT
-// kernel terminal as both `from` (who issues it) and `parent` (whose child it
-// is). `from` alone left the Orca tree to be inferred from the Run, so a Task
-// whose Run was bound to a replaced kernel terminal fell out to the sidebar
-// root (docs/fable.md orca-hierarchy, root cause 3).
+// Every operation Task is created in the workflow's Run - the Run the Kernel worker bound as its own coordinator,
+// Orca's sub-dispatch shape (run-create, task-create, worker-start --task) - issued `from` the CURRENT kernel terminal.
+// It takes no `--parent`: Orca requires a parent to be a Task of the same Run, and the Kernel's own Task lives in its
+// entry Run; the Run's coordinator places the op under the Kernel (smoke 2026-10-01, launch.report.md).
 // A packet longer than the host's argv takes is written to the job's evidence directory and the
 // spec points at it (task-spec.mjs; inc-826e077777de: 993 owned_paths hit ENAMETOOLONG at spawn).
 const createOperationTask = ({ runId, prompt, op, title, attempt, kernelHandle, jobId = null, packetFile = null }) =>
@@ -4640,26 +4603,22 @@ function renewLiveWorkerLeases(ledger, workers, now) {
 // jobs (inc-360891316369). The op contract already forbade it; the owner wants
 // the boundary enforced, not instructed. What the api can enforce:
 //  - the op launch carries no ledger path (the packet and prompt name only the
-//    api verbs) and a role marker: a command-terminal op starts with
-//    STARCI_ROLE=op and STARCI_OP_JOB=<job> in its own shell (opLaunchEnv);
+//    api verbs);
 //  - Orca exports ORCA_TERMINAL_HANDLE into every terminal it owns, including
-//    a managed worker-start agent whose env StarCi cannot set, so a caller
-//    whose handle is the bound terminal of an op job IS that op;
+//    every worker-start agent (whose env StarCi cannot set), so a caller whose
+//    handle is the bound terminal of an op job IS that op;
 //  - from an op caller the api refuses every kernel verb, and `report` only
 //    files for the caller's own job (whose dispatch/contract binding
 //    requireDispatchedReportBinding already proves).
 // Residual (modules/kernel/api.yaml conventions.callerBoundary): a worker
 // running with unattended permissions can still read the ledger file or unset
 // the marker; the api cannot stop raw file access, only refuse its verbs.
-// STARCI_OP_PROVIDER names the pool's provider (devin, codex ...): the draw loop keeps its critic a different model
-// from the drawer (scripts/work/draw-critic.mjs criticFor; owner ruling 2026-09-27).
-const opLaunchEnv = (jobId, provider = null, scratchDir = null) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId, ...(provider ? { STARCI_OP_PROVIDER: String(provider) } : {}), ...(scratchDir ? { STARCI_JOB_SCRATCH: scratchDir } : {}) });
 // The shared-checkout guard of one op launch (scripts/guards/install.mjs,
 // modules/kernel/api.yaml conventions.sharedCheckout): the job's owned paths as
-// absolute paths for the git/npm shims, and the history hook in every checkout
-// the job writes. Best effort — a guard that cannot be put in place rides on the
+// absolute paths for the command guard (bound to the worker's terminal once it
+// starts), and the history hook in every checkout the job writes. Best effort — a guard that cannot be put in place rides on the
 // dispatch receipt and never refuses the launch.
-const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }) => {
+const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd }) => {
   try {
     const items = (placements ?? []).filter((p) => p && !p.unresolved && p.base);
     const owned = items.map((p) => path.resolve(p.base, String(p.path ?? '.').replace(/[\\/]\*\*[\\/]?$/, '') || '.'));
@@ -4678,9 +4637,9 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
     const repos = [...new Set([workerCwd ?? repo, ...items.map((p) => p.base)].filter(Boolean).map(gitRoot))];
     let config = null;
     try { config = loadConfig(); } catch { config = null; }
-    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config, shims });
+    return guardLaunch({ skillRoot, jobId, workflowId: job.workflow_id, ledgerRepo: repo, owned, repos, config });
   } catch (e) {
-    return { env: {}, pathPrefix: null, receipt: { error: String(e?.message ?? e) } };
+    return { receipt: { error: String(e?.message ?? e) } };
   }
 };
 /* ------------------------------------------------------------------ extensions */
@@ -4692,10 +4651,10 @@ const API_INTERNALS = Object.freeze({
   skillRoot, SETTLED, opSlotAdmission, queuedSeamsOf, observeOperationWorker, AGENT_HIERARCHY_SCHEMA,
   kernelNodeId, operationNodeId, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf,
   deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel,
-  buildPacket, bestEffort, rejectDispatch, recordGateAnswers, DISPATCH_LEASE_TTL_MS, opLeaseRequests,
+  buildPacket, bestEffort, rejectDispatch, DISPATCH_LEASE_TTL_MS, opLeaseRequests,
   livePathLeaseWait, reserveOpLeases, buildContractMarkdown, fileContract, envServicesOf, servingWorktreeOf,
-  environmentPreStep, raiseEnvironmentIncident, MANAGED_KINDS, recordLaunchTerminal, ensureWorkflowRun,
-  createOperationTask, opLaunchEnv, opGuardLaunch,
+  environmentPreStep, raiseEnvironmentIncident, recordLaunchTerminal, ensureWorkflowRun,
+  createOperationTask, opGuardLaunch,
   runSettleTail, ownerRoot, agentHierarchyOf, bindRunToKernel, foundationDutyOf,
   FINAL_SETTLED, staleInputProjection, staleOperationLine, sourceDriftLines, peerDriftLines,
   resolveJob, parseAttempt, reportDispatchIdOf, OWNER_GATE_KINDS,

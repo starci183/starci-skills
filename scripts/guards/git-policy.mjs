@@ -1,7 +1,7 @@
 // git-policy.mjs — which git commands an op worker may run in a checkout it
-// shares with other workflows. Pure: argv in, verdict out; scripts/guards/shim.mjs
-// applies it in front of the real git, scripts/guards/history-hook.mjs backs it
-// with a reference-transaction hook git itself runs.
+// shares with other workflows. Pure: argv in, verdict out; scripts/guards/command-guard.mjs
+// (a PreToolUse hook) applies it to the agent's shell command before it runs, and the
+// reference-transaction hook git itself runs backs it (scripts/guards/install.mjs).
 //
 // Several workflows of one product ledger build in ONE checkout on ONE branch
 // (nivo: Login, workspace provision, modules and collab on nivo-backend main).
@@ -79,8 +79,8 @@ const norm = pathKey;
 // scoped `src/app/[locale]/x` to `src/app/`, outside the grant `src/app/[locale]`, and refused the op's
 // own paths PATH_NOT_OWNED (nivo-fe inc-21f76abb6d10). Git, though, still reads a plain `[...slug]` as a
 // character class (`src/app/[...slug]/page.tsx` also matches a peer's `src/app/l/page.tsx`), so a pathspec
-// the guard reads literally is handed to git literally too: literalPathspec, applied by the shim through
-// literalAppRouterArgv. A pathspec that also carries a real glob, or `:(glob)` magic, keeps git's glob
+// the guard reads literally must reach git literally too: the command guard (command-guard.mjs) refuses a
+// command whose glob reading reaches a path the literal reading does not, naming the literalAppRouterArgv form. A pathspec that also carries a real glob, or `:(glob)` magic, keeps git's glob
 // reading and is scoped from before its first glob character, App Router segment or not.
 const GIT_GLOB = /[*?[]/;
 const PATHSPEC_MAGIC = /^:(\([^)]*\)|[/!^]*)/;
@@ -118,7 +118,7 @@ const pathspecBase = (spec, cwd, top) => {
   let s = rest;
   const base = names.includes('top') ? top ?? cwd : cwd;
   if (names.includes('exclude')) return null; // an exclusion narrows, never widens
-  // :(literal)src/app/[id] names exactly that path; so does src/app/[id], which the shim hands git as :(literal)
+  // :(literal)src/app/[id] names exactly that path; so does src/app/[id], whose glob reading the command guard checks
   if (!names.includes('literal') && readsAsGlob(rest, names)) {
     const segments = segmentsOf(s);
     s = segments.slice(0, segments.findIndex((seg) => GIT_GLOB.test(seg))).join('/');
@@ -187,8 +187,8 @@ export function parsePathspecList(text, nul = false) {
 }
 /** The commands the commit-only packet (scripts/kernel/api.mjs) gives for a long owned list; tests/shared-checkout-guard.spec.mjs proves this policy passes them. */
 export const PATHSPEC_LIST_COMMIT = Object.freeze([`git add ${PATHSPEC_FILE}=<list>`, `git commit -m "<msg>" ${PATHSPEC_FILE}=<list>`]);
-// The file resolves against the command's directory (git's OPT_FILENAME); `-` is the stdin the
-// shim read and hands on to git (ctx.stdin), unreadable without it.
+// The file resolves against the command's directory (git's OPT_FILENAME); `-` is stdin (ctx.stdin), which the
+// command guard never sees before the command runs, so a stdin list is refused with the list-file remedy.
 const readPathspecFile = (file, dir, stdin) => {
   if (file === '-') return stdin == null ? null : String(stdin);
   try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return null; }
@@ -201,10 +201,9 @@ const LITERAL_SUBS = new Set(['add', 'commit', 'reset', 'restore', 'checkout', '
 const WORD_PATHSPEC_SUBS = new Set(['add', 'commit', 'restore', 'rm', 'clean']);
 const SUB_VALUE_OPTIONS = { restore: new Set(['-s', '--source']), clean: new Set(['-e', '--exclude']) };
 /**
- * literalAppRouterArgv(argv, {cwd, stdin, listFile}) -> {argv, list, changed}: the argv the shim hands the real
- * git so that git reads every pathspec the way the guard scoped it (literalPathspec on each pathspec
- * position). A --pathspec-from-file list with such a pathspec comes back as `list` (NUL-separated text) for
- * the shim to write to `listFile`, which the argv then names with --pathspec-file-nul. Anything else passes
+ * literalAppRouterArgv(argv, {cwd, stdin, listFile}) -> {argv, list, changed}: the argv with which git reads every
+ * pathspec the way the guard scoped it (literalPathspec on each pathspec position). A --pathspec-from-file list
+ * with such a pathspec comes back as `list` (NUL-separated text) for the caller to write to `listFile`, which the argv then names with --pathspec-file-nul. Anything else passes
  * byte for byte.
  */
 export function literalAppRouterArgv(argv, { cwd = process.cwd(), stdin = null, listFile = null } = {}) {
@@ -244,6 +243,15 @@ export function literalAppRouterArgv(argv, { cwd = process.cwd(), stdin = null, 
     return [`${PATHSPEC_FILE}=${listFile}`, '--pathspec-file-nul'];
   });
   return { argv: [...head, ...flat], list, changed };
+}
+
+// `--pathspec-from-file=-` (or `--pathspec-from-file -`) before a bare `--`: the list is on stdin.
+export function pathspecListOnStdin(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === '--') return false;
+    if (args[i] === '--pathspec-from-file=-' || (args[i] === '--pathspec-from-file' && args[i + 1] === '-')) return true;
+  }
+  return false;
 }
 
 // Config git reads from the environment, as `key=value` entries: GIT_CONFIG_PARAMETERS (how git hands `-c` to its

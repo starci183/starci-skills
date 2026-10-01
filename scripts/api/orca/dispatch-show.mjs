@@ -13,6 +13,7 @@ export function dispatchShow({ task, preamble, from }) {
     assigneeHandle: d?.assignee_handle ?? null,
     dispatch: d,
     error: r.error,
+    hostUnavailable: r.hostUnavailable === true,
   };
 }
 

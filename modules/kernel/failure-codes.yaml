@@ -73,6 +73,16 @@ ALIAS_PROPS:
   owner: op-retry
   kind: input-invalid
 
+APP_ROUTER_GLOB:
+  title: "App Router pathspec would glob"
+  title_vi: "Đường dẫn App Router sẽ bị git đọc thành mẫu"
+  meaning_vi: "Lệnh git bị từ chối vì một đoạn App Router như [locale] hay (group) trong đường dẫn sẽ bị git hiểu là mẫu và chạm cả đường dẫn anh em của luồng khác."
+  causes_vi:
+    - "Đặt đường dẫn có ngoặc vuông hoặc ngoặc tròn trực tiếp vào lệnh git"
+  nextStep_vi: "Cổng bảo vệ từ chối; worker chạy lại đúng lệnh được gợi ý với đường dẫn dạng :(literal)."
+  owner: op-retry
+  kind: dispatch-refusal
+
 ARCHETYPE_MISSING:
   title: "Brand archetype missing"
   title_vi: "Thiếu nguyên mẫu thương hiệu"
@@ -1160,17 +1170,7 @@ DEPS_DELETE_WHILE_PEER_LEASED:
   meaning_vi: "Lệnh xóa node_modules bị chặn vì công việc của luồng khác đang chạy kiểm tra từ thư mục đó."
   causes_vi:
     - "Chạy npm ci hoặc xóa thư mục node_modules"
-  nextStep_vi: "Cổng bảo vệ npm từ chối; dùng npm install (có khóa) hoặc báo môi trường bị chặn kèm tên phụ thuộc thiếu."
-  owner: op-retry
-  kind: dispatch-refusal
-
-DEPS_LOCK_TIMEOUT:
-  title: "Dependency lock still held"
-  title_vi: "Khóa cài phụ thuộc vẫn bị giữ"
-  meaning_vi: "Khóa cài đặt phụ thuộc của kho vẫn do một công việc khác giữ sau thời gian chờ."
-  causes_vi:
-    - "Một lần npm install khác đang chạy lâu"
-  nextStep_vi: "Cổng bảo vệ từ chối; thử lại sau khi lần cài kia xong, hoặc báo môi trường bị chặn."
+  nextStep_vi: "Cổng bảo vệ npm từ chối; dùng npm install hoặc báo môi trường bị chặn kèm tên phụ thuộc thiếu."
   owner: op-retry
   kind: dispatch-refusal
 
@@ -7881,16 +7881,6 @@ infra-provider:
   nextStep_vi: "Sự cố được mở với loại này; Supervisor xem xét, chờ mạch nhà cung cấp phục hồi hoặc đổi nhà cung cấp."
   owner: supervisor
   kind: blocker
-interactive-gate:
-  title: "Agent blocked on interactive prompt"
-  title_vi: "Tác tử bị chặn bởi hộp thoại chờ trả lời"
-  meaning_vi: "Cửa sổ của tác tử đang dừng ở một câu hỏi cần người trả lời và hệ thống không tự trả lời được."
-  causes_vi:
-    - "câu hỏi không có trong danh sách tự trả lời của thẻ tác tử"
-    - "đã gửi phím trả lời nhưng câu hỏi vẫn còn"
-  nextStep_vi: "Lần khởi chạy bị đánh là lỗi không tạm thời; cần người hoặc Supervisor xử lý hộp thoại theo hướng dẫn kèm theo."
-  owner: supervisor
-  kind: runtime-fault
 job-foreign:
   title: "Job belongs to another workflow"
   title_vi: "Việc thuộc quy trình khác"
@@ -8030,15 +8020,6 @@ job-unknown:
   nextStep_vi: "Lệnh bị từ chối; kiểm tra lại mã việc."
   owner: op-retry
   kind: input-invalid
-kernel-adopted:
-  title: "Kernel terminal adopted"
-  title_vi: "Cửa sổ Kernel được nhận lại"
-  meaning_vi: "Hệ thống nhận một cửa sổ đang chạy làm Kernel của quy trình thay cho bản đã mất."
-  causes_vi:
-    - "Kernel cũ chết, còn cửa sổ Kernel mới đang sống"
-  nextStep_vi: "Việc của Kernel được gắn lại vào cửa sổ đó, các sự cố cửa sổ cũ còn sót được đóng; không cần làm thêm."
-  owner: runtime-core
-  kind: settle-reason
 kernel-edit-drop:
   title: "Job dropped by a Kernel edit"
   title_vi: "Việc bị bỏ do Kernel sửa đồ thị"
@@ -8351,15 +8332,6 @@ main-moving:
   nextStep_vi: "Land thất bại sau số lần thử tối đa; thử lại khi main ổn định."
   owner: op-retry
   kind: runtime-fault
-managed-agent:
-  title: "Launch kind needs managed path"
-  title_vi: "Loại khởi chạy này cần đường tác tử quản lý"
-  meaning_vi: "Mô hình này khởi chạy theo kiểu tác tử quản lý, không dùng đường tạo cửa sổ lệnh."
-  causes_vi:
-    - "hồ sơ mô hình đặt sai kiểu khởi chạy"
-  nextStep_vi: "Dispatch bị từ chối; dùng đường worker-start của Orca hoặc đổi mô hình."
-  owner: supervisor
-  kind: dispatch-refusal
 max-ops:
   title: "Operation slots are full"
   title_vi: "Đã hết chỗ chạy op"
@@ -8396,16 +8368,6 @@ missing-account:
   nextStep_vi: "Nhà cung cấp bị coi là chết và không thử chạy; chủ phải thêm tài khoản."
   owner: owner
   kind: blocker
-model-attestation:
-  title: "Model did not confirm identity"
-  title_vi: "Mô hình không xác nhận đúng loại"
-  meaning_vi: "Cửa sổ tác tử không cho thấy đúng mô hình đã yêu cầu."
-  causes_vi:
-    - "công cụ chạy mô hình khác"
-    - "màn hình không hiện tên mô hình"
-  nextStep_vi: "Lần khởi chạy bị đánh thất bại không tạm thời; đổi mô hình hoặc kiểm tra cấu hình tác tử."
-  owner: supervisor
-  kind: dispatch-refusal
 model-outside-order:
   title: "Model outside allowed order"
   title_vi: "Mô hình nằm ngoài thứ tự cho phép"
@@ -8433,15 +8395,6 @@ multi-repo:
   nextStep_vi: "Việc chạy chung kho thay vì cây riêng; không cần làm thêm."
   owner: op-retry
   kind: settle-reason
-native-managed-agent:
-  title: "Native managed agent launch"
-  title_vi: "Khởi chạy tác tử quản lý gốc"
-  meaning_vi: "Thẻ tác tử này khởi chạy theo đường tác tử quản lý, không phải tạo cửa sổ lệnh."
-  causes_vi:
-    - "cấu hình khởi chạy dùng kiểu quản lý"
-  nextStep_vi: "Dispatch đi theo đường worker-start; không cần làm thêm."
-  owner: runtime-core
-  kind: dispatch-refusal
 no-budget:
   title: "No budget for scope"
   title_vi: "Không có ngân sách cho phạm vi này"
@@ -10404,6 +10357,15 @@ worker-died-no-report:
     - "Người dùng đóng terminal"
     - "Agent thoát bất ngờ"
   nextStep_vi: "Job bị đánh dấu thất bại với lý do này; Kernel quyết định giao lại."
+  owner: op-retry
+  kind: settle-reason
+worker-retired-terminal-launch:
+  title: "Terminal-launched worker retired"
+  title_vi: "Worker khởi chạy bằng terminal bị thu hồi"
+  meaning_vi: "Worker này được mở bằng terminal create trước khi mọi agent đều khởi chạy qua orchestration worker-start; nó không có Dispatch để giám sát nên bị đóng."
+  causes_vi:
+    - "Job đang chạy từ trước khi runtime chuyển sang worker-start"
+  nextStep_vi: "Job bị đánh dấu thất bại với lý do này; Supervisor xếp lại job để chạy lại bằng worker-start."
   owner: op-retry
   kind: settle-reason
 worker-failed-no-report:

@@ -162,9 +162,10 @@ export function planWake({ now = Date.now(), wakes = [], unread = [], reported =
 /* ------------------------------------------------------------ the pass */
 
 async function hostDeps() {
-  const [{ terminalRead }, { terminalShow }, { terminalSend }, host, liveness, closeMod, quitMod, wake, config] = await Promise.all([
+  const [{ terminalRead }, { terminalShow }, { terminalSend }, host, liveness, closeMod, quitMod, wake, config, { workerShow }, { workerStop }, { workerRelease }] = await Promise.all([
     import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-show.mjs'), import('../api/orca/terminal-send.mjs'), import('../kernel/host-outage.mjs'), import('../kernel/terminal-liveness.mjs'),
-    import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'), import('../kernel/wake-delivery.mjs'), import('../../engine/config.mjs')]);
+    import('../kernel/close-op-terminal.mjs'), import('../kernel/quit-agent.mjs'), import('../kernel/wake-delivery.mjs'), import('../../engine/config.mjs'),
+    import('../api/orca/worker-show.mjs'), import('../api/orca/worker-stop.mjs'), import('../api/orca/worker-release.mjs')]);
   const screen = (handle) => { try { const r = terminalRead({ terminal: handle, screen: true }); return r?.ok ? String(r.screen ?? '') : null; } catch { return null; } };
   const outputAge = (handle) => {
     try { return liveness.outputAgeOf(terminalShow({ terminal: handle })?.terminal?.lastOutputAt).outputAgeMs; } catch { return null; }
@@ -172,7 +173,8 @@ async function hostDeps() {
   return {
     list: () => terminalList({ includeVisualLayouts: true }), tabTitles: tabTitlesOf,
     rename: (terminal, title) => terminalRename({ terminal, title }),
-    verdict: (h) => host.kernelTerminalVerdict(h), screen, exitedRow: liveness.exitedAgentPromptRow, settleMs: host.DEATH_SETTLE_MS, outputAge,
+    show: (dispatch) => workerShow({ dispatch }), stop: (dispatch) => workerStop({ dispatch }), release: (dispatch) => workerRelease({ dispatch }),
+    screen, settleMs: host.DEATH_SETTLE_MS, outputAge,
     // Escape (no Enter) leaves an input row that targets a subagent before the wake is typed.
     escape: (handle) => { try { return terminalSend({ terminal: handle, text: '\u001b', enter: false }); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } },
     state: (handle) => {
@@ -186,7 +188,6 @@ async function hostDeps() {
     enter: (terminal) => wake.sendEnterWithProof({ terminal }),
     quit: (handle, agent) => quitMod.quitAgent({ handle, agent }),
     close: (handle) => closeMod.closeOperationTerminal(handle),
-    closeExited: (handle) => closeMod.closeExitedTerminal(handle),
     replace: () => {
       const r = spawnSync(process.execPath, [START_FILE, '--replace', '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: 600_000 });
       try { return JSON.parse(String(r.stdout ?? '').trim().split(/\r?\n/).pop()); } catch { return { ok: false, action: 'replace-failed', error: String(r.stderr || r.stdout || `exit ${r.status}`).slice(0, 300) }; }
@@ -218,37 +219,51 @@ export function repairSupervisorTabTitles(seatTerminal, workers, d) {
   return repairs;
 }
 
-/** The [Worker] sweep over the machine handle `m` (sup_jobs): returns {deaths:[{jobId, reason}], closed:[...]}. */
+// worker-show states that end a worker (start-workflow.mjs MANAGED_DEAD_STATE).
+const DEAD_WORKER_STATE = /stop|fail|dead|exit|release|abandon/i;
+const bestEffort = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+
+/**
+ * The [Worker] sweep over the machine handle `m` (sup_jobs): returns {deaths:[{jobId, reason}], closed:[...]}.
+ * Liveness is worker-show on the job's Dispatch; a reported or dead worker is fenced and released (worker-stop +
+ * worker-release, which archives its output). A job with no Dispatch is a terminal-launched [Worker] from before every
+ * launch went through worker-start: its terminal is closed and, unreported, the job fails (worker-retired-terminal-launch).
+ */
 export function sweepWorkers(m, d, { now = Date.now() } = {}) {
   const out = { deaths: [], closed: [] };
+  const markClosed = (job, extra = {}) => m.transaction(() => m.update('sup_jobs', { payload_json: { ...job.payload, terminalClosed: true, ...extra }, updated_at: now }, { job_id: job.job_id }));
+  const fail = (job, reason, result, closed, extra = {}) => m.transaction(() => {
+    m.releaseSupLeases(job.job_id);
+    m.setSupJobStatus(job.job_id, 'failed', { payload: { ...job.payload, terminalClosed: closed, result } });
+    supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-died', payload: { terminal: job.worker_id, reason, agent: job.payload.agent ?? null, ...extra }, now });
+  });
   for (const job of jobsOf(m, ['running', 'reported'])) {
     const handle = job.worker_id;
+    const dispatch = job.payload.dispatch ?? null;
     if (!handle || job.payload.self || job.payload.terminalClosed) continue;
-    const v = d.verdict(handle);
-    if (v.verdict === 'host-unavailable' || v.verdict === 'unverified') return { ...out, skipped: v.reason };
-    const screen = v.verdict === 'live' ? d.screen(handle) : null;
-    const exited = screen != null && d.exitedRow(screen);
-    const dead = v.verdict !== 'live' || Boolean(exited);
     const reported = job.status === 'reported' || Boolean(reportOf(m, job.job_id));
+    if (!dispatch) {
+      const closed = bestEffort(() => d.close(handle));
+      if (reported) { if (closed?.ok) { markClosed(job); out.closed.push({ jobId: job.job_id, handle }); } continue; }
+      const reason = 'terminal-launched worker retired: every [Worker] is now a worker-start worker';
+      fail(job, reason, { reason: 'worker-retired-terminal-launch', detail: reason }, closed?.ok === true);
+      out.deaths.push({ jobId: job.job_id, reason });
+      continue;
+    }
+    const shown = bestEffort(() => d.show(dispatch));
+    if (shown?.hostUnavailable) return { ...out, skipped: shown.error ?? 'worker-show did not answer' };
+    if (!shown?.ok) continue; // an unreadable worker proves nothing
+    const dead = Boolean(shown.state && DEAD_WORKER_STATE.test(shown.state));
     if (reported) {
-      // The worker filed its report: it should have exited; make sure its terminal is gone.
-      let quit = null, closed = null;
-      if (!dead) { try { quit = d.quit(handle, job.payload.agent ?? 'claude'); } catch { /* best effort */ } }
-      try { closed = dead && v.verdict !== 'live' ? { ok: true, gone: true } : d.close(handle); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
-      if (closed?.ok || quit?.exited) {
-        m.transaction(() => m.update('sup_jobs', { payload_json: { ...job.payload, terminalClosed: true }, updated_at: now }, { job_id: job.job_id }));
-        out.closed.push({ jobId: job.job_id, handle });
-      }
+      const stop = dead ? null : bestEffort(() => d.stop(dispatch));
+      const release = bestEffort(() => d.release(dispatch));
+      if (release?.ok) { markClosed(job, { released: { at: now, stopped: stop?.ok ?? null } }); out.closed.push({ jobId: job.job_id, handle, dispatch }); }
       continue;
     }
     if (!dead) continue;
-    const reason = exited ? 'agent exited without a report' : `terminal ${v.verdict} without a report`;
-    m.transaction(() => {
-      m.releaseSupLeases(job.job_id);
-      m.setSupJobStatus(job.job_id, 'failed', { payload: { ...job.payload, terminalClosed: true, result: { reason: 'worker-died-no-report', detail: reason } } });
-      supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-died', payload: { terminal: handle, reason, agent: job.payload.agent ?? null }, now });
-    });
-    if (exited) { try { d.closeExited(handle); } catch { /* best effort */ } }
+    const reason = `worker ${shown.state} without a report`;
+    const release = bestEffort(() => d.release(dispatch));
+    fail(job, reason, { reason: 'worker-died-no-report', detail: reason }, release?.ok === true, { dispatch });
     out.deaths.push({ jobId: job.job_id, reason });
   }
   return out;

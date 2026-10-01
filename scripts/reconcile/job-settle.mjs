@@ -97,7 +97,7 @@ const repoKey = (repo) => crypto.createHash('sha1').update(path.resolve(repo).to
 /** The environment a runtime child runs with: never an op caller's identity (api callerOf reads these). */
 export const runtimeEnv = (env = process.env) => {
   const out = { ...env, STARCI_CALLER: 'runtime-settler' };
-  for (const k of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_OP_PROVIDER']) delete out[k];
+  delete out.ORCA_TERMINAL_HANDLE;
   return out;
 };
 

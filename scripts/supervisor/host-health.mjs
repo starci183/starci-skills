@@ -1,26 +1,10 @@
 // host-health.mjs — the process table the reconciler host and resource controllers read: node.exe and git.exe
-// counts, the runaway guard-shim chains it may stop on its own, and the per-owner grouping each bottleneck sample
-// records.
-//
-// Incident (2026-09-27, fixed in 1034cdabd): a PATH that looped back to runtime/guards/bin made every git call
-// re-enter scripts/guards/shim.mjs; two orphaned chains grew to ~1,400 git and ~1,500 node processes and 59 GB of
-// RAM, and Orca stopped answering. Only chains whose every process is part of the shim chain are ever stopped:
-//   guard-shim-recursion   shims nested deeper than the shim's own depth limit allows, or a chain of chainMin+
-//   orphaned-shim-rev-parse  a `shim.mjs git rev-parse` chain whose parent is gone, older than orphanMinAgeMs
-// Anything else over a threshold is reported, never stopped.
+// counts, the parents holding the most of them, and the per-owner grouping each bottleneck sample records. A count
+// over its threshold is reported, never stopped.
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { MAX_SHIM_DEPTH } from '../guards/shim.mjs';
 import { killProcessTree } from '../lib/kill-tree.mjs';
 import { listHostProcesses, listHostProcessesAsync } from '../lib/process-list.mjs';
-
-const SHIM_CMD = /[\\/]scripts[\\/]guards[\\/]shim\.mjs["']?\s+(?:git|npm)\b/i;
-const SHIM_EXE = /[\\/]runtime[\\/]guards[\\/]bin[\\/](?:git|npm)(?:\.exe)?$/i;
-const REV_PARSE = /\bgit(?:\.exe)?["']?\s+rev-parse\b/i;
-// What a shim runs beneath itself: the launcher, node, the real git and its helpers, their consoles.
-const CHAIN_IMAGES = new Set(['git.exe', 'node.exe', 'conhost.exe', 'sh.exe', 'bash.exe', 'git-remote-https.exe']);
-
-export const isShim = (p) => SHIM_CMD.test(p?.cmd ?? '') || SHIM_EXE.test(p?.exe ?? '');
 
 /** Every process on this host: [{pid, ppid, name, exe, cmd, ws, created, cpu}] (cpu: % of one core), or null when unreadable. */
 export function listProcesses({ platform = process.platform, run = spawnSync } = {}) {
@@ -54,51 +38,6 @@ export const processCounts = (procs) => ({
   git: procs.filter((p) => String(p.name).toLowerCase() === 'git.exe').length,
 });
 
-/**
- * The runaway guard-shim chains in a process table:
- *   [{kind, rootPid, size, nesting, safe, orphaned, ageMs, cmd}]
- * `nesting`: the most `node shim.mjs` processes on one path down the chain (a launcher exe is not counted).
- * `safe`: every process under the root belongs to the shim chain, so stopping the tree stops nothing else.
- * Pure over `procs`.
- */
-export function findRunaways(procs, { now = Date.now(), chainMin, orphanMinAgeMs, maxDepth = MAX_SHIM_DEPTH } = {}) {
-  const { byPid, children } = indexOf(procs);
-  const member = new Map();
-  const isMember = (p) => {
-    if (member.has(p.pid)) return member.get(p.pid);
-    member.set(p.pid, false);
-    const parent = parentOf(p, byPid);
-    const yes = isShim(p) || (CHAIN_IMAGES.has(String(p.name).toLowerCase()) && parent != null && isMember(parent));
-    member.set(p.pid, yes);
-    return yes;
-  };
-  const out = [];
-  for (const root of procs.filter((p) => isShim(p))) {
-    const parent = parentOf(root, byPid);
-    if (parent && isMember(parent)) continue;
-    let size = 0, nesting = 0, safe = true;
-    const shimNode = (p) => SHIM_CMD.test(p.cmd ?? '');
-    const stack = [[root, shimNode(root) ? 1 : 0]];
-    const seen = new Set();
-    while (stack.length) {
-      const [p, depth] = stack.pop();
-      if (seen.has(p.pid)) continue;
-      seen.add(p.pid);
-      size += 1;
-      nesting = Math.max(nesting, depth);
-      if (!isMember(p)) safe = false;
-      for (const c of children.get(p.pid) ?? []) if (parentOf(c, byPid) === p) stack.push([c, depth + (shimNode(c) ? 1 : 0)]);
-    }
-    const ageMs = root.created ? now - root.created : 0;
-    const base = { rootPid: root.pid, size, nesting, safe, orphaned: parent == null, ageMs, cmd: String(root.cmd ?? '').slice(0, 200) };
-    // A shim at depth maxDepth refuses before it spawns: more nested shims than that, plus the refusing one, is recursion.
-    if (nesting > maxDepth + 1 || size >= chainMin) out.push({ kind: 'guard-shim-recursion', ...base });
-    else if (parent == null && ageMs >= orphanMinAgeMs && (REV_PARSE.test(root.cmd ?? '') || (children.get(root.pid) ?? []).some((c) => isShim(c) && REV_PARSE.test(c.cmd ?? ''))))
-      out.push({ kind: 'orphaned-shim-rev-parse', ...base });
-  }
-  return out;
-}
-
 /** The parents that hold the most node/git processes: [{parentPid, count, cmd}], top `limit`. Pure. */
 export function topParents(procs, { limit = 5 } = {}) {
   const { byPid } = indexOf(procs);
@@ -112,19 +51,17 @@ export function topParents(procs, { limit = 5 } = {}) {
 }
 
 /**
- * The host-health verdict over one process table: {counts, over, runaways, stop, alert, topParents}.
- * `stop`: the safe runaways; `alert`: over a threshold with nothing safe to stop, or an unsafe runaway. Pure.
+ * The host-health verdict over one process table: {counts, over, alert, topParents}. `alert`: a count over its
+ * threshold. Pure.
  */
-export function hostVerdict(procs, { maxNode, maxGit, chainMin, orphanMinAgeMs, now = Date.now() }) {
+export function hostVerdict(procs, { maxNode, maxGit }) {
   const counts = processCounts(procs);
   const over = counts.node > maxNode || counts.git > maxGit;
-  if (!over) return { counts, over, runaways: [], stop: [], alert: false, topParents: [] };
-  const runaways = findRunaways(procs, { now, chainMin, orphanMinAgeMs });
-  const stop = runaways.filter((r) => r.safe);
-  return { counts, over, runaways, stop, alert: stop.length === 0 || runaways.some((r) => !r.safe), topParents: topParents(procs) };
+  if (!over) return { counts, over, alert: false, topParents: [] };
+  return { counts, over, alert: true, topParents: topParents(procs) };
 }
 
-/** Stop one runaway chain: its whole tree, forced. {ok, rootPid, output}. */
+/** Stop one process tree, forced. {ok, rootPid, output}. */
 export function stopTree(rootPid, { platform = process.platform, run = spawnSync } = {}) {
   const r = killProcessTree(rootPid, { platform, run, timeoutMs: 120_000 });
   return { ok: r.ok, rootPid, output: r.output };

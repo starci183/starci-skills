@@ -9,7 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, seatCommand, supervisorTerminals } from '../scripts/supervisor/start-supervisor.mjs';
+import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, SEAT_DENIED_TOOLS, supervisorTerminals } from '../scripts/supervisor/start-supervisor.mjs';
+import { seatToolDecision } from '../scripts/guards/seat-tools.mjs';
 import { withSupervisor, readSupervisor, seatOf, enabledOf, writeSeat, supervisorEvent, SUPERVISOR_ID, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob, ackReport,
@@ -22,7 +23,6 @@ import { tell, replies, sinceMs } from '../scripts/supervisor/tell.mjs';
 import { replyToOwner, registrationRefusal } from '../scripts/supervisor/channel.mjs';
 import { appendInbox, readInbox, registerSupervisor, readOutbox, createBridge } from '../scripts/connectors/telegram-bridge.mjs';
 import { planWake, busyScreen, watchdogPass, sweepWorkers } from '../scripts/supervisor/watchdog.mjs';
-import { buildSpawnCommand, cwdCommand } from '../scripts/agent/lib.mjs';
 import { orcaTreeFindings, readTerminals, supervisorWorkerHandles } from '../scripts/checks/check-orca-tree.mjs';
 import { withLedger } from './_ledger-fixture.mjs';
 import { clusterOwed } from '../scripts/supervisor/cluster.mjs';
@@ -53,22 +53,28 @@ const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: pat
 
 /* ------------------------------------------------------------ fake Orca */
 
-function fakeHost({ terminals = [], live = new Set(), screens = {}, spawnOk = true, hostDown = false } = {}) {
-  const calls = { spawn: [], close: [], quit: [] };
+// The seat is a worker-start worker: `start` is scripts/agent/lib.mjs startAgent, `show`/`stop`/`release` the worker
+// verbs on its Dispatch (workers: dispatch -> state), `bindSeat` the seat guard the PreToolUse hook enforces.
+function fakeHost({ terminals = [], live = new Set(), screens = {}, spawnOk = true, hostDown = false, workers = new Map() } = {}) {
+  const calls = { start: [], close: [], quit: [], stop: [], release: [], bind: [] };
   let n = 0;
   return {
-    calls, live,
+    calls, live, workers,
     list: () => (hostDown ? { ok: false, hostUnavailable: true } : { ok: true, terminals, visualLayouts: [] }),
     tabTitles: (_layouts, rows) => new Map(rows.map((r) => [r.handle, r.tab ?? null])),
-    verdict: (h) => (hostDown ? { verdict: 'host-unavailable', reason: 'down' } : live.has(h) ? { verdict: 'live', reason: 'ok' } : { verdict: 'gone', reason: 'gone' }),
     screen: (h) => screens[h] ?? '> ',
     exitedRow: (s) => (/PS [A-Z]:\\[^>]*>\s*$/.test(s) ? s.trim() : null),
     close: (h) => { calls.close.push(h); live.delete(h); return { ok: true }; },
     quit: (h) => { calls.quit.push(h); return { sent: true, exited: false }; },
-    spawn: (opts) => {
-      calls.spawn.push(opts);
-      if (!spawnOk) return { ok: false, step: 'readiness', error: 'refused' };
-      const h = `term_new${++n}`; live.add(h); return { ok: true, terminal: h, modelAttested: opts.model };
+    show: (d) => (hostDown ? { ok: false, hostUnavailable: true, error: 'down' } : workers.has(d) ? { ok: true, state: workers.get(d) } : { ok: false, error: 'no such worker' }),
+    stop: (d) => { calls.stop.push(d); workers.set(d, 'stopped'); return { ok: true }; },
+    release: (d) => { calls.release.push(d); workers.set(d, 'released'); return { ok: true }; },
+    bindSeat: (h) => { calls.bind.push(h); return `guards/seats/${h}.json`; },
+    start: (opts) => {
+      calls.start.push(opts);
+      if (!spawnOk) return { ok: false, step: 'worker-start', error: 'refused', effectState: 'none' };
+      const h = `term_new${++n}`, d = `ctx_new${n}`; live.add(h); workers.set(d, 'ready');
+      return { ok: true, terminal: h, dispatchId: d, runId: 'run_sup', taskId: `task_${n}`, effective: { agent: opts.provider, model: opts.model } };
     },
   };
 }
@@ -80,11 +86,11 @@ test('singleton: one launch boots the seat; a second start with the seat live la
   const host = fakeHost();
   const first = await launch(env, host);
   assert.equal(first.action, 'booted');
-  assert.equal(host.calls.spawn.length, 1);
-  assert.equal(host.calls.spawn[0].title, '[Supervisor] main');
+  assert.equal(host.calls.start.length, 1);
+  assert.equal(host.calls.start[0].title, '[Supervisor] main');
   const again = await launch(env, host);
   assert.equal(again.action, 'already-live');
-  assert.equal(host.calls.spawn.length, 1, 'never a second [Supervisor]');
+  assert.equal(host.calls.start.length, 1, 'never a second [Supervisor]');
   assert.equal(readSupervisor((m) => seatOf(m).value.terminal, null, { env }), first.terminal);
   assert.equal(readSupervisor((m) => enabledOf(m), null, { env }), true);
 });
@@ -101,14 +107,14 @@ test('singleton: a live startup reservation, a host outage and a disabled seat a
   const out = await launch(env2, down);
   assert.equal(out.action, 'host-unavailable');
   assert.equal(out.exit, 75);
-  assert.equal(down.calls.spawn.length, 0);
+  assert.equal(down.calls.start.length, 0);
   const stopped = await stopSupervisor({ env: env2, deps: fakeHost() });
   assert.equal(stopped.action, 'stopped');
   const replace = await launch(env2, fakeHost(), { mode: 'replace' });
   assert.equal(replace.action, 'disabled', 'the watchdog never relaunches a stopped seat');
 });
 
-test('singleton dedupe: with the seat dead a live [Supervisor] session is adopted, extra ones and bare shells are closed', async (t) => {
+test('singleton dedupe: with the seat dead every marked [Supervisor] terminal is closed and one worker starts; none is adopted', async (t) => {
   const env = envOf(t);
   const terminals = [
     { handle: 'term_a', title: '✳ supervisor tick', tab: '[Supervisor] main' },
@@ -118,14 +124,13 @@ test('singleton dedupe: with the seat dead a live [Supervisor] session is adopte
   ];
   const host = fakeHost({ terminals, live: new Set(['term_a', 'term_b', 'term_c', 'term_k']), screens: { term_c: 'PS D:\\x> ' } });
   const out = await launch(env, host);
-  assert.equal(out.action, 'adopted');
-  assert.equal(out.terminal, 'term_a');
-  assert.equal(host.calls.spawn.length, 0, 'adopting replaces a launch');
-  assert.deepEqual(out.closedDuplicates.map((c) => c.handle).sort(), ['term_b', 'term_c']);
+  assert.equal(out.action, 'booted');
+  assert.equal(host.calls.start.length, 1, 'the seat is a new worker-start worker');
+  assert.deepEqual(out.closedDuplicates.map((c) => c.handle).sort(), ['term_a', 'term_b', 'term_c']);
   assert.ok(!host.calls.close.includes('term_k'), 'a kernel terminal is never touched');
-  const plan = planSupervisorDedupe({ marked: [{ handle: 's' }, { handle: 'd' }], seatTerminal: 's', seatLive: true, screenOf: () => '> ', exitedRow: () => null });
+  const plan = planSupervisorDedupe({ marked: [{ handle: 's' }, { handle: 'd' }], seatTerminal: 's', screenOf: () => '> ', exitedRow: () => null });
   assert.deepEqual(plan.close.map((c) => c.handle), ['d']);
-  assert.equal(plan.adopt, null, 'a live seat never adopts');
+  assert.equal(plan.adopt, undefined, 'a terminal is never adopted as the seat');
 });
 
 test('the prompt doctrine is built from supervise.yaml kernelSeat', () => {
@@ -164,14 +169,15 @@ test('workers: one job per cluster, launches stop at the cap, a leased file wait
     route: async () => ({ pool: 'devin-agent', agent: 'devin', model: 'm', effort: null }),
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
     unstage: () => ({}),
-    spawn: (opts) => { spawned.push(opts); return { ok: true, terminal: `term_${spawned.length}` }; },
+    start: (opts) => { spawned.push(opts); return { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
   };
   const r = await spawnWorkers(m, { settings, deps, env });
   assert.equal(r.cap.cap, 1, 'a saturated machine runs one worker');
   assert.equal(r.launched.length, 1);
   assert.equal(spawned[0].title, '[Worker] c1');
-  assert.ok(spawned[0].env?.STARCI_GUARD_FILE, 'a [Worker] launches with the guard layer (node-modules-link-wipe)');
-  if (spawned[0].pathPrefix) assert.equal(spawned[0].pathPrefix, spawned[0].env.STARCI_GUARD_BIN, 'the npm shim is first on its PATH');
+  assert.equal(spawned[0].worktree, `/tmp/${a.job.job_id}`, 'a [Worker] starts through worker-start on its staging checkout');
+  assert.equal(typeof spawned[0].onCreated, 'function', 'its guard is bound to the worker terminal the moment it exists');
+  assert.equal(jobOf(m, a.job.job_id).payload.dispatch, 'ctx_1', 'the job keeps the Dispatch its liveness and release read');
   assert.equal(jobOf(m, a.job.job_id).status, 'running');
   const attempt = m.latestSupAttempt(a.job.job_id);
   assert.equal(attempt.terminal_handle, 'term_1', 'one sup_attempts row per spawn names its terminal');
@@ -194,7 +200,7 @@ test('worker routing: the balanced pick skips an unavailable provider and prefer
   assert.ok(skip.skipped.some((s) => s.pool === 'devin-agent'));
 });
 
-test('worker readiness: a readiness failure excludes the provider', async (t) => {
+test('worker readiness: a refused worker-start excludes the provider', async (t) => {
   const env = envOf(t);
   const m = machineOf(t, env);
   const runtimes = parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
@@ -208,7 +214,7 @@ test('worker readiness: a readiness failure excludes the provider', async (t) =>
     route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
     unstage: () => ({}),
-    spawn: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'readiness', error: 'terminal readiness timeout after 120000ms' } : { ok: true, terminal: `term_${spawned.length}` }; },
+    start: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'worker-start', error: 'agent_readiness_failed' } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
   };
   const r = await spawnWorkers(m, { settings, deps, env });
   assert.equal(spawned[0].provider, 'devin', 'devin is furthest below its share');
@@ -225,7 +231,7 @@ test('worker readiness: a readiness failure excludes the provider', async (t) =>
   assert.ok(routed.at(-1).avoid.includes('devin'));
   assert.equal(jobOf(m, b.job.job_id).status, 'running');
   // READINESS_FAILS_PER_HOUR failures in the hour exclude the provider for every job, fresh ones included.
-  for (let i = 0; i < READINESS_FAILS_PER_HOUR; i += 1) supervisorEvent(m, { entityType: 'job', entityId: `x${i}`, kind: 'worker-spawn-failed', payload: { agent: 'claude', step: 'readiness' } });
+  for (let i = 0; i < READINESS_FAILS_PER_HOUR; i += 1) supervisorEvent(m, { entityType: 'job', entityId: `x${i}`, kind: 'worker-spawn-failed', payload: { agent: 'claude', step: 'worker-start' } });
   createJob(m, { cluster: 'r3', files: ['scripts/r3.mjs'] });
   await spawnWorkers(m, { settings, deps, env });
   assert.ok(routed.at(-1).avoid.includes('claude'), JSON.stringify(routed.at(-1)));
@@ -246,7 +252,7 @@ test('worker outage: an attestation refused for a provider capacity outage exclu
     route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
     unstage: () => ({}),
-    spawn: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'attestation', error: quota } : { ok: true, terminal: `term_${spawned.length}` }; },
+    start: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'attestation', error: quota } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
   };
   await spawnWorkers(m, { settings, deps, env });
   assert.equal(spawned[0].provider, 'devin', 'devin is furthest below its share');
@@ -261,7 +267,7 @@ test('worker outage: an attestation refused for a provider capacity outage exclu
   assert.equal(jobOf(m, b.job.job_id).status, 'running');
   // An attestation failure that is no outage (a wrong model on screen) excludes nothing.
   const c = createJob(m, { cluster: 'q3', files: ['scripts/q3.mjs'] });
-  const other = { ...deps, route: async () => pickWorkerPool({ shares, runtimes, recent, prefer: 'devin' }), spawn: () => ({ ok: false, step: 'attestation', error: 'attestation rejected: model mismatch' }) };
+  const other = { ...deps, route: async () => pickWorkerPool({ shares, runtimes, recent, prefer: 'devin' }), start: () => ({ ok: false, step: 'attestation', error: 'attestation rejected: model mismatch' }) };
   await spawnWorkers(m, { settings, deps: other, env, jobId: c.job.job_id });
   assert.equal(jobOf(m, c.job.job_id).payload.avoidAgents, undefined);
 });
@@ -277,7 +283,7 @@ test('worker guard: a [Worker] owns its leased files, so its git shim lets it st
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
     unstage: () => ({}), command: () => null,
     guard: (jobId, opts) => workerGuard(jobId, { ...opts, launch: (args) => { launched.push(args); return { env: {}, pathPrefix: 'bin', receipt: {} }; } }),
-    spawn: (opts) => { guarded.push(opts); return { ok: true, terminal: 'term_g' }; },
+    start: (opts) => { guarded.push(opts); return { ok: true, terminal: 'term_g', dispatchId: 'ctx_g' }; },
   };
   await spawnWorkers(m, { settings, deps, env });
   assert.equal(guarded.length, 1);
@@ -508,7 +514,7 @@ test('a worker job lands end to end: report -> gate -> succeeded, leases release
   const { job } = createJob(m, { cluster: 'e2e', files: ['scripts/a.mjs'] });
   const r = await spawnWorkers(m, { settings, env, root, deps: {
     load: () => ({ cpuBusy: 0, freeMem: 1 }), route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
-    spawn: () => ({ ok: true, terminal: 'term_w' }) } });
+    start: () => ({ ok: true, terminal: 'term_w', dispatchId: 'ctx_w' }) } });
   assert.equal(r.launched.length, 1);
   const staging = jobOf(m, job.job_id).payload.staging;
   fs.writeFileSync(path.join(staging.path, 'scripts', 'a.mjs'), 'export const a = 7;\n');
@@ -727,15 +733,24 @@ test('status block and clustering', (t) => {
 /* ------------------------------------------------------------ 2026-09-24 live defects */
 
 test('the Supervisor seat launches with its subagent tool denied; the prompt sends diagnosis to [Worker]s', async (t) => {
-  const card = parseYaml(fs.readFileSync(new URL('../modules/models/agents/claude.yaml', import.meta.url), 'utf8'));
-  const cmd = seatCommand({ agent: 'claude', model: 'claude-opus-5-5', effort: 'high', card });
-  assert.equal(cmd, "claude --model claude-opus-5-5 --effort high --disallowedTools 'Agent,Task'");
-  assert.equal(seatCommand({ agent: 'codex', card: { terminalFallback: { command: 'codex' } } }), null, 'no denial known: the card command stands');
+  // worker-start takes no provider argv, so the denial is a seat guard bound to the seat's terminal and enforced by
+  // the project PreToolUse hook (scripts/guards/seat-tools.mjs) - for that terminal only.
+  assert.deepEqual([...SEAT_DENIED_TOOLS.claude], ['Agent', 'Task']);
   const env = envOf(t);
   const host = fakeHost();
-  host.card = () => card;
-  await launch(env, host);
-  assert.match(host.calls.spawn[0].command, /--disallowedTools 'Agent,Task'/);
+  const out = await launch(env, host);
+  assert.deepEqual(host.calls.bind, [out.terminal], 'the seat guard is bound to the seat terminal');
+  assert.equal(host.calls.start[0].command, undefined, 'no command is composed for a worker-start seat');
+  const root = tmp(t, 'seat-guard-');
+  const guard = path.join(root, 'runtime', 'guards', 'seats');
+  fs.mkdirSync(guard, { recursive: true });
+  fs.writeFileSync(path.join(guard, 'term_seat.json'), JSON.stringify({ role: 'supervisor', deniedTools: ['Agent', 'Task'] }));
+  assert.match(seatToolDecision({ handle: 'term_seat', toolName: 'Agent', root })?.reason ?? '', /Agent is denied for the supervisor/);
+  assert.equal(seatToolDecision({ handle: 'term_seat', toolName: 'Bash', root }), null, 'only the denied tools');
+  assert.equal(seatToolDecision({ handle: 'term_other', toolName: 'Agent', root }), null, 'any other terminal passes untouched');
+  assert.equal(seatToolDecision({ handle: null, toolName: 'Agent', root }), null, 'a session outside Orca passes untouched');
+  const settings = JSON.parse(fs.readFileSync(new URL('../.claude/settings.json', import.meta.url), 'utf8'));
+  assert.match(JSON.stringify(settings.hooks.PreToolUse), /scripts\/guards\/seat-tools\.mjs/);
   const prompt = fs.readFileSync(new URL('../modules/supervisor/supervisor-prompt.md', import.meta.url), 'utf8');
   assert.match(prompt, /Diagnosis is a \[Worker\] job too/);
   assert.match(fs.readFileSync(new URL('../modules/supervisor/worker-prompt.md', import.meta.url), 'utf8'), /`diagnosed`/);
@@ -783,9 +798,9 @@ test('watchdog: a busy Supervisor (mid-turn, or idle input with subagents runnin
   appendInbox(SUPERVISOR_ID, { chatId: null, messageId: null, from: 'desktop', text: 'hi' }, { env });
   registerSupervisor({ id: SUPERVISOR_ID, label: 'S', terminal: seed.terminal }, { env });
   const woke = [];
-  const d = (state, screen) => ({ verdict: () => ({ verdict: 'live' }), screen: () => screen, exitedRow: () => null, settleMs: 0, sleep: () => {},
+  const d = (state, screen) => ({ show: () => ({ ok: true, state: 'ready' }), screen: () => screen, settleMs: 0, sleep: () => {},
     state: () => state, wake: (_t, text) => { woke.push(text); return { action: 'kernel-woken', delivered: true }; }, enter: () => ({ ok: true }),
-    quit: () => null, close: () => ({ ok: true }), closeExited: () => null, replace: () => assert.fail('never') });
+    quit: () => null, close: () => ({ ok: true }), replace: () => assert.fail('never') });
   assert.equal((await watchdogPass({ env, d: d('active', '✽ Working…') })).action, 'busy');
   assert.equal((await watchdogPass({ env, d: d('turn-idle', subagents) })).state, 'subagents-running');
   assert.equal(woke.length, 0);
@@ -810,32 +825,26 @@ test('watchdog: a wake whose proof failed still counts, and an identical text is
 
 /* ------------------------------------------------------------ [Worker] terminals in the Orca sidebar */
 
-test('a [Worker] terminal is created on the runtime project Orca worktree and starts its agent in the staging checkout', async (t) => {
-  // A staging checkout is no Orca worktree: a terminal created on it is orphaned (under no project in the sidebar).
+test('a [Worker] starts through worker-start on its staging checkout, which Orca lists under the runtime project', async (t) => {
   const env = envOf(t);
   const m = machineOf(t, env);
-  createJob(m, { cluster: 'orca-tree', files: ['scripts/o.mjs'] });
-  const spawned = [];
+  const { job } = createJob(m, { cluster: 'orca-tree', files: ['scripts/o.mjs'] });
+  const spawned = [], bound = [];
   const root = path.join(os.tmpdir(), 'runtime-root');
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const r = await spawnWorkers(m, { settings, env, root, deps: {
     load: () => ({ cpuBusy: 0, freeMem: 1 }), route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
     staging: ({ jobId }) => ({ ok: true, path: path.join(os.tmpdir(), 'staging', jobId), branch: `sup/${jobId}`, base: 'abc' }),
-    unstage: () => ({}), spawn: (opts) => { spawned.push(opts); return { ok: true, terminal: 'term_w1' }; } } });
+    unstage: () => ({}), guard: () => ({ receipt: { jobFile: path.join(root, 'job.json') } }),
+    bindGuard: (args) => { bound.push(args); return 'bound.json'; },
+    start: (opts) => { spawned.push(opts); opts.onCreated?.('term_w1', 'ctx_w1'); return { ok: true, terminal: 'term_w1', dispatchId: 'ctx_w1', runId: 'run_w', taskId: 'task_w' }; } } });
   assert.equal(r.launched.length, 1);
-  assert.equal(spawned[0].worktree, root, 'the terminal is created on the registered runtime worktree');
-  assert.equal(spawned[0].cwd, r.launched[0].staging, 'the agent runs in the staging checkout');
+  assert.equal(spawned[0].worktree, r.launched[0].staging, 'the worker starts on its staging checkout');
   assert.equal(spawned[0].title, '[Worker] orca-tree');
+  assert.equal(spawned[0].cwd, undefined, 'no terminal is created elsewhere and changed into the checkout');
+  assert.deepEqual(bound.map((b) => b.handle), ['term_w1'], 'the guard is bound to the worker terminal');
   assert.deepEqual([...openWorkerHandles(m)], ['term_w1']);
-  // The launch command changes into the staging checkout before anything else, and stops the line when it cannot.
-  const dir = 'C:/x/staging/job-1';
-  assert.equal(cwdCommand(dir, 'win32'), "Set-Location -LiteralPath 'C:/x/staging/job-1' -ErrorAction Stop;");
-  assert.equal(cwdCommand(dir, 'posix'), "cd 'C:/x/staging/job-1' || exit 1;");
-  assert.equal(cwdCommand("C:/it's"), null, 'a quote never reaches the shell');
-  const built = buildSpawnCommand({ provider: 'claude', kernel: true, cwd: dir });
-  assert.ok(built.command.startsWith(cwdCommand(dir)), built.command);
-  assert.ok(!buildSpawnCommand({ provider: 'claude', kernel: true }).command.includes('Set-Location'), 'no cwd, no directory change');
-  assert.match(buildSpawnCommand({ provider: 'claude', cwd: "C:/it's" }).error ?? '', /launch cwd/);
+  assert.deepEqual([jobOf(m, job.job_id).payload.dispatch, jobOf(m, job.job_id).payload.runId], ['ctx_w1', 'run_w']);
 });
 
 test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervisor] duplicate, never swept', async (t) => {
@@ -843,13 +852,13 @@ test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervi
   const sup = openMachine({ env });
   const { job } = createJob(sup, { cluster: 'kept', files: ['scripts/k.mjs'] });
   sup.startSupAttempt({ jobId: job.job_id, agent: 'claude', terminalHandle: 'term_wk' });
-  sup.setSupJobStatus(job.job_id, 'running');
+  sup.setSupJobStatus(job.job_id, 'running', { payload: { ...job.payload, dispatch: 'ctx_wk' } });
   const { job: done } = createJob(sup, { cluster: 'gone', files: ['scripts/g.mjs'] });
   sup.startSupAttempt({ jobId: done.job_id, agent: 'claude', terminalHandle: 'term_old' });
   sup.setSupJobStatus(done.job_id, 'succeeded');
   // The watchdog sweep leaves a live running worker alone.
-  const d = { verdict: () => ({ verdict: 'live' }), screen: () => '> ', exitedRow: () => null,
-    close: () => assert.fail('a live worker of an open job is never closed'), quit: () => assert.fail('never quit'), closeExited: () => assert.fail('never') };
+  const d = { show: () => ({ ok: true, state: 'ready' }), close: () => assert.fail('a live worker of an open job is never closed'),
+    stop: () => assert.fail('never stopped'), release: () => assert.fail('never released') };
   assert.deepEqual(sweepWorkers(sup, d), { deaths: [], closed: [] });
   sup.close();
   assert.deepEqual([...supervisorWorkerHandles({ env })], ['term_wk']);
@@ -876,7 +885,7 @@ test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervi
   const host = fakeHost({ terminals, live: new Set(['term_seat', 'term_wk', 'term_w2', 'term_dup']) });
   const out = await launch(env, host);
   assert.ok(!host.calls.close.includes('term_wk') && !host.calls.close.includes('term_w2'), JSON.stringify(host.calls.close));
-  assert.ok(out.action === 'adopted' || out.action === 'booted', out.action);
+  assert.equal(out.action, 'booted', out.action);
 });
 
 test('the push scan reads a diff file in chunks and keeps line numbers across chunk seams', async () => {

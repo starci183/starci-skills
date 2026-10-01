@@ -150,8 +150,8 @@ test('provider-health --recover refuses an op and any caller not proven to be th
   const base = { ...baseEnv(), [TEST_REGISTRY_ENV]: machineFile };
   const recover = ['provider-health', '--repo', repo, '--provider', 'devin', '--recover', '--reason', 'key rotated', '--json'];
   const cases = [
-    [{ STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-docs-running' }, 'op-context-refused'],
     [{ ORCA_TERMINAL_HANDLE: 'term_op-running' }, 'op-context-refused'],
+    [{ STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-docs-running' }, 'kernel-proof-required'],
     [{ STARCI_ROLE: 'supervisor' }, 'kernel-proof-required'],
     [{}, 'kernel-proof-required'],
     [{ ORCA_TERMINAL_HANDLE: 'term_somebody-else' }, 'kernel-proof-required'],
@@ -161,7 +161,7 @@ test('provider-health --recover refuses an op and any caller not proven to be th
     assert.equal(r.status, 1, `${JSON.stringify(extra)}: ${r.stdout}${r.stderr}`);
     assert.equal(errOf(r)?.code, code, `${JSON.stringify(extra)} → ${code}`);
   }
-  const opRead = await runApi({ ...base, STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-docs-running' }, 'provider-health', '--repo', repo, '--provider', 'devin', '--json');
+  const opRead = await runApi({ ...base, ORCA_TERMINAL_HANDLE: 'term_op-running' }, 'provider-health', '--repo', repo, '--provider', 'devin', '--json');
   assert.equal(errOf(opRead)?.code, 'op-context-refused', 'provider-health is a kernel verb for an op, read or not');
   const supervisorRead = await runApi(base, 'provider-health', '--repo', repo, '--provider', 'devin', '--json');
   assert.equal(supervisorRead.status, 0, 'a caller that is not the Kernel may read the row');

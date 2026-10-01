@@ -64,37 +64,6 @@ test('a submitted prompt, a live turn above a queued paste and an idle prompt ke
   assert.equal(classifyAgentScreen('Codex\nmodel: gpt-6-sol\n› Ask Codex to do anything',{sentText:PREAMBLE}).state,'turn-idle');
 });
 
-test('Devin dispatch: a [Pasted text] input row gets one Enter and submits',t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-devin-pasted-text-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const stub=path.join(root,'fake-orca.mjs');
-  const stateFile=path.join(root,'state.json');
-  const logFile=path.join(root,'calls.jsonl');
-  const source=FAKE_ORCA.replace("INLINE_STAGED(h) :", "'Devin\\n\\n❭ [Pasted text #1 +115 lines]\\n' :");
-  assert.notEqual(source,FAKE_ORCA,'the fake terminal renders the observed Devin row');
-  fs.writeFileSync(stub,source);
-  fs.writeFileSync(stateFile,JSON.stringify({sends:1,terminals:{'fake-terminal-1':{
-    handle:'fake-terminal-1',connected:true,writable:true,command:'devin',model:'devin',
-    sent:true,staged:true,prompt:'the dispatched contract',
-  }}}));
-  const script=`import {awaitSubmission,loadAdapter} from ${JSON.stringify(pathToFileURL(path.join(ROOT,'scripts','agent','lib.mjs')).href)};
-    const card=loadAdapter('devin').card;
-    const result=awaitSubmission('fake-terminal-1',{...card,submission:{...card.submission,timeoutMs:250,settleMs:250}},{sentText:'the dispatched contract'});
-    console.log(JSON.stringify(result));`;
-  const run=spawnSync(process.execPath,['--input-type=module','-e',script],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:30000,
-    env:{...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-      STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_STUCK_PASTE:'inline-enter'}});
-  assert.equal(run.status,0,run.stderr||run.stdout);
-  const result=json(run.stdout.trim());
-  assert.equal(result?.ok,true,result?.reason);
-  assert.equal(result?.enters,2,'initial send plus one Enter-only send');
-  const state=json(fs.readFileSync(stateFile,'utf8'));
-  assert.equal(state.terminals['fake-terminal-1'].enters,1);
-  const sends=fs.readFileSync(logFile,'utf8').trim().split('\n').map(json).filter(e=>e?.argv?.[0]==='terminal'&&e.argv[1]==='send');
-  assert.equal(sends.length,1);
-  assert.ok(sends[0].argv.includes('--enter'));
-  assert.equal(sends[0].argv[sends[0].argv.indexOf('--text')+1],'');
-});
 
 /* ------------------------------------------------------------ fake Orca */
 
@@ -135,24 +104,7 @@ const opFixture=(t,extra={})=>{
   return {repo,workflowId,jobId,run,dispatch,events,job,orcaState,writeState,sends};
 };
 
-test('dispatch: an inline paste that never left the input box gets one Enter, then is refused prompt-stuck',t=>{
-  const fx=opFixture(t,{STARCI_FAKE_ORCA_STUCK_PASTE:'inline-never'});
-  const r=fx.dispatch();
-  assert.notEqual(r.status,0,'the pasted "Running"/"Working" words are not a submitted turn');
-  const [rejected]=fx.events('dispatch-rejected');
-  assert.deepEqual([rejected?.step,rejected?.signal],['submission','prompt-stuck']);
-  assert.equal(fx.orcaState().terminals['fake-terminal-1'].enters,1,'exactly one Enter-only send');
-  // leased -> ready on a pre-contract rejection (jobs_transitions): dispatchable again, the try not consumed.
-  assert.equal(fx.job()?.status,'ready');
-});
 
-test('dispatch: an inline paste one Enter submits is a running job',t=>{
-  const fx=opFixture(t,{STARCI_FAKE_ORCA_STUCK_PASTE:'inline-enter'});
-  const r=fx.dispatch();
-  assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.equal(fx.job()?.status,'running');
-  assert.equal(fx.orcaState().terminals['fake-terminal-1'].enters,1);
-});
 
 test('status, observe and nudge: a running worker whose paste sits unsubmitted is staged-input and nudge sends Enter only',t=>{
   const fx=opFixture(t);

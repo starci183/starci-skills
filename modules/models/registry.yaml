@@ -56,11 +56,7 @@ targets:
     profiles:
       working: gpt-6-luna
       reasoning: gpt-6-sol
-    orcaLaunch:
-      kind: command-terminal
-      adapter: codex
-      dispatch: return-preamble-and-send
-      composition: card-terminal-fallback   # modules/models/agents/codex.yaml terminalFallback command + routed model/effort + bypassArgs
+    orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
   # Launch-only targets: an explicit `--model gpt-6-sol` or `--model gpt-6-luna` request reaches that one model
   # on the Codex provider window. They are off every automatic chain; allocation routes the codex-agent pool.
   gpt-6-sol:
@@ -69,31 +65,21 @@ targets:
     profiles:
       working: gpt-6-sol
       reasoning: gpt-6-sol
-    orcaLaunch:
-      kind: command-terminal
-      adapter: codex
-      dispatch: return-preamble-and-send
-      composition: card-terminal-fallback   # modules/models/agents/codex.yaml terminalFallback command + routed model/effort + bypassArgs
+    orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
   gpt-6-luna:
     runtime: codex
     requestedModel: gpt-6-luna
     profiles:
       working: gpt-6-luna
       reasoning: gpt-6-luna
-    orcaLaunch:
-      kind: command-terminal
-      adapter: codex
-      dispatch: return-preamble-and-send
-      composition: card-terminal-fallback   # modules/models/agents/codex.yaml terminalFallback command + routed model/effort + bypassArgs
+    orcaLaunch: {agent: codex}   # orca orchestration worker-start --agent codex
   claude-agent:
     runtime: claude
     requestedModel: claude-opus-5-5
     profiles:
       working: opus
       reasoning: opus-reviewer
-    orcaLaunch:
-      kind: managed-agent
-      agent: claude
+    orcaLaunch: {agent: claude}   # orca orchestration worker-start --agent claude
   devin-agent:
     runtime: devin
     requestedModel: swe-2-max
@@ -101,14 +87,7 @@ targets:
     profiles:
       working: devin-worker
       reasoning: devin-reviewer
-    orcaLaunch:
-      kind: command-terminal
-      command: devin --model swe-2-max --permission-mode dangerous --respect-workspace-trust false
-      reasoningCommand: devin --model swe-2-max --permission-mode dangerous --respect-workspace-trust false
-      dispatch: return-preamble-and-send
-      adapter: devin
-      nestedAgents: forbidden
-      capacityGate: explicit-workflow-quota
+    orcaLaunch: {agent: devin}   # orca orchestration worker-start --agent devin
 targetAliases:
   codex-gpt-6-sol: codex-agent
   codex-gpt-6-luna: codex-agent
@@ -432,12 +411,11 @@ selection: |-
   Orca supplies the observed external-agent inventory. Resolve the selected skill and
   operator chain from top to bottom, choosing the first ready runtime/profile. Fall through only
   after an allowed failure with verified no-effect state. This policy never installs an agent,
-  authenticates a provider, grants tools or expands the workflow authority. The Claude and Codex pools use
-  managed-agent launch (worker-start). The Devin pool uses the command-terminal launch declared on
-  its target: the canonical launcher creates one terminal per attempt running the declared `devin`
-  command, waits for the rendered input prompt, obtains the Task preamble with `dispatch
-  --return-preamble`, submits it with `terminal send` and verifies the submission, then attests the
-  Dispatch assignee and the rendered model.
+  authenticates a provider, grants tools or expands the workflow authority. Every pool launches the one
+  way (modules/kernel/contract-changes/launch-through-worker-start.yaml): `orca orchestration worker-start --agent
+  <runtime> [--model <id> --effort <level>]` on an existing Task, the unattended flags from Orca's per-agent default
+  args; the launcher resolves the exact assignee (dispatch-show) and attests the effective agent and model
+  (worker-show). Devin takes no model flag (Orca: --model is for Claude, Codex and Cursor) and starts on its CLI default.
 costPolicy: |-
   Runtime pools are provider quota windows: the Codex pool carries gpt-6-luna for easy and medium work and
   gpt-6-sol for hard and insane work, the Claude pool carries claude-opus-5-5 for every role,
@@ -461,10 +439,9 @@ costPolicy: |-
   installed grammar as code - a typed unit with its stories, its tests, its published version and its canon
   entry - so it carries the execution `implement` role at a hard floor; nothing in it is drawn, and a publish
   is irreversible, so the chain is limited to declared coding runtimes. knowledge.repair rewrites a canonical
-  rule of this runtime and is think work the hands serve on the implement order. Every automatic chain contains only managed-agent or return-preamble
-  command-terminal candidates and
-  advances only after a verified no-effect failure. Command-terminal agents disable nested agents and have explicit turn,
-  wall-time and tool-call ceilings; a ceiling stop is a failed attempt and never proof of completion.
+  rule of this runtime and is think work the hands serve on the implement order. Every automatic chain contains only
+  worker-start candidates and advances only after a verified no-effect failure. Agents have explicit turn, wall-time
+  and tool-call ceilings; a ceiling stop is a failed attempt and never proof of completion.
   Never infer price or quality superiority from a subscription label; benchmark bounded
   representative operations before proposing another routing change. A native worker is released
   after its exact worker_done result is accepted; the workflow child remains until integration is

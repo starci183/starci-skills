@@ -87,9 +87,11 @@ test('manifests decide a drawing: index.yaml generation.tool, draws.yaml provena
 test('a job\'s Playwright recordings (uat-slots default folder) are its proof: collected, video/trace with their subkinds', (t) => {
   const repo = tmp(t);
   const rec = tmp(t, 'starci-recordings-');
-  const env = { [RECORDINGS_ROOT_ENV]: rec, STARCI_OP_JOB: 'op-e2e.verify-1' };
-  assert.equal(defaultRecordRoot(env), recordingsRootOf('op-e2e.verify-1', env));
-  assert.equal(defaultRecordRoot({ [RECORDINGS_ROOT_ENV]: rec }), rec, 'no op: the shared root');
+  // The op a run belongs to is the job its Orca terminal is bound to (scripts/kernel/op-context.mjs).
+  const env = { [RECORDINGS_ROOT_ENV]: rec };
+  assert.equal(defaultRecordRoot(env, { jobId: 'op-e2e.verify-1' }), recordingsRootOf('op-e2e.verify-1', env));
+  assert.equal(defaultRecordRoot(env, null), rec, 'no op: the shared root');
+  assert.equal(defaultRecordRoot({ ...env, STARCI_OP_JOB: 'op-e2e.verify-1' }), rec, 'an env marker names no op');
   const saved = process.env[RECORDINGS_ROOT_ENV];
   process.env[RECORDINGS_ROOT_ENV] = rec;
   t.after(() => { if (saved === undefined) delete process.env[RECORDINGS_ROOT_ENV]; else process.env[RECORDINGS_ROOT_ENV] = saved; });
@@ -179,7 +181,7 @@ const seedJob = (repo, { jobId, op = 'backend.implement', wf = 'wf-s', report })
     ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)').run(wf, op, 1, json({ checks: report.checks }), Date.now());
   } finally { ledger.close(); }
 };
-const api = (...args) => { const r = spawnSync(process.execPath, [API, ...args, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: { ...process.env, STARCI_ROLE: '', STARCI_OP_JOB: '' } }); let body = null; try { body = JSON.parse(r.stdout); } catch { body = null; } return { r, body }; };
+const api = (...args) => { const r = spawnSync(process.execPath, [API, ...args, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: { ...process.env, ORCA_TERMINAL_HANDLE: '' } }); let body = null; try { body = JSON.parse(r.stdout); } catch { body = null; } return { r, body }; };
 
 test('the typed-log rules reach every new dispatch and every kernel boot', async () => {
   const { buildOpPrompt } = await import('../scripts/kernel/op-prompt.mjs');

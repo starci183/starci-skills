@@ -157,16 +157,17 @@ test('op-IPC dispatch: contracts row, one path: lease per owned_path, phase=runn
   assert.ok(contract.markdown?.trim(),'contract markdown must be non-empty');
   assert.ok(contract.dispatch_id,'the contract row names the dispatch it was written for');
   const payload=JSON.parse(job.payload_json);
-  assert.equal(payload?.orca?.runId,'run-fake-1');
-  assert.equal(payload?.orca?.taskId,'task-fake-1');
-  assert.equal(payload?.orca?.dispatchId,contract.dispatch_id,
-    'command-terminal jobs keep the terminal handle for cleanup but key reports/contracts to the Orca Dispatch');
-  assert.equal(payload?.orca?.agentTerminalHandle,job.worker_id);
+  assert.equal(payload?.managed?.runId,'run-fake-1');
+  assert.equal(payload?.managed?.taskId,'task-fake-1');
+  assert.equal(payload?.managed?.dispatchId,contract.dispatch_id,'the op is keyed to its worker-start Dispatch');
+  assert.equal(job.worker_id,contract.dispatch_id,'worker_id is the Dispatch id');
+  assert.ok(payload?.managed?.agentTerminalHandle,'the worker terminal is bound for the caller boundary and follow-up input');
   assert.equal(payload?.hierarchy?.parentNodeId,`agent:kernel:${WORKFLOW}`);
   assert.equal(payload?.hierarchy?.runtime?.dispatchId,contract.dispatch_id);
   const calls=fs.readFileSync(fx.env.STARCI_FAKE_ORCA_LOG,'utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line).argv.slice(0,2).join(' '));
-  for(const step of ['orchestration run-create','orchestration task-create','terminal create','orchestration dispatch'])
-    assert.ok(calls.includes(step),`command-terminal hierarchy never called '${step}' — log: ${calls.join(', ')}`);
+  for(const step of ['orchestration run-create','orchestration task-create','orchestration worker-start'])
+    assert.ok(calls.includes(step),`the op hierarchy never called '${step}' — log: ${calls.join(', ')}`);
+  assert.equal(calls.includes('terminal create'),false,'no op terminal is created by the runtime');
 
   // Every owned_path is fenced in the ledger the worker runs against.
   const keys=leaseRows(fx,jobId).map(l=>l.resource_key).sort();

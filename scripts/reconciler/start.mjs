@@ -8,8 +8,8 @@
 //
 // Order of an apply run:
 //   1. preflight (read-only): bundled SQLite >= 3.51.3, machine.sqlite and every registered ledger quick_check, registered
-//      ledgers that are temp/test paths, whose repo_root is gone, or whose file is missing, legacy in-repo .starciwork/runtime.sqlite stores, kernel/supervisor pins whose model the
-//      agent card cannot attest (modelAttestation.displayNames), Orca reachable;
+//      ledgers that are temp/test paths, whose repo_root is gone, or whose file is missing, legacy in-repo .starciwork/runtime.sqlite stores, kernel/supervisor pins whose
+//      agent takes no --model on worker-start (agent card start.modelArgument false), Orca reachable;
 //   2. config: config.yaml is NEVER rewritten by a plain run; a profile that is not operational is a red row with the one
 //      command that fixes it. `--set-profile operational|observe` writes that one `reconciler` block (backup first) and
 //      then runs as usual (operational: job/host/workflow/resource active; gc/fleet/learning shadow unless configured);
@@ -110,16 +110,18 @@ export function configuredPins(config) {
   return pins;
 }
 
-/** Pins whose agent card cannot attest the model: {where, agent, model, problem}. Seam: card(agent) -> parsed card | null. */
+/**
+ * Pins the launch cannot honour: {where, agent, model, problem}. A model is pinned through worker-start --model and
+ * attested from worker-show's effective model, so a pin is unsound only when its agent has no card or its card takes no
+ * model flag (start.modelArgument false: Orca's --model is for Claude, Codex and Cursor). Seam: card(agent) -> parsed card | null.
+ */
 export function pinProblems(pins, { card = (agent) => { try { return parseYaml(fs.readFileSync(path.join(SKILL_ROOT, 'modules', 'models', 'agents', `${agent}.yaml`), 'utf8')); } catch { return null; } } } = {}) {
   const out = [];
   for (const pin of pins) {
     const c = card(pin.agent);
     if (!c) { out.push({ ...pin, problem: `no agent card modules/models/agents/${pin.agent}.yaml` }); continue; }
-    const att = c.modelAttestation ?? {};
-    if (att.mode === 'launch-flag') continue;
-    if (att.displayNames && typeof att.displayNames === 'object' && !att.displayNames[pin.model])
-      out.push({ ...pin, problem: `modules/models/agents/${pin.agent}.yaml modelAttestation.displayNames has no entry for ${pin.model}` });
+    if (pin.model && c.start?.modelArgument === false)
+      out.push({ ...pin, problem: `${pin.agent} takes no --model on worker-start (modules/models/agents/${pin.agent}.yaml start.modelArgument false); drop the model pin` });
   }
   return out;
 }
@@ -324,8 +326,8 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   push(legacy.length ? warn('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', `${legacy.length} store(s): ${legacy.map((f) => f.repoRoot).join(', ').slice(0, 300)}`, 'the ledger lives in %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite; archive the in-repo copy (LEDGER_LEGACY_WORK_SQLITE, node scripts/checks/ledger-hygiene.mjs)')
     : green('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', 'none', { required: false }));
   const pinBad = pinProblems(configuredPins(config));
-  push(pinBad.length ? red('preflight', 'pins', 'kernel/supervisor model pins', pinBad.map((p) => `${p.where}: ${p.problem}`).join('; ').slice(0, 400), 'declare the display name in modules/models/agents/<agent>.yaml modelAttestation.displayNames')
-    : green('preflight', 'pins', 'kernel/supervisor model pins', 'every pin resolves to a model its agent card can attest'));
+  push(pinBad.length ? red('preflight', 'pins', 'kernel/supervisor model pins', pinBad.map((p) => `${p.where}: ${p.problem}`).join('; ').slice(0, 400), 'drop the model pin of an agent that takes no --model (modules/models/agents/<agent>.yaml start.modelArgument)')
+    : green('preflight', 'pins', 'kernel/supervisor model pins', 'every pinned model is one worker-start can launch and attest'));
   const orcaProbe = orca ? await probeOrcaAsync({ timeoutMs: 30_000 }) : { ok: null };
   // config + engine + controllers + sla
   const raw = config?.reconciler ?? null;

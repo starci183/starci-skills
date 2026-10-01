@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {endLaunchGrace,notGraceSeed} from './helpers/launch-grace.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
@@ -205,8 +206,9 @@ const nudgeFixture=t=>{
   }finally{ledger.close();}
   const d=run(['dispatch','--repo',repo,'--job',jobId,'--model','codex-agent','--spawn','--json']);
   assert.equal(d.status,0,d.stderr||d.stdout);
+  endLaunchGrace(ledgerFile,{workflowId,jobId}); // these specs exercise the draft handling, not the launch grace
   const events=kind=>{const l=inspectLedger({file:ledgerFile});
-    try{return l.db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json));}finally{l.close();}};
+    try{return l.db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json)).filter(notGraceSeed);}finally{l.close();}};
   return {...w,repo,workflowId,jobId,run,events};
 };
 

@@ -47,7 +47,7 @@ const world=(t,prefix)=>{
 };
 
 const signalKernel=(ledger,workflowId)=>ledger.db.prepare("INSERT OR REPLACE INTO signals(scope,key,workflow_id,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,?,NULL,?,?,?,NULL)")
-  .run(workflowId,workflowId,'kernel-token',JSON.stringify({terminal:KERNEL,host:'orca',agent:'claude'}),Date.now());
+  .run(workflowId,workflowId,'kernel-token',JSON.stringify({terminal:KERNEL,dispatch:'dispatch-kernel-1',host:'orca',agent:'claude',launch:'worker'}),Date.now());
 
 /* --------------------------------------------------------------- units */
 
@@ -337,7 +337,7 @@ const unwritableWorld=t=>{
   return {...w,workflowId,terminal,tick,events};
 };
 
-test('watchdog --repair: a refused wake on a frozen Kernel closes the terminal without a quit and replaces the seat',t=>{
+test('watchdog --repair: a refused wake on a frozen Kernel releases its worker without a quit and replaces the seat',t=>{
   const fx=unwritableWorld(t);
   const terminal=fx.terminal;
   // The Kernel's frame froze 19 minutes ago and Orca refuses every write to the terminal.
@@ -347,11 +347,11 @@ test('watchdog --repair: a refused wake on a frozen Kernel closes the terminal w
   assert.equal(first.result.action,'restarted',JSON.stringify(first.result));
   assert.equal(first.result.sendRefused,true);
   assert.equal(first.result.sendErrorCode,'terminal_not_writable');
-  assert.equal(first.result.terminalClosed?.ok,true);
+  assert.deepEqual([first.result.terminalClosed?.ok,first.result.terminalClosed?.dispatch],[true,'dispatch-fake-1'],'the Kernel worker is fenced by its Dispatch');
   assert.ok(first.result.replacementTerminal&&first.result.replacementTerminal!==terminal,JSON.stringify(first.result));
   // One refused wake send, nothing else typed: no quit, no Enter retry, no Orca interrupt.
   assert.equal(fx.orcaState().refusedSends,1,'the refused wake send is the only write attempted');
-  assert.ok((fx.orcaState().closed??[]).includes(terminal),'the unwritable kernel terminal is closed');
+  assert.equal(fx.orcaState().workerStates['dispatch-fake-1'],'released','the unwritable Kernel worker is stopped and released');
   assert.deepEqual(fx.events('kernel-wake-unwritable').map(e=>[e.terminal,e.errorCode]),
     [[terminal,'terminal_not_writable']],'the refused wake send is recorded once');
   assert.ok(fx.events('kernel-stale-cleared').length>=1,'start-workflow cleared the stale seat');

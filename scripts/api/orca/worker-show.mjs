@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // worker-show.mjs — the calls.yaml `worker-show` call as a callable function.
 //   node scripts/api/orca/worker-show.mjs --dispatch <dispatch_id>
-// Returns {ok, state, dispatch, effective} — state is result.worker.state.
+// Returns {ok, state, dispatch, effective, hostUnavailable} — state is result.worker.state; hostUnavailable is an Orca that
+// did not answer (proves nothing about the worker).
 import { orcaCall, arg } from './lib.mjs';
 
 export function workerShow({ dispatch }) {
@@ -24,6 +25,7 @@ export function workerShow({ dispatch }) {
     effective,
     result,
     error: r.error,
+    hostUnavailable: r.hostUnavailable === true,
   };
 }
 

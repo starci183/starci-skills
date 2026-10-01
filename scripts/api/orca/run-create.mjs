@@ -12,7 +12,7 @@ export function runCreate({ objective, from }) {
     ? r.receipt.error
     : (r.receipt?.error ? JSON.stringify(r.receipt.error) : null);
   const error = r.error || receiptError || (!runId ? r.stdout : null);
-  return { ok: r.exitCode === 0 && Boolean(runId), runId, result, error };
+  return { ok: r.exitCode === 0 && Boolean(runId), runId, result, error, hostUnavailable: r.hostUnavailable === true };
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replaceAll('\\', '/')}`).href || process.argv[1]?.endsWith('run-create.mjs')) {

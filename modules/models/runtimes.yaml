@@ -272,10 +272,8 @@ allocation:
   resume: {orcaWaitMs: 600000, everyMs: 600000}
   # supervisorTick: the numbers of the retired supervisor tick (2026-09-28) that the reconciler controllers still read
   # (host thresholds, orca probes, statusApp port, owner digest cadence); everyMs is unused. The tick ran every
-  # everyMs (whole minutes: schtasks repetition). host: above maxNode node.exe or maxGit git.exe processes the tick
-  # looks for a runaway guard-shim chain - one of at least chainMin processes or nested deeper than the shim's own
-  # depth limit, or an orphaned `shim.mjs git rev-parse` chain older than orphanMinAgeMs - stops it, and alerts on
-  # anything else. orca: terminal-list is probed up to probes times, probeTimeoutMs each, gapMs apart; when every
+  # everyMs (whole minutes: schtasks repetition). host: above maxNode node.exe or maxGit git.exe processes the host
+  # controller logs the counts and the parents holding the most. orca: terminal-list is probed up to probes times, probeTimeoutMs each, gapMs apart; when every
   # probe fails the Orca app (never its terminal daemon) gets closeWaitMs to close before it is forced, is launched
   # again, and restart-all runs. deadKernelMs: a watchdog whose trailing ticks read tick-failed or restart-failed
   # this long flags a dead kernel. orphanedFrontierMs: a workflow read orphaned-frontier on ticks this far apart is
@@ -286,7 +284,7 @@ allocation:
   # ownerDigestMs: the Fleet Notifier's periodic owner digest goes out at most this often.
   supervisorTick:
     everyMs: 1800000
-    host: {maxNode: 300, maxGit: 100, chainMin: 20, orphanMinAgeMs: 600000}
+    host: {maxNode: 300, maxGit: 100}
     orca: {probeTimeoutMs: 30000, probes: 5, gapMs: 30000, closeWaitMs: 20000}
     deadKernelMs: 900000
     orphanedFrontierMs: 1800000
@@ -358,9 +356,6 @@ allocation:
   # footprint (scripts/guards/footprint-scan.mjs): one host-wide scan at most every everyMs; a crashed
   # tick's claim lock is cleared after lockStaleMs.
   footprint: {everyMs: 600000, lockStaleMs: 60000}
-  # depsLock (scripts/guards/deps-guard.mjs): an install waits waitMs for the repository's dependency lock,
-  # polling every pollMs, and takes over a lock older than staleMs.
-  depsLock: {waitMs: 1200000, staleMs: 10800000, pollMs: 2000}
   # jobGuard (scripts/guards/install.mjs): a guard file older than ttlMs is pruned.
   jobGuard: {ttlMs: 604800000}
   # landGate (scripts/supervisor/land.mjs): a land waits waitMs for its turn at the gate; its spec run may take
@@ -408,8 +403,8 @@ allocation:
   # context-free session that scores beauty and hierarchy against the product's brand.direction rubric: `codex
   # exec` in a clean temp dir holding only the PNGs, the HTML and the rubric, on the model and effort named here,
   # killed after timeoutMs. The critic is a DIFFERENT model from the drawer (owner ruling 2026-09-27
-  # draw-devin-brand-claude): Devin draws, Codex critiques; when the drawer (the op's STARCI_OP_PROVIDER, or
-  # draw-loop.mjs round --drawer) is the critic's provider - Codex drawing as the draw order's fallback - the round is
+  # draw-devin-brand-claude): Devin draws, Codex critiques; when the drawer (the op's provider, bound to its
+  # terminal - scripts/kernel/op-context.mjs - or draw-loop.mjs round --drawer) is the critic's provider - Codex drawing as the draw order's fallback - the round is
   # judged by criticWhenDrawer.<drawer> instead, and a round with no independent critic has no beauty. directionPrerequisite: interface.draw needs an ACCEPTED brand.direction
   # archetype for its ui record's ui.archetype - brand.mjs checkDirection evidence.ready, the owner's receipt
   # (scripts/kernel/prerequisites.mjs direction-unaccepted; the Kernel enqueues brand.decide --param

@@ -34,9 +34,6 @@ test('a finished draw loop installs JSON that cites no scratch path and passes t
   // The op's scratch, named as the runtime names it (op-prompt.mjs jobScratchDirOf: <temp>/starci-job-scratch/<sha256>).
   const scratch = path.join(tmp(t, 'starci-scratch-paths-'), 'starci-job-scratch', sha256('repo\0wf\0job'));
   const out = path.join(scratch, 'draw-loop', 'signin');
-  const prior = process.env.STARCI_JOB_SCRATCH;
-  process.env.STARCI_JOB_SCRATCH = scratch;
-  t.after(() => { if (prior === undefined) delete process.env.STARCI_JOB_SCRATCH; else process.env.STARCI_JOB_SCRATCH = prior; });
 
   const repo = tmp(t, 'starci-scratch-repo-');
   const dir = path.join(repo, '.starciwork', 'features', 'login', 'ui', 'authentication', 'assets', 'directions');

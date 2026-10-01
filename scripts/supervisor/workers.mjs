@@ -29,7 +29,7 @@
 // Routing: the balanced allocator over config.yaml allocation.shares (scripts/agent/models.mjs balanceDeficits),
 // counting the machine's recent op dispatches (scripts/agent/balance.mjs) plus the Supervisor's own workers (sup_jobs), skipping a
 // provider whose quota probe is dead or whose provider-health circuit is open on any product ledger, and a
-// provider whose [Worker] spawn proved it cannot serve - its terminal failed readiness, or the failure text shows
+// provider whose [Worker] spawn proved it cannot serve - its worker-start failed, or the failure text shows
 // the outage its agent card declares (quotaExhausted/capacityExhausted, scripts/agent/provider-outage.mjs
 // outageInText: e.g. an attestation rejected for "Quota exhausted") - for the rest of that spawn pass, for the
 // requeued job it failed (payload.avoidAgents), and for every job once it failed READINESS_FAILS_PER_HOUR times
@@ -48,33 +48,34 @@ import {
 } from './home.mjs';
 import { openMachine } from '../../engine/machine-db.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
-import { closeSelfSafe } from '../lib/close-verify.mjs';
+import { closeSelfSafe, releaseSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { gitSpawn } from '../lib/git.mjs';
 import { posixPath, sameOrUnder } from '../lib/path-key.mjs';
 import { CONTRACT_CHANGES_DIR } from '../kernel/contract-changes-store.mjs';
-import { guardLaunch } from '../guards/install.mjs';
+import { guardLaunch, bindGuardTerminal } from '../guards/install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
 
 /**
- * The guard layer of a [Worker] launch, the same shim bin op workers get (scripts/guards/install.mjs guardLaunch):
- * its staging checkout's node_modules is a junction to the LIVE runtime's, and npm reifying through that junction
- * empties it (node-modules-link-wipe, 2026-09-28) - the npm shim refuses that (DEPS_THROUGH_LINK). No history
+ * The guard layer of a [Worker] launch, the same one op workers get (scripts/guards/install.mjs guardLaunch), bound to
+ * the worker's terminal once it starts: its staging checkout's node_modules is a junction to the LIVE runtime's, and
+ * npm reifying through that junction empties it (node-modules-link-wipe, 2026-09-28) - the command guard
+ * (scripts/guards/command-guard.mjs, a PreToolUse hook) refuses that (DEPS_THROUGH_LINK). No history
  * hook (repos []): a [Worker] commits only in its runtime staging branch, and that checkout is a linked worktree of
  * the live runtime repo, so `git rev-parse --git-path hooks` there is the live repo's SHARED hooks dir - a hook
  * installed "for the staging checkout" lands in the live repo and refuses every branch deletion and ref rewrite
  * there (the land gate's sup/* cleanup, lanes; land run 26 refused 3a9558930). Its owned paths are the job's leased
  * files resolved against its staging checkout, absolute like op leases (scripts/kernel/api.mjs opGuardLaunch): a
  * directory lease (a trailing `/**` dropped) covers its subtree. With none, or with paths left relative (resolved
- * against the Supervisor's cwd), the git shim refuses every `git add`/commit (PATH_NOT_OWNED) and no worker can
- * commit (worker-guard-owned-empty). {env, pathPrefix, receipt}.
+ * against the Supervisor's cwd), the command guard refuses every `git add`/commit (PATH_NOT_OWNED) and no worker can
+ * commit (worker-guard-owned-empty). {receipt}.
  */
 export function workerGuard(jobId, { root = SKILL_ROOT, staging = null, files = [], launch = guardLaunch } = {}) {
   try {
     const owned = staging ? (files ?? []).filter(Boolean).map((f) => path.resolve(staging, String(f).replace(/[\\/]\*\*[\\/]?$/, '') || '.')) : [];
     return launch({ skillRoot: root, jobId, workflowId: 'supervisor', ledgerRepo: null, owned, repos: [] });
-  } catch (error) { return { env: {}, pathPrefix: null, receipt: { error: String(error?.message ?? error) } }; }
+  } catch (error) { return { receipt: { error: String(error?.message ?? error) } }; }
 }
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -349,7 +350,7 @@ export function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_H
   const counts = {};
   for (const row of m.db.prepare("SELECT payload_json FROM sup_events WHERE kind='worker-spawn-failed' AND created_at>=?").all(since)) {
     const p = parse(row.payload_json);
-    if ((p.step === 'readiness' || p.outage) && p.agent) counts[p.agent] = (counts[p.agent] ?? 0) + 1;
+    if ((p.step === 'worker-start' || p.outage) && p.agent) counts[p.agent] = (counts[p.agent] ?? 0) + 1;
   }
   return Object.keys(counts).filter((a) => counts[a] >= min);
 }
@@ -368,12 +369,11 @@ export function renderWorkerPrompt(job, staging, { template = null, skillRoot = 
 
 /**
  * Launch queued jobs while the adaptive cap has room. Each launch: lease check, route, staging checkout,
- * leases, [Worker] terminal. The terminal is created on the runtime's own Orca worktree (`root`), or, when Orca
- * does not register it (the .claude runtime is a nested repo; selector_not_found), on the host repo root
- * (spawnAgent fallbackWorktree), with the agent started in the staging path (spawnAgent cwd): a staging checkout
- * is no Orca worktree, and a terminal created on it is orphaned, under no project in the sidebar. A failed launch releases
- * its leases, removes its checkout and requeues the job (failed after MAX_SPAWN_ATTEMPTS).
- * `deps`: {spawn, route, load, staging, unstage} for specs.
+ * leases, [Worker] worker. The worker starts through worker-start ON its staging checkout (scripts/agent/lib.mjs
+ * startAgent): a staging checkout is a git worktree of the runtime repository, which Orca resolves under the runtime's
+ * project. Its guard is bound to the worker's terminal (bindGuardTerminal). A failed launch releases its leases,
+ * removes its checkout and requeues the job (failed after MAX_SPAWN_ATTEMPTS).
+ * `deps`: {start, bindGuard, route, load, staging, unstage} for specs.
  */
 export async function spawnWorkers(m, { jobId = null, dryRun = false, settings = supervisorSettings(), deps = {}, env = process.env, root = SKILL_ROOT, now = Date.now } = {}) {
   const queuedJobs = jobsOf(m, ['queued']).filter((j) => !j.payload.self && (!jobId || j.job_id === jobId));
@@ -412,18 +412,20 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     const prompt = renderWorkerPrompt(job, staging);
     const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
     const guard = (deps.guard ?? workerGuard)(job.job_id, { root, staging: staging.path, files: job.payload.files ?? [] });
-    if (!guard.pathPrefix) supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
-    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, fallbackWorktree: path.dirname(root), cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id,
-      env: guard.env, pathPrefix: guard.pathPrefix });
+    if (typeof guard.receipt?.jobFile !== 'string') supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
+    const spawned = (deps.start ?? (await import('../agent/lib.mjs')).startAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: staging.path,
+      title, prompt, specFile: path.join(root, 'runtime', 'supervisor', 'workers', `${job.job_id}.prompt.md`), objective: `${title} — ${job.job_id}`, entry: env.ORCA_TERMINAL_HANDLE || null,
+      onCreated: (handle) => { if (typeof guard.receipt?.jobFile === 'string') guard.receipt.terminal = (deps.bindGuard ?? bindGuardTerminal)({ skillRoot: root, handle, jobFile: guard.receipt.jobFile }); } });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: { path: staging.path, branch: staging.branch, base: staging.base },
-      spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1, guard: guard.receipt };
+      spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1, guard: guard.receipt,
+      ...(spawned?.ok ? { dispatch: spawned.dispatchId, runId: spawned.runId, taskId: spawned.taskId } : {}) };
     if (!spawned?.ok) {
       const exhausted = payload.spawnAttempts >= MAX_SPAWN_ATTEMPTS;
       // A requeued job keeps the agent it asked for (never the one routed to it) and never returns to a provider
-      // whose terminal failed readiness for it or whose failure shows its card's outage (quota/capacity
+      // whose worker-start failed for it or whose failure shows its card's outage (quota/capacity
       // exhausted); the rest of this pass skips that provider too.
-      const outage = route.agent ? outageInText(route.agent, [spawned?.error, spawned?.signal, spawned?.lastOutput]) : null;
-      const notReadyHere = spawned?.step === 'readiness' || Boolean(outage);
+      const outage = route.agent ? outageInText(route.agent, [spawned?.error, JSON.stringify(spawned?.details ?? null)]) : null;
+      const notReadyHere = spawned?.step === 'worker-start' || Boolean(outage);
       if (notReadyHere) notReady.add(route.agent);
       const avoidAgents = notReadyHere ? [...new Set([...(job.payload.avoidAgents ?? []), route.agent])] : job.payload.avoidAgents;
       m.transaction(() => {
@@ -441,7 +443,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     m.transaction(() => {
       m.updateSupAttempt(leased.attemptId, { terminalHandle: spawned.terminal });
       setJob(m, job.job_id, { status: 'running', payload: { ...payload, startedAt: new Date(now()).toISOString() } });
-      supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawned', payload: { terminal: spawned.terminal, agent: route.agent, model: route.model, pool: route.pool, staging: staging.path }, now: now() });
+      supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawned', payload: { terminal: spawned.terminal, dispatch: spawned.dispatchId, agent: route.agent, model: route.model, pool: route.pool, staging: staging.path }, now: now() });
     });
     live += 1;
     result.launched.push({ jobId: job.job_id, terminal: spawned.terminal, agent: route.agent, model: route.model, staging: staging.path });
@@ -476,21 +478,25 @@ export function stageSelf(m, { name, files, root = SKILL_ROOT, env = process.env
 /* ------------------------------------------------------------ report, cancel, finish */
 
 /**
- * The Supervisor closes its own [Worker]'s terminal (owner, 2026-09-28: the Supervisor owns its workers' lifecycle) and
+ * The Supervisor releases its own [Worker] (owner, 2026-09-28: the Supervisor owns its workers' lifecycle): worker-stop + worker-release on its Dispatch, and
  * records the verified result on the job (payload.terminalClosed, the attempt's closed_at) and as a
  * worker-terminal-closed event. Nothing to do for a self job (worker_id 'supervisor'), a job that never got a
  * terminal, or one already closed with proof. A close that is not proven stays unrecorded on the payload so
  * openWorkerHandles still counts the terminal and the tick GC (gc.mjs) retries it as a leftover. `close` is
  * closeSelfSafe (seam). Returns the close result or null.
  */
-export function closeWorkerTerminal(m, { jobId, env = process.env, now = Date.now(), close = closeSelfSafe } = {}) {
+export function closeWorkerTerminal(m, { jobId, env = process.env, now = Date.now(), close = closeSelfSafe, release = releaseSelfSafe } = {}) {
   const job = jobOf(m, jobId);
   const handle = job?.worker_id;
   if (!handle || handle === 'supervisor' || job.payload.self) return null;
   if (job.payload.terminalClosed?.ok === true) return null;
+  // A worker-start worker is fenced and released by its Dispatch (release archives its output); only a
+  // terminal-launched [Worker] from before every launch went through worker-start is closed by its terminal.
+  const dispatch = job.payload.dispatch ?? null;
   let r;
-  try { r = close(handle, { owner: `supervisor:${jobId}`, env }); } catch (error) { r = { handle, ok: false, error: String(error?.message ?? error) }; }
-  const record = { handle, ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.detached ? { detached: true } : {}), ...(r?.reason ? { reason: r.reason } : {}),
+  try { r = dispatch ? release(dispatch, handle, { owner: `supervisor:${jobId}`, env }) : close(handle, { owner: `supervisor:${jobId}`, env }); }
+  catch (error) { r = { handle, ok: false, error: String(error?.message ?? error) }; }
+  const record = { handle, ...(dispatch ? { dispatch } : {}), ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.detached ? { detached: true } : {}), ...(r?.reason ? { reason: r.reason } : {}),
     ...(r?.error ? { error: String(r.error).slice(0, 200) } : {}), at: new Date(now).toISOString() };
   try {
     m.transaction(() => {

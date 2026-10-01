@@ -27,7 +27,7 @@ const fakeDeps = (into) => ({
   staging: ({ jobId }) => ({ ok: true, path: path.join(into.stagingRoot, jobId), branch: `sup/${jobId}`, base: 'abc' }),
   unstage: () => ({}),
   guard: (jobId, opts) => workerGuard(jobId, { ...opts, launch: (args) => { into.guards.push(args); return { env: {}, pathPrefix: 'bin', receipt: {} }; } }),
-  spawn: (opts) => { into.spawned.push(opts); return { ok: true, terminal: `term_${into.spawned.length}` }; },
+  start: (opts) => { into.spawned.push(opts); return { ok: true, terminal: `term_${into.spawned.length}`, dispatchId: `ctx_${into.spawned.length}` }; },
 });
 
 test('the contract-changes directory is never leased: jobs naming it do not conflict, and a stale lease row on it blocks nobody', async (t) => {
@@ -51,7 +51,7 @@ test('the contract-changes directory is never leased: jobs naming it do not conf
   assert.deepEqual(leaseConflicts(m, [CONTRACT_CHANGES_DIR]), []);
   assert.deepEqual(leaseConflicts(m, [`${CONTRACT_CHANGES_DIR}/new-entry.yaml`]), []);
   // The guard still owns the directory in each staging checkout: the worker writes its new entry file there
-  // (an owned directory covers its subtree - scripts/guards/shim.mjs foreignPathsOf).
+  // (an owned directory covers its subtree - scripts/guards/verify-commit.mjs foreignPathsOf).
   for (const g of into.guards) {
     const owned = g.owned.map((o) => path.relative(into.stagingRoot, o).replaceAll('\\', '/'));
     assert.ok(owned.some((p) => p.endsWith(`/${CONTRACT_CHANGES_DIR}`)), JSON.stringify(owned));

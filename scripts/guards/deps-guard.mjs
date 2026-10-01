@@ -5,19 +5,15 @@
 // same checkout; its ordinal 4 worker saw "node_modules disappeared mid-run"
 // and every check in that window had to be re-run (nivo inc-7faca0d4d632,
 // inc-3de1d5efdea6). The rule (modules/kernel/api.yaml conventions.sharedCheckout):
-//  - every install-family npm command in a repository runs under ONE
-//    repository-level lock (<git common dir>/starci-deps.lock), so two
-//    installs never interleave;
 //  - a command that deletes node_modules (npm ci and its aliases) is refused
 //    while a job of ANOTHER workflow of the same ledger is leased, because that
-//    job's checks read node_modules right now. The shim reads the leases under
-//    the lock, so no other install interleaves; a peer dispatched in that window
-//    is not held by the lock (the ledger and the lock file are separate stores).
-// scripts/guards/shim.mjs applies it in front of npm for op workers.
+//    job's checks read node_modules right now;
+//  - an install-family command through a linked node_modules is always refused:
+//    it empties the live tree the link points to (node-modules-link-wipe).
+// scripts/guards/command-guard.mjs (a PreToolUse hook) applies it to an op or
+// [Worker] agent's npm command before it runs.
 import fs from 'node:fs';
 import path from 'node:path';
-import { sleepSync } from '../lib/sleep-sync.mjs';
-import { pidAlive } from '../../engine/machine-db.mjs';
 
 const INSTALL = new Set(['install', 'i', 'in', 'ins', 'inst', 'insta', 'instal', 'isnt', 'isnta', 'isntal', 'isntall', 'add',
   'uninstall', 'un', 'unlink', 'remove', 'rm', 'r', 'update', 'up', 'upgrade', 'udpate', 'prune', 'dedupe', 'ddp', 'rebuild', 'rb', 'link', 'ln',
@@ -97,53 +93,3 @@ export async function peerLeasedJobs({ ledgerRepo, workflowId, env = process.env
   } finally { db.close(); }
 }
 
-
-/**
- * modules/models/runtimes.yaml allocation.depsLock {waitMs, staleMs, pollMs}. Loaded on demand: the shim runs
- * on every git and npm call and reads the yaml only for a locked install.
- */
-export async function depsLockWindows() {
-  const { allocationMs } = await import('../../engine/config.mjs');
-  return { waitMs: allocationMs('depsLock.waitMs'), staleMs: allocationMs('depsLock.staleMs'), pollMs: allocationMs('depsLock.pollMs') };
-}
-
-/**
- * acquireDepsLock({lockFile, holder, waitMs, staleMs, pollMs, onWait}) -> {ok, release()} | {ok:false, holder}
- * The windows are depsLockWindows(). An exclusive create of the lock file. A lock whose holder process is gone is
- * taken over; so is one older than staleMs (a reused pid), far past any real install. release() removes the lock
- * only while it is still this holder's own.
- */
-export function acquireDepsLock({ lockFile, holder, waitMs, staleMs, pollMs, onWait = null, now = () => Date.now() }) {
-  for (const [name, value] of Object.entries({ waitMs, staleMs, pollMs }))
-    if (!Number.isFinite(value) || value < 0) throw Error(`acquireDepsLock: ${name} must be a number of milliseconds (allocation.depsLock)`);
-  fs.mkdirSync(path.dirname(lockFile), { recursive: true });
-  const started = now();
-  let announced = false;
-  for (;;) {
-    try {
-      const fd = fs.openSync(lockFile, 'wx');
-      const mine = JSON.stringify({ ...holder, pid: process.pid, at: new Date(now()).toISOString() });
-      fs.writeSync(fd, mine);
-      fs.closeSync(fd);
-      let released = false;
-      const release = () => {
-        if (released) return;
-        released = true;
-        try { if (fs.readFileSync(lockFile, 'utf8') === mine) fs.rmSync(lockFile, { force: true }); } catch { /* gone already */ }
-      };
-      return { ok: true, release };
-    } catch (e) {
-      if (e?.code !== 'EEXIST') throw e;
-    }
-    let current = null;
-    try { current = JSON.parse(fs.readFileSync(lockFile, 'utf8')); } catch { current = null; }
-    const age = current?.at ? now() - Date.parse(current.at) : Infinity;
-    if (!current || !pidAlive(current.pid) || age > staleMs) {
-      try { fs.rmSync(lockFile, { force: true }); } catch { /* raced */ }
-      continue;
-    }
-    if (now() - started >= waitMs) return { ok: false, holder: current };
-    if (!announced && onWait) { onWait(current); announced = true; }
-    sleepSync(pollMs);
-  }
-}

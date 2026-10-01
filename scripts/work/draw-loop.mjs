@@ -47,6 +47,7 @@
 // decision evidence (DRAW_RATIONALE_MISSING, scripts/checks/draw-rationale.mjs: the rationale.json beside the source,
 // data-why on every element and region, every measured value covered, every rule id resolvable, a redline per part).
 // A metric that cannot run is DRAW_METRICS_UNVERIFIED - a failure, never a pass.
+import { opContextOf } from '../kernel/op-context.mjs';
 import fs from 'node:fs';
 import { putBundle } from '../lib/blob-lookup.mjs';
 import os from 'node:os';
@@ -228,11 +229,11 @@ export async function machineMetrics({ html, captures, ui = null, repo, family =
 // ---------------------------------------------------------------------------------------------------------
 
 export const loopFileOf = (out) => path.join(out, 'loop.json');
-// The loop is agent data (ARCHITECTURE-DB §5.1): its rounds live in the job's STARCI_JOB_SCRATCH (else an OS-temp
+// The loop is agent data (ARCHITECTURE-DB §5.1): its rounds live in the op's job scratch (op-context.mjs; else an OS-temp
 // folder keyed by the ui record), never in .starciwork. finish puts the whole loop in the blob store as one bundle
 // (blob-lookup.mjs putBundle) and generation.loop cites it {sha256: <bundle manifest>, round}.
-export const defaultOutOf = (uiDir, base, state, env = process.env) => path.join(
-  env.STARCI_JOB_SCRATCH ? path.resolve(env.STARCI_JOB_SCRATCH) : path.join(os.tmpdir(), 'starci-draw-loop', sha256(path.resolve(uiDir)).slice(0, 16)),
+export const defaultOutOf = (uiDir, base, state, context = opContextOf()) => path.join(
+  context?.scratchDir ? path.resolve(context.scratchDir) : path.join(os.tmpdir(), 'starci-draw-loop', sha256(path.resolve(uiDir)).slice(0, 16)),
   LOOP_DIR, `${base}--${state}`);
 /** The manifest file finish writes beside the loop dir (<out>.bundle.json), so api report --attach carries it too. */
 export const bundleFileOf = (out) => `${path.resolve(out)}.bundle.json`;
@@ -374,7 +375,7 @@ export async function runRound(o) {
 /**
  * The independent critic of one round (both round kinds): the rubric (brand.direction's, with the owner's open notes as
  * gate checks), the critic picked by criticFor - a different model from the drawer (--drawer, else the op launch's
- * STARCI_OP_PROVIDER) - run by runCritic, written to <round>/critique.json. Never throws: a critic that cannot be
+ * op's provider, op-context.mjs) - run by runCritic, written to <round>/critique.json. Never throws: a critic that cannot be
  * picked or cannot answer is a critique with `error` and no verdict (the round then has no beauty and finish reports
  * DRAW_CRITIC_MISSING, not a low score).
  */
@@ -382,7 +383,7 @@ export async function critiqueRound({ loop, n, roundDir, captures, html, uiDir =
   const { rubric, ownerChecks } = rubricFor({ workRoot: uiDir ? workRootOf(uiDir) : null, archetype, record, shape });
   // The owner's notes this shape must address ride as gate checks (draw-feedback.mjs); the loop records which.
   if (ownerChecks.length) loop.ownerChecks = ownerChecks;
-  const who = drawer ?? process.env.STARCI_OP_PROVIDER ?? null;
+  const who = drawer ?? opContextOf()?.provider ?? null;
   const pick = criticFor(settings, who);
   let critique;
   try {
@@ -520,11 +521,11 @@ export async function runComponentRound(o) {
 }
 
 // What finish installs is a Work file the product commits, so its JSON (the draw-render record, the ui-proof score, the
-// rationale, the fixture) never cites the loop's scratch: the loop dir, STARCI_JOB_SCRATCH, an OS-temp render harness.
+// rationale, the fixture) never cites the loop's scratch: the loop dir, the job scratch, an OS-temp render harness.
 // Such a path is gone once the op files its report, and the job scratch's 64-hex name is a "long hex blob" to the
 // product's commit guard (secrets-guard.mjs), which refuses the commit. A scratch path becomes the installed file it
 // was copied to (relative to the JSON's own directory), else a member of the loop bundle `draw-loop:<path in the loop>`
-// (generation.loop cites the bundle's sha256), else `scratch:<path in STARCI_JOB_SCRATCH>`, else (a temp path that is
+// (generation.loop cites the bundle's sha256), else `scratch:<path in the job scratch>`, else (a temp path that is
 // gone) `temp:<file name>`.
 export const LOOP_REF = 'draw-loop:';
 export const SCRATCH_REF = 'scratch:';
@@ -535,10 +536,10 @@ const within = (root, p) => { const rel = path.relative(root, p); return rel ===
 const withReal = (d) => { const out = [path.resolve(d)]; try { out.push(fs.realpathSync.native(d)); } catch { /* missing */ } return out; };
 const reEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** The scratch roots of a loop (the loop dir, STARCI_JOB_SCRATCH, the OS temp dirs), with a mapper of a path under them. */
-export function scratchRewriter({ out, env = process.env, installed = new Map() }) {
+/** The scratch roots of a loop (the loop dir, the job scratch, the OS temp dirs), with a mapper of a path under them. */
+export function scratchRewriter({ out, env = process.env, context = opContextOf({ env }), installed = new Map() }) {
   const loopRoots = withReal(out);
-  const jobRoots = env.STARCI_JOB_SCRATCH ? withReal(env.STARCI_JOB_SCRATCH) : [];
+  const jobRoots = context?.scratchDir ? withReal(context.scratchDir) : [];
   const roots = [...new Set([...loopRoots, ...jobRoots, ...[os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).flatMap(withReal)])]
     .filter((d) => path.parse(d).root !== d).sort((a, b) => b.length - a.length);
   // Each root as written with either separator, optionally as a file URL; the tail runs to the first quote or space.

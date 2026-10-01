@@ -9,6 +9,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {
   claudeKeyForms,codexKeyForms,codexHeader,codexProjectTables,writeClaudeTrust,writeCodexTrust,writeCodexNoUpdateCheck,writeCodexNoModelNudge,
   assertClaudeBypassConsent,ensureLaunchTrust,trustTargets,orcaCodexHome,assertClaudeSettingsEnv,claudeLaunchEnv,
+  toolGuardCommand,assertJsonToolGuard,writeDevinProfile,codexGuardBlock,writeCodexToolGuard,trustCodexToolGuard,projectTargets,excludeFromGit,
 } from '../scripts/agent/trust.mjs';
 import {gateMenuPosition} from '../scripts/agent/lib.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
@@ -142,7 +143,8 @@ test('ensureLaunchTrust asserts the launch env for a Claude launch only',t=>{
   const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:home};
   const claude=ensureLaunchTrust({agent:'claude',cwd,env});
   assert.equal(claude.launchEnv,'written');
-  assert.equal(JSON.parse(fs.readFileSync(path.join(home,'.claude','settings.json'),'utf8')).env.DISABLE_AUTOUPDATER,'1');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(cwd,'.claude','settings.local.json'),'utf8')).env.DISABLE_AUTOUPDATER,'1','the worktree\'s local project settings, never ~/.claude/settings.json');
+  assert.equal(fs.existsSync(path.join(home,'.claude','settings.json')),false);
   assert.equal(ensureLaunchTrust({agent:'claude',cwd,env}).launchEnv,'already');
   assert.equal(ensureLaunchTrust({agent:'codex',cwd,env}).launchEnv,undefined);
 });
@@ -215,12 +217,136 @@ test('ensureLaunchTrust writes Claude and every Codex home under the trust home,
   for(const k of claudeKeyForms(cwd))assert.equal(doc.projects[k].hasTrustDialogAccepted,true);
   const codex=ensureLaunchTrust({agent:'codex',cwd,env});
   assert.equal(codex.status,'written');
-  assert.deepEqual([...new Set(codex.written.map(w=>w.file))].sort(),[path.join(home,'.codex','config.toml'),path.join(orcaHome,'config.toml')].sort());
+  assert.deepEqual([...new Set(codex.written.map(w=>w.file))].sort(),[path.join(home,'.codex','config.toml'),path.join(orcaHome,'config.toml'),path.join(cwd,'.codex','config.toml')].sort());
   assert.match(fs.readFileSync(path.join(orcaHome,'config.toml'),'utf8'),/^approval_policy = "never"\n/,'the owner\'s approval policy is untouched');
   assert.equal(ensureLaunchTrust({agent:'codex',cwd,env}).status,'already');
   assert.equal(ensureLaunchTrust({agent:'claude',cwd,env}).status,'already');
-  assert.equal(ensureLaunchTrust({agent:'devin',cwd,env}),null,'an agent with no trust prompt and no host prerequisite is not touched');
+  assert.equal(ensureLaunchTrust({agent:'gemini',cwd,env}),null,'an agent the runtime launches no worker for is not touched');
   assert.equal(ensureLaunchTrust({agent:'claude',cwd:'active',env}).status,'skipped','an Orca selector is not a directory');
+});
+
+/* ---------------------------------------- the command guard, every host */
+
+// The op guard is a PreToolUse hook every agent host runs (scripts/guards/command-guard.mjs); launch trust registers
+// it in the launch worktree's PROJECT files only, and pins Devin's model in Devin's local project config (worker-start
+// passes Devin no --model).
+test('launch trust registers the command guard hook in the worktree\'s project settings for Claude and Devin, and pins Devin\'s model there',t=>{
+  const home=tmp(t,'starci-trust-guard-home-');const cwd=tmp(t,'starci-trust-guard-cwd-');
+  const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:home};
+  const command=toolGuardCommand();
+  assert.match(command,/^node ".*\/scripts\/guards\/command-guard\.mjs"$/);
+  assert.doesNotMatch(command,/\\/,'forward slashes: Claude and Devin run hooks through Git Bash on Windows');
+  const {claudeSettings:settings,devinConfig:devinFile}=projectTargets(cwd);
+  assert.equal(settings,path.join(cwd,'.claude','settings.local.json'));
+  assert.equal(devinFile,path.join(cwd,'.devin','config.local.json'));
+  fs.mkdirSync(path.dirname(settings),{recursive:true});
+  fs.writeFileSync(settings,JSON.stringify({hooks:{PreToolUse:[{matcher:'Edit',hooks:[{type:'command',command:'owner-hook'}]},{matcher:'Bash',hooks:[{type:'command',command:'node "D:/old/runtime/scripts/guards/command-guard.mjs"'}]}]}},null,2));
+  const claude=ensureLaunchTrust({agent:'claude',cwd,env});
+  assert.deepEqual(claude.toolGuard,[{file:settings,state:'written'}]);
+  const pre=JSON.parse(fs.readFileSync(settings,'utf8')).hooks.PreToolUse;
+  assert.deepEqual(pre,[{matcher:'Edit',hooks:[{type:'command',command:'owner-hook'}]},{matcher:'Bash|PowerShell',hooks:[{type:'command',command,timeout:30}]}],'the owner\'s hook stays; an older guard entry is replaced, never doubled');
+  assert.deepEqual(ensureLaunchTrust({agent:'claude',cwd,env}).toolGuard,[{file:settings,state:'already'}]);
+  // Devin: its local project config, the model pinned, any other key kept.
+  fs.mkdirSync(path.dirname(devinFile),{recursive:true});
+  fs.writeFileSync(devinFile,JSON.stringify({version:1,permissions:{allow:['Read']}},null,2));
+  const devin=ensureLaunchTrust({agent:'devin',cwd,env,model:'swe-2-max',platform:'win32'});
+  assert.equal(devin.status,'written',JSON.stringify(devin));
+  assert.deepEqual(devin.modelPin,{file:devinFile,model:'swe-2-max',state:'written'});
+  const doc=JSON.parse(fs.readFileSync(devinFile,'utf8'));
+  assert.equal(doc.agent.model,'swe-2-max');
+  assert.deepEqual(doc.permissions,{allow:['Read']});
+  assert.deepEqual(doc.hooks.PreToolUse,[{hooks:[{type:'command',command,timeout:30}]}]);
+  assert.equal(ensureLaunchTrust({agent:'devin',cwd,env,model:'swe-2-max',platform:'win32'}).status,'already');
+  // The model moves with the route: a different pinned model is rewritten, the guard kept.
+  assert.equal(writeDevinProfile({file:devinFile,command,model:'swe-2-high'}).state,'written');
+  assert.equal(JSON.parse(fs.readFileSync(devinFile,'utf8')).agent.model,'swe-2-high');
+  fs.writeFileSync(devinFile,'{"hooks":[]}');
+  assert.equal(assertJsonToolGuard({file:devinFile,command}).ok,false,'a hooks value that is not an object is never rewritten');
+});
+
+// Lead ruling 2026-10-01: launch trust writes only under the launch worktree (and its repository's own
+// info/exclude), never a user-global settings file: ~/.claude/settings.json, Devin's user config.json and each Codex
+// home keep no guard hook and no launch setting from the runtime. The home is injected (STARCI_AGENT_TRUST_HOME).
+test('launch trust writes only under the op worktree and never touches a user-global settings file',t=>{
+  const home=tmp(t,'starci-trust-scope-home-');const cwd=tmp(t,'starci-trust-scope-cwd-');
+  const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:home};
+  const git=(...a)=>spawnSync('git',a,{cwd,encoding:'utf8',windowsHide:true});
+  assert.equal(git('init','-q').status,0);
+  const orcaHome=orcaCodexHome({env:{APPDATA:path.join(home,'AppData','Roaming'),XDG_CONFIG_HOME:path.join(home,'.config')},home});
+  const userSettings=path.join(home,'.claude','settings.json');
+  const devinUser=path.join(home,'AppData','Roaming','devin','config.json');
+  const codexUsers=[path.join(home,'.codex','config.toml'),path.join(orcaHome,'config.toml')];
+  for(const [file,text] of [[userSettings,'{"model":"opus"}\n'],[devinUser,'{"version":1}\n'],...codexUsers.map(f=>[f,'approval_policy = "never"\n'])]){
+    fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);
+  }
+  const snapshot=(dir)=>{const out=new Map();const walk=d=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else out.set(p,fs.readFileSync(p,'utf8'));}};walk(dir);return out;};
+  const homeBefore=snapshot(home);
+  const codexServer=({requests})=>requests.map(q=>q.method==='config/batchWrite'?{}:{data:[{hooks:[{key:'k',eventName:'preToolUse',command:toolGuardCommand(),currentHash:'h',trustStatus:'trusted'}]}]});
+  for(const agent of ['claude','codex','devin']){
+    const r=ensureLaunchTrust({agent,cwd,env,model:agent==='devin'?'swe-2-max':null,codexAppServer:codexServer});
+    assert.notEqual(r.status,'failed',JSON.stringify(r));
+    for(const g of r.toolGuard)assert.ok(path.resolve(g.file).startsWith(path.resolve(cwd)+path.sep),`${agent}: the guard hook lives under the worktree, not ${g.file}`);
+  }
+  // Under the home only the per-user trust records change: ~/.claude.json and each Codex home's project trust and
+  // notices - never a hook or a launch setting, and never ~/.claude/settings.json or Devin's user config.
+  const homeAfter=snapshot(home);
+  const changed=[...homeAfter].filter(([f,text])=>homeBefore.get(f)!==text).map(([f])=>f).sort();
+  assert.deepEqual(changed,[path.join(home,'.claude.json'),...codexUsers].sort());
+  assert.equal(homeAfter.get(userSettings),homeBefore.get(userSettings),'~/.claude/settings.json is untouched');
+  assert.equal(homeAfter.get(devinUser),homeBefore.get(devinUser),'Devin\'s user config is untouched');
+  for(const f of codexUsers)assert.doesNotMatch(homeAfter.get(f),/command-guard|hooks\.PreToolUse/,`${f} carries no guard hook`);
+  // Under the worktree: the three project files, each kept out of git status by the repository's own info/exclude.
+  const p=projectTargets(cwd);
+  for(const f of [p.claudeSettings,p.codexConfig,p.devinConfig])assert.ok(fs.existsSync(f),f);
+  assert.equal(JSON.parse(fs.readFileSync(p.claudeSettings,'utf8')).skipDangerousModePermissionPrompt,true);
+  assert.equal(git('status','--porcelain','--untracked-files=all').stdout.trim(),'','the project files never dirty the checkout');
+  const excludeFile=path.join(cwd,'.git','info','exclude');
+  const exclude=fs.readFileSync(excludeFile,'utf8');
+  for(const line of ['/.claude/settings.local.json','/.codex/config.toml','/.devin/config.local.json'])assert.ok(exclude.split(/\r?\n/).includes(line),line);
+  ensureLaunchTrust({agent:'codex',cwd,env,codexAppServer:codexServer});
+  assert.equal(fs.readFileSync(excludeFile,'utf8'),exclude,'a second launch adds nothing');
+  assert.deepEqual(excludeFromGit(cwd,p.codexConfig),{file:'.codex/config.toml',state:'already'});
+  // A file the repository tracks is never excluded, and a directory that is no checkout is left alone.
+  fs.writeFileSync(path.join(cwd,'tracked.json'),'{}');
+  assert.equal(git('add','tracked.json').status,0);
+  assert.deepEqual(excludeFromGit(cwd,path.join(cwd,'tracked.json')),{file:'tracked.json',state:'tracked'});
+  const plain=tmp(t,'starci-trust-scope-plain-');
+  assert.equal(excludeFromGit(plain,path.join(plain,'.claude','settings.local.json')),null);
+});
+
+test('a Codex home gets the guard block in config.toml and Codex\'s own hash for it, the way Orca trusts its hooks',t=>{
+  const home=tmp(t,'starci-trust-codex-guard-');const cwd=tmp(t,'starci-trust-codex-cwd-');
+  const file=path.join(home,'config.toml');
+  const command=toolGuardCommand();
+  fs.writeFileSync(file,'model = "gpt"\r\n\r\n[projects."D:\\\\x"]\r\ntrust_level = "trusted"\r\n');
+  assert.equal(writeCodexToolGuard({file,command}).written,true);
+  const text=fs.readFileSync(file,'utf8');
+  assert.ok(text.startsWith('model = "gpt"\r\n\r\n[projects."D:\\\\x"]\r\ntrust_level = "trusted"\r\n'),'the owner\'s tables stay');
+  assert.ok(text.includes(codexGuardBlock(command,'\r\n')),text);
+  assert.equal(writeCodexToolGuard({file,command}).written,false);
+  // Another runtime path: the block is replaced in place, a table after it kept.
+  fs.writeFileSync(file,`${codexGuardBlock('node "D:/old/scripts/guards/command-guard.mjs"')}\n[notice]\nhide_rate_limit_model_nudge = true\n`);
+  assert.equal(writeCodexToolGuard({file,command}).written,true);
+  assert.equal(fs.readFileSync(file,'utf8'),`${codexGuardBlock(command)}\n[notice]\nhide_rate_limit_model_nudge = true\n`);
+  // Trust: hooks/list names the hash, config/batchWrite records it under hooks.state, hooks/list proves it.
+  const calls=[];let trusted=false;
+  const listed=()=>({data:[{cwd,hooks:[{key:`${file}:pre_tool_use:0:0`,eventName:'preToolUse',command,currentHash:'sha256:abc',trustStatus:trusted?'trusted':'untrusted'},
+    {key:'x:pre_tool_use:0:0',eventName:'preToolUse',command:'owner',currentHash:'sha256:zzz',trustStatus:'untrusted'}]}]});
+  const appServer=({home:h,requests})=>requests.map(r=>{calls.push({home:h,...r});if(r.method==='config/batchWrite'){trusted=true;return {};}return listed();});
+  assert.deepEqual(trustCodexToolGuard({home,cwd,command,appServer}),{home,ok:true,trusted:'written'});
+  assert.deepEqual(calls.find(c=>c.method==='config/batchWrite').params,{edits:[{keyPath:'hooks.state',value:{[`${file}:pre_tool_use:0:0`]:{trusted_hash:'sha256:abc'}},mergeStrategy:'upsert'}],reloadUserConfig:true},'only the guard hook is trusted, never the owner\'s');
+  assert.deepEqual(trustCodexToolGuard({home,cwd,command,appServer}),{home,ok:true,trusted:'already'});
+  assert.equal(trustCodexToolGuard({home,cwd,command:'node "elsewhere"',appServer}).ok,false,'a guard hook Codex does not list is a failure, never assumed');
+  // Through ensureLaunchTrust, with the app-server injected (a spec never starts the real Codex).
+  const trustHome=tmp(t,'starci-trust-codex-home-');
+  const env={NODE_TEST_CONTEXT:'child-v8',STARCI_AGENT_TRUST_HOME:trustHome};
+  fs.mkdirSync(path.join(trustHome,'.codex'),{recursive:true});
+  const r=ensureLaunchTrust({agent:'codex',cwd,env,codexAppServer:({requests})=>requests.map(q=>q.method==='config/batchWrite'?{}:{data:[{hooks:[{key:'k',eventName:'preToolUse',command,currentHash:'h',trustStatus:'trusted'}]}]})});
+  const projectFile=path.join(cwd,'.codex','config.toml');
+  assert.deepEqual(r.toolGuard,[{file:projectFile,written:true,trustedIn:[{home:path.join(trustHome,'.codex'),trusted:'already'}]}],'the hook lives in the worktree\'s project layer; the home only trusts it');
+  assert.ok(fs.readFileSync(projectFile,'utf8').includes(codexGuardBlock(command)));
+  assert.doesNotMatch(fs.readFileSync(path.join(trustHome,'.codex','config.toml'),'utf8'),/command-guard/,'no guard hook in the Codex home');
+  assert.deepEqual(ensureLaunchTrust({agent:'codex',cwd,env}).toolGuard,[{file:projectFile,trustedIn:[{home:path.join(trustHome,'.codex'),trusted:'not-checked'}]}],'no app-server injected under a trust home: the hash step waits');
 });
 
 /* -------------------------------------------------- gate menu reading */
@@ -232,7 +358,7 @@ test('the menu cursor is read from the screen, not assumed',()=>{
   assert.equal(gateMenuPosition('Do you trust the contents of this directory? › 1. Yes, continue 2. No, quit','Yes, continue'),null,'no cursor row, no answer');
 });
 
-/* ------------------------------------------- gate auto-answer: op dispatch */
+/* ------------------------------------------- launch trust: op dispatch */
 
 const opFixture=(t,extra={})=>{
   const root=tmp(t,'starci-gate-op-');
@@ -270,38 +396,23 @@ const opFixture=(t,extra={})=>{
   return {repo,trustHome,dispatch,events,job,orcaState};
 };
 
-test('an allowlisted Codex trust gate is answered once by the runtime and the dispatch proceeds',t=>{
-  const fx=opFixture(t,{STARCI_FAKE_ORCA_GATE_SCREEN:'codex-trust'});
+// Every launch is orchestration worker-start: Orca answers nothing on the owner's behalf and the runtime types
+// nothing into a starting agent, so the launch pre-trusts its directory and the receipt rides the dispatch.
+test('a Codex op dispatch pre-trusts its worktree and the trust receipt rides op-dispatched',t=>{
+  const fx=opFixture(t);
   const r=fx.dispatch();
   assert.equal(r.status,0,`dispatch failed: ${r.stderr||r.stdout}`);
   assert.equal(fx.job()?.status,'running');
-  assert.deepEqual(fx.orcaState().terminals['fake-terminal-1'].gateKeys,['\r'],'one Enter on the cursor already at "Yes, continue"');
-  const [approved]=fx.events('gate-auto-approved');
-  assert.deepEqual([approved?.gate,approved?.keystroke,approved?.cleared],['codex-directory-trust','enter',true]);
   const [dispatched]=fx.events('op-dispatched');
   assert.equal(dispatched?.trust?.agent,'codex');
   assert.equal(dispatched.trust.status,'written');
   assert.deepEqual(dispatched.trust.paths,[path.resolve(fx.repo)]);
   const toml=fs.readFileSync(path.join(fx.trustHome,'.codex','config.toml'),'utf8');
   for(const k of codexKeyForms(fx.repo))assert.equal(codexProjectTables(toml).get(k)?.trust,'trusted');
+  assert.equal(fx.events('gate-auto-approved').length,0,'nothing is typed into a starting worker');
 });
 
-test('a gate that persists after its one answer is refused and the terminal closed',t=>{
-  const fx=opFixture(t,{STARCI_FAKE_ORCA_GATE_SCREEN:'codex-trust',STARCI_FAKE_ORCA_GATE_STICKY:'1'});
-  const r=fx.dispatch();
-  assert.notEqual(r.status,0);
-  const [rejected]=fx.events('dispatch-rejected');
-  assert.equal(rejected?.step,'readiness');
-  assert.match(rejected.error,/interactive gate 'codex-directory-trust' — it persisted after the runtime answered it \(enter\)/);
-  assert.equal(rejected.terminalClosed,true);
-  assert.equal(rejected.trust?.agent,'codex','the trust receipt rides the refusal too');
-  assert.deepEqual(fx.orcaState().terminals['fake-terminal-1'].gateKeys,['\r'],'answered exactly once, never hammered');
-  const [approved]=fx.events('gate-auto-approved');
-  assert.deepEqual([approved?.keystroke,approved?.cleared],['enter',false]);
-  assert.equal(fx.job()?.status,'ready');
-});
-
-/* ----------------------------------------------- gate auto-answer: kernel */
+/* ----------------------------------------------- launch trust: kernel */
 
 const kernelFixture=(t,kernelLine,extra={})=>{
   const root=tmp(t,'starci-gate-kernel-');
@@ -331,34 +442,17 @@ const kernelFixture=(t,kernelLine,extra={})=>{
 
 const CLAUDE_KERNEL='kernel: {agent: claude, model: claude-opus-5-5, effort: high}';
 
-for(const [screen,gate,select] of [['claude-trust','claude-workspace-trust','Yes, I trust this folder'],['claude-bypass','claude-bypass-permissions-consent','Yes, I accept']]){
-  test(`kernel boot answers the Claude ${gate} gate by walking the cursor to '${select}'`,t=>{
-    const f=kernelFixture(t,CLAUDE_KERNEL,{STARCI_FAKE_ORCA_GATE_SCREEN:screen});
-    const r=f.boot();
-    assert.equal(r.status,0,r.stderr||r.stdout);
-    assert.deepEqual(f.orcaState().terminals['fake-terminal-1'].gateKeys,['\x1b[B','\r'],'Down from "No, exit", then Enter');
-    const events=f.events();
-    const approved=events.find(e=>e.kind==='gate-auto-approved');
-    assert.deepEqual([approved?.payload.gate,approved?.payload.keystroke,approved?.payload.cleared],[gate,'down,enter',true]);
-    const booted=events.find(e=>e.kind==='kernel-booted');
-    assert.equal(booted?.payload.trust?.agent,'claude');
-    assert.equal(booted.payload.trust.status,'written');
-    assert.equal(booted.payload.trust.bypassConsent,'written');
-    const doc=JSON.parse(fs.readFileSync(path.join(f.trustHome,'.claude.json'),'utf8'));
-    for(const k of claudeKeyForms(f.repo))assert.equal(doc.projects[k].hasTrustDialogAccepted,true,k);
-  });
-}
-
-test('a gate outside the allowlist is refused with no keystroke',t=>{
-  const f=kernelFixture(t,CLAUDE_KERNEL,{STARCI_FAKE_ORCA_GATE_SCREEN:'claude-onboarding'});
+test('a Claude kernel boot pre-trusts the repository and asserts the bypass consent before worker-start',t=>{
+  const f=kernelFixture(t,CLAUDE_KERNEL);
   const r=f.boot();
-  assert.equal(r.status,1);
-  const events=f.events();
-  const failed=events.find(e=>e.kind==='kernel-start-failed');
-  assert.deepEqual([failed?.payload.step,failed?.payload.gate],['readiness','claude-first-run-onboarding']);
-  assert.match(failed.payload.error,/not on the agent card's gateAutoAnswer allowlist/);
-  assert.deepEqual(f.orcaState().terminals['fake-terminal-1'].gateKeys,[],'nothing was typed into the gate');
-  assert.equal(events.some(e=>e.kind==='gate-auto-approved'),false);
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const booted=f.events().find(e=>e.kind==='kernel-booted');
+  assert.equal(booted?.payload.launch,'worker');
+  assert.equal(booted.payload.trust?.agent,'claude');
+  assert.equal(booted.payload.trust.status,'written');
+  assert.equal(booted.payload.trust.bypassConsent,'written');
+  const doc=JSON.parse(fs.readFileSync(path.join(f.trustHome,'.claude.json'),'utf8'));
+  for(const k of claudeKeyForms(f.repo))assert.equal(doc.projects[k].hasTrustDialogAccepted,true,k);
 });
 
 // A new Codex release put an "Update available! ... Press enter to continue"

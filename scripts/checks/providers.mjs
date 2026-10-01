@@ -86,27 +86,23 @@ export function validateProviderContracts({root=skillRoot}={}){
     }
   }
 
-  // 3. Every adapter reference resolves to a real agent card — model profiles
-  //    (launch.orca.adapter) and the registry's orcaLaunch.adapter alike.
+  // 3. Every launch names a real agent card — model profiles (launch.orca.agent) and the registry's
+  //    orcaLaunch.agent alike: the one launch is worker-start --agent <card>.
   const profileFiles=yamlFilesIn(PROFILES_DIR);
   for(const name of profileFiles){
     const rel=`modules/models/profiles/${name}`;
     let profile=null;
     try{profile=readYamlFile(path.join(PROFILES_DIR,name));}
     catch(error){errors.push(`Model profile ${rel} does not parse: ${error.message}`);continue;}
-    const adapter=profile?.launch?.orca?.adapter;
-    if(adapter!==undefined)
-      add(errors,typeof adapter==='string'&&Object.hasOwn(cards,adapter),`Profile ${rel} names unknown agent card: ${adapter}`);
-    if(profile?.launch?.orca?.kind==='command-terminal')
-      add(errors,typeof adapter==='string'&&adapter.length>0,`Command-terminal profile ${rel} must declare launch.orca.adapter`);
+    const agent=profile?.launch?.orca?.agent;
+    add(errors,typeof agent==='string'&&Object.hasOwn(cards,agent),`Profile ${rel} launch.orca.agent names no agent card: ${agent}`);
   }
   let registry=null;
   try{registry=fs.existsSync(REGISTRY_FILE)?readYamlFile(REGISTRY_FILE):null;}
   catch(error){errors.push(`modules/models/registry.yaml does not parse: ${error.message}`);}
   for(const [name,target] of Object.entries(registry?.targets||{})){
-    const adapter=target?.orcaLaunch?.adapter;
-    if(adapter!==undefined)
-      add(errors,typeof adapter==='string'&&Object.hasOwn(cards,adapter),`Registry target ${name} names unknown agent card: ${adapter}`);
+    const agent=target?.orcaLaunch?.agent;
+    add(errors,typeof agent==='string'&&Object.hasOwn(cards,agent),`Registry target ${name} orcaLaunch.agent names no agent card: ${agent}`);
   }
 
   // 4. The Orca call contract is the argv source scripts/api/orca/lib.mjs

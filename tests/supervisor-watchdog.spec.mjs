@@ -25,19 +25,22 @@ const envOf = (t) => { const root = tmp(t, 'sup-wd-'); return { LOCALAPPDATA: pa
 
 /* ------------------------------------------------------------ fake Orca (launch) */
 
-function fakeHost({ terminals = [], live = new Set(), screens = {} } = {}) {
-  const calls = { spawn: [], close: [], quit: [] };
+function fakeHost({ terminals = [], live = new Set(), screens = {}, workers = new Map() } = {}) {
+  const calls = { start: [], close: [], quit: [], stop: [], release: [] };
   let n = 0;
   return {
     calls, live,
     list: () => ({ ok: true, terminals, visualLayouts: [] }),
     tabTitles: (_layouts, rows) => new Map(rows.map((r) => [r.handle, r.tab ?? null])),
-    verdict: (h) => (live.has(h) ? { verdict: 'live', reason: 'ok' } : { verdict: 'gone', reason: 'gone' }),
+    show: (d) => (workers.has(d) ? { ok: true, state: workers.get(d) } : { ok: false, error: 'no such worker' }),
+    stop: (d) => { calls.stop.push(d); workers.set(d, 'stopped'); return { ok: true }; },
+    release: (d) => { calls.release.push(d); workers.set(d, 'released'); return { ok: true }; },
+    bindSeat: () => 'seat.json',
     screen: (h) => screens[h] ?? '> ',
     exitedRow: () => null,
     close: (h) => { calls.close.push(h); live.delete(h); return { ok: true }; },
     quit: (h) => { calls.quit.push(h); return { sent: true, exited: false }; },
-    spawn: (opts) => { calls.spawn.push(opts); const h = `term_new${++n}`; live.add(h); return { ok: true, terminal: h, modelAttested: opts.model }; },
+    start: (opts) => { calls.start.push(opts); const h = `term_new${++n}`, d = `ctx_new${n}`; live.add(h); workers.set(d, 'ready'); return { ok: true, terminal: h, dispatchId: d, runId: 'run_sup', taskId: `task_${n}` }; },
   };
 }
 const settings = { agent: 'claude', model: 'claude-opus-5-5', effort: 'high', repos: [], pollIntervalMs: 600000, language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
@@ -54,9 +57,8 @@ function seatDeps({ state = 'turn-idle', frame = '❯ ', outputAge = null, wakeR
     replaceResult: replaceResult ?? { ok: true, action: 'restarted', terminal: 'term_replaced' },
   };
   const d = {
-    verdict: () => ({ verdict: 'live', reason: 'ok' }),
+    show: () => ({ ok: true, state: 'ready' }),
     screen: () => seat.frame,
-    exitedRow: () => null,
     settleMs: 0,
     sleep: () => {},
     state: () => seat.state,
@@ -66,7 +68,6 @@ function seatDeps({ state = 'turn-idle', frame = '❯ ', outputAge = null, wakeR
     enter: () => ({ ok: true }),
     quit: () => null,
     close: () => ({ ok: true }),
-    closeExited: () => null,
     replace: () => { seat.order.push('replace'); return seat.replaceResult; },
   };
   return { seat, d };

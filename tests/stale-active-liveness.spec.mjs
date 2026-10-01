@@ -80,7 +80,7 @@ const watchdogOnce=(t,{screen,outputAgeMs})=>{
     const at=Date.now();
     seedWorkflow(ledger,{id:wf,state:{phase:'running',job:'stale active'},goal:{revision:0,identity:'stale',markdown:'# goal',json:{}}});
     ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,?,?,?,NULL)")
-      .run(wf,'kernel-test',JSON.stringify({terminal:'kern-term-1',host:'orca',agent:'codex'}),at);
+      .run(wf,'kernel-test',JSON.stringify({terminal:'kern-term-1',dispatch:'dispatch-kernel-1',host:'orca',agent:'codex',launch:'worker'}),at);
   }finally{ledger.close();}
   const stub=path.join(dir,'orca-stub.cjs'),sendLog=path.join(dir,'sends.jsonl');
   fs.writeFileSync(stub,STUB);

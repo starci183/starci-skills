@@ -28,8 +28,8 @@ dispatch:
     SAME job to ready, H13 - no new try, attemptConsumed false; a launch whose effect is unknown fences the job
     effect_unknown for reconcile). Once Orca returns the dispatch id, one op_attempts row (dispatch_seq, scratch_dir =
     the job scratch, terminal, run, task, pool) and its contracts row (keyed by attempt_id) are written in one
-    transaction that also moves a queued workflow to running; the op launches with STARCI_JOB_SCRATCH set, the
-    scratch api report reads its report from. A refused launch ends that attempt in the refusal's own transaction
+    transaction that also moves a queued workflow to running; the op's prompt names that job scratch
+    (STARCI_JOB_SCRATCH in op contracts), the scratch api report reads its report from. A refused launch ends that attempt in the refusal's own transaction
     (end_state requeued, or effect-unknown when the effect is unknown; a requeued attempt is also settled_at/settled_by kernel
     with no verdict, released_at set, its Orca Task closed, task_closed_at set, and work_units.dispatches gives the slot back)
     and keeps it as history: it is never open, never running in api status or the UI, never a try. settle_json.message
@@ -112,11 +112,11 @@ dispatch:
     ctx_3074731253e3 as ctx_cc73a111de44 before this)
   spawn: >-
     with --spawn the api runs the Orca sequence itself — through
-    scripts/agent/lib.mjs spawnAgent, so the agent card's
-    command flags are auto-injected and can never be forgotten:
-    terminal create titled `[Op] <op-id>` -> readiness read -> send the
-    rendered packet — command, flags and readiness patterns from the
-    agent card modules/models/agents/<agent>.yaml. The
+    scripts/agent/lib.mjs spawnAgent, the one agent launch: task-create
+    with the rendered packet -> worker-start --agent <provider> [--model
+    <id> --effort <level>] on the op's worktree -> dispatch-show ->
+    terminal rename `[Op] <op>` -> worker-show attestation. Orca composes
+    the agent command with the owner's per-agent default args. The
     kernel agent never calls orca directly. Without --spawn: dry-run —
     the packet prints, nothing is reserved and nothing launches.
   attestation: >-
@@ -151,7 +151,6 @@ dispatch:
     - 'model-outside-order (field `reason`): the launch pool (--model, the persisted route or the unrouted default devin-agent) is outside the kind''s order at its floor-raised tier (scripts/agent/models.mjs kindOrder; a cut slice walks the fan-out order); a profile target counts as its provider''s pool. Strategy kinds (order think/decide/plan) therefore launch only on claude-agent or codex-agent. --spawn checks it before leases and any Orca call, prints {ok:false, jobId, op, reason:"model-outside-order", model, order, difficulty, allowed, detail} and exits 1; the job stays queued. A dry run does not refuse; it carries `modelOutsideOrder`'
     - brief-missing: '--spawn with no brief at modules/ops/ops/<op>.yaml — the packet would cite a contract that is not there'
     - 'tool-unavailable (field `reason`): --spawn whose launch agent (the persisted route, --model, or the unrouted default) lacks a host tool the op''s route.riskHints requires. Checked before leases and before any Orca call; prints {ok:false, jobId, op, reason:"tool-unavailable", tools, model, detail} and exits 1, the job stays queued. detail reads "<pool> (agent <provider>) lacks host tool <tool> that <op> requires (...). Re-run api route --job <id> — it now selects only agents whose card lists the tool — then dispatch again. The job stays queued." A dry run does not refuse; it carries `toolUnavailable`'
-    - managed-agent: '--spawn on a launch kind that is neither command-terminal nor managed — that path is orca orchestration worker-start (modules/host/orca/index.yaml managedFallback)'
     - 'path-lease (field `reason`, `waiting: true`): a LIVE capacity-1 `path:<owned_path>` lease of another job (unexpired, its holder not settled) overlaps this job''s owned_paths - often the workflow''s OWN running job. A wait, never a launcher failure: checked before the provider circuit, the leases and any Orca call on --spawn (and again when reserve loses the race to a new holder), so nothing is reserved or launched and NO dispatch-rejected event is written. Prints {ok:false, jobId, op, reason:"path-lease", waiting:true, queuedBecause:"path-lease", holders:[{jobId, opId, workflowId, status, sameWorkflow, paths, expiresAt}], conflicts, detail} and exits 1; the job stays queued, api status reports it queuedBecause path-lease naming the holder and its lease expiry, and once the holder settles (releasing its rows) it reads ready, the frontier turns actionable and the next wake dispatches it. Never re-dispatch it by hand while it waits. An EXPIRED or orphaned overlapping row is no wait: reserve still refuses it as dispatch-rejected (a recovery signal - reconcile or settle the holder)'
     - 'host-resources-low (field `reason`, `waiting: true`): the host itself is short — free disk on the drive that holds %TEMP% and the repositories under runtimes.yaml allocation.resources.minFreeDiskGb, or the RAM-aware throttle (scripts/lib/ram-throttle.mjs, owner ruling 2026-09-28) refusing this op: the fleet already at maxParallelOps, a slot or the RAM a higher-priority workflow (allocation.resources.ramThrottle.priorities, scripts/supervisor/ram-cap.mjs prioritize) still claims (priority-reserved), a heavy op (allocation.resources.opRam class heavy) while free RAM is under minFreeRamPct or CPU is saturated and the workflow is below the top priority, any heavy op while free RAM is under ramThrottle.landSpecPauseBelowPct (heavy-paused, hysteresis: resumes above heavyResumeAbovePct), or its RAM estimate not fitting above hardFloorPct (does-not-fit); the answer then carries `throttle` {reason, op, class, estimateMb, mode, modeWhy, freeRamPct, cpuBusy, headroomMb, running, effectiveCap, heavyCap, maxParallelOps, priority} and the job''s ledger a `dispatch-throttled` event with the same numbers. Running ops are never stopped. A wait, never a launch failure: checked with the admission/provider-health path on --spawn before any Orca call, so nothing is reserved or launched and NO dispatch-rejected event is written. Prints {ok:false, jobId, op, reason:"host-resources-low", waiting:true, queuedBecause:"host-resources-low", resources:{drive, freeDiskGb, freeRamPct, minFreeDiskGb, minFreeRamPct}, detail} and exits 1; the job stays queued, api status reports it queuedBecause host-resources-low naming the drive and its free space, the watchdog runs housekeeping once against the shortage and stall-alert tells the owner with an approval-class alert naming the drive. Kernels wait for it — never a failure, never re-dispatched by hand; once the host is back over the thresholds the job reads ready and the next wake dispatches it'
     - 'reserve-failed (UNTYPED, field `refused`): admission threw on job identity/status drift — the job row is left untouched, an operator error rather than a dispatch rejection'
