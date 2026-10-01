@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
-import { commandVerdict } from '../scripts/guards/command-guard.mjs';
+import { commandVerdict } from '../../scripts/guards/command-guard.mjs';
 
 // The command guard refuses a command that writes the WHOLE environment to output, even when a grep or a sed follows:
 // the AWS, Azure and Anthropic values reached a transcript through `env | grep -i orca | sed ...`. Reading one named
