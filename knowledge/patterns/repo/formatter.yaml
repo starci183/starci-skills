@@ -23,16 +23,17 @@ rules:
     hfsRules: [R19]
     requirement: |
       `@starci/prettier-config` is `{ printWidth: 120, tabWidth: 4, semi: false, singleQuote: false, trailingComma: "all" }` for
-      backend and frontend, referenced as `"prettier": "@starci/prettier-config"` in `package.json`. Pre-commit runs
-      `prettier --write` on staged files, CI and pre-push run `prettier --check`. `.prettierignore` is generated. No other
-      formatter, and no EditorConfig setting that contradicts these values.
+      both sides, referenced by the app root's managed `.prettierrc` (the string `"@starci/prettier-config"`); a `prettier` key in
+      a `package.json` is a local tool configuration (HFS_TOOL_CONFIG_LOCAL). Pre-commit runs `prettier --check` on the staged
+      files, pre-push and CI run `npm run format:check` (`prettier --check .` at the app root). `.prettierignore` is generated. No
+      other formatter, and no EditorConfig setting that contradicts these values.
     rationale: |
-      One formatter with one configuration ends style debate, and the values follow the largest repository so a reformat diff
+      One formatter with one configuration ends style debate, and the values follow the largest codebase so a reformat diff
       stays small.
     cases:
       - id: case-1
-        when: A repository adopts the standard
-        write: One reformat commit in a quiet window, listed in .git-blame-ignore-revs.
+        when: An app adopts the standard
+        write: One reformat commit (npm run format at the app root) in a quiet window, with nothing else in it.
     verification:
       automated:
         - HFS_FORMAT

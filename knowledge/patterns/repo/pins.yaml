@@ -1,9 +1,9 @@
 schema: starci/knowledge-source@1
 id: repo.pins
-title: Repository version pins
+title: App version pins
 purpose: |
   Given a dependency version, who decides it? `knowledge/hfs/canon-pins.yaml` decides for every `@starci/*` package and every
-  core framework tool. A repository has one version of each dependency, pinned exactly.
+  core framework tool. An app has one version of each dependency, pinned exactly, in its one root `package.json`.
 appliesTo:
   - backend
   - frontend
@@ -24,14 +24,15 @@ rules:
     hfsRules: [R15]
     requirement: |
       `@starci/*`, TypeScript, Nest, Next, React, Prettier, ESLint, stylelint, Jest (back end) are at the exact
-      version in `canon-pins.yaml` for the repository's major. Dependencies are pinned exactly (no range) in `package.json`.
-      Raising a version is a change to `canon-pins.yaml` in `.claude` first; `hfs sync` then raises the repositories.
+      version in `canon-pins.yaml` for the app's major. Dependencies are pinned exactly (no range) in the root `package.json`
+      (and in each workspace package's `package.json`). Raising a version is a change to `canon-pins.yaml` in `.claude` first;
+      each app then moves to the new pins in its own upgrade lane.
     rationale: |
-      A repository green under one version while the agent grades under another wastes every cycle.
+      An app green under one version while the agent grades under another wastes every cycle.
     cases:
       - id: case-1
         when: A framework upgrade
-        write: Change canon-pins.yaml, land it in .claude, then run hfs sync in each repository with a visual check for a frontend.
+        write: Change canon-pins.yaml, land it in .claude, then raise the pins in each app's root package.json, npm install, and check the front end visually.
     verification:
       automated:
         - HFS_CANON_PIN_DRIFT
@@ -42,9 +43,9 @@ rules:
     kind: mandatory
     hfsRules: [R14]
     requirement: |
-      Each dependency has one version in the workspace. The root `overrides` fix react, next and grammar. A nested copy
-      (`apps/<app>/node_modules/@starci/grammar`) is forbidden. A dependency shared by several apps is declared identically in
-      each.
+      Each dependency has one version across the root and workspace `package.json` files. The root `overrides` fix react, next
+      and grammar. A nested copy (`fe/packages/<pkg>/node_modules/@starci/grammar`, a nested entry in `package-lock.json`) is
+      forbidden. A dependency a workspace package also declares is declared at the same version as at the root.
     rationale: |
       Two versions of one design system or framework in one bundle behave as two products.
     cases:
