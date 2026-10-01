@@ -12,7 +12,7 @@ One root `jest.config.js` (managed: `require("@starci/jest-preset").starciJestCo
 `src/tests/world/` is the only test infrastructure, declared once for `@starci/test-world` in `test-world.config.ts`
 (`export const { useTestWorld, useSandbox } = defineTestWorld({...})`). The jest `global-setup.ts` / `global-teardown.ts`
 re-export the library's hooks: the library runs the services `.starcistacks/dev` declares, real and behind toxiproxy (Postgres,
-and Keycloak importing the stack's `realm-todo.json`), runs `apps/migrate`'s exported `bootstrap` once, and serves the
+Keycloak importing the stack's `realm-todo.json`, MinIO with the uploads bucket and the Redis of the rate limiter), runs `apps/migrate`'s exported `bootstrap` once, and serves the
 library's network-edge fakes of the external providers (the mail host and the payment gateway). `use-test-world.ts`
 re-exports `useTestWorld(...)` -> `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager),
 `world.keycloak` (the real realm: `person()`, `events()`, `sessions()`), `world.infra.<service>` (`cut()`, `restore()`,

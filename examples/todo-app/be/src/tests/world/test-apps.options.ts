@@ -1,7 +1,7 @@
 /**
  * The typed options the test world hands to the real apps: what the `main.ts` of each app would parse from the environment
  * of a deployment, built as objects from the wiring of the run. The services of the stack are the real ones the library
- * runs (Postgres, Keycloak with the stack's realm); every external provider points at a fake at the network edge; rate
+ * runs (Postgres, Keycloak with the stack's realm, MinIO, Redis); every external provider points at a fake at the network edge; rate
  * limits are high, the job tick and the queue poll are short, the session lives a day.
  */
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"

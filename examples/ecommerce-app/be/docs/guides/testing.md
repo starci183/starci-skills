@@ -63,7 +63,8 @@ Everything else lives under `src/tests/`:
 - `src/tests/world/` is the only test infrastructure, declared once for `@starci/test-world` in `test-world.config.ts`
   (`export const { useTestWorld, useSandbox } = defineTestWorld({...})`); `global-setup.ts` and `global-teardown.ts`
   re-export the library's hooks. The library runs the services `.starcistacks/dev` declares, real and behind toxiproxy:
-  Postgres with one database per connection (identity, order) and the Redis of the cache. It runs the real `apps/migrate`
+  Postgres with one database per connection (identity, order), the Redis of the cache, Keycloak with the stack's
+  `realm-ecommerce.json` and MinIO with the receipts bucket. It runs the real `apps/migrate`
   bootstrap once and applies the dev seeds; `use-test-world.ts` re-exports `useTestWorld({ apps } | { modules })`, which
   boots the real identity and order apps in the spec process, wired to each other over real GraphQL, and returns
   `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager), `world.infra.redis` (the real Redis:
@@ -71,7 +72,9 @@ Everything else lives under `src/tests/`:
   and `world.waitFor`. Nothing is overridden in the DI container and nothing of the stack is faked; this app calls no
   external provider, so it has no network fakes and no contract specs.
 - `src/tests/fixtures/` holds the builders, the response shapes and the SQL constants of out-of-band reads.
-- `src/tests/integration/<area>/*.integration-spec.ts` run real capability modules over the world database.
+- `src/tests/integration/<capability>/*.integration-spec.ts` run real capability modules through `useTestWorld({ modules })`:
+  every integration of `src/modules/integrations/<provider>/` has one (R112), against the real Redis, realm, MinIO or the
+  real peer app the world boots beside the modules (`apps`).
 - `src/tests/e2e/<area>/*.e2e-spec.ts` are flow specs: they call the public GraphQL doors and assert persisted state
   through `world.db`. Narrow a run with jest arguments, for example `npm run test:e2e -- checkout/checkout-journey`.
 

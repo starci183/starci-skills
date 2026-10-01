@@ -1,7 +1,8 @@
 /**
  * The declaration of the todo test world: selection and overrides only. The service list and the image versions come from
- * the stack definition (`.starcistacks/dev`); the library runs Postgres and Keycloak (with the stack's realm) real behind
- * toxiproxy, the mail host and the payment gateway as fakes at the network edge, and boots the real apps in process.
+ * the stack definition (`.starcistacks/dev`); the library runs Postgres, Keycloak (with the stack's realm), MinIO (the
+ * uploads bucket) and Redis real behind toxiproxy, the mail host and the payment gateway as fakes at the network edge, and
+ * boots the real apps in process.
  */
 import { defineTestWorld } from "@starci/test-world"
 import { sepayFake, smtpFake } from "@starci/test-world/fakes"
