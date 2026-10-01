@@ -31,6 +31,7 @@ import { taskSpecOf } from '../machine/task-spec.mjs';
 import { dispatchDepthOf } from '../lib/worker-depth.mjs';
 import { bestEffortCall } from './best-effort-call.mjs';
 import { depthPreflight, entryDispatchOf } from './depth-preflight.mjs';
+import { recordLaunchedTerminal } from './launched-terminals.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -446,6 +447,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
     return fail('attestation', `worker attest failed: expected agent=${provider} model=${takesModel ? model : '(agent default)'}, got agent=${effAgent} model=${effModel} state=${attest?.state ?? 'none'}`,
       { terminal, incident: true, details: attest ?? null });
   }
+  (io?.recordLaunch ?? recordLaunchedTerminal)({ terminal, dispatchId });
   return { ok: true, terminal, dispatchId, taskId: task ?? null, runId: run ?? null, provider, model: takesModel ? model : null,
     effort: takesModel && model ? effort : null, effective: { agent: effAgent, model: effModel }, titleApplied: renamed?.ok === true,
     depth: dispatchDepthOf(attest) ?? depth, maxDepth: limit, ...(trust ? { trust } : {}) };
