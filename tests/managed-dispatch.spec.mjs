@@ -9,7 +9,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {openMachine,openMachineReader} from '../engine/machine-db.mjs';
 process.env.STARCI_SLEEP_SCALE??='0.02';
 import {jobRowOf} from '../scripts/kernel/api-lib/rows.mjs';
-import {writeGreenSonar} from './helpers/sonar-scan.mjs';
+import {writeGreenProofs} from './helpers/sonar-scan.mjs';
 
 // Build the workflow and logical unit required by the current ledger before
 // exercising dispatch. Each fixture op job represents a distinct unit.
@@ -234,7 +234,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   // contract's two-step worker-stop/worker-release lifecycle.
   const report=reportFile(fx.repo,jobId);fs.writeFileSync(report,JSON.stringify({
     schema:'starci/op-report@1',outcome:'done',summary:'managed dispatch completed',head:'abc1234def',
-    files:['docs/managed-result.md',(writeGreenSonar(path.join(fx.repo,'docs')),'docs/sonar.json')],checks:[{name:'self-check',command:'true',exitCode:0}],
+    files:['docs/managed-result.md',...(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json'])],checks:[{name:'self-check',command:'true',exitCode:0}],
   }));
   const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
   assert.equal(filed.status,0,`report failed: ${filed.stderr||filed.stdout}`);
@@ -282,7 +282,7 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   assert.equal(d.status,0,d.stderr||d.stdout);
   assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managed?.agentTerminalHandle,'fake-terminal-1');
   const report=reportFile(fx.repo,jobId);fs.writeFileSync(report,JSON.stringify({
-    schema:'starci/op-report@1',outcome:'done',summary:'done',head:'abc1234def',files:['docs/r.md',(writeGreenSonar(path.join(fx.repo,'docs')),'docs/sonar.json')],checks:[{name:'self',command:'true',exitCode:0}]}));
+    schema:'starci/op-report@1',outcome:'done',summary:'done',head:'abc1234def',files:['docs/r.md',...(writeGreenProofs(path.join(fx.repo,'docs')),['docs/sonar.json','docs/gate.json','docs/read-digest.json'])],checks:[{name:'self',command:'true',exitCode:0}]}));
   assert.equal(fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json').status,0);
   fx.env.STARCI_CALLER='runtime-settler';
   assert.equal(fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'v',command:'v',exitCode:0,evidence:'green'}]}),'--json').status,0);

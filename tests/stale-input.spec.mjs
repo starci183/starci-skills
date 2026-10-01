@@ -8,7 +8,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
-import {writeGreenSonar} from './helpers/sonar-scan.mjs';
+import {writeGreenProofs} from './helpers/sonar-scan.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
 import {INPUT_DIGEST_SCHEMA,baselineWorkInputs,createDigester,inputKindOf,lawTokens,opInputPaths,recordInputs,workInputPaths} from '../scripts/kernel/input-digests.mjs';
 
@@ -42,6 +42,7 @@ const fixture=(t,{registry=null}={})=>{
   for(const file of ['CONTEXT.md','package.json'])fs.copyFileSync(path.join(ROOT,file),path.join(skill,file));
   fs.mkdirSync(path.join(skill,'knowledge'),{recursive:true});
   fs.copyFileSync(path.join(ROOT,'knowledge','sonar-gate.yaml'),path.join(skill,'knowledge','sonar-gate.yaml')); // the Sonar gate a code-writing settle reads
+  fs.copyFileSync(path.join(ROOT,'knowledge','op-gate.yaml'),path.join(skill,'knowledge','op-gate.yaml')); // the op loop a code-writing settle reads
   fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,
@@ -136,7 +137,7 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
   const inputs=inputsOf();
   assert.equal(inputs.schema,INPUT_DIGEST_SCHEMA);
   const recorded=Object.fromEntries(inputs.digests.map(d=>[d.path,d]));
-  assert.deepEqual(Object.keys(recorded).sort(),[FR_DIR,RULES,'knowledge/patterns/be/index.yaml','knowledge/patterns/fe/index.yaml','modules/models/code-patterns.yaml'].sort(),
+  assert.deepEqual(Object.keys(recorded).sort(),[FR_DIR,RULES,'knowledge/op-gate.yaml','knowledge/patterns/be/index.yaml','knowledge/patterns/fe/index.yaml','modules/models/code-patterns.yaml'].sort(),
     'a record outside .starciwork (the job\'s own source) is not a Work input');
   assert.deepEqual(Object.values(recorded).filter(d=>d.kind==='work').map(d=>d.path),[FR_DIR]);
   assert.equal(recorded[RULES].kind,'source');
@@ -144,7 +145,7 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
   assert.equal(recorded[FR_DIR].digest,sha(`${FR_DIR}/index.yaml\0${sha('fr: v1\n')}\n`),'a record directory counts its record files, never evidence/');
 
   const report=inspect(fx,db=>path.join(db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get('job-refactor').scratch_dir,'report.json'));
-  fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:'abc1234def',files:['src/refactor/a.ts',(writeGreenSonar(path.join(fx.repo,'src','refactor')),'src/refactor/sonar.json')],checks:[{name:'self',command:'true',exitCode:0}]}));
+  fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:'abc1234def',files:['src/refactor/a.ts',...(writeGreenProofs(path.join(fx.repo,'src','refactor')),['src/refactor/sonar.json','src/refactor/gate.json','src/refactor/read-digest.json'])],checks:[{name:'self',command:'true',exitCode:0}]}));
   const reported=fx.run('report','--job','job-refactor','--report',report);
   assert.equal(reported.status,0,reported.stderr||reported.stdout);
   const checked=fx.run('check','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));

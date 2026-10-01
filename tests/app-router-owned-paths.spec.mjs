@@ -11,7 +11,7 @@ import {landedProof,ownedPathEffects} from '../scripts/kernel/settle-landed.mjs'
 import {resolveReadPath} from '../scripts/kernel/prerequisites.mjs';
 import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
-import {writeGreenSonar} from './helpers/sonar-scan.mjs';
+import {writeGreenProofs} from './helpers/sonar-scan.mjs';
 
 // Next.js App Router route segments are literal directory names that look like globs
 // (inc-ed9f28ec0561 nivo Modules, inc-e3e7d183c3d5 mia base-repos: interface.scaffold/implement
@@ -241,7 +241,7 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> landed-che
   assert.equal(d3.status,0,`glob twins are disjoint from the literal routes: ${d3.stderr||d3.stdout}`);
 
   for(const dir of ALL_DIRS)write(fx.repo,pageOf(dir),`export default function Page() { return ${JSON.stringify(dir)}; }\n`);
-  writeGreenSonar(path.join(fx.repo,ALL_DIRS[0])); // the Sonar gate reads the scan the op commits with its routes
+  writeGreenProofs(path.join(fx.repo,ALL_DIRS[0])); // the Sonar gate and the op loop read the proofs the op commits with its routes
   git(fx.repo,'add','-A','--',...ALL_DIRS.map(ownedPathspec));
   git(fx.repo,'commit','--quiet','-m','implement routes');
   const head=git(fx.repo,'rev-parse','HEAD');
@@ -249,7 +249,7 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> landed-che
   const scratch=fx.inspect(db=>db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get(routes).scratch_dir);
   const reportFile=path.join(scratch,'report.json');
   fs.writeFileSync(reportFile,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'implemented every route form',
-    files:[...ALL_DIRS.map(pageOf),`${ALL_DIRS[0]}/sonar.json`],checks:[{name:'self-check',command:'true',exitCode:0}],head,branch:'main'}));
+    files:[...ALL_DIRS.map(pageOf),`${ALL_DIRS[0]}/sonar.json`,`${ALL_DIRS[0]}/gate.json`,`${ALL_DIRS[0]}/read-digest.json`],checks:[{name:'self-check',command:'true',exitCode:0}],head,branch:'main'}));
   const filed=fx.run('report','--job',routes,'--report',reportFile);
   assert.equal(filed.status,0,`report files under App Router owned paths: ${filed.stderr||filed.stdout}`);
   // The settler's own re-run evidence is runtime authority (H8); any other caller's green is declared and never counts.
