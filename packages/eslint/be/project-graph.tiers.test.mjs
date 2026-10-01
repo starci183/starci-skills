@@ -386,6 +386,25 @@ test("every owner export and every production file is reached by a root", () => 
     f.cleanup()
 })
 
+test("an integration spec counts as a consumer of its own provider's integration only", () => {
+    const files = {
+        "tsconfig.json": tsconfig({}),
+        "apps/core/src/app.module.ts": "import { PayModule } from '../../../src/modules/integrations/pay';\nimport { MailModule } from '../../../src/modules/integrations/mail';\nexport const AppModule = [PayModule, MailModule];\n",
+        "apps/core/src/main.ts": "import { AppModule } from './app.module';\nvoid AppModule;\n",
+        "src/modules/integrations/pay/index.ts": "export const PayModule = 1;\nexport enum PayErrorCode { Refused = 'PAY_REFUSED' }\nexport const onlyMailSpec = 2;\nexport const onlyE2e = 3;\n",
+        "src/modules/integrations/mail/index.ts": "export const MailModule = 1;\nexport enum MailErrorCode { Bounced = 'MAIL_BOUNCED' }\n",
+        "src/tests/integration/pay/pay-client.integration-spec.ts": "import { PayErrorCode } from '../../../modules/integrations/pay';\nit('refuses', () => { expect(PayErrorCode.Refused).toBe('PAY_REFUSED'); });\n",
+        "src/tests/integration/mail/mail-client.integration-spec.ts": "import { MailErrorCode } from '../../../modules/integrations/mail';\nimport { onlyMailSpec } from '../../../modules/integrations/pay';\nit('bounces', () => { expect([MailErrorCode.Bounced, onlyMailSpec]).toHaveLength(2); });\n",
+        "src/tests/e2e/pay/pay.e2e-spec.ts": "import { onlyE2e } from '../../../modules/integrations/pay';\nit('uses', () => { expect(onlyE2e).toBe(3); });\n",
+    }
+    const f = projectFixture({ files })
+    f.tester.run("dead-exports", rules["dead-exports"], {
+        valid: [...ok(f, files, ["apps/core/src/app.module.ts", "apps/core/src/main.ts", "src/modules/integrations/mail/index.ts"])],
+        invalid: [...bad(f, files, { "src/modules/integrations/pay/index.ts": [3, 4] })],
+    })
+    f.cleanup()
+})
+
 /** A function of `statements + 4` lines whose shape never repeats inside one body; a copy with other names and literals is a clone. */
 const helper = (name, statements, { literal = 1, variable = "value", offset = 0 } = {}) => {
     const chain = (i) => ` + ${literal}`.repeat(i % 7)

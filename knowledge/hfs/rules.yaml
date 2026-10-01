@@ -1143,3 +1143,11 @@ rules:
     failureCodes: ["HFS_PEER_INTEGRATION_MISSING"]
     enforcers:
       - {kind: hfs, id: peer-integrations, at: scripts/lib/hfs-rules/peer-integrations.mjs}
+  - id: R112
+    code: "BE_INTEGRATION_SPEC_MISSING"
+    law: "Every integration of a back end (`src/modules/integrations/<provider>/` holding `<provider>.config.ts`) has at least one `src/tests/integration/<provider>/*.integration-spec.ts` that, read as a syntax tree, calls `useTestWorld({ modules })` with a factory registering the integration's own module (`<Provider>Module.register`, imported from the integration folder; an inline array, a local const or an exported const of another file), references the ErrorCode enum the integration exports, and drives an outage through the world (`world.infra.<service>.cut|latency|during|connection`, `world.fake.<name>.failNext`, `world.apps.<peer>.during`, `world.interruptDatabase`); the finding sits on the integration folder."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_INTEGRATION_SPEC_MISSING"]
+    enforcers:
+      - {kind: hfs, id: integration-specs, at: scripts/lib/hfs-rules/integration-specs.mjs}

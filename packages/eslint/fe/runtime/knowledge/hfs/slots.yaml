@@ -818,9 +818,9 @@ slots:
     tier: integrations
     owner: true
     requires: [index.ts, "<provider>.config.ts"]
-    tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
+    tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts; plus src/tests/integration/<provider>/ (R112)
     budget: {indexExports: 60}
-    rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT]
+    rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT, BE_INTEGRATION_SPEC_MISSING]
   - id: be.integrations.model
     profiles: [be]
     path: "src/modules/integrations/<provider>/model/"
@@ -897,8 +897,8 @@ slots:
     tracked: tracked
     tier: e2e
     tests: e2e
-    why: one capability module on the real database, no HTTP (SQL, transactions, concurrency, inbox claims) through useTestWorld({ modules }); run by test:integration
-    rules: [BE_TEST_TOPOLOGY]
+    why: one capability module through useTestWorld({ modules }), no HTTP door of ours (SQL, transactions, concurrency, inbox claims on the real database; and every integration client, `<capability>` being its provider folder, against our real infra, a real peer app or the library fake at the network edge, with its success, its ErrorCode refusal mapping and an outage through the world, R112); run by test:integration
+    rules: [BE_TEST_TOPOLOGY, BE_INTEGRATION_SPEC_MISSING]
   - id: be.tests.e2e
     profiles: [be]
     path: "src/tests/e2e/<area>/*.e2e-spec.ts"

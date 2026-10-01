@@ -208,3 +208,59 @@ test('HFS_PEER_INTEGRATION_MISSING: the pair catalog is a starci/hfs-peer-integr
   assert.equal(validate(catalog), true, JSON.stringify(validate.errors));
   assert.equal(validate({ ...catalog, pairs: [{ id: 'x', when: [], requires: 'y', why: 'z' }] }), false, 'a pair with no condition is refused');
 });
+
+// ------------------------------------------------------------------------------------------------ R112 BE_INTEGRATION_SPEC_MISSING
+
+const PAY = 'be/src/modules/integrations/pay';
+const withPayIntegration = (specs = {}) => (dir) => {
+  put(dir, `${PAY}/pay.config.ts`, 'export const parsePayConfig = (): { readonly url: string } => ({ url: "x" });\n');
+  put(dir, `${PAY}/errors/pay.error.ts`, "export enum PayErrorCode {\n  Refused = 'PAY_REFUSED',\n}\nexport const PAY_ERROR_KINDS = { [PayErrorCode.Refused]: 'invalid' };\n");
+  put(dir, `${PAY}/pay.module.ts`, 'export class PayModule {\n  static register(options: object): object {\n    return options;\n  }\n}\n');
+  put(dir, `${PAY}/index.ts`, "export { PAY_ERROR_KINDS, PayErrorCode } from './errors/pay.error';\nexport { PayModule } from './pay.module';\n");
+  for (const [rel, text] of Object.entries(specs)) put(dir, rel, text);
+};
+const PAY_SPEC = 'be/src/tests/integration/pay/pay-client.integration-spec.ts';
+const specText = ({ modules, refusal = "await expect(Promise.reject({ code: PayErrorCode.Refused })).rejects.toMatchObject({ code: PayErrorCode.Refused })", outage = "await world.fake.pay.failNext({ status: 500 })", head = '' }) => [
+  "import { PayErrorCode, PayModule } from '../../../modules/integrations/pay';",
+  "import { useTestWorld } from '../../world/use-test-world';",
+  head,
+  "describe('pay', () => {",
+  `  const world = useTestWorld({ modules: ${modules} });`,
+  "  it('refuses and survives an outage', async () => {",
+  `    ${refusal};`,
+  `    ${outage};`,
+  '  });',
+  '});',
+  '',
+].join('\n');
+const r112 = (mutate) => only(checkRepo({ repoRoot: repoOf(APP, mutate) }), 'BE_INTEGRATION_SPEC_MISSING');
+
+test('BE_INTEGRATION_SPEC_MISSING: an integration without an integration spec is refused on its folder', () => {
+  const findings = r112(withPayIntegration());
+  assert.deepEqual(findings.map((f) => [f.path, f.provider, f.missing]), [[`${PAY}/`, 'pay', ['spec']]]);
+});
+
+test('BE_INTEGRATION_SPEC_MISSING: a spec that does not register the integration module, by origin not by name, is refused', () => {
+  const local = specText({ modules: '[() => PayModule.register({})]' }).replace("import { PayErrorCode, PayModule } from '../../../modules/integrations/pay';", "import { PayErrorCode } from '../../../modules/integrations/pay';\nclass PayModule { static register(o: object): object { return o; } }");
+  assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: local })).map((f) => f.missing), [['modules']]);
+  const other = specText({ modules: '[() => OtherModule.register({})]', head: "import { OtherModule } from '../../../modules/platform/other';" });
+  assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: other, 'be/src/modules/platform/other/index.ts': 'export class OtherModule { static register(o: object): object { return o; } }\n' })).map((f) => f.missing), [['modules']]);
+});
+
+test('BE_INTEGRATION_SPEC_MISSING: a spec with no ErrorCode enum reference or no world outage is refused, naming what it lacks', () => {
+  const noEnum = specText({ modules: '[() => PayModule.register({})]', refusal: "expect(PayModule).toBeDefined()" });
+  assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: noEnum })).map((f) => f.missing), [['errorCode']]);
+  const readOnly = specText({ modules: '[() => PayModule.register({})]', outage: 'await world.infra.redis.size()' });
+  assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: readOnly })).map((f) => f.missing), [['outage']]);
+});
+
+test('BE_INTEGRATION_SPEC_MISSING: a correct pair passes, inline or through an exported factory list of another file', () => {
+  assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: specText({ modules: '[() => PayModule.register({})]' }) })), []);
+  const viaList = specText({ modules: 'PAY_MODULES', head: "import { PAY_MODULES } from '../../world/test-capabilities.options';" }).replace("import { PayErrorCode, PayModule } from '../../../modules/integrations/pay';", "import { PayErrorCode } from '../../../modules/integrations/pay';");
+  assert.deepEqual(r112(withPayIntegration({
+    [PAY_SPEC]: viaList.replace('await world.fake.pay.failNext({ status: 500 })', 'await world.infra.postgresql.connection("primary").during(async () => undefined)'),
+    'be/src/tests/world/test-capabilities.options.ts': "import { PayModule } from '../../modules/integrations/pay';\nconst BASE = [() => PayModule.register({ isGlobal: true })];\nexport const PAY_MODULES = [...BASE];\n",
+  })), []);
+  const peer = specText({ modules: '[() => PayModule.register({})]', outage: 'await world.apps.order.during(async () => undefined)' });
+  assert.deepEqual(r112(withPayIntegration({ [PAY_SPEC]: peer })), []);
+});
