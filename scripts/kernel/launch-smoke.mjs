@@ -23,8 +23,7 @@
 //                      its work on preserved/<id>/<op> and the worktree is back on the last checkpoint. Finally, with every
 //                      agent released, finishWorkflow fast-forwards the app's main and marks the worktree release-pending;
 //                      the host-side controller must then remove it (gone from `orca worktree list`, its directory and
-//                      branch gone), and only after that main's checkout must hold exactly the two green files more, byte
-//                      for byte (every other tracked file and the node_modules listing unchanged).
+//                      branch gone); only then main's checkout holds exactly the two green files more, every other file unchanged.
 //
 // Every agent is a no-op on the cheapest model modules/models/runtimes.yaml pins (priced by modules/models/prices.yaml):
 // a leaf writes its result line (`mark`; an op also writes its owned file in the workflow worktree) and reports
