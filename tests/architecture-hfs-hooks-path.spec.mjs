@@ -4,7 +4,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { checkHfs } from '../scripts/checks/architecture/hfs.mjs';
+import { checkHfsWithoutConfig } from '../scripts/checks/architecture/hfs.mjs';
+import { appDeclarationText, DEFAULT_APPS } from './_hfs-arch-fixture.mjs';
+
+// core.hooksPath is judged at the app root (checkAppRoot, reached through checkHfsWithoutConfig on a kind: app hfs.json).
 
 const RULE = 'HFS_HOOKS_PATH_REDIRECTED';
 const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -14,9 +17,11 @@ const repo = t => {
   git(root, 'init', '-q');
   fs.mkdirSync(path.join(root, '.husky'), { recursive: true });
   fs.writeFileSync(path.join(root, '.husky', 'pre-push'), 'npm run lint\n');
+  fs.writeFileSync(path.join(root, 'hfs.json'), appDeclarationText('fe', { apps: DEFAULT_APPS.fe }));
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'fixture', private: true }));
   return root;
 };
-const findings = root => checkHfs({ root, kinds: ['frontend'] }).violations.filter(item => item.ruleId === RULE);
+const findings = root => checkHfsWithoutConfig(root).violations.filter(item => item.ruleId === RULE);
 
 test('a clone with no core.hooksPath is clean', t => {
   assert.deepEqual(findings(repo(t)), []);
