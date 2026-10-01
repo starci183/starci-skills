@@ -15,8 +15,8 @@ summary: >-
   WORKER_STAGING_CREATE_FAILED and WORKER_STAGING_REMOVE_FAILED. Deleted with no fallback: the git staging path
   (createScratchWorktree for supervisor-staging, safeRemoveWorktree, `git worktree prune`, the hand-made branch delete),
   stagingPathOf, branchOf, home.mjs stagingRoot, the supervisor GC's sup/* lane branch and its staging leftover-directory
-  sweep, and the STAGING_ON_SCREEN path pattern (a [Worker] that renamed its tab is now matched by its job's recorded
-  staging path, as its working directory or on its screen). createScratchWorktree refuses the kind at run time, and
+  sweep (the agents collector reads Orca's worker-list since lane WLIST, so no staging path or title is matched).
+  createScratchWorktree refuses the kind at run time, and
   scripts/checks/check-worktree-add.mjs fails any createScratchWorktree call that names an Orca kind. The worktree GC
   (gcWorktrees) collects a settled job's staging through Orca. No op contract changes.
 reach: new-legs
