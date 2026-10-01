@@ -51,7 +51,7 @@ rules:
         write: "Export X from the unit entry; do not invent XBase."
     verification:
       automated:
-        - FE_SOURCE_NAME_SHAPE
+        - starci-fe/export-matches-folder
         - HFS_SLOT_UNDECLARED
       manual:
         - Confirm split units use X and XBase and unsplit units do not add an empty forwarding twin.
@@ -185,8 +185,7 @@ rules:
         when: "A name the framework mandates"
         write: "export const config = { matcher } in src/proxy.ts keeps its framework spelling"
     verification:
-      automated:
-        - FE_SOURCE_NAME_SHAPE
+      automated: []
       manual: []
     relatedExamples: []
 

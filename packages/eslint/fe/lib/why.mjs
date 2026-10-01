@@ -236,6 +236,11 @@ export const why = {
     vi: "`<file>` ghi cookie qua cookie phản hồi của Next mà không nêu `httpOnly` cố định, thiếu `secure` hoặc `sameSite` không phải `lax`/`strict`.",
     fixVi: "Truyền một hằng số options `as const` của module sở hữu cookie: `httpOnly: true` (chỉ `false` cho cookie tùy chọn script cần đọc), `secure` từ `modules/config`, `sameSite: \"lax\"` hoặc `\"strict\"`.",
   },
+  "props-fields-readonly": {
+    code: "FE_PROPS_MUTABLE",
+    vi: "Kiểu props của component ở `<file>` có field hoặc collection không `readonly`, nên component có thể ghi vào thứ nó được truyền.",
+    fixVi: "Đánh dấu `readonly` cho mọi field và index signature, viết collection là `readonly T[]`, `readonly [A, B]` hoặc `ReadonlyArray<T>`.",
+  },
   "no-native-img": {
     code: "FE_NATIVE_IMAGE",
     vi: "`<img>` thô ở `<file>`: tải ảnh gốc, không giữ chỗ nên trang nhảy khi ảnh tải xong.",

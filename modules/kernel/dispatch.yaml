@@ -303,14 +303,14 @@ preflight:
     against the target repo's declared layout and lint rules — the
     applicability/ruleIds tables in modules/models/code-patterns.yaml and
     the check surface under scripts/checks/ that enforces them
-    (code-patterns/*, gate.mjs). A grant that contradicts a layout
+    (gate.mjs, architecture/*). A grant that contradicts a layout
     rule — e.g. `src/tests/**` claimed while the repo profile enforces
     starci-be/unit-test-colocated — is `api incident --kind
     path-illegality`, never a job row that dispatches and settles red.
     Disjointness between sibling ops is a different wall (fields
     .owned_paths above); this one is grant-vs-repo-legality. It is kernel
     discipline: the api does not refuse an illegal path.
-  citation: "modules/models/code-patterns.yaml applicability/ruleIds; scripts/checks/code-patterns/*; modules/kernel/api.yaml dispatch layoutPreflight"
+  citation: "modules/models/code-patterns.yaml applicability/ruleIds; scripts/checks/gate.mjs; modules/kernel/api.yaml dispatch layoutPreflight"
 
 # ============================================================================
 # SPAWN MECHANICS — how a packet becomes a running agent on Orca.

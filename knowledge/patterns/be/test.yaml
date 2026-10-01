@@ -404,9 +404,8 @@ rules:
     hfsRules: [R48, R47]
     requirement: |-
       Assert the refusal code or error code, ordering of side effects, returned rows, persisted state and the `where` that holds
-      ownership, as relevant. Test titles start with a word from `NEST_TEST_TITLE_ACTIONS` (accepts, rejects, returns,
-      preserves, refuses, maps, creates). This action-prefix rule is machine-checked; whether title and assertions describe the
-      required behavior is agent review. Adding vocabulary is a reviewed profile change, never a per-file suppression.
+      ownership, as relevant. Test titles are English sentences that state the behavior (BE-CONVENTION 1.16); whether title
+      and assertions describe the required behavior is agent review.
     rationale: |-
       Assertions on type, code and state prove behavior. Message strings and call counts alone do not.
     cases:
@@ -424,7 +423,6 @@ rules:
         write: 'it("refuses a learner who already owns the offer", ...)'
     verification:
       automated:
-        - NEST_TEST_NAME_FORM
         - BE_SPEC_QUALITY
       manual:
         - Review that titles and assertions describe the required behavior.

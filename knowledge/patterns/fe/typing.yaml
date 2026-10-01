@@ -46,7 +46,7 @@ rules:
   - id: FE-TYPING-2
     title: readonly on every field
     kind: mandatory
-    hfsRules: [R22]
+    hfsRules: [R22, R110]
     requirement: |
       Props fields, nested objects, collections and tuple keys are readonly.
     rationale: |
@@ -66,7 +66,7 @@ rules:
         write: "_key: readonly [string, string]"
     verification:
       automated:
-        - FE_READONLY_PROPS_CONTRACT
+        - starci-fe/props-fields-readonly
       manual:
         - Resolve an imported or inherited props shape and require readonly fields at the declaring source.
     relatedExamples: []

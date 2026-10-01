@@ -46,7 +46,6 @@ rules:
     verification:
       automated:
         - FE_ERROR_BOUNDARY_MISSING
-        - FE_NEXT_ERROR_BOUNDARY_LOCATION
       manual:
         - Trigger a render error and an unknown route and confirm the boundaries render and recover.
     relatedExamples: []
@@ -66,7 +65,7 @@ rules:
         write: toSlot gives isForbidden true; a primary slot shows the forbidden notice and a secondary slot unmounts.
     verification:
       automated:
-        - FE_ERROR_WORLD_STATE_MAPPING
+        - starci-fe/slot-status-through-slotview
         - FE_HTTP_STATUS_COLLAPSE
       manual: []
     relatedExamples: []

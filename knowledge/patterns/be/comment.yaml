@@ -80,7 +80,7 @@ rules:
   - id: BE-COMMENT-3
     title: Methods and fields
     kind: mandatory
-    hfsRules: [R89]
+    hfsRules: [R89, R109]
     requirement: |-
       Methods and declared class, interface and type fields carry non-empty responsibility docblocks. Generic parameters
       have named `@template` documentation. Parameter and return explanations and cross-references are added where
@@ -101,7 +101,7 @@ rules:
         write: '/** Stable error code that transports map to a status. */ readonly code: string'
     verification:
       automated:
-        - NEST_MEMBER_DOCUMENTATION
+        - require-public-member-jsdoc
       manual:
         - Review responsibility, useful parameter and return explanation and cross-reference meaning.
     relatedExamples: []
@@ -144,8 +144,7 @@ rules:
         when: A constraint
         write: '// idempotent add, because a second row would violate UQ_order_lines_order_sku'
     verification:
-      automated:
-        - NEST_COMMENT_FORM
+      automated: []
       manual:
         - Review why the prose is needed and whether it explains the actual consequence.
     relatedExamples: []
@@ -167,8 +166,7 @@ rules:
            * An earlier reading refused anything but the display id; that was wrong about the bucket.
            */
     verification:
-      automated:
-        - NEST_COMMENT_FORM
+      automated: []
       manual:
         - Review the claim, the evidence and the useful corrected history.
     relatedExamples: []

@@ -2015,17 +2015,6 @@ FE_BLOCK_PRODUCT_HOOK_DEFINITION:
   owner: other-op:interface.implement
   kind: check-finding
 
-FE_CLOSED_VOCABULARY_SHAPE:
-  title: "Closed state vocabulary has wrong shape"
-  title_vi: "Tập trạng thái đóng có dạng chưa đúng"
-  meaning_vi: "Một tập trạng thái hoặc chế độ đã khai báo là đóng nhưng cách viết không đúng quy chuẩn."
-  causes_vi:
-    - "Dùng cờ nhị phân cho các trạng thái loại trừ nhau"
-    - "Ánh xạ enum truyền tải chưa đặt ở nơi sở hữu"
-  nextStep_vi: "Op interface.implement viết lại kiểu cho đúng dạng tập đóng rồi kiểm tra lại."
-  owner: other-op:interface.implement
-  kind: check-finding
-
 FE_COMPONENT_API:
   title: "Front-end component exposes a non-canon surface"
   title_vi: "Component FE sai bề mặt công khai"
@@ -2071,17 +2060,6 @@ FE_CONNECTED_BLOCK_RENDER_PAIR:
   owner: other-op:interface.implement
   kind: check-finding
 
-FE_CONTRACT_NAME_SHAPE:
-  title: "Public contract name has wrong form"
-  title_vi: "Tên hợp đồng công khai sai quy cách"
-  meaning_vi: "Tên của một hợp đồng (kiểu công khai) trong mã giao diện không theo quy cách đặt tên đã chọn."
-  causes_vi:
-    - "Đặt tên kiểu props hoặc hợp đồng sai dạng"
-    - "Hợp đồng được khai báo ở nơi khác so với chủ sở hữu"
-  nextStep_vi: "Op interface.implement đổi tên theo đúng quy cách rồi chạy lại kiểm tra."
-  owner: other-op:interface.implement
-  kind: check-finding
-
 FE_CUSTOM_HOOK_LOCATION:
   title: "Custom hook declared outside hooks root"
   title_vi: "Hook tự viết nằm ngoài thư mục hooks"
@@ -2090,50 +2068,6 @@ FE_CUSTOM_HOOK_LOCATION:
     - "Viết hook ngay trong file thành phần"
     - "Đặt hook ở thư mục khác"
   nextStep_vi: "Op interface.implement chuyển hook vào thư mục hooks."
-  owner: other-op:interface.implement
-  kind: check-finding
-
-FE_ERROR_ENVELOPE_POLICY:
-  title: "Error envelope handled off-policy"
-  title_vi: "Xử lý phong bì lỗi sai chính sách"
-  meaning_vi: "Mã giao diện mở phong bì lỗi của API không đúng chính sách, hoặc để phong bì lỗi lọt ra ngoài ranh giới dữ liệu."
-  causes_vi:
-    - "Đọc trực tiếp phong bì lỗi trong thành phần"
-    - "Không gỡ phong bì tại hook dữ liệu"
-  nextStep_vi: "Op interface.implement chuẩn hóa lỗi tại ranh giới dữ liệu rồi kiểm tra lại."
-  owner: other-op:interface.implement
-  kind: check-finding
-
-FE_ERROR_WORLD_STATE_MAPPING:
-  title: "Failure not mapped to render state"
-  title_vi: "Lỗi thế giới sản phẩm chưa ánh xạ sang trạng thái hiển thị"
-  meaning_vi: "Lỗi đã khai báo của hệ thống chưa được ánh xạ sang một trạng thái hiển thị đóng."
-  causes_vi:
-    - "Thiếu nhánh xử lý cho một loại lỗi đã khai báo"
-    - "Ánh xạ nằm sai chủ sở hữu"
-  nextStep_vi: "Op interface.implement thêm ánh xạ lỗi sang trạng thái hiển thị tại đúng nơi sở hữu."
-  owner: other-op:interface.implement
-  kind: check-finding
-
-FE_GRAMMAR_GUARD_BEHAVIOR:
-  title: "Grammar guard vectors failed"
-  title_vi: "Bộ thử bảo vệ của Grammar không đạt"
-  meaning_vi: "Các phép thử bảo vệ công khai của Grammar (chuẩn và trạng thái hiển thị) không cho kết quả đúng hoặc không chạy được."
-  causes_vi:
-    - "Gói Grammar của sản phẩm sai hoặc lỗi thời"
-    - "Khai báo hợp đồng thử sai"
-  nextStep_vi: "Op grammar.update hoặc người phụ trách gói Grammar sửa gói cho qua bộ thử rồi chạy lại."
-  owner: other-op:grammar.update
-  kind: check-finding
-
-FE_NEXT_ERROR_BOUNDARY_LOCATION:
-  title: "Next error boundary in wrong place"
-  title_vi: "Ranh giới lỗi của Next đặt sai vị trí"
-  meaning_vi: "Tệp khôi phục lỗi của Next không nằm ở vị trí hợp lệ, hoặc chưa kiểm tra được vị trí đó."
-  causes_vi:
-    - "Thiếu error.tsx hoặc not-found ở đúng thư mục"
-    - "Đặt tệp lỗi ngoài cấu trúc route"
-  nextStep_vi: "Op interface.implement đặt lại tệp ranh giới lỗi đúng chỗ rồi kiểm tra lại."
   owner: other-op:interface.implement
   kind: check-finding
 
@@ -2167,39 +2101,6 @@ FE_PURE_WORLD_IMPORT:
     - "Nhập next/navigation hoặc thư viện dịch trong thành phần thuần"
     - "Bản thuần và bản kết nối chưa được tách"
   nextStep_vi: "Op interface.implement bỏ nhập này khỏi component.tsx và để index.tsx truyền vào."
-  owner: other-op:interface.implement
-  kind: check-finding
-
-FE_READONLY_PROPS_CONTRACT:
-  title: "Component props are not readonly"
-  title_vi: "Props của thành phần chưa ở dạng chỉ đọc"
-  meaning_vi: "Hợp đồng props công khai của thành phần hoặc các trường tập hợp lồng nhau chưa được khai báo chỉ đọc."
-  causes_vi:
-    - "Quên readonly ở các trường props"
-    - "Mảng hoặc đối tượng lồng nhau chưa readonly"
-  nextStep_vi: "Op interface.implement thêm readonly vào hợp đồng props rồi chạy lại kiểm tra."
-  owner: other-op:interface.implement
-  kind: check-finding
-
-FE_REQUIRED_VALUE_FAILURE:
-  title: "Missing required value does not throw"
-  title_vi: "Thiếu giá trị bắt buộc nhưng không báo lỗi"
-  meaning_vi: "Khi thiếu giá trị mà chủ sở hữu đã khai báo là bắt buộc, mã không dừng bằng lỗi thật mà cứ chạy tiếp."
-  causes_vi:
-    - "Trả về rỗng hoặc bỏ qua khi context thiếu"
-    - "Không ném Error khi giá trị vắng mặt"
-  nextStep_vi: "Op interface.implement cho nhánh thiếu giá trị ném Error thật trước khi chạy tiếp."
-  owner: other-op:interface.implement
-  kind: check-finding
-
-FE_RETURN_TYPE_PROFILE:
-  title: "Return type breaks declared profile"
-  title_vi: "Kiểu trả về không đúng mẫu đã khai"
-  meaning_vi: "Kiểu trả về của thành phần, hook hay hàm không theo mẫu đã khai báo cho vai trò của nó."
-  causes_vi:
-    - "Thiếu kiểu trả về công khai rõ ràng"
-    - "Vai trò của hàm khai báo chưa khớp với mã"
-  nextStep_vi: "Op interface.implement bổ sung hoặc sửa kiểu trả về theo mẫu rồi kiểm tra lại."
   owner: other-op:interface.implement
   kind: check-finding
 
@@ -2269,17 +2170,6 @@ FE_SOURCE_LAYOUT_INVALID:
   owner: other-op:interface.implement
   kind: check-finding
 
-FE_SOURCE_NAME_SHAPE:
-  title: "Source name breaks naming shape"
-  title_vi: "Tên tệp hoặc giá trị sai quy cách"
-  meaning_vi: "Tên tệp hook, module hoặc giá trị hằng cố định không theo quy cách đặt tên."
-  causes_vi:
-    - "Đặt tên hook không bắt đầu bằng use"
-    - "Tên hằng module không theo dạng quy định"
-  nextStep_vi: "Op interface.implement đổi tên theo quy cách rồi chạy lại."
-  owner: other-op:interface.implement
-  kind: check-finding
-
 FE_STYLE_SOURCE_UNRESOLVED:
   title: "Tailwind @source path does not resolve"
   title_vi: "Đường dẫn @source của Tailwind không tồn tại"
@@ -2337,17 +2227,6 @@ FE_WORLD_OWNER_RENDER_BOUNDARY:
     - "Viết JSX trực tiếp trong thành phần đọc dữ liệu"
     - "Chưa có thành phần thuần tương ứng"
   nextStep_vi: "Op interface.implement tách phần hiển thị sang thành phần thuần và giao cho nó."
-  owner: other-op:interface.implement
-  kind: check-finding
-
-FE_WRITE_FEEDBACK_OWNER:
-  title: "Write action feedback has no owner"
-  title_vi: "Phản hồi sau thao tác ghi chưa có nơi chịu trách nhiệm"
-  meaning_vi: "Thao tác ghi dữ liệu không có nơi sở hữu rõ ràng để báo kết quả cho người dùng, hoặc chưa được gọi."
-  causes_vi:
-    - "Thiếu thành phần phản hồi cho hành động"
-    - "Phản hồi có nhưng chưa được gọi"
-  nextStep_vi: "Op interface.implement chỉ định và nối nơi báo phản hồi cho thao tác ghi."
   owner: other-op:interface.implement
   kind: check-finding
 
@@ -3419,149 +3298,6 @@ NAV_ROUTE_NULL:
     - "Mục được giữ chỗ để làm sau"
     - "Quên điền đường dẫn"
   nextStep_vi: "Chỉ là thông tin, không chặn; không cần làm gì nếu cố ý."
-  owner: op-retry
-  kind: check-finding
-
-NEST_CACHE_TOKEN_BOUNDARY:
-  title: "Cache token used outside boundary"
-  title_vi: "Dùng mã cache ngoài phạm vi cho phép"
-  meaning_vi: "Mã nguồn NestJS dùng mã nhận diện cache ở nơi không được phép."
-  causes_vi:
-    - "Truy cập token cache trực tiếp trong tầng không thuộc ranh giới"
-    - "Không đi qua lớp bọc đã quy định"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải chuyển việc dùng token cache về đúng lớp rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-NEST_COMMENT_FORM:
-  title: "Comment does not follow required form"
-  title_vi: "Chú thích không đúng quy cách"
-  meaning_vi: "Chú thích một dòng trong mã NestJS nằm cuối dòng hoặc bắt đầu bằng chữ hoa, trái quy ước."
-  causes_vi:
-    - "Viết chú thích ở cuối dòng mã"
-    - "Chú thích mở đầu bằng chữ in hoa"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải đặt chú thích phía trên mã và viết chữ thường đầu câu."
-  owner: op-retry
-  kind: check-finding
-
-NEST_ENV_ACCESS:
-  title: "Environment read outside parser"
-  title_vi: "Đọc biến môi trường ngoài nơi quy định"
-  meaning_vi: "Mã NestJS đọc biến môi trường trực tiếp ở tệp không phải nơi phân tích cấu hình được phép."
-  causes_vi:
-    - "Dùng process.env ngay trong dịch vụ hoặc controller"
-    - "Không đi qua module cấu hình"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải đọc cấu hình qua bộ phân tích môi trường đã quy định."
-  owner: op-retry
-  kind: check-finding
-
-NEST_ERROR_DECLARATION_IDENTITY:
-  title: "Error class lacks required base"
-  title_vi: "Lớp lỗi không kế thừa lớp gốc quy định"
-  meaning_vi: "Lớp lỗi mang tên của dự án nhưng không kế thừa lớp lỗi gốc mà hệ thống lỗi yêu cầu."
-  causes_vi:
-    - "Khai báo lớp lỗi kế thừa Error thuần"
-    - "Chọn sai lớp gốc của họ lỗi"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải cho lớp lỗi kế thừa đúng lớp gốc rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-NEST_FOREIGN_ERROR_CAUSE:
-  title: "Foreign error not kept as cause"
-  title_vi: "Lỗi từ bên ngoài không được giữ làm nguyên nhân"
-  meaning_vi: "Lỗi từ thư viện hoặc hệ thống ngoài bị bắt và ném lại mà không gắn lỗi gốc làm nguyên nhân."
-  causes_vi:
-    - "Ném lỗi mới bỏ mất lỗi ban đầu"
-    - "Thiếu tùy chọn cause khi bọc lỗi"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải truyền lỗi gốc vào cause khi bọc lỗi."
-  owner: op-retry
-  kind: check-finding
-
-NEST_IMPORT_FORMAT:
-  title: "Named import format is wrong"
-  title_vi: "Định dạng import có tên sai quy cách"
-  meaning_vi: "Danh sách import có tên trong mã NestJS không được xuống dòng từng mục kèm dấu phẩy cuối."
-  causes_vi:
-    - "Viết nhiều mục import trên một dòng"
-    - "Thiếu dấu phẩy ở mục cuối"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải định dạng lại import mỗi tên một dòng."
-  owner: op-retry
-  kind: check-finding
-
-NEST_JEST_ALIAS_PARITY:
-  title: "Jest aliases differ from TypeScript"
-  title_vi: "Bí danh của Jest lệch với TypeScript"
-  meaning_vi: "Các bí danh đường dẫn cấu hình cho Jest không khớp với các bí danh trong cấu hình TypeScript."
-  causes_vi:
-    - "Thêm bí danh ở một bên mà quên bên kia"
-    - "Sửa đường dẫn ở một nơi"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải đồng bộ hai cấu hình rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-
-NEST_MEMBER_DOCUMENTATION:
-  title: "Member lacks responsibility docblock"
-  title_vi: "Thành viên thiếu chú thích trách nhiệm"
-  meaning_vi: "Một phương thức hoặc trường khai báo trong mã NestJS chưa có chú thích docblock mô tả trách nhiệm."
-  causes_vi:
-    - "Quên viết chú thích cho phương thức mới"
-    - "Docblock để trống"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải thêm docblock không rỗng cho thành viên đó."
-  owner: op-retry
-  kind: check-finding
-
-NEST_NAMED_EXPORTS:
-  title: "Named exports rule violated"
-  title_vi: "Vi phạm quy tắc export có tên"
-  meaning_vi: "Mã NestJS có kiểu export không theo quy ước export có tên của dự án."
-  causes_vi:
-    - "Dùng export mặc định"
-    - "Gom export theo cách không được phép"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải đổi sang export có tên."
-  owner: op-retry
-  kind: check-finding
-
-NEST_TEST_DISCOVERY:
-  title: "Test files not discoverable"
-  title_vi: "Tệp test không được tìm thấy"
-  meaning_vi: "Cấu hình Jest không tìm ra các tệp test theo quy ước nên chúng có thể không bao giờ được chạy."
-  causes_vi:
-    - "Mẫu tìm test trong cấu hình sai"
-    - "Tệp test đặt sai tên hoặc sai chỗ"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải sửa cấu hình hoặc tên tệp test."
-  owner: op-retry
-  kind: check-finding
-
-NEST_TEST_NAME_FORM:
-  title: "Service spec test title is not valid"
-  title_vi: "Tên test trong tệp spec của service không đúng quy cách"
-  meaning_vi: "Tệp service.spec.ts có test không có tiêu đề tĩnh bắt đầu bằng một động từ hành động, thiếu nhóm describe ngoài cùng, hoặc hàm chạy test không bắt đầu ở dòng sau tiêu đề."
-  causes_vi:
-    - "Tiêu đề test bắt đầu bằng danh từ hoặc để trống"
-    - "Tiêu đề test được ghép động thay vì viết tĩnh"
-  nextStep_vi: "Bộ kiểm lint từ chối; op viết test phải đặt lại tiêu đề test bắt đầu bằng động từ hành động."
-  owner: op-retry
-  kind: check-finding
-
-NEST_THROWN_ERROR_IDENTITY:
-  title: "Thrown error lacks required identity"
-  title_vi: "Lỗi được ném không đúng loại quy định"
-  meaning_vi: "Mã NestJS ném một lỗi không thuộc họ lỗi mà dự án quy định."
-  causes_vi:
-    - "Ném Error thuần hoặc lỗi của framework"
-    - "Dùng sai lớp lỗi cho tình huống"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải ném đúng lớp lỗi của dự án."
-  owner: op-retry
-  kind: check-finding
-
-NEST_TRANSPORT_ERROR_MAPPER:
-  title: "HTTP error mapper unavailable"
-  title_vi: "Không có bộ ánh xạ lỗi HTTP khai báo"
-  meaning_vi: "Bộ ánh xạ lỗi sang HTTP được khai báo nhưng không tìm thấy phần export tương ứng trong mã."
-  causes_vi:
-    - "Tên export trong khai báo không khớp mã"
-    - "Tệp ánh xạ bị dời hoặc đổi tên"
-  nextStep_vi: "Bộ kiểm lint từ chối; op backend phải sửa khai báo hoặc thêm export còn thiếu."
   owner: op-retry
   kind: check-finding
 
@@ -5725,7 +5461,6 @@ TITLE_DRIFT:
   nextStep_vi: "Chỉ ghi nhận cho dễ thấy; không chặn công việc, cần xem lại việc đổi tên khi rảnh."
   owner: runtime-core
   kind: runtime-fault
-
 
 TRANSCRIPT_MISSING:
   title: "Transcript not captured in time"
@@ -12510,5 +12245,41 @@ FE_COOKIE_ATTRIBUTES:
     - "Vi phạm luật R107: ghi cookie phiên bằng `set(name, value)` không có options, hoặc options thiếu `httpOnly: true`"
     - "`sameSite: \"none\"`, `secure: false` hoặc `httpOnly` lấy từ một biến boolean không cố định"
   nextStep_vi: "Khai báo một hằng số options `as const` trong module sở hữu cookie với `httpOnly: true` (chỉ `false` cho cookie tùy chọn mà script của trang cần đọc), `secure` lấy từ `modules/config` và `sameSite: \"lax\"` hoặc `\"strict\"`, rồi truyền nó vào mọi lần `set`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_ERROR_CAUSE_DROPPED:
+  title: "A catch replaces the failure without carrying it"
+  title_vi: "Catch thay lỗi mà không giữ lỗi gốc"
+  meaning_vi: "Một `throw` thoát ra khỏi `catch` (hoặc handler `.catch`) ở `<file>` ném một lỗi mới mà không ném lại giá trị đã bắt và không mang nó theo; lỗi gốc cùng stack của nó mất hẳn. Lỗi thay thế phải nhận đúng giá trị đã bắt làm `cause` (luật R108, BE-ERROR-4)."
+  causes_vi:
+    - "catch (error) { throw new PlanError({ code: PlanErrorCode.Failed }) } thiếu `cause: error`"
+    - "Chỉ đọc `error.message` rồi dựng lỗi mới từ chuỗi đó"
+    - "catch { throw new PlanError(...) } không đặt tên cho giá trị đã bắt"
+  nextStep_vi: "Đặt tên cho giá trị bắt được (`catch (error)`) và truyền đúng nó làm `cause` của lỗi capability (`new <C>Error({ code, cause: error })`), hoặc ném lại chính nó. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_MEMBER_DOC_MISSING:
+  title: "A public member has no doc block"
+  title_vi: "Thành viên công khai không có JSDoc"
+  meaning_vi: "Một thành viên công khai (phương thức, accessor, field hoặc signature) của class, interface hoặc type object được export ở `<file>` không có khối JSDoc ngay phía trên; người gọi chạm tới thành viên chứ không đọc doc của kiểu (luật R109, BE-COMMENT-3)."
+  causes_vi:
+    - "Phương thức public của service hoặc handler không có /** ... */"
+    - "Field của interface Request/Result được export không có doc"
+    - "Comment dòng `//` thay cho khối JSDoc"
+  nextStep_vi: "Thêm một khối JSDoc tiếng Anh ngay trên thành viên, nói nó dùng để làm gì hoặc gọi nó gây ra điều gì; private, protected, constructor và property gán hằng không cần. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+FE_PROPS_MUTABLE:
+  title: "Component props can be written"
+  title_vi: "Props của component có thể bị ghi"
+  meaning_vi: "Kiểu props của một hàm render được export ở `<file>` có field hoặc index signature thiếu `readonly`, hoặc giữ một collection có thể thay đổi (`T[]`, `[A, B]`, `Array<T>`), trực tiếp hay trong object lồng nhau (luật R110, FE-TYPING-2)."
+  causes_vi:
+    - "interface XProps { title: string } thiếu `readonly`"
+    - "readonly items: Item[] thay vì `readonly Item[]`"
+    - "Field của kiểu phần tử khai báo cùng file thiếu `readonly`"
+  nextStep_vi: "Đánh dấu `readonly` cho mọi field và index signature của props, viết collection là `readonly T[]`, `readonly [A, B]` hoặc `ReadonlyArray<T>`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding

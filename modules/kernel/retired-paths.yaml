@@ -112,3 +112,32 @@ retired:
   - {path: scripts/kernel/api-verbs/product-deps.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: a dependency manifest change lands into main with its op; the settle names the install the live checkout owes'}
   - {path: modules/kernel/api-commands/product-deps.yaml, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: no workflow deps unit without a workflow worktree'}
   - {path: tests/product-land.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'tests/worktree-lifecycle.spec.mjs'}
+  - {path: scripts/checks/code-patterns/common.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'none: the shared helpers of the code-pattern adapters, which nothing ran after check-scoped-lint.mjs retired'}
+  - {path: scripts/checks/code-patterns/nest.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'eslint-be require-public-member-jsdoc (R109) for member docs; formatting is Prettier (R19 hfs format); comment casing is review'}
+  - {path: scripts/checks/code-patterns/nest-boundaries.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'eslint-be no-direct-env-read and config-parsed-in-main (R43), infra-import-owner (R90) and injector-only (R85), no-default-export (R89)'}
+  - {path: scripts/checks/code-patterns/nest-errors.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'eslint-be replacement-throw-carries-cause (R108) and error-masked (R39)'}
+  - {path: scripts/checks/code-patterns/nest-error-identity.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'eslint-be error-home, throw-domain-error, error-family-shape and error-code-unique (R38)'}
+  - {path: scripts/checks/code-patterns/nest-metadata.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the managed jest.config.js of @starci/jest-preset held by hfs test-topology (R47) and spec-placement (R102)'}
+  - {path: scripts/checks/code-patterns/nest-tests.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'none: the title-verb vocabulary is not adopted by BE-CONVENTION; English titles are no-non-ascii-source (R89) and the subject form is R48'}
+  - {path: scripts/checks/code-patterns/next.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'eslint-fe props-fields-readonly (R110), no-data-status-shape (R65), base-props-atom and public-component-signature, hooks-are-hooks and hook-location (R56), the slot manifest (R01)'}
+  - {path: scripts/checks/code-patterns/next-errors.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'eslint-fe Outcome rules (R51), error-boundary-missing and no-null-suspense-fallback (R53), no-env-outside-config and no-hardcoded-endpoint-fallback (R49)'}
+  - {path: scripts/checks/code-patterns/grammar-guards.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the Grammar package checks (scripts/checks/grammar-*.mjs) and package-shape (R63); guard behaviour is the package spec'}
+  - {path: docs/nest-boundary-check.md, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'knowledge/hfs/rules.yaml R43, R85, R89, R90'}
+  - {path: docs/nest-error-checks.md, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'knowledge/hfs/rules.yaml R39, R108'}
+  - {path: docs/nest-error-identity-check.md, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'knowledge/hfs/rules.yaml R38'}
+  - {path: docs/nest-syntax-checks.md, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'knowledge/hfs/rules.yaml R19, R109'}
+  - {path: docs/nest-test-code-check.md, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'knowledge/hfs/rules.yaml R48, R89'}
+  - {path: docs/nest-test-discovery-check.md, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'knowledge/hfs/rules.yaml R47, R102'}
+  - {path: docs/next-error-state-check.md, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'knowledge/hfs/rules.yaml R49, R51, R53'}
+  - {path: docs/grammar-guard-checks.md, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'knowledge/hfs/rules.yaml R63'}
+  - {path: tests/grammar-guards.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
+  - {path: tests/nest-boundaries.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
+  - {path: tests/nest-code-patterns.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'packages/eslint/be/comments.test.mjs (R109)'}
+  - {path: tests/nest-error-identity.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
+  - {path: tests/nest-errors.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'packages/eslint/be/error-handling.test.mjs (R108)'}
+  - {path: tests/nest-metadata.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
+  - {path: tests/nest-test-patterns.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
+  - {path: tests/next-code-patterns.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'packages/eslint/fe/props-and-slots.test.mjs (R110)'}
+  - {path: tests/next-error-context.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
+  - {path: tests/next-error-patterns.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/'}
+  - {path: tests/next-framework-pinned-names.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-orphan, replacedBy: 'the spec of what it tested retired with scripts/checks/code-patterns/next.mjs'}

@@ -982,7 +982,6 @@ moduleLocalDocumentKinds:
 
 gaps:
   - "starci/goal@1 (kernel goal.json) has no dedicated schema file — the workflow goal is a sqlite row written by `api enqueue`/define-goal; its contract lives in modules/goal/define-goal.yaml."
-  - "starci/code-pattern-script@1 is emitted by every scripts/checks/code-patterns/*.mjs script and has no schema file; since check-scoped-lint.mjs was retired (op-gate-loop) no runner aggregates it."
   - "starci/evidence-packet@1 is named in modules/models/kinds.yaml but has no schema file;"
 
 coverage:

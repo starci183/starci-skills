@@ -903,7 +903,7 @@ rules:
       - {kind: eslint-be, id: em-injection-slots}
   - id: R89
     code: "BE_SOURCE_FORM"
-    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export and public member has English JSDoc; no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source."
+    law: "Files use the closed role-suffix vocabulary of the slot manifest; named exports only; every export has English JSDoc (its public members: R109); no emoji, and no Vietnamese in identifiers, string literals, comments or test titles outside message catalogs and the i18n fixtures slot; a public input or output is a named contract, never an inline object type; no `Mock*`, `Fake*` or `Stub*` class, function or constant in production source."
     kinds: [lint, check, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_SOURCE_FORM", "BE_PUBLIC_CONTRACT_FORM"]
@@ -1111,3 +1111,27 @@ rules:
     failureCodes: ["FE_COOKIE_ATTRIBUTES"]
     enforcers:
       - {kind: eslint-fe, id: response-cookie-attributes}
+  - id: R108
+    code: "BE_ERROR_CAUSE_DROPPED"
+    law: "A `throw` that escapes a `catch` (or a promise `.catch` handler) rethrows the caught value or carries it: the replacement capability error takes the exact caught value as `cause`; a `catch` with no binding throws nothing new."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_ERROR_CAUSE_DROPPED"]
+    enforcers:
+      - {kind: eslint-be, id: replacement-throw-carries-cause}
+  - id: R109
+    code: "BE_MEMBER_DOC_MISSING"
+    law: "Every public member of an exported class, interface or object type alias in product source opens with English JSDoc: methods, accessors, fields and signatures; a private, protected or `#` member, the constructor, an index signature and a property set to a literal or a named constant are not judged, and overloads of one name share one doc."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_MEMBER_DOC_MISSING"]
+    enforcers:
+      - {kind: eslint-be, id: require-public-member-jsdoc}
+  - id: R110
+    code: "FE_PROPS_MUTABLE"
+    law: "The props type of an exported rendering function in front-end product source is readonly all the way down: every field and index signature is `readonly`, and every collection it holds, directly or in a nested object, is `readonly T[]`, `readonly [A, B]` or `ReadonlyArray<T>`."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_PROPS_MUTABLE"]
+    enforcers:
+      - {kind: eslint-fe, id: props-fields-readonly}

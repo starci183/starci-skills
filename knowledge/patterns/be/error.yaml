@@ -116,7 +116,7 @@ rules:
   - id: BE-ERROR-4
     title: Wrapping a foreign error and handling every catch
     kind: mandatory
-    hfsRules: [R38, R40]
+    hfsRules: [R38, R40, R108]
     requirement: |-
       When an ownership boundary replaces a caught failure, pass the exact caught value (a non-Error value included) as
       `cause` of the capability error. Every `catch` block does exactly one of three things: rethrows, calls a method of a
@@ -134,6 +134,7 @@ rules:
     verification:
       automated:
         - BE_LOGGER_REQUIRED
+        - BE_ERROR_CAUSE_DROPPED
       manual:
         - Verify whether the boundary should recover, rethrow or translate the failure and test the retained cause.
     relatedExamples: []

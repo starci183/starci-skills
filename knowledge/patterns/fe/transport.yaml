@@ -69,7 +69,6 @@ rules:
     verification:
       automated:
         - FE_HTTP_STATUS_COLLAPSE
-        - FE_ERROR_ENVELOPE_POLICY
       manual:
         - Confirm every refused outcome leads somewhere the user can act, such as sign-in.
     relatedExamples: []

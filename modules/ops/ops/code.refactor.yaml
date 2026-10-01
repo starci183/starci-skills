@@ -99,8 +99,7 @@ reads:
       en: The adopted naming, error-identity, structure and typing conventions, and the FE or BE pattern
         topics for the selected repository.
   - id: machines
-    path: scripts/checks/gate.mjs + scripts/checks/code-patterns/*.mjs +
-      scripts/checks/architecture/*.mjs + modules/models/code-patterns.yaml +
+    path: scripts/checks/gate.mjs + scripts/checks/architecture/*.mjs + modules/models/code-patterns.yaml +
       docs/architecture-check.md
     purpose:
       en: When the slice lives in a checked FE/BE repository, read the sealed architecture and

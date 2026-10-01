@@ -63,9 +63,8 @@ rules:
       - instrumentation-client.mjs
       - next-env.d.ts
     frameworkPinnedRootExports:
-      # Export names the framework mandates in a pinned root file, keyed by file stem (read by
-      # scripts/checks/architecture/framework-pinned.mjs). FE_SOURCE_NAME_SHAPE accepts exactly these names in exactly
-      # these files when they sit directly in a Next source root; everywhere else the name-shape rule is unchanged.
+      # Export names the framework mandates in a pinned root file, keyed by file stem: a naming review keeps exactly these
+      # names in exactly these files when they sit directly in a Next source root.
       middleware: [config, middleware, default]
       proxy: [config, proxy, default]
       instrumentation: [register, onRequestError]

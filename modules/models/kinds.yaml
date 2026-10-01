@@ -40,7 +40,7 @@ vocabularies:
   # names entries of the `knowledge/` tree by extensionless name or directory glob (`patterns/fe/*`,
   # `architecture-rules`, `design-patterns`, `hfs/rules`, `grammars/<name>`, `ui/*`,
   # `application-stacks`); `checks` names executable check scripts (`scripts/checks/gate.mjs`,
-  # `scripts/checks/code-patterns/*.mjs`, `scripts/checks/architecture/*.mjs`, `scripts/checks/acceptance.mjs`); `stacks` names the
+  # `scripts/checks/architecture/*.mjs`, `scripts/checks/acceptance.mjs`); `stacks` names the
   # bound repository's `.starcistacks` compose manifests and the `.claude`-owned layout and schema definitions an
   # op's artifacts obey - `modules/schemas/work-layout.yaml` for `.starciwork` paths and filenames,
   # `modules/schemas/workspace-routing.yaml` for bound-source routing, and the `modules/schemas/*.schema.yaml` shape each
@@ -334,7 +334,7 @@ kinds:
     # directions and generated artwork remain owned by the separate `ui` lane.
     writes: [code, asset]
     knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs]
+    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Build the interface the drawing settled, against that drawing and nothing invented beside it.
@@ -366,7 +366,7 @@ kinds:
     reads: [srs, sds, decision, code]
     writes: [code]
     knowledge: [patterns/be/*, architecture-rules, hfs/rules, application-stacks]
-    checks: [scripts/checks/gate.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
+    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Build one slice of behind-the-interface behaviour under the node's own allowlist.
@@ -383,7 +383,7 @@ kinds:
     reads: [srs, sds, decision]
     writes: [code]
     knowledge: [patterns/be/*, architecture-rules, hfs/rules, application-stacks]
-    checks: [scripts/checks/gate.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/check-hfs-sync.mjs]
+    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs, scripts/checks/check-hfs-sync.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Create one new backend source tree - toolchain, house layout, runnable skeleton - proven green.
@@ -404,7 +404,7 @@ kinds:
     reads: [srs, sds, design, brand, shell, grammar]
     writes: [code, asset, shell]
     knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs, scripts/checks/check-hfs-sync.mjs]
+    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs, scripts/checks/check-hfs-sync.mjs]
     stacks: [modules/schemas/workspace-routing.yaml, modules/schemas/work-layout-tree.schema.yaml]
     carries: [work/layout-tree@1]
     purpose: Create one new interface source tree - grammar-written shell with tokens wired, realising the planned layout tree - proven by build plus captured first render, and re-scan the layout tree from it.
@@ -421,7 +421,7 @@ kinds:
     reads: [sds, decision, code]
     writes: [code]
     knowledge: [patterns/be/*, architecture-rules, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/code-patterns/*.mjs]
+    checks: [scripts/checks/gate.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Create one new package/module tree - manifest, exports, harness - proven by build plus a real consumer import.
@@ -456,7 +456,7 @@ kinds:
     reads: [design, grammar, brand]
     writes: [grammar, code]
     knowledge: [grammars/*, ui/*, hfs/rules]
-    checks: [scripts/checks/code-patterns/*.mjs]
+    checks: [scripts/checks/grammar-*.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/*]
     purpose: "Grow the installed grammar by one semantic unit the product needs and no composition of existing contracts renders: implement it in the grammar package with its stories and tests, publish it, bump the consumer, and record it in the canon."
@@ -564,7 +564,7 @@ kinds:
     reads: [srs, sds, code, evidence, runtime]
     writes: []
     knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, design-patterns, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/acceptance.mjs]
+    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs, scripts/checks/acceptance.mjs]
     stacks: []
     carries: []
     purpose: Read the delivered slice against its acceptance and report findings, repairing nothing.
@@ -736,7 +736,7 @@ kinds:
     reads: [sds, code]
     writes: [code]
     knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
+    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Restructure the selected code with its behaviour invariant - the existing regression check is run before and after the edit, and a slice with no coverage to pin it reports `test-gap` instead of proceeding.
@@ -753,7 +753,7 @@ kinds:
     reads: [sds, code]
     writes: [code]
     knowledge: [patterns/be/*, patterns/fe/*, hfs/rules]
-    checks: [scripts/checks/gate.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
+    checks: [scripts/checks/gate.mjs, scripts/checks/architecture/*.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Author the test files a slice is missing - tests are code records and this kind writes them, never judges them.
@@ -771,7 +771,7 @@ kinds:
     reads: [code, asset]
     writes: [evidence]
     knowledge: [hfs/rules]
-    checks: [scripts/checks/code-patterns/*.mjs]
+    checks: [scripts/checks/gate.mjs]
     stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Inspect the delivered code, configuration and shipped assets for vulnerabilities and leave the findings as evidence, repairing nothing.
@@ -871,7 +871,7 @@ kinds:
     reads: [record, code, grammar]
     writes: [code]
     knowledge: [patterns/be/*, patterns/fe/*, hfs/rules]
-    checks: [scripts/checks/code-patterns/*.mjs]
+    checks: [scripts/checks/check-hfs-rules.mjs]
     stacks: [modules/schemas/knowledge-source.schema.yaml, modules/schemas/knowledge-rule.schema.yaml]
     carries: [starci/knowledge-source@1]
     purpose: Repair one challenged canonical instruction or rule and the references it affects, from concrete applicability evidence - fixed in its canonical home, never patched around.

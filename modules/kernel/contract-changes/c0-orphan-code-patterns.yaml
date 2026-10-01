@@ -1,0 +1,27 @@
+id: c0-orphan-code-patterns
+effectiveAt: '2026-10-01T18:00:00+07:00'
+summary: "The script adapters of the retired scripts/checks/code-patterns/ folder (no runner since check-scoped-lint.mjs retired) are deleted with their docs, specs and failure codes; every obligation they held is either judged by a canon rule, hfs check or the architecture machine already, or ported. New catalog rules: R108 BE_ERROR_CAUSE_DROPPED (eslint-be replacement-throw-carries-cause: a throw escaping a catch rethrows the caught value or carries it as cause, BE-ERROR-4), R109 BE_MEMBER_DOC_MISSING (eslint-be require-public-member-jsdoc: every public member of an exported class, interface or object type in product source has JSDoc, BE-COMMENT-3; R89's law now points members to it) and R110 FE_PROPS_MUTABLE (eslint-fe props-fields-readonly: the props type of an exported rendering function is readonly all the way down, FE-TYPING-2), all at error. Dropped without a port: NEST_COMMENT_FORM (first-letter casing is inexact), NEST_IMPORT_FORMAT (BE-CONVENTION 1.15: formatting is Prettier, ESLint carries no formatting rule), NEST_TEST_NAME_FORM (the title-verb vocabulary is not adopted), NEST_JEST_ALIAS_PARITY and NEST_TEST_DISCOVERY (the jest config is managed, R47), FE_RETURN_TYPE_PROFILE, FE_WRITE_FEEDBACK_OWNER and FE_GRAMMAR_GUARD_BEHAVIOR (declaration-driven, no slot-structural form). modules/models/code-patterns.yaml obligations name the eslint rules that now hold them; scripts/checks/architecture/framework-pinned.mjs no longer reads frameworkPinnedRootExports (its one reader was the deleted Next name-shape adapter)."
+paths:
+  - packages/eslint/be/comments.mjs
+  - packages/eslint/be/error-handling.mjs
+  - packages/eslint/fe/props-and-slots.mjs
+  - packages/eslint/fe/lib/why.mjs
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/be/comment.yaml
+  - knowledge/patterns/be/error.yaml
+  - knowledge/patterns/be/test.yaml
+  - knowledge/patterns/fe/typing.yaml
+  - knowledge/patterns/fe/error.yaml
+  - knowledge/patterns/fe/boundaries.yaml
+  - knowledge/patterns/fe/naming.yaml
+  - knowledge/patterns/fe/transport.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/retired-paths.yaml
+  - modules/models/code-patterns.yaml
+  - modules/models/kinds.yaml
+  - scripts/checks/architecture/framework-pinned.mjs
+  - scripts/checks/code-patterns/next.mjs
+  - scripts/checks/code-patterns/nest.mjs
+  - docs/code-pattern-enforcement.md
+reach: new-legs

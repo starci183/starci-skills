@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- New (lane c0-orphan): `props-fields-readonly` (R110 `FE_PROPS_MUTABLE`, law props-and-slots). The props type of an exported rendering function in product source is readonly all the way down: every field and index signature is `readonly`, and every collection it holds, directly or in a nested object declared in the file, is `readonly T[]`, `readonly [A, B]` or `ReadonlyArray<T>`. Replaces the unrun `FE_READONLY_PROPS_CONTRACT` script adapter.
 - New (lane AUTHCHK): `response-cookie-attributes` (R107 `FE_COOKIE_ATTRIBUTES`, law client-boundary). A `set` on Next's `ResponseCookies` (`response.cookies.set`, `(await cookies()).set`), identified by the method's declaring class of `next`, must state `httpOnly` as a literal, carry `secure` and use `sameSite` `lax` or `strict`, judged on the TYPE of the options. The typed fixture's `next/server` and `next/headers` stubs gain the cookie classes.
 
 ## 7.1.2 - 2026-10-01

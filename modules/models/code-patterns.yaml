@@ -160,10 +160,14 @@ profiles:
         sourceRuleIds: [BE-ERROR-1, BE-ERROR-2, BE-ERROR-3, BE-NAMING-3]
         applicability: { include: ['**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.{spec,test}.{ts,mts,cts,tsx}', '**/*-{spec,test}.{ts,mts,cts,tsx}', '**/__tests__/**', '**/tests/**', '**/test/**'] }
         mechanical:
-          requirement: Resolve selected capability-owned or Academy error-family declarations and escaping throw identities across every selected production source.
-          check: { kind: script, sourceOnly: true, ruleIds: [NEST_ERROR_DECLARATION_IDENTITY, NEST_THROWN_ERROR_IDENTITY] }
+          requirement: Every thrown value derives from the platform DomainError, each capability declares its one error family in errors/<capability>.error.ts, and error codes are unique across the repository.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/throw-domain-error, starci-be/error-family-shape, starci-be/error-code-unique]
+            expected: { severity: error }
         semantic:
-          guidance: docs/nest-error-identity-check.md
+          guidance: knowledge/patterns/be/error.yaml
           review: Select the error family and genuine protocol health exceptions explicitly; preserve typed normal business dispositions and test transport redaction separately.
         status: implemented
       - id: NEST-HFS-ERROR-HANDLING
@@ -448,8 +452,12 @@ profiles:
         sourceRuleIds: [BE-COMMENT-3, BE-COMMENT-5, BE-COMMENT-6]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
         mechanical:
-          requirement: Enforce required member-doc presence and the adopted line/block comment placement and sentence form.
-          check: { kind: script, ruleIds: [NEST_MEMBER_DOCUMENTATION, NEST_COMMENT_FORM] }
+          requirement: Every public member of an exported class, interface or object type in product source opens with a doc block. Comment placement and sentence form remain review.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/require-public-member-jsdoc]
+            expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/be/comment.yaml
           review: Confirm comments explain consequence and corrected reasoning.
@@ -468,31 +476,29 @@ profiles:
         sourceRuleIds: [BE-ERROR-4, BE-ERROR-5, BE-ERROR-6]
         applicability: { include: ['src/**/*.{ts,mts,cts,tsx}', 'apps/*/src/**/*.{ts,mts,cts,tsx}', 'libs/*/src/**/*.{ts,mts,cts,tsx}', 'packages/*/src/**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.spec.{ts,mts,cts,tsx}', '**/*-spec.{ts,mts,cts,tsx}', '**/*.test.{ts,mts,cts,tsx}', '**/*-test.{ts,mts,cts,tsx}', '**/__tests__/**'] }
         mechanical:
-          requirement: Preserve the caught input when replacing a foreign failure and verify every discovered declared HTTP/GraphQL mapper carries the selected error code, message and transport-owned status consistently.
-          check: { kind: script, ruleIds: [NEST_FOREIGN_ERROR_CAUSE, NEST_TRANSPORT_ERROR_MAPPER] }
+          requirement: A throw that escapes a catch rethrows the caught value or carries it as the cause of the replacement, and each API app registers exactly the one platform/errors filter and GraphQL formatError.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/replacement-throw-carries-cause, starci-be/error-masked]
+            expected: { severity: error }
         semantic:
-          guidance: docs/nest-error-checks.md
+          guidance: knowledge/patterns/be/error.yaml
           review: Verify public redaction, retry policy and expected versus unknown outcome behavior with real transport tests.
         status: implemented
       - id: NEST-ENV-CACHE-BOUNDARY
         sourceRuleIds: [BE-IMPORTS-6]
         applicability: { include: ['src/**/*.{ts,mts,cts,tsx}', 'apps/**/*.{ts,mts,cts,tsx}', 'libs/**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.spec.{ts,mts,cts,tsx}', '**/*-spec.{ts,mts,cts,tsx}', '**/*.test.{ts,mts,cts,tsx}', '**/*-test.{ts,mts,cts,tsx}', 'src/tests/**'] }
         mechanical:
-          requirement: Restrict process.env to the declared parser, raw cache tokens to their owner and default exports to sanctioned Jest entries.
-          check: { kind: script, ruleIds: [NEST_ENV_ACCESS, NEST_CACHE_TOKEN_BOUNDARY, NEST_NAMED_EXPORTS] }
+          requirement: Raw cache and other infrastructure libraries are imported only by their one owning capability and reached through injectors, and production exports are named (the Jest global-setup default export is the one exception).
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/infra-import-owner, starci-be/injector-only, starci-be/no-default-export]
+            expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/be/imports.yaml
           review: None; these are code-shape obligations.
-        status: implemented
-      - id: NEST-IMPORT-FORMAT
-        sourceRuleIds: [BE-IMPORTS-2]
-        applicability: { include: ['**/*.ts'], exclude: ['**/*.d.ts'] }
-        mechanical:
-          requirement: Enforce multiline braced imports with one binding per line and a trailing comma; side-effect, default and namespace imports retain their valid forms.
-          check: { kind: script, ruleIds: [NEST_IMPORT_FORMAT] }
-        semantic:
-          guidance: knowledge/patterns/be/imports.yaml
-          review: None; import order is intentionally not part of this obligation.
         status: implemented
       - id: NEST-TYPE-IMPORT-FORM
         sourceRuleIds: [BE-IMPORTS-2]
@@ -507,26 +513,6 @@ profiles:
         semantic:
           guidance: knowledge/patterns/be/imports.yaml
           review: None; the TypeScript-aware lint rule resolves type-only use.
-        status: implemented
-      - id: NEST-JEST-ALIAS-PARITY
-        sourceRuleIds: [BE-IMPORTS-7, BE-TEST-1]
-        applicability: { include: ['jest*.{js,mjs,cjs,ts,json}', 'apps/*/jest*.{js,mjs,cjs,ts,json}', 'libs/*/jest*.{js,mjs,cjs,ts,json}', 'packages/*/jest*.{js,mjs,cjs,ts,json}', 'tsconfig*.json', 'apps/*/tsconfig*.json', 'libs/*/tsconfig*.json', 'packages/*/tsconfig*.json', 'package.json', 'package-lock.json'] }
-        mechanical:
-          requirement: Compare Jest discovery and moduleNameMapper with the declared TypeScript projects and aliases.
-          check: { kind: script, ruleIds: [NEST_JEST_ALIAS_PARITY, NEST_TEST_DISCOVERY] }
-        semantic:
-          guidance: knowledge/patterns/be/test.yaml
-          review: Record which real service, database and external boundaries ran.
-        status: implemented
-      - id: NEST-TEST-CODE-FORM
-        sourceRuleIds: [BE-TEST-2, BE-TEST-3, BE-TEST-4, BE-TEST-6]
-        applicability: { include: ['**/*.service.spec.ts'] }
-        mechanical:
-          requirement: Check the title form of service specs (an outer suite, static test titles starting with a lexical action verb, callback layout). Subject construction is owned by the spec lint rules, not by this script.
-          check: { kind: script, ruleIds: [NEST_TEST_NAME_FORM] }
-        semantic:
-          guidance: knowledge/patterns/be/test.yaml
-          review: Verify actual test execution, assertions, effects and ordering; static call form does not establish behavior.
         status: implemented
       - id: NEST-CONTRACT-TYPE-FORM
         sourceRuleIds: [BE-TYPING-1, BE-TYPING-2, BE-TYPING-3, BE-TYPING-4, BE-NAMING-7]
@@ -840,8 +826,12 @@ profiles:
         sourceRuleIds: [FE-ERROR-1, FE-ERROR-2, FE-ERROR-4]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
-          requirement: Bind declared world failure to closed render state, selected envelope unwrapping, action feedback ownership and installed Next recovery boundaries across the selected production programs.
-          check: { kind: script, sourceOnly: true, ruleIds: [FE_ERROR_WORLD_STATE_MAPPING, FE_ERROR_ENVELOPE_POLICY, FE_WRITE_FEEDBACK_OWNER, FE_NEXT_ERROR_BOUNDARY_LOCATION] }
+          requirement: Failures cross the client as the one Outcome union, every outcome kind is handled, an auth failure maps to refused, a failure is never collapsed into empty data, a slot reads its status through the slot view, and no Suspense falls back to null.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-fe/one-outcome-union, starci-fe/outcome-kinds-exhaustive, starci-fe/client-maps-auth-to-refused, starci-fe/no-failure-collapse, starci-fe/slot-status-through-slotview, starci-fe/no-null-suspense-fallback]
+            expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/fe/error.yaml
           review: Verify retry eligibility, copy, redaction and valid recovery behavior.
@@ -850,21 +840,15 @@ profiles:
         sourceRuleIds: [FE-ERROR-3]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
-          requirement: Once an owner declares a required payload or context value, its absent-value path terminates with an actual Error before unsafe continuation.
-          check: { kind: script, sourceOnly: true, ruleIds: [FE_REQUIRED_VALUE_FAILURE] }
+          requirement: Configuration is read only in modules/config, which fails when a required value is missing instead of falling back to a hardcoded endpoint.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-fe/no-env-outside-config, starci-fe/no-hardcoded-endpoint-fallback]
+            expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/fe/error.yaml
           review: Decide which values are required and preserve typed normal business dispositions; verify recovery and user-facing behavior separately.
-        status: implemented
-      - id: NEXT-GRAMMAR-GUARD-BEHAVIOR
-        sourceRuleIds: [FE-ERROR-5]
-        applicability: { include: ['package.json'] }
-        mechanical:
-          requirement: Execute the selected public Grammar conformance and presentation-state guard vectors with exact package and input binding.
-          check: { kind: script, ruleIds: [FE_GRAMMAR_GUARD_BEHAVIOR] }
-        semantic:
-          guidance: docs/grammar-guard-checks.md
-          review: Finite public guard vectors do not prove rendering, every JavaScript value or product recovery behavior.
         status: implemented
       - id: NEXT-DATA-LIFECYCLE-KEYS
         sourceRuleIds: [FE-FUNCTION-6, FE-NAMING-4, FE-TYPING-8]
@@ -883,28 +867,26 @@ profiles:
         sourceRuleIds: [FE-TYPING-2]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
-          requirement: Enforce readonly component props and nested collection fields on the explicit public props contract.
-          check: { kind: script, ruleIds: [FE_READONLY_PROPS_CONTRACT] }
+          requirement: The props type of an exported rendering function is readonly all the way down, through fields, index signatures, nested objects and collections.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-fe/props-fields-readonly]
+            expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/fe/typing.yaml
           review: Confirm the statically selected type is the component's real public props boundary.
-        status: implemented
-      - id: NEXT-RETURN-TYPE-PROFILE
-        sourceRuleIds: [FE-TYPING-5]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
-        mechanical:
-          requirement: Enforce the declared return-form profile after the component, hook, async-utility or primitive-helper role is explicitly bound.
-          check: { kind: script, ruleIds: [FE_RETURN_TYPE_PROFILE] }
-        semantic:
-          guidance: knowledge/patterns/fe/typing.yaml
-          review: Declare the symbol role before this checker can distinguish required public return types from useful inference.
         status: implemented
       - id: NEXT-CLOSED-VOCABULARY-SHAPE
         sourceRuleIds: [FE-TYPING-3, FE-TYPING-7]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
-          requirement: Enforce a closed state or mode vocabulary only after its owned inventory and transport mapping are explicitly declared.
-          check: { kind: script, ruleIds: [FE_CLOSED_VOCABULARY_SHAPE] }
+          requirement: A component state vocabulary is a closed union, never a loose data/status shape.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-fe/no-data-status-shape]
+            expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/fe/typing.yaml
           review: Distinguish binary flags from mutually exclusive states and map transport enums at the owner.
@@ -913,8 +895,12 @@ profiles:
         sourceRuleIds: [FE-NAMING-4, FE-NAMING-5, FE-NAMING-7]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
-          requirement: Enforce hook and module basenames plus frozen module-value names without treating framework-reserved exports as product constants (route exports, nextConfig, and the framework-mandated exports of a framework-pinned source-root file listed in knowledge/patterns/fe/folder.yaml frameworkPinnedRootExports).
-          check: { kind: script, ruleIds: [FE_SOURCE_NAME_SHAPE] }
+          requirement: Hooks are real hooks, live in hooks/<domain>/ and the hooks folder holds hooks only.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-fe/hooks-are-hooks, starci-fe/hook-location, starci-fe/hooks-folder-holds-hooks-only]
+            expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/fe/naming.yaml
           review: Confirm an exported name describes the owned responsibility rather than only matching syntax.
@@ -923,8 +909,12 @@ profiles:
         sourceRuleIds: [FE-NAMING-2]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
         mechanical:
-          requirement: Enforce the adopted public contract and contract-part naming forms.
-          check: { kind: script, ruleIds: [FE_CONTRACT_NAME_SHAPE] }
+          requirement: A Base component takes the one state, props and on atom under its XBaseProps contract.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-fe/base-props-atom]
+            expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/fe/naming.yaml
           review: Confirm the named value actually owns a public contract role.

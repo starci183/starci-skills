@@ -36,88 +36,28 @@ The manifest may select a subset of a package's exported toolbox. An extra expor
 
 Architecture obligations bind a `starci/architecture-check@1` result from `node scripts/checks/architecture.mjs <repository>`. The code-pattern result records the architecture report digest, repository/source identity and required rule IDs. An absent, stale, invalid or non-clean report is uncovered coverage. Static dependency checks do not prove dependency-injection lifetime, authorization or behavior; the obligation's semantic companion states the remaining review.
 
-### Script
-
-Repository audits use a stable script rule ID and a typed result binding. A generic command exit code, a package script with the same name, or prose saying that a check ran is insufficient. Missing tools/configuration are unavailable coverage, not a pass.
-
-The Next adapter resolves declarations with the target-installed TypeScript compiler. `FE_RETURN_TYPE_PROFILE` distinguishes JSX or explicitly owned visual functions, symbol-bound React `memo`/`forwardRef` wrappers, hooks, async utilities and primitive helpers; capitalization alone never makes a component. `FE_CLOSED_VOCABULARY_SHAPE` binds checked state/mode/Grammar unions to exact inventories, follows unaliased public type re-exports, rejects presentation enums and checks boolean prop names. `FE_CONTRACT_NAME_SHAPE` resolves public type exports to one owner and one symbol instead of comparing text aliases.
-
-A repository may declare the roles that syntax cannot supply at `package.json#starci.codePatterns.next`:
-
-```json
-{
-  "schema": "starci/next-code-pattern-contract@1",
-  "owners": [
-    { "root": "src/features/pages/AuthenticationPage", "name": "AuthenticationPage" }
-  ],
-  "closedVocabularies": [
-    {
-      "path": "src/features/pages/AuthenticationPage/view-state.ts",
-      "type": "AuthenticationPagePhase",
-      "inventory": "AUTHENTICATION_PAGE_MODES",
-      "role": "mode"
-    }
-  ],
-  "projects": ["apps/app/tsconfig.json", "packages/ui/tsconfig.json"]
-}
-```
-
-Every declared path must be normalized, in-repository, non-redirecting and covered by the exact selected source set. Duplicate identities, missing symbols, unresolved aliases and uncovered owner paths are unavailable coverage. The aggregate runner passes canonical `starci/typescript-project-selection@1` architecture identity: config path, exact-byte SHA-256 digest and project list. `projects` in package metadata is a standalone fallback only. If both exist they must agree exactly. Every selected source must belong to a declared TypeScript program; uncovered sources or overlapping programs with conflicting compiler meaning make coverage unavailable. The result records the authority identity and selected-source count per resolved project.
-
-`FE_READONLY_PROPS_CONTRACT` follows selected imported aliases and interfaces, inheritance, recursive shapes and the resolved built-in `Readonly`/`ReadonlyArray` contracts. Mutable fields remain violations at their declaring path. Generic/computed shapes, `any`/`unknown`, shadowed built-ins and declarations outside the exact selected set are unavailable instead of syntax-only passes.
+There is no third machine kind. The former script adapters lost their runner with the scoped-lint aggregate and were
+deleted (lane c0-orphan, listed in `modules/kernel/retired-paths.yaml`): each obligation
+they held is either judged by a canon rule or the architecture machine now, or was dropped because the locked convention
+does not adopt it. The three obligations no canon rule held were ported at error: `require-public-member-jsdoc` (R109),
+`replacement-throw-carries-cause` (R108) and `props-fields-readonly` (R110).
 
 ## Coverage and remaining work
 
 The manifest is the current implementation inventory; inspect each obligation's
 status and actual result instead of treating this prose as a frozen count.
-Explicit owner/public-entry and Grammar boundaries, Nest documentation/import
-syntax, and the implemented Next syntax clauses have executable checks.
 Installed rules that contradict the adopted standard must be off while their
 replacement obligations remain required. That update does not waive an
-unimplemented replacement.
+unimplemented replacement. Private Academy rules do not become shared canon
+merely because their names occur in a local config. This inventory does not
+authorize product rewrites or lint-package publication.
 
-Remaining `missing` or `conflict` obligations still block conformance. The
-conditional FE world-owner/render boundary, SWR key lifecycle, selected Next
-error-state contracts, Nest boundary/test/error forms and Grammar guard vectors
-have separate adapters. Their declarations and coverage must match the target;
-the presence of a registered adapter never certifies an unsupported target form.
-Private Academy rules do not become shared canon merely because their names
-occur in a local config. This inventory does not authorize product rewrites or
-lint-package publication.
-
-The aggregate records `frontendDataLifecycle` coverage independently of its rule
-IDs. A proven absence of SWR is not applicable; selecting SWR without a supported
-contract is unavailable. Next error-state adapters receive the same canonical
-architecture config and full bound source/configuration context as other
-scripts. Grammar guard results retain their Node execution and exact package
-input identity in `machineResults[].execution`; a static import-boundary check
-does not substitute for these finite behavior vectors.
-
-Each adapter's target declaration and executable-rule table has a guide beside
-this file: [Nest environment/cache/export boundaries](nest-boundary-check.md),
-[Nest member, comment and import syntax](nest-syntax-checks.md),
-[Nest transport errors](nest-error-checks.md), [Nest error identity](nest-error-identity-check.md),
-[Nest contract and readonly boundary](nest-contract-check.md),
-[Nest test configuration and discovery](nest-test-discovery-check.md),
-[Nest test source form](nest-test-code-check.md),
-[Next data lifecycle](next-data-lifecycle-check.md),
-[Next error state](next-error-state-check.md) and
-[Grammar guards](grammar-guard-checks.md).
-
-The Nest error-family adapter is selected by `NEST-EXCEPTION-IDENTITY`. Its
-`capability` and `academy-abstract-exception` profiles resolve actual TypeScript
-error identity and the declared profile's constructor rules. Universal
-folder/name/return heuristics are explicitly off under a separate guard; the
-replacement script remains required. A missing error-family declaration is
-unavailable, not permission to accept arbitrary thrown values. See
-[Nest error identity](nest-error-identity-check.md).
-
-`NEXT-REQUIRED-VALUE-FAILURE` runs the selected Next required-value guard check.
-Declaring which inputs are required remains a reviewed domain decision; for
-each selected binding, the machine checks that absence reaches a real Error
-before unsafe continuation. An empty declaration does not certify completeness
-of the domain decision. Source adapters and the heuristics-off guard retain configuration bytes in
-evidence without treating them as application contracts.
+The architecture adapters keep their guides beside this file:
+[Nest contract and readonly boundary](nest-contract-check.md) and
+[Next data lifecycle](next-data-lifecycle-check.md). The aggregate records
+`frontendDataLifecycle` coverage independently of its rule IDs. A proven absence
+of SWR is not applicable; selecting SWR without a supported contract is
+unavailable.
 
 ## Evidence limits
 

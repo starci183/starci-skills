@@ -1,5 +1,5 @@
-// next-contract.mjs - Next.js's own contract for route segment files, stated once. The architecture machine
-// (scripts/checks/code-patterns/next.mjs) and @starci/eslint-canon-fe (its runtime/ copy, lib/next.mjs) read it here, so a
+// next-contract.mjs - Next.js's own contract for route segment files, stated once. @starci/eslint-canon-fe (its
+// runtime/ copy, lib/next.mjs) reads it here, so a
 // naming or aliasing law never asks an author to spell a framework-reserved export differently.
 
 /** Exports Next reads by name from a route segment file. */

@@ -99,7 +99,7 @@ test('law tokens: knowledge, schema paths and the named data-owned files, never 
     ['.starciwork/shell/index.yaml','.starciwork/features/x/fr']);
   assert.deepEqual([{path:'knowledge/a.yaml'},{path:'.starciwork/index.yaml'},{path:'docs/x.md'},{path:'knowledge/a.yaml',kind:'work'}].map(inputKindOf),['source','work',null,'work'],'an entry recorded before kinds is classified by its path');
   assert.deepEqual(lawTokens('CONTEXT.md (fixed stack) + knowledge/repository-baseline.yaml (shapes common and nest)'),['knowledge/repository-baseline.yaml']);
-  assert.deepEqual(lawTokens('scripts/checks/code-patterns/*.mjs + modules/models/code-patterns.yaml + docs/architecture-check.md'),['modules/models/code-patterns.yaml']);
+  assert.deepEqual(lawTokens('scripts/checks/architecture/*.mjs + modules/models/code-patterns.yaml + docs/architecture-check.md'),['modules/models/code-patterns.yaml']);
   assert.deepEqual(lawTokens('knowledge/patterns/be/* + knowledge/../CONTEXT.md'),['knowledge/patterns/be/*']);
   const brief={reads:[{path:'knowledge/grammars/<family>/DNA.yaml'}],policy:{executionModes:{lint:{reads:[{path:'knowledge/coding-reference.yaml'}]}}}};
   assert.deepEqual(opInputPaths(brief,{params:{family:'carbon'}}),['knowledge/grammars/carbon/DNA.yaml']);

@@ -124,10 +124,6 @@ test('framework-pinned root files are read from knowledge FE-FOLDER-1, exact and
   assert.throws(()=>frameworkPinnedRootFiles(bad),/^Error: ARCH_KNOWLEDGE_UNAVAILABLE/);
   assert.throws(()=>frameworkPinnedRootFiles(path.join(dir,'missing.yaml')),/^Error: ARCH_KNOWLEDGE_UNAVAILABLE/);
   fs.writeFileSync(bad,'rules:\n  - id: FE-FOLDER-1\n    frameworkPinnedRootFiles: [middleware.ts]\n');
-  assert.throws(()=>frameworkPinnedRootFiles(bad),/frameworkPinnedRootExports/,'the mandated-export map is part of the same contract');
-  fs.writeFileSync(bad,'rules:\n  - id: FE-FOLDER-1\n    frameworkPinnedRootFiles: [middleware.ts]\n    frameworkPinnedRootExports: {proxy: [config]}\n');
-  assert.throws(()=>frameworkPinnedRootFiles(bad),/no frameworkPinnedRootFiles entry pins/);
-  fs.writeFileSync(bad,'rules:\n  - id: FE-FOLDER-1\n    frameworkPinnedRootFiles: [middleware.ts]\n    frameworkPinnedRootExports: {middleware: [config]}\n');
   assert.deepEqual([...frameworkPinnedRootFiles(bad)],['middleware.ts'],'an explicit file is read afresh, never the cached install list');
 });
 

@@ -60,7 +60,6 @@ rules:
           names a drawn shape
     verification:
       automated:
-        - FE_ERROR_WORLD_STATE_MAPPING
         - FE_WORLD_OWNER_RENDER_BOUNDARY
         - FE_HTTP_STATUS_COLLAPSE
         - starci-fe/no-data-status-shape
@@ -97,8 +96,6 @@ rules:
     verification:
       automated:
         - FE_HTTP_STATUS_COLLAPSE
-        - FE_ERROR_ENVELOPE_POLICY
-        - FE_WRITE_FEEDBACK_OWNER
       manual:
         - Verify business dispositions, retry eligibility, failure copy and redaction.
     relatedExamples:
@@ -128,7 +125,6 @@ rules:
           modules/config throws when it loads if a required NEXT_PUBLIC value is missing; there is no localhost fallback
     verification:
       automated:
-        - FE_REQUIRED_VALUE_FAILURE
         - FE_ENV_OWNER
       manual:
         - Select domain-required bindings and confirm which absence modes must stop continuation.
@@ -160,7 +156,6 @@ rules:
         write: "apps/<app>/src/instrumentation.ts, instrumentation-client.ts"
     verification:
       automated:
-        - FE_NEXT_ERROR_BOUNDARY_LOCATION
         - FE_ERROR_BOUNDARY_MISSING
       manual:
         - Verify feedback applicability, recovery safety, copy, redaction and telemetry behavior.

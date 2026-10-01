@@ -235,9 +235,8 @@ time. The stamp ships in the tarball.
 **Freshness check.** The root `npm run check` runs `scripts/checks/grammar-dist.mjs`. It fails when
 `dist/` is missing, has no stamp, was built from other source or another version, or was edited
 after the build. It also compares every `--*` custom property in each family's dist CSS with the
-source CSS, so a hand-edited token fails too. The brand check (`scripts/checks/brand.mjs`) and the
-grammar guard probe (`scripts/checks/code-patterns/grammar-guards.mjs`) run the same test before
-they read a grammar dist, and refuse a dist that fails it. Every refusal ends with the same fix:
+source CSS, so a hand-edited token fails too. The brand check (`scripts/checks/brand.mjs`) runs the same test before
+it reads a grammar dist, and refuses a dist that fails it. Every refusal ends with the same fix:
 `run npm run build in packages/grammar`. A registry install carries no `src/`, so it cannot be
 compared. It is reported as `unverifiable` and allowed, but if it carries a stamp, the version and
 built-file digest must still match.
