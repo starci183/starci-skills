@@ -23,6 +23,8 @@ import { fileLinkFindings } from '../../scripts/hfs/runtime-rules/node-modules-l
 import { controlCharFinding } from '../../scripts/hfs/runtime-rules/control-chars.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+/** An old (moved or retired) runtime path, spelled in segments so the move codemod never rewrites a fixture. */
+const old = (...segments) => segments.join('/');
 const MANIFEST = loadSlotManifest({ root: ROOT, file: path.join(ROOT, RUNTIME_MANIFEST_FILE) });
 const RESOLVER = createSlotResolver(MANIFEST, resolveRepoDeclaration(MANIFEST, { hfs: 1, kind: 'runtime', project: 'starci' }));
 const PARAMS = ruleParams(MANIFEST, 'runtime');
@@ -134,10 +136,10 @@ test('RT_SPEC_PLACEMENT: tests/<area>/<module>[.<topic>].spec.mjs, helpers, setu
 
 test('RT_SOURCE_NAME: one-off names, a non-kebab name and a basename repeated inside a tier are refused', () => {
   assert.deepEqual(codesOf(nameFindings('scripts/kernel/tmp-quota.mjs', PARAMS)), ['RT_SOURCE_NAME']);
-  assert.deepEqual(codesOf(nameFindings('scripts/kernel/verbs/shared/status-view.mjs', PARAMS)), ['RT_SOURCE_NAME']);
+  assert.deepEqual(codesOf(nameFindings(old('scripts', 'kernel', 'api-status', '_view.mjs'), PARAMS)), ['RT_SOURCE_NAME']);
   assert.deepEqual(codesOf(nameFindings('scripts/supervisor/owner-backfill.mjs', PARAMS)), ['RT_SOURCE_NAME']);
   assert.deepEqual(codesOf(nameFindings('scripts/kernel/camelCase.mjs', PARAMS)), ['RT_SOURCE_NAME']);
-  const dup = sourceNameFindings(ctxOf({ 'scripts/agent/install.mjs': '', 'scripts/guards/hook-install.mjs': '' }));
+  const dup = sourceNameFindings(ctxOf({ 'scripts/agent/install.mjs': '', [old('scripts', 'guards', 'install.mjs')]: '' }));
   assert.deepEqual(codesOf(dup), ['RT_SOURCE_NAME', 'RT_SOURCE_NAME']);
 });
 
@@ -150,15 +152,15 @@ test('RT_SOURCE_NAME: kebab names, and lib.mjs repeated across api systems, are 
 
 test('RT_RETIRED_PRESENT: a retired path, a moved-from path or a retired symbol that comes back is refused', () => {
   const ctx = ctxOf({ 'scripts/kernel/orca-tasks.mjs': 'export function closeOperationTask() {}\n' }, {
-    files: ['scripts/lib/kill-tree.mjs', 'scripts/gates/gate.mjs'],
-    retiredPaths: { retired: [{ path: 'scripts/lib/kill-tree.mjs' }], moved: [{ from: 'scripts/gates/gate.mjs', to: 'scripts/gates/gate.mjs', movedIn: 'C4' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
+    files: ['scripts/lib/kill-tree.mjs', old('scripts', 'checks', 'gate.mjs')],
+    retiredPaths: { retired: [{ path: 'scripts/lib/kill-tree.mjs' }], moved: [{ from: old('scripts', 'checks', 'gate.mjs'), to: 'scripts/gates/gate.mjs', movedIn: 'C4' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
   });
   assert.deepEqual(codesOf(retiredFindings(ctx)), ['RT_RETIRED_PRESENT', 'RT_RETIRED_PRESENT', 'RT_RETIRED_PRESENT']);
 });
 
 test('RT_RETIRED_PRESENT: retired paths that stay gone and a symbol only called, never declared, are clean', () => {
   const ctx = ctxOf({ 'scripts/kernel/orca-tasks.mjs': "import { other } from './x.mjs';\nother('closeOperationTask');\n" }, {
-    retiredPaths: { retired: [{ path: 'scripts/lib/kill-tree.mjs' }], moved: [{ from: 'scripts/gates/gate.mjs', to: 'scripts/gates/gate.mjs' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
+    retiredPaths: { retired: [{ path: 'scripts/lib/kill-tree.mjs' }], moved: [{ from: old('scripts', 'checks', 'gate.mjs'), to: 'scripts/gates/gate.mjs' }], retiredSymbols: [{ symbol: 'closeOperationTask', replacedBy: 'worker_done' }] },
   });
   assert.deepEqual(retiredFindings(ctx), []);
 });
@@ -192,8 +194,8 @@ test('HFS_SIZE_GROWTH: an oversized runtime source that grows, or a new one abov
 
 test('HFS_SIZE_GROWTH: an oversized file that shrinks, a moved one that keeps its size, and no base revision are clean', () => {
   assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/big.mjs': lines(590) }, { base: baseRev({ 'scripts/kernel/big.mjs': lines(600) }) })), []);
-  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/machine/decisions.mjs': lines(700) }, { base: baseRev({ 'scripts/machine/decisions.mjs': lines(700) }), retiredPaths: { moved: [{ from: 'scripts/machine/decisions.mjs', to: 'scripts/machine/decisions.mjs' }] } })), []);
-  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/verbs/big.mjs': lines(700) }, { base: baseRev({ 'scripts/kernel/verbs/big.mjs': lines(700) }), retiredPaths: { moved: [{ from: 'scripts/kernel/verbs/', to: 'scripts/kernel/verbs/' }] } })), [], 'a file below a moved directory keeps its size');
+  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/machine/decisions.mjs': lines(700) }, { base: baseRev({ [old('scripts', 'reconciler', 'decisions.mjs')]: lines(700) }), retiredPaths: { moved: [{ from: old('scripts', 'reconciler', 'decisions.mjs'), to: 'scripts/machine/decisions.mjs' }] } })), []);
+  assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/verbs/big.mjs': lines(700) }, { base: baseRev({ [old('scripts', 'kernel', 'api-verbs', 'big.mjs')]: lines(700) }), retiredPaths: { moved: [{ from: old('scripts', 'kernel', 'api-verbs', ''), to: 'scripts/kernel/verbs/' }] } })), [], 'a file below a moved directory keeps its size');
   assert.deepEqual(sizeFindings(ctxOf({ 'scripts/kernel/big.mjs': lines(900) })), []);
 });
 
@@ -329,7 +331,7 @@ test('RT_PENDING_ADDED: an entry the base had, a narrowed one, and one that foll
 });
 
 test('applyPending: matching is by code and path glob, a trailing / covers a directory', () => {
-  assert.ok(pendingMatcher('scripts/kernel/verbs/')('scripts/kernel/verbs/x.mjs'));
+  assert.ok(pendingMatcher(old('scripts', 'kernel', 'api-verbs', ''))(old('scripts', 'kernel', 'api-verbs', 'x.mjs')));
   assert.ok(pendingMatcher('tests/*.spec.mjs')('tests/a.spec.mjs') && !pendingMatcher('tests/*.spec.mjs')('tests/x/a.spec.mjs'));
   const { errors, allowed } = applyPending({ findings: [{ code: 'RT_SOURCE_NAME', level: 'error', path: 'scripts/a.mjs' }], pending: [{ path: 'scripts/a.mjs', rule: 'RT_API_SHAPE', lane: 'C6' }], codes: new Set(['RT_SOURCE_NAME', 'RT_API_SHAPE']) });
   assert.deepEqual(allowed, []);
