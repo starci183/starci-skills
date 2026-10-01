@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.0.6 - 2026-10-01
+
+- Changed: the runtime api layer move and the new pins.
+
 ## 8.0.5 - 2026-10-01
 
 - Changed: bundled slots.yaml, sonar-gate.yaml and canon-pins.

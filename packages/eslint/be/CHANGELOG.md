@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.6 - 2026-10-01
+
+- Changed: the runtime api layer (lib/git.mjs became api/git/lib.mjs), R112 and the dead-exports pairing, test-world 1.0.5 and the integration test shape.
+
 ## 3.0.5 - 2026-10-01
 
 - Changed: bundled slots.yaml (workflow worktree), sonar-gate.yaml (service coverage) and canon-pins.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.6 - 2026-10-01
+
+- Changed: R112 integration specs, the runtime api layer, the examples-root CI scope and the new pins.
+
 ## 4.0.5 - 2026-10-01
 
 - Changed: workflow worktree runtime copies, the services coverage scope for Sonar and codecov.yml, sonar-gate, canon-pins.
