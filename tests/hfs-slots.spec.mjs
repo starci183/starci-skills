@@ -8,6 +8,10 @@ import { parseYaml } from '../engine/yaml.mjs';
 import { braceVariants } from '../scripts/lib/glob.mjs';
 import { HfsSlotsError, loadSlotManifest, ruleParams, openHfs, readRepoDeclaration, resolveRepoDeclaration } from '../scripts/lib/hfs-slots.mjs';
 
+// The slot manifest (knowledge/hfs/slots.yaml) and its resolver. A product is ONE app: the app root holds the slots of profile app
+// (hfs.json, README, the one package.json and lockfile, CI, hooks, .starciwork), and be/ and fe/ are its sides, each judged with its
+// folder as the root it was when products were split in two repositories (the side view, `openHfs({ declaration, side })`).
+
 const root = path.resolve(import.meta.dirname, '..');
 const manifestText = fs.readFileSync(path.join(root, 'knowledge/hfs/slots.yaml'), 'utf8');
 const readSchema = (name) => parseYaml(fs.readFileSync(path.join(root, 'modules/schemas', name), 'utf8'));
@@ -17,19 +21,23 @@ const ajv = new Ajv2020({ strict: false, allErrors: true, logger: false });
 const validateManifestSchema = ajv.compile(readSchema('hfs-slots.schema.yaml'));
 const validateRepoSchema = ajv.compile(readSchema('hfs-repo.schema.yaml'));
 
-const BE = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] };
-const FE = { hfs: 1, profile: 'fe', project: 'nivo', apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }], optionalSlots: ['repo.packages', 'fe.package.ui'] };
+const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] };
+const FE_SIDE = { apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }], optionalSlots: ['repo.packages', 'fe.package.ui'], reads: ['be/contracts/'] };
+const app = ({ be = BE_SIDE, fe = FE_SIDE, ...rest } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe }, ...rest });
+const APP = app();
 
 const refusal = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code, `expected ${code}`);
+const sideOf = (declaration, side, options = {}) => openHfs({ declaration, side, ...options });
 
-test('the shipped manifest is 1.0.0 and validates against its JSON schema and the loader', () => {
+test('the shipped manifest is 2.0.0 and validates against its JSON schema and the loader', () => {
   const doc = parseYaml(manifestText);
-  assert.equal(doc.version, '1.0.0');
+  assert.equal(doc.version, '2.0.0');
   assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
   const manifest = loadSlotManifest();
-  assert.equal(manifest.major, 1);
+  assert.equal(manifest.major, 2);
   for (const slot of manifest.slots) {
     for (const field of ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests']) assert.notEqual(slot[field], undefined, `${slot.id} lacks ${field}`);
+    if (slot.profiles.includes('app')) assert.deepEqual(slot.profiles, ['app'], `${slot.id}: a slot of the app root belongs to no side`);
   }
   assert.equal(new Set(manifest.slots.map((s) => s.id)).size, manifest.slots.length);
 });
@@ -58,61 +66,75 @@ test('the loader also refuses what only semantics can see', () => {
   refusal(load((d) => { d.slots[0].tier = 'nowhere'; }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.tiers.be.app.mayImport.push('ghost'); }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.appKinds.be.push('lambda'); }), 'HFS_MANIFEST_INVALID');
-  refusal(load((d) => { d.schema = 'starci/hfs-slots@2'; }), 'HFS_MANIFEST_INVALID');
+  refusal(load((d) => { d.schema = 'starci/hfs-slots@3'; }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.slots.find((s) => s.id === 'be.transport.http').requires = ['<nope>.module.ts']; }), 'HFS_MANIFEST_INVALID');
-  refusal(load((d) => { d.slots.push({ ...d.slots.find((s) => s.id === 'repo.readme'), id: 'repo.readme-twin' }); }), 'HFS_MANIFEST_INVALID');
+  refusal(load((d) => { d.slots.push({ ...d.slots.find((s) => s.id === 'app.readme'), id: 'app.readme-twin' }); }), 'HFS_MANIFEST_INVALID');
+  refusal(load((d) => { d.sides.fe.reads = ['contracts']; }), 'HFS_MANIFEST_INVALID');                       // a read is a <side>/<dir>/ path
 });
 
 test('hfs.json: schema and loader agree', () => {
-  assert.equal(validateRepoSchema(BE), true, JSON.stringify(validateRepoSchema.errors));
-  assert.equal(validateRepoSchema(FE), true, JSON.stringify(validateRepoSchema.errors));
+  assert.equal(validateRepoSchema(APP), true, JSON.stringify(validateRepoSchema.errors));
   const manifest = loadSlotManifest();
   const bad = {
-    'missing hfs': { ...BE, hfs: undefined },
-    'fe with connections': { ...FE, connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }] },
-    'connection as a bare string': { ...BE, connections: ['primary'] },
-    'no apps': { ...BE, apps: [] },
-    'unknown key': { ...BE, owners: ['x'] },
-    'bad project name': { ...BE, project: 'Nivo Backend' },
-    'be with stacks': { ...BE, stacks: '../nivo-backend' },
-    'absolute stacks': { ...FE, stacks: '/srv/nivo-backend' },
+    'missing hfs': { ...APP, hfs: undefined },
+    'a standalone back end (profile)': { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] },
+    'kind other than app': { ...APP, kind: 'be' },
+    'one side only': { ...APP, sides: { be: BE_SIDE } },
+    'fe with connections': app({ fe: { ...FE_SIDE, connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }] } }),
+    'connection as a bare string': app({ be: { ...BE_SIDE, connections: ['primary'] } }),
+    'no apps on a side': app({ fe: { apps: [] } }),
+    'unknown key': { ...APP, owners: ['x'] },
+    'unknown side key': app({ be: { ...BE_SIDE, stacks: '../nivo-backend' } }),
+    'bad project name': { ...APP, project: 'Nivo Backend' },
   };
-  assert.equal(validateRepoSchema({ ...FE, stacks: '../nivo-backend' }), true, JSON.stringify(validateRepoSchema.errors));
-  assert.doesNotThrow(() => resolveRepoDeclaration(manifest, { ...FE, stacks: '../nivo-backend' }));
   for (const [name, declaration] of Object.entries(bad)) {
     assert.equal(validateRepoSchema(JSON.parse(JSON.stringify(declaration))), false, `schema accepted: ${name}`);
     refusal(() => resolveRepoDeclaration(manifest, declaration), 'HFS_DECLARATION_INVALID');
   }
-  // semantic only (the schema cannot state them): one name per database, env keys disjoint across connections
+  // semantic only (the schema cannot state them): one name per database, env keys disjoint across connections, app names unique across sides
   for (const connections of [
     [{ name: 'primary', envPrefix: 'A_DB' }, { name: 'primary', envPrefix: 'B_DB' }],
     [{ name: 'order', envPrefix: 'ORDER' }, { name: 'order-archive', envPrefix: 'ORDER_ARCHIVE' }],
-  ]) refusal(() => resolveRepoDeclaration(manifest, { ...BE, connections }), 'HFS_DECLARATION_INVALID');
-  assert.deepEqual(resolveRepoDeclaration(manifest, BE).connections, BE.connections);
+  ]) refusal(() => resolveRepoDeclaration(manifest, app({ be: { ...BE_SIDE, connections } })), 'HFS_DECLARATION_INVALID');
+  refusal(() => resolveRepoDeclaration(manifest, app({ fe: { apps: [{ name: 'core', kind: 'next' }] } })), 'HFS_DECLARATION_INVALID');
+  assert.deepEqual(resolveRepoDeclaration(manifest, APP, { side: 'be' }).connections, BE_SIDE.connections);
+  assert.equal(resolveRepoDeclaration(manifest, APP).profile, 'app');
 });
 
-test('a declaration is checked against the manifest', () => {
+test('a declaration is checked against the manifest, per side', () => {
   const manifest = loadSlotManifest();
-  refusal(() => resolveRepoDeclaration(manifest, { ...BE, apps: [...BE.apps, { name: 'game', kind: 'unity' }] }), 'HFS_DECLARATION_INVALID');
-  refusal(() => resolveRepoDeclaration(manifest, { ...BE, apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }, { name: 'migrate', kind: 'migrate' }] }), 'HFS_DECLARATION_INVALID');
-  refusal(() => resolveRepoDeclaration(manifest, { ...BE, optionalSlots: ['be.feature'] }), 'HFS_DECLARATION_INVALID');          // required, not opt-in
-  refusal(() => resolveRepoDeclaration(manifest, { ...BE, optionalSlots: ['be.app.worker'] }), 'HFS_DECLARATION_INVALID');       // implied by an app of its kind
-  refusal(() => resolveRepoDeclaration(manifest, { ...BE, optionalSlots: ['fe.package.ui'] }), 'HFS_DECLARATION_INVALID');       // another profile
-  refusal(() => resolveRepoDeclaration(manifest, { ...BE, optionalSlots: ['be.made.up'] }), 'HFS_DECLARATION_INVALID');
-  refusal(() => resolveRepoDeclaration(manifest, { ...BE, apps: [{ name: 'core', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }] }), 'HFS_DECLARATION_INVALID');   // no api app
-  refusal(() => resolveRepoDeclaration(manifest, { ...BE, apps: [{ name: 'core', kind: 'api' }] }), 'HFS_DECLARATION_INVALID');   // connections declared, no migrate app
-  assert.doesNotThrow(() => resolveRepoDeclaration(manifest, { ...BE, apps: [{ name: 'core', kind: 'api' }], connections: [] }));
-  refusal(() => resolveRepoDeclaration(manifest, { ...FE, apps: [] }), 'HFS_DECLARATION_INVALID');
+  const be = (fields) => app({ be: { ...BE_SIDE, ...fields } });
+  refusal(() => resolveRepoDeclaration(manifest, be({ apps: [...BE_SIDE.apps, { name: 'game', kind: 'unity' }] })), 'HFS_DECLARATION_INVALID');
+  refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }, { name: 'core', kind: 'cli' }, { name: 'migrate', kind: 'migrate' }] })), 'HFS_DECLARATION_INVALID');
+  refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['be.feature'] })), 'HFS_DECLARATION_INVALID');          // required, not opt-in
+  refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['be.app.worker'] })), 'HFS_DECLARATION_INVALID');       // implied by an app of its kind
+  refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['fe.package.ui'] })), 'HFS_DECLARATION_INVALID');       // the other side's
+  refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['app.ci-e2e'] })), 'HFS_DECLARATION_INVALID');          // the root's
+  refusal(() => resolveRepoDeclaration(manifest, be({ optionalSlots: ['be.made.up'] })), 'HFS_DECLARATION_INVALID');
+  refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }] })), 'HFS_DECLARATION_INVALID');   // no api app
+  refusal(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }] })), 'HFS_DECLARATION_INVALID');   // connections declared, no migrate app
+  assert.doesNotThrow(() => resolveRepoDeclaration(manifest, be({ apps: [{ name: 'core', kind: 'api' }], connections: [] })));
+  refusal(() => resolveRepoDeclaration(manifest, app({ fe: { ...FE_SIDE, apps: [] } })), 'HFS_DECLARATION_INVALID');
+  refusal(() => resolveRepoDeclaration(manifest, app({ fe: { ...FE_SIDE, reads: ['be/src/'] } })), 'HFS_DECLARATION_INVALID');  // only the manifest's reads
+  refusal(() => resolveRepoDeclaration(manifest, app({ be: { ...BE_SIDE, reads: ['fe/apps/'] } })), 'HFS_DECLARATION_INVALID');  // the be side reads nothing
+  refusal(() => resolveRepoDeclaration(manifest, APP, { side: 'root' }), 'HFS_DECLARATION_INVALID');
 });
 
-test('readRepoDeclaration reads hfs.json and refuses a missing one (never "unavailable")', (t) => {
+test('readRepoDeclaration reads the app hfs.json at the app root, the side view from a side folder, and refuses a missing one (never "unavailable")', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-hfs-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const manifest = loadSlotManifest();
   refusal(() => readRepoDeclaration(manifest, dir), 'HFS_DECLARATION_INVALID');
-  fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify(BE));
+  fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify(APP));
   assert.equal(readRepoDeclaration(manifest, dir).project, 'nivo');
-  assert.equal(openHfs({ repoRoot: dir }).repo.profile, 'be');
+  assert.equal(openHfs({ repoRoot: dir }).repo.profile, 'app');
+  for (const side of ['be', 'fe']) {
+    fs.mkdirSync(path.join(dir, side));
+    const view = openHfs({ repoRoot: path.join(dir, side) }).repo;
+    assert.deepEqual([view.profile, view.side], [side, side], `${side}/ is judged with the view of its side`);
+  }
+  fs.mkdirSync(path.join(dir, 'tools'));
+  refusal(() => readRepoDeclaration(manifest, path.join(dir, 'tools')), 'HFS_DECLARATION_INVALID');   // a folder that is no side has no declaration
   fs.writeFileSync(path.join(dir, 'hfs.json'), '{not json');
   refusal(() => readRepoDeclaration(manifest, dir), 'HFS_DECLARATION_INVALID');
 });
@@ -120,23 +142,63 @@ test('readRepoDeclaration reads hfs.json and refuses a missing one (never "unava
 test('a manifest major mismatch is refused, in either direction, with no compatibility window', () => {
   const manifest = loadSlotManifest();
   try {
-    resolveRepoDeclaration(manifest, { ...BE, hfs: 2 });
-    assert.fail('major 2 was accepted by a 1.x manifest');
+    resolveRepoDeclaration(manifest, { ...APP, hfs: 1 });
+    assert.fail('major 1 was accepted by a 2.x manifest');
   } catch (error) {
     assert.equal(error.code, 'HFS_MANIFEST_MAJOR_MISMATCH');
-    assert.deepEqual([error.details.pinned, error.details.manifestMajor], [2, 1]);
+    assert.deepEqual([error.details.pinned, error.details.manifestMajor], [1, 2]);
   }
-  const next = loadSlotManifest({ text: manifestText.replace('schema: starci/hfs-slots@1', 'schema: starci/hfs-slots@2').replace('version: 1.0.0', 'version: 2.0.0') });
-  assert.equal(next.major, 2);
-  refusal(() => resolveRepoDeclaration(next, BE), 'HFS_MANIFEST_MAJOR_MISMATCH');           // a repository pinned to the old major
-  assert.equal(resolveRepoDeclaration(next, { ...BE, hfs: 2 }).hfs, 2);
+  const next = loadSlotManifest({ text: manifestText.replace('schema: starci/hfs-slots@2', 'schema: starci/hfs-slots@3').replace('version: 2.0.0', 'version: 3.0.0') });
+  assert.equal(next.major, 3);
+  refusal(() => resolveRepoDeclaration(next, APP), 'HFS_MANIFEST_MAJOR_MISMATCH');           // an app pinned to the old major
+  assert.equal(resolveRepoDeclaration(next, { ...APP, hfs: 3 }).hfs, 3);
 });
 
-test('BE fixture: which slot owns a path', () => {
-  const be = openHfs({ declaration: BE });
+test('the app root: its own slots, a side path through the side, and the files of the old repository root forbidden in a side', () => {
+  const whole = openHfs({ declaration: APP });
+  const owner = (p) => { const c = whole.classifyPath(p); return `${c.status}:${c.slot ?? ''}`; };
+  assert.equal(owner('README.md'), 'owned:app.readme');
+  assert.equal(owner('hfs.json'), 'owned:app.declaration');
+  assert.equal(owner('package.json'), 'owned:app.package-manifest');
+  assert.equal(owner('package-lock.json'), 'owned:app.lockfile');
+  assert.equal(owner('.prettierrc'), 'owned:app.format-config');
+  assert.equal(owner('sonar-project.properties'), 'owned:app.quality-config');
+  assert.equal(owner('.husky/pre-push'), 'owned:app.hooks');
+  assert.equal(owner('.github/workflows/ci.yml'), 'owned:app.ci');
+  assert.equal(owner('scripts/codegen.mjs'), 'owned:app.scripts');
+  assert.equal(owner('.starciwork/features/index.yaml'), 'owned:app.starciwork');
+  assert.equal(owner('.starciwork/worktrees/x/README.md'), 'forbidden:app.worktrees');
+  assert.equal(owner('.env.production'), 'forbidden:app.plaintext-env');
+  assert.equal(owner('tsconfig.json'), 'forbidden:app.tool-config-local');                       // a tool config belongs to a side
+  assert.equal(owner('node_modules/x/index.js'), 'owned:app.build-output');
+  // a side path answers through its side, with the side named and the path kept app-relative
+  const feature = whole.classifyPath('be/src/features/orders/index.ts');
+  assert.deepEqual([feature.status, feature.slot, feature.side, feature.path], ['owned', 'be.feature', 'be', 'be/src/features/orders/index.ts']);
+  assert.equal(whole.ownerOf('be/src/features/orders/application/place.handler.ts').root, 'be/src/features/orders');
+  assert.equal(whole.classifyPath('fe/apps/web/src/modules/cart/index.ts').slot, 'fe.modules');
+  assert.equal(whole.sideOf('fe/apps/web/next.config.ts'), 'fe');
+  assert.equal(whole.sideOf('README.md'), null);
+  // what the old repository root held besides the side's own files is the app root's: a copy in a side is forbidden
+  for (const file of ['package.json', 'package-lock.json', 'hfs.json', 'README.md', '.github/workflows/ci.yml', '.starciwork/x.yaml', '.prettierrc', 'scripts/x.mjs']) {
+    assert.equal(owner(`be/${file}`), 'forbidden:repo.side-root-forbidden', `be/${file}`);
+    assert.equal(owner(`fe/${file}`), 'forbidden:repo.side-root-forbidden', `fe/${file}`);
+  }
+  // required paths: the root's own, then each side's under its folder
+  const paths = whole.requiredPaths().paths.map((e) => e.path);
+  for (const p of ['README.md', 'hfs.json', 'package.json', 'package-lock.json', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/', 'be/', 'fe/', 'be/tsconfig.json', 'be/apps/core/src/', 'fe/tsconfig.json', 'fe/apps/admin/src/modules/i18n/'])
+    assert.equal(paths.includes(p), true, `required path missing: ${p}`);
+  // nothing crosses sides except the declared reads
+  const ok = (a, b) => whole.importAllowed(a, b);
+  assert.deepEqual([ok('fe/apps/web/src/modules/api/index.ts', 'be/src/features/orders/index.ts').allowed, ok('fe/apps/web/src/modules/api/index.ts', 'be/src/features/orders/index.ts').reason], [false, 'crossSide']);
+  assert.deepEqual([ok('fe/apps/web/src/modules/api/index.ts', 'be/contracts/core/schema.graphql').allowed, ok('fe/apps/web/src/modules/api/index.ts', 'be/contracts/core/schema.graphql').reason], [true, 'sideRead']);
+  assert.equal(ok('be/src/features/orders/index.ts', 'fe/apps/web/src/modules/api/index.ts').reason, 'crossSide');
+  assert.equal(ok('be/src/features/orders/application/a.ts', 'be/src/modules/domain/stock/index.ts').allowed, true, 'inside a side, the side decides');
+});
+
+test('BE side: which slot owns a path', () => {
+  const be = sideOf(APP, 'be');
   const owner = (p) => { const c = be.classifyPath(p); return `${c.status}:${c.slot ?? ''}`; };
-  assert.equal(owner('README.md'), 'owned:repo.readme');
-  assert.equal(owner('hfs.json'), 'owned:repo.declaration');
+  assert.equal(owner('README.md'), 'forbidden:repo.side-root-forbidden');
   assert.equal(owner('apps/core/src/main.ts'), 'owned:be.app.api');
   assert.equal(owner('apps/worker/src/app.module.ts'), 'owned:be.app.worker');
   assert.equal(owner('apps/migrate/src/main.ts'), 'owned:be.app.migrate');
@@ -157,10 +219,7 @@ test('BE fixture: which slot owns a path', () => {
   assert.equal(owner('src/tests/world/use-test-world.ts'), 'owned:be.tests.world');
   assert.equal(owner('contracts/core/schema.graphql'), 'owned:be.contract.graphql');
   assert.equal(owner('contracts/core/openapi.json'), 'not-enabled:be.contract.openapi');
-  assert.equal(owner('.starciwork/features/index.yaml'), 'owned:be.starciwork');
-  assert.equal(owner('.starciwork/worktrees/x/README.md'), 'forbidden:repo.worktrees');
   assert.equal(owner('.starcistacks/prod/secrets/db.enc'), 'owned:be.starcistacks');
-  assert.equal(owner('.github/workflows/ci.yml'), 'owned:repo.ci');
   assert.equal(owner('docs/adr/0001-use-nest.md'), 'owned:repo.docs');
   assert.equal(owner('e2e/probe.spec.ts'), 'forbidden:be.root-e2e');
   assert.equal(owner('.env.production'), 'forbidden:repo.plaintext-env');
@@ -173,8 +232,8 @@ test('BE fixture: which slot owns a path', () => {
   assert.equal(be.classifyPath('e2e/probe.spec.ts').goesTo.startsWith('src/tests/e2e/'), true);
 });
 
-test('BE fixture: tracked, tier, required files', () => {
-  const be = openHfs({ declaration: BE });
+test('BE side: tracked, tier, required files', () => {
+  const be = sideOf(APP, 'be');
   assert.equal(be.isTracked('src/features/orders/index.ts'), true);
   assert.equal(be.trackingOf('apps/core/dist/main.js'), 'ignored');
   assert.equal(be.isTracked('apps/core/dist/main.js'), false);
@@ -185,27 +244,27 @@ test('BE fixture: tracked, tier, required files', () => {
   assert.equal(be.tierOf('apps/core/src/main.ts'), 'app');
   assert.equal(be.tierOf('src/modules/domain/orders/persistence/orders.repository.ts'), 'domain');       // inherits the owner's tier
   assert.equal(be.tierOf('src/modules/platform/database/persistence/x.ts'), 'platform');
-  assert.equal(be.tierOf('README.md'), 'none');
+  assert.equal(be.tierOf('tsconfig.json'), 'none');
   assert.deepEqual(be.requiredFiles('src/features/orders/index.ts'), ['src/features/orders/index.ts', 'src/features/orders/orders.module.ts', 'src/features/orders/application/']);
   assert.deepEqual(be.requiredFiles('src/features/orders/transport/http/a.controller.ts'), ['src/features/orders/transport/http/orders-http.module.ts']);
   assert.deepEqual(be.requiredFiles('apps/core/src/main.ts'), ['apps/core/src/main.ts', 'apps/core/src/app.module.ts']);
   assert.deepEqual(be.requiredFiles('src/modules/domain/orders/persistence/x.ts'), ['src/modules/domain/orders/persistence/connection.ts']);
   const { paths, minimums } = be.requiredPaths();
   const has = (p) => paths.some((e) => e.path === p);
-  for (const p of ['README.md', 'hfs.json', 'package-lock.json', 'tsconfig.json', 'nest-cli.json', '.husky/pre-push', '.github/workflows/ci.yml', '.sops.yaml', '.starciwork/', '.starciwork/features/index.yaml', '.starcistacks/application-stacks.yaml',
+  for (const p of ['tsconfig.json', 'tsconfig.build.json', 'nest-cli.json', '.sops.yaml', '.starcistacks/application-stacks.yaml',
     'apps/core/src/', 'src/modules/platform/config/', 'src/modules/platform/logging/', 'src/modules/platform/errors/', 'src/modules/platform/primitives/'])
     assert.equal(has(p), true, `required path missing: ${p}`);
-  assert.equal(has('.github/workflows/e2e.yml'), false, 'an optional file is not required');
+  for (const p of ['README.md', 'hfs.json', 'package-lock.json', '.husky/pre-push', '.github/workflows/ci.yml', '.starciwork/']) assert.equal(has(p), false, `${p} is the app root's, not the side's`);
   assert.equal(has('apps/worker/src/'), false, 'an opt-in app is not required');
   assert.equal(has('jest.config.e2e.js'), false);
   assert.deepEqual(minimums.map((m) => m.slot).sort(), ['be.app.api', 'be.feature']);
   // no connection declared: no migrate app is required, and its paths are not
-  const noDb = openHfs({ declaration: { ...BE, apps: [{ name: 'core', kind: 'api' }], connections: [] } });
+  const noDb = sideOf(app({ be: { ...BE_SIDE, apps: [{ name: 'core', kind: 'api' }], connections: [] } }), 'be');
   assert.equal(noDb.requiredPaths().paths.some((e) => e.slot === 'be.app.migrate'), false);
 });
 
-test('BE fixture: import direction', () => {
-  const be = openHfs({ declaration: BE });
+test('BE side: import direction', () => {
+  const be = sideOf(APP, 'be');
   const ok = (a, b) => be.importAllowed(a, b);
   assert.equal(ok('src/features/orders/application/place.handler.ts', 'src/modules/domain/stock/index.ts').allowed, true);
   assert.equal(ok('src/features/orders/application/place.handler.ts', 'src/features/orders/orders.module.ts').reason, 'sameOwner');
@@ -220,55 +279,53 @@ test('BE fixture: import direction', () => {
   assert.equal(ok('src/tests/e2e/orders/place.e2e-spec.ts', 'apps/core/src/app.module.ts').allowed, true);                                  // an app's public entry is app.module.ts
   assert.equal(ok('src/tests/e2e/orders/place.e2e-spec.ts', 'apps/core/src/main.ts').reason, 'notPublicEntry');
   assert.equal(ok('src/tests/fixtures/orders.ts', 'src/features/orders/index.ts').reason, 'tierDirection');                                // fixtures never import a feature
-  assert.equal(ok('src/features/orders/index.ts', 'README.md').reason, 'untiered');
+  assert.equal(ok('src/features/orders/index.ts', 'tsconfig.json').reason, 'untiered');
   const unknown = ok('src/features/orders/index.ts', 'src/whatever/x.ts');
   assert.deepEqual([unknown.allowed, unknown.reason, unknown.code], [false, 'unowned', 'HFS_SLOT_UNDECLARED']);
   assert.equal(ok('src/features/orders/transport/message/a.ts', 'src/features/orders/index.ts').reason, 'slotNotEnabled');
 });
 
-test('FE multi-app fixture', () => {
-  const fe = openHfs({ declaration: FE });
+test('FE side with two apps', () => {
+  const fe = sideOf(APP, 'fe');
   const owner = (p) => fe.classifyPath(p).slot;
   assert.equal(owner('apps/web/next.config.ts'), 'fe.app.next');
-  assert.equal(owner('apps/admin/package.json'), 'fe.app.next');
+  assert.equal(owner('apps/web/tsconfig.json'), 'fe.app.next');
+  assert.equal(fe.classifyPath('apps/admin/package.json').status === 'owned' && owner('apps/admin/package.json') === 'fe.app.next', false, 'an fe app has no package.json of its own');
   assert.equal(owner('apps/web/public/logo.svg'), 'fe.app-optional');
-  assert.equal(fe.classifyPath('apps/web/vitest.config.ts').status, 'no-slot', 'a front end has no test configuration slot: FE_NO_TESTS owns the path');
+  assert.equal(fe.classifyPath('apps/web/vitest.config.ts').status, 'no-slot', 'the fe side has no test configuration slot: FE_NO_TESTS owns the path');
   assert.equal(owner('apps/web/src/app/[locale]/page.tsx'), 'fe.route');
   assert.equal(owner('apps/web/src/features/pages/Home/index.tsx'), 'fe.feature');
   assert.equal(owner('apps/web/src/components/blocks/Header/component.tsx'), 'fe.components');
   assert.equal(owner('apps/web/src/hooks/orders/useOrders.ts'), 'fe.hooks');
   assert.equal(owner('apps/web/src/modules/api/client.ts'), 'fe.transport.client');
-  assert.equal(owner('apps/web/src/modules/api/contract/core.graphql'), 'fe.contract.copy');   // the contract copy is a slot of its own
-  assert.equal(owner('apps/web/src/modules/api/read/orders.ts'), 'fe.modules.api');            // anything else below the module stays the module's
+  assert.equal(owner('apps/web/src/modules/api/contract/core.graphql'), 'fe.modules.api', 'no contract copy slot: the fe side reads be/contracts/ in place');
+  assert.equal(owner('apps/web/src/modules/api/read/orders.ts'), 'fe.modules.api');
   assert.equal(owner('apps/web/src/modules/i18n/messages/en.json'), 'fe.modules.i18n');
   assert.equal(owner('apps/web/src/modules/brand/brand.css'), 'fe.modules.brand');
   assert.equal(owner('apps/web/src/modules/cart/index.ts'), 'fe.modules');
   assert.equal(owner('packages/nivo-ui/src/index.ts'), 'fe.package.ui');
-  assert.equal(fe.classifyPath('e2e/checkout/pay.e2e-spec.ts').status, 'no-slot', 'a front end has no e2e slot');
+  assert.equal(fe.classifyPath('e2e/checkout/pay.e2e-spec.ts').status, 'no-slot', 'the fe side has no e2e slot');
   assert.equal(owner('apps/web/Dockerfile'), 'repo.app-image');
-  assert.equal(fe.classifyPath('src/index.ts').status, 'no-slot');                              // FE has no root src/
-  assert.equal(fe.classifyPath('.starciwork/x.yaml').status, 'no-slot');                        // and no .starciwork
+  assert.equal(fe.classifyPath('src/index.ts').status, 'no-slot');                              // the fe side has no root src/
+  assert.equal(owner('.starciwork/x.yaml'), 'repo.side-root-forbidden');                       // Work records are the app root's
   assert.equal(fe.ownerOf('apps/admin/src/modules/cart/index.ts').root, 'apps/admin/src/modules/cart');
   assert.equal(fe.classifyPath('apps/admin/src/modules/cart/index.ts').bindings.app, 'admin');
   // required paths are expanded per declared app
   const paths = fe.requiredPaths().paths.map((e) => e.path);
-  for (const app of ['web', 'admin']) for (const p of [`apps/${app}/next.config.ts`, `apps/${app}/src/app/[locale]/layout.tsx`, `apps/${app}/src/modules/i18n/`, `apps/${app}/src/modules/routes/`, `apps/${app}/src/modules/config/`])
+  for (const name of ['web', 'admin']) for (const p of [`apps/${name}/next.config.ts`, `apps/${name}/tsconfig.json`, `apps/${name}/src/app/[locale]/layout.tsx`, `apps/${name}/src/modules/i18n/`, `apps/${name}/src/modules/routes/`, `apps/${name}/src/modules/config/`])
     assert.equal(paths.includes(p), true, `missing ${p}`);
   assert.equal(paths.includes('apps/web/src/modules/api/'), false, 'the transport may live in the shared api package; FE_TRANSPORT_OWNER counts the clients');
-  assert.equal(fe.classifyPath('tsconfig.e2e.json').status, 'no-slot', 'the front-end e2e tsconfig is no longer a managed file');
-  assert.equal(fe.classifyPath('.github/workflows/e2e.yml').status, 'no-slot', 'a front end has no e2e workflow');
-  // the tool configuration of a front end: managed files, the repository's own three, and the forbidden ones
-  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs', '.prettierrc', '.prettierignore']) assert.equal(owner(file), 'fe.tool-config', file);
+  assert.equal(fe.classifyPath('tsconfig.e2e.json').status, 'no-slot', 'the front-end e2e tsconfig is no managed file');
+  // the tool configuration of the fe side: managed files, the side's own turbo.json, and the forbidden ones
+  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs']) assert.equal(owner(file), 'fe.tool-config', file);
+  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs']) assert.equal(paths.includes(file), true, `${file} is required`);
   for (const file of ['vitest.config.ts', 'vitest.setup.ts', 'playwright.config.ts']) assert.equal(fe.classifyPath(file).status, 'no-slot', file);
   assert.equal(owner('turbo.json'), 'fe.tool-config-repo');
   for (const file of ['.eslintrc.json', '.eslintignore', 'eslint.config.js', '.stylelintrc.json', 'stylelint.config.cjs', '.prettierrc.json', '.lintstagedrc.json']) assert.equal(owner(file), 'fe.tool-config-local', file);
-  assert.equal(owner('package.json'), 'fe.package-manifest');
-  assert.equal(owner('package-lock.json'), 'fe.lockfile');
-  for (const file of ['tsconfig.json', 'eslint.config.mjs', 'stylelint.config.mjs', '.prettierrc', '.prettierignore', 'package.json', 'package-lock.json']) assert.equal(paths.includes(file), true, `${file} is required`);
+  for (const file of ['package.json', 'package-lock.json', '.prettierrc', '.prettierignore']) assert.equal(owner(file), 'repo.side-root-forbidden', `${file} is the app root's`);
   assert.equal(fe.slot('fe.tool-config-local').presence, 'forbidden');
   assert.equal(fe.slot('fe.tool-config').managedBy, 'tool-config');
-  assert.equal(fe.slot('fe.package-manifest').managedBy, 'package-scripts');
-  assert.equal(fe.classifyPath('tsconfig.build.json').status, 'no-slot', 'a root tsconfig.build.json has no owner in a front end');
+  assert.equal(fe.classifyPath('tsconfig.build.json').status, 'no-slot', 'a tsconfig.build.json has no owner in the fe side');
   // import direction, cross-app and layers
   const ok = (a, b) => fe.importAllowed(a, b);
   assert.equal(ok('apps/web/src/features/pages/Home/index.tsx', 'apps/web/src/components/blocks/Header/index.tsx').allowed, true);
@@ -292,11 +349,11 @@ test('FE multi-app fixture', () => {
   assert.equal(ok('apps/web/src/features/pages/Home/index.tsx', 'packages/nivo-ui/src/index.ts').allowed, true);
   assert.equal(ok('packages/nivo-ui/src/button.ts', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');
   assert.equal(fe.slotEnabled(fe.slot('fe.package.ui')), true);
-  assert.equal(openHfs({ declaration: { ...FE, optionalSlots: [] } }).classifyPath('packages/nivo-ui/src/index.ts').status, 'not-enabled');
+  assert.equal(sideOf(app({ fe: { ...FE_SIDE, optionalSlots: [] } }), 'fe').classifyPath('packages/nivo-ui/src/index.ts').status, 'not-enabled');
 });
 
 test('classification reports the folder kind and the role of a file from the slot manifest', () => {
-  const fe = openHfs({ declaration: FE });
+  const fe = sideOf(APP, 'fe');
   const at = (p) => fe.classifyPath(p);
   assert.equal(at('apps/web/src/components/leaves/Button/index.tsx').kind, 'leaves');
   assert.equal(at('apps/web/src/components/blocks/Header/component.tsx').kind, 'blocks');
@@ -312,10 +369,11 @@ test('classification reports the folder kind and the role of a file from the slo
   assert.equal(at('apps/web/src/hooks/orders/index.ts').role, 'entry');
   assert.equal(at('apps/web/src/hooks/orders/useOrders.ts').role, undefined);
   assert.equal(at('apps/web/src/app/[locale]/cart/page.tsx').role, 'page');
+  assert.equal(openHfs({ declaration: APP }).classifyPath('fe/apps/web/src/app/[locale]/cart/page.tsx').role, 'page', 'the app resolver keeps the side answer');
 });
 
-test('BE fixture: test kinds agree folder with suffix, and the retired e2e/world folder is forbidden', () => {
-  const be = openHfs({ declaration: BE });
+test('BE side: test kinds agree folder with suffix, and the retired e2e/world folder is forbidden', () => {
+  const be = sideOf(APP, 'be');
   const owner = (p) => { const c = be.classifyPath(p); return `${c.status}:${c.slot ?? ''}`; };
   assert.equal(owner('src/tests/integration/inbox/claim.integration-spec.ts'), 'owned:be.tests.integration');
   assert.equal(owner('src/tests/contract/stripe/charge.contract-spec.ts'), 'owned:be.tests.contract');
@@ -332,8 +390,8 @@ test('BE fixture: test kinds agree folder with suffix, and the retired e2e/world
   assert.equal(be.classifyPath('src/tests/contract/stripe/charge.e2e-spec.ts').status, 'no-slot');
 });
 
-test('an unknown path is reported with its nearest slot and HFS_SLOT_UNDECLARED', () => {
-  const be = openHfs({ declaration: BE });
+test('an unknown path is reported with its nearest slot and HFS_SLOT_UNDECLARED, in a side and at the app root', () => {
+  const be = sideOf(APP, 'be');
   const stray = be.classifyPath('src/tests/e2e/orders/place.ts');
   assert.deepEqual([stray.status, stray.code], ['no-slot', 'HFS_SLOT_UNDECLARED']);
   assert.equal(stray.nearest.slot, 'be.tests.e2e');
@@ -346,6 +404,10 @@ test('an unknown path is reported with its nearest slot and HFS_SLOT_UNDECLARED'
   assert.equal(rootFile.status, 'no-slot');
   assert.equal(rootFile.nearest.matchedDepth, 0);
   assert.equal(be.classifyPath('src/tests/e2e/orders/place.ts').path, 'src/tests/e2e/orders/place.ts');
+  const whole = openHfs({ declaration: APP });
+  const appStray = whole.classifyPath('be/src/helpers/util.ts');
+  assert.deepEqual([appStray.status, appStray.path, appStray.nearest.matchedPrefix], ['no-slot', 'be/src/helpers/util.ts', 'be/src']);
+  assert.equal(whole.classifyPath('LICENSE').status, 'no-slot');
 });
 
 test('be.feature.application.support is an optional feature-tier slot inside application/, opt-out by absence', () => {
@@ -357,7 +419,7 @@ test('be.feature.application.support is an optional feature-tier slot inside app
   assert.equal(slot.tier, 'feature');
   assert.equal(slot.tests, 'none');
   assert.equal(slot.owner, undefined, 'support is not an owner: it belongs to the enclosing feature');
-  const be = openHfs({ declaration: BE });
+  const be = sideOf(APP, 'be');
   assert.equal(be.classifyPath('src/features/orders/application/place.handler.ts').slot, 'be.feature.application');
   assert.equal(be.classifyPath('src/features/orders/application/support/price-lines.ts').slot, 'be.feature.application.support');
 });
@@ -371,13 +433,13 @@ test('be.feature.transport.cli is an opt-in feature-tier transport slot, owned o
   assert.equal(slot.tier, 'feature');
   assert.deepEqual(slot.requires, ['<feature>-cli.module.ts']);
   assert.ok(manifest.appKinds.be.includes('cli'), 'the cli app kind exists');
-  const cli = openHfs({ declaration: { ...BE, apps: [...BE.apps, { name: 'ops', kind: 'cli' }], optionalSlots: [...BE.optionalSlots, 'be.feature.transport.cli'] } });
+  const cli = sideOf(app({ be: { ...BE_SIDE, apps: [...BE_SIDE.apps, { name: 'ops', kind: 'cli' }], optionalSlots: [...BE_SIDE.optionalSlots, 'be.feature.transport.cli'] } }), 'be');
   assert.equal(cli.classifyPath('src/features/orders/transport/cli/import.command.ts').slot, 'be.feature.transport.cli');
   assert.equal(cli.classifyPath('src/features/orders/transport/cli/import.command.ts').status, 'owned');
 });
 
 test('growth is a minor: adding a slot changes no existing answer; every slot pattern owns its own sample', () => {
-  const grown = loadSlotManifest({ text: manifestText.replace('version: 1.0.0', 'version: 1.1.0').replace('\n# Checks that read this manifest', `
+  const grown = loadSlotManifest({ text: manifestText.replace('version: 2.0.0', 'version: 2.1.0').replace('\n# Checks that read this manifest', `
   - id: be.transport.grpc
     profiles: [be]
     path: "src/features/<feature>/transport/grpc/"
@@ -385,27 +447,30 @@ test('growth is a minor: adding a slot changes no existing answer; every slot pa
     tracked: tracked
     tier: feature
     tests: unit-beside
-    since: 1.1.0
+    since: 2.1.0
 
 # Checks that read this manifest`) });
   assert.equal(grown.minor, 1);
-  const before = openHfs({ declaration: BE });
-  const after = openHfs({ manifest: grown, declaration: { ...BE, optionalSlots: [...BE.optionalSlots, 'be.transport.grpc'] } });
-  for (const p of ['src/features/orders/index.ts', 'apps/core/src/main.ts', 'src/modules/domain/a/errors/x.error.ts', 'README.md', '.env'])
+  const before = sideOf(APP, 'be');
+  const after = sideOf(app({ be: { ...BE_SIDE, optionalSlots: [...BE_SIDE.optionalSlots, 'be.transport.grpc'] } }), 'be', { manifest: grown });
+  for (const p of ['src/features/orders/index.ts', 'apps/core/src/main.ts', 'src/modules/domain/a/errors/x.error.ts', 'tsconfig.json', '.env'])
     assert.equal(after.classifyPath(p).slot, before.classifyPath(p).slot);
   assert.equal(after.classifyPath('src/features/orders/transport/grpc/a.ts').status, 'owned');
   assert.equal(before.classifyPath('src/features/orders/transport/grpc/a.ts').status, 'owned', 'the feature slot owns the subtree until the new slot is declared');
   assert.equal(after.classifyPath('src/features/orders/transport/grpc/a.ts').slot, 'be.transport.grpc');
 
-  // every variant of every slot, filled with sample names, is owned by that slot and never ambiguous
+  // every variant of every slot, filled with sample names, is owned by that slot and never ambiguous: the root's and each side's
   const manifest = loadSlotManifest();
-  for (const [profile, declaration] of [['be', BE], ['fe', FE]]) {
-    const repo = openHfs({ declaration: { ...declaration, optionalSlots: [] } });
-    const kindOf = (slot) => declaration.apps.find((a) => a.kind === slot.appKind)?.name;
-    for (const slot of manifest.slots.filter((s) => s.profiles.includes(profile))) {
+  const bare = app({ be: { ...BE_SIDE, optionalSlots: [] }, fe: { ...FE_SIDE, optionalSlots: [] } });
+  for (const profile of ['app', 'be', 'fe']) {
+    const resolver = profile === 'app' ? openHfs({ declaration: bare }) : sideOf(bare, profile);
+    const apps = profile === 'app' ? [] : bare.sides[profile].apps;
+    const kindOf = (slot) => apps.find((a) => a.kind === slot.appKind)?.name;
+    // app.sides answers only for the side folders themselves; what lies below them is the sides' (sampled under be and fe).
+    for (const slot of manifest.slots.filter((s) => s.profiles.includes(profile) && s.id !== 'app.sides')) {
       for (const variant of braceVariants(slot.path)) {
         const sample = variant.replace(/<app>/g, kindOf(slot) ?? 'core').replace(/<[^>]+>/g, 'sample').replace(/\*\*\//g, '').replace(/\*\*/g, 'a/b').replace(/\*/g, 'x') + (variant.endsWith('/') ? 'file.ts' : '');
-        const c = repo.classifyPath(sample);
+        const c = resolver.classifyPath(sample);
         assert.notEqual(c.status, 'ambiguous', `${profile}: ${sample} (${slot.id}) is ambiguous between ${c.candidates}`);
         assert.notEqual(c.status, 'no-slot', `${profile}: ${sample} (${slot.id}) matches no slot`);
         if (slot.appKind === undefined) assert.equal(c.slot, slot.id, `${profile}: ${sample} owned by ${c.slot}, expected ${slot.id}`);
@@ -422,7 +487,7 @@ test('the failure catalog explains the new codes in Vietnamese', () => {
   }
 });
 
-test('ruleParams: the parameters the canon lint lanes read', () => {
+test('ruleParams: the parameters the canon lint lanes read, per side', () => {
   const manifest = loadSlotManifest();
   const be = ruleParams(manifest, 'be');
   assert.equal('globalModules' in be, false, 'the @Global allowlist is retired: no module is global from inside itself');
@@ -434,11 +499,13 @@ test('ruleParams: the parameters the canon lint lanes read', () => {
   assert.equal('clientModule' in fe, false, 'the transport client is a slot (fe.transport.client, fe.package.api.client), not a parameter');
   assert.equal(manifest.slots.find((s) => s.id === 'be.domain').budget.indexExports, 60);
   assert.equal(manifest.slots.find((s) => s.id === 'be.feature').budget.indexExports, 60);
-  assert.deepEqual(openHfs({ declaration: BE }).ruleParams(), be);
-  assert.deepEqual(openHfs({ declaration: FE }).ruleParams(), fe);
+  assert.deepEqual(sideOf(APP, 'be').ruleParams(), be);
+  assert.deepEqual(sideOf(APP, 'fe').ruleParams(), fe);
+  assert.equal(openHfs({ declaration: APP }).ruleParams(), null, 'the app root has no rule parameters of its own');
+  refusal(() => ruleParams(manifest, 'app'), 'HFS_MANIFEST_INVALID');
   assert.throws(() => { ruleParams(manifest, 'be').fileLines.soft = 1; }, TypeError);
   // the transport client and the Outcome union are slots of their own, in an app or in the shared api package
-  const feHfs = openHfs({ declaration: { ...FE, optionalSlots: ['repo.packages', 'fe.package.ui', 'fe.package.api', 'fe.package.i18n'] } });
+  const feHfs = sideOf(app({ fe: { ...FE_SIDE, optionalSlots: ['repo.packages', 'fe.package.ui', 'fe.package.api', 'fe.package.i18n'] } }), 'fe');
   assert.equal(feHfs.classifyPath('apps/web/src/modules/api/client.ts').slot, 'fe.transport.client');
   assert.equal(feHfs.classifyPath('apps/web/src/modules/api/outcome.ts').slot, 'fe.transport.outcome');
   assert.equal(feHfs.classifyPath('packages/nivo-api/src/client.ts').slot, 'fe.package.api.client');

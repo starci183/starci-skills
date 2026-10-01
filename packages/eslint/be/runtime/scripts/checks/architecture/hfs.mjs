@@ -218,7 +218,7 @@ function scriptCommand(name) {
 }
 
 /** Presentation checks shared by the product HFS gate and this runtime's own standalone gate. */
-export function checkRepoPresentation({ root, runtime = false, tree = treeView(root), profile = 'be' }) {
+export function checkRepoPresentation({ root, runtime = false, tree = treeView(root), profile = 'app' }) {
   const violations = [];
   const finding = (ruleId, entry, message, line = 1) => violations.push({ ruleId, path: entry, line, column: 1, message });
   for (const entry of tree.top) {

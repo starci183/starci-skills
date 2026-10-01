@@ -1,5 +1,5 @@
 // canon-packed-load.spec.mjs - each eslint canon, installed from its packed tarball (only the files its package.json ships),
-// loads every rule and lints a file of a real HFS repository. 2.1.0/7.1.0 shipped a runtime that read a template left
+// loads every rule and lints a file of a real HFS app (the be canon on be/, the fe canon on fe/). 2.1.0/7.1.0 shipped a runtime that read a template left
 // outside the tarball, so every rule failed to load in product repositories while the in-tree tests passed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { BE, FE, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { APP, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 
 const RUNTIME = path.resolve(import.meta.dirname, '..');
 const NEEDED = ['eslint', 'typescript', '@typescript-eslint/eslint-plugin', '@typescript-eslint/parser', 'eslint-plugin-react-hooks', 'globals'];
@@ -44,23 +44,26 @@ function installPacked(repo, dir, name) {
   return target;
 }
 
-for (const [label, declaration, dir, name, entry, file] of [
-  ['be', BE, 'eslint/be', 'eslint-canon-be', 'starciBeConfig', 'src/modules/platform/config/index.ts'],
-  ['fe', FE, 'eslint/fe', 'eslint-canon-fe', 'starciFeConfig', null],
+for (const [label, dir, name, entry, file] of [
+  ['be', 'eslint/be', 'eslint-canon-be', 'starciBeConfig', 'src/modules/platform/config/index.ts'],
+  ['fe', 'eslint/fe', 'eslint-canon-fe', 'starciFeConfig', null],
 ]) {
-  test(`the packed ${name} loads every rule and lints a file of a ${label} repository`, { skip: DEPS ? false : `no local install carries ${NEEDED.join(', ')}; install an FE example to run this check` }, async () => {
-    const repo = gitAdd(installTypeScript(writeCleanRepo(declaration)));
+  test(`the packed ${name} loads every rule and lints a file of the ${label} side of an app`, { skip: DEPS ? false : `no local install carries ${NEEDED.join(', ')}; install an FE example to run this check` }, async () => {
+    const repo = gitAdd(installTypeScript(writeCleanRepo(APP)));
     made.push(repo);
+    const side = path.join(repo, label);
     // a local export list (`export { x }`, no module specifier) once crashed the backend machine inside the lint rules
-    if (label === 'be') fs.appendFileSync(path.join(repo, 'src/modules/platform/config/index.ts'), 'const localValue = 1;\nexport { localValue };\n');
+    if (label === 'be') fs.appendFileSync(path.join(side, 'src/modules/platform/config/index.ts'), 'const localValue = 1;\nexport { localValue };\n');
     const canon = installPacked(repo, dir, name);
     const plugin = await import(pathToFileURL(path.join(canon, 'index.mjs')).href);
     assert.equal(typeof plugin[entry], 'function', `${name} exports ${entry}`);
     const { ESLint } = await import(pathToFileURL(path.join(DEPS, 'eslint', 'lib', 'api.js')).href);
-    const config = await plugin[entry]({ hfs: plugin.loadHfs(pathToFileURL(path.join(repo, 'eslint.config.mjs')).href) });
-    const eslint = new ESLint({ cwd: repo, overrideConfigFile: true, overrideConfig: config });
-    const target = file ?? fs.readdirSync(path.join(repo, 'apps', declaration.apps[0].name, 'src'), { recursive: true }).map(String).find((f) => /\.tsx?$/.test(f));
-    const results = await eslint.lintFiles([file ? path.join(repo, file) : path.join(repo, 'apps', declaration.apps[0].name, 'src', target)]);
+    // The side's eslint.config.mjs finds the app-root hfs.json one level up and gives every file of the side its side's view.
+    const config = await plugin[entry]({ hfs: plugin.loadHfs(pathToFileURL(path.join(side, 'eslint.config.mjs')).href) });
+    const eslint = new ESLint({ cwd: side, overrideConfigFile: true, overrideConfig: config });
+    const app = APP.sides[label].apps[0].name;
+    const target = file ?? fs.readdirSync(path.join(side, 'apps', app, 'src'), { recursive: true }).map(String).find((f) => /\.tsx?$/.test(f));
+    const results = await eslint.lintFiles([file ? path.join(side, file) : path.join(side, 'apps', app, 'src', target)]);
     const loadErrors = results.flatMap((r) => r.messages).filter((m) => m.fatal || /Error while loading rule|cannot be found/.test(m.message));
     assert.deepEqual(loadErrors, [], `${name} rules load from the tarball`);
   });

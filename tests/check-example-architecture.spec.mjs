@@ -4,24 +4,24 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { BE, cleanup, gitAdd, installPresets, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { APP, cleanup, gitAdd, installPresets, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 import { checkExamples, exampleDirs, formatResults, main } from '../scripts/checks/check-example-architecture.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const prettierOf = path.resolve(root, 'examples', 'shape-slot', 'node_modules', 'prettier');
+const prettierOf = path.resolve(root, 'node_modules', 'prettier');
 const made = [];
 test.after(() => cleanup(made));
 
-/** An examples directory holding a clean and a dirty tiny back end, each its own Git repository, plus a directory with no hfs.json. */
+/** An examples directory holding a clean and a dirty tiny app, each its own Git repository, plus a directory with no hfs.json. */
 function examples() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-examples-'));
   made.push(dir);
   for (const name of ['clean', 'dirty']) {
-    const repo = writeCleanRepo(BE, { into: dir, name });
+    const repo = writeCleanRepo(APP, { into: dir, name });
     if (name === 'dirty') {
-      fs.mkdirSync(path.join(repo, 'src', 'modules', 'business'), { recursive: true });
-      fs.mkdirSync(path.join(repo, 'src', 'modules', 'domain', 'order'), { recursive: true });
-      fs.writeFileSync(path.join(repo, 'src', 'modules', 'domain', 'order', 'index.ts'), 'export {};\n');
+      fs.mkdirSync(path.join(repo, 'be', 'src', 'modules', 'business'), { recursive: true });
+      fs.mkdirSync(path.join(repo, 'be', 'src', 'modules', 'domain', 'order'), { recursive: true });
+      fs.writeFileSync(path.join(repo, 'be', 'src', 'modules', 'domain', 'order', 'index.ts'), 'export {};\n');
     }
     installPresets(installTypeScript(repo));
     // the example's own prettier, the way `npm ci` installs it (the format check judges with the repository's prettier)
@@ -75,7 +75,7 @@ test('an example whose check cannot run (not a Git work tree) is reported as unr
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-examples-'));
   made.push(dir);
   fs.mkdirSync(path.join(dir, 'broken'));
-  fs.writeFileSync(path.join(dir, 'broken', 'hfs.json'), `${JSON.stringify(BE)}\n`);
+  fs.writeFileSync(path.join(dir, 'broken', 'hfs.json'), `${JSON.stringify(APP)}\n`);
   const [result] = checkExamples({ examplesDir: dir });
   assert.equal(result.status, 'unrunnable');
   assert.match(formatResults([result]), /broken: the check could not run/);
