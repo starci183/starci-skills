@@ -62,15 +62,15 @@ const world = useTestWorld({ apps: ["todo", "worker"] })   // or { todo: true },
 | `world.apps.<name>.api` | `graphql(op, vars?, lang?)`, `read/mutate`, `get/post/put/delete` (Buffer body = raw bytes), `as(token)` / `bearing(token)`, `signIn`, `baseUrl`. `op` is a key of the app's `operations` registry or a document string. Refusals resolve as data (`errorCode`). |
 | `world.db.<connection>` | the shared TypeORM `EntityManager` of the connection. |
 | `world.fake.<name>` | `failNext({status,timeout,badSignature,truncateStream,times,match})`, `requests()`, `reset()` plus each fake's own methods (`mails()`, `settle()`, `replayWebhook()`, `delayWebhook()`, ...). |
-| `world.infra.<svc>` | `latency(ms)`, `cut()`, `restore()`, `during(fn)` through toxiproxy; `redis.size()`; `keycloak.rotateClientSecret(client)` (new secret on the real realm, so an app holding the old one is stale). |
-| `world.keycloak` | `person(email, password)`, `token(email, password)` on the real realm. |
+| `world.infra.<svc>` | `latency(ms)`, `cut()`, `restore()`, `during(fn)` through toxiproxy; `redis.size()`; `keycloak.rotateClientSecret(client)` (new secret on the real realm, so an app holding the old one is stale); `postgresql.connection(name).cut()/restore()/during(fn)` takes one connection's database down while the others serve. |
+| `world.keycloak` | `person(email, password)`, `token(email, password)` on the real realm; `events(personId)` (the user events the realm stored: LOGIN, LOGOUT, ...; the realm import enables events) and `sessions(personId)` (live sessions and the clients holding their tokens), read through the admin API. |
 | `world.buckets.<name>` | run-isolated MinIO/S3 bucket declared in `stacks.minio.buckets`: `{ endpoint, region, bucket, accessKeyId, secretAccessKey, forcePathStyle }`; stored name is `<namespace>-<name>`. |
 | `world.cluster` | `pods(ns?)`, `namespaces()`, `createNamespace`, `deleteNamespace`, `apply`, `waitForPods` (this repository's namespaces only). |
 | `world.services.<name>.api`, `world.http(url)` | REST clients. |
 | `world.waitFor(label, check, opts?)`, `world.waitUntil(label, observe, ready, opts?)` | state pollers; no sleeps. |
 | `world.signedInPerson(label)`, `world.registerPerson(label)`, `world.signIn(email, pw)`, `world.actAs(person, app?)`, `world.scratchDir(name)` | through the doors `identity` declares. |
 | `world.commandBus`, `world.queryBus`, `world.resolve(Class)`, `world.context` | `{ modules }` mode. |
-| `world.interruptDatabase(fn)` | `infra.postgresql.during(fn)`. |
+| `world.interruptDatabase(fn, connection?)` | `infra.postgresql.during(fn)`, or `infra.postgresql.connection(name).during(fn)` with a connection. |
 | `useSandbox({ provider, keys, module, client })` | contract layer: the real client against a provider sandbox; the library reads the keys and skips when absent. |
 
 ## One warm stack for all repos

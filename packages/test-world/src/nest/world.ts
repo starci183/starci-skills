@@ -22,17 +22,19 @@ import { readRunContext } from "../jest/context"
 import type { RunContext } from "../jest/context"
 import { createClusterClient } from "../stack/cluster/client"
 import type { ClusterClient, RunInfra } from "../stack/contracts"
+import type { PgConnect } from "../stack/pg"
 import { createProxyToxics } from "../stack/toxiproxy"
 import type { TestApi, TestCaller, TestHttp } from "./api"
 import { createTestApi } from "./graphql"
 import { createTestHttp } from "./http-client"
+import { cutDatabase, databaseOf, restoreDatabases } from "./database-outage"
 import { createKeycloakAdmin } from "./keycloak"
 import { pollUntil } from "./poll"
 import { freePorts } from "./ports"
 import { redisSize } from "./redis-probe"
 import { buildWiring, RUN_DIRECTORY } from "./wiring"
 import { WorldLock } from "./world-lock"
-import type { AppHandle, InfraHandle, KeycloakInfraHandle, ModulesWorldSpec, RedisInfraHandle, ServiceHandle, SignedInPerson, WaitForOptions, WorldBucket, WorldInfra, WorldKeycloak, WorldRequestScope, WorldSpec } from "./world-types"
+import type { AppHandle, DatabaseOutageHandle, InfraHandle, KeycloakInfraHandle, ModulesWorldSpec, PostgresInfraHandle, RedisInfraHandle, ServiceHandle, SignedInPerson, WaitForOptions, WorldBucket, WorldInfra, WorldKeycloak, WorldRequestScope, WorldSpec } from "./world-types"
 
 const DEFAULT_WAIT_MS = 30_000
 const DEFAULT_POLL_MS = 250
@@ -84,6 +86,8 @@ export interface WorldDependencies {
     readonly resetRun?: (context: RunContext) => Promise<void>
     /** The pause between two attempts on the run's outage lock (default 100 ms). */
     readonly lockIntervalMs?: number
+    /** Replaces the `pg` client of the database outages (`infra.postgresql.connection(name)`). */
+    readonly pgConnect?: PgConnect
 }
 
 /** The folder of the run's outage lock inside the run directory. */
@@ -98,6 +102,8 @@ export class World {
     private lock: WorldLock | null = null
     /** The outages this world has in force (service names, plus a secret rotation); the exclusive lock is held while any is. */
     private readonly outages = new Set<string>()
+    /** The databases this world took down (`infra.postgresql.connection(name).cut()`) and has not restored yet. */
+    private readonly downDatabases = new Set<string>()
 
     constructor(
         private readonly declaration: AnyTestWorldConfig,
@@ -304,9 +310,38 @@ export class World {
             return { ...base, ...(extra?.(base) ?? {}) }
         }
         const redis = infra.redis
+        const postgres = infra.postgresql
+        const pgConnect = this.dependencies.pgConnect
+        const databaseOutage = (name: string): DatabaseOutageHandle => {
+            if (postgres === undefined) throw notDeclared("infra.postgresql")
+            const database = databaseOf(postgres, name)
+            const key = `postgresql:${name}`
+            const cut = async (): Promise<void> => {
+                await this.beginOutage(key)
+                this.downDatabases.add(database)
+                await cutDatabase(postgres, database, pgConnect)
+            }
+            const restore = async (): Promise<void> => {
+                await restoreDatabases(postgres, [database], pgConnect)
+                this.downDatabases.delete(database)
+                this.endOutage(key)
+            }
+            return {
+                cut,
+                restore,
+                during: async <T>(during: () => Promise<T>): Promise<T> => {
+                    await cut()
+                    try {
+                        return await during()
+                    } finally {
+                        await restore()
+                    }
+                },
+            }
+        }
         return {
-            get postgresql() {
-                return handle("postgresql", infra.postgresql?.proxy, infra.postgresql?.directPort)
+            get postgresql(): PostgresInfraHandle {
+                return handle("postgresql", postgres?.proxy, postgres?.directPort, () => ({ connection: databaseOutage })) as PostgresInfraHandle
             },
             get redis(): RedisInfraHandle {
                 return handle("redis", redis?.proxy, redis?.directPort, () => ({ size: () => redisSize(redis?.directPort ?? 0, redis?.db ?? 0) })) as RedisInfraHandle
@@ -443,9 +478,9 @@ export class World {
         return this.context.get(token, { strict: false })
     }
 
-    /** Cuts the database, runs `during`, restores it. */
-    interruptDatabase(during: () => Promise<void>): Promise<void> {
-        return this.infra.postgresql.during(during)
+    /** Cuts the database, runs `during`, restores it; with `connection`, only that connection's database goes down. */
+    interruptDatabase(during: () => Promise<void>, connection?: string): Promise<void> {
+        return connection === undefined ? this.infra.postgresql.during(during) : this.infra.postgresql.connection(connection).during(during)
     }
 
     /** A caller that carries the person's session. */
@@ -541,6 +576,11 @@ export class World {
         const { infra } = context
         const proxies = [infra.postgresql, infra.redis, infra.minio, infra.qdrant, infra.keycloak].flatMap((entry) => (entry === undefined ? [] : [entry.proxy]))
         await Promise.all(proxies.map((proxy) => createProxyToxics(infra.toxiproxyApi, proxy).restore().catch(() => undefined)))
+        // A database this world took down and a failed spec never restored accepts connections again.
+        if (infra.postgresql !== undefined && this.downDatabases.size > 0) {
+            await restoreDatabases(infra.postgresql, [...this.downDatabases], this.dependencies.pgConnect).catch(() => undefined)
+        }
+        this.downDatabases.clear()
     }
 
     private async openDatabases(wired: Readonly<Record<string, { readonly url: string }>>): Promise<ReadonlyArray<{ name: string; dataSource: DataSource }>> {

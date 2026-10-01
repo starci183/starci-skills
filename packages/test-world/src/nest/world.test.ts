@@ -360,6 +360,75 @@ test("an outage takes the run's outage lock itself: it waits for another file's 
     }
 })
 
+test("one connection's database outage takes the outage lock like any outage, touches only that database, and a world that stops with it down restores it", async () => {
+    const context = await publish()
+    const queries: Array<string> = []
+    const pgConnect = () => ({
+        connect: async () => undefined,
+        query: async (text: string) => {
+            queries.push(text)
+            return { rows: [] }
+        },
+        end: async () => undefined,
+        on: () => undefined,
+    })
+    const outageContext = {
+        ...context,
+        infra: {
+            toxiproxyApi: "http://127.0.0.1:1",
+            postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: { identity: "t_identity", order: "t_order" } },
+        },
+    } as RunContext
+    removeRunContext()
+    writeRunContext(outageContext)
+    const options = { resetRun: async () => undefined, lockIntervalMs: 5, pgConnect }
+    const outage = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
+    const other = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
+    await outage.start()
+    await other.start()
+    try {
+        await other.enterTest()
+        let cut = false
+        const cutting = outage.infra.postgresql
+            .connection("order")
+            .cut()
+            .then(() => {
+                cut = true
+            })
+        await settle()
+        assert.equal(cut, false, "the database outage waits for the other file's running test")
+        assert.equal(queries.length, 0)
+        other.leaveTest()
+        await cutting
+        assert.deepEqual(
+            queries.filter((query) => query.startsWith("ALTER")),
+            [`ALTER DATABASE "t_order" ALLOW_CONNECTIONS false`],
+        )
+        let entered = false
+        const entering = other.enterTest().then(() => {
+            entered = true
+        })
+        await settle()
+        assert.equal(entered, false, "the other file's next test waits while the order database is down")
+        await outage.infra.postgresql.connection("order").restore()
+        await entering
+        other.leaveTest()
+        assert.equal(queries.at(-1), `ALTER DATABASE "t_order" ALLOW_CONNECTIONS true`)
+        assert.throws(() => outage.infra.postgresql.connection("billing"), /connection\(billing\) is not a declared connection/)
+        await outage.interruptDatabase(async () => {
+            assert.equal(queries.at(-1)?.includes("pg_terminate_backend"), true)
+        }, "identity")
+        assert.equal(queries.at(-1), `ALTER DATABASE "t_identity" ALLOW_CONNECTIONS true`)
+        await outage.infra.postgresql.connection("identity").cut()
+        queries.length = 0
+        await outage.stop()
+        assert.deepEqual(queries, [`ALTER DATABASE "t_identity" ALLOW_CONNECTIONS true`], "a database left down is restored at stop")
+    } finally {
+        await other.stop()
+        await outage.stop()
+    }
+})
+
 test("a client-secret rotation takes the outage lock too and, never undone, holds it until its world stops", async () => {
     const context = await publish()
     const server = createServer((request, response) => {

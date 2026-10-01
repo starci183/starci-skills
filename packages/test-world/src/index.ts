@@ -49,6 +49,7 @@ export type {
     WiredService,
     WorldWiring,
 } from "./config/wiring"
+export type { KeycloakEvent, KeycloakSession } from "./nest/keycloak"
 export type { ModuleRegistration, SandboxAnswer, SandboxHandle, SandboxRequest, SandboxSpec } from "./nest/sandbox"
 export { TestWorldError, TestWorldErrorCode } from "./errors"
 export type { TestWorldErrorCodeValue } from "./errors"
@@ -68,10 +69,12 @@ export type {
     AppOverride,
     AppsWorldSpec,
     FakeHandles,
+    DatabaseOutageHandle,
     InfraHandle,
     KeycloakInfraHandle,
     ModuleFactory,
     ModulesWorldSpec,
+    PostgresInfraHandle,
     RedisInfraHandle,
     ServiceHandle,
     SignedInPerson,

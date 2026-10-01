@@ -9,6 +9,7 @@ import type { WorldWiring } from "../config/wiring"
 import type { FakeClient, FakeDefinition } from "../fakes/framework/contracts"
 import type { ClusterClient, ProxyToxics } from "../stack/contracts"
 import type { TestApi, TestCaller, TestHttp } from "./api"
+import type { KeycloakEvent, KeycloakSession } from "./keycloak"
 
 /** How `waitFor` polls. */
 export interface WaitForOptions {
@@ -70,6 +71,26 @@ export interface InfraHandle extends ProxyToxics {
     during<T>(during: () => Promise<T>): Promise<T>
 }
 
+/**
+ * The outage of ONE database connection of the shared Postgres: the database stops accepting connections and every session
+ * on it is terminated, while the other connections' databases keep serving. It takes and keeps the run's outage lock like
+ * every other outage.
+ */
+export interface DatabaseOutageHandle {
+    /** Refuses every new connection to the database and terminates the live ones. */
+    cut(): Promise<void>
+    /** Lets the database accept connections again. */
+    restore(): Promise<void>
+    /** Cuts the database, runs `during` while it is down, then restores it. */
+    during<T>(during: () => Promise<T>): Promise<T>
+}
+
+/** Postgres adds the outage of one named connection (`stacks.postgresql.connections[].name`). */
+export interface PostgresInfraHandle extends InfraHandle {
+    /** The outage handle of one connection's database; an undeclared connection throws `NotDeclared`. */
+    connection(name: string): DatabaseOutageHandle
+}
+
 /** Redis adds a read of its own keys. */
 export interface RedisInfraHandle extends InfraHandle {
     /** The number of keys in the repository's own Redis DB. */
@@ -84,7 +105,7 @@ export interface KeycloakInfraHandle extends InfraHandle {
 
 /** The infrastructure handles of the world; a service the declaration does not run throws `NotDeclared`. */
 export interface WorldInfra {
-    readonly postgresql: InfraHandle
+    readonly postgresql: PostgresInfraHandle
     readonly redis: RedisInfraHandle
     readonly minio: InfraHandle
     readonly qdrant: InfraHandle
@@ -100,6 +121,10 @@ export interface WorldKeycloak {
     token(email: string, password: string): Promise<string>
     /** Changes the secret of a client of the realm and answers the new value. */
     rotateClientSecret(client: string): Promise<string>
+    /** The user events the realm stored for a person (LOGIN, LOGOUT, ...), newest first; the realm import must enable events. */
+    events(personId: string): Promise<ReadonlyArray<KeycloakEvent>>
+    /** The live sessions of a person in the realm, each with the clients that hold its tokens. */
+    sessions(personId: string): Promise<ReadonlyArray<KeycloakSession>>
 }
 
 /** One run-isolated S3 (MinIO) bucket a stack declares: everything an S3 client needs, with scoped credentials. */
@@ -210,8 +235,8 @@ export interface TestWorld<
     signIn(email: string, password: string): Promise<{ readonly personId: string; readonly email: string; readonly password: string; readonly sessionToken: string }>
     /** A caller that carries the person's session (of the first listening app, or the named one). */
     actAs(person: { readonly sessionToken: string }, app?: string): TestCaller
-    /** Cuts the database, runs `during`, restores it; `infra.postgresql.during` under the name older specs use. */
-    interruptDatabase(during: () => Promise<void>): Promise<void>
+    /** Cuts the database, runs `during`, restores it: `infra.postgresql.during`, or with `connection` only that connection's database (`infra.postgresql.connection(name).during`). */
+    interruptDatabase(during: () => Promise<void>, connection?: string): Promise<void>
     /** The root context of a `{ modules }` world. */
     readonly context: INestApplicationContext
     /** Closes everything the world booted (the `afterAll` calls it; a spec that proves shutdown calls it itself). */

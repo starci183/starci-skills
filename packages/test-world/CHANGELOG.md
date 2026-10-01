@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.1
+
+- Added: `world.keycloak.events(personId)` and `world.keycloak.sessions(personId)`: the user events the repository realm
+  stored for a person (LOGIN, LOGIN_ERROR, LOGOUT, ... with client, session, error and time; the realm import enables events)
+  and the person's live sessions with the clients that hold their tokens, read through the realm's admin API. The admin
+  credentials stay inside the library.
+- Added: `world.infra.postgresql.connection(name)` with `cut()`, `restore()` and `during(fn)`: the outage of ONE declared
+  connection's database (it stops accepting connections and its sessions are terminated) while the other connections keep
+  serving. It takes and keeps the run's outage lock like every other outage, and a world that stops with a database still
+  down restores it. `world.interruptDatabase(fn, connection?)` takes the connection.
+
 ## 1.0.0
 
 First release, pinned in `knowledge/hfs/canon-pins.yaml` for back ends.

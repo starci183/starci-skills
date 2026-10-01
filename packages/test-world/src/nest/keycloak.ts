@@ -18,6 +18,49 @@ export interface KeycloakAdmin {
     rotateClientSecret(client: string): Promise<string>
     /** The password grant of the realm's public client: the access token of a registered person. */
     token(email: string, password: string): Promise<string>
+    /** The user events the realm stored for a person, newest first (the realm import enables events). */
+    events(personId: string): Promise<ReadonlyArray<KeycloakEvent>>
+    /** The live sessions of a person in the realm. */
+    sessions(personId: string): Promise<ReadonlyArray<KeycloakSession>>
+}
+
+/** One user event the realm stored: what the provider did for a person (LOGIN, LOGIN_ERROR, LOGOUT, ...). */
+export interface KeycloakEvent {
+    /** The event type. */
+    readonly type: string
+    /** The user the event is about, when there is one. */
+    readonly userId: string | null
+    /** The client that caused it, when there is one. */
+    readonly clientId: string | null
+    /** The Keycloak session it belongs to, when there is one. */
+    readonly sessionId: string | null
+    /** The error of a failed event (`invalid_user_credentials`, ...), when there is one. */
+    readonly error: string | null
+    /** When it happened, epoch milliseconds. */
+    readonly time: number
+}
+
+/** One live session of a person in the realm. */
+export interface KeycloakSession {
+    /** The session id. */
+    readonly id: string
+    /** The clients that hold tokens of the session (their clientId). */
+    readonly clientIds: ReadonlyArray<string>
+}
+
+const textOrNull = (value: unknown): string | null => (typeof value === "string" ? value : null)
+const recordsOf = (value: unknown): ReadonlyArray<Record<string, unknown>> =>
+    Array.isArray(value) ? value.filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null) : []
+
+/** A GET of the realm's admin API, answered as JSON; a non-200 answer is a world failure naming `what`. */
+const adminRead = async (run: RunKeycloak, path: string, what: string): Promise<unknown> => {
+    const token = await adminToken(run)
+    const response = await fetch(`http://127.0.0.1:${run.directPort}/admin/realms/${run.realm}${path}`, {
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+    })
+    if (response.status !== 200) throw worldError(TestWorldErrorCode.InfrastructureFailed, `reading ${what} of ${run.realm} answered ${response.status}`)
+    return response.json()
 }
 
 const adminToken = async (run: RunKeycloak): Promise<string> => {
@@ -78,6 +121,20 @@ export const createKeycloakAdmin = (run: RunKeycloak): KeycloakAdmin => ({
             signal: AbortSignal.timeout(TIMEOUT_MS),
         })
     },
+    events: async (personId) =>
+        recordsOf(await adminRead(run, `/events?user=${encodeURIComponent(personId)}&max=1000`, `the events of ${personId}`)).map((event) => ({
+            type: String(event.type),
+            userId: textOrNull(event.userId),
+            clientId: textOrNull(event.clientId),
+            sessionId: textOrNull(event.sessionId),
+            error: textOrNull(event.error),
+            time: typeof event.time === "number" ? event.time : 0,
+        })),
+    sessions: async (personId) =>
+        recordsOf(await adminRead(run, `/users/${encodeURIComponent(personId)}/sessions`, `the sessions of ${personId}`)).map((session) => ({
+            id: String(session.id),
+            clientIds: typeof session.clients === "object" && session.clients !== null ? Object.values(session.clients as Record<string, unknown>).map(String) : [],
+        })),
     token: async (email, password) => {
         const response = await fetch(`http://127.0.0.1:${run.port}/realms/${run.realm}/protocol/openid-connect/token`, {
             method: "POST",
