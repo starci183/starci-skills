@@ -1,7 +1,7 @@
 // api reply: split from api.mjs.
 import { getWorkflow } from '../api-lib/rows.mjs';
-import { postInbox, setInboxStatus, setInboxStatusByKey } from '../../../engine/ledger-db.mjs';
-import { OWNER_ROUTED_REPLY, WORKER_QUESTION, workerQuestionsOf } from '../api-lib/messages.mjs';
+import { setInboxStatusByKey } from '../../../engine/ledger-db.mjs';
+import { OWNER_ROUTED_REPLY, WORKER_QUESTION, drainWorkflowMessages, workerQuestionsOf } from '../api-lib/messages.mjs';
 import { orchReply } from '../../api/orca/orch-reply.mjs';
 
 export default {
@@ -16,6 +16,8 @@ export default {
     if (!toOwner && !(typeof args.body === 'string' && args.body.trim())) {
       throw Object.assign(new Error('reply needs --body <answer> or --to-owner'), { code: 'reply-body-missing' });
     }
+    // A question Orca delivered since the last drain is bridged first: the ledger row is what api reply answers.
+    drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by: `reply:${messageId}` }) });
     const item = workerQuestionsOf(db, workflowId).questions.find((q) => q.messageId === messageId);
     if (!item) throw Object.assign(new Error(`no worker question or escalation ${messageId} in ${workflowId}'s Runs`), { code: 'question-unknown' });
     if (item.state !== 'pending') {
@@ -32,12 +34,7 @@ export default {
     ledger.transaction(() => {
       const now = Date.now();
       const disposition = { reply: body, toOwner, at: now };
-      const { state, bridged, jobStatus, repliedInOrca, ...stored } = item;
-      if (bridged) setInboxStatusByKey(db, { workflowId, kind: WORKER_QUESTION, key: messageId, status: 'applied', disposition, at: now });
-      else {
-        const inboxId = postInbox(db, { workflowId, kind: WORKER_QUESTION, key: messageId, payload: stored, createdAt: now });
-        setInboxStatus(db, { inboxId, status: 'applied', disposition, at: now });
-      }
+      setInboxStatusByKey(db, { workflowId, kind: WORKER_QUESTION, key: messageId, status: 'applied', disposition, at: now });
       ledger.appendEvent({ workflowId, entityType: 'job', entityId: item.jobId, kind: 'worker-question-answered',
         payload: { messageId, dispatchId: item.dispatchId, runId: item.runId, toOwner } });
     });

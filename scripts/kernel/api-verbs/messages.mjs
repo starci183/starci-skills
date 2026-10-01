@@ -1,8 +1,7 @@
-// api messages: split from api.mjs.
+// api messages: drain the workflow's Runs into the ledger (api-lib/messages.mjs) and list every bridged message.
 import { parseJson } from '../../lib/json.mjs';
-import { orchInbox } from '../../api/orca/orch-inbox.mjs';
-import { getWorkflow, operationTerminalHandleOf } from '../api-lib/rows.mjs';
-import { ORCHESTRATION_INBOX_LIMIT, jobDispatchIdsOf, workflowRunIdsOf } from '../api-lib/messages.mjs';
+import { getWorkflow } from '../api-lib/rows.mjs';
+import { drainWorkflowMessages, orchestrationMessagesOf, workerQuestionsOf } from '../api-lib/messages.mjs';
 const MESSAGE_ROUTES = {
   question: 'answer with api reply --message <id> (api questions lists it)',
   worker_done: 'information: the op files api report; settle from the ledger',
@@ -18,32 +17,24 @@ export default {
   run({ ledger, args, emit, internals }) {
     const db = ledger.db, workflowId = args.workflow;
     if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-    const runIds = workflowRunIdsOf(db, workflowId);
-    let listed = { ok: true, messages: [], error: null };
-    if (runIds.size) {
-      try { listed = orchInbox({ limit: ORCHESTRATION_INBOX_LIMIT, all: Boolean(args.all) }); }
-      catch (e) { listed = { ok: false, messages: [], error: String(e?.message ?? e) }; }
-    }
-    const jobs = db.prepare("SELECT job_id,workflow_id,op_id,try_no AS attempt,status,payload_json,worker_id FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
+    const drained = drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by: 'messages' }) });
+    const jobs = new Map(db.prepare("SELECT job_id,status FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId).map((row) => [row.job_id, row.status]));
     const read = new Set(db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='orchestration-messages-read'").all(workflowId)
       .flatMap((row) => parseJson(row.payload_json, {})?.ids ?? []));
-    const messages = (listed.messages ?? []).filter((m) => runIds.has(String(m.run_id))).map((m) => {
-      const body = parseJson(m.payload ?? '', {}) ?? {};
-      const from = String(m.from_handle ?? '');
-      const dispatchId = body.dispatchId ?? (from.startsWith('dispatch:') ? from.slice('dispatch:'.length) : null);
-      const job = jobs.find((row) => (dispatchId && jobDispatchIdsOf(db, row).has(dispatchId)) || (from && operationTerminalHandleOf(row) === from)) ?? null;
-      const type = String(m.type ?? 'message');
-      return { id: m.id, type, subject: m.subject ?? null, body: String(body.question ?? m.body ?? '').slice(0, 600), from: from || null, to: m.to_handle ?? null,
-        runId: m.run_id ?? null, threadId: m.thread_id ?? null, createdAt: m.created_at ?? null,
-        jobId: job?.job_id ?? null, opId: job?.op_id ?? null, attempt: job?.attempt ?? null, jobStatus: job?.status ?? null,
-        new: !read.has(m.id), handle: MESSAGE_ROUTES[type] ?? 'information: read it; act only through api verbs' };
-    });
+    const bridged = [
+      ...workerQuestionsOf(db, workflowId).questions.map((q) => ({ ...q, body: q.question, createdAt: q.askedAt })),
+      ...orchestrationMessagesOf(db, workflowId),
+    ].sort((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')));
+    const messages = bridged.map((m) => ({ id: m.messageId, type: m.type, subject: m.subject ?? null, body: String(m.body ?? '').slice(0, 600),
+      from: m.from ?? null, to: m.to ?? null, runId: m.runId ?? null, threadId: m.threadId ?? null, createdAt: m.createdAt ?? null,
+      jobId: m.jobId ?? null, opId: m.opId ?? null, attempt: m.attempt ?? null, jobStatus: m.jobId ? jobs.get(m.jobId) ?? null : null,
+      new: !read.has(m.messageId), handle: MESSAGE_ROUTES[m.type] ?? 'information: read it; act only through api verbs' }));
     const fresh = messages.filter((m) => m.new).map((m) => m.id);
     if (fresh.length) ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'orchestration-messages-read', payload: { ids: fresh } }));
-    const out = { ok: listed.ok !== false, workflowId, runs: [...runIds], count: messages.length, new: fresh.length, messages, ...(listed.error ? { error: listed.error } : {}) };
+    const out = { ok: drained.ok, workflowId, runs: drained.runs, count: messages.length, new: fresh.length, heartbeats: drained.heartbeats, messages, ...(drained.error ? { error: drained.error } : {}) };
     emit(out, [
-      `messages ${workflowId}: ${messages.length} orchestration message(s) on ${runIds.size} Run(s), ${fresh.length} new${listed.error ? ` — host inbox unreadable: ${listed.error}` : ''}`,
-      ...messages.slice(0, 40).map((m) => `  ${m.new ? '*' : ' '} ${m.id} [${m.type}] ${m.jobId ?? m.from ?? '-'}${m.opId ? ` (${m.opId} a${m.attempt})` : ''}: ${m.subject ?? ''} ${m.body ? `— ${m.body.replace(/\s+/g, ' ').slice(0, 160)}` : ''}\n      -> ${m.handle}`),
+      `messages ${workflowId}: ${messages.length} orchestration message(s) on ${drained.runs.length} Run(s), ${fresh.length} new${drained.error ? ` — orchestration check failed: ${drained.error}` : ''}`,
+      ...messages.slice(-40).map((m) => `  ${m.new ? '*' : ' '} ${m.id} [${m.type}] ${m.jobId ?? m.from ?? '-'}${m.opId ? ` (${m.opId} a${m.attempt})` : ''}: ${m.subject ?? ''} ${m.body ? `— ${m.body.replace(/\s+/g, ' ').slice(0, 160)}` : ''}\n      -> ${m.handle}`),
     ].join('\n'), args.json);
   },
 };

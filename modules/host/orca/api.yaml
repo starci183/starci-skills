@@ -270,7 +270,6 @@ starciOrchestrationAllowlist:
     - orchestration check
     - orchestration ask
     - orchestration reply
-    - orchestration inbox
     - orchestration gate-create
     - orchestration gate-resolve
     - orchestration gate-list

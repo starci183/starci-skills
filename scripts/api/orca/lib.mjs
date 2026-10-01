@@ -37,9 +37,9 @@ export const ORCA_PREFIX_ARGS = (() => {
   try { return JSON.parse(process.env.STARCI_ORCA_ARGS || '[]'); } catch { return []; }
 })();
 
-// A read answers with the host's whole listing: the orchestration inbox of a
-// run with many worker heartbeats passed spawnSync's 1 MB default and every
-// `api questions` failed with ENOBUFS (inc-13ab4be5059f). Reads get 64 MB.
+// A read can answer more than spawnSync's 1 MB default (a worker-read
+// transcript page, a terminal scrollback, a worker-list page of 100 rows), and
+// a clipped stdout is a lost receipt (ENOBUFS, inc-13ab4be5059f). Reads get 64 MB.
 export const READ_MAX_BUFFER = 64 * 1024 * 1024;
 
 export function orcaRun(args, { timeout = 120000, maxBuffer } = {}) {

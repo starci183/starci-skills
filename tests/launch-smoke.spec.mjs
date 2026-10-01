@@ -17,7 +17,7 @@ import { gitResult } from '../scripts/api/git/lib.mjs';
 // launchers - startAgent (Supervisor, Kernel, the api dispatch shape of an Op), workers.mjs startWorkerAgent ([Worker])
 // and draw-critic.mjs launchCriticWorker (the critic on its criticWorkspace placement) - against a fake Orca at the
 // wrapper level: Runs, Tasks, worker-start, dispatch-show, worker-show (depth and creator Dispatch, the way Orca
-// reports them), worker-read, worker-stop, worker-release, task-update, the inbox and worktree list. Each fake agent does
+// reports them), worker-read, worker-stop, worker-release, task-update and worktree list. Each fake agent does
 // what its no-op spec says: a parent runs its stage (starting its children from its own terminal), every agent marks its
 // result line (an op writes its owned file in the workflow worktree) and sends worker_done. Nothing reaches a host.
 //
@@ -134,7 +134,6 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
   const tasks = new Map();
   const workers = new Map();
   const byTerminal = new Map();
-  const messages = [];
   const pending = [];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-launch-smoke-spec-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
@@ -179,7 +178,6 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
       return { ok: true };
     }),
     taskUpdate: rec('task-update', ({ id, status }) => ({ ok: true, taskId: id, status })),
-    inbox: rec('inbox', () => ({ ok: true, messages: [...messages] })),
     worktreeList: rec('worktree-list', () => ({ ok: true, worktrees: [...wfr.listed.values()] })),
   };
   const io = { runShow: wrappers.runShow, runCreate: wrappers.runCreate, taskCreate: wrappers.taskCreate,
@@ -197,7 +195,7 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
     removeCriticWorkspace: rec('critic-workspace-remove', ({ dir }) => { fs.rmSync(dir, { recursive: true, force: true }); return { ok: true }; }),
     launchCriticWorker: (opts) => launchCriticWorker({ ...opts, orca: { ...wrappers } }),
     workerShow: wrappers.workerShow, workerRead: wrappers.workerRead, workerStop: wrappers.workerStop,
-    workerRelease: wrappers.workerRelease, taskUpdate: wrappers.taskUpdate, inbox: wrappers.inbox, worktreeList: wrappers.worktreeList,
+    workerRelease: wrappers.workerRelease, taskUpdate: wrappers.taskUpdate, worktreeList: wrappers.worktreeList,
     ctx: { fake: true },
     workflow: wfr.workflow,
     git: (args, dir) => gitResult(args, { dir }),
@@ -214,7 +212,6 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
         ? await runStage({ role, state, orca: client, env, waitMs: 0, sleep: async () => {} })
         : markResult({ role, state });
       w.status = stage.ok ? 'completed' : 'failed';
-      messages.unshift({ id: `m_${w.role}`, type: 'worker_done', from_handle: w.terminal, payload: JSON.stringify({ dispatchId: w.id, taskId: w.task, outcome: stage.ok ? 'succeeded' : 'failed' }) });
     }
     // The host-side controller: a release-pending worktree whose terminals are all released is removed.
     for (const row of [...wfr.rows.values()]) {
@@ -503,7 +500,7 @@ test('worker-start worktree arguments map to the launcher options; main manifest
 test('the live client loads every runtime launcher, wrapper and workflow-worktree function the smoke calls (no call is made)', async () => {
     const { defaultClient } = await import('../scripts/kernel/launch-smoke.mjs');
     const client = await defaultClient();
-    for (const k of ['startAgent', 'startWorkerAgent', 'criticWorkspace', 'removeCriticWorkspace', 'launchCriticWorker', 'workerShow', 'workerRead', 'workerStop', 'workerRelease', 'taskUpdate', 'inbox', 'worktreeList', 'git']) {
+    for (const k of ['startAgent', 'startWorkerAgent', 'criticWorkspace', 'removeCriticWorkspace', 'launchCriticWorker', 'workerShow', 'workerRead', 'workerStop', 'workerRelease', 'taskUpdate', 'worktreeList', 'git']) {
       assert.equal(typeof client[k], 'function', k);
     }
     for (const k of ['spec', 'ensure', 'of', 'opArgs', 'sideOf', 'canDispatchConcurrently', 'release', 'checkpointOp', 'gateBaseOf', 'preserveAndReset', 'finish']) {

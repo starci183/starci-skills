@@ -55,7 +55,10 @@ test('the critic is started through worker-start with the configured provider, m
   assert.match(spec, /the one file you may write is/, 'every other write is forbidden');
   assert.match(spec, /worker_done/);
   const names = orca.names();
-  assert.ok(names.indexOf('inbox') > names.indexOf('worker-start'), 'the worker_done is awaited through the orchestration inbox');
+  assert.ok(names.indexOf('check') > names.indexOf('worker-start'), 'the worker_done is awaited through the consuming orchestration check');
+  const checks = orca.calls.filter((c) => c[0] === 'check').map((c) => c[1]);
+  assert.deepEqual(checks[0], { run: 'run_critic', terminal: 'term_op' }, "the critic's own Run, named by its coordinator");
+  assert.equal(checks.at(-1).ack, 'delivery_1', 'the Delivery is acknowledged once read');
   assert.deepEqual(names.slice(-4), ['worker-stop', 'worker-release', 'task-update', 'critic-workspace-remove'], 'the verdict is read, then the worker is released, its Task closed and its placement removed');
   assert.equal(orca.calls.find((c) => c[0] === 'worker-release')[1].dispatch, critique.critic.dispatchId);
   assert.deepEqual(critique.critic.cleanup, { stopped: true, released: true, taskClosed: true });

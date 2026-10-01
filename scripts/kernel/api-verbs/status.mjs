@@ -11,7 +11,7 @@ import { DRAW_REVIEW_OP } from '../../work/draw-review.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { JOB_ROW, getWorkflow, goalJsonOf, jobPayloadOf, jobResultOf, jobResultSql, latestGoal } from '../api-lib/rows.mjs';
 import { kernelSeatOf } from '../api-lib/kernel-seat.mjs';
-import { WORKER_QUESTION, workerQuestionsOf } from '../api-lib/messages.mjs';
+import { drainWorkflowMessages, workerQuestionsOf } from '../api-lib/messages.mjs';
 import { PEER_WAIT, blockingHeadsUp, leaseCanonOf, openPeerWaits, pendingPeerMessagesOf, releaseTypedWaits } from '../api-lib/peers.mjs';
 import { hostThrottle, throttleSummary } from '../../lib/ram-throttle.mjs';
 import { askClassOf, isLiveProofOp, parkAsk } from '../serve-ask.mjs';
@@ -318,16 +318,13 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     && ['running', 'answering', 'leased'].includes(worker.ledgerStatus)
     && !reports.some((report) => report.job_id === worker.jobId));
   // A worker that asked its coordinator through `orca orchestration ask` waits
-  // on the Kernel until `api reply` answers (inc-b944cbaef24b). The host inbox
-  // is read only when a live operation terminal exists - the same condition
-  // under which the worker projection above already reads the host.
-  const workerAsks = workers.some((worker) => worker.terminalHandle)
-    ? workerQuestionsOf(db, workflowId)
-    : { pending: db.prepare("SELECT key,payload_json FROM inbox WHERE workflow_id=? AND kind=? AND status='pending'").all(workflowId, WORKER_QUESTION)
-      .map((row) => ({ ...(parseJson(row.payload_json, {}) ?? {}), messageId: row.key, bridged: true, state: 'pending' }))
-      .filter((item) => item.jobId && workers.some((worker) => worker.jobId === item.jobId)
-        && !reports.some((report) => report.dispatch_id === item.dispatchId || report.job_id === item.jobId)), error: null };
-  const workerQuestions = workerAsks.pending.map(({ messageId, type, jobId, opId, attempt, question, options, askedAt, bridged }) => ({ messageId, type, jobId, opId, attempt, question, options, askedAt, bridged }));
+  // on the Kernel until `api reply` answers (inc-b944cbaef24b). Every status
+  // drains the workflow's Runs into the ledger first (orchestration check, then
+  // the ledger write, then --ack: api-lib/messages.mjs), so the questions it
+  // projects are the ledger's. A finished workflow has no worker left to ask.
+  const drained = wf.phase === 'finished' ? { error: null } : drainWorkflowMessages(ledger, workflowId, { rebind: (runId) => internals.bindRunToKernel({ db, ledger, workflowId, runId, by: 'status' }) });
+  const workerAsks = { pending: workerQuestionsOf(db, workflowId).pending, error: drained.error };
+  const workerQuestions = workerAsks.pending.map(({ messageId, type, jobId, opId, attempt, question, options, askedAt }) => ({ messageId, type, jobId, opId, attempt, question, options, askedAt }));
   // A peer workflow's pending message (api notify, or the enqueue overlap
   // heads-up) waits on this Kernel until it reads api inbox and acks it. It
   // ranks below the reports, settles and blocked workers already in flight.

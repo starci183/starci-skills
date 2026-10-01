@@ -117,16 +117,16 @@ export function noopAgent({ runtimes = runtimeProfile(), prices = loadPrices() }
  * the context those two modules take; `git` runs one git command ({ok, stdout, error}).
  */
 export async function defaultClient() {
-  const [lib, workers, critic, show, read, stop, release, update, inbox, list, wt, cp] = await Promise.all([
+  const [lib, workers, critic, show, read, stop, release, update, list, wt, cp] = await Promise.all([
     import('../agent/lib.mjs'), import('../supervisor/workers.mjs'), import('../work/draw-critic.mjs'),
     import('../api/orca/worker-show.mjs'), import('../api/orca/worker-read.mjs'), import('../api/orca/worker-stop.mjs'),
-    import('../api/orca/worker-release.mjs'), import('../api/orca/task-update.mjs'), import('../api/orca/orch-inbox.mjs'),
+    import('../api/orca/worker-release.mjs'), import('../api/orca/task-update.mjs'),
     import('../api/orca/worktree-list.mjs'), import('./workflow-worktree.mjs'), import('./workflow-checkpoint.mjs')]);
   return {
     startAgent: lib.startAgent, startWorkerAgent: workers.startWorkerAgent,
     criticWorkspace: critic.criticWorkspace, removeCriticWorkspace: critic.removeCriticWorkspace, launchCriticWorker: critic.launchCriticWorker,
     workerShow: show.workerShow, workerRead: read.workerRead, workerStop: stop.workerStop, workerRelease: release.workerRelease,
-    taskUpdate: update.taskUpdate, inbox: inbox.orchInbox, worktreeList: list.worktreeList,
+    taskUpdate: update.taskUpdate, worktreeList: list.worktreeList,
     // The context of parts A and B. The smoke's ops are no-op agents, so no review.verify op runs: the smoke attests that
     // step itself through part B's `verify` seam, and the result says so (workflow.finish.steps).
     ctx: { verify: () => ({ ok: true, jobId: null, detail: 'launch smoke: its ops are no-op agents, no review.verify op runs' }) },
@@ -351,7 +351,6 @@ export async function runStage({ role, state, orca, env = process.env, root = SK
 }
 
 const defaultSleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
-const payloadOf = (m) => { try { return typeof m?.payload === 'string' ? JSON.parse(m.payload) : m?.payload ?? null; } catch { return null; } };
 
 /** One worker-show read reduced to what the smoke checks. */
 function observe(show) {
@@ -359,6 +358,9 @@ function observe(show) {
   return { ok: show?.ok === true, state: show?.state ?? null, status: d?.status ?? null, depth: Number.isFinite(Number(d?.depth)) ? Number(d.depth) : null,
     creatorDispatchId: d?.creatorDispatchId ?? null, lastFailure: d?.lastFailure ?? null, runId: d?.runId ?? null, taskId: d?.taskId ?? d?.task_id ?? null };
 }
+// A valid worker_done settles the Dispatch (Orca's completion accounting): its status is the outcome the worker sent. A
+// Dispatch the smoke itself stopped settles too, but its worker reads stopped: that one never reported.
+const workerDoneOf = (o) => SETTLED_STATUS.has(String(o?.status)) && String(o?.state) !== 'stopped';
 const settledOf = (o) => SETTLED_STATUS.has(String(o?.status)) || ENDED_STATE.has(String(o?.state));
 
 /** The workflow's Orca worktree in `orca worktree list` (by its Orca id, else its path), or null. */
@@ -492,7 +494,6 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
     workflow: { workflowId, feApp, name: spec.name, branch: wf.branch, path: wf.path, orcaWorktreeId: wf.orcaWorktreeId } });
   if (!before.ok) wf.problems.push(`main manifest before: ${before.error}`);
   const seen = {};
-  const doneMessages = new Set();
   let cleaned = false;
   const cleanupAgents = () => {
     if (cleaned) return;
@@ -503,13 +504,13 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
       if (a?.workspace && !a?.dispatchId) out.cleanup.push({ role, workspaceRemoved: unplace() });
       if (!a?.dispatchId) continue;
       const o = observe(settle(() => orca.workerShow({ dispatch: a.dispatchId })));
-      const settled = settledOf(o) || doneMessages.has(a.dispatchId);
+      const settled = settledOf(o);
       const stop = settled ? null : settle(() => orca.workerStop({ dispatch: a.dispatchId }));
       // Orca's recovery for release_unknown is one more release under a fresh request id (the wrapper never reuses one).
       const first = settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
       const release = first?.ok ? first : settle(() => orca.workerRelease({ dispatch: a.dispatchId }));
-      // A worker that reported (worker_done, or a settled Dispatch status) closed its own Task.
-      const reported = doneMessages.has(a.dispatchId) || SETTLED_STATUS.has(String(o.status));
+      // A worker that reported worker_done settled its Dispatch, and with it its own Task (worker-show status).
+      const reported = SETTLED_STATUS.has(String(o.status));
       const task = reported || !a.taskId ? null : settle(() => orca.taskUpdate({ id: a.taskId, status: 'failed', ...(a.runId ? { run: a.runId } : {}), ...(a.creatorTerminal ? { from: a.creatorTerminal } : {}) }));
       const entryOut = { role, dispatchId: a.dispatchId, stopped: stop ? stop.ok === true : null, released: release?.ok === true, taskClosed: task ? task.ok === true : reported ? 'by-worker_done' : null,
         ...(release === first ? {} : { releaseRetried: true }), ...(release?.ok ? {} : { releaseState: release?.state ?? null, releaseError: release?.result?.lastError ?? release?.error ?? release?.outcome ?? null }) };
@@ -525,14 +526,12 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
     const deadline = now() + timeoutMs;
     // Wait until every role has settled, or can no longer appear (its parent settled, failed to launch, or its stage failed).
     for (;;) {
-      const inbox = settle(() => orca.inbox({ limit: 200 }));
-      for (const m of inbox?.messages ?? []) if (m?.type === 'worker_done') { const id = payloadOf(m)?.dispatchId; if (id) doneMessages.add(id); }
       let open = 0;
       for (const role of Object.keys(ROLES)) {
         const a = agentOf(state, role);
         if (a?.dispatchId) {
           seen[role] = observe(settle(() => orca.workerShow({ dispatch: a.dispatchId })));
-          if (!settledOf(seen[role]) && !doneMessages.has(a.dispatchId)) open += 1;
+          if (!settledOf(seen[role])) open += 1;
           continue;
         }
         // A top role is launched synchronously: no Dispatch now means it never started. A stage child can no longer
@@ -572,7 +571,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
         launched: a.ok === true, dispatchId: a.dispatchId, terminal: a.terminal ?? null, runId: a.runId ?? o.runId, taskId: a.taskId ?? o.taskId,
         creatorTerminal: a.creatorTerminal ?? null, effective: a.effective ?? null, ...(a.workspace ? { workspace: slash(a.workspace) } : {}),
         depth: o.depth, expectedDepth: ROLES[role].depth, creatorDispatchId: o.creatorDispatchId, expectedCreatorDispatchId: creatorExpected,
-        status: o.status, state: o.state, workerDone: doneMessages.has(a.dispatchId) || GREEN_STATUS.has(String(o.status)),
+        status: o.status, state: o.state, workerDone: workerDoneOf(o),
         result, read: { ok: read?.ok === true, source: read?.source ?? null, liveness: read?.status?.liveness ?? null, rows: read?.rows?.length ?? 0, ...(read?.ok ? {} : { error: read?.error ?? null }) },
         ...(a.ok ? {} : { error: a.error ?? null, step: a.step ?? null }),
       };
