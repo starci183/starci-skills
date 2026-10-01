@@ -221,10 +221,12 @@ test('the digest prints one ORCA-TREE line per finding, from the same projection
       {handle:'term-kernel-new',title:`[Kernel] ${WORKFLOW}`,connected:true},
       {handle:'term-kernel-old',title:`[Kernel] ${WORKFLOW}`,connected:true},
     ]};
-    const tree=orcaTree(ledger.db,{terminals:listing});
+    // Orca accounts for the old kernel as a worker of the workflow's Run that no job holds.
+    const workers=[{dispatchId:'ctx_old',runId:'run-x',terminalState:'active',agentTerminalHandle:'term-kernel-old',resource:{terminalHandle:'term-kernel-old'}}];
+    const tree=orcaTree(ledger.db,{terminals:listing,workers});
     assert.equal(tree.listed,true);
-    assert.deepEqual(tree.findings.map(f=>f.code),['DUPLICATE_KERNEL']);
-    assert.deepEqual(tree.findings,orcaTreeFindings(ledger.db,readTerminals(listing)),
+    assert.deepEqual(tree.findings.map(f=>f.code),['ORPHAN_TERMINAL']);
+    assert.deepEqual(tree.findings,orcaTreeFindings(ledger.db,readTerminals(listing),{workers}),
       'the digest and the check report the same thing, because they are the same projection');
   });
 });

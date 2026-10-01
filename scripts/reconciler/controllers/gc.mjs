@@ -2,9 +2,11 @@
 //
 // It wraps scripts/supervisor/gc.mjs, never re-implements it. Three triggers:
 //   1. an event (op-settled, worker-released[-on-report], kernel-stale-cleared, land-succeeded/land-passed,
-//      workflow-finished, workflow-archived) → verify just that entity: its terminals (classifyTerminals restricted to
-//      the entity's handles), its leases (classifyLeases) and, for a landed [Worker] job, its staging checkout. What
-//      the owner step left behind is closed through the same verified close (close-verify.mjs --tree) and recorded as a
+//      workflow-finished, workflow-archived) → verify just that entity: its workers (Orca's worker-list of the entity's
+//      Runs: a reclaimable worker on one of its terminals is released per Orca's nextAction, lib/worker-accounting.mjs
+//      releasePlan), its other terminals (classifyTerminals restricted to the entity's handles), its leases
+//      (classifyLeases) and, for a landed [Worker] job, its staging checkout. What the owner step left behind is
+//      released through worker-release or closed through the verified close (close-verify.mjs --tree) and recorded as a
 //      leftover lesson (lessons.mjs recordLeftover, klass per DESIGN §15.3). A leaked lease has no api path that
 //      deletes it: it is reported and a runtime-defect Decision Item goes to the Supervisor (LEASE_LEAK);
 //   2. key gc:sweep, every allocation.gc.sweepMs (30 min): runGc({apply: mode === 'active'}) under the host lock
@@ -31,12 +33,13 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
+import { releasePlan, workerTerminalHandles } from '../../lib/worker-accounting.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'gc';
 const OWNER = 'reconciler/gc';
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 2, housekeepingEveryMs: 86_400_000, lowResourceGapMs: 3_600_000, eventGraceMs: 60_000,
-  eventMaxTries: 6, ownerlessEscalateMs: 21_600_000, blobSweepEveryMs: 86_400_000 });
+  eventMaxTries: 6, blobSweepEveryMs: 86_400_000 });
 /** MB-14: a retry lands this long after the grace window closes, never exactly on its edge. */
 export const GRACE_MARGIN_MS = 5_000;
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
@@ -104,6 +107,8 @@ const liveDeps = {
     return report;
   },
   list: async () => (await import('../../api/orca/terminal-list.mjs')).terminalList({ includeVisualLayouts: true }),
+  // Orca's worker accounting of one Run (every page).
+  workers: async (run) => (await import('../../api/orca/worker-list.mjs')).workerListAll({ run }),
   worktrees: async ({ env, repos }) => (await import('../../lib/worktrees.mjs')).gcWorktrees({ env, repos: (await import('../../kernel/target-repo.mjs')).boundRepoRoots(repos) }),
   worktreeSettings: async () => (await import('../../lib/worktree-registry.mjs')).worktreeSettings(),
   read: async () => (await import('../../api/orca/terminal-read.mjs')).terminalRead,
@@ -190,19 +195,43 @@ export function createGcController(overrides = {}) {
     return { handle: d.handle, klass: d.klass, reason: d.reason, ok: r?.ok ?? null, shadow: ctx.mode !== 'active', ...(closed || ctx.mode !== 'active' ? {} : { error: r?.error ?? r?.value?.error ?? 'close failed' }) };
   }
 
-  /** The runtime terminals of one entity that are due to close: classifyTerminals over just those handles. */
-  async function decideTerminals(ctx, { handles, sup, ledgers, owners = null }) {
+  /** One worker-release of a reclaimable worker Orca names (the engine's shadow gate records it instead in shadow). */
+  async function releaseWorker(ctx, d, { entity }) {
+    const r = await ctx.run('node', ['scripts/api/orca/worker-release.mjs', '--dispatch', d.dispatchId], { timeoutMs: 90_000 });
+    const released = ctx.mode === 'active' && r?.ok === true && !r?.shadow;
+    ctx.log('reconciler.gc.release', `${released ? 'released' : ctx.mode === 'active' ? 'release FAILED' : 'would release'} worker ${d.dispatchId} of ${entity}`, { controller: NAME, dispatch: d.dispatchId, terminal: d.terminalHandle, reason: d.reason, entity, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
+    if (released) await deps.lesson({ klass: 'worker', count: 1, examples: [`${d.dispatchId} ${d.terminalHandle ?? ''} (${entity}, released by the GC controller after its event)`] });
+    return { handle: d.terminalHandle ?? d.dispatchId, klass: 'worker', reason: d.reason, ok: r?.ok ?? null, shadow: ctx.mode !== 'active', ...(released || ctx.mode !== 'active' ? {} : { error: r?.error ?? 'worker-release failed' }) };
+  }
+
+  /**
+   * What one entity left behind: [{kind: 'release', ...releasePlan row} | {kind: 'close', ...classifyTerminals row}].
+   * Orca's worker-list of the entity's Runs (`runs`) decides its workers (a reclaimable worker on one of the entity's terminals is
+   * released per Orca's nextAction); classifyTerminals decides the entity's other terminals, never one Orca accounts for.
+   */
+  async function decideTerminals(ctx, { handles, sup, ledgers, owners = null, runs }) {
     const gc = await deps.gc();
+    const rows = [];
+    for (const run of runs.filter(Boolean)) {
+      const listed = await deps.workers(run);
+      if (!listed?.ok) throw Object.assign(new Error(`WORKER_LIST_UNAVAILABLE: worker-list --run ${run}: ${listed?.error ?? 'Orca did not answer'}`), { retryAfterMs: 60_000 });
+      rows.push(...listed.workers);
+    }
+    const mine = (h) => (handles ? handles.includes(h) : true);
+    const releases = releasePlan(rows).filter((d) => d.verdict === 'release' && d.terminalHandle && mine(d.terminalHandle)).map((d) => ({ kind: 'release', ...d }));
     const listed = await deps.list();
     if (!listed?.ok) throw Object.assign(new Error(`terminal list: ${listed?.error ?? 'Orca did not answer'}`), { retryAfterMs: 60_000 });
-    const terminals = (listed.terminals ?? []).filter((t) => (handles ? handles.includes(t.handle) : true));
-    if (!terminals.length) return [];
+    const terminals = (listed.terminals ?? []).filter((t) => mine(t.handle));
+    if (!terminals.length) return releases;
     const read = await deps.read();
     const screenOf = (h) => { try { const r = read({ terminal: h, screen: true }); return r?.ok ? r.screen ?? '' : null; } catch { return null; } };
     const s = gc.gcSettings();
-    const decided = gc.classifyTerminals({ terminals, titles: gc.tabTitles(listed.visualLayouts), sup, ledgers, screenOf, now: ctx.now(), minAgeMs: s.minAgeMs, keepTitles: s.keepTitles });
-    return decided.filter((d) => d.verdict === 'collect' && (!owners || owners.has(String(d.owner ?? ''))));
+    const decided = gc.classifyTerminals({ terminals, titles: gc.tabTitles(listed.visualLayouts), sup, ledgers, workers: workerTerminalHandles(rows), screenOf, now: ctx.now(), minAgeMs: s.minAgeMs, keepTitles: s.keepTitles });
+    return [...releases, ...decided.filter((d) => d.verdict === 'collect' && (!owners || owners.has(String(d.owner ?? '')))).map((d) => ({ kind: 'close', ...d }))];
   }
+
+  /** Release or close one decision of decideTerminals. */
+  const settleLeftover = (ctx, d, { entity }) => (d.kind === 'release' ? releaseWorker(ctx, d, { entity }) : closeTerminal(ctx, d, { entity }));
 
   async function leaseDecision(ctx, leaks, { ledgerId, entity }) {
     if (!leaks.length) return 0;
@@ -231,7 +260,7 @@ export function createGcController(overrides = {}) {
     const key = jobKey(ledgerId, jobId);
     if (updatedAt && ctx.now() - updatedAt < settings.eventGraceMs) return graceWait(ctx, key, { age: ctx.now() - updatedAt, what: `job ${jobId}` });
     const closes = [];
-    for (const d of await decideTerminals(ctx, { handles: job.handles, sup: { seat: null, jobs: [] }, ledgers: [view] })) closes.push(await closeTerminal(ctx, d, { entity: `job ${jobId}` }));
+    for (const d of await decideTerminals(ctx, { handles: job.handles, sup: { seat: null, jobs: [] }, ledgers: [view], runs: [job.task?.runId] })) closes.push(await settleLeftover(ctx, d, { entity: `job ${jobId}` }));
     const leaks = SETTLED.has(job.status) ? gc.classifyLeases({ rows: (view.leases ?? []).filter((l) => l.jobId === jobId).map((l) => ({ ...l, ledger: ledgerId })), now: ctx.now(), minAgeMs: 0 }) : [];
     const leases = await leaseDecision(ctx, leaks, { ledgerId, entity: jobId });
     await recordEvent(ctx, key, { closes });
@@ -246,7 +275,7 @@ export function createGcController(overrides = {}) {
     if (updatedAt && ctx.now() - updatedAt < settings.eventGraceMs) return graceWait(ctx, landKey(jobId), { age: ctx.now() - updatedAt, what: `supervisor job ${jobId}` });
     const closes = [];
     if (job.handle && job.handle !== 'supervisor')
-      for (const d of await decideTerminals(ctx, { handles: [job.handle], sup, ledgers: [] })) closes.push(await closeTerminal(ctx, d, { entity: `[Worker] job ${jobId}` }));
+      for (const d of await decideTerminals(ctx, { handles: [job.handle], sup, ledgers: [], runs: [job.runId] })) closes.push(await settleLeftover(ctx, d, { entity: `[Worker] job ${jobId}` }));
     let staging = null;
     if (await deps.stagingExists(jobId)) {
       if (ctx.mode !== 'active') { would(ctx, 'remove-staging', jobId, { klass: 'staging', status: job.status }); staging = { shadow: true }; }
@@ -273,7 +302,7 @@ export function createGcController(overrides = {}) {
     // The entity's terminals: its Kernel seat, its jobs' terminals, and an unbound [Kernel]/[Op] that names it.
     const owners = new Set([workflowId, ...view.jobs.filter((j) => j.workflowId === workflowId).map((j) => j.jobId)]);
     const closes = [];
-    for (const d of await decideTerminals(ctx, { handles: null, sup: { seat: null, jobs: [] }, ledgers: [view], owners })) closes.push(await closeTerminal(ctx, d, { entity: `workflow ${workflowId}` }));
+    for (const d of await decideTerminals(ctx, { handles: null, sup: { seat: null, jobs: [] }, ledgers: [view], owners, runs: [...new Set(view.jobs.filter((j) => j.workflowId === workflowId).map((j) => j.task?.runId))] })) closes.push(await settleLeftover(ctx, d, { entity: `workflow ${workflowId}` }));
     const leaks = wf.ended ? gc.classifyLeases({ rows: (view.leases ?? []).filter((l) => l.workflowId === workflowId).map((l) => ({ ...l, ledger: ledgerId })), now: ctx.now(), minAgeMs: 0 }) : [];
     const leases = await leaseDecision(ctx, leaks, { ledgerId, entity: workflowId });
     await recordEvent(ctx, workflowKey(ledgerId, workflowId), { closes });
@@ -295,7 +324,6 @@ export function createGcController(overrides = {}) {
       ctx.log(WOULD, `sweep: ${report.line}`, { controller: NAME, action: 'gc-sweep', counts: report.counts,
         items: collect.slice(0, 300).map((i) => ({ class: i.class, action: i.action, target: String(i.target), owner: i.owner ?? null })), truncated: collect.length > 300 });
       await leaseDecisionsOf(ctx, report);
-      await ownerlessDecisions(ctx, report);
       finishDuty(ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });
       return { shadow: true, wouldCollect: collect.length, counts: report.counts };
     }
@@ -309,30 +337,9 @@ export function createGcController(overrides = {}) {
     ctx.log('reconciler.gc.sweep', report.line, { controller: NAME, counts: report.counts, errors: report.errors.slice(0, 5), progress: report.progress ?? null });
     if (report.stopped) await stoppedDecision(ctx, report.stopped);
     await leaseDecisionsOf(ctx, report);
-    await ownerlessDecisions(ctx, report);
     await record(ctx, 'sweep', report.items.map(sweepItem), report);
     finishDuty(ctx, { controller: NAME, duty: 'sweep', result: report.ok === false ? 'failed' : 'done', now: ctx.now() });
     return { counts: report.counts, ok: report.ok };
-  }
-
-  /**
-   * MB-13: a terminal the sweep keeps refusing because no ledger job owns it and no removed lane explains it is ONE
-   * Supervisor DI after ownerlessEscalateMs (key ownerless-terminal:<handle>): close it, or name its owner.
-   */
-  async function ownerlessDecisions(ctx, report) {
-    const now = ctx.now();
-    for (const i of report.items.filter((x) => x.ownerless && x.verdict === 'refuse' && now - Number(x.firstSeenAt ?? now) >= settings.ownerlessEscalateMs)) {
-      const hours = Math.round((now - Number(i.firstSeenAt)) / 3_600_000);
-      await ctx.openDecision({
-        schema: 'starci/decision-item@1', kind: 'runtime-defect', decider: 'supervisor', ledger: 'supervisor',
-        idempotencyKey: `ownerless-terminal:${String(i.target).replace(/:/g, '_')}`, entity: { type: 'terminal', id: String(i.target) },
-        summary: `Terminal ${i.target} (${String(i.title ?? '').slice(0, 60)}) has no owner for ${hours}h: ${i.reason}`,
-        evidence: [{ ref: `terminal:${i.target}`, why: i.reason }, ...(i.lane ? [{ ref: `lane:${i.lane}` }] : [])],
-        options: [{ key: 'close', verb: `node scripts/lib/close-verify.mjs --terminal ${i.target} --tree --log`, recommended: !i.lane },
-          { key: 'keep', title: 'Name its owner (a lane still in use) and keep it' }],
-        allowedVerbs: [], openedBy: 'gc-controller', escalateTo: 'owner',
-      });
-    }
   }
 
   async function leaseDecisionsOf(ctx, report) {

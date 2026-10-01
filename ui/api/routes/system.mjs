@@ -118,15 +118,12 @@ function seats(store) { const m = store.machine.db; const deaf = new Set(many(m,
       deaf: deaf.has(row.seat_id), lastSnapshotAt: row.last_snapshot_at, transcript: blob(m, snapshot?.sha256) };
   });
 }
+// The shells the GC has sighted (machine.sqlite terminals: role shell/other only). Worker terminals are Orca's to account for.
 function terminals(store, url) { const m = store.machine.db; return many(m, 'SELECT * FROM terminals ORDER BY opened_at DESC').filter(row =>
-  (url.searchParams.get('open') !== '1' || row.closed_at == null) && (!url.searchParams.get('role') || row.role === url.searchParams.get('role'))
-  && (!url.searchParams.get('project') || projectName(store, row.ledger_id) === url.searchParams.get('project'))
-  && (!url.searchParams.get('wf') || row.workflow_id === url.searchParams.get('wf'))).map(row => ({
-    handle: row.handle, title: row.title, role: row.role, project: projectName(store, row.ledger_id), wf: row.workflow_id,
-    job: row.job_id ? ref('workflow', row.workflow_id, projectName(store, row.ledger_id)) : null,
-    seat: row.seat_id ? ref('seat', row.seat_id) : null, owner: row.owner_ref, expiresAt: row.expires_at,
+  (url.searchParams.get('open') !== '1' || row.closed_at == null) && (!url.searchParams.get('role') || row.role === url.searchParams.get('role'))).map(row => ({
+    handle: row.handle, title: row.title, role: row.role,
     openedAt: row.opened_at, closedAt: row.closed_at, closeVerifiedAt: row.close_verified_at, closedBy: row.closed_by,
-    lastOutputAt: row.last_output_at, ui: row.closed_at ? 'done' : row.expires_at && row.expires_at < Date.now() ? 'bad' : 'running' })); }
+    ui: row.closed_at ? 'done' : 'running' })); }
 function resources(machine) {
   const state = one(machine, 'SELECT * FROM throttle_state WHERE id=1');
   const recent = many(machine, 'SELECT at,from_mode,to_mode,reason FROM throttle_events ORDER BY seq DESC LIMIT 20').map(row => ({ at: row.at, from: row.from_mode, to: row.to_mode, reason: row.reason }));

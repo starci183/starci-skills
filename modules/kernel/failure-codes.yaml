@@ -5660,10 +5660,11 @@ TASK_OUTSIDE_RUN:
 TERMINAL_COUNT_DRIFT:
   title: "More terminals than expected"
   title_vi: "Số terminal nhiều hơn dự kiến"
-  meaning_vi: "Số terminal đang mở nhiều hơn số cần có và tình trạng này kéo dài."
+  meaning_vi: "Số terminal đang mở nhiều hơn số worker mà Orca đang giữ ở trạng thái hoạt động, cộng phần dư cho phép, và tình trạng này kéo dài."
   causes_vi:
-    - "Terminal của worker đã xong chưa được đóng"
-  nextStep_vi: "Sau thời hạn chờ, bộ điều khiển máy chủ tự dọn các shell thừa."
+    - "Terminal của worker đã xong chưa được giải phóng"
+    - "Shell trống còn sót lại"
+  nextStep_vi: "Sau thời hạn chờ, bộ dọn rác giải phóng các worker Orca báo là có thể thu hồi và đóng các shell trống."
   owner: runtime-core
   kind: runtime-fault
 
@@ -5914,6 +5915,17 @@ WITHDRAWS_WITHOUT_BREAKING:
   owner: op-retry
   kind: check-finding
 
+WORKER_LIST_UNAVAILABLE:
+  title: "Orca worker list unavailable"
+  title_vi: "Không đọc được danh sách worker của Orca"
+  meaning_vi: "Lệnh liệt kê worker của Orca cho một Run không trả lời, nên không worker nào của Run đó được đụng tới trong lượt này."
+  causes_vi:
+    - "Orca đang khởi động lại hoặc tự cập nhật"
+    - "Run không còn trên máy chủ Orca"
+  nextStep_vi: "Không cần làm gì; lượt dọn sau đọc lại. Nếu lặp lại nhiều giờ thì lõi runtime xem Orca."
+  owner: runtime-core
+  kind: runtime-fault
+
 WORKER_RELEASE_LEAK:
   title: "Worker was not released in time"
   title_vi: "Worker chưa được giải phóng đúng hạn"
@@ -5922,6 +5934,29 @@ WORKER_RELEASE_LEAK:
     - "Việc đóng terminal của worker bị lỗi"
     - "Tiến trình agent không chịu thoát"
   nextStep_vi: "Bộ điều phối tự đóng và xác minh worker rồi ghi phần còn sót lại; nếu lặp lại thì cần lõi runtime xem."
+  owner: runtime-core
+  kind: runtime-fault
+
+WORKER_RELEASE_FAILED:
+  title: "Worker release failed"
+  title_vi: "Giải phóng worker thất bại"
+  meaning_vi: "Bộ dọn rác gọi lệnh giải phóng worker của Orca cho một worker đã xong nhưng Orca không xác nhận đã giải phóng."
+  causes_vi:
+    - "Orca không chứng minh được tiến trình agent đã dừng"
+    - "Orca không trả lời"
+  nextStep_vi: "Lượt dọn sau thử lại theo hành động kế tiếp mà Orca báo; nếu Orca báo không rõ kết quả giải phóng thì lõi runtime xem."
+  owner: runtime-core
+  kind: runtime-fault
+
+WORKER_RELEASE_REFUSED:
+  title: "Worker release refused"
+  title_vi: "Không giải phóng worker"
+  meaning_vi: "Orca giữ terminal của một worker đã xong nhưng bộ dọn rác không giải phóng nó, vì Orca không xác minh được worker hoặc hành động kế tiếp Orca báo không phải là giải phóng."
+  causes_vi:
+    - "Orca không xác minh được worker còn sống hay đã thoát"
+    - "Orca báo không rõ kết quả của lần giải phóng trước"
+    - "Hành động kế tiếp Orca báo là dừng hoặc bỏ worker"
+  nextStep_vi: "Mục này chỉ được báo cáo; bộ dọn rác không đụng tới worker. Lõi runtime xem worker đó qua lệnh xem worker của Orca."
   owner: runtime-core
   kind: runtime-fault
 

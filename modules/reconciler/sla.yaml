@@ -45,7 +45,7 @@ codes:
   DECISION_OVERDUE:         {slaMs: 900000, severity: warn, owner: kernel, autoAction: 'the DI escalates; twice -> the Supervisor'}
   DEAD_WORKER_UNRECONCILED: {slaMs: 120000, severity: warn, owner: job-controller, autoAction: 'api reconcile --dead-worker --settle-failed'}
   EFFECT_UNKNOWN_STUCK:     {slaMs: 600000, severity: warn, owner: job-controller, autoAction: 'api reconcile, then a DI'}
-  TERMINAL_LEAK:            {slaMs: 60000, severity: warn, owner: gc-controller, autoAction: 'close and verify; an ownerless terminal waits housekeeping.gcMinAgeMs'}
+  TERMINAL_LEAK:            {slaMs: 60000, severity: warn, owner: gc-controller, autoAction: 'release a reclaimable worker per its Orca nextAction (worker-list), close and verify a bound non-worker terminal; an idle shell waits housekeeping.gcMinAgeMs'}
   TASK_LEAK:                {slaMs: 300000, severity: warn, owner: gc-controller, autoAction: 'close the Orca Task'}
   LEASE_LEAK:               {slaMs: 60000, severity: warn, owner: gc-controller, autoAction: 'release the lease'}
   TRANSCRIPT_MISSING:       {slaMs: 120000, severity: warn, owner: gc-controller, autoAction: 'none (reported): a closed op attempt without op_attempts.transcript_sha, or an ended seat turn without a seat transcript snapshot, past the capture grace (scripts/reconciler/sla.mjs transcriptPass; entity attempt:<ledgerId>:<attemptId> or seat-turn:<turnId>)'}

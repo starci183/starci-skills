@@ -36,7 +36,8 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { hhmmss } from '../lib/time.mjs';
 import { classifyAgentScreen } from '../kernel/terminal-liveness.mjs';
-import { orcaTreeFindings, readTerminals, formatFinding } from '../checks/check-orca-tree.mjs';
+import { orcaTreeFindings, readTerminals, formatFinding, ledgerRuns } from '../checks/check-orca-tree.mjs';
+import { workerListAll } from '../api/orca/worker-list.mjs';
 import { stallFindings, stallMinutesOf } from './stall.mjs';
 import { blockingLines } from '../kernel/waiter-priority.mjs';
 import { dependencyGraph, findingLine } from '../kernel/dependency-graph.mjs';
@@ -145,11 +146,11 @@ export const kernelState = (db, wf) => {
 
 // The Orca tree against the ledger, once per cycle:
 // scripts/checks/check-orca-tree.mjs owns the codes and the projection, this
-// only supplies the listing. A digest that reads kernel liveness is already
+// only supplies the listings (the terminals, and Orca's workers of the ledger's Runs). A digest that reads kernel liveness is already
 // talking to the host, so the listing costs one more read — but a ledger with
 // no kernel signal at all still makes no host call, because there is nothing
 // of ours for Orca to be holding.
-export const orcaTree = (db, { terminals = undefined, repo = null } = {}) => {
+export const orcaTree = (db, { terminals = undefined, workers = undefined, repo = null } = {}) => {
   const anyKernel = db.prepare(
     "SELECT COUNT(*) n FROM signals s JOIN workflows w ON w.workflow_id=s.key WHERE s.scope='kernel' AND w.phase!='finished'").get().n;
   if (terminals === undefined && !anyKernel) return { listed: false, reason: 'no kernel signal', findings: [] };
@@ -159,7 +160,17 @@ export const orcaTree = (db, { terminals = undefined, repo = null } = {}) => {
   }
   const rows = readTerminals(listing);
   if (!rows) return { listed: false, reason: listing?.error ?? 'terminal-list returned no listing', findings: [] };
-  return { listed: true, count: rows.length, findings: orcaTreeFindings(db, rows, { repo }) };
+  // Orca's workers of this ledger's Runs, Run by Run; a listing handed in is an offline projection with the workers it names.
+  const workerRows = workers ?? [];
+  if (workers === undefined && terminals === undefined) {
+    for (const run of ledgerRuns(db)) {
+      let listed;
+      try { listed = workerListAll({ run }); } catch (e) { listed = { ok: false, error: String(e?.message ?? e) }; }
+      if (!listed?.ok) return { listed: false, reason: `WORKER_LIST_UNAVAILABLE: worker-list --run ${run}: ${listed?.error ?? 'no listing'}`, findings: [] };
+      workerRows.push(...listed.workers);
+    }
+  }
+  return { listed: true, count: rows.length, findings: orcaTreeFindings(db, rows, { repo, workers: workerRows }) };
 };
 
 // Newest direction/artifact images under .starciwork, bounded walk.

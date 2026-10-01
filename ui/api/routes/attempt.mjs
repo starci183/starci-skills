@@ -251,7 +251,8 @@ function attemptDetail(store, ledger, db, row) {
   const actions = many(machine, 'SELECT * FROM v_engine_actions WHERE ledger_id=? AND workflow_id=? AND job_id=? ORDER BY started_at', ledger.ledgerId, row.workflow_id, row.job_id).map(x => actionRow(machine, x));
   const decisions = many(db, 'SELECT * FROM decisions WHERE workflow_id=? AND (subject_id=? OR subject_id=? OR di_id IN (SELECT di_id FROM decision_items WHERE attempt_id=? OR job_id=?)) ORDER BY decided_at DESC', row.workflow_id, String(row.attempt_id), row.job_id, row.attempt_id, row.job_id)
     .map(d => ({ id: d.decision_id, decider: d.decider, choice: d.choice, rationale: d.rationale, result: parse(d.result_json), at: d.decided_at }));
-  const terminal = one(machine, 'SELECT handle,closed_at FROM terminals WHERE ledger_id=? AND attempt_id=? ORDER BY opened_at DESC LIMIT 1', ledger.ledgerId, row.attempt_id);
+  // The attempt's agent terminal is the ledger's own record of its dispatch (op_attempts); Orca accounts for the worker.
+  const terminal = raw?.terminal_handle ? { handle: raw.terminal_handle, closed_at: raw.terminal_closed_at ?? null } : null;
   const snapshots = one(db, 'SELECT count(*) AS n,max(at) AS last_at FROM attempt_transcript_snapshots WHERE attempt_id=?', row.attempt_id);
   const transcript = raw.transcript_sha ?? one(db, 'SELECT sha256 FROM attempt_transcript_snapshots WHERE attempt_id=? ORDER BY at DESC,snapshot_id DESC LIMIT 1', row.attempt_id)?.sha256;
   const lessons = many(machine, 'SELECT * FROM sup_learning WHERE kind IN (\'lesson\',\'experiment\',\'experiment-result\') ORDER BY updated_at DESC')
@@ -392,7 +393,7 @@ export async function handleAttempt(request, response, store, url) {
   if (route === 'detail') {
     sendJson(request, response, attemptDetail(store, ledger, db, row), { sources: [
       ...source(ledger.name, 'v_op_history', 'op_attempts', 'jobs', 'contracts', 'reports', 'v_checks', 'v_media', 'job_artifacts', 'blobs', 'report_attachments', 'artifact_proofs', 'v_decision_rows', 'decisions', 'conditions', 'settle_tails', 'product_lands', 'llm_usage'),
-      ...source('machine', 'terminals', 'worktrees', 'v_engine_actions', 'action_steps', 'sup_learning')], stale: staleOf(store) }); return true;
+      ...source('machine', 'worktrees', 'v_engine_actions', 'action_steps', 'sup_learning')], stale: staleOf(store) }); return true;
   }
   if (route.startsWith('checks/')) {
     const check = one(db, 'SELECT * FROM v_checks WHERE check_id=? AND attempt_id=?', Number(match[4]), id);

@@ -28,7 +28,8 @@
 //                                 turnInterruptGraceMs later -> the seat terminal is closed (--turn-replace) and the
 //                                 seat's watchdog pass replaces it.
 //   host:processes                node/git counts over threshold (host-health hostVerdict -> log), orphan runtime loops
-//                                 (ORPHAN_PROCESS -> stop), the footprint scan, the Orca terminal count (TERMINAL_COUNT_DRIFT).
+//                                 (ORPHAN_PROCESS -> stop), the footprint scan, the Orca terminal count against Orca's
+//                                 own active workers over every Run (worker-list; TERMINAL_COUNT_DRIFT).
 //   host:transcripts              every 60 s (schedules host/transcripts): scrollback snapshots of every live op attempt
 //                                 (scripts/kernel/transcripts.mjs snapshot --repo) and of every live seat (snapshotSeats).
 //   host:usage (schedules host/usage, every 5 min, on the transcripts tick) the token meter: scripts/kernel/usage-record.mjs
@@ -203,6 +204,8 @@ export function createHostController(deps = {}) {
   });
   const orcaTerminals = deps.orcaTerminals ?? (async () => (await probeOrcaAsync({ timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).terminals ?? null);
   const supervisorMode = deps.supervisorMode ?? (async () => { try { return (await import('../../supervisor/home.mjs')).supervisorMode(); } catch { return 'chat'; } });
+  // Orca's active workers over every Run (worker-list), or null when Orca does not answer for every Run.
+  const activeWorkers = deps.activeWorkers ?? (async () => (await import('../../api/orca/worker-list.mjs')).activeWorkersAllRuns());
   // The handles a responding Orca lists, or null when it does not answer (read-only: runs in both modes).
   const terminalHandles = deps.terminalHandles ?? (async () => {
     const r = await runChild(process.execPath, [path.join(SKILL_ROOT, TERMINAL_LIST)], { timeoutMs: 60_000 });
@@ -563,16 +566,13 @@ export function createHostController(deps = {}) {
       finishDuty(ctx, { controller: 'host', duty: 'footprint', result: r?.shadow ? 'skipped' : r?.ok === false ? 'failed' : 'done', actionId: r?.actionId ?? null, now: ctx.now() });
       out.footprint = true;
     }
-    // INV-H2: Orca's shells against the seats and running workers it should hold.
+    // INV-H2: Orca's terminals against the workers Orca itself holds active (every seat, op and [Worker] is a
+    // worker-start worker; worker-list is the one count). An Orca that does not answer for every Run proves nothing.
     const terminals = await orcaTerminals();
-    if (terminals != null) {
-      let seats = (await supervisorMode()) === 'kernel' ? 1 : 0, workers = 0;
-      for (const l of ctx.ledgers ?? []) {
-        if (l.ledgerId !== 'supervisor') seats += (await running(ctx, l.ledgerId)).length;
-        try { workers += (await ctx.read(l.ledgerId, (db) => db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE status IN ('running','answering') AND worker_id IS NOT NULL").get()))?.n ?? 0; } catch { /* no jobs table */ }
-      }
-      const expected = seats + workers + p.terminalSlack;
-      out.terminals = { count: terminals, expected, seats, workers };
+    const active = terminals == null ? null : await activeWorkers();
+    if (terminals != null && Array.isArray(active)) {
+      const expected = active.length + p.terminalSlack;
+      out.terminals = { count: terminals, expected, workers: active.length };
       if (terminals > expected) await clock(ctx, 'host:terminals', 'TERMINAL_COUNT_DRIFT', p.terminalDriftSlaMs, { code: 'TERMINAL_COUNT_DRIFT', owner: 'host-controller', ledgerId: 'supervisor', count: terminals, expected });
       else await clear(ctx, 'host:terminals', 'TERMINAL_COUNT_DRIFT');
     }

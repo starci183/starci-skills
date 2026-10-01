@@ -155,8 +155,9 @@ try {
   machine.recordViolation({ code:'WORKER_SILENT', severity:'critical', entity:'unit:unit-failed', ledgerId:a.id, workflowId:'wf-stuck', episodeId:sla, detail:{cause:'silent'} });
   machine.upsertSeat({ seatId:'kernel:nivo-backend:wf-stuck', role:'kernel', ledgerId:a.id, workflowId:'wf-stuck', state:'live', bootedAt:fixedNow - 3600000, lastSeenAt:fixedNow - 10000 });
   machine.seatTranscriptSnapshot({ seatId:'kernel:nivo-backend:wf-stuck', text:`Kernel considered retry ${secrets[0]}` });
-  machine.upsertTerminal({ handle:'term-seed', role:'op', ledgerId:a.id, workflowId:'wf-stuck', jobId:'job-failed', attemptId:attempt.attempt_id, openedAt:fixedNow - 2900000, ownerRef:'seed' });
-  machine.upsertTerminal({ handle:'term-missing', role:'op', ledgerId:a.id, workflowId:'wf-stuck', jobId:'job-missing-transcript', attemptId:missing.attempt_id, openedAt:fixedNow - 2400000, closedAt:fixedNow - 600000, ownerRef:'seed' });
+  db.write.updateAttempt({ attemptId:attempt.attempt_id, terminalHandle:'term-seed', at:fixedNow - 2900000 });
+  db.write.updateAttempt({ attemptId:missing.attempt_id, terminalHandle:'term-missing', at:fixedNow - 2400000 });
+  machine.upsertTerminal({ handle:'term-shell-seed', title:'Terminal 3', role:'shell', openedAt:fixedNow - 2900000 });
   machine.setService({ name:'reconciler', kind:'host-app', state:'healthy' });
   machine.setThrottle({ mode:'heavy', effectiveCap:2, running:1, freeRamPct:11, reason:'seed pressure', writer:'seed' });
   machine.recordThrottleDecision({ ledgerId:a.id, workflowId:'wf-under-dispatched', reason:'RAM_THROTTLED', waitedMs:240000 });

@@ -268,18 +268,19 @@ function detail(store, row, db, wf) {
     phaseReason: p.phase_reason ?? lifecycle?.reason ?? null,
     kernelRev: seat ? { current: seat.kernel_rev ?? '', acked: seat.acked_rev ?? null, stale: Boolean(seat.kernel_rev && seat.acked_rev && seat.kernel_rev !== seat.acked_rev) } : null,
     blockedBy: blockedBy(store, row, db, wf), counts,
-    where: whereOf(store, row, wf), usage: usageDetail(db, { wf }),
+    where: whereOf(store, row, db, wf), usage: usageDetail(db, { wf }),
   };
 }
-function whereOf(store, row, wf) {
+function whereOf(store, row, db, wf) {
   const machine = store.machine.db;
   const repos = many(machine, 'SELECT name,role,repo_root FROM repositories WHERE ledger_id=? ORDER BY name', row.ledgerId).map(r => ({ name: r.name, role: r.role, root: hostPath(r.repo_root) }));
   const backend = repos.find(r => r.role === 'backend') ?? repos[0] ?? null;
   const roots = backend ? backend.root : row.repoRoot ?? null;
   return { repos, workTree: roots ? path.join(roots, '.starciwork') : null, ledgerFile: row.file ?? null,
     blobRoot: artifactRoot(), runtimeRoot: RUNTIME_ROOT, kernelSeat: `kernel:${row.name}:${wf}`,
-    terminals: many(machine, 'SELECT handle,role,attempt_id,pid,opened_at,closed_at FROM terminals WHERE ledger_id=? AND workflow_id=? ORDER BY opened_at DESC', row.ledgerId, wf)
-      .map(t => ({ handle: t.handle, role: t.role, attempt: t.attempt_id, pid: t.pid, openedAt: t.opened_at, closedAt: t.closed_at })),
+    // The workflow's op terminals as its ledger recorded each dispatch (op_attempts); Orca accounts for the workers.
+    terminals: many(db, 'SELECT terminal_handle,attempt_id,worker_pid,dispatched_at,terminal_closed_at FROM op_attempts WHERE workflow_id=? AND terminal_handle IS NOT NULL ORDER BY dispatched_at DESC', wf)
+      .map(t => ({ handle: t.terminal_handle, role: 'op', attempt: t.attempt_id, pid: t.worker_pid, openedAt: t.dispatched_at, closedAt: t.terminal_closed_at })),
     worktreesOpen: one(machine, 'SELECT count(*) AS n FROM worktrees WHERE ledger_id=? AND workflow_id=? AND removed_at IS NULL', row.ledgerId, wf)?.n ?? 0,
     worktreesRemoved: one(machine, 'SELECT count(*) AS n FROM worktrees WHERE ledger_id=? AND workflow_id=? AND removed_at IS NOT NULL', row.ledgerId, wf)?.n ?? 0 };
 }

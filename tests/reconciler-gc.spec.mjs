@@ -38,7 +38,7 @@ const listed = { ok: true, terminals: [{ handle: 'term_op', title: '[Op] code.re
 function controller(extra = {}) {
   const lessons = [];
   const c = createGcController({ ledgerView: () => extra.view ?? view(), list: async () => listed, read: async () => () => ({ ok: true, screen: '' }),
-    lesson: async (a) => { lessons.push(a); return a; }, ...extra.deps });
+    workers: async () => ({ ok: true, workers: [] }), lesson: async (a) => { lessons.push(a); return a; }, ...extra.deps });
   return { c, lessons };
 }
 
@@ -107,7 +107,8 @@ function gcDeps(closes) {
   return { list: () => listed, read: () => ({ ok: true, screen: '' }), procs: async () => [], table: () => [], sup: () => ({ seat: null, jobs: [], leases: [] }),
     ledgers: () => [view()], git: () => ({ ok: true, stdout: '' }), landBusy: async () => false, sweepTmp: async () => ({ ok: true, skipped: [], deleted: [] }),
     taskUpdate: () => ({ ok: true }), fsx: { list: () => [], move: () => { throw Error('no move in a spec'); }, remove: () => { throw Error('no remove'); } },
-    readState: () => ({ seen: {} }), freemem: () => 0, close: (h) => { closes.push(h); return { ok: true, proof: 'gone' }; }, kill: () => true, reap: () => ({ checked: false }) };
+    readState: () => ({ seen: {} }), freemem: () => 0, close: (h) => { closes.push(h); return { ok: true, proof: 'gone' }; }, kill: () => true, reap: () => ({ checked: false }),
+    workers: () => ({ ok: true, workers: [] }), activeWorkers: () => [] };
 }
 
 /** The sweep seam (the controller runs gc.mjs as a child): the same runGc, in process, on the spec's fakes. */
@@ -212,7 +213,11 @@ test('host lock: a busy gc lock touches nothing; both new collectors are default
   assert.ok(COLLECTORS.includes('leases') && COLLECTORS.includes('lanelogs'));
 });
 
-test('lane worktrees: never collected while the owner agent lives or git moved in the last 60 min', async (t) => {
+/** An Orca worker-list row of an active worker whose worktree is `dir`. */
+const activeIn = (dispatchId, dir) => ({ dispatchId, runId: 'run_lane', terminalState: 'active', workerState: 'active', agentTerminalHandle: `term_${dispatchId}`,
+  resource: { terminalHandle: `term_${dispatchId}`, worktreeId: `repo-1::${dir.replace(/\\/g, '/')}` }, projection: { liveness: { verdict: 'live' } } });
+
+test('lane worktrees: never collected while an active Orca worker works in them or git moved in the last 60 min', async (t) => {
   const { collectLanes, laneOwnerOf, gcSettings } = await import('../scripts/supervisor/gc.mjs');
   const fs = await import('node:fs');
   const os = await import('node:os');
@@ -231,17 +236,20 @@ test('lane worktrees: never collected while the owner agent lives or git moved i
     if (args[0] === 'rev-parse' || args[0] === 'merge-base') return { ok: true, stdout: 'bbb' };
     return { ok: true, stdout: '' };
   };
-  const terminals = [{ handle: 't1', title: '[Worker] slim-api land often', connected: true }, { handle: 't2', title: 'Terminal 4', worktreePath: path.join(dirs.cwd, 'src'), connected: true }];
+  const workers = [activeIn('ctx_api', dirs.owned), activeIn('ctx_ui', path.join(dirs.cwd, 'src')),
+    { ...activeIn('ctx_docs_done', dirs.idle), terminalState: 'released', workerState: 'succeeded' }];
   const settings = { ...gcSettings({}), laneGraceMs: 1_800_000 };
-  const run = (terms) => collectLanes({ apply: false, env: { STARCI_LANES_ROOT: lanes }, now, settings, sup: { jobs: [] }, root, git, terminals: terms });
-  const by = Object.fromEntries(run(terminals).items.map((i) => [path.basename(i.target), i]));
-  assert.equal(by['slim-api'].verdict, 'keep'); assert.match(by['slim-api'].reason, /owner is alive.*\[Worker\] slim-api/);
-  assert.equal(by['slim-ui'].verdict, 'keep'); assert.match(by['slim-ui'].reason, /works in it/);
+  const run = (rows) => collectLanes({ apply: false, env: { STARCI_LANES_ROOT: lanes }, now, settings, sup: { jobs: [] }, root, git, workers: rows });
+  const by = Object.fromEntries(run(workers).items.map((i) => [path.basename(i.target), i]));
+  assert.equal(by['slim-api'].verdict, 'keep'); assert.match(by['slim-api'].reason, /owner is alive: active worker ctx_api/);
+  assert.equal(by['slim-ui'].verdict, 'keep'); assert.match(by['slim-ui'].reason, /ctx_ui .*works in it/);
   assert.equal(by['slim-db'].verdict, 'keep'); assert.match(by['slim-db'].reason, /40m ago/);
-  assert.equal(by['slim-docs'].verdict, 'collect', 'merged, clean, idle > 60 min, no live owner');
+  assert.equal(by['slim-docs'].verdict, 'collect', 'merged, clean, idle > 60 min, no live owner (a released worker owns nothing)');
   const down = Object.fromEntries(run(null).items.map((i) => [path.basename(i.target), i]));
   assert.equal(down['slim-docs'].verdict, 'keep', 'Orca down: an owner cannot be ruled out');
-  assert.equal(laneOwnerOf({ lanePath: path.join(lanes, 'slim'), branch: 'lane/slim', terminals }), null, '[Worker] slim-api does not own lane slim');
+  assert.equal(laneOwnerOf({ lanePath: path.join(lanes, 'slim'), branch: 'lane/slim', workers }), null, 'a worker in slim-api does not own lane slim');
+  // Former false positive: a tab titled "[Worker] slim-docs" with no Orca worker behind it no longer owns the lane.
+  assert.equal(laneOwnerOf({ lanePath: dirs.idle, branch: 'lane/slim-docs', workers: [] }), null);
   assert.equal(gcSettings({}).laneIdleMs, 3_600_000);
 });
 
@@ -266,11 +274,64 @@ test('housekeeping sweepLanes applies the same live-owner rule as gc.mjs (script
   };
   const allocation = { housekeeping: { lanesRoot: lanes, laneGraceMs: 86_400_000 } };
   const run = (owners) => sweepLanes({ apply: false, now, env: {}, allocation, root, git, owners });
-  const owned = run({ terminals: [{ handle: 't1', title: '[Worker] slim-api still going', connected: true }], titles: new Map(), sup: { jobs: [] } });
+  const owned = run({ workers: [activeIn('ctx_api', dir)], sup: { jobs: [] } });
   assert.deepEqual(owned.wouldRemove, []);
   assert.equal(owned.skipped.find((x) => x.path === dir)?.reason, 'live-owner');
-  const down = run({ terminals: null, titles: new Map(), sup: { jobs: [] } });
+  const down = run({ workers: null, sup: { jobs: [] } });
   assert.equal(down.skipped.find((x) => x.path === dir)?.reason, 'live-owner', 'Orca down: nothing removed');
-  const free = run({ terminals: [], titles: new Map(), sup: { jobs: [] } });
+  const free = run({ workers: [], sup: { jobs: [] } });
   assert.deepEqual(free.wouldRemove.map((x) => x.path), [dir]);
+});
+
+/** An Orca worker-list row (the receipt shape of orchestration worker-list). */
+const workerRow = (dispatchId, { run = 'run_a', terminalState = 'reclaimable', liveness = 'exited', next = 'release', handle = `term_${dispatchId}` } = {}) => ({
+  dispatchId, runId: run, workerState: 'succeeded', terminalState, agentTerminalHandle: handle,
+  resource: { terminalHandle: handle, worktreeId: `repo-1::${REPO}` },
+  projection: { liveness: { verdict: liveness }, nextAction: next === 'release'
+    ? { kind: 'release', argv: ['orca', 'orchestration', 'worker-release', '--dispatch', dispatchId, '--json'] } : { kind: next, argv: [] } },
+});
+const ranView = () => ({ ...view(), jobs: view().jobs.map((j) => ({ ...j, task: { taskId: `task-${j.jobId}`, runId: 'run_a', closed: true } })) });
+
+test('agents collector: Orca\'s reclaimable workers are released per nextAction, Run by Run; unverifiable and release_unknown are reported, never touched', async () => {
+  const rows = [workerRow('ctx_ok'), workerRow('ctx_unv', { liveness: 'unverifiable' }), workerRow('ctx_unk', { terminalState: 'release_unknown' }),
+    workerRow('ctx_other', { next: 'stop' }), workerRow('ctx_live', { terminalState: 'active', liveness: 'live', next: 'none' }), workerRow('ctx_foreign', { run: 'run_owner' })];
+  const asked = [], released = [];
+  const deps = { ...gcDeps([]), ledgers: () => [ranView()], writeState: () => null, log: () => {}, lesson: () => null, settleMs: 0,
+    workers: (run) => { asked.push(run); return { ok: true, workers: rows.filter((r) => r.runId === run) }; },
+    release: ({ dispatch }) => { released.push(dispatch); return { ok: true, state: 'released' }; } };
+  const plan = await runGc({ apply: false, only: ['agents'], now: T, deps });
+  assert.deepEqual(asked, ['run_a'], 'only the Runs the runtime owns, each named with --run');
+  assert.deepEqual(released, [], 'a dry run releases nothing');
+  const items = Object.fromEntries(plan.items.filter((i) => i.class === 'worker').map((i) => [i.target, i]));
+  assert.deepEqual(Object.keys(items).sort(), ['ctx_ok', 'ctx_other', 'ctx_unk', 'ctx_unv']);
+  assert.equal(items.ctx_ok.verdict, 'collect');
+  for (const id of ['ctx_unv', 'ctx_unk', 'ctx_other']) assert.deepEqual([id, items[id].verdict, items[id].code], [id, 'refuse', 'WORKER_RELEASE_REFUSED']);
+  const live = await runGc({ apply: true, only: ['agents'], now: T, deps });
+  assert.deepEqual(released, ['ctx_ok']);
+  assert.equal(live.counts.agents, 2, 'one release and one close of the settled op terminal no worker row covers');
+  assert.ok(!live.items.some((i) => i.target === 'term_ctx_ok' && i.action === 'close-terminal'), 'a worker Orca accounts for is never closed by tab');
+});
+
+test('agents collector: a Run whose worker-list fails touches none of its workers (WORKER_LIST_UNAVAILABLE); a failed release is WORKER_RELEASE_FAILED', async () => {
+  const deps = { ...gcDeps([]), ledgers: () => [ranView()], writeState: () => null, log: () => {}, lesson: () => null, settleMs: 0, workers: () => ({ ok: false, error: 'runtime_unavailable' }), release: () => { throw Error('never'); } };
+  const down = await runGc({ apply: true, only: ['agents'], now: T, deps });
+  assert.equal(down.ok, false);
+  assert.match(down.errors.join('\n'), /WORKER_LIST_UNAVAILABLE: worker-list --run run_a/);
+  const failing = await runGc({ apply: true, only: ['agents'], now: T,
+    deps: { ...deps, workers: () => ({ ok: true, workers: [workerRow('ctx_ok')] }), release: () => ({ ok: false, outcome: 'release_unknown', error: 'exit 1' }) } });
+  assert.equal(failing.items.find((i) => i.target === 'ctx_ok').code, 'WORKER_RELEASE_FAILED');
+  assert.match(failing.errors.join('\n'), /WORKER_RELEASE_FAILED: worker-release --dispatch ctx_ok/);
+});
+
+test('op-settled whose worker Orca holds reclaimable: released through worker-release, never closed by tab', async () => {
+  const { c, lessons } = controller({ view: ranView(), deps: { workers: async (run) => ({ ok: true, workers: run === 'run_a' ? [workerRow('ctx_op', { handle: 'term_op' })] : [] }) } });
+  const { ctx, calls } = ctxOf('active');
+  const r = await c.reconcile('gc:job:nivo-backend:op-1', ctx);
+  assert.deepEqual(calls.run.map(([, a]) => a.slice(0, 3)), [['scripts/api/orca/worker-release.mjs', '--dispatch', 'ctx_op']]);
+  assert.equal(r.closes.length, 1);
+  assert.equal(lessons[0].klass, 'worker');
+  const unv = controller({ view: ranView(), deps: { workers: async () => ({ ok: true, workers: [workerRow('ctx_op', { handle: 'term_op', liveness: 'unverifiable' })] }) } }).c;
+  const { ctx: ctx2, calls: calls2 } = ctxOf('active');
+  await unv.reconcile('gc:job:nivo-backend:op-1', ctx2);
+  assert.equal(calls2.run.length, 0, 'unverifiable: neither released nor closed by tab (Orca accounts for it)');
 });

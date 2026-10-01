@@ -34,15 +34,15 @@ function v1Store(file, rows) {
   db.close();
 }
 
-test('the forward migrations are 0002 then 0003, and the last one brings a store to the runtime version', () => {
-  assert.deepEqual(MACHINE_MIGRATIONS.map((m) => [m.version, m.name]), [[2, '0002-worktrees-no-workflow-kind'], [3, '0003-worktrees-workflow-orca']]);
-  assert.equal(MACHINE_VERSION, 3);
+test('the forward migrations are 0002, 0003 then 0004, and the last one brings a store to the runtime version', () => {
+  assert.deepEqual(MACHINE_MIGRATIONS.map((m) => [m.version, m.name]), [[2, '0002-worktrees-no-workflow-kind'], [3, '0003-worktrees-workflow-orca'], [4, '0004-terminals-shells-only']]);
+  assert.equal(MACHINE_VERSION, 4);
 });
 
 test('a fresh machine.sqlite runs 0001, 0002, 0003: the CHECK refuses the per-op kind, takes workflow and critic, orca_id is unique', (t) => {
   const m = openMachine({ file: tmpFile(t) });
   try {
-    assert.equal(Number(m.db.prepare('PRAGMA user_version').get().user_version), 3);
+    assert.equal(Number(m.db.prepare('PRAGMA user_version').get().user_version), MACHINE_VERSION);
     assert.equal(m.db.prepare('SELECT status FROM schema_migrations WHERE version=3').get()?.status, 'done');
     assert.throws(() => insert(m.db, row('op', path.resolve('/r/op'))), /CHECK constraint failed/);
     for (const kind of KINDS) insert(m.db, row(kind, path.resolve(`/r/${kind}`)));
@@ -60,7 +60,7 @@ test('a user_version 1 store is migrated on the first writer open: workflow and 
   v1Store(file, [row('workflow', path.resolve('/r/wf')), row('op', path.resolve('/r/op')), row('lane', path.resolve('/r/lane'))]);
   const m = openMachine({ file });
   try {
-    assert.equal(Number(m.db.prepare('PRAGMA user_version').get().user_version), 3);
+    assert.equal(Number(m.db.prepare('PRAGMA user_version').get().user_version), MACHINE_VERSION);
     assert.deepEqual(m.db.prepare('SELECT kind FROM worktrees ORDER BY kind').all().map((r) => r.kind), ['lane']);
     for (const [version, name] of [[2, '0002-worktrees-no-workflow-kind'], [3, '0003-worktrees-workflow-orca']]) {
       const migration = m.db.prepare('SELECT name,status,backup_path FROM schema_migrations WHERE version=?').get(version);

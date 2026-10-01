@@ -65,7 +65,7 @@ function controller(over = {}) {
   return createHostController({
     settings: () => S, registry: () => noopRegistry(), store: () => memoryStore(),
     probeSeat: async () => ({ ok: true, action: 'active' }),
-    listProcesses: async () => [], hostVerdict: async () => ({ alert: false }), orcaTerminals: async () => null,
+    listProcesses: async () => [], hostVerdict: async () => ({ alert: false }), orcaTerminals: async () => null, activeWorkers: async () => [],
     supervisorMode: async () => 'kernel', quickCheck: () => ({ ok: true, result: ['ok'] }), backupDue: () => false,
     dedupeDryRun: async () => ({ ok: true, closed: [] }),
     probeTurn: async () => ({ ok: true, busy: false, state: 'turn-idle' }),
@@ -189,14 +189,21 @@ test('an orphan watchdog of a temp repo -> stop planned + ORPHAN_PROCESS clock; 
 
 test('process counts over threshold are logged and nothing is stopped for them; the terminal count drift is a clock', async () => {
   const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-a', goal: GOAL }], jobs: [{ id: 'j1', status: 'running', worker: 't1' }, { id: 'j2', status: 'settled', worker: 't2' }] }) };
-  const c = controller({ listProcesses: async () => [{ pid: 1 }], hostVerdict: async () => ({ alert: true, counts: { node: 400, git: 5, all: 900 }, topParents: [] }), orcaTerminals: async () => 9 });
+  // Orca's active workers over every Run (the Supervisor seat, the Kernel, one op): the count the drift is measured against.
+  const active = [{ dispatchId: 'ctx_sup', terminalState: 'active' }, { dispatchId: 'ctx_k', terminalState: 'active' }, { dispatchId: 'ctx_op', terminalState: 'active' }];
+  const c = controller({ listProcesses: async () => [{ pid: 1 }], hostVerdict: async () => ({ alert: true, counts: { node: 400, git: 5, all: 900 }, topParents: [] }), orcaTerminals: async () => 9, activeWorkers: async () => active });
   const ctx = hostCtx({ dbs });
   const r = await c.reconcile('host:processes', ctx);
   assert.equal(r.stopped, undefined);
   assert.deepEqual(ctx.calls.run.filter((x) => x.cmd === 'taskkill.exe'), [], 'a count over threshold stops nothing');
   assert.deepEqual(ctx.calls.log.filter((x) => x.kind === 'reconciler.host.runaway').map((x) => x.data.counts), [{ node: 400, git: 5, all: 900 }]);
-  assert.deepEqual(r.terminals, { count: 9, expected: 1 + 1 + 1 + S.processes.terminalSlack, seats: 2, workers: 1 });
+  assert.deepEqual(r.terminals, { count: 9, expected: 3 + S.processes.terminalSlack, workers: 3 });
   assert.ok(ctx.calls.clock.some((x) => x.code === 'TERMINAL_COUNT_DRIFT' && x.count === 9 && x.expected === 8));
+  // An Orca that answers for one bound Run only (or not at all) proves nothing: no count, no clock.
+  const blind = controller({ listProcesses: async () => [], hostVerdict: async () => ({ alert: false }), orcaTerminals: async () => 9, activeWorkers: async () => null });
+  const ctx2 = hostCtx({ dbs });
+  assert.equal((await blind.reconcile('host:processes', ctx2)).terminals, undefined);
+  assert.ok(!ctx2.calls.clock.some((x) => x.code === 'TERMINAL_COUNT_DRIFT'));
 });
 
 test('boot: waits for Orca, then services in order, dedupe (dry-run in shadow), reconcile per ledger, then seats', async () => {

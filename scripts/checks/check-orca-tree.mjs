@@ -18,14 +18,19 @@
 //   TASK_OUTSIDE_RUN   a job whose Orca Run is not the workflow's current Run,
 //                      so its Task hangs outside the workflow's tree
 //
-// ORPHAN_TERMINAL covers only StarCi's own terminals: a handle the ledger names, or a
-// title the kernel wrote ([Kernel] … / [Op] …). An owner's own terminals are
-// never findings, and neither is a live [Worker] of an open Supervisor job: it
-// runs in the runtime project's worktree (scripts/supervisor/workers.mjs) and
-// its job lives in machine.sqlite (sup_jobs), not in the ledger checked here.
+// ORPHAN_TERMINAL covers only StarCi's own terminals: a handle the ledger names, or
+// a worker Orca accounts for in one of this ledger's Runs (orchestration
+// worker-list, every row not released). A tab title proves nothing. An owner's
+// own terminals are never findings, and neither is a live [Worker] of an open
+// Supervisor job: it runs in the runtime project's worktree
+// (scripts/supervisor/workers.mjs) and its job lives in machine.sqlite
+// (sup_jobs), not in the ledger checked here.
 //
 //   node scripts/checks/check-orca-tree.mjs --repo <ledger owner>
-//        (--terminals <terminal-list --json receipt> | --live) [--json]
+//        (--terminals <terminal-list --json receipt> [--workers <worker-list --json receipt>] | --live) [--json]
+//
+// --live lists the terminals and, Run by Run, the workers of every Orca Run the
+// ledger's jobs name.
 //
 // Exit 0 clean, 1 findings, 2 usage. It needs a ledger, so it is not part of
 // `npm run check`; scripts/supervisor/poll.mjs runs the same projection every
@@ -35,17 +40,16 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
+import { workerListAll } from '../api/orca/worker-list.mjs';
+import { workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { readSupervisor } from '../supervisor/home.mjs';
 import { openWorkerHandles } from '../supervisor/workers.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { workflowDisplayName } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder, WORKER_HOLDING_STATUSES } from '../lib/terminal-ledger.mjs';
 
 export const SCHEMA = 'starci/orca-tree-check@1';
 export const FINDING_CODES = ['DUPLICATE_KERNEL', 'ORPHAN_TERMINAL', 'STRAY_TERMINAL', 'DEAD_KERNEL', 'TITLE_DRIFT', 'TASK_OUTSIDE_RUN'];
 
-const KERNEL_TITLE = /^\[Kernel\]\s*(.*)$/;
-const STARCI_TITLE = /^\[(?:Kernel|Op)\]\s/;
 
 const parse = parseJson;
 
@@ -68,6 +72,15 @@ export function readTerminals(source) {
 }
 
 const runIdOf = (payload) => payload?.orca?.runId ?? payload?.managed?.runId ?? payload?.hierarchy?.runtime?.runId ?? null;
+
+/** The rows of a worker-list receipt, whichever envelope it arrives in (the wrapper's, the raw Orca one, a bare array), or null. */
+export function readWorkers(source) {
+  const rows = Array.isArray(source) ? source : Array.isArray(source?.workers) ? source.workers : Array.isArray(source?.result?.workers) ? source.result.workers : null;
+  return rows;
+}
+
+/** The Orca Runs this ledger's jobs name. */
+export const ledgerRuns = (db) => distinctRuns(ledgerJobs(db).map((job) => runIdOf(job.payload)));
 
 /**
  * The ledger's side of the tree: one entry per non-finished workflow plus the
@@ -96,8 +109,6 @@ export function projectLedger(db) {
       const kernelJob = jobs.find((j) => j.kind === 'kernel' && j.workflow_id === w.workflow_id) ?? null;
       return {
         workflowId: w.workflow_id,
-        // The [Kernel] tab title carries the display name (start-workflow, api rename); older kernels the id.
-        name: workflowDisplayName(w),
         phase: w.phase,
         finished: w.phase === 'finished',
         signalTerminal: signals.get(w.workflow_id) ?? null,
@@ -117,8 +128,10 @@ export const supervisorWorkerHandles = ({ env = process.env } = {}) => readSuper
 // and settled workers linger; TITLE_DRIFT and STRAY_TERMINAL make both visible
 // to the supervisor (modules/supervisor/supervise.yaml form checks).
 const underRepo = pathUnder;
-export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = {}) {
+export function orcaTreeFindings(db, terminals, { repo = null, owned = null, workers: workerRows = [] } = {}) {
   const workers = owned ?? supervisorWorkerHandles();
+  // The terminals Orca accounts for as workers of this ledger's Runs (the caller lists those Runs).
+  const orcaWorkers = workerTerminalHandles(workerRows ?? []);
   const listing = terminals ?? [];
   const live = listing.filter((t) => t.live);
   const byHandle = new Map(listing.map((t) => [t.handle, t]));
@@ -128,10 +141,9 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = 
 
   for (const wf of workflows) {
     if (wf.finished) continue;
-    // A live terminal is this workflow's kernel when the ledger says so, or
-    // when the kernel itself wrote the title at creation.
-    const kernels = live.filter((t) => t.handle === wf.signalTerminal || t.handle === wf.kernelTerminal
-      || [wf.workflowId, wf.name].includes(KERNEL_TITLE.exec(t.title ?? '')?.[1]?.trim()));
+    // A live terminal is this workflow's kernel when the ledger says so: its
+    // signal or its kernel job's worker. A tab title proves nothing.
+    const kernels = live.filter((t) => t.handle === wf.signalTerminal || t.handle === wf.kernelTerminal);
     if (kernels.length > 1) {
       findings.push({ code: 'DUPLICATE_KERNEL', workflowId: wf.workflowId, terminals: kernels.map((t) => t.handle),
         detail: `${kernels.length} live kernel terminals for one workflow: ${kernels.map((t) => t.handle).join(', ')}` });
@@ -151,30 +163,18 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null } = 
   // A terminal a DUPLICATE_KERNEL already names is that finding, not a second
   // one: the answer is to close the loser, and it is already on the report.
   const named = new Set(findings.flatMap((f) => f.terminals ?? []));
-  const ledgerWorkflows = new Set(workflows.map((w) => w.workflowId));
-  const ledgerNames = new Set(workflows.flatMap((w) => [w.workflowId, w.name]).filter(Boolean));
   for (const terminal of live) {
-    // A [Kernel]/[Op] title that names a workflow this ledger does not hold is
-    // another project's terminal: several ledgers share one Orca host.
-    const titledWorkflow = /\bwf-[a-z0-9-]+/i.exec(terminal.title ?? '')?.[0] ?? null;
-    // A managed [Op] tab title names no workflow, so a terminal sitting in
-    // another project's worktree is that project's too: nivo's two live
-    // architecture.decide workers read as orphans on the StarCi Next and Mia
-    // Mia polls.
-    // A [Kernel] title names its workflow by display name (or, before the rename, by id): one this ledger
-    // holds under neither is another ledger's kernel.
-    const kernelTitled = KERNEL_TITLE.exec(terminal.title ?? '')?.[1]?.trim() || null;
-    const foreign = (titledWorkflow != null && !ledgerWorkflows.has(titledWorkflow))
-      || (kernelTitled != null && titledWorkflow == null && !ledgerNames.has(kernelTitled))
-      || (repo != null && terminal.worktreePath != null && !underRepo(terminal.worktreePath, repo));
-    const ours = knownHandles.has(terminal.handle) || (STARCI_TITLE.test(terminal.title ?? '') && !foreign);
+    // Ours: a handle this ledger names, or a worker Orca accounts for in one of
+    // this ledger's Runs. Several ledgers share one Orca host: another
+    // project's worker is in another Run.
+    const ours = knownHandles.has(terminal.handle) || orcaWorkers.has(terminal.handle);
     if (!ours || workers.has(terminal.handle) || named.has(terminal.handle) || boundHandles.has(terminal.handle) || kernelSignals.has(terminal.handle)) continue;
     const owner = jobs.find((job) => jobTerminalHandles(job, job.payload).includes(terminal.handle)) ?? null;
     findings.push({ code: 'ORPHAN_TERMINAL', workflowId: owner?.workflow_id ?? null, terminal: terminal.handle,
       ...(owner ? { jobId: owner.job_id } : {}),
       detail: owner
         ? `terminal ${terminal.handle} is live but its job ${owner.job_id} is ${owner.status}`
-        : `terminal ${terminal.handle} (${terminal.title ?? 'untitled'}) is live and belongs to no job` });
+        : `terminal ${terminal.handle} (${terminal.title ?? 'untitled'}) is a live Orca worker of this ledger's Run that no job holds` });
   }
 
   // Names: the sidebar shows the tab title Orca set at creation (--title) or
@@ -237,15 +237,22 @@ function main(argv) {
   const has = (name) => argv.includes(`--${name}`);
   const repo = value('repo');
   const file = value('terminals');
+  const workersFile = value('workers');
   if (!repo) usage('check-orca-tree: --repo <ledger owner> is required');
   if (!file && !has('live')) usage('check-orca-tree: pass --terminals <json file> or --live');
   if (file && has('live')) usage('check-orca-tree: --terminals and --live are two answers to one question');
+  if (workersFile && !file) usage('check-orca-tree: --workers goes with --terminals (--live lists the workers itself)');
 
-  let terminals;
+  let terminals, workers = [];
   if (file) {
     if (!fs.existsSync(file)) usage(`check-orca-tree: no terminal listing at ${file}`);
     terminals = readTerminals(parse(fs.readFileSync(file, 'utf8')));
     if (!terminals) usage(`check-orca-tree: ${file} holds no terminal listing (expected a terminal-list --json receipt)`);
+    if (workersFile) {
+      if (!fs.existsSync(workersFile)) usage(`check-orca-tree: no worker listing at ${workersFile}`);
+      workers = readWorkers(parse(fs.readFileSync(workersFile, 'utf8')));
+      if (!workers) usage(`check-orca-tree: ${workersFile} holds no worker listing (expected a worker-list --json receipt)`);
+    }
   } else {
     const listed = terminalList({});
     if (!listed.ok) usage(`check-orca-tree: terminal-list failed: ${listed.error ?? 'no listing'}`);
@@ -256,7 +263,16 @@ function main(argv) {
   if (!fs.existsSync(ledgerFile)) usage(`check-orca-tree: no ledger at ${ledgerFile}`);
   const ledger = inspectLedger({ file: ledgerFile });
   let findings;
-  try { findings = orcaTreeFindings(ledger.db, terminals, { repo: path.resolve(repo) }); } finally { ledger.close(); }
+  try {
+    if (!file) {
+      for (const run of ledgerRuns(ledger.db)) {
+        const listed = workerListAll({ run });
+        if (!listed.ok) usage(`check-orca-tree: WORKER_LIST_UNAVAILABLE: worker-list --run ${run} failed: ${listed.error ?? 'no listing'}`);
+        workers.push(...listed.workers);
+      }
+    }
+    findings = orcaTreeFindings(ledger.db, terminals, { repo: path.resolve(repo), workers });
+  } finally { ledger.close(); }
 
   if (has('json')) console.log(JSON.stringify({ schema: SCHEMA, ok: findings.length === 0, terminals: terminals.length, findings }, null, 2));
   else if (findings.length) console.log(findings.map(formatFinding).join('\n'));
