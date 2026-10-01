@@ -13,10 +13,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runGit } from '../lib/git.mjs';
+import { GENERATED_MIRROR_ROOTS } from './check-json-exceptions.mjs';
 
 export const DB_MODULES = Object.freeze(['engine/ledger-db.mjs', 'engine/machine-db.mjs']);
 export const PENDING = Object.freeze({});
 const OPENER = /\bnew\s+DatabaseSync\s*\(/;
+/**
+ * The runtime file a tracked path is: a generated mirror (packages/hfs/scripts/sync-runtime.mjs writes each bundle byte for
+ * byte from the runtime, and `sync-runtime --check` fails on any drift) is the same module as its source, so a mirrored
+ * engine/machine-db.mjs is the DB module, while a mirrored file that is not a DB module is judged like its source.
+ */
+export const sourceOf = (rel) => { for (const mirror of GENERATED_MIRROR_ROOTS) if (rel.startsWith(`${mirror}/`)) return rel.slice(mirror.length + 1); return rel; };
 const isComment = (line) => /^\s*(\/\/|\*|\/\*)/.test(line);
 
 export function scanOpeners(root) {
@@ -30,7 +37,7 @@ export function scanOpeners(root) {
     if (!OPENER.test(text)) continue;
     text.split('\n').forEach((line, i) => { if (OPENER.test(line) && !isComment(line)) hits.push({ file: rel, line: i + 1 }); });
   }
-  const forbidden = hits.filter((h) => !DB_MODULES.includes(h.file) && !PENDING[h.file]);
+  const forbidden = hits.filter((h) => !DB_MODULES.includes(sourceOf(h.file)) && !PENDING[h.file]);
   const pending = Object.entries(PENDING).map(([file, owner]) => ({ file, owner, opens: hits.some((h) => h.file === file) }));
   const stale = pending.filter((p) => !p.opens);
   return { ok: forbidden.length === 0 && stale.length === 0, forbidden, pending: pending.filter((p) => p.opens), stale };
