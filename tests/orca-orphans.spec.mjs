@@ -17,7 +17,7 @@ import { gcWorktrees } from '../scripts/lib/worktrees.mjs';
 import { reserveOrcaSlot, createOrcaWorktree } from '../scripts/api/orca/worktree-provision.mjs';
 import { ENDED_WORKFLOW_PHASES } from '../scripts/lib/worktree-registry.mjs';
 import { ensureWorkflowWorktree, workflowWorktreeOf } from '../scripts/kernel/workflow-worktree.mjs';
-import { runtimeStampOf, parseRuntimeStamp, psCoverage, orphanVerdict, orphanPreserveName, SUP_FINAL_STATUSES } from '../scripts/lib/orca-orphans.mjs';
+import { runtimeStampOf, parseRuntimeStamp, psCoverage, orphanVerdict, orphanPreserveName } from '../scripts/lib/orca-orphans.mjs';
 import { fakeOrcaWorktrees } from './helpers/fake-orca-worktrees.mjs';
 import { SETTLED_JOB_LIST } from '../engine/admission.mjs';
 
@@ -95,7 +95,7 @@ test('orphanVerdict: foreign never touched, in-flight left, a live owner adopted
   assert.deepEqual(v({ stamp: critic, jobStatus: SETTLED_JOB_LIST[0] }), { verdict: 'collect', owner: 'ended' });
   assert.deepEqual(v({ stamp: critic, jobStatus: 'running' }), { verdict: 'adopt', owner: 'live' });
   const staging = parseRuntimeStamp('starci:supervisor-staging:sup-42;sup=sup-42');
-  const sup = (o) => v({ stamp: staging, settledStatuses: new Set(SUP_FINAL_STATUSES), ...o });
+  const sup = (o) => v({ stamp: staging, ...o });
   assert.deepEqual(sup({ jobStatus: 'succeeded' }), { verdict: 'collect', owner: 'ended' }, 'a staging tree follows its Supervisor job');
   assert.deepEqual(sup({ jobStatus: 'running' }), { verdict: 'adopt', owner: 'live' });
   assert.deepEqual(v({ stamp: critic, ageMs: 0 }), { verdict: 'keep', owner: 'unknown' });

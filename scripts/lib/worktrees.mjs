@@ -34,7 +34,7 @@ import {
   worktreeSettings, withRegistry, markRemoved, isPendingRow, stalePending, releaseOrcaSlot, collectReason, pendingPathOf,
   treeKey, sameTree, insideTree, worktreesRootOf, SETTLED_JOBS, ORCA_KINDS, ENDED_WORKFLOW_PHASES,
 } from './worktree-registry.mjs';
-import { parseRuntimeStamp, psCoverage, orphanPreserveName, orphanVerdict, SUP_FINAL_STATUSES } from './orca-orphans.mjs';
+import { parseRuntimeStamp, psCoverage, orphanPreserveName, orphanVerdict } from './orca-orphans.mjs';
 import { gitWorktreeList, mainRootOf, registeredAt } from '../api/git/worktree-list.mjs';
 import { revParse } from '../api/git/rev-parse.mjs';
 import { isAncestor } from '../api/git/merge-base.mjs';
@@ -223,7 +223,6 @@ function removeEmptyDirs(root) {
 }
 
 const ENDED = new Set(ENDED_WORKFLOW_PHASES);
-const SUP_FINAL = new Set(SUP_FINAL_STATUSES);
 
 /** One incident line in machine_logs (actor gc, kind worktree.orphan): what the orphan scan found and did. */
 function orphanIncident({ level = 'warn', msg, owner = {}, data, env }) {
@@ -267,7 +266,7 @@ function collectOrcaOrphans({ ps, items, halt, lookup, phaseOf, supOf, now, appl
       lane: staging ? stamp.supJobId ?? stamp.slot : null };
     const ageMs = Math.min(ageOf(w.path, now), w.lastActivityAt ? now - w.lastActivityAt : Infinity);
     const v = orphanVerdict({ stamp, inFlight, liveTerminals: w.liveTerminalCount, ageMs, ownerGoneMs: settings.ownerGoneMs, endedPhases: ENDED,
-      settledStatuses: staging ? SUP_FINAL : SETTLED_JOBS,
+      settledStatuses: SETTLED_JOBS,
       workflowPhase: stamp.kind === 'workflow' && owner.workflowId ? phaseOf(owner.ledgerId, owner.workflowId) : null,
       jobStatus: staging ? (owner.lane ? supOf(owner.lane) : null) : owner.jobId ? lookup(owner.ledgerId, owner.jobId) : null });
     if (v.verdict !== 'adopt' && v.verdict !== 'collect') continue;

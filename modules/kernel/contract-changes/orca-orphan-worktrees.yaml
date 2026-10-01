@@ -2,10 +2,12 @@ id: orca-orphan-worktrees
 effectiveAt: '2026-10-02T00:00:00+07:00'
 summary: >-
   ORPHAN WORKTREES AFTER A CRASH, FROM ORCA'S WORKTREE PS (lane dv-c0-orphan2; deep map REPLACE #5 WT4 and #6 P3).
-  scripts/lib/worktrees.mjs createOrcaWorktree always passes `--comment` with the runtime's ownership stamp
-  `starci:<kind>:<slot>[;wf=..][;job=..][;ledger=..]` (scripts/lib/orca-orphans.mjs runtimeStampOf), in the same call
-  that creates the tree; the `comment` option is gone. gcWorktrees reads Orca's `worktree ps` (new wrapper
-  scripts/api/orca/worktree-ps.mjs, calls.yaml `worktree-ps`) FIRST and the registry after it. A workflow tree's live
+  scripts/api/orca/worktree-provision.mjs createOrcaWorktree always passes `--comment` with the runtime's ownership
+  stamp `starci:<kind>:<slot>[;wf=..][;job=..][;ledger=..][;sup=..]` (scripts/lib/orca-orphans.mjs runtimeStampOf), in the
+  same call that creates the tree; the `comment` option is gone. The stamped kinds are workflow, critic and
+  supervisor-staging (owned by a Supervisor job, judged by its sup_jobs status), so lane WSTAGE's staging tree is covered
+  once it is an Orca kind; until then a staging stamp is left alone. gcWorktrees reads Orca's `worktree ps` (new wrapper
+  scripts/api/orca/worktree-ps.mjs, calls.yaml `worktree-ps`, in scripts/api/orca/worktree-client.mjs in place of list) FIRST and the registry after it. A workflow tree's live
   terminals are ps `liveTerminalCount` (the ledger's workflowTerminalsLive count is deleted); an unreadable page, or an
   incomplete one (truncated, or a host omitted) for a tree it does not list, keeps the tree. The orphan pass judges
   every stamped tree on this host with no registry row from its stamped owner (orphanVerdict): a live owner (or a live
@@ -27,6 +29,8 @@ reach: new-legs
 paths:
   - modules/kernel/contract-changes/orca-orphan-worktrees.yaml
   - scripts/lib/worktrees.mjs
+  - scripts/api/orca/worktree-provision.mjs
+  - scripts/api/orca/worktree-client.mjs
   - scripts/lib/orca-orphans.mjs
   - scripts/api/orca/worktree-ps.mjs
   - scripts/api/orca/project-setup-delete.mjs

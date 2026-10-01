@@ -22,8 +22,6 @@ export const RUNTIME_STAMP_PREFIX = 'starci';
  */
 export const STAMPED_KINDS = Object.freeze(['workflow', 'critic', 'supervisor-staging']);
 const STAMPED = new Set(STAMPED_KINDS);
-/** The final statuses of a Supervisor job (machine.sqlite sup_jobs): a staging tree's owner has ended. */
-export const SUP_FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
 const OWNER_FIELDS = Object.freeze([['wf', 'workflowId'], ['job', 'jobId'], ['ledger', 'ledgerId'], ['sup', 'supJobId']]);
 
 const enc = (v) => encodeURIComponent(String(v));
@@ -84,7 +82,8 @@ export function orphanPreserveName({ slot, orcaId, digest }) {
  *   liveTerminals   Orca's liveTerminalCount of the tree: an agent still works in it
  *   workflowPhase   the stamped workflow's phase (a workflow tree), null when no ledger knows it
  *   jobStatus       the stamped owner job's status: a critic's op job (its ledger), a staging tree's Supervisor job
- *                   (machine.sqlite sup_jobs); null when nothing knows it. settledStatuses: the final statuses of that job kind
+ *                   (machine.sqlite sup_jobs); null when nothing knows it. settledStatuses: the settled job statuses (engine/admission.mjs
+ *                   SETTLED_JOB_LIST, which holds a Supervisor job's final statuses too)
  *   ageMs           how long the tree has existed without a row; ownerGoneMs the unknown-owner grace
  * {verdict: 'foreign'|'in-flight'|'keep'|'adopt'|'collect', owner?: 'ended'|'unknown'|'live'}
  */
