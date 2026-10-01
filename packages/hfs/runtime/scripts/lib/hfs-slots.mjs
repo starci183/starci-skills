@@ -47,6 +47,25 @@ const PROFILES = ['be', 'fe'];
 export const SIDES = Object.freeze([...PROFILES]);
 /** The profile of the app root's own slots. */
 export const APP_SCOPE = 'app';
+
+/**
+ * The rewriter of a side's finding messages: `(message) => message` with its paths made app-relative like the finding's own path.
+ * Every check and rule of a side judges the side folder as its root, so the paths it names (`apps/web/src/...`, `src/modules/...`,
+ * `tsconfig.json`) are side-relative. A path here is a token that starts at a word boundary with a top-level entry of the side folder
+ * (`sideRoot`, read once) and goes on with `/`, or is that entry when its name holds a dot (a file). An import specifier (`@/x`,
+ * `../x`) or a path already app-relative is left alone.
+ */
+export function appRelativeMessages(side, sideRoot) {
+  let entries = [];
+  try { entries = fs.readdirSync(sideRoot).filter((name) => name !== 'node_modules' && !name.startsWith('.git')); } catch { /* no side folder: nothing to rewrite */ }
+  if (!entries.length) return (message) => message;
+  const escaped = entries.sort((a, b) => b.length - a.length).map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const token = new RegExp(`(^|[\\s'"\`(\\[{,;=<>])((?:${escaped.join('|')})(?=/|[\\s'"\`)\\]},;:!?<>]|\\.(?:\\s|$)|$))`, 'g');
+  return (message) => (typeof message === 'string' && message
+    ? message.replace(token, (whole, before, entry, offset) => (message.startsWith('/', offset + whole.length) || entry.includes('.') ? `${before}${side}/${entry}` : whole))
+    : message);
+}
+
 const SCOPES = [APP_SCOPE, ...PROFILES];
 const APP_KIND = 'app';
 const strList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0);

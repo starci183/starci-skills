@@ -17,7 +17,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { linterReport, mergeReports, sonarReport, sourceRootsOf } from '../report/sonar.mjs';
-import { SIDES, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { SIDES, appRelativeMessages, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
 import { STYLE_GLOB } from '../sync/index.mjs';
 
 export const LINT_SCHEMA = 'starci/lint@1';
@@ -101,7 +101,13 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     if (changed !== null && !sources.length) { engines.eslint.sides[side] = { files: 0, skipped: 'no changed source file' }; continue; }
     const linted = runLinter({ cwd: path.join(repoRoot, side), pkg: 'eslint', bin: 'eslint', args: ['--format', 'json', ...(opts.fix ? ['--fix'] : []), ...(changed ? sources : ['.'])] });
     if (linted.error) errors.push(linted.error);
-    else { raw.eslint.push(...linted.results); findings.push(...eslintFindings(linted.results, repoRoot)); }
+    else {
+      // The side canon names side-relative paths in its messages; the report names every path from the app root.
+      const appRelative = appRelativeMessages(side, path.join(repoRoot, side));
+      for (const result of linted.results) for (const message of result.messages ?? []) message.message = appRelative(message.message);
+      raw.eslint.push(...linted.results);
+      findings.push(...eslintFindings(linted.results, repoRoot));
+    }
     engines.eslint.sides[side] = { files: linted.results?.length ?? 0 };
   }
 
@@ -111,7 +117,12 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
     if (changed === null || styles.length) {
       const linted = runLinter({ cwd: path.join(repoRoot, STYLE_SIDE), pkg: 'stylelint', bin: 'stylelint', args: [...(changed ? styles : [STYLE_GLOB]), '--formatter', 'json', ...(opts.fix ? ['--fix'] : [])] });
       if (linted.error) errors.push(linted.error);
-      else { raw.stylelint = linted.results; findings.push(...stylelintFindings(linted.results, repoRoot)); }
+      else {
+        const appRelative = appRelativeMessages(STYLE_SIDE, path.join(repoRoot, STYLE_SIDE));
+        for (const result of linted.results) for (const warning of result.warnings ?? []) warning.text = appRelative(warning.text);
+        raw.stylelint = linted.results;
+        findings.push(...stylelintFindings(linted.results, repoRoot));
+      }
     }
     engines.stylelint = { side: STYLE_SIDE, files: raw.stylelint.length };
   }

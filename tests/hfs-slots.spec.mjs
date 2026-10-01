@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../engine/yaml.mjs';
 import { braceVariants } from '../scripts/lib/glob.mjs';
-import { HfsSlotsError, loadSlotManifest, ruleParams, openHfs, readRepoDeclaration, resolveRepoDeclaration } from '../scripts/lib/hfs-slots.mjs';
+import { HfsSlotsError, appRelativeMessages, loadSlotManifest, ruleParams, openHfs, readRepoDeclaration, resolveRepoDeclaration } from '../scripts/lib/hfs-slots.mjs';
 
 // The slot manifest (knowledge/hfs/slots.yaml) and its resolver. A product is ONE app: the app root holds the slots of profile app
 // (hfs.json, README, the one package.json and lockfile, CI, hooks, .starciwork), and be/ and fe/ are its sides, each judged with its
@@ -518,4 +518,17 @@ test('ruleParams: the parameters the canon lint lanes read, per side', () => {
     assert.equal(validateManifestSchema(doc), false);
     refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
   }
+});
+
+test('appRelativeMessages: a side finding message names its paths from the app root, like the finding path', (t) => {
+  const side = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-side-'));
+  t.after(() => fs.rmSync(side, { recursive: true, force: true }));
+  for (const dir of ['apps', 'src']) fs.mkdirSync(path.join(side, dir));
+  fs.writeFileSync(path.join(side, 'tsconfig.json'), '{}');
+  const message = appRelativeMessages('fe', side);
+  assert.equal(message('apps/web/src/app/page.tsx mounts 0 owners; see src/x.ts and tsconfig.json.'), 'fe/apps/web/src/app/page.tsx mounts 0 owners; see fe/src/x.ts and fe/tsconfig.json.');
+  assert.equal(message("declared in 'apps/a.ts' and `src/b.ts`"), "declared in 'fe/apps/a.ts' and `fe/src/b.ts`");
+  // an import specifier, a path already app-relative and a bare word are left alone
+  assert.equal(message('import @/features/x or ../../src/y from fe/apps/a.ts; every apps'), 'import @/features/x or ../../src/y from fe/apps/a.ts; every apps');
+  assert.equal(message(undefined), undefined);
 });

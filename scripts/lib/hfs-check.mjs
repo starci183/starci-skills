@@ -45,7 +45,7 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { ARCHITECTURE_RULE_IDS, checkArchitecture } from '../checks/architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { APP_SCOPE, HFS_DECLARATION_FILE, HfsSlotsError, SIDES, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './hfs-slots.mjs';
+import { APP_SCOPE, HFS_DECLARATION_FILE, appRelativeMessages, HfsSlotsError, SIDES, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './hfs-slots.mjs';
 import { allowsFile } from './hfs-allows.mjs';
 import { gitOutput } from './git.mjs';
 import { posixPath } from './path-key.mjs';
@@ -323,7 +323,8 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
       const sideFiles = tracked.filter((file) => file.startsWith(prefix)).map((file) => file.slice(prefix.length));
       const sideScoped = scoped ? new Set([...scoped].filter((file) => file.startsWith(prefix)).map((file) => file.slice(prefix.length))) : null;
       const sideFindings = scopeFindings({ repoRoot: sideRoot, root, repo: repo.sides[side], resolver: resolver.sides[side], files: sideFiles, scoped: sideScoped });
-      findings.push(...keep(sideFindings, sideRoot).map((finding) => ({ ...finding, side, path: onSide(side, finding.path) })));
+      const message = appRelativeMessages(side, sideRoot);
+      findings.push(...keep(sideFindings, sideRoot).map((finding) => ({ ...finding, side, path: onSide(side, finding.path), message: message(finding.message) })));
     }
   } else {
     findings.push(...keep(scopeFindings({ repoRoot, root, repo, resolver, files: tracked, scoped }), repoRoot));
@@ -428,7 +429,8 @@ function machineOver({ scope, manifest, machine, changed }) {
   } catch (error) {
     report = { ok: false, files: 0, kinds: [], violations: [], errors: [{ ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error?.message ?? error) }] };
   }
-  const findings = machineFindings(report).map((finding) => (side ? { ...finding, side, ...(finding.path ? { path: onSide(side, finding.path) } : {}) } : finding));
+  const message = side ? appRelativeMessages(side, scope.repoRoot) : null;
+  const findings = machineFindings(report).map((finding) => (side ? { ...finding, side, message: message(finding.message), ...(finding.path ? { path: onSide(side, finding.path) } : {}) } : finding));
   return { info: { side, status: 'ran', files: report.files, kinds: report.kinds, ...(paths ? { paths: paths.map((p) => `${prefix}${p}`) } : {}) }, findings };
 }
 // --------------------------------------------------------------------------------------------------- explain

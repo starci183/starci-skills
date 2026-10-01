@@ -7,6 +7,22 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- A product is one app repository (hfs 4.0.0, slot and rule manifests at 2.0.0, `@starci/eslint-canon-be` 3.0.0, `@starci/eslint-canon-fe` 8.0.0; package changelogs under `packages/hfs`, `packages/eslint/be` and `packages/eslint/fe`). The app root holds:
+  - the one `package.json` (every dependency and script of both sides; npm workspaces only for the sides' `packages/*`), the one lockfile and `node_modules`;
+  - `hfs.json` of kind `app`: `{ hfs: 2, kind: "app", project, sides: { be: { apps, optionalSlots, connections }, fe: { apps, optionalSlots, reads: ["be/contracts/"] } } }`;
+  - README, CI, `.husky`, `scripts/` and `.starciwork` (slots of profile `app`).
+  `be/` and `fe/` hold what the standalone repository roots held except `package.json` and the lockfile. Every check, canon rule and machine check judges a side with its folder as the root, and nothing crosses sides except the declared reads. `hfs lint`, `hfs check` and `hfs sync` run at the app root:
+  - `hfs lint` runs ESLint per side with that side's canon, stylelint over `fe/` and the app check, into one report and one Sonar import;
+  - every finding path and every path a finding message names is app-relative (`be/...`, `fe/...`).
+  `hfs scaffold app <name>` writes the shape; its spec lints it with 0 findings and type-checks it with the scaffold's own `typecheck` script. Deleted, with no alias:
+  - the standalone be and fe repository kinds (`profile`, `stacks`) and a pre-4 `hfs.json`;
+  - `hfs sync --init` and `HFS_SYNC_SKELETON_MISSING`;
+  - the front-end contract copy and its hash comparison;
+  - `check-canon-pins --side`.
+  One version per dependency: a conflict between the sides takes its canon pin, otherwise the higher (`graphql` 16.14.2 pinned). Fixed with it:
+  - the machine gives each file to the deepest tsconfig project that holds it, so an app's `@/` alias resolves (the `route-files-thin` "0 feature owners" false positive);
+  - a route file binding a declaration to a Next.js segment export (`generateMetadata`, ...) is not an `HFS_ALIAS_REEXPORT`.
+  Contract change `hfs-app-monorepo`.
 - The orphaned code-pattern checkers are settled. `scripts/checks/code-patterns/` lost its runner when `check-scoped-lint` was removed; the folder, its 8 docs, 11 specs and 24 failure codes are deleted and listed in `modules/kernel/retired-paths.yaml`. The 24 codes went three ways:
   - 15 were already enforced by a canon rule or an hfs check (R38, R39, R43, R47, R49, R51, R53, R56, R65, R85, R89, R90, R102, base-props-atom);
   - 2 were contradicted by the convention (import formatting belongs to Prettier; the test-title verb list);
