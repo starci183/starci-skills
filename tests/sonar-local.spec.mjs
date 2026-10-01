@@ -10,6 +10,7 @@ import {
   findDeclaration,isolatedKey,isolationDefines,parseDiffNewLines,projectTokenRef,readSonarDeclaration,resolveConfig,
   resolveScanCwd,scannerCommand,scrub,sliceChanges,sonarLocalMain,sourceHostStackDir,
 } from '../scripts/checks/sonar-local.mjs';
+import {resolveCustodyFile,runtimeHostRoot} from '../scripts/lib/runtime-host.mjs';
 
 // Fake values only: no real token is ever read by this spec.
 const ADMIN='fake-admin-token-0001';
@@ -946,7 +947,8 @@ test('the slice holds every service it touched at 100 coverage: one service belo
   const green=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100,'src/orders/payment.service.js':100,'src/orders/order.resolver.js':0}});
   const passed=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-green'),{services:true}),'--wait'],{config:configFor(green.host,custody,{coverageRunner:lcovRunner()})});
   assert.equal(passed.exitCode,0,JSON.stringify(passed.report.slice));
-  assert.deepEqual(passed.report.slice.coverage.failures,[]);
+  assert.deepEqual([passed.report.slice.coverage.failures,passed.report.slice.coverage.status],[[],'green']);
+  assert.equal('ownerMode' in passed.report,false);
   // A service the lcov does not name has no measure: never a pass.
   const missing=await fakeSonar(t,{sources:serviceSources(),coverage:{'src/orders/order.service.js':100}});
   const absent=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-missing'),{services:true}),'--wait'],{config:configFor(missing.host,custody,{coverageRunner:lcovRunner()})});
@@ -960,8 +962,10 @@ test('the slice holds every service it touched at 100 coverage: one service belo
   const offRunner=lcovRunner();
   const off=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'cov-off'),{services:true}),'--wait'],{config:configFor(red.host,custody,{coverageRunner:offRunner,specs:{unit:false,e2e:false}})});
   assert.equal(off.exitCode,0,JSON.stringify(off.report.slice));
-  assert.deepEqual([off.report.slice.coverage.applied,offRunner.calls.length],[false,0]);
-  assert.match(off.report.slice.coverage.note,/specs\.unit=false/);
+  assert.deepEqual([off.report.slice.coverage.applied,off.report.slice.coverage.status,offRunner.calls.length],[false,'not-measured',0],'never green: not measured');
+  assert.match(off.report.slice.coverage.note,/owner mode specs\.unit=false[\s\S]*NOT MEASURED/);
+  assert.deepEqual([off.report.ownerMode.specs,off.report.ownerMode.coverage],[{unit:false},'not-measured'],'the summary says owner mode explicitly');
+  assert.ok(!off.report.slice.coverage.files.length,'no service is listed as covered');
 });
 
 test('dashboard prints the project numbers and fails unless bugs, smells and vulnerabilities are 0, hotspots reviewed and every service at 100', async t => {
@@ -988,4 +992,33 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
   assert.equal(unscoped.exitCode,1);
   assert.match(unscoped.report.reason,/declares no sonar\.coverage\.inclusions/);
   assertNoSecret(red.report,'dashboard report');
+});
+
+test('an example app inside the runtime checkout resolves its host custody inside this runtime tree, worktree or main checkout', () => {
+  const root=path.resolve(import.meta.dirname,'..');
+  const file=path.join(root,'examples','todo-app','.starcistacks','application-stacks.yaml');
+  const declared=readSonarDeclaration(file);
+  // {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/...} names the runtime host: the file is this tree's ext/.
+  assert.equal(declared.admin,path.join(root,'ext','sonar','secrets','sonarqube-admin-token.key'));
+  assert.equal(declared.stackDir,path.join(root,'ext','sonar'));
+  assert.ok(!declared.admin.includes(`${path.sep}examples${path.sep}starci-academy-backend`),'never under the app folder');
+  const cfg=resolveConfig({cwd:path.join(root,'examples','todo-app')},{});
+  assert.equal(cfg.adminToken,declared.admin);
+  assert.ok(fs.existsSync(`${declared.admin}.enc`),'the encrypted member the declaration names exists at the resolved path');
+});
+
+test('the runtime host holds the runtime main checkout; .claude/ custody paths of it resolve in this runtime tree', t => {
+  const root=path.resolve(import.meta.dirname,'..');
+  const host=runtimeHostRoot({});
+  assert.notEqual(path.basename(host).toLowerCase(),'.claude');
+  assert.equal(runtimeHostRoot({STARCI_SOURCE_ROOT:'D:/elsewhere/host'}),path.resolve('D:/elsewhere/host'));
+  const before=process.env.STARCI_SOURCE_ROOT;
+  const fake=temporary(t,'host');
+  process.env.STARCI_SOURCE_ROOT=fake;
+  t.after(()=>{if(before===undefined)delete process.env.STARCI_SOURCE_ROOT;else process.env.STARCI_SOURCE_ROOT=before;});
+  assert.equal(resolveCustodyFile(fake,'.claude/ext/sonar/secrets/a.key'),path.join(root,'ext','sonar','secrets','a.key'));
+  assert.equal(resolveCustodyFile(fake,'.starcistacks/dev/runtime/files/b.key'),path.join(fake,'.starcistacks','dev','runtime','files','b.key'));
+  const other=temporary(t,'other');
+  assert.equal(resolveCustodyFile(other,'.claude/ext/x'),path.join(other,'.claude','ext','x'),'only the runtime host .claude is this tree');
+  assert.equal(resolveCustodyFile(fake,'../escape'),null);
 });

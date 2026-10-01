@@ -82,6 +82,22 @@ test('the gate judges coverage per service: one service below 100 fails, a non-s
   assert.deepEqual([settle.status,settle.code,settle.findings],['red','sonar-gate-red',red.failures]);
 });
 
+test('owner mode (specs.unit off): coverage is not measured and the judgment says so, and the claim stands only while the owner switch is off', () => {
+  const ownerMode={specs:{unit:false},coverage:'not-measured',note:'owner mode specs.unit=false (config.yaml specs): the slice wrote and ran no unit test, so its coverage is NOT MEASURED'};
+  const summary=scan({ownerMode,slice:{verdict:'pass',failures:[],coverage:{applied:false,status:'not-measured',files:[],failures:[]}}});
+  const off=judgeSummary(summary,gate,{specs:{unit:false,e2e:false}});
+  assert.deepEqual([off.status,off.coverage],['pass','not-measured'],'never a plain green: coverage reads not measured');
+  assert.match(off.note,/owner mode specs\.unit=false[\s\S]*NOT MEASURED/);
+  // An op cannot claim owner mode: with the owner's unit tests on (or the switches unknown) the claim is refused.
+  for(const specs of [{unit:true,e2e:false},null]){
+    const claimed=judgeSummary(summary,gate,{specs});
+    assert.deepEqual([claimed.status,claimed.code],['missing','sonar-proof-missing']);
+    assert.match(claimed.detail,/claims owner mode/);
+  }
+  // A plain pass carries no owner-mode note.
+  assert.equal(judgeSummary(scan(),gate,{specs:{unit:false}}).coverage,undefined);
+});
+
 test('judgeSummary: pass, red, unavailable, refused and missing are told apart - never a silent pass', () => {
   assert.equal(judgeSummary(scan(),gate).status,'pass');
   const red=judgeSummary(scan({outcome:'fail',slice:{failures:['1 open BLOCKER/CRITICAL issue(s) on changed lines','duplication on the slice\'s changed lines 12% > 3%']}}),gate);

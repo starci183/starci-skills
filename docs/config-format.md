@@ -208,8 +208,9 @@ What an op does when a class is off is its brief's `policy.specsToggle.<class>`:
   skip it, and a deferred queued job is a dispatch nextAction whatever held it.
 - `skip` (backend.implement, interface.implement, code.refactor) - the op runs; the dispatch prompt's `specs:`
   line tells it to run and write no such tests and to demand no changed-line coverage. Sonar still runs, with
-  `sonar-local.mjs scan`, which reads `specs.unit` and neither runs the slice's unit coverage nor judges it while it is
-  off, so bugs, smells and security findings still gate. A skipped gate is recorded as a check named `specs.unit` / `specs.e2e`, exit 0.
+  `sonar-local.mjs scan`, which reads `specs.unit`: while it is off the scan runs no unit test, reports the slice's
+  coverage as NOT MEASURED with an owner-mode note in the scan JSON (never green), and settle accepts that note only
+  while the owner switch is really off; bugs, smells and security findings still gate. A skipped gate is recorded as a check named `specs.unit` / `specs.e2e`, exit 0.
 - `not-counted` (review.verify, handover.review) - the gate does not count those tests or that coverage; `api
   coverage` (and the handover-proof-owed refusal) drops that `requiresProof` kind from must-haves (`notCounted`).
 

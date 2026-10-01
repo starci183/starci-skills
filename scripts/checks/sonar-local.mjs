@@ -10,6 +10,7 @@ import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {safeRemoveTree} from '../lib/safe-remove.mjs';
 import {repositoryName,repositoryHome} from '../lib/repo-identity.mjs';
+import {resolveCustodyFile,resolveDeclaredRepository,runtimeHostRoot} from '../lib/runtime-host.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
 import {runGit,unquoteDiffPath} from '../lib/git.mjs';
@@ -110,9 +111,9 @@ export function scrub(text){
 
 // ---- configuration ----------------------------------------------------------------------------------------
 
-/** The source host's dev stack - the stack this runtime tree's own repository runs: <source>/.starcistacks/dev. */
+/** The source host's dev stack - the stack the repository hosting this runtime runs: <host>/.starcistacks/dev. */
 export function sourceHostStackDir(){
-  return path.join(path.resolve(skillRoot,'..'),'.starcistacks','dev');
+  return path.join(runtimeHostRoot(),'.starcistacks','dev');
 }
 
 const DECLARATION='application-stacks.yaml';
@@ -163,8 +164,9 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   const doc=parseYaml(fs.readFileSync(file,'utf8'));
   const sonar=[doc?.services?.sonar,doc?.quality?.sonar,doc?.services?.quality?.sonar].find(plain);
   if(!sonar)return null;
-  const sourceRoot=path.resolve(skillRoot,'..');
-  const repoDir=name=>!name||name===repositoryName(repoRoot)?repoRoot:name===path.basename(sourceRoot)?sourceRoot:path.join(path.dirname(repositoryHome(repoRoot)),name);
+  // A named repository resolves by identity (scripts/lib/runtime-host.mjs): the declaring repository, the runtime host or a
+  // sibling checkout; one not checked out here is named where its sibling checkout would be, so its custody reads as missing.
+  const repoDir=name=>!name?repoRoot:resolveDeclaredRepository(name,{fromRepo:repoRoot})??path.join(path.dirname(repositoryHome(repoRoot)),name);
   let stackDir=null,composeFile=null,container=null;
   if(plain(sonar.stack)){
     const stack=sonar.stack;
@@ -185,7 +187,7 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   const projects=(Array.isArray(sonar.projects)?sonar.projects.filter(plain).map(p=>({repository:text(p.repository),key:text(p.key),name:text(p.name)}))
     :plain(sonar.projects)?Object.entries(sonar.projects).map(([repository,v])=>({repository,key:text(v)??text(v?.key),name:text(v?.name)})):[]).filter(p=>p.key);
   const credentials=(Array.isArray(sonar.credentials)?sonar.credentials:[]).filter(plain).map(c=>({id:text(c.id)??'',env:text(c.env),
-    file:text(c.custody?.path)?path.join(repoDir(text(c.custody?.repository)),c.custody.path):null})).filter(c=>c.file);
+    file:resolveCustodyFile(repoDir(text(c.custody?.repository)),text(c.custody?.path))})).filter(c=>c.file);
   const isAdmin=c=>/admin/i.test(c.id)||/admin/i.test(path.basename(c.file));
   const analysis=credentials.filter(c=>!isAdmin(c)&&(!c.env||c.env==='SONAR_TOKEN'));
   const forProject=key=>analysis.find(c=>c.id.includes(key)||path.basename(c.file).includes(key))?.file??null;
@@ -284,11 +286,12 @@ const launcher=(bin,args)=>/\.(?:c|m)?js$/i.test(bin)?[process.execPath,[bin,...
 export function readCustody(cfg,ref){
   // A relative reference is a member of the configured stack; an absolute one (a declaration credential,
   // resolved from its repository root) must still sit inside a custody tree - a repository's
-  // .starcistacks or the runtime's .claude/ext/<service> extension.
+  // .starcistacks or a runtime's extension tree (.claude/ext/<service>, or this runtime's own ext/ when it is a
+  // lane worktree, where a host custody path resolves - scripts/lib/runtime-host.mjs resolveCustodyFile).
   const plainFile=path.resolve(cfg.stackDir,ref);
   const name=String(ref).replace(/\\/g,'/');
   const inside=path.isAbsolute(String(ref))
-    ?/[\\/]\.starcistacks[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)
+    ?/[\\/]\.starcistacks[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)||plainFile.startsWith(path.join(skillRoot,'ext')+path.sep)
     :plainFile.startsWith(cfg.stackDir+path.sep);
   if(!inside)return {present:false,name,reason:`custody reference ${name} is outside a stack custody tree`};
   const enc=`${plainFile}.enc`;
@@ -844,11 +847,14 @@ export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
  * (config.yaml `specs`, scripts/kernel/spec-deferral.mjs) the op writes no unit test and is held to no coverage: nothing
  * runs and the slice's coverage is not judged (`judged` false). Returns {judged, targets, lcov, exitCode?, written?, error?, note?}.
  */
+/** What a slice summary says while the owner's specs.unit is off: its coverage is not measured, never read as green. */
+export const OWNER_MODE_NOTE='owner mode specs.unit=false (config.yaml specs): the slice wrote and ran no unit test, so its coverage is NOT MEASURED - the coverage conditions are neither green nor red, and the slice passes on the other conditions only';
+
 export function prepareSliceCoverage(cfg,{cwd,props,slice}){
   const inclusions=coverageInclusionsOf(props);
   if(!inclusions.length)return {judged:true,targets:[],note:'the repository declares no sonar.coverage.inclusions'};
   const specs=cfg.specs??specsSettings(inspectOwnerConfig().config);
-  if(specs.unit===false)return {judged:false,targets:[],note:'specs.unit=false (owner config.yaml specs): the slice writes no unit test and its coverage is not judged'};
+  if(specs.unit===false)return {judged:false,targets:[],ownerMode:'specs.unit=false',note:OWNER_MODE_NOTE};
   const isTarget=coverageTargetOf(inclusions);
   const targets=slice.files.map(f=>f.path).filter(file=>isTarget(file)&&fs.existsSync(path.join(cwd,file)));
   if(!targets.length)return {judged:true,targets};
@@ -955,9 +961,10 @@ export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate
     measured.push({path:file.path,coverage:got.coverage});
   }
   const coverage=coverageRun?.judged===false
-    ?{applied:false,inclusions,minPercent:gate.coverageMinPercent,files:[],failures:[],note:coverageRun.note}
+    ?{applied:false,status:'not-measured',ownerMode:coverageRun.ownerMode,inclusions,minPercent:gate.coverageMinPercent,files:[],failures:[],note:coverageRun.note}
     :judgeCoverage(measured,{inclusions,minPercent:gate.coverageMinPercent});
   if(coverageRun?.judged!==false&&coverageRun?.error)coverage.failures.unshift(`the slice's services could not be measured: ${coverageRun.error}`);
+  if(!coverage.status)coverage.status=!coverage.applied?'no-scope':coverage.failures.length?'red':coverage.files.length?'green':'no-target';
   failures.push(...coverage.failures);
   return {error:null,result:{
     analyzedFiles:keys.length,notAnalyzed,
@@ -1098,6 +1105,7 @@ export async function scan(cfg,options={}){
   // last `npm test` wrote).
   const coverageRun=slice?prepareSliceCoverage(cfg,{cwd,props,slice}):null;
   if(coverageRun)summary.coverageRun=coverageRun;
+  if(coverageRun?.judged===false)summary.ownerMode={specs:{unit:false},coverage:'not-measured',note:coverageRun.note};
   const analysisToken=token.value;
   const childEnv={...process.env,SONAR_HOST_URL:cfg.host,SONAR_TOKEN:analysisToken};
 

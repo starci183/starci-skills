@@ -36,6 +36,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { list } from '../lib/list.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { loadSonarGate } from './sonar-gate.mjs';
+import { resolveCustodyFile, resolveDeclaredRepository, runtimeHostRoot } from '../lib/runtime-host.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { DECLARATION, STACK_ROOT, declaredStack, findStackDeclaration, readDeclaration, readText, text } from '../lib/stack-declaration.mjs';
 
@@ -78,8 +79,6 @@ const INFRA_VALUE_PROBES = ['infra/compose/.env', 'infra/compose/.env.generated'
 
 const escapeRe = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** The runtime's source host: the repository this runtime tree lives in (STARCI_SOURCE_ROOT overrides). */
-export const sourceHostRoot = () => (process.env.STARCI_SOURCE_ROOT ? path.resolve(process.env.STARCI_SOURCE_ROOT) : path.dirname(skillRoot));
 
 // ---- schema ---------------------------------------------------------------------------------------------
 
@@ -122,25 +121,6 @@ export function schemaErrors(value, shape, at = '$', root = declarationSchema())
 
 // ---- locating declarations and repositories -------------------------------------------------------------
 
-/**
- * A repository named in a declaration, on this machine: the declaring repository itself, the runtime's
- * source host, or a sibling checkout of either. Null when it is not checked out here.
- */
-export function resolveRepository(name, { fromRepo } = {}) {
-  const wanted = text(name);
-  if (!wanted) return null;
-  const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
-  const candidates = [];
-  if (fromRepo) candidates.push(path.resolve(fromRepo));
-  candidates.push(sourceHostRoot());
-  for (const dir of candidates) if (same(repositoryName(dir), wanted) && isDir(dir)) return dir;
-  for (const dir of candidates) {
-    const sibling = path.join(path.dirname(repositoryHome(dir)), wanted);
-    if (isDir(sibling)) return sibling;
-  }
-  return null;
-}
-
 /** A frontend declared by its backend's stack: a sibling declaration whose `sources` lists this repository. */
 function governingDeclaration(repo) {
   const name = repositoryName(repo);
@@ -170,14 +150,14 @@ export function normalizeService(id, entry, { declaringRepo } = {}) {
   const hostRoot = hostOwned ? slash(stack.root) : null;
   const extDir = hostRoot && /^\.claude\//.test(hostRoot) && !hostRoot.split('/').includes('..')
     ? path.join(skillRoot, hostRoot.replace(/^\.claude\//, '')) : null;
-  const stackRepo = stack && !hostOwned ? resolveRepository(stack.repository, { fromRepo: declaringRepo }) : null;
+  const stackRepo = stack && !hostOwned ? resolveDeclaredRepository(stack.repository, { fromRepo: declaringRepo }) : null;
   const stackDir = hostOwned ? extDir
     : stackRepo && text(stack.root) && text(stack.environment) ? path.join(stackRepo, stack.root, stack.environment) : null;
   const credentials = list(s.credentials).filter(plain).map((credential) => {
     const custody = plain(credential.custody) ? credential.custody : {};
-    const repo = resolveRepository(custody.repository, { fromRepo: declaringRepo });
+    const repo = resolveDeclaredRepository(custody.repository, { fromRepo: declaringRepo });
     const rel = text(custody.path);
-    const abs = repo && rel && !rel.split(/[\\/]/).includes('..') ? path.join(repo, rel) : null;
+    const abs = resolveCustodyFile(repo, rel);
     return { id: text(credential.id), env: text(credential.env), key: text(credential.key), purpose: text(credential.purpose),
       custody: { repository: text(custody.repository), path: rel, resolved: Boolean(repo), file: abs,
         encPresent: abs ? isFile(`${abs}.enc`) : null, plainPresent: abs ? isFile(abs) : null } };
@@ -213,7 +193,7 @@ export function resolveStackService(repoRoot, serviceId) {
   const name = repositoryName(repo);
   const own = findStackDeclaration(repo);
   const candidates = [own.doc ? own : governingDeclaration(repo)].filter(Boolean);
-  const host = sourceHostRoot();
+  const host = runtimeHostRoot();
   if (path.resolve(host) !== repo) { const source = findStackDeclaration(host); if (source.doc) candidates.push({ ...source, sourceHost: true }); }
   for (const declaration of candidates) {
     const entry = declaration.doc?.services?.[serviceId];

@@ -150,14 +150,20 @@ export function judgeDashboard({ measures = {}, files = [], inclusions = [] }, g
  *   refused      the scan was refused before it ran (unknown base, empty slice ...): the op fixes and reruns
  *   missing      no sonar.json (or one that is not a scan summary) is attached
  * A slice that changed no file is a pass with `note`: there is nothing new to fail.
+ * Owner mode: a summary that says `ownerMode.coverage: not-measured` (the owner's specs.unit off) passes on its other
+ * conditions with `coverage: 'not-measured'` and the owner-mode `note`, never as a plain pass, and only when `specs` (the
+ * owner switches the caller read) confirms unit is off; otherwise the claim is refused as sonar-proof-missing.
  */
-export function judgeSummary(summary, gate) {
+export function judgeSummary(summary, gate, { specs = null } = {}) {
   if (!summary || typeof summary !== 'object' || !String(summary.schema ?? '').startsWith(SCAN_SCHEMA_PREFIX))
     return { status: 'missing', code: 'sonar-proof-missing', detail: 'no sonar.json scan summary (schema starci/sonar-local-scan) is attached to the report', findings: [] };
   const why = String(summary.reason ?? '').replace(/\s+/g, ' ').slice(0, 300);
   switch (summary.outcome) {
     case 'pass':
       if (summary.scope !== 'slice') return { status: 'missing', code: 'sonar-proof-missing', detail: `the summary's scope is ${summary.scope ?? 'unknown'}, not the slice's own (scope slice is required)`, findings: [] };
+      // Owner mode (specs.unit off): the slice passes on the other conditions, and the judgment says coverage was not measured.
+      if (summary.ownerMode && specs?.unit !== false) return { status: 'missing', code: 'sonar-proof-missing', detail: 'the summary claims owner mode specs.unit=false (coverage not measured) but the owner config has unit tests on: rerun the scan', findings: [] };
+      if (summary.ownerMode?.coverage === 'not-measured') return { status: 'pass', code: null, detail: null, coverage: 'not-measured', note: String(summary.ownerMode.note ?? 'owner mode: coverage not measured'), findings: [] };
       return { status: 'pass', code: null, detail: null, findings: [] };
     case 'fail': {
       const findings = Array.isArray(summary.slice?.failures) && summary.slice.failures.length ? summary.slice.failures.map(String) : [why || 'the slice fails the gate'];

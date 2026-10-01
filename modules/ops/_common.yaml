@@ -593,7 +593,7 @@ sections:
       - "What an op does when a class is off is its brief's policy.specsToggle (scripts/kernel/spec-deferral.mjs):
         defer-leg - the leg is never dispatched; the kernel settles it deferred with no attempt spent and the
         legs behind it proceed. skip - the op runs without writing or running that class of test and demands
-        no coverage of it; Sonar still runs (sonar-local reads specs.unit and judges no coverage while it is off), so
+        no coverage of it; Sonar still runs (sonar-local reads specs.unit and reports coverage NOT MEASURED in owner mode, never green), so
         bugs, smells and security findings still gate. not-counted - a review or handover gate does not count an absent test or coverage of that class
         (api coverage drops that requiresProof kind from must-haves). The dispatch prompt prints a `specs:`
         line naming the classes that are off; it overrides every test, coverage and e2e step, proof and
