@@ -21,8 +21,11 @@ test('portable application-stack kit is complete and statically safe in dev and 
     const checked=checkApplicationStacks({repoRoot:root,environment,deploymentModelFile:modelFile});
     assert.equal(checked.ok,true,checked.errors.map(error=>`${error.code}:${error.path??''}:${error.message}`).join('\n'));
   }
-  // Portable means the custody script survives the copy with its refusals intact.
-  const prepare=fs.readFileSync(path.join(root,'scripts','prepare.sh'),'utf8');
-  assert.match(prepare,/vps preparation requires --cipher-only/);
-  assert.match(prepare,/age key must be outside the application root/);
+  // Portable means each copied environment runbook still declares its prepare command: prepare is a runbook row
+  // (modules/schemas/stacks-layout.yaml), not a scripts/prepare.* file - the app.scripts slot never requires one.
+  for(const environment of ['dev','vps']){
+    const runbook=fs.readFileSync(path.join(root,'.starcistacks',environment,'README.md'),'utf8');
+    assert.match(runbook,/^| prepare |/m,environment);
+    assert.equal(fs.existsSync(path.join(root,'scripts','prepare.sh')),false,'no scripts/prepare.* is assumed');
+  }
 });

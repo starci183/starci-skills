@@ -17,14 +17,17 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
     const op=parseYaml(fs.readFileSync(path.join(root,'modules/ops/ops',`${id}.yaml`),'utf8'));
     for(const contract of [op,...modes.map(mode=>op.policy.executionModes[mode])]){
       assert.ok(contract.reads.some(read=>read.id==='application-stacks'),id);
-      assert.ok(contract.steps[0].reads.includes('application-stacks'),id);
+      // A code-writing op opens with the op loop's READ step (reads [op-loop], writes only the read digest, no code);
+      // the first working step after it must read the stack contract.
+      const first=contract.steps.find(step=>!(step.reads.length===1&&step.reads[0]==='op-loop'));
+      assert.ok(first.reads.includes('application-stacks'),id);
     }
   }
   for(const file of ['scripts/checks/stacks.mjs','modules/schemas/application-stacks.schema.yaml','knowledge/application-stacks.yaml',
     'docs/application-stacks.md','docs/application-stacks-vps.md',
-    ...['.starcistacks/vps/infra/compose/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1','.gitignore',
+    ...['.starcistacks/vps/infra/compose/nginx.conf','.gitignore',
       '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml',
-      '.starcistacks/vps/README.md','.starcistacks/vps/infra/stack.yaml']
+      '.starcistacks/vps/README.md','.starcistacks/vps/infra/compose/stack.yaml']
       .map(name=>'examples/todo-app/'+(name.startsWith('.starcistacks/')?'be/':'')+name)])assert.ok(files.has(file),file);
   assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app/')&&
     (/\/(runtime|generated|\.runtime)\//.test(file)||/\.(enc|agekey)$/.test(file))),false);
