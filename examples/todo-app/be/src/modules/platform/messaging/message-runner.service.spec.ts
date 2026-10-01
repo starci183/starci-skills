@@ -77,7 +77,9 @@ describe("MessageRunnerService", () => {
 
         it("leaves a claimed message of a queue without a consumer alone", async () => {
             const { runner, outbox } = await build()
-            outbox.queueRecords(outboxRecord({ queue: "other.queue" }))
+            // The recording outbox claims only the registered queues, so a claim that hands out a message of a queue no consumer
+            // registered is scripted here.
+            jest.spyOn(outbox, "claimDue").mockResolvedValueOnce([outboxRecord({ queue: "other.queue" })])
             runner.add(consumerOf())
 
             await runner.drain()
