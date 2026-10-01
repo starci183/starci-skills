@@ -47,6 +47,14 @@ class CiteInputError extends Error {}
 
 export const RETIRED_PATHS_FILE = 'modules/kernel/retired-paths.yaml';
 const HISTORY = (rel) => rel.startsWith('modules/kernel/contract-changes/') || rel === 'modules/kernel/owner-rulings.yaml' || rel === RETIRED_PATHS_FILE;
+/** The generated copy roots of the runtime (ruleParams.runtime.generated of knowledge/hfs/runtime-slots.yaml), each a byte mirror of the runtime layout. */
+const generatedRoots = (root) => {
+  const file = path.join(root, 'knowledge', 'hfs', 'runtime-slots.yaml');
+  if (!fs.existsSync(file)) return [];
+  return (parseYaml(fs.readFileSync(file, 'utf8'))?.ruleParams?.runtime?.generated ?? []).map((g) => `${String(g.root).replace(/\/$/, '')}/`);
+};
+/** A path inside a generated copy is the runtime path it mirrors (packages/hfs/runtime/scripts/x.mjs -> scripts/x.mjs). */
+const mirrored = (roots, target) => { const r = roots.find((g) => target.startsWith(g)); return r ? target.slice(r.length) : target; };
 
 const readRegistry = (root) => {
   const file = path.join(root, RETIRED_PATHS_FILE);
@@ -151,6 +159,8 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
   const files = collectScanFiles(root, scan);
   const retired = retiredPaths(root);
   const moved = movedPaths(root);
+  const roots = generatedRoots(root);
+  const retiredOrMoved = (target) => retired.has(target) || moved(target) || retired.has(mirrored(roots, target)) || moved(mirrored(roots, target));
   let checked = 0, historic = 0;
   for (const file of files) {
     const rel = path.relative(root, file).replaceAll('\\', '/');
@@ -171,7 +181,7 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
         dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: 'bare filename — a cite names a repo-relative path' });
         continue;
       }
-      if ((retired.has(cite.target) || moved(cite.target)) && HISTORY(rel) && !fs.existsSync(path.join(root, cite.target))) { historic += 1; continue; }
+      if (retiredOrMoved(cite.target) && HISTORY(rel) && !fs.existsSync(path.join(root, cite.target))) { historic += 1; continue; }
       const body = readTarget(path.join(root, cite.target));
       if (body === null) { dead.push({ file: rel, line: cite.line, form: cite.form, target: cite.target, why: moved(cite.target) ? `moved to ${moved(cite.target)}` : 'no such file' }); continue; }
       if (cite.kind === 'symbol' && !body.includes(cite.symbol)) {
