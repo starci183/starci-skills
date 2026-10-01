@@ -140,7 +140,7 @@ writes:
       en: "The READ digest (read-digest.mjs --knowledge): every knowledge file the decision cites and the hfs slot of every record written, each with its sha256."
       vi: "Bản tóm tắt ĐỌC (read-digest.mjs --knowledge): mọi tệp knowledge mà quyết định dẫn ra và slot hfs của mọi bản ghi đã viết, kèm sha256 của từng tệp."
 steps:
-  - reads: [standard, design-patterns]
+  - reads: [standard, design-patterns, application-stacks]
     writes: [read-digest]
     action:
       en: "READ the standard before deciding (knowledge/op-gate.yaml proofs.read-knowledge): run node scripts/checks/read-digest.mjs --root <app> --touch <every record this op will write> --knowledge knowledge/architecture-rules.yaml knowledge/design-patterns.yaml knowledge/application-stacks.yaml knowledge/hfs/slots.yaml knowledge/hfs/rules.yaml knowledge/patterns/{be,fe}/<the pattern of each layer the design places: architecture-check, cqrs, transport, api-auth, persistence, injection, error, background, idempotency, resilience, boundaries, multi-app>.yaml --out $STARCI_JOB_SCRATCH/read-digest.json, and read what it records - the knowledge files in place and the hfs slot map of each record (slot, tier, rules). Every standard-bound choice the record makes cites the rule id (knowledge/hfs/rules.yaml R<n>), pattern id or slot it rests on; a choice no read file supports is a reported gap or an owner question, never an invented standard. Each component the design places names the hfs slot it lands in (be.feature.application, be.integrations, fe.route, ...), so the build ops' READ digests resolve the same patterns. A record the op comes to write later is added with --touch and read the same way; REPORT with read-digest.json attached."

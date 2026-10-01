@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
+import {writeGreenProofs} from './helpers/sonar-scan.mjs';
 
 // Incident inc-751dd1ac4492 (starci-next base-repos, backend.scaffold): which cut pass runs the whole-set
 // integration gate. settle used to call ordinal === total "final", but once the seam passes the other
@@ -29,6 +30,10 @@ const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{r
 const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
 
 const OP='docs.author',CUT='be-baseline-r1-g2',TOTAL=3;
+// docs.author owes its READ digest and document gate at settle (knowledge/op-gate.yaml opProofs): each ordinal attaches the green ones.
+const PROOF_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'starci-cutset-proofs-'));
+const PROOFS=writeGreenProofs(PROOF_DIR);
+after(()=>fs.rmSync(PROOF_DIR,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
 const jobsByAttempt=new Map();
 /** One dispatched cut ordinal: running, its contract written, a done report filed. */
 const seedOrdinal=(ledger,wf,ordinal,attempt)=>{
@@ -49,7 +54,7 @@ const dispatchOrdinal=(ledger,wf,jobId,attempt,dispatch=`ctx-${jobId}`)=>{
   const {attempt_id:attemptId}=ledger.write.startAttempt({workflowId:wf,jobId,dispatchId:dispatch});
   ledger.write.setJobStatus({jobId,to:'running',reason:'fixture dispatch'});
   ledger.write.writeContract({attemptId,markdown:'# cut contract',context:{}});
-  ledger.write.fileReport({attemptId,outcome:'done',report:{outcome:'done'}});
+  ledger.write.fileReport({attemptId,outcome:'done',report:{outcome:'done',files:PROOFS}});
   jobsByAttempt.set(`${wf}:${attempt}`,jobId);
   return jobId;
 };

@@ -196,7 +196,9 @@ test('no-actionable-drift is the only pass, and it needs the whole proof', () =>
 });
 
 test('the audit writes one evidence bundle and nothing else', () => {
-  assert.deepEqual(op.writes.map((w) => w.id).sort(), ['evidence', 'node']);
+  // lint.json is the op-proof attachment (knowledge/op-gate.yaml proofs.fe-lint) in the job scratch, never a product or Work write.
+  assert.deepEqual(op.writes.map((w) => w.id).sort(), ['evidence', 'lint', 'node']);
+  assert.equal(writeOf(op, 'lint').path, 'STARCI_JOB_SCRATCH/lint.json');
   const evidence = writeOf(op, 'evidence');
   for (const artifact of ['findings.json', 'routing.json', 'draw-lineage.json', 'side-by-side.json',
     'realization.json', 'deviations.json', 'deviation-brief.md', 'measurements.json'])
