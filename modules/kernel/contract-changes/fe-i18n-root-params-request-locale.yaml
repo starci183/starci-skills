@@ -1,0 +1,13 @@
+id: fe-i18n-root-params-request-locale
+effectiveAt: '2026-10-01T18:00:00+07:00'
+summary: >-
+  FE-I18N-1 teaches the request locale through `next/root-params` with `experimental.rootParams` in next.config.ts, not the
+  `requestLocale` parameter of getRequestConfig, which next-intl 4.13 deprecates; the decision and its reason are recorded
+  in the canon. The matcher example uses `.*[.].*`. The fe skeleton (next.config.ts, request.ts, proxy.ts) is born that way.
+reach: new-legs
+paths:
+  - knowledge/patterns/fe/i18n.yaml
+  - packages/hfs/templates/fe/skeleton/apps/__app__/next.config.ts
+  - packages/hfs/templates/fe/skeleton/apps/__app__/src/modules/i18n/request.ts
+  - packages/hfs/templates/fe/skeleton/apps/__app__/src/proxy.ts
+  - modules/kernel/contract-changes/fe-i18n-root-params-request-locale.yaml

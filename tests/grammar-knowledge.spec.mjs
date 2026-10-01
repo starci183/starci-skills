@@ -79,7 +79,7 @@ test('a snapshot that falls behind the package is reported: renderer, class, tok
   assert.notEqual(withoutBottomNav,doc);
   fs.writeFileSync(common,withoutBottomNav.replace('      - "starci-core-toaster-list"\n','').replace(/version: "\d+\.\d+\.\d+"/,`version: "0.4.13"`));
   const index=path.join(dir,'index.yaml');
-  fs.writeFileSync(index,fs.readFileSync(index,'utf8').replace(/the 96 renderers/,'the 42 renderers'));
+  fs.writeFileSync(index,fs.readFileSync(index,'utf8').replace(/the 100 renderers/,'the 42 renderers'));
   const {findings,ok}=await checkGrammarKnowledge({packageRoot,grammarRoot:dir,census});
   assert.equal(ok,false);
   const has=(file,what)=>assert.ok(findings.some(f=>f.file===file&&f.what.startsWith(what)),`expected ${file} ${what} in ${JSON.stringify(findings,null,1)}`);

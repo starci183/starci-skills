@@ -399,15 +399,15 @@ describe('the package.json scripts of the app', () => {
     assert.equal(scripts['start:core'], 'node be/dist/apps/core/src/main.js');
     assert.equal(scripts.migrate, 'node be/dist/apps/migrate/src/main.js');
     assert.equal(scripts['dev:be'], 'cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/core/src/main.ts');
-    assert.equal(scripts['dev:fe:app'], 'npm run codegen --silent && cd fe && next dev apps/app');
-    assert.equal(scripts['start:app'], 'cd fe && next start apps/app');
+    assert.equal(scripts['dev:fe:app'], 'npm run codegen --silent && cd fe/apps/app && next dev');
+    assert.equal(scripts['start:app'], 'cd fe/apps/app && next start');
     assert.equal(scripts.test, 'cd be && jest --selectProjects unit --coverage');
     assert.equal(scripts['test:stack'], 'cd be && starci-test-stack');
     for (const project of ['integration', 'e2e', 'contract']) assert.equal(scripts[`test:${project}`], `npm run typecheck:tests && cd be && jest --selectProjects ${project}`);
     assert.equal(scripts['typecheck:tests'], 'tsc -p be/src/tests/tsconfig.json');
     assert.equal(scripts.lint, 'npm run codegen --silent && hfs lint', 'one lint gate over both sides, stylelint and the app checks');
     assert.equal(scripts['lint:fix'], scripts.lint.replace('hfs lint', 'hfs lint --fix'));
-    assert.match(scripts['build:fe'], /^npm run codegen --silent && cd fe && next build apps\/app && next build apps\/admin$/);
+    assert.match(scripts['build:fe'], /^npm run codegen --silent && \(cd fe\/apps\/app && next build\) && \(cd fe\/apps\/admin && next build\)$/);
     assert.doesNotMatch(Object.values(scripts).join('\n'), /--rule|--no-inline-config|--no-eslintrc|--ignore-pattern|vitest|playwright|scripts\/check-/);
   });
   it('typecheck builds the fe workspace packages before it type-checks the fe apps that import them from dist/', () => {
@@ -420,7 +420,7 @@ describe('the package.json scripts of the app', () => {
   });
   it('one api app and one Next app take the unsuffixed dev scripts; a second migrate app is named; a cli app gets a start script', () => {
     const one = scriptsOf(app({ fe: { apps: [{ name: 'web', kind: 'next' }] } }));
-    assert.equal(one['dev:fe'], 'npm run codegen --silent && cd fe && next dev apps/web');
+    assert.equal(one['dev:fe'], 'npm run codegen --silent && cd fe/apps/web && next dev');
     const many = scriptsOf(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'jobs', kind: 'worker' }, { name: 'a', kind: 'migrate' }, { name: 'b', kind: 'migrate' }] } }));
     assert.deepEqual(Object.keys(many).filter(name => /^(start|migrate)/.test(name)).sort(), ['migrate:a', 'migrate:b', 'start:admin', 'start:app', 'start:core', 'start:jobs']);
     assert.match(appScripts(validateHfs(app({ be: { apps: [{ name: 'core', kind: 'api' }, { name: 'x', kind: 'cli' }] } }))), /"start:x": "node be\/dist\/apps\/x\/src\/main\.js",/);

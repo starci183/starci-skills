@@ -3,7 +3,7 @@ id: grammar.common.dna
 title: Common Grammar — DNA
 purpose: |
   Package snapshot of the `@starci/grammar/common` public entry: the custom-property names its own
-  stylesheet set writes or reads, the 96 renderers it publishes with the class names and rule ids those
+  stylesheet set writes or reads, the 100 renderers it publishes with the class names and rule ids those
   sources stamp, and the absences observed while reading them. Historical observation only — not a
   claim that the currently installed package has these names, classes or gaps. Static source
   inspection does not prove runtime behavior; nothing here was rendered in a browser.
@@ -93,7 +93,7 @@ provenance:
     - path: "packages/grammar/src/common/index.ts"
       sha256: "962c84f025a4cd7d53d27424c434b1b7d00d6ca82c3335c894c963ba498eb5a1"
     - path: "packages/grammar/src/common/renderers.ts"
-      sha256: "05917e8af0c50ef90794397b25c8c56ca9d05602ceca1ddf73b29aaf554e1438"
+      sha256: "1ac19652d4ff47292351cc3a3c0aecdcc606543715efc7e224b0f93775b95103"
     - path: "packages/grammar/src/common/renderers-forms.ts"
       sha256: "139dbf64fa2afd57cbe9fc6551acc41bac25bf3568f41487991c22135813f499"
     - path: "packages/grammar/src/common/renderers-overlays.ts"
@@ -101,9 +101,9 @@ provenance:
     - path: "packages/grammar/src/common/renderers-navigation.ts"
       sha256: "3d99c838d1a53f7e4ccf7581580742206fcf248f6cd075bd00f398e9584ee7a5"
     - path: "packages/grammar/src/common/registry.tsx"
-      sha256: "b640a2809a3bcc97e4a7646adb4610d0ef7b1ed6796caf98ec8761d75a407f78"
+      sha256: "fad9ade65a1c07ed78d60ae5d84dec9ec4fba713788de69b63312b4d4db40d20"
     - path: "packages/grammar/src/common/styles.css"
-      sha256: "3a4c35a1ff9d308180234e58eedf0b0244481bb08a0f18cb7f4829d4513939d4"
+      sha256: "9cd2a655bcee3887ddbe703955d677aec17b74215682e526bfe804b6a23a97f8"
     - path: "packages/grammar/src/common/components-forms.css"
       sha256: "040d8eaf37ec3339f66d36ac6e1f5ff6a5818a95a68091b40509a642cf0a6229"
     - path: "packages/grammar/src/common/components-overlays.css"
@@ -179,17 +179,17 @@ identity:
     overlays: "14 renderers, COMMON_OVERLAYS_COMPONENTS in src/common/renderers-overlays.ts"
     navigation: "19 renderers, COMMON_NAVIGATION_COMPONENTS in src/common/renderers-navigation.ts"
   counts:
-    renderers: 96
+    renderers: 100
     tokens: 156
     tokensAssignedByCommon: 97
     tokensAssignedAndAlsoReadByCommon: 63
     tokensWrittenByRenderers: 2
     tokensReadOnlyByCommon: 59
     tokensReadByCommon: 122
-    claimEntries: 408
-    distinctClaimIds: 90
-    emittedClasses: 398
-    classesWithARuleInAShippedSheet: 366
+    claimEntries: 418
+    distinctClaimIds: 91
+    emittedClasses: 402
+    classesWithARuleInAShippedSheet: 370
     gaps: 10
 observations:
   - id: common-supplies-no-colour
@@ -254,7 +254,7 @@ observations:
       `src/common/styles.spec.ts` refuse.
   - id: every-renderer-stamps-rule-ids
     observation: |
-      Every one of the 96 renderers stamps at least one `data-contract` rule id (`claims` /
+      Every one of the 100 renderers stamps at least one `data-contract` rule id (`claims` /
       `computedClaims` per renderer above; `tests/grammar-contracts.spec.mjs` holds it). The base
       renderers mostly claim paint - spacing, font, tone, surface, boundary, overflow ids that
       `src/__test__/styleClaims.ts` checks against the shipped declaration. The 53 renderers added in
@@ -612,13 +612,13 @@ tokens:
     readBy: "common"
     commonFallback: "var(--radius, 0.5rem)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2708"
+    source: "packages/grammar/src/common/styles.css:2750"
   - name: "--radius-md"
     assignedBy: "host"
     readBy: "common"
     commonFallback: "calc(var(--radius, 0.5rem) * 0.75)"
     uses: 1
-    source: "packages/grammar/src/common/styles.css:2809"
+    source: "packages/grammar/src/common/styles.css:2851"
   - name: "--radius-sm"
     assignedBy: "host"
     readBy: "common"
@@ -1781,6 +1781,15 @@ renderers:
       - "starci-core-link"
       - "starci-core-link-external-icon"
       - "starci-core-nav-visually-hidden"
+  - component: "List"
+    propsType: "ListProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/List/index.tsx"
+    claims: ["GAP-0", "MARGIN-0", "PADDING-0"]
+    computedClaims: []
+    classes:
+      - "starci-core-semantic-list"
   - component: "ListBox"
     propsType: "ListBoxProps"
     kind: "branch"
@@ -1799,6 +1808,15 @@ renderers:
       - "starci-core-list-box-leading"
       - "starci-core-list-box-row"
       - "starci-core-list-box-trailing"
+  - component: "ListItem"
+    propsType: "ListItemProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/ListItem/index.tsx"
+    claims: ["MARGIN-0", "PADDING-0"]
+    computedClaims: []
+    classes:
+      - "starci-core-semantic-list-item"
   - component: "MarkdownArticle"
     propsType: "MarkdownArticleProps"
     kind: "branch"
@@ -1850,6 +1868,15 @@ renderers:
       - "starci-core-meter-segment"
       - "starci-core-meter-segments"
       - "starci-core-meter-track"
+  - component: "NavLandmark"
+    propsType: "NavLandmarkProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/NavLandmark/index.tsx"
+    claims: []
+    computedClaims: ["GAP-1", "GAP-4"]
+    classes:
+      - "starci-core-nav-landmark"
   - component: "NavigationFeatureNav"
     propsType: "NavigationFeatureNavProps"
     kind: "composition"
@@ -2031,6 +2058,15 @@ renderers:
       - "starci-core-rating-glyph"
       - "starci-core-rating-input"
       - "starci-core-rating-item"
+  - component: "Region"
+    propsType: "RegionProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Region/index.tsx"
+    claims: []
+    computedClaims: ["MARGIN-0", "PADDING-0", "PADDING-6"]
+    classes:
+      - "starci-core-region"
   - component: "SearchField"
     propsType: "SearchFieldProps"
     kind: "primitive"

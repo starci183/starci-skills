@@ -543,22 +543,29 @@ function nullish(ts, checker, expression) {
   return !symbol || (symbol.getDeclarations?.() ?? []).every(declaration => declaration.getSourceFile().isDeclarationFile);
 }
 
-function trueMeansAvailable(ts, checker, condition, identity) {
+/** True when taking `branch` of `condition` proves the declared identity is available. */
+function branchMeansAvailable(ts, checker, condition, identity, branch) {
   condition = unwrapExpression(ts, condition);
   if (expressionReferences(ts, checker, condition, identity) && (ts.isIdentifier(condition)
-    || ts.isPropertyAccessExpression(condition) || ts.isElementAccessExpression(condition))) return true;
+    || ts.isPropertyAccessExpression(condition) || ts.isElementAccessExpression(condition))) return branch;
   if (ts.isPrefixUnaryExpression(condition) && condition.operator === ts.SyntaxKind.ExclamationToken) {
-    const nested = trueMeansAvailable(ts, checker, condition.operand, identity);
-    return nested === null ? null : !nested;
+    return branchMeansAvailable(ts, checker, condition.operand, identity, !branch);
   }
   if (ts.isBinaryExpression(condition)) {
+    const operator = condition.operatorToken.kind;
+    if (operator === ts.SyntaxKind.AmpersandAmpersandToken || operator === ts.SyntaxKind.BarBarToken) {
+      // `a && b` is true only when both sides are true; `a || b` is false only when both sides are false.
+      const decisive = operator === ts.SyntaxKind.AmpersandAmpersandToken ? branch : !branch;
+      return decisive && [condition.left, condition.right]
+        .some(side => branchMeansAvailable(ts, checker, side, identity, branch));
+    }
     const leftIdentity = expressionReferences(ts, checker, condition.left, identity) && nullish(ts, checker, condition.right);
     const rightIdentity = expressionReferences(ts, checker, condition.right, identity) && nullish(ts, checker, condition.left);
-    if (!leftIdentity && !rightIdentity) return null;
-    if ([ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(condition.operatorToken.kind)) return true;
-    if ([ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken].includes(condition.operatorToken.kind)) return false;
+    if (!leftIdentity && !rightIdentity) return false;
+    if ([ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(operator)) return branch;
+    if ([ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken].includes(operator)) return !branch;
   }
-  return null;
+  return false;
 }
 
 function violation(config, call, ruleId, message, extra = {}) {
@@ -687,8 +694,7 @@ function inspectKey(config, context, entry, call, identities, violations, reason
     }
     if (identity.gatesRequest) {
       const gated = active.every(leaf => leaf.decisions.some(decision => {
-        const available = trueMeansAvailable(context.ts, call.checker, decision.condition, identity);
-        return available !== null && decision.branch === available;
+        return branchMeansAvailable(context.ts, call.checker, decision.condition, identity, decision.branch);
       }));
       if (!gated) violations.push(violation(config, call, SWR_KEY_RULE_ID,
         `${entry.id} must produce an explicit null key when ${identity.id} (${identity.binding}) is unavailable.`,

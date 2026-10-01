@@ -205,8 +205,8 @@ npm run build:be     # cd be && tsc -p tsconfig.build.json && tsc-alias -p tscon
 npm run start:todo   # node be/dist/apps/todo/src/main.js
 npm run dev:be       # cd be && ts-node-dev --respawn -r tsconfig-paths/register apps/todo/src/main.ts
 npm test             # cd be && jest --selectProjects unit --coverage
-npm run dev:fe       # codegen, then cd fe && next dev apps/web
-npm run build:fe     # codegen, then cd fe && next build apps/web
+npm run dev:fe       # codegen, then cd fe/apps/web && next dev
+npm run build:fe     # codegen, then cd fe/apps/web && next build
 npm run typecheck    # codegen, then tsc over be/ and fe/apps/web
 ```
 

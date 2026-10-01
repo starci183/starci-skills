@@ -48,6 +48,8 @@ test("FE-GRAMMAR-1: page structure and text are grammar components, not raw tags
     valid: [
       // grammar components compose the structure
       { filename: FEATURE, code: "import { Heading, Text } from \"@starci/grammar\"\nexport const A = () => <Heading level={1}><Text>x</Text></Heading>" },
+      // a named non-card region and a plain semantic list are grammar components too
+      { filename: FEATURE, code: "import { List, ListItem, NavLandmark, Region } from \"@starci/grammar\"\nexport const A = () => <Region labelledBy=\"t\" spacing=\"spaced\"><NavLandmark label=\"n\" layout=\"bar\">n</NavLandmark><List label=\"y\"><ListItem>z</ListItem></List></Region>" },
       { filename: BLOCK, code: "import { SurfaceCard } from \"@nivo/ui\"\nexport const A = () => <SurfaceCard>x</SurfaceCard>" },
       // a tag the grammar has no component for stays available: layout wrappers and line breaks
       { filename: FEATURE, code: raw("div") },
@@ -67,13 +69,13 @@ test("FE-GRAMMAR-1: page structure and text are grammar components, not raw tags
       { filename: at("scripts/render.tsx"), code: raw("p") },
     ],
     invalid: [
-      { filename: FEATURE, code: raw("section"), errors: [{ messageId: "raw" }] },
       { filename: FEATURE, code: raw("p"), errors: [{ messageId: "raw" }] },
       { filename: FEATURE, code: raw("span"), errors: [{ messageId: "raw" }] },
       { filename: FEATURE, code: raw("h2"), errors: [{ messageId: "raw" }] },
       { filename: FEATURE, code: raw("ul"), errors: [{ messageId: "raw" }] },
       { filename: FEATURE, code: raw("li"), errors: [{ messageId: "raw" }] },
-      { filename: FEATURE, code: raw("nav"), errors: [{ messageId: "raw" }] },
+      { filename: FEATURE, code: raw("nav"), errors: [{ messageId: "raw", data: { tag: "nav", owner: "`NavLandmark, Subnav, Breadcrumbs or NavigationFeatureNav`" } }] },
+      { filename: FEATURE, code: raw("section"), errors: [{ messageId: "raw", data: { tag: "section", owner: "`Region or SurfaceCard`" } }] },
       { filename: FEATURE, code: raw("header"), errors: [{ messageId: "raw" }] },
       { filename: FEATURE, code: raw("footer"), errors: [{ messageId: "raw" }] },
       { filename: FEATURE, code: raw("main"), errors: [{ messageId: "raw" }] },

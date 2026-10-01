@@ -108,7 +108,7 @@ provenance:
     - path: "packages/grammar/src/core/styles.css"
       sha256: "29c858979b648b2424e796f77184b0dd6aa9ae08df1131196a20d1cca0f756b6"
     - path: "packages/grammar/src/common/registry.tsx"
-      sha256: "b640a2809a3bcc97e4a7646adb4610d0ef7b1ed6796caf98ec8761d75a407f78"
+      sha256: "fad9ade65a1c07ed78d60ae5d84dec9ec4fba713788de69b63312b4d4db40d20"
 identity:
   package: "@starci/grammar"
   version: "0.8.1"
@@ -125,9 +125,9 @@ identity:
     overlays and navigation render in Common anatomy painted through the semantic variables Core binds
     (`--accent`, `--surface`, `--field-*`, `--radius`, `--shadow-surface`, …).
   counts:
-    renderers: 96
+    renderers: 100
     tokens: 108
-    claimEntries: 408
+    claimEntries: 418
     gaps: 13
 
 dna:
@@ -1659,6 +1659,18 @@ renderers:
       - "starci-core-link"
       - "starci-core-link-external-icon"
       - "starci-core-nav-visually-hidden"
+  - component: "List"
+    propsType: "ListProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/List/index.tsx"
+    closedValues:
+      - prop: "as"
+        values: ["ul", "ol"]
+    claims: ["GAP-0", "MARGIN-0", "PADDING-0"]
+    computedClaims: []
+    classes:
+      - "starci-core-semantic-list"
   - component: "ListBox"
     propsType: "ListBoxProps"
     kind: "branch"
@@ -1680,6 +1692,16 @@ renderers:
       - "starci-core-list-box-leading"
       - "starci-core-list-box-row"
       - "starci-core-list-box-trailing"
+  - component: "ListItem"
+    propsType: "ListItemProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/ListItem/index.tsx"
+    closedValues: []
+    claims: ["MARGIN-0", "PADDING-0"]
+    computedClaims: []
+    classes:
+      - "starci-core-semantic-list-item"
   - component: "MarkdownArticle"
     propsType: "MarkdownArticleProps"
     kind: "branch"
@@ -1747,6 +1769,18 @@ renderers:
       - "starci-core-meter-segment"
       - "starci-core-meter-segments"
       - "starci-core-meter-track"
+  - component: "NavLandmark"
+    propsType: "NavLandmarkProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/NavLandmark/index.tsx"
+    closedValues:
+      - prop: "layout"
+        values: ["bar", "scrolling"]
+    claims: []
+    computedClaims: ["GAP-1", "GAP-4"]
+    classes:
+      - "starci-core-nav-landmark"
   - component: "NavigationFeatureNav"
     propsType: "NavigationFeatureNavProps"
     kind: "composition"
@@ -1987,6 +2021,18 @@ renderers:
       - "starci-core-rating-glyph"
       - "starci-core-rating-input"
       - "starci-core-rating-item"
+  - component: "Region"
+    propsType: "RegionProps"
+    kind: "primitive"
+    group: "base"
+    source: "packages/grammar/src/core/primitive/Region/index.tsx"
+    closedValues:
+      - prop: "spacing"
+        values: ["spaced", "flush"]
+    claims: []
+    computedClaims: ["MARGIN-0", "PADDING-0", "PADDING-6"]
+    classes:
+      - "starci-core-region"
   - component: "SearchField"
     propsType: "SearchFieldProps"
     kind: "primitive"
