@@ -27,7 +27,7 @@ const typedSha256 = (line, hex) => hex.length === 64 && (line.includes(`sha256:$
 const guardHits = (text) => text.split(/\r?\n/).flatMap((line) => [...line.matchAll(HEX_BLOB)].map((m) => m[0]).filter((hex) => !typedSha256(line, hex)));
 
 const DRAW = `import { Text } from "@starci/grammar/core"
-export const SignInBase = () => <Text>Đăng nhập</Text>
+export const SignInBase = () => <Text>\u0110\u0103ng nh\u1eadp</Text>
 `;
 
 test('a finished draw loop installs JSON that cites no scratch path and passes the product secrets guard', async (t) => {
@@ -39,7 +39,7 @@ test('a finished draw loop installs JSON that cites no scratch path and passes t
   const dir = path.join(repo, '.starciwork', 'features', 'login', 'ui', 'authentication', 'assets', 'directions');
   const source = write(dir, 'SignInBase.draw.tsx', DRAW);
   const fixture = write(dir, 'SignInBase.fixture.json', JSON.stringify({ state: 'sign-in-ready', props: { title: 'Nivo' } }));
-  const DOM = '<!doctype html><html><body><div id="root"><section data-draw-layout=""><span data-component="Badge" data-grammar-component="Badge" data-tone="success">Sẵn sàng</span></section></div></body></html>';
+  const DOM = '<!doctype html><html><body><div id="root"><section data-draw-layout=""><span data-component="Badge" data-grammar-component="Badge" data-tone="success">S\u1eb5n s\u00e0ng</span></section></div></body></html>';
   const why = withRationale(DOM);
   const whyFile = write(dir, 'SignInBase.rationale.json', JSON.stringify(why.entries));
   const grammar = { ok: true, pick: { source: 'product', version: '0.5.0', root: path.join(repo, 'node_modules') }, grammarSource: 'product@0.5.0', attempts: [{ source: 'product', ok: true, errors: [] }] };

@@ -6,6 +6,7 @@ import { TimeAgo } from '../time-ago';
 import type { Concept } from '../concept';
 import { AgentAvatar } from '../agent/agent-avatar';
 import { attemptAgent, useAttemptAgents } from '../agent/use-running-agents';
+import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C7';
 
@@ -53,6 +54,6 @@ export function LiveFeed({ limit = 30 }: { limit?: number }) {
   }, [logs.data]);
   return <div className="max-h-[32rem] overflow-y-auto">
     {rows.map(row => <FeedRow key={row.key} row={row} fresh={fresh.has(row.key)} />)}
-    {!rows.length && <p className="px-4 py-3 text-sm text-muted-foreground">{logs.error ?? (logs.loading ? 'Đang đọc…' : 'Chưa có sự kiện.')}</p>}
+    {!rows.length && <p className="px-4 py-3 text-sm text-muted-foreground">{logs.error ?? (logs.loading ? t('Loading…') : t('No events yet.'))}</p>}
   </div>;
 }

@@ -7,8 +7,8 @@ import { catalogFindings } from '../../scripts/checks/check-i18n-catalog.mjs';
 import { fill, loadCatalog, placeholdersOf, resetCatalogCache, translate, translator } from '../../scripts/lib/i18n.mjs';
 
 // Vietnamese in this file is written as \u escapes so the spec stays ASCII.
-const OPEN = 'Mở';
-const NEEDS = 'Quyết định {id} cần bạn';
+const OPEN = 'M\u1edf';
+const NEEDS = 'Quy\u1ebft \u0111\u1ecbnh {id} c\u1ea7n b\u1ea1n';
 
 const root = (t, files) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-i18n-'));

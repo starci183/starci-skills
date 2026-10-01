@@ -5,6 +5,7 @@ import { toneVar, type Tone } from '../status';
 import { groupBy, num, triesPerUnit } from './analytics-data';
 import { ChartCard } from './chart-card';
 import { useWidth } from './use-width';
+import { t } from '../../i18n/t';
 
 const ROW = 30;
 /** The ledger sometimes stores the class as a JSON object; show its `class` field. */
@@ -29,18 +30,18 @@ function Bars({ bars, width, aria }: { bars: Bar[]; width: number; aria: string 
 export function Retries({ rows }: { rows: AttemptRow[] }) {
   const [ref, width] = useWidth();
   const dist = [...triesPerUnit(rows).entries()].sort((a, b) => a[0] - b[0]);
-  const tryBars: Bar[] = dist.map(([tries, n]) => ({ key: `t${tries}`, label: tries === 1 ? 'Xong ở lần 1' : `Cần ${tries} lần`, n, tone: tries === 1 ? 'success' : tries === 2 ? 'warning' : 'failed',
-    title: `${n} đơn vị cần ${tries} lần thử` }));
+  const tryBars: Bar[] = dist.map(([tries, n]) => ({ key: `t${tries}`, label: tries === 1 ? t('Done on try 1') : t('Needed {n} tries', { n: tries }), n, tone: tries === 1 ? 'success' : tries === 2 ? 'warning' : 'failed',
+    title: t('{n} units needed {tries} tries', { n, tries }) }));
   const classes = [...groupBy(rows.filter(r => r.failureClass), r => failureName(r.failureClass as string)).entries()].map(([k, list]) => ({ k, n: list.length })).sort((a, b) => b.n - a.n).slice(0, 6);
-  const failBars: Bar[] = classes.map(c => ({ key: c.k, label: c.k, n: c.n, tone: 'failed', title: `${c.k}: ${c.n} lần thử` }));
-  return <ChartCard title="Thử lại" hint="Số lần thử mỗi đơn vị cần, và các lớp lỗi hay gặp nhất."
-    legend={[{ tone: 'success', label: 'Lần 1' }, { tone: 'warning', label: 'Lần 2' }, { tone: 'failed', label: 'Lần 3 trở lên / lớp lỗi' }]}
-    empty={!tryBars.length && !failBars.length && 'Chưa có đơn vị nào được thử trong khoảng này.'}>
+  const failBars: Bar[] = classes.map(c => ({ key: c.k, label: c.k, n: c.n, tone: 'failed', title: t('{kind}: {n} attempts', { kind: c.k, n: c.n }) }));
+  return <ChartCard title={t('Retries')} hint={t('How many tries each unit needed, and the most common failure classes.')}
+    legend={[{ tone: 'success', label: t('Try 1') }, { tone: 'warning', label: t('Try 2') }, { tone: 'failed', label: t('Try 3 and up / failure classes') }]}
+    empty={!tryBars.length && !failBars.length && t('No unit was tried in this range yet.')}>
     <div ref={ref}>
-      <h3 className="mb-2 text-sm font-medium">Số lần thử mỗi đơn vị</h3>
-      {tryBars.length ? <Bars bars={tryBars} width={width} aria="Phân bố số lần thử mỗi đơn vị" /> : <p className="text-xs text-muted-foreground">Chưa có đơn vị nào.</p>}
-      <h3 className="mb-2 mt-4 text-sm font-medium">Lớp lỗi hay gặp</h3>
-      {failBars.length ? <Bars bars={failBars} width={width} aria="Các lớp lỗi hay gặp" /> : <p className="text-xs text-muted-foreground">Không có lớp lỗi nào được ghi nhận.</p>}
+      <h3 className="mb-2 text-sm font-medium">{t('Tries per unit')}</h3>
+      {tryBars.length ? <Bars bars={tryBars} width={width} aria={t('Distribution of tries per unit')} /> : <p className="text-xs text-muted-foreground">{t('No units yet.')}</p>}
+      <h3 className="mb-2 mt-4 text-sm font-medium">{t('Common failure classes')}</h3>
+      {failBars.length ? <Bars bars={failBars} width={width} aria={t('The common failure classes')} /> : <p className="text-xs text-muted-foreground">{t('No failure class recorded.')}</p>}
     </div>
   </ChartCard>;
 }

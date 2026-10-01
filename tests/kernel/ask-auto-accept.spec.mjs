@@ -29,8 +29,8 @@ const WORKFLOW='wf-auto-accept';
 const ON={autoAcceptRecommended:true,excludes:['credential','irreversible-confirmation','handover'],source:'asks'};
 const TOKEN='123456789:AAFakeTokenForSpecsOnly_abcdefghijklmnop';
 
-const RECOMMENDED={text:'Mời thành viên bằng cách nào?',options:['Mời bằng email','Mời bằng link'],recommended:0,recommendedReason:'email đã có sẵn luồng xác thực'};
-const TEXT_MARKED={text:'Hoàn tiền khi huỷ gói?',options:['Tự động hoàn tiền đầy đủ (khuyến nghị): khách không phải chờ','Hoàn tiền thủ công']};
+const RECOMMENDED={text:'M\u1eddi th\u00e0nh vi\u00ean b\u1eb1ng c\u00e1ch n\u00e0o?',options:['M\u1eddi b\u1eb1ng email','M\u1eddi b\u1eb1ng link'],recommended:0,recommendedReason:'email \u0111\u00e3 c\u00f3 s\u1eb5n lu\u1ed3ng x\u00e1c th\u1ef1c'};
+const TEXT_MARKED={text:'Ho\u00e0n ti\u1ec1n khi hu\u1ef7 g\u00f3i?',options:['T\u1ef1 \u0111\u1ed9ng ho\u00e0n ti\u1ec1n \u0111\u1ea7y \u0111\u1ee7 (khuy\u1ebfn ngh\u1ecb): kh\u00e1ch kh\u00f4ng ph\u1ea3i ch\u1edd','Ho\u00e0n ti\u1ec1n th\u1ee7 c\u00f4ng']};
 
 const seedAsk=(ledger,{dispatchId,question,opId='provision.ask',workflowId=WORKFLOW})=>{
   const jobId=`ask-${dispatchId}`;
@@ -74,16 +74,16 @@ test('the report envelope accepts question.recommended as an option index with i
 /* ------------------------------------------------------------ recommendation */
 
 test('a recommendation is question.recommended, else exactly one option marked in its text; zero or several mean none',()=>{
-  assert.deepEqual(recommendationOf(RECOMMENDED),{index:0,label:'Mời bằng email',reason:'email đã có sẵn luồng xác thực',source:'structured'});
+  assert.deepEqual(recommendationOf(RECOMMENDED),{index:0,label:'M\u1eddi b\u1eb1ng email',reason:'email \u0111\u00e3 c\u00f3 s\u1eb5n lu\u1ed3ng x\u00e1c th\u1ef1c',source:'structured'});
   assert.deepEqual(recommendationOf(TEXT_MARKED),{index:0,label:TEXT_MARKED.options[0],reason:null,source:'text'});
-  assert.equal(textRecommendation(['1. (Khuyến nghị) Tạm thời mời bằng email','2. Mời bằng link']),0);
+  assert.equal(textRecommendation(['1. (Khuy\u1ebfn ngh\u1ecb) T\u1ea1m th\u1eddi m\u1eddi b\u1eb1ng email','2. M\u1eddi b\u1eb1ng link']),0);
   assert.equal(textRecommendation(['a','b (Recommended)']),1);
-  assert.equal(textRecommendation(['a (ĐỀ XUẤT)','b']),0,'case-insensitive, Vietnamese capitals included');
-  assert.equal(textRecommendation(['a (khuyến nghị)'.normalize('NFD'),'b']),0,'decomposed text is the same mark');
+  assert.equal(textRecommendation(['a (\u0110\u1ec0 XU\u1ea4T)','b']),0,'case-insensitive, Vietnamese capitals included');
+  assert.equal(textRecommendation(['a (khuy\u1ebfn ngh\u1ecb)'.normalize('NFD'),'b']),0,'decomposed text is the same mark');
   assert.equal(textRecommendation([{label:'x (recommended)'},{label:'y'}]),0,'option objects are read by label');
   assert.equal(textRecommendation(['a','b']),null,'none marked');
-  assert.equal(textRecommendation(['a (khuyến nghị)','b (đề xuất)']),null,'several marked is no recommendation');
-  assert.equal(textRecommendation(['a khuyến nghị','b']),null,'only the parenthesised mark counts');
+  assert.equal(textRecommendation(['a (khuy\u1ebfn ngh\u1ecb)','b (\u0111\u1ec1 xu\u1ea5t)']),null,'several marked is no recommendation');
+  assert.equal(textRecommendation(['a khuy\u1ebfn ngh\u1ecb','b']),null,'only the parenthesised mark counts');
   assert.equal(recommendationOf({text:'q',options:['a (recommended)','b'],recommended:1}).index,1,'the structured field wins');
   assert.equal(recommendationOf({text:'q'}),null);
 });
@@ -152,16 +152,16 @@ test('an auto-accepted ask writes the serve-ask receipt, ask-answered by auto-re
     assert.equal(answered.dispatchId,'ctx_invite');
     assert.equal(answered.answeredBy,'auto-recommended');
     assert.equal(answered.optionIndex,0);
-    assert.equal(answered.option,'Mời bằng email');
+    assert.equal(answered.option,'M\u1eddi b\u1eb1ng email');
     assert.match(answered.note,/asks\.autoAcceptRecommended/);
-    assert.match(answered.note,/email đã có sẵn luồng xác thực/,'the note cites the recommendedReason');
+    assert.match(answered.note,/email \u0111\u00e3 c\u00f3 s\u1eb5n lu\u1ed3ng x\u00e1c th\u1ef1c/,'the note cites the recommendedReason');
 
     const receipt=JSON.parse(fs.readFileSync(answered.receiptPath,'utf8'));
     assert.ok(isBlobFile(answered.receiptPath),'the receipt lives in the artifact blob store');
     for(const key of ['schema','workflowId','dispatchId','opId','option','optionIndex','picks','answeredBy','custodyWritten','envWritten','pointersWritten','bridge','errors','note','at'])
       assert.ok(Object.hasOwn(receipt,key),`the receipt keeps serve-ask's shape: ${key}`);
     assert.equal(receipt.schema,'starci/ask-answer@1');
-    assert.equal(receipt.option,'Mời bằng email');
+    assert.equal(receipt.option,'M\u1eddi b\u1eb1ng email');
     assert.equal(receipt.optionIndex,0);
     assert.equal(receipt.answeredBy,'auto-recommended');
 
@@ -172,7 +172,7 @@ test('an auto-accepted ask writes the serve-ask receipt, ask-answered by auto-re
     assert.deepEqual(audit.config,{autoAcceptRecommended:true,excludes:['credential','irreversible-confirmation','handover'],source:'asks'});
 
     assert.deepEqual(spy.woken.map(w=>[w.workflowId,w.dispatchId,w.answeredBy,w.receiptPath]),[[WORKFLOW,'ctx_invite','auto-recommended',answered.receiptPath]],'the kernel is woken as a submission wakes it');
-    assert.deepEqual(spy.notified.map(n=>[n.dispatchId,n.label]),[['ctx_invite','Mời bằng email']],'one Telegram message');
+    assert.deepEqual(spy.notified.map(n=>[n.dispatchId,n.label]),[['ctx_invite','M\u1eddi b\u1eb1ng email']],'one Telegram message');
     assert.deepEqual(await openAsks(ledger.db),[],'the answered ask is no longer open');
 
     const again=await autoAcceptAsk({ledger,ledgerFile,repo:repoRoot,workflowId:WORKFLOW,report,policy:ON,wake:spy.wake,notify:spy.notify});
@@ -199,11 +199,11 @@ test('excluded (credential, handover, irreversible) and unrecommended asks are n
   await withLedger(t,async({repoRoot,ledger,ledgerFile})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
     const cases=[
-      ['ctx_secret',{text:'Dán GITHUB_OAUTH_CLIENT_SECRET vào form',options:['Dán ngay (khuyến nghị)','Để sau']},'provision.ask','excluded:credential'],
+      ['ctx_secret',{text:'D\u00e1n GITHUB_OAUTH_CLIENT_SECRET v\u00e0o form',options:['D\u00e1n ngay (khuy\u1ebfn ngh\u1ecb)','\u0110\u1ec3 sau']},'provision.ask','excluded:credential'],
       ['ctx_account',{...RECOMMENDED,kind:'account'},'provision.ask','excluded:credential'],
-      ['ctx_handover',{text:'Duyệt bàn giao?',options:['Duyệt','Góp ý','Hỏi thêm'],recommended:0,recommendedReason:'mọi kiểm tra đều xanh'},'handover.review','excluded:handover'],
+      ['ctx_handover',{text:'Duy\u1ec7t b\u00e0n giao?',options:['Duy\u1ec7t','G\u00f3p \u00fd','H\u1ecfi th\u00eam'],recommended:0,recommendedReason:'m\u1ecdi ki\u1ec3m tra \u0111\u1ec1u xanh'},'handover.review','excluded:handover'],
       ['ctx_drop',{...RECOMMENDED,kind:'irreversible-confirmation'},'provision.ask','excluded:irreversible-confirmation'],
-      ['ctx_plain',{text:'Chọn màu?',options:['Xanh','Đỏ']},'provision.ask','no-recommendation'],
+      ['ctx_plain',{text:'Ch\u1ecdn m\u00e0u?',options:['Xanh','\u0110\u1ecf']},'provision.ask','no-recommendation'],
     ];
     for(const [dispatchId,question,opId,why] of cases){
       const report=seedAsk(ledger,{dispatchId,question,opId});
@@ -241,9 +241,9 @@ const serve=(repoRoot,dispatchId)=>spawnSync(process.execPath,[SERVE_ASK,'--repo
 test('serve-ask serves the form for a handover, a credential and an unrecommended ask',async t=>{
   await withLedger(t,async({repoRoot,ledger})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
-    seedAsk(ledger,{dispatchId:'ctx_handover',opId:'handover.review',question:{text:'Duyệt bàn giao?',options:['Duyệt (khuyến nghị)','Góp ý','Hỏi thêm'],recommended:0,recommendedReason:'xanh'}});
-    seedAsk(ledger,{dispatchId:'ctx_secret',question:{text:'Dán STRIPE_SECRET_KEY',options:['Dán (khuyến nghị)','Để sau'],recommended:0}});
-    seedAsk(ledger,{dispatchId:'ctx_plain',question:{text:'Chọn màu?',options:['Xanh','Đỏ']}});
+    seedAsk(ledger,{dispatchId:'ctx_handover',opId:'handover.review',question:{text:'Duy\u1ec7t b\u00e0n giao?',options:['Duy\u1ec7t (khuy\u1ebfn ngh\u1ecb)','G\u00f3p \u00fd','H\u1ecfi th\u00eam'],recommended:0,recommendedReason:'xanh'}});
+    seedAsk(ledger,{dispatchId:'ctx_secret',question:{text:'D\u00e1n STRIPE_SECRET_KEY',options:['D\u00e1n (khuy\u1ebfn ngh\u1ecb)','\u0110\u1ec3 sau'],recommended:0}});
+    seedAsk(ledger,{dispatchId:'ctx_plain',question:{text:'Ch\u1ecdn m\u00e0u?',options:['Xanh','\u0110\u1ecf']}});
     for(const dispatchId of ['ctx_handover','ctx_secret','ctx_plain']){
       const r=serve(repoRoot,dispatchId);
       assert.equal(r.status,0,r.stderr||r.stdout);
@@ -260,7 +260,7 @@ test('serve-ask serves the form for a handover, a credential and an unrecommende
 test('api serve-ask launches the form for a handover ask even when it carries a recommendation',async t=>{
   await withLedger(t,async({repoRoot,ledger})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
-    seedAsk(ledger,{dispatchId:'ctx_handover',opId:'handover.review',question:{text:'Duyệt bàn giao?',options:['Duyệt','Góp ý','Hỏi thêm'],recommended:0,recommendedReason:'xanh'}});
+    seedAsk(ledger,{dispatchId:'ctx_handover',opId:'handover.review',question:{text:'Duy\u1ec7t b\u00e0n giao?',options:['Duy\u1ec7t','G\u00f3p \u00fd','H\u1ecfi th\u00eam'],recommended:0,recommendedReason:'xanh'}});
     const r=spawnSync(process.execPath,[API,'serve-ask','--repo',repoRoot,'--workflow',WORKFLOW,'--dispatch','ctx_handover','--ttl','300','--json'],
       {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:60000,env:{...process.env,STARCI_CONNECTORS_OFF:'1'}});
     assert.equal(r.status,0,r.stderr||r.stdout);
@@ -280,20 +280,20 @@ test('the owner gets one plain Telegram message naming the pick and the question
   await withLedger(t,async({ledger,ledgerFile,machineHome})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running',job:'app-invite'}});
     seedAsk(ledger,{dispatchId:'ctx_invite',question:RECOMMENDED});
-    const text=autoAcceptedMessage({workflow:{id:WORKFLOW,title:null},question:RECOMMENDED,label:'Mời bằng email',language:'vi'});
-    assert.ok(text.startsWith('Đã tự chọn phương án đề xuất: Mời bằng email — câu hỏi: Mời thành viên bằng cách nào?. Thầy muốn đổi thì trả lời lại kernel / supervisor.'),text);
+    const text=autoAcceptedMessage({workflow:{id:WORKFLOW,title:null},question:RECOMMENDED,label:'M\u1eddi b\u1eb1ng email',language:'vi'});
+    assert.ok(text.startsWith('\u0110\u00e3 t\u1ef1 ch\u1ecdn ph\u01b0\u01a1ng \u00e1n \u0111\u1ec1 xu\u1ea5t: M\u1eddi b\u1eb1ng email — c\u00e2u h\u1ecfi: M\u1eddi th\u00e0nh vi\u00ean b\u1eb1ng c\u00e1ch n\u00e0o?. Th\u1ea7y mu\u1ed1n \u0111\u1ed5i th\u00ec tr\u1ea3 l\u1eddi l\u1ea1i kernel / supervisor.'),text);
     assert.doesNotMatch(text,/https?:\/\//);
     const calls=[];
     const fetchImpl=async(url,init)=>{calls.push({method:url.split('/').pop(),body:JSON.parse(init.body)});return {ok:true,status:200,json:async()=>({ok:true,result:{message_id:7}})};};
     const config={...structuredClone(EXAMPLE),language:'vi',connectors:{...structuredClone(EXAMPLE.connectors),secretsFile:null,telegram:{enabled:true,chatId:'4242'}}};
     const deps={config,env:{LOCALAPPDATA:machineHome,TELEGRAM_BOT_TOKEN:TOKEN},apiBase:'http://bot.invalid',fetchImpl,sleepImpl:async()=>{},warn:()=>{}};
-    const first=await notifyAutoAccepted({ledgerFile,workflowId:WORKFLOW,dispatchId:'ctx_invite',label:'Mời bằng email'},deps);
-    const second=await notifyAutoAccepted({ledgerFile,workflowId:WORKFLOW,dispatchId:'ctx_invite',label:'Mời bằng email'},deps);
+    const first=await notifyAutoAccepted({ledgerFile,workflowId:WORKFLOW,dispatchId:'ctx_invite',label:'M\u1eddi b\u1eb1ng email'},deps);
+    const second=await notifyAutoAccepted({ledgerFile,workflowId:WORKFLOW,dispatchId:'ctx_invite',label:'M\u1eddi b\u1eb1ng email'},deps);
     assert.equal(first.sent,1);
     assert.equal(second.skipped,'already sent','one message per ask');
     assert.equal(calls.length,1);
     assert.equal(calls[0].method,'sendMessage');
-    assert.match(calls[0].body.text,/^Đã tự chọn phương án đề xuất: Mời bằng email — câu hỏi: /);
+    assert.match(calls[0].body.text,/^\u0110\u00e3 t\u1ef1 ch\u1ecdn ph\u01b0\u01a1ng \u00e1n \u0111\u1ec1 xu\u1ea5t: M\u1eddi b\u1eb1ng email — c\u00e2u h\u1ecfi: /);
     assert.match(calls[0].body.text,/app-invite/);
     assert.equal((await notifyAutoAccepted({ledgerFile,workflowId:WORKFLOW,dispatchId:'ctx_x',label:'x'},{...deps,env:{...deps.env,STARCI_CONNECTORS_OFF:'1'}})).skipped,'STARCI_CONNECTORS_OFF');
   });

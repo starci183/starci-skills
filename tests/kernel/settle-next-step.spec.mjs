@@ -87,11 +87,11 @@ test('a failed report queues its route: the same op again, pinned to the failed 
   assert.equal(w.row('j1').result.nextStep.jobs[0],retry.job_id,'the step is recorded on the failed job');
   const s=w.status();
   assert.deepEqual(s.nextActions[0],{kind:'dispatch',op:'docs.author',jobId:retry.job_id,reason:`ready: api route --job ${retry.job_id}, then api dispatch`,
-    label:'Viết tài liệu',displayName:'Viết tài liệu · docs · next step'});
+    label:'Vi\u1ebft t\u00e0i li\u1ec7u',displayName:'Vi\u1ebft t\u00e0i li\u1ec7u · docs · next step'});
   // The leg also carries why of the failed attempt it retries (scripts/kernel/why.mjs), headline first.
   assert.equal(Object.keys(s.legs[0].why)[0],'headline');
   assert.equal(s.legs[0].why.state,'failed');
-  assert.deepEqual(s.legs.map(({why,attempts,...leg})=>leg),[{op:'docs.author',color:'yellow',jobId:retry.job_id,status:'queued',label:'Viết tài liệu'}],'the queued retry is actionable');
+  assert.deepEqual(s.legs.map(({why,attempts,...leg})=>leg),[{op:'docs.author',color:'yellow',jobId:retry.job_id,status:'queued',label:'Vi\u1ebft t\u00e0i li\u1ec7u'}],'the queued retry is actionable');
 });
 
 test('past the route limit an owner gate holds that job alone; resolving it names the retry',t=>{

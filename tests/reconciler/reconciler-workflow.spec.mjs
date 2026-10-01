@@ -109,7 +109,7 @@ test('a stall past progress.supervisorGraceMs escalates the same progress-stall 
 }));
 
 test('a running workflow with a null goal text gets a critical GOAL_TEXT_MISSING clock, which the SLA pass reports with one DI', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
-  seed(ledger, { goal: { markdown: 'Goal gốc: null' }, progressAgoMin: 5 });
+  seed(ledger, { goal: { markdown: 'Goal g\u1ed1c: null' }, progressAgoMin: 5 });
   const { ctx } = fakeCtx({ repoRoot, ledgerFile });
   await reconcileWorkflow(keyOf(LEDGER, WF), ctx);
   const clock = clocksOf(ctx, { prefixes: [`workflow:${LEDGER}:${WF}`] }).find((c) => c.state === 'GOAL_TEXT_MISSING');

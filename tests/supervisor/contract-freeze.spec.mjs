@@ -14,8 +14,8 @@ import {
 import {gateFamiliesTouched} from '../../scripts/supervisor/land.mjs';
 import {compareSides,gateSide} from '../../scripts/supervisor/gate-stability.mjs';
 
-// Owner, 2026-09-28: "Đóng băng luật vẽ: ngừng đổi cổng vẽ trong lúc workflow đang chạy; thay đổi gom lại, áp một lần
-// và chỉ nợ vẽ lại một lần." Eight reach follow-up changes hit interface.draw on 2026-09-27 and each made running and
+// Owner, 2026-09-28: "Freeze the draw rules: stop changing the draw gate while a workflow is running; batch the
+// changes, apply them once and owe only one redraw." Eight reach follow-up changes hit interface.draw on 2026-09-27 and each made running and
 // settled draw legs owe another redo. A frozen family's changes reach a running workflow only at a release; until then
 // new legs are admitted with them withheld and they owe nothing; after it a leg owes ONE redo for the whole set.
 const ROOT=path.resolve(import.meta.dirname,'..', '..');

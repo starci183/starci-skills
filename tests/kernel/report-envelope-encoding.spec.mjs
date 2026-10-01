@@ -15,7 +15,7 @@ test('a report whose text lost its non-ASCII characters is refused with a UTF-8 
 });
 
 test('real Vietnamese, English questions and query strings are not lossy', () => {
-  const vi = { outcome: 'ask', summary: 'Đã rà soát 22 bản ghi quy tắc', question: { text: 'Chọn tuyến công khai cho các thao tác Sales. Phương án nào được chấp nhận?', options: ['1. Đăng ký thao tác Sales có phiên bản'] } };
+  const vi = { outcome: 'ask', summary: '\u0110\u00e3 r\u00e0 so\u00e1t 22 b\u1ea3n ghi quy t\u1eafc', question: { text: 'Ch\u1ecdn tuy\u1ebfn c\u00f4ng khai cho c\u00e1c thao t\u00e1c Sales. Ph\u01b0\u01a1ng \u00e1n n\u00e0o \u0111\u01b0\u1ee3c ch\u1ea5p nh\u1eadn?', options: ['1. \u0110\u0103ng k\u00fd thao t\u00e1c Sales c\u00f3 phi\u00ean b\u1ea3n'] } };
   assert.equal(validateOpReport(vi).ok, true);
   const en = { outcome: 'blocked', summary: 'Which route? The probe hit /api?x=1 and returned 404.', blocker: { kind: 'environment', detail: 'GET /health?probe=live failed; is the stack up?' } };
   assert.deepEqual(lossyTextFields(en), []);

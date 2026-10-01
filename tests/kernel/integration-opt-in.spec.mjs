@@ -14,9 +14,9 @@ test('integration.verify declares itself explicit-ask-only; other ops do not', (
 });
 
 test('explicit asks read the archetypes phrase data, English and Vietnamese, negation cancels', () => {
-  for (const yes of ['run the integration tests', 'kiểm thử tích hợp cho thanh toán', 'verify SMTP live', 'do a live verification of OAuth'])
+  for (const yes of ['run the integration tests', 'ki\u1ec3m th\u1eed t\u00edch h\u1ee3p cho thanh to\u00e1n', 'verify SMTP live', 'do a live verification of OAuth'])
     assert.equal(explicitAsk('integration', yes, { skillRoot }), true, yes);
-  for (const no of ['integrate Google OAuth into the backend', 'build the sign-in feature', 'skip integration tests', 'không kiểm thử tích hợp'])
+  for (const no of ['integrate Google OAuth into the backend', 'build the sign-in feature', 'skip integration tests', 'kh\u00f4ng ki\u1ec3m th\u1eed t\u00edch h\u1ee3p'])
     assert.equal(explicitAsk('integration', no, { skillRoot }), false, no);
   assert.deepEqual(explicitAsksOf({ skillRoot, text: 'run the integration tests' }), ['integration']);
   assert.deepEqual(explicitAsksOf({ skillRoot, text: 'build it' }), []);

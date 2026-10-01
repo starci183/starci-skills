@@ -9,6 +9,9 @@ import fleet, { KEYS, reconcileFleet, waitCycles, planDeps, planOwed, planLand, 
 import { clusterOwed } from '../../scripts/supervisor/cluster.mjs';
 import { digest, urgent, planUrgent, digestDue, composeDigest, URGENT_KEY_MS } from '../../scripts/reconciler/notifier.mjs';
 import { digestText } from '../../scripts/supervisor/actions.mjs';
+import { translator } from '../../scripts/lib/i18n.mjs';
+
+const trv = translator('vi');
 
 // Lane rc-fleet-ui (LANES.md "Lane G", DESIGN.md §8.6, §10.2, §17.2): a wait cycle is ONE deadlock DI, an owed cluster
 // ONE Supervisor DI (the same key on every pass), and the Notifier sends one digest per window and one urgent message
@@ -132,8 +135,8 @@ function home(t) {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
   return { ...process.env, LOCALAPPDATA: dir, STARCI_CONNECTORS_OFF: '1' };
 }
-const inputs = { progress: [{ workflowId: 'wf-todo-app-fe-canon', name: 'Todo App · Chuẩn hoá code FE', progress: { unitsDone: 14, unitsTotal: 36, unitsPerHour: 4, minUnitsPerHour: 3, eta: '2026-09-28T18:00:00Z', stall: { stalled: false } }, why: null }],
-  ownerWaits: [], violations: [{ code: 'SETTLE_OVERDUE' }, { code: 'SETTLE_OVERDUE' }], gc: 'Dọn rác: 0 agent, 0 terminal, 3 worktree, 0.4 GB', actions: [], owed: null };
+const inputs = { progress: [{ workflowId: 'wf-todo-app-fe-canon', name: 'Todo App · Chu\u1ea9n ho\u00e1 code FE', progress: { unitsDone: 14, unitsTotal: 36, unitsPerHour: 4, minUnitsPerHour: 3, eta: '2026-09-28T18:00:00Z', stall: { stalled: false } }, why: null }],
+  ownerWaits: [], violations: [{ code: 'SETTLE_OVERDUE' }, { code: 'SETTLE_OVERDUE' }], gc: 'D\u1ecdn r\u00e1c: 0 agent, 0 terminal, 3 worktree, 0.4 GB', actions: [], owed: null };
 
 test('the notifier sends one digest per window (fake push), then refuses until the window passes', async (t) => {
   const env = home(t);
@@ -148,9 +151,9 @@ test('the notifier sends one digest per window (fake push), then refuses until t
   assert.match(b.skipped, /last digest 30m ago/);
   assert.equal(c.sent, true);
   assert.equal(sent.length, 2);
-  assert.match(sent[0], /14\/36 đơn vị, 4\/h/);
+  assert.ok(sent[0].includes(`14/36 ${trv('units')}, 4/h`));
   assert.match(sent[0], /SETTLE_OVERDUE x2/);
-  assert.match(sent[0], /Dọn rác/);
+  assert.ok(sent[0].includes(inputs.gc), 'the gc line is carried verbatim');
 });
 
 test('the notifier sends one urgent message per key per 6 h, and only for the urgent classes', async (t) => {
@@ -176,8 +179,8 @@ test('pure pieces: digestDue, planUrgent, composeDigest', () => {
   assert.equal(digestDue({ lastSentAt: NOW - 10, now: NOW, everyMs: 100, force: true }), true);
   assert.deepEqual(planUrgent([{ class: 'crash-loop', key: 'k', text: '' }, { class: 'crash-loop', key: 'k', text: '' }], {}, { now: NOW }).due.length, 1);
   const text = composeDigest({ digestText, ...inputs, lands: [{ kind: 'land-passed', id: '7feb447e0', at: NOW - MIN }], judgements: [{ text: 'fe-canon on track', at: NOW }], language: 'vi', now: NOW });
-  assert.match(text, /AUTO land hôm nay: 1/);
-  assert.match(text, /Nhận định của Supervisor/);
+  assert.ok(text.includes(`${trv('AUTO lands today')}: 1`));
+  assert.ok(text.includes(trv('Supervisor judgement')));
 });
 
 /* ------------------------------------------------------------ what only the deleted tick did */
@@ -210,6 +213,7 @@ test('fleet:direct: each direct commit on main is one runtime-defect Supervisor 
 });
 
 test('the digest carries the op-health trend line', () => {
-  const text = composeDigest({ digestText, ...inputs, trend: 'Sức khỏe op 1d: đạt 44%', lands: [], judgements: [], language: 'vi', now: NOW });
-  assert.match(text, /Sức khỏe op 1d: đạt 44%/);
+  const trend = 'S\u1ee9c kh\u1ecfe op 1d: \u0111\u1ea1t 44%';
+  const text = composeDigest({ digestText, ...inputs, trend, lands: [], judgements: [], language: 'vi', now: NOW });
+  assert.ok(text.includes(trend));
 });

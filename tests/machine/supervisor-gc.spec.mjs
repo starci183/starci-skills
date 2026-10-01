@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyTerminals, onlyPrompts, isShellTitle, tabTitles, gcLine } from '../../scripts/supervisor/gc.mjs';
 import { closeAndVerify, closeSelfSafe } from '../../scripts/machine/close-verify.mjs';
+import { translator } from '../../scripts/lib/i18n.mjs';
 
 const RT = 'D:/Repositories/x/.claude';
 const REPO_PATH = 'D:/Repositories/todo-app-be';
@@ -36,7 +37,8 @@ test('prompts-only screens and plain shell titles', () => {
   for (const title of ['[Worker] fix-x', '[Kernel] Nivo · Live', '[Op] a · Nivo', '[Supervisor] main', '✳ Claude Code']) assert.equal(isShellTitle(title), false, title);
   const titles = tabTitles([{ root: { tabs: [{ title: '[Op] x · Nivo · Live', panes: { type: 'terminal', handle: 'term_z' } }] } }]);
   assert.equal(titles.get('term_z'), '[Op] x · Nivo · Live');
-  assert.match(gcLine({ agents: 2, terminals: 3, worktrees: 1, freedBytes: 2 * 1024 ** 3, ramFreedBytes: 0 }), /^Dọn rác: 2 agent, 3 terminal, 1 worktree, 2\.0 GB$/);
+  assert.equal(gcLine({ agents: 2, terminals: 3, worktrees: 1, freedBytes: 2 * 1024 ** 3, ramFreedBytes: 0 }),
+    translator('vi')('Garbage collected: {agents} agent(s), {terminals} terminal(s), {worktrees} worktree(s), {bytes}', { agents: 2, terminals: 3, worktrees: 1, bytes: '2.0 GB' }));
 });
 
 test('never the live seat, a live job, a live Kernel or a terminal the runtime did not create', () => {

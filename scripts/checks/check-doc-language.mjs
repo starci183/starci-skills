@@ -57,6 +57,13 @@ export const RUNTIME_SOURCE_ROOTS = Object.freeze(['scripts', 'engine', 'bin', '
 export const SOURCE_EXTENSIONS = Object.freeze(['.mjs', '.cjs', '.js', '.ts', '.tsx', '.sql', '.ps1', '.sh', '.html', '.css']);
 /** Source that IS declared Vietnamese: the UI catalog directory (ui/src/i18n/t.ts reads ui/src/i18n/messages/*.ts, keyed from the English source) and the Vietnamese-letter detector itself. */
 export const DECLARED_SOURCE_CATALOGS = Object.freeze(['ui/src/i18n/', 'scripts/lib/language.mjs']);
+/**
+ * Functional Vietnamese: source that MATCHES owner text (a phrase or mark the owner types) and so cannot be translated. One
+ * entry per file with the reason; the file is exempt from HFS_SOURCE_NOT_ENGLISH, nothing else is.
+ */
+export const FUNCTIONAL_VIETNAMESE = Object.freeze({
+  'scripts/machine/ask-recommendation.mjs': 'matches the recommendation mark the owner types in a question option (khuyen nghi, de xuat)',
+});
 /** A bundle's own runtime/ copy directory (a byte copy of a runtime source, kept by sync-runtime). */
 const BUNDLE_RUNTIME = /^packages\/(?:[^/]+|eslint\/[^/]+)\/runtime(?:\/|$)/;
 export const SOURCE_PENDING_FILE = 'scripts/checks/source-language.pending';
@@ -93,7 +100,7 @@ export function sourceLanguageFindings(root = skillRoot) {
   const pending = readSourcePending(root);
   const dirty = new Map();
   for (const rel of runtimeSourceFiles(root)) {
-    if (DECLARED_SOURCE_CATALOGS.some((prefix) => rel.startsWith(prefix))) continue;
+    if (DECLARED_SOURCE_CATALOGS.some((prefix) => rel.startsWith(prefix)) || Object.hasOwn(FUNCTIONAL_VIETNAMESE, rel)) continue;
     const hits = secondLanguageHits(fs.readFileSync(path.join(root, ...rel.split('/')), 'utf8'));
     if (hits.length) dirty.set(rel, hits);
   }

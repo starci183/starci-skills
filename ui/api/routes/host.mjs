@@ -1,6 +1,9 @@
 import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { sendJson } from '../envelope.mjs';
+import { translator } from '../../../scripts/lib/i18n.mjs';
+
+const tr = translator('vi');
 
 // Read-only host telemetry. Every external command is a fixed argv (never built from request input) and cached.
 const run = (file, args, timeout) => new Promise(resolve => {
@@ -83,7 +86,7 @@ export async function handleHost(request, response, store, url) {
   const gpuTemp = gpuInfo()[0]?.tempC ?? null;
   const view = {
     at: Date.now(), name: os.hostname() || null, os: `${os.type()} ${os.release()}`, uptimeSec: Math.round(os.uptime()),
-    cpu: { model: (cpus[0]?.model ?? 'không rõ').replace(/\s+/g, ' ').trim(), cores: cores?.cores ?? cpus.length, threads: cores?.threads ?? cpus.length,
+    cpu: { model: (cpus[0]?.model ?? tr('unknown')).replace(/\s+/g, ' ').trim(), cores: cores?.cores ?? cpus.length, threads: cores?.threads ?? cpus.length,
       loadPct: latest?.cpu_pct ?? loadPct(), tempC: tempInfo() },
     ram: { totalMb, freeMb, usedPct: Math.round((1 - freeMb / totalMb) * 1000) / 10 },
     gpus: gpuInfo(), disks: diskInfo(),

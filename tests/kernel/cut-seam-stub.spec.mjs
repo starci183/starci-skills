@@ -1,5 +1,5 @@
-// A cut's seam never stalls the chain (owner ruling 2026-09-28: "Seam không làm nghẽn cả chuỗi: seam trượt
-// thì tách lại hoặc cho các lát sau chạy song song với stub, không để chờ 3 tiếng"; scripts/kernel/cut-seam.mjs,
+// A cut's seam never stalls the chain (owner ruling 2026-09-28: "a seam must not stall the whole
+// chain: a slipped seam is cut again or the later slices run in parallel with a stub, never a 3-hour wait"; scripts/kernel/cut-seam.mjs,
 // modules/kernel/driver-loop.yaml enqueue.seamContractFirst). nivo wf-nivo-collab-group-chat-mujek7ue held seven
 // backend.implement ordinals for more than a day behind seam op-backend.implement-9a2c4c2f03 (attempt 11, queued
 // under a peer-wait after three failed attempts).

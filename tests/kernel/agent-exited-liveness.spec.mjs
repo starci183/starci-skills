@@ -40,7 +40,7 @@ const LIVE_DEVIN=['  ✓ Shell cd /d D:\\Repositories\\todo-app-be && npm test -
   'SWE-2 Max                             Context: 35k / 262k tokens (13%)'].join('\n');
 // A Claude Kernel at rest, plus a Bash tool row that printed a prompt.
 const IDLE_CLAUDE=['● Bash(pwsh -c "Get-Location")','  ⎿  PS D:\\Repositories\\todo-app-be>',
-  '✻ Sautéed for 19s · done 3:12 AM','─'.repeat(40),'❯','─'.repeat(40),'  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
+  '✻ Saut\u00e9ed for 19s · done 3:12 AM','─'.repeat(40),'❯','─'.repeat(40),'  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
 const IDLE_CODEX=['• Ran git status','  └ PS D:\\x> git status','› Ask Codex to do anything','  gpt-6-sol high · 70% left · ~\\x'].join('\n');
 
 /* ------------------------------------------------------------------ units */

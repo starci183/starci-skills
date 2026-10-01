@@ -205,10 +205,10 @@ test('managed dispatch: route persists the decision, spawn marks the job running
     'Orca --parent takes a task id; the kernel is a terminal, so the Task hangs under the Run and names the kernel with --from');
   assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--from')+1],'fake-kernel-terminal');
   assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--task-title')+1],'code.refactor #1');
-  assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--display-name')+1],'[Op] Chỉnh sửa mã nguồn · docs · wf-managed');
+  assert.equal(taskCreateCall?.[taskCreateCall.indexOf('--display-name')+1],'[Op] Ch\u1ec9nh s\u1eeda m\u00e3 ngu\u1ed3n · docs · wf-managed');
   const renameCall=calls.find(argv=>argv.slice(0,2).join(' ')==='terminal rename');
   assert.equal(renameCall?.[renameCall.indexOf('--terminal')+1],'fake-terminal-1');
-  assert.equal(renameCall?.[renameCall.indexOf('--title')+1],'[Op] Chỉnh sửa mã nguồn · docs · wf-managed',
+  assert.equal(renameCall?.[renameCall.indexOf('--title')+1],'[Op] Ch\u1ec9nh s\u1eeda m\u00e3 ngu\u1ed3n · docs · wf-managed',
     'managed worker terminals keep the semantic [Op] title instead of worker-task_<id>');
   const payload=json(job?.payload_json);
   assert.equal(payload?.hierarchy?.parentNodeId,'agent:kernel:wf-managed');

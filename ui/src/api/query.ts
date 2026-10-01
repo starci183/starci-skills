@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Envelope } from '../contract';
+import { t } from '../i18n/t';
 
 export type QuerySnapshot<T> = {
   data: T | null;
@@ -100,7 +101,7 @@ async function request(record: QueryRecord): Promise<void> {
     record.etag = response.headers.get('ETag') ?? envelope.meta.etag ?? null;
     publish(record, { data: envelope.data, meta: envelope.meta, loading: false, observedAt: Date.now(), error: null });
   } catch (error) {
-    if (!controller.signal.aborted) publish(record, { loading: false, error: error instanceof Error ? error.message : 'Không đọc được dữ liệu.' });
+    if (!controller.signal.aborted) publish(record, { loading: false, error: error instanceof Error ? error.message : t('Could not read the data.') });
   } finally {
     record.controller = null;
     schedule(record);

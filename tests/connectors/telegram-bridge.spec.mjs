@@ -9,7 +9,7 @@ import {
 } from '../../scripts/supervisor/telegram-bridge.mjs';
 import { readInbox } from '../../scripts/machine/sup-messages.mjs';
 import { claimManager, writeConnectorState } from '../../scripts/connectors/lib.mjs';
-import { askKeyOf, readSentStore } from '../../scripts/connectors/telegram.mjs';
+import { askKeyOf, readSentStore, textFor } from '../../scripts/connectors/telegram.mjs';
 import { ledgerResolver } from '../../scripts/connectors/ask-gateway.mjs';
 import { withLedger, seedWorkflow } from '../helpers/ledger-fixture.mjs';
 import { collectProgress, progressMessages } from '../../scripts/supervisor/progress-report.mjs';
@@ -193,7 +193,7 @@ test('/status answers from the bridge itself with the progress report, with no s
   await bridge.pollOnce();
   const [report] = bot.sent();
   assert.equal(report.parse_mode, 'HTML');
-  assert.match(report.text, /Báo cáo tiến độ/);
+  assert.match(report.text, /B\u00e1o c\u00e1o ti\u1ebfn \u0111\u1ed9/);
   bot.updates.push(message('/help'));
   await bridge.pollOnce();
   assert.equal(bot.sent().at(-1).text, vi.help);
@@ -297,8 +297,8 @@ test('the registry heartbeats, validates ids, and ignores files that are not sup
 });
 
 /* ------------------------------------------------------------ owner asks on demand */
-// Owner, 2026-09-24: "1 link response.starci.org trỏ vào các question thôi, với lại khi yêu cầu thì
-// mới serve url! trò báo tele, tele có nút generate url thì mới serve. trả lời xong xóa".
+// Owner, 2026-09-24: "one response.starci.org link pointing at the questions, and serve a url only
+// when asked! the bot tells on telegram, the form is served only when the Generate URL button is pressed. answered means deleted".
 
 const WF = 'wf-ask';
 const seedAskReport = (ledger, { dispatchId, question }) => {
@@ -320,9 +320,9 @@ const button = (key) => `ask:${key}`;
 test('/asks lists every open approval ask of the ask repos, one message each with its own Generate URL button', async (t) => {
   const bot = await fakeBot(t);
   await withLedger(t, async ({ ledger, repoRoot }) => {
-    seedAskReport(ledger, { dispatchId: 'ctx_a', question: { text: 'Chọn cổng thanh toán?', options: ['VNPay', 'MoMo'] } });
-    seedAskReport(ledger, { dispatchId: 'ctx_b', question: { text: 'Tên miền nào?', options: [] } });
-    seedAskReport(ledger, { dispatchId: 'ctx_done', question: { text: 'Đã xong?', options: [] } });
+    seedAskReport(ledger, { dispatchId: 'ctx_a', question: { text: 'Ch\u1ecdn c\u1ed5ng thanh to\u00e1n?', options: ['VNPay', 'MoMo'] } });
+    seedAskReport(ledger, { dispatchId: 'ctx_b', question: { text: 'T\u00ean mi\u1ec1n n\u00e0o?', options: [] } });
+    seedAskReport(ledger, { dispatchId: 'ctx_done', question: { text: '\u0110\u00e3 xong?', options: [] } });
     ledger.appendEvent({ workflowId: WF, entityType: 'report', entityId: 'ctx_done', kind: 'ask-answered', payload: { dispatchId: 'ctx_done' } });
     const { env, bridge } = setup(t, bot, { repos: () => [repoRoot], sweepEveryMs: -1 });
     bot.updates.push(message('/asks'));
@@ -331,8 +331,8 @@ test('/asks lists every open approval ask of the ask repos, one message each wit
     assert.equal(head.text, vi.asksHead(2));
     assert.equal(listed.length, 2, 'an answered ask is not listed');
     assert.deepEqual(listed.map((m) => m.reply_markup.inline_keyboard[0][0].callback_data).sort(), ['ctx_a', 'ctx_b'].map((d) => button(askKeyOf(WF, d))).sort());
-    assert.ok(listed.every((m) => m.reply_markup.inline_keyboard[0][0].text === 'Tạo link trả lời'));
-    assert.ok(listed.some((m) => /Chọn cổng thanh toán\?/.test(m.text) && /1\. VNPay\n2\. MoMo/.test(m.text)));
+    assert.ok(listed.every((m) => m.reply_markup.inline_keyboard[0][0].text === textFor('vi').generate));
+    assert.ok(listed.some((m) => /Ch\u1ecdn c\u1ed5ng thanh to\u00e1n\?/.test(m.text) && /1\. VNPay\n2\. MoMo/.test(m.text)));
     assert.ok(listed.every((m) => !/https?:\/\//.test(m.text)), 'listing serves nothing, so it links nothing');
     assert.deepEqual(askEvents(ledger, 'ask-serving'), []);
     const store = readSentStore(env);
@@ -349,7 +349,7 @@ test('/asks lists every open approval ask of the ask repos, one message each wit
 test('the Generate URL button serves the form on demand and edits the message with the public link; the answer deletes it and stops serving', async (t) => {
   const bot = await fakeBot(t);
   await withLedger(t, async ({ ledger, repoRoot }) => {
-    seedAskReport(ledger, { dispatchId: 'ctx_pick', question: { text: 'Gói Pro giá bao nhiêu?', options: ['99k', '199k'] } });
+    seedAskReport(ledger, { dispatchId: 'ctx_pick', question: { text: 'G\u00f3i Pro gi\u00e1 bao nhi\u00eau?', options: ['99k', '199k'] } });
     const ensured = [];
     const { env, bridge } = setup(t, bot, {
       repos: () => [repoRoot], serveTtlMs: 120000, sweepEveryMs: 0,
@@ -366,8 +366,8 @@ test('the Generate URL button serves the form on demand and edits the message wi
     const nonce = new URL(serving.url).pathname.slice(1);
     const edit = bot.of('editMessageText').at(-1);
     assert.equal(edit.message_id, 91, 'the pressed message itself carries the link');
-    assert.match(edit.text, new RegExp(`Trả lời tại: https://response\\.example\\.org/${nonce}`));
-    assert.match(edit.text, /Gói Pro giá bao nhiêu\?/);
+    assert.ok(edit.text.includes(`${textFor('vi').link}: https://response.example.org/${nonce}`));
+    assert.match(edit.text, /G\u00f3i Pro gi\u00e1 bao nhi\u00eau\?/);
     assert.ok(!edit.text.includes('127.0.0.1'), 'a decision ask carries only the public link');
     assert.equal(edit.reply_markup.inline_keyboard[0][0].callback_data, button(key), 'the button stays: an expired link is regenerated');
     assert.equal(ensured.length, 1, 'the gateway and tunnel are ensured for a public link');
@@ -391,7 +391,7 @@ test('the Generate URL button serves the form on demand and edits the message wi
 test('a credential ask\'s button gives the localhost link to answer on the machine; an ended form goes back to the button; a closed ask\'s button removes its message', async (t) => {
   const bot = await fakeBot(t);
   await withLedger(t, async ({ ledger, repoRoot }) => {
-    seedAskReport(ledger, { dispatchId: 'ctx_key', question: { text: 'Nhập vnpay-hash-secret.key', options: [] } });
+    seedAskReport(ledger, { dispatchId: 'ctx_key', question: { text: 'Nh\u1eadp vnpay-hash-secret.key', options: [] } });
     const url = 'http://127.0.0.1:6970/a-00112233445566778899';
     const spawned = [], ensured = [];
     const spawnServe = (target) => {
@@ -410,7 +410,7 @@ test('a credential ask\'s button gives the localhost link to answer on the machi
     assert.deepEqual(spawned.map((s) => [s.repo, s.workflowId, s.dispatchId]), [[repoRoot, WF, 'ctx_key']]);
     let edit = bot.of('editMessageText').at(-1);
     assert.equal(edit.message_id, 92);
-    assert.match(edit.text, /KHÔNG đưa ra ngoài\. Thầy trả lời TRÊN MÁY, mở link localhost này tại máy:/);
+    assert.ok(edit.text.includes(textFor('vi').credential));
     assert.ok(edit.text.includes(url), 'the credential form is linked on localhost');
     assert.ok(!edit.text.includes('response.example.org'), 'never on the public host');
     assert.equal(ensured.length, 0, 'a credential ask never needs the tunnel');
@@ -420,7 +420,7 @@ test('a credential ask\'s button gives the localhost link to answer on the machi
     await bridge.pollOnce();
     edit = bot.of('editMessageText').at(-1);
     assert.equal(edit.message_id, 92);
-    assert.ok(!edit.text.includes(url) && /Tạo link trả lời/.test(edit.text), 'back to the Generate URL notice');
+    assert.ok(!edit.text.includes(url) && edit.text.includes(textFor('vi').generate), 'back to the Generate URL notice');
     assert.equal(edit.reply_markup.inline_keyboard[0][0].callback_data, button(key));
 
     // Retired meanwhile: its button removes the message instead of serving.

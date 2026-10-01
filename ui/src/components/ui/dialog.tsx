@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Modal } from '@heroui/react';
 import { XIcon } from 'lucide-react';
+import { t } from '../../i18n/t';
 
 export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpenChange: (open: boolean) => void; children: React.ReactNode }) {
   return <Modal isOpen={open} onOpenChange={onOpenChange}>{children}</Modal>;
@@ -11,7 +12,7 @@ export function DialogContent({ className, children, showCloseButton = true, ...
     <Modal.Container placement="center" className="st-dialog-container">
       <Modal.Dialog data-slot="dialog-content" className={['st-dialog', className].filter(Boolean).join(' ')} {...props}>
         {children}
-        {showCloseButton && <Modal.CloseTrigger data-slot="dialog-close" className="st-dialog-close" aria-label="Đóng"><XIcon size={16} aria-hidden="true" /></Modal.CloseTrigger>}
+        {showCloseButton && <Modal.CloseTrigger data-slot="dialog-close" className="st-dialog-close" aria-label={t('Close')}><XIcon size={16} aria-hidden="true" /></Modal.CloseTrigger>}
       </Modal.Dialog>
     </Modal.Container>
   </Modal.Backdrop>;

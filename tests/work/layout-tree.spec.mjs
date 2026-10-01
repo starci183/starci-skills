@@ -70,7 +70,7 @@ test('navigation labels come from the route tree plus the catalogs, and every mi
     ['billing', '/billing', null, 'console.nav.billing'],
     ['help', null, null, 'console.nav.help'],
   ]);
-  assert.deepEqual(nav.items[0].labels, { en: 'Photos', vi: 'Ảnh' });
+  assert.deepEqual(nav.items[0].labels, { en: 'Photos', vi: '\u1ea2nh' });
   assert.deepEqual(nav.items[1].labels, { en: 'Billing' }, 'a label is never typed in for a catalog that lacks it');
   assert.deepEqual(nav.findings.map((f) => f.code).sort(), ['NAV_LABEL_MISSING', 'NAV_ROUTE_MISSING', 'NAV_ROUTE_NULL', 'ROUTE_NOT_IN_NAV']);
   assert.match(nav.findings.find((f) => f.code === 'ROUTE_NOT_IN_NAV').detail, /^\/reports /);

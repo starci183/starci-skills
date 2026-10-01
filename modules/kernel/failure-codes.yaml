@@ -4386,6 +4386,110 @@ RT_DEAD_SCRIPT:
   owner: supervisor
   kind: check-finding
 
+RT_DEAD_ENTRY:
+  title: "Stale dead-scripts entry"
+  title_vi: "Mục khai báo CLI đã lỗi thời"
+  meaning_vi: "Danh sách scripts/checks/dead-scripts.entries nêu một script đã bị xóa hoặc đã có mã đọc tới, nên mục này không còn cần."
+  causes_vi:
+    - "Script đã bị xóa nhưng mục khai báo còn lại"
+    - "Script đã được nối vào mã nên không còn là CLI độc lập"
+  nextStep_vi: "Người giám sát xóa dòng đó khỏi dead-scripts.entries qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+HFS_SOURCE_NOT_ENGLISH:
+  title: "Runtime source is not English"
+  title_vi: "Mã nguồn runtime không phải tiếng Anh"
+  meaning_vi: "Một tệp mã nguồn của runtime chứa chữ cái tiếng Việt ngoài danh mục đã khai báo; chú thích, chuỗi và nhận xét SQL đều phải là tiếng Anh."
+  causes_vi:
+    - "Chú thích hoặc chuỗi viết bằng tiếng Việt"
+    - "Thông điệp cho chủ chưa đi qua danh mục i18n"
+  nextStep_vi: "Người giám sát chuyển văn bản sang tiếng Anh, đưa bản tiếng Việt vào modules/i18n/messages hoặc ui/src/i18n/messages, qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+HFS_SOURCE_PENDING_STALE:
+  title: "Stale source-language pending entry"
+  title_vi: "Mục chờ chuyển ngôn ngữ đã lỗi thời"
+  meaning_vi: "Danh sách scripts/checks/source-language.pending nêu một tệp đã sạch tiếng Việt hoặc đã bị xóa, nên mục chờ phải được xóa (danh sách chỉ co lại)."
+  causes_vi:
+    - "Tệp đã được chuyển sang tiếng Anh"
+    - "Tệp đã bị xóa hoặc đổi tên"
+  nextStep_vi: "Người giám sát xóa dòng đó khỏi source-language.pending qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_UNREADABLE:
+  title: "I18n catalog file unreadable"
+  title_vi: "Tệp danh mục i18n không đọc được"
+  meaning_vi: "Một tệp trong modules/i18n/messages không phải YAML hợp lệ nên không thể nạp danh mục dịch."
+  causes_vi:
+    - "Lỗi cú pháp YAML khi sửa tay"
+  nextStep_vi: "Người giám sát sửa cú pháp tệp danh mục qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_SCHEMA:
+  title: "I18n catalog schema missing"
+  title_vi: "Danh mục i18n thiếu schema"
+  meaning_vi: "Tệp danh mục không khai báo schema starci/i18n-catalog@1."
+  causes_vi:
+    - "Tệp mới tạo thiếu dòng schema"
+  nextStep_vi: "Người giám sát thêm dòng schema vào đầu tệp qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_EMPTY:
+  title: "I18n catalog has no messages"
+  title_vi: "Danh mục i18n không có thông điệp"
+  meaning_vi: "Tệp danh mục không có danh sách messages hoặc danh sách rỗng."
+  causes_vi:
+    - "Tệp tạo sẵn chưa có mục"
+  nextStep_vi: "Người giám sát thêm mục en/vi hoặc xóa tệp qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_ENTRY:
+  title: "I18n catalog entry malformed"
+  title_vi: "Mục danh mục i18n sai dạng"
+  meaning_vi: "Một mục không có cả en và vi là chuỗi không rỗng."
+  causes_vi:
+    - "Thiếu một trong hai trường"
+    - "Trường rỗng"
+  nextStep_vi: "Người giám sát sửa mục thành en/vi đầy đủ qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_EN_NOT_ENGLISH:
+  title: "I18n source is not English"
+  title_vi: "Nguồn en của danh mục i18n không phải tiếng Anh"
+  meaning_vi: "Trường en của một mục chứa chữ cái tiếng Việt; en là nguồn tiếng Anh làm khóa dịch."
+  causes_vi:
+    - "Dán nhầm bản tiếng Việt vào trường en"
+  nextStep_vi: "Người giám sát đặt bản tiếng Anh vào en và bản tiếng Việt vào vi qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_PLACEHOLDERS:
+  title: "I18n placeholders differ"
+  title_vi: "Chỗ giữ chỗ của en và vi khác nhau"
+  meaning_vi: "Hai bản en và vi của một mục không có cùng các chỗ giữ chỗ {tên}, nên bản dịch sẽ hiển thị sai."
+  causes_vi:
+    - "Bản dịch thiếu hoặc thừa một chỗ giữ chỗ"
+  nextStep_vi: "Người giám sát sửa vi cho khớp các chỗ giữ chỗ của en qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
+RT_I18N_DUPLICATE:
+  title: "I18n source translated twice"
+  title_vi: "Một nguồn tiếng Anh được dịch hai lần"
+  meaning_vi: "Cùng một chuỗi en xuất hiện trong hai mục của danh mục, tức là hai cách dịch cho một thông điệp."
+  causes_vi:
+    - "Hai lane cùng thêm một thông điệp"
+  nextStep_vi: "Người giám sát giữ một mục và xóa mục còn lại qua một lane đã land."
+  owner: supervisor
+  kind: runtime-fault
+
 RT_GUIDANCE_REFUSED_COMMAND:
   title: "Agent guidance tells an agent to run a refused command"
   title_vi: "Hướng dẫn cho agent bảo chạy một lệnh mà guard chặn"

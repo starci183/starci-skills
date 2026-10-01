@@ -15,7 +15,7 @@ test('a Codex status row with its tree detail, or a held message, is a running t
   // A captured Codex op blocked in `orca orchestration ask`.
   const waiting = ['• Ran node shell-conformance.mjs .starciwork/features/sales/ui/workbench', '  └   REFUSED ui.sales.workbench binds no shell',
     '• Waiting for background terminal (2m 30s • esc to interrupt) · 3 background terminals running · /ps to view · /stop to…',
-    '  └ orca orchestration ask --from term_7427743e --question "Lệnh api op-contract cho job op…', ...CODEX_FOOT];
+    '  └ orca orchestration ask --from term_7427743e --question "L\u1ec7nh api op-contract cho job op…', ...CODEX_FOOT];
   assert.equal(classifyAgentScreen(waiting.join('\n')).state, 'active');
   assert.equal(classifyAgentScreen(['• Waiting for background terminal (18m 10s • esc to interrupt) · 1 background terminal running', '  └ npm run test:e2e', ...CODEX_FOOT].join('\n')).state, 'active');
   const held = ['• Working (4m 47s • esc to interrupt) · 2 background terminals running', '',

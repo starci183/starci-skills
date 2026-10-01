@@ -56,7 +56,7 @@ test('api archive resolves every live DI of the workflow (open|claimed|escalated
   const other = openDi(ledger, OTHER, { idempotencyKey: 'progress-stall:wf:e' });
   assert.equal(listDecisions(ledger.db, { workflowId: WF }).length, 3);
 
-  const r = api('archive', '--workflow', WF, '--reason', 'owner ruled: archive hết', '--by', 'owner');
+  const r = api('archive', '--workflow', WF, '--reason', 'owner ruled: archive h\u1ebft', '--by', 'owner');
   assert.equal(r.status, 0, r.stderr || r.stdout);
   const body = JSON.parse(r.stdout);
   assert.equal(body.archived, true);

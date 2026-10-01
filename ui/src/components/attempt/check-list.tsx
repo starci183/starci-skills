@@ -7,6 +7,7 @@ import { PathLink } from '../path-link';
 import { StatusChip } from '../status-chip';
 import { Card, Empty } from './frame/card';
 import { formatSpan } from './frame/util';
+import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C9';
 
@@ -23,9 +24,9 @@ const evidenceText = (summary: unknown): string | null => {
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
-  return <button type="button" className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground" title="Chép lệnh" onClick={() => {
+  return <button type="button" className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground" title={t('Copy the command')} onClick={() => {
     void navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }, () => undefined);
-  }}><Copy className="size-3" aria-hidden="true" />{copied ? 'Đã chép' : 'Chép'}</button>;
+  }}><Copy className="size-3" aria-hidden="true" />{copied ? t('Copied') : t('Copy')}</button>;
 }
 
 function matchFile(files: EvidenceFile[], check: CheckRow): EvidenceFile | null {
@@ -84,7 +85,7 @@ function Mark({ verdict, exit, extra }: { verdict: Verdict; exit: number | null;
 function Tails({ check }: { check: CheckRow }) {
   const tails = [check.stdout && ['stdout', check.stdout] as const, check.stderr && ['stderr', check.stderr] as const, check.output && ['output', check.output] as const].filter((item): item is NonNullable<typeof item> => Boolean(item));
   if (!tails.length) return null;
-  return <details className="mt-2"><summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">Đuôi {tails.map(([label]) => label).join(' / ')}</summary>
+  return <details className="mt-2"><summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">{t('Tail {labels}', { labels: tails.map(([label]) => label).join(' / ') })}</summary>
     <div className="mt-2 grid gap-2">{tails.map(([label, blob]) => <div key={label}><p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">{label} · {blob.bytes.toLocaleString('vi-VN')} B</p><div className="max-h-56 overflow-auto"><BlobText blob={blob} mode="tail" lines={40} /></div></div>)}</div></details>;
 }
 
@@ -106,18 +107,18 @@ function PairRow({ pair, files, onOpenFile }: { pair: CheckPair; files: Evidence
       <ChevronRight className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
       <strong className="min-w-0 break-words text-sm">{pair.name}</strong>
       <span className="col-start-2 flex flex-wrap items-center gap-x-4 gap-y-1 sm:col-auto sm:contents">
-        <span className="inline-flex items-center gap-1"><span className="text-[11px] text-muted-foreground sm:hidden">Op khai</span><Mark verdict={op.verdict} exit={op.exit} /></span>
-        <span className="inline-flex items-center gap-1"><span className="text-[11px] text-muted-foreground sm:hidden">Runtime chạy</span><Mark verdict={rt.verdict} exit={rt.exit} extra={pair.runtime?.wallMs != null ? formatSpan(pair.runtime.wallMs) : null} /></span>
-        {mismatch ? <span className="inline-flex items-center gap-1 text-[11px] font-medium" data-tone="warning" style={{ color: 'var(--tone)' }} title="Op khai và runtime chạy không khớp"><TriangleAlert className="size-3.5" aria-hidden="true" />Lệch</span> : <span className="hidden sm:block" />}
+        <span className="inline-flex items-center gap-1"><span className="text-[11px] text-muted-foreground sm:hidden">{t('Op declared')}</span><Mark verdict={op.verdict} exit={op.exit} /></span>
+        <span className="inline-flex items-center gap-1"><span className="text-[11px] text-muted-foreground sm:hidden">{t('Runtime ran')}</span><Mark verdict={rt.verdict} exit={rt.exit} extra={pair.runtime?.wallMs != null ? formatSpan(pair.runtime.wallMs) : null} /></span>
+        {mismatch ? <span className="inline-flex items-center gap-1 text-[11px] font-medium" data-tone="warning" style={{ color: 'var(--tone)' }} title={t('Op-declared and runtime-run do not match')}><TriangleAlert className="size-3.5" aria-hidden="true" />{t('Mismatch')}</span> : <span className="hidden sm:block" />}
       </span>
     </button>
     {open ? <div className="mb-2 ml-8 min-w-0 space-y-2 rounded-lg border bg-muted/20 p-3 text-sm">
       {evidence ? <p className="break-words">{evidence}</p> : null}
-      {mismatch ? <p className="text-xs" data-tone="warning" style={{ color: 'var(--tone)' }}>Lệch: op khai {op.exit ?? '—'}, runtime chạy {rt.exit ?? '—'}.</p> : null}
-      {command ? <div className="flex min-w-0 items-start gap-2 rounded-md border bg-card p-2"><code className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-xs">{command}</code><CopyButton value={command} /></div> : <p className="text-xs text-muted-foreground">Không ghi lệnh.</p>}
+      {mismatch ? <p className="text-xs" data-tone="warning" style={{ color: 'var(--tone)' }}>{t('Mismatch: op declared {opExit}, runtime ran {runtimeExit}.', { opExit: op.exit ?? '—', runtimeExit: rt.exit ?? '—' })}</p> : null}
+      {command ? <div className="flex min-w-0 items-start gap-2 rounded-md border bg-card p-2"><code className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-xs">{command}</code><CopyButton value={command} /></div> : <p className="text-xs text-muted-foreground">{t('No command recorded.')}</p>}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-        {cwd ? <span className="inline-flex flex-wrap items-center gap-2 text-muted-foreground">cwd <PathLink path={cwd} /></span> : <span className="text-muted-foreground">cwd: không ghi</span>}
-        {file ? <button type="button" className="font-medium text-primary hover:underline" onClick={() => onOpenFile(file)}>Xem output →</button> : <span className="text-muted-foreground">Chưa có tệp output</span>}
+        {cwd ? <span className="inline-flex flex-wrap items-center gap-2 text-muted-foreground">cwd <PathLink path={cwd} /></span> : <span className="text-muted-foreground">{t('cwd: not recorded')}</span>}
+        {file ? <button type="button" className="font-medium text-primary hover:underline" onClick={() => onOpenFile(file)}>{t('View output →')}</button> : <span className="text-muted-foreground">{t('No output file yet')}</span>}
       </div>
       {rows.map(row => <Tails key={row.id} check={row} />)}
     </div> : null}
@@ -130,11 +131,11 @@ export function CheckList({ attempt, onOpenFile }: { attempt: AttemptDetailV2; o
   const confirmed = pairs.filter(pair => runtimeSide(pair).verdict === 'pass').length;
   const red = pairs.filter(pair => runtimeSide(pair).verdict === 'fail' || opSide(pair).verdict === 'fail').length;
   const lech = pairs.filter(pair => { const o = opSide(pair); const r = runtimeSide(pair); return (o.verdict != null && r.verdict != null && o.verdict !== r.verdict) || (o.exit != null && r.exit != null && o.exit !== r.exit); }).length;
-  return <Card id="attempt-step-checks" concept="C9" title="Kiểm chứng" hint={pairs.length ? `${pairs.length} check${attempt.checks.length > pairs.length ? ` · ${attempt.checks.length} lần chạy` : ''} · runtime xác nhận ${confirmed}/${pairs.length}` : undefined}
-    right={pairs.length ? <>{red ? <StatusChip status="failed" label={`${red} hỏng`} /> : null}{lech ? <StatusChip status="retry" label={`${lech} lệch`} /> : null}</> : null}>
+  return <Card id="attempt-step-checks" concept="C9" title={t('Verification')} hint={pairs.length ? t('{n} checks{runs} · runtime confirmed {done}/{total}', { n: pairs.length, runs: attempt.checks.length > pairs.length ? t(' · {n} runs', { n: attempt.checks.length }) : '', done: confirmed, total: pairs.length }) : undefined}
+    right={pairs.length ? <>{red ? <StatusChip status="failed" label={t('{n} failed', { n: red })} /> : null}{lech ? <StatusChip status="retry" label={t('{n} mismatched', { n: lech })} /> : null}</> : null}>
     {pairs.length ? <>
-      <div className="hidden grid-cols-[auto_minmax(0,1fr)_9rem_13rem_auto] gap-x-3 border-b px-1 pb-2 text-[11px] uppercase tracking-wide text-muted-foreground sm:grid"><span className="w-4" /><span>Check</span><span>Op khai</span><span>Runtime chạy</span><span /></div>
+      <div className="hidden grid-cols-[auto_minmax(0,1fr)_9rem_13rem_auto] gap-x-3 border-b px-1 pb-2 text-[11px] uppercase tracking-wide text-muted-foreground sm:grid"><span className="w-4" /><span>Check</span><span>{t('Op declared')}</span><span>{t('Runtime ran')}</span><span /></div>
       <ul className="divide-y">{pairs.map(pair => <PairRow key={pair.name} pair={pair} files={attempt.files} onOpenFile={onOpenFile} />)}</ul>
-    </> : <Empty>Chưa có check nào được ghi cho lần thử này.</Empty>}
+    </> : <Empty>{t('No checks recorded for this attempt yet.')}</Empty>}
   </Card>;
 }

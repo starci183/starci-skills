@@ -436,6 +436,19 @@ schemas:
       whenNot: Never authorizes a live runtime reference to a deleted or moved file.
       selectedBy: The retired-path citation exception in check-contract-cites.mjs and the runtime rules that read it.
 
+  - id: starci/i18n-catalog@1
+    file: modules/i18n/messages/common.yaml
+    dialect: prose-data
+    subsystem: kernel
+    governs: "The Vietnamese message catalog of owner-visible runtime text: modules/i18n/messages/<area>.yaml, a messages[] list of {en, vi} entries keyed from the English source."
+    binds: "modules/i18n/messages/*.yaml messages[] entries"
+    usedBy: [scripts/lib/i18n.mjs, scripts/checks/check-i18n-catalog.mjs]
+    business:
+      question: "What does the owner read in Vietnamese for this English runtime message?"
+      whenNeeded: Translating a Telegram notice, a why line, a progress report or any owner-visible runtime message; the only declared home of Vietnamese outside the failure-code, op and archetype fields.
+      whenNot: Never holds English-only text, a second translation of one source, or a message whose placeholders differ between en and vi.
+      selectedBy: scripts/lib/i18n.mjs translator(language) and the i18n-catalog check.
+
   - id: starci/op@1
     file: modules/schemas/op.schema.yaml
     dialect: json-schema

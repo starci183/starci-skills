@@ -84,7 +84,7 @@ test('pure helpers: seat states, goal problems, child output', () => {
   assert.equal(seatStateOf('interactive-gate'), 'gated');
   assert.equal(seatStateOf('active'), 'live');
   assert.equal(goalProblem(null, goalTextRefusal), 'goal-text-missing');
-  assert.equal(goalProblem('Khởi động lại\nGoal gốc:\n\nnull', goalTextRefusal), 'goal-text-unresolved');
+  assert.equal(goalProblem('Kh\u1edfi \u0111\u1ed9ng l\u1ea1i\nGoal g\u1ed1c:\n\nnull', goalTextRefusal), 'goal-text-unresolved');
   assert.equal(goalProblem(GOAL, goalTextRefusal), null);
   assert.equal(outputOf({ ok: true, shadow: true }), null);
   assert.deepEqual(outputOf({ stdout: 'noise\n{"action":"restarted"}\n' }), { action: 'restarted' });
@@ -136,7 +136,7 @@ test('active: watchdog --once --repair runs through ctx.run and its action=resta
 });
 
 test('null goal -> no seat, one DI goal-text-missing for the Supervisor', async () => {
-  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: 'Khởi động lại trên runtime mới\nGoal gốc:\n\nnull' }] }) };
+  const dbs = { 'todo-app-be': ledgerDb({ workflows: [{ id: 'wf-todo-app-fe-canon', goal: 'Kh\u1edfi \u0111\u1ed9ng l\u1ea1i tr\u00ean runtime m\u1edbi\nGoal g\u1ed1c:\n\nnull' }] }) };
   let probed = 0;
   const c = booted(controller({ probeSeat: async () => { probed += 1; return { action: 'restart-needed' }; } }));
   for (const mode of ['shadow', 'active']) {

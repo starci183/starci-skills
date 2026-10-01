@@ -40,7 +40,7 @@ const cli = async (argv, seams = {}) => {
   const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets: presetsOf(argv), prettier: FORMATTED, ...seams });
   return { code, out, err };
 };
-const HAS_VIETNAMESE = /[À-ỹ]/;
+const HAS_VIETNAMESE = /[\u00c0-\u1ef9]/;
 
 test('a clean app passes with no findings', () => {
   const result = checkRepo({ repoRoot: repoOf(APP) });
@@ -514,7 +514,7 @@ test('--fast: slot checks run on the changed paths only, and the tree checks do 
 });
 
 test('--fast with the real machine: a Vietnamese document already on main is not judged, a full check reports it', async () => {
-  const dir = branched((d) => { put(d, 'be/docs/adr/0001-old.md', 'Đây là một tài liệu viết bằng tiếng Việt, không phải tiếng Anh.\n'); });
+  const dir = branched((d) => { put(d, 'be/docs/adr/0001-old.md', '\u0110\u00e2y l\u00e0 m\u1ed9t t\u00e0i li\u1ec7u vi\u1ebft b\u1eb1ng ti\u1ebfng Vi\u1ec7t, kh\u00f4ng ph\u1ea3i ti\u1ebfng Anh.\n'); });
   put(dir, 'be/src/features/orders/application/place-order.query.ts', 'export const placed = 1;\n');
   git(dir, 'add', '-A', '--', '.', ':!node_modules'); // --fast judges tracked paths: the change is staged
   const fast = await cli(['check', '--repo', dir, '--fast']);

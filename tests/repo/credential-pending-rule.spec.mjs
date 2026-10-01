@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-// Owner ruling 2026-09-23: "creds không có thì vẫn code, để dumb string vào, uat
-// không làm thôi" - asking for a credential does not mean not doing the work.
+// Owner ruling 2026-09-23: "without creds you still code, put in a dumb string,
+// uat just does not run" - asking for a credential does not mean not doing the work.
 const read = (p) => fs.readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 
 test('a missing credential parks only live proof; build ops code on a placeholder', () => {

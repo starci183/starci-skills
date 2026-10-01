@@ -12,6 +12,7 @@ import { Retries } from '../../components/charts/retries';
 import { Throughput } from '../../components/charts/throughput';
 import { UsagePanel, type OpsMetric } from '../../components/charts/usage-panel';
 import { WorkflowProgress } from '../../components/charts/workflow-progress';
+import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C16';
 
@@ -60,7 +61,7 @@ function useAllAttempts(project: string, retryKey: number): { rows: AttemptRow[]
         }
         if (!cancelled) setState({ key: project, rows: all, error: null });
       } catch (error) {
-        if (!cancelled && !controller.signal.aborted) setState(prev => ({ key: project, rows: prev.key === project ? prev.rows : null, error: error instanceof Error ? error.message : 'Lỗi tải' }));
+        if (!cancelled && !controller.signal.aborted) setState(prev => ({ key: project, rows: prev.key === project ? prev.rows : null, error: error instanceof Error ? error.message : t('Load error') }));
       }
     }
     void load();
@@ -71,8 +72,8 @@ function useAllAttempts(project: string, retryKey: number): { rows: AttemptRow[]
 }
 
 function Segmented({ value, onChange }: { value: Window; onChange: (value: Window) => void }) {
-  const options: { value: Window; label: string }[] = [{ value: '24h', label: '24 giờ' }, { value: '7d', label: '7 ngày' }];
-  return <div role="group" aria-label="Khoảng thời gian" className="inline-flex gap-1 rounded-lg border bg-muted/40 p-1">
+  const options: { value: Window; label: string }[] = [{ value: '24h', label: t('24 hours') }, { value: '7d', label: t('7 days') }];
+  return <div role="group" aria-label={t('Time window')} className="inline-flex gap-1 rounded-lg border bg-muted/40 p-1">
     {options.map(o => <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}
       className={`h-8 rounded-md px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${value === o.value ? 'border bg-card text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{o.label}</button>)}
   </div>;
@@ -107,33 +108,33 @@ export default function AnalyticsPage() {
   return <main className="page-shell flex flex-col gap-6 md:gap-8" data-concept="C16">
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Phân tích</p>
-        <h1 className="text-2xl font-semibold tracking-tight">{loading ? 'Đang tải…' : <><Ticker value={rows.length} /> lần thử · <Ticker value={workflows} /> workflow</>}</h1>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('Analytics')}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{loading ? t('Loading…') : <><Ticker value={rows.length} /> {t('attempts')} · <Ticker value={workflows} /> {t('workflows')}</>}</h1>
         <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          {from != null && to != null ? <span>{fmtDayClock(from)} → {fmtDayClock(to)}</span> : <span>{win === '24h' ? '24 giờ' : '7 ngày'} qua</span>}
-          <Count tone="success" label="đạt" n={c.pass} /><Count tone="failed" label="hỏng/chặn" n={c.bad} /><Count tone="running" label="đang chạy" n={c.run} />
-          {c.dropped > 0 ? <span><strong className="tabular-nums text-foreground"><Ticker value={c.dropped} /></strong> đã bỏ</span> : null}
+          {from != null && to != null ? <span>{fmtDayClock(from)} → {fmtDayClock(to)}</span> : <span>{t('last {window}', { window: win === '24h' ? t('24 hours') : t('7 days') })}</span>}
+          <Count tone="success" label={t('passed')} n={c.pass} /><Count tone="failed" label={t('failed/blocked')} n={c.bad} /><Count tone="running" label={t('running')} n={c.run} />
+          {c.dropped > 0 ? <span><strong className="tabular-nums text-foreground"><Ticker value={c.dropped} /></strong> {t('dropped')}</span> : null}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="sr-only" htmlFor="an-project">Dự án</label>
+        <label className="sr-only" htmlFor="an-project">{t('Project')}</label>
         <select id="an-project" value={project} onChange={e => setParam('project', e.target.value || null)}
           className="h-9 min-w-0 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <option value="">Mọi dự án</option>
+          <option value="">{t('All projects')}</option>
           {(projects.data ?? []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <Segmented value={win} onChange={value => setParam('window', value === '7d' ? null : value)} />
       </div>
     </div>
 
-    {attempts.error && !attempts.rows ? <FeedbackState error onRetry={() => setRetryKey(value => value + 1)}>Không tải được danh sách lần thử ({attempts.error}).</FeedbackState> : null}
+    {attempts.error && !attempts.rows ? <FeedbackState error onRetry={() => setRetryKey(value => value + 1)}>{t('Could not load the attempt list ({error}).', { error: attempts.error })}</FeedbackState> : null}
 
-    {loading ? <PageSkeleton label="Đang tải…" /> : <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
+    {loading ? <PageSkeleton label={t('Loading…')} /> : <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
       <OpOutcomes rows={rows} />
       <Throughput rows={rows} since={since} now={now} />
       <WorkflowProgress fleet={fleet.data} project={project} />
     </div>}
-    <Advanced variant="card" title="Phân tích chi tiết" summary="Tỉ lệ theo model, thời lượng, thử lại, token và chi phí">
+    <Advanced variant="card" title={t('Detailed analytics')} summary={t('Rates by model, durations, retries, tokens and cost')}>
       <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
         <ModelRates rows={rows} />
         <DurationPlot rows={rows} now={now} />

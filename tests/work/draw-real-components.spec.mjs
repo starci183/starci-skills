@@ -1,4 +1,4 @@
-// Owner ruling 2026-09-27 ("chốt"): interface.draw DRAWS WITH THE REAL GRAMMAR COMPONENTS - <XBase>.draw.tsx composing
+// Owner ruling 2026-09-27 ("settled"): interface.draw DRAWS WITH THE REAL GRAMMAR COMPONENTS - <XBase>.draw.tsx composing
 // only @starci/grammar, type-checked (DRAW_TYPECHECK_FAILED) and gated at AST level (draw-source.mjs), rendered against
 // the grammar the product will ship (draw-grammar.mjs: product install, else claude-dist with an owed upgrade), judged
 // on its rendered DOM, and kept round by round for interface.implement to start from.
@@ -207,11 +207,11 @@ test('a component round keeps source.tsx, fixtures and the grammar resolution, j
   const out = path.join(tmp(t), 'loop'); // the bundle manifest lands beside the loop dir, so nest it inside the temp dir
   const dir = tmp(t);
   const source = write(dir, 'LedgerBase.draw.tsx', GOOD_DRAW);
-  const fixture = write(dir, 'LedgerBase.installed.fixture.json', JSON.stringify({ state: 'installed', props: { title: 'Mô-đun' }, on: { open: '[Function]' } }));
+  const fixture = write(dir, 'LedgerBase.installed.fixture.json', JSON.stringify({ state: 'installed', props: { title: 'M\u00f4-\u0111un' }, on: { open: '[Function]' } }));
   const grammar = { ok: true, pick: { source: 'claude-dist', version: '0.5.2', root: '/g' }, grammarSource: 'claude-dist@0.5.2', productVersion: '0.5.0', productRange: '^0.5.0',
     upgradeOwed: { status: 'owed', from: '0.5.0', to: '0.5.2', range: '^0.5.0', inRange: true }, attempts: [{ source: 'product', ok: false, errors: [{}] }, { source: 'claude-dist', ok: true, errors: [] }] };
   // The decision evidence (lane draw-devin-rationale) rides beside the draw source and binds by selector.
-  const DOM = '<!doctype html><html><body><div id="root"><section data-draw-layout=""><span data-component="Badge" data-grammar-component="Badge" data-tone="success">Đang chạy</span></section></div></body></html>';
+  const DOM = '<!doctype html><html><body><div id="root"><section data-draw-layout=""><span data-component="Badge" data-grammar-component="Badge" data-tone="success">\u0110ang ch\u1ea1y</span></section></div></body></html>';
   const why = withRationale(DOM);
   fs.writeFileSync(path.join(dir, 'LedgerBase.draw.rationale.json'), JSON.stringify(why.entries));
   let unowned = 1;
@@ -260,7 +260,7 @@ test('a component round keeps source.tsx, fixtures and the grammar resolution, j
   assert.ok(fs.existsSync(path.join(dir, 'parts', 'LedgerBase#installed--390x60--light.fixture.json')));
 });
 
-// ---- The gates read a REAL grammar render (lane draw-real-components, owner "còn lỗi thì sửa hết"): what the grammar's
+// ---- The gates read a REAL grammar render (lane draw-real-components, owner "if errors remain, fix them all"): what the grammar's
 // own anatomy renders is the grammar's (its conformance), not a drawing decision; a notice or media box is no card; a
 // sized Button is judged on its shape; a grammar Button declares its width; badges pair within one card.
 import { badgesOf } from '../../scripts/work/draw/draw-quality.mjs';
@@ -274,9 +274,9 @@ const box = (i, parent, o = {}) => ({ i, parent, tag: o.tag ?? 'div', id: null, 
 const snapOf = (elements) => ({ elements, root: { bodyBg: [240, 240, 240, 1], htmlBg: null, clientWidth: 1184 }, viewport: { width: 1184, height: 900 } });
 
 test('badge detection: a TagGroup root is no badge; a vendor BEM variant class binds the tone', () => {
-  const html = '<div class="tag-group starci-core-tag-group"><div class="tag tag--sm tag--default starci-core-tag"><span>Trả lời</span></div></div><span class="chip chip--success chip--sm"><span>Đang chạy</span></span>';
+  const html = '<div class="tag-group starci-core-tag-group"><div class="tag tag--sm tag--default starci-core-tag"><span>Tr\u1ea3 l\u1eddi</span></div></div><span class="chip chip--success chip--sm"><span>\u0110ang ch\u1ea1y</span></span>';
   const got = badgesOf(html);
-  assert.deepEqual(got.map((b) => [b.text, b.tone]), [['Trả lời', 'default'], ['Đang chạy', 'success']]);
+  assert.deepEqual(got.map((b) => [b.text, b.tone]), [['Tr\u1ea3 l\u1eddi', 'default'], ['\u0110ang ch\u1ea1y', 'success']]);
 });
 
 test('the rendered-DOM view: grammar anatomy is the grammar\'s; an Alert or an Image is never a card', () => {
@@ -301,8 +301,8 @@ test('badges pair within one container only: two cards\' status badges on one ro
     box(0, null, { layout: true, w: 1184, h: 800 }),
     box(1, 0, { bg: [255, 255, 255, 1], shadow: '0 1px 2px black', radius: 16, w: 560, h: 300 }),
     box(2, 0, { bg: [255, 255, 255, 1], shadow: '0 1px 2px black', radius: 16, x: 600, w: 560, h: 300 }),
-    box(3, 1, { own: 'Đang chạy', bg: [200, 240, 200, 1], x: 16, y: 40, w: 80, h: 20 }),
-    box(4, 2, { own: 'Đang chạy', bg: [200, 240, 200, 1], x: 616, y: 40, w: 80, h: 20 }),
+    box(3, 1, { own: '\u0110ang ch\u1ea1y', bg: [200, 240, 200, 1], x: 16, y: 40, w: 80, h: 20 }),
+    box(4, 2, { own: '\u0110ang ch\u1ea1y', bg: [200, 240, 200, 1], x: 616, y: 40, w: 80, h: 20 }),
   ]));
   const checks = spacingChecks(v, { knowledge: loadKnowledge(), pageInset: 24, width: 1184, cardInset: 16, badgeGap: 8 });
   assert.equal(checks.filter((c) => c.id === 'badge to badge').length, 0);
@@ -317,7 +317,7 @@ test('a component round picks an independent critic; finish critiques an uncriti
   const source = write(dir, 'LedgerBase.draw.tsx', GOOD_DRAW);
   const fixture = write(dir, 'LedgerBase.installed.fixture.json', JSON.stringify({ state: 'installed', props: {}, on: {} }));
   const grammar = { ok: true, pick: { source: 'product', version: '0.6.0', root: '/g' }, grammarSource: 'product@0.6.0', attempts: [] };
-  const DOM = '<!doctype html><html><body><div id="root"><section data-draw-layout=""><span data-component="Badge" data-grammar-component="Badge" data-tone="success">Đang chạy</span></section></div></body></html>';
+  const DOM = '<!doctype html><html><body><div id="root"><section data-draw-layout=""><span data-component="Badge" data-grammar-component="Badge" data-tone="success">\u0110ang ch\u1ea1y</span></section></div></body></html>';
   const why = withRationale(DOM);
   fs.writeFileSync(path.join(dir, 'LedgerBase.draw.rationale.json'), JSON.stringify(why.entries));
   const render = async ({ out: roundDir, viewports, name }) => viewports.map((v) => {
@@ -386,7 +386,7 @@ test('a component draw installed by finish passes settle draw-acceptance on ever
   fs.appendFileSync(source, '\nimport hero from "./assets/hero.png"\n');
   const fixture = write(src, 'LedgerBase.installed.fixture.json', JSON.stringify({ state: 'installed', props: {}, on: {} }));
   const grammar = { ok: true, pick: { source: 'product', version: '0.6.0', root: '/g' }, grammarSource: 'product@0.6.0', attempts: [] };
-  const why = withRationale('<!doctype html><html><body><div id="root"><section data-draw-layout=""><div class="starci-core-section-header-copy"><h1 class="starci-core-section-title">Mô-đun</h1></div><span data-component="Badge" data-grammar-component="Badge" data-tone="success">Đang chạy</span></section></div></body></html>');
+  const why = withRationale('<!doctype html><html><body><div id="root"><section data-draw-layout=""><div class="starci-core-section-header-copy"><h1 class="starci-core-section-title">M\u00f4-\u0111un</h1></div><span data-component="Badge" data-grammar-component="Badge" data-tone="success">\u0110ang ch\u1ea1y</span></section></div></body></html>');
   fs.writeFileSync(path.join(src, 'LedgerBase.draw.rationale.json'), JSON.stringify(why.entries));
   const render = async ({ out: roundDir, viewports, name }) => viewports.map((v) => {
     const file = path.join(roundDir, `${name}--${v.width}x${v.height}--light.png`);

@@ -229,7 +229,7 @@ test('a bare --until-message still means the peer-wait form; typed flags are ref
 test('--attach types an already-open free-text incident without re-raising it; a closed one is refused',t=>{
   const fx=fixture(t);
   fx.seedJob(BASE,PEER_JOB);
-  const {incidentId}=fx.ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',BASE,'--op','backend.implement','--detail',`Chờ job ${PEER_JOB} settle + sha`]);
+  const {incidentId}=fx.ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',BASE,'--op','backend.implement','--detail',`Ch\u1edd job ${PEER_JOB} settle + sha`]);
   fx.refused(['incident','--workflow',WORK,'--attach',incidentId],'until-missing');
   const attached=fx.ok(['incident','--workflow',WORK,'--attach',incidentId,'--until-job',PEER_JOB]);
   assert.deepEqual([attached.status,attached.until],['open',[{type:'job',jobId:PEER_JOB,want:'settled'}]]);

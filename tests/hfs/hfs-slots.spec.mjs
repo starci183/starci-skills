@@ -486,7 +486,7 @@ test('the failure catalog explains the new codes in Vietnamese', () => {
   const catalog = parseYaml(fs.readFileSync(path.join(root, 'modules/kernel/failure-codes.yaml'), 'utf8'));
   for (const code of ['HFS_SLOT_UNDECLARED', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID', 'HFS_DECLARATION_INVALID']) {
     assert.ok(catalog[code], `${code} has no catalog entry`);
-    for (const field of ['title_vi', 'meaning_vi', 'nextStep_vi']) assert.match(catalog[code][field], /[À-ỹ]/, `${code}.${field} is not Vietnamese`);
+    for (const field of ['title_vi', 'meaning_vi', 'nextStep_vi']) assert.match(catalog[code][field], /[\u00c0-\u1ef9]/, `${code}.${field} is not Vietnamese`);
   }
 });
 

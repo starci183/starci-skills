@@ -44,7 +44,7 @@ test('a command shown under an explicit prohibition is not a finding', async () 
     'Do not run `git worktree add <dir>` yourself; the runtime makes the tree.',
     'Use safeRemoveTree instead of `rm -rf <dir>`.',
     '`git worktree add <dir>` is refused for every op (WORKTREE_NOT_OPS).',
-    'Không bao giờ chạy `rm -rf node_modules` trong worktree.',
+    'Kh\u00f4ng bao gi\u1edd ch\u1ea1y `rm -rf node_modules` trong worktree.',
   ];
   for (const text of prohibitions) assert.deepEqual(await textFindings(text), [], text);
 });
@@ -113,7 +113,7 @@ test('a tree scan reports the yaml field and the guard code; the live tree is cl
   try {
     fs.mkdirSync(path.join(dir, 'modules', 'supervisor'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'modules', 'supervisor', 'x.yaml'),
-      'classes:\n  fix:\n    en: "open a lane (git worktree add <d> -b lane/x main)"\n    vi: "Không bao giờ chạy `git worktree add`."\n');
+      'classes:\n  fix:\n    en: "open a lane (git worktree add <d> -b lane/x main)"\n    vi: "Kh\u00f4ng bao gi\u1edd ch\u1ea1y `git worktree add`."\n');
     const r = await scanGuidance(dir, { files: ['modules/supervisor/x.yaml'] });
     assert.equal(r.ok, false);
     assert.deepEqual(r.findings.map((f) => [f.file, f.key, f.code]), [['modules/supervisor/x.yaml', 'classes.fix.en', 'WORKTREE_NOT_OPS']]);

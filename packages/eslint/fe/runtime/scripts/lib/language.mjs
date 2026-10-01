@@ -113,7 +113,7 @@ export function documentLanguageHits(rel, text) {
     if (declared.fields?.includes(keys[hit.line - 1])) return false;
     if (!declared.flowFields) return true;
     // an inline flow map: drop the declared fields' values and judge what is left of the line
-    const rest = declared.flowFields.reduce((line, field) => line.replace(new RegExp(`\\b${field}\\s*:\\s*[^,}]*`, 'g'), ''), lines[hit.line - 1]);
+    const rest = declared.flowFields.reduce((line, field) => line.replace(new RegExp(`\\b${field}\\s*:\\s*(?:"(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*'|[^,}]*)`, 'g'), ''), lines[hit.line - 1]);
     return hasSecondLanguage(rest);
   });
 }

@@ -14,12 +14,12 @@ export function useOpInfo(attempt: Pick<AttemptDetailV3, 'project' | 'wf' | 'op'
   return { info: leg?.info ?? null, loading: pipeline.loading };
 }
 
-/** Essentials block "Op này làm gì". */
+/** Essentials block "What this op does". */
 export function AttemptOpGoal({ attempt, info, loading }: { attempt: AttemptDetailV3; info: OpInfo | null; loading: boolean }) {
   return <OpGoalCard attempt={attempt} info={info} loading={loading} />;
 }
 
-/** Advanced block "Đầu vào & ngữ cảnh"; fetches the workflow goal only once it is mounted (i.e. opened). */
+/** Advanced block "Inputs & context"; fetches the workflow goal only once it is mounted (i.e. opened). */
 export function AttemptInputContext({ attempt, info }: { attempt: AttemptDetailV3; info: OpInfo | null }) {
   const enc = encodeURIComponent;
   const workflow = useApiQuery<WorkflowDetailV2>(`/api/workflows/${enc(attempt.project)}/${enc(attempt.wf)}`);

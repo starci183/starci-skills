@@ -88,7 +88,7 @@ test('healthy stub: dispatch --spawn attests and marks the job running',t=>{
   assert.equal(start?.[start.indexOf('--agent')+1],'devin');
   assert.equal(start?.includes('--model'),false,'devin takes no --model on worker-start: it starts on its CLI default');
   const rename=callArgv(fx).find(argv=>argv.slice(0,2).join(' ')==='terminal rename');
-  assert.equal(rename?.[rename.indexOf('--title')+1],'[Op] Chỉnh sửa mã nguồn · docs · wf-dispatch',
+  assert.equal(rename?.[rename.indexOf('--title')+1],'[Op] Ch\u1ec9nh s\u1eeda m\u00e3 ngu\u1ed3n · docs · wf-dispatch',
     'the worker\'s tab carries the semantic name, not the provider auto-summary');
 });
 

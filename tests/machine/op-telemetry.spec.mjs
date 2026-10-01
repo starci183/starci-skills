@@ -9,6 +9,7 @@ import {
   telemetrySettings, trendLine, WAIT_KINDS, SNAPSHOT_KIND,
 } from '../../scripts/machine/op-metrics.mjs';
 import { digestText } from '../../scripts/supervisor/actions.mjs';
+import { translator } from '../../scripts/lib/i18n.mjs';
 
 // Op health and the stuck SLA (scripts/machine/op-metrics.mjs; owner 2026-09-28 "upgrade supervisor to track
 // properly"): per-op metrics from ledger rows, every wait aged against runtimes.yaml, the tick's snapshot and trend.
@@ -161,6 +162,9 @@ test('trendLine compares the newest snapshot with the one closest to trendMs ear
   assert.equal(trendLine([], { trendMs: 24 * HOUR }), null);
   const line = trendLine([snap(NOW - 30 * HOUR, 0.4, 10 * MIN, 1, 0), snap(NOW - 24 * HOUR, 0.5, 8 * MIN, 2, 1), snap(NOW, 0.62, 5 * MIN, 3, 2)], { trendMs: 24 * HOUR });
   assert.equal(line, 'Op health 1.0d: success 62% (+12pt), median wait 5m (-3m), stuck 5 (2 critical) (+2); top failure check:e2e [vs 1.0d ago]');
-  assert.match(trendLine([snap(NOW, 0.62, 5 * MIN, 0, 0)], { trendMs: HOUR, language: 'vi' }), /^Sức khỏe op 1\.0d: đạt 62%/);
+  const trv = translator('vi');
+  assert.equal(trendLine([snap(NOW, 0.62, 5 * MIN, 0, 0)], { trendMs: HOUR, language: 'vi' }),
+    trv('Op health {window}: success {rate}{rateDelta}, median wait {wait}{waitDelta}, stuck {stuck} ({critical} critical){stuckDelta}{top}{vs}',
+      { window: '1.0d', rate: '62%', rateDelta: '', wait: '5m', waitDelta: '', stuck: 0, critical: 0, stuckDelta: '', top: trv('; top failure {top}', { top: 'check:e2e' }), vs: '' }));
 });
 

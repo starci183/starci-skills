@@ -154,7 +154,7 @@ test('STALE-WAIT: a queued job waiting past stallMinutes on a blocker that settl
   assert.equal(byType(stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf}),'STALE-WAIT').length,0);
 }));
 
-// Owner, 2026-09-24: "check tele sao toàn stale block? bản thân workflow không thể cứu nó hay sao?"
+// Owner, 2026-09-24: "check Telegram, why is it all stale blocks? can't the workflow rescue it itself?"
 // Every STALE-* / STALLED finding went to the owner's Telegram. Now the owning Kernel gets a
 // `[stall]` wake first, the supervisor hears only what outlived that wake, and the owner gets one
 // digest of what waits on the owner.

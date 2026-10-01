@@ -18,10 +18,11 @@ import { BareCards } from '../../components/attempt/frame/card';
 import { AttemptDecisions, DiffSection, LandSection, TimelineCard, TranscriptSection } from '../../components/attempt/frame/sections';
 import { stepItems } from '../../components/attempt/frame/steps';
 import { formatBytes, formatSpan, hashParam, setHashParam } from '../../components/attempt/frame/util';
+import { t } from '../../i18n/t';
 
 export const concept: Concept = 'C7';
 const baseOf = (project: string, id: string) => `/api/attempts/${encodeURIComponent(project)}/${encodeURIComponent(id)}`;
-/** Where each step lives on the page; every step scrolls to its own section. Run/checks/land sections live under "Nâng cao" and open when targeted. */
+/** Where each step lives on the page; every step scrolls to its own section. Run/checks/land sections live under "Advanced" and open when targeted. */
 const anchors: Record<AttemptStep, string> = { dispatch: 'attempt-op-goal', run: 'attempt-step-run', report: 'attempt-result', checks: 'attempt-step-checks', verdict: 'attempt-result', land: 'attempt-step-land' };
 const advancedIds = new Set(['attempt-input', 'attempt-step-checks', 'attempt-where', 'attempt-evidence', 'attempt-step-run', 'attempt-step-diff', 'attempt-step-land', 'attempt-timeline', 'attempt-decisions']);
 
@@ -31,14 +32,14 @@ function initialStep(attempt: AttemptDetailV3): AttemptStep {
   return 'verdict';
 }
 
-/** "gpt-6-sol · codex-agent · 12 phút 52 giây · token chưa ghi nhận" */
+/** "gpt-6-sol · codex-agent · 12 min 52 sec · tokens not recorded" */
 function costSummary(a: AttemptDetailV3): string {
   const end = a.settledAt ?? a.reportedAt;
   const total = a.usage?.total;
-  return [a.model, a.agent ?? a.where?.agent, a.dispatchedAt && end ? formatSpan(end - a.dispatchedAt) : null, total ? `${compactVi(total.input + total.output)} token` : 'token chưa ghi nhận'].filter(Boolean).join(' · ');
+  return [a.model, a.agent ?? a.where?.agent, a.dispatchedAt && end ? formatSpan(end - a.dispatchedAt) : null, total ? t('{n} tokens', { n: compactVi(total.input + total.output) }) : t('tokens not recorded')].filter(Boolean).join(' · ');
 }
 
-/** One "Nâng cao" card. `nonce` > 0 means a deep link / step click asked for it open; a new nonce remounts it open. */
+/** One "Advanced" card. `nonce` > 0 means a deep link / step click asked for it open; a new nonce remounts it open. */
 function AdvancedSection({ id, title, summary, concept: c, nonce, children }: { id: string; title: string; summary: string; concept: Concept; nonce: number; children: React.ReactNode }) {
   return <StaggerItem>
     <ConceptBlock concept={c} as="section" id={id} className="min-w-0 scroll-mt-4">
@@ -84,8 +85,8 @@ function AttemptDetailPage({ project, attemptId, routeStep }: { project: string;
     if (target) window.requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ block: 'start' }));
   }, [data, picked, fileId]);
 
-  if (attempt.error) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">← Tổng quan</a><div className="mt-4"><FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{attempt.error}</FeedbackState></div></div>;
-  if (!data) return <div className="mx-auto max-w-6xl p-6"><PageSkeleton label="Đang đọc lần thử…" /></div>;
+  if (attempt.error) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">{t('← Overview')}</a><div className="mt-4"><FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{attempt.error}</FeedbackState></div></div>;
+  if (!data) return <div className="mx-auto max-w-6xl p-6"><PageSkeleton label={t('Reading the attempt…')} /></div>;
 
   const step = picked ?? initialStep(data);
   const selectStep = (value: AttemptStep) => {
@@ -113,19 +114,19 @@ function AttemptDetailPage({ project, attemptId, routeStep }: { project: string;
 
     <Enter delay={0.12} className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="m-0 text-lg font-semibold">Nâng cao</h2>
-        <span className="text-xs text-muted-foreground">Đầu vào, kiểm chứng chi tiết, chi phí, tệp thô, transcript, diff, land và dòng thời gian.</span>
+        <h2 className="m-0 text-lg font-semibold">{t('Advanced')}</h2>
+        <span className="text-xs text-muted-foreground">{t('Inputs, detailed verification, cost, raw files, transcript, diff, land and the timeline.')}</span>
       </div>
       <Stagger className="flex min-w-0 flex-col gap-4">
-        <AdvancedSection id="attempt-input" title="Đầu vào & ngữ cảnh" summary="kernel giao gì, op phải đọc gì" concept="C8" nonce={n('attempt-input')}><AttemptInputContext attempt={data} info={info.info} /></AdvancedSection>
-        <AdvancedSection id="attempt-step-checks" title="Kiểm chứng" summary={pairs.length ? `${pairs.length} check${data.checks.length > pairs.length ? ` · ${data.checks.length} lần chạy` : ''} · runtime xác nhận ${confirmed}/${pairs.length}${data.checksRed ? ` · ${data.checksRed} hỏng` : ''}` : 'chưa có check'} concept="C9" nonce={n('attempt-step-checks')}><CheckList attempt={data} onOpenFile={openFile} /></AdvancedSection>
-        <AdvancedSection id="attempt-where" title="Chi phí & nơi chạy" summary={costSummary(data)} concept="C6" nonce={n('attempt-where')}><AttemptWhereCard attempt={data} /></AdvancedSection>
-        <AdvancedSection id="attempt-evidence" title="Tệp thô" summary={`${data.files.length} tệp${data.files.length ? ` · ${formatBytes(totalBytes)}` : ''}`} concept="C8" nonce={n('attempt-evidence')}><EvidenceBrowser files={data.files} selected={fileId} onSelect={selectFile} /></AdvancedSection>
-        <AdvancedSection id="attempt-step-run" title="Transcript" summary={terminal?.transcript ? `${formatBytes(terminal.transcript.bytes)}${terminal.live ? ' · đang mở' : ''}` : 'chưa có transcript'} concept="C7" nonce={n('attempt-step-run')}><TranscriptSection project={project} attemptId={attemptId} attempt={data} /></AdvancedSection>
-        <AdvancedSection id="attempt-step-diff" title="Diff" summary={where.baseSha || where.headSha ? `${where.baseSha?.slice(0, 8) ?? '—'} → ${where.headSha?.slice(0, 8) ?? '—'}` : 'thay đổi op ghi vào repo'} concept="C11" nonce={n('attempt-step-diff')}><DiffSection project={project} attemptId={attemptId} attempt={data} /></AdvancedSection>
-        <AdvancedSection id="attempt-step-land" title="Land" summary={data.land ? data.land.result : 'chưa có bản ghi land'} concept="C11" nonce={n('attempt-step-land')}><LandSection attempt={data} /></AdvancedSection>
-        <AdvancedSection id="attempt-timeline" title="Dòng thời gian" summary={`${data.timeline.filter(item => item.at).length}/${data.timeline.length} mốc`} concept="C7" nonce={n('attempt-timeline')}><TimelineCard attempt={data} /></AdvancedSection>
-        <AdvancedSection id="attempt-decisions" title="Quyết định" summary={`${data.actions.length} tác động · ${data.decisions.length} quyết định · ${data.lessons.length} bài học`} concept="C12" nonce={n('attempt-decisions')}><AttemptDecisions attempt={data} /></AdvancedSection>
+        <AdvancedSection id="attempt-input" title={t('Inputs & context')} summary={t('what the kernel hands over, what the op must read')} concept="C8" nonce={n('attempt-input')}><AttemptInputContext attempt={data} info={info.info} /></AdvancedSection>
+        <AdvancedSection id="attempt-step-checks" title={t('Verification')} summary={pairs.length ? `${pairs.length} check${data.checks.length > pairs.length ? t(' · {n} runs', { n: data.checks.length }) : ''}${t(' · runtime confirmed {done}/{total}', { done: confirmed, total: pairs.length })}${data.checksRed ? t(' · {n} failed', { n: data.checksRed }) : ''}` : t('no checks yet')} concept="C9" nonce={n('attempt-step-checks')}><CheckList attempt={data} onOpenFile={openFile} /></AdvancedSection>
+        <AdvancedSection id="attempt-where" title={t('Cost & where it ran')} summary={costSummary(data)} concept="C6" nonce={n('attempt-where')}><AttemptWhereCard attempt={data} /></AdvancedSection>
+        <AdvancedSection id="attempt-evidence" title={t('Raw files')} summary={`${t('{n} files', { n: data.files.length })}${data.files.length ? ` · ${formatBytes(totalBytes)}` : ''}`} concept="C8" nonce={n('attempt-evidence')}><EvidenceBrowser files={data.files} selected={fileId} onSelect={selectFile} /></AdvancedSection>
+        <AdvancedSection id="attempt-step-run" title="Transcript" summary={terminal?.transcript ? `${formatBytes(terminal.transcript.bytes)}${terminal.live ? t(' · open') : ''}` : t('No transcript yet')} concept="C7" nonce={n('attempt-step-run')}><TranscriptSection project={project} attemptId={attemptId} attempt={data} /></AdvancedSection>
+        <AdvancedSection id="attempt-step-diff" title="Diff" summary={where.baseSha || where.headSha ? `${where.baseSha?.slice(0, 8) ?? '—'} → ${where.headSha?.slice(0, 8) ?? '—'}` : t('changes the op wrote to the repo')} concept="C11" nonce={n('attempt-step-diff')}><DiffSection project={project} attemptId={attemptId} attempt={data} /></AdvancedSection>
+        <AdvancedSection id="attempt-step-land" title="Land" summary={data.land ? data.land.result : t('no land record yet')} concept="C11" nonce={n('attempt-step-land')}><LandSection attempt={data} /></AdvancedSection>
+        <AdvancedSection id="attempt-timeline" title={t('Timeline')} summary={t('{n}/{total} marks', { n: data.timeline.filter(item => item.at).length, total: data.timeline.length })} concept="C7" nonce={n('attempt-timeline')}><TimelineCard attempt={data} /></AdvancedSection>
+        <AdvancedSection id="attempt-decisions" title={t('Decisions')} summary={t('{actions} actions · {decisions} decisions · {lessons} lessons', { actions: data.actions.length, decisions: data.decisions.length, lessons: data.lessons.length })} concept="C12" nonce={n('attempt-decisions')}><AttemptDecisions attempt={data} /></AdvancedSection>
       </Stagger>
     </Enter>
   </div>;

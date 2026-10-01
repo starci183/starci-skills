@@ -4,8 +4,8 @@ import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {owedFindings,classifyIncidents,patternFindings,linkFix,fixTokens,labelsOf,CLASSES} from '../../scripts/supervisor/owed.mjs';
 import {stallFindings} from '../../scripts/supervisor/stall.mjs';
 
-// Owner, 2026-09-24: "supervisor phải xử lý các conflict, chỉnh grammar, sửa lint, xác định vấn đề out
-// of scope workflow ... để workflows stale/block/kẹt chờ sai là lỗi của supervisor". ~90 open incidents
+// Owner, 2026-09-24: "the supervisor has to handle the conflicts, fix grammar, fix lint, mark out-of-scope
+// workflow problems ... leaving workflows stale/blocked/stuck waiting wrongly is the supervisor's fault". ~90 open incidents
 // of the running workflows waited on the supervisor/runtime/Source, many fixed by later .claude
 // commits and never resolved. scripts/supervisor/owed.mjs classifies every open incident by
 // elimination and links each OWED one to the commit that likely fixed it.
@@ -44,8 +44,8 @@ const seed=(ledger)=>{
   incident(ledger,{id:'inc-111111111111',kind:'source-runtime-defect',text:'terminal liveness classifier reads a Claude spinner frame as turn-idle',agoMin:120});
   incident(ledger,{id:'inc-222222222222',kind:'runtime-owned-path-bracket',text:'For the supervisor: engine/admission.mjs GLOB_META=/[*?[\\]{}]/ rejects src/app/[lang] as an owned path',agoMin:100});
   incident(ledger,{id:'inc-333333333333',kind:'plan-note',text:'Cut backend-reconcile ordinal 5 settles after ordinal 6; see .starciwork/features/login/index.yaml'});
-  incident(ledger,{id:'inc-3a3a3a3a3a3a',kind:'scope-gap',text:'Dependency loop needs the owner or supervisor to decide: cần chủ sở hữu hoặc supervisor quyết'});
-  incident(ledger,{id:'inc-3b3b3b3b3b3b',kind:'plan',text:'Stale input (inc-999999999999, chưa có phản hồi supervisor): redo seam first'});
+  incident(ledger,{id:'inc-3a3a3a3a3a3a',kind:'scope-gap',text:'Dependency loop needs the owner or supervisor to decide: c\u1ea7n ch\u1ee7 s\u1edf h\u1eefu ho\u1eb7c supervisor quy\u1ebft'});
+  incident(ledger,{id:'inc-3b3b3b3b3b3b',kind:'plan',text:'Stale input (inc-999999999999, ch\u01b0a c\u00f3 ph\u1ea3n h\u1ed3i supervisor): redo seam first'});
   incident(ledger,{id:'inc-444444444444',kind:'runtime-liveness-misread',text:'Escalation of inc-111111111111: codex frame Working read turn-idle; index.yaml',agoMin:110});
   incident(ledger,{id:'inc-555555555555',kind:'runtime-nudge-receipt',text:'nudge returned terminal-send-failed while the wake landed',agoMin:60});
   incident(ledger,{id:'inc-666666666666',kind:'weird-new-kind',text:'something nobody typed a release for',agoMin:45});

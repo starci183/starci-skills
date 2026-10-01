@@ -30,8 +30,8 @@ test('every op of modules/ops/ops has a vi and an en label, and nothing else is 
     assert.ok(labels[op].vi?.trim() && labels[op].en?.trim(), `${op} has vi and en`);
     assert.notEqual(labels[op].vi, op, `${op}'s label is words, not its id`);
   }
-  assert.equal(opLabel('interface.draw'), 'Vẽ giao diện');
-  assert.equal(opLabel('uat.verify'), 'Kiểm thử UAT');
+  assert.equal(opLabel('interface.draw'), 'V\u1ebd giao di\u1ec7n');
+  assert.equal(opLabel('uat.verify'), 'Ki\u1ec3m th\u1eed UAT');
   assert.equal(opLabel('backend.implement'), 'Code backend');
   assert.equal(opLabel('workspace.manage#stacks'), opLabel('workspace.manage'), 'a leg instance reads as its op');
   assert.equal(opLabel('interface.draw', 'en'), 'Draw interface');
@@ -41,16 +41,16 @@ test('every op of modules/ops/ops has a vi and an en label, and nothing else is 
 test('a derived workflow name is `<Product> · <first clause>`, at most 48 characters, else the slug', () => {
   assert.equal(productName('todo-app-be'), 'Todo App');
   assert.equal(productName('starci-be'), 'StarCi');
-  assert.equal(deriveWorkflowDisplayName({ text: 'Đăng nhập & xác thực cho app. Thêm OAuth sau.', product: 'nivo', fallback: 'nivo-app-auth' }), 'Nivo · Đăng nhập & xác thực cho app');
-  const long = deriveWorkflowDisplayName({ text: 'Xây dựng nền tảng học trực tuyến hoàn chỉnh gồm đăng ký, nội dung và thanh toán', product: 'todo-app-be', fallback: 'ta-foundation' });
-  assert.ok(long.startsWith('Todo App · Xây dựng'), long);
+  assert.equal(deriveWorkflowDisplayName({ text: '\u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c cho app. Th\u00eam OAuth sau.', product: 'nivo', fallback: 'nivo-app-auth' }), 'Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c cho app');
+  const long = deriveWorkflowDisplayName({ text: 'X\u00e2y d\u1ef1ng n\u1ec1n t\u1ea3ng h\u1ecdc tr\u1ef1c tuy\u1ebfn ho\u00e0n ch\u1ec9nh g\u1ed3m \u0111\u0103ng k\u00fd, n\u1ed9i dung v\u00e0 thanh to\u00e1n', product: 'todo-app-be', fallback: 'ta-foundation' });
+  assert.ok(long.startsWith('Todo App · X\u00e2y d\u1ef1ng'), long);
   assert.ok(long.length <= WORKFLOW_NAME_MAX, `${long.length} <= ${WORKFLOW_NAME_MAX}`);
   assert.ok(long.endsWith('…'), 'a clipped name says so');
   assert.equal(deriveWorkflowDisplayName({ text: 'Nivo: module studio for creators', product: 'nivo', fallback: 'x' }), 'Nivo · Module studio for creators', 'the product is not repeated');
   assert.equal(deriveWorkflowDisplayName({ text: '...', product: 'nivo', fallback: 'nivo-app-auth' }), 'nivo-app-auth', 'nothing usable: the slug');
   assert.throws(() => normalizeDisplayName('   '), /empty/);
   assert.throws(() => normalizeDisplayName('x'.repeat(81)), /at most 80/);
-  assert.equal(normalizeDisplayName('  Nivo ·\n Chat nhóm '), 'Nivo · Chat nhóm');
+  assert.equal(normalizeDisplayName('  Nivo ·\n Chat nh\u00f3m '), 'Nivo · Chat nh\u00f3m');
   assert.equal(workflowDisplayName({ workflow_id: 'wf-a', title: 'a-slug', display_name: null }), 'a-slug');
   assert.equal(workflowDisplayName({ workflow_id: 'wf-a', title: 'a-slug', display_name: 'Nivo · A' }), 'Nivo · A');
   assert.equal(workflowDisplayName({ workflow_id: 'wf-a', title: null }), 'wf-a');
@@ -62,7 +62,7 @@ test('what a job works on: explicit, then the work-graph node, the op-prefixed t
     { id: 'login.sign-in', domain: 'login', title: 'Verify password and enrolled factor proof without disclosing account facts', ownedPaths: ['.starciwork/features/login/fr/sign-in', '.starciwork/features/login/uat/signin'] },
     { id: 'login.register', domain: 'login', title: 'Register', ownedPaths: ['.starciwork/features/login/fr/register'] },
   ];
-  assert.equal(jobWhat({ payload: { displayWhat: 'Đăng nhập', owned_paths: ['.starciwork/features/login/uat/signin'] }, op: 'uat.verify', nodes }), 'Đăng nhập');
+  assert.equal(jobWhat({ payload: { displayWhat: '\u0110\u0103ng nh\u1eadp', owned_paths: ['.starciwork/features/login/uat/signin'] }, op: 'uat.verify', nodes }), '\u0110\u0103ng nh\u1eadp');
   assert.equal(jobWhat({ payload: { owned_paths: ['.starciwork/features/login/uat/signin'] }, op: 'uat.verify', nodes }), 'login / sign in', 'a sentence-long node title gives way to its id');
   assert.equal(jobWhat({ payload: { owned_paths: ['.starciwork/features/login/fr/register'] }, op: 'business.decide', nodes }), 'Register', 'a short node title is the name');
   assert.equal(jobWhat({ payload: { title: 'work.author instance-management.recovery', owned_paths: [] }, op: 'work.author' }), 'instance-management.recovery');
@@ -74,8 +74,8 @@ test('what a job works on: explicit, then the work-graph node, the op-prefixed t
   assert.ok(long.length <= JOB_WHAT_MAX, long);
   assert.equal(pathLabel('.starciwork/features/instance-management/ui/owned-shell/module-ledger/evidence/draws.yaml'), 'instance management / module ledger');
   assert.equal(nodeLabel({ id: 'learning-paths.view-roadmap', domain: 'learning-paths' }), 'learning paths / view roadmap');
-  assert.equal(jobDisplayName({ op: 'interface.draw', what: 'Mô-đun đã cài đặt', workflowName: 'Nivo · Mô-đun Todo' }), 'Vẽ giao diện · Mô-đun đã cài đặt · Nivo · Mô-đun Todo');
-  assert.equal(jobDisplayName({ op: 'review.verify', what: null, workflowName: 'Nivo · Chuẩn hoá code FE' }), 'Review cuối · Nivo · Chuẩn hoá code FE');
+  assert.equal(jobDisplayName({ op: 'interface.draw', what: 'M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t', workflowName: 'Nivo · M\u00f4-\u0111un Todo' }), 'V\u1ebd giao di\u1ec7n · M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t · Nivo · M\u00f4-\u0111un Todo');
+  assert.equal(jobDisplayName({ op: 'review.verify', what: null, workflowName: 'Nivo · Chu\u1ea9n ho\u00e1 code FE' }), 'Review cu\u1ed1i · Nivo · Chu\u1ea9n ho\u00e1 code FE');
 });
 
 test('a Work record title names the job when it is short; a folded `title: >-` reads whole', (t) => withLedger(t, ({ repoRoot }) => {
@@ -101,7 +101,7 @@ const world = (t, fn) => withLedger(t, ({ root, repoRoot, machineHome, ledger })
     { jobId: 'kernel-wf-nivo-app-auth-abc12345', kind: 'kernel', role: 'kernel', status: 'running', workerId: 'term-k',
       payload: { hierarchy: { role: 'kernel', runtime: { host: 'orca', agent: 'codex', terminalHandle: 'term-k' } } } },
     { jobId: 'op-uat.verify-1', opId: 'uat.verify', kind: 'op', status: 'running', workerId: 'term-op',
-      payload: { opId: 'uat.verify', title: 'uat.verify', displayWhat: 'Đăng nhập', owned_paths: ['.starciwork/features/login/uat/signin'], orca: { agentTerminalHandle: 'term-op' } } },
+      payload: { opId: 'uat.verify', title: 'uat.verify', displayWhat: '\u0110\u0103ng nh\u1eadp', owned_paths: ['.starciwork/features/login/uat/signin'], orca: { agentTerminalHandle: 'term-op' } } },
   ] });
   ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,'tok-k',?,?,NULL)")
     .run('wf-nivo-app-auth-abc12345', JSON.stringify({ terminal: 'term-k' }), Date.now());
@@ -110,33 +110,33 @@ const world = (t, fn) => withLedger(t, ({ root, repoRoot, machineHome, ledger })
 
 test('api rename sets the display name, records workflow-renamed and renames the live Kernel and op tabs', (t) => world(t, ({ ledger, run, calls }) => {
   const WF = 'wf-nivo-app-auth-abc12345';
-  const dry = out(run(['rename', '--workflow', WF, '--title', 'Nivo · Đăng nhập & xác thực', '--dry-run']));
+  const dry = out(run(['rename', '--workflow', WF, '--title', 'Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c', '--dry-run']));
   assert.deepEqual([dry.dryRun, dry.changed, dry.kernelTerminal], [true, true, 'term-k']);
   assert.equal(ledger.db.prepare("SELECT count(*) n FROM events WHERE kind='workflow-renamed'").get().n, 0, 'a dry run writes nothing');
   assert.deepEqual(calls().filter((argv) => argv[1] === 'rename'), [], 'and renames no tab');
-  const r = run(['rename', '--workflow', WF, '--title', 'Nivo · Đăng nhập & xác thực', '--by', 'owner']);
+  const r = run(['rename', '--workflow', WF, '--title', 'Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c', '--by', 'owner']);
   assert.equal(r.status, 0, r.stderr || r.stdout);
   const body = out(r);
-  assert.deepEqual([body.title, body.from, body.slug, body.by, body.changed], ['Nivo · Đăng nhập & xác thực', null, 'nivo-app-auth', 'owner', true]);
+  assert.deepEqual([body.title, body.from, body.slug, body.by, body.changed], ['Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c', null, 'nivo-app-auth', 'owner', true]);
   assert.ok(hasLedgerColumn(ledger.db, 'workflows', 'display_name'), 'the api migrated the additive column');
   const row = ledger.db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(WF);
-  assert.deepEqual([row.workflow_id, row.title, row.display_name], [WF, 'nivo-app-auth', 'Nivo · Đăng nhập & xác thực'], 'the id and the slug never change');
+  assert.deepEqual([row.workflow_id, row.title, row.display_name], [WF, 'nivo-app-auth', 'Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c'], 'the id and the slug never change');
   const events = ledger.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='workflow-renamed'").all(WF).map((e) => JSON.parse(e.payload_json));
-  assert.deepEqual(events.map((e) => [e.from, e.to, e.by]), [[null, 'Nivo · Đăng nhập & xác thực', 'owner']]);
+  assert.deepEqual(events.map((e) => [e.from, e.to, e.by]), [[null, 'Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c', 'owner']]);
   const renames = calls().filter((argv) => argv[0] === 'terminal' && argv[1] === 'rename').map((argv) => [argv[argv.indexOf('--terminal') + 1], argv[argv.indexOf('--title') + 1]]);
-  assert.deepEqual(renames, [['term-k', '[Kernel] Nivo · Đăng nhập & xác thực'], ['term-op', '[Op] Kiểm thử UAT · Đăng nhập · Nivo · Đăng nhập & xác thực']]);
+  assert.deepEqual(renames, [['term-k', '[Kernel] Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c'], ['term-op', '[Op] Ki\u1ec3m th\u1eed UAT · \u0110\u0103ng nh\u1eadp · Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c']]);
   assert.deepEqual(body.terminals.map((x) => [x.role, x.ok]), [['kernel', true], ['op', true]]);
 
-  const again = out(run(['rename', '--workflow', WF, '--title', 'Nivo · Đăng nhập & xác thực', '--no-terminals']));
+  const again = out(run(['rename', '--workflow', WF, '--title', 'Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c', '--no-terminals']));
   assert.equal(again.changed, false, 'the same name writes nothing');
   assert.equal(ledger.db.prepare("SELECT count(*) n FROM events WHERE kind='workflow-renamed'").get().n, 1);
 
   const status = out(run(['status', '--workflow', WF]));
-  assert.deepEqual([status.workflowId, status.title, status.slug], [WF, 'Nivo · Đăng nhập & xác thực', 'nivo-app-auth']);
+  assert.deepEqual([status.workflowId, status.title, status.slug], [WF, 'Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c', 'nivo-app-auth']);
   for (const leg of status.legs) assert.equal(leg.label, opLabel(leg.op));
 
   const job = ledger.db.prepare("SELECT * FROM jobs WHERE job_id='op-uat.verify-1'").get();
-  assert.equal(jobDisplayNameOf(ledger.db, job), 'Kiểm thử UAT · Đăng nhập · Nivo · Đăng nhập & xác thực');
+  assert.equal(jobDisplayNameOf(ledger.db, job), 'Ki\u1ec3m th\u1eed UAT · \u0110\u0103ng nh\u1eadp · Nivo · \u0110\u0103ng nh\u1eadp & x\u00e1c th\u1ef1c');
 }));
 
 test('api rename refuses a bad name, a bad --by, an unknown workflow and an op caller', (t) => world(t, ({ run, ledger }) => {
@@ -154,24 +154,24 @@ test('api rename refuses a bad name, a bad --by, an unknown workflow and an op c
 
 test('the orca-tree check never identifies a kernel by its [Kernel] tab title, display name or not', (t) => withLedger(t, ({ ledger }) => {
   seedWorkflow(ledger, { id: 'wf-tree-named', state: { phase: 'running', job: 'tree-slug' } });
-  ledger.db.prepare("UPDATE workflows SET phase='running', display_name='Nivo · Cây' WHERE workflow_id='wf-tree-named'").run();
+  ledger.db.prepare("UPDATE workflows SET phase='running', display_name='Nivo · C\u00e2y' WHERE workflow_id='wf-tree-named'").run();
   const term = (handle, title) => ({ handle, title, live: true, worktreePath: null });
   // Former false positive: two tabs titled with the workflow's display name read as a duplicate kernel.
-  const dup = orcaTreeFindings(ledger.db, [term('t1', '[Kernel] Nivo · Cây'), term('t2', '[Kernel] Nivo · Cây')], { owned: new Set() });
+  const dup = orcaTreeFindings(ledger.db, [term('t1', '[Kernel] Nivo · C\u00e2y'), term('t2', '[Kernel] Nivo · C\u00e2y')], { owned: new Set() });
   assert.deepEqual(dup.filter((f) => f.code === 'DUPLICATE_KERNEL'), []);
-  const foreign = orcaTreeFindings(ledger.db, [term('t9', '[Kernel] Todo App · Nền tảng')], { owned: new Set() });
+  const foreign = orcaTreeFindings(ledger.db, [term('t9', '[Kernel] Todo App · N\u1ec1n t\u1ea3ng')], { owned: new Set() });
   assert.deepEqual(foreign.filter((f) => f.terminal === 't9'), [], 'another ledger\'s kernel is not this ledger\'s orphan');
 }));
 
 test('a Telegram ask names the workflow by its display name and the asking job by its name', (t) => withLedger(t, ({ ledger }) => {
   seedWorkflow(ledger, { id: 'wf-ask-named', state: { phase: 'running', job: 'ask-slug' }, jobs: [
-    { jobId: 'op-interface.draw-1', opId: 'interface.draw', kind: 'op', status: 'answering', dispatchId: 'ask-1', payload: { opId: 'interface.draw', displayWhat: 'Mô-đun đã cài đặt' } },
+    { jobId: 'op-interface.draw-1', opId: 'interface.draw', kind: 'op', status: 'answering', dispatchId: 'ask-1', payload: { opId: 'interface.draw', displayWhat: 'M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t' } },
   ] });
-  ledger.db.prepare("UPDATE workflows SET display_name='Nivo · Mô-đun Todo' WHERE workflow_id='wf-ask-named'").run();
+  ledger.db.prepare("UPDATE workflows SET display_name='Nivo · M\u00f4-\u0111un Todo' WHERE workflow_id='wf-ask-named'").run();
   const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('op-interface.draw-1').attempt_id;
   ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'ask',?,?)")
-    .run('wf-ask-named', attemptId, 'ask-1', 'op-interface.draw-1', JSON.stringify({ outcome: 'ask', question: { text: 'Duyệt?', options: ['ok'] } }), Date.now());
+    .run('wf-ask-named', attemptId, 'ask-1', 'op-interface.draw-1', JSON.stringify({ outcome: 'ask', question: { text: 'Duy\u1ec7t?', options: ['ok'] } }), Date.now());
   const view = askState(ledger.db, 'wf-ask-named', 'ask-1');
-  assert.equal(view.title, 'Nivo · Mô-đun Todo');
-  assert.equal(view.jobName, 'Vẽ giao diện · Mô-đun đã cài đặt · Nivo · Mô-đun Todo');
+  assert.equal(view.title, 'Nivo · M\u00f4-\u0111un Todo');
+  assert.equal(view.jobName, 'V\u1ebd giao di\u1ec7n · M\u00f4-\u0111un \u0111\u00e3 c\u00e0i \u0111\u1eb7t · Nivo · M\u00f4-\u0111un Todo');
 }));

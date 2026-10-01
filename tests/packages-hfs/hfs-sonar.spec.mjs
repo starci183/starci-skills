@@ -48,7 +48,7 @@ function schemaProblems(document) {
   return problems;
 }
 
-const finding = (over) => ({ code: 'HFS_MANAGED_FILE_DRIFT', level: 'error', path: 'src/a.ts', message: 'a.ts drifted', title: 'A managed file differs from its render', titleVi: 'Tệp do máy sinh bị sửa tay', whyVi: 'Tệp lệch bản render.', nextStepVi: 'Chạy lại hfs sync.', ...over });
+const finding = (over) => ({ code: 'HFS_MANAGED_FILE_DRIFT', level: 'error', path: 'src/a.ts', message: 'a.ts drifted', title: 'A managed file differs from its render', titleVi: 'T\u1ec7p do m\u00e1y sinh b\u1ecb s\u1eeda tay', whyVi: 'T\u1ec7p l\u1ec7ch b\u1ea3n render.', nextStepVi: 'Ch\u1ea1y l\u1ea1i hfs sync.', ...over });
 
 test('the report maps a finding to an issue and its code to a rule with the catalog text, in the 10.3+ format', () => {
   const report = sonarReport([finding({ path: 'src/a.ts', line: 7, message: 'a.ts line 7' })]);
@@ -57,7 +57,7 @@ test('the report maps a finding to an issue and its code to a rule with the cata
   const [rule] = report.rules;
   assert.deepEqual([rule.id, rule.engineId, rule.name, rule.cleanCodeAttribute], ['HFS_MANAGED_FILE_DRIFT', 'starci-hfs', 'A managed file differs from its render', 'CONVENTIONAL']);
   assert.deepEqual(rule.impacts, [{ softwareQuality: 'MAINTAINABILITY', severity: 'HIGH' }]);
-  assert.match(rule.description, /A managed file differs from its render\. Tệp do máy sinh bị sửa tay: Tệp lệch bản render\. Cách sửa: Chạy lại hfs sync\./);
+  assert.match(rule.description, /A managed file differs from its render\. T\u1ec7p do m\u00e1y sinh b\u1ecb s\u1eeda tay: T\u1ec7p l\u1ec7ch b\u1ea3n render\. C\u00e1ch s\u1eeda: Ch\u1ea1y l\u1ea1i hfs sync\./);
   assert.deepEqual(report.issues, [{ ruleId: 'HFS_MANAGED_FILE_DRIFT', effortMinutes: 5, primaryLocation: { message: 'a.ts line 7', filePath: 'src/a.ts', textRange: { startLine: 7, endLine: 7 } } }]);
 });
 

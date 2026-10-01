@@ -3,6 +3,7 @@ export const concept: Concept = 'C8';
 import type { ReactNode } from 'react';
 import { CopyButton, Frame, Line, Toolbar, wordTone } from './common';
 import { TextView } from './text-view';
+import { t } from '../../../i18n/t';
 
 const KEY_RE = /^("(?:[^"\\]|\\.)*"|'[^']*'|[^\s:#"'[\]{},&*!|>%@`][^:#]*?)(\s*):(?=\s|$)/;
 const NUM_RE = /^[-+]?(?:\d[\d_]*(?:\.\d*)?(?:[eE][-+]?\d+)?|0x[0-9a-fA-F]+|\.\d+)$/;
@@ -99,7 +100,7 @@ export function YamlView({ text }: { text: string }) {
   });
   return (
     <Frame>
-      <Toolbar right={<span>YAML · {lines.length} dòng</span>}><CopyButton value={text} label="Chép hết" /></Toolbar>
+      <Toolbar right={<span>{t('YAML · {n} lines', { n: lines.length })}</span>}><CopyButton value={text} label={t('Copy all')} /></Toolbar>
       <div className="max-h-[70vh] overflow-auto bg-background py-1">{rows}</div>
     </Frame>
   );

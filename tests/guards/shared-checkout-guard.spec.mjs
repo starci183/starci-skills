@@ -340,7 +340,7 @@ test('a --pathspec-from-file list is scoped line by line like named pathspecs', 
   const nul = list('nul.txt', 'src/features/collab/chat/a.ts\0.starciwork/features/collab/ui/chat/a b.yaml\0');
   const empty = list('empty.txt', '');
   assert.deepEqual(parsePathspecList(fs.readFileSync(path.join(cwd, mine), 'utf8')).slice(0, 3),
-    ['src/features/collab/chat/a.ts', '.starciwork/features/collab/ui/chat/index.yaml', '.starciwork/features/collab/ui/chat/é x.yaml']);
+    ['src/features/collab/chat/a.ts', '.starciwork/features/collab/ui/chat/index.yaml', '.starciwork/features/collab/ui/chat/\u00e9 x.yaml']);
   // allowed: every line owned, whichever form names the list
   for (const argv of [
     ['add', `--pathspec-from-file=${mine}`], ['add', '--pathspec-from-file', mine],
