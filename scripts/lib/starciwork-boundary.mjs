@@ -9,8 +9,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// The one source of the .starciwork/.gitignore text: the be template `hfs sync` renders (packages/hfs/templates).
-const TEMPLATE = path.join(import.meta.dirname, '..', '..', 'packages', 'hfs', 'templates', 'be', 'starciwork.gitignore');
+// The one source of the .starciwork/.gitignore text: the app root template `hfs sync` renders (packages/hfs/templates).
+const TEMPLATE = path.join(import.meta.dirname, '..', '..', 'packages', 'hfs', 'templates', 'app', 'starciwork.gitignore');
 
 // The record families that hold nothing but index.yaml and evidence.yaml (ui, impl, uat and ac have their own rows).
 export const PLAIN_FAMILIES = Object.freeze(['br', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'contract', 'integration', 'gap', 'event']);
