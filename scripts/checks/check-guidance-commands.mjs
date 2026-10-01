@@ -88,6 +88,10 @@ const REFUSED_AFTER = /^[^.;]*?\b(?:refuses?|is refused|are refused|is blocked|a
 const PAST_BEFORE = /\b(?:was|were|ran|had)\b[^,;:]*$/i;
 const PAST_AFTER = /^\W{0,3}(?:,?\s*which\s+)?(?:ran|followed|deleted|emptied|restarted|wiped)\b/i;
 const RUNTIME_ACTOR = /(?:\bthe runtime\b|\bruntime's\b|[\w/.-]+\.mjs\b|\b[a-z]+[A-Z]\w*\b)(?:\s+\w+){0,3}?\s+(?:[\w-]+s|is the only)\b[^,;:]*$/;
+// A clause whose SUBJECT is a runtime actor (the runtime, the host-side controller, the reconciler, the GC, the finish, a script
+// file) describes what the runtime itself does, whatever punctuation follows: the clause is the text after the last . ; | or
+// table cell break before the command.
+const RUNTIME_SUBJECT = /^\s*(?:the\s+)?(?:runtime(?:'s)?|host-side controller|controller|reconciler|GC|garbage collector|finish|settle|land gate|[\w/.-]+\.mjs)\b/i;
 
 /** Why the refused command at `span` of `sentence` is not an instruction, or null when it is one. */
 export function excusedBy(sentence, span) {
@@ -96,6 +100,8 @@ export function excusedBy(sentence, span) {
   if (NEGATION.test(before) || REFUSED_AFTER.test(after)) return 'prohibition';
   if (PAST_BEFORE.test(before) || PAST_AFTER.test(after)) return 'narrative';
   if (RUNTIME_ACTOR.test(before)) return 'runtime-internal';
+  const clause = before.split(/[.;|]/).pop();
+  if (RUNTIME_SUBJECT.test(clause)) return 'runtime-internal';
   return null;
 }
 

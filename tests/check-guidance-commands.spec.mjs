@@ -83,6 +83,13 @@ test('command spans: backticks, quotes, parentheses and an imperative run', () =
   assert.equal(excusedBy('Never `rm -rf x`.', commandSpans('Never `rm -rf x`.')[0]), 'prohibition');
 });
 
+test('a clause whose subject is a runtime actor describes the runtime, whatever punctuation the clause carries', () => {
+  const runtime = 'The finish marks it release-pending; the host-side controller removes it once released (link check, removal, then `git branch -d`).';
+  assert.equal(excusedBy(runtime, commandSpans(runtime)[0]), 'runtime-internal');
+  const instruction = 'When it is stale, clean up (link check, removal, then `git branch -d`).';
+  assert.equal(excusedBy(instruction, commandSpans(instruction)[0]), null, 'an agent told to run it is still an instruction');
+});
+
 test('markdown: fenced lines stand under their lead-in sentence, table cells are their own text', async () => {
   const md = ['Never run these:', '', '```', 'rm -rf node_modules', '```', '', 'Clean up:', '', '```bash', 'rm -rf dist', '```', '',
     '| Signature | First response |', '| --- | --- |', '| x | Clean with `rm -rf out`. |'].join('\n');
