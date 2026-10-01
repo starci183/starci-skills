@@ -49,6 +49,11 @@ reads:
         active profiles. Use current host model configuration; historical model names are not
         availability proof. Capabilities are the intersection of actual tools, selected profile
         policy, op permissions and existing task authority.
+  - id: release-proof
+    path: knowledge/op-gate.yaml + scripts/checks/release-proof.mjs + scripts/checks/release-app-installs.mjs + knowledge/hfs/canon-pins.yaml + modules/models/code-patterns.yaml
+    purpose:
+      en: "The release proof a publish or a deploy owes: release-app-installs (the published hfs scaffolds an app, the app installs fresh from the npm registry, the scaffold spec runs lint, typecheck and the api boot with installs required), check-canon-pins (every pin, and every code-pattern profile bound to its published canon by the content digest), the merge guard over the release range and npm run check of the runtime."
+      vi: "Bằng chứng phát hành mà một lần publish hoặc deploy phải có: release-app-installs (hfs đã publish dựng một app, app cài mới từ npm registry, spec scaffold chạy lint, typecheck và khởi động api với yêu cầu có bản cài), check-canon-pins (mọi pin, và mọi profile code-pattern gắn với canon đã publish bằng digest nội dung), merge guard trên dải phát hành và npm run check của runtime."
 writes:
   - id: node
     path: N/index.yaml
@@ -62,6 +67,12 @@ writes:
     content:
       en: Record operation, exact scope, criteria, output artifact references, observed effects and
         unresolved findings.
+  - id: release-proof
+    path: STARCI_JOB_SCRATCH/release-proof.json
+    schema: starci/release-proof@1
+    content:
+      en: "The release proof (scripts/checks/release-proof.mjs): each required step - app-installs, canon-pins, merge-guard, check - with its command, exit, status (pass, red, skipped, tool-failed) and detail."
+      vi: "Bằng chứng phát hành (scripts/checks/release-proof.mjs): từng bước bắt buộc - app-installs, canon-pins, merge-guard, check - kèm lệnh, exit, trạng thái (pass, red, skipped, tool-failed) và chi tiết."
 steps:
   - reads:
       - application-stacks
@@ -71,25 +82,27 @@ steps:
     writes: []
     action:
       en: "Resolve the exact named operation and load only its contract. Its reads/writes, effect ceiling
-        and completion profile replace this selector envelope; the union of modes never grants
+        and completion profile replace this selector envelope, except the mechanism steps and proofs
+        below (the release proof), which every mode they name keeps; the union of modes never grants
         authority. Resolve the execution profile and actual tool availability before selecting
         instruments; this does not switch the model/runtime or spawn workers. For an explicitly new
         target, absence is expected: inspect the nearest existing ancestor/workspace, then create
         only that selected scope."
-  - reads:
-      - target
-      - selection
-    writes: [node, evidence]
+  - reads: [target, selection, release-proof]
+    writes: [node, evidence, release-proof]
     action:
-      en: Execute the selected mode procedure through its actual postconditions. Return operation, scope,
-        per-criterion results and real output refs; no other mode, source repair or successor is
-        implied. This handoff is conditional and does not change standalone or named frontend
-        response contracts.
+      en: "Before any publish or deploy effect, prove the release: node scripts/checks/release-proof.mjs --repo <the released repository> --base <the first commit of the release range>^ --out $STARCI_JOB_SCRATCH/release-proof.json. Every step is required - release-app-installs (fresh npm installs, lint, typecheck and the api boot; a SKIPPED proof is a skip, never a pass), check-canon-pins with the canon content digest, the merge guard over the release range and a green npm run check; a red, skipped or unrunnable step stops the release and is reported failed or blocked with that step's detail, never published around. Then execute the selected mode procedure through its actual postconditions. Return operation, scope, per-criterion results and real output refs; no other mode, source repair or successor is implied. A migrate dispatch owes no release proof (it ships no package). REPORT with release-proof.json attached."
+      vi: "Trước mọi hiệu ứng publish hay deploy, chứng minh bản phát hành: node scripts/checks/release-proof.mjs --repo <repo được phát hành> --base <commit đầu tiên của dải phát hành>^ --out $STARCI_JOB_SCRATCH/release-proof.json. Mọi bước đều bắt buộc - release-app-installs (cài mới từ npm, lint, typecheck và khởi động api; chứng minh bị SKIPPED là bỏ qua, không bao giờ là đạt), check-canon-pins với digest nội dung canon, merge guard trên dải phát hành và npm run check xanh; bước đỏ, bị bỏ qua hoặc không chạy được sẽ dừng việc phát hành và được báo failed hoặc blocked kèm chi tiết của bước đó, không bao giờ phát hành vòng qua. Sau đó thực hiện quy trình của chế độ đã chọn tới các hậu điều kiện thật. Trả về thao tác, phạm vi, kết quả theo từng tiêu chí và tham chiếu đầu ra thật; không ngầm định chế độ khác, sửa mã hay bước kế tiếp. Lần dispatch migrate không cần bằng chứng phát hành (nó không giao gói nào). BÁO CÁO kèm release-proof.json."
 proofs:
   - id: mode-result
     requirement:
       en: Exactly the selected mode contract and all requested criteria pass with real evidence before
         delivery.
+  - id: release
+    requirement:
+      en: "For a publish or a deploy api settle re-reads the attached release-proof.json (runtime check op-proof, proof release): a done without it (op-release-proof-missing), with a required step missing or skipped (op-release-step-skipped) or with a step red or unrunnable (op-release-step-red) is refused."
+      vi: "Với publish hoặc deploy api settle tự đọc lại release-proof.json đính kèm (check op-proof, proof release): done thiếu nó (op-release-proof-missing), thiếu hoặc bỏ qua một bước bắt buộc (op-release-step-skipped) hoặc có bước đỏ hay không chạy được (op-release-step-red) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: OPERATION_REQUIRED
     condition:

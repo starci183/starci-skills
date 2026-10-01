@@ -59,6 +59,11 @@ reads:
         active profiles. Use current host model configuration; historical model names are not
         availability proof. Capabilities are the intersection of actual tools, selected profile
         policy, op permissions and existing task authority.
+  - id: review-gate
+    path: knowledge/op-gate.yaml + scripts/checks/gate.mjs + <app>/<reviewed range>
+    purpose:
+      en: "The gate the review runs over the reviewed range and the classes its defects take: gate.mjs (the installed canon, the merge guard over base..HEAD, hfs lint, tsc and the slice's specs, measured against the range's base read-only from git objects) and op-gate.yaml proofs.review-gate and review-defects (starci/review-defects@1)."
+      vi: "Cổng mà bản review chạy trên dải được review và các loại mà lỗi của nó mang: gate.mjs (canon đã cài, merge guard trên base..HEAD, hfs lint, tsc và các spec của slice, đo so với base của dải ở chế độ chỉ đọc từ đối tượng git) cùng proofs.review-gate và review-defects của op-gate.yaml (starci/review-defects@1)."
 writes:
   - id: node
     path: N/index.yaml
@@ -72,6 +77,18 @@ writes:
     content:
       en: Record operation, exact scope, criteria, output artifact references, observed effects and
         unresolved findings.
+  - id: gate-proof
+    path: STARCI_JOB_SCRATCH/gate.json
+    schema: starci/gate@1
+    content:
+      en: "The gate report over the reviewed range: exit, base, head, the changed files, the merge guard's checked merges and dropped main changes, new and preexisting counts and every new finding."
+      vi: "Báo cáo cổng trên dải được review: exit, base, head, các tệp đã đổi, các merge mà merge guard đã kiểm và các thay đổi của main bị mất, số lỗi mới và có sẵn, và từng lỗi mới."
+  - id: review-defects
+    path: STARCI_JOB_SCRATCH/review-defects.json
+    schema: starci/review-defects@1
+    content:
+      en: "Every defect the review found: {schema: starci/review-defects@1, defects: [{id, title, class: business|non-business, caughtBy: the check that caught it or null, missingCheck: {check, rule, detail} when non-business and no check caught it}]}; empty when it found none."
+      vi: "Mọi lỗi bản review tìm thấy: {schema: starci/review-defects@1, defects: [{id, title, class: business|non-business, caughtBy: check đã bắt được hoặc null, missingCheck: {check, rule, detail} khi non-business và không check nào bắt được}]}; rỗng khi không tìm thấy lỗi nào."
 steps:
   - reads:
       - application-stacks
@@ -81,7 +98,8 @@ steps:
     writes: []
     action:
       en: "Resolve the exact named operation and load only its contract. Its reads/writes, effect ceiling
-        and completion profile replace this selector envelope; the union of modes never grants
+        and completion profile replace this selector envelope, except the mechanism steps and proofs
+        below (the gate over the reviewed range and the defect classes), which every mode they name keeps; the union of modes never grants
         authority. Resolve the execution profile and actual tool availability before selecting
         instruments; this does not switch the model/runtime or spawn workers. For an explicitly new
         target, absence is expected: inspect the nearest existing ancestor/workspace, then create
@@ -95,11 +113,31 @@ steps:
         per-criterion results and real output refs; no other mode, source repair or successor is
         implied. This handoff is conditional and does not change standalone or named frontend
         response contracts.
+  - reads: [review-gate, target, selection]
+    writes: [gate-proof, evidence]
+    action:
+      en: "In the code modes (delivery, workflow, api, lint, and select when it picks one of them) run the gate READ-ONLY over the reviewed range: node scripts/checks/gate.mjs --root <app> --base <the first reviewed commit>^ [--main <the main ref>] --out $STARCI_JOB_SCRATCH/gate.json. It changes nothing in the checkout: the base is measured from git objects, and its MERGE GUARD recomputes every merge in the range with git merge-tree, so a merge that kept the lane side over a main change is a finding merge/dropped-main-change. A new finding, a dropped main change or a tool that could not run is the review's own result - the review never passes a range the gate finds red or could not judge, and it repairs nothing. REPORT with gate.json attached."
+      vi: "Ở các chế độ mã (delivery, workflow, api, lint, và select khi nó chọn một trong số đó) chạy cổng CHỈ ĐỌC trên dải được review: node scripts/checks/gate.mjs --root <app> --base <commit đầu tiên được review>^ [--main <ref main>] --out $STARCI_JOB_SCRATCH/gate.json. Nó không thay đổi gì trong checkout: base được đo từ đối tượng git, và MERGE GUARD của nó tính lại mọi merge trong dải bằng git merge-tree, nên merge giữ bản của lane thay cho thay đổi của main là lỗi merge/dropped-main-change. Lỗi mới, thay đổi của main bị mất hoặc công cụ không chạy được là kết quả của chính bản review - review không bao giờ cho qua một dải mà cổng thấy đỏ hoặc không chấm được, và không sửa gì. BÁO CÁO kèm gate.json."
+  - reads: [review-gate, target]
+    writes: [review-defects, evidence]
+    action:
+      en: "Classify every defect the review found, in every mode, into $STARCI_JOB_SCRATCH/review-defects.json: business (the product does not do what the records decided - a requirement, a rule, a journey) or non-business (structure, canon, typing, security, wiring, test layer, documents - anything a machine could judge). Name for each the check that caught it (caughtBy: the gate finding, the canon rule, the validator) or null. A non-business defect that no check caught is a missing check for .claude (owner rule): record missingCheck {check: the check or canon rule that should have caught it, rule: the knowledge/hfs/rules.yaml id when one applies, detail: why it slipped through} so the runtime grows that check; a business defect needs none. A review that found nothing attaches an empty list. REPORT with review-defects.json attached."
+      vi: "Phân loại mọi lỗi bản review tìm thấy, ở mọi chế độ, vào $STARCI_JOB_SCRATCH/review-defects.json: business (sản phẩm không làm điều bản ghi đã quyết - một yêu cầu, một luật, một hành trình) hoặc non-business (cấu trúc, canon, kiểu, bảo mật, nối dây, tầng test, tài liệu - bất cứ gì máy chấm được). Với mỗi lỗi nêu check đã bắt được nó (caughtBy: lỗi của cổng, luật canon, bộ kiểm tra hợp lệ) hoặc null. Lỗi non-business không check nào bắt được là một check còn thiếu cho .claude (luật của chủ sở hữu): ghi missingCheck {check: check hoặc luật canon lẽ ra phải bắt nó, rule: mã knowledge/hfs/rules.yaml khi có, detail: vì sao nó lọt qua} để runtime bổ sung check đó; lỗi business không cần. Bản review không tìm thấy gì thì đính kèm danh sách rỗng. BÁO CÁO kèm review-defects.json."
 proofs:
   - id: mode-result
     requirement:
       en: Exactly the selected mode contract and all requested criteria pass with real evidence before
         delivery.
+  - id: review-gate
+    requirement:
+      en: "In the code modes api settle re-reads the attached gate.json (runtime check op-proof, proof review-gate): a done without it (op-gate-proof-missing), with a tool that could not run (op-gate-tool-failed) or over a range with a new finding or a dropped main change (op-gate-new-findings) is refused."
+      vi: "Ở các chế độ mã api settle tự đọc lại gate.json đính kèm (check op-proof, proof review-gate): done thiếu nó (op-gate-proof-missing), có công cụ không chạy được (op-gate-tool-failed) hoặc trên một dải có lỗi mới hay thay đổi của main bị mất (op-gate-new-findings) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
+  - id: review-defects
+    requirement:
+      en: "api settle re-reads the attached review-defects.json (runtime check op-proof, proof review-defects): a done without it (op-review-defects-missing), with a defect not classified business or non-business (op-review-defect-unclassified) or with a non-business defect no check caught and no missingCheck recorded (op-review-missing-check-unrecorded) is refused."
+      vi: "api settle tự đọc lại review-defects.json đính kèm (check op-proof, proof review-defects): done thiếu nó (op-review-defects-missing), có lỗi chưa phân loại business hay non-business (op-review-defect-unclassified) hoặc có lỗi non-business không check nào bắt mà không ghi missingCheck (op-review-missing-check-unrecorded) đều bị từ chối."
+    check: scripts/kernel/gate-settle.mjs
 blockers:
   - code: OPERATION_REQUIRED
     condition:
