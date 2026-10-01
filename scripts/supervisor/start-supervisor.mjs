@@ -25,7 +25,7 @@
 //      worker-show reports live is never replaced; an Orca that does not answer proves nothing (exit 75, nothing touched);
 //   3. dedupe: every other terminal whose tab or pane title carries "[Supervisor]" is a duplicate (a [Worker]
 //      tab or a terminal an open worker job owns never is): bare shells and extra sessions are quit and closed.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';

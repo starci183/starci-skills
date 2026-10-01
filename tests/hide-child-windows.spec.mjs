@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { withWindowsHide } from '../scripts/lib/hide-child-windows.mjs';
+import { withWindowsHide } from '../scripts/api/process/hide-child-windows.mjs';
 
 // The owner saw black console windows flash on every watchdog tick: detached
 // runtime processes have no console, so each orca/powershell/node child they
@@ -25,6 +25,6 @@ test('windowsHide lands in the options slot of every call shape', () => {
 test('every detached runtime entry point imports the patch first', () => {
   for (const file of ['scripts/kernel/watchdog.mjs', 'scripts/connectors/ask-gateway.mjs', 'scripts/connectors/tunnel.mjs', 'scripts/kernel/serve-ask.mjs', 'scripts/connectors/telegram-bridge.mjs', 'scripts/uat/assisted-runner.mjs']) {
     const first = fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').split('\n').find((l) => l.startsWith('import '));
-    assert.equal(first?.trim(), "import '../lib/hide-child-windows.mjs';", file);
+    assert.equal(first?.trim(), "import '../api/process/hide-child-windows.mjs';", file);
   }
 });

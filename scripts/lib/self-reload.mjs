@@ -21,7 +21,8 @@
 // connectors/lib.mjs claimOrTakeOver) and RELOADED_AT (the guard's clock across the re-exec).
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { gitSpawn } from '../api/git/lib.mjs';
+import { spawnDetachedSilent } from '../api/process/spawn-detached.mjs';
 import { lockHolder, reassertManager } from '../connectors/lib.mjs';
 import { machineLog } from '../../engine/machine-db.mjs';
 import { allocationMs } from '../../engine/config.mjs';
@@ -43,7 +44,7 @@ export function rotateLog(log, { cap = LOG_CAP_BYTES } = {}) {
 }
 
 /** The runtime checkout's HEAD commit, or null when git does not answer. */
-export function runtimeHead({ root, run = spawnSync } = {}) {
+export function runtimeHead({ root, run = gitSpawn } = {}) {
   try {
     const r = run('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 });
     const sha = String(r?.stdout ?? '').trim();
@@ -55,7 +56,7 @@ export function runtimeHead({ root, run = spawnSync } = {}) {
  * The files `from..to` changed under `paths` (git diff --name-only), [] when none, or null when git does not answer
  * (the caller then counts the HEAD change as relevant).
  */
-export function changedPaths({ root, from, to, paths = [], run = spawnSync } = {}) {
+export function changedPaths({ root, from, to, paths = [], run = gitSpawn } = {}) {
   try {
     const r = run('git', ['-C', root, 'diff', '--name-only', `${from}..${to}`, '--', ...paths], { encoding: 'utf8', windowsHide: true, timeout: 20_000 });
     if (r?.status !== 0) return null;
@@ -150,14 +151,4 @@ export async function reexecSelf({ script, args = [], lockName, env = process.en
       msg: `${path.basename(String(script))} ${selfPid} -> ${result.pid ?? '-'}: ${result.ok ? 'handed over' : result.error}` });
   } catch { /* logging never blocks a reload */ }
   return result;
-}
-
-/** spawn node <script> ...args detached and hidden, its stdio discarded; {pid, exited()}. */
-export function spawnDetachedSilent({ execPath = process.execPath, script, args = [], env, cwd }) {
-  let gone = false;
-  const child = spawn(execPath, [script, ...args], { detached: true, stdio: 'ignore', windowsHide: true, cwd, env });
-  child.on('exit', () => { gone = true; });
-  child.on('error', () => { gone = true; });
-  child.unref();
-  return { pid: child.pid ?? null, exited: () => gone };
 }

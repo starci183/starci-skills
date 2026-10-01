@@ -26,7 +26,7 @@
 //      (--hooks-only), then the push - and the pushed count. The push is recorded in machine.sqlite `pushes` by
 //      pushMains; the suite results are printed as JSON only (no table holds a full-suite run).
 // Exit 0 = every selected repository green (and pushed unless --check); 1 = red, dirty, refused or main moved; 2 = usage.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

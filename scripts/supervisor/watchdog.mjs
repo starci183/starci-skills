@@ -21,7 +21,7 @@
 // It serves only the optional [Supervisor] kernel (config.yaml supervisor.mode kernel). In chat mode (the default;
 // owner, 2026-09-25: the Supervisor is the owner's desktop chat again), or while the seat is DISABLED
 // (start-supervisor --stop) or was never started, a pass does nothing.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import path from 'node:path';
 import {sha256} from '../../engine/digest.mjs';
 import { spawnSync } from 'node:child_process';

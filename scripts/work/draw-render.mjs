@@ -48,7 +48,7 @@
 //
 // Playwright, esbuild and tailwindcss are the project's own installs (scripts/lib/package-at.mjs), resolved from
 // the HTML's or the component's directory, then the working directory; the runtime ships none of them.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

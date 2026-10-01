@@ -16,9 +16,8 @@
 //               const password = testSecret('login-capture-password', { repo });
 // The push secret scan (scripts/supervisor/push-mains.mjs) passes a `.enc` only when isSopsEnvelope holds.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { sopsDecrypt } from '../api/sops/decrypt.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 
@@ -67,10 +66,7 @@ export function testSecret(name, { repo, stack = 'dev', env = process.env, sops 
   const bin = sops ?? resolveSops(env);
   if (!bin) throw new Error('sops is not installed (Windows: winget install Mozilla.SOPS)');
   const format = sopsFormatFor(plain);
-  const r = spawnSync(bin, ['--decrypt', '--input-type', format, '--output-type', format, enc], {
-    cwd: path.resolve(String(repo)), encoding: 'utf8', windowsHide: true,
-    env: { ...env, SOPS_AGE_KEY_FILE: env.SOPS_AGE_KEY_FILE || path.join(os.homedir(), '.starci', 'master.identity') },
-  });
+  const r = sopsDecrypt(bin, ['--decrypt', '--input-type', format, '--output-type', format, enc], { cwd: path.resolve(String(repo)), env, maxBuffer: 1024 * 1024 });
   if (r.status !== 0) throw new Error(`test secret ${name}: sops could not decrypt .starcistacks/${rel}.enc (${String(r.stderr ?? r.error?.message ?? '').trim().split(/\r?\n/).pop()})`);
   return String(r.stdout).replace(/\r?\n$/, '');
 }

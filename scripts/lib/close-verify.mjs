@@ -30,14 +30,14 @@
 // --tree (tree: true): the close counts only when no agent process that ran inside an Orca terminal before the close
 // lingers outside Orca after it (orcaAgents / reapOrphaned: a lingering tree is killed and read back).
 import path from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { sleepSync } from './sleep-sync.mjs';
-import { killProcessTree } from './kill-tree.mjs';
-import { listHostProcesses } from './process-list.mjs';
+import { killProcessTree } from '../api/process/kill-tree.mjs';
+import { listHostProcesses } from '../api/process/process-list.mjs';
+import { spawnDetached } from '../api/process/spawn-detached.mjs';
 import { workerStop } from '../api/orca/worker-stop.mjs';
 import { workerRelease } from '../api/orca/worker-release.mjs';
 
@@ -115,7 +115,7 @@ export function closeAndVerify(handle, { show = terminalShow, close = terminalCl
 }
 
 /** The host's process table: [{pid, ppid, name, exe, cmd, created}] or null when unreadable (not Windows, CIM failed). */
-export function processTable({ run = spawnSync, platform = process.platform } = {}) {
+export function processTable({ run, platform = process.platform } = {}) {
   if (platform !== 'win32') return null;
   return listHostProcesses({ cmdMax: 300, run, platform });
 }
@@ -168,7 +168,7 @@ export const isOwnTerminal = (handle, env = process.env) => Boolean(handle) && e
  * Close `handle` from a caller that may be running inside it: inline closeAndVerify when it is another terminal, a
  * detached verifier (this file's CLI) when it is the caller's own. {handle, ok, proof, detached?, pid?}.
  */
-export function closeSelfSafe(handle, { owner = 'runtime', env = process.env, delayMs = SELF_CLOSE_DELAY_MS, verify = closeAndVerify, spawnFn = spawn, tree = true } = {}) {
+export function closeSelfSafe(handle, { owner = 'runtime', env = process.env, delayMs = SELF_CLOSE_DELAY_MS, verify = closeAndVerify, spawnFn = spawnDetached, tree = true } = {}) {
   if (!handle) return null;
   if (!isOwnTerminal(handle, env)) return { ...verify(handle, { tree }), owner };
   try {
@@ -193,7 +193,7 @@ export function stopAndRelease(dispatch, { stop = workerStop, release = workerRe
  * Release worker `dispatch` from a caller that may be running inside its terminal `handle` (a worker filing its own
  * report): inline stopAndRelease for another worker, a detached releaser (this file's CLI) for the caller's own.
  */
-export function releaseSelfSafe(dispatch, handle, { owner = 'runtime', env = process.env, delayMs = SELF_CLOSE_DELAY_MS, inline = stopAndRelease, spawnFn = spawn } = {}) {
+export function releaseSelfSafe(dispatch, handle, { owner = 'runtime', env = process.env, delayMs = SELF_CLOSE_DELAY_MS, inline = stopAndRelease, spawnFn = spawnDetached } = {}) {
   if (!dispatch) return null;
   if (!isOwnTerminal(handle, env)) return { ...inline(dispatch), handle, owner };
   try {

@@ -436,6 +436,32 @@ schemas:
       whenNot: Never authorizes a live runtime reference to a deleted file.
       selectedBy: The retired-path citation exception in check-contract-cites.mjs.
 
+  - id: starci/runtime-layers@1
+    file: modules/kernel/runtime-layers.yaml
+    dialect: prose-data
+    subsystem: kernel
+    governs: "The layering of the runtime's own source: each external system's api home and programs, and what a layer may not hold."
+    binds: "modules/kernel/runtime-layers.yaml scan, apiRoot, systems[] and layers[]"
+    usedBy: [scripts/checks/check-layers.mjs, scripts/checks/check-host-boundary.mjs]
+    business:
+      question: "May this file start this program, or import child_process at all?"
+      whenNeeded: Every npm run check (check-layers.mjs) over scripts, engine, bin, ext, modules and init.
+      whenNot: Not product code layering; that is the hfs slots of each app.
+      selectedBy: check-layers.mjs readRules.
+
+  - id: starci/runtime-layers-allow@1
+    file: modules/kernel/runtime-layers.allow.yaml
+    dialect: prose-data
+    subsystem: kernel
+    governs: "The one reviewed list of exceptions to the runtime layers, each with its lane and reason."
+    binds: "modules/kernel/runtime-layers.allow.yaml entries[] {path, code, system, lane, reason}"
+    usedBy: [scripts/checks/check-layers.mjs]
+    business:
+      question: "Is this layer finding a reviewed exception or a temporary one a named lane removes?"
+      whenNeeded: Every check-layers run; an entry no finding matches is RT_LAYER_ALLOW_STALE.
+      whenNot: Never an exception without a reason; an invalid entry allows nothing.
+      selectedBy: check-layers.mjs readRules.
+
   - id: starci/push-scan-allow@1
     file: modules/supervisor/push-scan-allow.yaml
     dialect: prose-data

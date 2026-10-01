@@ -1,0 +1,26 @@
+# runtime-layers.yaml — the layering of the runtime's own source, as data (one rule set; scripts/checks/check-layers.mjs
+# enforces it in `npm run check`, docs/runtime-layers.md explains it).
+#
+#   systems   each external system the runtime talks to, the one directory that may start its programs, and the program
+#             names that start it (basename, lower case, no .exe/.cmd/.bat/.ps1). A spawn of one of those programs
+#             anywhere else is RT_LAYER_EXTERNAL_SPAWN.
+#   layers    a directory and what no module under it may hold. scripts/lib holds pure helpers and shared logic: no
+#             child_process at all (RT_LAYER_LIB_CHILD_PROCESS).
+#   unresolved  outside scripts/api/, a spawn whose program the AST cannot name (a variable, a property, a parameter no
+#             caller in the file fills) is RT_LAYER_SPAWN_UNRESOLVED: name the program, move the call into its api, or
+#             record it as a reviewed exception.
+#   node      `node` (process.execPath) children of the runtime's own scripts are the runtime itself, not an external
+#             system: domain layers may start them; scripts/lib may not (it starts nothing).
+# Exceptions live in one reviewed file: runtime-layers.allow.yaml.
+schema: starci/runtime-layers@1
+scan: [scripts, engine, bin, ext, modules, init]
+apiRoot: scripts/api
+systems:
+  - {id: orca, home: scripts/api/orca, programs: [orca]}
+  - {id: git, home: scripts/api/git, programs: [git]}
+  - {id: npm, home: scripts/api/npm, programs: [npm, npx]}
+  - {id: sonar, home: scripts/api/sonar, programs: [sonar-scanner, sonar]}
+  - {id: docker, home: scripts/api/docker, programs: [docker, docker-compose]}
+layers:
+  - {id: lib, path: scripts/lib, forbid: child_process}
+allowlist: modules/kernel/runtime-layers.allow.yaml

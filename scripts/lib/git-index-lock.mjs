@@ -17,9 +17,8 @@
 // command runs (scripts/guards/command-guard.mjs) and the housekeeping area `gitlocks` (scripts/supervisor/housekeeping.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { pathKey } from './path-key.mjs';
-import { listHostProcesses } from './process-list.mjs';
+import { listHostProcesses } from '../api/process/process-list.mjs';
 
 export const LOCK_EVENT = 'git-index-lock-removed';
 /** git.exe and its helpers (git-remote-https.exe, git-lfs.exe, ...). */
@@ -48,7 +47,7 @@ export function checkoutOf(start) {
 }
 
 /** Git-family processes on this host: [{pid, name, commandLine}], or null when the probe failed. */
-export function listGitProcesses({ platform = process.platform, run = spawnSync } = {}) {
+export function listGitProcesses({ platform = process.platform, run } = {}) {
   const rows = listHostProcesses({ where: "Name LIKE 'git%'", run, platform, timeoutMs: 30000 });
   return rows ? rows.map((p) => ({ pid: p.pid, name: String(p.name ?? ''), commandLine: p.cmd })).filter((p) => GIT_IMAGE.test(p.name)) : null;
 }

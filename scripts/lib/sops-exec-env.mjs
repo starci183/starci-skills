@@ -17,9 +17,9 @@
 // its top-level scalar keys become the child's environment. Nothing is written to a file, a log or the parent shell, and
 // a value is never printed except by `--get`, which writes exactly that one value to stdout for the calling process.
 // The age identity is SOPS_AGE_KEY_FILE, default ~/.starci/master.identity.
-import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { sopsDecrypt } from '../api/sops/decrypt.mjs';
+import { runShellInherit } from '../api/process/run-shell.mjs';
 import { fileURLToPath } from 'node:url';
 import { resolveSops } from './test-secrets.mjs';
 
@@ -41,10 +41,7 @@ export function custodyInputType(file, override) {
 export function readCustody(file, { inputType, env = process.env, sops = null } = {}) {
   const bin = sops ?? resolveSops(env);
   if (!bin) throw new Error('sops is not installed (Windows: winget install Mozilla.SOPS)');
-  const result = spawnSync(bin, ['decrypt', '--input-type', custodyInputType(file, inputType), '--output-type', 'json', file], {
-    encoding: 'utf8', windowsHide: true, maxBuffer: 16 * 1024 * 1024,
-    env: { ...env, SOPS_AGE_KEY_FILE: env.SOPS_AGE_KEY_FILE || path.join(os.homedir(), '.starci', 'master.identity') },
-  });
+  const result = sopsDecrypt(bin, ['decrypt', '--input-type', custodyInputType(file, inputType), '--output-type', 'json', file], { env });
   if (result.status !== 0) throw new Error(`sops could not decrypt ${file} (exit ${String(result.status)}); is the age identity installed?`);
   const values = {};
   for (const [name, value] of Object.entries(JSON.parse(result.stdout))) {
@@ -56,8 +53,7 @@ export function readCustody(file, { inputType, env = process.env, sops = null } 
 /** Runs `command` with the custody keys added to its environment; returns the child's exit status. */
 export function execWithCustody(file, command, options = {}) {
   const values = readCustody(file, options);
-  const child = spawnSync(command, { shell: true, stdio: 'inherit', env: { ...process.env, ...values } });
-  return child.status ?? 1;
+  return runShellInherit(command, values);
 }
 
 function main(argv) {

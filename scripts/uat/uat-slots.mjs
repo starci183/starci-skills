@@ -12,7 +12,7 @@
 // holding a slot; a Playwright test run records video, trace and screenshots into a fresh directory under
 // --record-dir (default <tmp>/starci-uat-recordings), printed first.
 
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import {spawn} from 'node:child_process';

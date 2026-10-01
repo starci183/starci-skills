@@ -162,3 +162,6 @@ retired:
   - {path: .github/workflows/example-unit.yml, retiredAt: 2026-10-01, removedIn: c0-sonar2, replacedBy: '.github/workflows/examples.yml (one root workflow, matrix derived from examples/*/hfs.json of kind app by scripts/checks/examples-ci.mjs)'}
   - {path: .github/workflows/todo-app-example.yml, retiredAt: 2026-10-01, removedIn: c0-sonar2, replacedBy: '.github/workflows/examples.yml (records job and the per-app matrix job)'}
   - {path: .github/workflows/todo-app-live-e2e.yml, retiredAt: 2026-10-01, removedIn: c0-sonar2, replacedBy: '.github/workflows/examples.yml workflow_dispatch (input layers: integration and e2e on the test world, manual only)'}
+  - {path: scripts/lib/process-list.mjs, retiredAt: 2026-10-01, removedIn: c0-layer1, replacedBy: 'scripts/api/process/process-list.mjs (scripts/lib starts no process: modules/kernel/runtime-layers.yaml)'}
+  - {path: scripts/lib/kill-tree.mjs, retiredAt: 2026-10-01, removedIn: c0-layer1, replacedBy: 'scripts/api/process/kill-tree.mjs (scripts/lib starts no process: modules/kernel/runtime-layers.yaml)'}
+  - {path: scripts/lib/hide-child-windows.mjs, retiredAt: 2026-10-01, removedIn: c0-layer1, replacedBy: 'scripts/api/process/hide-child-windows.mjs (scripts/lib starts no process: modules/kernel/runtime-layers.yaml)'}

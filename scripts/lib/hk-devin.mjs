@@ -32,7 +32,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {listProcessNames} from '../api/process/process-names.mjs';
 import {isLinkLike} from './safe-remove.mjs';
 import {pathKey} from './path-key.mjs';
 import {allocationSettings} from '../../engine/config.mjs';
@@ -51,18 +51,6 @@ const DEVIN_PROCESS=/^devin/i;
 export const devinRoot=(env=process.env)=>{
   if(env.APPDATA)return path.join(env.APPDATA,'devin');
   return path.join(env.XDG_CONFIG_HOME??path.join(os.homedir(),'.config'),'devin');
-};
-
-/** Running process image names: tasklist on Windows, `ps -eo comm` elsewhere. Null when the probe fails. */
-const listProcessNames=async()=>{
-  if(process.platform==='win32'){
-    const r=spawnSync('tasklist',['/fo','csv','/nh'],{encoding:'utf8',windowsHide:true,timeout:15000});
-    if(r.error||r.status!==0)return null;
-    return String(r.stdout??'').split(/\r?\n/).map(line=>/^"([^"]+)"/.exec(line.trim())?.[1]).filter(Boolean);
-  }
-  const r=spawnSync('ps',['-eo','comm='],{encoding:'utf8',timeout:15000});
-  if(r.error||r.status!==0)return null;
-  return String(r.stdout??'').split(/\r?\n/).map(line=>path.basename(line.trim())).filter(Boolean);
 };
 
 const sizeOf=file=>{try{return fs.lstatSync(file).size;}catch{return 0;}};

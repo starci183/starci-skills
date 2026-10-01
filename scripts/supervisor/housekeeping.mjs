@@ -18,7 +18,7 @@
 // the bare housekeeping sub-block), so housekeepingAllocation() hands each of them a merged view that serves
 // both. One area failing (a throwing sweep, a missing module, ok:false) is recorded in its own entry and
 // never stops the remaining areas.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

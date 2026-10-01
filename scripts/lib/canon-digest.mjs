@@ -10,7 +10,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { npmPackDryRun } from '../api/npm/pack-dry-run.mjs';
 import { braceVariants, globExpression } from './glob.mjs';
 import { posixPath } from './path-key.mjs';
 
@@ -38,8 +38,7 @@ export const selectedByPolicy = (file, policy) => matchAny(file, policy.include)
 
 /** The PUBLISHED file list of the package whose source is `directory`: `npm pack --dry-run --json --ignore-scripts`. */
 export function packedFiles(directory) {
-  // One fixed command string (no arguments to escape): npm is a .cmd shim on Windows, so it runs through the shell.
-  const run = spawnSync('npm pack --dry-run --json --ignore-scripts', { cwd: directory, encoding: 'utf8', shell: true, windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+  const run = npmPackDryRun(directory);
   let listed;
   try { listed = JSON.parse(run.stdout)?.[0]?.files; } catch { listed = null; }
   if (run.status !== 0 || !Array.isArray(listed)) throw fail('CANON_PACK_UNAVAILABLE', `npm pack --dry-run could not list ${directory}: ${String(run.stderr ?? run.error?.message ?? '').trim().split(/\r?\n/).at(-1) ?? ''}`);

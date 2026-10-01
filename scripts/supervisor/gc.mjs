@@ -57,7 +57,7 @@
 //
 // Output: the report {schema, apply, ok, counts, freedBytes, ramFreedBytes, items: [{class, action, target, ...}],
 // refused, errors, line}. Every item and one summary are typed rows of the machine log (gc.collect, gc.summary).
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -70,7 +70,7 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
 import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned } from '../lib/close-verify.mjs';
 import { gitResult } from '../api/git/lib.mjs';
-import { killProcessTree } from '../lib/kill-tree.mjs';
+import { killProcessTree } from '../api/process/kill-tree.mjs';
 import { lanesRoot, parseWorktreeList, laneActivity, treeBytes } from '../lib/hk-lanes.mjs';
 import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
 import { markRemoved } from '../lib/worktree-registry.mjs';
@@ -497,7 +497,7 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, p
 
 /* ------------------------------------------------------------ processes */
 
-/** taskkill /T /F of one process tree (scripts/lib/kill-tree.mjs); true when it answered 0. */
+/** taskkill /T /F of one process tree (scripts/api/process/kill-tree.mjs); true when it answered 0. */
 export const killTree = (pid) => killProcessTree(pid).ok;
 
 /**

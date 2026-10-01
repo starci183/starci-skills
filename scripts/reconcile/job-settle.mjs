@@ -45,7 +45,7 @@
 //     red or not re-verifiable is measured by the settler itself over its owned paths against its admission base
 //     (scripts/reconcile/canon-parity.mjs): canon-scan 0 findings, the gate's lint no new finding, typecheck no new
 //     error, every declared red superseded by those owned-scope measurements (foreign residue). Any new finding -> Kernel.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

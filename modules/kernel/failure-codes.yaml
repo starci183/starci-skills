@@ -4388,6 +4388,59 @@ RT_HELPER_REDEFINED:
   owner: supervisor
   kind: check-finding
 
+RT_LAYER_EXTERNAL_SPAWN:
+  title: "External system spawned outside its api"
+  title_vi: "Gọi hệ thống bên ngoài ngoài thư mục api của nó"
+  meaning_vi: "Một tiến trình con chạy chương trình của một hệ thống bên ngoài (git, npm/npx, orca, sonar, docker) nằm ngoài thư mục scripts/api/<hệ thống>/ mà modules/kernel/runtime-layers.yaml khai báo cho hệ thống đó."
+  causes_vi:
+    - "Gọi spawnSync/execFile với 'git' hay 'npm' trực tiếp trong tầng nghiệp vụ"
+    - "Một hàm chạy lệnh cục bộ (run, sync) được gọi với tên chương trình của hệ thống bên ngoài"
+  nextStep_vi: "Người giám sát chuyển lời gọi vào scripts/api/<hệ thống>/ (một tệp cho một lệnh) rồi gọi hàm đó từ tầng nghiệp vụ, qua một lane đã land; mục tạm trong runtime-layers.allow.yaml được xóa cùng commit."
+  owner: supervisor
+  kind: check-finding
+
+RT_LAYER_LIB_CHILD_PROCESS:
+  title: "child_process in scripts/lib"
+  title_vi: "scripts/lib dùng child_process"
+  meaning_vi: "Một module trong scripts/lib import child_process (import, require hoặc import()). scripts/lib chỉ chứa hàm thuần và logic dùng chung, không khởi chạy tiến trình nào."
+  causes_vi:
+    - "Thêm một lời gọi tiến trình vào thư viện dùng chung thay vì vào scripts/api"
+  nextStep_vi: "Người giám sát chuyển lời gọi vào scripts/api/<hệ thống>/ và để thư viện import hàm của api, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_LAYER_SPAWN_UNRESOLVED:
+  title: "Spawned program cannot be named"
+  title_vi: "Không xác định được chương trình được khởi chạy"
+  meaning_vi: "Ngoài scripts/api/, một lời gọi spawn/exec khởi chạy một chương trình mà cây cú pháp không xác định được tên (một biến, một thuộc tính, một tham số không có nơi gọi nào trong tệp truyền giá trị cố định)."
+  causes_vi:
+    - "Tên chương trình đến từ cấu hình hoặc từ tham số của một hàm được export"
+    - "Một trình chạy lệnh được khai báo (UAT, ví dụ) chưa được ghi là ngoại lệ đã duyệt"
+  nextStep_vi: "Người giám sát đặt tên chương trình bằng hằng, chuyển lời gọi vào scripts/api/<hệ thống>/, hoặc ghi một ngoại lệ đã duyệt (lane: reviewed, có lý do) vào modules/kernel/runtime-layers.allow.yaml."
+  owner: supervisor
+  kind: check-finding
+
+RT_LAYER_ALLOW_STALE:
+  title: "Stale layer exception"
+  title_vi: "Ngoại lệ phân tầng đã cũ"
+  meaning_vi: "Một mục trong modules/kernel/runtime-layers.allow.yaml không còn khớp với phát hiện nào: lời gọi đã được chuyển hoặc tệp đã bị xóa."
+  causes_vi:
+    - "Lane đã chuyển lời gọi vào scripts/api nhưng quên xóa mục tạm"
+  nextStep_vi: "Người giám sát xóa mục đó khỏi runtime-layers.allow.yaml trong cùng commit đã chuyển lời gọi."
+  owner: supervisor
+  kind: check-finding
+
+RT_LAYER_RULES_INVALID:
+  title: "Layer rule set invalid"
+  title_vi: "Bộ luật phân tầng không hợp lệ"
+  meaning_vi: "modules/kernel/runtime-layers.yaml hoặc runtime-layers.allow.yaml không đọc được, thiếu danh sách bắt buộc, hoặc có một mục ngoại lệ thiếu đường dẫn, mã, hệ thống hay lý do. Mục không hợp lệ không miễn trừ gì."
+  causes_vi:
+    - "Sửa tay tệp luật và làm hỏng YAML"
+    - "Thêm ngoại lệ mà không ghi lý do"
+  nextStep_vi: "Người giám sát sửa tệp luật theo thông báo, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 RULE_DUPLICATED:
   title: "Rule sentence repeated"
   title_vi: "Câu quy tắc bị lặp"

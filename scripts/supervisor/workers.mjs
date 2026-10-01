@@ -34,7 +34,7 @@
 // outageInText: e.g. an attestation rejected for "Quota exhausted") - for the rest of that spawn pass, for the
 // requeued job it failed (payload.avoidAgents), and for every job once it failed READINESS_FAILS_PER_HOUR times
 // in the last hour.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

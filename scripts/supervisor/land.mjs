@@ -52,7 +52,7 @@
 // A worker job lands as `succeeded` and its staging checkout and temp branch are removed - so does a self job
 // (workers.mjs stage --self) whose branch --commit landed in full (selfJobsLandedBy); a red gate records
 // `land-failed` and, with --notify, tells the Supervisor through its inbox. Nothing half-lands.
-import '../lib/hide-child-windows.mjs';
+import '../api/process/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

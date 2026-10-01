@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { STALL_MIN_MS, STALL_LOG_MS, STALL_REPEAT_MS, heartbeatPlan, startHeartbeatWorker } from '../scripts/reconciler/heartbeat-worker.mjs';
 import { Engine, safeForStart } from '../scripts/reconciler/engine.mjs';
 import { engineIsSafe, engineItems, safeShadowOf } from '../scripts/reconciler/start.mjs';
-import { listHostProcessesAsync } from '../scripts/lib/process-list.mjs';
+import { listHostProcessesAsync } from '../scripts/api/process/process-list.mjs';
 import { tempState } from '../scripts/reconciler/testing.mjs';
 
 const NUMBERS = { pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, backoff: { minMs: 1000, maxMs: 300000 }, crashLoop: { max: 3, windowMs: 1800000 } };
