@@ -51,7 +51,7 @@ rules:
       code or dependencies enters husky, lint-staged, the default typecheck, coverage, or an automatic CI
       trigger; a kept e2e workflow is `workflow_dispatch` only. `be/tsconfig.json` excludes `be/src/tests/world`,
       `be/src/tests/integration`, `be/src/tests/e2e` and `be/src/tests/contract`, `be/src/tests/tsconfig.json` backs `typecheck:tests`,
-      and coverage and `test:ci` read the unit project only (BE-TEST-13).
+      and coverage and `test` read the unit project only (BE-TEST-13).
     rationale: |-
       One placement rule makes discovery mechanical, and keeping integration, e2e and contract out of the automatic gates keeps the routine
       gates fast and deterministic while the manual gates still refuse to run on code that does not type check.

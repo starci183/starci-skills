@@ -1394,7 +1394,7 @@ HFS_ROOT_MARKDOWN_FORBIDDEN:
   kind: check-finding
 
 HFS_ROOT_SRC_FORBIDDEN_FE:
-  title: "Root src folder in frontend repo"
+  title: "Root src folder in the front end (fe/)"
   title_vi: "Repo giao diện có thư mục src ở gốc"
   meaning_vi: "Repo giao diện có thư mục src ngay ở gốc, trong khi mã nguồn chỉ được đặt trong apps/<tên app>/src."
   causes_vi:
@@ -1494,7 +1494,7 @@ HFS_SRC_LAYOUT_INVALID:
   kind: check-finding
 
 HFS_STACKS_IN_FE:
-  title: "Stack declarations in frontend repo"
+  title: "Stack declarations in the front end (fe/)"
   title_vi: "Khai báo stack nằm trong repo giao diện"
   meaning_vi: "Repo giao diện đang chứa thư mục .starcistacks, trong khi khai báo stack chỉ được đặt ở repo backend."
   causes_vi:
@@ -1591,7 +1591,7 @@ HFS_UNUSED_FILE:
   kind: check-finding
 
 HFS_WORK_IN_FE:
-  title: "Work tree inside frontend repo"
+  title: "Work tree inside the front end (fe/)"
   title_vi: "Hồ sơ Work nằm trong repo giao diện"
   meaning_vi: "Repo giao diện chứa thư mục .starciwork, trong khi hồ sơ Work chỉ được lưu ở repo backend."
   causes_vi:
