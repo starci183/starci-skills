@@ -1,0 +1,23 @@
+schema: work/integration@1
+id: integration.observability.redis
+title: Redis holds the rate limiter's shared counters
+state: todo
+provider: redis
+boundary: The rate-limit:* key space belongs to the todo api; every replica counts a caller's requests in one fixed window
+  there, and the api degrades to an in-process window (per replica) while Redis is down.
+endpoints:
+  - {name: counters, method: TCP, path: redis://redis:6379/0}
+credential:
+  name: CACHE_REDIS_URL
+  providedBy: owner
+  custody: identity:cache-redis-url
+  # the dev Redis is open on the compose network (demo-only), so there is no secret to custody yet
+sandbox: The dev environment runs Redis 7 in Compose on 6379.
+refs: [integration.login.keycloak]
+
+requiresProof:
+  live:
+    required: true
+    note: A counter shared, expired and recovered after an outage against the real server, not against a fake.
+
+change: {rev: 1, kind: initial, at: 2026-10-01T23:00:00.000Z}
