@@ -10,7 +10,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: aab0215cb6384f0b8e34e2e06d66908437c89f8fbef757a8f67fbe8e893cf2af
+        value: ab5440b4128a4c43a4f50f7434bf97241ea47fecfa0b428fbb111aa0a81b1059
         files: 135
     sourceRuleRoots:
       - knowledge/patterns/be
@@ -559,7 +559,7 @@ profiles:
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts', '**/*.yaml']
         exclude: ['**/*.spec.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: e02a7fbe97dd9a320d39978a82ff18b3907840d9eb3565fcb63aaf9bb94f29d6
+        value: 52a1bd813ab6b65b35023fd83692209de844acb1fb7e481b459f2418e971b03f
         files: 148
     sourceRuleRoots:
       - knowledge/patterns/fe
