@@ -8298,6 +8298,16 @@ no-hooks-path:
   nextStep_vi: "Bỏ qua cài hook; kiểm tra cài đặt git của kho."
   owner: runtime-core
   kind: runtime-fault
+no-dispatch:
+  title: "The observed op holds no Orca Dispatch, so its output cannot be read"
+  title_vi: "Việc được quan sát không giữ Dispatch Orca nào nên không đọc được đầu ra"
+  meaning_vi: "api observe đọc đầu ra của thợ theo Dispatch (worker-read); việc này chỉ có cửa sổ mà không có Dispatch nên phần output để trống, trạng thái lượt vẫn được báo."
+  causes_vi:
+    - "việc được khởi chạy trước khi có Dispatch Orca"
+    - "payload của việc mất định danh Dispatch"
+  nextStep_vi: "Lệnh observe vẫn trả trạng thái lượt; dùng api status hoặc đợi báo cáo của việc."
+  owner: supervisor
+  kind: runtime-fault
 no-job:
   title: "Job not found for land"
   title_vi: "Không thấy việc cần land"
