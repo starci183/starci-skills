@@ -393,8 +393,8 @@ const numbered=(count,label)=>Array.from({length:count},(_,i)=>`const ${label}${
 function fakeRepo(root,{scanner=true,specFile=false,services=false}={}){
   const repo=path.join(root,'product-repo');
   write(repo,'package.json',JSON.stringify({name:'product-repo',scripts:{'sonar:check':'node scanner.mjs'}}));
-  // services: the repository declares the coverage scope the way the managed properties do (only *.service.js counts).
-  write(repo,'sonar-project.properties',`sonar.projectKey=product-repo\nsonar.host.url=https://sonar.example.invalid\nsonar.sources=src\nsonar.tests=src\nsonar.test.inclusions=**/*.spec.js\n${services?'sonar.javascript.lcov.reportPaths=coverage/lcov.info\nsonar.coverage.inclusions=src/**/*.service.js\n':''}`);
+  // services: the repository declares the coverage scope the way the managed properties do (the complement of *.service.js is excluded).
+  write(repo,'sonar-project.properties',`sonar.projectKey=product-repo\nsonar.host.url=https://sonar.example.invalid\nsonar.sources=src\nsonar.tests=src\nsonar.test.inclusions=**/*.spec.js\n${services?'sonar.javascript.lcov.reportPaths=coverage/lcov.info\nsonar.coverage.exclusions=src/*.js,src/**/*.resolver.js\n':''}`);
   write(repo,'src/legacy.js',numbered(5,'legacy'));
   write(repo,'src/app.js',numbered(5,'app'));
   // The fake scanner echoes the token (the helper must scrub it) and writes report-task.txt into the
@@ -473,7 +473,7 @@ test('scan runs the repository scanner against the local host, mints the project
   assert.deepEqual(report.slice.changedFiles.sort(),['src/app.js','src/new.js']);
   assert.equal(report.slice.base,'HEAD');
   assert.deepEqual([report.slice.verdict,report.slice.newIssues.total,report.slice.newHotspots.total],['pass',0,0],'debt on unchanged lines is not the slice\'s');
-  assert.deepEqual([report.slice.coverage.applied,report.slice.coverage.files],[false,[]],'a repository without sonar.coverage.inclusions has no coverage target');
+  assert.deepEqual([report.slice.coverage.applied,report.slice.coverage.files],[false,[]],'a repository without sonar.coverage.exclusions has no coverage target');
   assert.deepEqual([report.slice.duplication.changedLines,report.slice.duplication.duplicatedLines,report.slice.duplication.applied],[28,0,true]);
   assert.equal('coverageReport' in report,false);
   assert.equal(report.issues.total,4);
@@ -980,7 +980,7 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
   assert.equal(pass.exitCode,0,JSON.stringify(pass.report));
   assert.deepEqual(pass.report.numbers,{bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,coverage:100});
   assert.deepEqual(pass.report.coverage.files.map(f=>[f.path,f.coverage]),[['src/orders/order.service.js',100],['src/orders/payment.service.js',100]],'the per-file coverage lists the services only');
-  assert.deepEqual(pass.report.coverageInclusions,['src/**/*.service.js']);
+  assert.deepEqual(pass.report.coverageExclusions,['src/*.js','src/**/*.resolver.js']);
   const red=await run('dash-red',{projectMeasures:{...clean,bugs:1,code_smells:3,security_hotspots_reviewed:50,coverage:96.4},coverage:{...files,'src/orders/payment.service.js':92.9}});
   assert.equal(red.exitCode,1);
   assert.deepEqual(red.report.failures,['bugs 1 > 0','code_smells 3 > 0','security_hotspots_reviewed 50% < 100%','coverage of src/orders/payment.service.js 92.9% < 100%','coverage 96.4% < 100%']);
@@ -990,7 +990,7 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
   const {host}=await fakeSonar(t,{projectMeasures:clean,coverage:files});
   const unscoped=await sonarLocalMain(['dashboard','--cwd',fakeRepo(temporary(t,'dash-unscoped'))],{config:configFor(host,custody)});
   assert.equal(unscoped.exitCode,1);
-  assert.match(unscoped.report.reason,/declares no sonar\.coverage\.inclusions/);
+  assert.match(unscoped.report.reason,/declares no sonar\.coverage\.exclusions/);
   assertNoSecret(red.report,'dashboard report');
 });
 

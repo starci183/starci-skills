@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { parseYaml } from '../engine/yaml.mjs';
 import { starciworkGitignoreText } from '../scripts/lib/starciwork-boundary.mjs';
 import {
-  BLOCK_BEGIN, BLOCK_END, appScripts, checkTargets, hashOf, loadPresets, render, renderTargets, runSync, targetsOf, validateHfs, writeTargets,
+  BLOCK_BEGIN, BLOCK_END, appScripts, checkTargets, coverageExclusions, hashOf, loadPresets, render, renderTargets, runSync, targetsOf, validateHfs, writeTargets,
 } from '../packages/hfs/sync/index.mjs';
 import { LOCK_STEP, scaffoldApp } from '../packages/hfs/scaffold/app.mjs';
 import { braceVariants } from '../scripts/lib/glob.mjs';
@@ -183,9 +183,13 @@ describe('sonar-project.properties', () => {
   it('one file for the app: both sides as sources, the be specs as tests, the preset exclusions, one import path and the services\' coverage', () => {
     const app = properties(rendered()['sonar-project.properties']);
     assert.equal(app['sonar.exclusions'], `${jestPreset.sonarExclusions()},**/.next/**,**/node_modules/**,**/src/messages/**`);
-    assert.deepEqual(Object.keys(app).filter(key => /coverage|lcov/i.test(key)).sort(), ['sonar.coverage.inclusions', 'sonar.javascript.lcov.reportPaths'], 'the lcov import and the inclusions, no other coverage key');
+    assert.deepEqual(Object.keys(app).filter(key => /coverage|lcov/i.test(key)).sort(), ['sonar.coverage.exclusions', 'sonar.javascript.lcov.reportPaths'], 'the lcov import and the complement of the services, no other coverage key (Sonar has no coverage inclusions)');
     assert.equal(app['sonar.javascript.lcov.reportPaths'], 'be/coverage/lcov.info');
-    assert.equal(app['sonar.coverage.inclusions'], 'be/src/**/*.service.ts', 'services only: fe/ and every other be file are outside coverage');
+    const exclusions = app['sonar.coverage.exclusions'].split(',');
+    assert.deepEqual(exclusions, coverageExclusions(PRESETS));
+    for (const glob of ['fe/**', 'be/**/*.resolver.ts', 'be/**/*.module.ts', 'be/**/*.mapper.ts', 'be/**/*.handler.ts', 'be/**/*.controller.ts', 'be/**/*.config.ts', 'be/**/*.error.ts', 'be/**/*.entity.ts', 'be/**/*.spec.ts', 'be/apps/*/src/main.ts', 'be/src/modules/domain/*/persistence/migrations/*-*.ts', 'be/src/tests/world/kit/*.ts'])
+      assert.ok(exclusions.includes(glob), `${glob} is outside coverage`);
+    assert.ok(!exclusions.some(glob => glob.endsWith('*.service.ts')), 'the services are the one thing left in scope');
     assert.equal(app['sonar.projectKey'], 'nivo');
     assert.equal(app['sonar.sources'], 'be/apps,be/src,fe/apps');
     assert.equal(app['sonar.tests'], 'be/apps,be/src');
@@ -206,18 +210,21 @@ describe('sonar-project.properties', () => {
   it('Sonar and Codecov read ONE coverage scope: both are rendered from the preset\'s COVERAGE_SOURCES and agree', () => {
     for (const hfs of [APP, app({ fe: { apps: [{ name: 'web', kind: 'next' }], optionalSlots: ['repo.packages'] } })]) {
       const files = rendered(hfs);
-      const sonar = properties(files['sonar-project.properties'])['sonar.coverage.inclusions'].split(',');
+      const sonar = properties(files['sonar-project.properties'])['sonar.coverage.exclusions'].split(',');
       const codecov = parseYaml(files['codecov.yml']);
-      assert.deepEqual(sonar, jestPreset.COVERAGE_SOURCES.map(glob => `be/${glob}`), 'the inclusions are the preset sources on the be side');
-      assert.deepEqual(codecov.coverage.status.project.default.paths, sonar, 'the codecov project status reads the same scope');
-      assert.deepEqual(codecov.coverage.status.patch.default.paths, sonar, 'the codecov patch status reads the same scope');
+      const scope = jestPreset.COVERAGE_SOURCES.map(glob => `be/${glob}`);
+      assert.deepEqual(sonar, coverageExclusions(PRESETS), 'Sonar reads the complement of the scope');
+      assert.deepEqual(codecov.coverage.status.project.default.paths, scope, 'the codecov project status reads the scope');
+      assert.deepEqual(codecov.coverage.status.patch.default.paths, scope, 'the codecov patch status reads the scope');
       assert.deepEqual([codecov.coverage.status.project.default.target, codecov.coverage.status.patch.default.target], ['100%', '100%']);
       assert.deepEqual(codecov.ignore, ['fe/**'], 'fe/ is outside coverage');
     }
     // A preset with another source list moves both files together: the scope is never written twice.
     const moved = Object.fromEntries(renderTargets(APP, { ...PRESETS, coverageSources: ['src/**/*.domain.ts'] }).map(target => [target.path, target.content]));
-    assert.equal(properties(moved['sonar-project.properties'])['sonar.coverage.inclusions'], 'be/src/**/*.domain.ts');
+    const movedExclusions = properties(moved['sonar-project.properties'])['sonar.coverage.exclusions'].split(',');
+    assert.ok(movedExclusions.includes('be/**/*.service.ts') && !movedExclusions.some(glob => glob.endsWith('*.domain.ts')), 'the complement moves with the sources');
     assert.deepEqual(parseYaml(moved['codecov.yml']).coverage.status.project.default.paths, ['be/src/**/*.domain.ts']);
+    assert.throws(() => renderTargets(APP, { ...PRESETS, coverageSources: ['src/core/**'] }), /HFS_SYNC_COVERAGE_SCOPE/, 'a source whose complement Sonar globs cannot write is refused');
     assert.throws(() => renderTargets(APP, { sonarExclusions: PRESETS.sonarExclusions }), /HFS_SYNC_PRESET_MISSING/, 'no coverage sources is a refusal, never an empty scope');
   });
 });

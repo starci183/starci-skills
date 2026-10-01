@@ -16,7 +16,7 @@ import {posixPath} from '../lib/path-key.mjs';
 import { runGit } from '../api/git/lib.mjs';
 import { unquoteDiffPath } from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
-import {coverageInclusionsOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
+import {coverageScopeOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
 import {text} from '../lib/stack-declaration.mjs';
 import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
 import {createRequire} from 'node:module';
@@ -45,7 +45,7 @@ import {createRequire} from 'node:module';
  *        [--isolate]
  *   dashboard --cwd REPO [--key K]           the project's dashboard numbers from its last analysis (bugs, code
  *                                            smells, vulnerabilities, hotspots reviewed, coverage and the coverage
- *                                            of every file inside sonar.coverage.inclusions), judged by judgeDashboard
+ *                                            of every file of the coverage scope), judged by judgeDashboard
  *
  * --cwd takes the repository root; a bare repository name (the brief's <app>) resolves to that
  * directory beside or above the current one, never to <cwd>/<name> (starci-next learn-content
@@ -65,7 +65,7 @@ import {createRequire} from 'node:module';
  * blocker or critical issue and no to-review security hotspot on a line it changed (a line-less one only
  * on a file it added), its duplicated share of the changed source lines is within the duplication
  * threshold (like the server's ignoreSmallChanges, fewer changed lines than the gate's floor are not held to it),
- * and every service it touched (a changed file inside the repository's sonar.coverage.inclusions) is at the coverage
+ * and every service it touched (a changed file of the repository's coverage scope, coverageScopeOf) is at the coverage
  * threshold on its own Sonar measure, imported from the be unit run's lcov. Lesser issues are
  * listed on the summary and never fail it. The scan also makes the server's gate of that name carry the
  * same conditions and selects it for the project (`qualityGate` on the summary). The whole-project
@@ -842,7 +842,7 @@ export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
 }
 
 /**
- * Before a slice scan: the services the slice touched (changed files inside sonar.coverage.inclusions) get a fresh lcov at
+ * Before a slice scan: the services the slice touched (changed files of the coverage scope) get a fresh lcov at
  * sonar.javascript.lcov.reportPaths, written by the be unit run over their related specs (cfg.coverageRunner, default
  * runSliceCoverage), so Sonar imports this slice's coverage and never a stale report. With the owner's specs.unit off
  * (config.yaml `specs`, scripts/kernel/spec-deferral.mjs) the op writes no unit test and is held to no coverage: nothing
@@ -852,11 +852,11 @@ export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
 export const OWNER_MODE_NOTE='owner mode specs.unit=false (config.yaml specs): the slice wrote and ran no unit test, so its coverage is NOT MEASURED - the coverage conditions are neither green nor red, and the slice passes on the other conditions only';
 
 export function prepareSliceCoverage(cfg,{cwd,props,slice}){
-  const inclusions=coverageInclusionsOf(props);
-  if(!inclusions.length)return {judged:true,targets:[],note:'the repository declares no sonar.coverage.inclusions'};
+  const scope=coverageScopeOf(props);
+  if(!scope.exclusions.length)return {judged:true,targets:[],note:'the repository declares no sonar.coverage.exclusions'};
   const specs=cfg.specs??specsSettings(inspectOwnerConfig().config);
   if(specs.unit===false)return {judged:false,targets:[],ownerMode:'specs.unit=false',note:OWNER_MODE_NOTE};
-  const isTarget=coverageTargetOf(inclusions);
+  const isTarget=coverageTargetOf(scope);
   const targets=slice.files.map(f=>f.path).filter(file=>isTarget(file)&&fs.existsSync(path.join(cwd,file)));
   if(!targets.length)return {judged:true,targets};
   const lcov=String(props['sonar.javascript.lcov.reportPaths']??'').split(',').map(p=>p.trim()).filter(Boolean)[0];
@@ -883,7 +883,7 @@ async function fileCoverage(cfg,tokens,fileKey){
  * Judge the slice on the processed analysis against `gate` (thresholdsOf(knowledge/sonar-gate.yaml)): open
  * blocker and critical issues and to-review hotspots on its changed lines (a line-less one only on a file
  * it added), the duplicated share of its changed source lines, and the coverage of every service it touched
- * (a changed file inside sonar.coverage.inclusions of `props`; any other file is not a coverage target).
+ * (a changed file of the coverage scope of `props`, coverageScopeOf; any other file is not a coverage target).
  * A changed file the server does not know (excluded, not source) is listed as not analyzed.
  */
 export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate=thresholdsOf(loadSonarGate()),coverageRun=null}){
@@ -951,8 +951,8 @@ export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate
   if(blocking.length>gate.blockingIssuesMax)failures.push(`${blocking.length} open ${gate.blockingSeverities.join('/')} issue(s) on changed lines`);
   if(hotspots.length>gate.unreviewedHotspotsMax)failures.push(`${hotspots.length} security hotspot(s) to review on changed lines`);
   // Coverage: each service the slice touched, on its own measure (one service below the threshold fails the slice).
-  const inclusions=coverageInclusionsOf(props);
-  const isTarget=coverageTargetOf(inclusions);
+  const scope=coverageScopeOf(props);
+  const isTarget=coverageTargetOf(scope);
   const measured=[];
   for(const fileKey of coverageRun?.judged===false?[]:keys){
     const file=analyzed.get(fileKey);
@@ -962,8 +962,8 @@ export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate
     measured.push({path:file.path,coverage:got.coverage});
   }
   const coverage=coverageRun?.judged===false
-    ?{applied:false,status:'not-measured',ownerMode:coverageRun.ownerMode,inclusions,minPercent:gate.coverageMinPercent,files:[],failures:[],note:coverageRun.note}
-    :judgeCoverage(measured,{inclusions,minPercent:gate.coverageMinPercent});
+    ?{applied:false,status:'not-measured',ownerMode:coverageRun.ownerMode,exclusions:scope.exclusions,minPercent:gate.coverageMinPercent,files:[],failures:[],note:coverageRun.note}
+    :judgeCoverage(measured,{scope,minPercent:gate.coverageMinPercent});
   if(coverageRun?.judged!==false&&coverageRun?.error)coverage.failures.unshift(`the slice's services could not be measured: ${coverageRun.error}`);
   if(!coverage.status)coverage.status=!coverage.applied?'no-scope':coverage.failures.length?'red':coverage.files.length?'green':'no-target';
   failures.push(...coverage.failures);
@@ -1193,7 +1193,7 @@ export const dashboardMetrics=gate=>[...Object.keys(gate.overall.issues.types),'
 /**
  * The dashboard of a project as its last analysis left it, judged by judgeDashboard: bugs, code smells and
  * vulnerabilities 0, every hotspot reviewed, coverage at the threshold on every file inside the repository's
- * sonar.coverage.inclusions (the services) and overall. It reads, it never scans: run `scan --project-gate --wait`
+ * coverage scope (the services: what sonar.coverage.exclusions leaves) and overall. It reads, it never scans: run `scan --project-gate --wait`
  * first. Exit 0 pass, 1 fail, 2 blocked (server down, no token, no analysis).
  */
 export async function dashboard(cfg,options={}){
@@ -1201,8 +1201,8 @@ export async function dashboard(cfg,options={}){
   const props=readProperties(path.join(cwd,'sonar-project.properties'));
   const key=options.key??cfg.declaredKey??props['sonar.projectKey']??null;
   const gate=loadSonarGate();
-  const inclusions=coverageInclusionsOf(props);
-  const summary={schema:SCHEMA,command:'dashboard',at:new Date().toISOString(),host:cfg.host,cwd,projectKey:key,coverageInclusions:inclusions};
+  const scope=coverageScopeOf(props);
+  const summary={schema:SCHEMA,command:'dashboard',at:new Date().toISOString(),host:cfg.host,cwd,projectKey:key,coverageExclusions:scope.exclusions};
   const finish=(outcome,reason,extra={})=>Object.assign(summary,extra,{outcome,...(reason?{reason}:{})});
   if(cfg.disabled)return finish('disabled',`Sonar is disabled for this repository: ${cfg.disabled}`);
   if(!key)return finish('blocked','no project key: pass --key or set sonar.projectKey');
@@ -1220,7 +1220,7 @@ export async function dashboard(cfg,options={}){
   const tree=await readAll(cfg,tokens,`/api/measures/component_tree?component=${component}&metricKeys=${gate.overall.coverage.metric}&qualifiers=FIL`,'components');
   if(tree.error)return finish('blocked',`the per-file coverage of ${key} could not be read: ${tree.error}`);
   const files=tree.items.map(item=>({path:item.path,coverage:(item.measures??[]).find(m=>m.metric===gate.overall.coverage.metric)?.value??null}));
-  const judged=judgeDashboard({measures,files,inclusions},gate);
+  const judged=judgeDashboard({measures,files,scope},gate);
   summary.dashboardUrl=`${cfg.host}/dashboard?id=${component}`;
   summary.numbers=judged.numbers;
   summary.coverage=judged.coverage;
@@ -1244,7 +1244,7 @@ const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
        [--isolate] [--keep-slice-project] analyse only --paths in a throwaway project (minutes, not a whole-repo scan)
   dashboard --cwd REPO [--key K]          the dashboard numbers of the project's last analysis: bugs, code smells,
                                           vulnerabilities, hotspots reviewed, coverage and the coverage of every
-                                          file inside sonar.coverage.inclusions; fails unless all are at the gate
+                                          file of the coverage scope; fails unless all are at the gate
 
   common: [--cwd REPO] [--declaration FILE] [--host URL] [--stack DIR]
           host, stack, custody and project keys come from the repository's .starcistacks/application-stacks.yaml

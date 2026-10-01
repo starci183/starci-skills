@@ -8,8 +8,8 @@
 // side (be, fe) for a side slot, whose files land under that side's folder. Two targets are not whole files of a managedBy slot
 // and are listed in this module: the marked block of the root .gitignore, and .starciwork/.gitignore, which lives inside the
 // .starciwork directory slot. Every file is rendered with the app's hfs.json (both sides and their apps) and, for the Sonar
-// exclusions and the one coverage scope (sonar.coverage.inclusions and codecov.yml alike), the jest preset the app installs for
-// its be side. `--check` compares the sha256 of the rendered content with the
+// exclusions and the one coverage scope (sonar.coverage.exclusions, its complement, and the codecov.yml paths alike), the jest
+// preset the app installs for its be side. `--check` compares the sha256 of the rendered content with the
 // file on disk and fails on any drift; `--write` rewrites the drifted files. `.gitignore` is the one shared file: only the marked
 // block is managed and the app's own lines around it are left alone. The root package.json is managed by its `scripts` block
 // only (mode scripts, compared as parsed JSON): the rest of the file (dependencies, npm workspaces of fe/packages/*) is the app's.
@@ -121,13 +121,50 @@ export const LCOV_REPORT = 'be/coverage/lcov.info';
 
 /**
  * THE coverage scope of an app, from the app root: the preset's coverage sources on the be side (`be/src/**` + `/*.service.ts`).
- * It is the one source of sonar.coverage.inclusions and of the codecov.yml status paths, so the two can never drift; fe/ is
- * outside it (a front end has no tests).
+ * It is the one source of the codecov.yml status paths and, through coverageExclusions, of Sonar's coverage scope, so the two
+ * can never drift; fe/ is outside it (a front end has no tests).
  */
 export function coverageScope(presets) {
   const sources = presets?.coverageSources;
   if (!Array.isArray(sources) || !sources.length) throw new SyncError('HFS_SYNC_PRESET_MISSING', '@starci/jest-preset gives no COVERAGE_SOURCES: the coverage scope cannot be rendered');
   return sources.map(glob => `be/${glob}`);
+}
+
+const COVERED_SUFFIX = /\*\.([a-z][a-z0-9-]*)\.ts$/;
+const asGlob = (text) => String(text).replace(/<[^>]+>/g, '*');
+
+/**
+ * Sonar's coverage scope of an app as `sonar.coverage.exclusions` globs: the COMPLEMENT of coverageScope. SonarQube has no
+ * coverage inclusions and its globs have no negation, so every executable file that is not a coverage source is excluded:
+ *   - every be source role of the slot manifest's closed suffix vocabulary (ruleParams.be.suffixes, R89) other than the
+ *     roles the coverage sources name (`service`), as `be/**` + `/*.<role>.ts`;
+ *   - every be file name outside that vocabulary a be slot declares (`main.ts`, `index.ts`, `connection.ts`, the migrations,
+ *     the test world's files, dto/ and kit/ files), as `be/<slot path>/<name>` with each `<placeholder>` a `*`;
+ *   - all of fe/ (a front end has no tests).
+ * The result is sorted and has no duplicate. A coverage source that is not `<dir>/**` + `/*.<role>.ts` is refused: its
+ * complement cannot be written in Sonar's globs.
+ */
+export function coverageExclusions(presets, manifest = loadSlotManifest()) {
+  const covered = new Set(coverageScope(presets).map(glob => {
+    const role = COVERED_SUFFIX.exec(glob)?.[1];
+    if (!role) throw new SyncError('HFS_SYNC_COVERAGE_SCOPE', `coverage source ${glob} is not <dir>/**/*.<role>.ts: Sonar's coverage exclusions cannot express its complement`);
+    return role;
+  }));
+  const suffixes = manifest.ruleParams?.be?.suffixes ?? [];
+  const isRole = new RegExp(`\\.(?:${suffixes.map(s => s.replace(/[-]/g, '\\-')).join('|')})\\.ts$`);
+  const globs = new Set(suffixes.filter(role => !covered.has(role)).map(role => `be/**/*.${role}.ts`));
+  for (const slot of manifest.slots) {
+    if (!slot.profiles.includes('be') || slot.presence === 'forbidden') continue;
+    for (const entry of [...(slot.requires ?? []), ...(slot.allows ?? [])]) {
+      if (!/\.ts$/.test(entry) || entry.includes('<role>')) continue;
+      for (const name of braceVariants(entry)) {
+        if (isRole.test(asGlob(name).replace(/\*/g, 'x'))) continue;
+        for (const dir of braceVariants(slot.path)) globs.add(`be/${asGlob(dir)}${asGlob(name)}`.replace(/\/\/+/g, '/'));
+      }
+    }
+  }
+  globs.add('fe/**');
+  return [...globs].sort();
 }
 
 /**
@@ -159,7 +196,7 @@ export const opensPackages = side => (side.optionalSlots ?? []).some(id => id ==
 export const STYLE_GLOB = '{apps,packages}/*/src/**/*.css';
 
 /** Every value a template of `scope` can name, derived from hfs.json and the presets. */
-export function variables(app, scope, presets, sonarKey) {
+export function variables(app, scope, presets, sonarKey, manifest = loadSlotManifest()) {
   const fe = app.sides.fe;
   const packages = opensPackages(fe);
   const feApps = fe.apps.map(entry => `fe/apps/${entry.name}`);
@@ -175,7 +212,7 @@ export function variables(app, scope, presets, sonarKey) {
     sonarExclusions: [presets?.sonarExclusions, '**/.next/**', '**/node_modules/**', '**/src/messages/**'].filter(Boolean).join(','),
     sonarSources: ['be/apps', 'be/src', 'fe/apps', ...(packages ? ['fe/packages'] : [])].join(','),
     lcovReport: LCOV_REPORT,
-    coverageInclusions: scope === APP_SCOPE ? coverageScope(presets).join(',') : '',
+    coverageExclusions: scope === APP_SCOPE ? coverageExclusions(presets, manifest).join(',') : '',
     codecovPaths: scope === APP_SCOPE ? coverageScope(presets).map(glob => `          - ${JSON.stringify(glob)}`).join('\n') : '',
     tsconfigPaths: ['be/tsconfig.json', ...feTsconfigs].join(','),
     styleGlob: STYLE_GLOB,
@@ -203,7 +240,7 @@ export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundl
   const app = validateHfs(hfs, manifest);
   const hasTemplate = name => { try { return readTemplate(name) !== undefined; } catch { return false; } };
   return SCOPES.flatMap(scope => {
-    const vars = variables(app, scope, presets, sonarKey);
+    const vars = variables(app, scope, presets, sonarKey, manifest);
     return targetsOf(scope, { manifest, hasTemplate }).map(target => {
       const body = render(readTemplate(target.template), vars, readTemplate);
       const where = onSide(scope, target.path);
