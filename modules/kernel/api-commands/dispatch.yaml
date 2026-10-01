@@ -37,25 +37,24 @@ dispatch:
     ones an older runtime left open.
   writes: >-
     admission FIRST, launch second: one `path:<owned_path>` lease row per
-    owned_path, spelled `path:repository:<role>/<path>` in a bound project
-    (scripts/kernel/lease-canon.mjs: a bare path with --repository or a
-    frontend op, a `<repo-name>/` prefix, `repository:<id>/`, a Work path —
-    every spelling of one file is one key; a held row of either spelling is
-    compared in that form through its holder job, and on Windows
-    case-insensitively; the same relative path in another repository never
-    overlaps; an unbound repository keeps the path as written)
+    owned_path, spelled app-relative in a bound app (scripts/kernel/lease-canon.mjs:
+    be/<path>, fe/<path>, .starciwork/<path> or a path of the app root - one
+    file is one key; a held row is compared in that form through its holder
+    job, and on Windows case-insensitively; be/x and fe/x never overlap; an
+    unbound repository keeps the path as written)
     (capacity-1 exclusive write fences, reserveTwoPhase — job
     queued->leased with its fencing token, ttl bounds a crashed worker's
     fence while settle releases early) + budget_reservations taken
-    atomically; the packet's owned_paths resolve per target repository
-    (enqueue `repository` above, scripts/kernel/target-repo.mjs): a path the
-    resolver retargets carries {path relative to its repository, repository
-    role, root checkout, declared}, and the prompt shows it bare when it
-    lives in the worker's checkout (--worktree, else --repo) and rooted at
-    its own checkout otherwise, under a `writes_in` line naming each root;
-    a path it leaves where dispatch placed the worker (no binding, bare
-    paths of an unretargeted op) stays {path} verbatim. api report accepts
-    `files` in either spelling; contracts row = the rendered packet markdown keyed
+    atomically; the packet's owned_paths resolve through
+    scripts/kernel/target-repo.mjs: in a bound app each carries {path
+    (app-relative, as declared), repository (its side: be, fe, app, or
+    none for a Work path), root (the app checkout: the op worktree, else
+    the app root), declared}; the worker starts at that app checkout, so
+    the prompt shows every owned path bare, the same spelling gate.mjs
+    --root <app> --changed and every finding use, under a `writes_in`
+    line naming the root; unbound, a path stays {path} verbatim (an
+    explicit payload repository or an absolute path roots it). api report
+    accepts `files` app-relative or rooted; contracts row = the rendered packet markdown keyed
     (workflow_id,op_id,attempt) with the dispatch_id — the worker's
     dispatch authority, read back via `api op-contract`, written BEFORE the
     job may stand running — whose context_json.inputs

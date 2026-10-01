@@ -12,7 +12,7 @@ import { priorAttemptFailures } from '../prior-failures.mjs';
 import { withLessons } from '../../supervisor/lessons-file.mjs';
 import { ownerAnswersOf } from '../owner-answers.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
-import { enqueueRepository, ownedPathPlacements, projectBinding, jobTargetRepository } from '../target-repo.mjs';
+import { enqueueRepository, ownedPathPlacements, projectBinding } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
 import { ensureOpWorktree, layoutOf as productLayoutOf, planIsolation, worktreePromptRules } from '../product-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
@@ -69,9 +69,7 @@ export default {
   const payload = jobPayloadOf(job);
   const op = job.op_id ?? payload.opId;
   if (!op) throw Object.assign(new Error(`job ${jobId} carries no op identity`), { code: 'job-no-op' });
-  const dispatchSiblings = payload.cut?.id ? db.prepare("SELECT payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND job_id<>? AND json_extract(payload_json,'$.cut.id')=?")
-    .all(job.workflow_id, op, jobId, String(payload.cut.id)).map((row) => jobPayloadOf(row).repository).filter(Boolean) : [];
-  const dispatchTarget = enqueueRepository({ op, repository: payload.repository, ownedPaths: ownedPathsOf(payload), repo, siblingRepositories: dispatchSiblings });
+  const dispatchTarget = enqueueRepository({ op, repository: payload.repository, ownedPaths: ownedPathsOf(payload), repo });
   if (!dispatchTarget.ok) {
     const out = { ok: false, jobId, op, reason: dispatchTarget.reason, detail: dispatchTarget.detail };
     emit(out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}`, args.json);
@@ -244,12 +242,10 @@ export default {
     productWorktree = { ...productLayoutOf({ repoRoot: productIsolation.repoRoot, workflowId: job.workflow_id, jobId }), preview: true };
   }
   const checkoutRoot = args.worktree ?? productWorktree?.op.path ?? repo;
-  const side = jobTargetRepository({ op, payload, binding: projectBinding(repo) });
-  const sideDir = side?.role === 'be' || side?.role === 'fe' ? path.join(checkoutRoot, side.role) : checkoutRoot;
-  const worktree = fs.existsSync(sideDir) && fs.statSync(sideDir).isDirectory() ? sideDir : checkoutRoot;
-  // The worker starts ON its checkout root: a product op worktree is a git worktree of the product repository, which
-  // Orca resolves as a worktree of that repository's project (repoId set), so the sidebar lists it under the project.
-  // A be/fe side directory is no Orca worktree, so the prompt names it (worktreePromptRules) and the agent works there.
+  // The worker starts and works ON its checkout root: a product op worktree is a git worktree of the app repository, which
+  // Orca resolves as a worktree of that repository's project (repoId set), so the sidebar lists it under the project. Every
+  // owned path is app-relative (target-repo.mjs), so the app root is where they, gate.mjs --root and the app scripts resolve.
+  const worktree = checkoutRoot;
   const workerCwd = (() => { const abs = path.resolve(repo, worktree); try { return fs.statSync(abs).isDirectory() ? abs : repo; } catch { return repo; } })();
   const placements = (() => {
     try {
@@ -297,7 +293,7 @@ export default {
   // The job scratch (a3-3 evidence contract): the op writes its report and attachments there and api report reads them
   // only from op_attempts.scratch_dir / STARCI_JOB_SCRATCH. Created fresh right before the launch.
   const scratchDir = repo ? jobScratchDirOf(repo, job.workflow_id, jobId) : null;
-  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir }) + worktreePromptRules(productWorktree, workerCwd);
+  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir }) + worktreePromptRules(productWorktree);
   const packetFile = repo ? packetFileOf(jobDirOf(repo, job.workflow_id, jobId), job.try_no) : null;
   // The names a person reads (owner request 2026-09-27, scripts/lib/display-names.mjs): the Task display
   // name, the managed worker's tab (terminal-rename after dispatch-show) and the command terminal's title

@@ -109,7 +109,12 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   const repoLabel = repo ?? '<target-repo>';
   const owned = packet.context.owned_paths;
   const unresolved = owned.filter((p) => p.unresolved);
-  const roots = [...new Map(owned.filter((p) => p.root).map((p) => [path.resolve(p.root), p])).values()];
+  // One entry per checkout root, labelled with its repository only when every owned path there names the same one.
+  const roots = [...owned.filter((p) => p.root).reduce((byRoot, p) => {
+    const key = path.resolve(p.root), seen = byRoot.get(key);
+    byRoot.set(key, { root: p.root, repository: seen && seen.repository !== (p.repository ?? null) ? null : (p.repository ?? null) });
+    return byRoot;
+  }, new Map()).values()];
   const entrySkill = path.join(skillRoot, 'CONTEXT.md');
   const brief = path.join(skillRoot, packet.brief);
   const verdictContract = path.join(skillRoot, VERDICT_CONTRACT);
@@ -178,7 +183,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `  never create a git worktree, junction, symlink or hard link anywhere (git worktree add, mklink, New-Item -ItemType Junction/SymbolicLink, ln): work in this checkout with its own node_modules - a private worktree linked into the live repository deleted 674 live files when it was removed (nivo-fe inc-c8fbf76aa499); report a need for another tree, never make one.`,
   `  your git and npm are the runtime guard: a refusal prints "starci guard: refused ..." and exits 3 - report the need, never work around it.`,
   ...(packet.context.goal ? [`goal: the owner's goal (revision ${packet.context.goal.revision}) is packet context.goal.statement - read it with api op-contract --json; never read the ledger for it.`] : []),
-  ...(unresolved.length ? [`unresolved_owned_paths: ${unresolved.map((p) => `${p.path} (repository ${p.repository} is not bound)`).join(', ')} — report blocked with kind authority; never guess a root`] : []),
+  ...(unresolved.length ? [`unresolved_owned_paths: ${unresolved.map((p) => `${p.path} (${p.repository === 'not-app-relative' ? 'not app-relative' : `repository ${p.repository} is not bound`})`).join(', ')} — report blocked with kind authority; never guess a root`] : []),
   `constraints: lease=${packet.constraints.lease ?? '(none)'} model=${packet.constraints.model} budget=${packet.constraints.budget ?? '(unset)'}`,
   `machines: check names in your brief (layoutPolicy.checks, proofs) are executable canonical validators — run them verbatim, never invent placeholder commands (e.g. a made-up validate function):`,
   `  when any validator may exceed 25 s, launch its exact command in the background with stdout, stderr and exit status written under STARCI_JOB_SCRATCH; poll the exit-status file until it appears, then read stdout and record the actual exit code in report.checks. Keep polling across command windows rather than treating a terminal timeout as a validator result.`,

@@ -158,15 +158,10 @@ export function attributeRedGate(db, { repo, job, failing = [], canon = null, gi
     : (payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean)).map(compare);
   const roots = [{ root: repo, name: path.basename(repo) },
     ...(canon?.binding?.repos ?? []).filter((r) => r?.root && !samePath(r.root, repo)).map((r) => ({ root: r.root, name: path.basename(r.root) }))];
-  const boundNames = new Set(roots.slice(1).map((r) => r.name.toLowerCase()));
-  // The owned paths as plain repository-relative prefixes (a `repository:<id>/` or bound-repository
-  // prefix dropped): the import guard of a preexisting peer compares against every one of them.
+  // The owned paths as plain prefixes (app-relative in a bound app): the import guard of a preexisting peer compares
+  // against every one of them (importsOwned also tries each without its first segment, the side-relative spelling).
   const ownedPlain = [...new Set((payload.owned_paths ?? []).map((p) => (typeof p === 'string' ? p : p?.path)).filter(Boolean).map((p) => {
-    try {
-      const plain = normalizeOwnedPath(String(p).replace(/^repository:[^/]+\/?/, ''));
-      const [head, ...rest] = plain.split('/');
-      return rest.length && boundNames.has(head.toLowerCase()) ? rest.join('/') : plain;
-    } catch { return null; }
+    try { return normalizeOwnedPath(String(p)); } catch { return null; }
   }).filter(Boolean))];
   const lineage = [job, ...lineageJobsOf(db, job)];
   const since = Math.min(...lineage.map((row) => Number(row.created_at)).filter(Number.isFinite));

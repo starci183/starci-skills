@@ -178,17 +178,8 @@ export default {
   // cover the plan's grants, and a slice whose moves another slice holds is cut again, never enqueued to block.
   const canonPlan = isCanonSlice({ cut, params: resolvedParams.params }) && !(typeof args['retry-of'] === 'string' && args['retry-of'].trim())
     ? requirePlannedCanonSlice({ cut, ownedPaths, scanFile: args['canon-scan'] ?? null }).plan : null;
-  // Bind a new cut slice to its already enqueued siblings when its own path
-  // has not been created yet. A sibling's qualified paths can supply the role.
-  const siblingRepositories = cut ? db.prepare("SELECT payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=?")
-    .all(workflowId, args.op, cut.id).flatMap((row) => {
-      const sibling = jobPayloadOf(row);
-      if (sibling.repository) return [sibling.repository];
-      return ownedPathPlacements({ op: args.op, payload: sibling, ownedPaths: ownedPathsOf(sibling), repo })
-        .filter((place) => place.role && ['path-repository', 'path-repository-name', 'path-absolute', 'path-relative'].includes(place.via)).map((place) => place.role);
-    }) : [];
   // Persist the repository so dispatch, guards and settle use the same root.
-  const target = enqueueRepository({ op: args.op, repository: args.repository, ownedPaths, repo, siblingRepositories });
+  const target = enqueueRepository({ op: args.op, repository: args.repository, ownedPaths, repo });
   if (!target.ok) {
     const out = { ok: false, workflowId, op: args.op, reason: target.reason, detail: target.detail };
     emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);

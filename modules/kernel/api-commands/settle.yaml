@@ -80,15 +80,12 @@ settle:
     A `pass` for an op whose manifest policy.commitPolicy commits (a mode
     other than none - scoped-local-commit today) owes a landed proof, run
     before anything is written (scripts/kernel/settle-landed.mjs). Each
-    owned path resolves against its target repository
-    (scripts/kernel/target-repo.mjs ownedPathPlacements), first match wins:
-    the repository the path names (enqueue above); a `.starciwork/` path in
-    the Work owner; payload.repository; the binding's
-    fe root for a frontend op (a job enqueued before payload.repository
-    existed resolves the same way); else the dispatch contract's worktree
-    when that is a directory, else --repo. A resolved repository is checked
-    in the contract worktree when that worktree is a checkout of it, else
-    at its bound root. Paths are grouped per git checkout and each group is
+    owned path resolves through scripts/kernel/target-repo.mjs
+    ownedPathPlacements: in a bound app every owned path is app-relative and
+    is checked in the app checkout - the contract worktree when that is a
+    checkout of the app, else the app root; unbound, payload.repository,
+    else the dispatch contract's worktree when that is a directory, else
+    --repo. Paths are grouped per git checkout and each group is
     proven there. `git status --porcelain -- <owned_paths>` must be empty
     (each owned path a `:(literal)` pathspec, so src/app/[id] never reads as a glob),
     and the filed done report's `head` must name a commit that exists and

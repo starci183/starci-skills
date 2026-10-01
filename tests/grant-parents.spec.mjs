@@ -6,7 +6,7 @@ import path from 'node:path';
 import { checkGrantParents } from '../scripts/kernel/grant-parents.mjs';
 import { loadCatalog } from '../scripts/kernel/why.mjs';
 
-// The fe/ side keeps its app router at apps/app/src/app; there is no src/app.
+// The fe/ side keeps its app router at fe/apps/app/src/app; there is no fe/src/app. Owned paths are app-relative.
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-grant-parents-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -28,35 +28,37 @@ function fixture(t) {
 
 test('a grant whose directory is missing is refused, naming the missing and the closest existing directory', (t) => {
   const { check } = fixture(t);
-  const out = check(['src/app/**']);
+  const out = check(['fe/src/app/**']);
   assert.equal(out.ok, false);
   assert.equal(out.reason, 'grant-parent-missing');
-  assert.equal(out.violations[0].dir, 'src/app');
-  assert.equal(out.violations[0].closest, '.');
-  assert.match(out.detail, /src\/app does not exist/);
-  assert.match(out.detail, /repository root/);
-  const file = check(['apps/app/src/pages/home.tsx']);
+  assert.equal(out.violations[0].dir, 'fe/src/app');
+  assert.equal(out.violations[0].closest, 'fe');
+  assert.match(out.detail, /fe\/src\/app does not exist/);
+  const top = check(['nowhere/x/**']);
+  assert.equal(top.violations[0].closest, '.');
+  assert.match(top.detail, /repository root/);
+  const file = check(['fe/apps/app/src/pages/home.tsx']);
   assert.equal(file.ok, false);
-  assert.equal(file.violations[0].dir, 'apps/app/src/pages');
-  assert.equal(file.violations[0].closest, 'apps/app/src');
+  assert.equal(file.violations[0].dir, 'fe/apps/app/src/pages');
+  assert.equal(file.violations[0].closest, 'fe/apps/app/src');
 });
 
 test('a grant under an existing directory passes, a new file included', (t) => {
   const { check } = fixture(t);
-  assert.deepEqual(check(['apps/app/src/app/**']), { ok: true });
-  assert.deepEqual(check(['apps/app/src/app/page.tsx']), { ok: true });
+  assert.deepEqual(check(['fe/apps/app/src/app/**']), { ok: true });
+  assert.deepEqual(check(['fe/apps/app/src/app/page.tsx']), { ok: true });
   assert.deepEqual(check(['README.md']), { ok: true });
   assert.deepEqual(check(['.starciwork/features/x/index.yaml']), { ok: true });
 });
 
 test('a declared create-new-module grant passes when the module root parent exists, and only then', (t) => {
   const { check } = fixture(t);
-  assert.deepEqual(check(['apps/app/src/billing/**', 'apps/app/src/billing/x.ts'], { new_modules: ['apps/app/src/billing'] }), { ok: true });
-  const orphan = check(['src/app/**'], { new_modules: ['src/app'] });
+  assert.deepEqual(check(['fe/apps/app/src/billing/**', 'fe/apps/app/src/billing/x.ts'], { new_modules: ['fe/apps/app/src/billing'] }), { ok: true });
+  const orphan = check(['fe/src/app/**'], { new_modules: ['fe/src/app'] });
   assert.equal(orphan.ok, false);
-  assert.equal(orphan.violations[0].dir, 'src');
-  assert.equal(orphan.violations[0].newModule, 'src/app');
-  assert.equal(check(['apps/app/src/other/y.ts'], { new_modules: ['apps/app/src/billing'] }).ok, false);
+  assert.equal(orphan.violations[0].dir, 'fe/src');
+  assert.equal(orphan.violations[0].newModule, 'fe/src/app');
+  assert.equal(check(['fe/apps/app/src/other/y.ts'], { new_modules: ['fe/apps/app/src/billing'] }).ok, false);
 });
 
 test('the refusal code is in the Vietnamese catalog', () => {

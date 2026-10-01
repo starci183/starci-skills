@@ -410,15 +410,14 @@ export function planIsolation({ brief, placements, binding, settings = productSe
 }
 
 /** The rules every isolated op's prompt carries (the path is explicit to every tool). */
-export function worktreePromptRules(rec, sideCwd = null) {
+export function worktreePromptRules(rec) {
   if (!rec) return '';
   const op = posix(rec.op.path);
-  const cwd = sideCwd ? posix(sideCwd) : op;
   return [
     '',
     '## Your product worktree (DESIGN §16.7)',
     `- Edit, check and commit ONLY in ${op} (branch ${rec.op.branch}, off ${rec.main ?? 'main'} at ${String(rec.baseSha ?? '').slice(0, 12)}). Never edit ${posix(rec.repoRoot)} itself.`,
-    `- Run role-specific checks and commands from ${cwd}; the app's package.json and .starciwork are at ${op}.`,
+    `- Run checks and commands from ${op}, the app root: every owned path is app-relative (be/..., fe/..., .starciwork/...).`,
     `- Dev servers, UAT and drawing run against the live checkout ${posix(rec.repoRoot)} (main); never start one in this worktree.`,
     '- node_modules is a junction overlay of the main checkout: never run npm/pnpm install here.',
     '- Commit everything you produce under .starciwork/ in this worktree before you report; the runtime salvages and then deletes this worktree right after your settle.',

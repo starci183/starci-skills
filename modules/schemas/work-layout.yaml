@@ -55,7 +55,7 @@ shape:
     itself, a broken reference. An owner path resolves against the side folder the record's `repository`
     field names (the be side when the field is absent); to point at another side bound
     in workspace.yaml, prefix the path `repository:<side>/` - `repository:fe/apps/landing` -
-    the same convention implementation `files[]` and job `owned_paths` already carry. A done
+    the same convention implementation `files[]` carries. A done
     implementation's every owner directory must exist on disk
     (OWNER_PATH_MISSING otherwise refuses it); a todo one is warned, not refused. A done implementation
     whose `proves` names a record that is not itself `state: done` is refused (PROVES_TARGET_NOT_DONE) -

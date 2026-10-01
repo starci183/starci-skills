@@ -79,49 +79,49 @@ const fixture=(t,{bound=true}={})=>{
   return {be,backend,fe,api,enqueue,contractOf,scratchOf};
 };
 
-test('a be/ path reaches the backend side, and its report is accepted',t=>{
-  const {be,backend,api,enqueue,contractOf,scratchOf}=fixture(t);
+// Every owned path of a bound app is app-relative: the worker starts at the app checkout and sees each path bare, the
+// spelling gate.mjs --root <app> --changed and every finding use.
+test('a be/ path reaches the worker bare at the app root, and its report is accepted',t=>{
+  const {be,api,enqueue,contractOf,scratchOf}=fixture(t);
   const jobId=enqueue('op-owner-name','backend.scaffold',['be/src/main.ts','.starciwork/features/base/assets/r2']);
   const d=api('dispatch','--repo',be,'--job',jobId,'--spawn','--json');
   assert.equal(d.r.status,0,d.r.stderr||d.r.stdout);
   const {status,markdown,packet}=contractOf(jobId);
   assert.equal(status,'running');
   const main=packet.context.owned_paths.find(p=>p.declared==='be/src/main.ts');
-  assert.equal(main.path,'src/main.ts');
-  assert.equal(main.repository,'be');
-  assert.equal(slash(main.root),slash(backend));
-  assert.ok(markdown.includes(`owned_paths: src/main.ts, ${slash(be)}/.starciwork/features/base/assets/r2\n`),markdown);
-  assert.match(markdown,new RegExp(`writes_in: ${esc(backend)} \\(repository be\\)`));
+  assert.deepEqual({path:main.path,repository:main.repository,root:slash(main.root)},{path:'be/src/main.ts',repository:'be',root:slash(be)});
+  assert.ok(markdown.includes('owned_paths: be/src/main.ts, .starciwork/features/base/assets/r2\n'),markdown);
+  assert.match(markdown,new RegExp(`writes_in: ${esc(be)} — `));
 
   const scratch=scratchOf(jobId);
   assert.ok(scratch,'dispatch records the attempt scratch dir');
   fs.mkdirSync(scratch,{recursive:true});
   const file=path.join(scratch,'report.json');
-  fs.writeFileSync(file,json({outcome:'blocked',summary:'needs more',files:['src/main.ts'],blocker:{kind:'authority',detail:'more files'}}));
+  fs.writeFileSync(file,json({outcome:'blocked',summary:'needs more',files:['be/src/main.ts'],blocker:{kind:'authority',detail:'more files'}}));
   const rep=api('report','--repo',be,'--job',jobId,'--report',file,'--json');
   assert.equal(rep.r.status,0,rep.r.stderr||rep.r.stdout);
 });
 
-test('a fe/ path reaches the worker rooted at the frontend side',t=>{
-  const {be,fe,api,enqueue,contractOf}=fixture(t);
-  const jobId=enqueue('op-fe-name','interface.scaffold',['fe/package.json','fe/src/app','.starciwork/features/base/impl/fe/assets/cut-1']);
+test('fe/ paths reach the worker bare at the app root, labelled with their side',t=>{
+  const {be,api,enqueue,contractOf}=fixture(t);
+  const jobId=enqueue('op-fe-name','interface.scaffold',['fe/package.json','fe/src/app']);
   const d=api('dispatch','--repo',be,'--job',jobId,'--spawn','--json');
   assert.equal(d.r.status,0,d.r.stderr||d.r.stdout);
   const {markdown,packet}=contractOf(jobId);
   const pkg=packet.context.owned_paths.find(p=>p.declared==='fe/package.json');
-  assert.deepEqual({path:pkg.path,repository:pkg.repository,root:slash(pkg.root)},{path:'package.json',repository:'fe',root:slash(fe)});
-  assert.ok(markdown.includes(`owned_paths: ${slash(fe)}/package.json, ${slash(fe)}/src/app, .starciwork/features/base/impl/fe/assets/cut-1\n`),markdown);
-  assert.match(markdown,/writes_in: [^\n]*\(repository fe\)/);
+  assert.deepEqual({path:pkg.path,repository:pkg.repository,root:slash(pkg.root)},{path:'fe/package.json',repository:'fe',root:slash(be)});
+  assert.ok(markdown.includes('owned_paths: fe/package.json, fe/src/app\n'),markdown);
+  assert.match(markdown,new RegExp(`writes_in: ${esc(be)} \\(repository fe\\)`));
   assert.equal(fs.existsSync(path.join(path.dirname(be),'shop-fe')),false);
 });
 
-test('placed in fe/, frontend paths are bare and Work paths are rooted at the app root',t=>{
+test('placed in fe/ by --worktree, the app-relative paths are rooted at the app checkout',t=>{
   const {be,fe,api,enqueue,contractOf}=fixture(t);
   const jobId=enqueue('op-fe-placed','interface.scaffold',['fe/package.json','.starciwork/features/base/impl/fe/assets/cut-1']);
   const d=api('dispatch','--repo',be,'--job',jobId,'--worktree',fe,'--spawn','--json');
   assert.equal(d.r.status,0,d.r.stderr||d.r.stdout);
   const {markdown}=contractOf(jobId);
-  assert.ok(markdown.includes(`owned_paths: package.json, ${slash(be)}/.starciwork/features/base/impl/fe/assets/cut-1\n`),markdown);
+  assert.ok(markdown.includes(`owned_paths: ${slash(be)}/fe/package.json, ${slash(be)}/.starciwork/features/base/impl/fe/assets/cut-1\n`),markdown);
 });
 
 test('an unbound ledger keeps today\'s packet: owned paths verbatim, no writes_in',t=>{

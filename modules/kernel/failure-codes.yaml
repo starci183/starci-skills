@@ -8629,24 +8629,14 @@ path-outside-roots:
   nextStep_vi: "Bị từ chối. Gửi lại đường dẫn tương đối so với kho."
   owner: supervisor
   kind: input-invalid
-path-repository-ambiguous:
-  title: "Owned paths span several repositories"
-  title_vi: "Đường dẫn giao thuộc nhiều kho khác nhau"
-  meaning_vi: "Các đường dẫn giao không quy về một kho duy nhất nên không biết cây làm việc nào để dùng."
+path-not-app-relative:
+  title: "An owned path of a bound app is not app-relative"
+  title_vi: "Đường dẫn giao không tính từ gốc app"
+  meaning_vi: "Trong một app đã gắn, mọi đường dẫn giao tính từ gốc app: be/..., fe/..., .starciwork/... hoặc một đường dẫn ở gốc app."
   causes_vi:
-    - "Các lát cắt cùng cụm gắn với nhiều kho"
-    - "Đường dẫn không có tiền tố kho rõ ràng"
-  nextStep_vi: "Job không được dựng cây làm việc riêng; Kernel chia lại phạm vi để mỗi job chỉ thuộc một kho."
-  owner: supervisor
-  kind: dispatch-refusal
-path-repository-missing:
-  title: "An owned path is in no bound repository"
-  title_vi: "Đường dẫn giao không thuộc kho nào đã gắn"
-  meaning_vi: "Một đường dẫn giao không có trong kho nào mà dự án đã gắn nên không biết dựng cây làm việc ở đâu."
-  causes_vi:
-    - "Đường dẫn bị gõ sai hoặc thiếu tiền tố be/ hay fe/"
-    - "Tệp chưa tồn tại và không ghi rõ kho"
-  nextStep_vi: "Kernel ghi rõ kho hoặc phía (be/ hay fe/) cho đường dẫn rồi giao lại job."
+    - "Thiếu tiền tố be/ hay fe/ (đường dẫn tính từ một phía)"
+    - "Dùng tiền tố repository:<id>/, đường dẫn tuyệt đối hoặc ../"
+  nextStep_vi: "Job không được xếp. Kernel ghi lại đường dẫn tính từ gốc app (ví dụ be/src/... thay cho src/...) rồi xếp lại."
   owner: supervisor
   kind: dispatch-refusal
 path-repository-unknown:
@@ -10583,6 +10573,27 @@ STARCI_LEDGER_MIGRATE_FAILED:
     - "Dữ liệu cũ vi phạm ràng buộc mới"
     - "Lỗi trong tệp migration"
   nextStep_vi: "Ledger giữ nguyên bản cũ (đã hoàn tác); Supervisor sửa migration hoặc dữ liệu rồi mở lại."
+  owner: runtime-core
+  kind: runtime-fault
+STARCI_MACHINE_MIGRATE_REFUSED:
+  title: "machine.sqlite migration refused"
+  title_vi: "Từ chối nâng cấp cấu trúc machine.sqlite"
+  meaning_vi: "File machine.sqlite cũ không qua kiểm tra toàn vẹn nên runtime không nâng cấp nó lên cấu trúc mới."
+  causes_vi:
+    - "File machine.sqlite bị hỏng"
+    - "Ổ đĩa lỗi hoặc file bị ghi dở"
+  nextStep_vi: "Runtime không mở machine.sqlite; Supervisor kiểm tra PRAGMA integrity_check và khôi phục từ bản .bak nếu cần."
+  owner: supervisor
+  kind: runtime-fault
+
+STARCI_MACHINE_MIGRATE_FAILED:
+  title: "machine.sqlite migration failed"
+  title_vi: "Nâng cấp cấu trúc machine.sqlite thất bại"
+  meaning_vi: "Bước nâng cấp để lại lỗi khóa ngoại hoặc không qua quick_check nên đã được hoàn tác."
+  causes_vi:
+    - "Dữ liệu cũ vi phạm ràng buộc mới"
+    - "Lỗi trong tệp migration"
+  nextStep_vi: "machine.sqlite giữ nguyên bản cũ (đã hoàn tác); Supervisor sửa migration hoặc dữ liệu rồi mở lại."
   owner: runtime-core
   kind: runtime-fault
 git-unusable:
