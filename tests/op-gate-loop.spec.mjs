@@ -16,6 +16,7 @@ import { DIGEST_SCHEMA } from '../scripts/checks/read-digest.mjs';
 import { OP_GATE_CHANGE, judgeLoop } from '../scripts/kernel/gate-settle.mjs';
 import { loadContractChanges } from '../scripts/kernel/contract-version.mjs';
 import { seedWorkflow } from './_ledger-fixture.mjs';
+import { installCanons } from './_canon-install-fixture.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
@@ -34,7 +35,8 @@ function hfsStub(t, findings = []) {
 
 /**
  * An app in the monorepo shape `hfs scaffold app` makes (built by hand: the scaffold is not on main yet) - one root
- * package.json and hfs.json of kind app, a be/ side and an fe/ app - committed on main, with a lane branch checked out.
+ * package.json and hfs.json of kind app, a be/ side and an fe/ app - committed on main, with a lane branch checked out. The
+ * published canons are installed under node_modules (ignored), as the registry installs them; the gate judges that install.
  */
 function appFixture(t, { baseFiles = {} } = {}) {
   const root = tmp(t);
@@ -52,6 +54,7 @@ function appFixture(t, { baseFiles = {} } = {}) {
   put(root, 'fe/apps/web/tsconfig.json', JSON.stringify({ compilerOptions: { ...strict, jsx: 'preserve' }, include: ['src'] }));
   put(root, 'fe/apps/web/src/page.tsx', 'export const title: string = "home";\n');
   for (const [rel, body] of Object.entries(baseFiles)) put(root, rel, body);
+  installCanons(root);
   git('add', '-A'); git('commit', '-q', '-m', 'scaffold');
   const base = git('rev-parse', 'HEAD');
   git('checkout', '-q', '-b', 'lane');

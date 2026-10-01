@@ -1,0 +1,32 @@
+id: canon-content-digest
+effectiveAt: '2026-10-01T20:00:00+07:00'
+summary: >-
+  THE CANON CONTENT DIGEST IS VERIFIED AGAIN (lane DIGEST under C0). Its only verifier, packageIdentity in the deleted
+  scripts/checks/check-scoped-lint.mjs (b0436ee93), is replaced by one helper, scripts/lib/canon-digest.mjs: it hashes a
+  canon by the policy each profile of modules/models/code-patterns.yaml binds (sha256; include/exclude globs; framing
+  sorted-posix-relative-path-null-raw-bytes-null: every selected file in ICU 'en' collation of its posix relative path, its
+  path as UTF-8, a NUL, its raw bytes, a NUL), and refuses an unknown algorithm (CANON_DIGEST_ALGORITHM_UNKNOWN), an unknown
+  framing (CANON_DIGEST_FRAMING_UNKNOWN), a malformed policy (CANON_DIGEST_POLICY_INVALID), a symlink anywhere on a file's
+  path (CANON_PACKAGE_SYMLINK) and a missing or non-regular file (CANON_PACKAGE_UNREADABLE). On the npm pack list of
+  packages/eslint/{be,fe} it reproduces the bound canon-be and canon-fe values (checked on 3.0.0/8.0.0 and on the
+  republished 3.0.1/8.0.1). `npm run check` (check-canon-pins.mjs) holds every profile to the canon this runtime publishes: canon.version
+  equals the canon's package.json and its pin (CANON_BINDING_VERSION), the digest of the PUBLISHED file set (npm pack
+  --dry-run --json --ignore-scripts of the pin's source directory; CANON_PACK_UNAVAILABLE when it cannot list) equals
+  contentDigest.value and files (CANON_BINDING_DIGEST), and a profile it cannot judge is CANON_BINDING_INVALID; so a canon
+  change without a version bump and a rebinding fails the check, and so does any edit to a copy bundled into a canon's
+  runtime/ folder (canon-pins, failure codes, slots), because it is published content; the failure message says so. scripts/checks/gate.mjs first judges the canon each
+  profile's pinned side (be/, fe/) of the app resolves: another version or digest is the blocking finding
+  canon/installed-canon-mismatch (CANON_INSTALL_MISMATCH, exit 1, never preexisting), a canon that does not resolve is
+  CANON_INSTALL_MISSING and one it cannot hash CANON_INSTALL_UNJUDGED (exit 2, never a pass). The report carries
+  steps.canon (profile, package, side, path, version, digest, files).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/canon-content-digest.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/models/code-patterns.yaml
+  - scripts/lib/canon-digest.mjs
+  - scripts/checks/check-canon-pins.mjs
+  - scripts/checks/gate.mjs
+  - tests/canon-digest.spec.mjs
+  - tests/_canon-install-fixture.mjs
+  - tests/op-gate-loop.spec.mjs

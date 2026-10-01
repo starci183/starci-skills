@@ -832,6 +832,137 @@ BRAND_UNREADABLE:
   owner: other-op:brand.decide
   kind: check-finding
 
+CANON_BINDING_DIGEST:
+  title: "Published canon differs from its bound digest"
+  title_vi: "Canon phát hành khác digest đã ràng buộc"
+  meaning_vi: "Digest của bộ tệp canon mà runtime phát hành (danh sách npm pack) khác giá trị contentDigest hoặc số tệp mà hồ sơ code-patterns.yaml ràng buộc."
+  causes_vi:
+    - "Tệp canon đã sửa mà chưa nâng phiên bản gói"
+    - "Bản sao đóng gói trong thư mục runtime/ của canon (canon-pins, mã lỗi, slot) đã sửa: đó cũng là nội dung phát hành"
+    - "Đã nâng phiên bản nhưng chưa ràng buộc lại contentDigest của hồ sơ"
+  nextStep_vi: "Nâng phiên bản gói canon và ghim của nó, phát hành, rồi ràng buộc lại canon.version và contentDigest của hồ sơ theo tarball đã phát hành."
+  owner: runtime-core
+  kind: check-finding
+
+CANON_BINDING_INVALID:
+  title: "Canon binding cannot be judged"
+  title_vi: "Không đánh giá được ràng buộc canon"
+  meaning_vi: "Một hồ sơ code-patterns.yaml không trỏ tới gói canon được ghim có nguồn, hoặc chính sách digest hay bộ tệp của nó bị bộ tính digest từ chối."
+  causes_vi:
+    - "canon.package không có ghim starci kèm source"
+    - "Thuật toán, cách đóng khung hay danh sách glob của contentDigest không hợp lệ"
+    - "Bộ tệp canon chứa liên kết tượng trưng hoặc npm pack không chạy được"
+  nextStep_vi: "Sửa hồ sơ hoặc gói canon theo mã được trích trong thông báo rồi chạy lại npm run check."
+  owner: runtime-core
+  kind: check-finding
+
+CANON_BINDING_VERSION:
+  title: "Canon version differs from its binding"
+  title_vi: "Phiên bản canon khác ràng buộc"
+  meaning_vi: "canon.version của một hồ sơ khác phiên bản trong package.json của gói canon hoặc khác phiên bản ghim của nó."
+  causes_vi:
+    - "Đã nâng phiên bản gói canon mà chưa cập nhật hồ sơ"
+    - "Hồ sơ hoặc ghim được sửa một phía"
+  nextStep_vi: "Đưa package.json, ghim và canon.version của hồ sơ về cùng một phiên bản, ràng buộc lại contentDigest, rồi chạy lại npm run check."
+  owner: runtime-core
+  kind: check-finding
+
+CANON_DIGEST_ALGORITHM_UNKNOWN:
+  title: "Unknown canon digest algorithm"
+  title_vi: "Thuật toán digest canon không xác định"
+  meaning_vi: "Chính sách contentDigest nêu một thuật toán mà bộ tính digest canon không hỗ trợ, nên không băm theo cách khác."
+  causes_vi:
+    - "algorithm khác sha256"
+  nextStep_vi: "Đặt algorithm là sha256 trong code-patterns.yaml rồi ràng buộc lại giá trị digest."
+  owner: runtime-core
+  kind: input-invalid
+
+CANON_DIGEST_FRAMING_UNKNOWN:
+  title: "Unknown canon digest framing"
+  title_vi: "Cách đóng khung digest canon không xác định"
+  meaning_vi: "Chính sách contentDigest nêu một cách đóng khung mà bộ tính digest canon không có, nên không băm theo cách đoán."
+  causes_vi:
+    - "framing khác sorted-posix-relative-path-null-raw-bytes-null"
+  nextStep_vi: "Đặt framing là sorted-posix-relative-path-null-raw-bytes-null rồi ràng buộc lại giá trị digest."
+  owner: runtime-core
+  kind: input-invalid
+
+CANON_DIGEST_POLICY_INVALID:
+  title: "Canon digest policy is malformed"
+  title_vi: "Chính sách digest canon sai dạng"
+  meaning_vi: "contentDigest không phải một đối tượng có danh sách include không rỗng và danh sách exclude gồm các glob."
+  causes_vi:
+    - "Thiếu include hoặc exclude"
+    - "Một glob rỗng hoặc không phải chuỗi"
+  nextStep_vi: "Sửa contentDigest trong code-patterns.yaml theo đúng dạng rồi chạy lại kiểm tra."
+  owner: runtime-core
+  kind: input-invalid
+
+CANON_INSTALL_MISMATCH:
+  title: "Installed canon differs from its binding"
+  title_vi: "Canon đã cài khác ràng buộc"
+  meaning_vi: "Gói canon mà một phía (be/ hoặc fe/) của ứng dụng phân giải được có phiên bản hoặc digest nội dung khác hồ sơ code-patterns.yaml ràng buộc; gate chặn (thoát 1)."
+  causes_vi:
+    - "Ứng dụng cài phiên bản canon khác phiên bản ghim"
+    - "Tệp trong node_modules của canon bị sửa tại chỗ"
+  nextStep_vi: "Cài lại đúng phiên bản canon đã ghim từ npm registry rồi chạy lại gate."
+  owner: op-retry
+  kind: check-finding
+
+CANON_INSTALL_MISSING:
+  title: "Canon is not installed in the app"
+  title_vi: "Ứng dụng chưa cài canon"
+  meaning_vi: "Gói canon của một hồ sơ không phân giải được từ thư mục phía tương ứng của ứng dụng; gate không chạy được (thoát 2), không bao giờ coi là đạt."
+  causes_vi:
+    - "Chưa cài phụ thuộc của ứng dụng"
+    - "package.json của ứng dụng không khai báo gói canon"
+  nextStep_vi: "Khai báo và cài đúng phiên bản canon đã ghim từ npm registry rồi chạy lại gate."
+  owner: op-retry
+  kind: check-finding
+
+CANON_INSTALL_UNJUDGED:
+  title: "Installed canon cannot be judged"
+  title_vi: "Không đánh giá được canon đã cài"
+  meaning_vi: "Gate không đọc được ràng buộc canon của runtime hoặc không tính được digest của canon đã cài; gate không chạy được (thoát 2)."
+  causes_vi:
+    - "code-patterns.yaml hoặc canon-pins.yaml không đọc được, hay ghim không nêu side"
+    - "Canon đã cài chứa liên kết tượng trưng hoặc tệp không đọc được"
+  nextStep_vi: "Sửa ràng buộc của runtime hoặc cài lại canon theo mã được trích rồi chạy lại gate."
+  owner: runtime-core
+  kind: check-finding
+
+CANON_PACK_UNAVAILABLE:
+  title: "Canon pack list unavailable"
+  title_vi: "Không lấy được danh sách đóng gói canon"
+  meaning_vi: "npm pack --dry-run không liệt kê được bộ tệp phát hành của gói canon, nên không tính được digest phát hành."
+  causes_vi:
+    - "npm không có trên PATH"
+    - "package.json của gói canon hỏng"
+  nextStep_vi: "Khôi phục npm hoặc package.json của gói canon rồi chạy lại npm run check."
+  owner: runtime-core
+  kind: runtime-fault
+
+CANON_PACKAGE_SYMLINK:
+  title: "Canon package holds a symlink"
+  title_vi: "Gói canon chứa liên kết tượng trưng"
+  meaning_vi: "Bộ tệp của canon có liên kết tượng trưng; digest canon chỉ băm tệp thường, nên từ chối thay vì đi theo liên kết."
+  causes_vi:
+    - "Tệp hoặc thư mục trong gói canon là symlink hay junction"
+  nextStep_vi: "Thay liên kết bằng tệp thật (hoặc cài lại canon từ registry) rồi chạy lại."
+  owner: runtime-core
+  kind: check-finding
+
+CANON_PACKAGE_UNREADABLE:
+  title: "Canon file is missing or not a file"
+  title_vi: "Tệp canon thiếu hoặc không phải tệp"
+  meaning_vi: "Một tệp thuộc bộ tệp canon không tồn tại hoặc không phải tệp thường, nên không tính được digest."
+  causes_vi:
+    - "Danh sách đóng gói nêu một tệp đã bị xoá"
+    - "Một thư mục mang tên khớp glob include"
+  nextStep_vi: "Khôi phục tệp canon hoặc sửa danh sách files của gói rồi chạy lại."
+  owner: runtime-core
+  kind: check-finding
+
 CANON_SCAN_UNAVAILABLE:
   title: "Canon scan unavailable"
   title_vi: "Không quét được canon"

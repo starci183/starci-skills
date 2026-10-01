@@ -13,7 +13,11 @@
 //   3. tsc, one incremental program per tsconfig that owns a changed file (be/, each fe app or package), through the compiler
 //      API, its buildinfo in this worktree's git dir; the worktree's own stale *.tsbuildinfo files are deleted first;
 //   4. with --tests, the slice's unit/integration specs (jest --maxWorkers=2);
-//   0. first, the MERGE GUARD: every merge commit in base..HEAD with one parent on the main line (--main, default main|master) is
+//   0. first, the INSTALLED CANON: for every profile of modules/models/code-patterns.yaml, the canon package its pin's side (be/, fe/)
+//      resolves must carry the bound canon.version and canon.contentDigest (scripts/lib/canon-digest.mjs over the installed
+//      files); a mismatch is a finding `canon/installed-canon-mismatch` (never preexisting), a canon that does not resolve is a
+//      tool that could not run (exit 2, CANON_INSTALL_MISSING), never a pass;
+//   0. then the MERGE GUARD: every merge commit in base..HEAD with one parent on the main line (--main, default main|master) is
 //      recomputed with `git merge-tree`; a path main changed whose merged blob is the lane's (main's change dropped, merge
 //      9958cce38) is a finding `merge/dropped-main-change`, never preexisting.
 // Only NEW findings block: lint per (file, engine/rule) count and tsc per normalised message are compared with the base commit
@@ -32,6 +36,9 @@ import { posixPath } from '../lib/path-key.mjs';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { sha256 } from '../../engine/digest.mjs';
 import { isMain, walkFiles } from './common.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
+import { canonContentDigest, installedFiles } from '../lib/canon-digest.mjs';
+import { PROFILES_FILE, loadPins } from './check-canon-pins.mjs';
 
 export const GATE_SCHEMA = 'starci/gate@1';
 export const LINT_SCHEMA = 'starci/lint@1';
@@ -512,6 +519,52 @@ export function mergeGuard(root, { base, head = 'HEAD', mainTip = mainTipOf(root
   return out;
 }
 
+/* ----------------------------------------------------------------------------------------- installed canon */
+
+const INSTALL = Object.freeze({ missing: 'CANON_INSTALL_MISSING', mismatch: 'CANON_INSTALL_MISMATCH', unjudged: 'CANON_INSTALL_UNJUDGED' });
+
+/** The installed root of package `name` as node resolves it from `directory` (its node_modules walk), or null. */
+function installedPackageRoot(directory, name) {
+  const searched = createRequire(path.join(directory, 'package.json')).resolve.paths(name) ?? [];
+  for (const modules of searched) {
+    const candidate = path.join(modules, ...name.split('/'));
+    if (fs.existsSync(path.join(candidate, 'package.json'))) return fs.realpathSync(candidate);
+  }
+  return null;
+}
+
+/**
+ * Every profile's canon as installed under the app at `root`, judged against its binding in `runtime`'s code-patterns.yaml:
+ * the package resolved from the pin's side directory must have the bound version and content digest.
+ * {checked: [{profile, package, side, path, version, digest, files}], findings[], errors[]}
+ */
+export function installedCanonFindings(root, { runtime = runtimeRoot } = {}) {
+  const out = { checked: [], findings: [], errors: [] };
+  let pins, profiles;
+  try {
+    pins = loadPins(runtime).pins ?? {};
+    profiles = parseYaml(fs.readFileSync(path.join(runtime, PROFILES_FILE), 'utf8'))?.profiles ?? {};
+  } catch (error) { out.errors.push(`${INSTALL.unjudged} the canon bindings are unreadable: ${error.message}`); return out; }
+  for (const [profile, value] of Object.entries(profiles)) {
+    const canon = value?.canon, side = pins[canon?.package]?.side;
+    if (!canon?.package || typeof side !== 'string') { out.errors.push(`${INSTALL.unjudged} profile ${profile}: canon.package ${canon?.package} has no pinned side`); continue; }
+    const installed = installedPackageRoot(path.join(root, side), canon.package);
+    if (!installed) { out.errors.push(`${INSTALL.missing} profile ${profile}: ${canon.package} does not resolve from ${side}/ of the app; install the pinned ${canon.version}`); continue; }
+    const where = posixPath(path.relative(root, installed));
+    let version, digest;
+    try {
+      version = JSON.parse(fs.readFileSync(path.join(installed, 'package.json'), 'utf8')).version ?? null;
+      digest = canonContentDigest(installed, canon.contentDigest, installedFiles(installed));
+    } catch (error) { out.errors.push(`${INSTALL.unjudged} profile ${profile}: ${error.code ?? 'ERROR'} ${error.message}`); continue; }
+    out.checked.push({ profile, package: canon.package, side, path: where, version, digest: digest.value, files: digest.files });
+    if (version !== canon.version || digest.value !== canon.contentDigest.value || digest.files !== canon.contentDigest.files) {
+      out.findings.push({ engine: 'canon', rule: 'installed-canon-mismatch', path: where, line: null,
+        message: `${canon.package} installed for ${side}/ is ${version} with ${digest.files} files digesting ${digest.value}; profile ${profile} binds ${canon.version} with ${canon.contentDigest.files} files digesting ${canon.contentDigest.value} (${INSTALL.mismatch}: reinstall the pinned version from the registry)` });
+    }
+  }
+  return out;
+}
+
 /* ----------------------------------------------------------------------------------------------- gate */
 
 /**
@@ -522,7 +575,7 @@ export function mergeGuard(root, { base, head = 'HEAD', mainTip = mainTipOf(root
 export async function runGate({ root, base = null, changed = null, tests = null, main = null, hfs = null, ts: typescript = null }) {
   const at = new Date().toISOString();
   const report = { schema: GATE_SCHEMA, at, root: posixPath(path.resolve(root)), base: null, head: null, dirty: null, changed: [], exit: GATE_EXIT.toolFailed, ok: false,
-    steps: { merges: null, lint: null, codegen: null, build: [], tsc: [], tests: null, staleBuildInfo: [] }, counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
+    steps: { canon: null, merges: null, lint: null, codegen: null, build: [], tsc: [], tests: null, staleBuildInfo: [] }, counts: { new: 0, preexisting: 0 }, findings: [], errors: [] };
   const fail = (error) => { report.errors.push(String(error?.message ?? error)); return finish(report); };
   let cache, delta;
   try {
@@ -538,6 +591,12 @@ export async function runGate({ root, base = null, changed = null, tests = null,
   const readBase = baseBlobReader(root, report.base);
   const fresh = [];
   let preexisting = 0;
+
+  // The installed canon: the lint below means nothing over a canon that is not the bound one.
+  const installed = installedCanonFindings(root);
+  report.steps.canon = installed.checked;
+  report.errors.push(...installed.errors);
+  fresh.push(...installed.findings);
 
   // The merge guard first: a merge in base..HEAD that took the lane side over a main-side change is never a clean branch.
   const guard = mergeGuard(root, { base: report.base, mainTip: mainTipOf(root, main) });
