@@ -387,6 +387,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, re
   const { depth, limit, refusal } = preflight ?? depthPreflight({ parentDispatch, maxDepth, show: orca.show });
   if (refusal) return { ...refusal, provider, taskId: task ?? null, runId: run ?? null };
   const takesModel = card?.start?.modelArgument !== false;
+  if (takesModel && !model) model = card?.start?.defaultModel ?? null;
   if (effort === 'none') effort = null;
   let trust = null;
   // A card that takes no model flag (Devin) is pinned by launch trust in the worktree's local Devin config instead.

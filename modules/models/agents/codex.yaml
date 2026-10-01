@@ -4,6 +4,9 @@ kind: native-managed-agent
 start:
   api: orchestration.worker-start
   agentArgument: codex
+  # A launch that names no model starts this one, never the model of the user's ~/.codex/config.toml (a dead default there
+  # answers 400 and the worker never reaches a prompt: live smoke 2026-10-02).
+  defaultModel: gpt-6-luna
 readiness: worker-start-receipt
 roles:
   - workflow-kernel
