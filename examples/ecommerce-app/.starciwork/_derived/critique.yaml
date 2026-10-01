@@ -22,11 +22,12 @@ findings:
       - ui.checkout.shop-browse
       - ui.checkout.stock-refused
     because: A breaking change to br.checkout.place-order sends 14 other record(s) back to todo, would
-      stale 11 evidence file(s), and touches 10 code path(s) (src/features/checkout,
-      src/features/identity, src/modules/domain/account, src/modules/domain/cart,
-      src/modules/domain/catalog, src/modules/domain/order, src/modules/domain/payment,
-      src/modules/domain/session, src/modules/integrations/identity, src/modules/integrations/order)
-      - this is the number a reviewer wants before approving the change.
+      stale 11 evidence file(s), and touches 10 code path(s) (be/src/features/checkout,
+      be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
+      be/src/modules/domain/catalog, be/src/modules/domain/order, be/src/modules/domain/payment,
+      be/src/modules/domain/session, be/src/modules/integrations/identity,
+      be/src/modules/integrations/order) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.identity.sign-in
     kind: blast-radius
     severity: critical
@@ -45,11 +46,12 @@ findings:
       - uat.identity.sign-in
       - ui.identity.sign-in
     because: A breaking change to br.identity.sign-in sends 12 other record(s) back to todo, would stale
-      9 evidence file(s), and touches 10 code path(s) (src/features/checkout, src/features/identity,
-      src/modules/domain/account, src/modules/domain/cart, src/modules/domain/catalog,
-      src/modules/domain/order, src/modules/domain/payment, src/modules/domain/session,
-      src/modules/integrations/identity, src/modules/integrations/order) - this is the number a
-      reviewer wants before approving the change.
+      9 evidence file(s), and touches 10 code path(s) (be/src/features/checkout,
+      be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
+      be/src/modules/domain/catalog, be/src/modules/domain/order, be/src/modules/domain/payment,
+      be/src/modules/domain/session, be/src/modules/integrations/identity,
+      be/src/modules/integrations/order) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.identity.account
     kind: blast-radius
     severity: warn
@@ -65,11 +67,12 @@ findings:
       - integration.checkout.redis
       - sds.checkout.order-flow
     because: A breaking change to br.identity.account sends 9 other record(s) back to todo, would stale
-      5 evidence file(s), and touches 10 code path(s) (src/features/checkout, src/features/identity,
-      src/modules/domain/account, src/modules/domain/cart, src/modules/domain/catalog,
-      src/modules/domain/order, src/modules/domain/payment, src/modules/domain/session,
-      src/modules/integrations/identity, src/modules/integrations/order) - this is the number a
-      reviewer wants before approving the change.
+      5 evidence file(s), and touches 10 code path(s) (be/src/features/checkout,
+      be/src/features/identity, be/src/modules/domain/account, be/src/modules/domain/cart,
+      be/src/modules/domain/catalog, be/src/modules/domain/order, be/src/modules/domain/payment,
+      be/src/modules/domain/session, be/src/modules/integrations/identity,
+      be/src/modules/integrations/order) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.checkout.cart
     kind: blast-radius
     severity: warn
@@ -79,8 +82,8 @@ findings:
       - fr.checkout.cart.clear
       - fr.checkout.cart.list
     because: A breaking change to br.checkout.cart sends 3 other record(s) back to todo, would stale 0
-      evidence file(s), and touches 1 code path(s) (src/modules/domain/cart) - this is the number a
-      reviewer wants before approving the change.
+      evidence file(s), and touches 1 code path(s) (be/src/modules/domain/cart) - this is the number
+      a reviewer wants before approving the change.
   - id: fan-in-hotspot:fr.checkout.place-order
     kind: fan-in-hotspot
     severity: info
@@ -102,53 +105,25 @@ findings:
     severity: critical
     records:
       - br.checkout.place-order
-    because: "br.checkout.place-order is state: done but 3 of its 3 anchor path(s) do not exist on disk:
-      src/modules/domain/order (module), src/modules/integrations/identity (module),
-      src/modules/integrations/order (module) - the record claims proof over code that is not there
-      to have been proven."
-  - id: done-without-anchor:br.identity.sign-in
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - br.identity.sign-in
-    because: "br.identity.sign-in is state: done but 2 of its 2 anchor path(s) do not exist on disk:
-      src/modules/domain/account (module), src/modules/domain/session (module) - the record claims
-      proof over code that is not there to have been proven."
+    because: "br.checkout.place-order is state: done but 2 of its 3 anchor path(s) do not exist on disk:
+      be/src/modules/integrations/identity (module), be/src/modules/integrations/order (module) -
+      the record claims proof over code that is not there to have been proven."
   - id: done-without-anchor:impl.checkout.be.order-checkout
     kind: done-without-anchor
     severity: critical
     records:
       - impl.checkout.be.order-checkout
-    because: "impl.checkout.be.order-checkout is state: done but 6 of its 6 anchor path(s) do not exist
-      on disk: src/modules/domain/order (owners), src/modules/domain/cart (owners),
-      src/modules/domain/catalog (owners), src/modules/domain/payment (owners),
-      src/modules/integrations/identity (owners), src/features/checkout (owners) - the record claims
-      proof over code that is not there to have been proven."
+    because: "impl.checkout.be.order-checkout is state: done but 1 of its 6 anchor path(s) do not exist
+      on disk: be/src/modules/integrations/identity (owners) - the record claims proof over code
+      that is not there to have been proven."
   - id: done-without-anchor:impl.identity.be.identity-account
     kind: done-without-anchor
     severity: critical
     records:
       - impl.identity.be.identity-account
-    because: "impl.identity.be.identity-account is state: done but 4 of its 4 anchor path(s) do not
-      exist on disk: src/modules/domain/account (owners), src/modules/domain/session (owners),
-      src/modules/integrations/order (owners), src/features/identity (owners) - the record claims
-      proof over code that is not there to have been proven."
-  - id: done-without-anchor:sds.checkout.order-flow
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - sds.checkout.order-flow
-    because: "sds.checkout.order-flow is state: done but 4 of its 4 anchor path(s) do not exist on disk:
-      src/modules/domain/order (owners), src/modules/domain/cart (owners),
-      src/modules/domain/payment (owners), src/modules/domain/catalog (owners) - the record claims
-      proof over code that is not there to have been proven."
-  - id: unbound-sds:sds.checkout.order-flow
-    kind: unbound-sds
-    severity: warn
-    records:
-      - sds.checkout.order-flow
-    because: sds.checkout.order-flow authors owners, but none resolve to a real module directory - it is
-      bound in name only.
+    because: "impl.identity.be.identity-account is state: done but 1 of its 4 anchor path(s) do not
+      exist on disk: be/src/modules/integrations/order (owners) - the record claims proof over code
+      that is not there to have been proven."
   - id: stale-evidence-bulk-edit:br.checkout.place-order
     kind: stale-evidence-bulk-edit
     severity: warn

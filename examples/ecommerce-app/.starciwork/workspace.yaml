@@ -10,8 +10,3 @@ repositories:
     name: be
   - role: fe
     name: fe
-    apps:
-      - name: landing
-        root: apps/landing
-      - name: shop
-        root: apps/shop

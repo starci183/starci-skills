@@ -30,7 +30,7 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
   - the `hfs.json` of kind `app`;
   - the managed root files;
   - the `.starciwork`.
-  The old folders are deleted with no aliases. Implementation records name the side their code lives in (`impl/be`, `impl/fe`, `repository: be|fe`), and a `.starciwork` at an app root resolves those sides to its side folders (`repoRootFor`, `frontendOf`). Both sides of each app type-check and the unit suites stay green. The examples gate `scripts/checks/check-example-architecture.mjs` now runs `hfs lint`, because the machine's source rules sit on the lint surface. Every reference moved with the folders:
+  The old folders are deleted with no aliases. Implementation records name the side their code lives in (`impl/be`, `impl/fe`, `repository: be|fe`), and every owner path is app-relative (`be/...`, `fe/...`). Each test world runs the services its stack declares for real: Postgres and the cache's Redis in ecommerce-app, and Postgres and Keycloak in todo-app, importing the repository's `realm-todo.json` with user and admin events on. `world.infra.<service>` drives their outages, and only external providers stay faked. Both sides of each app type-check, and the unit suites stay green. The examples gate `scripts/checks/check-example-architecture.mjs` now runs `hfs lint`, because the machine's source rules sit on the lint surface. Every reference moved with the folders:
   - specs, including `tests/canon-packed-load.spec.mjs`;
   - CI workflows;
   - docs and knowledge;

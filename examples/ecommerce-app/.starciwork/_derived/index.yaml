@@ -216,6 +216,11 @@ records:
       refs:
         - integration.checkout.postgres
         - integration.checkout.redis
+  shell:
+    schema: work/layout-tree@1
+    feature: null
+    state: todo
+    effectiveState: todo
   uat.checkout.place-order:
     schema: work/uat-flow@1
     feature: checkout
@@ -295,6 +300,9 @@ tally:
         - uat.identity.sign-in
   unbuiltModuleGaps: 0
 frontier:
+  - id: shell
+    feature: null
+    title: null
   - id: br.checkout.cart
     feature: checkout
     title: A cart is the person's own accumulating list of product lines
