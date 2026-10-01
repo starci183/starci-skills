@@ -62,7 +62,7 @@ reads:
   - id: consumer
     path: <consumer-app>/fe/<consumer-manifest>
     purpose:
-      en: Read the consuming frontend repository's declared dependency on the grammar package - the exact
+      en: Read the consuming app's declared dependency on the grammar package (its root package.json) - the exact
         package name and the version it currently resolves - so the published version can actually
         be bound after it exists.
   - id: profile

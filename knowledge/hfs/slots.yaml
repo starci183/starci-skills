@@ -352,7 +352,7 @@ slots:
     tracked: external
     tier: none
     tests: none
-    goesTo: "D:/starci-lanes/<project>/<lane>/ (outside every repository)"
+    goesTo: "D:/starci-lanes/<project>/<lane>/ (outside every repository) for a lane; a runtime op worktree (.starciwork/worktrees/<op>) is git-excluded, never tracked, and removed when its op settles"
   - id: app.plaintext-env
     profiles: [app]
     path: "{.env,.env.*,.secrets/,**/*.pem,**/*.key}"
@@ -1167,10 +1167,10 @@ slots:
 # Checks that read this manifest (all ship from .claude; none keeps its own path list)
 consumers:
   - scripts/lib/hfs-slots.mjs                  # the loader every consumer below goes through
-  - scripts/checks/hfs/slot-check.mjs          # HFS_SLOT_* / tracked / external / managed drift
+  - scripts/lib/hfs-check.mjs                  # hfs check: HFS_SLOT_* / tracked / external, the side view per side
   - scripts/checks/architecture.mjs            # tiers, direction matrix, cycles, reachability
   - packages/eslint/be starciBeConfig({hfs})   # file globs for rules come from slots
   - packages/eslint/fe starciFeConfig({hfs})
-  - packages/stylelint-canon                   # colour and brand allowances from fe.modules.brand
+  - packages/stylelint                         # @starci/stylelint-canon: colour and brand allowances from fe.modules.brand
   - packages/hfs/sync                          # renders managedBy templates (hfs sync) and judges them (hfs check)
   - modules/kernel/failure-codes.yaml          # every rule id listed above has a Vietnamese why

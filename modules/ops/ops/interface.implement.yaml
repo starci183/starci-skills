@@ -217,7 +217,7 @@ writes:
         through `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <app> --wait
         --base <source commit recorded before this slice's first edit> --paths <owned paths,
         comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` attach both files at api report
-        (the specs of the changed or added source and the specs that import it - never the repository's whole test:ci, owner 2026-09-29) in this same attempt: it scans against the local SonarQube the
+        (the specs of the changed or added source and the specs that import it - never the app's whole unit suite, owner 2026-09-29; the front end itself has no tests) in this same attempt: it scans against the local SonarQube the
         stack declaration names (default the source host's dev stack), takes the project key, host
         and token from that declaration and its custody, creates the project and its analysis
         token when missing, and records the analysis/revision, the slice verdict, issue counts and
@@ -452,7 +452,7 @@ steps:
         Never guess endpoints, fake success or invent undisclosed business decisions. CALL POINT
         (step 4): if an observed API integration or render-data defect blocks an already accepted
         journey and is repairable without business changes, report outcome blocked with blocker
-        kind `shared-change` whose detail names the exact backend repository, the backend file
+        kind `shared-change` whose detail names the app's back end (`be/`), the back-end file
         paths outside this op's allowlist, the defect evidence/problem, changeKind and the
         unchanged businessRefs. The kernel routes it by the modules/models/kinds.yaml
         `shared-change` routes to one scoped backend build and this op waits; it never edits

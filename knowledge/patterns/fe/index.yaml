@@ -20,7 +20,7 @@ provenance:
   limitations: |
     Patterns place code and shape it. They do not approve business requirements or architecture, which belong to
     .starciwork, and static checks do not prove rendered behavior. Inspect actual source, manifest, lockfile, aliases and lint
-    and test configuration in the selected repository. Verify installed Grammar exports at the public entry
+    configuration in the selected app. Verify installed Grammar exports at the public entry
     @starci/grammar/common.
 topics:
   - path: architecture-check.yaml
@@ -33,7 +33,7 @@ topics:
     rules: "FE-FOLDER-1 … FE-FOLDER-6"
   - path: naming.yaml
     title: Naming
-    decides: "Folder, export, props type, class-name export, hook, reader, constant and spec names"
+    decides: "Folder, export, props type, class-name export, hook, reader and constant names"
     rules: "FE-NAMING-1 … FE-NAMING-7"
   - path: function.yaml
     title: Function
@@ -57,7 +57,7 @@ topics:
     rules: "FE-ERROR-1 … FE-ERROR-5"
   - path: transport.yaml
     title: Data transport
-    decides: "One client, the Outcome vocabulary, generated wire types from the contract copy, server and client reads, one refresh mechanism"
+    decides: "One client, the Outcome vocabulary, generated wire types from be/contracts, server and client reads, one refresh mechanism"
     rules: "FE-TRANSPORT-1 … FE-TRANSPORT-5"
   - path: boundaries.yaml
     title: Boundaries
@@ -77,5 +77,5 @@ topics:
     rules: "FE-PACKAGES-1 … FE-PACKAGES-3"
   - path: multi-app.yaml
     title: Multiple apps
-    decides: "Independent apps under apps/<app>, drafts as branches, ui-screen records that name their app"
+    decides: "Independent apps under fe/apps/<app>, drafts as branches, ui-screen records that name their app"
     rules: "FE-APPS-1 … FE-APPS-3"

@@ -34,13 +34,11 @@ The manifest may select a subset of a package's exported toolbox. An extra expor
 
 ### Architecture
 
-Architecture obligations bind a `starci/architecture-check@1` result from `node scripts/checks/architecture.mjs <repository>`. The code-pattern result records the architecture report digest, repository/source identity and required rule IDs. An absent, stale, invalid or non-clean report is uncovered coverage. Static dependency checks do not prove dependency-injection lifetime, authorization or behavior; the obligation's semantic companion states the remaining review.
+Architecture obligations bind a `starci/architecture-check@1` result from `node scripts/checks/architecture.mjs <app>/<side>` (`hfs check` runs it over `be/` and `fe/`). The code-pattern result records the architecture report digest, repository/source identity and required rule IDs. An absent, stale, invalid or non-clean report is uncovered coverage. Static dependency checks do not prove dependency-injection lifetime, authorization or behavior; the obligation's semantic companion states the remaining review.
 
-There is no third machine kind. The former script adapters lost their runner with the scoped-lint aggregate and were
-deleted (lane c0-orphan, listed in `modules/kernel/retired-paths.yaml`): each obligation
-they held is either judged by a canon rule or the architecture machine now, or was dropped because the locked convention
-does not adopt it. The three obligations no canon rule held were ported at error: `require-public-member-jsdoc` (R109),
-`replacement-throw-carries-cause` (R108) and `props-fields-readonly` (R110).
+There is no third machine kind: every obligation is judged by a canon rule or the architecture machine, or is not part
+of the locked convention; `require-public-member-jsdoc` (R109), `replacement-throw-carries-cause` (R108) and
+`props-fields-readonly` (R110) are canon rules at error.
 
 ## Coverage and remaining work
 

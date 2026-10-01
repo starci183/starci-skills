@@ -28,7 +28,7 @@ rules:
       outcome becomes isForbidden, any other failure isError), and the pure half renders it through `SlotView` with a
       retry that re-runs that read (knowledge/grammars/starci/playbook.yaml guidance state-recipes). A command failure is
       resolved by the connected half into field errors (zod message keys resolved by next-intl) or a toast. XState never
-      holds failed, error or forbidden. Tests assert the mapping and retry eligibility.
+      holds failed, error or forbidden.
     rationale: |
       One recipe renders every read failure the same way; transport details stop at the connected half and recovery
       conditions stay explicit.
@@ -53,11 +53,6 @@ rules:
         write: >
           the connected half resolves the failure into a field error or a toast; the pure half receives only the resolved
           string
-      - id: case-5
-        when: "Connected spec"
-        write: >
-          asserts the mapping: given a refused outcome the captured props.status.isForbidden is true, and the state still
-          names a drawn shape
     verification:
       automated:
         - FE_WORLD_OWNER_RENDER_BOUNDARY
@@ -150,10 +145,10 @@ rules:
         write: "runWithToast returns false and toasts; the caller flips a local state"
       - id: case-3
         when: "Render crash"
-        write: "apps/<app>/src/app/global-error.tsx and app/[locale]/error.tsx"
+        write: "fe/apps/<app>/src/app/global-error.tsx and app/[locale]/error.tsx"
       - id: case-4
         when: "Telemetry"
-        write: "apps/<app>/src/instrumentation.ts, instrumentation-client.ts"
+        write: "fe/apps/<app>/src/instrumentation.ts, instrumentation-client.ts"
     verification:
       automated:
         - FE_ERROR_BOUNDARY_MISSING

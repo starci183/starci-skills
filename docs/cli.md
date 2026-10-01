@@ -67,12 +67,13 @@ node scripts/route/build-ops-registry.mjs [--check]                 # regenerate
 
 ## Agent lifecycle (`node scripts/agent/*`)
 
-Spawning, probing and closing a worker terminal are library calls in
-`scripts/agent/lib.mjs`, driven by `api dispatch` and `api settle`. One shell
-stands beside them:
+Starting, attesting and releasing a worker are library calls in
+`scripts/agent/lib.mjs` (`orchestration worker-start`, `worker-show`,
+`worker-stop`, `worker-release`), driven by `api dispatch` and `api settle`. One
+shell stands beside them:
 
 ```sh
-node scripts/agent/send.mjs ...    # deliver a follow-up to a live agent terminal
+node scripts/agent/send.mjs ...    # deliver a follow-up to a live worker's terminal
 ```
 
 Agent flags always come from the agent card

@@ -188,10 +188,10 @@ windowHours:24, grants:null}` in memory: the `runtimes.yaml` default policy and 
 ## Product test switches (`specs.unit`, `specs.e2e`)
 
 Owner rulings 2026-09-28 ("speed up development; test later when asked") and 2026-09-29. `specs.unit` (default on)
-covers product unit tests in workflows (jest, vitest, coverage gates, Sonar coverage): while on, an op that writes code
-also writes or updates the specs of that code and runs only those - the specs of the changed or added source and the
-specs that import it - plus typecheck, lint, canon-scan and the build, scoped as usual, never the repository's whole
-unit suite; `unit.verify` is the op that runs the whole unit suite (`npm test`, the app's managed unit script), dispatched only when the goal
+covers the back end's unit tests in workflows (jest and its per-file coverage threshold; the front end has no tests and
+Sonar takes no coverage): while on, an op that writes code also writes or updates the specs of that code and runs only
+those - the specs of the changed or added source and the specs that import it - through the op gate (`gate.mjs --tests`),
+never the app's whole unit suite; `unit.verify` is the op that runs the whole unit suite (`npm test`), dispatched only when the goal
 or the owner asks for it ("full unit", or its Vietnamese phrase for running the whole unit suite), never by default. `specs.e2e` (default off) covers product
 e2e (e2e.verify, Playwright and `*.e2e-spec.*` specs): it runs only when the goal or the owner asks, and `e2e.verify`
 then runs the full e2e suite. `false` for either family switches that class off for the workflow. uat.verify is neither:

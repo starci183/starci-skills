@@ -68,14 +68,14 @@ rules:
     kind: mandatory
     hfsRules: [R32, R33]
     requirement: |-
-      An app directory `apps/<app>/src` holds `main.ts` (at most 80 lines), `app.module.ts` (at most 250 lines, with
+      An app directory `be/apps/<app>/src` holds `main.ts` (at most 80 lines), `app.module.ts` (at most 250 lines, with
       `static register(options: AppOptions)`), and `<app>.options.ts`; an app has no spec of its own (BE-TEST-1). `main.ts`
       builds `EnvSource` once, parses every capability config into `AppOptions`, calls `AppModule.register(options)` and handles
       startup failure. `app.module.ts` registers the capability modules, the transport modules of the app's kind (api:
       `-graphql`, `-http`, `-websocket`; worker: `-schedule`, `-message`; cli: `-cli`), and `APP_GUARD` and `APP_FILTER`, and
       holds no business handler, service, controller, resolver or entity. The e2e world boots the real
       `AppModule.register(options)` (BE-TEST-12). A process entrypoint (`main.ts`, `bootstrap()`, a
-      top-level `void x()`, `NestFactory.create`) exists only under `apps/*/src`; migrations run from `apps/migrate`.
+      top-level `void x()`, `NestFactory.create`) exists only under `be/apps/*/src`; migrations run from `be/apps/migrate`.
     rationale: |-
       A thin composition root makes startup explicit and keeps product behavior independently testable below it.
     cases:
@@ -87,7 +87,7 @@ rules:
         write: 'app.module.ts lists ClockModule.register({ isGlobal: true }), PurchaseModule.register({ isGlobal: true, ...options.purchase }), CheckoutGraphqlModule and the APP_GUARD and APP_FILTER providers.'
       - id: case-3
         when: A second process kind is needed
-        write: Add `apps/worker`, `apps/migrate` or `apps/cli` and declare its kind in hfs.json; never grow the api app.
+        write: Add `be/apps/worker`, `be/apps/migrate` or `be/apps/cli` and declare its kind in hfs.json sides.be.apps; never grow the api app.
     verification:
       automated:
         - BE_APP_COMPOSITION_ONLY
@@ -102,14 +102,14 @@ rules:
     kind: mandatory
     hfsRules: [R30, R45]
     requirement: |-
-      Every capability module (`src/modules/{domain,platform,integrations}/<c>/<c>.module.ts`) is
+      Every capability module (`be/src/modules/{domain,platform,integrations}/<c>/<c>.module.ts`) is
       `@Module({...}) export class XModule extends ConfigurableModuleClass {}` with a `<c>.module-definition.ts` built by
       `new ConfigurableModuleBuilder<XOptions>().setExtras({ isGlobal: false }, (definition, extras) => ({ ...definition, global: extras.isGlobal })).build()`.
       The generic `XOptions` is required; a capability without options declares `export type XOptions = Record<string, never>` in
       `<c>.options.ts`. Only the method name `register` exists (no `forRoot`, `forFeature`, `registerAsync`); a module that adds
       providers overrides `static register(options: typeof OPTIONS_TYPE): DynamicModule`. Each capability has one representative
       module (`AnimalModule`), the only module of the capability registered in an app, exactly once per app, in
-      `apps/<app>/src/app.module.ts`, as `X.register({ isGlobal: true, ...options.x })`. A representative may split its
+      `be/apps/<app>/src/app.module.ts`, as `X.register({ isGlobal: true, ...options.x })`. A representative may split its
       complexity into sub-modules (`PetModule`, `HumanModule`) and import them as plain `imports: [PetModule]`; a sub-module is
       never registered in an app, never global and has exactly one importer, its parent. Other capabilities reach a capability
       only through its `Inject<Thing>()` decorators and never import its representative module. `isGlobal: true` appears only in

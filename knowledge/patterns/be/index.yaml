@@ -107,7 +107,7 @@ topics:
   - id: be.persistence
     title: Persistence and migrations
     path: persistence.yaml
-    decides: Migrations as the only schema authority, apps/migrate, persistence per capability, SqlText constants, the outbox, no transaction spanning an external call, the named shared EntityManager, one connection per database, table ownership and bounds, transactions
+    decides: Migrations as the only schema authority, be/apps/migrate, persistence per capability, SqlText constants, the outbox, no transaction spanning an external call, the named shared EntityManager, one connection per database, table ownership and bounds, transactions
     rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-10
   - id: be.background
     title: Background work

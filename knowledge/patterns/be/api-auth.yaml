@@ -39,7 +39,7 @@ rules:
     cases:
       - id: case-1
         when: Registration
-        write: 'apps/api/src/app.module.ts provides { provide: APP_GUARD, useClass: RateLimitGuard }, { provide: APP_GUARD, useClass: OriginGuard } and { provide: APP_GUARD, useClass: AuthGuard } in that order.'
+        write: 'be/apps/api/src/app.module.ts provides { provide: APP_GUARD, useClass: RateLimitGuard }, { provide: APP_GUARD, useClass: OriginGuard } and { provide: APP_GUARD, useClass: AuthGuard } in that order.'
       - id: case-2
         when: An open door
         write: '@Public({ reason: PublicReason.AuthHandshake }) on the signIn operation'

@@ -55,7 +55,7 @@ rules:
         write: errors/purchase.error.ts holds the code enum, the kind table and the one error class.
       - id: case-7
         when: Spec
-        write: 'unit `commission.service.spec.ts` beside `commission.service.ts`; e2e `place-order.e2e-spec.ts` under src/tests/e2e/checkout/'
+        write: 'unit `commission.service.spec.ts` beside `commission.service.ts`; e2e `place-order.e2e-spec.ts` under be/src/tests/e2e/checkout/'
       - id: case-8
         when: App
         write: 'main.ts, app.module.ts, api.options.ts'
@@ -155,7 +155,7 @@ rules:
       Module-level constants are UPPER_SNAKE. Exported function values are camelCase arrows. Decorator factories keep PascalCase;
       an injector is `Inject<Thing>` and its token a `unique symbol` constant in `<owner>.decorators.ts`. A connection name is
       `export const <CONN>_CONNECTION = "<conn>"` in `platform/database/<conn>.connection.ts`, equal to a name in `hfs.json`
-      `connections`; a capability's `persistence/connection.ts` declares no connection constant. SQL constants are UPPER_SNAKE in
+      `sides.be.connections`; a capability's `persistence/connection.ts` declares no connection constant. SQL constants are UPPER_SNAKE in
       `*.sql.ts`.
     rationale: |-
       Constants are visible at a glance and a connection name has exactly one definition.

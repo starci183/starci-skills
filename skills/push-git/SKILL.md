@@ -51,11 +51,12 @@ nothing is ahead.
 2. If a repository is dirty or off main: say which paths, and let their owner land or revert them. Never stash, reset
    or clean to make it pass.
 
-3. If a suite is red, spawn one fixer agent per failing group (one spec file or one source file, exactly the groups the
-   run printed). Each fixer works in its own lane worktree, writes or updates the specs of the code it repairs, runs
-   only those specs and lands with `node .claude/scripts/supervisor/land.mjs --commit <sha> --lane <lane> --specs touching --json`
-   (`.claude`) or the serialized product-repo helper `ff-main.mjs --repo <main checkout> --worktree <worktree> --branch <branch>`
-   (a product repository). No fixer runs a full suite and none pushes. When the fixes have landed, run `/push-git`
+3. If a suite is red, start one fixer agent per failing group (one spec file or one source file, exactly the groups the
+   run printed), each an `orchestration worker-start` worker. A `.claude` fixer works in its own lane worktree, writes or
+   updates the specs of the code it repairs, runs only those specs and lands with
+   `node .claude/scripts/supervisor/land.mjs --commit <sha> --lane <lane> --specs touching --json`. A product app's fix is
+   a workflow op: its green settle lands it into the app's main through the op worktree landing (rebase, `gate.mjs`,
+   fast-forward; `docs/workflow-kernel.md`). No fixer runs a full suite and none pushes. When the fixes have landed, run `/push-git`
    again from the top.
 
 4. If the push is refused (secret scan, pre-push hook, remote), report the reason as printed; never retry with force

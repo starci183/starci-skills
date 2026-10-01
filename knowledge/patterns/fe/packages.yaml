@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: fe.packages
 title: Frontend packages
 purpose: |-
-  Given code shared by several apps of one repository, where does it live and what does it expose? A package is built to
+  Given code shared by several front-end apps, where does it live and what does it expose? A package is built to
   dist with explicit named exports and no dead unit.
 appliesTo:
   - frontend
@@ -23,9 +23,9 @@ rules:
     kind: mandatory
     hfsRules: [R63]
     requirement: |-
-      A shared package is `packages/<pkg>/` (a product UI package is `packages/<family>-ui/`), declared in the root npm
-      `workspaces`, with `package.json` (`exports` explicit and pointing at `dist`), `src/index.ts`, `tsconfig.json` and
-      colocated specs. `npm run build` produces `dist`, and consumers import the built output; a package that exports
+      A shared package is `fe/packages/<pkg>/` (a product UI package is `fe/packages/<family>-ui/`), declared in the root npm
+      `workspaces`, with `package.json` (`exports` explicit and pointing at `dist`), `src/index.ts` and `tsconfig.json`, and
+      no spec (FE_NO_TESTS). Its `build` script produces `dist` (the root `build:fe` and `typecheck` run every workspace's), and consumers import the built output; a package that exports
       source files is a finding.
     rationale: |-
       A package that ships source depends on the consumer's compiler and cannot be versioned or cached as a unit.
@@ -44,8 +44,8 @@ rules:
     kind: mandatory
     hfsRules: [R63, R25]
     requirement: |-
-      `src/index.ts` re-exports named symbols only; `export *` is forbidden. Every exported unit has a consumer outside its
-      own spec, so an unused export is a finding and is deleted. A UI package holds composites, branches and leaves only, no
+      `src/index.ts` re-exports named symbols only; `export *` is forbidden. Every exported unit has a consumer, so an
+      unused export is a finding and is deleted. A UI package holds composites, branches and leaves only, no
       block, no colour literal and no world lifecycle.
     rationale: |-
       Explicit exports make the surface reviewable, and unused units are copies of a former product that nobody maintains.
@@ -65,9 +65,10 @@ rules:
     kind: mandatory
     hfsRules: [R14, R15]
     requirement: |-
-      A dependency has one version across the workspace, pinned exactly, with root `overrides` for react, next and grammar;
-      a nested copy such as `apps/<app>/node_modules/@starci/grammar` is forbidden. `@starci/*` and framework versions equal
-      `knowledge/hfs/canon-pins.yaml`. Raising a version starts in `.claude`; `hfs sync` then raises the repositories.
+      A dependency has one version across the root and workspace manifests, pinned exactly, with root `overrides` for react,
+      next and grammar; a nested copy such as `fe/packages/<pkg>/node_modules/@starci/grammar` is forbidden. `@starci/*` and
+      framework versions equal `knowledge/hfs/canon-pins.yaml`. Raising a version starts in `.claude`; each app then moves
+      to the new pins in its own upgrade lane.
     rationale: |-
       Two versions of one design system in one bundle produce two behaviors for one component.
     cases:

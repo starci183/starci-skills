@@ -20,7 +20,7 @@ node scripts/checks/brand.mjs <work-root> [--source <repository-root>] [--stage 
 ```
 
 `<work-root>` is the Work tree that owns the brand record (`<tree>/brand/index.yaml`; a repository root works
-too, resolving `<repo>/.starciwork/brand/index.yaml`). `--source` is the frontend repository root that the
+too, resolving `<repo>/.starciwork/brand/index.yaml`). `--source` is the front-end root (the app's `fe/`, or one app under `fe/apps/<app>`) that the
 record's `sources[].path` entries are relative to. Without it the two checks that read shipped source skip
 and say so. `--json` emits the whole result; otherwise one line per check. The exit code is 1 when any check
 failed, and 1 for a broken input — a missing record, a node that is not `kind: brand`, a record with no
@@ -69,8 +69,8 @@ negated light theme is not a light one.)
 
 The check skips — never passes — when `--source` is absent, when the brand declares no colour token, when it
 names no `css`/`tokens` source, or when not one declared source file could be read from the given root. A
-declared file this repository does not carry is reported per file with its reason, which is also how a record
-whose `sources[]` span two repositories behaves: run the check once per repository root.
+declared file the given root does not carry is reported per file with its reason, which is also how a record
+whose `sources[]` span two roots behaves: run the check once per root.
 
 **A token the app has not written yet.** An owner can rule a token into the product before the app's theme
 declares it - the value read off a reference render, the theme written later by interface.implement. Such a

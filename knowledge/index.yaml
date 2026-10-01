@@ -39,8 +39,9 @@ branches:
   - id: sonar-gate
     title: Sonar quality gate
     path: sonar-gate.yaml
-    use: The one place the Sonar new-code thresholds live (coverage, duplication, blocker/critical issues, unreviewed hotspots),
-      the ops that must pass them and the why codes; products only name the gate in .starcistacks.
+    use: The one place the Sonar thresholds live (new code - duplication, blocker/critical issues, unreviewed hotspots, no
+      coverage condition - and the overall part), the ops that must pass them and the why codes; an app only names the gate
+      in be/.starcistacks.
   - id: code-examples
     title: Code examples
     path: code-examples/index.yaml
@@ -48,8 +49,9 @@ branches:
   - id: hfs-slots
     title: HFS slot manifest
     path: hfs/slots.yaml
-    use: The one manifest of what may exist in a repository, where, and which tier may import which; read only
-      through scripts/lib/hfs-slots.mjs. A repository carries hfs.json (modules/schemas/hfs-repo.schema.yaml).
+    use: The one manifest of what may exist in an app (the root and its be/ and fe/ sides), where, and which tier may
+      import which; read only through scripts/lib/hfs-slots.mjs. An app carries one hfs.json of kind app
+      (modules/schemas/hfs-repo.schema.yaml).
   - id: hfs-rules
     title: HFS rule catalog
     path: hfs/rules.yaml
@@ -64,8 +66,8 @@ branches:
   - id: hfs
     title: HFS
     path: hfs/README.md
-    use: The one source and storage standard for every StarCi repository - principles, slots and versioning,
-      hfs.json, the repository map, backend and frontend trees, tests, secrets, tooling, gates, done criteria and the
+    use: The one source and storage standard for every StarCi app - principles, slots and versioning,
+      hfs.json, the app map (root, be/, fe/), backend and frontend trees, tests, secrets, tooling, gates, done criteria and the
       rule table of the catalog. The slot manifest hfs/slots.yaml is its machine form.
   - id: repo-patterns
     title: Repository patterns

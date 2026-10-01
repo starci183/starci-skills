@@ -33,7 +33,7 @@ rules:
       plugin pointing at `modules/i18n/request.ts`. An app with one language still uses `next-intl` with one locale and the
       same files; there is no copy-module variant.
     rationale: |-
-      One placement lets tooling, agents and specs find and check every catalog the same way, and a single-language app can
+      One placement lets tooling, agents and checks find and check every catalog the same way, and a single-language app can
       add a language without restructuring.
     cases:
       - id: case-1
@@ -41,7 +41,7 @@ rules:
         write: 'export const routing = defineRouting({ locales: ["vi", "en"], defaultLocale: "vi", localePrefix: "as-needed" })'
       - id: case-2
         when: The proxy
-        write: 'apps/<app>/src/proxy.ts is `export default createMiddleware(routing)` with `export const config = { matcher: ["/((?!api|_next|.*\\..*).*)"] }`; middleware.ts is not used on Next 16.'
+        write: 'fe/apps/<app>/src/proxy.ts is `export default createMiddleware(routing)` with `export const config = { matcher: ["/((?!api|_next|.*\\..*).*)"] }`; middleware.ts is not used on Next 16.'
       - id: case-3
         when: A layout
         write: 'app/[locale]/layout.tsx sets `<html lang={locale}>` and wraps children in NextIntlClientProvider with only the needed namespaces.'

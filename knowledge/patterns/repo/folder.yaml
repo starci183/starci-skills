@@ -1,25 +1,26 @@
 schema: starci/knowledge-source@1
 id: repo.folder
-title: Repository folder
+title: App folder
 purpose: |
-  The one standard repository tree (HFS) for every StarCi repository: which entries the repository root may carry, where
-  application source lives, which roots are backend-only, what is ignored, what may not exist in the working tree at all, and
-  the one package manager. knowledge/hfs/README.md section 4 draws the same map; knowledge/hfs/slots.yaml is the machine form;
-  the BE and FE pattern topics own the source rules inside it.
+  The one standard tree (HFS) of every StarCi app: what the app root carries, what each side (`be/`, `fe/`) carries, where
+  application source lives, what is ignored, what may not exist in the working tree at all, and the one package manager.
+  knowledge/hfs/README.md section 4 draws the same map; knowledge/hfs/slots.yaml is the machine form; the BE and FE pattern
+  topics own the source rules inside each side. Every path here is app-relative: `be/...` is the back end, `fe/...` the
+  front end.
 appliesTo:
   - backend
   - frontend
 family: repo
 provenance:
-  reviewedAt: 2026-09-29
+  reviewedAt: 2026-10-01
   sources:
     - knowledge/hfs/README.md
     - knowledge/hfs/slots.yaml
+    - modules/schemas/hfs-repo.schema.yaml
+    - packages/hfs/README.md
     - docs/source-layout.md
-    - docs/backend-source-pattern.md
-    - docs/architecture-rules.md
   limitations: |
-    The tree law governs entries and top-level placement only; it does not certify a repository's contents, behavior or
+    The tree law governs entries and top-level placement only; it does not certify an app's contents, behavior or
     deployment. Record shape inside .starciwork stays with modules/schemas/work-layout.yaml; stack declaration shape stays
     with knowledge/application-stacks.yaml and scripts/checks/check-starcistacks.mjs.
 rules:
@@ -28,21 +29,24 @@ rules:
     kind: mandatory
     hfsRules: [R01, R02, R24]
     requirement: |
-      Every tracked path of a repository matches exactly one slot of knowledge/hfs/slots.yaml. A repository declares itself in
-      `hfs.json` (`hfs` major, `profile`, `project`, `apps` with kinds, `optionalSlots`, `connections`) and nothing else; there
-      is no owner list, path, allowlist or disabled rule. Required on both profiles: README.md, hfs.json, package.json,
-      package-lock.json, .gitignore, .gitattributes, tsconfig.json, eslint.config.mjs, .editorconfig, .nvmrc,
-      .prettierignore, sonar-project.properties, .husky/, .github/workflows/ci.yml and apps/. Optional: packages/
-      (built packages with explicit exports), scripts/ (lasting tooling only, `*.mjs`, no product code and no one-off codemod),
-      docs/{adr,runbooks,guides}/ (opt-in), .npmrc, .dockerignore, apps/<app>/Dockerfile. A backend repository additionally
-      requires src/, nest-cli.json, jest.config.js, .starciwork/, .starcistacks/ and .sops.yaml, and forbids a root e2e/. A
-      frontend repository allows turbo config, has no test configuration and no e2e/ (it has no tests), and forbids src/, .starciwork/,
-      .starcistacks/ and .sops.yaml. Anything else at the root moves to its owner: infrastructure, compose, docker and
-      environment templates, seeds and database init to `.starcistacks/<env>/`; migrations to the owning capability's
-      `persistence/`; product docs and workflow notes to `.starciwork` records or `docs/`; code generators to `scripts/` or a
-      real `packages/<pkg>`. A missing hfs.json, or a run that analysed zero files, is a failure.
+      Every tracked path of an app matches exactly one slot of knowledge/hfs/slots.yaml: a root slot (`app.*`) at the app
+      root, a side slot (`be.*`, `fe.*`, `repo.*`) under `be/` or `fe/`, its slot path read relative to the side folder. The
+      app declares itself in the root `hfs.json` (`hfs` major, `kind: app`, `project`, and per side `apps` with kinds,
+      `optionalSlots`, `reads`, and for `be` the `connections`) and nothing else; there is no owner list, path, allowlist or
+      disabled rule. The app root requires README.md, hfs.json, package.json, package-lock.json, .gitignore, .gitattributes,
+      .editorconfig, .nvmrc, .prettierrc, .prettierignore, sonar-project.properties, .husky/, .github/workflows/ci.yml,
+      .starciwork/, be/ and fe/; it may hold .npmrc, the optional e2e workflow, GitHub metadata and scripts/ (operational
+      scripts only). `be/` requires its managed tool configuration (tsconfig.json, tsconfig.build.json,
+      src/tests/tsconfig.json, eslint.config.mjs, jest.config.js), nest-cli.json, apps/, src/, .starcistacks/ and .sops.yaml,
+      and forbids a root e2e/. `fe/` requires its managed tool configuration (tsconfig.json, eslint.config.mjs,
+      stylelint.config.mjs) and apps/, may hold turbo.json, and has no src/, no test configuration and no e2e/. A side never
+      holds a package.json, lockfile, hfs.json, README.md, git, CI, hook, formatter or Sonar file, scripts/ or .starciwork/:
+      the root owns them. Anything else moves to its owner: infrastructure, compose, docker and environment templates, seeds
+      and database init to `be/.starcistacks/<env>/`; migrations to the owning capability's `persistence/`; product docs
+      and workflow notes to `.starciwork` records or a side's `docs/`; code generators to the root `scripts/` or a real
+      `be/packages/<pkg>` or `fe/packages/<pkg>`. A missing hfs.json, or a run that analysed zero files, is a failure.
     rationale: |
-      One closed contract makes every repository machine-checkable and leaves no unnamed place for output, second layouts or
+      One closed contract makes every app machine-checkable and leaves no unnamed place for output, second layouts or
       drifting metadata to collect. Growth adds a slot; it never edits one.
     cases:
       - id: case-1
@@ -50,11 +54,15 @@ rules:
         write: Propose a new slot (minor version); do not add a tolerated exception.
       - id: case-2
         when: A file matches no slot
-        write: Move it to its owner or delete it; HFS_SLOT_UNDECLARED names the path.
+        write: Move it to its owner or delete it; HFS_SLOT_UNDECLARED names the app-relative path.
+      - id: case-3
+        when: A tool configuration or a package.json appears inside be/ or fe/ outside the managed set
+        write: Delete it; the root package.json is the one manifest and each side holds exactly its managed tool configuration.
     verification:
       automated:
         - HFS_SLOT_UNDECLARED
         - HFS_SLOT_REQUIRED_MISSING
+        - HFS_FORBIDDEN_PRESENT
         - HFS_ARCH_CONFIG_UNREAD
         - HFS_ROOT_ENTRY_FORBIDDEN
         - HFS_ROOT_ENTRY_MISSING
@@ -63,47 +71,52 @@ rules:
         - Judge each leftover root entry by its owner and move it, never by tolerating a new root name.
     relatedExamples: []
   - id: REPO-FOLDER-2
-    title: apps/<app> is the only application root
+    title: be/apps/<app> and fe/apps/<app> are the only application roots
     kind: mandatory
     hfsRules: [R01, R32, R33, R64]
     requirement: |
-      Every repository, backend and frontend, is an apps/<app>/ monorepo even with one application; a single-app repository
-      names the app by its role (for example web). A backend app's composition lives in apps/<app>/src (main.ts, app.module.ts,
-      and optional <app>.options.ts) and nothing else; shared backend source lives in
-      src/features and src/modules. A frontend app carries its own package.json, next.config.ts, tsconfig.json and
-      postcss.config.mjs in apps/<app>/, and all product source sits under apps/<app>/src; a frontend repository has no root
-      src/. Apps never import each other. There is one topology for every repository.
+      Both sides are apps/<app>/ monorepos even with one application; an app is named by its role (api, web). A back-end
+      app's composition lives in be/apps/<app>/src (main.ts, app.module.ts and optional <app>.options.ts) and nothing else;
+      shared back-end source lives in be/src/features and be/src/modules. A front-end app carries next.config.ts,
+      tsconfig.json and postcss.config.mjs in fe/apps/<app>/ and no package.json, and all of its product source sits under
+      fe/apps/<app>/src; fe/ has no src/. Apps never import each other, and a side imports nothing of the app outside itself
+      except what `hfs.json` `sides.fe.reads` declares (be/contracts/ for the front end's codegen).
     rationale: |
       One topology removes the layout fork that lets per-project roots drift and keeps every app's source root addressable by
       the same FE and BE rules.
     cases:
       - id: case-1
-        when: A repository with one application
-        write: apps/web/ for a frontend or apps/api/ for a backend, never a root src/ alone.
+        when: An app with one back-end and one front-end application
+        write: be/apps/api/ and fe/apps/web/, declared in hfs.json sides.be.apps and sides.fe.apps; never a root src/.
+      - id: case-2
+        when: Front-end code needs a back-end type
+        write: Generate it from be/contracts/<app>/ through the root codegen script; never import from be/src.
     verification:
       automated:
         - HFS_APPS_REQUIRED
         - HFS_ROOT_SRC_FORBIDDEN_FE
         - HFS_APP_LAYOUT_INVALID
         - FE_APP_ISOLATION
+        - ARCH_INTERNAL_IMPORT_OUTSIDE
       manual:
-        - Confirm apps/<app> holds composition and config only and product source has a named owner.
+        - Confirm be/apps/<app> holds composition and config only and product source has a named owner.
     relatedExamples: []
   - id: REPO-FOLDER-3
-    title: npm is the only package manager
+    title: npm is the only package manager, with one manifest at the app root
     kind: mandatory
     hfsRules: [R14]
     requirement: |
-      package.json plus package-lock.json and npm ci or npm install are the only package-management contract. `packageManager`,
-      when declared, names npm. pnpm-lock.yaml, pnpm-workspace.yaml, yarn.lock, bun.lock, bun.lockb and any other manager's
-      lockfile or workspace file do not exist in the repository. package.json declares npm workspaces
-      (`"workspaces": ["apps/*", "packages/*"]`) whenever the repository holds more than one package.
+      The root package.json plus the root package-lock.json and npm ci or npm install at the app root are the only
+      package-management contract; there is one node_modules, at the root. `packageManager`, when declared, names npm.
+      pnpm-lock.yaml, pnpm-workspace.yaml, yarn.lock, bun.lock, bun.lockb and any other manager's lockfile or workspace file
+      do not exist. Every dependency of both sides is declared in the root package.json at its canon pin; a shared package
+      (`be/packages/<pkg>`, `fe/packages/<pkg>`) is an npm workspace of the root and carries its own package.json.
     rationale: |
       Two lockfiles disagree silently and hide the real dependency resolution a build ran against.
     cases:
       - id: case-1
-        when: A workspace repository
-        write: 'package.json has "workspaces": ["apps/*", "packages/*"] and one root package-lock.json.'
+        when: The front end grows a shared package
+        write: 'fe/packages/<pkg>/package.json, listed in the root package.json "workspaces"; one root package-lock.json.'
     verification:
       automated:
         - HFS_PACKAGE_MANAGER_MIXED
@@ -112,26 +125,27 @@ rules:
         - Confirm package.json packageManager names npm and the lockfile is the one CI installs.
     relatedExamples: []
   - id: REPO-FOLDER-4
-    title: .starciwork and .starcistacks live only in the backend repository
+    title: .starciwork lives at the app root, .starcistacks in be/
     kind: mandatory
     hfsRules: [R07, R10]
     requirement: |
-      .starciwork/, .starcistacks/ and .sops.yaml are required in the project's backend repository and forbidden in a
-      frontend repository; the frontend consumes the same records and never copies them. See starciwork.yaml and
-      starcistacks.yaml for their contents.
+      `.starciwork/` is required at the app root: one product record tree per app, for both sides. `be/.starcistacks/` and
+      `be/.sops.yaml` are required in the back end. `fe/` holds neither a .starciwork, a .starcistacks nor a .sops.yaml. See
+      starciwork.yaml and starcistacks.yaml for their contents.
     rationale: |
-      One canonical Work tree per project keeps product records authoritative, and deployment custody is backend-owned.
+      One canonical Work tree per app keeps product records authoritative, and deployment custody belongs to the back end.
     cases:
       - id: case-1
-        when: A frontend needs a product record
-        write: Read it from the backend repository through the project binding; do not copy it.
+        when: Front-end work needs a product record
+        write: Read it from the app root .starciwork; do not copy it under fe/.
     verification:
       automated:
         - HFS_WORK_IN_FE
         - HFS_STACKS_IN_FE
+        - HFS_FORBIDDEN_PRESENT
       manual:
-        - node scripts/checks/work-validate.mjs <repo>/.starciwork passes on the backend tree.
-        - node scripts/checks/check-starcistacks.mjs <repo> exits 0 on the backend tree.
+        - node scripts/checks/work-validate.mjs <app>/.starciwork passes.
+        - node scripts/checks/check-starcistacks.mjs <app>/be exits 0.
     relatedExamples: []
   - id: REPO-FOLDER-5
     title: Storage states, ignored and external
@@ -139,24 +153,25 @@ rules:
     hfsRules: [R03, R06, R07]
     requirement: |
       Content is `tracked`, `ignored` or `external`. Ignored, and only ignored, are the tool build outputs that must exist in
-      place: node_modules, dist, .next, coverage, test-results, next-env.d.ts, *.tsbuildinfo, and generated
-      code (`__generated__/`, Nest schema.gql) produced by `codegen`. External, meaning they must not exist in the working
-      tree at all, are: tool caches (.eslintcache, .turbo, .scannerwork, .jest-cache, .cache, .tools), which the canon presets
-      redirect to %LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/; worktrees (.worktrees, worktrees), which live under
-      D:/starci-lanes/<project>/<lane>/; agent output (report*.json, *.tmp.json, %*% names, nul, .artifacts, .tmp-*,
-      *-lint.json, design-plans/, draw rounds, UAT captures), which lives in the scratchpad or the blob store and is cited by
-      `{name, sha256}`; and plaintext secrets (.env*, .secrets/, *.pem, runtime/files/*). An entry that is ignored but must be
-      external is still a finding.
+      place: node_modules, dist, .next, coverage, reports, test-results, next-env.d.ts, *.tsbuildinfo, and generated code
+      (`__generated__/`, Nest schema.gql) produced by `codegen`. External, meaning they must not exist in the working tree
+      at all, are: tool caches (.eslintcache, .turbo, .scannerwork, .sonar, .jest-cache, .cache, .tools), which the canon
+      presets redirect to %LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/; lane worktrees (.worktrees, worktrees), which live
+      under D:/starci-lanes/<project>/<lane>/ (a runtime op worktree under the git-excluded .starciwork/worktrees/<op> is
+      never tracked and is removed when its op settles); agent output (report*.json, *.tmp.json, %*% names, nul, .artifacts,
+      .tmp-*, *-lint.json, design-plans/, draw rounds, UAT captures), which lives in the scratchpad or the blob store and is
+      cited by `{name, sha256}`; and plaintext secrets (.env*, .secrets/, *.pem, *.key, runtime/files/*). An entry that is
+      ignored but must be external is still a finding.
     rationale: |
       Evidence and caches change every run, bloat history and are reviewed by nobody; a name in .gitignore does not make a
       secret or a cache safe to keep in the tree.
     cases:
       - id: case-1
         when: An agent produces a report
-        write: Write it to the scratchpad and cite it by hash; never at the repository root.
+        write: Write it to the scratchpad and cite it by hash; never at the app root or in a side.
       - id: case-2
         when: A tool wants a cache directory
-        write: Configure it through the canon preset so it points outside the repository.
+        write: Configure it through the canon preset so it points outside the app.
     verification:
       automated:
         - HFS_UNTRACKED_ROOT_ENTRY
@@ -167,22 +182,26 @@ rules:
         - Confirm git status is clean with no untracked entry outside an ignored slot.
     relatedExamples: []
   - id: REPO-FOLDER-6
-    title: Repository README and GitHub presentation
+    title: App README and GitHub presentation
     kind: mandatory
-    hfsRules: [R05]
+    hfsRules: [R02, R05]
     requirement: |
-      README.md starts with the repository name as its level-one heading and one concise description line. Its standard
-      sections, in order, are Overview, Stack, Repository layout (the HFS map), and Development (install, typecheck, lint,
-      build and test commands). When .starciwork is present, add a Work section pointing readers at that product record tree.
-      Other sections may follow. Badges represent live external services only. Do not publish a badge for a local or private
-      SonarQube instance or any README URL pointing at localhost, loopback, RFC1918 or private hosts. Local development
-      endpoints may be documented as inline code, never as remote links or badges. .gitattributes is required; .github holds
-      CI and may hold optional PR and issue templates and CODEOWNERS. The GitHub repository description and topics are set with
-      gh repo edit. docs/repo-presentation.md is the maintenance checklist.
+      The root README.md starts with the app name as its level-one heading and one concise description line. Its standard
+      sections, in order, are Overview, Stack, Repository layout (the HFS map: the root, be/ and fe/), and Development
+      (install, typecheck, lint, build and test commands, all run at the app root). Because .starciwork is present, a Work
+      section points readers at that product record tree. Other sections may follow. Badges represent live external services
+      only. Do not publish a badge for a local or private SonarQube instance or any README URL pointing at localhost,
+      loopback, RFC1918 or private hosts. Local development endpoints may be documented as inline code, never as remote links
+      or badges. .gitattributes is required; .github holds CI and may hold optional PR and issue templates, CODEOWNERS and
+      dependabot. The GitHub repository description and topics are set with gh repo edit. docs/repo-presentation.md is the
+      maintenance checklist.
     rationale: |
       A consistent entry page makes the HFS tree and real checks discoverable without advertising local-only services as
       public project health.
-    cases: []
+    cases:
+      - id: case-1
+        when: A new app
+        write: Start from the README hfs scaffold app writes (packages/hfs/templates/app/skeleton/README.md).
     verification:
       automated:
         - HFS_README_TITLE_INVALID
@@ -195,7 +214,8 @@ rules:
         - HFS_README_BADGE_NOT_LIVE
       manual:
         - Confirm every badge's target currently reports a live external service.
-        - Review GitHub description and topics against the repository's current purpose.
+        - Review GitHub description and topics against the app's current purpose.
     relatedExamples:
       - examples/todo-app/README.md
       - examples/ecommerce-app/README.md
+      - packages/hfs/templates/app/skeleton/README.md

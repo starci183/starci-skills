@@ -98,15 +98,117 @@ and only `api report` plus recorded `api check` rows support a verdict.
 
 ## Dispatch — `modules/kernel/dispatch.yaml`
 
-`dispatch` reserves the lease + budget atomically, renders the packet and —
-with `--spawn` — runs the terminal sequence itself through
-`scripts/agent/lib.mjs` (readiness attested, packet delivered, submission
-attested; agent flags injected from `modules/models/agents/<agent>.yaml`).
-The packet is a bounded grant: one op, its brief (`modules/ops/ops/<op>.yaml`),
-a closed read set, a closed write set (`owned_paths`), one model, one budget,
-one lease token. Without `--spawn` it is a dry-run — the packet prints and
-nothing is reserved. A spawn that does not land is `dispatch-rejected`: the
-reservation is settled, never left leasing a ghost.
+`dispatch` reserves the lease + budget atomically, creates the op's worktree
+(below), renders the packet and — with `--spawn` — starts the op agent through
+`scripts/agent/lib.mjs` `spawnAgent`: one `orchestration worker-start` on the op
+worktree, the Task carrying the packet, the effective agent and model attested
+with `worker-show` ([host contract](host-contract.md)). The packet is a bounded
+grant: one op, its brief (`modules/ops/ops/<op>.yaml`), a closed read set, a
+closed write set (`owned_paths`, app-relative: `be/...`, `fe/...`,
+`.starciwork/...` or an app-root path of the bound app; any other form is
+refused `path-not-app-relative`), one model,
+one budget, one lease token. Without `--spawn` it is a dry-run — the packet
+prints and nothing is reserved. A spawn that does not land is
+`dispatch-rejected`: the reservation is settled, never left leasing a ghost.
+
+## Agent launches — every agent is a `worker-start` worker
+
+There is one way to start an agent: `orchestration worker-start` with
+`--agent <provider>` (and `--model`/`--effort` where the agent card takes them).
+No runtime code creates a terminal for an agent (`check-host-boundary.mjs` rule
+`agent-launch`), and Orca supervises every agent it starts (`worker-show`,
+`worker-read`, `worker-stop`, `worker-release`). The Kernel, the `[Supervisor]`,
+op agents and Supervisor workers all start this way. `start-workflow.mjs`
+creates the Kernel's entry Run from the launching terminal and starts the
+Kernel in it. The Kernel then binds its own Run (`run-create --from <its
+terminal>`) and starts every op there (`task-create --run`, `worker-start
+--task --run --from <its terminal>`), never with `--parent`: Orca nests the
+workflow Run under the Kernel's Dispatch, so `worker-show` shows the Kernel at
+depth 1 and its ops at depth 2. `settle` stops and releases the op's worker.
+
+## The op loop — `knowledge/op-gate.yaml`
+
+Every code-writing op listed in `knowledge/op-gate.yaml` `enforcedOps`
+(`backend.*`, `interface.scaffold|implement`, `package.scaffold`,
+`code.refactor`, `test.author`, `unit|integration|e2e.verify`,
+`grammar.update`, `task.execute`) runs one loop:
+
+1. **READ** — `scripts/checks/read-digest.mjs --root <app> --touch <files>`
+   prints what the slice must read before coding: the `hfs explain` slot map of
+   each touched file, the pattern files of each file kind (`op-gate.yaml`
+   `kinds`: the family's `always` files plus those of the longest listed slot
+   prefix) and the example files of the same slots. It records the READ digest
+   (`starci/read-digest@1`, every file with its sha256).
+2. **CODE** — inside the owned paths, in the op worktree.
+3. **CHECK** — `scripts/checks/gate.mjs --root <app> --changed <files>
+   [--tests <pattern>]`, forced every round. It runs, in order: the merge guard;
+   `hfs lint --changed` at the app root (the BE canon under `be/`, the FE canon
+   under `fe/`, the repository checks); the root `codegen` and the build of
+   every workspace package that exports `dist`; `tsc`, one incremental program
+   per tsconfig owning a changed file; with `--tests`, the slice's specs. Only
+   findings new against the base block (the base is measured read-only from git
+   objects, never from a second checkout); failing specs always block. Exit `0`
+   green, `1` new findings, `2` a tool could not run (never a pass). Its stdout is
+   one `starci/gate@1` document.
+4. **FIX** — and check again, up to the op's `params.gateRounds` rounds.
+5. **REPORT** — `api report` with `gate.json` and `read-digest.json`
+   attached. Still red after the last round is `blocked` with the exact
+   findings.
+
+`gate.mjs`, `read-digest.mjs`, the packet's owned paths and every finding use
+the same app-relative paths (`be/src/...`, `fe/apps/...`) at the app root.
+
+**Settle enforcement.** `api settle` re-reads both attached documents itself
+(`scripts/kernel/gate-settle.mjs`, recorded as the runtime check `op-gate`) and
+refuses a `done` that is `op-gate-proof-missing` (no gate JSON),
+`op-gate-tool-failed` (exit 2), `op-gate-new-findings`,
+`op-read-digest-missing` (READ skipped) or `op-read-digest-no-pattern` (the
+digest names no pattern file for a touched file kind). A refused pass never
+counts as green.
+
+**The merge guard.** Every merge commit in `base..HEAD` with one parent on the
+main line is recomputed with `git merge-tree`; a path main changed whose
+merged blob is the lane's (main's change dropped) is the finding
+`merge/dropped-main-change`, never preexisting. The gate runs it first, and the
+landing runs it again over the op branch before anything is rebased
+(`land-merge-dropped-main`).
+
+## Op worktrees and the landing — `modules/kernel/product-land.yaml`
+
+Exactly one git worktree per op that commits into a product app; the runtime
+owns its whole lifecycle (`scripts/kernel/product-worktree.mjs`,
+`scripts/lib/worktrees.mjs`). Ops that only touch the Work owner, ops on the
+`.claude` runtime and ops that never commit keep the shared tree
+(`defaultIsolation` and its exceptions in `product-land.yaml`).
+
+- **Create.** At dispatch, `<app>/.starciwork/worktrees/<op>` on branch
+  `op/<op>` off the app's main (git-excluded, never tracked). It is registered
+  in `machine.sqlite` `worktrees` with its owner op and a claim, against a cap
+  per repository (`worktrees.capPerRepo`, 10): a dispatch over the cap waits and
+  the job stays queued. `scripts/lib/worktrees.mjs` is the only place the
+  runtime runs `git worktree add` (`check-worktree-add.mjs`). Each worktree gets
+  a real `node_modules` of junctions into the main checkout's install, with the
+  workspace packages pointed at the worktree's own copy; a lockfile change
+  rebuilds it.
+- **Land.** At the op's green settle, under the repository's land lock: the
+  merge guard over the op's history, `op/<op>` rebased onto main's tip (a
+  conflict is a refusal with files and hunks; main's side is never
+  overwritten), `gate.mjs` over the rebased tree against main (`land-gate-red`,
+  `land-gate-unavailable`), the op's re-runnable declared checks, then main
+  compare-and-swap fast-forwarded (the live checkout with it) and pushed. Main
+  moved underneath means rebase and gate again (`land.maxMainRetries`). Any
+  refusal leaves main untouched and the job unsettled.
+- **Delete.** Right after the worker is released the worktree is removed:
+  evidence salvaged, a failed or blocked op's work preserved to
+  `refs/heads/preserved/<op>`, every junction removed as a link (`cmd /c rmdir`,
+  never through it), the tree removed and the removal verified, the branch
+  deleted. A worktree outliving its settle by `opRemoveSlaMs` is an SLA miss.
+- **GC.** The reconciler's GC controller (`gc:worktrees`, always active) removes
+  a live worktree whose branch is merged, whose op has settled or whose owner
+  process is gone longer than `ownerGoneMs`, always after preserving its work,
+  and reclaims unregistered trees under `.starciwork/worktrees`.
+  `node scripts/lib/worktrees.mjs counts` shows each repository's count against
+  its cap; `start --check` reports them.
 
 ## Verdicts — `modules/kernel/verdict-contract.yaml`
 

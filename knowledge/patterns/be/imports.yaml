@@ -25,7 +25,7 @@ rules:
     kind: mandatory
     hfsRules: [R30, R25]
     requirement: |-
-      Across owners use the repository aliases from `@starci/tsconfig` (`@modules/*`, `@features/*`, `@tests/*`) or a workspace
+      Across owners use the back end's aliases (the managed `be/tsconfig.json` `paths`: `@modules/*`, `@features/*`, `@tests/*`) or a workspace
       package export, and always resolve to the target owner's `index.ts`. Inside one owner use relative imports and never
       import the owner's own public `index.ts` back into its implementation. Deep imports into another owner's files are
       forbidden, a barrel that re-exports a folder wholesale (`export *`) is forbidden, and a nested `index.ts` does not exist.
@@ -144,7 +144,7 @@ rules:
     cases:
       - id: case-1
         when: Default export
-        write: Named exports everywhere; only src/tests/world/global-setup.ts and global-teardown.ts default-export the Jest API.
+        write: Named exports everywhere; only be/src/tests/world/global-setup.ts and global-teardown.ts default-export the Jest API.
       - id: case-2
         when: process.env
         write: Only platform/config reads it; a capability config parses the values that EnvSource passes.

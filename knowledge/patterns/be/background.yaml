@@ -63,7 +63,7 @@ rules:
     cases:
       - id: case-1
         when: A worker app
-        write: 'apps/worker/src/app.module.ts registers BillingScheduleModule and BillingMessageModule and no controller or resolver.'
+        write: 'be/apps/worker/src/app.module.ts registers BillingScheduleModule and BillingMessageModule and no controller or resolver.'
     verification:
       automated:
         - BE_BACKGROUND_UNOWNED

@@ -71,7 +71,7 @@ rules:
     kind: mandatory
     hfsRules: [R26, R38, R85]
     requirement: |-
-      An integration is `src/modules/integrations/<provider>/` with `index.ts`, `<provider>.config.ts`,
+      An integration is `be/src/modules/integrations/<provider>/` with `index.ts`, `<provider>.config.ts`,
       `<provider>.decorators.ts` (the SDK client token and `Inject<Provider>`), `<provider>.client.ts` (the only file that
       calls the SDK or the `HttpClient` for that provider), `errors/` and optional `messages/`. An integration imports
       `platform` only and never the domain; the domain calls the integration's public API. Results are typed and a failure is

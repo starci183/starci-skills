@@ -12,7 +12,7 @@ decisions and the invariants; when it disagrees with the SQL files, the SQL wins
 %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite   one per project (its workflows' complete history)
 %LOCALAPPDATA%/StarCi/machine.sqlite                        one per host (registry, Supervisor, engine, host state)
 ~/.starci/artifacts/<sha[0:2]>/<sha256>  +  <sha256>.json    one blob store (bytes; the DBs hold the index)
-<backend repo>/.starciwork/                                  product content only, in git
+<app>/.starciwork/                                           product content only, in git
 ```
 
 - A project ledger is found through `machine.ledgers` (`ledger_id → file`), never by walking a

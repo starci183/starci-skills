@@ -6,10 +6,10 @@ This is the Nest/TypeScript implementation of the [portable responsibility patte
 
 An application composes a process. A feature exposes externally meaningful operations as CQRS commands and queries. A module owns a cohesive domain, platform or provider capability. Transport maps a protocol onto one bus dispatch. Persistence sits with the capability that owns the table and is reached through the shared `EntityManager` of one named connection. A class, file, database table or second consumer is not itself a reason to create another module.
 
-This is the backend tree on every repository. `knowledge/hfs/slots.yaml` is its machine form, `knowledge/patterns/be/folder.yaml` (BE-FOLDER-1) and `knowledge/patterns/repo/folder.yaml` state it as law, and the checks report violations as `HFS_*` and `BE_*` codes. Create only folders with an actual responsibility:
+This is the back-end tree of every app, under `be/` (all paths below are relative to `be/`, so `src/features` is `be/src/features` of the app). `knowledge/hfs/slots.yaml` is its machine form, `knowledge/patterns/be/folder.yaml` (BE-FOLDER-1) and `knowledge/patterns/repo/folder.yaml` state it as law, and the checks report violations as `HFS_*` and `BE_*` codes. Create only folders with an actual responsibility:
 
 ```text
-apps/<app>/src/                     # kind api | worker | migrate | cli, declared in hfs.json
+apps/<app>/src/                     # kind api | worker | migrate | cli, declared in hfs.json sides.be.apps
   main.ts                           # at most 80 lines: builds EnvSource once, parses options, bootstraps, handles startup failure
   app.module.ts                     # at most 250 lines: AppModule.register(options), each capability once with isGlobal true, transports, APP_GUARD, APP_FILTER
   <app>.options.ts                  # the options type of the app
@@ -31,14 +31,14 @@ src/
     platform/<capability>/          # composition, config, errors, logging, clock, cqrs, database, ... each with its port and injector
     integrations/<provider>/        # index.ts, <provider>.config.ts, <provider>.decorators.ts, <provider>.client.ts, errors/
   tests/{world,fixtures,integration,e2e,contract}/   # world/ (the only infrastructure: global-setup, useTestWorld, fakes/<provider>/), integration/<capability>/, e2e/<area>/, contract/<provider>/
-contracts/<app>/schema.graphql      # opt-in committed contract
+contracts/<app>/schema.graphql      # opt-in committed contract (hfs emit-contracts); the front end reads it in place
 ```
 
 Nothing else exists at `src/` level, and no `types`, `constants`, `utils`, `helpers`, `shared`, `common`, `testing` or `exceptions` folder exists under `src/modules` or `src/features`. Within a capability create only what it owns: one `index.ts` at the root, `<c>.module.ts` and `<c>.module-definition.ts` when it registers providers, `<c>.config.ts` and `<c>.options.ts` when it is configured, `<c>.decorators.ts` for its injectors, `<c>.log-events.ts`, `errors/`, `messages/`, `persistence/`, services, policies, contracts and colocated service specs.
 
-Tests come in four kinds by folder and suffix (`knowledge/patterns/be/test.yaml` BE-TEST-1): unit `<name>.service.spec.ts` beside its `<name>.service.ts` (only services are unit-tested; handlers, resolvers, controllers and consumers are thin and have no unit spec), integration `src/tests/integration/<capability>/*.integration-spec.ts`, e2e `src/tests/e2e/<area>/*.e2e-spec.ts` and contract `src/tests/contract/<provider>/*.contract-spec.ts`; the only test infrastructure is `src/tests/world/` (`useTestWorld`, network-edge fakes). Integration, e2e and contract run by hand: the default `tsconfig.json`, `typecheck`, lint, lint-staged and husky exclude those trees; `typecheck:tests` (`src/tests/tsconfig.json`) runs before `test:integration`, `test:e2e` and `test:contract`; coverage and `test:ci` read the jest `unit` project only, whose coverage is `src/**/*.service.ts` at per-file 100 (Sonar takes no coverage); any e2e CI job is `workflow_dispatch` only. The unit project maps no module into `src/tests/{world,integration,e2e,contract}/`.
+Tests come in four kinds by folder and suffix (`knowledge/patterns/be/test.yaml` BE-TEST-1): unit `<name>.service.spec.ts` beside its `<name>.service.ts` (only services are unit-tested; handlers, resolvers, controllers and consumers are thin and have no unit spec), integration `src/tests/integration/<capability>/*.integration-spec.ts`, e2e `src/tests/e2e/<area>/*.e2e-spec.ts` and contract `src/tests/contract/<provider>/*.contract-spec.ts`; the only test infrastructure is `src/tests/world/` (`useTestWorld`, network-edge fakes). Integration, e2e and contract run by hand: the default `be/tsconfig.json`, `typecheck` and husky exclude those trees; the root `typecheck:tests` (`be/src/tests/tsconfig.json`) runs before `test:integration`, `test:e2e` and `test:contract`; coverage and `test` read the jest `unit` project only, whose coverage is `src/**/*.service.ts` at per-file 100 (Sonar takes no coverage); any e2e CI job is `workflow_dispatch` only. The unit project maps no module into `src/tests/{world,integration,e2e,contract}/`.
 
-Every backend repository is an `apps/<app>/` monorepo, including a single-application one: each deployable process composes in `apps/<app>/src` and nothing else lives there, while `src/features` and `src/modules` stay at the repository root and are shared by every app. Independently owned reusable packages sit in `packages/<capability>` and declare explicit exports. Topology never reverses dependencies.
+The back end of every app is a `be/apps/<app>/` monorepo, including a single-application one: each deployable process composes in `be/apps/<app>/src` and nothing else lives there, while `be/src/features` and `be/src/modules` are shared by every back-end app. Independently owned reusable packages sit in `be/packages/<capability>` (npm workspaces of the app root) and declare explicit exports. Topology never reverses dependencies.
 
 ## Dependency and contract boundaries
 

@@ -102,7 +102,7 @@ reads:
     path: scripts/checks/gate.mjs + scripts/checks/architecture/*.mjs + modules/models/code-patterns.yaml +
       docs/architecture-check.md
     purpose:
-      en: When the slice lives in a checked FE/BE repository, read the sealed architecture and
+      en: When the slice lives in a checked app (`be/` or `fe/`), read the sealed architecture and
         code-pattern machines' supported arguments, report schema, exit codes and coverage limits.
         The same machine set runs verbatim BEFORE and AFTER the restructure; an architecture or
         pattern regression introduced by a pure refactor is a failure, not a refactor outcome. This
@@ -206,7 +206,7 @@ steps:
         DECLARED_DEPENDENCY_UNMET record bindings never apply to it. Select the one
         declared regression check that exercises the slice's observable behavior and run it BEFORE
         the first edit, verbatim, keeping command, tree/commit, exit code, counts and sanitized
-        output. Where the slice lives in a checked FE/BE repository and context.cut is present,
+        output. Where the slice lives in a checked app side and context.cut is present,
         record the slice's admission commit before editing (params.admissionBase when it is set;
         with params.resumeFrom set, first bring that commit into the checkout - cherry-pick it, or
         git apply its indexed patch - and continue from the findings it left, never redoing its
@@ -356,7 +356,7 @@ proofs:
         intermediate rule: non-final ordinals require green `cut-slice-postcondition` and
         `cut-regression-inventory`, while the pass that closes the set (the last ordinal to settle,
         whichever it is) requires green `full-regression-final`.
-        Where the slice lives in a checked FE/BE repository, the same gate.mjs check ran
+        Where the slice lives in a checked app side, the same gate.mjs check ran
         verbatim on both sides with its reports retained. For context.cut this is the
         --base <slice admission commit> --changed <owned paths> command: its after run follows
         renamed destinations from the base diff and gates only new findings.

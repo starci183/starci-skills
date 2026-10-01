@@ -60,7 +60,7 @@ The schema itself is data: `engine/migrations/runtime/0001-init.sql` and
 | --- | --- | --- | --- |
 | Owner / chat | — | Creates the goal (`define-goal`), starts the Kernel (`start-kernel`), answers asks, approves. As the workflow monitor a chat relays; asked to supervise, it works as the Supervisor. See `CONTEXT.md`. | Never plans, enqueues, dispatches, settles or answers an ask on the owner's behalf inside the Kernel's loop. |
 | `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan, non-green verdicts, incidents and the finish. Reads its Decision Items first on every wake, acts through `scripts/kernel/api.mjs`, then yields. | Never opens a database, spawns a terminal or calls Orca directly. Never raises a unit's try budget. |
-| `[Op] <op-id>` | One per dispatch, ephemeral | Reads its contract (`api op-contract`), works inside its `owned_paths`, logs with `api log`, files one `api report`, and is closed. | Never sees the ledger beyond its own attempt; its report is its only channel back. |
+| `[Op] <op-id>` | One per dispatch, ephemeral | A `worker-start` worker in its own op worktree. Reads its contract (`api op-contract`), runs the op loop (READ, CODE, `gate.mjs`, FIX) inside its `owned_paths`, logs with `api log`, files one `api report` with the gate JSON and READ digest, and is released (`worker-stop`, `worker-release`). | Never sees the ledger beyond its own attempt; its report is its only channel back. |
 | Reconciler controllers | One host engine | Mechanical, idempotent work: settle green reports, recover dead workers, dispatch ready work, keep seats and services alive, GC, land and fleet digests. Open a Decision Item when judgment is needed. | Never make a business or workflow decision; never resume a `stopped` workflow. |
 | Supervisor | One seat (chat or Orca terminal) | Runtime-maintenance authority: decides Supervisor Decision Items, fixes `.claude` through lanes and `scripts/supervisor/land.mjs`, may raise a try budget. | Never dispatches an op, writes a product ledger, or answers an owner gate. |
 | Harness UI | One process | Serves the read-only views of both databases and `GET /api/blob/<sha>`. | Never writes, never calls an API verb, never talks to Orca for a closed terminal. |
@@ -71,7 +71,7 @@ The schema itself is data: `engine/migrations/runtime/0001-init.sql` and
   a try budget (default 5; only the owner or the Supervisor raises it, with a reference).
 - A **job** (`jobs`) is one try of a unit with concrete input. A business retry is a new job with
   `try_no + 1` and `retry_of` pointing at the failed job of the same unit.
-- An **attempt** (`op_attempts`) is one dispatch of a job into a terminal. A re-dispatch after a
+- An **attempt** (`op_attempts`) is one dispatch of a job to a `worker-start` worker. A re-dispatch after a
   dead worker is `dispatch_seq + 1` on the same job and does not consume the try budget.
 
 Every attempt carries a W3C `span_id` under the workflow's `trace_id`. The op's environment has
@@ -110,8 +110,10 @@ node scripts/kernel/api.mjs <verb> --repo <path> [...]
 arguments, reads, writes and refusals; `scripts/checks/check-api-surface.mjs` keeps them in step with
 the code. A write verb records its request in `api_requests` (idempotency), runs one transaction and
 appends one event. A refusal exits non-zero with `{ok:false, reason}`: a routed fact, never a crash.
-`dispatch --spawn` is the only place an op terminal is born, through `scripts/agent/lib.mjs` and the
-agent card `modules/models/agents/<agent>.yaml`.
+`dispatch --spawn` is the only place an op agent is started: `scripts/agent/lib.mjs` runs one
+`orchestration worker-start` on the op's worktree, shaped by the agent card
+`modules/models/agents/<agent>.yaml`; every other agent (Kernel, Supervisor, workers) starts through
+`worker-start` too, and no runtime code creates a terminal for an agent ([host contract](host-contract.md)).
 
 The op lifecycle is `enqueue → route → dispatch → api report → api check → api settle`, and every
 step is a column of the attempt row (`routed_at`, `dispatched_at`, `reported_at`, `checked_at`,
@@ -177,9 +179,9 @@ changes nothing.
 ## Ownership
 
 The host owns `.claude/`, the `.workspaces` project registry and the bootstrap written from
-`init/AGENTS.md`. A project's backend repository owns the project's only `.starciwork` — product
-records for both backend and frontend. The runtime ledger is outside every repository, so no
-worktree can copy it and no re-clone loses it. Secrets stay in each repository's `.starcistacks`
+`init/AGENTS.md`. A project is one app repository: its root owns the project's only `.starciwork` —
+product records for both `be/` and `fe/`. The runtime ledger is outside every repository, so no
+worktree can copy it and no re-clone loses it. Secrets stay in the app's `be/.starcistacks`
 custody, encrypted with sops; they never enter a database or a blob.
 
 ## Authorities

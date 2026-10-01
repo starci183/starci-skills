@@ -535,9 +535,10 @@ sections:
         contract or this op's brief assigns to another leg - UAT to uat.verify, journey E2E to
         e2e.verify, live-provider proof to integration.verify - cited with the owning op; (c) Sonar:
         scripts/checks/sonar-local.mjs runs against the local SonarQube, and a 401 means run it
-        again, never an owner token and never an open item; (d) a repository-wide gate (test:ci,
-        typecheck, lint over the whole tree) red only on files this op did not change while its own
-        scoped runs pass - other ops build in the same checkout: record that check with `failing`
+        again, never an owner token and never an open item; (d) an app-wide gate (the whole unit
+        suite, typecheck, lint over the whole tree) red only on files this op did not change while its own
+        gate.mjs run passes - an op on the shared tree (modules/kernel/product-land.yaml isolation exceptions) shares
+        its checkout with other ops: record that check with `failing`
         naming each failing file and the source file it points at (`path[:line]`), never a
         shared-change blocker and never a repair outside owned paths; the Kernel's api check
         attributes it to the peer whose change it is. A proof this op's own brief requires
@@ -559,9 +560,9 @@ sections:
   - title: Verification scope - the specs of the change, never the whole suite
     blocks:
       - "Owner policy 2026-09-29: an op that writes or changes code also writes or updates the unit specs of that code and
-        runs ONLY those - the specs of the changed or added source plus the specs that import it - together with
-        typecheck, lint, canon-scan and the build scoped as usual. It never runs the repository's whole unit suite:
-        unit.verify runs it (npm test), dispatched only when the goal or the owner explicitly asks for the full
+        runs ONLY those - the specs of the changed or added source plus the specs that import it - through the op gate
+        (scripts/checks/gate.mjs --tests, beside hfs lint --changed, codegen and tsc). It never runs the app's whole unit suite:
+        unit.verify runs it (npm test at the app root), dispatched only when the goal or the owner explicitly asks for the full
         unit run, and the owner's /push-git flow runs it before a main is pushed. e2e runs only when the goal or the
         owner asks (config.yaml specs.e2e, default off); e2e.verify then runs the FULL e2e suite. The .claude runtime
         itself follows config.yaml specs.harness (default false = touching-only): changed harness code gets its own
@@ -570,8 +571,8 @@ sections:
     blocks:
       - "Owner rule 2026-09-28 (\"speed up development; test later when asked\"): the owner config.yaml root
         `specs: {unit, e2e}` switches product testing per class; unit is on unless set false, e2e is off unless set true (defaults 2026-09-29).
-        unit covers product unit tests (*.spec.ts; jest, vitest, test:ci, coverage gates, Sonar
-        coverage); e2e covers product e2e tests (e2e.verify, backend e2e, Playwright and *.e2e-spec.* files).
+        unit covers the back end's unit tests (*.service.spec.ts; jest and its per-file coverage threshold; the front end
+        has no tests and Sonar takes no coverage); e2e covers product e2e tests (e2e.verify, backend e2e, Playwright and *.e2e-spec.* files).
         UAT is neither: uat.verify keeps its own owner deferral until credentials."
       - "What an op does when a class is off is its brief's policy.specsToggle (scripts/kernel/spec-deferral.mjs):
         defer-leg - the leg is never dispatched; the kernel settles it deferred with no attempt spent and the

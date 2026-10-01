@@ -18,7 +18,7 @@ provenance:
     - https://www.typescriptlang.org/tsconfig
   limitations: |-
     Adopted Nest and TypeScript profile. Static checks do not establish behavior. The compiler flags come from
-    `@starci/tsconfig`; a repository never lowers one.
+    `@starci/tsconfig` through the managed `be/tsconfig.json`; an app never lowers one.
 rules:
   - id: BE-TYPING-1
     title: Types express actual contracts
@@ -29,14 +29,14 @@ rules:
       `ReadonlyArray<T>`. `tsconfig.json` is `{ "extends": "@starci/tsconfig/be.json", "compilerOptions": { "paths": <the three aliases> } }`
       and nothing else; `be.json` sets `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noImplicitReturns`,
       `noFallthroughCasesInSwitch`, `noUnusedLocals`, `noUnusedParameters`, `allowJs: false`, `isolatedModules`,
-      `experimentalDecorators` and `emitDecoratorMetadata`, and a repository lowers no flag. TypeScript types do not validate
+      `experimentalDecorators` and `emitDecoratorMetadata`, and an app lowers no flag. TypeScript types do not validate
       untrusted runtime data.
     rationale: |-
-      Compile-time shape and runtime validation are distinct, and one flag set makes every repository read the same.
+      Compile-time shape and runtime validation are distinct, and one flag set makes every app read the same.
     cases:
       - id: case-1
         when: A tsconfig
-        write: '{ "extends": "@starci/tsconfig/be.json", "compilerOptions": { "paths": { "@modules/*": ["src/modules/*"], "@features/*": ["src/features/*"], "@tests/*": ["src/tests/*"] } } } and nothing else.'
+        write: 'be/tsconfig.json is the render of hfs sync: { "extends": "@starci/tsconfig/be.json", "compilerOptions": { "paths": { "@features/*": ["./src/features/*"], "@modules/*": ["./src/modules/*"], "@tests/*": ["./src/tests/*"] } }, "exclude": [the template list] } and nothing else.'
     verification:
       automated:
         - HFS_TS_STRICT

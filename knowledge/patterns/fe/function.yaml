@@ -142,7 +142,7 @@ rules:
       interaction or client data hooks is `"use client"`; a connected block that only reads is an async server component that
       awaits a reader from modules/api. Either way the connected half holds translations, locale, session and data, folds each
       read into a Slot with `toSlot`, picks the shape from data, resolves every label, and renders the pure XBase from the
-      sibling component.tsx. Only that sibling index.tsx (and the unit's specs) imports component.tsx, and index.tsx exports X
+      sibling component.tsx. Only that sibling index.tsx imports component.tsx, and index.tsx exports X
       only, never XBase. Each Block reads its own apis; a page composes Blocks with atoms and reads none; an overlay runs
       commands only; a layout reads none. A form lives in the connected half: react-hook-form with a zod resolver, the
       schema's messages are message keys, and the connected half resolves them with next-intl before they reach XBase as
@@ -150,7 +150,7 @@ rules:
       require no twin. Intrinsic browser interaction such as refs, focus, disclosure, measurement, drag and reduced motion may
       remain in one visual unit; an authored custom helper for it still lives under hooks/ui.
     rationale: |
-      Separating real world access makes presentation fixture-testable and prevents hidden requests, while avoiding
+      Separating real world access keeps presentation pure and prevents hidden requests, while avoiding
       boilerplate where there is no independent render contract.
     cases:
       - id: case-1

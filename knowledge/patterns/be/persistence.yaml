@@ -32,7 +32,7 @@ rules:
       `synchronize` is the literal `false` everywhere, including e2e databases, and is never read from the environment.
       There is no runtime DDL: no `dataSource.synchronize()`, no `migrationsRun`, no `CREATE`, `ALTER` or `DROP TABLE` string
       outside `persistence/migrations/**`, and no glob that discovers entities or migrations. E2E runs the real migrations
-      through the `apps/migrate` runner function, which is the evidence that they are right.
+      through the `be/apps/migrate` runner function, which is the evidence that they are right.
     rationale: |-
       When an ORM diffs the schema at boot, the live schema is whatever the entity graph implies that day, migrations never
       run, and an enum change can crash a boot.
@@ -42,7 +42,7 @@ rules:
         write: 'DatabaseModule.register({ connection: PRIMARY_CONNECTION, entities, migrations, synchronize: false })'
       - id: case-2
         when: An e2e database
-        write: 'the setup runs the apps/migrate runner function against the Testcontainers database before the tests, never synchronize'
+        write: 'the setup runs the be/apps/migrate runner function against the Testcontainers database before the tests, never synchronize'
     verification:
       automated:
         - BE_SCHEMA_AUTHORITY
@@ -50,12 +50,12 @@ rules:
         - Review each migration against the accepted SDS data design and a copy of realistic data.
     relatedExamples: []
   - id: BE-PERSISTENCE-2
-    title: apps/migrate is the only migration runner
+    title: be/apps/migrate is the only migration runner
     kind: mandatory
     hfsRules: [R33, R34]
     requirement: |-
       An app of kind `migrate` is the only process that runs migrations, once per connection, before any api or worker
-      process starts (a deploy runs it as an init job). It is required as soon as `hfs.json` declares a connection. It has
+      process starts (a deploy runs it as an init job). It is required as soon as `hfs.json` `sides.be.connections` declares a connection. It has
       `main.ts` and no business code; it builds its `DataSource` from the same `<conn>.config.ts` the
       api uses. Api and worker apps never run migrations.
     rationale: |-
@@ -81,8 +81,8 @@ rules:
       Entities and migrations sit in `persistence/{entities,migrations}/` of the capability that owns the table
       (`domain/<c>/persistence/` or `platform/<c>/persistence/` for technical tables). `persistence/connection.ts` declares
       the `<c>Entities` and `<c>Migrations` arrays and no `CONNECTION` alias. The owner's `index.ts` re-exports those two
-      names, the only two, and the apps and `apps/migrate` concatenate them per connection into `DatabaseModule.register`;
-      a capability's connection is the one its arrays are registered on, exactly one declared in `hfs.json` `connections`
+      names, the only two, and the apps and `be/apps/migrate` concatenate them per connection into `DatabaseModule.register`;
+      a capability's connection is the one its arrays are registered on, exactly one declared in `hfs.json` `sides.be.connections`
       across all apps, and every `Inject<Conn>EntityManager` inside the capability names that same connection. An entity is `@Entity("<plural_snake>")` in `entities/<table>.entity.ts`,
       every `@Column` has an explicit `name` and `type`, timestamps are `timestamptz`, an enum is stored as `varchar` with a
       `CHECK` in the migration (no native PG enum), and there is no `eager`, `lazy` or `cascade`. An entity file imports
@@ -96,10 +96,10 @@ rules:
     cases:
       - id: case-1
         when: A new table
-        write: 'src/modules/domain/purchase/persistence/entities/purchase.entity.ts, migrations/1790000000000-create-purchases.ts (class CreatePurchases1790000000000), and `purchaseEntities` / `purchaseMigrations` exported from purchase/index.ts.'
+        write: 'be/src/modules/domain/purchase/persistence/entities/purchase.entity.ts, migrations/1790000000000-create-purchases.ts (class CreatePurchases1790000000000), and `purchaseEntities` / `purchaseMigrations` exported from purchase/index.ts.'
       - id: case-2
         when: Composition
-        write: 'apps/migrate/src/app.module.ts lists [...purchaseEntities, ...identityEntities] and [...purchaseMigrations, ...identityMigrations] for the primary connection.'
+        write: 'be/apps/migrate/src/app.module.ts lists [...purchaseEntities, ...identityEntities] and [...purchaseMigrations, ...identityMigrations] for the primary connection.'
     verification:
       automated:
         - BE_SCHEMA_OWNER
@@ -114,7 +114,7 @@ rules:
     hfsRules: [R36, R68]
     requirement: |-
       SQL text is a constant (or a function returning one) built with the `sql` tag from `platform/database`, living in
-      `src/modules/{domain,platform}/<c>/persistence/<name>.sql.ts`; the tag returns the branded type `SqlText`. `.query()` on
+      `be/src/modules/{domain,platform}/<c>/persistence/<name>.sql.ts`; the tag returns the branded type `SqlText`. `.query()` on
       an `EntityManager` receives a `SqlText` first argument and a parameter array, and values are numbered parameters. A
       dynamic identifier is a `SqlIdent` from `ident(name, allowed)`, the only substitution the tag accepts. Row shapes are
       `interface <Name>Row` with snake_case keys and `to<Name>(row)` mappers in `<name>.rows.ts`. There is no SQL literal
@@ -201,9 +201,9 @@ rules:
       transaction callback, with the entity class passed by class and never by string name. Not used: `getRepository`,
       `@InjectRepository`, `Repository<T>`, `TypeOrmModule.forFeature`, custom repository or store classes
       (`*.repository.ts`, `*.store.ts`, `*_STORE` ports), `createQueryBuilder`, `ModuleRef.get`, an injected `DataSource` or
-      `QueryRunner` outside `platform/database` and `apps/migrate`. A manager is injected only in
-      `src/features/<f>/application/*.handler.ts`, `src/modules/domain/<c>/**/*.service.ts` and platform capabilities that own
-      a `persistence/` (database, inbox, outbox, lease); never in `transport/**`, `integrations/**` or `apps/**`.
+      `QueryRunner` outside `platform/database` and `be/apps/migrate`. A manager is injected only in
+      `be/src/features/<f>/application/*.handler.ts`, `be/src/modules/domain/<c>/**/*.service.ts` and platform capabilities that own
+      a `persistence/` (database, inbox, outbox, lease); never in `transport/**`, `integrations/**` or `be/apps/**`.
     rationale: |-
       A repository handle is bound to one entity and cannot carry a transaction into a second table, and a DataSource used
       for queries lets a caller bypass the named connection. One shared manager per connection, named at the injection site
@@ -227,13 +227,13 @@ rules:
     kind: mandatory
     hfsRules: [R84]
     requirement: |-
-      `hfs.json` `connections` lists every physical database as `{ "name": "<kebab>", "envPrefix": "<SNAKE>" }`; the name is
+      `hfs.json` `sides.be.connections` lists every physical database as `{ "name": "<kebab>", "envPrefix": "<SNAKE>" }`; the name is
       the logical database, never the engine (`primary`, `identity`, `order`). Per connection exactly these files exist in
-      `src/modules/platform/database/`: `<conn>.connection.ts` (`export const <CONN>_CONNECTION = "<conn>"`), `<conn>.config.ts`
+      `be/src/modules/platform/database/`: `<conn>.connection.ts` (`export const <CONN>_CONNECTION = "<conn>"`), `<conn>.config.ts`
       (reads only `<ENVPREFIX>_*` keys) and `<conn>.decorators.ts`
       (`Inject<Conn>EntityManager = (): TypedParameterDecorator<EntityManager> => injector<EntityManager>(getEntityManagerToken(<CONN>_CONNECTION))`).
       No other file declares a connection or calls `TypeOrmModule.forRoot*`, `new DataSource(`, `getEntityManagerToken(`,
-      `InjectEntityManager(` or `InjectDataSource(`, except `apps/migrate`. There is no
+      `InjectEntityManager(` or `InjectDataSource(`, except `be/apps/migrate`. There is no
       capability-specific injector, no second connection name onto an existing database, and two connections never resolve to
       the same (host, port, database).
     rationale: |-
@@ -242,7 +242,7 @@ rules:
     cases:
       - id: case-1
         when: Two databases
-        write: 'platform/database/identity.{connection,config,decorators}.ts and order.{connection,config,decorators}.ts, and hfs.json connections [{ "name": "identity", "envPrefix": "IDENTITY_DB" }, { "name": "order", "envPrefix": "ORDER_DB" }].'
+        write: 'platform/database/identity.{connection,config,decorators}.ts and order.{connection,config,decorators}.ts, and hfs.json sides.be.connections [{ "name": "identity", "envPrefix": "IDENTITY_DB" }, { "name": "order", "envPrefix": "ORDER_DB" }].'
     verification:
       automated:
         - BE_CONNECTION_DUPLICATE

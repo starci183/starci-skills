@@ -1,11 +1,13 @@
 schema: starci/knowledge-source@1
 id: repo.starciwork
-title: Repository .starciwork
+title: App .starciwork
 purpose: |
   Given content that describes a product (requirements, design, screens, implementation records, UAT), what may live in the
-  backend repository's `.starciwork` and what may not? Product records only, flat families, no agent data.
+  app's `.starciwork` (at the app root, one per app, for both sides) and what may not? Product records only, flat families,
+  no agent data.
 appliesTo:
   - backend
+  - frontend
 family: repo
 provenance:
   reviewedAt: 2026-09-29
@@ -23,7 +25,7 @@ rules:
     kind: mandatory
     hfsRules: [R07]
     requirement: |
-      `.starciwork/` holds exactly the paths that scripts/lib/starciwork-boundary.mjs `isProductPath` accepts:
+      The app root's `.starciwork/` holds exactly the paths that scripts/lib/starciwork-boundary.mjs `isProductPath` accepts:
       `workspace.yaml`, `index.yaml`, `brand/`, `shell/index.yaml`, `features/<feature>/index.yaml`, flat records
       `features/<feature>/<family>/<name>/index.yaml`, `features/<feature>/br/<rule>/ac/<name>/`,
       `features/<feature>/ui/<name>/assets/<approved-file>`, `features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml` with
@@ -31,7 +33,7 @@ rules:
       `.starciwork/.gitignore` is exactly `starciworkGitignoreText()`. The tracked image of a ui-screen is the accepted design
       direction only.
     rationale: |
-      One canonical Work tree per project keeps product records authoritative and reviewable in a pull request.
+      One canonical Work tree per app keeps product records authoritative and reviewable in a pull request.
     cases:
       - id: case-1
         when: A new requirement
@@ -44,7 +46,7 @@ rules:
         - HFS_AGENT_DATA_TRACKED
         - HFS_SLOT_UNDECLARED
       manual:
-        - node scripts/checks/work-validate.mjs <repo>/.starciwork passes.
+        - node scripts/checks/work-validate.mjs <app>/.starciwork passes.
     relatedExamples: []
   - id: REPO-WORK-2
     title: Agent data is never tracked
@@ -52,9 +54,10 @@ rules:
     hfsRules: [R07]
     requirement: |
       Evidence, logs, reports, checks, captures, draw rounds (initial and intermediate images, prompt files), UAT runs, kernel
-      evidence, runtime.sqlite files, operation folders and `_derived/` are not repository content. They live in the runtime
-      ledger and the blob store, and a record cites them by `{name, sha256}`. A worktree folder never sits under
-      `.starciwork`.
+      evidence, runtime.sqlite files, operation folders and `_derived/` are not app content. They live in the runtime
+      ledger and the blob store, and a record cites them by `{name, sha256}`. A worktree is never tracked under
+      `.starciwork`: the runtime's op worktrees at `.starciwork/worktrees/<op>` are git-excluded (`.git/info/exclude`) and
+      removed when their op settles.
     rationale: |
       Agent data changes every run, bloats history and is reviewed by nobody. Content addressing already gives it identity.
     cases:

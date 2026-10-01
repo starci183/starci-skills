@@ -2,10 +2,10 @@ schema: starci/knowledge-source@1
 id: repo.index
 title: Repository patterns
 purpose: |-
-  Read knowledge/hfs/README.md (HFS) first. These topics state the repository-level law: the root map and storage states,
-  the backend-only `.starciwork` and `.starcistacks`, sealed secrets, shared tooling, the formatter, version pins and size
+  Read knowledge/hfs/README.md (HFS) first. These topics state the app-level law: the root and side map and storage states,
+  the root `.starciwork` and the back end's `be/.starcistacks`, sealed secrets, shared tooling, the formatter, version pins and size
   budgets. Each rule cites the HFS rule ids it implements (hfsRules) and the finding codes that judge it
-  (verification.automated). The backend and frontend source rules inside the tree are in patterns/be and patterns/fe.
+  (verification.automated). The back-end (`be/`) and front-end (`fe/`) source rules inside the tree are in patterns/be and patterns/fe.
 appliesTo:
   - backend
   - frontend
@@ -23,7 +23,7 @@ topics:
   - id: repo.folder
     title: Repository folder
     path: folder.yaml
-    decides: Every tracked path has a slot, apps/<app> only, npm only, backend-only work and stacks, ignored and external storage, README
+    decides: Every tracked path has a slot, be/apps/<app> and fe/apps/<app> only, one npm manifest at the root, .starciwork at the root and .starcistacks in be/, ignored and external storage, README
     rules: REPO-FOLDER-1 … REPO-FOLDER-6
   - id: repo.starciwork
     title: .starciwork
@@ -43,7 +43,7 @@ topics:
   - id: repo.tooling
     title: Tooling
     path: tooling.yaml
-    decides: Thin configs into canon packages, generated files from hfs sync, one machine at every gate, no inline configuration, e2e outside automatic gates
+    decides: Thin configs into canon packages per side, generated files from hfs sync at the app root, one machine at every gate, no inline configuration, e2e outside automatic gates
     rules: REPO-TOOLING-1 … REPO-TOOLING-6
   - id: repo.formatter
     title: Formatter

@@ -1,7 +1,7 @@
 schema: starci/op@1
 id: unit.verify
 goal:
-  en: Run the product repository's FULL unit suite (npm test) against the delivered source and report the observed
+  en: Run the app's FULL back-end unit suite (npm test at the app root) against the delivered source and report the observed
     result - never a subset presented as the whole suite, never a repaired product. Dispatched only when the goal or the owner
     explicitly asks for the full unit run.
 params:
@@ -35,8 +35,8 @@ reads:
   - id: repo
     path: <app>/<bound-paths>
     purpose:
-      en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read package.json scripts (the
-        unit command is the app's managed `test` script, the be unit project as opposed to e2e), the unit runner configuration and the
+      en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read the root package.json scripts (the
+        unit command is the managed `test`, which runs `cd be && jest --selectProjects unit --coverage`, the unit project as opposed to e2e), the unit runner configuration and the
         delivered source. The evidence binds the exact tested tree, so a run without a resolved repository is
         not a unit result.
   - id: request
@@ -97,8 +97,8 @@ steps:
       - profile
     writes: [evidence]
     action:
-      en: Confirm the request asks for the full unit run and resolve the repository's unit command from its
-        package.json (the managed `test` script); a repository without one is a blocker, never an invented runner. Resolve the
+      en: Confirm the request asks for the full unit run and resolve the app's unit command from its
+        root package.json (the managed `test`); an app without one is a blocker, never an invented runner. Resolve the
         execution profile and actual tool availability; this does not switch the model/runtime or spawn workers.
   - reads:
       - repo
@@ -140,7 +140,7 @@ proofs:
 blockers:
   - code: UNIT_RUNNER_MISSING
     condition:
-      en: The repository declares no managed test script or the runner cannot start here and the cause is provably
+      en: The app declares no managed test command or the runner cannot start here and the cause is provably
         unfixable from the allowlist - report blocked with blocker kind environment naming the missing piece.
   - code: UNIT_RUN_NOT_REQUESTED
     condition:
