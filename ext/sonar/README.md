@@ -65,4 +65,4 @@ starci-next, starci-next-fe, mia-mia-backend, miamia-fe, tedo-landing — the se
 `services.sonar.projects` entry, listed in the host declaration
 (`examples/starcistacks-services/starci-academy-backend.application-stacks.yaml`). A product's own
 per-project analysis token stays in **its** custody
-(`.starcistacks/dev/runtime/files/sonarqube-<key>-token.key.enc`), never in this extension.
+(`.starcistacks/dev/runtime/files/sonarqube-<key>-token.key.enc`, written through that repository's stack-secret tool), never in this extension. The example apps under `examples/` are the exception: they belong to this runtime repository, so the tokens they declare (`services.sonar.credentials`, custody path `.claude/ext/sonar/secrets/sonarqube-<key>-token.key`) are sealed in `secrets/`. `sonar-local.mjs ensure-project --with-token` (and a scan whose member the server rejects) mints the token with the admin token and seals it there itself, with `sops --encrypt` to the one recipient the directory's sealed members share, through a 0600 temp file (never argv), writing only the `.enc`; a directory with no such recipient is refused and the minted value revoked.

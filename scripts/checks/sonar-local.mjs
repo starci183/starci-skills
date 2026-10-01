@@ -29,7 +29,8 @@ import {createRequire} from 'node:module';
  * published as https://sonar.starci.org, with the admin token in its custody at
  * .starcistacks/dev/runtime/files/sonarqube-admin-token.key(.enc). Each project scans with its own
  * PROJECT_ANALYSIS_TOKEN at runtime/files/sonarqube-KEY-token.key, minted with the admin token and stored
- * through the stack-secret tool the first time. No op ever asks the owner for a Sonar token or a GitHub
+ * through the stack-secret tool the first time (the example apps' tokens, whose declared custody is a runtime extension's
+ * ext/<service>/secrets directory, are sealed there by sealExtCustody). No op ever asks the owner for a Sonar token or a GitHub
  * setting. A stored token is validated (/api/authentication/validate) before use: one the server rejects
  * (a container and database recreated behind custody - starci-next inc-733bf51f2d75) is re-minted with a
  * valid admin token through the same mint path, stored over the rejected member through the same
@@ -335,21 +336,63 @@ const stackRootOf=file=>{
   return at?file.slice(0,at.index+at[0].length):null;
 };
 
+/** A runtime extension's custody directory: <runtime>/ext/<service>/secrets, a host tree no stack-secret tool manages. */
+const extSecretsDir=file=>{
+  const dir=path.dirname(file);
+  if(path.basename(dir)!=='secrets')return null;
+  const ext=path.dirname(path.dirname(dir));
+  return path.basename(ext)==='ext'&&(path.dirname(ext)===skillRoot||path.basename(path.dirname(ext))==='.claude')?dir:null;
+};
+
+/** The one age recipient the sealed members of an extension custody directory share; null when there is none or they differ. */
+function extRecipient(dir){
+  const recipients=new Set();
+  for(const name of fs.existsSync(dir)?fs.readdirSync(dir):[]){
+    if(!name.endsWith('.enc'))continue;
+    try{for(const r of JSON.parse(fs.readFileSync(path.join(dir,name),'utf8')).sops?.age??[])if(typeof r.recipient==='string')recipients.add(r.recipient);}catch{/* not a sops json member */}
+  }
+  return recipients.size===1?[...recipients][0]:null;
+}
+
 /**
- * Store a value as an encrypted custody member through the stack's own tool (scripts/stack-secret.mjs of the
- * repository whose .starcistacks holds the member). An absolute reference (a declaration credential
- * resolved from its repository root) names that tree directly - a project token minted into the declaring
- * repository while the sonar stack itself is the host extension; a relative one stays a member of the
- * configured stack. Host-extension custody (.claude/ext) has no stack-secret tool: minting there is refused
- * and mintToken revokes the value again. The value travels through a 0600 temp file only - never argv.
+ * Seal a value as a member of a runtime extension's custody (ext/<service>/secrets) with sops, to the recipient its
+ * sealed siblings already share: the same recipient, never a new key. Only the .enc twin is written. The value
+ * travels through a 0600 temp file read by sops - never argv.
+ */
+function sealExtCustody(cfg,file,value){
+  const dir=extSecretsDir(file);
+  const recipient=extRecipient(dir);
+  if(!recipient)return {ok:false,reason:`${path.basename(dir)} holds no sealed member with exactly one age recipient to seal to`};
+  const sops=cfg.sops??resolveCommand('sops');
+  if(!sops)return {ok:false,reason:'sops is not installed'};
+  const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
+  try{
+    fs.writeFileSync(tmp,value,{mode:0o600});
+    const [bin,args]=launcher(sops,['--encrypt','--age',recipient,'--input-type','binary','--output-type','json',tmp]);
+    const result=spawnSync(bin,args,{encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024,timeout:cfg.timeoutMs});
+    if(result.status!==0||!String(result.stdout??'').trim())return {ok:false,reason:scrub(`sops --encrypt of ${path.basename(file)} exited ${result.status}: ${String(result.stderr).trim().split(/\r?\n/).slice(-2).join(' ')}`)};
+    fs.writeFileSync(`${file}.enc`,result.stdout);
+    return {ok:true};
+  }finally{
+    try{fs.rmSync(tmp,{force:true});}catch{/* best effort */}
+  }
+}
+
+/**
+ * Store a value as an encrypted custody member. Two managed custodies exist: a repository's .starcistacks tree, written
+ * through that repository's own tool (scripts/stack-secret.mjs; an absolute reference names that tree directly - a project
+ * token minted into the declaring repository while the sonar stack itself is the host extension - and a relative one stays a
+ * member of the configured stack), and a runtime extension's ext/<service>/secrets directory (the example apps' analysis
+ * tokens), sealed by sealExtCustody. Anything else is refused and mintToken revokes the value again. Never argv.
  */
 function writeCustody(cfg,ref,value){
   const file=path.resolve(cfg.stackDir,ref);
+  if(extSecretsDir(file))return sealExtCustody(cfg,file,value);
   const managed=path.isAbsolute(String(ref))?stackRootOf(file):path.dirname(cfg.stackDir);
   const stacksRoot=managed??path.dirname(cfg.stackDir);
   const tool=cfg.stackSecret??path.join(path.dirname(stacksRoot),'scripts','stack-secret.mjs');
   if((!managed||path.basename(managed)!=='.starcistacks')&&!cfg.stackSecret)
-    return {ok:false,reason:`the custody member ${ref} is not under a .starcistacks tree a stack-secret tool manages`};
+    return {ok:false,reason:`the custody member ${ref} is neither under a .starcistacks tree a stack-secret tool manages nor in a runtime extension's secrets directory`};
   if(!fs.existsSync(tool))return {ok:false,reason:`no stack-secret tool at ${tool}`};
   const target=path.relative(stacksRoot,file).replace(/\\/g,'/');
   const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
@@ -374,9 +417,10 @@ export async function tokenAccepted(cfg,value){
 }
 
 /** A custody reference writeCustody may store over: a member of the configured stack, or an absolute
- *  declaration credential inside a repository's .starcistacks tree (host-extension custody is not). */
+ *  declaration credential inside a repository's .starcistacks tree or a runtime extension's secrets directory. */
 const inStack=(cfg,ref)=>{
   const file=path.resolve(cfg.stackDir,ref);
+  if(extSecretsDir(file))return true;
   if(!path.isAbsolute(String(ref))&&!file.startsWith(cfg.stackDir+path.sep))return false;
   return stackRootOf(file)!==null;
 };

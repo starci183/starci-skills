@@ -178,6 +178,7 @@ function fakeCustody(root){
   const sops=write(root,'fake-sops.mjs',`import fs from 'node:fs';
 if(process.env.SOPS_AGE_KEY_FILE!==${JSON.stringify(identity)}){process.stderr.write('wrong identity');process.exit(3);}
 const file=process.argv.at(-1);
+if(process.argv.includes('--encrypt')){if(!process.argv.includes('--age')){process.stderr.write('no recipient');process.exit(5);}process.stdout.write('ENC:'+fs.readFileSync(file,'utf8'));process.exit(0);}
 process.stdout.write(fs.readFileSync(file,'utf8').replace(/^ENC:/,''));`);
   const stackSecret=write(root,'fake-stack-secret.mjs',`import fs from 'node:fs';import path from 'node:path';
 const [cmd,target,flag,from]=process.argv.slice(2);
@@ -362,6 +363,48 @@ test('a declared or explicit token reference the server rejects is repaired in p
   assert.equal(fs.readFileSync(path.join(custody.stack,'runtime/files/custom-scan.key.enc'),'utf8'),`ENC:${REMINTED}`);
   assert.ok(!fs.existsSync(path.join(custody.stack,`${projectTokenRef('custom')}.enc`)),'no second member beside the repaired one');
   assert.equal(events.length,1);
+});
+
+// A runtime extension's custody (ext/<service>/secrets, where the example apps' analysis tokens live) has no stack-secret
+// tool: the runtime seals a minted token itself, with sops, to the recipient its sealed members already share.
+const extCustody=(root,{sealed=true}={})=>{
+  const dir=path.join(root,'.claude','ext','sonar','secrets');
+  if(sealed)write(dir,'sonarqube-admin-token.key.enc',JSON.stringify({data:'ENC[x]',sops:{age:[{recipient:'age1fakerecipient'}]}}));
+  else fs.mkdirSync(dir,{recursive:true});
+  write(dir,'sonarqube-example-token.key.enc','ENC:fake-stale-token-0006');
+  return path.join(dir,'sonarqube-example-token.key');
+};
+
+test('a rejected example token sealed in a runtime extension custody is re-minted and sealed there, never via argv or plaintext', async t => {
+  const root=temporary(t,'ext-seal');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  const ref=extCustody(root);
+  state.mintValues.push(REMINTED);
+  const {exitCode,report}=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
+  assert.equal(exitCode,0,JSON.stringify(report));
+  assert.deepEqual([report.tokenCustody.via,report.tokenCustody.reminted,report.tokenCustody.name],['minted',true,ref.split(path.sep).join('/')]);
+  assert.equal(fs.readFileSync(`${ref}.enc`,'utf8'),`ENC:${REMINTED}`,'sealed over the rejected member');
+  assert.ok(!fs.existsSync(ref),'no plaintext twin is written');
+  assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/revoke').length,0);
+  assertNoSecret(report,'ensure report');
+  const again=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
+  assert.equal(again.report.tokenCustody.via,'sops','the sealed member is read back, not minted again');
+});
+
+test('a token that cannot be sealed into an extension custody with no recipient is refused with the reason and revoked', async t => {
+  const root=temporary(t,'ext-refuse');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-analysis-token.txt.enc'));
+  const ref=extCustody(root,{sealed:false});
+  state.mintValues.push(REMINTED);
+  const {report}=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
+  assert.notEqual(report.tokenCustody.via,'minted');
+  assert.match(JSON.stringify(report),/holds no sealed member with exactly one age recipient/);
+  assert.equal(fs.readFileSync(`${ref}.enc`,'utf8'),'ENC:fake-stale-token-0006','the member is left as it was');
+  assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/revoke').length,1,'the minted value is revoked again');
+  assertNoSecret(report,'refused report');
 });
 
 test('token runs a child with the analysis token in its env only, and alone reports presence', async t => {

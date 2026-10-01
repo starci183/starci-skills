@@ -18,7 +18,7 @@ SOPS/age ciphertext twins of the host-level SonarQube secrets, moved read-only f
 Per-project Sonar analysis tokens of a product repository are NOT here: each project's
 `sonarqube-<key>-token.key.enc` twin lives in that project's own `.starcistacks/dev/runtime/files/` custody (its
 declaration's `services.sonar.credentials` points there). The example apps under `examples/` are part of this runtime
-repository and have no recipient of their own, so their analysis tokens are sealed here, to the same recipient.
+repository and have no stack-secret tool or recipient of their own, so their analysis tokens are sealed here, to the same recipient. `sonar-local.mjs` mints and seals these members itself (`ensure-project --with-token`, or a re-mint when the server rejects the stored token): `sops --encrypt` to the recipient shared by the sealed members of this directory, `.enc` only, the value passed through a 0600 temp file and never argv.
 
 Decrypt one member: `sops -d secrets/<name>.enc > secrets/<name>` — the plaintext twin is gitignored
 and must never be committed. If a twin listed above is missing, the owner re-mints the secret

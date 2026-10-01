@@ -7,6 +7,7 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- Lane C0-SONARPROV: `sonar-local.mjs ensure-project --with-token` (and a re-mint of a rejected token) works for the example apps, whose declared analysis credential lives in `ext/sonar/secrets`: that is a managed custody, so the runtime seals the minted token there itself (`sops --encrypt` to the one recipient the directory's sealed members share, 0600 temp file, never argv, `.enc` only). A custody directory with no such recipient, or any other unmanaged location, is refused with a clear reason and the minted token is revoked. Specs cover both. `ext/sonar/README.md` and `secrets/KEYS.md` describe it.
 - The land gate selects specs by dependency: `scripts/lib/spec-deps.mjs` follows each spec's relative imports transitively (TypeScript scanner, so imports in strings or comments are never followed), and `land.mjs` `touching` mode adds every spec whose import graph reaches a changed file. A clash between two lanes (one changes a module another lane's spec relies on) is refused at land time. The full spec run before a tag stays. Spec: `tests/spec-deps.spec.mjs`.
 - Lane C0-SONAR3: Sonar's coverage scope works. SonarQube has no `sonar.coverage.inclusions`, so it was ignored and overall coverage read 65.8% and 45.2% on the examples while every service was at 100.
   - hfs sync renders `sonar.coverage.exclusions` as the complement of the services, derived from the slot manifest and the preset's coverage sources.
