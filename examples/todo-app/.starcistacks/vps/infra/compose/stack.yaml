@@ -11,7 +11,7 @@ services:
   redis:
     image: redis:7
   minio:
-    image: minio/minio:latest
+    image: cgr.dev/chainguard/minio:latest
     command: server /data
     secrets:
       - minio-root-password
@@ -21,6 +21,10 @@ services:
     image: todo-app/api
     env_file:
       - ../../runtime/env/app.env
+    environment:
+      UPLOAD_S3_SECRET_ACCESS_KEY_FILE: /run/secrets/minio-root-password
+    secrets:
+      - minio-root-password
     deploy:
       replicas: 2
   web:

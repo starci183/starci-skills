@@ -15,7 +15,7 @@ components:
     role: stateful
     compose: infra/compose/redis.yaml
   minio:
-    image: minio/minio:latest
+    image: cgr.dev/chainguard/minio:latest
     role: stateful
     compose: infra/compose/minio.yaml
   prometheus:

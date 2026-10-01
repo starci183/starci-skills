@@ -16,7 +16,7 @@ const TRANSIENT_REFUSAL = 451
 describe("notify-smtp: mail client (integration)", () => {
     const world = useTestWorld({ modules: NOTIFY_SMTP_CAPABILITY_MODULES })
 
-    const client = (): NotifySmtpClient => world.context.get<NotifySmtpClient>(NOTIFY_SMTP_CLIENT, { strict: false })
+    const client = (): NotifySmtpClient => world.resolve<NotifySmtpClient>(NOTIFY_SMTP_CLIENT)
 
     it("delivers a message the mail host accepts with its recipient, subject and body", async () => {
         const to = `mail-${randomUUID()}@e2e.test`

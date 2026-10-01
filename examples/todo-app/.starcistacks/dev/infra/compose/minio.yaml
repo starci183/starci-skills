@@ -1,6 +1,7 @@
 services:
   minio:
-    image: minio/minio:latest
+    # MinIO no longer publishes a community image on Docker Hub; the Chainguard public build is the source.
+    image: cgr.dev/chainguard/minio:latest
     command: server /data --console-address ":9001"
     environment:
       # The image boots only when both the root user and root password are set; only the password was

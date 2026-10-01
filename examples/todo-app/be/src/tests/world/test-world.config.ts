@@ -13,7 +13,7 @@ import { AppModule as WorkerApp } from "../../../apps/worker/src/app.module"
 import * as migrateMain from "../../../apps/migrate/src/main"
 import { primaryConnectionOf } from "../../../apps/migrate/src/migrate.options"
 import type { SignInData } from "@tests/fixtures/views/e2e-views.contracts"
-import { testOptions } from "./test-apps.options"
+import { UPLOADS_BUCKET, testOptions } from "./test-apps.options"
 import { platformBase } from "./test-capabilities.options"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 import { TODO_KEYCLOAK_CLIENT } from "./todo-identity.contracts"
@@ -24,6 +24,7 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
     stacks: {
         postgresql: { connections: [{ name: "primary" }] },
         keycloak: { realm: ".starcistacks/dev/infra/compose/realm-todo.json", clientId: TODO_KEYCLOAK_CLIENT },
+        minio: { buckets: [UPLOADS_BUCKET] },
     },
     fakes: { smtp: smtpFake(), sepay: sepayFake({ webhookPath: "/webhooks/sepay", webhookStyle: "intent" }) },
     apps: {

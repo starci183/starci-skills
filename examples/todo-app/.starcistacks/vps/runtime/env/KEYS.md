@@ -9,3 +9,4 @@ before running `sops -d`. Never reuse that identity or this pattern outside the 
 | `PRIMARY_DB_URL` | `secrets/app-env.enc` | Postgres connection of the `primary` database, read by the api, the worker and apps/migrate |
 | `KEYCLOAK_ADMIN_PASSWORD_FILE` | Swarm secret `keycloak-admin-password` | Bootstrap password for the realm admin |
 | `MINIO_ROOT_PASSWORD_FILE` | Swarm secret `minio-root-password` | Object store root credential |
+| `UPLOAD_S3_SECRET_ACCESS_KEY_FILE` | Swarm secret `minio-root-password` | The secret access key the upload storage signs its S3 requests with (with `UPLOAD_S3_ENDPOINT`, `UPLOAD_S3_BUCKET` and `UPLOAD_S3_ACCESS_KEY_ID` in `secrets/app-env.enc`) |

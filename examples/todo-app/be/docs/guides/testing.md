@@ -111,7 +111,7 @@ npm run test:e2e -- flows/probes
 
 ## Uploads
 
-Task attachments live behind the upload capability (`src/modules/integrations/upload`): presigned intents (`GraphQL createUploadIntent` -> `PUT /uploads/<id>/content` with `x-upload-token`), a direct `POST /uploads`, attach/list/download/delete for the owner, size+mime validation, a storage port (local filesystem adapter in dev; S3/minio implements the same port) and a virus-scan port (noop adapter ships the contract). The e2e journey covers the whole lifecycle over the real stack:
+Task attachments live behind the upload capability (`src/modules/integrations/upload`): presigned intents (`GraphQL createUploadIntent` -> `PUT /uploads/<id>/content` with `x-upload-token`), a direct `POST /uploads`, attach/list/download/delete for the owner, size+mime validation, a storage port (an S3 adapter over the stack's MinIO, signed with AWS Signature Version 4) and a virus-scan port (noop adapter ships the contract). The e2e journey covers the whole lifecycle over the real stack:
 
 ```bash
 npm run test:e2e -- flows/upload-journey

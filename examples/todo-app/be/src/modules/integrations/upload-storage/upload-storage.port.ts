@@ -8,8 +8,7 @@ import type {
 
 /**
  * The byte plane: store, get and delete one object. Implementations own durability and containment; the object key is
- * derived from the upload id, never from client input. The dev stack answers with the local filesystem; an object
- * store implements the same three verbs.
+ * derived from the upload id, never from client input. The adapter speaks S3 to the stack's MinIO.
  */
 export interface UploadStorage {
     /**

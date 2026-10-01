@@ -12,6 +12,7 @@ import type { DatabaseConnectionConfig } from "@modules/platform/database"
 import type { KeycloakOptions } from "@modules/integrations/keycloak"
 import type { NotifySmtpOptions } from "@modules/integrations/notify-smtp"
 import type { SepayOptions } from "@modules/integrations/sepay"
+import type { UploadStorageOptions } from "@modules/integrations/upload-storage"
 import type { TodoAppOptions } from "../../../apps/todo/src/todo.options"
 import type { WorkerAppOptions } from "../../../apps/worker/src/worker.options"
 
@@ -69,6 +70,19 @@ export const notifySmtpOptionsOf = (w: TodoWiring): NotifySmtpOptions => ({
     commandTimeoutMs: CALL_DEADLINE_MS,
 })
 
+/** The bucket of the run's MinIO that holds the uploads (declared in `stacks.minio.buckets`). */
+export const UPLOADS_BUCKET = "uploads"
+
+/** The upload storage over the run's own bucket of the stack's MinIO. */
+export const uploadStorageOptionsOf = (w: TodoWiring): UploadStorageOptions => ({
+    endpoint: w.minio.endpoint,
+    region: "us-east-1",
+    bucket: w.minio.bucket(UPLOADS_BUCKET),
+    accessKeyId: w.minio.accessKey,
+    secretAccessKey: new Secret(w.minio.secretKey),
+    timeoutMs: CALL_DEADLINE_MS,
+})
+
 /** The options of the run, from the wiring the library built. */
 export const testOptions = (w: TodoWiring): TestOptions => ({
     port: w.apps.todo.port,
@@ -90,7 +104,7 @@ export const testOptions = (w: TodoWiring): TestOptions => ({
         presignTtlMs: UPLOAD_PRESIGN_TTL_MS,
         signingSecret: new Secret(w.secret("upload-signing")),
     },
-    uploadStorage: { directory: w.directory("uploads") },
+    uploadStorage: uploadStorageOptionsOf(w),
     notifySmtp: notifySmtpOptionsOf(w),
     scheduling: { tickMs: TICK_MS },
     messaging: { pollMs: TICK_MS, batchSize: 20, visibilityMs: 30_000 },

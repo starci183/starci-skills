@@ -76,7 +76,7 @@
     "@starci/jest-preset": "2.2.1",
     "@starci/prettier-config": "1.0.0",
     "@starci/stylelint-canon": "2.0.2",
-    "@starci/test-world": "1.0.3",
+    "@starci/test-world": "1.0.5",
     "@starci/tsconfig": "2.0.1",
     "@tailwindcss/postcss": "^4",
     "@types/express": "^4.17.21",

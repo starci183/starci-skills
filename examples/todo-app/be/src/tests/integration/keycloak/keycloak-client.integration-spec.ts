@@ -14,7 +14,7 @@ import { useTestWorld } from "@tests/world/use-test-world"
 describe("keycloak: identity provider client (integration)", () => {
     const world = useTestWorld({ modules: KEYCLOAK_CAPABILITY_MODULES })
 
-    const client = (): KeycloakClient => world.context.get<KeycloakClient>(KEYCLOAK, { strict: false })
+    const client = (): KeycloakClient => world.resolve<KeycloakClient>(KEYCLOAK)
 
     it("signs a registered person in, reads the subject and the refresh token, and ends the session on sign-out", async () => {
         const email = `kc-${randomUUID()}@e2e.test`
