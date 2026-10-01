@@ -1,6 +1,8 @@
 import "reflect-metadata"
 import assert from "node:assert/strict"
 import { mkdtempSync } from "node:fs"
+import { createServer } from "node:http"
+import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
@@ -288,5 +290,124 @@ test("withRequest runs commands, queries and providers in a real request scope t
         assert.equal(CommandBus !== undefined && QueryBus !== undefined, true)
     } finally {
         await world.stop()
+    }
+})
+
+/** A toxiproxy API that records every call and answers what the client expects. */
+const fakeToxiproxy = async (): Promise<{ readonly url: string; readonly calls: Array<string> }> => {
+    const calls: Array<string> = []
+    const server = createServer((request, response) => {
+        calls.push(`${request.method} ${request.url}`)
+        request.resume()
+        request.on("end", () => {
+            response.writeHead(200, { "content-type": "application/json" })
+            response.end(request.method === "GET" ? "[]" : "{}")
+        })
+    })
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+    started.push(() => new Promise<void>((resolve) => server.close(() => resolve())))
+    return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, calls }
+}
+
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 80))
+
+test("an outage takes the run's outage lock itself: it waits for another file's running test, holds that file's next test until restore, and only its own world restores it", async () => {
+    const context = await publish()
+    const toxiproxy = await fakeToxiproxy()
+    const outageContext = {
+        ...context,
+        infra: { toxiproxyApi: toxiproxy.url, postgresql: { host: "127.0.0.1", port: 1, directPort: 2, proxy: "pg", image: "postgres", container: "c", user: "u", password: "p", databases: {} } },
+    } as RunContext
+    removeRunContext()
+    writeRunContext(outageContext)
+    const options = { resetRun: async () => undefined, lockIntervalMs: 5 }
+    const outage = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
+    const other = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
+    await outage.start()
+    await other.start()
+    try {
+        await other.enterTest()
+        let cut = false
+        const cutting = outage.infra.postgresql.cut().then(() => {
+            cut = true
+        })
+        await settle()
+        assert.equal(cut, false, "the outage waits for the other file's running test")
+        assert.equal(toxiproxy.calls.length, 0, "nothing reached toxiproxy while the other test ran")
+        other.leaveTest()
+        await cutting
+        assert.equal(toxiproxy.calls.some((call) => call === "POST /proxies/pg"), true)
+        let entered = false
+        const entering = other.enterTest().then(() => {
+            entered = true
+        })
+        await settle()
+        assert.equal(entered, false, "the other file's next test waits while postgres is cut")
+        const before = toxiproxy.calls.length
+        await outage.infra.postgresql.restore()
+        await entering
+        assert.equal(toxiproxy.calls.length > before, true)
+        other.leaveTest()
+        const calls = toxiproxy.calls.length
+        await other.stop()
+        assert.equal(toxiproxy.calls.length, calls, "a world without an outage of its own restores nothing at stop")
+        await outage.infra.postgresql.during(async () => {
+            assert.equal(toxiproxy.calls.at(-1), "POST /proxies/pg")
+        })
+    } finally {
+        await other.stop()
+        await outage.stop()
+    }
+})
+
+test("a client-secret rotation takes the outage lock too and, never undone, holds it until its world stops", async () => {
+    const context = await publish()
+    const server = createServer((request, response) => {
+        request.resume()
+        request.on("end", () => {
+            const url = request.url ?? ""
+            const body = url.includes("/protocol/openid-connect/token") ? { access_token: "admin" } : url.includes("?clientId=") ? [{ id: "c1" }] : { value: "rotated" }
+            response.writeHead(200, { "content-type": "application/json" })
+            response.end(JSON.stringify(body))
+        })
+    })
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+    started.push(() => new Promise<void>((resolve) => server.close(() => resolve())))
+    const port = (server.address() as AddressInfo).port
+    const keycloakContext = {
+        ...context,
+        infra: { toxiproxyApi: "http://127.0.0.1:1", keycloak: { host: "127.0.0.1", port, directPort: port, proxy: "kc", image: "keycloak", container: "c", realm: "t-realm", clientId: "api", adminUser: "a", adminPassword: "p" } },
+    } as RunContext
+    removeRunContext()
+    writeRunContext(keycloakContext)
+    const options = { resetRun: async () => undefined, lockIntervalMs: 5 }
+    const rotating = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
+    const other = new World(declaration([]), { apps: ["worker"] } as WorldSpec, options)
+    await rotating.start()
+    await other.start()
+    try {
+        await other.enterTest()
+        let secret: string | null = null
+        const rotation = rotating.infra.keycloak.rotateClientSecret("api").then((value) => {
+            secret = value
+        })
+        await settle()
+        assert.equal(secret, null, "the rotation waits for the other file's running test")
+        other.leaveTest()
+        await rotation
+        assert.equal(secret, "rotated")
+        let entered = false
+        const entering = other.enterTest().then(() => {
+            entered = true
+        })
+        await settle()
+        assert.equal(entered, false, "the realm stays changed, so the other file waits until the rotating world stops")
+        await rotating.stop()
+        await entering
+        assert.equal(entered, true)
+        other.leaveTest()
+    } finally {
+        await other.stop()
+        await rotating.stop()
     }
 })

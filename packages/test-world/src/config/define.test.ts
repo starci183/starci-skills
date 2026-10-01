@@ -79,3 +79,24 @@ test("the option builders receive a wiring typed by the declared names", () => {
     }
     assert.equal(typeof check, "function")
 })
+
+test("useTestWorld registers the boot, a shared outage-lock hold around every test, and the stop, so no spec can skip the lock", async () => {
+    const hooks = globalThis as unknown as Record<string, unknown>
+    const names = ["jest", "beforeAll", "beforeEach", "afterEach", "afterAll"] as const
+    const saved = names.map((name) => [name, hooks[name]] as const)
+    const registered: Array<{ readonly hook: string; readonly run: () => unknown }> = []
+    hooks["jest"] = { setTimeout: () => undefined }
+    for (const hook of names.slice(1)) hooks[hook] = (run: () => unknown) => void registered.push({ hook, run })
+    try {
+        declared.useTestWorld({ apps: ["api"] })
+        assert.deepEqual(
+            registered.map((entry) => entry.hook),
+            ["beforeAll", "beforeEach", "afterEach", "afterAll"],
+        )
+        // the per-test hold belongs to a booted world: before the boot it names the cause instead of running unlocked
+        const enter = registered.find((entry) => entry.hook === "beforeEach")
+        await assert.rejects(async () => enter?.run(), /has not booted yet/)
+    } finally {
+        for (const [name, value] of saved) hooks[name] = value
+    }
+})

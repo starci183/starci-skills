@@ -55,6 +55,9 @@ export const defineTestWorld = <
             jest.setTimeout(spec.testTimeoutMs ?? DEFAULT_TEST_TIMEOUT_MS)
             const world = new World(declaration, spec as WorldSpec)
             beforeAll(() => world.start(), BOOT_TIMEOUT_MS)
+            // Each test holds the run's outage lock shared: another file's outage waits for it, and it waits for that outage to end.
+            beforeEach(() => world.enterTest())
+            afterEach(() => world.leaveTest())
             afterAll(() => world.stop(), STOP_TIMEOUT_MS)
             return world as unknown as TestWorld<TApps, TFakes, TSiblings, TStacks>
         },

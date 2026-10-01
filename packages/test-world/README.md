@@ -85,6 +85,17 @@ k3d: one cluster per k3s image plus a local registry with pull-through mirrors f
 
 globalSetup: validate declaration, read the stack definition, start the fakes host, attach the stack (provision), start siblings, run `migrate` once, apply `seeds`, snapshot the tables the migrate/seed step filled. Per spec file (`useTestWorld` `beforeAll`): reset (truncate every table except migration ledgers and seeded tables, delete non-imported realm users, flush the Redis DB, drop namespaces, reset fakes), reserve ports, build the wiring, `AppModule.register(options)`, listen, open the db handles. Teardown drops what the run provisioned; shared containers stay warm.
 
+## Outages and parallel spec files
+
+The spec files of one run share the run's stack, so an outage is serialized by the library itself: the run's outage lock (in
+the run directory) is held SHARED by every world while it boots, around every test (`beforeEach`/`afterEach` that
+`useTestWorld` registers) and while it stops, and EXCLUSIVELY by every outage call: `world.infra.<svc>.cut()`, `latency(ms)`
+and `during(fn)` take it before they touch toxiproxy and keep it until `restore()` (or the world stops),
+`keycloak.rotateClientSecret` keeps it until the world stops (a rotation is never undone). An outage therefore waits for the
+tests other files are running, and their next tests wait for the outage to end; a waiting outage keeps new tests out, and an
+outage spec gives its own shared hold up while it waits, so two outage specs never deadlock. A spec cannot forget the lock: the
+outage API takes it. Only the world that injected an outage restores proxies at its stop. A holder whose process died is broken.
+
 ## Fakes
 
 `@starci/test-world/fakes`: `defineHttpFake` (recording, failure injection, control channel), `smtpFake`, `openaiCompatibleFake` (streaming, embeddings), `vnpayFake`, `momoFake`, `payosFake`, `sepayFake` with the providers' real signature schemes and payload fixtures. Repo-specific fakes are built with `defineHttpFake` in `src/tests/world/fakes/`.

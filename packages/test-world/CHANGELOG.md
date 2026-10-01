@@ -2,10 +2,18 @@
 
 ## 1.0.0
 
-First release; joins the 2.0.0 release set (hfs, jest-preset, canon-be).
+First release, pinned in `knowledge/hfs/canon-pins.yaml` for back ends.
 
 - Added: `defineTestWorld` and the frozen spec-facing API (`useTestWorld({ apps } | { modules })`, `world.apps.<name>.api`, `world.db.<connection>`, `world.fake.<name>`, `world.infra.<service>` latency/cut/restore, `world.cluster`, `world.http`, `world.services`, `world.waitFor`, `world.commandBus/queryBus`, `world.signedInPerson`/`actAs`, `useSandbox` for contract specs).
 - Added: the shared warm stack for all repositories (`starci-test-stack up|down|status`): postgres, redis, minio, qdrant, kafka, Keycloak behind toxiproxy, keyed by image; per-repository isolation by namespace (database names, Keycloak realm, Redis DB index, bucket/collection/topic prefixes, k3d namespaces, per-run proxies); k3d with a local registry and pull-through mirrors, own images built by content hash with GC of `src-*` tags.
 - Added: the fakes framework (`@starci/test-world/fakes`) with request recording and failure injection, and the shared fakes `smtp`, `openai-compatible`, `vnpay`, `momo`, `payos`, `sepay`.
 - Added: `@starci/test-world/global-setup` and `/global-teardown` (thin re-exports in `src/tests/world/`), the migrate step once per run, seeds, per-spec reset.
-- Replaces the per-repository world infrastructure under `src/tests/world/`.
+- Replaces the infrastructure the per-repository world carried; `src/tests/world/` keeps `test-world.config.ts`, `use-test-world.ts`, the two jest hook re-exports and `fakes/` (R47).
+- Added: the run's outage lock. Every world holds it shared while it boots, around every test and while it stops; every outage
+  (`world.infra.<service>.cut()`, `latency(ms)`, `during(fn)`, `keycloak.rotateClientSecret`) takes it exclusively itself and keeps
+  it until `restore()` (a rotation until the world stops), so outage specs are serialized against every other spec file of the
+  run under `--maxWorkers` > 1 without the spec doing anything. Writers win, an outage spec gives its own shared hold up while it
+  waits (no deadlock between two outage specs), a dead holder is broken, and only the world that injected an outage restores the
+  proxies at its stop.
+- Added: `world.apps.<name>.restart()`, `world.applicationOrigin(app?)`, `world.withRequest(...)`, `world.buckets.<name>`,
+  `world.registerPerson`, `world.scratchDir`, `infra.keycloak.rotateClientSecret(client)` and typed wiring by declared names.

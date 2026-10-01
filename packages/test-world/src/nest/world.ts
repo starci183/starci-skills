@@ -9,6 +9,7 @@
  * ports of every listening app FIRST, build the wiring, then `AppModule.register(options)` per app, listen, open the db handles.
  */
 import { randomUUID } from "node:crypto"
+import { join } from "node:path"
 import { Module } from "@nestjs/common"
 import type { DynamicModule, INestApplicationContext, Type } from "@nestjs/common"
 import { NestFactory } from "@nestjs/core"
@@ -29,7 +30,8 @@ import { createKeycloakAdmin } from "./keycloak"
 import { pollUntil } from "./poll"
 import { freePorts } from "./ports"
 import { redisSize } from "./redis-probe"
-import { buildWiring } from "./wiring"
+import { buildWiring, RUN_DIRECTORY } from "./wiring"
+import { WorldLock } from "./world-lock"
 import type { AppHandle, InfraHandle, KeycloakInfraHandle, ModulesWorldSpec, RedisInfraHandle, ServiceHandle, SignedInPerson, WaitForOptions, WorldBucket, WorldInfra, WorldKeycloak, WorldRequestScope, WorldSpec } from "./world-types"
 
 const DEFAULT_WAIT_MS = 30_000
@@ -80,11 +82,22 @@ const postgresDeclaration = (declaration: AnyTestWorldConfig): PostgresStack | n
 export interface WorldDependencies {
     /** Replaces the per-spec reset of the shared stack (truncate, realm users, redis db, namespaces, fakes). */
     readonly resetRun?: (context: RunContext) => Promise<void>
+    /** The pause between two attempts on the run's outage lock (default 100 ms). */
+    readonly lockIntervalMs?: number
 }
+
+/** The folder of the run's outage lock inside the run directory. */
+export const OUTAGE_LOCK_DIRECTORY = "outage-lock"
+
+/** The outage a key rotation causes: it is never restored, so the world holds the lock until it stops. */
+const SECRET_ROTATION = "keycloak:client-secret"
 
 /** The handle a spec holds; `useTestWorld` builds one per spec file. */
 export class World {
     private runtime: Runtime | null = null
+    private lock: WorldLock | null = null
+    /** The outages this world has in force (service names, plus a secret rotation); the exclusive lock is held while any is. */
+    private readonly outages = new Set<string>()
 
     constructor(
         private readonly declaration: AnyTestWorldConfig,
@@ -95,6 +108,47 @@ export class World {
     /** Boots the world; called by the `beforeAll` that `useTestWorld` registers. */
     async start(): Promise<void> {
         const context = readRunContext()
+        const lock = this.openLock(context)
+        // The boot uses the shared stack: it waits for another world's outage to end, and an outage waits for it.
+        await lock.share()
+        try {
+            await this.bootWorld(context)
+        } finally {
+            lock.unshare()
+        }
+    }
+
+    /** Holds the run's outage lock shared for one test (the `beforeEach` that `useTestWorld` registers). */
+    async enterTest(): Promise<void> {
+        await this.openLock(this.booted().context).share()
+    }
+
+    /** Gives the shared hold of one test back (the `afterEach` that `useTestWorld` registers). */
+    leaveTest(): void {
+        this.lock?.unshare()
+    }
+
+    private openLock(context: RunContext): WorldLock {
+        if (this.lock !== null) return this.lock
+        const base = context.directories[RUN_DIRECTORY]
+        if (base === undefined) throw worldError(TestWorldErrorCode.StateMissing, "the run directory is missing from the state file")
+        this.lock = new WorldLock(join(base, OUTAGE_LOCK_DIRECTORY), randomUUID(), { intervalMs: this.dependencies.lockIntervalMs })
+        return this.lock
+    }
+
+    /** Takes the run's outage lock exclusively before an outage touches the shared stack; held until every outage is restored. */
+    private async beginOutage(key: string): Promise<void> {
+        await this.openLock(this.booted().context).acquire()
+        this.outages.add(key)
+    }
+
+    /** One outage is restored; the exclusive hold ends with the last one. */
+    private endOutage(key: string): void {
+        this.outages.delete(key)
+        if (this.outages.size === 0) this.lock?.release()
+    }
+
+    private async bootWorld(context: RunContext): Promise<void> {
         await this.resetRun(context)
         const declared = this.declaration.apps as Readonly<Record<string, AppDeclaration<never>>>
         const wanted = appNamesOf(this.spec)
@@ -123,8 +177,19 @@ export class World {
     async stop(): Promise<void> {
         const runtime = this.runtime
         this.runtime = null
-        if (runtime === null) return
-        await this.restoreInfra(runtime.context)
+        if (runtime === null) {
+            this.lock?.close()
+            this.lock = null
+            return
+        }
+        // Only a world that injected an outage restores the proxies: another world's outage is that world's to end.
+        try {
+            if (this.lock?.exclusive === true) await this.restoreInfra(runtime.context)
+        } finally {
+            this.outages.clear()
+            this.lock?.close()
+            this.lock = null
+        }
         const failures: Array<unknown> = []
         const contexts = [...(runtime.root === null ? [] : [runtime.root]), ...[...runtime.apps].reverse().map((app) => app.context)]
         for (const context of contexts) {
@@ -206,17 +271,33 @@ export class World {
     /** Failure injection per infrastructure service. */
     get infra(): WorldInfra {
         const { infra } = this.booted().context
+        const beginOutage = (key: string): Promise<void> => this.beginOutage(key)
         const handle = (service: InfraName, proxy: string | undefined, directPort: number | undefined, extra?: (h: InfraHandle) => object): InfraHandle => {
             if (proxy === undefined || directPort === undefined) throw notDeclared(`infra.${service}`)
             const toxics = createProxyToxics(infra.toxiproxyApi, proxy)
+            // Every outage takes the run's outage lock itself, so no spec can inject one while another file uses the stack.
+            const latency = async (ms: number, jitterMs?: number): Promise<void> => {
+                await this.beginOutage(service)
+                await toxics.latency(ms, jitterMs)
+            }
+            const cut = async (): Promise<void> => {
+                await this.beginOutage(service)
+                await toxics.cut()
+            }
+            const restore = async (): Promise<void> => {
+                await toxics.restore()
+                this.endOutage(service)
+            }
             const base: InfraHandle = {
-                ...toxics,
+                latency,
+                cut,
+                restore,
                 during: async <T>(during: () => Promise<T>): Promise<T> => {
-                    await toxics.cut()
+                    await cut()
                     try {
                         return await during()
                     } finally {
-                        await toxics.restore()
+                        await restore()
                     }
                 },
             }
@@ -242,8 +323,10 @@ export class World {
             get keycloak(): KeycloakInfraHandle {
                 const run = infra.keycloak
                 return handle("keycloak", run?.proxy, run?.directPort, () => ({
-                    rotateClientSecret: (client: string) => {
+                    rotateClientSecret: async (client: string) => {
                         if (run === undefined) throw notDeclared("infra.keycloak")
+                        // The realm is shared by every file of the run and a rotation is never undone: the world holds the lock until it stops.
+                        await beginOutage(SECRET_ROTATION)
                         return createKeycloakAdmin(run).rotateClientSecret(client)
                     },
                 })) as KeycloakInfraHandle

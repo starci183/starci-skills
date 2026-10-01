@@ -60,7 +60,11 @@ export interface AppHandle {
     restart(): Promise<void>
 }
 
-/** The failure-injection handle of one infrastructure service, behind toxiproxy (per run: it never touches another repository). */
+/**
+ * The failure-injection handle of one infrastructure service, behind toxiproxy (per run: it never touches another repository).
+ * `latency`, `cut` and `during` take the run's outage lock exclusively before they act and keep it until `restore` (or the
+ * world stops), so no other spec file of the run runs a test while the outage is in force.
+ */
 export interface InfraHandle extends ProxyToxics {
     /** Cuts the service, runs `during` while it is down, then restores it: the outage a deployment sees when a host crashes and comes back. */
     during<T>(during: () => Promise<T>): Promise<T>
