@@ -18,7 +18,9 @@
 //   overview when the op may not write it, or a path outside .starciwork altogether (source).
 // familyOwners(briefs) -> Map family -> [op]: who may author a family, for the refusal's hint.
 const FEATURE_WRITE = /^\.starciwork\/features\/<feature>\/(.+)$/;
-const EVIDENCE_WRITE = /^evidence\//;
+// Evidence and the job scratch (read-digest.json, gate.json: the attached proofs) are not Work records: they never widen or
+// disable the family guard.
+const EVIDENCE_WRITE = /^(?:evidence\/|\$?STARCI_JOB_SCRATCH\/)/;
 
 const expandBraces = (text) => {
   const m = /\{([^{}]*)\}/.exec(text);

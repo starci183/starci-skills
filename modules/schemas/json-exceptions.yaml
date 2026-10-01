@@ -217,6 +217,9 @@ exceptions:
   - path: packages/hfs/templates/fe/tool-config/tsconfig.json
     reason: >
       TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
+  - path: packages/jest-preset/package-lock.json
+    reason: >
+      The lockfile of @starci/jest-preset (lane PKGT): its clean-install proof runs npm ci from it; npm writes it as JSON.
   - path: packages/jest-preset/package.json
     reason: >
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
