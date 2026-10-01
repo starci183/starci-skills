@@ -60,12 +60,12 @@ const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: pat
 
 // The seat is a worker-start worker: `start` is scripts/agent/lib.mjs startAgent, `show`/`stop`/`release` the worker
 // verbs on its Dispatch (workers: dispatch -> state), `bindSeat` the seat guard the PreToolUse hook enforces.
-function fakeHost({ terminals = [], live = new Set(), screens = {}, spawnOk = true, hostDown = false, workers = new Map() } = {}) {
+function fakeHost({ terminals = [], live = new Set(), screens = {}, spawnOk = true, hostDown = false, workers = new Map(), entry = true } = {}) {
   const calls = { start: [], close: [], quit: [], stop: [], release: [], bind: [] };
   let n = 0;
   return {
     calls, live, workers,
-    list: () => (hostDown ? { ok: false, hostUnavailable: true } : { ok: true, terminals, visualLayouts: [] }),
+    list: () => (hostDown ? { ok: false, hostUnavailable: true } : { ok: true, terminals: entry ? [...terminals, { handle: 'term_entry', title: 'pwsh', worktreePath: SKILL_ROOT, writable: true }] : terminals, visualLayouts: [] }),
     tabTitles: (_layouts, rows) => new Map(rows.map((r) => [r.handle, r.tab ?? null])),
     screen: (h) => screens[h] ?? '> ',
     exitedRow: (s) => (/PS [^>]*>\s*$/.test(s) ? s.trim() : null),
@@ -180,13 +180,17 @@ test('a seat start from the reconciler (no ORCA_TERMINAL_HANDLE) names an existi
     { handle: 'term_other', title: 'pwsh', worktreePath: path.join(os.tmpdir(), 'elsewhere'), writable: true },
     { handle: 'term_root', title: 'pwsh', worktreePath: SKILL_ROOT, writable: true },
   ];
-  const host = fakeHost({ terminals });
+  const host = fakeHost({ terminals, entry: false });
   assert.equal((await launch(env, host)).action, 'booted');
   assert.equal(host.calls.start[0].entry, 'term_root', 'the runtime worktree terminal wins');
-  const own = fakeHost({ terminals });
+  const own = fakeHost({ terminals, entry: false });
   await launch(envOf(t), own, { env: { ...envOf(t), ORCA_TERMINAL_HANDLE: 'term_self' } });
   assert.equal(own.calls.start[0].entry, 'term_self', 'the caller own terminal wins');
-  assert.equal(entryTerminalOf({ env: {}, listing: { terminals }, recorded: new Set(['term_root']) }), 'term_other');
+  assert.equal(entryTerminalOf({ env: {}, listing: { terminals }, recorded: new Set(['term_root']) }), null, 'a foreign terminal outside the runtime worktree is never the sender');
+  const foreignOnly = fakeHost({ terminals: [terminals[0]], entry: false });
+  const refused = await launch(envOf(t), foreignOnly);
+  assert.deepEqual([refused.action, refused.step, foreignOnly.calls.start.length], ['launch-failed', 'run-create', 0]);
+  assert.match(refused.error, /no_active_sender_terminal.*runtime's own worktree/);
   assert.equal(entryTerminalOf({ env: {}, listing: { terminals: [] } }), null);
 });
 

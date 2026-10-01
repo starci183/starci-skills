@@ -39,7 +39,7 @@ import {
   readSupervisor, seatOf, writeSeat, clearSeat, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog,
 } from './home.mjs';
 import { openWorkerHandles } from './workers.mjs';
-import { recordedSeatTerminals, seatSessions, entryTerminalOf } from './seat-sessions.mjs';
+import { recordedSeatTerminals, seatSessions, entryTerminalOf, NO_ENTRY_REMEDY } from './seat-sessions.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const EXIT_HOST_UNAVAILABLE = 75;
@@ -233,6 +233,9 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
       return { ok: true, exit: 0, action: health.starting ? 'starting' : 'already-live', terminal: health.terminal, reason: health.reason, ...(closed.length ? { closedDuplicates: closed } : {}) };
     }
 
+    const entry = entryTerminalOf({ env, listing, recorded, owned: openWorkerHandles(m) });
+    if (!entry) return { ok: false, exit: 1, action: 'launch-failed', step: 'run-create', error: NO_ENTRY_REMEDY, effectState: 'none' };
+
     const token = `supervisor-${crypto.randomBytes(6).toString('hex')}`;
     const at = now();
     const attempt = (seat?.value?.attempt ?? 0) + 1;
@@ -261,7 +264,7 @@ export async function launchSupervisor({ mode = 'start', reason = null, plan: pl
     });
     const spawned = d.start({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT, title: SUPERVISOR_TITLE, prompt,
       specFile: path.join(SKILL_ROOT, 'runtime', 'supervisor', `prompt.a${attempt}.md`), objective: `${SUPERVISOR_TITLE} — ${SUPERVISOR_ID}`,
-      entry: entryTerminalOf({ env, listing, recorded, owned: openWorkerHandles(m) }), priorRunId: seat?.value?.runId ?? null });
+      entry, priorRunId: seat?.value?.runId ?? null });
     if (!spawned?.ok) {
       m.transaction(() => {
         clearSeat(m, { token });

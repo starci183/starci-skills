@@ -11,7 +11,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { launchSupervisor } from '../scripts/supervisor/start-supervisor.mjs';
-import { readSupervisor, supervisorSettings, SUPERVISOR_ID } from '../scripts/supervisor/home.mjs';
+import { readSupervisor, supervisorSettings, SUPERVISOR_ID, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import { appendInbox, registerSupervisor } from '../scripts/connectors/telegram-bridge.mjs';
 import { watchdogPass, busyScreen, busySignature, frozenBusyFrame, SUBAGENT_INPUT } from '../scripts/supervisor/watchdog.mjs';
 
@@ -30,7 +30,7 @@ function fakeHost({ terminals = [], live = new Set(), screens = {}, workers = ne
   let n = 0;
   return {
     calls, live,
-    list: () => ({ ok: true, terminals, visualLayouts: [] }),
+    list: () => ({ ok: true, terminals: [...terminals, { handle: 'term_entry', title: 'pwsh', worktreePath: SKILL_ROOT, writable: true }], visualLayouts: [] }),
     tabTitles: (_layouts, rows) => new Map(rows.map((r) => [r.handle, r.tab ?? null])),
     show: (d) => (workers.has(d) ? { ok: true, state: workers.get(d) } : { ok: false, error: 'no such worker' }),
     stop: (d) => { calls.stop.push(d); workers.set(d, 'stopped'); return { ok: true }; },

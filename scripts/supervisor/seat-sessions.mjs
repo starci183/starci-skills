@@ -34,11 +34,14 @@ export function seatSessions(listing, recorded, tabTitlesOf = () => new Map()) {
 const norm = (p) => path.resolve(String(p ?? '')).replaceAll('\\', '/').toLowerCase();
 
 /**
- * The sender terminal of the seat's Run: the caller's own ORCA_TERMINAL_HANDLE; else an existing writable terminal
- * of the runtime's own worktree; else any other writable terminal no seat session or open worker owns. null = none.
+ * The sender terminal of the seat's Run: the caller's own ORCA_TERMINAL_HANDLE; else an existing writable terminal of
+ * the runtime's own worktree (a seat session or an open worker never counts). null = none: a foreign terminal (the
+ * owner's chat, another lane's shell) is never made the coordinator of a Run.
  */
 export function entryTerminalOf({ env = process.env, listing = null, recorded = new Set(), owned = new Set(), root = SKILL_ROOT } = {}) {
   if (env.ORCA_TERMINAL_HANDLE) return env.ORCA_TERMINAL_HANDLE;
-  const free = (listing?.terminals ?? []).filter((t) => t?.handle && t.connected !== false && t.writable !== false && !recorded.has(t.handle) && !owned.has(t.handle));
-  return (free.find((t) => t.worktreePath && norm(t.worktreePath) === norm(root)) ?? free[0])?.handle ?? null;
+  return (listing?.terminals ?? []).find((t) => t?.handle && t.connected !== false && t.writable !== false && !recorded.has(t.handle) && !owned.has(t.handle)
+    && t.worktreePath && norm(t.worktreePath) === norm(root))?.handle ?? null;
 }
+
+export const NO_ENTRY_REMEDY = "no_active_sender_terminal: Orca needs a sender terminal for the seat's Run and none exists in the runtime's own worktree; open a terminal in the runtime's own worktree (its entry terminal) and run start-supervisor again";
