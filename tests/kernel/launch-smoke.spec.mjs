@@ -560,7 +560,7 @@ test('a release_unknown is retried once under a fresh request; a second refusal 
 });
 
 test('the Kernel stage holds until the driver releases it, so opFail starts under a live Kernel; the hold is bounded', async (t) => {
-  const { holdStage, releaseStageHold } = await import('../scripts/kernel/launch-smoke-hold.mjs');
+  const { holdStage, releaseStageHold } = await import('../../scripts/kernel/launch-smoke-hold.mjs');
   const state = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-hold-'));
   t.after(() => fs.rmSync(state, { recursive: true, force: true }));
   let ticks = 0;

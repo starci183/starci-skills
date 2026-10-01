@@ -12,16 +12,7 @@ const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 // accepted, anything else refused with exit!=0 — a misspelled verdict must never
 // write a settled row.
 //
-// The ledger module is canonical at engine/db/ledger.mjs post-flip (kernel/ is
-// doomed); use whichever actually imports — engine/ can exist-but-be-mid-flip.
-const LEDGER_MODULE=await (async()=>{
-  for(const p of ['../../engine/db/ledger.mjs','../kernel/ledger-db.mjs']){
-    if(!fs.existsSync(path.join(ROOT,p.slice(3))))continue;
-    try{return await import(p);}catch{/* landed but not yet wired — fall back */}
-  }
-  throw new Error('no importable ledger module at engine/ or kernel/');
-})();
-const {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract}=LEDGER_MODULE;
+import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract} from '../../engine/db/ledger.mjs';
 
 const runApi=(args,{env={}}={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,...env}});
 

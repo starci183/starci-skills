@@ -349,8 +349,12 @@ export function localStateEntries(repo, worktree, { run = git } = {}) {
   if (!listed.ok) return [];
   const points = new Map();
   const covered = (rel) => [...points.keys()].some((p) => rel === p || rel.startsWith(`${p}/`));
-  for (const entry of listed.stdout.split('\0').map((e) => e.replace(/\/+$/, '')).filter(Boolean)) {
-    const parts = entry.split('/');
+  // A directory git reports whole may hold installed dependencies (a workspace package's node_modules): it is descended
+  // into, so only its own local state is linked, never a node_modules below it (RT_NODE_MODULES_LINK).
+  const holdsExcluded = (rel) => { try { return fs.readdirSync(path.join(repo, rel), { withFileTypes: true }).some((e) => LOCAL_STATE_EXCLUDED.test(e.name) || (e.isDirectory() && holdsExcluded(`${rel}/${e.name}`))); } catch { return false; } };
+  const entries = listed.stdout.split('\0').map((e) => e.replace(/\/+$/, '')).filter(Boolean);
+  while (entries.length) {
+    const parts = entries.shift().split('/');
     if (parts.some((part) => LOCAL_STATE_EXCLUDED.test(part))) continue;
     for (let i = 1; i <= parts.length; i += 1) {
       const rel = parts.slice(0, i).join('/');
@@ -358,6 +362,10 @@ export function localStateEntries(repo, worktree, { run = git } = {}) {
       if (fs.existsSync(path.join(worktree, rel))) continue;
       let stat;
       try { stat = fs.statSync(path.join(repo, rel)); } catch { break; }
+      if (stat.isDirectory() && holdsExcluded(rel)) {
+        if (i === parts.length) for (const child of fs.readdirSync(path.join(repo, rel))) entries.push(`${rel}/${child}`);
+        continue;
+      }
       points.set(rel, { rel, dir: stat.isDirectory() });
       break;
     }

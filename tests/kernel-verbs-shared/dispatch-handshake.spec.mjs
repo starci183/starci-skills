@@ -18,17 +18,7 @@ const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 // STARCI_ORCA_COMMAND/STARCI_ORCA_ARGS overrides — serves canned receipts:
 // create → handle, read → a screen, send → ack, close → ack. Every call is
 // appended to a JSONL call log so the spec can prove no terminal leaks.
-//
-// The ledger module is canonical at engine/db/ledger.mjs post-flip (kernel/ is
-// doomed); use whichever actually imports — engine/ can exist-but-be-mid-flip.
-const LEDGER_MODULE=await (async()=>{
-  for(const p of ['../../engine/db/ledger.mjs','../kernel/ledger-db.mjs']){
-    if(!fs.existsSync(path.join(ROOT,p.slice(3))))continue;
-    try{return await import(p);}catch{/* landed but not yet wired — fall back */}
-  }
-  throw new Error('no importable ledger module at engine/ or kernel/');
-})();
-const {openLedger,inspectLedger,ledgerFileFor}=LEDGER_MODULE;
+import {openLedger,inspectLedger,ledgerFileFor} from '../../engine/db/ledger.mjs';
 
 // The canned `orca` binary lives in tests/helpers/fake-orca.mjs — the same
 // stub serves this spec and managed-dispatch.spec.mjs (orchestration verbs,

@@ -8,9 +8,10 @@ import { openLedger, projectsRootFor } from '../../engine/db/ledger.mjs';
 import { openMachine, projectLedgerFile, readMachine, repoKeyOf } from '../../engine/db/machine.mjs';
 import {
   ORPHAN_LEDGER_CODE, LEGACY_WORK_SQLITE_CODE, REGISTERED_DIR_MISSING_REASON, archiveOrphanLedger, boundRepoRoots, dateStamp,
-  legacyWorkSqliteFindings, orphanLedgerFindings, orphanReason, sourceRootsFromLedgerFile, sourceRootsOf, starciSourceRoot,
+  legacyWorkSqliteFindings, orphanLedgerFindings, orphanReason, sourceRootsFromLedgerFile, sourceRootsOf,
   sweepOrphanLedgers, workspaceBoundRepoRoots,
 } from '../../scripts/housekeeping/hk-orphan-ledgers.mjs';
+import { starciSourceRoot } from '../../engine/runtime-root.mjs';
 
 // The two ledger-hygiene findings of COOK-BRIEF F4 handover (incident 2026-09-30): a registered ledger whose bound
 // repo(s) are gone (orphan) and a bound repo that still has an in-repo .starciwork/runtime.sqlite (legacy).
