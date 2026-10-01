@@ -8,6 +8,10 @@ import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 import type { WorldWiring } from "@starci/test-world"
 import { EnvSource, Secret } from "@modules/platform/config"
 import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
+import type { DatabaseConnectionConfig } from "@modules/platform/database"
+import type { KeycloakOptions } from "@modules/integrations/keycloak"
+import type { NotifySmtpOptions } from "@modules/integrations/notify-smtp"
+import type { SepayOptions } from "@modules/integrations/sepay"
 import type { TodoAppOptions } from "../../../apps/todo/src/todo.options"
 import type { WorkerAppOptions } from "../../../apps/worker/src/worker.options"
 
@@ -37,22 +41,45 @@ const fakeValue = (values: Readonly<Record<string, string>>, key: string): strin
     return value
 }
 
+/** The primary connection of the run. */
+export const primaryDatabaseOf = (w: TodoWiring): DatabaseConnectionConfig =>
+    parsePrimaryDatabaseConfig(new EnvSource({ PRIMARY_DB_URL: w.db.primary.url }))
+
+/** The real Keycloak realm of the run, through its public password-grant client. */
+export const keycloakOptionsOf = (w: TodoWiring): KeycloakOptions => ({
+    tokenUrl: w.keycloak.tokenUrl,
+    clientId: w.keycloak.clientId,
+    timeoutMs: CALL_DEADLINE_MS,
+})
+
+/** The payment gateway fake at the network edge. */
+export const sepayOptionsOf = (w: TodoWiring): SepayOptions => ({
+    baseUrl: w.fake.sepay.url,
+    apiKey: new Secret(fakeValue(w.fake.sepay.values, "apiKey")),
+    webhookSecret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")),
+    timeoutMs: CALL_DEADLINE_MS,
+})
+
+/** The mail host fake at the network edge. */
+export const notifySmtpOptionsOf = (w: TodoWiring): NotifySmtpOptions => ({
+    host: w.fake.smtp.host,
+    port: w.fake.smtp.port,
+    from: "todo@e2e.test",
+    connectTimeoutMs: CALL_DEADLINE_MS,
+    commandTimeoutMs: CALL_DEADLINE_MS,
+})
+
 /** The options of the run, from the wiring the library built. */
 export const testOptions = (w: TodoWiring): TestOptions => ({
     port: w.apps.todo.port,
-    database: parsePrimaryDatabaseConfig(new EnvSource({ PRIMARY_DB_URL: w.db.primary.url })),
+    database: primaryDatabaseOf(w),
     httpSecurity: {
         allowedOrigins: ["http://localhost:4069"],
         rateLimit: { windowMs: 60_000, defaultLimit: RATE_LIMIT_HIGH, strictLimit: RATE_LIMIT_HIGH },
     },
     identity: { ttlDays: 1, adminSubjects: [] },
-    keycloak: { tokenUrl: w.keycloak.tokenUrl, clientId: w.keycloak.clientId, timeoutMs: CALL_DEADLINE_MS },
-    sepay: {
-        baseUrl: w.fake.sepay.url,
-        apiKey: new Secret(fakeValue(w.fake.sepay.values, "apiKey")),
-        webhookSecret: new Secret(fakeValue(w.fake.sepay.values, "webhookSecret")),
-        timeoutMs: CALL_DEADLINE_MS,
-    },
+    keycloak: keycloakOptionsOf(w),
+    sepay: sepayOptionsOf(w),
     plan: { paidPriceMinorUnits: PAID_PRICE_MINOR_UNITS, paidCurrency: "VND" },
     commission: { bps: 3000 },
     // The generation job is a cron of whole minutes: every minute is the shortest cadence it supports.
@@ -64,13 +91,7 @@ export const testOptions = (w: TodoWiring): TestOptions => ({
         signingSecret: new Secret(w.secret("upload-signing")),
     },
     uploadStorage: { directory: w.directory("uploads") },
-    notifySmtp: {
-        host: w.fake.smtp.host,
-        port: w.fake.smtp.port,
-        from: "todo@e2e.test",
-        connectTimeoutMs: CALL_DEADLINE_MS,
-        commandTimeoutMs: CALL_DEADLINE_MS,
-    },
+    notifySmtp: notifySmtpOptionsOf(w),
     scheduling: { tickMs: TICK_MS },
     messaging: { pollMs: TICK_MS, batchSize: 20, visibilityMs: 30_000 },
 })
