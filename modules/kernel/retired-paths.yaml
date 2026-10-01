@@ -176,6 +176,7 @@ retired:
   - {path: scripts/checks/check-layers.mjs, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'RT_EXTERNAL_OWNER of scripts/hfs/runtime-rules/external-owner.mjs (ruleParams.runtime.infraOwners of knowledge/hfs/runtime-slots.yaml), run by scripts/hfs/runtime-check.mjs in npm run check'}
   - {path: modules/kernel/runtime-layers.yaml, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'knowledge/hfs/runtime-slots.yaml ruleParams.runtime.infraOwners and tiers.runtime'}
   - {path: modules/kernel/runtime-layers.allow.yaml, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'the pending list of knowledge/hfs/runtime-slots.yaml (shrink-only, one entry per finding path and code, each with its chunk)'}
+  - {path: tests/check-layers.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'tests/runtime-hfs-rules.spec.mjs (RT_EXTERNAL_OWNER over the runtime source, the spawn reading of scripts/lib/spawn-calls.mjs included)'}
   - {path: docs/runtime-layers.md, retiredAt: 2026-10-01, removedIn: c0-rh0, replacedBy: 'docs/source-layout.md section Runtime layout and knowledge/hfs/runtime-slots.yaml'}
 moved:
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
