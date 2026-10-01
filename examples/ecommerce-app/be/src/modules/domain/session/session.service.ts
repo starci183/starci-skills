@@ -62,7 +62,7 @@ export class SessionService {
      */
     async revokeOwn(params: RevokeOwnSessionParams): Promise<Outcome<RevokedSession, SessionErrorCode.Invalid>> {
         const stored = await this.stored(params.sessionToken)
-        if (stored === null || stored.personId !== params.personId) return refused(SessionErrorCode.Invalid)
+        if (stored?.personId !== params.personId) return refused(SessionErrorCode.Invalid)
         await this.cache.del({ key: SESSION_KEY, args: [params.sessionToken] })
         try {
             await this.keycloak.notifySignOut({ refreshToken: stored.providerRefreshToken })

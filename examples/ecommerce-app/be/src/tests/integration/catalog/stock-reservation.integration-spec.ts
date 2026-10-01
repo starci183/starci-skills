@@ -1,4 +1,5 @@
 import { CatalogService } from "@modules/domain/catalog"
+import { OrderError, OrderErrorCode } from "@modules/domain/order"
 import { productBuilder } from "../../fixtures/builders/catalog.builder"
 import { readStock } from "../../fixtures/persistence/e2e-verification.rows"
 import { CATALOG_CAPABILITY_MODULES } from "../../world/test-capabilities.options"
@@ -45,9 +46,9 @@ describe("catalog: stock reservation (integration)", () => {
         await expect(
             world.db.order.transaction(async (manager) => {
                 await catalog.reserveStock({ manager, productId: "sku-rollback", quantity: 2 })
-                return Promise.reject(new TypeError("the confirmation failed after the reservation"))
+                throw new OrderError({ code: OrderErrorCode.PlacementFailed })
             }),
-        ).rejects.toThrow("the confirmation failed")
+        ).rejects.toMatchObject({ code: OrderErrorCode.PlacementFailed })
 
         expect(await readStock(world.db.order, "sku-rollback")).toBe(3)
     })

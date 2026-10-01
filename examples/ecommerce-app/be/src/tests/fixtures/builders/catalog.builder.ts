@@ -26,13 +26,7 @@ export const productRow = (overrides: Partial<ProductRow> = {}): ProductRow => (
 })
 
 /** The product view the catalog answers, with valid defaults. */
-export const productView = (overrides: Partial<ProductView> = {}): ProductView => ({
-    id: "sku-1",
-    name: "Shirt",
-    priceMinorUnits: 500,
-    stock: 4,
-    ...overrides,
-})
+export const productView = (overrides: Partial<ProductView> = {}): ProductView => ({ ...productRow(), ...overrides })
 
 /** Arranges catalog rows in a real database, constraints on. */
 export const productBuilder = (manager: EntityManager) => ({

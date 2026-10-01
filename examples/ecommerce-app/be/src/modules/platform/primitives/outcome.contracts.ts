@@ -22,7 +22,4 @@ export interface OutcomeRefused<C extends string> {
 export type Outcome<V, C extends string> = OutcomeOk<V> | OutcomeRefused<C>
 
 /** The error class of one capability, as `unwrapOutcome` constructs it from a refusal. */
-export interface DomainErrorClass<K extends string> {
-    /** Builds the capability error carrying the code and parameters of a refusal. */
-    new (init: DomainErrorInit<K>): DomainError<K>
-}
+export type DomainErrorClass<K extends string> = new (init: DomainErrorInit<K>) => DomainError<K>
