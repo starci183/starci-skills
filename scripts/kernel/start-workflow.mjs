@@ -40,7 +40,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, setInboxStatus } from '../../engine/ledger-db.mjs';
 // The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
 const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.attempt ?? 0;
-import { inspectOwnerConfig } from '../../engine/config.mjs';
+import { inspectOwnerConfig, loadConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { startAgent, loadAdapter } from '../agent/lib.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
@@ -52,6 +52,7 @@ import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { workflowDisplayName, workflowNameOf } from '../lib/display-names.mjs';
 import { KERNEL_BOOT_FILES, KERNEL_REV_ACKED_EVENT, currentRuntimeRev, revRootOf, shortRev } from './runtime-rev.mjs';
 import { ensureWorkflowWorktree, workflowAppRepo } from './workflow-worktree.mjs';
+import { guardLaunch, bindGuardTerminal, unbindGuardTerminal, guardReceiptErrors } from '../guards/install.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const sourceRoot = path.dirname(skillRoot);
@@ -691,6 +692,26 @@ try {
     }
   }
   const kernelWorktree = workflowWorktree?.path ?? repo;
+  // The Kernel's guard (contract change kernel-guard-file): the same job guard an op gets (scripts/guards/install.mjs
+  // guardLaunch), role 'kernel', naming the workflow worktree and owning no path. It is bound to the Kernel's Orca
+  // terminal the moment worker-start names it, so the PreToolUse command guard refuses the Kernel's raw git history
+  // changes, worktree adds, recursive deletes, kills by name and raw agent launches; its `node api.mjs <verb>` calls
+  // pass. The history hook is refreshed in the workflow worktree so it skips the kernel role (the runtime's own git
+  // under the Kernel's api calls). Best effort, as for an op: a guard that cannot be put in place rides on the
+  // kernel-booted receipt as kernel-guard-unbound, never refusing the boot.
+  const kernelJobId = `kernel-${workflowId}`;
+  let kernelGuard;
+  try {
+    let guardConfig = null;
+    try { guardConfig = loadConfig(); } catch { guardConfig = null; }
+    kernelGuard = guardLaunch({ skillRoot, jobId: kernelJobId, workflowId, ledgerRepo: repo, owned: [], role: 'kernel',
+      repos: workflowWorktree ? [workflowWorktree.path] : [], config: guardConfig, workflowWorktree: workflowWorktree?.path ?? null }).receipt;
+  } catch (e) { kernelGuard = { error: String(e?.message ?? e) }; }
+  const bindKernelGuard = (handle) => {
+    if (typeof kernelGuard.jobFile !== 'string') return;
+    try { kernelGuard.terminal = bindGuardTerminal({ skillRoot, handle, jobFile: kernelGuard.jobFile }); }
+    catch (e) { kernelGuard.terminal = { error: String(e?.message ?? e) }; }
+  };
   const fellThrough = [];
   let spawned = null;
   // The Kernel is a worker of its own entry Run (scripts/agent/lib.mjs startAgent; the launching terminal is its
@@ -701,7 +722,7 @@ try {
   for (const [index, member] of members.entries()) {
     updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: Date.now() + KERNEL_START_RESERVATION_MS });
     spawned = startAgent({ provider: member.agent, model: member.model, effort: member.effort, worktree: kernelWorktree, title, prompt, specFile,
-      objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null });
+      objective: `[Kernel] ${kernelName} — ${workflowId}`, entry, priorRunId: priorManaged?.runId ?? null, onCreated: bindKernelGuard });
     if (spawned.ok) {
       route = { ...member, warnings: route.warnings, members: route.members, fallThrough: route.fallThrough };
       break;
@@ -729,6 +750,13 @@ try {
   }
   const handle = spawned.terminal;
   const workerId = handle;
+  // The replaced Kernel's terminal no longer carries this workflow's guard.
+  if (!kernelGuard.terminal) bindKernelGuard(handle);
+  const priorHandle = priorManaged?.agentTerminalHandle ?? null;
+  if (priorHandle && priorHandle !== handle) { try { unbindGuardTerminal({ skillRoot, handle: priorHandle }); } catch { /* pruned by age later */ } }
+  const guardErrors = guardReceiptErrors(kernelGuard);
+  if (guardErrors.length) console.error(`start-workflow: warning: kernel-guard-unbound: ${guardErrors.join('; ')}`);
+  const guardReceipt = { ...kernelGuard, ...(guardErrors.length ? { code: 'kernel-guard-unbound', errors: guardErrors } : {}) };
   const kernelModel = route.model;
   const kernelEffort = route.effort ?? null;
 
@@ -802,6 +830,7 @@ try {
         managed,
         ...(workflowWorktree ? { workflowWorktree: { orcaWorktreeId: workflowWorktree.orcaWorktreeId, path: workflowWorktree.path, branch: workflowWorktree.branch } } : {}),
         ...(spawned.trust ? { trust: spawned.trust } : {}),
+        guard: guardReceipt,
         ...(fellThrough.length ? { fellThrough } : {}),
       },
       createdAt: now });
@@ -817,7 +846,7 @@ try {
     ...(route.runtimePool ? { runtimePool: route.runtimePool } : {}),
     ...(route.warnings?.length ? { warnings: route.warnings } : {}),
     ...(fellThrough.length ? { fellThrough } : {}),
-    dispatch: spawned.dispatchId, runId: spawned.runId, taskId: spawned.taskId,
+    dispatch: spawned.dispatchId, runId: spawned.runId, taskId: spawned.taskId, guard: guardReceipt,
     ...(workflowWorktree ? { workflowWorktree: { orcaWorktreeId: workflowWorktree.orcaWorktreeId, path: workflowWorktree.path, branch: workflowWorktree.branch } } : {}),
     hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}` },
     replaced, attempt, generation, sourceHost: sourceRoot, projectBinding: context?.file ?? null, promptSubmitted: true,

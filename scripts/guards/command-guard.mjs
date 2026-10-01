@@ -7,8 +7,10 @@
 // on the agent's PATH. The launch binds the op's guard to its Orca terminal instead (scripts/guards/install.mjs
 // bindGuardTerminal -> runtime/guards/terminals/<handle>.json) and launch trust registers this hook in the launch
 // worktree's PROJECT settings only (scripts/agent/trust.mjs projectTargets: .claude/settings.local.json,
-// .codex/config.toml, .devin/config.local.json), never a user-global settings file. A session with no Orca terminal, or whose terminal has no guard
-// bound (the Kernel, the [Supervisor], the owner's own sessions), passes untouched.
+// .codex/config.toml, .devin/config.local.json), never a user-global settings file. The Kernel's launch binds a guard
+// of role 'kernel' the same way (scripts/kernel/start-workflow.mjs, contract change kernel-guard-file): its raw shell
+// commands meet every rule below, and its `node api.mjs <verb>` calls pass. A session with no Orca terminal, or whose
+// terminal has no guard bound (the [Supervisor], the owner's own sessions), passes untouched.
 //
 // What it refuses, each from a real incident:
 //  - git: the shared-checkout policy (git-policy.mjs classifyGit - history rewrites, sweeping discards, foreign
