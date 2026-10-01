@@ -1,0 +1,147 @@
+name: examples
+
+# Every example app of this repository in CI: GitHub runs only the root workflows, so the app's own ci.yml (the app-repository
+# form hfs sync renders) never runs here. The app list is DERIVED: job `apps` prints every examples/* folder whose hfs.json is of
+# kind app (scripts/checks/examples-ci.mjs --matrix), and the `app` job runs once per entry. npm run check refuses a hand-written
+# list, a per-example root workflow and a root codecov.yml that lacks a flag for an app (scripts/checks/examples-ci.mjs).
+#
+# Per app: install, typecheck, hfs lint (with the Sonar import file), the unit project with coverage (per-file 100 on the
+# services; it writes be/coverage/lcov.info), the Codecov upload under the app's flag, the front-end build, then integration and
+# e2e on the test world (the runner has docker; the world starts the stack). The Sonar scan and quality gate run where a server
+# is configured (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN); otherwise the job notes the skip. The local dashboard gate
+# (scripts/checks/sonar-local.mjs dashboard) is a release-checklist item, not a CI step.
+#
+# Secrets: CODECOV_TOKEN once for this repository (the owner adds it: Codecov, then GitHub Settings > Secrets and variables >
+# Actions); without it the upload step is skipped and the log says so.
+
+on:
+  push:
+    paths:
+      - 'examples/**'
+      - 'packages/**'
+      - 'modules/schemas/**'
+      - 'scripts/checks/**'
+      - 'codecov.yml'
+      - '.github/workflows/examples.yml'
+  pull_request:
+    paths:
+      - 'examples/**'
+      - 'packages/**'
+      - 'modules/schemas/**'
+      - 'scripts/checks/**'
+      - 'codecov.yml'
+      - '.github/workflows/examples.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: examples-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # The example apps, derived from examples/*/hfs.json (kind app).
+  apps:
+    name: apps
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      apps: ${{ steps.list.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - id: list
+        run: echo "apps=$(node scripts/checks/examples-ci.mjs --matrix)" >> "$GITHUB_OUTPUT"
+
+  # The example trees as records: the runtime's own YAML loader and Work-layout gate (no build: the runtime reads this tree).
+  records:
+    name: records
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install runtime dependencies
+        run: npm ci
+      - name: Example YAML parses under the runtime's own loader
+        run: node scripts/checks/check-example-yaml.mjs
+      - name: Example Work-tree layout (ids, refs, evidence)
+        run: node scripts/checks/check-example-work.mjs
+      - name: Example Work-gate fixture suite
+        run: node --test tests/example-work-gate.spec.mjs
+
+  app:
+    name: ${{ matrix.app }}
+    needs: apps
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.apps.outputs.apps) }}
+    env:
+      APP_DIR: examples/${{ matrix.app }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+    defaults:
+      run:
+        working-directory: examples/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install runtime dependencies (repository root)
+        working-directory: .
+        run: npm ci
+      - name: Install app dependencies
+        run: npm ci
+      - name: Typecheck both sides
+        run: npm run typecheck
+      # THE lint of the app (ESLint with both canons, stylelint, hfs check), also written as the one Sonar import file.
+      - name: hfs lint
+        working-directory: .
+        run: node packages/hfs/bin/hfs.mjs lint --repo "$APP_DIR" --sonar "$APP_DIR/reports/lint.sonar.json"
+      - name: Unit tests with coverage (per-file 100 on the services; writes be/coverage/lcov.info)
+        if: ${{ !cancelled() }}
+        run: npm test -- --ci
+      - name: Coverage upload (Codecov, flag ${{ matrix.app }})
+        if: ${{ !cancelled() && env.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ env.CODECOV_TOKEN }}
+          files: ${{ env.APP_DIR }}/be/coverage/lcov.info
+          flags: ${{ matrix.app }}
+          disable_search: true
+          fail_ci_if_error: true
+      - name: Coverage upload skipped (no CODECOV_TOKEN)
+        if: ${{ env.CODECOV_TOKEN == '' }}
+        run: echo "::notice title=Codecov skipped::CODECOV_TOKEN is not set for this repository, so the coverage of ${{ matrix.app }} was not uploaded (the unit run still enforced per-file 100)."
+      - name: Front-end build
+        run: npm run build:fe
+      - name: Integration tests (test world)
+        run: npm run test:integration -- --ci
+      - name: E2E tests (test world)
+        run: npm run test:e2e -- --ci
+      - name: Sonar scan
+        if: ${{ !cancelled() && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        uses: SonarSource/sonarqube-scan-action@v7
+        with:
+          projectBaseDir: ${{ env.APP_DIR }}
+      - name: Sonar quality gate
+        if: ${{ !cancelled() && env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != '' }}
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 10
+        with:
+          scanMetadataReportFile: ${{ env.APP_DIR }}/.scannerwork/report-task.txt
+      - name: Sonar skipped (no server configured)
+        if: ${{ env.SONAR_TOKEN == '' || env.SONAR_HOST_URL == '' }}
+        run: echo "::notice title=Sonar skipped::no Sonar server is configured for this repository (vars.SONAR_HOST_URL and secrets.SONAR_TOKEN), so ${{ matrix.app }} was not scanned; the local dashboard gate (scripts/checks/sonar-local.mjs dashboard) is a release-checklist item."
