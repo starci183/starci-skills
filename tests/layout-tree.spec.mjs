@@ -16,7 +16,7 @@ import { buildProduct, layoutCapture } from './fixtures/layout-tree.mjs';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.json'))('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
 const validateTree = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
-const scanOf = (p) => scanAppDir(p.appDir, { repoRoot: p.web, repository: 'web' });
+const scanOf = (p) => scanAppDir(p.appDir, { repoRoot: p.app });
 
 test('segment kinds follow the App Router file convention', () => {
   assert.equal(segmentKindOf('(console)'), 'group');
@@ -55,8 +55,8 @@ test('the scanner reads groups, nested layouts, a @modal slot with a (.) interce
   assert.equal(node('/[locale]/(console)').layout.chrome, 'unknown', 'a layout with chrome is decided by its owner, not guessed');
   assert.equal(node('/[locale]/(console)/photos').layout.component, 'PhotoTabs', 'nested layouts are nodes of their own');
   assert.equal(scan.app.localeParam, 'locale');
-  assert.deepEqual(scan.productLocale, { default: 'vi', fallback: 'vi', locales: ['vi', 'en'], source: 'apps/app/src/i18n/config.ts (defaultLocale / locales)' });
-  assert.deepEqual(scan.i18n.catalogs.map((c) => [c.locale, c.path]), [['en', 'apps/app/src/messages/en.json'], ['vi', 'apps/app/src/messages/vi.json']]);
+  assert.deepEqual(scan.productLocale, { default: 'vi', fallback: 'vi', locales: ['vi', 'en'], source: 'fe/apps/app/src/i18n/config.ts (defaultLocale / locales)' });
+  assert.deepEqual(scan.i18n.catalogs.map((c) => [c.locale, c.path]), [['en', 'fe/apps/app/src/messages/en.json'], ['vi', 'fe/apps/app/src/messages/vi.json']]);
   assert.match(scan.source.digest, /^[a-f0-9]{64}$/);
 });
 
@@ -64,7 +64,7 @@ test('navigation labels come from the route tree plus the catalogs, and every mi
   const p = buildProduct(t);
   const scan = scanOf(p);
   const nav = scan.nodes.find((n) => n.id === '/[locale]/(console)').layout.nav;
-  assert.equal(nav.source, 'apps/app/src/shell/Sidebar.tsx');
+  assert.equal(nav.source, 'fe/apps/app/src/shell/Sidebar.tsx');
   assert.deepEqual(nav.items.map((i) => [i.key, i.route, i.target, i.i18nKey]), [
     ['photos', '/photos', '/[locale]/(console)/photos', 'console.nav.photos'],
     ['billing', '/billing', null, 'console.nav.billing'],
@@ -164,7 +164,7 @@ test('the CLI scans read-only by default and writes the record only with --write
   assert.equal(layoutTreeMain(['scan', '--work', p.work, '--write']).exitCode, 0);
   const written = parseYaml(fs.readFileSync(path.join(p.work, 'shell', 'index.yaml'), 'utf8'));
   assert.equal(written.schema, 'work/layout-tree@1');
-  assert.equal(written.apps[0].repository, 'web');
+  assert.equal('repository' in written.apps[0], false, 'an app is the one repository: no fe repository is recorded');
   assert.equal(layoutTreeMain(['slot', p.put('s.png', encodePng(layoutCapture(20, 20, { x: 2, y: 3, width: 4, height: 5 })))]).text.trim(), JSON.stringify({ ok: true, slot: { x: 2, y: 3, width: 4, height: 5 }, fill: 1 }));
   fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml({ schema: 'work/other-shell@1', id: 'shell', productLocale: { default: 'vi', fallback: 'vi', locales: ['vi'] } }));
   const refused = layoutTreeMain(['scan', '--work', p.work, '--write']);
@@ -175,11 +175,10 @@ test('the CLI scans read-only by default and writes the record only with --write
 });
 
 test('the todo example carries an honestly unsettled layout tree', () => {
-  const example = parseYaml(fs.readFileSync(path.join(ROOT, 'examples/todo-app-backend/.starciwork/shell/index.yaml'), 'utf8'));
+  const example = parseYaml(fs.readFileSync(path.join(ROOT, 'examples/todo-app/.starciwork/shell/index.yaml'), 'utf8'));
   assert.equal(validateTree(example), true, JSON.stringify(validateTree.errors));
   assert.equal(example.state, 'todo');
-  // appDir names the App Router directory relative to the repository root (the example's web app
-  // lives in apps/web, so app/, not the bare src/app an app at the repo root would record).
-  assert.equal(example.apps[0].appDir, 'apps/web/src/app');
+  // appDir names the App Router directory relative to the app root: the example's fe app web lives in fe/apps/web.
+  assert.equal(example.apps[0].appDir, 'fe/apps/web/src/app');
   assert.ok(nodeById(treeOf(example, 'web'), '/[lang]/tasks'), 'the scan holds the example frontend routes');
 });

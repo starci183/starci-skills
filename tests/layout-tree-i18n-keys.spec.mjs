@@ -16,8 +16,8 @@ const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.j
 const validateTree = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
 const CONSOLE = '/[locale]/(console)';
 const appOf = (record) => treeOf(record, 'app');
-const scanOf = (p) => scanAppDir(p.appDir, { repoRoot: p.web, repository: 'web' });
-const catalogFile = (p, locale) => path.join(p.web, 'apps', 'app', 'src', 'messages', `${locale}.json`);
+const scanOf = (p) => scanAppDir(p.appDir, { repoRoot: p.app });
+const catalogFile = (p, locale) => path.join(p.fe, 'apps', 'app', 'src', 'messages', `${locale}.json`);
 const editCatalog = (p, locale, mutate) => {
   const doc = JSON.parse(fs.readFileSync(catalogFile(p, locale), 'utf8'));
   mutate(doc);

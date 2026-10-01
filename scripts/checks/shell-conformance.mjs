@@ -29,9 +29,9 @@
 //                  the @slot/(.)x intercept beside the full page.
 //   geometry       every html direction a ui record declares is rendered at its breakpoint (or at every
 //                  breakpoint of the tree) and measured by scripts/checks/grammar-geometry.mjs --check against
-//                  the frontend repository's own HeroUI + Grammar + family CSS: GEOMETRY_OFF_GRAMMAR names each
+//                  the app's fe side's own HeroUI + Grammar + family CSS: GEOMETRY_OFF_GRAMMAR names each
 //                  button, input, card, badge or text run off the grammar; GEOMETRY_CHECK_FAILED when the check
-//                  could not run (fails closed); GEOMETRY_UNCHECKED (info) when no frontend repository exists yet.
+//                  could not run (fails closed); GEOMETRY_UNCHECKED (info) when the app has no fe side yet.
 //   brand palette  every drawn part and composite a ui record declares, every layout capture of the tree and
 //                  every running-page capture of an implementation record is painted in the brand record's
 //                  colours (scripts/checks/brand-palette.mjs): PALETTE_OFF_BRAND names each foreign colour, its
@@ -190,7 +190,7 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
       if (!appDirOf || !fs.existsSync(appDirOf)) out.push(finding('info', 'SHELL_SOURCE_UNAVAILABLE', at, inApp(name, `${tree.app?.appDir ?? 'app/'} is not readable here; the recorded digests could not be compared`)));
       else {
         let scan = null;
-        try { scan = scanAppDir(appDirOf, { repoRoot: located.repoRoot, repository: located.repository, name }); } catch (error) { out.push(finding('info', 'SHELL_SOURCE_UNAVAILABLE', at, inApp(name, `app/ could not be scanned (${error.message})`))); }
+        try { scan = scanAppDir(appDirOf, { repoRoot: located.repoRoot, name }); } catch (error) { out.push(finding('info', 'SHELL_SOURCE_UNAVAILABLE', at, inApp(name, `app/ could not be scanned (${error.message})`))); }
         // A message catalog is judged by the keys the tree uses, never by its whole-file digest: an unrelated
         // string another workflow adds is not drift (nivo inc-13f6af8494bf).
         const drift = scan ? sourceDrift(tree, scan) : null;
@@ -339,8 +339,8 @@ export function checkDrawGeometry(workRoot, uiFile, record, shell, { run = spawn
   const at = shown(workRoot, uiFile);
   const tree = shell && !shell.error && isLayoutTree(shell.record) ? shell.record : null;
   const located = tree ? frontendOf(workRoot) : null;
-  const repo = located?.repository ? located.repoRoot : null;
-  if (!repo || !fs.existsSync(repo)) return [finding('info', 'GEOMETRY_UNCHECKED', at, `no frontend repository resolves from the layout tree, so ${htmls.map((a) => a.path).join(', ')} could not be measured against the product CSS`)];
+  const repo = located && !located.error ? located.feRoot : null;
+  if (!repo || !fs.existsSync(repo)) return [finding('info', 'GEOMETRY_UNCHECKED', at, `no fe side of the app resolves from the layout tree, so ${htmls.map((a) => a.path).join(', ')} could not be measured against the product CSS`)];
   const breakpoints = list(tree.breakpoints).filter((b) => b?.name && b.width && b.height);
   const out = [];
   for (const a of htmls) {

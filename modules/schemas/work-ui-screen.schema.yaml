@@ -116,8 +116,8 @@ properties:
   app:
     type: string
     pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
-    description: "The frontend app the route belongs to - a name in the layout tree's apps[] (workspace.yaml
-      repositories[role fe].apps[].name). Required when the tree declares several apps and the route alone does not
+    description: "The fe app the route belongs to - a name in the layout tree's apps[] (hfs.json
+      sides.fe.apps[].name). Required when the tree declares several apps and the route alone does not
       say (a route that exists in one app only is that app); a tree of one app needs none. A route is resolved in
       this app: the same route in another app is another screen (UI_APP_UNKNOWN, UI_APP_MISSING)."
   route:

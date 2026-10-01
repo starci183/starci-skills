@@ -8,16 +8,15 @@ import { checkShellConformance } from '../scripts/checks/shell-conformance.mjs';
 import {
   appNamesOf, appOfUi, frontendOf, layoutTreeMain, locateApps, nodeById, nodesOf, treeOf,
 } from '../scripts/work/layout-tree.mjs';
-import { APP_FILES, buildProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
+import { APP_FILES, appDeclarationText, buildProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
 
-// A frontend monorepo may hold several apps (nivo-fe: apps/app, the console, and apps/landing, the public
-// website). The layout tree holds one tree per app the workspace declares; a ui record binds its route in an
+// The fe side of an app may hold several apps (fe/apps/app, the console, and fe/apps/landing, the public
+// website). The layout tree holds one tree per fe app hfs.json declares; a ui record binds its route in an
 // app, named by `app`, or derived when the tree holds one app or only one app holds the route.
 const ROOT = path.resolve(import.meta.dirname, '..');
 const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.json'))('ajv/dist/2020.js'); return loaded?.default ?? loaded; })();
 const validateTree = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-layout-tree.schema.yaml'), 'utf8')));
 const validateUi = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-ui-screen.schema.yaml'), 'utf8')));
-const validateWorkspace = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-workspace.schema.yaml'), 'utf8')));
 
 const LANDING_FILES = {
   'apps/landing/tsconfig.json': JSON.stringify({ compilerOptions: {} }),
@@ -25,7 +24,7 @@ const LANDING_FILES = {
   'apps/landing/src/app/page.tsx': 'export default () => <main>Home</main>\n',
   'apps/landing/src/app/pricing/page.tsx': 'export default () => <main>Pricing</main>\n',
 };
-const DECLARED = [{ name: 'app', root: 'apps/app' }, { name: 'landing', root: 'apps/landing' }];
+const DECLARED = ['app', 'landing'];
 const twoApps = (t, { apps = DECLARED } = {}) => buildProduct(t, { files: { ...APP_FILES, ...LANDING_FILES }, apps });
 const scanAll = (p) => {
   const result = layoutTreeMain(['scan', '--work', p.work, '--write']);
@@ -43,19 +42,19 @@ const check = (p, over) => {
   return { record, codes: [...new Set(result.findings.filter((f) => f.level === 'refuse').map((f) => f.code))], findings: result.findings };
 };
 
-test('the scan covers every app the workspace declares, keyed by app, and the record compiles', (t) => {
+test('the scan covers every fe app hfs.json declares, keyed by app, and the record compiles', (t) => {
   const p = twoApps(t);
   const located = locateApps(p.work);
-  assert.deepEqual(located.apps.map((a) => [a.name, a.root]), [['app', 'apps/app'], ['landing', 'apps/landing']]);
+  assert.deepEqual(located.apps.map((a) => [a.name, a.root]), [['app', 'fe/apps/app'], ['landing', 'fe/apps/landing']]);
   assert.equal(located.error, undefined);
   const record = scanAll(p);
   assert.equal(validateTree(record), true, JSON.stringify(validateTree.errors));
   assert.deepEqual(appNamesOf(record), ['app', 'landing']);
   assert.equal('nodes' in record || 'app' in record || 'source' in record, false, 'the single-app fields are gone');
   const [app, landing] = record.apps;
-  assert.equal(app.appDir, 'apps/app/src/app');
-  assert.equal(landing.appDir, 'apps/landing/src/app');
-  assert.equal(landing.repository, 'web');
+  assert.equal(app.appDir, 'fe/apps/app/src/app');
+  assert.equal(landing.appDir, 'fe/apps/landing/src/app');
+  assert.equal('repository' in landing, false, 'the app is the one repository');
   assert.deepEqual(landing.nodes.map((n) => n.id), ['/', '/pricing']);
   assert.ok(app.nodes.some((n) => n.id === '/[locale]/(console)'), 'the console routes stay in their own app');
   assert.match(landing.source.digest, /^[a-f0-9]{64}$/);
@@ -63,44 +62,41 @@ test('the scan covers every app the workspace declares, keyed by app, and the re
   // A re-scan is stable, and dropping an app from the declaration drops its tree.
   const again = layoutTreeMain(['scan', '--work', p.work, '--json']);
   assert.equal(JSON.parse(again.text).record.rev, record.rev, 'nothing moved, so the rev holds');
-  const workspace = path.join(p.work, 'workspace.yaml');
-  const declared = parseYaml(fs.readFileSync(workspace, 'utf8'));
-  declared.repositories.find((r) => r.role === 'fe').apps = [DECLARED[0]];
-  fs.writeFileSync(workspace, stringifyYaml(declared));
+  fs.writeFileSync(path.join(p.app, 'hfs.json'), appDeclarationText([DECLARED[0]]));
   const dropped = JSON.parse(layoutTreeMain(['scan', '--work', p.work, '--json']).text);
   assert.deepEqual(appNamesOf(dropped.record), ['app']);
   assert.ok(dropped.notes.some((n) => /app landing: no longer declared/.test(n)));
 });
 
-test('the workspace schema accepts the apps declaration', () => {
-  const workspace = { schema: 'work/workspace@1', id: 'nivo', project: 'nivo', description: 'A product.', repositories: [{ role: 'be', name: 'nivo-backend' }, { role: 'fe', name: 'nivo-fe', apps: DECLARED }] };
-  assert.equal(validateWorkspace(workspace), true, JSON.stringify(validateWorkspace.errors));
-  assert.equal(validateWorkspace({ ...workspace, repositories: [{ role: 'fe', name: 'nivo-fe', apps: [{ name: 'app' }] }] }), false, 'an app names its root');
+test('the workspace schema no longer declares apps: hfs.json sides.fe.apps is the one declaration', () => {
+  const schema = parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-workspace.schema.yaml'), 'utf8'));
+  assert.equal('apps' in schema.properties.repositories.items.properties, false);
 });
 
-test('a frontend holding several app/ directories must declare its apps; one holding a single app needs no declaration', (t) => {
-  const p = twoApps(t, { apps: null });
-  const located = locateApps(p.work);
-  assert.match(located.error, /holds 2 app\/ directories.*declare the frontend's apps in workspace\.yaml/);
-  const refused = layoutTreeMain(['scan', '--work', p.work, '--write']);
-  assert.equal(refused.exitCode, 1);
-  assert.match(refused.text, /declare the frontend's apps/);
-  assert.equal(fs.existsSync(path.join(p.work, 'shell', 'index.yaml')), false, 'nothing is written');
-
+test('the fe apps resolve through the app sides: hfs.json names them, an app without a readable hfs.json is refused', (t) => {
   const single = buildProduct(t);
   const found = locateApps(single.work);
-  assert.deepEqual(found.apps.map((a) => [a.name, a.root]), [['app', 'apps/app']]);
-  assert.equal(frontendOf(single.work).repository, 'web');
+  assert.deepEqual(found.apps.map((a) => [a.name, a.root]), [['app', 'fe/apps/app']]);
+  const located = frontendOf(single.work);
+  assert.deepEqual([located.repoRoot, located.feRoot], [single.app, single.fe]);
   const record = scanAll(single);
-  assert.deepEqual(appNamesOf(record), ['app'], 'a single-app repo keeps working');
+  assert.deepEqual(appNamesOf(record), ['app'], 'a single-app product keeps working');
   assert.equal(validateTree(record), true, JSON.stringify(validateTree.errors));
+
+  const undeclared = buildProduct(t);
+  fs.rmSync(path.join(undeclared.app, 'hfs.json'));
+  assert.match(locateApps(undeclared.work).error, /no readable app declaration/);
+  const refused = layoutTreeMain(['scan', '--work', undeclared.work, '--write']);
+  assert.equal(refused.exitCode, 1);
+  assert.match(refused.text, /no readable app declaration/);
+  assert.equal(fs.existsSync(path.join(undeclared.work, 'shell', 'index.yaml')), false, 'nothing is written');
 });
 
 test('a declared app without an app/ directory is refused by the scan', (t) => {
-  const p = twoApps(t, { apps: [...DECLARED, { name: 'expert', root: 'apps/expert' }] });
+  const p = twoApps(t, { apps: [...DECLARED, 'expert'] });
   const refused = layoutTreeMain(['scan', '--work', p.work, '--write']);
   assert.equal(refused.exitCode, 1);
-  assert.match(refused.text, /app expert \(apps\/expert\) has no app\/ or src\/app\/ directory/);
+  assert.match(refused.text, /app expert \(fe\/apps\/expert\) has no app\/ or src\/app\/ directory/);
 });
 
 test('a route resolves in the app the ui record names; the same route in the wrong app is refused', (t) => {
@@ -166,7 +162,7 @@ test('capture, plan and destinations name the app when the tree holds several', 
   const written = parseYaml(fs.readFileSync(path.join(p.work, 'shell', 'index.yaml'), 'utf8'));
   assert.ok(nodeById(treeOf(written, 'landing'), '/(site)'), 'planned into landing');
   assert.equal(nodeById(treeOf(written, 'app'), '/(site)'), null, 'and not into the console');
-  assert.equal(nodeById(treeOf(written, 'landing'), '/(site)').files.layout.path, 'apps/landing/src/app/(site)/layout.tsx');
+  assert.equal(nodeById(treeOf(written, 'landing'), '/(site)').files.layout.path, 'fe/apps/landing/src/app/(site)/layout.tsx');
   const bogus = layoutTreeMain(['destinations', '--work', p.work, '--route', '/', '--app', 'ghost']);
   assert.equal(bogus.exitCode, 2);
   assert.match(bogus.text, /--app ghost is not an app of the layout tree \(app, landing\)/);
