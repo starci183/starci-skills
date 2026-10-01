@@ -442,10 +442,10 @@ sections:
         `robocopy /MIR` or `/PURGE`, `Remove-Item -Recurse` and its aliases; RECURSIVE_DELETE): a recursive delete
         follows a junction into the live tree; a tree goes only through the runtime's safeRemoveTree
         (scripts/lib/safe-remove.mjs), one junction is removed with `cmd /c rmdir <path>` (no /s), one file with
-        `rm <file>`. Never start an agent or a terminal outside Orca's supervision: no `orca terminal create`
+        `rm <file>`. Never start an agent or a terminal outside Orca's supervision: no raw terminal create
         (RAW_TERMINAL_CREATE) and no headless agent CLI (`codex exec`, `claude -p`/`--print`, `cursor-agent -p`,
         `devin -p`, `gemini -p`, `opencode run`; AGENT_HEADLESS_LAUNCH); every agent and worker starts through
-        `orca orchestration worker-start --agent <provider>` and is supervised with worker-show / worker-read /
+        scripts/api/orca/worker-start.mjs (orchestration worker-start --agent <provider>) and is supervised with worker-show / worker-read /
         worker-stop / worker-release. The command guard sees through cmd, PowerShell and bash wrappers and chains,
         and lets text that only mentions these commands (echo, commit message, heredoc) pass. The runtime enforces this: an op's git and npm are the guard
         (modules/kernel/api.yaml conventions.sharedCheckout) and refuse with exit 3; report the need,

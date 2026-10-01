@@ -25,7 +25,8 @@ import { GRAMMAR_PROPOSAL_FILED, GRAMMAR_PROPOSAL_RESOLVED, openGrammarProposals
 import {
   DRAW_LOOP_MISSING, DRAW_METRICS_FAILED, defaultOutOf, DRAW_METRICS_UNVERIFIED, STOP, bestRound, finishLoop, loopCoverageFindings, progressed, readLoop, runRound, stopOf, verifyRecordParts,
 } from '../scripts/work/draw-loop.mjs';
-import { DEFAULT_RUBRIC, criticArgv, normaliseVerdict, parseVerdict, rubricFor, runCritic } from '../scripts/work/draw-critic.mjs';
+import { DEFAULT_RUBRIC, normaliseVerdict, parseVerdict, rubricFor, runCritic } from '../scripts/work/draw-critic.mjs';
+import { fakeCriticOrca, passingVerdict } from './helpers/fake-critic-orca.mjs';
 import { settleDrawMetricFindings, DRAW_LOOP_CHANGE } from '../scripts/work/draw-loop-settle.mjs';
 import { ARCHETYPES, archetypeOf, directionReadiness } from '../scripts/work/ui-archetype.mjs';
 import { DIRECTION_ARCHETYPES } from '../scripts/checks/brand.mjs';
@@ -185,7 +186,7 @@ test('grammar proposals: complete entries in md and yaml; an incomplete one is n
   assert.deepEqual(openGrammarProposals(db, 'wf-draw').map((p) => `${p.name}:${p.status}`), ['Meter.segments:proposed', 'PageContainer.pinnedAction:proposed', 'ArtworkBand:proposed']);
 });
 
-test('the critic: the product rubric or the default, a verdict parsed and gate-capped, a clean read-only codex session', async (t) => {
+test('the critic: the product rubric or the default, a verdict parsed and gate-capped, a clean-dir worker started through worker-start', async (t) => {
   const work = path.join(tmp(t), '.starciwork');
   assert.equal(rubricFor({ workRoot: work }).source, 'default');
   fs.mkdirSync(path.join(work, 'brand'), { recursive: true });
@@ -199,23 +200,23 @@ test('the critic: the product rubric or the default, a verdict parsed and gate-c
   const v = normaliseVerdict(parseVerdict('thinking...\n{"schema":"starci/draw-critique@1","checks":[{"id":"P1","pass":false,"evidence":"two red fills"}],"beauty":8}'), r.rubric);
   assert.deepEqual(v.failed, ['P1', 'P2'], 'a check the critic skipped fails');
   assert.equal(v.beauty, 5, 'a failed gate caps the beauty');
-  const argv = criticArgv({ critic: { model: 'gpt-6-sol', effort: 'high' }, dir: 'C:/clean', images: [{ file: 'render-1.png' }], lastMessage: 'C:/clean/last.txt' });
-  assert.deepEqual(argv.slice(0, 9), ['exec', '--skip-git-repo-check', '--ephemeral', '-C', 'C:/clean', '-s', 'read-only', '-m', 'gpt-6-sol']);
-  assert.ok(argv.includes('model_reasoning_effort=high') && argv.includes('-i') && argv.at(-1) === '-');
 
   const dir = tmp(t);
   const png = path.join(dir, 'a.png');
   fs.writeFileSync(png, encodePng(blankImage(4, 4, WHITE)));
   fs.writeFileSync(path.join(dir, 'a.html'), GOOD);
   let seen = null;
-  const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC, critic: allocationSettings().drawLoop.critic, tmpRoot: dir,
-    runner: async ({ dir: clean, prompt }) => { seen = { files: fs.readdirSync(clean).sort(), prompt }; return { code: 0, lastMessage: JSON.stringify({ checks: DEFAULT_RUBRIC.checks.map((c) => ({ id: c.id, pass: true })), beauty: 9, anchor: '9' }) }; } });
+  const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
+  const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC, critic: allocationSettings().drawLoop.critic, tmpRoot: dir, orca });
   assert.deepEqual(seen.files, ['render-1.png', 'rubric.yaml', 'screen.html'], 'the critic sees only the PNGs, the HTML and the rubric');
-  assert.match(seen.prompt, /did NOT draw this screen/);
+  const spec = orca.calls.find((c) => c[0] === 'task-create')[1].spec;
+  assert.match(spec, /did NOT draw this screen/);
+  assert.equal(critique.outcome, 'judged');
   assert.equal(critique.verdict.beauty, 9);
   assert.equal(critique.critic.model, 'gpt-6-sol');
-  assert.equal(critique.critic.promptSha256, sha256(critique.critic.prompt));
-  assert.equal(critique.critic.independent, false, 'a stubbed runner is never recorded as the independent critic');
+  assert.equal(critique.critic.promptSha256, sha256(spec), 'the hash is of the exact Task spec');
+  assert.equal(critique.critic.prompt, spec.split(seen.dir.replaceAll('\\', '/')).join('<clean-dir>'));
+  assert.equal(critique.critic.independent, false, 'a fake Orca client is never recorded as the independent critic');
   assert.deepEqual(fs.readdirSync(dir).filter((n) => n.startsWith('starci-draw-critic-')), [], 'the clean dir is removed');
 });
 
@@ -260,7 +261,7 @@ function product(t) {
     return rec;
   });
   const probes = { geometry: async () => ({ findings: [] }), score: async (html, viewport) => ({ schema: 'starci/ui-proof-score@1', htmlSha256: sha256(fs.readFileSync(html)), viewport, summary: { pass: 5, fail: 0, unmeasurable: 0 }, cases: [], spacing: [] }) };
-  const critic = (beauty) => async () => ({ code: 0, lastMessage: JSON.stringify({ checks: DEFAULT_RUBRIC.checks.map((c) => ({ id: c.id, pass: true, evidence: 'ok' })), beauty }) });
+  const critic = (beauty) => fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, beauty) });
   return { repo, ui, directions, source, render, probes, critic, why };
 }
 const VIEWPORTS = [{ width: 800, height: 60 }, { width: 390, height: 60 }];
@@ -269,7 +270,7 @@ test('a loop that never passes stops without progress and finishes blocked with 
   const p = product(t);
   fs.writeFileSync(p.source, p.why.html.replace('<h1 data-grammar-component="Heading"', '<h1'));
   const base = { ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes };
-  const r1 = await runRound({ ...base, criticRunner: p.critic(6) });
+  const r1 = await runRound({ ...base, criticOrca: p.critic(6) });
   assert.equal(r1.round.n, 1);
   assert.deepEqual(r1.round.codes, [DRAW_OFF_GRAMMAR_COMPONENT]);
   for (const f of ['source.html', 'metrics.json', 'critique.json', 'LedgerBase#installed--800x60--light.png', 'LedgerBase#installed--800x60--light.json', 'LedgerBase#installed--800x60--light.score.json']) {
@@ -277,10 +278,10 @@ test('a loop that never passes stops without progress and finishes blocked with 
   }
   assert.equal(JSON.parse(fs.readFileSync(path.join(r1.out, 'round-1', 'critique.json'), 'utf8')).critic.model, 'gpt-6-sol');
   assert.throws(() => finishLoop({ out: r1.out }), /has not stopped/);
-  await runRound({ ...base, criticRunner: p.critic(6) });
-  const r3 = await runRound({ ...base, criticRunner: p.critic(6) });
+  await runRound({ ...base, criticOrca: p.critic(6) });
+  const r3 = await runRound({ ...base, criticOrca: p.critic(6) });
   assert.equal(r3.stop.reason, STOP.noProgress);
-  await assert.rejects(runRound({ ...base, criticRunner: p.critic(6) }), /stopped/);
+  await assert.rejects(runRound({ ...base, criticOrca: p.critic(6) }), /stopped/);
   const done = finishLoop({ out: r3.out });
   assert.equal(done.outcome, 'blocked');
   assert.ok(done.remaining.some((f) => f.code === DRAW_OFF_GRAMMAR_COMPONENT));
@@ -290,7 +291,7 @@ test('a loop that never passes stops without progress and finishes blocked with 
 
 test('a passing loop installs its best round; the record binds generation.loop; settle re-measures every part itself', async (t) => {
   const p = product(t);
-  const r = await runRound({ ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes, criticRunner: p.critic(9) });
+  const r = await runRound({ ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes, criticOrca: p.critic(9) });
   assert.equal(r.stop.reason, STOP.passed);
   const done = finishLoop({ out: r.out });
   assert.equal(done.outcome, 'passed');
@@ -376,7 +377,7 @@ test('api settle re-measures the drawn parts itself: a loop-passed draw the runt
   fs.writeFileSync(path.join(p.repo, 'src', 'a.ts'), 'export const a = 1;\n');
   fs.appendFileSync(path.join(p.repo, '.git', 'info', 'exclude'), '.starciwork/\n');
   git('add', '.'); git('commit', '--quiet', '-m', 'init');
-  const r = await runRound({ ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes, criticRunner: p.critic(9) });
+  const r = await runRound({ ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes, criticOrca: p.critic(9) });
   const done = finishLoop({ out: r.out });
   const record = parseYaml(fs.readFileSync(path.join(p.ui, 'index.yaml'), 'utf8'));
   record.assets = done.assets;

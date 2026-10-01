@@ -1,16 +1,21 @@
 // draw-critic.mjs — the independent critic of a draw-loop round (owner ruling 2026-09-27: draw -> shoot -> evaluate ->
-// fix; the beauty and hierarchy judgement comes from a critic that did NOT draw it). The critic is a fresh session with
-// no drawing context: `codex exec` (modules/models/runtimes.yaml allocation.drawLoop.critic: model, effort, timeoutMs)
-// run in a clean temp directory that holds only the round's PNGs, its HTML and the rubric, the PNGs attached as
-// images. It answers one JSON verdict (starci/draw-critique@1): every rubric check pass/fail with evidence and fix,
-// a 1-10 beauty score with its anchor. The model, the exact prompt, the command and the verdict are recorded in the
-// round's critique.json; the temp directory is removed.
+// fix; the beauty and hierarchy judgement comes from a critic that did NOT draw it). The critic is a fresh Orca worker
+// with no drawing context, launched like every other agent through orchestration worker-start
+// (scripts/agent/lib.mjs startAgent; modules/kernel/contract-changes/draw-critic-worker-start.yaml) with the provider,
+// model and effort of modules/models/runtimes.yaml allocation.drawLoop.critic. Its placement is a clean temp
+// directory that holds only the round's PNGs, its HTML and the rubric; its Task spec names that directory, the images
+// and the one file it may write, verdict.json (starci/draw-critique@1: every rubric check pass/fail with evidence and
+// fix, a 1-10 beauty score with its anchor), and forbids every other write. The runtime waits for the worker's
+// worker_done (or its escalation, or the worker ending) through the orchestration commands, bounded by the critic's
+// timeoutMs, reads verdict.json, then stops and releases the worker and closes its Task. A launch failure, a timeout,
+// a refusal or a missing verdict is a typed outcome with an error and no verdict - never a pass. The provider, model,
+// exact prompt, dispatch and verdict are recorded in the round's critique.json; the temp directory is removed.
 //
 // The critic is a DIFFERENT model from the drawer (owner ruling 2026-09-27 draw-devin-brand-claude: Devin draws,
 // Codex critiques). criticFor picks it: allocation.drawLoop.critic, unless the drawer (draw-loop.mjs round --drawer,
 // else the provider of the op running it, scripts/kernel/op-context.mjs) is that critic's provider - Codex drawing as the draw order's fallback -
-// then allocation.drawLoop.criticWhenDrawer.<drawer> (a `claude -p` session, read-only tools); with none configured
-// the round has no independent critic (an error, no beauty), never the drawer judging itself.
+// then allocation.drawLoop.criticWhenDrawer.<drawer> (a Claude worker); with none configured the round has no
+// independent critic (an error, no beauty), never the drawer judging itself.
 //
 // The rubric is the product's: `.starciwork/brand/index.yaml` brand.direction.rubric.checks (brand.decide's direction
 // mode - lane ui-discipline-brand), with the archetype block of the record's ui.archetype when the direction has one.
@@ -20,12 +25,17 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { ownerRubricChecks } from './draw-feedback.mjs';
+import { startAgent } from '../agent/lib.mjs';
+import { workerShow } from '../api/orca/worker-show.mjs';
+import { workerStop } from '../api/orca/worker-stop.mjs';
+import { workerRelease } from '../api/orca/worker-release.mjs';
+import { orchInbox } from '../api/orca/orch-inbox.mjs';
+import { taskUpdate } from '../api/orca/task-update.mjs';
 
 export const CRITIQUE_SCHEMA = 'starci/draw-critique@1';
 export const RUBRIC_SCHEMA = 'starci/draw-rubric@1';
@@ -100,20 +110,28 @@ export function rubricFor({ workRoot = null, archetype = null, record = null, sh
 /** The gate check ids of a rubric: every check marked gate. */
 export const gateIdsOf = (rubric) => [...new Set((rubric.checks ?? []).filter((c) => c?.gate === true).map((c) => String(c.id)))];
 
-/** The critic's instructions. It never sees the drawing brief, the worker's notes or any earlier round. */
-export function criticPrompt({ images, html = 'screen.html', rubricFile = 'rubric.yaml' }) {
+/** The one file the critic writes, in its clean directory. */
+export const VERDICT_FILE = 'verdict.json';
+
+/**
+ * The critic's Task spec. It never sees the drawing brief, the worker's notes or any earlier round: only the clean
+ * directory `dir` with the images, the HTML and the rubric. Its one write is `dir`/verdict.json.
+ */
+export function criticPrompt({ dir, images, html = 'screen.html', rubricFile = 'rubric.yaml', verdictFile = VERDICT_FILE }) {
+  const at = (f) => slash(path.join(dir, f));
   return [
     'You are an independent senior product-design critic. You did NOT draw this screen and you have no other context.',
-    `The attached images (image files in this directory) are the renders of ONE product surface: ${images.map((i) => `${i.file} (${i.label})`).join(', ')}. The HTML source is ${html} in this directory; the rubric is ${rubricFile}.`,
-    'Judge strictly and only what you can observe in the images and the HTML. Do not edit, create or run anything except reading these files.',
+    `Your directory is ${slash(dir)}. The images in it are the renders of ONE product surface - open and look at each: ${images.map((i) => `${at(i.file)} (${i.label})`).join(', ')}. The HTML source is ${at(html)}; the rubric is ${at(rubricFile)}.`,
+    `Judge strictly and only what you can observe in the images and the HTML. Read only these files. Do not edit, create, delete or run anything; the one file you may write is ${at(verdictFile)}.`,
     `For EVERY check in ${rubricFile}: pass true/false, one line of evidence (what you saw and where), and for a failure the concrete fix.`,
     'Then give the overall beauty score 1-10 by the rubric\'s beauty anchors (judge the desktop render first, then confirm on mobile); a failed gate check caps the score at the rubric\'s gateCap.',
-    'Answer with ONE JSON object and nothing else, exactly this shape:',
+    `Write ONE JSON object to ${at(verdictFile)}, exactly this shape and nothing else:`,
     '{"schema":"starci/draw-critique@1","checks":[{"id":"H1","pass":true,"evidence":"...","fix":null}],"beauty":7,"anchor":"<the anchor you matched>","summary":"<two sentences: the biggest problem and the most valuable fix>"}',
+    'Then report worker_done exactly once. If you cannot judge, report an escalation saying why instead of writing a verdict.',
   ].join('\n');
 }
 
-/** The verdict JSON out of the critic's last message (the last {...} block that parses). */
+/** The verdict JSON out of the critic's verdict file (the last {...} block that parses). */
 export function parseVerdict(text) {
   const s = String(text ?? '');
   for (let end = s.lastIndexOf('}'); end >= 0; end = s.lastIndexOf('}', end - 1)) {
@@ -149,78 +167,124 @@ export function normaliseVerdict(v, rubric) {
 export function criticFor(settings, drawer = null) {
   const main = settings?.critic ?? null;
   if (!main) return { error: 'modules/models/runtimes.yaml allocation.drawLoop.critic is not configured' };
-  const providerOf = (c) => String(c?.provider ?? c?.command ?? '').toLowerCase();
+  const providerOf = (c) => String(c?.provider ?? '').toLowerCase();
   const d = drawer ? String(drawer).toLowerCase() : null;
   if (!d || providerOf(main) !== d) return { critic: main };
   const alt = settings?.criticWhenDrawer?.[d] ?? null;
-  if (alt && providerOf(alt) !== d) return { critic: alt, replaced: main.provider ?? main.command };
+  if (alt && providerOf(alt) !== d) return { critic: alt, replaced: main.provider };
   return { error: `the drawer (${d}) is the critic's model (${main.model}) and allocation.drawLoop.criticWhenDrawer.${d} names no other: the critic must be a different model from the drawer` };
 }
 
+/** The critic's typed outcomes: only `judged` carries a verdict. */
+export const CRITIC_OUTCOMES = Object.freeze(['judged', 'not-configured', 'launch-failed', 'timeout', 'refused', 'verdict-missing']);
+// worker-show states after which the worker does nothing more.
+const ENDED = new Set(['done', 'completed', 'failed', 'stopped', 'released', 'exited']);
+// The Orca Task status a settled Task is closed with (scripts/kernel/api.mjs TASK_CLOSED_STATUS).
+const TASK_CLOSED = 'completed';
+const DEFAULT_POLL_MS = 5000;
+const payloadOf = (m) => { try { return typeof m?.payload === 'string' ? JSON.parse(m.payload) : m?.payload ?? null; } catch { return null; } };
+const settle = (fn) => { try { return fn(); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } };
+
 /**
- * The argv of the configured critic for a clean dir: `codex exec` read-only, ephemeral, the images attached; a claude
- * critic runs `claude -p` in the clean dir with only its read tools, reading the images from it.
+ * The Orca client the critic runs through: the scripts/api/orca wrappers, each replaceable (tests pass a fake).
+ * Launch calls go to scripts/agent/lib.mjs startAgent's io; the rest supervise the worker.
  */
-export function criticArgv({ critic, dir, images, lastMessage }) {
-  if (String(critic?.provider ?? critic?.command ?? '').toLowerCase() === 'claude') {
-    return ['-p', '--model', String(critic.model), '--output-format', 'text', '--allowedTools', 'Read,Glob,LS', '--disallowedTools', 'Bash,Edit,Write,WebFetch,WebSearch'];
-  }
-  return ['exec', '--skip-git-repo-check', '--ephemeral', '-C', dir, '-s', 'read-only', '-m', String(critic.model),
-    '-c', `model_reasoning_effort=${critic.effort}`, ...images.flatMap((i) => ['-i', path.join(dir, i.file)]), '-o', lastMessage, '-'];
+function clientOf(orca) {
+  const o = orca ?? {};
+  return {
+    launch: (opts) => startAgent({ ...opts, io: orca ? { runShow: o.runShow, runCreate: o.runCreate, taskCreate: o.taskCreate,
+      spawn: { trust: o.trust, start: o.workerStart, assignee: o.dispatchShow, rename: o.terminalRename, show: o.workerShow, stop: o.workerStop, release: o.workerRelease } } : null }),
+    show: o.workerShow ?? workerShow,
+    stop: o.workerStop ?? workerStop,
+    release: o.workerRelease ?? workerRelease,
+    inbox: o.inbox ?? orchInbox,
+    taskUpdate: o.taskUpdate ?? taskUpdate,
+  };
 }
 
-const runProcess = (command, argv, { input, cwd, timeoutMs }) => new Promise((resolve) => {
-  let child;
-  // On Windows `codex` is a .cmd shim that only a shell runs: hand the shell ONE quoted command line (never an args
-  // array with shell: true, which concatenates unescaped); the prompt itself goes through stdin.
-  const viaShell = process.platform === 'win32' && !/\.exe$/i.test(command);
-  const quote = (a) => (/^[\w./:=\\-]+$/.test(a) ? a : `"${String(a).replace(/"/g, '""')}"`);
-  try { child = viaShell ? spawn([command, ...argv].map(quote).join(' '), { cwd, shell: true, windowsHide: true }) : spawn(command, argv, { cwd, windowsHide: true }); }
-  catch (error) { resolve({ code: null, error: String(error?.message ?? error), stdout: '', stderr: '' }); return; }
-  let stdout = '', stderr = '', timedOut = false;
-  const timer = setTimeout(() => { timedOut = true; try { child.kill(); } catch { /* gone */ } }, timeoutMs);
-  child.stdout?.on('data', (d) => { stdout += d; if (stdout.length > 2e6) stdout = stdout.slice(-1e6); });
-  child.stderr?.on('data', (d) => { stderr += d; if (stderr.length > 2e6) stderr = stderr.slice(-1e6); });
-  child.on('error', (error) => { clearTimeout(timer); resolve({ code: null, error: String(error?.message ?? error), stdout, stderr }); });
-  child.on('close', (code) => { clearTimeout(timer); resolve({ code, timedOut, stdout, stderr }); });
-  child.stdin?.end(input);
-});
+/**
+ * Wait for the critic worker through the orchestration commands: its worker_done or escalation (the non-consuming
+ * inbox, matched by the worker's terminal, dispatch or Task), else the worker ending (worker-show), else the deadline.
+ * {signal: 'worker_done'|'escalation'|'ended'|'timeout', message?, state?}.
+ */
+async function awaitCritic({ client, dispatchId, terminal, taskId, timeoutMs, pollMs, sleep, now }) {
+  const deadline = now() + timeoutMs;
+  for (;;) {
+    const listed = settle(() => client.inbox({ limit: 200 }));
+    const mine = (listed?.messages ?? []).filter((m) => {
+      const p = payloadOf(m);
+      return (terminal && m?.from_handle === terminal) || (dispatchId && p?.dispatchId === dispatchId) || (taskId && p?.taskId === taskId);
+    });
+    const done = mine.find((m) => m?.type === 'worker_done');
+    if (done) return { signal: 'worker_done', message: done };
+    const escalation = mine.find((m) => m?.type === 'escalation');
+    if (escalation) return { signal: 'escalation', message: escalation };
+    const shown = settle(() => client.show({ dispatch: dispatchId }));
+    if (shown?.ok && ENDED.has(String(shown.state))) return { signal: 'ended', state: shown.state };
+    const left = deadline - now();
+    if (left <= 0) return { signal: 'timeout' };
+    await sleep(Math.min(pollMs, left));
+  }
+}
 
 /**
  * Run the independent critic over one round. `images` [{path, label}], `html` the round's source, `rubric` from
- * rubricFor. `runner` (tests) replaces the process: ({command, argv, dir, prompt}) => {code, lastMessage}.
- * Returns the critique.json body (never throws): {schema, critic, rubric, verdict|null, error|null}.
+ * rubricFor, `critic` {provider, model, effort, timeoutMs} from criticFor. `orca` replaces the Orca client (tests: a
+ * fake of the wrappers - runCreate, taskCreate, trust, workerStart, dispatchShow, terminalRename, workerShow,
+ * workerStop, workerRelease, inbox, taskUpdate); `entry` is the coordinator terminal (the op's ORCA_TERMINAL_HANDLE).
+ * Returns the critique.json body (never throws): {schema, outcome, critic, rubric, verdict|null, error|null}.
  */
-export async function runCritic({ images, html, rubric, critic, runner = null, tmpRoot = os.tmpdir() }) {
-  if (!critic || typeof critic !== 'object' || !critic.command || !critic.model) {
-    return { schema: CRITIQUE_SCHEMA, critic: { independent: false }, rubric: { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length }, verdict: null,
-      error: 'no critic is configured (modules/models/runtimes.yaml allocation.drawLoop.critic needs command and model)' };
+export async function runCritic({ images, html, rubric, critic, orca = null, entry = process.env.ORCA_TERMINAL_HANDLE || null, tmpRoot = os.tmpdir(),
+  pollMs = DEFAULT_POLL_MS, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now }) {
+  const rubricInfo = { source: rubric?.source ?? null, checks: (rubric?.checks ?? []).length };
+  if (!critic || typeof critic !== 'object' || !critic.provider || !critic.model || !(Number(critic.timeoutMs) > 0)) {
+    return { schema: CRITIQUE_SCHEMA, outcome: 'not-configured', critic: { independent: false }, rubric: rubricInfo, verdict: null,
+      error: 'no critic is configured (modules/models/runtimes.yaml allocation.drawLoop.critic needs provider, model and timeoutMs)' };
   }
+  const client = clientOf(orca);
   const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-critic-'));
   const files = images.map((img, i) => ({ file: `render-${i + 1}${path.extname(img.path) || '.png'}`, label: img.label, from: img.path }));
-  const base = { schema: CRITIQUE_SCHEMA, critic: { provider: critic.provider ?? critic.command, command: critic.command, model: critic.model, effort: critic.effort, independent: !runner, cleanDir: true }, rubric: { source: rubric.source, checks: (rubric.checks ?? []).length } };
+  const base = { schema: CRITIQUE_SCHEMA, critic: { provider: critic.provider, model: critic.model, effort: critic.effort ?? null, timeoutMs: Number(critic.timeoutMs),
+    launch: 'orchestration worker-start', independent: !orca, cleanDir: true }, rubric: rubricInfo };
+  const failed = (outcome, error) => ({ ...base, outcome, verdict: null, error });
+  let launched = null;
   try {
     for (const f of files) fs.copyFileSync(f.from, path.join(dir, f.file));
     fs.writeFileSync(path.join(dir, 'screen.html'), fs.readFileSync(html));
     fs.writeFileSync(path.join(dir, 'rubric.yaml'), stringifyYaml(rubric));
-    const prompt = criticPrompt({ images: files });
-    const lastMessage = path.join(dir, 'last-message.txt');
-    const argv = criticArgv({ critic, dir, images: files, lastMessage });
-    base.critic.argv = argv.map((a) => a.split(dir).join('<clean-dir>'));
-    base.critic.prompt = prompt;
+    const prompt = criticPrompt({ dir, images: files });
+    base.critic.prompt = prompt.split(slash(dir)).join('<clean-dir>');
     base.critic.promptSha256 = sha256(prompt);
-    const started = Date.now();
-    const r = runner ? await runner({ command: critic.command, argv, dir, prompt }) : await runProcess(critic.command, argv, { input: prompt, cwd: dir, timeoutMs: Number(critic.timeoutMs) });
-    base.critic.ms = Date.now() - started;
-    base.critic.exit = r.code ?? null;
-    if (r.timedOut) base.critic.timedOut = true;
-    const text = r.lastMessage ?? (fs.existsSync(lastMessage) ? fs.readFileSync(lastMessage, 'utf8') : r.stdout ?? '');
+    const started = now();
+    const title = `[Critic] draw ${critic.model}`;
+    launched = client.launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir, title, prompt,
+      objective: 'independent critique of one draw-loop round', entry });
+    if (!launched?.ok) {
+      return failed('launch-failed', `the critic worker did not start (${launched?.step ?? 'worker-start'}${launched?.errorCode ? ` ${launched.errorCode}` : ''}): ${launched?.error ?? 'no receipt'}`);
+    }
+    Object.assign(base.critic, { dispatchId: launched.dispatchId, taskId: launched.taskId, runId: launched.runId, effective: launched.effective ?? null });
+    const waited = await awaitCritic({ client, dispatchId: launched.dispatchId, terminal: launched.terminal, taskId: launched.taskId,
+      timeoutMs: Number(critic.timeoutMs), pollMs, sleep, now });
+    base.critic.ms = now() - started;
+    base.critic.signal = waited.signal;
+    if (waited.signal === 'timeout') return failed('timeout', `the critic sent no worker_done within ${critic.timeoutMs}ms`);
+    if (waited.signal === 'escalation') return failed('refused', `the critic escalated instead of judging: ${String(waited.message?.body ?? waited.message?.subject ?? '').slice(0, 400)}`);
+    if (waited.signal === 'ended') return failed('refused', `the critic worker ended (${waited.state}) without worker_done`);
+    const file = path.join(dir, VERDICT_FILE);
+    const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
     const raw = parseVerdict(text);
-    if (!raw) return { ...base, verdict: null, error: `the critic returned no verdict JSON (exit ${r.code ?? r.error ?? '?'}${r.timedOut ? ', timed out' : ''}): ${String(text || r.stderr || r.error || '').slice(-400)}` };
-    return { ...base, verdict: normaliseVerdict(raw, rubric), raw, error: null };
+    if (!raw) return failed('verdict-missing', `the critic reported worker_done without a verdict in ${VERDICT_FILE}${text ? `: ${text.slice(-400)}` : ' (no file)'}`);
+    return { ...base, outcome: 'judged', verdict: normaliseVerdict(raw, rubric), raw, error: null };
   } catch (error) {
-    return { ...base, verdict: null, error: String(error?.message ?? error) };
+    return failed(launched?.ok ? 'refused' : 'launch-failed', String(error?.message ?? error));
   } finally {
+    if (launched?.ok) {
+      // Stop is a no-op for a worker that already settled; release frees its seat; the Task closes.
+      const stop = settle(() => client.stop({ dispatch: launched.dispatchId }));
+      const release = settle(() => client.release({ dispatch: launched.dispatchId }));
+      const task = settle(() => client.taskUpdate({ id: launched.taskId, status: TASK_CLOSED, run: launched.runId, ...(entry ? { from: entry } : {}) }));
+      base.critic.cleanup = { stopped: stop?.ok === true, released: release?.ok === true, taskClosed: task?.ok === true };
+    }
     safeRemoveTree(dir);
   }
 }

@@ -8,7 +8,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../engine/yaml.mjs';
 import { selectPool, hostToolsRequired, hostToolsOf } from '../scripts/agent/models.mjs';
-import { criticArgv, criticFor } from '../scripts/work/draw-critic.mjs';
+import { criticFor } from '../scripts/work/draw-critic.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const read = (rel) => parseYaml(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
@@ -64,9 +64,8 @@ test('the critic is a different model from the drawer: Codex when Devin draws, C
   assert.equal(alt.critic.provider, 'claude');
   assert.notEqual(alt.critic.provider, 'codex');
   assert.match(criticFor({ critic: s.critic }, 'codex').error, /different model from the drawer/);
-  const argv = criticArgv({ critic: alt.critic, dir: 'C:/clean', images: [{ file: 'render-1.png' }], lastMessage: 'x' });
-  assert.deepEqual(argv.slice(0, 3), ['-p', '--model', 'claude-opus-5-5']);
-  assert.ok(argv.includes('--disallowedTools'), 'a read-only critic');
+  assert.equal(alt.critic.model, 'claude-opus-5-5');
+  for (const c of [s.critic, alt.critic]) assert.equal(c.command, undefined, 'a critic names its provider, never a CLI to spawn');
   const loop = fs.readFileSync(path.join(ROOT, 'scripts', 'work', 'draw-loop.mjs'), 'utf8');
   assert.match(loop, /opContextOf\(\)\?\.provider/, 'the loop knows the drawer from the op its Orca terminal is bound to');
 });

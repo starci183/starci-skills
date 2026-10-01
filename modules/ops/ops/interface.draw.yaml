@@ -474,7 +474,8 @@ steps:
         draw-renders the source, keeps round-<n>/{source.tsx, fixture*.json, harness/, <part>.png + .json +
         .dom.html}, runs EVERY machine metric (the source gate, the capture, the rendered-DOM DNA gate, the taste metrics DRAW_ACCENT_BUDGET /
         DRAW_TOO_MANY_BANDS / DRAW_TOO_MANY_BADGES, copy, badges, actions, the brand palette, the Grammar
-        geometry and the ui-proof score) and then an independent critic - a fresh session of a model other than the
+        geometry and the ui-proof score) and then an independent critic - a fresh Orca worker the loop starts through worker-start (a
+        worker of your Run: it waits for its worker_done up to the critic's timeoutMs, then releases it) on a model other than the
         drawer's (runtimes.yaml allocation.drawLoop.critic - Codex when Devin draws - or criticWhenDrawer) with no drawing
         context, only the PNGs, the HTML and the product's brand.direction rubric - scores every rubric check
         and the beauty 1-10, recorded in <out>/round-<n>/{source.html, parts, metrics.json, critique.json}. Fix

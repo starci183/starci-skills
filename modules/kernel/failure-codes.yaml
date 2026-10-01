@@ -74,6 +74,17 @@ AGENT_HEADLESS_LAUNCH:
   owner: op-retry
   kind: verb-refusal
 
+AGENT_CLI_SPAWN:
+  title: "Runtime script spawns an agent CLI"
+  title_vi: "Script runtime tự chạy agent CLI như tiến trình con"
+  meaning_vi: "Một script trong scripts, engine, modules hoặc bin gọi spawn, exec, execFile hoặc fork của node:child_process với lệnh là một agent CLI (codex, claude, cursor-agent, devin, gemini, opencode hoặc shim .cmd/.exe của chúng), nên hook PreToolUse không thấy agent đó và Orca không giám sát, dừng hay giải phóng được nó."
+  causes_vi:
+    - "Giao một việc phụ (ví dụ chấm điểm bản vẽ) cho agent khác bằng codex exec hoặc claude -p ngay trong script"
+    - "Chạy agent qua một hằng số, một shim .cmd hoặc lệnh bọc cmd /c, sh -c"
+  nextStep_vi: "Bộ kiểm tra host-boundary từ chối; khởi động agent đó bằng scripts/agent/lib.mjs startAgent (orchestration worker-start --agent <provider>), chờ worker_done qua các lệnh orchestration rồi worker-stop và worker-release."
+  owner: runtime-core
+  kind: check-finding
+
 ALIAS_PROPS:
   title: "YAML alias carries properties"
   title_vi: "Bí danh YAML mang thêm thuộc tính"
