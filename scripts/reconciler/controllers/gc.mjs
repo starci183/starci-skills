@@ -116,7 +116,7 @@ const liveDeps = {
   hostResources: async () => (await import('../../lib/host-resources.mjs')).hostResourcesFor({}),
   lesson: async (args) => (await import('../../supervisor/lessons.mjs')).recordLeftover(args),
   removeStaging: async (args) => (await import('../../supervisor/workers.mjs')).removeStaging(args),
-  stagingExists: async (jobId) => fs.existsSync((await import('../../supervisor/workers.mjs')).stagingPathOf(jobId)),
+  stagingExists: async (job) => Boolean(job?.staging?.path) && fs.existsSync(job.staging.path),
   // MB-13/MB-14 (G4): every GC item's final outcome in machine.sqlite gc_runs / gc_items, through the one writer.
   recordRun: async ({ trigger, report = null, items = [] }) => {
     const { withMachine } = await import('../../../engine/machine-db.mjs');
@@ -278,13 +278,13 @@ export function createGcController(overrides = {}) {
     if (job.handle && job.handle !== 'supervisor')
       for (const d of await decideTerminals(ctx, { handles: [job.handle], sup, ledgers: [], runs: [job.runId] })) closes.push(await settleLeftover(ctx, d, { entity: `[Worker] job ${jobId}` }));
     let staging = null;
-    if (await deps.stagingExists(jobId)) {
+    if (await deps.stagingExists(job)) {
       if (ctx.mode !== 'active') { would(ctx, 'remove-staging', jobId, { klass: 'staging', status: job.status }); staging = { shadow: true }; }
       else {
-        const r = await deps.removeStaging({ jobId, landed: job.status === 'succeeded', base: job.base });
+        const r = await deps.removeStaging({ jobId, staging: job.staging, landed: job.status === 'succeeded' });
         staging = { ok: r?.removed === true, error: r?.error ?? null };
         ctx.log('reconciler.gc.staging', `${staging.ok ? 'removed' : 'could not remove'} staging of ${job.status} job ${jobId}`, { controller: NAME, jobId, ...staging });
-        if (staging.ok) await deps.lesson({ klass: 'staging', count: 1, examples: [`sup/${jobId} (removeStaging did not run at report/land)`] });
+        if (staging.ok) await deps.lesson({ klass: 'staging', count: 1, examples: [`${job.staging.branch ?? jobId} (removeStaging did not run at report/land)`] });
       }
     }
     const leaks = gc.classifyLeases({ rows: (sup.leases ?? []).filter((l) => l.jobId === jobId).map((l) => ({ ...l, ledger: 'supervisor' })), now: ctx.now(), minAgeMs: 0 });

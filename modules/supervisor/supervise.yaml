@@ -233,7 +233,7 @@ chatSeat:
     - "registers channel 'main' from the chat (channel.mjs register --id main --label <text>; no Orca terminal - the chat's CLAUDE_CODE_SESSION_ID is recorded) and is the only reader that drains it (channel.mjs inbox --id main); every other reader uses --peek"
     - "watches the inbox (channel.mjs wait --id main under a Monitor, or inbox --peek) and answers each message with channel.mjs reply --to <inboxId>: a Telegram message is answered on Telegram, a runtime alert (land-gate) is answered locally; Fleet owed work arrives as Decision Items"
     - reads its Decision Items (node scripts/reconciler/decisions.mjs supervisor --list) and the poll digest (poll.mjs --once, owed.mjs) on each wake while the chat lives - the deterministic duties are the reconciler controllers' (scheduledTick) - and closes every OWED cluster it finds
-    - "fixes through its own staged lanes: workers.mjs stage --self --name <slug> --files <csv> makes an ephemeral checkout on sup/<job> under <lanesRoot>/staging through the runtime worktree API (<lanesRoot> is runtimes.yaml allocation.housekeeping.lanesRoot, default D:/starci-lanes), it commits there and lands with land.mjs --commit <sha>[,<sha>] --lane <slug> --specs <csv>; the land removes the checkout and its branch (never a raw git worktree command or a recursive delete)"
+    - "fixes through its own staged lanes: workers.mjs stage --self --name <slug> --files <csv> makes an ephemeral Orca worktree checkout through the runtime worktree API (its path and branch are the ones Orca reported, recorded on the job and printed by the command), it commits there and lands with land.mjs --commit <sha>[,<sha>] --lane <slug> --specs <csv>; the land removes the checkout and its branch (never a raw git worktree command or a recursive delete)"
     - may still spawn [Worker] fix agents (scripts/supervisor/workers.mjs); not required
     - releases @starci/grammar to npm when its source moves ahead of the registry (grammarRelease), without asking the owner first
   never:
@@ -311,8 +311,9 @@ workers:
     memory < 12%), 1 while it is saturated (CPU >= 95% or free memory < 6%). `workers.mjs cap` prints it.
   lifecycle: |
     create (cluster, explicit file leases, incidents, specs, brief) -> spawn: an EPHEMERAL staging checkout
-    (git worktree of .claude on temp branch sup/<job> under <supervisor home>/staging, outside the live tree:
-    the owner-approved narrow exception to "main only, no worktrees"), the file leases, a [Worker] terminal ->
+    (an Orca worktree of .claude that the runtime creates through createOrcaWorktree, registry kind
+    supervisor-staging keyed by Orca's worktree id; its path and branch are the ones Orca reported, recorded in
+    the job's payload.staging), the file leases, a [Worker] terminal ->
     the worker commits on its branch and files one report (workers.mjs report: the commit, the incidents it
     fixes, the specs; done means a spec reproducing the defect passes; a diagnosis brief ends in outcome diagnosed
     with the findings, no commit) -> the Supervisor lands it through the

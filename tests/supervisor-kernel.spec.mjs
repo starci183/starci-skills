@@ -1,7 +1,8 @@
 // The one [Supervisor] kernel, its [Worker] fix agents, the land gate and the chat relay
 // (modules/supervisor/supervise.yaml kernelSeat/workers/landGate/chat, docs/supervisor.md).
 // Every spec runs on a temp supervisor home, a temp LOCALAPPDATA and, for git, a temp repository:
-// no Orca, no agent, no network, never the live runtime.
+// no live Orca (a [Worker] staging checkout goes through the fake Orca worktree client,
+// tests/helpers/fake-orca-worktrees.mjs), no agent, no network, never the live runtime.
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,7 +14,7 @@ import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, SEA
 import { seatToolDecision } from '../scripts/guards/seat-tools.mjs';
 import { withSupervisor, readSupervisor, seatOf, enabledOf, writeSeat, supervisorEvent, SUPERVISOR_ID, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import {
-  adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob, ackReport,
+  adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, leaseConflicts, pickWorkerPool, cancelJob, ackReport,
   stageSelf, workerGuard, READINESS_FAILS_PER_HOUR, openWorkerHandles,
 } from '../scripts/supervisor/workers.mjs';
 import { landCommits, land, contractCoverage, governedPaths, specsTouching, specPlan, runChecks, describe, acquireLand, landQueue, specTimeoutMs, LAND_WAIT_MS } from '../scripts/supervisor/land.mjs';
@@ -29,6 +30,7 @@ import { clusterOwed } from '../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../scripts/supervisor/status-block.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import { withMachine, openMachine } from '../engine/machine-db.mjs';
+import { fakeOrcaWorktrees } from './helpers/fake-orca-worktrees.mjs';
 
 // git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
 // worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
@@ -49,6 +51,8 @@ const tmp = (t, prefix) => {
 // These specs exercise the optional [Supervisor] kernel: config.yaml supervisor.mode kernel (the default is chat).
 /** A machine.sqlite writer handle (the Supervisor's store) on the spec's own file, closed after the test. */
 const machineOf = (t, env) => { const m = openMachine({ env }); t.after(() => m.close()); return m; };
+/** The fake Orca worktree client of one spec: its trees under a temp workspace root. */
+const orcaOf = (t) => fakeOrcaWorktrees({ root: tmp(t, 'sup-orca-') });
 const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel', STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') }; };
 
 /* ------------------------------------------------------------ fake Orca */
@@ -167,7 +171,7 @@ test('workers: one job per cluster, launches stop at the cap, a leased file wait
   const deps = {
     load: () => ({ cpuBusy: 0.99, freeMem: 0.5 }),
     route: async () => ({ pool: 'devin-agent', agent: 'devin', model: 'm', effort: null }),
-    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
+    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::/tmp/${jobId}` }),
     unstage: () => ({}),
     start: (opts) => { spawned.push(opts); return { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
   };
@@ -181,7 +185,7 @@ test('workers: one job per cluster, launches stop at the cap, a leased file wait
   assert.equal(jobOf(m, a.job.job_id).status, 'running');
   const attempt = m.latestSupAttempt(a.job.job_id);
   assert.equal(attempt.terminal_handle, 'term_1', 'one sup_attempts row per spawn names its terminal');
-  assert.equal(attempt.branch, `sup/${a.job.job_id}`);
+  assert.equal(attempt.branch, `sup-${a.job.job_id}`);
   deps.load = () => ({ cpuBusy: 0.1, freeMem: 0.9 });
   const r2 = await spawnWorkers(m, { settings, deps, env });
   assert.ok(r2.skipped.some((s) => /files leased by/.test(s.reason)), 'c2 waits for the lease on scripts/a.mjs');
@@ -212,7 +216,7 @@ test('worker readiness: a refused worker-start excludes the provider', async (t)
   const deps = {
     load: () => ({ cpuBusy: 0, freeMem: 1 }),
     route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
-    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
+    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::/tmp/${jobId}` }),
     unstage: () => ({}),
     start: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'worker-start', error: 'agent_readiness_failed' } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
   };
@@ -250,7 +254,7 @@ test('worker outage: an attestation refused for a provider capacity outage exclu
   const deps = {
     load: () => ({ cpuBusy: 0, freeMem: 1 }),
     route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
-    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
+    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::/tmp/${jobId}` }),
     unstage: () => ({}),
     start: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'attestation', error: quota } : { ok: true, terminal: `term_${spawned.length}`, dispatchId: `ctx_${spawned.length}` }; },
   };
@@ -280,7 +284,7 @@ test('worker guard: a [Worker] owns its leased files, so its git shim lets it st
   const deps = {
     load: () => ({ cpuBusy: 0, freeMem: 1 }),
     route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
-    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
+    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::/tmp/${jobId}` }),
     unstage: () => ({}), command: () => null,
     guard: (jobId, opts) => workerGuard(jobId, { ...opts, launch: (args) => { launched.push(args); return { env: {}, pathPrefix: 'bin', receipt: {} }; } }),
     start: (opts) => { guarded.push(opts); return { ok: true, terminal: 'term_g', dispatchId: 'ctx_g' }; },
@@ -328,25 +332,27 @@ function sideCommit(root, name, files, base = 'main') {
   return sha;
 }
 
-test('staging lifecycle: a worktree on a temp branch; removal after a land deletes both and never the live node_modules', (t) => {
+test('staging lifecycle: an Orca worktree on the branch Orca reported; removal after a land deletes both and never the live node_modules', (t) => {
   const env = envOf(t);
   const root = repoFixture(t);
+  const orca = orcaOf(t);
   fs.mkdirSync(path.join(root, 'node_modules', 'dep'), { recursive: true });
   fs.writeFileSync(path.join(root, 'node_modules', 'dep', 'index.js'), 'keep');
-  const s = createStaging({ jobId: 'fix-x-1', root, env });
+  const s = createStaging({ jobId: 'fix-x-1', root, env, orca });
   assert.ok(s.ok, s.error);
   assert.ok(fs.existsSync(path.join(s.path, 'scripts', 'a.mjs')));
-  assert.ok(git(root, 'branch', '--list', 'sup/fix-x-1'));
+  assert.equal(s.branch, 'sup-fix-x-1', 'the branch is the one Orca reported for the name');
+  assert.ok(git(root, 'branch', '--list', s.branch));
   fs.writeFileSync(path.join(s.path, 'scripts', 'a.mjs'), 'export const a = 2;\n');
   git(s.path, 'commit', '-q', '-am', 'work');
-  const kept = removeStaging({ jobId: 'fix-x-1', root, env, base: s.base });
-  assert.ok(kept.removed && !fs.existsSync(s.path));
-  assert.equal(kept.branchKept, 'sup/fix-x-1', 'unlanded commits keep their branch');
+  const kept = removeStaging({ jobId: 'fix-x-1', staging: s, root, env, orca });
+  assert.ok(kept.removed && !fs.existsSync(s.path), kept.error);
+  assert.equal(kept.branchKept, s.branch, 'unlanded commits keep their branch');
   assert.ok(fs.existsSync(path.join(root, 'node_modules', 'dep', 'index.js')), 'the junction removal never walks into the live node_modules');
-  const s2 = createStaging({ jobId: 'fix-y-2', root, env });
-  const landed = removeStaging({ jobId: 'fix-y-2', root, env, landed: true, base: s2.base });
-  assert.ok(landed.removed && landed.branchDeleted);
-  assert.equal(git(root, 'branch', '--list', 'sup/fix-y-2'), '');
+  const s2 = createStaging({ jobId: 'fix-y-2', root, env, orca });
+  const landed = removeStaging({ jobId: 'fix-y-2', staging: s2, root, env, landed: true, orca });
+  assert.ok(landed.removed && landed.branchDeleted, landed.error);
+  assert.equal(git(root, 'branch', '--list', s2.branch), '');
 });
 
 /* ------------------------------------------------------------ land gate */
@@ -510,9 +516,10 @@ test('land specs: touching by default, never the whole suite (--specs all refuse
 test('a worker job lands end to end: report -> gate -> succeeded, leases released, checkout and branch removed', async (t) => {
   const env = envOf(t);
   const root = repoFixture(t);
+  const orca = orcaOf(t);
   const m = openMachine({ env });
   const { job } = createJob(m, { cluster: 'e2e', files: ['scripts/a.mjs'] });
-  const r = await spawnWorkers(m, { settings, env, root, deps: {
+  const r = await spawnWorkers(m, { settings, env, root, deps: { orca,
     load: () => ({ cpuBusy: 0, freeMem: 1 }), route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
     start: () => ({ ok: true, terminal: 'term_w', dispatchId: 'ctx_w' }) } });
   assert.equal(r.launched.length, 1);
@@ -525,7 +532,7 @@ test('a worker job lands end to end: report -> gate -> succeeded, leases release
   assert.ok(rep.ok, rep.error);
   assert.equal(jobOf(m, job.job_id).status, 'reported');
   m.close();
-  const out = await land({ jobId: job.job_id, root, env, push: false, deps: { runChecks: lightChecks } });
+  const out = await land({ jobId: job.job_id, root, env, push: false, deps: { runChecks: lightChecks, orca } });
   assert.ok(out.ok, JSON.stringify(out));
   assert.equal(fs.readFileSync(path.join(root, 'scripts', 'a.mjs'), 'utf8'), 'export const a = 7;\n');
   const after = machineOf(t, env);
@@ -534,10 +541,11 @@ test('a worker job lands end to end: report -> gate -> succeeded, leases release
   const attempt = after.latestSupAttempt(job.job_id);
   assert.ok(attempt.landed_at && attempt.landed_sha, 'the attempt records the land');
   assert.equal(after.supReports({ jobId: job.job_id, unconsumed: true }).length, 0, 'the landed report is consumed');
-  assert.ok(!fs.existsSync(stagingPathOf(job.job_id, env)), 'the checkout lives only until it lands');
-  assert.equal(git(root, 'branch', '--list', `sup/${job.job_id}`), '');
+  assert.ok(!fs.existsSync(staging.path), 'the checkout lives only until it lands');
+  assert.equal(git(root, 'branch', '--list', staging.branch), '');
+  assert.deepEqual(orca.names().filter((n) => n !== 'list'), ['create', 'remove'], 'created and removed through Orca');
   const other = createJob(after, { cluster: 'cancel-me', files: ['scripts/q.mjs'] });
-  assert.equal(cancelJob(after, { jobId: other.job.job_id, root, env }).ok, true);
+  assert.equal(cancelJob(after, { jobId: other.job.job_id, root, env, orca }).ok, true);
 });
 
 test('the grammar changelog and contract-change entry files are never leased; two appends to the changelog both land through the gate (merge=union)', async (t) => {
@@ -546,9 +554,10 @@ test('the grammar changelog and contract-change entry files are never leased; tw
   fs.writeFileSync(path.join(root, '.gitattributes'), 'packages/grammar/CHANGELOG.md merge=union\n');
   git(root, 'add', '-A');
   git(root, 'commit', '-q', '-m', 'union changelog');
+  const orca = orcaOf(t);
   const m = openMachine({ env });
-  const one = stageSelf(m, { name: 'reg-a', files: ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml', 'scripts/a.mjs'], root, env });
-  const two = stageSelf(m, { name: 'reg-b', files: ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml', 'scripts/b.mjs'], root, env });
+  const one = stageSelf(m, { name: 'reg-a', files: ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml', 'scripts/a.mjs'], root, env, orca });
+  const two = stageSelf(m, { name: 'reg-b', files: ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml', 'scripts/b.mjs'], root, env, orca });
   assert.ok(one.ok && two.ok, JSON.stringify({ one, two }));
   assert.deepEqual(leaseConflicts(m, ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml']), []);
   m.close();
@@ -556,7 +565,7 @@ test('the grammar changelog and contract-change entry files are never leased; tw
   const a = sideCommit(root, 'append-a', { 'packages/grammar/CHANGELOG.md': `${log}## a\n` });
   const b = sideCommit(root, 'append-b', { 'packages/grammar/CHANGELOG.md': `${log}## b\n` });
   for (const sha of [a, b]) {
-    const out = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+    const out = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks, orca } });
     assert.ok(out.ok, JSON.stringify(out));
   }
   const sections = git(root, 'show', 'main:packages/grammar/CHANGELOG.md').split(/\r?\n/).filter((l) => l.startsWith('## '));
@@ -566,9 +575,10 @@ test('the grammar changelog and contract-change entry files are never leased; tw
 test('a self checkout landed with --commit closes its job: succeeded, leases released, checkout and branch removed', async (t) => {
   const env = envOf(t);
   const root = repoFixture(t);
+  const orca = orcaOf(t);
   const m = openMachine({ env });
-  const one = stageSelf(m, { name: 'tooling', files: ['scripts/a.mjs'], root, env });
-  const two = stageSelf(m, { name: 'rules', files: ['scripts/b.mjs'], root, env });
+  const one = stageSelf(m, { name: 'tooling', files: ['scripts/a.mjs'], root, env, orca });
+  const two = stageSelf(m, { name: 'rules', files: ['scripts/b.mjs'], root, env, orca });
   assert.ok(one.ok && two.ok, JSON.stringify({ one, two }));
   fs.writeFileSync(path.join(one.path, 'scripts', 'a.mjs'), 'export const a = 9;\n');
   git(one.path, 'commit', '-q', '-am', 'self fix');
@@ -582,22 +592,22 @@ test('a self checkout landed with --commit closes its job: succeeded, leases rel
   git(two.path, 'commit', '-q', '-am', 'r3');
   const r3 = git(two.path, 'rev-parse', 'HEAD');
   m.close();
-  const out = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
+  const out = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks, orca } });
   assert.ok(out.ok, JSON.stringify(out));
   let db = openMachine({ env });
   assert.equal(jobOf(db, one.jobId).status, 'succeeded', 'land --commit of a self branch never leaves its job running');
   assert.equal(leaseConflicts(db, ['scripts/a.mjs']).length, 0, 'its leases no longer block a worker');
   assert.ok(!fs.existsSync(one.path));
-  assert.equal(git(root, 'branch', '--list', `sup/${one.jobId}`), '');
+  assert.equal(git(root, 'branch', '--list', one.branch), '');
   assert.equal(jobOf(db, two.jobId).status, 'running', 'an untouched self job stays open');
   db.close();
-  const half = await land({ commits: [r2], root, env, push: false, deps: { runChecks: lightChecks } });
+  const half = await land({ commits: [r2], root, env, push: false, deps: { runChecks: lightChecks, orca } });
   assert.ok(half.ok, JSON.stringify(half));
   assert.deepEqual(half.selfPending.map((p) => p.jobId), [two.jobId]);
   db = openMachine({ env });
   assert.equal(jobOf(db, two.jobId).status, 'running', 'a partly landed self branch keeps its checkout');
   db.close();
-  const rest = await land({ commits: [r3], root, env, push: false, deps: { runChecks: lightChecks } });
+  const rest = await land({ commits: [r3], root, env, push: false, deps: { runChecks: lightChecks, orca } });
   assert.ok(rest.ok, JSON.stringify(rest));
   db = machineOf(t, env);
   assert.equal(jobOf(db, two.jobId).status, 'succeeded');
@@ -834,7 +844,7 @@ test('a [Worker] starts through worker-start on its staging checkout, which Orca
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const r = await spawnWorkers(m, { settings, env, root, deps: {
     load: () => ({ cpuBusy: 0, freeMem: 1 }), route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
-    staging: ({ jobId }) => ({ ok: true, path: path.join(os.tmpdir(), 'staging', jobId), branch: `sup/${jobId}`, base: 'abc' }),
+    staging: ({ jobId }) => ({ ok: true, path: path.join(os.tmpdir(), 'staging', jobId), branch: `sup-${jobId}`, base: 'abc', orcaId: `repo::${jobId}` }),
     unstage: () => ({}), guard: () => ({ receipt: { jobFile: path.join(root, 'job.json') } }),
     bindGuard: (args) => { bound.push(args); return 'bound.json'; },
     start: (opts) => { spawned.push(opts); opts.onCreated?.('term_w1', 'ctx_w1'); return { ok: true, terminal: 'term_w1', dispatchId: 'ctx_w1', runId: 'run_w', taskId: 'task_w' }; } } });

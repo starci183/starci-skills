@@ -2,11 +2,13 @@
 // check-worktree-add.mjs — the runtime creates a worktree in exactly one place (owner decision WFWT; lane WT before it:
 // 600+ orphan worktrees piled up because every script ran its own `git worktree add`). An agent's workspace is created
 // by Orca (`orca worktree create` through scripts/api/orca/worktree-create.mjs: the Kernel's workflow worktree, the
-// draw critic's placement), never by git. A runtime-internal scratch tree no agent works in (land/push scratch, the
-// verify-proof base tree, the revert lane, the [Worker] staging checkout) is made by git in ONE function:
+// draw critic's placement, the [Worker] staging checkout), never by git. A runtime-internal scratch tree no agent works
+// in (land/push scratch, the verify-proof base tree, the revert lane) is made by git in ONE function:
 // scripts/api/git/worktree-add.mjs createScratchWorktree, which registers it in machine.sqlite and hands it to the GC. A
-// `git worktree add` anywhere else - another file, or the worktree API outside that function - is red. A land gate
-// tree check (scripts/supervisor/land.mjs TREE_CHECKS) and part of `npm run check`.
+// `git worktree add` anywhere else - another file, or the worktree API outside that function - is red, and so is a
+// createScratchWorktree call that names an Orca kind (scripts/lib/worktree-registry.mjs ORCA_KINDS: an agent's workspace made by
+// git; createScratchWorktree also refuses it at run time). A land gate tree check (scripts/supervisor/land.mjs
+// TREE_CHECKS) and part of `npm run check`.
 //
 // It scans every tracked script outside tests/ (.mjs .js .cjs .ts .ps1 .sh; node_modules and the packages' copied
 // runtime/ excluded) for an invocation of `worktree add`:
@@ -21,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runGit } from '../api/git/lib.mjs';
+import { ORCA_KINDS } from '../lib/worktree-registry.mjs';
 
 export const WORKTREE_API = 'scripts/api/git/worktree-add.mjs';
 /** The one function of WORKTREE_API that may run `git worktree add`. */
@@ -29,6 +32,9 @@ const EXTENSIONS = /\.(?:mjs|cjs|js|ts|ps1|sh)$/;
 const ARGV_FORM = /['"`]worktree['"`]\s*,\s*['"`]add['"`]/;
 const SHELL_FORM = /(?:^|['"`]|&&|;|\|\|)\s*git(?:\s+-C\s+(?:"[^"]*"|'[^']*'|\S+))?\s+worktree\s+add\b/;
 const isComment = (line) => /^\s*(?:\/\/|\*|\/\*|#)/.test(line);
+/** A createScratchWorktree call and the literal kind it names on that line. */
+const SCRATCH_CALL = /\bcreateScratchWorktree\s*\(/;
+const KIND_LITERAL = /\bkind\s*:\s*['"`]([a-z-]+)['"`]/;
 
 const SHELL_CALL = /\b(?:exec|execSync|execFile|execFileSync|spawn|spawnSync)\s*\(|\bshell\s*:/;
 const SHELL_SCRIPT = /\.(?:ps1|sh)$/;
@@ -53,7 +59,8 @@ export function strayLines(text, file = 'x.mjs', { allowed = null } = {}) {
     if (isComment(line)) return;
     if (allowed && i + 1 >= allowed[0] && i + 1 <= allowed[1]) return;
     const shell = SHELL_FORM.test(line) && (script || SHELL_CALL.test(line));
-    if (ARGV_FORM.test(line) || shell) out.push({ line: i + 1, text: line.trim().slice(0, 200) });
+    const orcaKind = SCRATCH_CALL.test(line) && ORCA_KINDS.includes(KIND_LITERAL.exec(line)?.[1]);
+    if (ARGV_FORM.test(line) || shell || orcaKind) out.push({ line: i + 1, text: line.trim().slice(0, 200), ...(orcaKind ? { orcaKind: KIND_LITERAL.exec(line)[1] } : {}) });
   });
   return out;
 }
@@ -88,7 +95,11 @@ function main(argv) {
   const r = scanWorktreeAdd(root);
   if (asJson) console.log(JSON.stringify(r, null, 2));
   else {
-    for (const h of r.hits) console.log(`  ${h.file}:${h.line}  git worktree add outside ${WORKTREE_API} ${WORKTREE_ADD_HOME} (an agent workspace is created by Orca, a runtime scratch tree by ${WORKTREE_ADD_HOME}): ${h.text}`);
+    for (const h of r.hits) {
+      console.log(h.orcaKind
+        ? `  ${h.file}:${h.line}  ${WORKTREE_ADD_HOME} asked for Orca kind ${h.orcaKind} (an agent workspace is created by Orca through createOrcaWorktree): ${h.text}`
+        : `  ${h.file}:${h.line}  git worktree add outside ${WORKTREE_API} ${WORKTREE_ADD_HOME} (an agent workspace is created by Orca, a runtime scratch tree by ${WORKTREE_ADD_HOME}): ${h.text}`);
+    }
     console.log(r.ok ? `check-worktree-add: only ${WORKTREE_API} ${WORKTREE_ADD_HOME} runs git worktree add (${r.files} files)` : `check-worktree-add: red (${r.hits.length} stray)`);
   }
   return r.ok ? 0 : 1;

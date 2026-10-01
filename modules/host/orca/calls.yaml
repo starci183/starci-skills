@@ -309,8 +309,9 @@ calls:
     replay: none
     timeoutMs: 180000
     note: |-
-      A runtime-owned agent workspace that is not a Kernel's (the draw critic's placement, scripts/lib/worktrees.mjs
-      createOrcaWorktree): a git worktree of the named repository on a branch Orca creates, as a top-level row
+      A runtime-owned agent workspace that is not a Kernel's (the draw critic's placement; the [Worker] staging checkout,
+      scripts/supervisor/workers.mjs createStaging, name sup-<job>, --comment starci:supervisor-staging:<job>;
+      both through scripts/api/orca/worktree-provision.mjs createOrcaWorktree): a git worktree of the named repository on a branch Orca creates, as a top-level row
       (--no-parent). --setup skip keeps the creation a git operation only. Orca names the branch after --name with
       every '/' turned into '-' and a -2, -3 suffix when the name is taken, and places the tree under its own
       workspace root, so result.worktree carries what the runtime records: the Orca id (<repo-id>::<path>), the path and

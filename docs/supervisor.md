@@ -125,8 +125,10 @@ land.mjs --job <id>          # through the gate; on success the checkout and tem
 workers.mjs list | cap | cancel --job <id> | cleanup
 ```
 
-The staging checkout is a git worktree of `.claude` on `sup/<job>` under `<lanesRoot>/staging`, the
-owner-approved narrow exception to "main only, no worktrees"; it lives only until its commit lands. Cap: at most
+The staging checkout is an Orca worktree of `.claude` (`orca worktree create --name sup-<job>`, made by the runtime
+through `scripts/api/orca/worktree-provision.mjs` createOrcaWorktree, registry kind `supervisor-staging` keyed by Orca's worktree
+id). Orca picks its path and branch; the job records both, and every reader uses the recorded values. It lives only
+until its commit lands, then goes through the link-safe Orca removal. Cap: at most
 10, default base 4 plus one per two queued jobs, halved under machine load. A worker whose terminal dies without a
 report fails its job; a reported worker is quit and closed. The Supervisor's own changes use
 `workers.mjs stage --self --name <slug> --files <csv>` and land the same way.

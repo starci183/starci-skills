@@ -1,0 +1,35 @@
+id: wstage-worker-staging-orca
+effectiveAt: '2026-10-01T23:30:00+07:00'
+summary: >-
+  THE [WORKER] STAGING CHECKOUT IS AN ORCA WORKTREE (lane WSTAGE under C0, deep map WT2, orca-overlap row 2: replaced in
+  alpha.4). scripts/supervisor/workers.mjs createStaging asks Orca for it through scripts/api/orca/worktree-provision.mjs
+  createOrcaWorktree (scripts/api/orca/worktree-create.mjs: repo path:<runtime>, name sup-<job>, base branch main, setup
+  skip, comment starci:supervisor-staging:<job>, no parent); the registry kind supervisor-staging moved from the git
+  scratch kinds into ORCA_KINDS (scripts/lib/worktree-registry.mjs), so its row is keyed by Orca's worktree id. Orca picks the path and the branch: the job's
+  payload.staging records {path, branch, base, orcaId} exactly as Orca reported them, and every reader (the land gate,
+  which cherry-picks from the recorded branch above the recorded base, the self-job close, fileReport, the supervisor
+  and reconciler GCs, the worker board) takes the recorded values; no reader builds sup/<job> or a path under
+  <lanesRoot>/staging any more. removeStaging is the link-safe Orca removal (removeOrcaWorktree: every link unlinked and
+  zero asserted, scripts/api/orca/worktree-rm.mjs with force, the main checkout asserted untouched, the row closed), then the recorded
+  branch is deleted when the work landed (`-D`) or holds nothing beyond main (`-d`), and kept otherwise. Typed failures:
+  WORKER_STAGING_CREATE_FAILED and WORKER_STAGING_REMOVE_FAILED. Deleted with no fallback: the git staging path
+  (createScratchWorktree for supervisor-staging, safeRemoveWorktree, `git worktree prune`, the hand-made branch delete),
+  stagingPathOf, branchOf, home.mjs stagingRoot, the supervisor GC's sup/* lane branch and its staging leftover-directory
+  sweep (the agents collector reads Orca's worker-list since lane WLIST, so no staging path or title is matched).
+  createScratchWorktree refuses the kind at run time, and
+  scripts/checks/check-worktree-add.mjs fails any createScratchWorktree call that names an Orca kind. The worktree GC
+  (gcWorktrees) collects a settled job's staging through Orca. No op contract changes.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/wstage-worker-staging-orca.yaml
+  - scripts/supervisor/workers.mjs
+  - scripts/supervisor/gc.mjs
+  - scripts/supervisor/home.mjs
+  - scripts/supervisor/land.mjs
+  - scripts/reconciler/controllers/gc.mjs
+  - scripts/lib/worktrees.mjs
+  - scripts/lib/worktree-registry.mjs
+  - scripts/api/orca/worktree-provision.mjs
+  - scripts/api/git/worktree-add.mjs
+  - scripts/checks/check-worktree-add.mjs
+  - tests/worker-staging-orca.spec.mjs
