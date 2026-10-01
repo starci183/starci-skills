@@ -1,0 +1,13 @@
+services:
+  order-worker:
+    # The order worker, built from this repository: the context is the app root, the Dockerfile is the app's own. The tag is the
+    # exact version of the image (never a moving tag); it has no listener, so no port is published.
+    image: ecommerce-app/order-worker:1.0.0
+    build:
+      context: ../../../..
+      dockerfile: be/apps/order-worker/Dockerfile
+    profiles: [app]
+    depends_on:
+      - postgres
+      - redis
+      - minio

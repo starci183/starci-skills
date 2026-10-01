@@ -120,8 +120,8 @@ ruleParams:
       "@nestjs/cache-manager": [integrations/cache, integrations/redis]     # the CACHE_MANAGER token: caching goes through the cache capability (retired local rule must-use-cache-service)
       redis: [integrations/cache, integrations/redis]
       ioredis: [integrations/cache, integrations/redis]
-      bullmq: [platform/messaging]
-      "@nestjs/bullmq": [platform/messaging]
+      bullmq: [platform/messaging, integrations/messaging]
+      "@nestjs/bullmq": [platform/messaging, integrations/messaging]
       kafkajs: [platform/messaging]
       "@nestjs/schedule": [platform/scheduling, platform/retry, platform/messaging, platform/http]
       setInterval: [platform/scheduling, platform/retry, platform/messaging, platform/http]
@@ -602,6 +602,7 @@ slots:
     minInstances: 1
     requires: [main.ts, app.module.ts]
     allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts, events.ts, consumes.ts]   # events.ts: the events this service publishes (R131); consumes.ts: what it reads of its siblings (R131)
+    contractTables: [operations.ts, events.ts, consumes.ts]   # read as data by `hfs emit-contracts` and `hfs check`, imported by nothing: roots of the dead-file walk
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     budget: {app.module.ts: 250, main.ts: 80}
     rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED]
@@ -615,6 +616,7 @@ slots:
     owner: true
     requires: [main.ts, app.module.ts]
     allows: [main.ts, app.module.ts, "<app>.options.ts", events.ts, consumes.ts]
+    contractTables: [events.ts, consumes.ts]   # read as data by `hfs emit-contracts` and `hfs check`, imported by nothing: roots of the dead-file walk
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED]
   - id: be.app.migrate

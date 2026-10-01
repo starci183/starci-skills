@@ -23,7 +23,7 @@ export const MANIFEST_KINDS = [APP_KIND, RUNTIME_KIND];
 export const manifestKind = (m) => (isPlainObject(m) && m.kind !== undefined ? m.kind : APP_KIND);
 export const strList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0);
 
-const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor'];
+const APP_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'contractTables', 'allows', 'forbids', 'layers', 'kinds', 'roles', 'composedBy', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor'];
 /** A runtime slot has no app kind, side composition, layer or managed template; it may name the generator of a generated copy. */
 const RUNTIME_SLOT_KEYS = ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'minInstances', 'requires', 'allows', 'forbids', 'budget', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor', 'generatedBy'];
 
@@ -55,8 +55,9 @@ export function slotProblems(slot, index, kind, { appScope = 'app', scopes = [] 
   if (slot.appKind !== undefined && !NAME.test(String(slot.appKind))) bad.push(`${at}: appKind must be a name`);
   if (slot.minInstances !== undefined && !(Number.isInteger(slot.minInstances) && slot.minInstances >= 1)) bad.push(`${at}: minInstances must be a positive integer`);
   if (slot.requiredWhen !== undefined && slot.requiredWhen !== 'connections') bad.push(`${at}: requiredWhen may only be connections`);
+  if (slot.contractTables !== undefined && !(strList(slot.contractTables) && slot.contractTables.length)) bad.push(`${at}: contractTables must be a non-empty list of file names`);
   if (slot.requiredInstances !== undefined && !(isPlainObject(slot.requiredInstances) && Object.values(slot.requiredInstances).every((v) => strList(v) && v.length))) bad.push(`${at}: requiredInstances must map a variable to a non-empty list of names`);
-  for (const key of ['requires', 'allows', 'forbids', 'layers', 'kinds']) if (slot[key] !== undefined && !strList(slot[key])) bad.push(`${at}: ${key} must be a list of strings`);
+  for (const key of ['requires', 'contractTables', 'allows', 'forbids', 'layers', 'kinds']) if (slot[key] !== undefined && !strList(slot[key])) bad.push(`${at}: ${key} must be a list of strings`);
   if (slot.kinds !== undefined && strList(slot.kinds) && (!slot.kinds.length || new Set(slot.kinds).size !== slot.kinds.length || slot.kinds.some((k) => !NAME.test(k) || (slot.layers ?? []).includes(k)))) bad.push(`${at}: kinds must be a non-empty list of unique folder names that are not layers`);
   if (slot.roles !== undefined && !(isPlainObject(slot.roles) && Object.keys(slot.roles).length && Object.entries(slot.roles).every(([role, file]) => NAME.test(role) && typeof file === 'string' && file && !file.includes('/')))) bad.push(`${at}: roles must map a role name to a file name`);
   if (slot.composedBy !== undefined && !(strList(slot.composedBy) && slot.composedBy.length && new Set(slot.composedBy).size === slot.composedBy.length)) bad.push(`${at}: composedBy must be a non-empty list of unique app kinds`);

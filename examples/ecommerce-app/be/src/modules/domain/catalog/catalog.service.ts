@@ -2,7 +2,13 @@ import { Injectable } from "@nestjs/common"
 import { In, MoreThanOrEqual } from "typeorm"
 import type { EntityManager } from "typeorm"
 import { InjectOrderEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
-import type { ProductLookup, ProductView, ProductsByIdsParams, ReserveStockParams } from "./catalog.contracts"
+import type {
+    ProductLookup,
+    ProductView,
+    ProductsByIdsParams,
+    ReleaseStockParams,
+    ReserveStockParams,
+} from "./catalog.contracts"
 import { ProductEntity } from "./persistence/entities/product.entity"
 
 const toProductView = (row: ProductEntity): ProductView => ({
@@ -13,7 +19,7 @@ const toProductView = (row: ProductEntity): ProductView => ({
 })
 
 @Injectable()
-/** The catalog: reads for the doors and the checkout, and the guarded stock decrement only a transaction may call. */
+/** The catalog: reads for the doors and the checkout, the guarded stock decrement only a transaction may call and its compensation. */
 export class CatalogService {
     constructor(@InjectOrderEntityManager() private readonly entityManager: EntityManager) {}
 
@@ -42,5 +48,10 @@ export class CatalogService {
             params.quantity,
         )
         return (result.affected ?? 0) > 0
+    }
+
+    /** Gives `quantity` units back in the caller transaction: the compensation of a reservation of a cancelled order. */
+    async releaseStock(params: ReleaseStockParams): Promise<void> {
+        await params.manager.increment(ProductEntity, { id: params.productId }, "stock", params.quantity)
     }
 }

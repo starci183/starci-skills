@@ -1,6 +1,9 @@
 import type { EntityManager } from "typeorm"
 import type { CartLine } from "@modules/domain/cart"
 import type { ProductView } from "@modules/domain/catalog"
+import { defineQueue } from "@modules/integrations/messaging"
+import type { QueueSpec } from "@modules/integrations/messaging"
+import { isRecord } from "@modules/platform/primitives"
 
 /** One priced line of a checkout plan: the catalog unit price captured at evaluation time. */
 export interface CheckoutLine {
@@ -26,8 +29,8 @@ export interface CheckoutPlan {
 export interface PlacedOrder {
     /** The order id. */
     readonly orderId: string
-    /** The lifecycle state. */
-    readonly status: "confirmed"
+    /** The lifecycle state: an order that confirmed and was later cancelled keeps answering as a replay with `cancelled`. */
+    readonly status: "confirmed" | "cancelled"
     /** The order total in minor units. */
     readonly totalMinorUnits: number
     /** The currency. */
@@ -158,4 +161,50 @@ export interface EmptyCartParams {
 export interface EmptiedCart {
     /** Always true. */
     readonly cleared: true
+}
+
+/** The payload of `order.placed`, as published on its queue (the contract `be/contracts/order/events.json`). */
+export interface OrderPlacedPayload {
+    /** The placed order. */
+    readonly orderId: string
+    /** The buyer. */
+    readonly personId: string
+    /** The total of the order in minor units. */
+    readonly totalMinorUnits: number
+}
+
+/** The queue of placed orders: three deliveries, one second of backoff doubling. */
+export const ORDER_PLACED_QUEUE: QueueSpec = { name: "order.placed", attempts: 3, backoffMs: 1000 }
+
+/** The payload of `billing.invoice-rejected` as this service reads it (version 1 of the billing service's contract, `be/contracts/billing/events.json`). */
+export interface RejectedInvoiceNotice {
+    /** The order whose invoice was rejected. */
+    readonly orderId: string
+    /** Why the invoice was rejected. */
+    readonly reason: string
+}
+
+/** The queue of the rejected invoices this service compensates: three deliveries, one second of backoff doubling. */
+export const REJECTED_INVOICE_QUEUE = defineQueue<RejectedInvoiceNotice>({
+    name: "billing.invoice-rejected",
+    attempts: 3,
+    backoffMs: 1000,
+    parse: (value) =>
+        isRecord(value) && typeof value.orderId === "string" && typeof value.reason === "string"
+            ? { orderId: value.orderId, reason: value.reason }
+            : null,
+})
+
+/** What cancelling an order takes. */
+export interface CancelOrderParams {
+    /** The order to cancel. */
+    readonly orderId: string
+}
+
+/** How a cancellation ended: `cancelled` is false when the order was already cancelled or is unknown and nothing changed. */
+export interface CancelledOrder {
+    /** The order. */
+    readonly orderId: string
+    /** Whether this call cancelled it. */
+    readonly cancelled: boolean
 }

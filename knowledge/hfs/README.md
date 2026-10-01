@@ -334,6 +334,25 @@ expression of the service method a consumer or signed-webhook handler dispatches
 site (R81). No transaction spans an external call: commit first and call out after, or enqueue an outbox message inside
 the transaction (R82). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`.
 
+### 5.11 Services of one product (R128 to R133)
+
+A product with more than one back-end service keeps every service as a Nest app at `be/apps/<service>/` of the one repository
+(R128): the apps share the `be/src` libraries and the one `package.json`, each has its own `Dockerfile` and builds its own
+image, and no file of one service app imports a file of another (R133). In `.starcistacks/application-stacks.yaml` every api or
+worker app is a `role: service` component (R130) and every image of the stack, own or third-party, is pinned: a digest or an
+exact version, never a moving tag (R129); an own image is `<repo>/<service>:<x.y.z>` built from the app's Dockerfile, a service
+the product does not own stays a pinned third-party image. The wire between services is a contract the consumer judges
+itself against: a service keeps the snapshot of its GraphQL schema (R23, R113) and, for the messages it publishes, the literal
+table `apps/<service>/src/events.ts` and its snapshot `be/contracts/<service>/events.json`; a consumer lists what it reads
+in `apps/<app>/src/consumes.ts` and each entry must exist in the provider's snapshot at that version (R131). Messages travel
+on the queues of `platform/messaging` (BullMQ over the stack's Redis): a publisher appends after its commit, a consumer is a
+`transport/message/<event>.consumer.ts` of a worker app, the receiver dedupes on the event id (inbox claim or an idempotent
+state check) and a message that runs out of attempts waits in the dead letters. A saga is a chain of services reacting to each
+other's events, never an in-process event: the failure is an event whose contract declares `compensates: "<event>"` and its
+consumer undoes that step. Every consumed event is named by an e2e spec that boots the real apps through `useTestWorld`, and the
+spec of a saga step also names the compensated event, so it drives the whole flow (R132). See `docs/microservices.md` and the
+`ecommerce-app` example (`order`, `billing`, `order-worker`).
+
 ## 6. Frontend
 
 ### 6.1 Source tree

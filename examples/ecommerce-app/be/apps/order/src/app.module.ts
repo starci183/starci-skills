@@ -33,6 +33,12 @@ import {
 } from "@modules/platform/http-security"
 import { I18nModule } from "@modules/platform/i18n"
 import { LoggingModule } from "@modules/platform/logging"
+import {
+    MESSAGE_PUBLISHER,
+    MESSAGING_ERROR_KINDS,
+    MESSAGING_MESSAGES,
+    MessagingModule,
+} from "@modules/integrations/messaging"
 import { PROBES_ERROR_KINDS, PROBES_MESSAGES, ProbesModule } from "@modules/platform/probes"
 import { CheckoutGraphqlModule } from "@features/checkout"
 import { HealthHttpModule } from "@features/health"
@@ -58,6 +64,7 @@ export class AppModule {
                         IDENTITY_API_MESSAGES,
                         ORDER_MESSAGES,
                         RECEIPT_STORAGE_MESSAGES,
+                        MESSAGING_MESSAGES,
                         IDENTITY_MESSAGES,
                     ],
                 }),
@@ -73,6 +80,7 @@ export class AppModule {
                         CART_ERROR_KINDS,
                         ORDER_ERROR_KINDS,
                         RECEIPT_STORAGE_ERROR_KINDS,
+                        MESSAGING_ERROR_KINDS,
                         IDENTITY_ERROR_KINDS,
                     ],
                 }),
@@ -96,6 +104,7 @@ export class AppModule {
                 HttpModule.register({ isGlobal: true }),
                 IdentityApiModule.register({ isGlobal: true, ...options.identityApi }),
                 ReceiptStorageModule.register({ isGlobal: true, ...options.receiptStorage }),
+                MessagingModule.register({ isGlobal: true, ...options.messaging }),
                 CatalogModule.register({ isGlobal: true }),
                 CartModule.register({ isGlobal: true }),
                 PaymentModule.register({ isGlobal: true }),
@@ -104,7 +113,7 @@ export class AppModule {
                 ProbesModule.register({
                     isGlobal: true,
                     service: "order",
-                    probes: [DatabaseProbe, IDENTITY_API],
+                    probes: [DatabaseProbe, IDENTITY_API, MESSAGE_PUBLISHER],
                 }),
                 GraphqlModule.register({ isGlobal: true }),
                 HealthHttpModule,

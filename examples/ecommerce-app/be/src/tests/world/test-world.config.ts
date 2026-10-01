@@ -1,8 +1,8 @@
 /**
  * The declaration of the ecommerce test world: selection and overrides only. The service list and the image versions come
  * from the stack definition (`.starcistacks/dev`); the library runs Postgres (one database per connection, seeded with the
- * dev seeds), the Redis of the cache, MinIO with the receipts bucket and Keycloak with the stack's realm real behind toxiproxy, and boots the two real apps
- * in process, each wired to the other. The stack calls no third party, so the world declares no fake.
+ * dev seeds), the Redis of the cache, MinIO with the receipts bucket and Keycloak with the stack's realm real behind toxiproxy, and boots the three real apps
+ * in process: identity and order are wired to each other and talk to billing, a worker with no listener, over Redis streams. The stack calls no third party, so the world declares no fake.
  */
 import { defineTestWorld } from "@starci/test-world"
 import type { IdentityWorld, TestApi } from "@starci/test-world"
@@ -10,14 +10,19 @@ import { EnvSource } from "@modules/platform/config"
 import type { RegisterData, SignInData } from "../fixtures/e2e-views.contracts"
 import { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
 import { AppModule as OrderApp } from "../../../apps/order/src/app.module"
+import { AppModule as OrderWorkerApp } from "../../../apps/order-worker/src/app.module"
+import { AppModule as BillingApp } from "../../../apps/billing/src/app.module"
 import * as migrateMain from "../../../apps/migrate/src/main"
 import { ECOMMERCE_OPERATIONS } from "./ecommerce-operations.contracts"
 import {
+    BILLING_ENTITIES,
     IDENTITY_ENTITIES,
     KEYCLOAK_SIGN_IN_CLIENT,
     ORDER_ENTITIES,
     RECEIPTS_BUCKET,
+    billingOptions,
     identityOptions,
+    orderWorkerOptions,
     orderOptions,
     platformBase,
 } from "./test-apps.options"
@@ -42,6 +47,7 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
             connections: [
                 { name: "identity", entities: IDENTITY_ENTITIES, seeds: [".starcistacks/dev/seeds/identity-demo.sql"] },
                 { name: "order", entities: ORDER_ENTITIES, seeds: [".starcistacks/dev/seeds/order-catalog.sql"] },
+                { name: "billing", entities: BILLING_ENTITIES },
             ],
         },
         redis: {},
@@ -51,10 +57,17 @@ export const { useTestWorld, useSandbox } = defineTestWorld({
     apps: {
         identity: { module: IdentityApp, operations: ECOMMERCE_OPERATIONS, options: identityOptions },
         order: { module: OrderApp, operations: ECOMMERCE_OPERATIONS, options: orderOptions },
+        billing: { module: BillingApp, listen: false, options: billingOptions },
+        "order-worker": { module: OrderWorkerApp, listen: false, options: orderWorkerOptions },
     },
     migrate: {
         module: migrateMain,
-        options: (w) => new EnvSource({ IDENTITY_DB_URL: w.db.identity.url, ORDER_DB_URL: w.db.order.url }),
+        options: (w) =>
+            new EnvSource({
+                IDENTITY_DB_URL: w.db.identity.url,
+                ORDER_DB_URL: w.db.order.url,
+                BILLING_DB_URL: w.db.billing.url,
+            }),
     },
     identity: {
         emailDomain: "ecommerce.dev",

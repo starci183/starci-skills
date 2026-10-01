@@ -21,7 +21,7 @@ export class PaymentEntity {
 
     /** The ledger state; a varchar with a CHECK in the migration, not a native enum. */
     @Column({ name: "status", type: "varchar", length: 16 })
-    status!: "captured"
+    status!: "captured" | "refunded"
 
     /** When the payment was captured. */
     @Column({ name: "created_at", type: "timestamptz", default: () => "now()" })

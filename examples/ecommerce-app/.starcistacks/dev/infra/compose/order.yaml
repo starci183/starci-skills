@@ -1,7 +1,7 @@
 services:
   order:
     # See identity.yaml: same placeholder-image contract for the second service.
-    image: ecommerce-app/order
+    image: ecommerce-app/order:1.0.0
     profiles: [app]
     depends_on:
       - postgres

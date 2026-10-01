@@ -5,6 +5,8 @@ import { parseReceiptStorageConfig } from "@modules/integrations/receipt-storage
 import type { EnvSource } from "@modules/platform/config"
 import { parseOrderDatabaseConfig } from "@modules/platform/database"
 import type { DatabaseConnectionConfig } from "@modules/platform/database"
+import { parseMessagingConfig } from "@modules/integrations/messaging"
+import type { MessagingOptions } from "@modules/integrations/messaging"
 import { parseHttpSecurityConfig } from "@modules/platform/http-security"
 import type { HttpSecurityOptions } from "@modules/platform/http-security"
 
@@ -16,6 +18,8 @@ export interface OrderAppOptions {
     readonly database: DatabaseConnectionConfig
     /** Where the identity service answers. */
     readonly identityApi: IdentityApiOptions
+    /** The Redis queues the order events are published on. */
+    readonly messaging: MessagingOptions
     /** The private bucket the receipts of placed orders are archived in. */
     readonly receiptStorage: ReceiptStorageOptions
     /** The origin allowlist and rate limits. */
@@ -27,6 +31,7 @@ export const parseOrderAppOptions = (env: EnvSource): OrderAppOptions => ({
     port: env.int("ORDER_API_PORT"),
     database: parseOrderDatabaseConfig(env),
     identityApi: parseIdentityApiConfig(env),
+    messaging: parseMessagingConfig(env),
     receiptStorage: parseReceiptStorageConfig(env),
     httpSecurity: parseHttpSecurityConfig(env),
 })

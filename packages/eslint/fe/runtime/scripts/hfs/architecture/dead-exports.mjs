@@ -2,7 +2,7 @@
  * HFS check 4, dead code (knowledge/hfs/rules.yaml R25, both profiles, errors in every gate):
  *   HFS_UNUSED_EXPORT  an export of an owner's public entry that no production file outside the owner imports is dead.
  *   HFS_UNUSED_FILE    a production source file that no root reaches is dead. Roots: the files an app slot requires
- *                      (main.ts, app.module.ts), every route file (slot tier `route`), the public entry of every package,
+ *                      (main.ts, app.module.ts) and its contract tables (`contractTables`: events.ts, consumes.ts, read as data), every route file (slot tier `route`), the public entry of every package,
  *                      and a source file a framework config of the app names by a relative string literal
  *                      (next.config.ts pointing next-intl at its request config). Specs and tests are not in the graph,
  *                      so a file only a spec imports is dead, on purpose. Type-only imports reach a file.
@@ -118,7 +118,7 @@ function rootFiles(graph, config) {
     if (!node.owner || node.tier !== 'app') continue;
     const slot = graph.resolver.slot(node.owner.slot);
     const inside = rel.slice(withoutSlash(node.owner.root).length + 1);
-    if ((slot?.requires ?? []).some(name => name === inside)) roots.add(rel);
+    if ((slot?.requires ?? []).some(name => name === inside) || (slot?.contractTables ?? []).some(name => name === inside)) roots.add(rel);
   }
   for (const [key, owner] of graph.ownerRoots) {
     if (owner.tier !== 'package') continue;

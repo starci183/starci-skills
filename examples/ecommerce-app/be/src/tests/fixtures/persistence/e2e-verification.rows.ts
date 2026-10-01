@@ -50,6 +50,16 @@ export interface PaymentRow {
     amount_minor_units: number
 }
 
+/** A persisted invoice of the billing database. */
+export interface InvoiceRow {
+    /** The order the invoice bills. */
+    order_id: string
+    /** The invoice state. */
+    status: string
+    /** The billed amount in minor units. */
+    total_minor_units: number
+}
+
 /** A count answered by an aggregate read. */
 export interface CountRow {
     /** The number of rows. */

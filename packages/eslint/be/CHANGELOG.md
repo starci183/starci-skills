@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New: `service-isolation` (R133 `BE_SERVICE_ISOLATION`, new law `service-isolation`): a file of a service app imports no file of a sibling service app. The slot manifest copy gains `be.contract.events` and `events.ts`/`consumes.ts` in the api and worker app slots.
+
 ## 3.0.7 - 2026-10-01
 
 - Changed: the runtime layer check moves test-secrets onto api/sops/decrypt.mjs; bundled copies follow.
