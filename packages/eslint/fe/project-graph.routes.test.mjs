@@ -324,6 +324,24 @@ test("route-files-thin: a route file mounts one feature and draws nothing, and h
     })
 })
 
+test("route-files-thin: a route file that mounts its feature through the app's `@/` alias mounts one owner", (t) => {
+    // The former false positive: the side root tsconfig.json (no paths) also holds the route files, and its program used to own them,
+    // so `@/features/...` resolved to nothing and the layout mounted "0 feature owners". The app's own tsconfig owns its files.
+    const files = {
+        ...THIN_FEATURES,
+        "apps/web/tsconfig.json": `${JSON.stringify({ extends: "../../tsconfig.json", compilerOptions: { paths: { "@/*": ["./src/*"] } }, include: ["src/**/*.ts", "src/**/*.tsx"] })}\n`,
+        [`${ROUTES}/layout.tsx`]: "import { Shell } from '@fixture/shell';\nimport { ShopLayout } from '@/features/layouts/ShopLayout';\nconst Layout = ({ children }: { children: unknown }) => (\n  <Shell>\n    <ShopLayout content={children} />\n  </Shell>\n);\nexport default Layout;\n",
+        [`${ROUTES}/loading.tsx`]: "import { AuthLayout } from '@/features/layouts/AuthLayout';\nexport default function Loading() { return <AuthLayout />; }\n",
+        // the alias resolves for a finding too: two owners through the alias are still two
+        [`${ROUTES}/two/layout.tsx`]: "import { ShopLayout } from '@/features/layouts/ShopLayout';\nimport { AuthLayout } from '@/features/layouts/AuthLayout';\nexport default () => (\n  <>\n    <ShopLayout content={null} />\n    <AuthLayout />\n  </>\n);\n",
+    }
+    const { tester, ok, bad } = repo(t, files)
+    tester.run("route-files-thin", rules["route-files-thin"], {
+        valid: [ok(`${ROUTES}/layout.tsx`), ok(`${ROUTES}/loading.tsx`)],
+        invalid: [bad(`${ROUTES}/two/layout.tsx`, saying(/mounts 2 feature owners/))],
+    })
+})
+
 // ------------------------------------------------------------------------------------------------ route-adapter
 
 const PAGE_OF = "apps/web/src/app"

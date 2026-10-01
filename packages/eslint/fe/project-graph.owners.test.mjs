@@ -526,6 +526,24 @@ test("HFS_ALIAS_REEXPORT: a re-export under another name, and a const, type or i
     })
 })
 
+test("HFS_ALIAS_REEXPORT: a route file binding a declaration to a name Next.js requires of a route segment is not a second name", (t) => {
+    // The former false positive: `export const generateMetadata = homeMetadata` in page.tsx. Next.js fixes the name generateMetadata,
+    // so no rename can remove it. The same binding outside a route file is still a second name.
+    const metadata = "export const homeMetadata = async () => ({ title: 'home' })\nexport const HomePage = () => <main />\n"
+    const s = scene(t, {
+        files: {
+            "apps/web/src/features/pages/HomePage/index.tsx": metadata,
+            "apps/web/src/app/[locale]/page.tsx": "import { HomePage, homeMetadata } from '../../features/pages/HomePage'\nexport const generateMetadata = homeMetadata\nexport default function Page() { return <HomePage /> }\n",
+            "apps/web/src/app/[locale]/about/page.tsx": "export { homeMetadata as generateMetadata } from '../../../features/pages/HomePage'\nexport default function Page() { return null }\n",
+            "apps/web/src/modules/seo/index.ts": "import { homeMetadata } from '../../features/pages/HomePage'\nexport const generateMetadata = homeMetadata\n",
+        },
+    })
+    s.tester.run("alias-reexport", rules["alias-reexport"], {
+        valid: [s.good("apps/web/src/app/[locale]/page.tsx"), s.good("apps/web/src/app/[locale]/about/page.tsx")],
+        invalid: [s.bad("apps/web/src/modules/seo/index.ts", 2)],
+    })
+})
+
 // ---- cross-app-duplicate (FE_CROSS_APP_DUPLICATE) ---------------------------------------------------------------------------
 
 const ERROR_PAGE = "'use client'\nexport default function GlobalError({ reset }: { reset: () => void }) {\n  return <button onClick={reset}>Retry</button>\n}\n"

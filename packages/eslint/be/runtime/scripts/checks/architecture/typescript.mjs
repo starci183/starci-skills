@@ -420,19 +420,28 @@ function typeScriptContext(config, loaded, paths) {
       .map(item => compilerError(ts, config.root, item, relative, 'ARCH_SYNTAX_INVALID')));
     projects.push({ relative, program, options: parsed.options });
   }
-  const fileMap = new Map();
-  const checkerByFile = new Map();
   const occurrences = new Map();
+  const sourceIn = new Map();
   for (const project of projects) {
     for (const sourceFile of project.program.getSourceFiles().filter(file => isProductionSource(config.root, file))) {
       const name = canonical(sourceFile.fileName);
-      if (!fileMap.has(name)) {
-        fileMap.set(name, sourceFile);
-        checkerByFile.set(name, project.program.getTypeChecker());
-      }
       if (!occurrences.has(name)) occurrences.set(name, []);
       occurrences.get(name).push(project);
+      sourceIn.set(`${project.relative}|${name}`, sourceFile);
     }
+  }
+  // The deepest project directory holding a file owns it: its source file, its checker and its resolution. A side or repository
+  // root tsconfig without paths must not shadow the app project whose aliases (`@/*`) the file actually uses.
+  const owningProject = (candidates, file) => candidates.filter(item => isInside(path.dirname(path.join(config.root, ...item.relative.split('/'))), file))
+    .sort((x, y) => y.relative.split('/').length - x.relative.split('/').length)[0] ?? candidates[0];
+  const fileMap = new Map();
+  const checkerByFile = new Map();
+  const ownerByFile = new Map();
+  for (const [name, candidates] of occurrences) {
+    const owner = owningProject(candidates, name);
+    ownerByFile.set(name, owner);
+    fileMap.set(name, sourceIn.get(`${owner.relative}|${name}`));
+    checkerByFile.set(name, owner.program.getTypeChecker());
   }
   const files = [...fileMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, file]) => file);
   const edges = new Map([...fileMap.keys()].map(file => [file, []]));
@@ -446,11 +455,7 @@ function typeScriptContext(config, loaded, paths) {
   const workspaceNames = new Set(workspaces.map(item => item.name).filter(Boolean));
   for (const [from, sourceFile] of fileMap) {
     const owningWorkspace = workspaceOf(workspaces, from);
-    const candidates = occurrences.get(from) ?? [];
-    // The deepest project directory holding the file owns its resolution: a root tsconfig without paths must not
-    // shadow the app project whose aliases the file actually uses.
-    const project = candidates.filter(item => isInside(path.dirname(path.join(config.root, ...item.relative.split('/'))), from))
-      .sort((x, y) => y.relative.split('/').length - x.relative.split('/').length)[0] ?? candidates[0];
+    const project = ownerByFile.get(from);
     if (!project) continue;
     const references = moduleReferences(ts, sourceFile, project.program.getTypeChecker());
     for (const item of references.unproven) errors.push({

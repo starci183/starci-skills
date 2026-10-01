@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import type { ReactNode } from "react"
-import { LocaleShell, localeMetadata } from "../../features/layouts/LocaleShell"
+import { LocaleShell, localeMetadata } from "@/features/layouts/LocaleShell"
 import "../globals.css"
 
 type LayoutProps = {

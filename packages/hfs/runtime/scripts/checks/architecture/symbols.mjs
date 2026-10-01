@@ -8,7 +8,9 @@
  *                         exported `const Y = X` / `const Y = X.y` (a bare identifier or member that resolves to a function,
  *                         class, const or enum of the repository), `type Y = X` and `interface Y extends X {}` (no body, no
  *                         type arguments, no type parameters): a second name for one declaration. Rename the declaration,
- *                         or import it by its name.
+ *                         or import it by its name. A route file (slot fe.route) binding a declaration to a name Next.js
+ *                         requires of a route segment (generateMetadata, generateStaticParams, ...) is not a second name: the
+ *                         framework fixes that name, so no rename can remove it.
  * Specs and tests are not in the graph. The public entry of an owner is found the way dead-exports.mjs finds it.
  */
 import { canonical } from './config.mjs';
@@ -145,14 +147,23 @@ function declarationAliases(ts, checker, graph, statement) {
   return found;
 }
 
+/** The names Next.js reads from a route segment file (layout, page, route, ...): the framework fixes them. */
+const NEXT_SEGMENT_EXPORTS = new Set([
+  'generateMetadata', 'metadata', 'generateViewport', 'viewport', 'generateStaticParams', 'generateImageMetadata', 'generateSitemaps',
+  'dynamic', 'dynamicParams', 'revalidate', 'fetchCache', 'runtime', 'preferredRegion', 'maxDuration',
+]);
+const ROUTE_SLOT = 'fe.route';
+
 function aliasReexports({ context, graph }) {
   const kind = context.ts.SyntaxKind;
   const violations = [];
   for (const [rel, node] of graph.files) {
+    const frameworkName = name => node.slot === ROUTE_SLOT && NEXT_SEGMENT_EXPORTS.has(name);
     const point = target => node.sourceFile.getLineAndCharacterOfPosition(target.getStart(node.sourceFile));
     const checker = context.checkerFor(node.abs);
     for (const statement of node.sourceFile.statements) {
       for (const alias of declarationAliases(context.ts, checker, graph, statement)) {
+        if (frameworkName(alias.name)) continue;
         const at = point(alias.node);
         violations.push({
           ruleId: 'HFS_ALIAS_REEXPORT', path: rel, line: at.line + 1, column: at.character + 1, name: alias.name, aliasOf: alias.of,
@@ -170,7 +181,7 @@ function aliasReexports({ context, graph }) {
         continue;
       }
       for (const element of clause.elements) {
-        if (!element.propertyName || element.propertyName.text === element.name.text) continue;
+        if (!element.propertyName || element.propertyName.text === element.name.text || frameworkName(element.name.text)) continue;
         const at = point(element);
         violations.push({
           ruleId: 'HFS_ALIAS_REEXPORT', path: rel, line: at.line + 1, column: at.character + 1,
