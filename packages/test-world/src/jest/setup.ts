@@ -107,6 +107,13 @@ const runMigrate = async (config: AnyTestWorldConfig, context: RunContext): Prom
     }
 }
 
+/**
+ * A seed with every user id the realm file pins replaced by the id this slot's realm stores it under, so a seeded row that
+ * names a Keycloak user (the token `sub`) matches the slot's realm. Ids are UUIDs, so a plain text replacement is exact.
+ */
+export const withRealmUserIds = (sql: string, context: Pick<RunContext, "infra">): string =>
+    Object.entries(context.infra.keycloak?.userIds ?? {}).reduce((text, [pinned, stored]) => text.split(pinned).join(stored), sql)
+
 const applySeeds = async (config: AnyTestWorldConfig, context: RunContext, root: string): Promise<void> => {
     const postgres = postgresOf(config)
     if (postgres === null) return
@@ -117,7 +124,7 @@ const applySeeds = async (config: AnyTestWorldConfig, context: RunContext, root:
         for (const seed of connection.seeds ?? []) {
             const file = resolve(root, seed)
             if (!existsSync(file)) throw worldError(TestWorldErrorCode.ConfigInvalid, `seed file ${seed} of connection ${connection.name} does not exist`)
-            await withClient(database.url, (client) => client.query(readFileSync(file, "utf8")))
+            await withClient(database.url, (client) => client.query(withRealmUserIds(readFileSync(file, "utf8"), context)))
         }
     }
 }

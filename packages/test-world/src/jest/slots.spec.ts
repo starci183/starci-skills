@@ -7,7 +7,7 @@ import type { AnyTestWorldConfig } from "../config/types"
 import { TestWorldErrorCode } from "../errors"
 import { LIBRARY, SLOT_ENV, STATE_FILE_ENV, STATE_VERSION, readRunContext, removeRunState, writeRunState } from "./context"
 import type { RunContext } from "./context"
-import { DEFAULT_WORKERS, slotCountOf } from "./setup"
+import { DEFAULT_WORKERS, slotCountOf, withRealmUserIds } from "./setup"
 
 const slotContext = (slot: number): RunContext => ({
     slot,
@@ -70,4 +70,11 @@ test("a run has one slot per jest worker, capped by the declaration's workers (d
     assert.equal(slotCountOf(config(), undefined), 1)
     assert.equal(slotCountOf(config(3), 7), 3)
     assert.equal(slotCountOf(config(3), 2), 2)
+})
+
+test("a slot's seeds name the realm users by the ids the slot's realm stores them under", () => {
+    const pinned = "4f1c2b7e-8a3d-4e5f-9b6a-0c1d2e3f4a5b"
+    const context = { infra: { toxiproxyApi: "x", keycloak: { userIds: { [pinned]: "stored-id" } } } } as unknown as RunContext
+    assert.equal(withRealmUserIds(`INSERT INTO persons (id) VALUES ('${pinned}'); -- ${pinned}`, context), "INSERT INTO persons (id) VALUES ('stored-id'); -- stored-id")
+    assert.equal(withRealmUserIds("SELECT 1", { infra: { toxiproxyApi: "x" } } as unknown as RunContext), "SELECT 1")
 })

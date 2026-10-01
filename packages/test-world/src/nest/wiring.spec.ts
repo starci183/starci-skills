@@ -35,6 +35,7 @@ const context = (overrides: Partial<RunContext["infra"]> = {}): RunContext => ({
             clientId: "todo-api",
             adminUser: "admin",
             adminPassword: "admin",
+            userIds: {},
             clientSecrets: { "admin-reader": "generated-secret" },
         },
         ...overrides,
