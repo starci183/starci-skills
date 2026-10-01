@@ -138,7 +138,7 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null, wor
   // Names: the sidebar shows the tab title Orca set at creation (--title) or
   // by terminal rename; `terminal list`'s `title` is the pane title the agent
   // CLI rewrites on every turn, so it is never compared. A managed worker gets
-  // its [Op] tab title only through the rename after dispatch-show, whose
+  // its [Op] tab title only through the rename once its start names the agent terminal, whose
   // receipt the job keeps (payload.managed.terminalTitle): a live job whose
   // rename did not apply is the unnamed worker-task_<id> row the owner saw.
   const liveJobHandles = new Set(jobs.filter((job) => job.kind !== 'kernel' && ['running', 'answering', 'leased'].includes(job.status)).flatMap((job) => jobTerminalHandles(job, job.payload)));
@@ -172,7 +172,7 @@ export function orcaTreeFindings(db, terminals, { repo = null, owned = null, wor
     const runId = runIdOf(payload);
     const expected = currentRun.get(job.workflow_id) ?? null;
     if (!runId || !expected || runId === expected) continue;
-    if (payload?.taskClosed?.ok === true) continue;
+    if (!WORKER_HOLDING_STATUSES.includes(job.status)) continue;
     findings.push({ code: 'TASK_OUTSIDE_RUN', workflowId: job.workflow_id, jobId: job.job_id,
       taskId: payload?.orca?.taskId ?? payload?.managed?.taskId ?? null, runId, expectedRunId: expected,
       detail: `job ${job.job_id} holds an open Task in run ${runId}; the workflow's run is ${expected}` });

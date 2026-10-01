@@ -42,10 +42,13 @@ settle:
     never settled unconsumed; lease and budget_reservation rows released -
     a
     settle frees the slot; the worker terminal is closed (terminal-close for
-    a command terminal, worker-stop + worker-release for a managed worker)
-    and the op's Orca Task is closed with `task-update --status done`,
-    recorded as taskClosed on the receipt and the job payload - a settled op
-    leaves no live terminal, worker or open Task
+    a command terminal; worker-release for a managed worker, preceded by
+    worker-stop only when worker-show reads the Dispatch not settled by the
+    op's own worker_done - managedWorker.dispatch {state, workerDone} on the
+    receipt and the job payload). The op's Orca Task settled with its
+    Dispatch (the op sent worker_done after api report); settle never
+    issues task-update. A settled op leaves no live terminal, worker or
+    open Task
     (modules/kernel/start-workflow.yaml orcaTree is the rule);
     events 'op-settled' {verdict}; the settled op's agent session files may
     then move under runtimes.yaml allocation.housekeeping.archiveRoot keeping

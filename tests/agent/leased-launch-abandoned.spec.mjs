@@ -114,10 +114,10 @@ test('spawnAgent hands the caller the worker terminal before it attests the laun
   // The handle is recorded durably the moment the assignee is known: an attestation that then fails still leaves
   // the caller the handle (and the Dispatch) to account for (nivo inc-e523617a3c31).
   const seen=[];
-  const io={trust:()=>({status:'ok'}),start:()=>({ok:true,outcome:'ok',dispatchId:'ctx_1',state:'ready'}),
-    assignee:()=>({ok:true,assigneeHandle:'term_1'}),rename:()=>({ok:true}),
+  const io={trust:()=>({status:'ok'}),start:()=>({ok:true,outcome:'ok',dispatchId:'ctx_1',taskId:'task_1',agentTerminalHandle:'term_1',state:'ready'}),
+    rename:()=>({ok:true}),
     show:()=>({ok:true,state:'ready',effective:{agent:'claude',model:'another-model'}}),stop:()=>({ok:true}),release:()=>({ok:true})};
-  const out=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'t',task:'task_1',run:'run_1',
+  const out=spawnAgent({provider:'claude',model:'claude-opus-5-5',worktree:'w',title:'t',spec:'s',run:'run_1',request:{job:'j'},
     onCreated:(handle,dispatch)=>seen.push([handle,dispatch]),io});
   assert.equal(out.ok,false,'the launch itself fails at attestation');
   assert.equal(out.step,'attestation');

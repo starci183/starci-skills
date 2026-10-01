@@ -167,7 +167,7 @@ test('repeat-reject never counts a lease-overlap refusal; real launcher failures
   assert.equal(isLeaseOverlapRefusal({step:'reserve',error:`resource path:${EN} overlaps durable lease path:${EN} held by j1`}),true);
   assert.equal(isLeaseOverlapRefusal({step:'reserve',error:'machine arbiter unavailable: EBUSY'}),false);
   assert.equal(isLeaseOverlapRefusal({step:'reserve',error:`resource path:${EN} overlaps durable lease path:${EN} held by j1; resource path:x has no declared capacity`}),false,'a mixed refusal still counts');
-  assert.equal(isLeaseOverlapRefusal({step:'task-create',error:overlap}),false);
+  assert.equal(isLeaseOverlapRefusal({step:'worker-start',error:overlap}),false);
   seedWorkflow(ledger,{id:WF,now:NOW-300*MIN,events:[
     ...[1,2].map(n=>({kind:'dispatch-rejected',entityType:'job',entityId:'op-code.refactor-devin0000001',payload:{provider:'devin',step:'reserve',error:overlap},created_at:NOW-n*10*MIN})),
     ...[1,2].map(n=>({kind:'dispatch-rejected',entityType:'job',entityId:`op-x-000000000${n}`,payload:{provider:'devin',step:'reserve',error:'machine arbiter unavailable: EBUSY'},created_at:NOW-n*10*MIN})),

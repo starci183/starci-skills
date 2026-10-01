@@ -29,7 +29,6 @@ export function fakeCriticOrca({ verdict = null, mode = 'judge', onStart = null 
     removeCriticWorkspace: rec('critic-workspace-remove', ({ dir }) => { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); return { ok: true }; }),
     runShow: rec('run-show', () => ({ ok: false })),
     runCreate: rec('run-create', () => ({ ok: true, runId: 'run_critic' })),
-    taskCreate: rec('task-create', () => ({ ok: true, taskId: `task_critic_${n + 1}` })),
     trust: rec('trust', () => ({ status: 'ok', paths: [] })),
     workerStart: rec('worker-start', (a) => {
       if (mode === 'launch-failed') return { ok: false, outcome: 'failed', effectState: 'none', dispatchId: null, errorCode: 'agent_unavailable', error: 'worker_start_failed' };
@@ -41,9 +40,9 @@ export function fakeCriticOrca({ verdict = null, mode = 'judge', onStart = null 
       if (mode === 'judge') fs.writeFileSync(path.join(a.worktree, 'verdict.json'), JSON.stringify(typeof verdict === 'function' ? verdict(a) : verdict));
       if (mode === 'judge' || mode === 'done-no-verdict') messages.unshift({ id: `m_done_${n}`, type: 'worker_done', from_handle: terminal, payload: JSON.stringify({ dispatchId }) });
       if (mode === 'escalate') messages.unshift({ id: `m_esc_${n}`, type: 'escalation', from_handle: terminal, subject: 'Escalation', body: 'the images cannot be opened' });
-      return { ok: true, outcome: 'ok', effectState: 'committed', dispatchId, state: 'ready' };
+      // worker-start --spec files the critic's Task and names its agent terminal in the receipt.
+      return { ok: true, outcome: 'ok', effectState: 'committed', dispatchId, taskId: `task_critic_${n}`, agentTerminalHandle: terminal, state: 'ready' };
     }),
-    dispatchShow: rec('dispatch-show', () => ({ ok: true, assigneeHandle: `term_critic_${n}` })),
     terminalRename: rec('terminal-rename', () => ({ ok: true })),
     workerShow: rec('worker-show', ({ dispatch }) => {
       const w = workers.get(dispatch);

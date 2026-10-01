@@ -36,7 +36,7 @@ import { productLocaleFor } from '../product-locale.mjs';
 import { isSeamCut, seamStubForDispatch, cutManifestOf } from '../cut-seam.mjs';
 import { kernelOverrideFor, refuseSettleBacklog } from '../kernel-authority.mjs';
 import { jobDirOf } from '../job-artifacts.mjs';
-import { packetFileOf } from '../../machine/task-spec.mjs';
+import { packetFileOf, taskSpecOf } from '../../machine/task-spec.mjs';
 import { ENV_GATED_OPS } from '../verify-failure.mjs';
 import { workflowWorktreeOf } from '../../machine/workflow-tree.mjs';
 import { bindGuardTerminal } from '../../guards/hook-install.mjs';
@@ -279,24 +279,23 @@ export default {
   const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, scratchDir }) + workflowWorktreePromptRules(workflowTree);
   const packetFile = repo ? packetFileOf(jobDirOf(repo, job.workflow_id, jobId), job.try_no) : null;
   // The names a person reads (owner request 2026-09-27, scripts/lib/display-names.mjs): the Task display
-  // name, the managed worker's tab (terminal-rename after dispatch-show) and the command terminal's title
+  // name, the managed worker's tab (terminal-rename once its handle is known) and the command terminal's title
   // are all `[Op] <op label> · <what> · <workflow name>`. Left untitled, a terminal shows the provider's
   // own auto-summary ("devin.exe: Kernel orchestration for…"). op_id and job_id stay the keys.
   const opWhat = jobWhat({ payload, op, nodes: latestGraphNodesOf(db, job.workflow_id), repo });
   const terminalTitle = `[Op] ${jobDisplayName({ op, what: opWhat, workflowName: workflowNameOf(db, job.workflow_id) })}`;
   const title = terminalTitle;
-  // The one launch (contract-changes/launch-through-worker-start.yaml): the Task, then worker-start --agent on the
-  // op's own worktree. The launch model is the persisted route's, else the pool's pin at the kind's tier, else the
+  // The one launch (contract-changes/launch-through-worker-start.yaml, worker-start-spec.yaml): worker-start --spec
+  // --agent on the op's own worktree, which files the Task in the same call. The launch model is the persisted route's, else the pool's pin at the kind's tier, else the
   // profile's requestedModel (resolveWorkerLaunchModel); a card that takes no model flag (devin) starts on its default.
   const launchModel = resolveWorkerLaunchModel({ target: model.target, requestedModel: model.requestedModel,
     payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
   const orcaCommands = [
     { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${workflowNameOf(db, job.workflow_id)} — ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow by the Kernel; later operations reuse it' },
-    { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.try_no}`, '--display-name', title, '--spec', '<prompt>', '--from', '<kernel-terminal>', '--json'] },
-    { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', checkoutRoot, '--agent', model.provider ?? '<agent>',
-      ...(launchModel.modelId ? ['--model', launchModel.modelId, ...(launchModel.effort ? ['--effort', launchModel.effort] : [])] : []), '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'] },
-    { step: 'assignee', argv: ['orchestration', 'dispatch-show', '--task', '<task-id>', '--from', '<kernel-terminal>', '--json'] },
-    { step: 'title', argv: ['terminal', 'rename', '--terminal', '<assignee>', '--title', title, '--json'] },
+    { step: 'worker-start', argv: ['orchestration', 'worker-start', '--spec', '<prompt>', '--task-title', `${op} #${job.try_no}`, '--worktree', checkoutRoot, '--agent', model.provider ?? '<agent>',
+      ...(launchModel.modelId ? ['--model', launchModel.modelId, ...(launchModel.effort ? ['--effort', launchModel.effort] : [])] : []), '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>',
+      '--retry-request', '<uuid derived from the job + lease>', '--json'], note: 'Orca files the Task (result.taskId) and names the agent terminal (result.worker.agentTerminalHandle)' },
+    { step: 'title', argv: ['terminal', 'rename', '--terminal', '<agent-terminal>', '--title', title, '--json'] },
     { step: 'attest', argv: ['orchestration', 'worker-show', '--dispatch', '<dispatch-id>', '--json'], note: 'effective agent/model must equal the route' },
   ];
 
@@ -459,7 +458,7 @@ export default {
 };
 
 function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile = null, worktree, checkoutRoot = worktree, title, reserve, inputs = null, guard = null, launchModel, scratchDir = null }, internals, emit) {
-  const { cleanupManagedWorker, rejectDispatch, ensureWorkflowRun, createOperationTask, recordLaunchTerminal, skillRoot, AGENT_HIERARCHY_SCHEMA, operationNodeId, kernelNodeId, buildContractMarkdown, fileContract } = internals;
+  const { cleanupManagedWorker, rejectDispatch, ensureWorkflowRun, recordLaunchTerminal, skillRoot, AGENT_HIERARCHY_SCHEMA, operationNodeId, kernelNodeId, buildContractMarkdown, fileContract } = internals;
   const db = ledger.db;
 
   let trust = null;
@@ -492,18 +491,18 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   const preflight = depthPreflight({ parentDispatch: run.kernelPayload?.managed?.dispatchId ?? null });
   if (preflight.refusal) return reject({ step: 'depth', code: preflight.refusal.code, error: preflight.refusal.error });
 
-  // 3. Task — the operation's contract. The spec is the rendered packet prompt.
-  const task = createOperationTask({ runId, prompt, op, title, attempt: job.try_no, kernelHandle, jobId, packetFile });
-  if (!task?.ok || !task.taskId) {
-    return reject({ step: 'task-create', error: task?.error ?? 'task-create returned no taskId' });
-  }
-  const taskId = task.taskId;
-
-  // 4-6. The one agent launch (scripts/agent/lib.mjs spawnAgent): pre-trust, worker-start --agent on the op's worktree,
-  // the exact assignee (dispatch-show, never a second orchestration dispatch), its [Op] title, and the attestation
-  // that the worker's EFFECTIVE agent/model equal the route - a mismatch is a provider-side defect, rejected with the
-  // typed infra-provider incident.
-  const launched = spawnAgent({ provider: model.provider, model: modelId, effort, worktree: checkoutRoot, title, task: taskId, run: runId, from: kernelHandle, preflight,
+  // 3-6. The one agent launch (scripts/agent/lib.mjs spawnAgent): pre-trust, then worker-start --spec on the op's
+  // worktree - Orca files the operation Task (the rendered packet prompt) in the workflow Run from the CURRENT kernel
+  // terminal and starts its worker in one call, so a refused start leaves no orphan Task - then the agent terminal
+  // (the start receipt, else worker-show), its [Op] title, and the attestation that the worker's EFFECTIVE agent/model
+  // equal the route - a mismatch is a provider-side defect, rejected with the typed infra-provider incident. No
+  // `--parent`: the Run's coordinator places the op under the Kernel (smoke 2026-10-01, launch.report.md). A packet
+  // longer than the host's argv takes is written to the job's evidence directory and the spec points at it
+  // (task-spec.mjs; inc-826e077777de). The start's ledger identity is the job and its lease token (calls.yaml
+  // worker-start replay: request): a lost receipt replays this start, and a new lease is a new start.
+  const spec = taskSpecOf({ prompt, file: packetFile, op, jobId, attempt: job.try_no }).spec;
+  const launched = spawnAgent({ provider: model.provider, model: modelId, effort, worktree: checkoutRoot, title, spec, taskTitle: `${op} #${job.try_no}`,
+    run: runId, from: kernelHandle, preflight, request: { job: jobId, lease: reserve.leaseToken },
     onCreated: (handle) => recordLaunchTerminal(ledger, jobId, handle), io: { cleanup: cleanupManagedWorker } });
   trust = launched.trust ?? null;
   if (!launched.ok) {
@@ -511,7 +510,7 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
       ...(launched.step === 'attestation' ? { signal: launched.error } : { error: launched.error }),
       effectState: launched.effectState, observation: launched.observation ?? null, cleanup: launched.cleanup ?? null, details: launched.details ?? null });
   }
-  const dispatchId = launched.dispatchId;
+  const { dispatchId, taskId } = launched;
   // The op's guard, keyed by the terminal Orca exports as ORCA_TERMINAL_HANDLE (scripts/guards/hook-install.mjs bindGuardTerminal).
   if (guard?.receipt && typeof guard.receipt.jobFile === 'string') {
     try { guard.receipt.terminal = bindGuardTerminal({ skillRoot, handle: launched.terminal, jobFile: guard.receipt.jobFile }); }

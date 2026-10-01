@@ -413,8 +413,8 @@ selection: |-
   after an allowed failure with verified no-effect state. This policy never installs an agent,
   authenticates a provider, grants tools or expands the workflow authority. Every pool launches the one
   way (modules/kernel/contract-changes/launch-through-worker-start.yaml): `orca orchestration worker-start --agent
-  <runtime> [--model <id> --effort <level>]` on an existing Task, the unattended flags from Orca's per-agent default
-  args; the launcher resolves the exact assignee (dispatch-show) and attests the effective agent and model
+  <runtime> [--model <id> --effort <level>] --spec <prompt>` (Orca files the Task), the unattended flags from Orca's per-agent
+  default args; the launcher takes the agent terminal from the start receipt (else worker-show) and attests the effective agent and model
   (worker-show). Devin takes no model flag (Orca: --model is for Claude, Codex and Cursor) and starts on its CLI default.
 costPolicy: |-
   Runtime pools are provider quota windows: the Codex pool carries gpt-6-luna for easy and medium work and

@@ -55,6 +55,9 @@ approvalMode:
 start:
   api: orchestration.worker-start
   agentArgument: devin
+  # The agent's own approval-bypass mode. Orca applies it from settings.agentDefaultArgs; the host preflight refuses a launch
+  # when that setting lacks it (the agent would stop at an approval prompt no one answers).
+  bypassFlag: '--permission-mode bypass'
   modelArgument: false
 release:
   api: orchestration.worker-release

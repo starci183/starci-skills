@@ -102,11 +102,11 @@ test('a settled job still holding a lease: reported and a runtime-defect DI, nev
   assert.equal(calls.decisions[0].idempotencyKey, 'lease-leak:nivo-backend:op-1');
 });
 
-/** runGc seams: one settled op worker to collect, no lanes, no temp, no tasks. `closes` counts real closes. */
+/** runGc seams: one settled op worker to collect, no lanes, no temp. `closes` counts real closes. */
 function gcDeps(closes) {
   return { list: () => listed, read: () => ({ ok: true, screen: '' }), procs: async () => [], table: () => [], sup: () => ({ seat: null, jobs: [], leases: [] }),
     ledgers: () => [view()], git: () => ({ ok: true, stdout: '' }), landBusy: async () => false, sweepTmp: async () => ({ ok: true, skipped: [], deleted: [] }),
-    taskUpdate: () => ({ ok: true }), fsx: { list: () => [], move: () => { throw Error('no move in a spec'); }, remove: () => { throw Error('no remove'); } },
+    fsx: { list: () => [], move: () => { throw Error('no move in a spec'); }, remove: () => { throw Error('no remove'); } },
     readState: () => ({ seen: {} }), freemem: () => 0, close: (h) => { closes.push(h); return { ok: true, proof: 'gone' }; }, kill: () => true, reap: () => ({ checked: false }),
     workers: () => ({ ok: true, workers: [] }), activeWorkers: () => [] };
 }

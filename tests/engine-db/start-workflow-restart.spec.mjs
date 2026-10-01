@@ -239,7 +239,8 @@ test('the workflow Orca Run survives a kernel restart — one workflow Run, one 
 
   const runCreates=f.calls().filter(c=>c==='orchestration run-create');
   assert.equal(runCreates.length,2,`one entry Run and one workflow Run, never one per kernel: ${f.calls().join(', ')}`);
-  const opTasks=f.callArgv().filter(argv=>argv.slice(0,2).join(' ')==='orchestration task-create'&&/^code\.refactor #/.test(argv[argv.indexOf('--task-title')+1]));
+  // worker-start --spec files each op Task: the op starts are the op Tasks.
+  const opTasks=f.callArgv().filter(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start'&&/^code\.refactor #/.test(argv[argv.indexOf('--task-title')+1]));
   assert.equal(opTasks.length,2);
   assert.equal(opTasks[0][opTasks[0].indexOf('--from')+1],firstKernel);
   assert.equal(opTasks[1][opTasks[1].indexOf('--from')+1],secondKernel,

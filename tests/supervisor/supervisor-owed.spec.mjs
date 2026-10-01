@@ -178,7 +178,7 @@ test('patterns with no incident: 3+ failures in a row since the last success, th
       {kind:'op-settled',entityType:'job',entityId:j,payload:{reportFiled:false,status:'failed'},created_at:NOW-(90-n)*MIN}]),
     {kind:'op-dispatched',entityType:'job',entityId:'op-c-0000000003',payload:{model:'claude-agent'},created_at:NOW-80*MIN},
     {kind:'op-settled',entityType:'job',entityId:'op-c-0000000003',payload:{reportFiled:false},created_at:NOW-70*MIN},
-    ...[1,2].map(n=>({kind:'dispatch-rejected',entityType:'job',entityId:`op-d-000000000${n}`,payload:{provider:'devin',step:'task-create',error:''},created_at:NOW-n*10*MIN})),
+    ...[1,2].map(n=>({kind:'dispatch-rejected',entityType:'job',entityId:`op-d-000000000${n}`,payload:{provider:'devin',step:'worker-start',error:''},created_at:NOW-n*10*MIN})),
     {kind:'dispatch-rejected',entityType:'job',entityId:'op-e-0000000001',payload:{provider:'devin',step:'readiness',error:'timeout'},created_at:NOW-10*MIN},
     ...[1,2,3,4].map(n=>({kind:'route-decided',entityType:'job',entityId:'op-scope.define-0000000001',payload:{},created_at:NOW-n*10*MIN})),
   ]});

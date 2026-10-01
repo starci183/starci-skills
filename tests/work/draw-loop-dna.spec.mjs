@@ -209,7 +209,7 @@ test('the critic: the product rubric or the default, a verdict parsed and gate-c
   const orca = fakeCriticOrca({ verdict: passingVerdict(DEFAULT_RUBRIC, 9), onStart: (a) => { seen = { dir: a.worktree, files: fs.readdirSync(a.worktree).sort() }; } });
   const critique = await runCritic({ images: [{ path: png, label: 'desktop' }], html: path.join(dir, 'a.html'), rubric: DEFAULT_RUBRIC, critic: allocationSettings().drawLoop.critic, placement: { tmpRoot: dir }, orca });
   assert.deepEqual(seen.files, ['render-1.png', 'rubric.yaml', 'screen.html'], 'the critic sees only the PNGs, the HTML and the rubric');
-  const spec = orca.calls.find((c) => c[0] === 'task-create')[1].spec;
+  const spec = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
   assert.match(spec, /did NOT draw this screen/);
   assert.equal(critique.outcome, 'judged');
   assert.equal(critique.verdict.beauty, 9);

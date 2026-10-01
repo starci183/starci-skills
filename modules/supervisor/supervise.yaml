@@ -658,7 +658,7 @@ guardrails:
       owner's chat - and a leftover one is closed. In mode kernel it holds exactly one "[Supervisor] main" terminal (kernelSeat singleton) and the
       "[Worker] <cluster>" terminals of its live jobs, nothing else of the supervisor's - no probe or
       helper terminal, task or run; a probe or cleanup runs as a CLI call from the Supervisor's own
-      terminal. An Orca action that can only be issued from a bound terminal (task-update fenced to a
+      terminal. An Orca action that can only be issued from a bound terminal (worker-start --spec fenced to a
       run's coordinator) is not the supervisor's; it is fixed in the runtime so the kernel, settle or
       finish performs it.
   - id: notice-delivery-proven

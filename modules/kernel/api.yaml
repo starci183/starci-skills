@@ -144,7 +144,7 @@ conventions:
     `mklink`, New-Item -ItemType Junction|SymbolicLink|HardLink and Create*Link are refused (LINK_CREATE)
     - the hook blocks the command (exit 2) with a typed code and the remedy; (2)
     <guards root>/jobs/<job>.json names the job's owned paths as absolute paths, bound to the agent's
-    Orca terminal (<guards root>/terminals/<handle>.json, bound after dispatch-show, removed when that
+    Orca terminal (<guards root>/terminals/<handle>.json, bound once the start names the terminal, removed when that
     terminal closes); (3) every checkout the job
     writes gets a reference-transaction hook (starci-history-guard) that git runs for every caller:
     main, master and every checked-out branch only move forward and are never deleted, and an op

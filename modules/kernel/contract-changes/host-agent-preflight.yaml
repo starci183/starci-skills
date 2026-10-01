@@ -1,0 +1,17 @@
+id: host-agent-preflight
+effectiveAt: '2026-10-02T03:00:00+07:00'
+summary: >-
+  AN AGENT THE HOST CANNOT RUN IS REFUSED AT START, NEVER SILENTLY LIVE (lane ORCA). scripts/agent/lib.mjs spawnAgent, the one
+  launch every Kernel, [Supervisor], [Worker], op and critic start goes through (start-workflow and api dispatch included), asks
+  scripts/agent/host-agents.mjs hostAgentVerdict before it trusts or starts anything: (1) agent-disabled-on-host when Orca's own
+  settings (orca-data.json of the active profile, settings.disabledTuiAgents) disable the agent; (2) agent-binary-missing when the
+  agent's CLI binary (Orca's agentCmdOverrides command, else the card's start.cli, else the agent id) is not on PATH, the message
+  naming the binary; (3) model-not-listed when the model is none the runtime declares for that provider (modules/models prices,
+  registry defaults, runtimes.yaml pool models; a card with no model flag, Devin, takes none). The refusal is step host-agent with
+  effectState none, so start-workflow may fall through to the next routed member and a dispatch spends no try. No agent list is
+  hard-coded and nothing is removed from modules/models. A test process reads no host state unless a spec passes its own
+  settings file and PATH folders. Adds three failure codes: agent-disabled-on-host, agent-binary-missing, model-not-listed.
+paths:
+  - scripts/agent/host-agents.mjs
+  - scripts/agent/lib.mjs
+  - modules/kernel/failure-codes.yaml

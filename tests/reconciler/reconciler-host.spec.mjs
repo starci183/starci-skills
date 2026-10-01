@@ -221,8 +221,8 @@ test('boot: waits for Orca, then services in order, dedupe (dry-run in shadow), 
   const up = await c.reconcile('host:boot', ctx);
   assert.equal(up.ok, true);
   assert.deepEqual(up.steps.map((s) => s.step), ['orca', 'harness-ui', 'harness-tunnel', 'ask-gateway', 'ask-tunnel', 'telegram-bridge', 'dedupe',
-    'reconcile --orphan-kernel-jobs', 'reconcile --orca-tasks', 'seat', 'seat:supervisor']);
-  assert.deepEqual(ctx.calls.api.map((a) => `${a.id} ${a.verb} ${a.argv.join(' ')}`), ['nivo-backend reconcile --orphan-kernel-jobs', 'nivo-backend reconcile --orca-tasks']);
+    'reconcile --orphan-kernel-jobs', 'seat', 'seat:supervisor']);
+  assert.deepEqual(ctx.calls.api.map((a) => `${a.id} ${a.verb} ${a.argv.join(' ')}`), ['nivo-backend reconcile --orphan-kernel-jobs']);
   assert.equal(c._state.bootPending, false);
   assert.ok(!(await c.list(ctx)).includes('host:boot'));
 });

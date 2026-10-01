@@ -3,7 +3,7 @@ import { changeWorkflowPhase, resolveIncident, setInboxStatus, updateIncident } 
 import { getWorkflow } from './shared/rows.mjs';
 import { requirePhase } from './shared/lifecycle.mjs';
 import { kernelCustodyOf } from './shared/kernel-seat.mjs';
-import { closeHeldTasks, closeKernelTerminal, releaseKernelSeat, retainAfterEnd } from './shared/workflow-end.mjs';
+import { closeKernelTerminal, releaseKernelSeat, retainAfterEnd } from './shared/workflow-end.mjs';
 import { handoverGateOf } from '../handover.mjs';
 import { closeWorkflowDecisions } from '../../machine/decisions.mjs';
 import { CHECKPOINT_EVENTS, finishWorkflow } from '../workflow-checkpoint.mjs';
@@ -83,13 +83,12 @@ export default {
       kind: 'workflow-finished', payload: { inboxClosed: closed, incidentsClosed, decisionsClosed, alreadyFinished: already, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, ...(handoverFinish ? { handover: handoverFinish } : {}) },
     });
   });
-  const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now, internals);
   const retention = retainAfterEnd(db, now);
 
   const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, incidentsClosed, decisionsClosed, alreadyFinished: already,
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal),
-    tasksClosed, retention, ...(handoverFinish ? { handover: handoverFinish } : {}), ...(land ? { landed: { head: land.head, releasePending: land.releasePending, steps: land.steps.map((st) => st.step) } } : {}) };
-  emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; decisions closed: ${decisionsClosed.length}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
+    retention, ...(handoverFinish ? { handover: handoverFinish } : {}), ...(land ? { landed: { head: land.head, releasePending: land.releasePending, steps: land.steps.map((st) => st.step) } } : {}) };
+  emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; decisions closed: ${decisionsClosed.length}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
   closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:finish` });
 
   },

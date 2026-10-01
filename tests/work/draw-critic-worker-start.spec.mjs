@@ -49,7 +49,7 @@ test('the critic is started through worker-start with the configured provider, m
   assert.equal(start.worktree, seen.dir, 'the worker is placed in the clean dir');
   assert.equal(start.from, 'term_op', 'the worker belongs to the Run of the terminal running the loop');
   assert.deepEqual(seen.files, ['render-1.png', 'rubric.yaml', 'screen.html'], 'the clean dir holds no drawing context');
-  const spec = orca.calls.find((c) => c[0] === 'task-create')[1].spec;
+  const spec = orca.calls.find((c) => c[0] === 'worker-start')[1].spec;
   const at = (f) => path.join(seen.dir, f).replaceAll('\\', '/');
   for (const f of ['render-1.png', 'screen.html', 'rubric.yaml', VERDICT_FILE]) assert.ok(spec.includes(at(f)), `the Task spec names ${f}`);
   assert.match(spec, /the one file you may write is/, 'every other write is forbidden');

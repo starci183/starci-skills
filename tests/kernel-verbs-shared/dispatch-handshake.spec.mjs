@@ -81,8 +81,9 @@ test('healthy stub: dispatch --spawn attests and marks the job running',t=>{
   assert.equal(job?.status,'running',`a successfully attested spawn must mark the job running, got ${job?.status}`);
   assert.equal(job?.worker_id,'dispatch-fake-1','the op is a worker-start worker, keyed by its Dispatch');
   const seen=calls(fx);
-  for(const step of ['orchestration task-create','orchestration worker-start','orchestration dispatch-show','terminal rename','orchestration worker-show'])
+  for(const step of ['orchestration worker-start','terminal rename','orchestration worker-show'])
     assert.ok(seen.includes(step),`fake orca never saw '${step}' — log: ${seen.join(', ')}`);
+  assert.equal(seen.includes('orchestration task-create')||seen.includes('orchestration dispatch-show'),false,'worker-start --spec: no task-create, no dispatch-show');
   assert.equal(seen.includes('terminal create'),false,'no agent terminal is created by the runtime');
   const start=callArgv(fx).find(argv=>argv.slice(0,2).join(' ')==='orchestration worker-start');
   assert.equal(start?.[start.indexOf('--agent')+1],'devin');

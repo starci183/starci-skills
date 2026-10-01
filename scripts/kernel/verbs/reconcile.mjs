@@ -13,15 +13,14 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   validate(args, need) {
-    need(args.job || args['orphan-kernel-jobs'] || args['orca-tasks'],
-      'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks)');
+    need(args.job || args['orphan-kernel-jobs'],
+      'reconcile needs --job <job_id> (or --orphan-kernel-jobs)');
   },
   run({ ledger, args, repo, emit, internals }) {
-    const { reconcileOrphanKernelJobs, reconcileOrcaTasks,
+    const { reconcileOrphanKernelJobs,
       reconcileDrop, reconcileReap, reconcileReleaseWorker, reconcileDeadWorker,
       observeOperationWorker, reserveOpLeases, opLeaseRequests, cleanupManagedWorker } = internals;
   if (args['orphan-kernel-jobs']) return reconcileOrphanKernelJobs(ledger, args);
-  if (args['orca-tasks']) return reconcileOrcaTasks(ledger, args);
   const db = ledger.db, jobId = args.job;
   const job = jobRowOf(db, jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });

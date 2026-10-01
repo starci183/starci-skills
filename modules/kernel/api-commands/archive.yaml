@@ -23,7 +23,7 @@ archive:
     Every reader of a live workflow excludes it: peers read it not running (peer-not-running), the
     Kernel watchdog pass ends with action archived, the Host controller keeps no seat for it and start-workflow
     refuses its goal. Archiving an archived workflow writes nothing and says so.
-  returns: '{ok:true, workflowId, archived:true, archivedAt, reason, by, inboxClosed, incidentsClosed, decisionsClosed:[diId], jobsDropped:[{jobId, priorStatus, leasesReleased, managedWorker?, terminalClosed?}], asksRetired:[dispatchId], kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed, retention} | {ok:true, workflowId, archived:false, alreadyArchived:true, archivedAt}'
+  returns: '{ok:true, workflowId, archived:true, archivedAt, reason, by, inboxClosed, incidentsClosed, decisionsClosed:[diId], jobsDropped:[{jobId, priorStatus, leasesReleased, managedWorker?, terminalClosed?}], asksRetired:[dispatchId], kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, retention} | {ok:true, workflowId, archived:false, alreadyArchived:true, archivedAt}'
   refuses:
     - workflow-unknown
     - archive-needs-reason

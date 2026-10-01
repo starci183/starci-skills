@@ -1,13 +1,12 @@
 // api-lib/workflow-end.mjs — the teardown both ways a workflow ends run (`api finish`, `api archive`;
-// split out of cli.mjs, lane slim-06): the Kernel seat released, every Task the Run still holds
-// closed, the ledger retained, the Kernel terminal closed last. `closeOperationTask` and the worker
-// release helpers stay in cli.mjs (the settle and report paths share them) — they arrive through
-// `internals`, the same extension surface the verbs get.
-import { JOB_STATUSES, clearSignal, recordJobResult, releaseLeases, setJobStatus, updateJob } from '../../../../engine/db/ledger.mjs';
+// split out of cli.mjs, lane slim-06): the Kernel seat released, the ledger retained, the Kernel
+// terminal closed last. An op's Orca Task is never closed here: it settles with the op's own
+// worker_done (or the Dispatch fence settle issues). The worker release helpers stay in cli.mjs
+// (the settle and report paths share them) — they arrive through `internals`, the same extension
+// surface the verbs get.
+import { JOB_STATUSES, clearSignal, recordJobResult, releaseLeases, setJobStatus } from '../../../../engine/db/ledger.mjs';
 import { retainLedgerDb } from '../../../housekeeping/hk-ledger.mjs';
 import { closeSelfSafe } from '../../../machine/close-verify.mjs';
-import { JOB_ROW } from '../../../machine/job-row.mjs';
-import { jobPayloadOf, operationTaskOf } from './rows.mjs';
 
 /**
  * Move a job to `to` along the shortest job_transitions path from its current status (inside the caller's
@@ -48,21 +47,6 @@ export const releaseKernelSeat = (db, workflowId, seat, { status, result, stamp,
     }
   }
   return { kernelSignalsReleased, kernelJobsSettled };
-};
-// A workflow that ends leaves no open Task in its Run. Settle closes an op's Task as it settles;
-// this catches the ones no settle ever reached — a cancelled attempt, a job settled before task
-// closure existed, an op whose task-update was refused (taskClosed.ok false).
-export const closeHeldTasks = (db, workflowId, kernelTerminal, now, internals) => {
-  const tasksClosed = [];
-  for (const row of db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id`).all(workflowId)) {
-    const payload = jobPayloadOf(row);
-    if (!operationTaskOf(payload) || payload?.taskClosed?.ok === true) continue;
-    const result = internals.closeOperationTask(db, row, payload, kernelTerminal);
-    if (!result) continue;
-    tasksClosed.push({ jobId: row.job_id, ...result });
-    updateJob(db, { jobId: row.job_id, payload: { ...payload, taskClosed: result }, at: now });
-  }
-  return tasksClosed;
 };
 // E1 ledger retention: the ending transaction released this kernel's seat, so the ledger is
 // retainable when no other workflow in it is still live — retainLedgerDb re-proves that under the

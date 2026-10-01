@@ -4,6 +4,9 @@ kind: native-managed-agent
 start:
   api: orchestration.worker-start
   agentArgument: codex
+  # The agent's own approval-bypass mode. Orca applies it from settings.agentDefaultArgs; the host preflight refuses a launch
+  # when that setting lacks it (the agent would stop at an approval prompt no one answers).
+  bypassFlag: '--dangerously-bypass-approvals-and-sandbox'
 readiness: worker-start-receipt
 roles:
   - workflow-kernel

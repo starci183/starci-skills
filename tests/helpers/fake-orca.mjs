@@ -80,6 +80,18 @@
 //                          like any other send (no receipt).
 //   STARCI_FAKE_ORCA_OLD_HOST '1': --wait-submit is refused incompatible_runtime before any input (a host
 //                          without prompt receipts behind a CLI that lists the flag).
+//   --retry-request (calls.yaml replay: request) on any verb but `terminal send`: the
+//                          receipt is recorded under the id (state.requests[id]) and a later issue
+//                          of the same id answers that receipt with result.mutation.replayed:true
+//                          and no second effect (state.replays lists them). `orchestration
+//                          request-show --request <id>` answers completed for a recorded id, else
+//                          absent; STARCI_FAKE_ORCA_REQUEST_STATE=<state> forces its answer.
+//   STARCI_FAKE_ORCA_LOSE_RECEIPT '<command>' ('orchestration run-create'): the first issue of
+//                          that command takes effect (and records its receipt under its request id), then answers a
+//                          non-JSON transport error (exit 1) - the lost receipt orcaCall settles.
+//   STARCI_FAKE_ORCA_START_NO_HANDLE '1': a ready worker-start receipt names no
+//                          result.worker.agentTerminalHandle; worker-show's
+//                          result.dispatch.assigneeHandle still does.
 //   STARCI_FAKE_ORCA_PREAMBLE overrides the `orchestration dispatch` preamble
 //                          text (default 'fake dispatch preamble').
 //
@@ -187,8 +199,28 @@ if (log) fs.appendFileSync(log, JSON.stringify({ argv }) + '\n');
 const state = stateFile && fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : { sends: 0 };
 const save = () => { if (stateFile) fs.writeFileSync(stateFile, JSON.stringify(state)); };
 const arg = n => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : null; };
-const out = o => console.log(JSON.stringify(o));
-const fail = (o, code) => { console.log(JSON.stringify(o)); process.exit(code ?? 1); };
+// A replay-request mutation's receipt is recorded under its --retry-request id before it is printed.
+const remember = (o, code) => {
+  const id = argv.includes('--retry-request') && argv.slice(0, 2).join(' ') !== 'terminal send' ? arg('retry-request') : null;
+  // Only a recorded request writes the state: a read never rewrites it (a spec edits it between runs).
+  if (id) { state.requests = { ...(state.requests || {}), [id]: { receipt: o, code } }; save(); }
+  const lose = process.env.STARCI_FAKE_ORCA_LOSE_RECEIPT || '';
+  const command = argv.slice(0, 2).join(' ');
+  if (lose === command && !(state.lostReceipts || []).includes(command)) {
+    state.lostReceipts = [...(state.lostReceipts || []), command]; save();
+    console.log('transport closed before the receipt was written');
+    process.exit(1);
+  }
+};
+const out = o => { remember(o, 0); console.log(JSON.stringify(o)); };
+// STARCI_FAKE_ORCA_STDERR: a harmless line on stderr, like the crashpad registration line the real orca CLI prints in PowerShell.
+if (process.env.STARCI_FAKE_ORCA_STDERR) process.stderr.write(process.env.STARCI_FAKE_ORCA_STDERR + String.fromCharCode(10));
+// Orca 1.4.209 accepts only a UUID as --retry-request (terminal send's own id aside): anything else is invalid_argument.
+if (argv.includes('--retry-request') && argv.slice(0, 2).join(' ') !== 'terminal send' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(arg('retry-request') ?? '')) {
+  console.log(JSON.stringify({ ok: false, error: { code: 'invalid_argument', message: '--retry-request must be the UUID Orca reported in error.data.orchestrationRequestId (or in result.mutation.requestId), or omit the flag' } }));
+  process.exit(1);
+}
+const fail = (o, code) => { remember(o, code ?? 1); console.log(JSON.stringify(o)); process.exit(code ?? 1); };
 const commandModel = command => {
   const match = String(command || '').match(/(?:^|\s)(?:-m|--model)\s+["']?([^\s"']+)/i);
   return match?.[1] ?? null;
@@ -272,6 +304,18 @@ if (argv[0] === 'agent-context') {
   }
   out({ ok: true, schemaVersion: 1, commandCount: commands.length, commands });
   process.exit(0);
+}
+if (verb === 'orchestration request-show') {
+  const id = arg('request');
+  console.log(JSON.stringify({ ok: true, result: { requestId: id, state: process.env.STARCI_FAKE_ORCA_REQUEST_STATE || (state.requests?.[id] ? 'completed' : 'absent') } }));
+  process.exit(0);
+}
+if (verb !== 'terminal send' && arg('retry-request') && state.requests?.[arg('retry-request')]) {
+  const id = arg('retry-request');
+  const recorded = state.requests[id];
+  state.replays = [...(state.replays || []), { verb, id }]; save();
+  console.log(JSON.stringify({ ...recorded.receipt, result: { ...(recorded.receipt.result || {}), mutation: { requestId: id, replayed: true } } }));
+  process.exit(recorded.code);
 }
 if (verb === 'terminal create') {
   state.terminalCommand = arg('command');
@@ -476,7 +520,7 @@ else if (verb === 'terminal rename')
   out({ ok: true, result: { terminal: { handle: arg('terminal'), title: arg('title') } } });
 // ---- orchestration verbs (managed-agent lifecycle) ----
 // Runs are stateful: state.runs[id] = {id, coordinator, objective, lost?}. run-create binds
-// --from as coordinator, run-use re-binds it, and task-create/task-update from any other
+// --from as coordinator, run-use re-binds it, and worker-start/task-update from any other
 // terminal are refused the way a live Orca refused every restarted Kernel after the
 // 2026-09-24 reboot: JSON error on stdout, empty stderr, exit 1. A Run marked lost:true
 // answers run_not_found. A Run the state does not hold keeps the old permissive answers.
@@ -502,20 +546,18 @@ else if (verb === 'orchestration run-show')
   out({ ok: true, result: { run: { id: arg('id'), coordinator_handle: state.runs?.[arg('id')]?.coordinator ?? null } } });
 else if (verb === 'orchestration run-list')
   out({ ok: true, result: { runs: Object.values(state.runs || {}).map(r => ({ id: r.id, objective: r.objective ?? null, coordinator_handle: r.coordinator ?? null })) } });
-else if ((verb === 'orchestration task-create' || verb === 'orchestration task-update') && state.runs?.[arg('run')]?.lost)
+// A Task is filed in a Run (worker-start --spec, task-update) only from that Run's coordinator; a lost Run answers run_not_found.
+else if ((verb === 'orchestration worker-start' || verb === 'orchestration task-update') && state.runs?.[arg('run')]?.lost)
   fail({ ok: false, error: { code: 'run_not_found', message: 'Run ' + arg('run') + ' was not found.' } });
-else if ((verb === 'orchestration task-create' || verb === 'orchestration task-update') && state.runs?.[arg('run')]
+else if ((verb === 'orchestration worker-start' || verb === 'orchestration task-update') && state.runs?.[arg('run')]
   && state.runs[arg('run')].coordinator !== arg('from'))
   fail({ ok: false, error: { code: 'not_run_coordinator', message: 'Terminal ' + arg('from') + ' is not the coordinator of run ' + arg('run') + '.' } });
-else if (verb === 'orchestration task-create' && arg('parent') != null)
-  fail({ ok: false, error: { code: 'runtime_error', message: 'Parent task ' + arg('parent') + ' must belong to run ' + arg('run') + ' (the runtime never passes --parent: the nested Run rule)' } });
-else if (verb === 'orchestration task-create') {
-  // taskSpecs[id]: the spec a worker-start of that Task delivers (the prompt the worker receives).
-  state.taskSpecs = { ...(state.taskSpecs || {}), 'task-fake-1': arg('spec') }; save();
-  out({ ok: true, result: { task: { id: 'task-fake-1', display_name: arg('display-name'), run: arg('run') } } });
-}
+else if (verb === 'orchestration worker-start' && (arg('task') != null || arg('parent') != null || arg('retry-of') != null))
+  fail({ ok: false, error: { code: 'runtime_error', message: 'the runtime starts every worker with --spec (no --task, --parent or --retry-of)' } });
 else if (verb === 'orchestration task-update' && !['pending', 'ready', 'dispatched', 'completed', 'failed', 'blocked'].includes(arg('status')))
   fail({ ok: false, error: { code: 'invalid_argument', message: 'invalid status ' + arg('status') + ', expected one of: pending, ready, dispatched, completed, failed, blocked' } });
+else if (verb === 'orchestration task-update' && state.settledTasks?.[arg('id')])
+  fail({ ok: false, error: { code: 'task_settled', message: 'Task ' + arg('id') + ' was settled by worker_done.' } });
 else if (verb === 'orchestration task-update') {
   // state.tasks[runId] = [{id, status, task_title, display_name}] seeds task-list; an update closes the row.
   const rows = state.tasks?.[arg('run')];
@@ -562,21 +604,28 @@ else if (verb === 'orchestration worker-start') {
     fail({ ok: false, error: { code: 'agent_prompt_stalled' },
       result: { dispatchId: 'dispatch-partial', stage: 'dispatch_input', failedStage: 'dispatch_input', residualResources: ['dispatch-partial'] } });
   }
-  // Orca creates the worker's own agent terminal and injects the Task: the terminal record a real worker leaves.
+  // Orca files the Task from --spec, creates the worker's own agent terminal and injects the Task: the terminal record a real worker leaves.
   state.counter = (state.counter || 0) + 1;
+  const taskId = 'task-fake-' + ((state.workerStarts || []).length + 1);
+  state.taskSpecs = { ...(state.taskSpecs || {}), [taskId]: arg('spec') };
+  state.tasks = { ...(state.tasks || {}), [arg('run')]: [...(state.tasks?.[arg('run')] || []),
+    { id: taskId, status: 'dispatched', task_title: arg('task-title'), display_name: arg('display-name') }] };
   const handle = uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1';
   const command = [arg('agent'), ...(arg('model') ? ['--model', arg('model')] : [])].join(' ');
   state.terminals = { ...(state.terminals || {}), [handle]: { ...(state.terminals?.[handle] || {}), handle, connected: true, writable: true, sent: true,
-    prompt: state.taskSpecs?.[arg('task')] ?? null, command, model: arg('model') ?? null, title: arg('display-name'), tabTitle: arg('display-name'),
+    prompt: arg('spec'), command, model: arg('model') ?? null, title: arg('display-name'), tabTitle: arg('display-name'),
     worktree: arg('worktree'), closed: false } };
-  state.workerStarts = [...(state.workerStarts || []), { agent: arg('agent'), model: arg('model') ?? null, effort: arg('effort') ?? null, task: arg('task'),
+  state.workerStarts = [...(state.workerStarts || []), { agent: arg('agent'), model: arg('model') ?? null, effort: arg('effort') ?? null, task: taskId,
+    spec: arg('spec'), taskTitle: arg('task-title'), retryRequest: arg('retry-request'),
     worktree: arg('worktree'), run: arg('run'), from: arg('from') ?? null, handle }];
   // Every start is its own Dispatch (the first is dispatch-fake-1): a released op never reads as its Kernel's seat.
   const dispatchId = 'dispatch-fake-' + state.workerStarts.length;
   state.agent = arg('agent'); state.model = arg('model'); state.dispatchId = dispatchId; state.assignee = handle;
+  state.assignees = { ...(state.assignees || {}), [dispatchId]: handle };
   state.workerStates = { ...(state.workerStates || {}), [dispatchId]: 'ready' }; save();
-  out({ ok: true, result: { runId: arg('run'), taskId: arg('task'), dispatchId,
+  out({ ok: true, result: { runId: arg('run'), taskId, dispatchId,
     state: 'ready', stage: 'ready',
+    worker: { state: 'ready', ...(process.env.STARCI_FAKE_ORCA_START_NO_HANDLE === '1' ? {} : { agentTerminalHandle: handle }) },
     launch: { effective: { agent: arg('agent'), model: arg('model'), effort: arg('effort') } } } });
 }
 // state.lostDispatches: Dispatches a restarted host no longer knows (after a reboot).
@@ -591,7 +640,8 @@ else if (verb === 'orchestration worker-show') {
   else
     // dispatchDepths[dispatch]: the depth Orca reports for a Dispatch (none when unseeded).
     out({ ok: true, result: { dispatch: { id: arg('dispatch'), task_id: 'task-fake-1', lastHeartbeatAt: state.heartbeatAt ?? null,
-      ...(state.dispatchDepths?.[arg('dispatch')] != null ? { depth: state.dispatchDepths[arg('dispatch')] } : {}) },
+        assigneeHandle: state.assignees?.[arg('dispatch')] ?? 'fake-terminal-1',
+        ...(state.dispatchDepths?.[arg('dispatch')] != null ? { depth: state.dispatchDepths[arg('dispatch')] } : {}) },
       // workerStates[dispatch]: what worker-stop / worker-release left (a seeded Dispatch reads ready).
       worker: { state: state.workerStates?.[arg('dispatch')] ?? 'ready', agent_terminal_handle: 'fake-terminal-1',
         // STARCI_FAKE_ORCA_EFFECTIVE_MODEL: the model the worker really runs, when it is not the requested one.
@@ -667,8 +717,6 @@ else if (verb === 'orchestration worker-read') {
 }
 else if (verb === 'orchestration dispatch')
   out({ ok: true, result: { dispatch: { id: arg('to') ?? 'dispatch-fake-1' }, preamble: process.env.STARCI_FAKE_ORCA_PREAMBLE || 'fake dispatch preamble' } });
-else if (verb === 'orchestration dispatch-show')
-  out({ ok: true, result: { dispatch: { id: state.dispatchId ?? 'dispatch-fake-1', assignee_handle: state.assignee ?? (uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1') } } });
 // Orca's consuming check: state.messages (newest first) addressed to run:<id> are delivered oldest first, up to 50 a
 // Delivery; an open Delivery replays until --ack names it, and the ack call answers the next one. A --terminal that
 // is not the Run's coordinator (state.runs) is refused consumer_fenced, as Orca 1.4.209 did in smoke E2.
@@ -690,6 +738,18 @@ else if (verb === 'orchestration check') {
   save();
   const messages = open ? open[1].ids.map(id => (state.messages || []).find(m => m.id === id)).filter(Boolean) : [];
   out({ ok: true, result: { runId: run, deliveryId: open ? open[0] : null, messages, count: messages.length, acknowledged: ack || null } });
+}
+// A worker_done settles the exact Dispatch (worker state = its outcome) and its Task (completed/failed), as Orca does;
+// state.workerDone records each one, and a later task-update of that Task is refused task_settled (smoke E3).
+else if (verb === 'orchestration send' && arg('type') === 'worker_done') {
+  const dispatchId = arg('dispatch-id'), taskId = arg('task-id'), outcome = arg('outcome');
+  if (!['succeeded', 'failed'].includes(outcome)) fail({ ok: false, error: { code: 'invalid_argument', message: 'worker_done requires --outcome succeeded or --outcome failed' } });
+  state.workerStates = { ...(state.workerStates || {}), [dispatchId]: outcome };
+  state.settledTasks = { ...(state.settledTasks || {}), [taskId]: outcome === 'succeeded' ? 'completed' : 'failed' };
+  for (const rows of Object.values(state.tasks || {})) for (const t of (Array.isArray(rows) ? rows : [])) if (t.id === taskId) t.status = state.settledTasks[taskId];
+  state.workerDone = [...(state.workerDone || []), { dispatchId, taskId, outcome, from: arg('from'), reportPath: arg('report-path'), request: arg('retry-request') }];
+  save();
+  out({ ok: true, result: { message: { id: 'msg-' + state.workerDone.length, type: 'worker_done' } } });
 }
 else if (verb === 'orchestration send')
   out({ ok: true, result: { sent: true } });
