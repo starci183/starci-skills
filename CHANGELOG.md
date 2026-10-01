@@ -7,6 +7,7 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- Lane BOUND: `gate.mjs` type-checks a project only inside its app root (hfs.json of kind app, else the nearest lockfile root). Both tsc programs and the installed-canon lookup ignore any enclosing repository's node_modules, so an import the app does not install is TS2307. An app root with no install is `GATE_INSTALL_MISSING` (exit 2, never measured). The ESLint typed project service is not bounded; the contract change says why. Contract change `gate-tsc-app-root-bound`.
 - Lane ROOT (owner correction): `.starcistacks/` and `.sops.yaml` live at the app root, beside `fe/`, `be/` and `.starciwork`, never under `be/`. Contract change `starcistacks-app-root`.
   - hfs 4.0.2, eslint-canon-be 3.0.2, eslint-canon-fe 8.0.2 (their bundled slots, canon-pins and failure codes change), `@starci/test-world` 1.0.2. The code-patterns binding of the bumped canons is the owner's (publish, then rebind); until then `npm run check` reports `CANON_BINDING_DIGEST` for them.
   - Slots `app.starcistacks` and `app.sops` replace `be.starcistacks` and `be.sops`; a side holding `.starcistacks/` or `.sops.yaml` is `HFS_FORBIDDEN_PRESENT` (repo.side-root-forbidden), and the machine reports `HFS_STACKS_IN_SIDE` for either side (it replaces `HFS_STACKS_IN_FE`).
