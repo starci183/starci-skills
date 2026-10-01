@@ -250,7 +250,7 @@ export function launchRole({ role, state, entry, orca, root = SKILL_ROOT, script
     if (!placed?.ok) {
       launched = { ok: false, step: 'placement', error: `criticWorkspace: ${placed?.error ?? 'no placement'}` };
     } else {
-      record({ workspace: placed.dir, workspaceRepo: placed.repoRoot ?? null });
+      record({ workspace: placed.dir, workspaceRepo: placed.repoRoot ?? null, workspaceOrcaId: placed.orcaId ?? null, workspaceBranch: placed.branch ?? null });
       launched = orca.launchCriticWorker({ critic: { provider: noop.provider, model: noop.model, effort: noop.effort }, dir: placed.dir, prompt, entry });
     }
   } else if (role === 'kernel') {
@@ -501,7 +501,7 @@ export async function runSmoke({ entry = process.env.ORCA_TERMINAL_HANDLE || nul
     cleaned = true;
     for (const role of CLEANUP_ORDER) {
       const a = agentOf(state, role);
-      const unplace = () => settle(() => orca.removeCriticWorkspace({ dir: a.workspace, repoRoot: a.workspaceRepo ?? null }))?.ok === true;
+      const unplace = () => settle(() => orca.removeCriticWorkspace({ dir: a.workspace, repoRoot: a.workspaceRepo ?? null, orcaId: a.workspaceOrcaId ?? null, branch: a.workspaceBranch ?? null }))?.ok === true;
       if (a?.workspace && !a?.dispatchId) out.cleanup.push({ role, workspaceRemoved: unplace() });
       if (!a?.dispatchId) continue;
       const o = observe(settle(() => orca.workerShow({ dispatch: a.dispatchId })));

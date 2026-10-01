@@ -141,6 +141,7 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
   const wfr = fakeWorkflowRuntime(tmp, { ...runtime, unlisted });
   let runs = 0;
   const rec = (name, fn) => (args = {}) => { calls.push([name, args]); return fn(args); };
+  const placements = new Map();
   const wrappers = {
     runShow: rec('run-show', () => ({ ok: false })),
     runCreate: rec('run-create', ({ from }) => { runs += 1; return { ok: true, runId: `run_${runs}`, from }; }),
@@ -191,8 +192,20 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
     },
     startWorkerAgent: (opts) => startWorkerAgent({ ...opts, start: client.startAgent }),
     // The placement is a temp directory here; tests/work/draw-critic-worker-start.spec.mjs proves the real worktree placement.
-    criticWorkspace: rec('critic-workspace', () => ({ ok: true, dir: fs.mkdtempSync(path.join(tmp, 'starci-draw-critic-')), repoRoot: tmp })),
-    removeCriticWorkspace: rec('critic-workspace-remove', ({ dir }) => { fs.rmSync(dir, { recursive: true, force: true }); return { ok: true }; }),
+    // Orca registers the placement (an id and a branch); its removal needs both, as removeOrcaWorktree does, or the worktree stays listed.
+    criticWorkspace: rec('critic-workspace', () => {
+      const dir = fs.mkdtempSync(path.join(tmp, 'starci-draw-critic-'));
+      const orcaId = `wt_critic_${placements.size + 1}`;
+      placements.set(orcaId, { dir, branch: `draw-critic-${placements.size + 1}` });
+      return { ok: true, dir, repoRoot: tmp, orcaId, branch: placements.get(orcaId).branch };
+    }),
+    removeCriticWorkspace: rec('critic-workspace-remove', ({ dir, orcaId, branch }) => {
+      const placed = placements.get(orcaId);
+      if (!placed || placed.dir !== dir || placed.branch !== branch) return { ok: false, error: 'removal needs the placement orcaId and branch' };
+      placements.delete(orcaId);
+      fs.rmSync(dir, { recursive: true, force: true });
+      return { ok: true };
+    }),
     launchCriticWorker: (opts) => launchCriticWorker({ ...opts, orca: { ...wrappers } }),
     workerShow: wrappers.workerShow, workerRead: wrappers.workerRead, workerStop: wrappers.workerStop,
     workerRelease: wrappers.workerRelease, taskUpdate: wrappers.taskUpdate, worktreeList: wrappers.worktreeList,
@@ -218,7 +231,7 @@ function fakeOrca(t, { refuse = null, silent = null, releaseUnknownOnce = null, 
       if (row.releasePending && !controllerStuck && [...workers.values()].every((w) => w.released)) wfr.workflow.release({ controller: true }, row.workflowId);
     }
   };
-  return { client, calls, workers, tmp, app, wfr, launches, tick, names: () => calls.map((c) => c[0]) };
+  return { client, calls, workers, tmp, app, wfr, launches, placements, tick, names: () => calls.map((c) => c[0]) };
 }
 
 const clock = (fake) => { let now = 0; return { now: () => now, sleep: async (ms) => { now += ms; await fake.tick(); } }; };
@@ -261,6 +274,7 @@ test('every nesting path starts through the runtime launchers at the depth Orca 
   assert.equal(names.includes('task-update'), false, 'worker_done settled every Task, the failed op included');
   assert.deepEqual(r.cleanup.find((c) => c.role === 'critic'), { role: 'critic', dispatchId: 'ctx_critic', stopped: null, released: true, taskClosed: 'by-worker_done', workspaceRemoved: true });
   assert.deepEqual(fs.readdirSync(fake.tmp).filter((n) => n.startsWith('starci-draw-critic-')), [], 'the critic placement is removed');
+  assert.equal(fake.placements.size, 0, 'the critic worktree is no longer registered: the smoke passed its orcaId and branch to the removal');
   assert.deepEqual(fs.readdirSync(stateParentOf(fake.tmp)), [], 'the state directory is removed');
 });
 
