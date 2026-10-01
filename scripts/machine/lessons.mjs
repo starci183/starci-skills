@@ -57,7 +57,6 @@ export const KINDS = Object.freeze({
   hypothesis: 'supervisor-hypothesis', experiment: 'supervisor-experiment', result: 'supervisor-experiment-result',
   lesson: 'supervisor-lesson', proposal: 'supervisor-proposal',
 });
-export const CAUSE_CLASSES = Object.freeze(['gate-defect', 'brief-gap', 'runtime-flow', 'env', 'contract-churn']);
 export const one = (s, n = 300) => clipLine(String(s ?? '').replace(/\s+/g, ' '), n);
 const norm = posixPath;
 

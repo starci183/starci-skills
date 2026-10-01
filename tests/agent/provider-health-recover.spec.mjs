@@ -1,6 +1,6 @@
 // Provider-health circuits: credential fingerprints and the Kernel's recover verb.
 //
-// Live defect (nivo-backend, 2026-09-24): an auth circuit opened by a 401 from a STALE key kept rejecting its pool
+// Live defect: an auth circuit opened by a 401 from a STALE key kept rejecting its pool
 // for 24h after the key was rotated and the launch path fixed, because nothing but expiry cleared it. Now an auth
 // circuit records the fingerprint of the credential it rejected and reads closed once the credential in effect
 // differs, and `api provider-health --recover` lets the Kernel (only) clear it early.

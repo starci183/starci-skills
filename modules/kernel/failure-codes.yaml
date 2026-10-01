@@ -9101,7 +9101,7 @@ plan-edges-missing:
   causes_vi:
     - "Kế hoạch cũ được sinh trước khi có cạnh phụ thuộc"
     - "Bộ định tuyến bị lỗi khi dựng cạnh"
-  nextStep_vi: "Chạy lại route-plan để có cạnh; với mục tiêu đang chạy dùng lệnh migrate-plan-edges một lần."
+  nextStep_vi: "Chạy lại route-plan để có cạnh."
   owner: supervisor
   kind: verb-refusal
 
@@ -10303,15 +10303,6 @@ worker-died-no-report:
   nextStep_vi: "Job bị đánh dấu thất bại với lý do này; Kernel quyết định giao lại."
   owner: op-retry
   kind: settle-reason
-worker-retired-terminal-launch:
-  title: "Terminal-launched worker retired"
-  title_vi: "Worker khởi chạy bằng terminal bị thu hồi"
-  meaning_vi: "Worker này được mở bằng terminal create trước khi mọi agent đều khởi chạy qua orchestration worker-start; nó không có Dispatch để giám sát nên bị đóng."
-  causes_vi:
-    - "Job đang chạy từ trước khi runtime chuyển sang worker-start"
-  nextStep_vi: "Job bị đánh dấu thất bại với lý do này; Supervisor xếp lại job để chạy lại bằng worker-start."
-  owner: op-retry
-  kind: settle-reason
 worker-failed-no-report:
   title: "Worker failed without report"
   title_vi: "Worker hỏng mà chưa báo cáo"
@@ -11184,7 +11175,7 @@ HFS_UNTRACKED_ROOT_ENTRY:
   title_vi: "Mục lạ ở gốc kho"
   meaning_vi: "Có mục chưa được git theo dõi, cũng không nằm trong `.gitignore` hay slot `ignored`, nên HFS không cho phép nó tồn tại trong cây làm việc. Theo dõi nó vào đúng slot, hoặc lưu trữ ra `D:/starci-archive/` rồi xóa."
   causes_vi:
-    - "Vi phạm luật R03: Thư mục làm việc không được có mục untracked/ignored ngoài slot `ignored` (vd `nul`, `.qwen/`, `.worktrees/`, `design-plans/`, `express`)."
+    - "Vi phạm luật R03: Thư mục làm việc không được có mục untracked/ignored ngoài slot `ignored` (vd `nul`, `.worktrees/`, `design-plans/`, `express`)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding

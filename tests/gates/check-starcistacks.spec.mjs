@@ -214,7 +214,7 @@ test('api report refuses an ask for a declared credential and files any other as
   assert.equal(count(), 1);
 });
 
-// mia base inc-5360513a96b3: the custody rule re-included `!.starcistacks/*/infra/compose/**` after the
+// Live defect: the custody rule re-included `!.starcistacks/*/infra/compose/**` after the
 // `.env.*` deny, so every plaintext env under compose (compose/.env.generated) was trackable. The rule is
 // now an ordered list (stacks-layout.yaml custody.gitignoreRules) that denies infra value files again after
 // the infra re-includes; the check probes the rules with git and refuses an open one or a tracked value file.
@@ -229,7 +229,7 @@ test('ignore rules that leave an infra value file trackable are refused; the lay
   let result = checkStarciStacks(product);
   assert.ok(codes(result, 'refuse').includes('STACKS_GITIGNORE_VALUE_OPEN'), JSON.stringify(result.findings));
   assert.match(result.findings.find((f) => f.code === 'STACKS_GITIGNORE_VALUE_OPEN').message, /\.starcistacks\/dev\/infra\/compose\/\.env\.generated/);
-  // mia-mia-backend inc-5b22edbb4e62: rules without `!.starcistacks/*/README.md` hide the runbook the
+  // Live defect: rules without `!.starcistacks/*/README.md` hide the runbook the
   // layout declares (shape.runbook) - a suspect, not a refusal.
   const hiddenRunbook = result.findings.find((f) => f.code === 'STACKS_RUNBOOK_IGNORED');
   assert.ok(hiddenRunbook, JSON.stringify(result.findings));

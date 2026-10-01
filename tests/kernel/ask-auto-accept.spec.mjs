@@ -12,7 +12,7 @@ import {autoAcceptAsk,wakeAskAnswered} from '../../scripts/kernel/ask-server.mjs
 import {autoAcceptedMessage,notifyAutoAccepted} from '../../scripts/connectors/telegram.mjs';
 import {openAsks} from '../../scripts/supervisor/poll.mjs';
 import {isBlobFile} from '../../scripts/machine/ask-receipts.mjs';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
@@ -101,7 +101,7 @@ test('exclusions: secret fields and credential kinds are credential, handover.re
   assert.equal(autoAcceptDecision({question:{text:'q',options:['a','b']},opId:'provision.ask',secretFields:none,policy:ON}).why,'no-recommendation');
   assert.equal(autoAcceptDecision({question:{...RECOMMENDED,picks:[{id:'a',choices:['x','y']},{id:'b',choices:['x','y']}]},opId:'provision.ask',secretFields:none,policy:ON}).why,'several-decisions');
   assert.equal(autoAcceptDecision({question:RECOMMENDED,opId:'provision.ask',secretFields:none,policy:ON}).accept,true);
-  // An owner review is never auto-accepted, even filed without the draw-review kind (starci-next op-interface.draw-7bcf258e67).
+  // An owner review is never auto-accepted, even filed without the draw-review kind.
   assert.equal(autoAcceptDecision({question:RECOMMENDED,opId:'interface.draw',secretFields:none,policy:ON}).why,'owner-only');
   assert.equal(autoAcceptDecision({question:{...RECOMMENDED,review:{record:'ui.x'}},opId:'provision.ask',secretFields:none,policy:ON}).why,'owner-only');
 });
@@ -278,7 +278,7 @@ test('api serve-ask launches the form for a handover ask even when it carries a 
 
 test('the owner gets one plain Telegram message naming the pick and the question, with no link',async t=>{
   await withLedger(t,async({ledger,ledgerFile,machineHome})=>{
-    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running',job:'nivo-invite'}});
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running',job:'app-invite'}});
     seedAsk(ledger,{dispatchId:'ctx_invite',question:RECOMMENDED});
     const text=autoAcceptedMessage({workflow:{id:WORKFLOW,title:null},question:RECOMMENDED,label:'Mời bằng email',language:'vi'});
     assert.ok(text.startsWith('Đã tự chọn phương án đề xuất: Mời bằng email — câu hỏi: Mời thành viên bằng cách nào?. Thầy muốn đổi thì trả lời lại kernel / supervisor.'),text);
@@ -294,7 +294,7 @@ test('the owner gets one plain Telegram message naming the pick and the question
     assert.equal(calls.length,1);
     assert.equal(calls[0].method,'sendMessage');
     assert.match(calls[0].body.text,/^Đã tự chọn phương án đề xuất: Mời bằng email — câu hỏi: /);
-    assert.match(calls[0].body.text,/nivo-invite/);
+    assert.match(calls[0].body.text,/app-invite/);
     assert.equal((await notifyAutoAccepted({ledgerFile,workflowId:WORKFLOW,dispatchId:'ctx_x',label:'x'},{...deps,env:{...deps.env,STARCI_CONNECTORS_OFF:'1'}})).skipped,'STARCI_CONNECTORS_OFF');
   });
 });

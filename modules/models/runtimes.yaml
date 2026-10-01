@@ -68,7 +68,7 @@ allocation:
   # The hands group: Devin (SWE-2 Max). It implements and, since the owner decision of 2026-09-25
   # (review-hands), reviews - the third audit family.
   hands: [devin-agent]
-  # Owner decision 2026-09-25 ("ok"): route by the 72h evidence of scripts/agent/model-scorecard.mjs (1389 op jobs over the nivo, mia and starci-next ledgers).
+  # Owner decision 2026-09-25 ("ok"): route by the 72h evidence of scripts/agent/model-scorecard.mjs (1389 op jobs over the product ledgers of that window).
   # Each kind walks ONE order, named by its roleOfKind `order` (default: `think` for think work, else its role),
   # at its difficulty tier:
   #   implement, write, verify (hands-on implementation: backend.implement, interface.implement, code.refactor,
@@ -214,7 +214,7 @@ allocation:
     # Size classes over the same measure. A closure is `xl` when any of its counts reaches an `xl`
     # bound, `l` when any reaches an `l` bound, `s` when W is inside targetMinutes[0], else `m`.
     # `l.from.files: 12` is ledger-derived: of 52 settled implement/refactor/author jobs in the
-    # nivo ledger, closures at or above 12 authored files ran a median 46 min against 12 min below
+    # measured product ledger, closures at or above 12 authored files ran a median 46 min against 12 min below
     # it, the first cutoff where the majority exceeds one targetMinutes[1] window
     # (benchmark/findings/2026-09-23-parallel-gear.md). Every other `from` bound is the
     # benchmark/findings/fable.md sketch value carried as an ASSUMPTION: that ledger holds exactly one job over three
@@ -239,7 +239,7 @@ allocation:
   # liveness.quietMs overrides these per provider (modules/models/agents/<provider>.yaml).
   # launchGraceMs: a managed worker-start returns before Orca injects the worker's Task, so for this
   # long after its op-dispatched event a managed worker that still reads an idle prompt is `starting`
-  # - never nudge-ready, and api nudge skips it worker-starting (inc-bc0b90a7ec70, inc-9ae771781252).
+  # - never nudge-ready, and api nudge skips it worker-starting.
   # A command-terminal dispatch has already proven its prompt submitted and carries no grace; a
   # staged paste is nudge-ready at any age, and a nudge since the dispatch ends the grace.
   # kernelTurnBudgetMs / supervisorTurnBudgetMs: the longest ONE busy turn of a Kernel / the [Supervisor] seat (its
@@ -543,10 +543,9 @@ allocation:
       # weight leaves `reserve` slots (and the RAM its queued ops need) to the higher ones and loses its heavy
       # ops first under the heavy pause; the top one keeps starting heavy ops while they fit, until critical.
       # The Supervisor overrides per host: node scripts/supervisor/ram-cap.mjs prioritize --workflow <id>
-      # --weight <n> [--reserve <slots>]. Owner priority 2026-09-28: the FE refactor workflow runs up to 15
-      # parallel code.refactor slices first; the other workflows ramp up in what is left.
-      priorities:
-        wf-nivo-fe-canon-mujek980: {weight: 10, reserve: 15}
+      # --weight <n> [--reserve <slots>]. Owner priority 2026-09-28: the prioritized FE refactor workflow ran
+      # up to 15 parallel code.refactor slices first; the other workflows ramped up in what was left.
+      priorities: {}
     # opRam: the per-op RAM estimate table (MB for one running op: the agent CLI plus what it runs - the
     # test runner, the browser, the dev server) and its class. heavy = Playwright / render / test /
     # implement; light = reading, deciding, writing records. A kind not listed takes `default`.

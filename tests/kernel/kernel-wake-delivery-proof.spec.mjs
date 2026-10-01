@@ -228,9 +228,9 @@ test('ask-answered wake: agent_prompt_stalled with the wake landed is kernel-wok
 
 /* ------------------------------------------ dropped send (Codex), split retry */
 
-// 2026-09-24 01:45: the Codex Kernel term_28a694d9 (wf-miamia-base-repos) took two text+Enter sends that
-// Orca answered ok:true with no error code while nothing reached the screen; its ledger was silent from
-// 19:59, every watchdog wake dropped the same way. The same text with enter:false staged in the input row
+// A Codex Kernel took two text+Enter sends that
+// Orca answered ok:true with no error code while nothing reached the screen; its ledger was silent,
+// every watchdog wake dropped the same way. The same text with enter:false staged in the input row
 // and an Enter-only send submitted it. Every Kernel wake path now retries a wake whose frame stays idle with
 // no trace of it once that way (scripts/kernel/wake-delivery.mjs) - STARCI_FAKE_ORCA_DROP_ENTER_SEND.
 const CODEX_KERNEL_IDLE=['• Yielding - waiting on the base-repos report.','','› Ask Codex to do anything','','  gpt-6-sol high · 62% context left'].join('\n');
@@ -262,7 +262,7 @@ const FROZEN_KERNEL=[
   '    … +77 lines (ctrl + t to view transcript)',
   '• Working (5m 30s • esc to interrupt)',
   '› Ask Codex to do anything',
-  '  gpt-6-sol high · D:\\Repositories\\nivo-backend · Report task outcome',
+  '  gpt-6-sol high · D:\\Repositories\\todo-app-be · Report task outcome',
 ].join('\n');
 
 const unwritableDeps=(lastOutputAt,screen=FROZEN_KERNEL)=>({

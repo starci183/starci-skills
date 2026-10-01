@@ -204,7 +204,7 @@ const readsData = (context, fn, seen = new Set()) => {
  * A timer is polling when what it runs READS DATA (see `readsData`, decided by the type of each call, not by a name): a
  * `setInterval`, or a `setTimeout` whose callback schedules the enclosing function again. The FE convention names no shared clock
  * owner (knowledge/hfs/README.md section 6: "one refresh mechanism per resource, poll or socket"), so a timer that only ticks time
- * or state - nivo-fe `useNow`, a one-minute clock behind `useSyncExternalStore` - is not a second refresh mechanism.
+ * or state - a `useNow`-style one-minute clock behind `useSyncExternalStore` - is not a second refresh mechanism.
  */
 export const noHandRolledPolling = {
   meta: {

@@ -242,7 +242,7 @@ export function createGcController(overrides = {}) {
       schema: 'starci/decision-item@1', kind: 'runtime-defect', decider: 'supervisor', ledger: ledgerId, workflowId: leaks[0]?.workflowId ?? null,
       idempotencyKey: `lease-leak:${ledgerId}:${entity}`, entity: { type: 'job', id: String(entity) }, summary,
       evidence: leaks.slice(0, 10).map((l) => ({ ref: `lease:${l.resourceKey}`, why: l.why })),
-      options: [{ key: 'fix-release-step', verb: 'fix the settle/reconcile step that left the lease (DESIGN §15.3 lease mồ côi)', recommended: true }],
+      options: [{ key: 'fix-release-step', verb: 'fix the settle/reconcile step that left the lease (DESIGN §15.3 orphan lease)', recommended: true }],
       allowedVerbs: [], openedBy: 'gc-controller', escalateTo: 'owner',
     });
     return leaks.length;

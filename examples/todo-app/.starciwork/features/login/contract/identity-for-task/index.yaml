@@ -12,8 +12,8 @@ surface:
     transport: >-
       GraphQL request header "Authorization: Bearer <sessionToken>" (RFC 6750 bearer-token form). The
       token itself stays this app's own opaque, Postgres-backed session id (sds.login.session-store),
-      not a Keycloak-verified JWT, but the header name and value shape match nivo-fe/nivo-backend's own
-      convention for presenting an access token (nivo-fe apps/app/src/modules/api/graphql.ts sends
+      not a Keycloak-verified JWT, but the header name and value shape match this example's own
+      convention for presenting an access token (fe/apps/web/src/modules/api/client.ts sends
       "authorization: Bearer <token>"). A missing header, an empty token, or a value with no "Bearer "
       prefix all resolve to the empty string before any session lookup and are refused by
       SessionNotFoundException before the lookup ever queries Postgres (session.service.ts#findActive) -
@@ -63,7 +63,7 @@ change:
     surface - the exact gap that let the original mismatch go unnoticed. This rev (a) names the header
     explicitly in surface[0].transport so a future change to either side is a contract change, not a
     silent drift, and (b) renames the header itself to "Authorization: Bearer <token>", matching
-    nivo-fe/nivo-backend's own convention instead of this example's one-off custom header name. The
+    the front end's own bearer-token convention instead of a one-off custom header name. The
     provider (application/session-actor.adapter.ts) also now refuses a missing/empty token before any database
     query, closing the bypass class at its root rather than relying only on the header name matching.
 

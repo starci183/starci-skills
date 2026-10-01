@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // owed.mjs — what the running workflows wait on the SUPERVISOR for.
 //
-// Owner, 2026-09-24: "supervisor phải xử lý các conflict, chỉnh grammar, sửa lint, xác định vấn đề
-// out of scope workflow ... để sửa hết không? ... chứ để workflows stale/block/kẹt chờ sai là lỗi của
-// supervisor". That day the three ledgers' running workflows held ~90 open incidents addressed to the
-// supervisor, the runtime monitor or Source ("For the supervisor", "cần supervisor", "runtime
+// Owner, 2026-09-24: "the supervisor must handle the conflicts, fix grammar, fix lint, identify the
+// out-of-scope workflow problems ... are they all to be fixed? ... because leaving workflows
+// stale/blocked/stuck waiting wrongly is the supervisor's fault". That day the three ledgers' running
+// workflows held ~90 open incidents addressed to the supervisor, the runtime monitor or Source
+// ("For the supervisor", the Vietnamese "needs supervisor", "runtime
 // monitor", source-runtime-defect, knowledge churn, cross-workflow git effects, delegated rulings),
 // many already fixed by later .claude commits and never resolved, others still blocking. Nothing
 // surfaced them: poll printed a RUNTIME line only for a fixed list of kinds.
@@ -46,7 +47,7 @@
 // poll.mjs prints the OWED lines every cycle; the Fleet controller opens their Decision Items.
 //
 // A pattern item stays OWED until a success breaks its streak, so a lineage whose causes are already
-// fixed used to re-alert every hour: mia wf-miamia-work-and-stacks-mud7kjun brand.decide a1-a8 failed, fixed by
+// fixed used to re-alert every hour: one workflow's brand.decide a1-a8 failed, fixed by
 // 5069309f2, 7893dcbb0, 7535339ca and 69348e272, then queued behind an owner review ask - four items
 // remaining OWED until the next success. Two ways out:
 //   ack      the supervisor's disposition (`ack --item <key> --commits <csv> --reason <t>`), kept in
@@ -540,7 +541,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
     } catch { /* no events */ }
     // Settled work that really owes work (api status staleOperations): an owner-declared breaking change or an
     // unattributed edit of an owned record. A peer's rewrite of a shared record is advisory peerDrift and never
-    // counts (work-ownership.mjs, starci-next inc-1c7f7dad53e0).
+    // counts (work-ownership.mjs).
     try {
       const ops = staleOperationsOf(staleOf(db, wf, { root, repo }));
       if (ops.length) {

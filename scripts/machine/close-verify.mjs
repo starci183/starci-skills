@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// close-verify.mjs — close an Orca terminal the runtime owns AND prove it is gone (owner, 2026-09-28: "sao supervisor
-// không xóa worker, và op đầy rác thế!!! phải có dọn rác chứ").
+// close-verify.mjs — close an Orca terminal the runtime owns AND prove it is gone (owner, 2026-09-28: "why does the
+// supervisor not delete its workers, and the ops are full of leftovers!!! there has to be a cleanup").
 //
 // Root cause of the leftovers: every owner of a terminal asked Orca to close it and never read the answer back. A
 // close refused with tab_not_found, a close that stopped the PTY but left the tab in Orca's persisted layout (the

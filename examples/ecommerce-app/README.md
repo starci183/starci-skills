@@ -8,7 +8,7 @@ The back end runs two NestJS APIs (`be/apps/identity`, `be/apps/order`) and one 
 convention: CQRS handlers, GraphQL doors that only dispatch the bus, one injected `EntityManager` per database, outcomes for
 expected refusals and one error family per capability.
 
-The front end, shaped like `nivo-fe`, serves one deployable Next.js app per `fe/apps/*` site:
+The front end serves one deployable Next.js app per `fe/apps/*` site:
 
 | app               | what it is                                          |
 | ----------------- | --------------------------------------------------- |
@@ -89,7 +89,7 @@ port map the front end reads. No port literal exists in the front end:
 - Env overrides keep the BE's precedence — `NEXT_PUBLIC_ORDER_API_URL`, `NEXT_PUBLIC_IDENTITY_API_URL`,
   `NEXT_PUBLIC_SHOP_URL` win outright; the projection is the fallback.
 
-Each env is read once in the app's `src/modules/config` module (nivo-fe's convention); pages and components import the
+Each env is read once in the app's `src/modules/config` module (the read-once-in-config convention); pages and components import the
 resolved constant, not `process.env`.
 
 With no back end running, `/browse` and `/account` in the shop render their unreachable states and name the service and

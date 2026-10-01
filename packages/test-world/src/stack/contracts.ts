@@ -9,9 +9,9 @@ import type { InfraName } from "../config/types"
 
 /** The isolation identity of one repository checkout. Everything a repository owns in the shared stack is named from it. */
 export interface Namespace {
-    /** `<package-name-slug>_<6 hex of the checkout root hash>` in snake case, e.g. `nivo_backend_a1b2c3`; safe as a Postgres identifier prefix. */
+    /** `<package-name-slug>_<6 hex of the checkout root hash>` in snake case, e.g. `todo_app_be_a1b2c3`; safe as a Postgres identifier prefix. */
     readonly snake: string
-    /** The same in kebab case (`nivo-backend-a1b2c3`); safe for realm, bucket, namespace and container names. */
+    /** The same in kebab case (`todo-app-be-a1b2c3`); safe for realm, bucket, namespace and container names. */
     readonly kebab: string
     /** The absolute repository root. */
     readonly root: string

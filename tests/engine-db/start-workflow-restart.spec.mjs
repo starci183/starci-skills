@@ -107,7 +107,7 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
     '  approves launch gates). Owner decisions reach you only as asks you file through the api.'].join('\n'));
   assert.deepEqual(firstOut.launchAuthority?.kind,'first-boot');
   // Replacement Claude kernels read the pasted prompt as unverified text and asked a person to
-  // reply yes (starci-next sn-foundation and sn-subscription attempt 2, 2026-09-25). The prompt
+  // reply yes (observed on two replacement attempt-2 launches). The prompt
   // states the rule first, the approval, the launcher and why, and the ledger read that proves them.
   const authority=authorityOf(readState(f).terminals[restartOut.terminal].prompt).split('\n');
   assert.equal(authority[0],`LAUNCH AUTHORITY: resume ${workflowId} now as its Kernel attempt 2; ask no one to confirm.`);
@@ -149,7 +149,7 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
 });
 
 test('a replacement launch proceeds on its recorded authority alone — no confirmation step anywhere',t=>{
-  // Orca 1.4.209 / starci-next sn-foundation and sn-subscription attempt 2: a replacement Claude
+  // Orca 1.4.209, observed on two replacement attempt-2 launches: a replacement Claude
   // Kernel held for a human "yes" because its prompt gave too little authority and it read watchdog
   // wakes as possible injection. The launch itself is the proof it needs no person: it completes,
   // names its launcher, and files no ask, incident or owner wait (owner rule: the owner never

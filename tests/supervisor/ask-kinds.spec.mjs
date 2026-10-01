@@ -173,22 +173,22 @@ test('/asks lists approval asks only, including one from a supervisor.repos repo
   await withLedger(t, async ({ ledger, repoRoot, machineHome }) => {
     seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_vnpay', question: VNPAY });
     seedAsk(ledger, { workflowId: WF, dispatchId: 'ctx_momo', question: { text: 'Nhập momo-secret-key.key và MOMO_PARTNER_CODE', options: [] } });
-    // The mia handover lives in a product repo the connectors never listed: config supervisor.repos names it.
-    const mia = path.join(tmp(t, 'starci-askkinds-mia-'), 'mia-mia-backend');
-    fs.mkdirSync(path.join(mia, '.starciwork'), { recursive: true });
-    const miaLedger = openLedger({ file: ledgerFileFor(mia) });
-    try { seedAsk(miaLedger, { workflowId: 'wf-miamia-work-and-stacks', dispatchId: 'ctx_handover', opId: 'handover.review', question: HANDOVER }); } finally { miaLedger.close(); }
+    // The second handover lives in a product repo the connectors never listed: config supervisor.repos names it.
+    const other = path.join(tmp(t, 'starci-askkinds-other-'), 'todo-app-be');
+    fs.mkdirSync(path.join(other, '.starciwork'), { recursive: true });
+    const otherLedger = openLedger({ file: ledgerFileFor(other) });
+    try { seedAsk(otherLedger, { workflowId: 'wf-todo-app-work-and-stacks', dispatchId: 'ctx_handover', opId: 'handover.review', question: HANDOVER }); } finally { otherLedger.close(); }
     const env = { LOCALAPPDATA: machineHome };
-    const config = { ...structuredClone(EXAMPLE), connectors: { ...EXAMPLE.connectors, secretsFile: null, repos: [repoRoot] }, supervisor: { ...(EXAMPLE.supervisor ?? {}), repos: [mia] } };
+    const config = { ...structuredClone(EXAMPLE), connectors: { ...EXAMPLE.connectors, secretsFile: null, repos: [repoRoot] }, supervisor: { ...(EXAMPLE.supervisor ?? {}), repos: [other] } };
     const repos = bridgeAskRepos({ env, config });
-    assert.ok(repos.includes(repoRoot) && repos.includes(mia), `the ask repos cover the connector repos and supervisor.repos: ${repos.join(', ')}`);
+    assert.ok(repos.includes(repoRoot) && repos.includes(other), `the ask repos cover the connector repos and supervisor.repos: ${repos.join(', ')}`);
     const bridge = bridgeFor(t, bot, env, { repos: () => bridgeAskRepos({ env, config }) });
     await bridge.handleUpdate(message('/asks'));
     const [head, ...listed] = bot.of('sendMessage');
     assert.equal(head.text, `${vi.asksHead(1)}\n${vi.credsHint(2)}`, 'one approval ask, and the credential asks only as a count');
     assert.equal(listed.length, 1);
     assert.match(listed[0].text, /Duyệt bàn giao\?/);
-    assert.equal(listed[0].reply_markup.inline_keyboard[0][0].callback_data, `ask:${askKeyOf('wf-miamia-work-and-stacks', 'ctx_handover')}`);
+    assert.equal(listed[0].reply_markup.inline_keyboard[0][0].callback_data, `ask:${askKeyOf('wf-todo-app-work-and-stacks', 'ctx_handover')}`);
     assert.ok(!bot.of('sendMessage').some((m) => /VNPAY|MoMo|momo/.test(m.text)), 'no credential ask is listed by /asks');
     assert.match(vi.help, /\/creds/);
     assert.match(bridgeText('en').help, /\/creds/);

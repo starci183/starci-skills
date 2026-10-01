@@ -1,7 +1,7 @@
 // A write grant must be satisfiable: the directory the worker writes into has to exist in the target repository.
 // `api enqueue` and `api dispatch` refuse (reason grant-parent-missing) an owned path whose directory - the
 // path itself for a directory/glob grant, its parent for a file grant - is absent, and name the missing
-// directory and the closest one that exists (a grant under nivo-fe/src/app when nivo-fe keeps its router at
+// directory and the closest one that exists (a grant under my-app/src/app when my-app keeps its router at
 // apps/app/src/app could never be met). A create-new-module grant is explicit: `--new-module <repo-relative
 // dir,...>` on enqueue (payload.new_modules) exempts the grants under that module root, provided the module
 // root's own parent directory exists. Work paths (.starciwork/...) are authored by Work ops and are not checked.

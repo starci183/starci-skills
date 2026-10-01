@@ -7,8 +7,8 @@ import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {JOB_ROW} from '../../scripts/machine/job-row.mjs';
 
-// On 2026-09-23 twenty-nine op workers died or went quiet without a report (codex and claude
-// exited to a bare PowerShell prompt, Mia Mia workers sat nudged and silent), and each became a
+// Twenty-nine op workers died or went quiet without a report (codex and claude
+// exited to a bare PowerShell prompt, some workers sat nudged and silent), and each became a
 // hand-written incident while its Kernel stalled. These specs pin the self-heal:
 //   - `reconcile --dead-worker --settle-failed` settles a dead worker's attempt failed-no-report
 //     when its effect evidence is bounded by the owned paths: lease released, terminal closed,
@@ -17,7 +17,7 @@ import {JOB_ROW} from '../../scripts/machine/job-row.mjs';
 //   - a worker quiet past its provider's timeout after a nudge is dead to the frontier, nudge
 //     refuses it, and the recovery quits its agent before closing its terminal;
 //   - the third failed-no-report death of one op raises ONE pattern incident;
-//   - a live worker's path leases are renewed by status (inc-2262f5eab354);
+//   - a live worker's path leases are renewed by status;
 //   - the watchdog runs the recovery for every frontier deadWorkerJobs entry.
 
 const ROOT=path.resolve(import.meta.dirname,'..', '..');
@@ -110,7 +110,7 @@ test('--settle-failed settles a dead worker with owned-path effects failed-no-re
   assert.equal(events('worker-failed-no-report').length,1);
 }));
 
-// nivo academy-debt: a8 (order-input-contract) died, and its auto-retry chained to a7, a queued
+// An attempt (a8, order-input-contract) died, and its auto-retry chained to a7, a queued
 // dead-code-proof job of the same op enqueued in between, so the lineage crossed units and read as
 // a false retry-loop. The dead attempt itself is the retry's predecessor.
 test('a no-report retry chains to the dead attempt, never to a later unrelated job of the same op',t=>world(t,({ledger,repoRoot,run,jobs})=>{
@@ -173,11 +173,10 @@ test('the third no-report death of one op raises one pattern incident, and only 
   assert.equal(incidents().length,1);
 }));
 
-// 2026-09-26 09:55, 11:30 and 17:04 +07: Orca restarts wiped every terminal on the host - every Kernel
+// Orca restarts wiped every terminal on the host - every Kernel
 // and every worker answered terminal_handle_stale in the same second. Each worker with partial effects
 // settled failed-no-report as a spent business attempt, demoted its pool for the retry, and three of
-// them raised [worker-died-no-report-pattern] (nivo inc-ceb153dfd2cf: 3x devin, starci-next
-// inc-65666fb85763: 3x devin). A worker gone together with its workflow's Kernel terminal died
+// them raised [worker-died-no-report-pattern]. A worker gone together with its workflow's Kernel terminal died
 // of the host: the retry continues the tree, spends no business attempt, blames no pool, counts in no
 // pattern.
 const KERNEL_HANDLE='term-kernel-self-heal';
@@ -231,7 +230,7 @@ test('a worker gone while its Kernel terminal lives is its own death: a spent bu
   const lineage=JSON.parse(jobs().find(j=>j.job_id!==JOB&&j.kind==='op').payload_json).retry;
 },{terminal:WIPED}));
 
-// Mia Mia inc-c6cf249ecd5a: a worker nudged once, then silent at its prompt with a lease and no report.
+// A worker nudged once, then silent at its prompt with a lease and no report.
 const IDLE={connected:true,writable:true,screen:['• Report pending.','› Ask Codex to do anything','  gpt-6-sol high · 62% left'].join('\n'),lastOutputAt:Date.now()-45*MIN};
 test('a worker quiet past its provider timeout after a nudge is dead: nudge refuses, the recovery quits and closes it',t=>world(t,({ledger,repoRoot,run,job,orcaState})=>{
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-worker-nudged',payload:{opId:OP,attempt:1},createdAt:Date.now()-30*MIN});
@@ -257,7 +256,7 @@ test('a worker nudged a moment ago, or never nudged, is not quiet',t=>world(t,({
   assert.equal(status(run).workers.find(w=>w.jobId===JOB).liveness,'turn-idle','nudged 2 minutes ago');
 },{terminal:IDLE,dispatchedAgo:HOUR}));
 
-// inc-2c1ac4ff3e48: a worker sat 34+ minutes on one shell command with no output - its moving
+// A worker sat 34+ minutes on one shell command with no output - its moving
 // spinner read as active and nothing flagged it, while status/driver-loop pointed the Kernel at a
 // nudge cmdNudge has no branch for (it refused worker-state-unknown) and reconcile --dead-worker
 // refused worker-alive. A wedged worker is dead to its contract - the turn can never file the
@@ -290,7 +289,7 @@ test('a wedged worker: nudge refuses worker-wedged, plain --dead-worker refuses,
   assert.equal(dead[0]?.liveness,'wedged');
 },{terminal:WEDGED,dispatchedAgo:HOUR,payloadExtra:{provider:'codex'}}));
 
-test('status renews the path lease of a live running worker and never the lease of a dead one (inc-2262f5eab354)',async t=>{
+test('status renews the path lease of a live running worker and never the lease of a dead one',async t=>{
   await world(t,({run,leases})=>{
     const body=status(run);
     assert.equal(body.activeLeases.length,1,'the expiring lease is listed');

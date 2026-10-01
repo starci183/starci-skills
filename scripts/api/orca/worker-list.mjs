@@ -11,7 +11,6 @@
 // binding; `scope.source` (flag | bound | all) says which, and callers that need every Run check it.
 import { orcaCall, arg, flag } from './lib.mjs';
 
-export const TERMINAL_STATES = Object.freeze(['active', 'reclaimable', 'retained', 'release_pending', 'release_unknown', 'released']);
 export const PAGE_LIMIT = 100;
 /** A runaway cursor never loops forever: 50 pages are 5000 rows. */
 export const MAX_PAGES = 50;

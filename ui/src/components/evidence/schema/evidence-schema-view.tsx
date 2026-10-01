@@ -5,6 +5,7 @@ import { WorkGraphSlices } from '../../work/work-graph-slices';
 import { JsonView, MarkdownView, TextView, YamlView } from '../renderers';
 import { useBlobText } from '../use-blob-text';
 import { ScopeView } from './scope-view';
+import { t } from '../../../i18n/t';
 
 export const concept: Concept = 'C8';
 
@@ -13,7 +14,7 @@ const rec = (v: unknown): Rec | null => (v && typeof v === 'object' && !Array.is
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
 
-export const SCHEMA_LABELS: Record<string, string> = { 'starci/scope-evidence@1': 'Phạm vi', 'starci/work-graph@1': 'Đồ thị lát cắt', 'starci/evidence@1': 'Manifest' };
+export const SCHEMA_LABELS: Record<string, string> = { 'starci/scope-evidence@1': t('Scope'), 'starci/work-graph@1': t('Slice graph'), 'starci/evidence@1': 'Manifest' };
 
 /** A work-graph evidence file → the WorkGraphView the shared slice diagram draws. */
 export function workGraphFromFile(data: unknown, file: EvidenceFile, authorOp: string): WorkGraphView | null {
@@ -21,7 +22,7 @@ export function workGraphFromFile(data: unknown, file: EvidenceFile, authorOp: s
   const nodes = arr(root.nodes).map(rec).filter((n): n is Rec => n != null && str(n.id) != null);
   if (!nodes.length) return null;
   return {
-    version: typeof root.version === 'number' ? root.version : 0, event: 'tệp bằng chứng của op', reason: str(root.reason) ?? '', authorOp, at: file.createdAt,
+    version: typeof root.version === 'number' ? root.version : 0, event: t('op evidence file'), reason: str(root.reason) ?? '', authorOp, at: file.createdAt,
     domains: arr(root.domains).map(rec).filter((d): d is Rec => d != null).map(d => ({ id: String(d.id), ...(str(d.title) ? { title: String(d.title) } : {}) })),
     nodes: nodes.map(n => ({ id: String(n.id), title: str(n.title) ?? String(n.id), domain: str(n.domain), kind: str(n.kind), ownedPaths: arr(n.ownedPaths).filter((p): p is string => typeof p === 'string'), color: str(n.color) })),
     edges: arr(root.edges).map(rec).filter((e): e is Rec => e != null).map(e => ({ from: String(e.from), to: String(e.to), kind: str(e.kind), reason: str(e.reason) })),
@@ -38,10 +39,10 @@ export function schemaOf(file: EvidenceFile & { schema?: string | null }, text: 
 /** Renders one evidence file by what it is: scope evidence, work graph, markdown, YAML, other JSON, plain text. */
 export function EvidenceSchemaView({ file, authorOp = '' }: { file: EvidenceFile & { schema?: string | null }; authorOp?: string }) {
   const blob = useBlobText(file);
-  if (blob.status === 'idle' || blob.status === 'loading') return <p className="p-3 text-sm text-muted-foreground">Đang đọc {file.base}…</p>;
-  if (blob.status === 'error') return <p role="alert" className="p-3 text-sm text-[var(--status-failed)]">Không đọc được {file.base}: {blob.error}</p>;
+  if (blob.status === 'idle' || blob.status === 'loading') return <p className="p-3 text-sm text-muted-foreground">{t('Reading {name}…', { name: file.base })}</p>;
+  if (blob.status === 'error') return <p role="alert" className="p-3 text-sm text-[var(--status-failed)]">{t('Could not read {name}: {error}', { name: file.base, error: blob.error })}</p>;
   const schema = schemaOf(file, blob.text);
-  const note = blob.truncated ? <p className="mb-2 text-xs text-muted-foreground">Tệp lớn: chỉ hiện 2000 dòng đầu.</p> : null;
+  const note = blob.truncated ? <p className="mb-2 text-xs text-muted-foreground">{t('Large file: only the first 2000 lines are shown.')}</p> : null;
   if (schema && file.kind === 'json' && !blob.truncated) {
     let data: unknown = null;
     try { data = JSON.parse(blob.text); } catch { data = null; }

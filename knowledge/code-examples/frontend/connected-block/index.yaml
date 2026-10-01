@@ -50,7 +50,7 @@ dependencies:
     - next-intl
   assumptions: |
     Illustrative Next.js client-block shape. Grammar symbols Button, Heading, Text
-    and SurfaceCard were verified against starci-academy-fe packages/grammar
+    and SurfaceCard were verified against the runtime's packages/grammar
     (package name @starci/grammar, public entry ./common, version 0.4.13) source
     renderers.ts and the built dist/common/index.js. App hooks and i18n are
     adapter seams, not Grammar APIs.
@@ -65,18 +65,18 @@ verification:
     the shape-slot rules. Mock-only connected mapping is not browser UAT.
 provenance:
   sources:
-    - starci-academy-fe/src/components/blocks/commerce/CartBlock/index.tsx
-    - starci-academy-fe/src/components/blocks/commerce/CartBlock/component.tsx
-    - starci-academy-fe/src/components/blocks/commerce/CartBlock/classNames.ts
-    - starci-academy-fe/src/components/blocks/auth/AccountMenu/component.tsx
-    - starci-academy-fe/packages/grammar/src/common/renderers.ts
-    - starci-academy-fe/packages/grammar/src/core/primitive/Button/index.tsx
-    - starci-academy-fe/packages/grammar/package.json
+    - examples/ecommerce-app/fe/apps/shop/src/components/blocks/SessionForm/index.tsx
+    - examples/ecommerce-app/fe/apps/shop/src/components/blocks/SessionForm/component.tsx
+    - examples/ecommerce-app/fe/apps/shop/src/components/blocks/SessionForm/classNames.ts
+    - examples/ecommerce-app/fe/apps/shop/src/components/blocks/SignOutAction/component.tsx
+    - packages/grammar/src/common/renderers.ts
+    - packages/grammar/src/core/primitive/Button/index.tsx
+    - packages/grammar/package.json
   simplifications: |
     Replaced cart/account business flows with a synthetic status summary.
     Kept the three-part pure contract (state/props/on), connected ownership of
     hooks, colocated classNames ownership, and Grammar Button onPress-versus-href
-    discrimination. Omitted Academy leaves, overlays and payment surfaces.
+    discrimination. Omitted the source product's leaves, overlays and payment surfaces.
 grammarExportsVerified:
   package: "@starci/grammar"
   entry: "@starci/grammar/common"

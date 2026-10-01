@@ -1,6 +1,6 @@
-// safe-remove.mjs — the ONE way the runtime deletes a directory tree (nivo-fe inc-c8fbf76aa499).
+// safe-remove.mjs — the ONE way the runtime deletes a directory tree.
 //
-// At 05:47 on 2026-09-25 D:/Repositories/nivo-fe lost 674 tracked working-tree files and its node_modules: a
+// A product repository once lost 674 tracked working-tree files and its node_modules: a
 // recursive delete of a scratch tree followed directory links (Windows junctions) into the live repository.
 // Git for Windows' `git worktree remove --force` follows a junction inside the worktree and empties its target
 // (proven on this host, git 2.52), and a PowerShell/cmd/third-party recursive delete may do the same. A tree

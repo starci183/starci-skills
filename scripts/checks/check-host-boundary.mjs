@@ -12,9 +12,6 @@
 // modules/host/orca/** is the contract itself and skills/{orca-cli,
 // orchestration,computer-use} are the owner's own chat tools, so both quote
 // orca commands on purpose and are not agent-facing prose.
-//
-// scripts/checks/host-boundary.allow lists `path:line  # reason` exemptions for
-// lines a lane that owns the file has not rewritten yet.
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import fs from 'node:fs';
@@ -25,7 +22,6 @@ import {spawnCalls} from '../lib/spawn-calls.mjs';
 import {RUNTIME_MANIFEST_FILE,loadSlotManifest,ruleParams} from '../hfs/slots.mjs';
 
 const WRAPPER_DIR='scripts/api/orca';
-const ALLOW_FILE='scripts/checks/host-boundary.allow';
 // This check names the patterns it bans.
 const ALLOW_SELF='scripts/checks/check-host-boundary.mjs';
 
@@ -51,20 +47,6 @@ function orcaVerbs(root){
   }catch{return null;}
 }
 
-export function readAllowList(root){
-  const file=path.join(root,ALLOW_FILE);
-  const allow=new Map();
-  if(!fs.existsSync(file))return allow;
-  for(const raw of fs.readFileSync(file,'utf8').split(/\r?\n/)){
-    const line=raw.trim();
-    if(!line||line.startsWith('#'))continue;
-    const [entry,...rest]=line.split('#');
-    const key=entry.trim();
-    if(key)allow.set(key,rest.join('#').trim()||'no reason given');
-  }
-  return allow;
-}
-
 // `orca <verb>` in command position: line start, a code fence, a backtick, a
 // quote, a shell prompt or a pipe/chain operator. 'the kernel never runs the
 // orca call itself' is prose about orca, not a command, and its next word is
@@ -75,7 +57,7 @@ const LOADS_HOST=/\b(load|loads|loading|read|reads|reading)\b[^.\n]{0,100}module
 // (c) agent-launch: every agent launch is orchestration worker-start (modules/kernel/contract-changes/
 // launch-through-worker-start.yaml). A terminal the runtime creates itself is the bypass: the terminalCreate wrapper,
 // the calls.yaml `terminal-create` call, a `terminal create` argv or an `orca terminal create` command string. Only
-// code is read, comment lines skipped; a plain shell that is not an agent needs a reviewed host-boundary.allow entry.
+// code is read, comment lines skipped. There is no exemption list.
 const LAUNCH_ROOTS=['engine','scripts','bin','init','modules','packages'];
 const TERMINAL_LAUNCH=[
   [/\bterminalCreate\b/,'the terminalCreate wrapper'],
@@ -111,14 +93,12 @@ function runtimeSourceRoots(root){
 const COMMENT_LINE=/^\s*(?:\/\/|\/?\*|#)/;
 const IMPORTS_RUNNER=/import\s*\{[^}]*\b(?:ORCA|orcaRun|orcaCall)\b[^}]*\}\s*from\s*['"][^'"]*orca\/lib\.mjs['"]/;
 
-/** Every host-boundary violation in `root`, allow-list applied. */
+/** Every host-boundary violation in `root`. */
 export function findHostBoundaryViolations({root=skillRoot}={}){
   const verbs=orcaVerbs(root);
-  const allow=readAllowList(root);
   const found=[];
   const flag=(file,lineNo,rule,detail,code=null)=>{
     const key=`${rel(root,file)}:${lineNo}`;
-    if(allow.has(key))return;
     found.push({where:key,rule,...(code?{code}:{}),detail});
   };
 
@@ -149,7 +129,7 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
       fs.readFileSync(file,'utf8').split(/\r?\n/).forEach((line,i)=>{
         if(COMMENT_LINE.test(line))return;
         const hit=TERMINAL_LAUNCH.find(([re])=>re.test(line));
-        if(hit)flag(file,i+1,'agent-launch',`creates a terminal (${hit[1]}) — every agent launch is ${WRAPPER_DIR}/worker-start.mjs; a plain non-agent shell needs a reviewed ${ALLOW_FILE} entry`);
+        if(hit)flag(file,i+1,'agent-launch',`creates a terminal (${hit[1]}) — every agent launch is ${WRAPPER_DIR}/worker-start.mjs`);
       });
     }
   }
@@ -184,7 +164,7 @@ export function findHostBoundaryViolations({root=skillRoot}={}){
       });
     }
   }
-  return {ok:found.length===0,violations:found,allowed:[...allow].map(([where,reason])=>({where,reason}))};
+  return {ok:found.length===0,violations:found};
 }
 
 export function hostBoundaryMain(argv=[]){

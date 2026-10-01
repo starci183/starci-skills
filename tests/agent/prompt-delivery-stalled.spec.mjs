@@ -1,6 +1,6 @@
 // A prompt Orca answered agent_prompt_stalled is proven from the frame, never counted delivered on the
-// receipt (scripts/agent/lib.mjs deliverPrompt). starci-next op-interface.draw-4d29c2beaf (twice) and
-// -c3f0e8e174 (three times, 2026-09-25): a fresh Codex took a stalled send, the frame showed it idle at
+// receipt (scripts/agent/lib.mjs deliverPrompt). Seen on a live defect (twice on one interface.draw op,
+// three times on another): a fresh Codex took a stalled send, the frame showed it idle at
 // "› Ask Codex to do anything" or a bare "›" whose input box Orca lifted out as `draft`, and dispatch
 // waited 45s for a submission that could not come ("prompt was not consumed within 45000ms").
 // A lost send is sent once more; lost again, the launch is refused prompt-delivery-stalled, a provider
@@ -32,8 +32,8 @@ const codex = loadAdapter('codex').card;
 const PREAMBLE = 'Orca Task preamble: you are the operation agent for op-interface.draw. Read the contract with api op-contract.';
 const HEADER = ['╭──────────────────────────────╮', '│ >_ OpenAI Codex (v0.155.1)   │', '╰──────────────────────────────╯',
   '  Tip: This is GPT-6, a new generation of intelligence.'];
-const IDLE = [...HEADER, '› Ask Codex to do anything', '  gpt-6-sol high · D:\\Repositories\\starci-next'].join('\n');
-const BARE = [...HEADER, '›', '  gpt-6-sol high · D:\\Repositories\\starci-next'].join('\n');
+const IDLE = [...HEADER, '› Ask Codex to do anything', '  gpt-6-sol high · D:\\Repositories\\ecommerce-app'].join('\n');
+const BARE = [...HEADER, '›', '  gpt-6-sol high · D:\\Repositories\\ecommerce-app'].join('\n');
 const STALLED = { ok: false, errorCode: 'agent_prompt_stalled', error: 'agent_prompt_stalled' };
 
 // A scripted terminal: `sends` answer in order; every read returns `frame()`.

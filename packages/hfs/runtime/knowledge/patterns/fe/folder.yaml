@@ -46,9 +46,8 @@ rules:
       # keep is decided by the slot fe.source-root-pinned and FE_NEXT_CONVENTIONS, not by this list.
       # Machine list read by scripts/hfs/architecture/framework-pinned.mjs (FE_SOURCE_LAYOUT_INVALID
       # accepts exactly these basenames directly in a Next source root;
-      # their imports follow the FE_TIER_DIRECTION matrix). Exact names, case-sensitive, no globs. Supervisor rulings for nivo
-      # wf-nivo-fe-debt-mug06w7h inc-2e42a24b74e4 and inc-846867b9a34e (proxy is the Next 16 name of
-      # middleware, listed so the list survives the upgrade).
+      # their imports follow the FE_TIER_DIRECTION matrix). Exact names, case-sensitive, no globs. Supervisor rulings
+      # (proxy is the Next 16 name of middleware, listed so the list survives the upgrade).
       - middleware.ts
       - middleware.js
       - middleware.mjs

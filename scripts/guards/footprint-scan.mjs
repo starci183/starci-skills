@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// footprint-scan.mjs — the worktree/link footprint watch, independent of every guard hook (nivo-fe inc-c8fbf76aa499).
+// footprint-scan.mjs — the worktree/link footprint watch, independent of every guard hook.
 //
 // A worker's command may slip past the command guard (a script, a tool that is not a shell), `git worktree remove` cannot be
 // hooked, and a link can be made by any tool. So the runtime also LOOKS: under the repositories root (the parent of
-// the source host repository, D:/Repositories on this host) it lists
+// the source host repository) it lists
 //   - every linked git worktree of a repository there that lives under the root (kernel and supervisor scratch lives
 //     under the user's .starci home or the temp directory, never there), and
 //   - every link (symlink, junction, other reparse point) to depth --depth whose target is in ANOTHER top-level

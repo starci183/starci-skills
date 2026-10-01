@@ -70,8 +70,8 @@
 //                          --no-enter send is dropped too.
 //   STARCI_FAKE_ORCA_PROMPT_LOST <n>: the first n text+Enter sends to a terminal answer
 //                          agent_prompt_stalled and are lost: the frame stays Codex idle at
-//                          "› Ask Codex to do anything" (starci-next op-interface.draw,
-//                          2026-09-25). A later text+Enter send is submitted: the text is
+//                          "› Ask Codex to do anything" (a live op defect). A later
+//                          text+Enter send is submitted: the text is
 //                          echoed and a Codex turn runs.
 //   STARCI_FAKE_ORCA_PROMPT_RECEIPT '1': a host with durable prompt receipts (Orca 1.4.209): a prompt
 //                          sent with --wait-submit answers result.send.prompt - stages
@@ -100,8 +100,8 @@
 //   STARCI_FAKE_ORCA_BOOT_SCREEN 'claude-hint': a Claude terminal, until its first
 //                          prompt send, shows Claude Code 2.1's fresh frame whose
 //                          empty input box carries the placeholder hint
-//                          (❯ Try "write a test for <filepath>") - the frame three
-//                          nivo kernel boots timed out on (2026-09-24).
+//                          (❯ Try "write a test for <filepath>") - the frame live
+//                          kernel boots timed out on.
 //   STARCI_FAKE_ORCA_BOOT_EXIT <n>: the first n terminals created exit on
 //                          start: their frame shows the echoed launch line, a
 //                          startup error and a bare PowerShell prompt
@@ -314,7 +314,7 @@ else if (verb === 'terminal read')
 else if (verb === 'terminal send' && argv.includes('--wait-submit') && oldHost)
   fail({ ok: false, error: { code: 'incompatible_runtime', message: 'This Orca host does not support --wait-submit. No input was sent.' } });
 // terminals[h].sendRefused = '<code>': Orca shows the terminal writable but refuses every write with that
-// typed code (nivo inc-f1b576fb6006: terminal_not_writable); nothing reaches the screen.
+// typed code (a live refusal: terminal_not_writable); nothing reaches the screen.
 else if (verb === 'terminal send' && record(arg('terminal'))?.sendRefused) {
   state.refusedSends = (state.refusedSends || 0) + 1; save();
   fail({ ok: false, error: { code: record(arg('terminal')).sendRefused, message: record(arg('terminal')).sendRefused } });
@@ -698,7 +698,7 @@ else if (verb === 'orchestration reply') {
   if (process.env.STARCI_FAKE_ORCA_REPLY_FAILS === '1')
     fail({ ok: false, error: { code: 'message_not_found', message: 'no such question' } });
   // state.callerTerminal names the terminal the reply comes from: a Run whose coordinator is another
-  // terminal refuses it consumer_fenced, as Orca did a replaced Kernel (nivo inc-e523617a3c31).
+  // terminal refuses it consumer_fenced, as Orca did to a replaced Kernel.
   if (state.callerTerminal && state.runs?.[arg('run')] && state.runs[arg('run')].coordinator !== state.callerTerminal)
     fail({ ok: false, error: { code: 'consumer_fenced', message: 'Terminal ' + state.callerTerminal + ' is not the current consumer of run ' + arg('run') + '.' } });
   const question = (state.messages || []).find(m => m.id === arg('id'));

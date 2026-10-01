@@ -36,8 +36,9 @@ verification:
     BE-ERROR-5/6/7 in knowledge/patterns/be/error.yaml.
 provenance:
   sources:
-    - starci-academy-backend/src/modules/platform/exceptions/errors/abstract.ts
-    - starci-academy-backend/src/modules/platform/exceptions/errors/courses/challenge-not-found.ts
+    - examples/todo-app/be/src/modules/platform/errors/domain.error.ts
+    - examples/todo-app/be/src/modules/domain/task/errors/task.error.ts
   simplifications: |
-    Copied AbstractException API surface without filter/interceptor consumers.
-    Replaced ChallengeNotFound with synthetic ExampleNotFound.
+    Mirrors the base-error/capability-error declaration shape (stable code, one
+    init object) without filter/interceptor consumers. Uses a synthetic
+    ExampleNotFound rather than a real capability error.

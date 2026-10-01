@@ -1,0 +1,20 @@
+# dead-scripts.entries - the runtime CLIs that no code imports (owner or agent tools), declared once with why they have no code reader.
+# scripts/checks/check-dead-scripts.mjs reads it: an undeclared script with no executable reader is RT_DEAD_SCRIPT, and an entry whose
+# script is gone or that code now reads is RT_DEAD_ENTRY, so this list only shrinks. Format: <script path><TAB><reason>.
+# A reason that says "candidate-dead" is a script with no code reader, no spec and only a doc mention: delete it when the owner agrees.
+scripts/api/orca/project-setup-delete.mjs	typed call of modules/host/orca/calls.yaml with no code importer; HELD: owner decides whether it goes (legacy scan row 27)
+scripts/checks/check-entry.mjs	CLI run by the owner (docs/cli.md); no code reader and no spec: candidate-dead, owner to confirm
+scripts/checks/check-example-architecture.mjs	CLI run by the owner (RED14: the examples meet their own standard); a spec reads it
+scripts/checks/check-example-derived.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); a spec reads it
+scripts/example/example-evidence.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); specs read it
+scripts/example/example-verify.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); a spec reads it
+scripts/example/work-example.mjs	CLI of the example standard (docs/examples/todo-app-standard.md); no spec: candidate-dead, owner to confirm
+scripts/gates/hfs-sync.mjs	gate CLI that a product repository runs (docs/application-stacks.md); specs read it
+scripts/gates/repo-presentation.mjs	gate CLI that a product repository runs (docs/repo-presentation.md); no spec
+scripts/housekeeping/ledger-throughput.mjs	load-test CLI of the ledger write path (owner ruling 2026-09-27); no spec: candidate-dead, owner to confirm
+scripts/kernel/launch-smoke.mjs	release smoke run by the owner (docs/releasing.md); specs read it
+scripts/route/route-op.mjs	routing CLI named by the op prompts (docs/ops.md); no spec
+scripts/uat/assisted-runner.mjs	UAT runner CLI named by the op prompts; specs read it
+scripts/work/validate/check-evidence-binding.mjs	validator CLI (docs/verify-proof.md); a spec reads it
+scripts/work/validate/check-work-citations.mjs	validator CLI; no doc beyond the slots list and no spec: candidate-dead, owner to confirm
+scripts/work/validate/work-change.mjs	validator CLI of work records (docs); a spec reads it

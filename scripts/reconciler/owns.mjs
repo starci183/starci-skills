@@ -1,6 +1,6 @@
 // scripts/reconciler/owns.mjs — which controller owns each concern (DESIGN §7.9; modules/reconciler/reconciler.yaml
 // concerns). The engine's ctx.owns(concern) and boot.mjs --status read it. The old loops that asked
-// reconcilerOwns(concern) before each duty were deleted on 2026-09-28 (owner ruling "có lỗi xóa luôn": the reconciler
+// reconcilerOwns(concern) before each duty were deleted on 2026-09-28 (owner ruling "on an error, delete it outright": the reconciler
 // is the only loop; rollback is git revert, not a dormant fallback), and so were reconcilerOwns and yieldTo.
 
 /** concern -> owning controller. The CONCERNS of the reconciler contract (LANES shared contract). */

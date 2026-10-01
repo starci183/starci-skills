@@ -1,6 +1,6 @@
-// A registered brand artwork master shown in a token-rendered drawing is the brand's own bytes, not a palette
-// (starci-next wf-sn-foundation-mujek8g5 inc-2c34ae792249): the Academy learning-journey master
-// (brand.artworkSlots academy-learning-journey, brand rev 6) embedded as an <img> in a subscription direction made
+// A registered brand artwork master shown in a token-rendered drawing is the brand's own bytes, not a palette:
+// a learning-journey master (brand.artworkSlots learning-journey, brand rev 6) embedded as an <img> in a
+// subscription direction made
 // every render fail PALETTE_OFF_BRAND on its own purple-magenta shading. draw-render.mjs now measures each <img>'s
 // painted box and the sha256 of the bytes it shows (layout.artwork); brand-palette.mjs skips exactly the box of an
 // image whose bytes are a registered master - never a colour allowlist, never an unregistered or altered image.
@@ -18,7 +18,7 @@ import { NIVO_BRAND, redAccentPart } from '../fixtures/brand-palette.mjs';
 
 const tmp = (t) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-palette-art-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); return dir; };
 const refused = (findings) => findings.filter((f) => f.level === 'refuse').map((f) => f.code).sort();
-const MASTER = Buffer.from('academy learning-journey master bytes');
+const MASTER = Buffer.from('product learning-journey master bytes');
 const MASTER_SHA = sha256(MASTER);
 
 /** The red-accent part with a violet illustration block (x 130..226, y 76..114) the brand does not declare. */
@@ -34,7 +34,7 @@ const capture = (dir, { box = { x: 130, y: 76, width: 96, height: 38 }, bytes = 
   const file = path.join(dir, `${name}.png`);
   fs.writeFileSync(file, png);
   fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify({ schema: 'starci/draw-render@1', ok: true, viewport: { width: 240, height: 160, deviceScaleFactor: 1 },
-    image: { path: file, sha256: sha256(png) }, layout: { artwork: [{ src: 'file:///academy/pro-learning-journey-v1.png', slot: null, sha256: bytes, ...box }] } }));
+    image: { path: file, sha256: sha256(png) }, layout: { artwork: [{ src: 'file:///app/pro-learning-journey-v1.png', slot: null, sha256: bytes, ...box }] } }));
   return file;
 };
 
@@ -45,18 +45,18 @@ test('the box of an <img> showing a registered artwork master is not palette; wi
   const dir = tmp(t);
   const file = capture(dir);
   assert.deepEqual(refused(findingsOf(file, NIVO_BRAND)), ['PALETTE_OFF_BRAND'], 'no artworkSlots: the violet illustration is an off-brand colour');
-  assert.deepEqual(findingsOf(file, brandWith([{ id: 'academy-learning-journey', master: 'assets/pro-learning-journey-v1.png', sha256: MASTER_SHA }])), [], 'the declared sha256 of the slot');
+  assert.deepEqual(findingsOf(file, brandWith([{ id: 'learning-journey', master: 'assets/pro-learning-journey-v1.png', sha256: MASTER_SHA }])), [], 'the declared sha256 of the slot');
   // The master's own bytes register it too (a slot with no declared digest).
   fs.mkdirSync(path.join(dir, 'brand', 'assets'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'brand', 'assets', 'pro-learning-journey-v1.png'), MASTER);
-  const bySlotFile = brandWith([{ id: 'academy-learning-journey', master: 'assets/pro-learning-journey-v1.png' }]);
-  assert.equal(registeredArtwork(bySlotFile, path.join(dir, 'brand')).get(MASTER_SHA), 'academy-learning-journey');
+  const bySlotFile = brandWith([{ id: 'learning-journey', master: 'assets/pro-learning-journey-v1.png' }]);
+  assert.equal(registeredArtwork(bySlotFile, path.join(dir, 'brand')).get(MASTER_SHA), 'learning-journey');
   assert.deepEqual(findingsOf(file, bySlotFile, path.join(dir, 'brand')), []);
 });
 
 test('only the registered bytes and only their box: an altered image, or paint outside the box, is still refused', (t) => {
   const dir = tmp(t);
-  const brand = brandWith([{ id: 'academy-learning-journey', master: 'assets/pro-learning-journey-v1.png', sha256: MASTER_SHA }]);
+  const brand = brandWith([{ id: 'learning-journey', master: 'assets/pro-learning-journey-v1.png', sha256: MASTER_SHA }]);
   const altered = capture(dir, { bytes: sha256(Buffer.from('a recoloured copy')), name: 'altered' });
   assert.deepEqual(refused(findingsOf(altered, brand)), ['PALETTE_OFF_BRAND'], 'an image whose bytes are not the master is judged like any paint');
   const half = capture(dir, { box: { x: 130, y: 76, width: 40, height: 38 }, name: 'half' });
@@ -72,7 +72,7 @@ test('only the registered bytes and only their box: an altered image, or paint o
 
 test('a composite maps its content part\'s artwork box through the recorded rect and fit', (t) => {
   const dir = tmp(t);
-  const brand = brandWith([{ id: 'academy-learning-journey', master: 'assets/pro-learning-journey-v1.png', sha256: MASTER_SHA }]);
+  const brand = brandWith([{ id: 'learning-journey', master: 'assets/pro-learning-journey-v1.png', sha256: MASTER_SHA }]);
   const content = capture(dir, { name: 'active--page--desktop--light.content' });
   // The part placed 1:1 at (40, 20) of a 320 x 200 page composite.
   const page = blankImage(320, 200, [251, 249, 247, 255]);

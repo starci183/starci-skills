@@ -14,8 +14,9 @@ family: cross-cutting
 provenance:
   extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
   sources:
-    - starci-academy-backend
-    - starci-academy-fe
+    - examples/todo-app
+    - examples/ecommerce-app
+    - examples/shape-slot
   limitations: |
     Historical file counts do not prove current conformance. Reopen the extraction source when
     a case is missing, contradictory or stale, then repair that knowledge; do not answer such a

@@ -10,8 +10,8 @@
 // owned path is moved to `outOfScope` (a pre-existing finding another record's owner repairs) and never
 // fails the run. Since 2026-09-27 business.decide/architecture.decide/scope.define legs validated their
 // whole feature and blocked on a journey actor, DATA_STATUS_DRAWN drawings or a done UI record's missing
-// asset in records they could not write (nivo modules-agentos, workspace-provision; starci-next
-// learn-content). A finding whose file cannot be read off stays in scope.
+// asset in records they could not write (seen on several product workflows).
+// A finding whose file cannot be read off stays in scope.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

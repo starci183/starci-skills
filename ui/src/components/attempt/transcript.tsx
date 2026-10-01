@@ -3,6 +3,7 @@ import { ArrowDownToLine, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, S
 import { useApiQuery } from '../../api/query';
 import type { Transcript } from '../../contract';
 import { formatAbsolute } from '../../i18n/vi';
+import { t } from '../../i18n/t';
 import { ConceptBlock, type Concept } from '../concept';
 import { stripAnsi } from '../logs/kinds';
 import { Button } from '../ui/button';
@@ -55,40 +56,40 @@ export function TranscriptViewer({ project, attemptId, live }: { project: string
   return <ConceptBlock concept="C7" className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center gap-2">
       <form className="flex min-w-0 flex-1 items-center gap-2" onSubmit={event => { event.preventDefault(); runSearch(draft); }}>
-        <div className="relative min-w-[10rem] flex-1"><Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Tìm văn bản hoặc /regex/" className="pl-8" aria-label="Tìm trong transcript" /></div>
-        <Button type="submit" variant="outline">Tìm</Button>
-        {search && <Button type="button" variant="ghost" size="icon" aria-label="Xóa tìm kiếm" onClick={() => { setDraft(''); runSearch(''); }}><X className="size-4" /></Button>}
+        <div className="relative min-w-[10rem] flex-1"><Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input value={draft} onChange={event => setDraft(event.target.value)} placeholder={t('Find text or /regex/')} className="pl-8" aria-label={t('Search the transcript')} /></div>
+        <Button type="submit" variant="outline">{t('Search')}</Button>
+        {search && <Button type="button" variant="ghost" size="icon" aria-label={t('Clear search')} onClick={() => { setDraft(''); runSearch(''); }}><X className="size-4" /></Button>}
       </form>
       <form className="flex items-center gap-1.5" onSubmit={event => { event.preventDefault(); goToLine(); }}>
-        <Input inputMode="numeric" value={jump} onChange={event => setJump(event.target.value.replace(/\D/g, ''))} placeholder="Dòng…" className="w-20" aria-label="Nhảy tới dòng" /><Button type="submit" variant="outline" disabled={!jump}>Đi</Button>
+        <Input inputMode="numeric" value={jump} onChange={event => setJump(event.target.value.replace(/\D/g, ''))} placeholder={t('Line…')} className="w-20" aria-label={t('Jump to line')} /><Button type="submit" variant="outline" disabled={!jump}>{t('Go')}</Button>
       </form>
-      <Button type="button" variant="outline" onClick={copy} disabled={!lines.length}>{copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? 'Đã chép' : 'Chép'}</Button>
-      {data?.blob && <Button variant="outline" onClick={() => { const link = document.createElement('a'); link.href = data.blob!.href; link.download = `attempt-${attemptId}.txt`; link.click(); }}><ArrowDownToLine className="size-4" /> Tải .txt</Button>}
+      <Button type="button" variant="outline" onClick={copy} disabled={!lines.length}>{copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? t('Copied') : t('Copy')}</Button>
+      {data?.blob && <Button variant="outline" onClick={() => { const link = document.createElement('a'); link.href = data.blob!.href; link.download = `attempt-${attemptId}.txt`; link.click(); }}><ArrowDownToLine className="size-4" /> {t('Download .txt')}</Button>}
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
       <span className="flex flex-wrap items-center gap-2">
-        {following && <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-medium" data-tone="running" style={{ color: 'var(--tone)', background: 'var(--tone-bg)', borderColor: 'var(--tone-line)' }}><span className="status-dot" data-tone="running" aria-hidden="true" /> Trực tiếp</span>}
-        <span>{data ? `${total.toLocaleString('vi-VN')} dòng · ${data.final ? 'bản cuối' : 'snapshot'} · ${formatAbsolute(data.at)}` : 'Chưa có transcript'}</span>
-        {data && <span>· đã che dữ liệu nhạy cảm, bỏ mã màu ANSI</span>}
+        {following && <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-medium" data-tone="running" style={{ color: 'var(--tone)', background: 'var(--tone-bg)', borderColor: 'var(--tone-line)' }}><span className="status-dot" data-tone="running" aria-hidden="true" /> {t('Live')}</span>}
+        <span>{data ? t('{lines} lines · {kind} · {at}', { lines: total.toLocaleString('vi-VN'), kind: data.final ? t('final copy') : 'snapshot', at: formatAbsolute(data.at) }) : t('No transcript yet')}</span>
+        {data && <span>· {t('sensitive data redacted, ANSI colour codes stripped')}</span>}
       </span>
-      <div className="flex items-center gap-2"><label htmlFor={`snapshot-${attemptId}`}>Thời điểm</label><select id={`snapshot-${attemptId}`} value={snapshot} onChange={event => { setSnapshot(event.target.value); setFrom(1); setTarget(null); }} className="max-w-44 rounded-md border bg-background px-2 py-1 text-foreground"><option value="">{live ? 'Theo dõi trực tiếp' : 'Bản cuối'}</option>{snapshots.data?.map(item => <option key={item.id} value={item.id}>{formatAbsolute(item.at)} · {item.lines} dòng</option>)}</select></div>
+      <div className="flex items-center gap-2"><label htmlFor={`snapshot-${attemptId}`}>{t('At time')}</label><select id={`snapshot-${attemptId}`} value={snapshot} onChange={event => { setSnapshot(event.target.value); setFrom(1); setTarget(null); }} className="max-w-44 rounded-md border bg-background px-2 py-1 text-foreground"><option value="">{live ? t('Follow live') : t('Final copy')}</option>{snapshots.data?.map(item => <option key={item.id} value={item.id}>{formatAbsolute(item.at)} · {t('{n} lines', { n: item.lines })}</option>)}</select></div>
     </div>
-    {search && <div className="flex items-center gap-2 text-xs"><span aria-live="polite">{hits.length ? `${hitIndex + 1}/${data?.hitCount ?? hits.length} kết quả` : 'Không có kết quả'}</span><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label="Kết quả trước" onClick={() => setHitIndex(index => (index - 1 + hits.length) % hits.length)}><ChevronLeft className="size-3" /></Button><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label="Kết quả sau" onClick={() => setHitIndex(index => (index + 1) % hits.length)}><ChevronRight className="size-3" /></Button>{activeHit && <span className="truncate text-muted-foreground">dòng {activeHit.n}</span>}</div>}
+    {search && <div className="flex items-center gap-2 text-xs"><span aria-live="polite">{hits.length ? t('{at}/{total} results', { at: hitIndex + 1, total: data?.hitCount ?? hits.length }) : t('No results')}</span><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label={t('Previous result')} onClick={() => setHitIndex(index => (index - 1 + hits.length) % hits.length)}><ChevronLeft className="size-3" /></Button><Button type="button" size="icon-xs" variant="outline" disabled={!hits.length} aria-label={t('Next result')} onClick={() => setHitIndex(index => (index + 1) % hits.length)}><ChevronRight className="size-3" /></Button>{activeHit && <span className="truncate text-muted-foreground">{t('line {n}', { n: activeHit.n })}</span>}</div>}
     {transcript.error && <p role="status" className="rounded-lg border p-3 text-sm text-muted-foreground">{transcript.error}</p>}
-    {data && <div className="max-h-[32rem] min-w-0 overflow-auto rounded-lg border bg-muted/20 font-mono text-xs" role="log" aria-label="Transcript đã che dữ liệu nhạy cảm">
+    {data && <div className="max-h-[32rem] min-w-0 overflow-auto rounded-lg border bg-muted/20 font-mono text-xs" role="log" aria-label={t('Transcript with sensitive data redacted')}>
       {lines.map((line, index) => {
         const gap = search && index > 0 && line.n !== lines[index - 1].n + 1;
         const active = line.n === focusLine;
         return <div key={line.n}>
-          {gap && <div className="select-none border-b border-border/30 bg-muted/40 px-2 py-0.5 text-center text-[10px] text-muted-foreground">⋯ {(line.n - lines[index - 1].n - 1).toLocaleString('vi-VN')} dòng ẩn ⋯</div>}
+          {gap && <div className="select-none border-b border-border/30 bg-muted/40 px-2 py-0.5 text-center text-[10px] text-muted-foreground">⋯ {t('{n} hidden lines', { n: (line.n - lines[index - 1].n - 1).toLocaleString('vi-VN') })} ⋯</div>}
           <div ref={active ? activeRef : undefined} id={`L${line.n}`} className={`flex min-w-max border-b border-border/30 px-2 py-0.5 leading-5 ${active ? 'bg-[color:var(--status-warning)]/25' : line.hit ? 'bg-[color:var(--status-warning)]/10' : ''}`}>
             <span className="mr-3 w-12 shrink-0 select-none text-right tabular-nums text-muted-foreground">{line.n}</span><span className="whitespace-pre">{line.text || ' '}</span>
           </div>
         </div>;
       })}
     </div>}
-    {data && !search && <div className="flex flex-wrap justify-between gap-2"><Button variant="outline" size="sm" disabled={from <= 1} onClick={() => { setTarget(null); setFrom(Math.max(1, from - PAGE)); }}>{PAGE} dòng trước</Button>
-      <Button variant="outline" size="sm" onClick={tail}><ChevronDown className="size-4" /> Xuống cuối</Button>
-      <Button variant="outline" size="sm" disabled={from + PAGE > total} onClick={() => { setTarget(null); setFrom(from + PAGE); }}>{PAGE} dòng sau</Button></div>}
+    {data && !search && <div className="flex flex-wrap justify-between gap-2"><Button variant="outline" size="sm" disabled={from <= 1} onClick={() => { setTarget(null); setFrom(Math.max(1, from - PAGE)); }}>{t('{n} lines back', { n: PAGE })}</Button>
+      <Button variant="outline" size="sm" onClick={tail}><ChevronDown className="size-4" /> {t('Jump to end')}</Button>
+      <Button variant="outline" size="sm" disabled={from + PAGE > total} onClick={() => { setTarget(null); setFrom(from + PAGE); }}>{t('{n} lines forward', { n: PAGE })}</Button></div>}
   </ConceptBlock>;
 }

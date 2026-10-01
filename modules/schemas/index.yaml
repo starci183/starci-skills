@@ -436,19 +436,6 @@ schemas:
       whenNot: Never authorizes a live runtime reference to a deleted or moved file.
       selectedBy: The retired-path citation exception in check-contract-cites.mjs and the runtime rules that read it.
 
-  - id: starci/push-scan-allow@1
-    file: modules/supervisor/push-scan-allow.yaml
-    dialect: prose-data
-    subsystem: gate
-    governs: "Owner-approved, file- and pattern-specific exemptions for the push secret scan."
-    binds: "modules/supervisor/push-scan-allow.yaml entries[]"
-    usedBy: [scripts/supervisor/push-mains.mjs]
-    business:
-      question: "Which reviewed historical scan finding has a narrowly scoped exemption?"
-      whenNeeded: Evaluating push scan findings against owner-approved entries.
-      whenNot: Never exempts forbidden secret files or grants approval for a new credential literal.
-      selectedBy: The push scanner's explicit allow-file read.
-
   - id: starci/op@1
     file: modules/schemas/op.schema.yaml
     dialect: json-schema

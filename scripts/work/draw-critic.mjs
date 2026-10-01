@@ -177,8 +177,6 @@ export function criticFor(settings, drawer = null) {
   return { error: `the drawer (${d}) is the critic's model (${main.model}) and allocation.drawLoop.criticWhenDrawer.${d} names no other: the critic must be a different model from the drawer` };
 }
 
-/** The critic's typed outcomes: only `judged` carries a verdict. */
-export const CRITIC_OUTCOMES = Object.freeze(['judged', 'not-configured', 'launch-failed', 'timeout', 'refused', 'verdict-missing']);
 // worker-show states after which the worker does nothing more.
 const ENDED = new Set(['done', 'completed', 'failed', 'stopped', 'released', 'exited']);
 // The Orca Task status a settled Task is closed with (scripts/kernel/cli.mjs TASK_CLOSED_STATUS).

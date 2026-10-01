@@ -1,10 +1,9 @@
 // gate-attribution.mjs — whose change turned a repo-wide gate red.
 //
 // Several ops share one product working tree, so a repo-wide gate (test:ci, typecheck, lint) run for
-// op A reads op B's in-flight or landed change: nivo academy-debt's test:ci went red 812/813 on
-// module-studio's commit 9caa2d5c (inc-9474fe9ff445) and on module-studio's uncommitted
-// agentos-module-studio spec (inc-36b309cb9138), and academy-debt retried backend.implement for
-// breakage it did not cause. The rule (modules/kernel/api.yaml commands.check peerBlocked): a red
+// op A reads op B's in-flight or landed change: one workflow's test:ci went red 812/813 on a peer
+// workflow's commit 9caa2d5c and on that peer's uncommitted spec, and the first retried
+// backend.implement for breakage it did not cause. The rule (modules/kernel/api.yaml commands.check peerBlocked): a red
 // check names the files its failure implicates (`failing`: the failing spec and the source it
 // points at); api check attributes each file, and a red check none of whose files is this op's and
 // at least one of which a peer changed is `peer`: recorded peerBlocked, counted neither passed nor
@@ -34,8 +33,8 @@
 // A git read that fails leaves its file unknown, never peer. Ledger and git reads only.
 //
 // A failing file may live in another repository of the project binding (a backend op whose slice spans
-// the frontend: starci-next foundation's fe typecheck red on starci-next-fe's
-// ContentSectionLessons/index.spec.tsx): an absolute path under a bound root, or a path whose first
+// the frontend: a foundation leg's fe typecheck red on a component spec of the
+// frontend repository): an absolute path under a bound root, or a path whose first
 // segment names a bound repository holding it, is read with git in that repository.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -45,7 +44,6 @@ import { resolveIntroducer } from './introducer.mjs';
 import { lineageJobsOf } from '../machine/owner-answers.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
-export const ATTRIBUTION_CLASSES = Object.freeze(['own', 'peer', 'foreign', 'unknown']);
 /** The Work tree: a record file there is judged by the record alone, so an untouched one outside the slice is foreign. */
 export const WORK_RECORD_PREFIX = '.starciwork/';
 const isWorkRecord = (file) => String(file).replace(/\\/g, '/').replace(/^\.\//, '').startsWith(WORK_RECORD_PREFIX);

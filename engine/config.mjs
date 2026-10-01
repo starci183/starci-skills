@@ -275,10 +275,6 @@ function validateAllocationBalance(allocation,runtimes){
     }
   }
 }
-/** The one provider the runtime no longer carries: a config naming it is refused with the owner's wording, not a generic unknown-id error. */
-function refuseRetiredProvider(value,where){
-  if(typeof value==='string'&&/^qwen(?:-agent)?$/i.test(value.trim()))throw Error(`Invalid config.yaml: ${where} names qwen. Qwen đã bị gỡ; dùng claude, codex hoặc devin.`);
-}
 export function validateConfig(config){
   const allowed=['language','model','effort','models','debug','allocation','kernel','budgets','supervisor','parallel','delegation','connectors','asks','uat','specs','reconciler','claudeDebug','orca'],models=config?.models,profile=runtimeProfile(),runtimes=profile?.runtimes??{};
   if(config?.connectors!==undefined)validateConnectors(config.connectors);
@@ -300,9 +296,6 @@ export function validateConfig(config){
     const allocation=config.allocation,preferred=allocation?.preferredProvider;
     if(!plain(allocation)||Object.keys(allocation).some(key=>!ALLOCATION_KEYS.includes(key))||allocation.mode!==ADAPTIVE_ALLOCATION_MODE||!(preferred===null||preferred===undefined||typeof preferred==='string'&&preferred.trim()))
       throw Error('Invalid config.yaml: allocation must be {mode:"adaptive", preferredProvider?: <provider|null>, policy?, shares?, windowHours?, grants?}.');
-    refuseRetiredProvider(preferred,'allocation.preferredProvider');
-    for(const pool of Object.keys(plain(allocation.shares)?allocation.shares:{}))refuseRetiredProvider(pool,'allocation.shares');
-    for(const text of Array.isArray(allocation.grants)?allocation.grants:[])refuseRetiredProvider(parseAllocationGrant(text)?.pool,'allocation.grants');
     if(typeof preferred==='string'&&!knownProviders.has(preferred))throw Error(`Invalid config.yaml: allocation.preferredProvider ${preferred} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
     validateAllocationBalance(allocation,runtimes);
   }
@@ -312,7 +305,6 @@ export function validateConfig(config){
       throw Error('Invalid config.yaml: kernel group must be {group: [{agent, model?}, ...], effort?} with at least one member.');
     if(new Set(group.map(member=>member.agent)).size!==group.length)throw Error('Invalid config.yaml: kernel.group names each agent once — availability is per provider.');
     for(const {agent,model} of group){
-      refuseRetiredProvider(agent,'kernel.group agent');
       if(!knownProviders.has(agent))throw Error(`Invalid config.yaml: kernel.group agent ${agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
       if(typeof model==='string'&&!Object.values(runtimes).some(runtime=>runtime?.provider===agent&&(runtime.target===model||Object.values(runtime.models??{}).includes(model))))
         throw Error(`Invalid config.yaml: kernel.group model ${model} is not declared by a ${agent} runtime.`);
@@ -323,7 +315,6 @@ export function validateConfig(config){
     const kernel=config.kernel;
     if(!plain(kernel)||Object.keys(kernel).some(key=>!['agent','model','effort'].includes(key))||Object.values(kernel).some(value=>value!==null&&(typeof value!=='string'||!value.trim())))
       throw Error('Invalid config.yaml: kernel must be {agent?, model?, effort?} with string-or-null values, or {group: [{agent, model?}, ...], effort?}.');
-    refuseRetiredProvider(kernel.agent,'kernel.agent');
     if(typeof kernel.agent==='string'&&!knownProviders.has(kernel.agent))
       throw Error(`Invalid config.yaml: kernel.agent ${kernel.agent} is not declared by a runtime (known: ${[...knownProviders].sort().join(', ')}).`);
     if(typeof kernel.effort==='string'&&!EFFORT_LEVELS.includes(kernel.effort))
@@ -350,7 +341,6 @@ export function validateConfig(config){
     const seat=supervisor.kernel,workers=supervisor.workers,gate=supervisor.landGate;
     if(!(seat===undefined||seat===null||(plain(seat)&&Object.keys(seat).every(key=>['agent','model','effort'].includes(key)&&(seat[key]===null||typeof seat[key]==='string')))))
       throw Error('Invalid config.yaml: supervisor.kernel must be {agent?, model?, effort?} strings, or null.');
-    refuseRetiredProvider(seat?.agent,'supervisor.kernel.agent');
     if(!(workers===undefined||workers===null||(plain(workers)&&Object.keys(workers).every(key=>['base','max'].includes(key)&&Number.isInteger(workers[key])&&workers[key]>=1&&workers[key]<=10))))
       throw Error('Invalid config.yaml: supervisor.workers must be {base?, max?} integers from 1 to 10, or null.');
     if(!(gate===undefined||gate===null||(plain(gate)&&Object.keys(gate).every(key=>(key==='mode'&&['shared','exclusive'].includes(gate.mode))||(key==='push'&&typeof gate.push==='boolean')))))

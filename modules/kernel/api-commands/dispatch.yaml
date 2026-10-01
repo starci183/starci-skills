@@ -33,8 +33,7 @@ dispatch:
     (end_state requeued, or effect-unknown when the effect is unknown; a requeued attempt is also settled_at/settled_by kernel
     with no verdict, released_at set, its Orca Task closed, task_closed_at set, and work_units.dispatches gives the slot back)
     and keeps it as history: it is never open, never running in api status or the UI, never a try. settle_json.message
-    says what step refused it and why. scripts/kernel/repair-rejected-attempts.mjs (dry run by default, --apply) seals the
-    ones an older runtime left open.
+    says what step refused it and why.
   writes: >-
     admission FIRST, launch second: one `path:<owned_path>` lease row per
     owned_path, spelled app-relative in a bound app (scripts/kernel/lease-canon.mjs:
@@ -107,8 +106,8 @@ dispatch:
     and never asked again. Absent when the lineage holds no answered ask. An
     owner-answer retry is enqueued exactly as before (same op and cut ordinal,
     no --after); the answer rides in the packet, not in the Kernel's free text
-    (starci-next business.decide attempt 12 re-filed the answered
-    ctx_3074731253e3 as ctx_cc73a111de44 before this)
+    (an earlier business.decide attempt once re-filed an answered ask as a new
+    dispatch before this)
   spawn: >-
     with --spawn the api runs the Orca sequence itself — through
     scripts/agent/lib.mjs spawnAgent, the one agent launch: task-create

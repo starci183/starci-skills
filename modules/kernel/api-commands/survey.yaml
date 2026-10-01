@@ -39,7 +39,7 @@ survey:
       change is `followUp: true`, owed ONE targeted follow-up leg and never held seam-first. A
       record the job's own workflow owns is listed only when no job of another workflow wrote it
       (an unattributed edit). Every other peer change is survey.peerDrift, never here (owner
-      2026-09-25, starci-next inc-1c7f7dad53e0). A Source-law edit (knowledge/**,
+      2026-09-25). A Source-law edit (knowledge/**,
       modules/schemas/**) NEVER appears here: see sourceDrift. A contract with no recorded inputs,
       or no settle baseline, never appears. `heldBy` names the open seam-ordinal job a higher stale
       slice of the same cut waits on (never on a followUp row). Computed by `inputDrift()` in

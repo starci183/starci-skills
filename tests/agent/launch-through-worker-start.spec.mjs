@@ -53,7 +53,7 @@ test('the agent-launch rule flags every terminal-creating form and nothing else'
   write('scripts/shell.mjs',"orcaRun(['terminal','create','--title','[Shell] probe']);\n");
   write('scripts/checks/host-boundary.allow','scripts/shell.mjs:1  # a plain non-agent shell (reviewed)\n');
   const found=findHostBoundaryViolations({root}).violations.filter(v=>v.rule==='agent-launch').map(v=>v.where).sort();
-  assert.deepEqual(found,['scripts/api/orca/wrapper.mjs:1','scripts/bad.mjs:1','scripts/bad.mjs:2','scripts/bad.mjs:3','scripts/bad.mjs:4']);
+  assert.deepEqual(found,['scripts/api/orca/wrapper.mjs:1','scripts/bad.mjs:1','scripts/bad.mjs:2','scripts/bad.mjs:3','scripts/bad.mjs:4','scripts/shell.mjs:1']);
 });
 
 test('the Orca contract carries no terminal-creating call and forbids it for the runtime',()=>{

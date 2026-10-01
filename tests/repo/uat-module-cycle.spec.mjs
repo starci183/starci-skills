@@ -6,7 +6,7 @@ import test from 'node:test';
 import {spawn} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
-// starci-next inc-f681bbed166f: scripts/uat/uat-slots.mjs ran `await import('./assisted-runner.mjs')` under its
+// scripts/uat/uat-slots.mjs ran `await import('./assisted-runner.mjs')` under its
 // own top-level await (`run`), while assisted-runner.mjs statically imports uat-slots.mjs. That module graph
 // never settles: Node printed "Detected unsettled top-level await" and exited 13 before the held command ran.
 // launchFor now lives in the leaf scripts/uat/launch.mjs, which both import.

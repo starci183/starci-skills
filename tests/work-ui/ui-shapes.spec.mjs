@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml, stringifyYaml } from '../../engine/yaml.mjs';
 import { DATA_STATUS_DRAWN, DRAW_TOOL, RASTER_TOOL, SHAPE_DUPLICATE, dataStatusOf, drawingsOf, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings } from '../../scripts/work/ui/ui-shapes.mjs';
@@ -12,7 +11,6 @@ import { checkWorkTree } from '../../scripts/work/validate/check-example-work.mj
 // Owner model (examples/shape-slot/README.md): a ui record's state is a SHAPE - one layout, one drawing - and a
 // slot's data status (loading, skeleton, empty, error, 401/403/404) renders by recipe and is never drawn.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const MIGRATE = path.join(ROOT, 'scripts', 'work', 'migrate-ui-shapes.mjs');
 const validate = new Ajv2020({ strict: true, allErrors: true }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-ui-screen.schema.yaml'), 'utf8')));
 const errors = () => (validate.errors ?? []).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ');
 const example = () => parseYaml(fs.readFileSync(path.join(ROOT, 'examples/ecommerce-app/.starciwork/features/identity/ui/sign-in/index.yaml'), 'utf8'));
@@ -118,7 +116,7 @@ test('DATA_STATUS_DRAWN refuses a data-status shape or drawing unless it is decl
   assert.deepEqual(codes(uiShapeFindings(twice)), [SHAPE_DUPLICATE]);
 });
 
-test('the ui record gate carries DATA_STATUS_DRAWN: refused on a shaped record, warned on one not yet migrated', (t) => {
+test('the ui record gate carries DATA_STATUS_DRAWN: refused on every record that draws a slot data status', (t) => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ui-shapes-gate-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   const work = path.join(base, '.starciwork');
@@ -181,76 +179,8 @@ const salesLike = () => ({
   ],
 });
 
-const migrate = (repo, ...args) => {
-  const r = spawnSync(process.execPath, [MIGRATE, '--repo', repo, ...args, '--json'], { encoding: 'utf8' });
-  assert.equal(r.status, 0, r.stderr || r.stdout);
-  return JSON.parse(r.stdout);
-};
-
-test('migrate-ui-shapes splits states into shapes and per-slot data status, retires drawings, and is idempotent', (t) => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ui-shapes-migrate-'));
-  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
-  const file = path.join(repo, '.starciwork', 'features', 'sales', 'ui', 'workbench', 'index.yaml');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, stringifyYaml(salesLike()));
-  const before = fs.readFileSync(file, 'utf8');
-  assert.deepEqual(codes(uiShapeFindings(salesLike())), [DATA_STATUS_DRAWN, DATA_STATUS_DRAWN], 'the unmigrated record draws opportunity-loading');
-
-  const dry = migrate(repo, '--dry-run');
-  assert.equal(fs.readFileSync(file, 'utf8'), before, 'a dry run writes nothing');
-  assert.deepEqual({ ...dry.totals }, { records: 1, changed: 1, unchanged: 0, skipped: 0, states: 6, shapes: 2, dataStatusStates: 4, slots: 2, retiredAssets: 2, mapEntriesDropped: 4, nonDerivableCandidates: 2 });
-  assert.deepEqual(dry.records[0].candidates.map((c) => [c.state, c.reasons.length]), [['opportunity-loading', 1], ['onboarding-empty', 1]]);
-
-  const applied = migrate(repo, '--apply');
-  assert.equal(applied.totals.changed, 1);
-  const after = parseYaml(fs.readFileSync(file, 'utf8'));
-  assert.deepEqual(after.ui.shapes, [
-    { base: 'OpportunityAttentionBase', state: 'opportunity-populated', viewports: ['desktop', 'mobile'] },
-    { base: 'OpportunityAttentionBase', state: 'opportunity-command-submitting', viewports: ['desktop'] },
-  ]);
-  assert.deepEqual(after.ui.dataStatus, [
-    { base: 'OpportunityAttentionBase', slot: 'opportunity', statuses: ['loading', 'empty', 'forbidden'] },
-    { base: 'OnboardingBase', slot: 'onboarding', statuses: ['empty'] },
-  ]);
-  assert.deepEqual(after.ui.states.map((s) => s.name), ['opportunity-populated', 'opportunity-command-submitting']);
-  assert.deepEqual(after.ui.coverage.map.map((m) => m.state), ['opportunity-populated', 'opportunity-populated', 'opportunity-command-submitting']);
-  const retired = [...after.assets, ...after.ui.assets].filter((a) => a.retired).map((a) => a.path);
-  assert.deepEqual([...new Set(retired)].sort(), ['assets/directions/opportunity-loading--page--mobile--light.content.png', 'assets/directions/opportunity-loading--page--mobile--light.png']);
-  assert.equal(after.assets.find((a) => a.role === 'prompt').retired, undefined, 'only drawings are retired');
-  assert.equal(after.change.rev, 3);
-  assert.equal(after.change.kind, 'clarifying');
-  assert.deepEqual(uiShapeFindings(after), [], 'a migrated record draws no data status');
-
-  const text = fs.readFileSync(file, 'utf8');
-  const again = migrate(repo, '--apply');
-  assert.equal(again.totals.changed, 0);
-  assert.equal(again.totals.unchanged, 1);
-  assert.equal(fs.readFileSync(file, 'utf8'), text, 'a second run rewrites nothing');
-});
-
-test('migrate-ui-shapes migrates the example ui record into a schema-valid one', (t) => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ui-shapes-example-'));
-  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
-  const file = path.join(repo, '.starciwork', 'features', 'identity', 'ui', 'sign-in', 'index.yaml');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const rec = example();
-  rec.ui.states.push({ name: 'session-loading', trigger: 'The session read is in flight.', behavior: 'Skeleton.' });
-  rec.ui.coverage.map.push({ screen: 'sign-in', state: 'session-loading', viewport: 'desktop-1536x1024', derivation: 'Derived.' });
-  fs.writeFileSync(file, stringifyYaml(rec));
-  migrate(repo, '--apply');
-  const after = parseYaml(fs.readFileSync(file, 'utf8'));
-  assert.equal(validate(after), true, errors());
-  assert.deepEqual(after.ui.shapes, [{ base: 'SignInBase', state: 'filled-welcome', viewports: ['desktop', 'mobile'] }]);
-  assert.deepEqual(after.ui.dataStatus, [{ base: 'SignInBase', slot: 'session', statuses: ['loading'] }]);
-});
-
-test('migrate-ui-shapes refuses a bad invocation', () => {
-  const none = spawnSync(process.execPath, [MIGRATE], { encoding: 'utf8' });
-  assert.equal(none.status, 2);
-  const both = spawnSync(process.execPath, [MIGRATE, '--repo', ROOT, '--apply', '--dry-run'], { encoding: 'utf8' });
-  assert.equal(both.status, 2);
-  const missing = spawnSync(process.execPath, [MIGRATE, '--repo', path.join(os.tmpdir(), 'no-such-starci-repo')], { encoding: 'utf8' });
-  assert.equal(missing.status, 1);
+test('a record that draws a slot data status is refused', () => {
+  assert.deepEqual(codes(uiShapeFindings(salesLike())), [DATA_STATUS_DRAWN, DATA_STATUS_DRAWN]);
 });
 
 test('generatedDrawingsOf: draw-render drawings make a record drawn; image_gen counts only on a record drawn before token rendering', () => {

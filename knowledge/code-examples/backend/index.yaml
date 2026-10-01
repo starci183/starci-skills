@@ -1,7 +1,8 @@
 schema: starci/code-example-catalog@1
 title: Backend code examples
 purpose: |
-  Multi-file interaction examples extracted from starci-academy-backend shapes.
+  Multi-file interaction examples extracted from the example backends' shapes
+  (examples/todo-app/be).
   They teach ownership and wiring; they are not product requirements or runnable apps.
 examples:
   - id: named-exception

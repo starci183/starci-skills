@@ -12,8 +12,8 @@ revision: 750bd4b1502aa47f44462f16e68a693c0a7d3803
 # pass to the login and task feature trees and a shared infrastructure module needs exactly one owner
 # record, not one per consuming feature. impl.login.be.auth's session-store proof and this
 # record's task-repository proof both rest on the same TaskEntity/SessionEntity shapes this module owns.
-# Renamed from modules/integrations/postgres to modules/platform/databases/postgresql/primary on
-# ex-nivo-shape, matching nivo's centralised-entities/named-connection convention.
+# Renamed from modules/integrations/postgres to its modules/platform/database home, matching the
+# centralised-entities/named-connection convention the product modules follow.
 proves: [data.task.task]
 change: {rev: 1, kind: initial, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):
   owners now also claims the shipped HTTP readiness door, src/features/todo/transport/http/health - the health

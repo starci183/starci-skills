@@ -134,6 +134,7 @@ ruleParams:
       - {id: failure-codes, run: scripts/checks/check-failure-codes.mjs}
       - {id: hfs-rules, run: scripts/checks/check-hfs-rules.mjs}
       - {id: doc-language, run: scripts/checks/check-doc-language.mjs}
+      - {id: i18n-catalog, run: scripts/checks/check-i18n-catalog.mjs}
       - {id: grammar-dist, run: scripts/checks/check-grammar-dist.mjs}
       - {id: canon-pins, run: scripts/checks/check-canon-pins.mjs}
       - {id: dead-scripts, run: scripts/checks/check-dead-scripts.mjs}

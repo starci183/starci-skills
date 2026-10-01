@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// gc.mjs — the Supervisor's garbage collection ("dọn rác"; owner, 2026-09-28: "sao supervisor không xóa worker, và op
-// đầy rác thế!!! phải có dọn rác chứ"). Every supervisor tick runs it (tick.mjs, duty gc); an operator runs it by hand.
+// gc.mjs — the Supervisor's garbage collection (owner, 2026-09-28: "why doesn't the supervisor delete the workers,
+// the ops are so full of garbage!!! there has to be a garbage collection"). Every supervisor tick runs it (tick.mjs, duty gc); an operator runs it by hand.
 //
 //   node scripts/supervisor/gc.mjs [--dry-run] [--apply] [--only agents,shells,lanes,tmp,tasks] [--json]
 //                                  [--plan] [--holder <name>] [--trigger <name>]
@@ -38,7 +38,7 @@
 //             empty leftover directory. A [Worker] staging checkout is an Orca worktree registered as supervisor-staging:
 //             the worktree GC (scripts/machine/worktrees.mjs gcWorktrees) removes it once its job settled, never this one.
 //             The node_modules junction is unlinked first, then the tree goes through safeRemoveTree (links unlinked, never followed; never
-//             `git worktree remove --force`, nivo-fe inc-c8fbf76aa499), then the registration is pruned. Lane branches
+//             `git worktree remove --force`), then the registration is pruned. Lane branches
 //             are kept as commit evidence. Unmerged or dirty lanes are kept and reported.
 //   (ended workflows are NOT purged here: housekeeping is the only purger — 30 days, zipped and verified first, Q6 —
 //    through scripts/housekeeping/hk-ledger.mjs and scripts/work/purge-workflow.mjs.)
@@ -87,6 +87,7 @@ import { acquireGcLock } from '../machine/gc-lock.mjs';
 import { LANE_IDLE_MS, laneOwnerOf } from '../machine/lane-owner.mjs';
 import { releasePlan, workerTerminalHandles, distinctRuns } from '../lib/worker-accounting.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SCHEMA = 'starci/gc-report@1';
@@ -126,16 +127,6 @@ export function gcSettings(allocation = allocationSettings()) {
     laneBudgetMs: num(gc.laneBudgetMs, DEFAULTS.laneBudgetMs) };
 }
 
-
-
-/**
- * Whether the periodic sweep is due (owner 2026-09-28: every allocation.gc.sweepMs, default 30 minutes; the tick only
- * checks): true when no supervisor-gc event is younger than sweepMs. {due, lastAt, nextAt}.
- */
-export function sweepDue({ env = process.env, now = Date.now(), sweepMs = DEFAULTS.sweepMs } = {}) {
-  const lastAt = readSupervisor((m) => m.newestSupEvent(GC_EVENT_KIND)?.created_at ?? null, null, { env });
-  return { due: lastAt == null || now - lastAt >= sweepMs, lastAt, nextAt: lastAt == null ? now : lastAt + sweepMs };
-}
 
 /* ------------------------------------------------------------ state: when a candidate was first seen (machine.sqlite) */
 
@@ -623,8 +614,10 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
 /** The one owner-digest line (Vietnamese per config.yaml language vi; English otherwise). */
 export function gcLine(counts, { language = 'vi', apply = true } = {}) {
   const bytes = (counts.freedBytes ?? 0) + (counts.ramFreedBytes ?? 0);
-  if (language === 'vi') return `Dọn rác${apply ? '' : ' (thử)'}: ${counts.agents} agent, ${counts.terminals} terminal, ${counts.worktrees} worktree, ${fmtGb(bytes)}`;
-  return `Garbage collected${apply ? '' : ' (dry run)'}: ${counts.agents} agent(s), ${counts.terminals} terminal(s), ${counts.worktrees} worktree(s), ${fmtGb(bytes)}`;
+  return translator(language)(
+    apply ? 'Garbage collected: {agents} agent(s), {terminals} terminal(s), {worktrees} worktree(s), {bytes}'
+      : 'Garbage collected (dry run): {agents} agent(s), {terminals} terminal(s), {worktrees} worktree(s), {bytes}',
+    { agents: counts.agents, terminals: counts.terminals, worktrees: counts.worktrees, bytes: fmtGb(bytes) });
 }
 
 /**

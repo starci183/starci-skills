@@ -51,7 +51,7 @@ Each record is a complete typed document of its own family schema, owns one `ind
 | Customer journey | `work/customer-journey@1` | `modules/schemas/work-customer-journey.schema.yaml` |
 | Policy decision | `work/policy-decision@1` | `modules/schemas/work-policy-decision.schema.yaml` |
 
-These schemas own each record's required fields and sections; this page states only the authoring policy around them. `modules/schemas/index.yaml` catalogs them and `modules/models/kinds.yaml` names which ops read and write each family. Do not use a product-specific schema such as `starci-next/srs@1`.
+These schemas own each record's required fields and sections; this page states only the authoring policy around them. `modules/schemas/index.yaml` catalogs them and `modules/models/kinds.yaml` names which ops read and write each family. Do not use a product-specific schema such as `my-app/srs@1`.
 
 ## Functional requirements
 

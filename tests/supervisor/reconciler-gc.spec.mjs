@@ -9,13 +9,13 @@ import { classifyLeases, planLaneLogs, collectLaneLogs, runGc, COLLECTORS } from
 
 import { fakeCtx } from '../../scripts/reconciler/testing.mjs';
 const T = 2_000_000_000_000;
-const REPO = 'D:/Repositories/nivo-backend';
+const REPO = 'D:/Repositories/todo-app-be';
 
 /** A ctx per the reconciler contract (lane A testing.mjs fakeCtx shape), recording every actuator call. */
 function ctxOf(mode, extra = {}) {
   const calls = { run: [], api: [], log: [], decisions: [], clocks: [] };
   const ctx = fakeCtx({
-    mode, now: () => T, ledgers: [{ ledgerId: 'nivo-backend', repo: REPO, file: `${REPO}/.starci/ledger.sqlite` }, { ledgerId: 'supervisor', repo: null, file: null }],
+    mode, now: () => T, ledgers: [{ ledgerId: 'todo-app-be', repo: REPO, file: `${REPO}/.starci/ledger.sqlite` }, { ledgerId: 'supervisor', repo: null, file: null }],
     read: () => null, status: () => null,
     api: async (...a) => { calls.api.push(a); return mode === 'active' ? { ok: true } : { ok: true, shadow: true }; },
     run: async (...a) => { calls.run.push(a); return mode === 'active' ? { ok: true } : { ok: true, shadow: true }; },
@@ -43,21 +43,21 @@ function controller(extra = {}) {
 }
 
 test('routes: the six entity events key one entity each; land-failed and a lane land key nothing', () => {
-  assert.equal(ROUTES['op-settled']({ kind: 'op-settled', ledgerId: 'nivo-backend', entityType: 'job', entityId: 'op-1' }), 'gc:job:nivo-backend:op-1');
-  assert.equal(ROUTES['worker-released-on-report']({ ledgerId: 'nivo-backend', entityType: 'job', entityId: 'op-1' }), 'gc:job:nivo-backend:op-1');
-  assert.equal(ROUTES['workflow-finished']({ ledgerId: 'nivo-backend', workflowId: 'wf-1' }), 'gc:workflow:nivo-backend:wf-1');
-  assert.equal(ROUTES['kernel-stale-cleared']({ ledgerId: 'nivo-backend', workflowId: 'wf-1' }), 'gc:workflow:nivo-backend:wf-1');
+  assert.equal(ROUTES['op-settled']({ kind: 'op-settled', ledgerId: 'todo-app-be', entityType: 'job', entityId: 'op-1' }), 'gc:job:todo-app-be:op-1');
+  assert.equal(ROUTES['worker-released-on-report']({ ledgerId: 'todo-app-be', entityType: 'job', entityId: 'op-1' }), 'gc:job:todo-app-be:op-1');
+  assert.equal(ROUTES['workflow-finished']({ ledgerId: 'todo-app-be', workflowId: 'wf-1' }), 'gc:workflow:todo-app-be:wf-1');
+  assert.equal(ROUTES['kernel-stale-cleared']({ ledgerId: 'todo-app-be', workflowId: 'wf-1' }), 'gc:workflow:todo-app-be:wf-1');
   assert.equal(ROUTES['land-passed']({ kind: 'land-passed', ledgerId: 'supervisor', payload: { jobId: 'fix-a-123456' } }), 'gc:land:fix-a-123456');
   assert.equal(ROUTES['land-passed']({ kind: 'land-passed', ledgerId: 'supervisor', payload: { jobId: null, lane: 'lane/x' } }), null);
   for (const k of ['op-settled', 'worker-released', 'kernel-stale-cleared', 'land-succeeded', 'workflow-finished', 'workflow-archived']) assert.equal(typeof ROUTES[k], 'function', k);
-  assert.deepEqual(parseKey('gc:job:nivo-backend:op-code.refactor-1'), { type: 'job', ledgerId: 'nivo-backend', id: 'op-code.refactor-1' });
+  assert.deepEqual(parseKey('gc:job:todo-app-be:op-code.refactor-1'), { type: 'job', ledgerId: 'todo-app-be', id: 'op-code.refactor-1' });
   assert.deepEqual(parseKey('gc:sweep'), { type: 'sweep' });
 });
 
 test('op-settled with its [Op] terminal still live: a verified close and a leftover lesson (active)', async () => {
   const { c, lessons } = controller();
   const { ctx, calls } = ctxOf('active');
-  const r = await c.reconcile('gc:job:nivo-backend:op-1', ctx);
+  const r = await c.reconcile('gc:job:todo-app-be:op-1', ctx);
   assert.equal(r.closes.length, 1);
   assert.equal(calls.run.length, 1);
   const [cmd, args] = calls.run[0];
@@ -72,7 +72,7 @@ test('op-settled with its [Op] terminal still live: a verified close and a lefto
 test('op-settled in shadow: the close goes through the gate as a would, no lesson', async () => {
   const { c, lessons } = controller();
   const { ctx, calls } = ctxOf('shadow');
-  await c.reconcile('gc:job:nivo-backend:op-1', ctx);
+  await c.reconcile('gc:job:todo-app-be:op-1', ctx);
   assert.equal(calls.run.length, 1, 'the engine gate records it as reconciler.would');
   assert.equal(lessons.length, 0);
 });
@@ -81,11 +81,11 @@ test('an event inside the grace window waits for the owner step; a live job is l
   const { ctx, calls } = ctxOf('active');
   const young = controller({ view: view({ updatedAt: T - 5_000 }) }).c;
   // MB-14: a wait, not a failure: requeued for the rest of the grace window plus a margin, never a full grace.
-  const waited = await young.reconcile('gc:job:nivo-backend:op-1', ctx);
+  const waited = await young.reconcile('gc:job:todo-app-be:op-1', ctx);
   assert.equal(waited.waiting, true);
   assert.equal(waited.requeueAfterMs, 60_000 - 5_000 + 5_000);
   const live = controller({ view: view({ status: 'running' }) }).c;
-  assert.match((await live.reconcile('gc:job:nivo-backend:op-1', ctx)).skipped, /running/);
+  assert.match((await live.reconcile('gc:job:todo-app-be:op-1', ctx)).skipped, /running/);
   assert.equal(calls.run.length, 0);
 });
 
@@ -93,13 +93,13 @@ test('a settled job still holding a lease: reported and a runtime-defect DI, nev
   const leases = [{ resourceKey: 'path:src/a.ts', jobId: 'op-1', workflowId: 'wf-1', acquiredAt: T - 600_000, expiresAt: T + 60_000, jobStatus: 'succeeded', jobUpdatedAt: T - 300_000, phase: 'build' }];
   const { c } = controller({ view: view({ leases }) });
   const { ctx, calls } = ctxOf('shadow');
-  const r = await c.reconcile('gc:job:nivo-backend:op-1', ctx);
+  const r = await c.reconcile('gc:job:todo-app-be:op-1', ctx);
   assert.equal(r.leases, 1);
   assert.equal(calls.decisions.length, 1);
   assert.equal(calls.decisions[0].kind, 'runtime-defect');
   assert.equal(calls.decisions[0].decider, 'supervisor');
   assert.match(calls.decisions[0].summary, /LEASE_LEAK/);
-  assert.equal(calls.decisions[0].idempotencyKey, 'lease-leak:nivo-backend:op-1');
+  assert.equal(calls.decisions[0].idempotencyKey, 'lease-leak:todo-app-be:op-1');
 });
 
 /** runGc seams: one settled op worker to collect, no lanes, no temp, no tasks. `closes` counts real closes. */
@@ -326,13 +326,13 @@ test('agents collector: a Run whose worker-list fails touches none of its worker
 test('op-settled whose worker Orca holds reclaimable: released through worker-release, never closed by tab', async () => {
   const { c, lessons } = controller({ view: ranView(), deps: { workers: async (run) => ({ ok: true, workers: run === 'run_a' ? [workerRow('ctx_op', { handle: 'term_op' })] : [] }) } });
   const { ctx, calls } = ctxOf('active');
-  const r = await c.reconcile('gc:job:nivo-backend:op-1', ctx);
+  const r = await c.reconcile('gc:job:todo-app-be:op-1', ctx);
   assert.deepEqual(calls.run.map(([, a]) => a.slice(0, 3)), [['scripts/api/orca/worker-release.mjs', '--dispatch', 'ctx_op']]);
   assert.equal(r.closes.length, 1);
   assert.equal(lessons[0].klass, 'worker');
   const unv = controller({ view: ranView(), deps: { workers: async () => ({ ok: true, workers: [workerRow('ctx_op', { handle: 'term_op', liveness: 'unverifiable' })] }) } }).c;
   const { ctx: ctx2, calls: calls2 } = ctxOf('active');
-  await unv.reconcile('gc:job:nivo-backend:op-1', ctx2);
+  await unv.reconcile('gc:job:todo-app-be:op-1', ctx2);
   assert.equal(calls2.run.length, 0, 'unverifiable: neither released nor closed by tab (Orca accounts for it)');
 });
 

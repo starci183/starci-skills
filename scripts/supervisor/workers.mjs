@@ -468,8 +468,8 @@ export function closeWorkerTerminal(m, { jobId, env = process.env, now = Date.no
   const handle = job?.worker_id;
   if (!handle || handle === 'supervisor' || job.payload.self) return null;
   if (job.payload.terminalClosed?.ok === true) return null;
-  // A worker-start worker is fenced and released by its Dispatch (release archives its output); only a
-  // terminal-launched [Worker] from before every launch went through worker-start is closed by its terminal.
+  // A worker-start worker is fenced and released by its Dispatch (release archives its output); a job
+  // recorded without a Dispatch has only its terminal to close.
   const dispatch = job.payload.dispatch ?? null;
   let r;
   try { r = dispatch ? release(dispatch, handle, { owner: `supervisor:${jobId}`, env }) : close(handle, { owner: `supervisor:${jobId}`, env }); }

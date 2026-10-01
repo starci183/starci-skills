@@ -17,10 +17,10 @@ const { DatabaseSync } = require('node:sqlite');
 const S = hostSettings();
 const T0 = Date.UTC(2026, 8, 29, 8, 0, 0);
 const WF = 'wf-nivo-auth-mum8xr9a';
-const SEAT = `seat:kernel:nivo-backend:${WF}`;
+const SEAT = `seat:kernel:todo-app-be:${WF}`;
 const OLD = 'term_3462bc7c-3dfe-455f-b041-6405c46382ef';
 const LIVE = 'term_live-kernel';
-const repo = path.join(os.tmpdir(), 'starci-fixture-repos', 'nivo-backend');
+const repo = path.join(os.tmpdir(), 'starci-fixture-repos', 'todo-app-be');
 
 function ledgerDb({ incidents = [], seatTerminal = LIVE } = {}) {
   const db = new DatabaseSync(':memory:');
@@ -42,7 +42,7 @@ function hostCtx({ mode = 'active', db, closeAnswer }) {
   let t = T0;
   const ctx = fakeCtx({
     mode, calls, now: () => t, advance: (ms) => { t += ms; },
-    ledgers: [{ ledgerId: 'nivo-backend', repo, file: path.join(repo, '.starciwork', 'runtime.sqlite') }],
+    ledgers: [{ ledgerId: 'todo-app-be', repo, file: path.join(repo, '.starciwork', 'runtime.sqlite') }],
     read: (id, fn) => fn(db),
     run: async (cmd, args, o) => {
       calls.run.push({ cmd, args, o });

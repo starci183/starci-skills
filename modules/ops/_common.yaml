@@ -344,7 +344,7 @@ sections:
         ledger — goals/jobs/inbox/reports/contracts/checks ROWS transacted through `api` verbs.
         An operation never opens, queries or copies that file: it reads its contract with `api
         op-contract` and files `api report` for its own job, and the api refuses every kernel verb
-        from an op terminal (modules/kernel/api.yaml conventions.callerBoundary, inc-360891316369).
+        from an op terminal (modules/kernel/api.yaml conventions.callerBoundary).
         Messages between workflows (`api peers`, `notify`, `inbox`) are kernel verbs too: work
         that belongs to another workflow is named in the op's report, and the kernel routes it.
         An operation's produced
@@ -416,7 +416,7 @@ sections:
         (checkpointOp), so a commit of your own is never your delivery; inspect your diff, run the
         applicable checks and report the changed paths and the tree you tested. History is never yours
         to move (main of a product repo, which peer workflows land on, included): never `git reset`, rebase, amend, drop or
-        force it - a Collab op ran `git reset HEAD~1` on nivo-backend main and silently removed its
+        force it - a Collab op ran `git reset HEAD~1` on a product repository's main and silently removed its
         own filed-report commit while three peer workflows were committing there. In a product workflow you work in the workflow's one worktree on wf-<workflowId>,
         never on main: the runtime commits each green op's checkpoint there, preserves a failed or blocked op's work to
         preserved/<workflowId>/<op> and resets the tree to the last checkpoint, and only the workflow's finish moves main;
@@ -430,9 +430,9 @@ sections:
         so on stderr; while it says a git process may still hold it, retry the git command shortly,
         and report blocked environment only if it persists. Never create a git worktree, a junction, a symlink or a hard link, anywhere:
         work in the checkout you were dispatched to (your workflow's worktree), with its own real node_modules from npm ci. A worker's private
-        worktree beside nivo-fe with node_modules junctions into the live checkout was removed with
-        `git worktree remove --force`, which followed the junctions and deleted 674 live files
-        (inc-c8fbf76aa499); a need for another revision, a clean build tree or a linked dependency is
+        worktree beside a product front end with node_modules junctions into the live checkout was removed with
+        `git worktree remove --force`, which followed the junctions and deleted 674 live files;
+        a need for another revision, a clean build tree or a linked dependency is
         reported (blocked environment), never made. Never kill processes by image name or pattern
         (`taskkill /IM` or `/FI`, `pkill`, `killall`, `Stop-Process -Name`, `wmic process where name=...`): the
         machine is shared with Orca and every other agent, and a lane's `taskkill` of node.exe restarted Orca
@@ -541,8 +541,8 @@ sections:
         declaration names, which resolves or mints the project and its token from the source stack
         custody. No op asks the owner for a SONAR_TOKEN, a Sonar host or
         a GitHub secret/variable; the CI secret wiring is an optional follow-up recorded as such."
-      - "Open items are unfinished work, never notes about the environment or another leg
-        (inc-00026c808d40). `partial` is a retry: the kernel settles it fail and dispatches this op
+      - "Open items are unfinished work, never notes about the environment or another leg.
+        `partial` is a retry: the kernel settles it fail and dispatches this op
         again, so `open[]` names only work inside this op's own grant that another attempt of this
         op can finish. These are never open items and never turn `done` into `partial` once every
         check this op's brief requires ran green; they are recorded as checks with their evidence

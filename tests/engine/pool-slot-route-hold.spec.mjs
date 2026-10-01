@@ -1,7 +1,7 @@
 // A routed-but-queued job holds its pool slot only while its latest route decision is younger than
 // runtimes.yaml allocation.routeHoldMs; running jobs always hold theirs; api route and api status count alike.
 //
-// Live defect (D:/Repositories/nivo-backend, 2026-09-28 23:05Z): api route and api status counted every
+// Live defect: api route and api status counted every
 // non-settled job with a payload.model toward its pool. Jobs routed and then parked for hours (owner gate,
 // Supervisor hold, peer-wait, dependency, readiness-timeout loop) kept their slot forever: devin-agent 10/10
 // with 5 running, codex-agent 10/10 with 3 running, claude-agent 6/6 with 0 running, so fe-canon's four ready

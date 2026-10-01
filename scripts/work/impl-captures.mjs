@@ -3,7 +3,6 @@
 // record's assets[] cites each file {artifact?, name, role, sha256} - never a file under the record's assets/.
 // capturesOf pairs every cited PNG with the markup cited under the same stem (<stem>.html), resolved through the blob
 // store (engine/db/blob.mjs assetFileOf).
-import path from 'node:path';
 import { assetFileOf } from '../../engine/db/blob.mjs';
 
 const nameOf = (a) => String(a?.name ?? a?.path ?? '');
@@ -18,6 +17,3 @@ export function capturesOf(recordDir, record, { db = null } = {}) {
     return { name: nameOf(a), png: assetFileOf(recordDir, a, { db }), markup: m ? assetFileOf(recordDir, m, { db }) : null };
   }).sort((x, y) => x.name.localeCompare(y.name));
 }
-
-/** How a capture is named in a finding: its artifact name (a blob has no path in the tree). */
-export const captureLabel = (c) => path.basename(c.name);

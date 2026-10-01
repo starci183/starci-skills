@@ -17,8 +17,8 @@ const checkout = (name: string, packageName: string | null): string => {
 
 describe("namespaceOf", () => {
     it("slugs the unscoped package name and appends 6 hex of the root hash", () => {
-        const namespace = namespaceOf(checkout("a", "@starci/Nivo-Backend"))
-        assert.match(namespace.snake, /^nivo_backend_[0-9a-f]{6}$/)
+        const namespace = namespaceOf(checkout("a", "@starci/Todo-App-Be"))
+        assert.match(namespace.snake, /^todo_app_be_[0-9a-f]{6}$/)
         assert.equal(namespace.kebab, namespace.snake.replace(/_/g, "-"))
     })
 
@@ -32,7 +32,7 @@ describe("namespaceOf", () => {
     it("keeps the snake form within 40 characters so <snake>_<connection> fits a Postgres identifier", () => {
         const namespace = namespaceOf(checkout("c", "a-very-long-package-name-that-goes-on-and-on-forever-and-ever"))
         assert.ok(namespace.snake.length <= 40)
-        assert.ok(`${namespace.snake}_expert_academy`.length <= 63)
+        assert.ok(`${namespace.snake}_expert_portal`.length <= 63)
     })
 
     it("falls back to the directory name and never starts with a digit", () => {

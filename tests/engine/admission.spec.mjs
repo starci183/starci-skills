@@ -8,19 +8,19 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {withLedger,seedWorkflow} from '../helpers/ledger-fixture.mjs';
 
 test('owned paths normalize to concrete workspace-relative prefixes',()=>{
-  assert.equal(normalizeOwnedPath('.\\nivo-fe//apps/landing/**'),'nivo-fe/apps/landing');
+  assert.equal(normalizeOwnedPath('.\\todo-app-fe//apps/landing/**'),'todo-app-fe/apps/landing');
   assert.equal(ownedPathLeaseKey('./.starciwork/migration/'),'path:.starciwork/migration');
-  assert.throws(()=>normalizeOwnedPath('../nivo-fe'),/must not traverse/);
-  assert.throws(()=>normalizeOwnedPath('nivo-fe/apps/*'),/concrete prefix/);
+  assert.throws(()=>normalizeOwnedPath('../todo-app-fe'),/must not traverse/);
+  assert.throws(()=>normalizeOwnedPath('todo-app-fe/apps/*'),/concrete prefix/);
   assert.throws(()=>normalizeOwnedPath('C:\\repo\\file'),/repository-relative/);
 });
 
-test('owned path sets collapse duplicate descendants but preserve disjoint Nivo slices',()=>{
-  assert.deepEqual(normalizeOwnedPaths(['nivo-fe/apps/landing/src','nivo-fe/apps/landing','nivo-fe/apps/landing/**','.starciwork/migration']),[
-    'nivo-fe/apps/landing','.starciwork/migration',
+test('owned path sets collapse duplicate descendants but preserve disjoint product slices',()=>{
+  assert.deepEqual(normalizeOwnedPaths(['todo-app-fe/apps/landing/src','todo-app-fe/apps/landing','todo-app-fe/apps/landing/**','.starciwork/migration']),[
+    'todo-app-fe/apps/landing','.starciwork/migration',
   ]);
-  assert.equal(ownedPathsIntersect('nivo-fe/apps/landing','nivo-fe/apps/landing/src/page.tsx'),true);
-  assert.equal(ownedPathsIntersect('nivo-fe/apps/landing','.starciwork/migration'),false);
+  assert.equal(ownedPathsIntersect('todo-app-fe/apps/landing','todo-app-fe/apps/landing/src/page.tsx'),true);
+  assert.equal(ownedPathsIntersect('todo-app-fe/apps/landing','.starciwork/migration'),false);
 });
 
 // Two declared ceilings meet at one line: budgets.maxOps (owner, per workflow)
@@ -52,15 +52,15 @@ test('durable prefix leases serialize parent and child scopes across workflows w
   seedWorkflow(ledger,{id:'wf-landing',jobs:[{jobId:'landing',opId:'interface.implement'}]});
   seedWorkflow(ledger,{id:'wf-other',jobs:[{jobId:'landing-child',opId:'test.author'}]});
   seedWorkflow(ledger,{id:'wf-canonicalize',jobs:[{jobId:'canonicalize',opId:'workspace.manage'}]});
-  for(const key of ['path:nivo-fe/apps/landing','path:nivo-fe/apps/landing/src','path:.starciwork/migration'])
+  for(const key of ['path:todo-app-fe/apps/landing','path:todo-app-fe/apps/landing/src','path:.starciwork/migration'])
     ledger.db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,1)').run(key);
   const landing=reserveTwoPhase(ledger,machine,{job:{jobId:'landing',workflowId:'wf-landing',opId:'interface.implement',generation:1,kind:'op'},
-    leases:[{resourceKey:'path:nivo-fe/apps/landing',units:1}]});
+    leases:[{resourceKey:'path:todo-app-fe/apps/landing',units:1}]});
   assert.equal(landing.ok,true);
   const child=reserveTwoPhase(ledger,machine,{job:{jobId:'landing-child',workflowId:'wf-other',opId:'test.author',generation:1,kind:'op'},
-    leases:[{resourceKey:'path:nivo-fe/apps/landing/src',units:1}]});
+    leases:[{resourceKey:'path:todo-app-fe/apps/landing/src',units:1}]});
   assert.equal(child.ok,false);
-  assert.match(child.reason,/overlaps durable lease path:nivo-fe\/apps\/landing held by landing/);
+  assert.match(child.reason,/overlaps durable lease path:todo-app-fe\/apps\/landing held by landing/);
   const migration=reserveTwoPhase(ledger,machine,{job:{jobId:'canonicalize',workflowId:'wf-canonicalize',opId:'workspace.manage',generation:1,kind:'op'},
     leases:[{resourceKey:'path:.starciwork/migration',units:1}]});
   assert.equal(migration.ok,true,'disjoint product and Work migration paths may run concurrently');
@@ -69,13 +69,13 @@ test('durable prefix leases serialize parent and child scopes across workflows w
 test('an expired path lease stays a fence until its attempt is explicitly settled',t=>withLedger(t,({ledger,machine})=>{
   seedWorkflow(ledger,{id:'wf-old',jobs:[{jobId:'old',opId:'op'}]});
   seedWorkflow(ledger,{id:'wf-next',jobs:[{jobId:'next',opId:'op'}]});
-  for(const key of ['path:nivo-fe/apps/landing','path:nivo-fe/apps/landing/src'])
+  for(const key of ['path:todo-app-fe/apps/landing','path:todo-app-fe/apps/landing/src'])
     ledger.db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,1)').run(key);
   assert.equal(reserveTwoPhase(ledger,machine,{job:{jobId:'old',workflowId:'wf-old',opId:'op',generation:1,kind:'op'},
-    leases:[{resourceKey:'path:nivo-fe/apps/landing',units:1}],ttlMs:1}).ok,true);
+    leases:[{resourceKey:'path:todo-app-fe/apps/landing',units:1}],ttlMs:1}).ok,true);
   ledger.db.prepare("UPDATE leases SET acquired_at=0,expires_at=1 WHERE job_id='old'").run();
   const next=reserveTwoPhase(ledger,machine,{job:{jobId:'next',workflowId:'wf-next',opId:'op',generation:1,kind:'op'},
-    leases:[{resourceKey:'path:nivo-fe/apps/landing/src',units:1}]});
+    leases:[{resourceKey:'path:todo-app-fe/apps/landing/src',units:1}]});
   assert.equal(next.ok,false);
   assert.match(next.reason,/overlaps durable lease/);
 }));

@@ -101,7 +101,7 @@ test('a scanned record compiles, and a re-scan keeps decisions but re-opens a la
   assert.equal(validateTree(moved.record), true, JSON.stringify(validateTree.errors));
 });
 
-test('a fresh app with no message catalogs scans to a record that compiles without i18n (starci-next inc-21d50d640e22)', (t) => {
+test('a fresh app with no message catalogs scans to a record that compiles without i18n', (t) => {
   const files = {
     'apps/app/tsconfig.json': JSON.stringify({ compilerOptions: {} }),
     'apps/app/src/app/layout.tsx': 'export default function RootLayout({ children }) { return <html><body>{children}</body></html> }\n',

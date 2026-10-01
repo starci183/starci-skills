@@ -1,5 +1,5 @@
 // decisions-archived-workflow.spec.mjs — archive/finish close a workflow's live Decision Items
-// (cluster decisions-archived-workflow). Evidence 2026-09-30 nivo-backend: 7 DIs open/claimed on workflows
+// (cluster decisions-archived-workflow). A live product repo had DIs open/claimed on workflows
 // archived by owner ruling; `api decisions --resolve` on them refuses 'workflow-archived: no further writes'
 // (events_refuse_archived), so they could never close yet kept being counted, escalated and digested.
 //   1. api archive | api finish resolves every live DI (open|claimed|escalated) of the workflow inside its own

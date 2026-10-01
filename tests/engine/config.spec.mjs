@@ -84,9 +84,9 @@ test('supervisor.repos names the ledgers resume-all resumes: a list of repositor
   const fs = await import('node:fs');
   const base = parseYaml(fs.readFileSync(new URL('../../config.example.yaml', import.meta.url), 'utf8'));
   assert.deepEqual(base.supervisor.repos, [], 'the example resumes no ledger until the owner lists one');
-  assert.doesNotThrow(() => validateConfig({ ...base, supervisor: { pollIntervalMs: null, repos: ['../nivo-backend', 'D:/Repositories/starci-next'] } }));
+  assert.doesNotThrow(() => validateConfig({ ...base, supervisor: { pollIntervalMs: null, repos: ['../todo-app-be', 'D:/Repositories/ecommerce-app'] } }));
   assert.doesNotThrow(() => validateConfig({ ...base, supervisor: { repos: null } }));
-  assert.throws(() => validateConfig({ ...base, supervisor: { repos: '../nivo-backend' } }), /supervisor\.repos/);
+  assert.throws(() => validateConfig({ ...base, supervisor: { repos: '../todo-app-be' } }), /supervisor\.repos/);
   assert.throws(() => validateConfig({ ...base, supervisor: { repos: ['  '] } }), /supervisor\.repos/);
 });
 
@@ -160,15 +160,10 @@ test('supervisor.frozenMinutes is accepted, malformed shapes are refused, and th
   assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,frozenMinutes:0}}),/frozenMinutes/);
 });
 
-test('a config that still names the removed Qwen provider is refused with the owner wording',()=>{
+test('a config naming a provider no runtime declares is refused by the provider whitelist',()=>{
   const ok=expected();
-  const gone=/Qwen đã bị gỡ; dùng claude, codex hoặc devin/;
-  assert.throws(()=>validateConfig({...ok,kernel:{agent:'qwen'}}),gone);
-  assert.throws(()=>validateConfig({...ok,kernel:{group:[{agent:'qwen'},{agent:'codex'}],effort:'high'}}),gone);
-  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',preferredProvider:'qwen'}}),gone);
-  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',policy:'balanced',shares:{'qwen-agent':35,'devin-agent':35}}}),gone);
-  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',grants:['qwen-agent=2@implement']}}),gone);
-  assert.throws(()=>validateConfig({...ok,supervisor:{pollIntervalMs:null,repos:[],kernel:{agent:'qwen'}}}),gone);
+  assert.throws(()=>validateConfig({...ok,kernel:{agent:'no-such-provider'}}),/Invalid config\.yaml/);
+  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',preferredProvider:'no-such-provider'}}),/not declared by a runtime/);
 });
 
 test('root specs is a map of family switches {harness, unit, e2e}, each at its default (harness off, unit on, e2e off)',async()=>{

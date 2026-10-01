@@ -212,7 +212,7 @@ export function openDecisionRow(ledger, spec, { now = Date.now(), prefix = 'deci
 }
 
 /**
- * MB-07: an idempotency key names every identity field: ':'-separated components, none empty ('push-refused:nivo-fe:'
+ * MB-07: an idempotency key names every identity field: ':'-separated components, none empty ('push-refused:my-app:'
  * with an empty head merged 73 later refusals into the first DI). Throws decision-key-invalid.
  */
 export function checkKey(key) {
@@ -359,7 +359,7 @@ export function resolutionOf(db, di, { repo = '<repo>', now = Date.now() } = {})
   const outcome = pending?.outcome ?? report?.outcome ?? null;
   const failures = (refusal?.failures ?? []).map(String);
   const owned = (payload.owned_paths ?? []).map(String);
-  // Owned paths may carry the product repo's folder (nivo-fe/apps/...) while a report names repo-relative files.
+  // Owned paths may carry the product repo's folder (my-app/apps/...) while a report names repo-relative files.
   const repoPrefix = owned.map((p) => p.replace(/\\/g, '/').match(/^([^/]+\/)(?:apps|packages|src)\//)?.[1]).find(Boolean) ?? '';
   const withPrefix = (p) => (repoPrefix && !String(p).startsWith(repoPrefix) && /^(apps|packages|src)\//.test(String(p)) ? `${repoPrefix}${p}` : String(p));
   const failing = [...new Set([...(refusal?.files ?? []), ...(refusal?.continuation?.files ?? []), ...((report?.owedToWire ?? []).map((o) => o?.path).filter(Boolean))].map(withPrefix))].slice(0, 20);
@@ -516,7 +516,7 @@ export function openDecision(repo, di, { env = process.env, run = runDecisionsVe
 
 /* ------------------------------------------------------------ the doorbell */
 
-export const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} việc chờ: api decisions --workflow ${workflowId}`,
+export const doorbellText = (n, workflowId, top = null) => [`${RING_TAG} ${n} waiting: api decisions --workflow ${workflowId}`,
   ...(top ? [`oldest ${top.id}: ${String(top.what).slice(0, 220)}`, top.decide ? `log: ${top.decide}` : null,
     `pick ONE: ${top.commands.map((c, i) => `(${String.fromCharCode(97 + i)}) ${c.title}: ${c.run}`).join(' || ')}`, `then: ${top.resolve}`] : [])].filter(Boolean).join(' | ');
 const RING_SCOPE = 'decision-doorbell';
@@ -693,7 +693,7 @@ export const resolveSupervisorDecision = (id, { by, verb, decisionId = null, not
   });
 }, { env, now });
 
-export const supervisorDoorbellText = (n) => `${RING_TAG} ${n} việc chờ: node scripts/machine/decisions.mjs supervisor --list`;
+export const supervisorDoorbellText = (n) => `${RING_TAG} ${n} waiting: node scripts/machine/decisions.mjs supervisor --list`;
 /** The sup_events kind of a delivered Supervisor ring ({text, count, open, decisions}); the newest one is the last ring. */
 export const SUP_RING_KIND = 'supervisor-ring';
 

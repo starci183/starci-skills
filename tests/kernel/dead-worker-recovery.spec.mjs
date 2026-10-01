@@ -178,15 +178,15 @@ test('a commit on the owned paths since dispatch fences the job even with a clea
   assert.equal(job().status,'effect_unknown');
 }));
 
-// 2026-09-24: reconcile --dead-worker recovered agent-exited workers and left each one's shell open - a
-// stray PowerShell tab per dead op (mia-mia term_0982b445). The recovery now closes that terminal with its
+// reconcile --dead-worker recovered agent-exited workers and left each one's shell open - a
+// stray PowerShell tab per dead op. The recovery now closes that terminal with its
 // tab, but only on fresh proof: disconnected, or a frame that ends in a bare shell prompt.
-// Captured 2026-09-24 from term_0982b445 (mia-mia-backend): a Codex op whose agent exited mid-turn.
-const DEAD_CODEX=['','• Ran node \'D:\\Repositories\\starci-academy-backend\\.claude\\bin\\starci.mjs\' validate \'.starciwork\' --json','  └ {',
+// A captured Codex op whose agent exited mid-turn.
+const DEAD_CODEX=['','• Ran node \'D:\\Repositories\\ecommerce-app\\.claude\\bin\\starci.mjs\' validate \'.starciwork\' --json','  └ {',
   '      "schema": "starci/work-validate-report@1",','    … +29 lines (ctrl + t to view transcript)','      }',
   '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
   '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',
-  'PS D:\\Repositories\\mia-mia-backend>'].join('\n');
+  'PS D:\\Repositories\\todo-app-be>'].join('\n');
 const EXITED={connected:true,writable:true,sent:true,command:'codex --model gpt-6-sol',screen:DEAD_CODEX};
 const closeEvents=events=>events('dead-worker-terminal-closed').map(r=>JSON.parse(r.payload_json));
 
@@ -197,7 +197,7 @@ test('an exited worker is requeued and its bare-shell terminal is closed with it
   const body=out(r);
   assert.equal(body.recovery,'requeued');
   assert.deepEqual([body.terminalClosed.handle,body.terminalClosed.closed,body.terminalClosed.proof,body.terminalClosed.shellPrompt],
-    [HANDLE,true,'shell-prompt','PS D:\\Repositories\\mia-mia-backend>']);
+    [HANDLE,true,'shell-prompt','PS D:\\Repositories\\todo-app-be>']);
   assert.deepEqual(orcaState().closedTabs,[HANDLE],'closed with its tab, so Orca never restores the shell');
   assert.equal(orcaState().terminals[HANDLE].closed,true);
   assert.equal(job().status,'queued','the close follows the requeue');
@@ -256,7 +256,7 @@ test('closeExitedTerminal closes only on proof: a bare shell or a disconnected t
   const up={ok:true,connected:true,writable:true};
   const probe=(shown,screen)=>closeExitedTerminal('t1',{show:()=>shown,read:()=>screen==null?{ok:false}:{ok:true,screen},close});
   let r=probe(up,DEAD_CODEX);
-  assert.deepEqual([r.closed,r.proof,r.shellPrompt],[true,'shell-prompt','PS D:\\Repositories\\mia-mia-backend>']);
+  assert.deepEqual([r.closed,r.proof,r.shellPrompt],[true,'shell-prompt','PS D:\\Repositories\\todo-app-be>']);
   r=probe({ok:true,connected:false,writable:false},null);
   assert.deepEqual([r.closed,r.proof],[true,'disconnected']);
   assert.equal(closes.length,2);

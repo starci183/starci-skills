@@ -59,7 +59,6 @@ job-dropped	ledger event kind
 job-enqueued	ledger event kind
 land-scratch	worktree registry kind (machine.sqlite worktrees.kind, scripts/lib/worktrees.mjs WORKTREE_KINDS), not a code
 layout-tree	foundation kind label
-live-unbound-session	seat adoption plan label
 live-worker-reconciled	ledger event kind
 no-open-circuit	benign no-op recover label
 no-quota-probe	benign probe skip label
@@ -96,11 +95,9 @@ supervisor-gate	next-action kind label
 supervisor-staging	worktree registry kind (machine.sqlite worktrees.kind, scripts/lib/worktrees.mjs WORKTREE_KINDS), not a code
 test-env-unrooted	session archive skip reason (informational)
 time-budget	GC item label: a bounded worktree GC pass stopped at its time budget and resumes next pass, not a failure
-typed-dependent	staleness relation label
 work-owner-only	product-isolation skip reason (not a failure)
 workflow-ended	incident close reason (success)
 workflow-finished	phase-transition reason (success)
-worktree-flag	product-isolation skip reason (operator flag)
 BYTE_CENSUS	constant, parser token or key name, not an emitted code
 CACHE_MANAGER	constant, parser token or key name, not an emitted code
 ENV_VAR_OR_CUSTODY_KEY	constant, parser token or key name, not an emitted code

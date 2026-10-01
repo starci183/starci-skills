@@ -1,7 +1,7 @@
 // The router decides, the Kernel does not bias: api route refuses --prefer/--avoid, and a retry learns
 // from its own lineage (scripts/kernel/lineage-route.mjs).
 //
-// Live defect (starci-next wf-sn-foundation, owner decision 2026-09-25): the Kernel routed
+// Live defect (owner decision): the Kernel routed
 // op-interface.implement-c3bcc0d5e4 with --avoid devin-agent,devin-agent; route-decided carried the avoid
 // and the job went to codex gpt-6-luna, defeating the evidence routing that sends implementation to Devin
 // first. Now a Kernel's per-route bias is refused as an unknown option; the router
@@ -25,7 +25,7 @@ import { FAKE_ORCA } from '../helpers/fake-orca.mjs';
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'cli.mjs');
 const json = (v) => JSON.stringify(v ?? null);
-const WF = 'wf-sn-foundation';
+const WF = 'wf-foundation';
 const OP = 'interface.implement';
 const JOB = 'op-interface.implement-c3bcc0d5e4';
 const P1 = 'op-interface.implement-a1a1a1a1a1';

@@ -43,8 +43,6 @@ const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.atte
 import { inspectOwnerConfig, loadConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { startAgent, loadAdapter } from '../agent/lib.mjs';
-import { terminalList } from '../api/orca/terminal-list.mjs';
-import { closeAndVerify } from '../machine/close-verify.mjs';
 import { workerShow } from '../api/orca/worker-show.mjs';
 import { stopAndRelease } from '../machine/close-verify.mjs';
 import { resolveLaunchModel, providerAvailability, providerCircuitOf, orderByAvailability } from '../agent/models.mjs';
@@ -402,9 +400,8 @@ async function signalHealth(signal) {
       reason: live ? `worker ${state ?? 'ready'}` : (shown?.error || `worker state ${state ?? 'unreadable'}`),
     };
   }
-  // A seat without a Dispatch is a Kernel launched by terminal create before every launch went through worker-start
-  // (contract-changes/launch-through-worker-start.yaml): never live, retired by the next start.
-  return { live: false, legacy: true, reason: 'terminal-launched kernel: every Kernel is now a worker-start worker', terminal: value.terminal ?? null, value };
+  // A seat without a Dispatch is not a worker-start worker (every Kernel is one): never live, replaced by the next start.
+  return { live: false, reason: 'seat has no worker', terminal: value.terminal ?? null, value };
 }
 
 // A refusal that changed nothing: JSON on stdout (the watchdog reads it) and a
@@ -429,32 +426,6 @@ const EXIT_KERNEL_ALIVE = 3;
 function releaseManagedWorker(dispatchId, handle = null) {
   const released = stopAndRelease(dispatchId);
   return { handle, dispatch: dispatchId, ok: released.ok, ...(released.ok ? {} : { error: released.release.error ?? released.stop.error ?? 'worker-release refused' }) };
-}
-
-// A stale command-terminal kernel (launch: terminal — the Devin/Codex
-// seat) leaves a live Orca terminal behind: clearing the signal removes the
-// ledger's handle on it, not the PTY. That is how one workflow grew two
-// [Kernel] rows in the sidebar (benchmark/findings/fable.md orca-hierarchy, root cause 2). The
-// close is best-effort but never silent: a failure is returned and recorded
-// as kernel-stale-terminal-unclosed. A disconnected terminal may still have a
-// persisted tab, so a disconnected show alone is not proof of removal.
-function closeStaleKernelTerminal(handle) {
-  if (!handle) return null;
-  let closed;
-  try { closed = closeAndVerify(handle, { tree: true }); }
-  catch (error) { closed = { handle, ok: false, proof: null, error: String(error?.message ?? error) }; }
-  let proof = closed?.proof ?? null, reason = closed?.reason ?? null;
-  if (closed?.ok && proof !== 'gone') {
-    try {
-      const listed = terminalList();
-      if (listed?.ok && !listed.terminals?.some(t => t?.handle === handle)) proof = 'unlisted';
-      else reason = listed?.ok ? 'terminal-still-listed' : 'terminal-list-unavailable';
-    } catch (error) { reason = `terminal-list-unavailable: ${String(error?.message ?? error)}`; }
-  }
-  const verified = { ok: closed?.ok === true && (proof === 'gone' || proof === 'unlisted'), proof,
-    attempts: closed?.attempts ?? 0, ...(closed?.tree ? { tree: closed.tree } : {}), ...(reason ? { reason } : {}) };
-  return { handle, ok: verified.ok, verified, ...(closed?.error ? { error: String(closed.error) } : {}),
-    ...(!verified.ok && reason ? { error: reason } : {}) };
 }
 
 const ledger = openLedger({ file: ledgerFileFor(repo) });
@@ -562,13 +533,8 @@ try {
     staleKernel = { token: priorSignal.token, terminal: priorHealth.value?.terminal ?? null,
       ...(priorHealth.value?.dispatch ? { dispatch: priorHealth.value.dispatch } : {}), reason: priorHealth.reason };
     // A stale Kernel may still hold a live Orca worker — settle the exact old Dispatch (stop + release) before the
-    // seat is cleared so the replacement never runs beside a zombie. A terminal-launched Kernel (legacy seat) is
-    // retired once: its terminal is closed BEFORE the new one is recorded — one workflow, one Kernel.
+    // seat is cleared so the replacement never runs beside a zombie — one workflow, one Kernel.
     if (priorHealth.value?.dispatch) staleKernel.terminalClosed = releaseManagedWorker(priorHealth.value.dispatch, staleKernel.terminal);
-    else if (priorHealth.legacy && staleKernel.terminal) {
-      staleKernel.retiredTerminalLaunch = true;
-      staleKernel.terminalClosed = closeStaleKernelTerminal(staleKernel.terminal);
-    }
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(target);
     const at = Date.now();
     const unclosed = staleKernel.terminalClosed && staleKernel.terminalClosed.ok !== true

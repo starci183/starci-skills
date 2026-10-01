@@ -24,7 +24,7 @@ import {
 import { at, slotTester, typedTester } from "./fixtures/typed/tester.mjs"
 
 // Rules that read the slot of the file (fetch-only-in-api-client, ...) run under the fixture repository: two apps and the
-// shared packages, so `at("apps/web/...")` is an app file and `at("packages/nivo-api/...")` the shared api package.
+// shared packages, so `at("apps/web/...")` is an app file and `at("packages/todo-app-api/...")` the shared api package.
 const slots = slotTester()
 const typed = typedTester()
 
@@ -33,8 +33,8 @@ const tester = new RuleTester({
 })
 
 const CLIENT = at("apps/web/src/modules/api/client.ts")
-const PKG_CLIENT = at("packages/nivo-api/src/client.ts")
-const PKG_TRANSPORT = at("packages/nivo-api/src/transport.ts")
+const PKG_CLIENT = at("packages/todo-app-api/src/client.ts")
+const PKG_TRANSPORT = at("packages/todo-app-api/src/transport.ts")
 const READER = at("apps/web/src/modules/api/course/read-course.ts")
 const GENERATED = at("apps/web/src/modules/api/__generated__/types.ts")
 const HOOK = at("apps/web/src/hooks/course/useCourse.ts")
@@ -80,7 +80,7 @@ test("FE-TRANSPORT-1: fetch is reached in the api client slot and nowhere else",
       { filename: PKG_TRANSPORT, code: "const r = await fetch(url, { signal })", errors: [{ messageId: "outside" }] },
       { filename: at("apps/web/src/modules/api/transport.ts"), code: "const r = await fetch(url, { signal })", errors: [{ messageId: "outside" }] },
       { filename: at("apps/admin/src/hooks/course/useCourse.ts"), code: "const r = await fetch(url)", errors: [{ messageId: "outside" }] },
-      { filename: at("packages/nivo-i18n/src/messages.ts"), code: "const r = await fetch(url)", errors: [{ messageId: "outside" }] },
+      { filename: at("packages/todo-app-i18n/src/messages.ts"), code: "const r = await fetch(url)", errors: [{ messageId: "outside" }] },
       // a connection that is not `fetch` is a transport too
       { filename: HOOK, code: "const r = new Request(url)", errors: [{ messageId: "channel" }] },
       { filename: HOOK, code: "const s = new EventSource(url)", errors: [{ messageId: "channel" }] },
@@ -141,7 +141,7 @@ test("FE-TRANSPORT-3: no module-level mutable state in the API layer", () => {
       { filename: CLIENT, code: "export const f = () => { let n = 0; return n }" },
       { filename: PKG_CLIENT, code: "export const f = () => { let n = 0; return n }" },
       { filename: HOOK, code: "let token = null" },
-      { filename: at("packages/nivo-ui/src/leaves/Menu/component.tsx"), code: "let count = 0" },
+      { filename: at("packages/todo-app-ui/src/leaves/Menu/component.tsx"), code: "let count = 0" },
       { filename: GENERATED, code: "let x = 1" },
       { filename: at("apps/web/src/modules/api/__generated__/graphql.ts"), code: "let x = 1" },
       // a folder named api below another module is not the API layer
@@ -155,7 +155,7 @@ test("FE-TRANSPORT-3: no module-level mutable state in the API layer", () => {
       { filename: CLIENT, code: "var cache = {}", errors: [{ messageId: "shared" }] },
       { filename: PKG_CLIENT, code: "let token = null", errors: [{ messageId: "shared" }] },
       { filename: PKG_TRANSPORT, code: "let token = null", errors: [{ messageId: "shared" }] },
-      { filename: at("packages/nivo-api/src/outcome.ts"), code: "export let last = null", errors: [{ messageId: "shared" }] },
+      { filename: at("packages/todo-app-api/src/outcome.ts"), code: "export let last = null", errors: [{ messageId: "shared" }] },
     ],
   })
 })
@@ -185,9 +185,9 @@ test("FE-TRANSPORT-4: the client maps a 401 and a 403 status to refused", () => 
       { filename: CLIENT, code: "export const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  return res.status === 401 || res.status === 403 ? { ok: false, kind: \"refused\" } : { ok: true }\n}" },
       { filename: CLIENT, code: "export const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  const { status } = res\n  if (status === 401 || status === 403) return { ok: false, kind: \"refused\" }\n  return { ok: true }\n}" },
       { filename: CLIENT, code: "export const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  const code = res.status\n  if (code === 401 || code === 403) return { ok: false, kind: \"refused\" }\n  return { ok: true }\n}" },
-      // the Outcome constructor named by its kind: starci-next-fe `failed("refused", { status, code })`
+      // the Outcome constructor named by its kind: `failed("refused", { status, code })`
       { filename: CLIENT, code: "export const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  if (res.status === 401 || res.status === 403) return failed(\"refused\", { status: res.status })\n  return { ok: true }\n}" },
-      // the branch sits in a helper whose parameter every call fills with the response status (starci-next-fe failureForResponse)
+      // the branch sits in a helper whose parameter every call fills with the response status (a failureForResponse helper)
       { filename: CLIENT, code: "const failureFor = (status: number) => {\n  if (status === 401 || status === 403) return failed(\"refused\", { status })\n  return failed(\"unavailable\", { status })\n}\nexport const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  if (!res.ok) return failureFor(res.status)\n  return { ok: true }\n}" },
       // a module with no fetch owes no mapping, and a file that is not the client is not judged
       { filename: CLIENT, code: "export const x = 1" },
@@ -279,7 +279,7 @@ test("FE-WIRE-1: a response body is narrowed from unknown or typed by a generate
       { filename: CLIENT, code: "export type LoginPayload = { email: string }" },
       { filename: READER, code: "const n = value as number" },
       { filename: READER, code: "const label = \"select the query text\"" },
-      // live (starci-next-fe): `as unknown` is the sanctioned narrowing entry
+      // seen live: `as unknown` is the sanctioned narrowing entry
       { filename: READER, code: "const body = (await response.json()) as unknown" },
       { filename: READER, code: "const body: unknown = await response.json()" },
       { filename: READER, code: "const body = await res.json()\nconst safe = body as unknown" },
@@ -340,7 +340,7 @@ test("TRANSPORT-7: a switch over an Outcome names every kind", () => {
 
 test("FE-OUTCOME-1: a result union is declared once, in the outcome slot", () => {
   const API_OUTCOME = at("apps/web/src/modules/api/outcome.ts")
-  const PKG_OUTCOME = at("packages/nivo-api/src/outcome.ts")
+  const PKG_OUTCOME = at("packages/todo-app-api/src/outcome.ts")
   const UNION = "export type Outcome<T> = { ok: true; data: T } | { ok: false; kind: \"refused\" | \"unavailable\" }"
   typed.run("one-outcome-union", oneOutcomeUnion, {
     valid: [
@@ -356,7 +356,7 @@ test("FE-OUTCOME-1: a result union is declared once, in the outcome slot", () =>
       { filename: HOOK, code: "export type Field = { type: \"text\"; value: string } | { type: \"number\"; value: number }" },
       // a `kind` union whose values are not result kinds (tree nodes, menu items)
       { filename: HOOK, code: "export type Node = { kind: \"folder\"; children: string[] } | { kind: \"file\"; size: number }" },
-      // a view a mapper derives from the Outcome (no `ok` arm) is a screen state: starci-next-fe LessonViewerView, StudyStepView
+      // a view a mapper derives from the Outcome (no `ok` arm) is a screen state: LessonViewerView, StudyStepView
       { filename: at("apps/web/src/modules/api/learn-content/learn-content.mapper.ts"), code: "export type LessonViewerView = { kind: \"ready\"; lesson: string } | { kind: \"not-found\"; sectionHref: string } | { kind: \"unavailable\"; retryHref: string }" },
       { filename: HOOK, code: "export type StudyStepView = { kind: \"saved\" } | { kind: \"refused\"; code: string } | { kind: \"not-found\" }" },
       // an `ok` that is a plain boolean flag on each member is not a true/false discriminant
@@ -387,7 +387,7 @@ test("FE-OUTCOME-1: a result union is declared once, in the outcome slot", () =>
       },
       // in another app and in a package that is not the api package
       { filename: at("apps/admin/src/hooks/course/useCourse.ts"), code: "export type Save = { ok: true } | { ok: false }", errors: [{ messageId: "second" }] },
-      { filename: at("packages/nivo-ui/src/leaves/Menu/index.tsx"), code: "export type Save = { ok: true } | { ok: false }", errors: [{ messageId: "second" }] },
+      { filename: at("packages/todo-app-ui/src/leaves/Menu/index.tsx"), code: "export type Save = { ok: true } | { ok: false }", errors: [{ messageId: "second" }] },
       // another file of the api layer is not the outcome file
       { filename: CLIENT, code: UNION, errors: [{ messageId: "second" }] },
       { filename: PKG_CLIENT, code: UNION, errors: [{ messageId: "second" }] },

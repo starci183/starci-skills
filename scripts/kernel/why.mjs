@@ -7,15 +7,17 @@
 //
 // Shape (starci/why@1, docs/why.md):
 //   { schema, lang:'vi', state, headline, cause, disagreement|null, next, owner, codes[], refs[], attemptId, opId, tryNo }
-// The Vietnamese text comes from modules/kernel/failure-codes.yaml (a flat map keyed by code) and from the ledger rows
-// the settle judged: check_runs, the filed report, settle_json. The language is the owner's config.yaml `language`; the
-// catalog carries Vietnamese only, so the text is Vietnamese.
+// The Vietnamese text comes from modules/kernel/failure-codes.yaml (a flat map keyed by code), from the i18n
+// catalog (modules/i18n/messages — the English sources below are translated through scripts/lib/i18n.mjs), and
+// from the ledger rows the settle judged: check_runs, the filed report, settle_json. The language is the owner's
+// config.yaml `language`; the catalog carries Vietnamese only, so the text is Vietnamese.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { blobPath } from '../../engine/db/blob.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const WHY_SCHEMA = 'starci/why@1';
@@ -104,8 +106,12 @@ const kebabTokens = (text, catalog) => [...new Set(String(text).match(/\b[a-z][a
 
 /* ------------------------------------------------------------ the sentence builders */
 
+// The why text is owner-facing Vietnamese (starci/why@1 lang 'vi'): every literal below is an English source whose
+// `vi` lives in modules/i18n/messages, translated at build time.
+const tr = translator('vi');
+
 const isScratch = (text) => /starci-job-scratch/i.test(String(text ?? ''));
-const scratchNote = 'thư mục tạm của op (starci-job-scratch) đã bị xóa khi op nộp report, nên lúc runtime chạy lại đường dẫn đó không còn';
+const scratchNote = tr("the op's scratch directory (starci-job-scratch) is deleted when the op files its report, so the path no longer exists when the runtime re-runs it");
 
 /** The one-line human reading of a red check: its first refused line without absolute paths, else its evidence. */
 function checkDetail(fact) {
@@ -114,21 +120,21 @@ function checkDetail(fact) {
   return clip(shortPaths(raw).replace(/\s*\[[A-Z][A-Z0-9_]+\]\s*$/, ''), 200);
 }
 
-const nextTry = (unit, tryNo) => (unit ? `lần ${Number(tryNo) + 1}/${unit.try_budget}` : `lần ${Number(tryNo) + 1}`);
+const nextTry = (unit, tryNo) => (unit ? tr('try {n} of {budget}', { n: Number(tryNo) + 1, budget: unit.try_budget }) : tr('try {n}', { n: Number(tryNo) + 1 }));
 
 /** What happens now, from the recorded next step of the failed job (enqueueNextStep) and the unit's try budget. */
 function nextOf({ step, unit, tryNo, primary, catalog }) {
   const c = primary ? catalog[primary] : null;
-  if (step?.kind === 'retry') return { text: `Kernel sẽ giao lại op (${nextTry(unit, tryNo)}${step.limit ? `, tuyến ${step.route} ${step.firing}/${step.limit}` : ''}).`, owner: 'op-retry' };
-  if (step?.kind === 'repair') return { text: `Kernel giao op sửa gốc lỗi trước rồi chạy lại op này (tuyến ${step.route}${step.jobs?.length ? `, ${step.jobs.length} job` : ''}).`, owner: step.owner?.op ? `other-op:${step.owner.op}` : 'runtime-core' };
-  if (step?.kind === 'owner-gate') return { text: `Chờ owner quyết định: ${clip(step.reason ?? step.classReason, 200)}`, owner: 'owner' };
-  if (step?.kind === 'supervisor-gate') return { text: `Chờ Supervisor xử lý sự cố ${step.incidentId ?? ''}: ${clip(step.reason, 200)}`.trim(), owner: 'supervisor' };
-  if (step?.kind === 'peer-blocked' || step?.kind === 'root-elsewhere') return { text: `Gốc lỗi nằm ở nơi khác${step.rootCause ? ` (${clip(typeof step.rootCause === 'string' ? step.rootCause : JSON.stringify(step.rootCause), 120)})` : ''}; op này không tốn lượt thử, chờ bên đó sửa.`, owner: 'runtime-core' };
-  if (step?.kind === 'deferred') return { text: `Hoãn tới buổi duyệt cuối: ${clip(step.reason, 200)}`, owner: 'owner' };
-  if (step?.kind === 'none') return { text: `Không có bước tiếp tự động: ${clip(step.reason, 200)}`, owner: 'supervisor' };
-  if (unit && Number(unit.tries) >= Number(unit.try_budget)) return { text: `Đã dùng hết ${unit.try_budget} lần thử của việc này; chờ owner hoặc Supervisor quyết định.`, owner: 'owner' };
+  if (step?.kind === 'retry') return { text: tr('Kernel will re-dispatch the op ({next}{route}).', { next: nextTry(unit, tryNo), route: step.limit ? tr(', route {route} {firing}/{limit}', { route: step.route, firing: step.firing, limit: step.limit }) : '' }), owner: 'op-retry' };
+  if (step?.kind === 'repair') return { text: tr('Kernel dispatches a root-cause repair op first, then re-runs this op (route {route}{jobs}).', { route: step.route, jobs: step.jobs?.length ? `, ${step.jobs.length} job` : '' }), owner: step.owner?.op ? `other-op:${step.owner.op}` : 'runtime-core' };
+  if (step?.kind === 'owner-gate') return { text: tr('Waiting on the owner to decide: {reason}', { reason: clip(step.reason ?? step.classReason, 200) }), owner: 'owner' };
+  if (step?.kind === 'supervisor-gate') return { text: tr('Waiting on the Supervisor to handle incident {id}: {reason}', { id: step.incidentId ?? '', reason: clip(step.reason, 200) }).trim(), owner: 'supervisor' };
+  if (step?.kind === 'peer-blocked' || step?.kind === 'root-elsewhere') return { text: tr('The root cause is elsewhere{root}; this op spends no try and waits for that side to fix it.', { root: step.rootCause ? ` (${clip(typeof step.rootCause === 'string' ? step.rootCause : JSON.stringify(step.rootCause), 120)})` : '' }), owner: 'runtime-core' };
+  if (step?.kind === 'deferred') return { text: tr('Deferred to the final review: {reason}', { reason: clip(step.reason, 200) }), owner: 'owner' };
+  if (step?.kind === 'none') return { text: tr('No automatic next step: {reason}', { reason: clip(step.reason, 200) }), owner: 'supervisor' };
+  if (unit && Number(unit.tries) >= Number(unit.try_budget)) return { text: tr('All {budget} tries of this work are used up; waiting on the owner or the Supervisor to decide.', { budget: unit.try_budget }), owner: 'owner' };
   if (c?.nextStep_vi) return { text: c.nextStep_vi, owner: c.owner };
-  return { text: 'Kernel sẽ quyết định bước tiếp theo.', owner: 'runtime-core' };
+  return { text: tr('Kernel will decide the next step.'), owner: 'runtime-core' };
 }
 
 const REFS = (attempt, checks, report) => {
@@ -173,31 +179,31 @@ export function buildWhy(ctx) {
     const codes = [settle.signal, settle.reason === 'dispatch-rejected' ? 'dispatch-rejected' : null].filter(Boolean);
     const unknownEffect = attempt.end_state === 'effect-unknown';
     return done(unknownEffect ? 'requeued' : 'dispatch-rejected',
-      `Không khởi chạy được op${settle.step ? ` (bước ${settle.step}${settle.signal ? `, ${settle.signal}` : ''})` : ''}; runtime từ chối lúc giao việc.`,
-      clip(shortPaths(settle.detail ?? settle.message ?? settle.error ?? 'không có chi tiết'), 260) + (catalogLine(settle.signal, catalog) ? ` — ${catalogLine(settle.signal, catalog)}` : ''),
+      tr('The op could not be launched{step}; the runtime refused at dispatch time.', { step: settle.step ? tr(' (step {step}{signal})', { step: settle.step, signal: settle.signal ? `, ${settle.signal}` : '' }) : '' }),
+      clip(shortPaths(settle.detail ?? settle.message ?? settle.error ?? tr('no detail')), 260) + (catalogLine(settle.signal, catalog) ? ` — ${catalogLine(settle.signal, catalog)}` : ''),
       null,
-      unknownEffect ? 'Có thể worker đã chạy được một phần: reconcile kiểm chứng trạng thái trước khi giao lại; không tính vào số lần thử.' : 'Không tính vào số lần thử; việc quay về hàng chờ và Kernel giao lại.',
+      unknownEffect ? tr('The worker may have run partway: reconcile verifies the state before re-dispatching; not counted against the tries.') : tr('Not counted against the tries; the work returns to the queue and Kernel re-dispatches it.'),
       catalog[settle.signal]?.owner ?? 'runtime-core', codes);
   }
   if (attempt.end_state === 'worker-dead') {
-    return done('worker-dead', 'Worker của op chết giữa chừng, không nộp được kết quả.',
-      settle.reason ? clip(settle.reason) : 'Terminal hoặc tiến trình của worker biến mất trước khi op nộp report.', null,
-      'Reconcile dọn lease và giao lại op; Kernel sẽ chạy lại.', 'runtime-core', [settle.reason ?? 'worker-died-no-report']);
+    return done('worker-dead', tr('The op worker died mid-run and could not file its result.'),
+      settle.reason ? clip(settle.reason) : tr('The worker terminal or process vanished before the op filed its report.'), null,
+      tr('Reconcile clears the lease and re-dispatches the op; Kernel will re-run it.'), 'runtime-core', [settle.reason ?? 'worker-died-no-report']);
   }
   if (attempt.end_state === 'requeued') {
-    return done('requeued', 'Lần chạy này bị hủy và xếp lại hàng chờ, chưa có phán quyết.', clip(settle.reason ?? 'runtime xếp lại việc sau khi worker không còn'), null,
-      'Việc quay về hàng chờ; Kernel giao lại, không tính vào số lần thử.', 'runtime-core', [settle.reason]);
+    return done('requeued', tr('This run was cancelled and put back in the queue, with no verdict yet.'), clip(settle.reason ?? tr('the runtime requeued the work after the worker was gone')), null,
+      tr('The work returns to the queue; Kernel re-dispatches it, not counted against the tries.'), 'runtime-core', [settle.reason]);
   }
   if (attempt.end_state === 'cancelled' || attempt.verdict === 'cancelled' || attempt.verdict === 'dropped') {
-    return done('cancelled', 'Lần chạy này đã bị hủy.', clip(settle.reason ?? 'workflow bị lưu trữ hoặc việc bị bỏ'), null, 'Không có bước tiếp theo cho lần chạy này.', 'runtime-core', [settle.reason]);
+    return done('cancelled', tr('This run was cancelled.'), clip(settle.reason ?? tr('the workflow was archived or the work dropped')), null, tr('There is no next step for this run.'), 'runtime-core', [settle.reason]);
   }
 
   // Waiting on the owner: the op ended with a question.
   if (attempt.verdict === 'blocked' && outcome === 'ask') {
     const q = rep.question?.text ?? '';
-    return done('awaiting-owner', `Op dừng lại để hỏi owner${q ? `: ${clip(q, 200)}` : '.'}`,
-      'Op cần một quyết định hoặc thông tin mà chỉ owner có; đây là chờ, không phải lỗi.', null,
-      'Chờ owner trả lời. Trả lời xong Kernel giao lại op; lần hỏi này không tính vào số lần thử.', 'owner', []);
+    return done('awaiting-owner', tr('The op paused to ask the owner{q}', { q: q ? `: ${clip(q, 200)}` : '.' }),
+      tr('The op needs a decision or information only the owner has; this is a wait, not a failure.'), null,
+      tr('Waiting for the owner to answer. Once answered, Kernel re-dispatches the op; this question does not count against the tries.'), 'owner', []);
   }
 
   // Blocked by what the op itself declared.
@@ -209,8 +215,8 @@ export function buildWhy(ctx) {
     const kindEntry = kindKey ? catalog[kindKey] : null;
     const next = nextOf({ step, unit, tryNo: attempt.try_no, primary: kindKey, catalog });
     return done('blocked',
-      `Op báo bị chặn${kindEntry ? ` (${kindEntry.title_vi.replace(/^Bị chặn:\s*/, '')})` : ''}: ${clip(shortPaths(b.detail ?? rep.summary ?? ''), 230)}`,
-      [kindEntry?.meaning_vi, found.length ? `Mã liên quan: ${found.slice(0, 4).map((c) => `${catalog[c]?.title_vi ?? c} (${c})`).join('; ')}.` : null].filter(Boolean).join(' ') || 'Op khai báo không thể tiếp tục.',
+      tr('The op reported blocked{kind}: {detail}', { kind: kindEntry ? ` (${kindEntry.title_vi.replace(/^[^:]+:\s*/, '')})` : '', detail: clip(shortPaths(b.detail ?? rep.summary ?? ''), 230) }),
+      [kindEntry?.meaning_vi, found.length ? tr('Related codes: {codes}.', { codes: found.slice(0, 4).map((c) => `${catalog[c]?.title_vi ?? c} (${c})`).join('; ') }) : null].filter(Boolean).join(' ') || tr('The op declared it cannot continue.'),
       null, next.text, kindEntry?.owner ?? next.owner, [kindKey, ...found].filter((c) => c && (catalog[c] || c === primary)));
   }
 
@@ -226,37 +232,37 @@ export function buildWhy(ctx) {
     const detail = red ? checkDetail(red) : '';
     const codeTag = primary ? ` (${primary})` : '';
     if (!ctx.report && outcome == null) {
-      return done('failed', 'Op kết thúc mà không nộp report, nên runtime chấm thất bại.',
-        settle.reason ? clip(settle.reason) : 'Worker dừng hoặc thoát trước khi nộp báo cáo.', null, next.text, next.owner === 'op-retry' ? 'op-retry' : next.owner, ['worker-died-no-report']);
+      return done('failed', tr('The op ended without filing a report, so the runtime scored it failed.'),
+        settle.reason ? clip(settle.reason) : tr('The worker stopped or exited before filing its report.'), null, next.text, next.owner === 'op-retry' ? 'op-retry' : next.owner, ['worker-died-no-report']);
     }
     if (claimOverruled && red) {
       const own = checks.find((c) => c.name === red.name && c.authority === 'declared');
       const declared = own?.declaredExit ?? red.declaredExit ?? null;
       const disagreement = declared != null && declared !== 0
-        ? `Op báo xong nhưng chính check ${red.name} nó khai đã thoát ${declared} (đỏ)${red.authority === 'runtime' ? `; runtime chạy lại cũng thoát ${red.exit ?? declared}` : ''}${detail ? `: ${detail}` : ''}.`
-        : `Op khai check ${red.name} thoát 0 (xanh) khi chạy trong thư mục làm việc của nó; runtime chạy lại sau khi report được nộp thì thoát ${red.exit ?? 1}${detail ? `: ${detail}` : ''}.`;
+        ? tr('The op reported done but its own check {name} was declared exit {declared} (red){rerun}{detail}.', { name: red.name, declared, rerun: red.authority === 'runtime' ? tr('; the runtime re-ran it and it also exited {exit}', { exit: red.exit ?? declared }) : '', detail: detail ? `: ${detail}` : '' })
+        : tr('The op declared check {name} exited 0 (green) in its own working directory; the runtime re-ran it after the report was filed and it exited {exit}{detail}.', { name: red.name, exit: red.exit ?? 1, detail: detail ? `: ${detail}` : '' });
       return done('failed',
-        `Op báo xong nhưng runtime ${red.authority === 'runtime' ? 'chạy lại' : 'đọc lại'} check ${red.name} thì đỏ${codeTag}.`,
-        [detail ? `${detail.charAt(0).toUpperCase()}${detail.slice(1)}${detail.endsWith('.') ? '' : '.'}` : null, primary ? catalogLine(primary, catalog) : null].filter(Boolean).join(' ') || 'Check độc lập của runtime không đạt.',
+        tr('The op reported done but the runtime {verb} check {name} and it is red{tag}.', { verb: tr(red.authority === 'runtime' ? 're-ran' : 're-read'), name: red.name, tag: codeTag }),
+        [detail ? `${detail.charAt(0).toUpperCase()}${detail.slice(1)}${detail.endsWith('.') ? '' : '.'}` : null, primary ? catalogLine(primary, catalog) : null].filter(Boolean).join(' ') || tr("The runtime's independent check did not pass."),
         disagreement, next.text, primary && catalog[primary] ? (next.owner === 'op-retry' ? catalog[primary].owner : next.owner) : next.owner, codes);
     }
     if (settle.peerBlocked) {
       const peers = (settle.peerBlocked.peers ?? []).join(', ');
-      return done('failed', 'Check đỏ vì thay đổi của workflow khác, không phải lỗi của op này.',
-        `Các check đỏ (${(settle.peerBlocked.checks ?? []).join(', ')}) do thay đổi của ${peers || 'một peer'}.`, null,
-        'Chờ bên kia sửa; lần này không tốn lượt thử.', 'runtime-core', codes);
+      return done('failed', tr('A check went red because of changes by another workflow, not a fault of this op.'),
+        tr('The red checks ({checks}) come from changes by {peers}.', { checks: (settle.peerBlocked.checks ?? []).join(', '), peers: peers || tr('a peer') }), null,
+        tr('Wait for that side to fix it; this run spends no try.'), 'runtime-core', codes);
     }
-    const said = outcome === 'failed' ? 'Op tự báo thất bại' : outcome === 'partial' ? 'Op chỉ làm được một phần' : `Runtime chấm thất bại (op báo ${outcome ?? 'không rõ'})`;
-    return done('failed', `${said}${red ? `; check ${red.name} đỏ${codeTag}` : ''}: ${clip(shortPaths(rep.summary ?? detail ?? ''), 200)}`.replace(/: $/, '.'),
+    const said = outcome === 'failed' ? tr('The op reported itself failed') : outcome === 'partial' ? tr('The op only completed a part') : tr('The runtime scored it failed (the op reported {outcome})', { outcome: outcome ?? tr('unknown') });
+    return done('failed', `${said}${red ? tr('; check {name} is red{tag}', { name: red.name, tag: codeTag }) : ''}: ${clip(shortPaths(rep.summary ?? detail ?? ''), 200)}`.replace(/: $/, '.'),
       [detail ? `${detail.charAt(0).toUpperCase()}${detail.slice(1)}${detail.endsWith('.') ? '' : '.'}` : null, primary ? catalogLine(primary, catalog) : null,
-        settle.failureClass?.reason ? `Phân loại: ${settle.failureClass.class} — ${clip(settle.failureClass.reason, 160)}` : null].filter(Boolean).join(' ') || 'Runtime không tìm thấy check nào đạt cho lần chạy này.',
+        settle.failureClass?.reason ? tr('Class: {class} — {reason}', { class: settle.failureClass.class, reason: clip(settle.failureClass.reason, 160) }) : null].filter(Boolean).join(' ') || tr('The runtime found no passing check for this run.'),
       null, next.text, next.owner, codes.length ? codes : (settle.failureClass?.class ? [`failure-class:${settle.failureClass.class}`] : []));
   }
 
   // Reported, not yet judged: a wait.
   if (attempt.settled_at == null && (attempt.reported_at != null || outcome)) {
-    return done('waiting-settle', 'Op đã nộp report và đang chờ runtime hoặc Kernel phán quyết.',
-      `Report (${outcome ?? 'chưa rõ'}) đã được ghi; các check độc lập chưa chốt.`, null, 'Runtime settle tự động; nếu cần quyết định của Kernel, Kernel sẽ xử lý ở lượt kế.', 'runtime-core', []);
+    return done('waiting-settle', tr('The op filed its report and is waiting for the runtime or Kernel verdict.'),
+      tr('The report ({outcome}) is recorded; the independent checks are not final yet.', { outcome: outcome ?? tr('unclear') }), null, tr('The runtime settles automatically; if a Kernel decision is needed, Kernel handles it on the next pass.'), 'runtime-core', []);
   }
   return null;
 }

@@ -1,11 +1,11 @@
 // work-ownership.mjs — who owns a shared product Work record, which revision of it is committed, and
 // what its owner declared about a change.
 //
-// Owner, 2026-09-25 (starci-next inc-1c7f7dad53e0): three workflows on one ledger (sn-foundation,
-// sn-learn-content, sn-subscription) share Work records - challenges, commerce/br/single-subscription,
-// the learning-paths foundation contract. Work-input staleness listed a settled job whenever a record
+// Owner, 2026-09-25: three workflows on one ledger share Work records - challenges,
+// commerce/br/single-subscription, the learning-paths foundation contract. Work-input staleness
+// listed a settled job whenever a record
 // it read changed from outside its workflow, so every peer rewrite re-staled settled work, the
-// Kernels redid it, the redo rewrote records and re-staled the peers: sn-subscription redid its
+// Kernels redid it, the redo rewrote records and re-staled the peers: one workflow redid its
 // scope 5 times and its business seam 6. The versioned rollout that settled Source drift
 // (2af07d02a) now reaches cross-workflow Work records:
 //
@@ -50,10 +50,8 @@ export const TRANSFER_SCHEMA = 'starci/ownership-transfer@1';
 /** Every ownership transfer the Supervisor recorded ({path, to, from, reason, at, by, provisional, bridgeId}): path_transfers rows. */
 export const readTransfers = (db) => db.prepare("SELECT detail_json FROM path_transfers WHERE state='applied' ORDER BY path").all()
   .map((row) => parseJson(row.detail_json)).filter((value) => value?.schema === TRANSFER_SCHEMA);
-export const RECORD_CHANGE_SCOPE = 'record-change';
 export const RECORD_CHANGE_SCHEMA = 'starci/record-change@1';
 export const RECORD_CHANGE_REACHES = Object.freeze(['follow-up', 'advisory']);
-export const OWNER_SOURCES = Object.freeze(['transfer', 'foundation', 'scope-record', 'scope-node', 'cut', 'repo-owner']);
 const WORK_PREFIX = '.starciwork/';
 const REPO_OWNER_KINDS = ['baseline', 'scaffold', 'layout-tree', 'brand'];
 const FOUNDATION_ROOTS = { brand: '.starciwork/brand', 'layout-tree': '.starciwork/shell' };

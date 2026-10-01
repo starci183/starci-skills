@@ -60,7 +60,7 @@ test('a long report is split under the Telegram message limit', () => {
 
 test('the report covers --repo, else config supervisor.repos resolved like the rest of the supervisor; no host-specific fallback', () => {
   assert.deepEqual(reportRepos(['D:/x']), ['D:/x']);
-  assert.deepEqual(reportRepos([], { supervisor: { repos: ['nivo-backend'] } }), [path.resolve(path.dirname(SKILL_ROOT), 'nivo-backend')]);
+  assert.deepEqual(reportRepos([], { supervisor: { repos: ['todo-app-be'] } }), [path.resolve(path.dirname(SKILL_ROOT), 'todo-app-be')]);
   assert.deepEqual(reportRepos([], { supervisor: { repos: [] } }), [], 'an empty list reports nothing');
   assert.deepEqual(reportRepos([], null), []);
 });

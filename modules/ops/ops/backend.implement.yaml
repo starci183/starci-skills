@@ -42,8 +42,8 @@ reads:
       en: "The existing selected implementation record, its feature scope, declared
         refs/dependsOn/proof demands and validator freshness. Requirement and design Work leaves
         can still read `state: todo` after their decide jobs settle; the source artifacts from a
-        declared dependency may already be present at HEAD (starci-next learn-content
-        op-backend.implement-d5bf375e7a)."
+        declared dependency may already be present at HEAD (a learn-content leg
+        observed exactly this)."
   - id: business
     path: .starciwork/features/<feature>/{br,fr,nfr,decision}/**/index.yaml
     purpose:
@@ -118,7 +118,7 @@ writes:
         --wait --isolate --base <source commit recorded before
         this slice's first edit> --paths <owned paths, comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log
         <STARCI_JOB_SCRATCH>/checks/sonar.txt` in this same attempt; attach both files at api report (--isolate analyses only the
-        slice in a throwaway project: minutes, where a whole nivo-backend analysis took 17-40
+        slice in a throwaway project: minutes, where a whole repository analysis took 17-40
         minutes for a 1-5 file slice): it scans against the local SonarQube the
         stack declaration names (default the source host's dev stack), takes the project key, host
         and token from that declaration and its custody, creates the project and its analysis
@@ -146,9 +146,8 @@ writes:
         or workflow when you can tell>, category: shared-change, evidence, expectedFix}; it is
         never an open item, never partial and never a blocker, and it never turns an otherwise
         green done into anything else - api check attributes it to the peer whose commit left it
-        (peerBlocked) and the Kernel routes it there. nivo collab op-backend.implement-bd2609ff17
-        and starci-next foundation f920334582 filed partial for exactly this and were re-run for
-        hours on files they may not touch."
+        (peerBlocked) and the Kernel routes it there. Legs that filed partial for exactly this
+        were re-run for hours on files they may not touch."
   - id: apiDelivery
     path: evidence/**
     fields: [operations, request, response, errors, authorization, codeRefs, servedVersions, endpoint, probeEvidence]

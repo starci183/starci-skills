@@ -153,7 +153,7 @@ zero files for a side, is a failure (`HFS_ARCH_CONFIG_UNREAD`), never "unavailab
 | `__generated__/`, Nest `schema.gql` | may exist, ignored, produced by `codegen` | `repo.generated` |
 | `.eslintcache`, `.turbo`, `.scannerwork`, `.sonar`, `.jest-cache`, `.cache`, `.tools` | forbidden, external to `%LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/` | `app.tool-cache`, `repo.tool-cache` |
 | Worktrees (`.worktrees/`, `worktrees/`, `.starciwork/worktrees/`) | forbidden as tracked content, external: a lane worktree lives at `D:/starci-lanes/<project>/<lane>/`; a Kernel workflow's worktree is created and owned by Orca outside the app checkout, one per workflow, and removed by the runtime's host-side controller after the workflow's finish (`docs/workflow-kernel.md`) | `app.worktrees`, `repo.worktrees` |
-| Agent output (reports, logs, `nul`, `.qwen*`, `.artifacts`, `design-plans/`, draw rounds, UAT captures) | forbidden, external: scratchpad or blob store, cited by `{name, sha256}` | `app.agent-output`, `repo.agent-output` |
+| Agent output (reports, logs, `nul`, `.artifacts`, `design-plans/`, draw rounds, UAT captures) | forbidden, external: scratchpad or blob store, cited by `{name, sha256}` | `app.agent-output`, `repo.agent-output` |
 | Plaintext secrets (`.env*`, `.secrets/`, `*.pem`, `*.key`) | forbidden, external: sealed at `.starcistacks/<env>/secrets/<slug>.enc` | `app.plaintext-env`, `repo.plaintext-env` |
 
 **Agent evidence is not tracked.** Evidence, logs, captures, UAT runs and draw rounds live in the blob store and the

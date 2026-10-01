@@ -1,5 +1,5 @@
-// cut-seam.mjs — a cut's seam never stalls the whole chain (owner ruling 2026-09-28: "Seam không làm nghẽn
-// cả chuỗi: seam trượt thì tách lại hoặc cho các lát sau chạy song song với stub, không để chờ 3 tiếng").
+// cut-seam.mjs — a cut's seam never stalls the whole chain (owner ruling 2026-09-28: "a seam must not jam the
+// whole chain: when the seam fails, cut it again or let the later slices run in parallel on a stub, never waiting 3 hours").
 //
 // A cut (driver-loop.yaml enqueue.cutExecution) runs seam-first: ordinal 1 owns the shared seam and the
 // other ordinals waited for it to settle succeeded. When the seam failed, queued or sat behind a wait the
@@ -37,8 +37,6 @@ export const SEAM_RELEASED_EVENT = 'seam-released';
 export const SEAM_RECONCILED_EVENT = 'seam-reconciled';
 export const SEAM_RECONCILE_CHECK = 'cut-seam-reconcile';
 export const SEAM_PRIORITY_CLASS = 'cut-seam';
-/** Why a sibling runs on a stub: the order a release is judged in. */
-export const SEAM_STUB_MODES = ['interface', 'released', 'seam-failed', 'seam-slipped', 'timeout', 'kernel-override'];
 
 const FINAL = SETTLED_JOB_LIST;
 const payloadOf = (row) => parseJson(row?.payload_json ?? '', {}) ?? {};
@@ -227,11 +225,11 @@ export function seamPromptLines({ cut, jobLabel, api = 'scripts/kernel/cli.mjs',
   ];
 }
 
-// Canon-conformance cut (code.refactor params.canonFamilies; nivo wf-nivo-fe-canon-mujek980, 22 of 56 slices
-// failed blocked:shared-change): canon-scan's slices own only the files that hold findings, but a finding
+// Canon-conformance cut (code.refactor params.canonFamilies; one canon cut saw 22 of 56 slices
+// fail blocked:shared-change): canon-scan's slices own only the files that hold findings, but a finding
 // such as FE_SOURCE_LAYOUT_INVALID is fixed by MOVING its owner into a canon home (features/layouts/<Owner>)
-// - paths no slice owned (owners are derived from knowledge/hfs/slots.yaml; nothing registers one in a shared file). op-code.refactor-7e9f7e20c1
-// (slice 7/34) committed 9 -> 7 findings and blocked on the rest. canonCutPlanOf grants each slice the exact
+// - paths no slice owned (owners are derived from knowledge/hfs/slots.yaml; nothing registers one in a shared file). One
+// slice (7/34) committed 9 -> 7 findings and blocked on the rest. canonCutPlanOf grants each slice the exact
 // relocation destinations its findings need (modules/ops/ops/code.refactor.yaml policy.canonConformance
 // relocations) unless a sibling or an earlier grant already holds them, and routes the shared-root files
 // (sharedRoots, empty in HFS) plus every contested relocation to ONE serial canon-wire leg per wave, enqueued --after every
@@ -394,7 +392,7 @@ export function canonRedispatchOf(db, jobId, { extraPaths = [] } = {}) {
  * packet carries it: every ordinal's latest live job with its owned paths and status, the path union, the
  * passed and open ordinals, ordinals no job holds yet (`absent`), any overlap between two ordinals' paths, and
  * the cut's canon-wire legs. Before this the packet held only {id, ordinal, total} and slices blocked
- * authority on the missing manifest (wf-nivo-fe-canon-mujek980 op-code.refactor-cae0499f4a, -da9ab10e32).
+ * authority on the missing manifest.
  */
 export function cutManifestOf(db, { workflowId, op, cut, ownJobId = null }) {
   if (!cut || cut.id == null) return null;
@@ -445,8 +443,8 @@ const CONFIG_FILE_RE = /(?:^|\/)(?:hfs\.json|tsconfig[^/]*\.json|package\.json|\
 const PUBLIC_ENTRY_RE = /\/index\.[cm]?[jt]sx?$/;
 /**
  * What settle does with a canon slice (params.canonFamilies, not the canon-wire leg) that settled blocked or
- * failed WITH a filed report, so a partial or scope-bound slice is never a dead end (wf-nivo-fe-canon-mujek980
- * 06:01-06:03Z: 14 slices blocked on shared-change after committing in-ceiling work, nothing requeued them):
+ * failed WITH a filed report, so a partial or scope-bound slice is never a dead end (one canon cut had
+ * 14 slices block on shared-change after committing in-ceiling work, and nothing requeued them):
  *   - `resumeFrom`: the commit it left (its report head, else a commit its report names) - the follow-up is a
  *     continuation from it, never a redo;
  *   - `grants`: relocation destinations its report names outside its paths that no sibling ordinal holds -

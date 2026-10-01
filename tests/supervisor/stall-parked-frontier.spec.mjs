@@ -11,16 +11,15 @@ import {parkedBehindWaits,waitHeldOperations} from '../../scripts/kernel/frontie
 
 // Two false STALLED alerts from scripts/supervisor/stall.mjs.
 //
-// inc-56d621d6359e (starci-next wf-sn-subscription-mufrhhro), and nivo wf-nivo-academy-debt-mugycgwl
-// ("frontier engaged; queued: peer-wait 1, dependency 1"): a job queued --after a job a typed peer-wait
+// A product workflow ("frontier engaged; queued: peer-wait 1, dependency 1"): a job queued --after a job a
+// typed peer-wait
 // holds read queuedBecause dependency and counted as engaged work, so api status read `engaged` instead of
 // `peer-wait` and stall's peer-parked exemption never applied. api status now parks a dependant whose chain
 // ends in a held or waited job (scripts/kernel/frontier-parked.mjs); stall reads that frontier.
 //
-// inc-b1435cb9c2b9 (nivo wf-nivo-workspace-provision-mudqjokb, same class as inc-42d3cceaa714): the alert
-// its Kernel quoted on 09-26 10:49Z was the 09-25 13:20:32Z STALL-ALERT "idle 966m: frontier
+// The alert a Kernel quoted a day later was a STALL-ALERT "idle 966m: frontier
 // orphaned-frontier ACTIONABLE but the Kernel has not moved", judged while every wake had been skipped
-// kernel-busy since 21:50Z and 9 s after the Kernel enqueued the next leg (job-enqueued 13:20:23Z). stall
+// kernel-busy for hours and seconds after the Kernel enqueued the next leg. stall
 // asked a peer's Kernel whether it was mid-turn but never the workflow's own, and read its idle clock
 // before the frontier. It now takes the one busy judgement (busyWhy) for itself too, re-reads the clock
 // after the frontier, and its supervisor alert says when it was judged.
@@ -29,7 +28,7 @@ const ROOT=path.resolve(import.meta.dirname,'..', '..');
 const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const MIN=60_000;
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
-const WORK='wf-sn-subscription-mufrhhro',PEER='wf-sn-learn-content-mufrhgwz';
+const WORK='wf-ecommerce-subscription-mufrhhro',PEER='wf-ecommerce-learn-content-mufrhgwz';
 
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stall-parked-'));
@@ -55,7 +54,7 @@ const fixture=t=>{
   return {repo,ok,status,enqueue,read};
 };
 
-test('inc-56d621d6359e: a job queued --after a peer-wait-held job is parked behind the wait - the frontier reads peer-wait, and stall does not alert',t=>{
+test('a job queued --after a peer-wait-held job is parked behind the wait - the frontier reads peer-wait, and stall does not alert',t=>{
   const fx=fixture(t);
   const ord3=fx.enqueue('backend.implement','src/modules/domain/purchase');
   const {incidentId}=fx.ok(['incident','--workflow',WORK,'--kind','peer-wait','--peer',PEER,'--holds',ord3,'--detail','repo gates must be green on learn-content/import first']);
@@ -113,7 +112,7 @@ test('parkedBehindWaits: owner-gate and deferred-settle roots, chains behind run
   assert.equal(waitHeldOperations(queued,heldSettle,parked),0+1+1);
 });
 
-// nivo wf-nivo-workspace-provision-mudqjokb as the 09-25 13:20Z pass saw it: last progress op-settled 21:14Z the
+// A product workflow as that stall pass saw it: last progress an op-settled the
 // day before, no open operation (orphaned-frontier, actionable), the Kernel mid-turn the whole time.
 const WSPV='wf-nivo-workspace-provision-mudqjokb';
 const NOW=Date.now();
@@ -124,7 +123,7 @@ const seedWspv=ledger=>{
   ledger.write.changeWorkflowPhase({workflowId:WSPV,to:'running',by:'fixture',reason:'seed'});
 };
 
-test('inc-b1435cb9c2b9: a Kernel mid-turn is the workflow moving - no STALLED "the Kernel has not moved"; at its prompt it still is one',t=>withLedger(t,({repoRoot,ledger})=>{
+test('a Kernel mid-turn is the workflow moving - no STALLED "the Kernel has not moved"; at its prompt it still is one',t=>withLedger(t,({repoRoot,ledger})=>{
   seedWspv(ledger);
   const busy=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:orphaned,kernelTurnOf:()=>'active'});
   assert.equal(busy.filter(f=>f.type==='STALLED').length,0,'the defect: STALLED idle 966m ACTIONABLE while every wake was skipped kernel-busy');
@@ -134,9 +133,9 @@ test('inc-b1435cb9c2b9: a Kernel mid-turn is the workflow moving - no STALLED "t
   assert.match(stalled.line,/^STALLED wf-nivo-workspace-provision-mudqjokb idle 966m: frontier orphaned-frontier ACTIONABLE but the Kernel has not moved/);
 }));
 
-test('inc-b1435cb9c2b9: progress made between the idle clock and the frontier read is what that frontier shows - no stale STALLED',t=>withLedger(t,({repoRoot,ledger})=>{
+test('progress made between the idle clock and the frontier read is what that frontier shows - no stale STALLED',t=>withLedger(t,({repoRoot,ledger})=>{
   seedWspv(ledger);
-  // The Kernel enqueues the next leg while the pass runs (job-enqueued 13:20:23Z, alert 13:20:32Z).
+  // The Kernel enqueues the next leg while the pass runs.
   const racing=()=>{
     ledger.appendEvent({workflowId:WSPV,entityType:'job',entityId:'op-interface.implement-efce9599f9',kind:'job-enqueued',payload:{opId:'interface.implement'},createdAt:NOW-1000});
     return {ok:true,frontier:{state:'engaged',actionable:true,readyOperations:1,queued:[],queuedCauses:{ready:1},reason:'queued or fenced operations are waiting on the Kernel'},workers:[]};
@@ -145,16 +144,16 @@ test('inc-b1435cb9c2b9: progress made between the idle clock and the frontier re
   assert.equal(found.filter(f=>f.type==='STALLED').length,0,'the defect: idle 966m stood beside a frontier read after the Kernel moved');
 }));
 
-// nivo inc-3a0e90528cbc (wf-nivo-modules-agentos-mudqjov6): STALLED idle 94m "frontier engaged" while
-// op-interface.implement-26e189461a's Devin turn was "Thinking 97m+" with bounded commands running - api
+// A modules workflow read STALLED idle 94m "frontier engaged" while
+// an interface.implement job's Devin turn was "Thinking 97m+" with bounded commands running - api
 // status read its liveness outside active, but its terminal output (outputAgeOf) was seconds old.
-const AGENTOS='wf-nivo-modules-agentos-mudqjov6',JOB='op-interface.implement-26e189461a';
+const MODULES='wf-nivo-modules-todo-mudqjov6',JOB='op-interface.implement-26e189461a';
 const engagedOn=worker=>()=>({ok:true,frontier:{state:'engaged',actionable:false,queued:[],queuedCauses:{},nudgeReadyJobs:[],deadWorkerJobs:[],wedgedJobs:[],workerQuestionJobs:[],reason:null},
   workers:[{jobId:JOB,ledgerStatus:'running',...worker}]});
 
-test('inc-3a0e90528cbc: a worker whose output or heartbeat api status aged fresh is mid-turn whatever its frame classified as',t=>withLedger(t,({repoRoot,ledger})=>{
-  seedWorkflow(ledger,{id:AGENTOS,now:NOW-600*MIN,events:[{kind:'op-dispatched',payload:{jobId:JOB},created_at:NOW-94*MIN}]});
-  ledger.write.changeWorkflowPhase({workflowId:AGENTOS,to:'running',by:'fixture',reason:'seed'});
+test('a worker whose output or heartbeat api status aged fresh is mid-turn whatever its frame classified as',t=>withLedger(t,({repoRoot,ledger})=>{
+  seedWorkflow(ledger,{id:MODULES,now:NOW-600*MIN,events:[{kind:'op-dispatched',payload:{jobId:JOB},created_at:NOW-94*MIN}]});
+  ledger.write.changeWorkflowPhase({workflowId:MODULES,to:'running',by:'fixture',reason:'seed'});
   const stalled=worker=>stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:engagedOn(worker),kernelTurnOf:()=>'turn-idle'}).filter(f=>f.type==='STALLED');
   assert.equal(stalled({liveness:'failed',screenState:'failed',outputAgeMs:4000}).length,0,'the defect: fresh output on a running worker alerted STALLED idle 94m');
   assert.equal(stalled({liveness:'unknown',outputAgeMs:null,heartbeatAgeMs:60_000}).length,0,'a fresh dispatch heartbeat is the worker moving too');

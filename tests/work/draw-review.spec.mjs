@@ -19,7 +19,7 @@ import { repeatedAnswerOf } from '../../scripts/machine/owner-answers.mjs';
 import { buildProduct, layoutCapture, uiSkeleton } from '../fixtures/layout-tree.mjs';
 import { seedWorkflow } from '../helpers/ledger-fixture.mjs';
 
-// mia inc-a4b5b1abdd90 (owner-gate inc-60e05a1c204c): brand.decide a7 could not crop the greenfield lockup. The
+// A product workflow's brand.decide could not crop the greenfield lockup. The
 // planned layout ui.learning.app-layout was drawn (interface.draw passed) but stayed todo: with candidatesPerScreen 1
 // interface.draw parked no owner ask, work-layout reserves done for the final reconciliation, and review.verify runs
 // after a7 - nothing could ever accept the drawing. interface.draw now parks one draw-review ask of the drawn parts
@@ -46,7 +46,7 @@ function greenfield(t) {
   assert.equal(planned.exitCode, 0, planned.text);
   const tree = readTree(p);
   tree.breakpoints = [{ name: 'desktop', width: 40, height: 30 }, { name: 'mobile', width: 20, height: 30 }];
-  tree.personas = [{ role: 'student', default: true, workspace: 'Mia', user: 'An Nguyen', currency: 'VND', dateFormat: 'dd/MM/yyyy' }];
+  tree.personas = [{ role: 'student', default: true, workspace: 'Todo', user: 'An Nguyen', currency: 'VND', dateFormat: 'dd/MM/yyyy' }];
   writeTree(p, tree);
   return { ...p, repo: path.dirname(p.work) };
 }
@@ -471,8 +471,8 @@ test('config.yaml asks.excludes [draw-review] opts drawings out of auto-accept',
   } finally { l.close(); }
 });
 
-// starci-next wf-sn-foundation-mufrhftf: op-interface.draw-68bf497278 redrew ui.identity.sign-in as an owner-answer
-// retry after the owner's pending review ask was retired for it, and its review ask ctx_130d38e88fc7 was auto-accepted.
+// An interface.draw job redrew ui.identity.sign-in as an owner-answer
+// retry after the owner's pending review ask was retired for it, and its second review ask was auto-accepted.
 /** An interface.draw job row of `wf` (attempt, retry, settled result). */
 function seedJob(l, { wf, jobId, attempt, dispatchId, retry = null, result = null, status = 'running' }) {
   seedWorkflow(l,{id:wf,jobs:[{jobId,opId:'interface.draw',unitId:'job-draw-a1',tryNo:attempt,

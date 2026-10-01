@@ -1,5 +1,5 @@
 /**
- * Twin tests for the `starciStylelintConfig` factory (no rule is off) and the Vietnamese why map.
+ * Twin tests for the `starciStylelintConfig` factory (no rule is off) and the why map.
  */
 import assert from "node:assert/strict"
 import test from "node:test"
@@ -88,15 +88,15 @@ test("every rule fires through the factory config on a stylesheet that breaks it
   assert.deepEqual([...fired].sort(), [...ruleNames].sort())
 })
 
-test("every rule has a why with a code, a Vietnamese headline and a Vietnamese next step", () => {
-  const vietnamese = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i
+test("every rule has a why with a code, an English headline and an English next step", () => {
+  const secondLanguage = /[\u00e0-\u00e3\u00e8-\u00ea\u00ec\u00ed\u00f2-\u00f5\u00f9\u00fa\u00fd\u0103\u0111\u0129\u0169\u01a1\u01b0\u1ea0-\u1ef9]/i
   for (const name of Object.keys(rules)) {
     const entry = why[name]
     assert.ok(entry, `${name} has no why`)
     assert.match(entry.code, /^[A-Z][A-Z0-9_]+$/, `${name} code`)
-    assert.match(entry.vi, vietnamese, `${name} vi is not Vietnamese`)
-    assert.match(entry.vi, /<file>/, `${name} vi names no <file>`)
-    assert.match(entry.fixVi, vietnamese, `${name} fixVi is not Vietnamese`)
+    assert.doesNotMatch(entry.en, secondLanguage, `${name} en is not English`)
+    assert.match(entry.en, /<file>/, `${name} en names no <file>`)
+    assert.doesNotMatch(entry.fix, secondLanguage, `${name} fix is not English`)
   }
 })
 

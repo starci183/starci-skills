@@ -84,6 +84,7 @@ import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { translator } from '../lib/i18n.mjs';
 // The reads the split-out verbs share with what stays here: one definition per helper (scripts/kernel/verbs/shared/).
 import {
   csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, latestReportOf, latestAttemptOf, operationTaskOf, operationDispatchOf,
@@ -432,8 +433,8 @@ const livenessMsOf = (job, key, fallback) => {
 };
 // The quiet proof: a nudge of THIS dispatch (after its latest op-dispatched event) older than the
 // provider's quietMs, and no terminal output for longer than that. A live agent answers a wake in
-// minutes; a Mia Mia worker sat leased at a PowerShell prompt, nudged, with no report, until the
-// Kernel wrote an incident by hand (inc-c6cf249ecd5a, inc-591629353910, inc-2de345cd4068).
+// minutes; a worker sat leased at a PowerShell prompt, nudged, with no report, until the
+// Kernel wrote an incident by hand.
 const quietAfterNudge = (db, job, { now, outputAgeMs }) => {
   if (outputAgeMs == null) return null;
   const quietMs = livenessMsOf(job, 'quietMs', QUIET_MS);
@@ -618,7 +619,7 @@ const DEAD_WORKER_LIVENESS = ['disconnected', 'gone', 'agent-exited', 'quiet', '
 // attempt (the gate's maxPerAttempt, default GATE_ANSWER_LIMIT) the gate is a loop, not a prompt: the
 // worker reads `gate-loop`, nudge refuses it, and it recovers like a wedged worker through
 // reconcile --dead-worker --settle-failed, so repeats across attempts become a retry-loop finding
-// (starci-next inc-af01e1cedbf4: a provider's "A potential loop was detected" menu).
+// (a provider's "A potential loop was detected" menu).
 const GATE_ANSWERED_EVENT = 'op-worker-gate-answered';
 const GATE_ANSWER_LIMIT = 2;
 const workerCardOf = (job) => {
@@ -860,8 +861,8 @@ const ownerGateOf = (gates, job) => {
  * lands something (installs a dependency, writes a record). `api incident --kind peer-wait --peer
  * <workflowId>` records it; --holds (else --op) names the held ops or jobs, which read queuedBecause
  * peer-wait, and with nothing else open the frontier reads `peer-wait`, not actionable, instead of
- * orphaned-frontier (mia-mia wf-miamia-work-and-stacks-mud7kjun, inc-0aebf976e625: brand.decide waited
- * on wf-miamia-base-repos-mud7kk5c's Grammar install while status re-woke the Kernel for nothing). A
+ * orphaned-frontier (a brand.decide waited
+ * on a peer workflow's Grammar install while status re-woke the Kernel for nothing). A
  * peer message from that peer wakes the Kernel and, with --until-message, resolves the wait
  * (peerWaitMessageArrived). `peer` is the peer's live row: a wait on a peer that is no longer running
  * can never be met by it, so it is the Kernel's move again (frontier.peerWaitsDead).
@@ -1029,7 +1030,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
   // its live head: a dropped, never-dispatched seam retry is skipped. A named
   // job is followed down its retry lineage (gate-conditions.mjs lineageHeadOf):
   // a failed --after job whose retry is queued is a live wait, not a dead one
-  // the Kernel must drop and re-enqueue (starci-next sn-subscription a14-a23).
+  // the Kernel must drop and re-enqueue.
   // A lineage that leads back to this job is its own history, never a wait: a retry whose --after
   // names the attempt it retries (a draw follow-up enqueued --after op-interface.draw-3cd517a152
   // as that job's retry, nivo wf-nivo-workspace-provision-mujek7cb) otherwise held itself forever.
@@ -1055,7 +1056,7 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
   for (const priorId of [...(Array.isArray(payload.after) ? payload.after : []), ...(seam ? [seam] : []), ...recordHolds]) {
     const prior = heldByJob(priorId);
     if (prior) {
-      // A StarCi Next and a MiaMia workspace.manage sat queued behind a seam
+      // Two products' workspace.manage jobs sat queued behind a seam
       // and an --after job that had settled failed; the frontier read engaged,
       // the watchdog never woke the Kernel, and both workflows stalled.
       const dead = FINAL_SETTLED.includes(prior.status) && !isAwaitingOwner(db, db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(prior.job_id));
@@ -1318,7 +1319,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   }
   // The ONE end-of-flow credential step: every business leg but the deferred live proofs settled (or deferred).
   if (autopilot?.on && autopilot.checklistDue) {
-    actions.push({ kind: 'dispatch', op: 'provision.ask', final: true, reason: `the end-of-flow owner step "bổ sung credential": api enqueue --op provision.ask --params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}' --paths .starciwork/evidence/${wf.workflow_id}.credentials; its ask files the question \`api autopilot --workflow ${wf.workflow_id} --checklist --json\` prints (.question), verbatim - one form for every deferred credential; the deferred approvals (${(autopilot.checklistApprovals ?? []).join(', ') || 'none'}) are released at the same time (api autopilot --release <dispatchId>). The deferred live proofs resume by themselves once the owner answers` });
+    actions.push({ kind: 'dispatch', op: 'provision.ask', final: true, reason: `the end-of-flow owner step "supply credentials": api enqueue --op provision.ask --params '{"subject":"${HANDOVER_CREDENTIALS_SUBJECT}"}' --paths .starciwork/evidence/${wf.workflow_id}.credentials; its ask files the question \`api autopilot --workflow ${wf.workflow_id} --checklist --json\` prints (.question), verbatim - one form for every deferred credential; the deferred approvals (${(autopilot.checklistApprovals ?? []).join(', ') || 'none'}) are released at the same time (api autopilot --release <dispatchId>). The deferred live proofs resume by themselves once the owner answers` });
   }
   for (const row of workflowJobs.filter((job) => LEG_IN_FLIGHT.includes(job.status))) {
     actions.push({ kind: 'wait', op: row.op_id, jobId: row.job_id, reason: row.status === 'effect_unknown' ? 'effect_unknown: reconcile it' : row.status });
@@ -1346,14 +1347,15 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   const reworkOps = new Set(contractFollowUps.map((item) => item.followUpOp));
   const ops = [...legOps, ...[...jobsByOp.keys()].filter((op) => !legOps.includes(op))];
   const provisional = autopilot?.provisionalOps ?? new Set();
+  const tr = translator(ownerLanguage());
   const legs = ops.map((op) => {
     const rows = (jobsByOp.get(op) ?? []).filter((row) => row.status !== 'cancelled');
     const latest = rows.at(-1) ?? null;
     // Autopilot: a leg whose open work is only deferred reads `deferred`; a green leg resting on a provisional
-    // acceptance reads green-provisional, labelled "tự nhận tạm" (the owner reviews it once at handover).
+    // acceptance reads green-provisional, labelled by PROVISIONAL_LABEL (the owner reviews it once at handover).
     if (rows.length && rows.every((row) => row.status === 'succeeded' || deferredJobs.has(row.job_id) || !['queued', 'failed', ...LEG_IN_FLIGHT].includes(row.status))
       && rows.some((row) => deferredJobs.has(row.job_id)) && !rows.some((row) => row.status === 'succeeded')) {
-      return { op, color: 'deferred', label: 'hoãn tới buổi duyệt cuối', jobId: latest?.job_id ?? null, status: latest?.status ?? null };
+      return { op, color: 'deferred', label: tr('deferred to the final review'), jobId: latest?.job_id ?? null, status: latest?.status ?? null };
     }
     const color = !rows.length ? 'gray'
       : rows.some((row) => LEG_IN_FLIGHT.includes(row.status)) ? 'yellow'
@@ -1364,7 +1366,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
       : 'red';
     const deferred = latest ? specDeferredJobs.get(latest.job_id) ?? null : null;
     const deferredField = deferred ? { deferred } : !rows.length && deferredPlanOps.has(op) ? { deferred: deferredPlanOps.get(op).reason } : {};
-    if (color === 'green' && provisional.has(op)) return { op, color: 'green-provisional', label: PROVISIONAL_LABEL, jobId: latest?.job_id ?? null, status: latest?.status ?? null, ...deferredField };
+    if (color === 'green' && provisional.has(op)) return { op, color: 'green-provisional', label: tr(PROVISIONAL_LABEL), jobId: latest?.job_id ?? null, status: latest?.status ?? null, ...deferredField };
     // A leg whose latest try ended asking the owner is yellow and says so: it is a wait, never a failure.
     const waitsOnOwner = latest?.status === 'awaiting_owner' && ownerWaitOps.has(op) ? { awaitingOwner: true } : {};
     return { op, color, jobId: latest?.job_id ?? null, status: latest?.status ?? null, ...waitsOnOwner, ...deferredField };
@@ -1926,7 +1928,7 @@ function recordWorkerOutageEvidence(ledger, workers, now = Date.now()) {
 // its payload so `dispatch --spawn` launches exactly what was routed. Bias: only
 // the owner's routing_bias {prefer[], avoid[]} on the workflow goal's json
 // (define-goal). A Kernel's --prefer/--avoid is refused as an unknown option
-// (owner decision 2026-09-25: starci-next op-interface.implement-c3bcc0d5e4 was routed around
+// (owner decision 2026-09-25: an interface.implement op was routed around
 // devin-agent onto codex on a hunch). The router itself skips a
 // pool whose provider-health circuit is open (capacity below) and, for a retry,
 // demotes or excludes the pools its lineage failed on (scripts/kernel/lineage-route.mjs).
@@ -2457,7 +2459,7 @@ const cleanupManagedWorker = (dispatchId) => {
 
 /* ----------------------------------------------------------- reconcile */
 // `reconcile --drop --reason <text>`: retire a QUEUED job that never crossed
-// the dispatch boundary. A StarCi Next Kernel held two cut ordinals behind a
+// the dispatch boundary. A Kernel held two cut ordinals behind a
 // failed seam whose grants broke the Work layout; the api had no way to drop
 // them, so the cut could not be re-planned and the workflow sat still. The row
 // settles `cancelled` with the reason, and every queued job that waits on it
@@ -2603,10 +2605,9 @@ const closedNote = (closed) => !closed ? ''
 // a business attempt, demoted its pool and fed a worker-died-no-report pattern (inc-ceb153dfd2cf,
 // inc-65666fb85763). Returns {cause:'host-terminal-wipe', errorCode, kernelTerminal, proof} or null.
 const HOST_TERMINAL_WIPE = 'host-terminal-wipe';
-// A host-wide DISCONNECT is the same event seen from a responding Orca: 2026-09-27 13:20-13:30Z every
+// A host-wide DISCONNECT is the same event seen from a responding Orca: once every
 // Kernel terminal of both ledgers was cleared 'terminal disconnected' within ten minutes, and the five
-// workers alive then (nivo app-auth uat.verify a3, collab backend.implement a9, agentos interface.draw
-// a3; starci-next learn-content and foundation backend.implement a2) settled failed-no-report as the
+// workers alive then - three on one product's ops, two on the other's - settled failed-no-report as the
 // op's own deaths - a business attempt spent, their pools demoted, feeding the pattern incident. A
 // worker disconnected or gone while Kernel terminals of HOST_EVENT_MIN_WORKFLOWS workflows of this
 // ledger were cleared for a gone or disconnected terminal inside HOST_EVENT_WINDOW_MS before now is
@@ -2836,8 +2837,8 @@ function reconcileDeadWorker(ledger, args, job, repo) {
 // human. The watchdog runs it under --repair for every frontier deadWorkerJobs entry: a worker
 // whose agent exited to a bare shell, whose terminal disconnected or vanished, or that stayed quiet
 // past its provider's timeout after a nudge will never file its report, and before this each one
-// became a hand-written incident and four manual steps for the Kernel (inc-305adcb1d3c1,
-// inc-e6e2e0d274a9, inc-c6cf249ecd5a, inc-2ce87e0e7703 and 25 more on 2026-09-23). Effect evidence
+// became a hand-written incident and four manual steps for the Kernel (29 such
+// incidents in one day). Effect evidence
 // the owned paths bound (dirty files, commits, a checks row, a worker question, exhausted
 // infrastructure requeues) is what a retry continues from, so the attempt settles failed (reason
 // failed-no-report, reportFiled false: a business attempt spent, engine/admission.mjs
@@ -2991,7 +2992,7 @@ const repairTemplateOf = (db, job, ops) => {
 };
 /**
  * The job that owns the Work record a rootCause.node names when the node is a record id rather than `<op>#...`
- * (nivo wf-nivo-app-auth-mujek72s: uat.verify named impl.login.nivo-backend.session-custody five times and the
+ * (a nivo uat.verify named a record id of another repository five times and the
  * route re-ran the same UAT, never the owner of that record): the newest settled job of another op of the workflow
  * whose owned .starciwork record directory holds an index.yaml with that id. Null when none does.
  */
@@ -3167,8 +3168,8 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
     const targets = routeTargetOps(catalog, route, op);
     // A report that names its root cause outside itself (rootCause.self false) and that this workflow
     // cannot verify through a job of its own is never re-run blind: the same op on the same tree files
-    // the same partial (nivo collab op-backend.implement-bd2609ff17 -> a1dad730db, starci-next
-    // foundation f920334582 -> a89b597df5: an hour or more each, identical open items). A red the
+    // the same partial (nivo collab op-backend.implement-bd2609ff17 -> a1dad730db and another
+    // product's foundation f920334582 -> a89b597df5: an hour or more each, identical open items). A red the
     // report's own checks pin on a peer's change settles peer-blocked like api check's (no business
     // attempt, routes to the peer); any other foreign root waits for the Kernel to hand it to its owner.
     const foreignRoot = envelope?.rootCause && envelope.rootCause.self === false && shape.verdict !== 'rejected' && shape.verdict !== 'no-report';
@@ -3854,7 +3855,7 @@ function warnTypedLogGaps(ledger, logs, job) {
   const op = jobOpOf(job);
   const out = { code: LOG_TYPED_MISSING, level: 'warn', missing: gaps.missing, opRows: gaps.opRows };
   const prepared = prepareLogRow({ workflowId: job.workflow_id, jobId: job.job_id, actor: 'runtime', kind: 'warning', level: 'warn', src: `ltm:${job.job_id}`,
-    msg: `${LOG_TYPED_MISSING}: op không ghi đủ nhật ký có cấu trúc (${gaps.missing.slice(0, 3).join(', ')}${gaps.missing.length > 3 ? ', …' : ''})`,
+    msg: `${LOG_TYPED_MISSING}: ${translator(ownerLanguage())('the op did not write the structured log rows it owed ({missing})', { missing: `${gaps.missing.slice(0, 3).join(', ')}${gaps.missing.length > 3 ? ', …' : ''}` })}`,
     data: { code: LOG_TYPED_MISSING, message: `${op} attempt ${tryOf(job)} settled with ${gaps.opRows} op log row(s); missing ${gaps.missing.join('; ')}`.slice(0, 1500), missing: gaps.missing.slice(0, 40),
       hint: 'op prompt logging: block - api log step.start, step.end and cmd.run per check' } });
   if (prepared.row) insertLogRows(logs, [prepared.row]);
@@ -4053,7 +4054,7 @@ function handoverProofGate(db, job, repo) {
 // identity is report-invalid. --outcome is optional consistency: when given it
 // must equal the envelope's outcome.
 /**
- * RELEASE ON REPORT (owner 2026-09-28: "tức là kernel xong việc không tự đóng op à?"): once `api report` validated and
+ * RELEASE ON REPORT (owner 2026-09-28: "so when the kernel finishes its work it doesn't close the op itself?"): once `api report` validated and
  * filed an op's report, its worker has nothing left to do - the report and the evidence are in the ledger and files -
  * so the runtime closes it now instead of waiting for the Kernel's settle: the agent terminal is closed and verified
  * gone with its process tree (close-verify.mjs; from the op's own terminal a detached verifier does it after this

@@ -8,7 +8,7 @@
 //                       gates pass is answered by the runtime: a starci/ask-answer@1 receipt with answeredBy
 //                       `autopilot`, provisional:true and acceptance {provisional, by, receipt: <gate evidence>}.
 //                       The retried op applies it (draw-review.mjs / brand-direction.mjs apply) as a PROVISIONAL
-//                       acceptance: the node turns green-provisional ("tự nhận tạm"), downstream proceeds, it is
+//                       acceptance: the node turns green-provisional (PROVISIONAL_LABEL), downstream proceeds, it is
 //                       never promoted golden and never counts as an owner answer (owner-claim.mjs ownerAnswerProof
 //                       and brand.mjs findOwnerReceipt read answeredBy owner only). Failing gates answer redraw or
 //                       revise with the findings as the brief, at most redrawBudget times per record; past it the
@@ -26,7 +26,7 @@
 //                       supervisorExtraBudget gates per node group, then the leg is `deferred`; a gate older than
 //                       supervisorGateTimeoutMs defers what it holds. Deferred legs never block independent work.
 //   budgets             per workflow (attempts, tokens, wall time): past one, a supervisor-gate holds new dispatch.
-//   handover            handover.review stays the one owner gate: its ask carries the "sổ chờ thầy xem lại" bundle
+//   handover            handover.review stays the one owner gate: its ask carries the owner review ledger bundle
 //                       (autopilotBundle) - every provisional acceptance with its images, every deferred leg, every
 //                       deferred-to-handover proof, the autopilot decision log. An owner note on a provisional item
 //                       re-opens only that item (api autopilot --reopen, the owner's words from the verified
@@ -37,7 +37,8 @@ import fs from 'node:fs';
 import { loopFileOfRef, loopLabelOf } from '../work/draw/draw-loop-coverage.mjs';
 import { fileAskReceipt, stageReceipt } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
-import { allocationSettings } from '../../engine/config.mjs';
+import { allocationSettings, loadConfig } from '../../engine/config.mjs';
+import { translator } from '../lib/i18n.mjs';
 import { openIncident, updateIncident } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
@@ -57,7 +58,7 @@ export const AUTOPILOT_BY = 'autopilot';
 export const AUTOPILOT_RULING = 'autopilot-run-to-finish';
 export const SUPERVISOR_GATE = 'supervisor-gate';
 export const HANDOVER_CREDENTIALS_SUBJECT = 'handover-credentials';
-export const PROVISIONAL_LABEL = 'tự nhận tạm';
+export const PROVISIONAL_LABEL = 'self-accepted provisional';
 export const AUTOPILOT_EVENTS = Object.freeze({
   configured: 'autopilot-configured',
   provisional: 'autopilot-provisional',
@@ -82,6 +83,9 @@ const DAY = 86_400_000;
 
 const num = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : fallback);
 const slash = (p) => String(p ?? '').split(path.sep).join('/');
+// The owner's language (config.yaml `language`); owner-facing strings are English sources translated through
+// modules/i18n/messages (scripts/lib/i18n.mjs). Absent a config the historical Vietnamese stands.
+const ownerLanguage = () => { try { return loadConfig()?.language ?? 'vi'; } catch { return 'vi'; } };
 
 /* ------------------------------------------------------------------ settings */
 
@@ -421,7 +425,7 @@ export function provisionalOf(db, workflowId) {
       const images = list(q.review?.parts).map((p) => ({ path: p.path, sha256: p.sha256 ?? null, recordPath: q.review?.recordPath ?? null }))
         .concat(list(q.review?.golden).map((g) => ({ path: g.png, sha256: g.sha256 ?? null, recordPath: q.review?.recordPath ?? null })));
       return { dispatchId: e.dispatchId, opId: e.opId ?? null, jobId: e.jobId ?? null, class: e.class, record: e.record ?? null, receiptPath: e.receiptPath ?? null,
-        option: e.option ?? null, images, label: PROVISIONAL_LABEL, at: e.at };
+        option: e.option ?? null, images, label: translator(ownerLanguage())(PROVISIONAL_LABEL), at: e.at };
     });
 }
 
@@ -591,13 +595,13 @@ export function credentialChecklist(db, workflowId, { lang = 'vi' } = {}) {
   const approvals = items.filter((item) => item.deferClass !== 'credential');
   const files = [...new Set(creds.flatMap((item) => list(item.fields?.files)))];
   const vars = [...new Set(creds.flatMap((item) => list(item.fields?.vars)))];
-  const vi = lang === 'vi';
+  const tr = translator(lang);
   const lines = [
-    vi ? 'Bổ sung credential - bước duy nhất thầy cần làm trước khi các bước kiểm chứng trực tiếp (UAT/e2e) chạy lại tự động:' : 'Supply credentials - the one owner step before the deferred live proofs (UAT/e2e) resume automatically:',
+    tr('Supply credentials - the one owner step before the deferred live proofs (UAT/e2e) resume automatically:'),
     ...creds.map((item, i) => `${i + 1}. ${item.opId ?? 'provision.ask'} (${item.dispatchId ?? '-'}): ${[...list(item.fields?.files), ...list(item.fields?.vars)].join(', ')} — ${String(item.question ?? '').split('\n')[0].slice(0, 200)}`),
-    ...(approvals.length ? [vi ? 'Cũng chờ thầy quyết (được mở lại cùng lúc, mỗi mục một câu hỏi):' : 'Also waiting on the owner (re-opened at the same time, one question each):',
+    ...(approvals.length ? [tr('Also waiting on the owner (re-opened at the same time, one question each):'),
       ...approvals.map((item) => `- ${item.deferClass}: ${item.opId ?? '-'} (${item.dispatchId ?? '-'}) — ${String(item.question ?? item.reason ?? '').split('\n')[0].slice(0, 200)}`)] : []),
-    vi ? 'Giá trị chỉ nhập vào biểu mẫu này, được lưu mã hoá; không hiện trong chat, log hay tài liệu.' : 'Values go into this form only and are sealed into custody; they never appear in chat, logs or documents.',
+    tr('Values go into this form only and are sealed into custody; they never appear in chat, logs or documents.'),
     ...files.map((f) => `- ${f}`), ...vars.map((v) => `- ${v}`),
   ];
   return { items: items.length, credentials: creds.length, approvals: approvals.map((item) => item.dispatchId).filter(Boolean),
@@ -605,7 +609,7 @@ export function credentialChecklist(db, workflowId, { lang = 'vi' } = {}) {
     fields: { files, vars } };
 }
 
-/** The final review bundle ("sổ chờ thầy xem lại") the handover ask carries. */
+/** The final review bundle (the owner review ledger) the handover ask carries. */
 export function autopilotBundle(db, workflowId) {
   const decisions = [AUTOPILOT_EVENTS.provisional, AUTOPILOT_EVENTS.recommended, AUTOPILOT_EVENTS.redraw, AUTOPILOT_EVENTS.deferred, AUTOPILOT_EVENTS.deferredToHandover, AUTOPILOT_EVENTS.rerouted, AUTOPILOT_EVENTS.supplied, AUTOPILOT_EVENTS.budget, AUTOPILOT_EVENTS.decision]
     .flatMap((kind) => eventsOf(db, workflowId, kind).map((e) => ({ kind, seq: e.seq, at: new Date(Number(e.at)).toISOString(), by: e.by ?? AUTOPILOT_BY,
@@ -614,7 +618,7 @@ export function autopilotBundle(db, workflowId) {
   const provisional = provisionalOf(db, workflowId);
   const deferred = deferredLegsOf(db, workflowId);
   const deferredToHandover = deferredToHandoverOf(db, workflowId);
-  return { schema: 'starci/autopilot-bundle@1', title: 'sổ chờ thầy xem lại', workflowId, ruling: AUTOPILOT_RULING,
+  return { schema: 'starci/autopilot-bundle@1', title: translator(ownerLanguage())('the owner review ledger'), workflowId, ruling: AUTOPILOT_RULING,
     provisional, deferred, deferredToHandover, decisions, counts: { provisional: provisional.length, deferred: deferred.length, deferredToHandover: deferredToHandover.length, decisions: decisions.length } };
 }
 

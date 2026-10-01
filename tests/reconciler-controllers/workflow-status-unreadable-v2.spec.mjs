@@ -6,17 +6,17 @@ import { reconcileWorkflow, keyOf, SUPERVISOR_LEDGER } from '../../scripts/recon
 import { createCtx, statusFailureOf } from '../../scripts/reconciler/ctx.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/db/machine.mjs';
 
-// Follow-up of 11a66bc49 (job fix-workflow-status-unreadable-v2-201f00). Seen live 2026-09-29 13:25-13:33Z:
-// 1) the runtime-defect:<wf>:status-unreadable DI (decider supervisor) was opened in the PRODUCT ledger (nivo-backend
-//    di-8f93adc4), so `decisions.mjs supervisor --list` never showed it; it belongs in the supervisor ledger.
+// Follow-up of 11a66bc49. Seen live on a product repo:
+// 1) the runtime-defect:<wf>:status-unreadable DI (decider supervisor) was opened in the PRODUCT ledger,
+//    so `decisions.mjs supervisor --list` never showed it; it belongs in the supervisor ledger.
 // 2) ctx.status mapped every failed spawn to null: the finding said 'no value (api status timed out, exited non-zero or
-//    printed no JSON)'. The real cause: cli.mjs status REFUSED plan-edges-missing for wf-nivo-collab-mum8xsop and
-//    wf-nivo-module-studio-mum8xt5e - exit 1, its {ok:false,error} JSON on STDERR, stdout empty. The read now names it.
+//    printed no JSON)'. The real cause: cli.mjs status REFUSED plan-edges-missing on two product workflows -
+//    exit 1, its {ok:false,error} JSON on STDERR, stdout empty. The read now names it.
 
 const MIN = 60_000;
 const NOW = Date.now();
 const WF = 'wf-nivo-collab-mum8xsop';
-const LEDGER = 'nivo-backend';
+const LEDGER = 'todo-app-be';
 const REFUSAL = { ok: false, error: "plan-edges-missing: the plan's 12 leg(s) [request.analyze, scope.define] carry no provable dependency edges (absent, partial, naming an unknown leg or cyclic); a plan without edges is refused", code: 'plan-edges-missing' };
 const refusedSpawn = () => ({ ok: false, code: 1, value: null, stdout: '', stderr: `${JSON.stringify(REFUSAL)}\n`, timedOut: false });
 

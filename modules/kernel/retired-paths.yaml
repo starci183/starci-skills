@@ -186,6 +186,18 @@ retired:
   - {path: engine/db/migrations/runtime/0003-usage-unavailable.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/runtime/0001-init.sql: one schema file per database, no migration chain'}
   - {path: engine/db/migrations/runtime/0004-attempt-why.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/runtime/0001-init.sql: one schema file per database, no migration chain'}
   - {path: engine/db/migrations/runtime/0005-ended-workflow-views.sql, retiredAt: 2026-10-02, removedIn: db-fold, replacedBy: 'folded into engine/db/migrations/runtime/0001-init.sql: one schema file per database, no migration chain'}
+  - {path: scripts/supervisor/why-backfill.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: the why is computed on read (scripts/kernel/why.mjs); there is no backfill'}
+  - {path: scripts/work/migrate-ui-shapes.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: records are written on ui.shapes from the start; there is no migration'}
+  - {path: scripts/kernel/migrate-plan-edges.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'route-plan: a plan without edges is routed again'}
+  - {path: tests/kernel/migrate-plan-edges.spec.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'the spec of scripts/kernel/migrate-plan-edges.mjs, retired with it'}
+  - {path: scripts/kernel/repair-rejected-attempts.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: a refused launch ends its attempt in the refusal transaction; no older runtime leaves one open'}
+  - {path: tests/kernel/rejected-attempt-repair.spec.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'the spec of scripts/kernel/repair-rejected-attempts.mjs, retired with it'}
+  - {path: packages/grammar/academy-shot.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: a one-off screenshot script of an abandoned product repository'}
+  - {path: docs/design-pattern-source-review-20260916.md, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'docs/design-pattern-catalog.md owns the pattern list; the dated research note is gone'}
+  - {path: scripts/checks/host-boundary.allow, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: scripts/checks/check-host-boundary.mjs has no exemption list'}
+  - {path: ui/public/logos/qwen.png, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: Qwen is not a provider'}
+  - {path: ui/public/logos/starci-next-blue.png, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'ui/public/logos/starci-blue.png'}
+  - {path: modules/supervisor/push-scan-allow.yaml, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: scripts/supervisor/push-mains.mjs has no scan exemption; test credentials are generated per run or kept as .starcistacks sops twins'}
 moved:
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
   - {from: .experiments/OPENSOURCE-GOAL.md, to: docs/opensource-goal.md, movedIn: C0, quiesced: false}

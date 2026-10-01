@@ -51,7 +51,7 @@ export function mainCheckoutDamage(before, after) {
 const gone = (p) => !fs.existsSync(p) && (() => { try { fs.lstatSync(p); return false; } catch { return true; } })();
 
 /**
- * Remove a git worktree (the one algorithm; the 490-file .claude incident and nivo-fe inc-c8fbf76aa499):
+ * Remove a git worktree (the one algorithm; the 490-file .claude incident and a live checkout emptied through a junction):
  *   1. enumerate every link in it WITHOUT following one (linksUnder);
  *   2. remove each as a link (removeLink: `cmd /c rmdir <link>`, never /s), outermost first;
  *   3. re-scan the same way and refuse (link-stuck, nothing deleted) unless ZERO links remain;

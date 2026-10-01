@@ -29,7 +29,7 @@ import { jobScratchDirOf } from './op-prompt.mjs';
 import { safeRemoveTree } from '../api/fs/safe-remove.mjs';
 import { artifactHoldReason } from '../machine/artifact-hold.mjs';
 
-export { kindOf, mediaTypeOf as mimeOf };
+export { kindOf };
 export const ARTIFACTS_INDEXED = 'artifacts-indexed';
 export const PROOF_MEDIA_MISSING = 'PROOF_MEDIA_MISSING';
 /** The contract change that made visual proof mandatory (modules/kernel/contract-changes.yaml, reach new-legs). */

@@ -57,7 +57,7 @@ test("COMMENTS-4: no emoji in source", () => {
 })
 
 /** "han cuoi da qua" spelled with Vietnamese letters, precomposed (NFC), written as escapes so this file stays ASCII. */
-const VI_NFC = "hạn cuối đã qua"
+const VI_NFC = "h\u1ea1n cu\u1ed1i \u0111\u00e3 qua"
 /** The same text decomposed (NFD): base letters followed by combining marks. */
 const VI_NFD = VI_NFC.normalize("NFD")
 
@@ -75,7 +75,7 @@ test("COMMENTS-5: no Vietnamese anywhere in source, specs and test titles includ
       { filename: SRC, code: `const message = "${VI_NFD}"`, errors: [{ messageId: "vietnamese" }] },
       { filename: SRC, code: `const message = \`${VI_NFC} \${x}\``, errors: [{ messageId: "vietnamese" }] },
       { filename: SRC, code: `// ${VI_NFC}\nconst x = 1`, errors: [{ messageId: "vietnamese" }] },
-      { filename: SRC, code: `const ${"hạn"} = 1`, errors: [{ messageId: "vietnamese" }] },
+      { filename: SRC, code: `const ${"h\u1ea1n"} = 1`, errors: [{ messageId: "vietnamese" }] },
       { filename: SRC, code: `const E = () => <p>${VI_NFC}</p>`, errors: [{ messageId: "vietnamese" }] },
       // a spec is authoring: its test titles are English too
       { filename: at("apps/web/src/components/leaves/Text/index.spec.tsx"), code: `it("${VI_NFC}", () => {})`, errors: [{ messageId: "vietnamese" }] },

@@ -23,8 +23,8 @@
 //           of another job of the same workflow still open or settled after it is
 //           progress the Kernel planned, never drift. Otherwise only a COMMITTED
 //           revision counts (an in-flight rewrite never does), judged by the
-//           record's ONE owner workflow (work-ownership.mjs, owner 2026-09-25,
-//           starci-next inc-1c7f7dad53e0 - peers re-staling each other's shared
+//           record's ONE owner workflow (work-ownership.mjs, owner 2026-09-25 -
+//           peers re-staling each other's shared
 //           records in a redo ping-pong): a peer's change is advisory `peerDrift`
 //           unless the OWNER marked it breaking (its change note or `api
 //           record-change --reach follow-up`), which owes ONE follow-up leg

@@ -32,14 +32,14 @@ const tmp=(t,prefix)=>{const d=fs.mkdtempSync(path.join(os.tmpdir(),prefix));t.a
 /* ------------------------------------------------------------ key forms */
 
 test('trust keys use the exact forms Claude and Codex write on Windows',()=>{
-  assert.deepEqual(claudeKeyForms('d:\\Repositories\\starci-next','win32'),['D:/Repositories/starci-next','D:\\Repositories\\starci-next']);
-  assert.deepEqual(claudeKeyForms('D:/Repositories/starci-next','win32'),['D:/Repositories/starci-next','D:\\Repositories\\starci-next']);
-  assert.deepEqual(codexKeyForms('D:/Repositories/starci-next','win32'),['d:\\repositories\\starci-next','D:\\Repositories\\starci-next']);
+  assert.deepEqual(claudeKeyForms('d:\\Repositories\\ecommerce-app','win32'),['D:/Repositories/ecommerce-app','D:\\Repositories\\ecommerce-app']);
+  assert.deepEqual(claudeKeyForms('D:/Repositories/ecommerce-app','win32'),['D:/Repositories/ecommerce-app','D:\\Repositories\\ecommerce-app']);
+  assert.deepEqual(codexKeyForms('D:/Repositories/ecommerce-app','win32'),['d:\\repositories\\ecommerce-app','D:\\Repositories\\ecommerce-app']);
   assert.deepEqual(codexKeyForms('d:\\lower\\only','win32'),['d:\\lower\\only','D:\\lower\\only'],'distinct strings, so never a duplicate table');
   assert.deepEqual(claudeKeyForms('/home/me/repo','linux'),['/home/me/repo']);
   assert.deepEqual(codexKeyForms('/home/me/repo','linux'),['/home/me/repo']);
-  assert.equal(codexHeader('d:\\repositories\\starci-next'),"[projects.'d:\\repositories\\starci-next']");
-  assert.equal(codexHeader('D:\\Repositories\\starci-next'),'[projects."D:\\\\Repositories\\\\starci-next"]');
+  assert.equal(codexHeader('d:\\repositories\\ecommerce-app'),"[projects.'d:\\repositories\\ecommerce-app']");
+  assert.equal(codexHeader('D:\\Repositories\\ecommerce-app'),'[projects."D:\\\\Repositories\\\\ecommerce-app"]');
   assert.equal(codexHeader('/home/me/repo'),'[projects."/home/me/repo"]');
 });
 
@@ -57,23 +57,23 @@ test('Orca CODEX_HOME resolves from the platform userData dir, and a test proces
 /* ------------------------------------------------------- claude writer */
 
 const CLAUDE_FIXTURE={numStartups:5,installMethod:'global',tipsHistory:{x:3},hasCompletedOnboarding:true,
-  projects:{'D:/Repositories/nivo-backend':{allowedTools:[],hasTrustDialogAccepted:true,lastCost:32.96738740000001},
-    'D:\\Repositories\\starci-next':{allowedTools:['Bash'],hasTrustDialogAccepted:false,lastSessionId:'abc'}},
+  projects:{'D:/Repositories/todo-app-be':{allowedTools:[],hasTrustDialogAccepted:true,lastCost:32.96738740000001},
+    'D:\\Repositories\\ecommerce-app':{allowedTools:['Bash'],hasTrustDialogAccepted:false,lastSessionId:'abc'}},
   userID:'9007199254740993123'};
 
 test('Claude trust sets hasTrustDialogAccepted in both key forms, keeps every other field, and is idempotent',t=>{
   const dir=tmp(t,'starci-trust-claude-');const file=path.join(dir,'.claude.json');
   const original=JSON.stringify(CLAUDE_FIXTURE,null,2);fs.writeFileSync(file,original);
-  const keys=claudeKeyForms('D:\\Repositories\\starci-next','win32');
+  const keys=claudeKeyForms('D:\\Repositories\\ecommerce-app','win32');
   const first=writeClaudeTrust({file,keys});
   assert.equal(first.ok,true,first.error);
   assert.deepEqual(first.written,keys,'the untrusted backslash key is upgraded, the forward-slash key is added');
   const doc=JSON.parse(fs.readFileSync(file,'utf8'));
-  assert.equal(doc.projects['D:\\Repositories\\starci-next'].hasTrustDialogAccepted,true);
-  assert.equal(doc.projects['D:/Repositories/starci-next'].hasTrustDialogAccepted,true);
-  assert.deepEqual(doc.projects['D:\\Repositories\\starci-next'],{...CLAUDE_FIXTURE.projects['D:\\Repositories\\starci-next'],hasTrustDialogAccepted:true},
+  assert.equal(doc.projects['D:\\Repositories\\ecommerce-app'].hasTrustDialogAccepted,true);
+  assert.equal(doc.projects['D:/Repositories/ecommerce-app'].hasTrustDialogAccepted,true);
+  assert.deepEqual(doc.projects['D:\\Repositories\\ecommerce-app'],{...CLAUDE_FIXTURE.projects['D:\\Repositories\\ecommerce-app'],hasTrustDialogAccepted:true},
     'an existing project keeps its fields and key order');
-  const rest=structuredClone(doc);delete rest.projects['D:/Repositories/starci-next'];rest.projects['D:\\Repositories\\starci-next'].hasTrustDialogAccepted=false;
+  const rest=structuredClone(doc);delete rest.projects['D:/Repositories/ecommerce-app'];rest.projects['D:\\Repositories\\ecommerce-app'].hasTrustDialogAccepted=false;
   assert.equal(JSON.stringify(rest,null,2),original,'nothing else changed, byte for byte');
   const bytes=fs.readFileSync(file,'utf8');
   const again=writeClaudeTrust({file,keys});

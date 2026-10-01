@@ -21,9 +21,9 @@ const ajv = new Ajv2020({ strict: false, allErrors: true, logger: false });
 const validateManifestSchema = ajv.compile(readSchema('hfs-slots.schema.yaml'));
 const validateRepoSchema = ajv.compile(readSchema('hfs-repo.schema.yaml'));
 
-const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'agentos', envPrefix: 'AGENTOS_DB' }] };
+const BE_SIDE = { apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }, { name: 'secondary', envPrefix: 'SECONDARY_DB' }] };
 const FE_SIDE = { apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }], optionalSlots: ['repo.packages', 'fe.package.ui'], reads: ['be/contracts/'] };
-const app = ({ be = BE_SIDE, fe = FE_SIDE, ...rest } = {}) => ({ hfs: 2, kind: 'app', project: 'nivo', sides: { be, fe }, ...rest });
+const app = ({ be = BE_SIDE, fe = FE_SIDE, ...rest } = {}) => ({ hfs: 2, kind: 'app', project: 'my-app', sides: { be, fe }, ...rest });
 const APP = app();
 
 const refusal = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code, `expected ${code}`);
@@ -77,15 +77,15 @@ test('hfs.json: schema and loader agree', () => {
   const manifest = loadSlotManifest();
   const bad = {
     'missing hfs': { ...APP, hfs: undefined },
-    'a standalone back end (profile)': { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }] },
+    'a standalone back end (profile)': { hfs: 2, profile: 'be', project: 'my-app', apps: [{ name: 'core', kind: 'api' }] },
     'kind other than app': { ...APP, kind: 'be' },
     'one side only': { ...APP, sides: { be: BE_SIDE } },
     'fe with connections': app({ fe: { ...FE_SIDE, connections: [{ name: 'primary', envPrefix: 'PRIMARY_DB' }] } }),
     'connection as a bare string': app({ be: { ...BE_SIDE, connections: ['primary'] } }),
     'no apps on a side': app({ fe: { apps: [] } }),
     'unknown key': { ...APP, owners: ['x'] },
-    'unknown side key': app({ be: { ...BE_SIDE, stacks: '../nivo-backend' } }),
-    'bad project name': { ...APP, project: 'Nivo Backend' },
+    'unknown side key': app({ be: { ...BE_SIDE, stacks: '../todo-app-be' } }),
+    'bad project name': { ...APP, project: 'My App' },
   };
   for (const [name, declaration] of Object.entries(bad)) {
     assert.equal(validateRepoSchema(JSON.parse(JSON.stringify(declaration))), false, `schema accepted: ${name}`);
@@ -126,7 +126,7 @@ test('readRepoDeclaration reads the app hfs.json at the app root, the side view 
   const manifest = loadSlotManifest();
   refusal(() => readRepoDeclaration(manifest, dir), 'HFS_DECLARATION_INVALID');
   fs.writeFileSync(path.join(dir, 'hfs.json'), JSON.stringify(APP));
-  assert.equal(readRepoDeclaration(manifest, dir).project, 'nivo');
+  assert.equal(readRepoDeclaration(manifest, dir).project, 'my-app');
   assert.equal(openHfs({ repoRoot: dir }).repo.profile, 'app');
   for (const side of ['be', 'fe']) {
     fs.mkdirSync(path.join(dir, side));
@@ -306,7 +306,7 @@ test('FE side with two apps', () => {
   assert.equal(owner('apps/web/src/modules/i18n/messages/en.json'), 'fe.modules.i18n');
   assert.equal(owner('apps/web/src/modules/brand/brand.css'), 'fe.modules.brand');
   assert.equal(owner('apps/web/src/modules/cart/index.ts'), 'fe.modules');
-  assert.equal(owner('packages/nivo-ui/src/index.ts'), 'fe.package.ui');
+  assert.equal(owner('packages/app-ui/src/index.ts'), 'fe.package.ui');
   assert.equal(fe.classifyPath('e2e/checkout/pay.e2e-spec.ts').status, 'no-slot', 'the fe side has no e2e slot');
   assert.equal(owner('apps/web/Dockerfile'), 'repo.app-image');
   assert.equal(fe.classifyPath('src/index.ts').status, 'no-slot');                              // the fe side has no root src/
@@ -349,10 +349,10 @@ test('FE side with two apps', () => {
   assert.equal(ok('apps/web/src/hooks/orders/useOrders.ts', 'apps/web/src/hooks/cart/useCart.ts').reason, 'notPublicEntry');
   assert.equal(ok('apps/web/src/hooks/orders/useOrders.ts', 'apps/web/src/hooks/orders/useOrderList.ts').reason, 'sameOwner');
   assert.equal(ok('apps/web/src/modules/config/index.ts', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');
-  assert.equal(ok('apps/web/src/features/pages/Home/index.tsx', 'packages/nivo-ui/src/index.ts').allowed, true);
-  assert.equal(ok('packages/nivo-ui/src/button.ts', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');
+  assert.equal(ok('apps/web/src/features/pages/Home/index.tsx', 'packages/app-ui/src/index.ts').allowed, true);
+  assert.equal(ok('packages/app-ui/src/button.ts', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');
   assert.equal(fe.slotEnabled(fe.slot('fe.package.ui')), true);
-  assert.equal(sideOf(app({ fe: { ...FE_SIDE, optionalSlots: [] } }), 'fe').classifyPath('packages/nivo-ui/src/index.ts').status, 'not-enabled');
+  assert.equal(sideOf(app({ fe: { ...FE_SIDE, optionalSlots: [] } }), 'fe').classifyPath('packages/app-ui/src/index.ts').status, 'not-enabled');
 });
 
 test('classification reports the folder kind and the role of a file from the slot manifest', () => {
@@ -364,9 +364,9 @@ test('classification reports the folder kind and the role of a file from the slo
   assert.equal(at('apps/web/src/components/blocks/leaves/index.tsx').kind, 'blocks', 'a component named like a layer is still in its own layer');
   assert.equal(at('apps/web/src/features/overlays/Cart/classNames.ts').kind, 'overlays');
   assert.equal(at('apps/web/src/features/overlays/Cart/classNames.ts').role, 'styles');
-  assert.equal(at('packages/nivo-ui/src/leaves/X/index.tsx').kind, 'leaves');
-  assert.equal(at('packages/nivo-ui/src/leaves/X/index.tsx').role, 'entry');
-  assert.equal(at('packages/nivo-ui/src/index.ts').kind, undefined);
+  assert.equal(at('packages/app-ui/src/leaves/X/index.tsx').kind, 'leaves');
+  assert.equal(at('packages/app-ui/src/leaves/X/index.tsx').role, 'entry');
+  assert.equal(at('packages/app-ui/src/index.ts').kind, undefined);
   assert.equal(at('apps/web/src/modules/components/x.ts').kind, undefined, 'a folder named components inside a module is not a component layer');
   assert.equal(at('apps/web/src/hooks/orders/orders.shared.ts').role, 'shared');
   assert.equal(at('apps/web/src/hooks/orders/index.ts').role, 'entry');
@@ -511,10 +511,10 @@ test('ruleParams: the parameters the canon lint lanes read, per side', () => {
   const feHfs = sideOf(app({ fe: { ...FE_SIDE, optionalSlots: ['repo.packages', 'fe.package.ui', 'fe.package.api', 'fe.package.i18n'] } }), 'fe');
   assert.equal(feHfs.classifyPath('apps/web/src/modules/api/client.ts').slot, 'fe.transport.client');
   assert.equal(feHfs.classifyPath('apps/web/src/modules/api/outcome.ts').slot, 'fe.transport.outcome');
-  assert.equal(feHfs.classifyPath('packages/nivo-api/src/client.ts').slot, 'fe.package.api.client');
-  assert.equal(feHfs.classifyPath('packages/nivo-api/src/outcome.ts').slot, 'fe.package.api.outcome');
-  assert.equal(feHfs.classifyPath('packages/nivo-api/src/graphql.ts').slot, 'fe.package.api');
-  assert.equal(feHfs.classifyPath('packages/nivo-i18n/src/app.ts').slot, 'fe.package.i18n');
+  assert.equal(feHfs.classifyPath('packages/app-api/src/client.ts').slot, 'fe.package.api.client');
+  assert.equal(feHfs.classifyPath('packages/app-api/src/outcome.ts').slot, 'fe.package.api.outcome');
+  assert.equal(feHfs.classifyPath('packages/app-api/src/graphql.ts').slot, 'fe.package.api');
+  assert.equal(feHfs.classifyPath('packages/app-i18n/src/app.ts').slot, 'fe.package.i18n');
   // schema and loader agree that ruleParams is required and closed
   for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.duplicateBlock; }, (d) => { delete d.ruleParams.be.duplicateBlock; }, (d) => { d.ruleParams.fe.duplicateBlock = { lines: 1, tokens: 60 }; }, (d) => { d.ruleParams.be.duplicateBlockLines = 25; }]) {
     const doc = parseYaml(manifestText); mutate(doc);

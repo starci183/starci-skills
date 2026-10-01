@@ -1,9 +1,9 @@
 // guard-hooks-tracked.spec.mjs — the history hook installs in a linked worktree of a husky repo.
 //
-// nivo-fe, wf-nivo-collab-mum8xsop: core.hooksPath is husky's relative `.husky/_`, which git resolves per checkout.
+// Live defect: core.hooksPath is husky's relative `.husky/_`, which git resolves per checkout.
 // husky generates that directory (with its own `.gitignore` of `*`) only in the checkout `npm install` ran in, so an
 // op's linked worktree under .starciwork/worktrees had none, and ensureHistoryHook refused with hooks-dir-tracked:
-// every nivo-fe dispatch ran without the reference-transaction guard. An absent, untracked hooks dir now gets husky's
+// every product dispatch ran without the reference-transaction guard. An absent, untracked hooks dir now gets husky's
 // own self-ignoring layout; a hooks dir the product really tracks stays refused.
 import test from 'node:test';
 import assert from 'node:assert/strict';

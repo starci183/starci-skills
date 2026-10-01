@@ -55,7 +55,7 @@ export default {
   }
   const legSplit = splitGoalLegParams(brief, goalLegOf(goal, args.op));
   const kernelFlag = Object.keys(legSplit.kernel).length || flagParams ? { ...legSplit.kernel, ...(flagParams ?? {}) } : null;
-  // Autopilot (owner ruling 2026-09-28 "hạn chế provision ask"): no provision.ask leg opens mid-flow - the code
+  // Autopilot (owner ruling 2026-09-28 "limit provision asks"): no provision.ask leg opens mid-flow - the code
   // proceeds on sandbox/stub/mocks and every credential or approval need is recorded deferred-to-handover
   // (api autopilot --defer-to-handover). The one provision.ask is the end-of-flow credential checklist (params.subject
   // handover-credentials); a retry of an ask the owner already answered (--retry-of) still runs.

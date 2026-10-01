@@ -10,11 +10,18 @@
 // (modules/ops/_labels.yaml) and the phrase-list keys of the Vietnamese lexicons (modules/goal/archetypes.yaml). The byte copies under a bundle's runtime/ directory (packages/*/runtime) are checked against
 // their sources by `sync-runtime.mjs --check`, so they are skipped here. A product repository's message catalogs are JSON or
 // TypeScript, which this check does not read.
+//
+// Source is English too (HFS_SOURCE_NOT_ENGLISH): every comment, string and SQL comment of scripts/, engine/, bin/, ui/,
+// packages/ and tests/ (`.mjs .cjs .js .ts .tsx .sql .ps1 .sh .html .css`). Text the owner must read in Vietnamese lives in a
+// DECLARED catalog instead, keyed from its English source: scripts/lib/i18n.mjs reads modules/i18n/messages/*.yaml, and the UI
+// catalog files under ui/src/i18n/ are declared in DECLARED_SOURCE_CATALOGS. Files not converted yet are listed in
+// scripts/checks/source-language.pending (shrink-only: an entry whose file is clean or gone is stale and fails, a file that
+// carries Vietnamese and is not listed fails). A new undeclared Vietnamese line therefore fails.
 // Exit 0 clean, 1 findings.
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { documentLanguageHits, isDocument } from '../lib/language.mjs';
+import { documentLanguageHits, isDocument, secondLanguageHits } from '../lib/language.mjs';
 import { BUNDLES } from '../hfs/sync-runtime.mjs';
 import { isMain } from '../lib/is-main.mjs';
 import { gitResult } from '../api/git/lib.mjs';
@@ -45,13 +52,66 @@ export function runtimeDocuments(root = skillRoot) {
   return out;
 }
 
+/** The source folders whose code files are read, and the file kinds. */
+export const RUNTIME_SOURCE_ROOTS = Object.freeze(['scripts', 'engine', 'bin', 'ui', 'packages', 'tests']);
+export const SOURCE_EXTENSIONS = Object.freeze(['.mjs', '.cjs', '.js', '.ts', '.tsx', '.sql', '.ps1', '.sh', '.html', '.css']);
+/** Source that IS declared Vietnamese: the UI catalog directory (ui/src/i18n/t.ts reads ui/src/i18n/messages/*.ts, keyed from the English source) and the Vietnamese-letter detector itself. */
+export const DECLARED_SOURCE_CATALOGS = Object.freeze(['ui/src/i18n/', 'scripts/lib/language.mjs']);
+/** A bundle's own runtime/ copy directory (a byte copy of a runtime source, kept by sync-runtime). */
+const BUNDLE_RUNTIME = /^packages\/(?:[^/]+|eslint\/[^/]+)\/runtime(?:\/|$)/;
+export const SOURCE_PENDING_FILE = 'scripts/checks/source-language.pending';
+
+/** The pending list: one repository-relative path per line (`#` lines and blanks skipped). */
+export function readSourcePending(root = skillRoot) {
+  try {
+    return new Set(fs.readFileSync(path.join(root, SOURCE_PENDING_FILE), 'utf8').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#')));
+  } catch { return new Set(); }
+}
+
+/** The tracked source files of a runtime checkout (repository-relative POSIX paths). */
+export function runtimeSourceFiles(root = skillRoot) {
+  const bundles = new Set(Object.keys(BUNDLES));
+  const listed = gitResult(['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: root });
+  const inRepository = listed.ok ? new Set(listed.stdout.split('\0').filter(Boolean)) : null;
+  const out = [];
+  const walk = (rel) => {
+    const abs = path.join(root, ...rel.split('/'));
+    if (!fs.existsSync(abs) || bundles.has(rel) || BUNDLE_RUNTIME.test(rel)) return;
+    if (fs.statSync(abs).isDirectory()) {
+      for (const name of fs.readdirSync(abs).sort()) if (!SKIPPED_DIRECTORIES.has(name)) walk(`${rel}/${name}`);
+    } else if (SOURCE_EXTENSIONS.includes(path.posix.extname(rel)) && (!inRepository || inRepository.has(rel))) out.push(rel);
+  };
+  for (const name of RUNTIME_SOURCE_ROOTS) walk(name);
+  return out;
+}
+
+/**
+ * The source-language findings: HFS_SOURCE_NOT_ENGLISH for a file with a Vietnamese letter that is neither a declared catalog
+ * nor pending, and HFS_SOURCE_PENDING_STALE for a pending entry whose file is clean, declared or missing.
+ */
+export function sourceLanguageFindings(root = skillRoot) {
+  const pending = readSourcePending(root);
+  const dirty = new Map();
+  for (const rel of runtimeSourceFiles(root)) {
+    if (DECLARED_SOURCE_CATALOGS.some((prefix) => rel.startsWith(prefix))) continue;
+    const hits = secondLanguageHits(fs.readFileSync(path.join(root, ...rel.split('/')), 'utf8'));
+    if (hits.length) dirty.set(rel, hits);
+  }
+  const findings = [];
+  for (const [rel, hits] of dirty) {
+    if (!pending.has(rel)) findings.push({ code: 'HFS_SOURCE_NOT_ENGLISH', path: rel, line: hits[0].line, column: hits[0].column, count: hits.length });
+  }
+  for (const rel of pending) if (!dirty.has(rel)) findings.push({ code: 'HFS_SOURCE_PENDING_STALE', path: rel, line: 1, column: 1, count: 0 });
+  return findings;
+}
+
 /** Every Vietnamese hit of the runtime's documents: `[{ path, line, column }]`. */
 export function docLanguageFindings(root = skillRoot) {
   return runtimeDocuments(root).flatMap((rel) => documentLanguageHits(rel, fs.readFileSync(path.join(root, ...rel.split('/')), 'utf8')).map((hit) => ({ code: 'HFS_DOC_NOT_ENGLISH', path: rel, ...hit })));
 }
 
 if (isMain(import.meta.url)) {
-  const findings = docLanguageFindings();
+  const findings = [...docLanguageFindings(), ...sourceLanguageFindings()];
   if (process.argv.includes('--json')) console.log(JSON.stringify(findings, null, 2));
   else {
     for (const f of findings) console.error(`${f.code} ${f.path}:${f.line}:${f.column} carries a Vietnamese letter; documents are English (only the declared fields of scripts/lib/language.mjs are exempt)`);

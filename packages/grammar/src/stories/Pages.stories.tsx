@@ -79,7 +79,7 @@ const SettingsFormPage = () => {
               </G.SurfaceCard>
               <G.SurfaceCard label="Preferences" headingLevel={2}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <G.Select name="language" label="Language" options={[{ id: 'en', label: 'English' }, { id: 'vi', label: 'Tiếng Việt' }, { id: 'fr', label: 'Français' }]} defaultValue="en" />
+                  <G.Select name="language" label="Language" options={[{ id: 'en', label: 'English' }, { id: 'vi', label: 'Ti\u1ebfng Vi\u1ec7t' }, { id: 'fr', label: 'Français' }]} defaultValue="en" />
                   <G.SegmentedControl name="theme" label="Appearance" options={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} defaultValue="system" />
                   <G.RadioGroup name="digest" label="Email digest" orientation="horizontal" options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'never', label: 'Never' }]} defaultValue="weekly" />
                   <G.Switch name="reminders" label="Study reminders" defaultSelected />

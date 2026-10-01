@@ -105,7 +105,7 @@ test('frontend role roots cannot overlap: tier directories directly under a sour
   assert.ok(overlapping.errors.some(item=>item.ruleId==='ARCH_CONFIG_INVALID'&&/must be disjoint/.test(item.message)),JSON.stringify(overlapping));
 });
 
-// Supervisor ruling, nivo wf-nivo-fe-debt-mug06w7h inc-2e42a24b74e4: Next.js loads middleware,
+// Supervisor ruling: Next.js loads middleware,
 // instrumentation and instrumentation-client (and next-env.d.ts) only from the source root, so those exact
 // names are framework adapters there - listed in knowledge, kept thin, and nothing else joins them.
 test('framework-pinned root files are read from knowledge FE-FOLDER-1, exact and nonempty',t=>{
@@ -158,6 +158,6 @@ test('only the exact pinned names directly in the source root are accepted; ever
   for(const refused of ['apps/web/src/middleware/standalone-self-proxy.ts','apps/web/src/i18n/request.ts','apps/web/src/config.ts','apps/web/src/instrumentation.tsx','apps/web/src/server.ts','apps/web/src/lib/middleware.ts'])
     assert.ok(layout.has(refused),`${refused}: ${JSON.stringify([...layout])}`);
   assert.equal(layout.has('apps/web/src/middleware.ts'),false);
-  assert.equal(layout.has('apps/web/src/proxy.ts'),false,'proxy.ts is the Next 16 name of middleware (nivo inc-846867b9a34e)');
+  assert.equal(layout.has('apps/web/src/proxy.ts'),false,'proxy.ts is the Next 16 name of middleware');
   assert.equal(layout.has('apps/web/src/app/instrumentation.ts'),false,'a file under app/ is a route-root file, judged as before');
 });

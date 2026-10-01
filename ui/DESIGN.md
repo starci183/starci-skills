@@ -1,6 +1,6 @@
 # StarCi Operations Center — visual language
 
-The interface is a read-only operations product. It keeps the operational story visible and gives technical detail a consistent home in its "Advanced" section (Vietnamese label). HeroUI v3 supplies the interactive primitives (Button, Card, Chip, Input, ProgressBar, Modal and Table); the shared `components/ui` adapters keep the product's density and semantic status system. The blue logo in `public/logos/starci-next-blue.png` is based on the StarCiNext mark. The visual direction reference is `D:/starci-tmp/hfs/f4-handover/ui-purify/visual-direction.png`; its example data is illustrative only.
+The interface is a read-only operations product. It keeps the operational story visible and gives technical detail a consistent home in its "Advanced" section (Vietnamese label). HeroUI v3 supplies the interactive primitives (Button, Card, Chip, Input, ProgressBar, Modal and Table); the shared `components/ui` adapters keep the product's density and semantic status system. The blue logo in `public/logos/starci-blue.png` is based on the StarCiNext mark. The visual direction reference is `D:/starci-tmp/hfs/f4-handover/ui-purify/visual-direction.png`; its example data is illustrative only.
 
 ## Tokens
 

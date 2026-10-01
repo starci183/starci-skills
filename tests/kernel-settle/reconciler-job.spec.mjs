@@ -28,7 +28,7 @@ function fixture({ status = 'running', payload = {}, report = null, handover = n
   ledger.db.prepare("INSERT INTO workflows(workflow_id,trace_id,phase,created_at,updated_at) VALUES('wf-x',?,'running',?,?)").run(sha('wf-x', 32), NOW, NOW);
   ledger.db.prepare("INSERT INTO work_units(workflow_id,unit_id,op_id,subject_key,goal_revision,state,current_job_id,tries,created_at,updated_at) VALUES('wf-x','op-a','code.refactor','op-a',0,'queued','op-a',1,?,?)").run(at, at);
   ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,unit_id,op_id,try_no,generation,kind,payload_json,status,worker_id,created_at,updated_at) VALUES('op-a','wf-x','op-a','code.refactor',1,0,'op',?,?,'term_1',?,?)")
-    .run(JSON.stringify({ owned_paths: ['nivo-fe/src/a'], params: { canonFamilies: 'all' }, cut: { id: 'c', ordinal: 2, total: 5 }, ...payload }), needsAttempt ? 'leased' : status, at, at);
+    .run(JSON.stringify({ owned_paths: ['todo-app-fe/src/a'], params: { canonFamilies: 'all' }, cut: { id: 'c', ordinal: 2, total: 5 }, ...payload }), needsAttempt ? 'leased' : status, at, at);
   if (needsAttempt) {
     const settled = ['succeeded', 'failed'].includes(status) ? at : null;
     const { lastInsertRowid: attemptId } = ledger.db.prepare(`INSERT INTO op_attempts(workflow_id,job_id,unit_id,op_id,try_no,dispatch_seq,dispatch_id,span_id,
@@ -51,12 +51,12 @@ function fixture({ status = 'running', payload = {}, report = null, handover = n
   const db = new DatabaseSync(file, { readOnly: true });
   return { dir, file, db, close: () => { try { db.close(); } catch { /* closed */ } fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); } };
 }
-const ledgers = (fx) => [{ ledgerId: 'nivo-backend', repo: 'D:/Repositories/nivo-backend', file: fx.file }];
-const ctxFor = (fx, over = {}) => fakeCtx({ controller: 'job', now: () => NOW, ledgers: ledgers(fx), dbs: { 'nivo-backend': fx.db }, ...over });
+const ledgers = (fx) => [{ ledgerId: 'todo-app-be', repo: 'D:/Repositories/todo-app-be', file: fx.file }];
+const ctxFor = (fx, over = {}) => fakeCtx({ controller: 'job', now: () => NOW, ledgers: ledgers(fx), dbs: { 'todo-app-be': fx.db }, ...over });
 
 test('keys parse and route', () => {
-  assert.deepEqual(parseKey('job:nivo-backend:op-a'), { type: 'job', ledgerId: 'nivo-backend', id: 'op-a' });
-  assert.deepEqual(parseKey('wf:nivo-backend:wf-x'), { type: 'wf', ledgerId: 'nivo-backend', id: 'wf-x' });
+  assert.deepEqual(parseKey('job:todo-app-be:op-a'), { type: 'job', ledgerId: 'todo-app-be', id: 'op-a' });
+  assert.deepEqual(parseKey('wf:todo-app-be:wf-x'), { type: 'wf', ledgerId: 'todo-app-be', id: 'wf-x' });
   assert.equal(parseKey('workers:supervisor').type, 'workers');
   assert.equal(parseKey('nonsense'), null);
   assert.deepEqual(job.routes['op-reported']({ ledgerId: 'n', entityType: 'job', entityId: 'op-a', workflowId: 'wf-x' }), ['job:n:op-a', 'wf:n:wf-x']);
@@ -69,12 +69,12 @@ test('a green done report -> exactly one settler run for the job (a would-row in
   const fx = fixture({ report: { outcome: 'done' } });
   try {
     const ctx = ctxFor(fx);
-    const r = await job.reconcile('job:nivo-backend:op-a', ctx);
+    const r = await job.reconcile('job:todo-app-be:op-a', ctx);
     assert.equal(r.action, 'settle'); assert.equal(r.shadow, true);
     assert.equal(ctx.calls.run.length, 1);
-    assert.deepEqual(ctx.calls.run[0].args, [SETTLER_SCRIPT, '--repo', 'D:/Repositories/nivo-backend', '--job', 'op-a', '--json']);
+    assert.deepEqual(ctx.calls.run[0].args, [SETTLER_SCRIPT, '--repo', 'D:/Repositories/todo-app-be', '--job', 'op-a', '--json']);
     assert.equal(ctx.calls.api.length, 0);
-    assert.ok(ctx.calls.clock.some((c) => c.state === 'SETTLE_OVERDUE' && c.entity === 'job:nivo-backend:op-a'));
+    assert.ok(ctx.calls.clock.some((c) => c.state === 'SETTLE_OVERDUE' && c.entity === 'job:todo-app-be:op-a'));
   } finally { fx.close(); }
 });
 
@@ -82,8 +82,8 @@ test('a red report handed to the Kernel -> one settle-nongreen DI, the same key 
   const fx = fixture({ report: { outcome: 'done' }, handover: { reason: 'cut-postcondition-red' } });
   try {
     const ctx = ctxFor(fx);
-    await job.reconcile('job:nivo-backend:op-a', ctx);
-    await job.reconcile('job:nivo-backend:op-a', ctx);
+    await job.reconcile('job:todo-app-be:op-a', ctx);
+    await job.reconcile('job:todo-app-be:op-a', ctx);
     assert.equal(ctx.calls.decisions.length, 2);
     assert.equal(new Set(ctx.calls.decisions.map((d) => d.idempotencyKey)).size, 1, 'one idempotency key per report: the DI verb dedupes');
     const di = ctx.calls.decisions[0];
@@ -97,10 +97,10 @@ test('a dead worker -> api reconcile --dead-worker --settle-failed; a held one -
   const fx = fixture({ report: null });
   try {
     const dead = ctxFor(fx, { status: () => ({ frontier: { deadWorkerJobs: ['op-a'] } }) });
-    await job.reconcile('job:nivo-backend:op-a', dead);
+    await job.reconcile('job:todo-app-be:op-a', dead);
     assert.deepEqual(dead.calls.api.map((c) => [c.verb, ...c.argv]), [['reconcile', '--job', 'op-a', '--dead-worker', '--settle-failed']]);
     const held = ctxFor(fx, { status: () => ({ frontier: { heldWorkerJobs: ['op-a'] } }) });
-    await job.reconcile('job:nivo-backend:op-a', held);
+    await job.reconcile('job:todo-app-be:op-a', held);
     assert.deepEqual(held.calls.api.map((c) => [c.verb, ...c.argv]), [['reconcile', '--job', 'op-a', '--release-worker']]);
   } finally { fx.close(); }
 });
@@ -109,7 +109,7 @@ test('active but not owning the concern -> nothing acts', async () => {
   const fx = fixture({ report: { outcome: 'done' } });
   try {
     const ctx = ctxFor(fx, { mode: 'active', owns: () => false });
-    const r = await job.reconcile('job:nivo-backend:op-a', ctx);
+    const r = await job.reconcile('job:todo-app-be:op-a', ctx);
     assert.equal(r.action, 'not-owned'); assert.equal(ctx.calls.run.length, 0);
   } finally { fx.close(); }
 });
@@ -118,7 +118,7 @@ test('a settled job with a live terminal -> the settler closes it; in active a l
   const fx = fixture({ status: 'succeeded', updatedAgoMs: 60_000 });
   try {
     const ctx = ctxFor(fx);
-    const r = await job.reconcile('job:nivo-backend:op-a', ctx);
+    const r = await job.reconcile('job:todo-app-be:op-a', ctx);
     assert.equal(r.action, 'close-verify');
     assert.deepEqual(ctx.calls.run[0].args.slice(0, 1), [SETTLER_SCRIPT]);
     assert.ok(ctx.calls.clock.some((c) => c.state === 'WORKER_RELEASE_LEAK'));
@@ -126,7 +126,7 @@ test('a settled job with a live terminal -> the settler closes it; in active a l
     const active = ctxFor(fx, { mode: 'active', env: { ...process.env, LOCALAPPDATA: home },
       runResult: () => ({ ok: true, value: { ok: true, results: [{ released: [{ jobId: 'op-a', state: 'released', closedNow: true }] }] } }) });
     try {
-      const a = await job.reconcile('job:nivo-backend:op-a', active);
+      const a = await job.reconcile('job:todo-app-be:op-a', active);
       assert.equal(a.closedNow, 1);
     } finally { fs.rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); }
   } finally { fx.close(); }
@@ -136,7 +136,7 @@ test('a handed-over settle refusal goes to the Kernel as settle-nongreen: no op 
   const fx = fixture({ report: { outcome: 'done' }, handover: { reason: 'settle-refused', code: 'op-gate-new-findings' } });
   try {
     const ctx = ctxFor(fx);
-    const r = await job.reconcile('job:nivo-backend:op-a', ctx);
+    const r = await job.reconcile('job:todo-app-be:op-a', ctx);
     assert.equal(r.action, 'settle-nongreen');
     assert.equal(ctx.calls.api.filter((c) => c.verb === 'enqueue').length, 0, 'nothing is enqueued for a settle refusal');
   } finally { fx.close(); }
@@ -168,8 +168,8 @@ test('the [Worker] sweep in shadow writes nothing', () => {
 test('list: open jobs, recently settled ones and their workflows', () => {
   const fx = fixture({ report: { outcome: 'done' } });
   try {
-    assert.deepEqual(listKeysOf(fx.db, 'nivo-backend', { now: NOW, settings }).sort(), ['job:nivo-backend:op-a', 'wf:nivo-backend:wf-x']);
-    const di = settleDecision(jobFacts(fx.db, 'op-a', { now: NOW, settings }), 'nivo-backend', { now: NOW, settings });
+    assert.deepEqual(listKeysOf(fx.db, 'todo-app-be', { now: NOW, settings }).sort(), ['job:todo-app-be:op-a', 'wf:todo-app-be:wf-x']);
+    const di = settleDecision(jobFacts(fx.db, 'op-a', { now: NOW, settings }), 'todo-app-be', { now: NOW, settings });
     assert.equal(di.schema, 'starci/decision-item@1');
   } finally { fx.close(); }
 });

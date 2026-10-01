@@ -86,7 +86,7 @@ export function sonarReport(findings, { sourceRoots = [], tracked = [] } = {}) {
   for (const finding of findings) {
     if (finding.level !== 'error') continue;
     if (!rules.has(finding.code)) {
-      rules.set(finding.code, ruleOf(finding.code, HFS_ENGINE, finding.title ?? finding.code, `${finding.title ?? finding.code}. ${finding.titleVi}: ${finding.whyVi} Cách sửa: ${finding.nextStepVi}`));
+      rules.set(finding.code, ruleOf(finding.code, HFS_ENGINE, finding.title ?? finding.code, `${finding.title ?? finding.code}. ${finding.titleVi}: ${finding.whyVi} C\u00e1ch s\u1eeda: ${finding.nextStepVi}`));
     }
     const primaryLocation = place(finding.path ? posix(finding.path) : null, finding.message, finding.line);
     if (primaryLocation === null) continue;

@@ -207,7 +207,7 @@ test("FE-NEXT-9: a route is built by modules/routes, not written at the call", (
       { filename: NAV, code: 'const A = () => <Link href="/courses">x</Link>', errors: [{ messageId: "route" }] },
       { filename: NAV, code: "const A = () => <Link href={`/courses/${slug}`}>x</Link>", errors: [{ messageId: "route" }] },
       { filename: NAV, code: 'const A = () => <a href="/tasks">x</a>', errors: [{ messageId: "route" }] },
-      { filename: NAV, code: 'router.push("/agentos/workspaces/new")', errors: [{ messageId: "route" }] },
+      { filename: NAV, code: 'router.push("/my-app/workspaces/new")', errors: [{ messageId: "route" }] },
       { filename: NAV, code: "router.replace(`/orders/${id}`)", errors: [{ messageId: "route" }] },
       { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: 'redirect("/sign-in")', errors: [{ messageId: "route" }] },
       // a folder named routes that the routes slot does not own gets no exemption
@@ -223,7 +223,7 @@ test("FE-NEXT-10: the next-intl stack is written once per repository", () => {
   const NAVIGATION = 'import { createNavigation } from "next-intl/navigation"\nexport const { Link } = createNavigation(routing)'
   const REQUEST = 'import { getRequestConfig } from "next-intl/server"\nexport default getRequestConfig(async () => ({ locale: "vi", messages: {} }))'
   const MIDDLEWARE = 'import createMiddleware from "next-intl/middleware"\nexport const proxy = createMiddleware(routing)'
-  const PACKAGE = at("packages/nivo-i18n/src/app.ts")
+  const PACKAGE = at("packages/todo-app-i18n/src/app.ts")
   const APP_INDEX = at("apps/web/src/modules/i18n/index.ts")
   const APP_REQUEST = at("apps/web/src/modules/i18n/request.ts")
   multi.run("i18n-stack-in-one-module", i18nStackInOneModule, {
@@ -233,9 +233,9 @@ test("FE-NEXT-10: the next-intl stack is written once per repository", () => {
       { filename: PACKAGE, code: NAVIGATION },
       { filename: PACKAGE, code: REQUEST },
       { filename: PACKAGE, code: MIDDLEWARE },
-      { filename: at("packages/nivo-i18n/src/request.ts"), code: REQUEST },
+      { filename: at("packages/todo-app-i18n/src/request.ts"), code: REQUEST },
       // an app calls the package factory, not next-intl's
-      { filename: APP_INDEX, code: 'import { createAppI18n } from "@nivo/i18n"\nexport const i18n = createAppI18n({ locales: ["vi"] })' },
+      { filename: APP_INDEX, code: 'import { createAppI18n } from "@todo-app/i18n"\nexport const i18n = createAppI18n({ locales: ["vi"] })' },
       { filename: APP_REQUEST, code: 'import { i18n } from "./index"\nexport default i18n.requestConfig' },
       // using the stack's products is not building one
       { filename: at("apps/web/src/features/pages/home/component.tsx"), code: 'import { useTranslations } from "next-intl"\nimport { getTranslations } from "next-intl/server"\nconst t = await getTranslations("home")' },
@@ -258,8 +258,8 @@ test("FE-NEXT-10: the next-intl stack is written once per repository", () => {
       { filename: APP_REQUEST, code: 'import mw from "next-intl/middleware"\nexport const proxy = mw(routing)', errors: [{ messageId: "stack" }] },
       // outside `modules/i18n` altogether, and in a package that is not the i18n package
       { filename: at("apps/web/src/hooks/lesson/useLesson.ts"), code: NAVIGATION, errors: [{ messageId: "stack" }] },
-      { filename: at("packages/nivo-ui/src/leaves/Menu/component.tsx"), code: NAVIGATION, errors: [{ messageId: "stack" }] },
-      { filename: at("packages/nivo-api/src/client.ts"), code: REQUEST, errors: [{ messageId: "stack" }] },
+      { filename: at("packages/todo-app-ui/src/leaves/Menu/component.tsx"), code: NAVIGATION, errors: [{ messageId: "stack" }] },
+      { filename: at("packages/todo-app-api/src/client.ts"), code: REQUEST, errors: [{ messageId: "stack" }] },
     ],
   })
   single.run("i18n-stack-in-one-module", i18nStackInOneModule, {
@@ -269,7 +269,7 @@ test("FE-NEXT-10: the next-intl stack is written once per repository", () => {
       { filename: at("apps/web/src/modules/i18n/routing.ts"), code: ROUTING },
       { filename: at("apps/web/src/modules/i18n/navigation.ts"), code: NAVIGATION },
       { filename: PACKAGE, code: REQUEST },
-      // the proxy mounts the locale middleware built from the one routing (starci-next-fe apps/web/src/proxy.ts)
+      // the proxy mounts the locale middleware built from the one routing (apps/web/src/proxy.ts)
       { filename: at("apps/web/src/proxy.ts"), code: MIDDLEWARE },
     ],
     invalid: [

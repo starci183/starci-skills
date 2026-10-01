@@ -84,7 +84,7 @@ export default {
   const media = verdict === 'pass' ? settleProofMedia(db, jobId, repo, null, null) : null;
   if (media) {
     emit({ ok: false, jobId, op: media.op, reason: PROOF_MEDIA_MISSING, code: PROOF_MEDIA_MISSING, missing: media.missing, detail: media.detail },
-      `settle REFUSED for ${jobId} (${media.op}): ${PROOF_MEDIA_MISSING} â€” missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. Re-dispatch the op to capture its screenshots${media.detail.browserRan ? ' and its browser video' : ''} into its evidence and name them in report.files, then settle again`, args.json);
+      `settle REFUSED for ${jobId} (${media.op}): ${PROOF_MEDIA_MISSING} — missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. Re-dispatch the op to capture its screenshots${media.detail.browserRan ? ' and its browser video' : ''} into its evidence and name them in report.files, then settle again`, args.json);
     process.exit(1);
   }
 
@@ -130,7 +130,7 @@ export default {
   if (drawn) {
     const codes = [...new Set(drawn.findings.map((f) => f.code))];
     emit({ ok: false, jobId, op: drawn.op, reason: 'draw-not-accepted', codes, findings: drawn.findings.slice(0, 50), findingCount: drawn.findings.length, records: drawn.records },
-      `settle REFUSED for ${jobId} (${drawn.op}): draw-not-accepted â€” ${codes.join(', ')} (${drawn.findings.length} finding(s); first: ${drawn.findings[0].detail}); the job stays ${drawn.status}. Every asset the draw binds, adopted ones included, must be a draw-render shape of ui.shapes and never a data status (node scripts/work/draw/draw-acceptance.mjs --repo <repo> --job ${jobId}); redraw, or settle fail`, args.json);
+      `settle REFUSED for ${jobId} (${drawn.op}): draw-not-accepted — ${codes.join(', ')} (${drawn.findings.length} finding(s); first: ${drawn.findings[0].detail}); the job stays ${drawn.status}. Every asset the draw binds, adopted ones included, must be a draw-render shape of ui.shapes and never a data status (node scripts/work/draw/draw-acceptance.mjs --repo <repo> --job ${jobId}); redraw, or settle fail`, args.json);
     process.exit(1);
   }
 
@@ -138,7 +138,7 @@ export default {
   if (measured) {
     const codes = [...new Set(measured.findings.flatMap((f) => [f.code, ...(f.codes ?? [])]))];
     emit({ ok: false, jobId, op: measured.op, reason: 'draw-metrics-failed', codes, findings: measured.findings.slice(0, 50), findingCount: measured.findings.length, records: measured.records, loops: measured.loops },
-      `settle REFUSED for ${jobId} (${measured.op}): draw-metrics-failed â€” ${codes.join(', ')} (${measured.findings.length} finding(s); first: ${measured.findings[0].detail}); the job stays ${measured.status}. The runtime re-rendered every drawn part and re-ran every machine metric itself (node scripts/work/draw-loop.mjs verify --ui <record> --repo <repo>): the draw is blocked with these remaining failures and its best round${measured.loops?.length ? ` (${measured.loops.map((l) => `${l.loop} best round ${l.best}`).join(', ')})` : ''} - redraw through the loop, or settle blocked, never pass`, args.json);
+      `settle REFUSED for ${jobId} (${measured.op}): draw-metrics-failed — ${codes.join(', ')} (${measured.findings.length} finding(s); first: ${measured.findings[0].detail}); the job stays ${measured.status}. The runtime re-rendered every drawn part and re-ran every machine metric itself (node scripts/work/draw-loop.mjs verify --ui <record> --repo <repo>): the draw is blocked with these remaining failures and its best round${measured.loops?.length ? ` (${measured.loops.map((l) => `${l.loop} best round ${l.best}`).join(', ')})` : ''} - redraw through the loop, or settle blocked, never pass`, args.json);
     process.exit(1);
   }
 
@@ -262,7 +262,7 @@ export default {
           const why = closesSet
             ? `this pass closes cut set ${cutSet.id} (every other ordinal of ${cutSet.total} settled succeeded), so the unchanged full gates run over the whole set and record ${CUT_SET_CLOSING_CHECK}`
             : `ordinal(s) ${cutSet.open.join(',')} of cut set ${cutSet.id} are still open, so this slice records its scoped checks and the set's last pass records ${CUT_SET_CLOSING_CHECK}`;
-          throw Object.assign(new Error(`cut pass for ${jobId} missing required green checks: ${missing.join(', ')} â€” ${why}`), {
+          throw Object.assign(new Error(`cut pass for ${jobId} missing required green checks: ${missing.join(', ')} — ${why}`), {
             code: 'cut-checks-missing', cut: payload.cut, missing,
           });
         }
@@ -381,10 +381,10 @@ export default {
     }
   });
 
-  // The settled op's Orca terminal is released with its leases â€” worker_id is
+  // The settled op's Orca terminal is released with its leases — worker_id is
   // the handle. Runs after the settled state is written; a close failure
   // never un-settles.
-  // Managed jobs hold a Dispatch id in worker_id, not a terminal handle â€” they
+  // Managed jobs hold a Dispatch id in worker_id, not a terminal handle — they
   // take the worker-stop/-release path below, never terminal close.
   const settledPayload = jobPayloadOf(job);
   const managed = settledPayload?.managed ?? null;
@@ -431,7 +431,7 @@ export default {
     } catch { /* the terminal proof stands; the tick GC reaps a lingering tree */ }
   }
 
-  // Managed settle â€” calls.yaml settle-dispatch: releaseManagedWorker below.
+  // Managed settle — calls.yaml settle-dispatch: releaseManagedWorker below.
   const managedWorker = !managed?.dispatchId ? null
     : releasedEarlier ? { ...(settledPayload.managedWorker ?? { dispatchId: managed.dispatchId }), releasedWhileHeld: true,
       custody: { state: 'released', proof: 'released-while-held', at: releasedEarlier.at ?? null } }

@@ -14,7 +14,6 @@ export const WORKFLOW_TRANSITIONS = Object.freeze([
 export const ACCEPTS_WORK = Object.freeze(['queued', 'running']);
 /** Phases an op may be dispatched in (op_attempts_dispatch_guard: the first dispatch moves queued → running). */
 export const DISPATCHES = Object.freeze(['queued', 'running']);
-export const LIFECYCLE_BY = Object.freeze(['owner', 'supervisor', 'kernel']);
 
 /** The phase a workflow row is in; an archived row is `archived` whatever its phase column says. */
 export const phaseOf = (wf) => (!wf ? null : wf.archived_at != null ? 'archived' : wf.phase ?? 'queued');

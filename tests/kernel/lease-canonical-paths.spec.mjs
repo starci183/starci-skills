@@ -10,8 +10,8 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {leaseCanonicalizer} from '../../scripts/kernel/lease-canon.mjs';
 import {placeOnRepo} from '../helpers/op-placement.mjs';
 
-// nivo wf-nivo-fe-debt-mug06w7h inc-52a4a5ee5b12: Modules enqueued `apps/app/src/messages/vi.json` bare
-// (--repository fe) while fe-debt enqueued `fe/apps/app/src/messages` prefixed with the side
+// One workflow enqueued `apps/app/src/messages/vi.json` bare
+// (--repository fe) while another enqueued `fe/apps/app/src/messages` prefixed with the side
 // folder's name. Leases compared strings, so both were admitted onto the same catalog. In a bound
 // app every owned path is app-relative (one form; a side-relative spelling is refused at enqueue), so
 // the lease key is the app-relative path, held rows are compared in that form through their holder
@@ -24,13 +24,13 @@ const git=(cwd,...args)=>{
   assert.equal(r.status,0,`git ${args.join(' ')}: ${r.stderr}`);
 };
 
-// A tmp Source binding one nivo app repository with be/ and fe/ sides.
+// A tmp Source binding one app repository with be/ and fe/ sides.
 const fixture=t=>{
   const dir=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'starci-lease-canon-')));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
     {recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const be=path.join(dir,'nivo'),backend=path.join(be,'be'),fe=path.join(be,'fe'),source=path.join(dir,'source');
+  const be=path.join(dir,'app'),backend=path.join(be,'be'),fe=path.join(be,'fe'),source=path.join(dir,'source');
   for(const side of [backend,fe]){
     fs.mkdirSync(path.join(side,'apps','app','src','messages'),{recursive:true});
     fs.writeFileSync(path.join(side,VI),'{}\n');
@@ -40,10 +40,10 @@ const fixture=t=>{
   git(be,'config','user.name','Fixture');
   git(be,'add','.');
   git(be,'commit','--quiet','-m','seed');
-  fs.mkdirSync(path.join(source,'.workspaces','projects','nivo'),{recursive:true});
-  fs.writeFileSync(path.join(source,'.workspaces','projects','nivo','work.json'),JSON.stringify({
-    schema:'starci/workspace-binding@2',project:'nivo',
-    repository:{pathFromSource:'../nivo',gitRepository:'https://example.test/nivo.git'},
+  fs.mkdirSync(path.join(source,'.workspaces','projects','app'),{recursive:true});
+  fs.writeFileSync(path.join(source,'.workspaces','projects','app','work.json'),JSON.stringify({
+    schema:'starci/workspace-binding@2',project:'app',
+    repository:{pathFromSource:'../app',gitRepository:'https://example.test/app.git'},
     sides:{be:'be',fe:'fe'},work:{pathFromRepository:'.starciwork'},
   }));
   const prior=process.env.STARCI_SOURCE_ROOT;
@@ -79,7 +79,7 @@ const holdLease=(ledger,jobId,key)=>{
 test('a bound app keys every lease by its app-relative path; an unbound repository keeps its own',t=>{
   const {be,dir}=fixture(t);
   const canon=leaseCanonicalizer({repo:be});
-  assert.ok(canon.binding,'the tmp Source binds nivo as one app repository');
+  assert.ok(canon.binding,'the tmp Source binds the repo as one app repository');
   assert.equal(canon.canonical(`fe/${VI}`,{op:'interface.implement',payload:{repository:'fe'}}),`fe/${VI}`);
   assert.equal(canon.canonical(`fe/${MESSAGES}/**`,{op:'code.refactor',payload:{}}),`fe/${MESSAGES}`);
   assert.equal(canon.canonical(`be/${VI}`,{op:'code.refactor',payload:{repository:'be'}}),`be/${VI}`,'the same relative path in the backend side');

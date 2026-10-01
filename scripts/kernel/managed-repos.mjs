@@ -4,7 +4,7 @@
 // explicit extra paths, each kept only when it holds a ledger. Nothing is discovered: a ledger nobody listed (an old
 // test workflow in the skill's own checkout) is never managed. The reconciler reads the same list
 // (scripts/reconciler/services.mjs --dedupe); it replaced resume-all.mjs, whose loop duties were deleted on
-// 2026-09-28 (owner ruling "có lỗi xóa luôn": the reconciler is the only loop).
+// 2026-09-28 (owner ruling "on error, delete it outright": the reconciler is the only loop).
 import fs from 'node:fs';
 import path from 'node:path';
 import { isRuntimeRoot, ledgerFileFor } from '../../engine/db/ledger.mjs';

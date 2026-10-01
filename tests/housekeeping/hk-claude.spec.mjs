@@ -136,8 +136,8 @@ test('archive keeps the project slug as the relative path and apply=false only r
 });
 
 test('claudeProjectSlug spells a cwd the way ~/.claude/projects does', () => {
-  assert.equal(claudeProjectSlug('D:/Repositories/starci-academy-backend/.claude'),
-    'D--Repositories-starci-academy-backend--claude');
+  assert.equal(claudeProjectSlug('D:/Repositories/ecommerce-app/.claude'),
+    'D--Repositories-ecommerce-app--claude');
   assert.equal(claudeProjectSlug('C:\\Users\\Hi\\AppData\\Roaming\\Claude\\scratch-workspaces\\u1\\u2\\scratch-2026-09-22-059e29'),
     'C--Users-Hi-AppData-Roaming-Claude-scratch-workspaces-u1-u2-scratch-2026-09-22-059e29');
   assert.deepEqual(claudeProjectsRoots({ STARCI_CLAUDE_PROJECTS_ROOT: 'x' + path.delimiter + 'y' }).map((p) => path.basename(p)), ['x', 'y']);

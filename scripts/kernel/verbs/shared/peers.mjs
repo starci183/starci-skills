@@ -1,7 +1,6 @@
 // api-lib/peers.mjs — the peer-messaging machinery of the kernel api (split out of cli.mjs,
 // lane slim-api). Several workflows of one product repo share its ledger and build in the
-// same source repositories (nivo: Login, workspace provision, modules and
-// collab in nivo-backend + nivo-fe). With no channel between their Kernels a
+// same source repositories. With no channel between their Kernels a
 // Collab Kernel that needed the Login workflow's phone verification asked the
 // owner who should build it, two workflows edited overlapping areas, and a
 // repo-wide migration was owned by no workflow. Peers now talk through the

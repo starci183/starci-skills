@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { connectorsConfig } from '../../engine/config.mjs';
 import { argsOf, askRepos, claimManager, connectorState, lockHolder, markStarting, NONCE, notifiedRepos, ownerConfig, recordAlive, servingAsksAcross, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
 import { pidAlive } from '../../engine/db/machine.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 export const GATEWAY_FILE = fileURLToPath(import.meta.url);
 
@@ -34,11 +35,6 @@ const RESOLVE_CACHE_MS = 3000;
 // A bearer-nonce page must not leak its URL through Referer, be cached by an
 // intermediary, or be indexed.
 const PAGE_HEADERS = { 'referrer-policy': 'no-referrer', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow', 'x-content-type-options': 'nosniff' };
-
-const TEXT = {
-  en: { notFound: 'not found', credential: 'This question asks for credentials, so it is not served over the public link. Answer it on the machine through the localhost link.', upstream: 'The form for this question is not answering right now.' },
-  vi: { notFound: 'không tìm thấy', credential: 'Câu hỏi này cần thông tin bí mật nên không mở qua link công khai. Hãy trả lời trên máy bằng link localhost.', upstream: 'Form của câu hỏi này hiện không phản hồi.' },
-};
 
 const deny = (res, status, text) => {
   res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8', ...PAGE_HEADERS });
@@ -67,7 +63,9 @@ export function ledgerResolver({ repos, now = Date.now } = {}) {
  */
 export function createGateway({ resolve, exposeCredentialAsks = () => false, language = () => 'en' } = {}) {
   return http.createServer((req, res) => {
-    const t = TEXT[language()] ?? TEXT.en;
+    const t = { notFound: 'not found', credential: 'This question asks for credentials, so it is not served over the public link. Answer it on the machine through the localhost link.', upstream: 'The form for this question is not answering right now.' };
+    const tr = translator(language());
+    for (const key of Object.keys(t)) t[key] = tr(t[key]);
     // A dot segment could walk from one nonce to another; such a path is refused before it is normalized.
     if (/(?:^|\/)(?:\.|%2e){1,2}(?:[/?#]|$)/i.test(req.url ?? '')) return deny(res, 404, t.notFound);
     let pathname, search;

@@ -1,8 +1,7 @@
 // A failed settle always leaves its next step in the ledger (scripts/kernel/cli.mjs enqueueNextStep over
 // modules/models/kinds.yaml routes), and `api status` names the Kernel's next moves as nextActions and
 // colours every leg. Before it `api settle --verdict fail` enqueued nothing, the frontier fell to
-// orphaned-frontier, and a worker that died without a report was retried without a cap
-// (inc-70834a1b8f73).
+// orphaned-frontier, and a worker that died without a report was retried without a cap.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,7 +12,7 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {jobRowOf} from '../../scripts/kernel/verbs/shared/rows.mjs';
 import {unitSubjectKey} from '../../engine/admission.mjs';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
@@ -22,7 +21,7 @@ const API=path.join(ROOT,'scripts','kernel','cli.mjs');
 const json=v=>JSON.stringify(v??null);
 
 const world=(t,{legs=['docs.author'],edges=legs.slice(1).map((op,i)=>[legs[i],op])}={})=>{
-  const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-next-step-'));
+  const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-settle-next-'));
   t.after(()=>fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const env={...process.env,STARCI_PROJECTS_ROOT:path.join(repo,'projects'),STARCI_TEST_MACHINE_FILE:path.join(repo,'machine.sqlite'),LOCALAPPDATA:path.join(repo,'localappdata')};
   fs.mkdirSync(path.join(repo,'docs'),{recursive:true});const wf='wf-next-step';
@@ -133,7 +132,7 @@ test('past the route limit an owner gate holds that job alone; resolving it name
   assert.equal(w.settleFail(again.body.job_id).nextStep.kind,'owner-gate','the original route limit still applies to a renewed failure');
 });
 
-test('a worker that ended without a report retries twice, then an owner gate (inc-70834a1b8f73)',t=>{
+test('a worker that ended without a report retries twice, then an owner gate',t=>{
   const w=world(t);
   w.job('d1','docs.author');
   let next=w.settleFail('d1').nextStep;

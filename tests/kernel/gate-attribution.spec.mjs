@@ -1,7 +1,7 @@
 // A repo-wide gate red on a peer's change is the peer's, not this op's failure
 // (scripts/kernel/gate-attribution.mjs; modules/kernel/api.yaml commands.check peerBlocked).
-// nivo academy-debt's test:ci went red 812/813 on module-studio commit 9caa2d5c (inc-9474fe9ff445)
-// and on module-studio's uncommitted spec (inc-36b309cb9138); academy-debt retried for both.
+// One workflow's test:ci went red 812/813 on a peer's commit
+// and on the peer's uncommitted spec; it retried for both.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -96,14 +96,14 @@ test('each implicated file is own, a peer\'s commit, a peer\'s in-flight change 
     const job = db.prepare("SELECT * FROM jobs WHERE job_id='job-self'").get();
     const at = (failing) => attributeRedGate(db, { repo: fx.repo, job, failing });
 
-    // inc-9474fe9ff445: the spec is old, the controller it tests changed in a peer's commit.
+    // The spec is old, the controller it tests changed in a peer's commit.
     const landed = at(['src/pod/pod.controller.spec.ts:123', 'src/pod/pod.controller.ts']);
     assert.equal(landed.class, 'peer');
     assert.deepEqual(landed.files.map((f) => f.owner), ['unknown', 'peer']);
     assert.deepEqual(landed.peers, [{ workflowId: PEER, via: 'commit', commit: fx.peerSha, files: ['src/pod/pod.controller.ts'] }]);
     assert.match(peerRouteOf(SELF, landed.peers[0], 'test:ci'), new RegExp(`--kind shared-blocker --introduced-by ${fx.peerSha}`));
 
-    // inc-36b309cb9138: the spec is dirty under the peer job's lease.
+    // The spec is dirty under the peer job's lease.
     const inFlight = at(['src/studio/studio.spec.ts']);
     assert.equal(inFlight.class, 'peer');
     assert.deepEqual(inFlight.peers, [{ workflowId: PEER, via: 'lease', jobId: 'job-peer', files: ['src/studio/studio.spec.ts'] }]);
@@ -164,7 +164,7 @@ test('retry accounting: peer-blocked is free only off a pass and only when the a
   assert.equal(retryDisposition(job({ verdict: 'blocked', peerBlocked: { checks: ['test:ci'] } })).retryClass, 'peer-blocked');
 });
 
-// nivo wf-nivo-app-auth-mujek72s op-interface.draw a4-a6: strict validate of login/ui stayed red on DATA_STATUS_DRAWN
+// Strict validate of login/ui stayed red on DATA_STATUS_DRAWN
 // in ui/session-ending records outside the job's owned paths that nothing had touched; three attempts were spent on it.
 test('an untouched Work record outside the owned paths is foreign debt: api check records it advisory', (t) => {
   const fx = fixture(t);
@@ -195,8 +195,8 @@ test('an untouched Work record outside the owned paths is foreign debt: api chec
   assert.deepEqual(row.advisory.outOfScope, ['.starciwork/features/login/ui/session-ending/index.yaml']);
 });
 
-// nivo collab inc-72edd7aa6741: typecheck red on workspace-provision's c0e7552d, committed hours before
-// collab's lineage began, read unknown - the attempt was spent and the same op re-ran for nothing.
+// Typecheck red on a peer commit c0e7552d, committed hours before
+// this lineage began, read unknown - the attempt was spent and the same op re-ran for nothing.
 const preexisting = (fx) => {
   const began = fx.read((db) => db.prepare("SELECT created_at FROM jobs WHERE job_id='job-self'").get().created_at);
   const at = began - 1_800_000;
@@ -249,8 +249,8 @@ test('api check attributes a red Kernel check on the files its evidence names', 
   assert.deepEqual([stored.failing, stored.failingDerived, stored.attribution.class], [['src/peer/broken.spec.ts:2'], true, 'peer']);
 });
 
-// A partial whose rootCause is not this op (self false) is never re-run blind: nivo collab bd2609ff17 ->
-// a1dad730db and starci-next foundation f920334582 -> a89b597df5 re-ran an hour or more for the same open items.
+// A partial whose rootCause is not this op (self false) is never re-run blind: two workflows
+// re-ran an hour or more for the same open items.
 const partialOf = (fx, jobId, extra, wf = SELF) => fx.seed((l) => {
   const attemptId = l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? AND workflow_id=?').get(jobId, wf).attempt_id;
   // A reports row is immutable once filed (H10): a different report for the attempt replaces the row.

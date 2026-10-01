@@ -6,14 +6,14 @@ import { classifyTerminals, onlyPrompts, isShellTitle, tabTitles, gcLine } from 
 import { closeAndVerify, closeSelfSafe } from '../../scripts/machine/close-verify.mjs';
 
 const RT = 'D:/Repositories/x/.claude';
-const NIVO = 'D:/Repositories/nivo-backend';
+const REPO_PATH = 'D:/Repositories/todo-app-be';
 const term = (handle, title, extra = {}) => ({ handle, title, connected: true, worktreePath: RT, ...extra });
 const sup = { seat: { handle: 'term_seat', live: true }, jobs: [
   { jobId: 'fix-a-aaaaaa', status: 'failed', cluster: 'a', handle: 'term_old' },
   { jobId: 'fix-b-bbbbbb', status: 'running', cluster: 'b', handle: 'term_b' },
   { jobId: 'fix-dead-row-cccccc', status: 'succeeded', cluster: 'dead-row', handle: 'term_gone' },
 ] };
-const ledger = { repo: NIVO, workflows: [
+const ledger = { repo: REPO_PATH, workflows: [
   { workflowId: 'wf-live', name: 'Nivo · Live', ended: false, kernelHandle: 'term_k' },
   { workflowId: 'wf-old', name: 'Nivo · Old', ended: true, kernelHandle: null },
 ], jobs: [
@@ -32,7 +32,7 @@ test('prompts-only screens and plain shell titles', () => {
   assert.equal(onlyPrompts(`${PROMPTS} npm test`), false);
   assert.equal(onlyPrompts(''), false);
   assert.equal(isShellTitle('Terminal 17'), true);
-  assert.equal(isShellTitle('nivo-backend', { worktreeName: 'nivo-backend' }), true);
+  assert.equal(isShellTitle('todo-app-be', { worktreeName: 'todo-app-be' }), true);
   for (const title of ['[Worker] fix-x', '[Kernel] Nivo · Live', '[Op] a · Nivo', '[Supervisor] main', '✳ Claude Code']) assert.equal(isShellTitle(title), false, title);
   const titles = tabTitles([{ root: { tabs: [{ title: '[Op] x · Nivo · Live', panes: { type: 'terminal', handle: 'term_z' } }] } }]);
   assert.equal(titles.get('term_z'), '[Op] x · Nivo · Live');
@@ -40,28 +40,28 @@ test('prompts-only screens and plain shell titles', () => {
 });
 
 test('never the live seat, a live job, a live Kernel or a terminal the runtime did not create', () => {
-  const d = decide([term('term_seat', 'x'), term('term_b', '[Worker] b'), term('term_k', '[Kernel] Nivo · Live', { worktreePath: NIVO }),
-    term('term_op1', '[Op] a · Nivo · Live', { worktreePath: NIVO }), term('term_owner', '✳ Claude Code')]);
+  const d = decide([term('term_seat', 'x'), term('term_b', '[Worker] b'), term('term_k', '[Kernel] Nivo · Live', { worktreePath: REPO_PATH }),
+    term('term_op1', '[Op] a · Nivo · Live', { worktreePath: REPO_PATH }), term('term_owner', '✳ Claude Code')]);
   for (const h of ['term_seat', 'term_b', 'term_k', 'term_op1', 'term_owner']) assert.equal(d[h].verdict, 'keep', h);
 });
 
 test('collects the terminals the ledgers bind to a settled op, a finished [Worker] job or an ended workflow', () => {
   const ended = { ...ledger, workflows: [...ledger.workflows, { workflowId: 'wf-done', name: 'Nivo · Done', ended: true, kernelHandle: 'term_oldk' }] };
-  const d = decide([term('term_old', '[Worker] a'), term('term_op2', '[Op] b · Nivo · Live', { worktreePath: NIVO }), term('term_oldk', '[Kernel] Nivo · Done', { worktreePath: NIVO })], { ledgers: [ended] });
+  const d = decide([term('term_old', '[Worker] a'), term('term_op2', '[Op] b · Nivo · Live', { worktreePath: REPO_PATH }), term('term_oldk', '[Kernel] Nivo · Done', { worktreePath: REPO_PATH })], { ledgers: [ended] });
   assert.deepEqual(['term_old', 'term_op2', 'term_oldk'].map((h) => [h, d[h].verdict, d[h].klass]),
     [['term_old', 'collect', 'sup-worker'], ['term_op2', 'collect', 'op-worker'], ['term_oldk', 'collect', 'kernel']]);
 });
 
 test('a runtime title or a staging path on screen identifies nothing: an unbound terminal is kept', () => {
   // Former false positives: title-regex identification closed an owner's own tab named like a runtime tab.
-  const d = decide([term('term_w', '[Worker] a'), term('term_untitled', 'Fix dead worker question row'), term('term_dup', '[Op] c · Nivo · Live', { worktreePath: NIVO }),
-    term('term_sup2', '[Supervisor] main'), term('term_k2', '[Kernel] Nivo · Old', { worktreePath: NIVO })],
+  const d = decide([term('term_w', '[Worker] a'), term('term_untitled', 'Fix dead worker question row'), term('term_dup', '[Op] c · Nivo · Live', { worktreePath: REPO_PATH }),
+    term('term_sup2', '[Supervisor] main'), term('term_k2', '[Kernel] Nivo · Old', { worktreePath: REPO_PATH })],
   { screens: { term_untitled: '› 1. Use session directory (D:\\starci-lanes\\staging\\fix-dead-row-cccccc)' }, seen: { term_dup: 0, term_w: 0 } });
   for (const h of ['term_w', 'term_untitled', 'term_dup', 'term_sup2', 'term_k2']) assert.deepEqual([h, d[h].verdict], [h, 'keep']);
 });
 
 test('a terminal Orca accounts for as a worker is Orca\'s: never closed here, even when a ledger binds it to a settled job', () => {
-  const d = decide([term('term_op2', '[Op] b · Nivo · Live', { worktreePath: NIVO }), term('term_old', '[Worker] a'), term('term_s', 'Terminal 3')],
+  const d = decide([term('term_op2', '[Op] b · Nivo · Live', { worktreePath: REPO_PATH }), term('term_old', '[Worker] a'), term('term_s', 'Terminal 3')],
     { workers: new Set(['term_op2', 'term_old', 'term_s']), screens: { term_s: PROMPTS }, seen: { term_s: 0 } });
   for (const h of ['term_op2', 'term_old', 'term_s']) assert.deepEqual([h, d[h].verdict, d[h].klass], [h, 'keep', 'orca-worker']);
 });

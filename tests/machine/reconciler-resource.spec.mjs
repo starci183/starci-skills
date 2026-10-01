@@ -22,7 +22,7 @@ const SETTINGS = { resources: { minFreeRamPct: 10, ramThrottle: { heavyResumeAbo
 function ctxOf(mode, extra = {}) {
   const calls = { api: [], log: [], decisions: [], clocks: [] };
   let now = T;
-  const ctx = fakeCtx({ mode, now: () => now, ledgers: [{ ledgerId: 'nivo-backend', repo: 'D:/r' }, { ledgerId: 'supervisor' }], read: () => null,
+  const ctx = fakeCtx({ mode, now: () => now, ledgers: [{ ledgerId: 'todo-app-be', repo: 'D:/r' }, { ledgerId: 'supervisor' }], read: () => null,
     api: async (...a) => { calls.api.push(a); return { ok: true, shadow: mode !== 'active' }; }, run: async () => ({ ok: true }),
     clock: (...a) => calls.clocks.push(['clock', ...a]), clear: (...a) => calls.clocks.push(['clear', ...a]),
     openDecision: async (di) => { calls.decisions.push(di); return { ok: true }; }, log: (kind, msg, data) => calls.log.push({ kind, msg, data }), owns: () => false, ...extra });
@@ -134,16 +134,16 @@ test('quota: probe every 5 min while a quota circuit is open; quota-exhausted wh
   const read = (id, fn) => fn({ prepare: () => ({ all: () => jobs }) });
   const { c } = controller({ providerCircuits: () => circuits });
   const { ctx, calls, advance } = ctxOf('shadow', { read });
-  const r = await c.reconcile('resource:quota:nivo-backend', ctx);
+  const r = await c.reconcile('resource:quota:todo-app-be', ctx);
   assert.equal(r.probed, true);
-  assert.deepEqual(calls.api[0].slice(0, 3), ['nivo-backend', 'provider-health', ['--quota-probe']]);
+  assert.deepEqual(calls.api[0].slice(0, 3), ['todo-app-be', 'provider-health', ['--quota-probe']]);
   assert.deepEqual(r.exhausted, ['interface.draw'], 'code.refactor (codex) still has quota');
   assert.equal(calls.decisions[0].kind, 'quota-exhausted');
   advance(60_000);
-  assert.equal((await c.reconcile('resource:quota:nivo-backend', ctx)).probed, false);
+  assert.equal((await c.reconcile('resource:quota:todo-app-be', ctx)).probed, false);
   advance(5 * 60_000);
-  assert.equal((await c.reconcile('resource:quota:nivo-backend', ctx)).probed, true);
-  assert.deepEqual(await c.list(ctx), [HOST_KEY, 'resource:pools', 'resource:quota:nivo-backend']);
+  assert.equal((await c.reconcile('resource:quota:todo-app-be', ctx)).probed, true);
+  assert.deepEqual(await c.list(ctx), [HOST_KEY, 'resource:pools', 'resource:quota:todo-app-be']);
   assert.deepEqual(quotaExhausted({ jobs: [{ op: 'a', status: 'queued', pool: null }], openProviders: ['devin'], providerOf: () => 'devin' }), [], 'an unrouted kind is never judged');
 });
 

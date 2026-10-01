@@ -11,8 +11,8 @@ import { linksUnder, safeRemoveTree } from '../../scripts/api/fs/safe-remove.mjs
 import { artifactHoldReason } from '../../scripts/machine/artifact-hold.mjs';
 import { guardsRoot } from '../../scripts/guards/guards-root.mjs';
 
-// nivo-fe inc-c8fbf76aa499 (2026-09-25 05:47): Devin op worker op-interface.implement-2a43f63c6c ran, through Git Bash,
-// `git worktree add --detach D:/Repositories/nivo-fe-wt-r4`, junctioned six node_modules of live nivo-fe into it
+// Live defect: a Devin op worker (op-interface.implement-2a43f63c6c) ran, through Git Bash,
+// `git worktree add --detach` on a sibling worktree directory, junctioned six node_modules of the live repo into it
 // (New-Item -ItemType Junction from a -File script, after `cmd //c mklink /J` failed on quoting), and removed it with
 // `git worktree remove --force`, which followed the junctions and deleted 674 live files. A guard on the worker's PATH
 // never saw it: Git Bash puts /mingw64/bin first. The guard now sees the agent's command itself (a PreToolUse hook)
@@ -156,28 +156,28 @@ test('the command guard hook refuses the incident\'s worktree and link commands 
 
 test('the footprint watch flags a new worktree or cross-repository link under the root, never a workspace link', (t) => {
   const root = tempDir(t, 'footprint-root-');
-  for (const name of ['nivo-fe', 'nivo-fe-wt-r4', 'other']) fs.mkdirSync(path.join(root, name, '.git'), { recursive: true });
+  for (const name of ['todo-app-fe', 'todo-app-fe-wt-r4', 'other']) fs.mkdirSync(path.join(root, name, '.git'), { recursive: true });
   const at = (...parts) => path.join(root, ...parts);
-  let links = [{ link: at('nivo-fe', 'node_modules', '@nivo', 'ui'), target: null, real: at('nivo-fe', 'packages', 'ui'), mtime: 'x' }];
+  let links = [{ link: at('todo-app-fe', 'node_modules', '@todo-app', 'ui'), target: null, real: at('todo-app-fe', 'packages', 'ui'), mtime: 'x' }];
   let trees = '';
-  const git = (cwd) => ({ status: 0, stdout: path.basename(cwd) === 'nivo-fe' ? `worktree ${at('nivo-fe')}\nHEAD 1\n\n${trees}` : `worktree ${cwd}\n` });
+  const git = (cwd) => ({ status: 0, stdout: path.basename(cwd) === 'todo-app-fe' ? `worktree ${at('todo-app-fe')}\nHEAD 1\n\n${trees}` : `worktree ${cwd}\n` });
   const listLinks = () => links;
   const first = scanFootprint({ root, state: null, git, listLinks, now: 't0' });
   assert.deepEqual([first.links, first.worktrees, first.fresh], [[], [], []], 'a workspace link inside its own repository is not a footprint');
-  links = [...links, { link: at('nivo-fe-wt-r4', 'node_modules'), target: null, real: at('nivo-fe', 'node_modules'), mtime: 'y' },
+  links = [...links, { link: at('todo-app-fe-wt-r4', 'node_modules'), target: null, real: at('todo-app-fe', 'node_modules'), mtime: 'y' },
     { link: at('other', 'bin'), target: 'E:\\elsewhere\\bin', real: 'E:\\elsewhere\\bin', mtime: 'z' }];
-  trees = `worktree ${at('nivo-fe-wt-r4')}\nHEAD 2\ndetached\n\nworktree ${path.join(os.tmpdir(), 'kernel-scratch')}\nHEAD 3\n`;
+  trees = `worktree ${at('todo-app-fe-wt-r4')}\nHEAD 2\ndetached\n\nworktree ${path.join(os.tmpdir(), 'kernel-scratch')}\nHEAD 3\n`;
   const second = scanFootprint({ root, state: first.state, git, listLinks, now: 't1' });
-  assert.deepEqual(second.fresh.map((entry) => [entry.type, entry.link ?? entry.worktree]), [['link', at('nivo-fe-wt-r4', 'node_modules')], ['worktree', at('nivo-fe-wt-r4')]],
+  assert.deepEqual(second.fresh.map((entry) => [entry.type, entry.link ?? entry.worktree]), [['link', at('todo-app-fe-wt-r4', 'node_modules')], ['worktree', at('todo-app-fe-wt-r4')]],
     'the junction into another repository and the worktree beside it are fresh; a link out of the root and kernel scratch outside it are not');
   const third = scanFootprint({ root, state: second.state, git, listLinks, now: 't2' });
   assert.deepEqual(third.fresh, [], 'a footprint is flagged once');
-  assert.equal(third.state.seen[`link:${process.platform === 'win32' ? at('nivo-fe-wt-r4', 'node_modules').toLowerCase() : at('nivo-fe-wt-r4', 'node_modules')}`], 't1');
+  assert.equal(third.state.seen[`link:${process.platform === 'win32' ? at('todo-app-fe-wt-r4', 'node_modules').toLowerCase() : at('todo-app-fe-wt-r4', 'node_modules')}`], 't1');
   // The state holds what the last scan saw: a footprint removed is dropped, and one made again later is fresh again.
   const saved = links;
-  links = links.filter((entry) => !entry.link.includes('nivo-fe-wt-r4'));
+  links = links.filter((entry) => !entry.link.includes('todo-app-fe-wt-r4'));
   const gone = scanFootprint({ root, state: third.state, git, listLinks, now: 't3' });
-  assert.equal(Object.keys(gone.state.seen).some((key) => key.startsWith('link:') && key.includes('nivo-fe-wt-r4')), false, 'a removed link leaves the state');
+  assert.equal(Object.keys(gone.state.seen).some((key) => key.startsWith('link:') && key.includes('todo-app-fe-wt-r4')), false, 'a removed link leaves the state');
   links = saved;
   const back = scanFootprint({ root, state: gone.state, git, listLinks, now: 't4' });
   assert.deepEqual(back.fresh.map((entry) => entry.type), ['link'], 'made again: fresh again');

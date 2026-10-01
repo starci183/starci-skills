@@ -39,11 +39,11 @@ test('every op of modules/ops/ops has a vi and an en label, and nothing else is 
 });
 
 test('a derived workflow name is `<Product> · <first clause>`, at most 48 characters, else the slug', () => {
-  assert.equal(productName('starci-next'), 'StarCi Next');
-  assert.equal(productName('nivo-backend'), 'Nivo');
+  assert.equal(productName('todo-app-be'), 'Todo App');
+  assert.equal(productName('starci-be'), 'StarCi');
   assert.equal(deriveWorkflowDisplayName({ text: 'Đăng nhập & xác thực cho app. Thêm OAuth sau.', product: 'nivo', fallback: 'nivo-app-auth' }), 'Nivo · Đăng nhập & xác thực cho app');
-  const long = deriveWorkflowDisplayName({ text: 'Xây dựng nền tảng học trực tuyến hoàn chỉnh gồm đăng ký, nội dung và thanh toán', product: 'starci-next', fallback: 'sn-foundation' });
-  assert.ok(long.startsWith('StarCi Next · Xây dựng'), long);
+  const long = deriveWorkflowDisplayName({ text: 'Xây dựng nền tảng học trực tuyến hoàn chỉnh gồm đăng ký, nội dung và thanh toán', product: 'todo-app-be', fallback: 'ta-foundation' });
+  assert.ok(long.startsWith('Todo App · Xây dựng'), long);
   assert.ok(long.length <= WORKFLOW_NAME_MAX, `${long.length} <= ${WORKFLOW_NAME_MAX}`);
   assert.ok(long.endsWith('…'), 'a clipped name says so');
   assert.equal(deriveWorkflowDisplayName({ text: 'Nivo: module studio for creators', product: 'nivo', fallback: 'x' }), 'Nivo · Module studio for creators', 'the product is not repeated');
@@ -74,7 +74,7 @@ test('what a job works on: explicit, then the work-graph node, the op-prefixed t
   assert.ok(long.length <= JOB_WHAT_MAX, long);
   assert.equal(pathLabel('.starciwork/features/instance-management/ui/owned-shell/module-ledger/evidence/draws.yaml'), 'instance management / module ledger');
   assert.equal(nodeLabel({ id: 'learning-paths.view-roadmap', domain: 'learning-paths' }), 'learning paths / view roadmap');
-  assert.equal(jobDisplayName({ op: 'interface.draw', what: 'Mô-đun đã cài đặt', workflowName: 'Nivo · Mô-đun AgentOS' }), 'Vẽ giao diện · Mô-đun đã cài đặt · Nivo · Mô-đun AgentOS');
+  assert.equal(jobDisplayName({ op: 'interface.draw', what: 'Mô-đun đã cài đặt', workflowName: 'Nivo · Mô-đun Todo' }), 'Vẽ giao diện · Mô-đun đã cài đặt · Nivo · Mô-đun Todo');
   assert.equal(jobDisplayName({ op: 'review.verify', what: null, workflowName: 'Nivo · Chuẩn hoá code FE' }), 'Review cuối · Nivo · Chuẩn hoá code FE');
 });
 
@@ -159,7 +159,7 @@ test('the orca-tree check never identifies a kernel by its [Kernel] tab title, d
   // Former false positive: two tabs titled with the workflow's display name read as a duplicate kernel.
   const dup = orcaTreeFindings(ledger.db, [term('t1', '[Kernel] Nivo · Cây'), term('t2', '[Kernel] Nivo · Cây')], { owned: new Set() });
   assert.deepEqual(dup.filter((f) => f.code === 'DUPLICATE_KERNEL'), []);
-  const foreign = orcaTreeFindings(ledger.db, [term('t9', '[Kernel] StarCi Next · Nền tảng')], { owned: new Set() });
+  const foreign = orcaTreeFindings(ledger.db, [term('t9', '[Kernel] Todo App · Nền tảng')], { owned: new Set() });
   assert.deepEqual(foreign.filter((f) => f.terminal === 't9'), [], 'another ledger\'s kernel is not this ledger\'s orphan');
 }));
 
@@ -167,11 +167,11 @@ test('a Telegram ask names the workflow by its display name and the asking job b
   seedWorkflow(ledger, { id: 'wf-ask-named', state: { phase: 'running', job: 'ask-slug' }, jobs: [
     { jobId: 'op-interface.draw-1', opId: 'interface.draw', kind: 'op', status: 'answering', dispatchId: 'ask-1', payload: { opId: 'interface.draw', displayWhat: 'Mô-đun đã cài đặt' } },
   ] });
-  ledger.db.prepare("UPDATE workflows SET display_name='Nivo · Mô-đun AgentOS' WHERE workflow_id='wf-ask-named'").run();
+  ledger.db.prepare("UPDATE workflows SET display_name='Nivo · Mô-đun Todo' WHERE workflow_id='wf-ask-named'").run();
   const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('op-interface.draw-1').attempt_id;
   ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'ask',?,?)")
     .run('wf-ask-named', attemptId, 'ask-1', 'op-interface.draw-1', JSON.stringify({ outcome: 'ask', question: { text: 'Duyệt?', options: ['ok'] } }), Date.now());
   const view = askState(ledger.db, 'wf-ask-named', 'ask-1');
-  assert.equal(view.title, 'Nivo · Mô-đun AgentOS');
-  assert.equal(view.jobName, 'Vẽ giao diện · Mô-đun đã cài đặt · Nivo · Mô-đun AgentOS');
+  assert.equal(view.title, 'Nivo · Mô-đun Todo');
+  assert.equal(view.jobName, 'Vẽ giao diện · Mô-đun đã cài đặt · Nivo · Mô-đun Todo');
 }));

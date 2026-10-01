@@ -1,10 +1,9 @@
 // deps-guard.mjs — dependency installs in a checkout several workflows share.
 //
-// nivo-backend/node_modules was deleted and recreated at 20:28:43 on
-// 2026-09-23 while Collab's cut collab-be-identity-r2 ran jest and tsc in the
-// same checkout; its ordinal 4 worker saw "node_modules disappeared mid-run"
-// and every check in that window had to be re-run (nivo inc-7faca0d4d632,
-// inc-3de1d5efdea6). The rule (modules/kernel/api.yaml conventions.sharedCheckout):
+// A shared checkout's node_modules was deleted and recreated while a
+// workflow's cut ran jest and tsc in the same checkout; one of its workers saw
+// "node_modules disappeared mid-run" and every check in that window had to be
+// re-run. The rule (modules/kernel/api.yaml conventions.sharedCheckout):
 //  - a command that deletes node_modules (npm ci and its aliases) is refused
 //    while a job of ANOTHER workflow of the same ledger is leased, because that
 //    job's checks read node_modules right now;
@@ -128,19 +127,11 @@ export function classifyInstall(program, argv) {
 export async function peerLeasedJobs({ ledgerRepo, workflowId, env = process.env, now = Date.now() }) {
   if (!ledgerRepo) return { known: false, jobs: [] };
   const { openLedgerReader, ledgerFileFor } = await import('../../engine/db/ledger.mjs');
-  const { readMachine } = await import('../../engine/db/machine.mjs');
-  // Decision Q1 (same as the owner digest): the repo's runtime ledger is the file machine.ledgers names for it —
-  // never the pre-Q1 in-repo .starciwork/runtime.sqlite. That legacy store is opened only when the registry names
-  // no ledger for the repo at all: a never-registered checkout's in-repo file is its only lease record, and a
-  // guard errs toward reading a possible lease list rather than silently skipping it.
+  // The repo's runtime ledger is the one file ledgerFileFor resolves (machine.ledgers names it); there is no other place to look.
   let file = null;
   try {
     const resolved = ledgerFileFor(ledgerRepo, { env });
     if (fs.existsSync(resolved)) file = resolved;
-    else if (!readMachine((m) => m.resolveLedger({ repoRoot: ledgerRepo }), null, { env })) {
-      const legacy = path.join(ledgerRepo, '.starciwork', 'runtime.sqlite');
-      if (fs.existsSync(legacy)) file = legacy;
-    }
   } catch { file = null; }
   if (!file) return { known: false, jobs: [] };
   const db = openLedgerReader(file);

@@ -58,7 +58,7 @@ const signalRegexp = (source) => {
 
 // A bare '401' matched any number or id holding those digits (a job id '...-false-401-...' in the echoed launch
 // line, an epoch, a token count) and the product's own "mapped to 401" in a pasted Task; each tripped a 24 h auth
-// circuit (nivo inc-7d452a3329ba, mia-mia inc-10f0777e39c1). 401 counts only as a word next to an auth word or
+// circuit (nivo inc-7d452a3329ba). 401 counts only as a word next to an auth word or
 // an HTTP/status/error prefix.
 const GENERIC_FAILURE = [
   '\\b401\\b[^\\n]{0,60}\\b(?:unauthori[sz]ed|authentication|not authenticated|invalid[^\\n]{0,20}(?:key|token|credential))',
@@ -154,8 +154,8 @@ function answerGate(handle, rule, screen) {
 /**
  * Answer an allowlisted gate that appears MID-RUN (the Kernel's `api nudge` on an op worker): the card's
  * gateAutoAnswer rule for `gate`, the same walk-and-Enter answerGate does at readiness, then up to settleMs
- * for the gate to leave the screen. A loop-detection dialog can halt a worker turn this way
- * (starci-next inc-af01e1cedbf4). Returns {gate, select, answered, cleared, keystroke, reason?}; a gate the
+ * for the gate to leave the screen. A loop-detection dialog can halt a worker turn this way.
+ * Returns {gate, select, answered, cleared, keystroke, reason?}; a gate the
  * card does not allowlist returns answered:false with no keystroke. `io` {read, sleep, now} is the spec seam.
  */
 export function answerAllowlistedGate(handle, adapter, gate, { screen = null, io = null } = {}) {

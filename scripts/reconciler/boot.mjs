@@ -24,6 +24,7 @@ import { machineFileFor, pidAlive, readMachine, withMachine } from '../../engine
 import { lockHolder, markStarting, startingHolder } from '../connectors/lib.mjs';
 import { stopTree } from '../supervisor/host-health.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
+import { translator } from '../lib/i18n.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, SKILL_ROOT, START_REASON_ENV, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
 import { machineUsage } from '../kernel/usage-report.mjs';
 
@@ -153,9 +154,7 @@ export async function ensure({ env = process.env, now = Date.now(), numbers = re
   const safe = plan.looping;
   if (plan.alertDue) {
     const minutes = Math.round(numbers.crashLoop.windowMs / 60_000);
-    out.alert = await push((language) => (language === 'vi'
-      ? `KHẨN: StarCi reconciler khởi động lại ${plan.starts.length + 1} lần trong ${minutes} phút; chạy safe mode (chỉ đọc). Xem machine_logs actor reconciler (boot.mjs --status).`
-      : `URGENT: the StarCi reconciler restarted ${plan.starts.length + 1} times in ${minutes} minutes; running in safe mode (read-only). See machine_logs actor reconciler (boot.mjs --status).`));
+    out.alert = await push((language) => translator(language)('URGENT: the StarCi reconciler restarted {count} times in {minutes} minutes; running in safe mode (read-only). See machine_logs actor reconciler (boot.mjs --status).', { count: plan.starts.length + 1, minutes }));
     record((m) => m.log({ actor: 'reconciler', kind: CRASH_ALERT_KIND, level: 'error', msg: `crash loop: ${plan.starts.length + 1} starts in ${minutes} min; safe mode`, data: { starts: plan.starts, alert: out.alert ?? null }, at: now }));
   }
   // A caller-named reason (owner-restart, start) or a previous engine that ended on purpose is a planned start: never a crash.

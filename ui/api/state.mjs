@@ -9,5 +9,3 @@ export function uiState(db, entity, native, { dueAt = null, now = Date.now(), wa
   if ((warnAt != null && now >= warnAt) || escalations > 0) return mapped === 'waiting' ? 'warn' : mapped;
   return mapped;
 }
-
-export function viewState(row) { return UI_STATES.has(row?.ui) ? row.ui : 'unknown'; }

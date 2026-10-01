@@ -55,7 +55,7 @@ export default function KitPage() {
           </ConceptBlock>
           <ConceptBlock concept="frame"><h2 className="mb-2 text-sm font-medium">Loại tệp và đường dẫn</h2>
             <div className="mb-3 flex flex-wrap gap-2">{fileKinds.map((kind) => <FileTypeBadge kind={kind} key={kind} />)}</div>
-            <div className="grid gap-2"><PathLink path="D:/Repositories/nivo-backend/.starciwork/evidence" kind="dir" /><PathLink path="D:/Repositories/nivo-backend/src/module.ts" kind="file" /></div>
+            <div className="grid gap-2"><PathLink path="todo-app/.starciwork/evidence" kind="dir" /><PathLink path="todo-app/src/module.ts" kind="file" /></div>
           </ConceptBlock>
           <ConceptBlock concept="C4"><h2 className="mb-2 text-sm font-medium">Phân bố đơn vị</h2><LifecycleBar counts={unitCounts} /></ConceptBlock>
         </CardContent></Card>
@@ -65,7 +65,7 @@ export default function KitPage() {
     <div className="kit-grid">
       <Card><CardHeader><CardTitle>Card và Nâng cao</CardTitle></CardHeader><CardContent className="grid gap-4">
         <p className="text-sm text-muted-foreground">Một bề mặt, chữ rõ cấp bậc, chi tiết tách bằng đường mảnh.</p>
-        <Advanced summary="Mã và đường dẫn" variant="inline"><PathLink path="D:/Repositories/nivo-backend/src/module.ts" kind="file" /></Advanced>
+        <Advanced summary="Mã và đường dẫn" variant="inline"><PathLink path="todo-app/src/module.ts" kind="file" /></Advanced>
         <Button variant="outline" className="justify-self-start" onClick={() => setDrawerOpen(true)}>Xem drawer</Button>
       </CardContent></Card>
       <Card><CardHeader><CardTitle>Bảng và trạng thái</CardTitle></CardHeader><CardContent className="grid gap-4">
@@ -75,6 +75,6 @@ export default function KitPage() {
       </CardContent></Card>
     </div>
     <Card><CardHeader><CardTitle>Tải và lỗi</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2"><PageSkeleton /><FeedbackState error onRetry={() => undefined}>Không đọc được nguồn dữ liệu.</FeedbackState></CardContent></Card>
-    <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} title="Drawer" description="Chi tiết kỹ thuật chỉ đọc"><div className="grid gap-4"><p>Thông tin giữ một cấp bề mặt.</p><Advanced summary="Mã và đường dẫn"><PathLink path="D:/Repositories/nivo-backend/src/module.ts" kind="file" /></Advanced></div></Drawer>
+    <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} title="Drawer" description="Chi tiết kỹ thuật chỉ đọc"><div className="grid gap-4"><p>Thông tin giữ một cấp bề mặt.</p><Advanced summary="Mã và đường dẫn"><PathLink path="todo-app/src/module.ts" kind="file" /></Advanced></div></Drawer>
   </ConceptBlock>;
 }

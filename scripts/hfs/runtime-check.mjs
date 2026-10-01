@@ -37,8 +37,6 @@ import { sourceNameFindings } from './runtime-rules/source-name.mjs';
 import { specPlacementFindings } from './runtime-rules/test-layout.mjs';
 import { tierFindings } from './runtime-rules/tier-direction.mjs';
 
-/** The tree codes checkRepo reports for a runtime repository (rules R01, R02, R03). */
-export const TREE_CODES = Object.freeze(['HFS_SLOT_UNDECLARED', 'HFS_SLOT_AMBIGUOUS', 'HFS_SLOT_NOT_ENABLED', 'HFS_FORBIDDEN_PRESENT', 'HFS_TRACKED_MUST_BE_IGNORED', 'HFS_SLOT_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY']);
 const SOURCE = /\.(?:mjs|cjs|js)$/;
 /** The codes only an extra emitter reports (scripts/checks/check-contract-cites.mjs, passed in by the `starci check` driver). */
 export const EXTRA_ONLY = new Set(['RT_CITED_PATH_MISSING']);

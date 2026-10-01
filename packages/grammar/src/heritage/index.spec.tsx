@@ -26,16 +26,16 @@ describe("@starci/grammar/heritage", () => {
     it("keeps Common semantic and accessibility behavior substitutable", () => {
         const markup = renderToStaticMarkup(
             <HeritageGrammarRoot>
-                <HeritageHeading level={2}>Giới thiệu</HeritageHeading>
-                <HeritageButton variant="primary">Tiếp tục</HeritageButton>
+                <HeritageHeading level={2}>Introduction</HeritageHeading>
+                <HeritageButton variant="primary">Continue</HeritageButton>
             </HeritageGrammarRoot>,
         )
 
         expect(markup).toContain("data-grammar-family=\"heritage\"")
         expect(markup).toContain("<h2")
-        expect(markup).toContain("Giới thiệu")
+        expect(markup).toContain("Introduction")
         expect(markup).toContain("<button")
-        expect(markup).toContain("Tiếp tục")
+        expect(markup).toContain("Continue")
     })
 
     it("keeps the inherited Common Card header outside its painted Card content", () => {

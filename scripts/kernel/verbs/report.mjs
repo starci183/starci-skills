@@ -71,7 +71,7 @@ export default {
   const handoverProblem = jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' ? handoverAskProblem(report.question) : null;
   if (handoverProblem) throw Object.assign(new Error(`report fails the handover ask: ${handoverProblem}`), { code: 'report-invalid' });
   if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask') handoverProofGate(db, job, repo);
-  // Autopilot: the handover is the owner's one review, so its ask carries the "sổ chờ thầy xem lại" bundle - every
+  // Autopilot: the handover is the owner's one review, so its ask carries the owner review ledger bundle - every
   // provisional acceptance (with its images), deferred leg, deferred-to-handover proof and autopilot decision.
   if (jobOpOf(job) === HANDOVER_OP && report.outcome === 'ask' && autopilotOn(db, job.workflow_id)) {
     const bundle = autopilotBundle(db, job.workflow_id);

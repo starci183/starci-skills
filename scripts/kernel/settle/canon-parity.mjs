@@ -402,7 +402,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   return { green: true, via: 'canon-parity', checks: { checks }, parity: { base, ...(owedAccepted ? { owedToWire: { findings: slice.findings, wires: owedAccepted.wires } } : {}), lint: { status: linted.status, counts: linted.counts }, tsc: typed.projects, superseded } };
 }
 
-/** A path of a report or payload (maybe prefixed with the repository folder, e.g. nivo-fe/apps/...) relative to root. */
+/** A path of a report or payload (maybe prefixed with the repository folder, e.g. todo-app-fe/apps/...) relative to root. */
 const relOf = (p, root) => { const n = norm(p).replace(/\/+$/, ''); const head = path.basename(root); return n.startsWith(`${head}/`) ? n.slice(head.length + 1) : n; };
 
 /**

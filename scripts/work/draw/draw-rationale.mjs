@@ -40,9 +40,6 @@ import { list } from '../../lib/list.mjs';
 import { isFile } from '../../lib/fs-kind.mjs';
 
 export const DRAW_RATIONALE_MISSING = 'DRAW_RATIONALE_MISSING';
-export const DRAW_RATIONALE_CODES = Object.freeze([DRAW_RATIONALE_MISSING]);
-/** The contract change that made rationale evidence a gate (modules/kernel/contract-changes/). */
-export const DRAW_RATIONALE_CHANGE = 'draw-devin-rationale';
 export const RATIONALE_KINDS = Object.freeze(['element', 'layout', 'spacing', 'type', 'radius', 'colour', 'art']);
 export const WHY_ATTR = 'data-why';
 export const REDLINE_ATTR = 'data-draw-redline';

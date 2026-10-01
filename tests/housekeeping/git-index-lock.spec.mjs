@@ -1,4 +1,4 @@
-// git-index-lock: a stale shared .git/index.lock (starci-next sn-subscription backend.implement a20: a 403 KB lock
+// git-index-lock: a stale shared .git/index.lock (a 403 KB lock
 // from 01:01:34, no git process alive, every commit in the checkout refused) is recovered by the runtime, only when
 // it is older than allocation.housekeeping.gitIndexLockStaleMs and no git process may be working on that repository;
 // each removal is a Supervisor audit event (machine.sqlite sup_events). The op command guard (before an op's git command) and the housekeeping area gitlocks run it.
@@ -46,13 +46,13 @@ test('runtimes.yaml declares the stale window and housekeeping runs the gitlocks
 });
 
 test('a git process holds the repo when it names it or names none; one naming only another repo does not', () => {
-  const repo = path.resolve('D:/Repositories/starci-next');
-  assert.deepEqual(reposNamed('"C:\\Program Files\\Git\\cmd\\git.exe" -C "D:\\Repositories\\starci-next" status'), ['D:\\Repositories\\starci-next']);
+  const repo = path.resolve('D:/Repositories/ecommerce-app');
+  assert.deepEqual(reposNamed('"C:\\Program Files\\Git\\cmd\\git.exe" -C "D:\\Repositories\\ecommerce-app" status'), ['D:\\Repositories\\ecommerce-app']);
   assert.deepEqual(reposNamed('git --git-dir=/r/.git --work-tree /r log'), ['/r/.git', '/r']);
-  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/starci-next commit -m x'), repo), 'this');
-  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/starci-next/src add a'), repo), 'this');
-  assert.equal(processOnRepo(proc('git.exe --git-dir=D:/Repositories/starci-next/.git status'), repo), 'this');
-  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/nivo-backend status'), repo), 'other');
+  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/ecommerce-app commit -m x'), repo), 'this');
+  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/ecommerce-app/src add a'), repo), 'this');
+  assert.equal(processOnRepo(proc('git.exe --git-dir=D:/Repositories/ecommerce-app/.git status'), repo), 'this');
+  assert.equal(processOnRepo(proc('git.exe -C D:/Repositories/todo-app-be status'), repo), 'other');
   assert.equal(processOnRepo(proc('git.exe commit -m x'), repo), 'unknown', 'its cwd may be this repo');
 });
 

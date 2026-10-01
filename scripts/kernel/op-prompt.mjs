@@ -18,6 +18,7 @@ import { renderGrammarContext } from './grammar-context.mjs';
 import { cutManifestPromptLines, seamPromptLines } from './cut-seam.mjs';
 import { resumePromptLines } from './resume-context.mjs';
 import { specsBriefLines, specsOf, verificationScopeLines } from '../route/spec-deferral.mjs';
+import { translator } from '../lib/i18n.mjs';
 
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
@@ -37,7 +38,7 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
   const wf = packet.context.workflow?.id ?? '<workflow-id>';
   return [
     `logging: the owner reads your work as TYPED LOG ROWS, not terminal text - log each step, command, file edit, check, test run, render and failure as it happens; --msg is one short line in owner_language, facts go in --data (JSON, at most 4 KB), bulk output goes in a file named in --refs:`,
-    `  node ${api} log --repo ${repoLabel} --workflow ${wf} --job ${jobLabel} --kind cmd.run --msg "Chạy unit test" --data '{"cmd":"npm test","exit":1,"durationMs":41200,"stdoutRef":"<path>"}'`,
+    `  node ${api} log --repo ${repoLabel} --workflow ${wf} --job ${jobLabel} --kind cmd.run --msg "${translator(packet.context.owner_language ?? 'en')('Run unit tests')}" --data '{"cmd":"npm test","exit":1,"durationMs":41200,"stdoutRef":"<path>"}'`,
     `  kinds: step.start {name} | step.end {name, durationMs, ok} | cmd.run {cmd, exit, durationMs, stdoutRef?, output?} | file.edit {path, added, removed, diffRef?} | check.result {name, pass, evidenceRef?} | test.result {suite, passed, failed, failures:[{name, message, file}]} | render {artifactRef, label} | video {artifactRef, label} | trace {artifactRef} | decision {markdown} | narration {markdown} | error {code, message, hint}`,
     `  owed at minimum: a step.start and a step.end around each step of your brief, and one cmd.run {cmd, exit, durationMs} per check command you put in report.checks (the same command string) - settle warns ${'LOG_TYPED_MISSING'} on your job when they are missing.`,
     `  a browser run (Playwright via scripts/uat/uat-slots.mjs run) records video, trace.zip and screenshots; put operational recordings under STARCI_JOB_SCRATCH and attach them with api report. Work-record UAT proof stays at its required owned path.`,
@@ -172,7 +173,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `shared_checkout: other ops of this workflow edit and build in this same worktree while you run (modules/kernel/api.yaml conventions.sharedCheckout).`,
   `  never git commit, reset, rebase, stash, clean, switch, checkout or restore, never push: the runtime is the only committer - when your op settles green it commits exactly your owned paths as the workflow's checkpoint (scripts/kernel/workflow-checkpoint.mjs); a commit of yours, or a change outside your owned paths, refuses your settle.`,
   `  dependencies: npm install runs under the repository's dependency lock; never npm ci or delete node_modules while other workflows run (the guard refuses it) - report blocked environment instead.`,
-  `  never create a git worktree, junction, symlink or hard link anywhere (git worktree add, mklink, New-Item -ItemType Junction/SymbolicLink, ln): work in this checkout with its own node_modules - a private worktree linked into the live repository deleted 674 live files when it was removed (nivo-fe inc-c8fbf76aa499); report a need for another tree, never make one.`,
+  `  never create a git worktree, junction, symlink or hard link anywhere (git worktree add, mklink, New-Item -ItemType Junction/SymbolicLink, ln): work in this checkout with its own node_modules - a private worktree linked into the live repository deleted 674 live files when it was removed; report a need for another tree, never make one.`,
   `  your git and npm are the runtime guard: a refusal prints "starci guard: refused ..." and exits 3 - report the need, never work around it.`,
   ...(packet.context.goal ? [`goal: the owner's goal (revision ${packet.context.goal.revision}) is packet context.goal.statement - read it with api op-contract --json; never read the ledger for it.`] : []),
   ...(unresolved.length ? [`unresolved_owned_paths: ${unresolved.map((p) => `${p.path} (${p.repository === 'not-app-relative' ? 'not app-relative' : `repository ${p.repository} is not bound`})`).join(', ')} — report blocked with kind authority; never guess a root`] : []),

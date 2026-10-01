@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { failureOnScreen } from '../../scripts/agent/lib.mjs';
 
-// nivo inc-7d452a3329ba, mia-mia inc-10f0777e39c1: a bare '401' in an id, a number or the runtime's own pasted
+// Live defect: a bare '401' in an id, a number or the runtime's own pasted
 // Task was read as an auth failure and opened a 24 h provider circuit.
 const card = { attestation: {}, knownFailures: [{ signal: 'Throttling\\.AllocationQuota' }] };
 

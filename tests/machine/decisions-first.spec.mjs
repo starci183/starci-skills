@@ -72,7 +72,7 @@ test('the doorbell carries the oldest item in copy-paste form', (t) => {
   const sent = [];
   const r = ringDoorbellWith({ ledger, workflowId: WF, wake: ({ text }) => { sent.push(text); return { action: 'kernel-woken', delivered: true }; }, repo: 'D:/r' });
   assert.equal(r.action, 'rung');
-  assert.match(sent[0], /^\[decide\] 1 việc chờ: api decisions --workflow wf-first \| oldest /);
+  assert.match(sent[0], /^\[decide\] 1 waiting: api decisions --workflow wf-first \| oldest /);
   assert.match(sent[0], new RegExp(`oldest ${di.id}`));
   assert.match(sent[0], /pick ONE: \(a\) push the ready units: node scripts\/kernel\/cli\.mjs dispatch-ready/);
   assert.match(sent[0], new RegExp(`then: node scripts/kernel/cli.mjs decisions --repo D:/r --resolve ${di.id}`));

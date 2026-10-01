@@ -112,23 +112,23 @@ test('work/catalog@1 types the setup entry with the scope field names and refuse
   for (const field of ['nodes', 'deps', 'exclusions', 'openQuestions']) assert.deepEqual(setup[field], scope[field], `${field} drifted from $defs.scope`);
   assert.deepEqual(Object.keys(setup.request.properties), Object.keys(scope.request.properties).filter(k => k !== 'workflow'));
   const validate = new Ajv2020({ allErrors: true, strict: false }).compile(catalogSchema);
-  const catalog = { schema: 'work/catalog@1', id: 'miamia', description: 'Synthetic catalog for a layout test.',
+  const catalog = { schema: 'work/catalog@1', id: 'todo-app', description: 'Synthetic catalog for a layout test.',
     features: [{ id: 'repository-foundation', directory: 'features/repository-foundation', description: 'Baseline.' }] };
   const entry = {
     request: { goalIdentity: 'abc123', goalRevision: 0, outcome: 'Canonical Work, SRS, SDS and stacks.' },
     assertions: ['Every declared outcome maps to a required leaf, a deferred decision or a justified exclusion.'],
-    nodes: [{ id: 'miamia.work', kind: 'business', purpose: 'Seed the SRS.' }], deps: [], exclusions: [],
+    nodes: [{ id: 'todo-app.work', kind: 'business', purpose: 'Seed the SRS.' }], deps: [], exclusions: [],
     review: { outcome: 'pass', checks: ['starci validate'] },
   };
   const withSetup = setup => ({ ...catalog, extensions: { work3: { setup } } });
-  assert.ok(validate(withSetup({ 'wf-miamia-work-and-stacks-mud7kjun': { prepare: entry, stacks: entry } })), JSON.stringify(validate.errors));
+  assert.ok(validate(withSetup({ 'wf-todo-app-work-and-stacks-mud7kjun': { prepare: entry, stacks: entry } })), JSON.stringify(validate.errors));
   assert.equal(validate(withSetup({ 'wf-x': { prepare: { ...entry, state: 'done' } } })), false, 'a catalog entry carries no state');
   assert.equal(validate(withSetup({ 'wf-x': { prepare: { ...entry, completion: { evidence: ['e'] } } } })), false);
   assert.equal(validate(withSetup({ 'import-cv-seam': { import: entry } })), false, 'entries are keyed by workflow id');
   assert.equal(validate(withSetup({ 'wf-x': { cleanup: entry } })), false, 'one entry per workspace.manage mode');
 });
 
-// A Mia Mia prepare cut set was structurally blocked after ordinal 1: full
+// A prepare cut set was structurally blocked after ordinal 1: full
 // validation failed CATALOG_DIRTY on the catalog the final ordinal owned, and
 // workspace.manage declared no cutSetAuthority to read that as sibling-owned.
 test('workspace.manage declares cutSetAuthority for prepare/import cut sets', () => {
@@ -140,8 +140,8 @@ test('workspace.manage declares cutSetAuthority for prepare/import cut sets', ()
   assert.match(authority.permits, /full-regression-final/);
 });
 
-// StarCi Next backend.scaffold cut ordinals were refused on a repository-wide
-// lint red that only a later sibling could fix (inc-751dd1ac4492).
+// backend.scaffold cut ordinals were refused on a repository-wide
+// lint red that only a later sibling could fix.
 test('the scaffold ops declare cutSetAuthority for their cut sets', () => {
   for (const op of ['backend.scaffold', 'interface.scaffold', 'package.scaffold']) {
     const doc = parseYaml(fs.readFileSync(path.join(root, `modules/ops/ops/${op}.yaml`), 'utf8'));

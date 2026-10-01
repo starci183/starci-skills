@@ -359,7 +359,7 @@ slots:
     goesTo: "${STARCI_CACHE_HOME:-%LOCALAPPDATA%/StarCi/cache}/<repo>/<tool>/ (the canon presets set eslint --cache-location, jest cacheDirectory, turbo cacheDir, sonar.working.directory)"
   - id: app.agent-output
     profiles: [app]
-    path: "{report*.json,*.tmp.json,%*%,nul,.qwen*,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
+    path: "{report*.json,*.tmp.json,%*%,nul,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
     presence: forbidden
     tracked: external
     tier: none
@@ -528,7 +528,7 @@ slots:
     goesTo: "${STARCI_CACHE_HOME:-%LOCALAPPDATA%/StarCi/cache}/<repo>/<tool>/ (the canon presets set eslint --cache-location, jest cacheDirectory, turbo cacheDir, sonar.working.directory)"
   - id: repo.agent-output
     profiles: [be, fe]
-    path: "{report*.json,*.tmp.json,%*%,nul,.qwen*,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
+    path: "{report*.json,*.tmp.json,%*%,nul,.artifacts/,.tmp-*,*-lint.json,lf.json,lt.json,*.log,design-plans/,.gitmounts/,.dat,vi-flat.txt}"
     presence: forbidden
     tracked: external
     tier: none

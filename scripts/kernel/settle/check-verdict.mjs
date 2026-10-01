@@ -6,7 +6,6 @@
 // (gate.mjs exits 2 when a tool could not run; canon-scan answers status unresolved); a bare exit code reads
 // 0 -> pass, 124 (timeout) / 127 (spawn failure) -> unavailable, anything else -> red. A run is `pass` only with raw
 // exit 0 (DBTREE check_runs: no pass with a raw exit != 0) - a status word never lifts a red exit to green.
-export const CHECK_VERDICTS = Object.freeze(['pass', 'red', 'unavailable']);
 const UNAVAILABLE = new Set(['unavailable', 'unresolved', 'invalid', 'error', 'timeout', 'not-run', 'not_run', 'skipped-unavailable']);
 const PASS = new Set(['ok', 'pass', 'passed', 'green', 'clean', 'success', 'succeeded']);
 const RED = new Set(['findings', 'fail', 'failed', 'red', 'new-findings']);

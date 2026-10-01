@@ -26,8 +26,8 @@ route:
     A CAPACITY circuit (failureKind capacity: modules/models/agents/devin.yaml
     capacityExhausted) expires after allocation.cooldownMs.capacity
   kernelBias: >-
-    a Kernel does not bias a route (owner decision 2026-09-25: starci-next wf-sn-foundation routed
-    op-interface.implement-c3bcc0d5e4 with --avoid devin-agent and it went to codex,
+    a Kernel does not bias a route (owner decision 2026-09-25: a Kernel once routed
+    an interface.implement leg with --avoid devin-agent and it went to codex,
     defeating the evidence routing that sends implementation to Devin first). --prefer and --avoid
     are unknown options on api route and api dispatch: both refuse them with the typed error
     unknown-option before any work. Pool

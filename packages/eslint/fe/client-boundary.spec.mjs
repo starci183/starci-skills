@@ -33,10 +33,10 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       { filename: at("apps/web/src/components/leaves/Menu/index.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/features/overlays/Compose/index.tsx"), code: DIRECTIVE },
       // a workspace package keeps its grammar tiers at src/<tier>, with no components/ folder
-      { filename: at("packages/nivo-ui/src/leaves/NivoIcon/index.tsx"), code: DIRECTIVE },
-      { filename: at("packages/nivo-ui/src/leaves/NivoGrammar/index.ts"), code: DIRECTIVE },
-      { filename: at("packages/nivo-ui/src/branches/Rail/component.tsx"), code: DIRECTIVE },
-      { filename: at("packages/nivo-ui/src/branches/Rail/index.tsx"), code: DIRECTIVE },
+      { filename: at("packages/todo-app-ui/src/leaves/TodoIcon/index.tsx"), code: DIRECTIVE },
+      { filename: at("packages/todo-app-ui/src/leaves/TodoGrammar/index.ts"), code: DIRECTIVE },
+      { filename: at("packages/todo-app-ui/src/branches/Rail/component.tsx"), code: DIRECTIVE },
+      { filename: at("packages/todo-app-ui/src/branches/Rail/index.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/app/error.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/app/global-error.tsx"), code: DIRECTIVE },
       { filename: at("apps/web/src/app/[locale]/error.tsx"), code: DIRECTIVE },
@@ -58,13 +58,13 @@ test("FE-CLIENT-1: the directive sits only at an interaction boundary", () => {
       { filename: at("apps/web/src/features/layouts/Shell/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
       { filename: at("apps/web/src/features/pages/Home/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
       { filename: at("apps/web/src/components/composites/Row/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
-      // a providers wrapper kept as a layout feature (nivo-fe features/layouts/ConsoleProviders) is not the providers role:
+      // a providers wrapper kept as a layout feature (features/layouts/ConsoleProviders) is not the providers role:
       // the convention puts it at the route tree's providers.tsx
       { filename: at("apps/web/src/features/layouts/ConsoleProviders/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "slot" }] },
       // a file named like the role outside the route tree is no role
       { filename: at("apps/web/src/modules/theme/providers.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       // the package layout does not widen the app layout, and a package composite is not a boundary
-      { filename: at("packages/nivo-ui/src/composites/Row/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
+      { filename: at("packages/todo-app-ui/src/composites/Row/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: at("apps/web/src/leaves/Menu/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: at("apps/web/src/components/branches/Rail/index.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
       { filename: at("apps/web/src/components/blocks/Feed/component.tsx"), code: DIRECTIVE, errors: [{ messageId: "elsewhere" }] },
@@ -164,7 +164,7 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
       { filename: at("apps/web/src/app/[locale]/api/x/route.ts"), code: 'import { NextResponse } from "next/server"\nexport const GET = () => NextResponse.json({})' },
       { filename: at("apps/web/src/proxy.ts"), code: 'import { NextResponse } from "next/server"\nexport const proxy = () => NextResponse.next()' },
       // a server COMPONENT (feature page, connected block) is judged by reachability (FE_CLIENT_REACHES_SERVER), not by a marker:
-      // starci-next-fe components/blocks/LearnContentSections/index.tsx imports a marked reader and needs no marker of its own
+      // a components/blocks/<name>/index.tsx that imports a marked reader needs no marker of its own
       { filename: FEATURE, code: 'import { getTranslations } from "next-intl/server"\nexport default async function Home() { await getTranslations(); return null }' },
       { filename: at("apps/web/src/components/blocks/Sections/index.tsx"), code: 'import { readMarked } from "../../../modules/marked/read-marked"\nexport const Sections = async () => { await readMarked(); return null }' },
       // a marked reader passes

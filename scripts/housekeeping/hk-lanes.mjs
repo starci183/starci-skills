@@ -14,7 +14,7 @@
 // its merge-base with main, one reflog position) and it is skipped as no-work-yet; a landed lane still
 // in use (its HEAD/branch reflog or directory changed within the grace) is skipped as recent-activity.
 // laneGraceMs unset or not a positive number sweeps nothing (lane-grace-unset). A reparse point
-// inside a worktree means `git worktree remove` could be made to walk out of it (nivo-fe inc-c8fbf76aa499), so that
+// inside a worktree means `git worktree remove` could be made to walk out of it, so that
 // worktree is skipped, never unlinked here. The main checkout, the checkout the sweep runs from, a
 // detached or dirty tree and anything outside the lanes root are skipped with a reason.
 import fs from 'node:fs';

@@ -204,7 +204,7 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
   // ---- api status unreadable: never a progress-stall (the pass holds the last readable status, or judges nothing);
   // statusUnreadablePasses consecutive misses are a runtime defect of the read itself, the Supervisor's, naming the error.
   // It lands in the SUPERVISOR ledger (like cap-starved / service-quarantined): a product-ledger DI with decider supervisor
-  // never reaches `decisions.mjs supervisor --list` (nivo-backend di-8f93adc4). productLedger/workflowId keep the refs.
+  // never reaches `decisions.mjs supervisor --list`. productLedger/workflowId keep the refs.
   if (unreadable) {
     const held = unreadable.heldAt != null && status ? `holding the status read ${Math.round((now - unreadable.heldAt) / 60_000)}m ago` : 'no readable status held; stall not judged';
     out.lines.push(`STATUS-UNREADABLE ${workflowId}: ${unreadable.misses} consecutive pass(es) since ${iso(unreadable.since)}: ${unreadable.error}; ${held}`);

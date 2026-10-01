@@ -1,9 +1,10 @@
 schema: starci/code-example-catalog@1
 title: Frontend code examples
 purpose: |
-  Multi-file interaction examples extracted from starci-academy-fe ownership shapes.
+  Multi-file interaction examples extracted from the example front ends' ownership
+  shapes (examples/ecommerce-app/fe).
   They teach connected/pure splits and Grammar usage; they are not product screens
-  or Academy business copy.
+  or product business copy.
 examples:
   - id: connected-block
     path: connected-block

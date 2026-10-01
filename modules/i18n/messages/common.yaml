@@ -1,0 +1,5 @@
+schema: starci/i18n-catalog@1
+area: common
+purpose: Owner-visible messages shared across the runtime, keyed from their English source (scripts/lib/i18n.mjs).
+messages:
+  - {en: "Open", vi: "Mở"}

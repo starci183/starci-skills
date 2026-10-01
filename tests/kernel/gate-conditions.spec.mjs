@@ -7,13 +7,13 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../../engine/db/ledger.mjs';
 import {seedWorkflow} from '../helpers/ledger-fixture.mjs';
 import {parseCondition,evaluateCondition,typedIncidents,recordRevision} from '../../scripts/kernel/gate-conditions.mjs';
-// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
+// These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs) is
 // on by default, so they run with it off - tests/kernel/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
 
 // Owner-gate and peer-wait incidents described their release only in free text; nobody re-checked it
-// and workflows sat for hours after it held (nivo AUTH inc-9f2e1e7ff1f6 waited on WSPV's
-// op-backend.implement-82b3110067; Collab inc-28187662c4fe on the Modules shell rev). Typed
+// and workflows sat for hours after it held (one waited on a peer's
+// op-backend.implement job; another on a peer's shell rev). Typed
 // --until-* conditions are stored on the incident, evaluated read-only on every status (every watchdog
 // tick), before route/dispatch, after a settle and after a peer message, and the runtime resolves the
 // incident once all hold. Opt-in: an incident without them keeps its free-text behaviour exactly.
@@ -72,7 +72,7 @@ test('parseCondition reads every typed form, Windows drive paths included, and r
   assert.deepEqual(parseCondition('job',PEER_JOB),{type:'job',jobId:PEER_JOB,want:'settled'});
   assert.deepEqual(parseCondition('job',`${PEER_JOB}:succeeded`),{type:'job',jobId:PEER_JOB,want:'succeeded'});
   assert.deepEqual(parseCondition('message',`${BASE}:reply`),{type:'message',peer:BASE,kind:'reply'});
-  assert.deepEqual(parseCondition('commit','D:/Repositories/miamia-fe:app/layout.tsx'),{type:'commit',repo:'D:/Repositories/miamia-fe',target:'app/layout.tsx'});
+  assert.deepEqual(parseCondition('commit','D:/Repositories/ecommerce-app-fe:app/layout.tsx'),{type:'commit',repo:'D:/Repositories/ecommerce-app-fe',target:'app/layout.tsx'});
   assert.deepEqual(parseCondition('incident','inc-123456789012'),{type:'incident',incidentId:'inc-123456789012',want:'resolved'});
   assert.throws(()=>parseCondition('job',`${PEER_JOB}:done`),{code:'until-invalid'});
   assert.throws(()=>parseCondition('commit','no-colon'),{code:'until-invalid'});
@@ -130,8 +130,8 @@ test('--until-job :succeeded on a job that settled failed can no longer be met: 
   assert.match(f.reason,new RegExp(`typed wait ${incidentId} \\(job ${PEER_JOB} settled failed, not succeeded\\) can no longer be met`));
 });
 
-// starci-next sn-subscription inc-da9c2be0115a waited 2h on learn-content fa50f7be16:succeeded after it
-// settled failed while its retry 77798b1b10 was queued - the wait read unmeetable and nobody re-pointed it.
+// A workflow waited 2h on a peer job's :succeeded after it
+// settled failed while its retry was queued - the wait read unmeetable and nobody re-pointed it.
 test('--until-job follows the retry lineage: a failed job with a queued retry is a live wait, met when the retry succeeds',t=>{
   const fx=fixture(t);
   fx.seedJob(BASE,PEER_JOB);
@@ -266,7 +266,7 @@ test('evaluateCondition is read-only and a finished workflow\'s incidents are ne
   assert.equal(fx.read(db=>db.prepare('SELECT count(*) n FROM events').get().n),before);
 });
 
-test('--until-job: a cancelled job is not settled; the wait follows its replacement (nivo auth inc-7c46a61faba1)',t=>{
+test('--until-job: a cancelled job is not settled; the wait follows its replacement',t=>{
   const fx=fixture(t);
   const cut={id:'backend-implement-r2',ordinal:3,total:3};
   const at=Date.now();
@@ -299,10 +299,10 @@ test('--until-job: a cancelled job is not settled; the wait follows its replacem
   assert.equal(evaluate({type:'job',jobId:'op-backend.implement-aaaaaaaaaa',want:'succeeded'}).met,true);
 });
 
-// --until-record >=<rev> reads the record's OWN revision (starci-next wf-sn-subscription inc-13eb86851909):
+// --until-record >=<rev> reads the record's OWN revision:
 // app-layout (work/ui-screen@1) stood at change.rev 6 yet '>=6' stayed pending with evidence rev=-,
 // because only a top-level rev was read and a ui-screen has none - its nested brand.rev 5 / shell.rev 7
-// are bindings to other records. Each fixture below is real-shaped (trimmed from starci-next) and its
+// are bindings to other records. Each fixture below is real-shaped (trimmed from a real record) and its
 // nested revs are chosen so that reading one would flip the verdict.
 const APP_LAYOUT=`schema: work/ui-screen@1
 id: ui.learning-paths.app-layout
@@ -371,7 +371,7 @@ state: done
 rev: 7
 origin: repository
 app:
-  repository: starci-next-fe
+  repository: ecommerce-app-fe
   root: .
   appDir: src/app
   framework: next-app-router
@@ -456,7 +456,7 @@ change:
   reason: Added the import intake guarantee.
 `;
 
-test('recordRevision: the record\'s own top-level rev or change.rev, never a nested binding\'s rev (inc-13eb86851909)',()=>{
+test('recordRevision: the record\'s own top-level rev or change.rev, never a nested binding\'s rev',()=>{
   const cases=[
     [{schema:'work/ui-screen@1',brand:{rev:5},shell:{ref:'shell',rev:7,layouts:[]},change:{rev:6,kind:'clarifying'}},{rev:6,source:'change.rev'}],
     [{schema:'work/layout-tree@1',rev:7,nodes:[{layout:{rev:12}}],change:{rev:7}},{rev:7,source:'rev'}],

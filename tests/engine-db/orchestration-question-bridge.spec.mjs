@@ -7,8 +7,8 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from '../helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus} from '../../engine/db/ledger.mjs';
 
-// Incidents inc-b944cbaef24b (runtime-orchestration-message-bridge) and inc-20449a260df8
-// (runtime-seam-ask-unreachable), starci-next base-repos backend.scaffold: Orca's preamble tells a worker to
+// Two live incidents on a base-repos backend.scaffold run (an orchestration message bridge gap and an
+// unreachable seam ask): Orca's preamble tells a worker to
 // reach its coordinator with an orchestration ask; the coordinator is the Kernel terminal, which may not call
 // Orca, and api had no verb to read or answer those messages. A cut ordinal waited on an ESLint question and
 // a seam retry on a background ask while status said engaged. The bridge (map REPLACE #7): status, questions,
@@ -146,9 +146,9 @@ test('a worker orchestration ask is surfaced, bridged into the ledger and answer
   assert.equal(json(late.stderr.trim().split('\n').at(-1)).code,'question-answered');
 });
 
-// inc-13ab4be5059f: a nivo run's inbox (thousands of worker heartbeats) passed spawnSync's 1 MB default and
+// Live defect: a monorepo run's inbox (thousands of worker heartbeats) passed spawnSync's 1 MB default and
 // every `api questions` failed with `spawnSync orca.exe ENOBUFS`, so Codex ops blocked in `orca orchestration
-// ask` (inc-884fc91be4bc, inc-ee62686a70a3) never reached the Kernel. A consuming check delivers 50 messages at a
+// ask` never reached the Kernel. A consuming check delivers 50 messages at a
 // time: the drain walks every Delivery, counts heartbeats on the Delivery event (Orca keeps lastHeartbeatAt) and
 // bridges the ask inside them.
 test('a Run of 1600 heartbeats still bridges the Codex worker ask inside it, every Delivery acknowledged',t=>{
@@ -182,7 +182,7 @@ test('a Run of 1600 heartbeats still bridges the Codex worker ask inside it, eve
   assert.equal(json(fx.api(['status','--workflow',fx.workflowId]).stdout).frontier.state,'worker-question');
 });
 
-// nivo inc-6e7b57326aa5: a Codex op sent escalation msg_8173221888c2 ("Blocked: frontend source boundary
+// Live defect: a Codex op sent an escalation ("Blocked: frontend source boundary
 // and build lock") and waited for the Kernel's decision; api reply refused it question-unknown, so no verb
 // could answer. An escalation is answered exactly like a question.
 test('a worker escalation is surfaced and answered through api reply',t=>{
@@ -216,7 +216,7 @@ test('reply refuses an unknown question and a missing body before any host call'
   assert.equal(json(unknown.stderr.trim().split('\n').at(-1)).code,'question-unknown');
 });
 
-// nivo inc-e523617a3c31: the supervisor replaced the Collab Kernel (start-workflow, a new terminal); the Run
+// Live defect: the supervisor replaced the Collab Kernel (start-workflow, a new terminal); the Run
 // still named the old terminal, and api reply was refused consumer_fenced until some later dispatch rebound
 // it. Every Run-scoped call binds the Run to the current Kernel terminal first.
 test('a replaced Kernel rebinds the Run before api reply answers',t=>{

@@ -276,17 +276,17 @@ const seedAsk=(ledger,{workflowId,dispatchId,question,title=null})=>{
 
 test('a parked ask is told once: workflow, question, numbered options and a Generate URL button, no link, in config language',async t=>{
   await withLedger(t,async({ledger,ledgerFile,machineHome,repoRoot})=>{
-    seedAsk(ledger,{workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price',title:'miamia-pricing',question:DECISION});
+    seedAsk(ledger,{workflowId:'wf-my-app-pricing-x1',dispatchId:'ctx_price',title:'my-app-pricing',question:DECISION});
     const bot=fakeBot(),warnings=[];
     const logs=[];const saved={log:console.log,error:console.error,warn:console.warn};
     console.log=console.error=console.warn=(...a)=>logs.push(a.join(' '));
     let first,second;
     try{
-      first=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
-      second=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
+      first=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-my-app-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
+      second=await notifyAsk({ledgerFile,repo:repoRoot,workflowId:'wf-my-app-pricing-x1',dispatchId:'ctx_price'},deps(machineHome,{fetchImpl:bot.fetchImpl,warn:w=>warnings.push(w)}));
     }finally{Object.assign(console,saved);}
     assert.equal(first.sent,1);assert.equal(first.ok,true);
-    assert.equal(first.key,askKeyOf('wf-miamia-pricing-x1','ctx_price'));
+    assert.equal(first.key,askKeyOf('wf-my-app-pricing-x1','ctx_price'));
     assert.equal(second.skipped,'already notified','an ask whose notice is in the chat is not sent again');
     assert.equal(second.messageId,first.messageId);
     assert.equal(bot.calls.length,1);
@@ -295,7 +295,7 @@ test('a parked ask is told once: workflow, question, numbered options and a Gene
     assert.equal(call.body.chat_id,'4242');
     assert.equal(call.body.link_preview_options?.is_disabled,true);
     const text=call.body.text;
-    assert.match(text,/^\[StarCi\] Có câu hỏi cần thầy trả lời\nWorkflow: miamia-pricing \(wf-miamia-pricing-x1\)\nViệc: Xin thông tin · miamia-pricing\n\nCâu hỏi:\nChốt giá gói Pro\?/);
+    assert.match(text,/^\[StarCi\] Có câu hỏi cần thầy trả lời\nWorkflow: my-app-pricing \(wf-my-app-pricing-x1\)\nViệc: Xin thông tin · my-app-pricing\n\nCâu hỏi:\nChốt giá gói Pro\?/);
     assert.match(text,/Lựa chọn:\n1\. 99\.000đ\/tháng\n2\. Để sau/);
     assert.match(text,/Form trả lời chưa mở\. Khi thầy muốn trả lời, bấm "Tạo link trả lời"/);
     assert.ok(!/https?:\/\//.test(text),'no form is served yet, so no link of any kind');
@@ -303,15 +303,15 @@ test('a parked ask is told once: workflow, question, numbered options and a Gene
     assert.ok(Buffer.byteLength(call.body.reply_markup.inline_keyboard[0][0].callback_data)<=64,'callback_data fits Telegram\'s 64 bytes');
     assert.equal(textFor('en').generate,'Generate URL');
     const store=readSentStore({LOCALAPPDATA:machineHome});
-    assert.deepEqual(store.asks['wf-miamia-pricing-x1|ctx_price'].messageIds,[first.messageId]);
-    assert.equal(store.asks['wf-miamia-pricing-x1|ctx_price'].repo,repoRoot,'the store knows where the ask lives, for the button');
-    assert.equal(store.keys[first.key],'wf-miamia-pricing-x1|ctx_price');
+    assert.deepEqual(store.asks['wf-my-app-pricing-x1|ctx_price'].messageIds,[first.messageId]);
+    assert.equal(store.asks['wf-my-app-pricing-x1|ctx_price'].repo,repoRoot,'the store knows where the ask lives, for the button');
+    assert.equal(store.keys[first.key],'wf-my-app-pricing-x1|ctx_price');
     assert.deepEqual(warnings,[]);
     const out=JSON.stringify([first,second])+logs.join('\n')+JSON.stringify(store);
     assert.ok(!out.includes(TOKEN)&&!out.includes('AAFakeToken'),'the token never reaches output, logs or state');
     // A closed ask is never told.
-    ledger.appendEvent({workflowId:'wf-miamia-pricing-x1',entityType:'report',entityId:'ctx_price',kind:'ask-answered',payload:{dispatchId:'ctx_price'}});
-    assert.equal((await notifyAsk({ledgerFile,workflowId:'wf-miamia-pricing-x1',dispatchId:'ctx_price'},deps(path.join(machineHome,'fresh'),{fetchImpl:bot.fetchImpl}))).skipped,'already answered');
+    ledger.appendEvent({workflowId:'wf-my-app-pricing-x1',entityType:'report',entityId:'ctx_price',kind:'ask-answered',payload:{dispatchId:'ctx_price'}});
+    assert.equal((await notifyAsk({ledgerFile,workflowId:'wf-my-app-pricing-x1',dispatchId:'ctx_price'},deps(path.join(machineHome,'fresh'),{fetchImpl:bot.fetchImpl}))).skipped,'already answered');
   });
 });
 

@@ -3,8 +3,8 @@
 // A worker's last two steps are "write report.json" and "api report --report <it>". A worker that dies
 // between them (a host terminal disconnect, a context limit, a killed agent) leaves a complete verdict
 // on disk while api reconcile --dead-worker sees no reports row, settles the attempt failed-no-report,
-// spends a business attempt and re-runs the whole op (2026-09-27: 5 such deaths across nivo and
-// starci-next in one 10-minute host disconnect). Before a dead worker is fenced or settled failed,
+// spends a business attempt and re-runs the whole op (once, 5 such deaths across two product
+// ledgers in one 10-minute host disconnect). Before a dead worker is fenced or settled failed,
 // unfiledReportCandidates lists the op-report@1 files in its STARCI_JOB_SCRATCH (alpha.3: a report is written
 // only there - op_attempts.scratch_dir, else op-prompt.mjs jobScratchDirOf) written since its dispatch (newest
 // first, stamped for this job or not stamped at all), and the caller files the first one that api report accepts -
@@ -13,7 +13,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJsonFile } from '../lib/json.mjs';
-import { jobScratchDirOf } from './op-prompt.mjs';
 
 export const REPORT_FILE = /^report(?:\.[A-Za-z0-9._-]+)?\.json$/;
 const MAX_ENTRIES = 4000;
@@ -31,10 +30,6 @@ function walkFiles(dir, out, budget) {
     else if (entry.isFile() && REPORT_FILE.test(entry.name)) out.push(abs);
   }
 }
-
-/** The scratch directory a dead worker's report is looked for in: the attempt's, else the job's by contract. */
-export const salvageScratchOf = ({ attempt = null, repo = null, workflowId = null, jobId = null } = {}) =>
-  attempt?.scratch_dir ?? (repo && workflowId && jobId ? jobScratchDirOf(repo, workflowId, jobId) : null);
 
 /**
  * unfiledReportCandidates({scratch, sinceMs, jobId, dispatchId}) -> [{file, mtimeMs, outcome}] newest first:

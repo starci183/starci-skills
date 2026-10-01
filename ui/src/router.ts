@@ -36,7 +36,6 @@ export function parseRoute(hash = window.location.hash): Route {
   catch { return { kind: 'not-found' }; }
   const parts = url.pathname.split('/').filter(Boolean);
   if (parts.length === 0) return { kind: 'overview' };
-  if (parts.length === 1 && ['agents', 'changes', 'verdicts', 'proofs', 'projects', 'owner', 'supervisor'].includes(parts[0])) return { kind: 'overview' };
   if (parts[0] === '_kit' && parts.length === 1) return { kind: 'kit' };
   if (parts[0] === 'w' && parts.length === 3) {
     return { kind: 'workflow', project: decode(parts[1]), wf: decode(parts[2]), tab: oneOf(url.searchParams.get('tab'), workflowTabs, 'units') };

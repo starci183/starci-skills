@@ -18,11 +18,11 @@ const plan = (text) => {
 
 test('a canon-conformance phrase in Vietnamese or English routes to the canon-conformance chain: a lint scan, then the refactor slices and the verify leg', () => {
   for (const text of [
-    'dọn nợ nivo-fe theo chuẩn starci',
-    'chuẩn hoá source starci-academy-fe',
-    'Dọn nợ kỹ thuật starci-next-fe: sửa hết lint canon',
-    'conform the nivo-fe frontend to the starci canon, zero lint findings',
-    'clean up the canon debt in the starci-next-fe screens',
+    'dọn nợ todo-app-fe theo chuẩn starci',
+    'chuẩn hoá source ecommerce-app-fe',
+    'Dọn nợ kỹ thuật my-app-fe: sửa hết lint canon',
+    'conform the todo-app-fe frontend to the starci canon, zero lint findings',
+    'clean up the canon debt in the my-app-fe screens',
   ]) {
     const result = plan(text);
     assert.equal(result.status, 'ok', text);

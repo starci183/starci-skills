@@ -99,11 +99,6 @@ const INTERACTIVE_GATES = [
 ];
 
 const FRAMED_GATE_ROWS = 24;
-/** The one-time action that clears `gate`, with <cwd> filled in, or null. */
-export function gateRemedy(gate, { cwd = null } = {}) {
-  const remedy = INTERACTIVE_GATES.find((g) => g.gate === gate)?.remedy;
-  return remedy ? remedy.replaceAll('<cwd>', cwd ? String(cwd) : 'the launch directory') : null;
-}
 
 // A dispatch paste that is still sitting in the provider's input row was never
 // submitted (Codex renders it as "› [Pasted Content 5012 chars]"). Only the
@@ -414,7 +409,7 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   if (failure.test(topLevelRecent)) return { state: 'failed', recent };
   // The queued-message hint under the input box exists only while a turn runs, whatever the rows
   // above show: a queued wake's own text between the spinner and the input row read as a finished
-  // answer (starci-next inc-f6df6aad55b7).
+  // answer.
   if (QUEUED_BEHIND_TURN.test(topLevelRecent)) return { state: 'active', recent };
   // The LAST rows decide. A spinner row followed by the Kernel's finished
   // answer and then its input row is scrollback of a turn that already ended:

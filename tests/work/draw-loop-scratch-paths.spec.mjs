@@ -1,8 +1,7 @@
-// A finished draw loop installs Work files the product commits (kernel-proposal kprop-425639c6c3 part 2,
-// wf-nivo-auth-mum8xr9a, op-interface.draw-9c669023e0 attempt 3): the draw-render record <part>.json and the ui-proof
+// A finished draw loop installs Work files the product commits: the draw-render record <part>.json and the ui-proof
 // score <part>.score.json used to be copied verbatim from the loop round, so they cited the op's STARCI_JOB_SCRATCH
 // (<temp>/starci-job-scratch/<64-hex>/draw-loop/...) and the deleted render harness (file:///<temp>/starci-draw-loop-*).
-// The product's pre-commit secrets guard (nivo-backend scripts/secrets-guard.mjs, step 4 "long hex blob") read the
+// The product's pre-commit secrets guard (a product repo's scripts/secrets-guard.mjs, step 4 "long hex blob") read the
 // scratch dir's 64-hex name as a secret and refused the commit. finishLoop now rewrites every scratch path it installs.
 import test from 'node:test';
 import assert from 'node:assert/strict';

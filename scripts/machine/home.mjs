@@ -122,8 +122,8 @@ export function newestEvent(m, kind) {
 }
 
 /**
- * Where the Supervisor role runs (config.yaml supervisor.mode, default 'chat'). Owner, 2026-09-25: "dời supervisor
- * vào chat đi cho persistent" - the role lives in the owner's desktop chat session again: it owns channel 'main'
+ * Where the Supervisor role runs (config.yaml supervisor.mode, default 'chat'). Owner, 2026-09-25: "move the
+ * supervisor back into chat so it stays persistent" - the role lives in the owner's desktop chat session again: it owns channel 'main'
  * (registers and drains it with no Orca terminal), runs the 10-minute tick itself and lands its Opus lanes through
  * land.mjs --lane. 'kernel' is the optional [Supervisor] Orca kernel (start-supervisor.mjs + watchdog.mjs); in chat
  * mode nothing (resume-all, restart-all, /start, the watchdog) starts one. STARCI_SUPERVISOR_MODE overrides the

@@ -10,7 +10,7 @@ import { postgresService, truncateStatements } from "./postgresql"
 import { s3Request } from "./minio"
 import type { ServiceNet, ServiceTarget } from "./definition"
 
-const namespace: Namespace = { snake: "nivo_backend_a1b2c3", kebab: "nivo-backend-a1b2c3", root: "/repo" }
+const namespace: Namespace = { snake: "todo_app_be_a1b2c3", kebab: "todo-app-be-a1b2c3", root: "/repo" }
 
 interface PgLog {
     readonly database: string
@@ -51,20 +51,20 @@ describe("postgresql service", () => {
         const log: Array<PgLog> = []
         const result = await postgresService.provision(
             targetWith({ pg: scriptedPg(log) }),
-            input({ postgresql: { connections: [{ name: "primary", extensions: ["vector", "pgcrypto"] }, { name: "agentos" }] } }),
+            input({ postgresql: { connections: [{ name: "primary", extensions: ["vector", "pgcrypto"] }, { name: "analytics" }] } }),
         )
         assert.deepEqual(result.run, {
             user: "postgres",
             password: "pw",
-            databases: { primary: "nivo_backend_a1b2c3_primary", agentos: "nivo_backend_a1b2c3_agentos" },
+            databases: { primary: "todo_app_be_a1b2c3_primary", analytics: "todo_app_be_a1b2c3_analytics" },
         })
         assert.deepEqual(log, [
-            { database: "postgres", sql: 'DROP DATABASE IF EXISTS "nivo_backend_a1b2c3_primary" WITH (FORCE)' },
-            { database: "postgres", sql: 'CREATE DATABASE "nivo_backend_a1b2c3_primary"' },
-            { database: "postgres", sql: 'DROP DATABASE IF EXISTS "nivo_backend_a1b2c3_agentos" WITH (FORCE)' },
-            { database: "postgres", sql: 'CREATE DATABASE "nivo_backend_a1b2c3_agentos"' },
-            { database: "nivo_backend_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "vector"' },
-            { database: "nivo_backend_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "pgcrypto"' },
+            { database: "postgres", sql: 'DROP DATABASE IF EXISTS "todo_app_be_a1b2c3_primary" WITH (FORCE)' },
+            { database: "postgres", sql: 'CREATE DATABASE "todo_app_be_a1b2c3_primary"' },
+            { database: "postgres", sql: 'DROP DATABASE IF EXISTS "todo_app_be_a1b2c3_analytics" WITH (FORCE)' },
+            { database: "postgres", sql: 'CREATE DATABASE "todo_app_be_a1b2c3_analytics"' },
+            { database: "todo_app_be_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "vector"' },
+            { database: "todo_app_be_a1b2c3_primary", sql: 'CREATE EXTENSION IF NOT EXISTS "pgcrypto"' },
         ])
     })
 
@@ -87,14 +87,14 @@ describe("postgresql service", () => {
             container: "c",
             user: "postgres",
             password: "pw",
-            databases: { primary: "nivo_backend_a1b2c3_primary" },
+            databases: { primary: "todo_app_be_a1b2c3_primary" },
         }
         await postgresService.reset(targetWith({ pg: scriptedPg(log, tables, ['TRUNCATE TABLE "public"."users" RESTART IDENTITY']) }), run, { namespace, keepTables: { primary: ["roles"] }, notes: {} })
         const sql = log.map((entry) => entry.sql)
         assert.equal(sql[0], "SET session_replication_role = replica")
         assert.match(sql[1] ?? "", /FROM pg_tables/)
         assert.deepEqual(sql.slice(2), ['TRUNCATE TABLE "public"."users" RESTART IDENTITY', 'DELETE FROM "public"."users"', 'TRUNCATE TABLE "public"."orders" RESTART IDENTITY'])
-        assert.ok(log.every((entry) => entry.database === "nivo_backend_a1b2c3_primary"))
+        assert.ok(log.every((entry) => entry.database === "todo_app_be_a1b2c3_primary"))
     })
 
     it("truncateStatements skips migration ledgers and kept tables by name or schema.name", () => {
@@ -116,18 +116,18 @@ describe("kafka service", () => {
         const calls: Array<ReadonlyArray<string>> = []
         const docker = new Docker(async (_command, args): Promise<ExecResult> => {
             calls.push(args)
-            return { code: 0, stdout: args.includes("--list") ? "other.topic\nnivo-backend-a1b2c3.orders\nnivo-backend-a1b2c3.mail\n" : "", stderr: "" }
+            return { code: 0, stdout: args.includes("--list") ? "other.topic\ntodo-app-be-a1b2c3.orders\ntodo-app-be-a1b2c3.mail\n" : "", stderr: "" }
         })
         const target = targetWith({ docker })
         const provisioned = await kafkaService.provision(target, input({ kafka: { topics: ["orders"] } }))
-        assert.deepEqual(provisioned.run, { topicPrefix: "nivo-backend-a1b2c3.", topics: { orders: "nivo-backend-a1b2c3.orders" } })
-        assert.deepEqual(calls[0], ["exec", "starci-ts-postgresql-11111111", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--create", "--if-not-exists", "--topic", "nivo-backend-a1b2c3.orders", "--partitions", "1", "--replication-factor", "1"])
+        assert.deepEqual(provisioned.run, { topicPrefix: "todo-app-be-a1b2c3.", topics: { orders: "todo-app-be-a1b2c3.orders" } })
+        assert.deepEqual(calls[0], ["exec", "starci-ts-postgresql-11111111", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--create", "--if-not-exists", "--topic", "todo-app-be-a1b2c3.orders", "--partitions", "1", "--replication-factor", "1"])
         calls.length = 0
-        const run = { topicPrefix: "nivo-backend-a1b2c3.", topics: {} } as unknown as RunKafka
+        const run = { topicPrefix: "todo-app-be-a1b2c3.", topics: {} } as unknown as RunKafka
         await kafkaService.deprovision(target, run, { namespace, releaseRedisDb: async () => undefined })
         assert.equal(calls.length, 3)
         assert.ok(calls[0]?.includes("--list"))
-        assert.deepEqual(calls.slice(1).map((args) => args.slice(-2).join(" ")), ["--topic nivo-backend-a1b2c3.orders", "--topic nivo-backend-a1b2c3.mail"])
+        assert.deepEqual(calls.slice(1).map((args) => args.slice(-2).join(" ")), ["--topic todo-app-be-a1b2c3.orders", "--topic todo-app-be-a1b2c3.mail"])
         assert.ok(calls.slice(1).every((args) => args.includes("--delete")))
     })
 
@@ -140,15 +140,15 @@ describe("kafka service", () => {
 describe("keycloak realm preparation", () => {
     const file = JSON.stringify({
         id: "abc",
-        realm: "nivo",
+        realm: "todo-app",
         clients: [{ clientId: "backend", directAccessGrantsEnabled: false }, { clientId: "web", directAccessGrantsEnabled: true }],
         users: [{ username: "Admin" }],
     })
 
     it("re-targets the realm name, drops the id, detects the password client and lists seed users", () => {
-        const prepared = prepareRealm(file, "nivo-backend-a1b2c3", "realm.json")
-        assert.equal(prepared.stored, "nivo-backend-a1b2c3-nivo")
-        assert.equal(prepared.body.realm, "nivo-backend-a1b2c3-nivo")
+        const prepared = prepareRealm(file, "todo-app-be-a1b2c3", "realm.json")
+        assert.equal(prepared.stored, "todo-app-be-a1b2c3-todo-app")
+        assert.equal(prepared.body.realm, "todo-app-be-a1b2c3-todo-app")
         assert.equal("id" in prepared.body, false)
         assert.equal(prepared.passwordClientId, "web")
         assert.deepEqual(prepared.seedUsers, ["admin"])
@@ -184,10 +184,10 @@ describe("minio s3 client", () => {
             seen = { url: String(url), headers: init?.headers as Record<string, string> }
             return new Response("<ListAllMyBucketsResult/>", { status: 200 })
         }) as typeof fetch
-        const result = await s3Request(targetWith({ fetch: fake }), { accessKey: "ak", secretKey: "sk" }, "GET", "/nivo-backend-a1b2c3-uploads", { "list-type": "2" }, new Date("2026-01-02T03:04:05Z"))
+        const result = await s3Request(targetWith({ fetch: fake }), { accessKey: "ak", secretKey: "sk" }, "GET", "/todo-app-be-a1b2c3-uploads", { "list-type": "2" }, new Date("2026-01-02T03:04:05Z"))
         assert.equal(result.status, 200)
         const captured = seen as unknown as { url: string; headers: Record<string, string> }
-        assert.equal(captured.url, "http://127.0.0.1:5555/nivo-backend-a1b2c3-uploads?list-type=2")
+        assert.equal(captured.url, "http://127.0.0.1:5555/todo-app-be-a1b2c3-uploads?list-type=2")
         assert.equal(captured.headers["x-amz-date"], "20260102T030405Z")
         assert.match(captured.headers.authorization ?? "", /^AWS4-HMAC-SHA256 Credential=ak\/20260102\/us-east-1\/s3\/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/)
     })

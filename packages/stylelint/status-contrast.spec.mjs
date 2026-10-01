@@ -4,7 +4,7 @@ import { FILES, lintRule } from "./testing.mjs"
 
 const rule = (code, file = FILES.brand) => lintRule("status-contrast", code, file)
 
-/** A complete, conforming brand layer of the core family, modelled on starci-next-fe's brand.css. */
+/** A complete, conforming brand layer of the core family, modelled on a product front end's brand.css. */
 const CONFORMING = `
 :root,
 .light {
@@ -95,7 +95,7 @@ test("passes hex, rgb() and hsl() values and a family-root scope", async () => {
 })
 
 test("refuses a solid status tone used as the soft foreground when it does not reach 4.5:1", async () => {
-  // nivo-fe's darkened solid success (58% lightness) is 3.81:1 on white.
+  // the darkened solid success (58% lightness) is 3.81:1 on white.
   const code = edit(
     "--success-soft-foreground: color-mix(in oklab, var(--starci-core-success) 80%, var(--starci-core-foreground) 60%);",
     "--success-soft-foreground: var(--starci-core-success);",
