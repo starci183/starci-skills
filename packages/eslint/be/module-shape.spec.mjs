@@ -1,7 +1,7 @@
 /**
  * Twin tests for the module-shape rules (R45).
  *
- *   node --test module-shape.test.mjs
+ *   node --test module-shape.spec.mjs
  *
  * Type-aware cases use the fixture repository in `fixtures/typed`: `CatalogModule` and `OrderModule` are modules of
  * other owners, `CheckoutModule` the application module of the `checkout` feature.

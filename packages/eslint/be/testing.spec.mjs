@@ -1,7 +1,7 @@
 /**
  * Twin tests for the testing rules.
  *
- *   node --test testing.test.mjs
+ *   node --test testing.spec.mjs
  *
  * Several rules judge a WHOLE FILE, so the cases that matter are the near-misses: one real assertion among call
  * assertions must clear the first rule, and one state read anywhere must clear the e2e rule. A file-level rule that

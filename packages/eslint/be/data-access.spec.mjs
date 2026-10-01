@@ -1,7 +1,7 @@
 /**
  * Twin tests for the data-access rules (R82, R83).
  *
- *   node --test data-access.test.mjs
+ *   node --test data-access.spec.mjs
  *
  * Every case is a virtual file under the typed fixture root, so slots come from the path and `EntityManager`, `DataSource`,
  * `QueryRunner` and the repository types from the `typeorm` stub. The loopholes each rule closes are cases here: a renamed

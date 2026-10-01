@@ -1,7 +1,7 @@
 /**
  * Twin tests for the environment-owner rules (HFS R49).
  *
- *   node --test env-owner.test.mjs
+ *   node --test env-owner.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"

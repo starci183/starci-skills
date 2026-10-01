@@ -10,7 +10,7 @@ npm run test:be   54 pass · 3 fail
 
 ## 1. A real defect: three rule names are published by two laws each
 
-`packages/be` — `index.test.mjs`, two assertions:
+`packages/be` — `index.spec.mjs`, two assertions:
 
 ```text
 ✖ no two laws publish the same rule name
@@ -34,7 +34,7 @@ and that disagreement is the thing to settle.
 
 ## 2. A twin test that reads a product repository
 
-`packages/be` — `e2e-flow.test.mjs`:
+`packages/be` — `e2e-flow.spec.mjs`:
 
 ```text
 ✖ the canonical business inventory contains every executable flow suite

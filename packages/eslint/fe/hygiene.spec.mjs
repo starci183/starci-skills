@@ -1,7 +1,7 @@
 /**
  * Twin tests for the hygiene rules (`FE_EFFECT_CLEANUP`, `FE_EFFECT_FETCH`, `FE_SWALLOWED_ERROR`, `FE_CONSOLE_CALL`).
  *
- *   node --test hygiene.test.mjs
+ *   node --test hygiene.spec.mjs
  *
  * The effect rules decide by resolution (React's export, the platform's symbol, the checker's promise type), so they run
  * under the typed tester; a case's `filename` is a virtual file typed by the fixture project.

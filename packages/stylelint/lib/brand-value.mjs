@@ -3,7 +3,7 @@
  *
  * `@starci/eslint-canon-fe` `no-raw-brand-value` (brand-values.mjs) judges TypeScript with these exact three
  * patterns; this package judges CSS with them. They are copied, not imported, because the two packages are
- * published apart; `brand-value.test.mjs` reads eslint-canon-fe's source and fails when a pattern differs, so the
+ * published apart; `brand-value.spec.mjs` reads eslint-canon-fe's source and fails when a pattern differs, so the
  * two cannot drift. A change to a pattern is made in both files in one commit.
  *
  * A raw brand value is a colour written as a value (hex, or a colour function) or a length written in pixels.

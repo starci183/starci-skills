@@ -1,7 +1,7 @@
 /**
  * Twin tests for the public-surface rules (R30).
  *
- *   node --test module-layering.test.mjs
+ *   node --test module-layering.spec.mjs
  *
  * Owners come from the HFS slot view and aliases from the program's `compilerOptions.paths`, so every case is a
  * typed virtual file under the fixture repository. HFS tiers are not owners: `@modules/domain` names a tier, while

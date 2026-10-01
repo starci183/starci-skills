@@ -1,7 +1,7 @@
 /**
  * Twin tests for the error rules (R38, R40).
  *
- *   node --test error-handling.test.mjs
+ *   node --test error-handling.spec.mjs
  *
  * Type-aware cases run over the fixture repository in `fixtures/typed`: `DomainError` is declared by its
  * `src/modules/platform/errors`, `Logger` by `platform/logging`, so the owner of a type is judged by the slot view.

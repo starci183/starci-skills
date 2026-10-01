@@ -1,7 +1,7 @@
 /**
  * Twin tests for the query-safety rules (R36, R68, R69, R77).
  *
- *   node --test query-safety.test.mjs
+ *   node --test query-safety.spec.mjs
  *
  * Cases are virtual files under the typed fixture root: the slot comes from the path, `EntityManager` from the `typeorm`
  * stub, `SqlText`, `SqlIdent` and the `sql` tag from the fixture `platform/database/database.sql.ts`.

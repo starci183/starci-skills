@@ -1,7 +1,7 @@
 /**
  * Twin tests for the size-growth law (HFS R20 `HFS_SIZE_GROWTH`).
  *
- *   node --test size-growth.test.mjs
+ *   node --test size-growth.spec.mjs
  */
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"

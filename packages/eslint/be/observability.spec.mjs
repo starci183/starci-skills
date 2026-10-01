@@ -1,7 +1,7 @@
 /**
  * Twin tests for the observability rules.
  *
- *   node --test observability.test.mjs
+ *   node --test observability.spec.mjs
  *
  * The Logger is identified by its type, so the cases carry the loopholes: a renamed receiver, a property injection, a
  * lookalike `Logger` declared by an ordinary owner, and a spec. The negative cases carry the weight:

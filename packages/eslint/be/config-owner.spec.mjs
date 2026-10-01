@@ -1,7 +1,7 @@
 /**
  * Twin tests for the config rules (R43, R44) and the timing-safe secret comparison (R41).
  *
- *   node --test config-owner.test.mjs
+ *   node --test config-owner.spec.mjs
  *
  * `Secret`, `Url` and `EnvSource` are declared by the fixture repository's `src/modules/platform/config`, so the owner of
  * a value's type is judged by the slot view.

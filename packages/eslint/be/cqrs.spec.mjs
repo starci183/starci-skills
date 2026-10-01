@@ -1,7 +1,7 @@
 /**
  * Twin tests for the CQRS law (R87 `BE_CQRS_SHAPE`).
  *
- *   node --test cqrs.test.mjs
+ *   node --test cqrs.spec.mjs
  *
  * Typed cases over the fixture repository (`fixtures/typed`): a case's file path decides its slot, and the types come
  * from the stubs of `@nestjs/cqrs`, `typeorm` and the fixture `platform/cqrs` capability.

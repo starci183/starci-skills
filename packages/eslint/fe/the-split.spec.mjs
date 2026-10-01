@@ -1,7 +1,7 @@
 /**
  * Twin tests for the split rule.
  *
- *   node --test the-split.test.mjs
+ *   node --test the-split.spec.mjs
  *
  * The scope is a slot role, so the cases that matter are the ones just outside it: the connected
  * half is SUPPOSED to reach for the world, and a rule that widened to every file in a surface

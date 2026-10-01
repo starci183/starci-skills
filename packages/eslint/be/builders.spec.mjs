@@ -1,7 +1,7 @@
 /**
  * Twin tests for the builder rules (R97 to R100, BE-TEST-16).
  *
- *   node --test builders.test.mjs
+ *   node --test builders.spec.mjs
  */
 import test from "node:test"
 import { at, typedTester } from "./fixtures/typed/tester.mjs"

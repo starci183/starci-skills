@@ -1,7 +1,7 @@
 /**
  * Twin tests for the native form control rule (HFS R62).
  *
- *   node --test native-controls.test.mjs
+ *   node --test native-controls.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"

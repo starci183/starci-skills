@@ -2,7 +2,7 @@
  * Twin tests for the service-dependency rules (R83 `no-repository-class`, R85 `provider-param-token`, R89
  * `no-test-double-in-source`).
  *
- *   node --test service-deps.test.mjs
+ *   node --test service-deps.spec.mjs
  *
  * Every case is a virtual file under the typed fixture root: slots come from the path, `EntityManager`, `Repository`,
  * `DataSource` from the `typeorm` stub and the Nest decorators from the `@nestjs/common` stub.

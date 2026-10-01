@@ -1,7 +1,7 @@
 /**
  * Twin tests for the comment rules.
  *
- *   node --test comments.test.mjs
+ *   node --test comments.spec.mjs
  *
  * The data constant and the marked literal are the cases that matter. A doc rule that demanded a
  * sentence beside `export const MAX_ATTEMPTS = 3` would produce sentences restating names, which is

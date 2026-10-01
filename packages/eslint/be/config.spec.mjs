@@ -1,7 +1,7 @@
 /**
  * Twin tests for the back-end config factory.
  *
- *   node --test config.test.mjs
+ *   node --test config.spec.mjs
  *
  * The failures worth catching: a rule published at anything but `error`, a config that a repository could weaken
  * (globs, ignores, overrides), a config without typed linting or without the HFS settings the path-scoped rules read,

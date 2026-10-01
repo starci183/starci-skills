@@ -1,7 +1,7 @@
 /**
  * Twin tests for the async-discipline rule.
  *
- *   node --test async-discipline.test.mjs
+ *   node --test async-discipline.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"

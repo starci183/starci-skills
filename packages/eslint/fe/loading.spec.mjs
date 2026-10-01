@@ -1,7 +1,7 @@
 /**
  * Twin tests for the loading rules.
  *
- *   node --test loading.test.mjs
+ *   node --test loading.spec.mjs
  *
  * The case that decides whether these rules are liveable is the `null` arm. A control that has
  * nowhere to go YET is drawn as nothing on purpose - LOADING-5 - and a rule that read that as a

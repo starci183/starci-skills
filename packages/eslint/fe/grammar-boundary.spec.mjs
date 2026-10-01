@@ -1,7 +1,7 @@
 /**
  * Twin tests for the grammar boundary (R62 family: the grammar owns the element).
  *
- *   node --test grammar-boundary.test.mjs
+ *   node --test grammar-boundary.spec.mjs
  */
 import assert from "node:assert/strict"
 import { readdirSync, readFileSync } from "node:fs"

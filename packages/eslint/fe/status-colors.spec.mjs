@@ -1,7 +1,7 @@
 /**
  * Twin tests for `starci-fe/status-text-uses-soft-foreground`.
  *
- *   node --test status-colors.test.mjs
+ *   node --test status-colors.spec.mjs
  *
  * The violating cases are the shapes a solid tone hides in: a plain className, a `cn()` call, a conditional, a variant
  * prefix, an opacity suffix, a hoisted constant and a `classes` entry. The passing cases are the soft pair, the solid

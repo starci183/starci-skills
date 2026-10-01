@@ -1,7 +1,7 @@
 /**
  * Twin tests for the operation table law (R95 `BE_OPERATION_CONTRACT`).
  *
- *   node --test operations.test.mjs
+ *   node --test operations.spec.mjs
  *
  * Typed cases over the fixture repository (`fixtures/typed`): the platform capability `operations` declares the canon types
  * (`OperationContract`, `query`, `mutation`, `defineOperations`, `OperationRequest`, `OperationReply`).

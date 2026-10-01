@@ -1,7 +1,7 @@
 /**
  * Twin tests for the served-locale rules.
  *
- *   node --test served-locale.test.mjs
+ *   node --test served-locale.spec.mjs
  *
  * The case that decides whether the first rule is honest is the EXEMPTION: a file that mentions
  * links but builds no terminal one must not be reported, because there is nothing there to attach a

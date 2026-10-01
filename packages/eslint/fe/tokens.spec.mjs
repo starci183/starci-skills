@@ -1,7 +1,7 @@
 /**
  * Twin tests for the token rules.
  *
- *   node --test tokens.test.mjs
+ *   node --test tokens.spec.mjs
  *
  * These rules exist for the ONE folder the union cannot reach, so the cases that matter are the
  * ones where a value hides: in a module constant rather than in markup, and in an entry's class

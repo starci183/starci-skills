@@ -1,7 +1,7 @@
 /**
  * Twin tests for the gathered back-end plugin.
  *
- *   node --test index.test.mjs
+ *   node --test index.spec.mjs
  *
  * The failures worth catching here are the ones a build never reports: a law module nobody imported,
  * whose rules then ship as a document; two laws publishing one rule name, where whichever imports
@@ -20,7 +20,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 /** Every rule module in this axis, by law name. */
 const lawModules = () =>
     readdirSync(HERE)
-        .filter((name) => name.endsWith(".mjs") && !name.endsWith(".test.mjs") && name !== "index.mjs")
+        .filter((name) => name.endsWith(".mjs") && !name.endsWith(".spec.mjs") && name !== "index.mjs")
         .map((name) => name.replace(/\.mjs$/, ""))
         .sort()
 

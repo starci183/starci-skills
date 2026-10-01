@@ -1,7 +1,7 @@
 /**
  * Twin tests for the transport law (R88 `BE_TRANSPORT_SHAPE`).
  *
- *   node --test transport.test.mjs
+ *   node --test transport.spec.mjs
  *
  * Typed cases over the fixture repository (`fixtures/typed`): the path of a case decides its slot, the stubs of
  * `@nestjs/cqrs`, `typeorm` and the fixture platform capabilities decide what a receiver IS.

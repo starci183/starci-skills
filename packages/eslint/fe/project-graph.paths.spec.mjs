@@ -1,9 +1,9 @@
 /**
  * RuleTester proof of the front-end project rule that serves the slot manifest's per-path judgement (scripts/hfs/path-findings.mjs,
  * origin "repo"): slot-undeclared. The project graph runs it over `git ls-files` of the fixture and the rule reports the finding on the
- * TypeScript file ESLint visits. (source-suffix and spec-placement are back-end rules; see ../be/project-graph.paths.test.mjs.)
+ * TypeScript file ESLint visits. (source-suffix and spec-placement are back-end rules; see ../be/project-graph.paths.spec.mjs.)
  *
- *   node --test project-graph.paths.test.mjs
+ *   node --test project-graph.paths.spec.mjs
  */
 import test from "node:test"
 import { projectFixture } from "../be/fixtures/project/tester.mjs"

@@ -1,7 +1,7 @@
 /**
  * Twin tests for the translation rules.
  *
- *   node --test translation.test.mjs
+ *   node --test translation.spec.mjs
  *
  * The cases that earn their place are the ones that separate a SENTENCE from a TOKEN in an object or
  * a generic prop (`"sm"` is a size, `"Search courses"` is copy), and the ones where a block used to

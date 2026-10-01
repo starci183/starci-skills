@@ -1,7 +1,7 @@
 /**
  * Twin tests for the naming rules.
  *
- *   node --test naming.test.mjs
+ *   node --test naming.spec.mjs
  *
  * `no-version-in-name` is the one with room to be wrong: a capital V followed by digits appears
  * inside perfectly good names, and it appears inside STRING values constantly (`claude-sonnet-5`,

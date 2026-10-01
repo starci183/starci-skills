@@ -21,7 +21,7 @@ import { hfsOf } from "./lib/hfs.mjs"
 
 /**
  * The intrinsic elements of page structure and text, each with the grammar components that render it.
- * Read against packages/grammar/src (`export const <Component>`); `grammar-boundary.test.mjs` fails when one is not exported.
+ * Read against packages/grammar/src (`export const <Component>`); `grammar-boundary.spec.mjs` fails when one is not exported.
  */
 export const GRAMMAR_OWNERS = Object.freeze({
   h1: "Heading", h2: "Heading", h3: "Heading", h4: "Heading", h5: "Heading", h6: "Heading",

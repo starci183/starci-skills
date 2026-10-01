@@ -1,7 +1,7 @@
 /**
  * Twin tests for the resilience rules.
  *
- *   node --test resilience.test.mjs
+ *   node --test resilience.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"

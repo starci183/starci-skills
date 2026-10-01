@@ -1,7 +1,7 @@
 /**
  * Twin tests for the client-boundary rule (HFS R55).
  *
- *   node --test client-boundary.test.mjs
+ *   node --test client-boundary.spec.mjs
  */
 import assert from "node:assert/strict"
 import test from "node:test"
