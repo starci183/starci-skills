@@ -4,6 +4,9 @@ kind: native-managed-agent
 start:
   api: orchestration.worker-start
   agentArgument: cursor
+  # The CLI binary Orca launches (the agent id is `cursor`) and its own approval-bypass mode (Orca's agentDefaultArgs).
+  cli: cursor-agent
+  bypassFlag: '--yolo'
 readiness: worker-start-receipt
 roles:
   - workflow-kernel

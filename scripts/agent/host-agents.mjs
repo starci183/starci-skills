@@ -3,7 +3,8 @@
 //   agent-disabled-on-host   Orca's own settings (orca-data.json of the active profile, settings.disabledTuiAgents) disable it;
 //   agent-binary-missing     its CLI binary (the card's start.cli, or Orca's agentCmdOverrides command) is not on PATH;
 //   agent-bypass-missing     Orca's settings.agentDefaultArgs for the agent lack the card's bypassFlag (an approval prompt no one answers);
-//   model-not-listed         the model is no model the runtime declares for that provider (prices.yaml, the registry defaults,
+//   model-not-listed         the model is no model the runtime declares for that provider (a provider that declares none, like Cursor whose
+//                            models Orca lists dynamically, is not judged) (prices.yaml, the registry defaults,
 //                            the runtimes.yaml pool models); a card with no model flag (Devin) takes no model.
 // No agent list is hard-coded: the card, Orca's settings and PATH decide. A test process reads none of them unless a spec passes
 // its own `settingsFile` / `pathDirs` (the host's real settings must not decide a spec's verdict).
@@ -74,7 +75,7 @@ export function hostAgentVerdict({ provider, model = null, card, env = process.e
   }
   if (card?.start?.modelArgument !== false && model) {
     const listed = models ?? modelsOfProvider(provider);
-    if (!listed.has(model)) return { ok: false, code: 'model-not-listed', error: `model '${model}' is not a model the runtime declares for provider '${provider}' (modules/models: prices, registry defaults, runtime pools)` };
+    if (listed.size && !listed.has(model)) return { ok: false, code: 'model-not-listed', error: `model '${model}' is not a model the runtime declares for provider '${provider}' (modules/models: prices, registry defaults, runtime pools)` };
   }
   return { ok: true };
 }

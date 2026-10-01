@@ -290,8 +290,7 @@ export default {
   // profile's requestedModel (resolveWorkerLaunchModel); a card that takes no model flag (devin) starts on its default.
   const launchModel = resolveWorkerLaunchModel({ target: model.target, requestedModel: model.requestedModel,
     payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
-  // The plan shows the flags spawnAgent really sends: a card whose start.modelArgument is false (devin) gets no --model/--effort.
-  const takesModel = loadAdapter(model.provider).card?.start?.modelArgument !== false;
+  const takesModel = loadAdapter(model.provider).card?.start?.modelArgument !== false; // the plan shows the flags spawnAgent really sends: a card with start.modelArgument false (devin) gets no --model/--effort
   const orcaCommands = [
     { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${workflowNameOf(db, job.workflow_id)} — ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow by the Kernel; later operations reuse it' },
     { step: 'worker-start', argv: ['orchestration', 'worker-start', '--spec', '<prompt>', '--task-title', `${op} #${job.try_no}`, '--worktree', checkoutRoot, '--agent', model.provider ?? '<agent>',

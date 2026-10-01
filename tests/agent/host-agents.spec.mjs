@@ -100,3 +100,28 @@ test('every real card declares its bypass flag as data', async () => {
   const { loadAdapter } = await import('../../scripts/agent/lib.mjs');
   for (const agent of ['claude', 'codex', 'devin']) assert.match(loadAdapter(agent).card.start.bypassFlag, /^--/, agent);
 });
+
+test('the cursor card passes the preflight when cursor-agent is installed and bypassed, and is refused naming cursor-agent when it is not', async (t) => {
+  const { loadAdapter } = await import('../../scripts/agent/lib.mjs');
+  const card = loadAdapter('cursor').card;
+  assert.equal(card.start.cli, 'cursor-agent');
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-cursor-bin-'));
+  t.after(() => fs.rmSync(bin, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const base = fixture(t, { defaultArgs: { cursor: '--yolo' } });
+  const missing = hostAgentVerdict({ provider: 'cursor', model: null, card, env: base.env, settingsFile: base.settingsFile, pathDirs: [bin] });
+  assert.equal(missing.code, 'agent-binary-missing');
+  assert.match(missing.error, /'cursor-agent'/);
+  fs.writeFileSync(path.join(bin, process.platform === 'win32' ? 'cursor-agent.exe' : 'cursor-agent'), '');
+  assert.equal(hostAgentVerdict({ provider: 'cursor', model: null, card, env: base.env, settingsFile: base.settingsFile, pathDirs: [bin], models: new Set() }).ok, true);
+  const noBypass = fixture(t, { defaultArgs: {} });
+  assert.equal(hostAgentVerdict({ provider: 'cursor', model: null, card, env: noBypass.env, settingsFile: noBypass.settingsFile, pathDirs: [bin] }).code, 'agent-bypass-missing');
+});
+
+test('a provider with no declared models (cursor: Orca lists them dynamically) is not judged on its model', async (t) => {
+  const { loadAdapter } = await import('../../scripts/agent/lib.mjs');
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-cursor-bin-'));
+  t.after(() => fs.rmSync(bin, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  fs.writeFileSync(path.join(bin, process.platform === 'win32' ? 'cursor-agent.exe' : 'cursor-agent'), '');
+  const fx = fixture(t, { defaultArgs: { cursor: '--yolo' } });
+  assert.equal(hostAgentVerdict({ provider: 'cursor', model: 'auto', card: loadAdapter('cursor').card, env: fx.env, settingsFile: fx.settingsFile, pathDirs: [bin] }).ok, true);
+});

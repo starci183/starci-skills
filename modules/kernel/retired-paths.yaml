@@ -596,12 +596,11 @@ moved:
   - {from: tests/op-work-paths.spec.mjs, to: tests/engine/op-work-paths.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/op-worktree-link-guard.spec.mjs, to: tests/guards/op-worktree-link-guard.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/open-items-contract.spec.mjs, to: tests/kernel/open-items-contract.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/orca-call-contract.spec.mjs, to: tests/repo/orca-call-contract.spec.mjs, movedIn: C7, quiesced: false}
+  - {from: tests/orca-call-contract.spec.mjs, to: tests/api-orca/orca-call-contract.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orca-host-outage.spec.mjs, to: tests/api-orca/orca-host-outage.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orca-launch-env.spec.mjs, to: tests/api-orca/orca-launch-env.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orca-orphans.spec.mjs, to: tests/lib/orca-orphans.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orca-run-rebind.spec.mjs, to: tests/kernel/orca-run-rebind.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/orca-tasks-reconcile.spec.mjs, to: tests/engine-db/orca-tasks-reconcile.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orca-worktree-rm-live.spec.mjs, to: tests/api-orca/orca-worktree-rm-live.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orchestration-check-drain.spec.mjs, to: tests/kernel-verbs-shared/orchestration-check-drain.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/orchestration-question-bridge.spec.mjs, to: tests/engine-db/orchestration-question-bridge.spec.mjs, movedIn: C7, quiesced: false}
