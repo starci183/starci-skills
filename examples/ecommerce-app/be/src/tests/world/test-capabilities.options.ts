@@ -9,7 +9,14 @@ import { CacheModule } from "@modules/integrations/cache"
 import { IdentityApiModule } from "@modules/integrations/identity-api"
 import { KeycloakAdminModule } from "@modules/integrations/keycloak-admin"
 import { OrderApiModule } from "@modules/integrations/order-api"
-import { cacheOptionsOf, identityApiOptionsOf, keycloakAdminOptionsOf, orderApiOptionsOf } from "./test-apps.options"
+import { ReceiptStorageModule } from "@modules/integrations/receipt-storage"
+import {
+    cacheOptionsOf,
+    identityApiOptionsOf,
+    keycloakAdminOptionsOf,
+    orderApiOptionsOf,
+    receiptStorageOptionsOf,
+} from "./test-apps.options"
 
 /** The catalog capability over the order database: stock, reservations. */
 export const CATALOG_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
@@ -34,4 +41,9 @@ export const ORDER_API_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
 /** The identity api client over the real identity app (the world boots it beside the modules). */
 export const IDENTITY_API_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
     (w) => IdentityApiModule.register({ isGlobal: true, ...identityApiOptionsOf(w) }),
+]
+
+/** The receipt archive over the run's bucket of the stack's MinIO. */
+export const RECEIPT_STORAGE_CAPABILITY_MODULES: ReadonlyArray<ModuleFactory> = [
+    (w) => ReceiptStorageModule.register({ isGlobal: true, ...receiptStorageOptionsOf(w) }),
 ]

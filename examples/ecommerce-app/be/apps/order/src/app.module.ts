@@ -12,6 +12,11 @@ import {
     IDENTITY_API_MESSAGES,
     IdentityApiModule,
 } from "@modules/integrations/identity-api"
+import {
+    RECEIPT_STORAGE_ERROR_KINDS,
+    RECEIPT_STORAGE_MESSAGES,
+    ReceiptStorageModule,
+} from "@modules/integrations/receipt-storage"
 import { ClockModule } from "@modules/platform/clock"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"
 import { CqrsModule } from "@modules/platform/cqrs"
@@ -52,6 +57,7 @@ export class AppModule {
                         PROBES_MESSAGES,
                         IDENTITY_API_MESSAGES,
                         ORDER_MESSAGES,
+                        RECEIPT_STORAGE_MESSAGES,
                         IDENTITY_MESSAGES,
                     ],
                 }),
@@ -66,6 +72,7 @@ export class AppModule {
                         IDENTITY_API_ERROR_KINDS,
                         CART_ERROR_KINDS,
                         ORDER_ERROR_KINDS,
+                        RECEIPT_STORAGE_ERROR_KINDS,
                         IDENTITY_ERROR_KINDS,
                     ],
                 }),
@@ -88,6 +95,7 @@ export class AppModule {
                 }),
                 HttpModule.register({ isGlobal: true }),
                 IdentityApiModule.register({ isGlobal: true, ...options.identityApi }),
+                ReceiptStorageModule.register({ isGlobal: true, ...options.receiptStorage }),
                 CatalogModule.register({ isGlobal: true }),
                 CartModule.register({ isGlobal: true }),
                 PaymentModule.register({ isGlobal: true }),

@@ -1,5 +1,7 @@
 import type { IdentityApiOptions } from "@modules/integrations/identity-api"
 import { parseIdentityApiConfig } from "@modules/integrations/identity-api"
+import type { ReceiptStorageOptions } from "@modules/integrations/receipt-storage"
+import { parseReceiptStorageConfig } from "@modules/integrations/receipt-storage"
 import type { EnvSource } from "@modules/platform/config"
 import { parseOrderDatabaseConfig } from "@modules/platform/database"
 import type { DatabaseConnectionConfig } from "@modules/platform/database"
@@ -14,6 +16,8 @@ export interface OrderAppOptions {
     readonly database: DatabaseConnectionConfig
     /** Where the identity service answers. */
     readonly identityApi: IdentityApiOptions
+    /** The private bucket the receipts of placed orders are archived in. */
+    readonly receiptStorage: ReceiptStorageOptions
     /** The origin allowlist and rate limits. */
     readonly httpSecurity: HttpSecurityOptions
 }
@@ -23,5 +27,6 @@ export const parseOrderAppOptions = (env: EnvSource): OrderAppOptions => ({
     port: env.int("ORDER_API_PORT"),
     database: parseOrderDatabaseConfig(env),
     identityApi: parseIdentityApiConfig(env),
+    receiptStorage: parseReceiptStorageConfig(env),
     httpSecurity: parseHttpSecurityConfig(env),
 })

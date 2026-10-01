@@ -7,6 +7,7 @@
         "postgres": 5501,
         "redis": 6448,
         "keycloak": 8149,
+        "minio": 9069,
         "landing": 3069,
         "shop": 4069
     },
@@ -35,6 +36,10 @@
             "scope": "shared",
             "basePort": 8080
         },
+        "minio": {
+            "scope": "shared",
+            "basePort": 9000
+        },
         "landing": {
             "scope": "application",
             "application": "landing",
@@ -51,6 +56,6 @@
         }
     },
     "secrets": {
-        "note": "The local Postgres runs with trust authentication. Keycloak's bootstrap admin password and the identity-admin client secret are sealed in secrets/keycloak-env.enc (SOPS+age, DEMO-ONLY recipient); runtime/env/keycloak.env is its decrypted member and is never tracked."
+        "note": "The local Postgres runs with trust authentication. Keycloak's bootstrap admin password and the identity-admin client secret are sealed in secrets/keycloak-env.enc, MinIO's root password in secrets/minio-env.enc (SOPS+age, DEMO-ONLY recipient); runtime/env/*.env are their decrypted members and are never tracked."
     }
 }

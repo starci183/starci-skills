@@ -14,6 +14,10 @@ components:
     image: quay.io/keycloak/keycloak:26.0
     role: stateful
     compose: infra/compose/keycloak.yaml
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285
+    role: stateful
+    compose: infra/compose/minio.yaml
   identity:
     image: ecommerce-app/identity
     role: service
@@ -35,16 +39,22 @@ environments:
         port: 6448
       keycloak:
         port: 8149
+      minio:
+        port: 9069
       identity:
         port: 5070
       order:
         port: 6070
     runbook: README.md
-    # The local Postgres runs with trust auth; the one secret material is Keycloak's (its bootstrap admin password and the
-    # secret of the identity-admin client), sealed with SOPS+age as the todo-app example does.
+    # The local Postgres runs with trust auth; the secret material is Keycloak's (its bootstrap admin password and the secret
+    # of the identity-admin client) and MinIO's root password, sealed with SOPS+age as the todo-app example does.
     secrets:
       - name: keycloak-env
         where: secrets/keycloak-env
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - private identity is untracked and provisioned externally before decryption
+      - name: minio-env
+        where: secrets/minio-env
         recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
         keyCustody: DEMO-ONLY - private identity is untracked and provisioned externally before decryption
 # Delivery/quality services (contract change starcistacks-services). Sonar points to the shared host extension;

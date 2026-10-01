@@ -21,6 +21,7 @@ import type { CacheOptions } from "@modules/integrations/cache"
 import type { IdentityApiOptions } from "@modules/integrations/identity-api"
 import type { KeycloakAdminOptions } from "@modules/integrations/keycloak-admin"
 import type { OrderApiOptions } from "@modules/integrations/order-api"
+import type { ReceiptStorageOptions } from "@modules/integrations/receipt-storage"
 import type { IdentityAppOptions } from "../../../apps/identity/src/identity.options"
 import type { OrderAppOptions } from "../../../apps/order/src/order.options"
 
@@ -77,6 +78,20 @@ export const identityApiOptionsOf = (w: EcommerceWiring): IdentityApiOptions => 
     timeoutMs: CALL_DEADLINE_MS,
 })
 
+/** The bucket of the run's MinIO that archives the receipts (declared in `stacks.minio.buckets`). */
+export const RECEIPTS_BUCKET = "receipts"
+
+/** The receipt archive over the run's own bucket of the stack's MinIO; links live five minutes. */
+export const receiptStorageOptionsOf = (w: EcommerceWiring): ReceiptStorageOptions => ({
+    endpoint: w.minio.endpoint,
+    region: "us-east-1",
+    bucket: w.minio.bucket(RECEIPTS_BUCKET),
+    accessKeyId: w.minio.accessKey,
+    secretAccessKey: new Secret(w.minio.secretKey),
+    linkTtlMs: 300_000,
+    timeoutMs: CALL_DEADLINE_MS,
+})
+
 const httpSecurity = {
     allowedOrigins: ALLOWED_ORIGINS,
     rateLimit: { windowMs: 60_000, defaultLimit: RATE_LIMIT_HIGH, strictLimit: RATE_LIMIT_HIGH },
@@ -97,6 +112,7 @@ export const orderOptions = (w: EcommerceWiring): OrderAppOptions => ({
     port: w.apps.order.port,
     database: orderDatabase(w),
     identityApi: identityApiOptionsOf(w),
+    receiptStorage: receiptStorageOptionsOf(w),
     httpSecurity,
 })
 

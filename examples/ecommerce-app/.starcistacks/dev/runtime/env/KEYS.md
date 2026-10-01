@@ -34,6 +34,13 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `ORDER_DB_URL` | Postgres URL of the `order` connection (secret) | none |
 | `IDENTITY_API_URL` | Base URL of the identity service | none |
 | `IDENTITY_API_TIMEOUT` | Deadline of a call to the identity service | `3s` |
+| `RECEIPTS_S3_ENDPOINT` | MinIO (S3) endpoint the receipts are archived in; buyers' download links point at it | none |
+| `RECEIPTS_S3_BUCKET` | Private bucket of the receipts | none |
+| `RECEIPTS_S3_ACCESS_KEY_ID` | Access key id (the MinIO root user `ecommerce` in dev) | none |
+| `RECEIPTS_S3_SECRET_ACCESS_KEY` | Secret access key (secret, sealed in `secrets/minio-env.enc`) | none |
+| `RECEIPTS_S3_REGION` | Region the requests are signed for | `us-east-1` |
+| `RECEIPTS_LINK_TTL` | Lifetime of a receipt download link (`5m`) | `5m` |
+| `RECEIPTS_S3_TIMEOUT` | Deadline of a call to MinIO | `15s` |
 | `HTTP_SECURITY_ALLOWED_ORIGINS`, `HTTP_SECURITY_RATE_*` | As above | as above |
 
 ## keycloak (the stack's identity provider)
@@ -43,8 +50,16 @@ The order service verifies every bearer token through identity `verifySession`, 
 | `KC_BOOTSTRAP_ADMIN_PASSWORD` | Password of the bootstrap `admin` of the master realm | `secrets/keycloak-env.enc` |
 | `KEYCLOAK_ADMIN_CLIENT_SECRET` | Secret of the `identity-admin` client; the realm import reads it, the identity api presents it | `secrets/keycloak-env.enc` |
 
+## minio (the stack's object storage)
+
+| Key | Meaning | Sealed in |
+| --- | --- | --- |
+| `MINIO_ROOT_PASSWORD` | Password of the MinIO root user `ecommerce` | `secrets/minio-env.enc` |
+| `RECEIPTS_S3_SECRET_ACCESS_KEY` | The same password, as the order api presents it | `secrets/minio-env.enc` |
+
 DEMO-ONLY: `secrets/keycloak-env.enc` is encrypted to the example identity expected at `runtime/env/demo.agekey`. `sops -d`
-writes its decrypted member to `runtime/env/keycloak.env`, which Compose reads and git never tracks.
+writes its decrypted member to `runtime/env/keycloak.env`, which Compose reads and git never tracks; `secrets/minio-env.enc`
+likewise decrypts to `runtime/env/minio.env`.
 
 ## migrate (`apps/migrate`)
 

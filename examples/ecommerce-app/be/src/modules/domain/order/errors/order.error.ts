@@ -13,6 +13,10 @@ export enum OrderErrorCode {
     PlacementFailed = "ORDER_PLACEMENT_FAILED",
     /** A confirmed order has no payment; a defect. */
     PaymentMissing = "ORDER_PAYMENT_MISSING",
+    /** The buyer has no order with that id (or it is another buyer's). */
+    ReceiptNotFound = "ORDER_RECEIPT_NOT_FOUND",
+    /** The receipt is not archived yet and the archive cannot take it now. */
+    ReceiptNotReady = "ORDER_RECEIPT_NOT_READY",
 }
 
 /** How each order code travels. */
@@ -22,6 +26,8 @@ export const ORDER_ERROR_KINDS: Record<OrderErrorCode, ErrorKind> = {
     [OrderErrorCode.InsufficientStock]: "conflict",
     [OrderErrorCode.PlacementFailed]: "internal",
     [OrderErrorCode.PaymentMissing]: "internal",
+    [OrderErrorCode.ReceiptNotFound]: "not-found",
+    [OrderErrorCode.ReceiptNotReady]: "unavailable",
 }
 
 /** The one error class of the order capability. */

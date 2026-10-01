@@ -38,6 +38,45 @@ export interface PlacedOrder {
     readonly replayed: boolean
 }
 
+/** One line of a receipt. */
+export interface ReceiptLine {
+    /** The product. */
+    readonly productId: string
+    /** How many. */
+    readonly quantity: number
+    /** The unit price paid, in minor units. */
+    readonly unitPriceMinorUnits: number
+}
+
+/** The receipt document an order archives: what was bought, for how much, paid by which payment, and when. */
+export interface ReceiptDocument {
+    /** The order. */
+    readonly orderId: string
+    /** The buyer. */
+    readonly personId: string
+    /** The lines, by product. */
+    readonly lines: ReadonlyArray<ReceiptLine>
+    /** The total in minor units. */
+    readonly totalMinorUnits: number
+    /** The currency. */
+    readonly currency: string
+    /** The captured payment. */
+    readonly paymentId: string
+    /** When the order was placed, ISO 8601. */
+    readonly placedAt: string
+}
+
+/** Which receipt a buyer asks for. */
+export interface ReceiptLinkParams {
+    /** The buyer asking. */
+    readonly personId: string
+    /** Their order. */
+    readonly orderId: string
+}
+
+/** The object key of an archived receipt, or null when the archive could not take it. */
+export type ArchivedReceiptKey = string | null
+
 /** Whether a person has confirmed orders. */
 export interface GetBuyerStatusResult {
     /** The person. */

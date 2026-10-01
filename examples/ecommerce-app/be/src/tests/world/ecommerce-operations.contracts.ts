@@ -12,4 +12,5 @@ export const ECOMMERCE_OPERATIONS = {
     placeOrder:
         "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(input: $input) { orderId status totalMinorUnits currency paymentId replayed } }",
     buyerStatus: "query { buyerStatus { personId hasOrders } }",
+    orderReceipt: "query OrderReceipt($input: OrderReceiptInput!) { orderReceipt(input: $input) { url expiresAt } }",
 } as const
