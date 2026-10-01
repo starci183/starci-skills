@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { loadConfig } from '../../engine/config.mjs';
 
 export const CATALOG_DIR = 'modules/i18n/messages';
 export const PLACEHOLDER = /\{([A-Za-z_][\w]*)\}/g;
@@ -53,6 +54,11 @@ export const fill = (text, vars = {}) => String(text).replace(PLACEHOLDER, (whol
 export function translate(en, vars = {}, { language = 'en', root = skillRoot } = {}) {
   const vi = language === 'vi' ? loadCatalog(root).get(en) : undefined;
   return fill(vi ?? en, vars);
+}
+
+/** The owner's language (config.yaml `language`); `fallback` when there is no readable config. */
+export function ownerLanguage(fallback = 'vi') {
+  try { return loadConfig()?.language ?? fallback; } catch { return fallback; }
 }
 
 /** A translator bound to one language: `tr(en, vars)`. */

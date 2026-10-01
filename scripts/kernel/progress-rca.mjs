@@ -1,11 +1,9 @@
 // progress-rca.mjs — "am I progressing toward the goal? if not, why, and which single change fixes the most?"
 // computed in deterministic code, so a Kernel on a modest model only has to pick the top untried action.
 //
-// Owner, 2026-09-28: "couldn't the supervisor think for itself until now?" then "why don't the workflows
-// coordinate themselves instead of waiting for the supervisor" then "the kernel must be able to brainstorm,
-// handle errors ... do everything so the workflows move forward", refined: ops draw
-// the graph, the Kernel makes LIGHT edits (api graph-edit) and dispatches the owning op for a heavy redesign
-// (api redesign). The Kernel stays on Devin, so the thinking lives here:
+// Owner ruling 2026-09-28: the workflows move themselves forward, not the supervisor. Ops draw the graph, the Kernel
+// makes LIGHT edits (api graph-edit) and dispatches the owning op for a heavy redesign (api redesign). The Kernel
+// stays on Devin, so the thinking lives here:
 //
 //   progressOf  units that PASSED their gates (a succeeded job; never a job count, never a self-marked done), units
 //               per hour, share of legs done, running vs allowed parallelism (RAM cap, pools, priority reserve),
@@ -593,8 +591,7 @@ export function workflowView({ db, workflowId, core = {}, repo, now = Date.now()
 
 /** The Kernel notice for one stalled workflow (the Workflow controller's progress-stall DI text). Pure. */
 export function stallNotice(w, { lang = 'vi' } = {}) {
-  const p = w.progress, r = w.rca;
-  const tr = translator(lang);
+  const p = w.progress, r = w.rca, tr = translator(lang);
   const top = (r?.actions ?? []).find((a) => !a.tried) ?? null;
   return [
     `PROGRESS-STALL ${p.stall.sinceMin}m: ${p.stall.reasons.join('; ')}.`,

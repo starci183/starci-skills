@@ -486,6 +486,23 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+  - id: runtime.i18n-catalog
+    profiles: [runtime]
+    # The Vietnamese message catalog of owner-visible runtime text (scripts/lib/i18n.mjs, scripts/checks/check-i18n-catalog.mjs).
+    path: "modules/i18n/messages/<area>.yaml"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: runtime.checks-data
+    profiles: [runtime]
+    # The two shrink-only declaration lists of the runtime checks: the CLIs no code imports (check-dead-scripts.mjs) and the source
+    # files not yet converted to English (check-doc-language.mjs).
+    path: "scripts/checks/{dead-scripts.entries,source-language.pending}"
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
   - id: runtime.host-contract
     profiles: [runtime]
     path: "modules/host/<system>/"

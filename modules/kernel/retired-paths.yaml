@@ -201,6 +201,7 @@ retired:
   - {path: scripts/example/work-example.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: no code or spec read it'}
   - {path: scripts/housekeeping/ledger-throughput.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: a one-off load test with no reader'}
   - {path: scripts/work/validate/check-work-citations.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: no code or spec read it'}
+  - {path: tests/engine-db/kernel-replace-close.spec.mjs, retiredAt: 2026-10-02, removedIn: legacy-purge, replacedBy: 'none: it tested the retired terminal-launched Kernel seat; every Kernel is a worker-start worker'}
 moved:
   - {from: .experiments/QUALITY-BAR.md, to: docs/quality-bar.md, movedIn: C0, quiesced: false}
   - {from: .experiments/OPENSOURCE-GOAL.md, to: docs/opensource-goal.md, movedIn: C0, quiesced: false}
@@ -554,7 +555,6 @@ moved:
   - {from: tests/kernel-group.spec.mjs, to: tests/kernel/kernel-group.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/kernel-guard.spec.mjs, to: tests/guards/kernel-guard.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/kernel-observe.spec.mjs, to: tests/engine-db/kernel-observe.spec.mjs, movedIn: C7, quiesced: false}
-  - {from: tests/kernel-replace-close.spec.mjs, to: tests/engine-db/kernel-replace-close.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/kernel-runtime-rev.spec.mjs, to: tests/kernel/kernel-runtime-rev.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/kernel-stale-terminal.spec.mjs, to: tests/reconciler/kernel-stale-terminal.spec.mjs, movedIn: C7, quiesced: false}
   - {from: tests/kernel-wake-delivery-proof.spec.mjs, to: tests/kernel/kernel-wake-delivery-proof.spec.mjs, movedIn: C7, quiesced: false}

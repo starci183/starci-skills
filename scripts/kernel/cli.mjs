@@ -84,7 +84,7 @@ import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { ownerLanguage as ownerLanguageOf, translator } from '../lib/i18n.mjs';
 // The reads the split-out verbs share with what stays here: one definition per helper (scripts/kernel/verbs/shared/).
 import {
   csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, workDirOf, latestReportOf, latestAttemptOf, operationTaskOf, operationDispatchOf,
@@ -1944,9 +1944,7 @@ const resolveModel = (target) => {
     requestedModel: doc?.identity?.requestedModel ?? null, profile: path.relative(skillRoot, file) };
 };
 
-// The owner's language (config.yaml `language`) for every string the owner
-// reads; canonical records stay English. A broken config falls back to English.
-const ownerLanguage = () => { try { return loadConfig()?.language ?? 'en'; } catch { return 'en'; } };
+const ownerLanguage = () => ownerLanguageOf('en');
 const ownerDelegation = () => { try { return activeDelegation(); } catch { return null; } };
 
 // Each owned path as the packet carries it. A path the target resolver

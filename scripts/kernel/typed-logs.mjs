@@ -2,8 +2,7 @@
 // (engine/db/ledger.mjs ledgerFileFor; engine/db/migrations/runtime/0001-init.sql; one RDBMS per project, so a finished
 // workflow is archived and deleted as a unit).
 // Every write goes through the process's ONE buffered writer (log-writer.mjs: its own connection, short batched
-// BEGIN IMMEDIATE transactions, never inside a caller's ledger transaction), so twenty ops logging at once never hold
-// the ledger's write lock for more than milliseconds.
+// BEGIN IMMEDIATE transactions, never inside a caller's ledger transaction), so twenty ops logging at once never hold the ledger's write lock for more than milliseconds.
 //
 //   logs(seq, at, workflow_id -> workflows, job_id?, actor, node_id?, level, kind, msg, data_json, refs_json, src?)
 //
@@ -36,8 +35,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { allocationSettings, loadConfig } from '../../engine/config.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { allocationSettings } from '../../engine/config.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { ledgerFileFor, openLedger } from '../../engine/db/ledger.mjs';
 import { jobResultSql } from '../machine/job-row.mjs';
 import { independentChecksOf } from './verbs/shared/check-evidence.mjs';
@@ -279,17 +278,11 @@ const compact = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v 
 
 /**
  * The typed rows one ledger event stands for, without writing: pure but for `ctx` lookups —
- * ctx.jobOf(jobId) -> {op_id, attempt (try_no), result_json (settle result)}, ctx.checksOf({jobId, attemptId}) -> [{name, command, exitCode, evidence}]
- * (the independent check runs of the event's attempt, else the job's newest attempt).
+ * ctx.jobOf(jobId) -> {op_id, attempt (try_no), result_json (settle result)}, ctx.checksOf({jobId, attemptId}) -> [{name, command, exitCode, evidence}] (the independent check runs of the event's attempt, else the job's newest attempt).
  * Each row carries src `ev:<ledger>:<seq>[:i]`, so re-deriving stores nothing twice.
  */
-// The derived msgs are owner-facing Vietnamese: every literal is an English source whose `vi` lives in
-// modules/i18n/messages (scripts/lib/i18n.mjs). The owner's config.yaml `language` picks it; absent a config the
-// historical Vietnamese stands.
-const logLanguage = () => { try { return loadConfig()?.language ?? 'vi'; } catch { return 'vi'; } };
-
 export function rowsOfEvent(event, ctx = {}) {
-  const tr = translator(logLanguage());
+  const tr = translator(ownerLanguage());
   const p = event.payload ?? (() => { try { return JSON.parse(event.payload_json || '{}') ?? {}; } catch { return {}; } })();
   const base = { at: event.created_at, workflowId: event.workflow_id, actor: 'runtime' };
   const src = (i = null) => `ev:${ctx.ledgerKey ?? 'l'}:${event.seq}${i == null ? '' : `:${i}`}`;

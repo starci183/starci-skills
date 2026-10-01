@@ -14,14 +14,11 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { loadUiRecords } from '../work/layout-tree.mjs';
 import { drawingAcceptance } from '../work/direction-part.mjs';
 import { isGlobSegment } from '../../engine/admission.mjs';
-import { allocationSettings, loadConfig } from '../../engine/config.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { allocationSettings } from '../../engine/config.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { DIRECTION_EXEMPT, archetypeOf, directionReadiness } from '../work/ui-archetype.mjs';
 
 const WORK_ROOT = '.starciwork';
-// The owner's language (config.yaml `language`); the Vietnamese gloss a refusal line carries is an English source
-// translated through modules/i18n/messages (scripts/lib/i18n.mjs). Absent a config the historical Vietnamese stands.
-const ownerLanguage = () => { try { return loadConfig()?.language ?? 'vi'; } catch { return 'vi'; } };
 /** The refusal code of the design gate (unmet kind design-not-settled). */
 export const DESIGN_NOT_SETTLED = 'DESIGN_NOT_SETTLED';
 const PLACEHOLDER = /^<[^<>/]+>$/;

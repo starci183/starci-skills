@@ -70,11 +70,8 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { translator } from '../lib/i18n.mjs';
 import { drawImageRefs, ownerImages } from '../work/direction-part.mjs';
 
-// The form speaks the owner's language (config.yaml `language`). Unknown
-// languages fall back to English; the op writes the question itself in the
-// same language (provision.ask, packet owner_language). The owner-facing
-// strings are English sources translated through modules/i18n/messages
-// (scripts/lib/i18n.mjs).
+// The form speaks the owner's language (config.yaml `language`), English when unknown; the op writes the question
+// in the same language (provision.ask, packet owner_language). Strings are English sources (scripts/lib/i18n.mjs).
 const uiText = () => {
   let lang = 'en';
   try { lang = loadConfig()?.language ?? 'en'; } catch { /* default */ }

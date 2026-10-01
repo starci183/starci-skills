@@ -5,8 +5,7 @@
 // owner reviews once; ugly UX/UI gets re-run and fixed in one batch instead of piecemeal." Under autopilot:
 //
 //   provisional         a draw-review (interface.draw) or brand-direction-review (brand.decide) ask whose machine
-//                       gates pass is answered by the runtime: a starci/ask-answer@1 receipt with answeredBy
-//                       `autopilot`, provisional:true and acceptance {provisional, by, receipt: <gate evidence>}.
+//                       gates pass is answered by the runtime: a starci/ask-answer@1 receipt with answeredBy `autopilot`, provisional:true and acceptance {provisional, by, receipt: <gate evidence>}.
 //                       The retried op applies it (draw-review.mjs / brand-direction.mjs apply) as a PROVISIONAL
 //                       acceptance: the node turns green-provisional (PROVISIONAL_LABEL), downstream proceeds, it is
 //                       never promoted golden and never counts as an owner answer (owner-claim.mjs ownerAnswerProof
@@ -37,8 +36,8 @@ import fs from 'node:fs';
 import { loopFileOfRef, loopLabelOf } from '../work/draw/draw-loop-coverage.mjs';
 import { fileAskReceipt, stageReceipt } from '../machine/ask-receipts.mjs';
 import path from 'node:path';
-import { allocationSettings, loadConfig } from '../../engine/config.mjs';
-import { translator } from '../lib/i18n.mjs';
+import { allocationSettings } from '../../engine/config.mjs';
+import { ownerLanguage, translator } from '../lib/i18n.mjs';
 import { openIncident, updateIncident } from '../../engine/db/ledger.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
@@ -83,9 +82,6 @@ const DAY = 86_400_000;
 
 const num = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : fallback);
 const slash = (p) => String(p ?? '').split(path.sep).join('/');
-// The owner's language (config.yaml `language`); owner-facing strings are English sources translated through
-// modules/i18n/messages (scripts/lib/i18n.mjs). Absent a config the historical Vietnamese stands.
-const ownerLanguage = () => { try { return loadConfig()?.language ?? 'vi'; } catch { return 'vi'; } };
 
 /* ------------------------------------------------------------------ settings */
 

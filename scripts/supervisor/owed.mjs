@@ -5,8 +5,7 @@
 // out-of-scope workflow problems ... are they all to be fixed? ... because leaving workflows
 // stale/blocked/stuck waiting wrongly is the supervisor's fault". That day the three ledgers' running
 // workflows held ~90 open incidents addressed to the supervisor, the runtime monitor or Source
-// ("For the supervisor", the Vietnamese "needs supervisor", "runtime
-// monitor", source-runtime-defect, knowledge churn, cross-workflow git effects, delegated rulings),
+// ("For the supervisor", "needs supervisor", "runtime monitor", source-runtime-defect, knowledge churn, cross-workflow git effects, delegated rulings),
 // many already fixed by later .claude commits and never resolved, others still blocking. Nothing
 // surfaced them: poll printed a RUNTIME line only for a fixed list of kinds.
 //
