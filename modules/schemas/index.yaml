@@ -943,12 +943,14 @@ moduleLocalDocumentKinds:
       - modules/models/profiles/devin-agent.yaml
       - modules/models/profiles/gpt-6-luna.yaml
       - modules/models/profiles/gpt-6-sol.yaml
+      - modules/models/profiles/cursor-agent.yaml
   - id: starci/agent-card@1
     governs: "One agent's spawn contract. Enforced by scripts/checks/providers.mjs (schema id, agent == file stem) and tests/provider-orca.spec.mjs."
     files:
       - modules/models/agents/claude.yaml
       - modules/models/agents/codex.yaml
       - modules/models/agents/devin.yaml
+      - modules/models/agents/cursor.yaml
   - id: starci/runtimes@1
     governs: "The quota-window runtime pools, allocation policy and roleOfKind table. The only concurrency authority."
     files: [modules/models/runtimes.yaml]

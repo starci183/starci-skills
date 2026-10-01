@@ -15,7 +15,7 @@ import { enqueueRepository, ownedPathPlacements } from '../target-repo.mjs';
 import { checkGrantParents } from '../grant-parents.mjs';
 import { workflowWorktreeOf, workflowAppRepo, opWorktreeArgs, sideOf, workflowSideWait, workflowWorktreePromptRules, WORKFLOW_WORKTREE_MISSING } from '../workflow-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
-import { spawnAgent } from '../../agent/lib.mjs';
+import { spawnAgent, loadAdapter } from '../../agent/lib.mjs';
 import { DISPATCHES, requirePhase } from '../api-lib/lifecycle.mjs';
 import { depthPreflight } from '../../agent/depth-preflight.mjs';
 import { markRunning, runningOrAbandon } from '../api-lib/dispatch-running.mjs';
@@ -289,11 +289,13 @@ export default {
   // profile's requestedModel (resolveWorkerLaunchModel); a card that takes no model flag (devin) starts on its default.
   const launchModel = resolveWorkerLaunchModel({ target: model.target, requestedModel: model.requestedModel,
     payload: { ...payload, difficulty: launchOrder.difficulty ?? payload.difficulty } });
+  // The plan shows the flags spawnAgent really sends: a card whose start.modelArgument is false (devin) gets no --model/--effort.
+  const takesModel = loadAdapter(model.provider).card?.start?.modelArgument !== false;
   const orcaCommands = [
     { step: 'run', argv: ['orchestration', 'run-create', '--objective', `[Workflow] ${workflowNameOf(db, job.workflow_id)} — ${job.workflow_id}`, '--from', '<kernel-terminal>', '--json'], note: 'created once per workflow by the Kernel; later operations reuse it' },
     { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.try_no}`, '--display-name', title, '--spec', '<prompt>', '--from', '<kernel-terminal>', '--json'] },
     { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', checkoutRoot, '--agent', model.provider ?? '<agent>',
-      ...(launchModel.modelId ? ['--model', launchModel.modelId, ...(launchModel.effort ? ['--effort', launchModel.effort] : [])] : []), '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'] },
+      ...(takesModel && launchModel.modelId ? ['--model', launchModel.modelId, ...(launchModel.effort ? ['--effort', launchModel.effort] : [])] : []), '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'] },
     { step: 'assignee', argv: ['orchestration', 'dispatch-show', '--task', '<task-id>', '--from', '<kernel-terminal>', '--json'] },
     { step: 'title', argv: ['terminal', 'rename', '--terminal', '<assignee>', '--title', title, '--json'] },
     { step: 'attest', argv: ['orchestration', 'worker-show', '--dispatch', '<dispatch-id>', '--json'], note: 'effective agent/model must equal the route' },

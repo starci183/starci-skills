@@ -23,7 +23,7 @@ schema: starci/module-models-index@1
 # - launcher: the human chat surface that invokes entry skills
 #   (codex-chat | claude-chat | devin-chat)
 # - host: Orca, which owns terminals, worktrees and managed operation workers
-# - agent: the execution adapter / Orca agent id (codex | claude | devin)
+# - agent: the execution adapter / Orca agent id (codex | claude | devin | cursor)
 # - provider: the credential/billing/quota family used by allocation
 # - model: a concrete model id such as gpt-6-sol
 # - profile: a StarCi routing/capability target such as codex-agent
@@ -53,6 +53,7 @@ exceptionTargets:
   # automatic chains; explicit benchmark/user-approved selection only
   - {target: gpt-6-sol,       profile: profiles/gpt-6-sol.yaml,       provider: codex, automaticChains: false, note: "explicit GPT-6 Sol route on the codex-agent window"}
   - {target: gpt-6-luna,      profile: profiles/gpt-6-luna.yaml,      provider: codex, automaticChains: false, note: "explicit GPT-6 Luna route on the codex-agent window"}
+  - {target: cursor-agent,    profile: profiles/cursor-agent.yaml,    provider: cursor, automaticChains: false, note: "Orca agent id cursor (cursor-agent); logged in, live-proven, no quota probe - explicit selection only"}
 
 notTargets:
   # things an agent might mistake for operation targets — they are not
