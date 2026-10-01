@@ -451,11 +451,6 @@ placeholders:
 layoutPolicy:
   checks: [starci-validate]
 policy:
-  # isolation: worktree - every code.refactor job runs in its workflow's one worktree of the product repository (Orca
-  # creates it at Kernel start; no worktree per op). Ops of the same side (be/ or fe/) run serially there and across
-  # sides in parallel, so slices never share checker inputs (fe-canon INPUTS_CHANGED_DURING_CHECK, 2026-09-28); a green
-  # settle commits the op's checkpoint on wf-<workflowId>, and main moves only at the workflow's finish.
-  isolation: worktree
   # specsToggle: what this op does when the owner's config.yaml specs.<class> is false (scripts/kernel/spec-deferral.mjs):
   # defer-leg = never dispatched, settled deferred; skip = runs without that class of test or coverage; not-counted = the gate does not demand it.
   specsToggle: {unit: skip}

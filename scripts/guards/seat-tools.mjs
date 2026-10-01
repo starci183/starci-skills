@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { guardsRoot } from './guards-root.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -15,7 +16,7 @@ const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 export function seatToolDecision({ handle, toolName, root = skillRoot }) {
   if (!handle || !toolName) return null;
   let guard;
-  try { guard = JSON.parse(fs.readFileSync(path.join(root, 'runtime', 'guards', 'seats', `${safeName(handle)}.json`), 'utf8')); }
+  try { guard = JSON.parse(fs.readFileSync(path.join(guardsRoot(root), 'seats', `${safeName(handle)}.json`), 'utf8')); }
   catch { return null; }
   if (!Array.isArray(guard?.deniedTools) || !guard.deniedTools.includes(toolName)) return null;
   return { reason: `${toolName} is denied for the ${guard.role ?? 'seat'} (${handle}): in-process subagents bypass [Worker] jobs, leases and the land gate - queue a [Worker] job instead (modules/supervisor/supervisor-prompt.md).` };

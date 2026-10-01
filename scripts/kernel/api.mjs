@@ -3655,11 +3655,6 @@ function reportOwnedPaths(db, job, repo) {
   return [...new Set([...declared, ...resolved])];
 }
 
-/** The job's OWN product worktree record (payload.productWorktree), never a retry's copy of its predecessor's. */
-const ownProductWorktreeOf = (job) => {
-  const rec = jobPayloadOf(job)?.productWorktree;
-  return rec?.op?.path && rec?.op?.branch && (!rec.jobId || rec.jobId === job.job_id) ? rec : null;
-};
 // The visual proof a pass owes (job-artifacts.mjs proofMediaGate over the op's policy.proofMedia): read-only,
 // before anything is written. A leg admitted before the job-proof-media change settles on its old contract.
 function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
@@ -4285,7 +4280,7 @@ const API_INTERNALS = Object.freeze({
   cleanupManagedWorker,
   releaseManagedWorker, closeOperationTask, custodyOf, quitWorkerTerminal,
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
-  failureShapeOf, latestKernelJobOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift,
+  failureShapeOf, latestKernelJobOf, reapIfStillLive, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,
   settleDrawAcceptance, settleDrawMetrics, settleOpGate, settleOpProofs, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
 });

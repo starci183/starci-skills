@@ -313,7 +313,7 @@ preflight:
 # ============================================================================
 # SPAWN MECHANICS — how a packet becomes a running agent on Orca.
 # ============================================================================
-  context.product_worktree:
+  context.workflow_worktree:
     meaning: >-
       Where an isolated op works (scripts/kernel/workflow-worktree.mjs): the ONE worktree of its workflow, never a
       worktree of its own. Orca creates it before the Kernel starts (ensureWorkflowWorktree: Orca's worktree create

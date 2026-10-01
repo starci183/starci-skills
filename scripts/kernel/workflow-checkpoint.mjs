@@ -34,7 +34,8 @@ import { runGit } from '../lib/git.mjs';
 import { mainRootOf, TERMINAL_JOB_STATUSES } from '../lib/worktrees.mjs';
 import { mergeGuard } from '../checks/gate.mjs';
 import { fastForwardLive } from '../supervisor/land.mjs';
-import { withLock, landLockName } from './product-worktree.mjs';
+import { claimManager } from '../connectors/lib.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
 import { workflowWorktreeOf, workflowWorktreeAt, setCheckpoint, markReleasePending } from './workflow-worktree.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { ownedPathsOf } from './api-lib/rows.mjs';
@@ -49,6 +50,19 @@ const NO_MODULES = [':(exclude,glob)**/node_modules', ':(exclude,glob)**/node_mo
 const SHA = /^[0-9a-f]{40,64}$/;
 
 /* ------------------------------------------------------------ plumbing */
+
+/** Hold the named host lock around fn (poll until waitMs). {ok:false, reason:'lock-busy', lock, holder} when it never frees. */
+function withLock(name, fn, { waitMs = 600_000, pollMs = 1000, env = process.env } = {}) {
+  const end = Date.now() + waitMs;
+  for (;;) {
+    const held = claimManager(name, { env });
+    if (held.ok) { try { return fn(); } finally { held.release(); } }
+    if (Date.now() >= end) return { ok: false, reason: 'lock-busy', lock: name, holder: held.holder ?? null };
+    sleepSync(pollMs);
+  }
+}
+/** The per-repository land lock: one workflow lands into a repository's main at a time. */
+export const landLockName = (repoRoot) => `product-land-${crypto.createHash('sha1').update(String(path.resolve(repoRoot)).replace(/\\/g, '/').toLowerCase()).digest('hex').slice(0, 10)}`;
 
 const fail = ({ code }, message) => Object.assign(new Error(message), { code });
 function git(cwd, args, { env = null, timeout = 600_000, input } = {}) {

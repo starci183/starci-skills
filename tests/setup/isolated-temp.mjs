@@ -17,9 +17,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { GUARDS_ROOT_ENV } from '../../scripts/guards/guards-root.mjs';
 
 export const TEST_TEMP_ENV = 'STARCI_TEST_TEMP_DIR';
-const INFRA = name => name === 'node-compile-cache' || name.startsWith('starci-test-registry-');
+const INFRA = name => name === 'node-compile-cache' || name.startsWith('starci-test-registry-') || name.startsWith('starci-test-guards-');
 
 if (!process.env[TEST_TEMP_ENV]) {
   const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-test-tmp-')));
@@ -38,4 +39,14 @@ if (!process.env[TEST_TEMP_ENV]) {
     try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); } catch { /* a detached child may still hold it */ }
     if (left.length) process.exitCode = code || 1;
   });
+}
+
+// The op guard directory (scripts/guards/guards-root.mjs) is per PROCESS, never inherited from the runner: every spec
+// file gets its own, so two files that bind the same fake Orca handle (fake-terminal-1) never read each other's guard
+// binding, and no spec writes the live runtime/guards. A process this preload did not load (an api.mjs a spec spawns)
+// inherits its spec's directory.
+{
+  const guards = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-test-guards-'));
+  process.env[GUARDS_ROOT_ENV] = guards;
+  process.on('exit', () => { try { fs.rmSync(guards, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); } catch { /* a detached child may still hold it */ } });
 }

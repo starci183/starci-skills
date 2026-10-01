@@ -113,6 +113,9 @@ retired:
   - {path: tests/settle-landed.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'tests/workflow-checkpoint.spec.mjs (only the runtime commits: checkpoint, foreign commit and foreign change)'}
   - {path: tests/work-landed.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'tests/workflow-checkpoint.spec.mjs (a Work-owner ops .starciwork records are its checkpoint)'}
   - {path: tests/work-debt-adopt.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb, replacedBy: 'none: no op commits, so no Work debt exists'}
+  - {path: scripts/kernel/product-worktree.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb2, replacedBy: 'scripts/kernel/workflow-worktree.mjs (one Orca worktree per workflow, removed by its release) and scripts/kernel/workflow-checkpoint.mjs (the land lock)'}
+  - {path: tests/product-worktree.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb2, replacedBy: 'tests/workflow-worktree.spec.mjs'}
+  - {path: tests/job-reap-ended-workflow.spec.mjs, retiredAt: 2026-10-01, removedIn: c0-wfb2, replacedBy: 'none: no per-op worktree exists to reap'}
   - {path: modules/kernel/api-commands/product-land.yaml, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: the settle lands each op into main'}
   - {path: scripts/kernel/api-verbs/product-deps.mjs, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: a dependency manifest change lands into main with its op; the settle names the install the live checkout owes'}
   - {path: modules/kernel/api-commands/product-deps.yaml, retiredAt: 2026-10-01, removedIn: c0-wt, replacedBy: 'none: no workflow deps unit without a workflow worktree'}

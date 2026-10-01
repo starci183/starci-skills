@@ -44,7 +44,7 @@ export function resetHintMs(text) {
 /** Classify one worker. Pure. `mem` is the job's probe memory ({lastOutputAt, ...}); `term` the orca terminal row or null. */
 export function classifyWorker(term, { mem = {}, reportFiled = false, leaseLost = false, now = Date.now(), settings = HEALTH_DEFAULTS } = {}) {
   if (leaseLost) return { state: 'dead', why: 'lease-lost' };
-  // Orca reports a product-worktree terminal orphaned and disconnected while its agent still runs: only a missing
+  // Orca reports a workflow-worktree terminal orphaned and disconnected while its agent still runs: only a missing
   // terminal or one with an exit cause is dead (the dead-worker step proves it).
   if (!term || term.exitCause) return { state: 'dead', why: term ? `exited: ${term.exitCause}` : 'terminal gone' };
   const preview = String(term.preview ?? '');

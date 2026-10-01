@@ -5992,17 +5992,6 @@ WORKTREE_NOT_OPS:
   owner: op-retry
   kind: dispatch-refusal
 
-WORKTREE_REMOVE_OVERDUE:
-  title: "Worktree removal overdue"
-  title_vi: "Xóa worktree quá hạn"
-  meaning_vi: "Worktree của op đã xong việc nhưng thư mục vẫn chưa được dọn sau hơn một phút."
-  causes_vi:
-    - "Tiến trình khác đang giữ tệp trong thư mục"
-    - "Lệnh xóa worktree git thất bại"
-  nextStep_vi: "Bộ điều phối tiếp tục thử dọn; nếu kẹt mãi thì cần lõi runtime xem thư mục bị khóa."
-  owner: runtime-core
-  kind: runtime-fault
-
 WORK_RECORD_MISSING:
   title: "No Work record found"
   title_vi: "Không tìm thấy bản ghi Work"
@@ -7349,16 +7338,6 @@ evidence-missing:
   nextStep_vi: "Sự cố do Kernel theo dõi; op bổ sung bằng chứng còn thiếu rồi làm lại."
   owner: op-retry
   kind: blocker
-evidence-unsalvaged:
-  title: "Evidence could not be salvaged"
-  title_vi: "Không cứu được bằng chứng"
-  meaning_vi: "Trước khi xóa thư mục làm việc, runtime không sao lưu được bằng chứng nên không dám dọn."
-  causes_vi:
-    - "lỗi khi chép bằng chứng ra nơi lưu"
-    - "thiếu chỗ chứa hoặc thiếu quyền ghi"
-  nextStep_vi: "Thư mục làm việc được giữ lại; cần xử lý lỗi sao lưu rồi dọn lại."
-  owner: runtime-core
-  kind: runtime-fault
 experiment-revert:
   title: "Experiment must be reverted"
   title_vi: "Thử nghiệm cần được hoàn tác"
@@ -9670,16 +9649,6 @@ stale-wait:
   nextStep_vi: "Mở mục quyết định để Kernel hoặc Supervisor gỡ chỗ nghẽn."
   owner: supervisor
   kind: blocker
-status-failed:
-  title: "git status failed"
-  title_vi: "Lệnh git status thất bại"
-  meaning_vi: "Không đọc được trạng thái thay đổi trong worktree của job."
-  causes_vi:
-    - "Kho git bị khoá"
-    - "Worktree hỏng"
-  nextStep_vi: "Bước đang chạy dừng lại và báo lỗi; thử lại sau, hoặc đội lõi xem chi tiết."
-  owner: runtime-core
-  kind: runtime-fault
 still-connected:
   title: "Terminal still connected after close"
   title_vi: "Terminal vẫn còn kết nối sau khi đóng"

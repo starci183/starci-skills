@@ -18,13 +18,14 @@
 // config.yaml `guards: {historyHook: false}` / `{workHook: false}` switches a hook layer off.
 import fs from 'node:fs';
 import path from 'node:path';
+import { guardsRoot } from './guards-root.mjs';
 import { fileURLToPath } from 'node:url';
 import { gitSpawn } from '../lib/git.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-export const guardsRoot = (skillRoot = path.resolve(here, '..', '..')) => path.join(skillRoot, 'runtime', 'guards');
+export { guardsRoot };
 export const HOOK_MARKER = 'starci-history-guard';
 export const HOOK_VERSION = 5;
 export const WORK_HOOK_MARKER = 'starci-work-guard';

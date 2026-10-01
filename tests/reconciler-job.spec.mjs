@@ -132,40 +132,6 @@ test('a settled job with a live terminal -> the settler closes it; in active a l
   } finally { fx.close(); }
 });
 
-test('worktree-removed: the clock runs while the folder exists, the reap retries until the event, a gone folder counts', async () => {
-  const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-job-wt-'));
-  const live = fixture({ status: 'succeeded', updatedAgoMs: 10_000, payload: { productWorktree: { op: { path: wt } }, terminalClosed: { verified: { ok: true } } },
-    events: [{ kind: EVENTS.released, payload: { proof: 'x' } }, { kind: 'job-worktree-remove-failed', payload: { reason: 'remove-failed' } }] });
-  try {
-    const ctx = ctxFor(live);
-    const r = await job.reconcile('job:nivo-backend:op-a', ctx);
-    assert.equal(r.action, 'worktree-reap', 'a failed removal is retried');
-    assert.deepEqual(ctx.calls.run[0].args.slice(0, 2), ['scripts/kernel/product-worktree.mjs', 'reap']);
-    assert.ok(ctx.calls.clock.some((c) => c.state === 'WORKTREE_REMOVE_OVERDUE' && c.slaMs === 60_000));
-  } finally { live.close(); fs.rmSync(wt, { recursive: true, force: true }); }
-  // The folder went later (op-code.refactor-b966ced588): removed, the clock clears, the reap still writes the event.
-  const gone = fixture({ status: 'succeeded', updatedAgoMs: 2 * 3_600_000, payload: { productWorktree: { op: { path: wt } }, terminalClosed: { verified: { ok: true } } },
-    events: [{ kind: EVENTS.released, payload: {} }, { kind: 'job-worktree-remove-failed', payload: {} }] });
-  try {
-    const ctx = ctxFor(gone);
-    assert.ok(listKeysOf(gone.db, 'nivo-backend', { now: NOW, settings }).includes('job:nivo-backend:op-a'), 'listed past the settled window while the event is owed');
-    const r = await job.reconcile('job:nivo-backend:op-a', ctx);
-    assert.equal(r.action, 'worktree-reap');
-    assert.ok(!ctx.calls.clock.some((c) => c.state === 'WORKTREE_REMOVE_OVERDUE'));
-    assert.ok(ctx.calls.clear.some((c) => c.state === 'WORKTREE_REMOVE_OVERDUE'));
-  } finally { gone.close(); }
-  const done = fixture({ status: 'succeeded', updatedAgoMs: 2 * 3_600_000, payload: { productWorktree: { op: { path: wt } } },
-    events: [{ kind: EVENTS.released, payload: {} }, { kind: 'job-worktree-removed', payload: {} }] });
-  try {
-    const ctx = ctxFor(done);
-    assert.ok(!listKeysOf(done.db, 'nivo-backend', { now: NOW, settings }).includes('job:nivo-backend:op-a'));
-    assert.ok(listKeysOf(done.db, 'nivo-backend', { now: NOW, settings, openClockJobs: ['op-a'] }).includes('job:nivo-backend:op-a'), 'an open clock lists the job');
-    const r = await job.reconcile('job:nivo-backend:op-a', ctx);
-    assert.equal(r.action, 'idle');
-    for (const state of ['WORKTREE_REMOVE_OVERDUE', 'WORKER_RELEASE_LEAK', 'WORKER_STALLED']) assert.ok(ctx.calls.clear.some((c) => c.state === state), state);
-  } finally { done.close(); }
-});
-
 test('a handed-over settle refusal goes to the Kernel as settle-nongreen: no op lands into main, so no land continuation exists', async () => {
   const fx = fixture({ report: { outcome: 'done' }, handover: { reason: 'settle-refused', code: 'op-gate-new-findings' } });
   try {

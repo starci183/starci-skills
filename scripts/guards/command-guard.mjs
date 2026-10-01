@@ -39,6 +39,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pathKey } from '../lib/path-key.mjs';
+import { guardsRoot } from './guards-root.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -46,7 +47,7 @@ const safeName = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
 /** The guard bound to Orca terminal `handle` (runtime/guards/terminals/<handle>.json), or null. */
 export function boundGuard(handle, { root = skillRoot } = {}) {
   if (!handle) return null;
-  try { return JSON.parse(fs.readFileSync(path.join(root, 'runtime', 'guards', 'terminals', `${safeName(handle)}.json`), 'utf8')); }
+  try { return JSON.parse(fs.readFileSync(path.join(guardsRoot(root), 'terminals', `${safeName(handle)}.json`), 'utf8')); }
   catch { return null; }
 }
 

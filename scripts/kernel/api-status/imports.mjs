@@ -2,8 +2,9 @@
 // workflow's code must import only paths that exist before the next wave dispatches. fe-canon 2026-09-28: 26 files
 // still imported the old `@/i18n` paths after slice 1 moved them, and the breakage read as "checker unavailable".
 //
-// Scanned tree: the live checkout (main) of each product repository the workflow's isolated ops land into (every op
-// lands into main at its settle, DESIGN §16.7); a workflow that never isolated scans nothing. Value, when broken:
+// Scanned tree: the workflow's own worktree (part A's registry, scripts/kernel/workflow-worktree.mjs): every slice's
+// green work is checkpointed there, so a move one slice made is what the next wave's slices build on. A workflow with no
+// open worktree scans nothing. Value, when broken:
 //   {code: 'IMPORTS_BROKEN_AFTER_MOVE', rcaCause: 'broken-import', count, files, sample, trees, repointQueued,
 //    blocksNextWave}
 // blocksNextWave is true while imports are broken and no repoint (canon-wire) unit is queued or running: the Job
@@ -12,30 +13,42 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { brokenImports } from '../import-scan.mjs';
-import { isolatedJobs, productSettings, git } from '../product-worktree.mjs';
+import { fileURLToPath } from 'node:url';
+import { runGit } from '../../lib/git.mjs';
+import { parseYaml } from '../../../engine/yaml.mjs';
+import { workflowWorktreeOf } from '../workflow-worktree.mjs';
 
 const cache = new Map();
 const LIVE = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
 
-/** The trees to scan for one workflow: the live checkouts its isolated ops land into. */
-export function importTreesOf(db, { workflowId }) {
-  const roots = new Set(isolatedJobs(db, { workflowId }).map((j) => path.resolve(j.record.repoRoot)));
-  return [...roots].filter((p) => fs.existsSync(p)).map((p) => ({ path: p, kind: 'main', repoRoot: p }));
+const SETTINGS_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'modules', 'kernel', 'product-land.yaml');
+/** modules/kernel/product-land.yaml invariant.importsCacheMs (default 5 min): one scan per tree state within it. */
+const importsCacheMs = () => {
+  let doc = null;
+  try { doc = parseYaml(fs.readFileSync(SETTINGS_FILE, 'utf8')); } catch { doc = null; }
+  const n = Number(doc?.invariant?.importsCacheMs);
+  return Number.isFinite(n) && n > 0 ? n : 300_000;
+};
+
+/** The trees to scan for one workflow: its open workflow worktree from part A's registry ([] when it has none). */
+export function importTreesOf(db, { workflowId, worktreeOf = (id) => workflowWorktreeOf({ env: process.env }, id) }) {
+  const rec = worktreeOf(workflowId);
+  return rec?.path && fs.existsSync(rec.path) ? [{ path: path.resolve(rec.path), kind: 'workflow', repoRoot: rec.repoRoot ? path.resolve(rec.repoRoot) : null }] : [];
 }
 
 const stateKey = (tree) => {
-  const head = git(tree.path, ['rev-parse', 'HEAD']).stdout;
-  return `${tree.path}\0${head}`;
+  const r = runGit(['rev-parse', 'HEAD'], { cwd: tree.path, timeout: 60_000 });
+  return `${tree.path}\0${String(r.stdout ?? '').trim()}`;
 };
 
 /**
  * The invariant value for one workflow, or null when nothing is broken (also read by progress-rca.mjs, which ranks
  * the repoint unit): brokenFiles are the importers to own, repository-qualified (<repo name>/<path>) as owned paths.
  */
-export function importsBrokenOf({ db, workflowId, repo, now = Date.now() }) {
-  const trees = importTreesOf(db, { workflowId });
+export function importsBrokenOf({ db, workflowId, repo, now = Date.now(), worktreeOf }) {
+  const trees = importTreesOf(db, { workflowId, ...(worktreeOf ? { worktreeOf } : {}) });
   if (!trees.length) return null;
-  const ttl = productSettings().invariant.importsCacheMs;
+  const ttl = importsCacheMs();
   let count = 0, files = 0;
   const sample = [], scanned = [], brokenFiles = new Set();
   for (const tree of trees) {

@@ -16,7 +16,6 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { withMachine } from '../engine/machine-db.mjs';
-import { reapJobWorktree, preservedOpRef } from '../scripts/kernel/product-worktree.mjs';
 import { CHECKPOINT_EVENTS } from '../scripts/kernel/workflow-checkpoint.mjs';
 import { evaluateCondition } from '../scripts/kernel/gate-conditions.mjs';
 import { createScratchWorktree, removeScratchWorktree, gcWorktrees, worktreeCounts, worktreesRootOf, snapshotCommit, reserveOrcaSlot } from '../scripts/lib/worktrees.mjs';
@@ -66,20 +65,6 @@ function fixture(t, name = 'nivo-fe') {
   return { base, repo, origin, env };
 }
 
-/** A ledger holding one settled isolated op job (status `status`) with the given product worktree record. */
-function ledgerWith(t, base, record, jobId, status) {
-  const ledgerRepo = path.join(base, 'ledger-repo');
-  fs.mkdirSync(ledgerRepo, { recursive: true });
-  const ledger = openLedger({ file: ledgerFileFor(ledgerRepo) });
-  t.after(() => { try { ledger.close(); } catch { /* closed */ } });
-  ledger.ensureWorkflow({ workflowId: WF, title: 'lifecycle' });
-  ledger.write.createUnit({ workflowId: WF, unitId: jobId, opId: 'code.refactor', subjectKey: jobId, goalRevision: 1 });
-  ledger.enqueueJob({ jobId, workflowId: WF, unitId: jobId, opId: 'code.refactor', kind: 'op',
-    payload: { opId: 'code.refactor', productWorktree: record, terminalClosed: { ok: true, verified: { ok: true, proof: 'spec' } } } });
-  const now = Date.now();
-  for (const s of ['ready', 'leased', 'running', 'reported', status]) ledger.db.prepare('UPDATE jobs SET status=?, updated_at=? WHERE job_id=?').run(s, now, jobId);
-  return { ledger, ledgerRepo, now };
-}
 const liveRows = (env) => withMachine((m) => m.liveWorktrees(), { env });
 /** The per-op tree the per-op land (part B's, until it is deleted) works on, made by the spec: <repo>/.starciwork/worktrees/<short> on op/<short>. */
 function opTree(repo, jobId) {
@@ -123,26 +108,6 @@ test('the workflow-landed event of api finish is what --until-landed reads', (t)
   assert.equal(evaluateCondition(ledger.db, cond, { repo: ledgerRepo, workflowId: 'wf-other' }).met, false, 'a land into another repository does not count');
   ledger.transaction(() => ledger.appendEvent({ workflowId: WF, entityType: 'workflow', entityId: WF, kind: CHECKPOINT_EVENTS.landed, payload: { repoRoot: repo, main: 'main', head: 'abc' } }));
   assert.equal(evaluateCondition(ledger.db, cond, { repo: ledgerRepo, workflowId: 'wf-other' }).met, true);
-});
-
-test('a failed op: its uncommitted work is preserved to preserved/<job>, and its worktree and branch are removed', (t) => {
-  const { base, repo, env } = fixture(t);
-  const jobId = 'op-code.refactor-f00dfeed01';
-  const rec = opTree(repo, jobId);
-  write(rec.op.path, 'src/a.ts', 'export const a = 99;\n');
-  write(rec.op.path, 'src/new.ts', 'export const fresh = true;\n');
-  const { ledger, ledgerRepo, now } = ledgerWith(t, base, rec, jobId, 'failed');
-  const r = reapJobWorktree({ ledger, ledgerRepo, jobId, now: now + 1000, env });
-  assert.equal(r.removed, true, JSON.stringify(r));
-  assert.equal(r.preserved?.ref, `refs/heads/preserved/${jobId}`);
-  assert.equal(git(repo, 'show', `preserved/${jobId}:src/a.ts`), 'export const a = 99;', 'the tracked change is preserved');
-  assert.equal(git(repo, 'show', `preserved/${jobId}:src/new.ts`), 'export const fresh = true;', 'the untracked file is preserved');
-  assert.equal(preservedOpRef(repo, jobId)?.sha, git(repo, 'rev-parse', `preserved/${jobId}`));
-  assert.ok(!fs.existsSync(rec.op.path), 'the worktree is removed all the same');
-  assert.deepEqual(branches(repo, 'op/*'), []);
-  assert.equal(trees(repo), 1);
-  assert.equal(git(repo, 'rev-parse', 'main'), git(repo, 'rev-parse', `preserved/${jobId}~1`), 'main untouched');
-  assert.equal(liveRows(env).length, 0);
 });
 
 test('the GC reclaims orphans: an ended workflow\'s tree (through Orca), an unregistered tree, a scratch whose owner is gone, a slot never bound', (t) => {

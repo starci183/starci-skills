@@ -1,9 +1,9 @@
-// worktree-exclude.mjs — where a product repository keeps its per-op git worktrees, and the one test every scanner
-// uses to stay out of them (DESIGN §16.7; owner order lane WT 2026-10-01: exactly one worktree per op).
+// worktree-exclude.mjs — where a product repository keeps the runtime's own git worktrees (scratch trees made by
+// scripts/lib/worktrees.mjs createScratchWorktree), and the one test every scanner uses to stay out of them.
 //
-// Layout inside a product repository (scripts/kernel/product-worktree.mjs, created by scripts/lib/worktrees.mjs):
-//   <repo>/.starciwork/worktrees/<op>    one op job's worktree, branch op/<op>
-// <op> is a short id (8 chars). The directory is git-excluded (.git/info/exclude), so `git status`,
+// Layout inside a product repository:
+//   <repo>/.starciwork/worktrees/<name>    one runtime scratch tree
+// The directory is git-excluded (.git/info/exclude), so `git status`,
 // `git ls-files --others --exclude-standard` and sonar never see it; every scanner that walks the filesystem
 // (canon-scan's eslint, hfs lint, the architecture walkers, input digests, proof-integrity, Work readers)
 // skips it with isWorktreesPath / WORKTREES_IGNORE_GLOBS, or it would lint and hash every sibling worktree.
@@ -32,6 +32,6 @@ export function isWorktreesPath(rel, { root = null } = {}) {
 
 /**
  * True when `abs` is a worktrees dir (or inside one) BELOW the scan root `root`. Always relative to the root a walker
- * started from: a walker whose root is itself an op worktree (<repo>/.starciwork/worktrees/<op>) must still walk it.
+ * started from: a walker whose root is itself a runtime tree (<repo>/.starciwork/worktrees/<name>) must still walk it.
  */
 export const underWorktrees = (root, abs) => isWorktreesPath(path.relative(path.resolve(String(root)), path.resolve(String(abs))));

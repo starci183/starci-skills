@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { commandVerdict } from '../scripts/guards/command-guard.mjs';
 import { bindGuardTerminal, writeJobGuard } from '../scripts/guards/install.mjs';
+import { guardsRoot } from '../scripts/guards/guards-root.mjs';
 
 // The command guard refuses a kill that selects processes by image name or pattern: the machine is shared with Orca and
 // every other agent, and a lane's `taskkill /F /IM node.exe //FI "WINDOWTITLE eq *"` restarted Orca (2026-10-01). An
@@ -69,6 +70,6 @@ test('the PreToolUse hook blocks a kill by name before it runs (exit 2) and logs
     assert.match(r.stderr, /starci guard: refused .*\[PROCESS_KILL_BY_NAME\]/);
   }
   assert.equal(hook('Bash', 'taskkill //PID 4242').status, 0);
-  const logged = fs.readFileSync(path.join(ROOT, 'runtime', 'guards', 'refusals.jsonl'), 'utf8').trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  const logged = fs.readFileSync(path.join(guardsRoot(ROOT), 'refusals.jsonl'), 'utf8').trim().split(/\r?\n/).map((line) => JSON.parse(line));
   assert.ok(logged.some((entry) => entry.jobId === 'op-kill-guard-spec' && entry.code === 'PROCESS_KILL_BY_NAME'));
 });

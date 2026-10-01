@@ -84,7 +84,7 @@ codes:
   # Added by lane rc-gc-resource (not in Appendix A): a running workflow with ready work and zero slots; its number is
   # modules/reconciler/resource.yaml capStarvedMs, carried on the clock.
   CAP_STARVED:              {slaMs: 900000, source: modules/reconciler/resource.yaml capStarvedMs, severity: warn, owner: resource-controller, autoAction: 'fair share gives the workflow a slot'}
-  # ---- Lanes, land and push (§9.6), fleet (§8.6), product worktrees (§16.7): fleet controller / lane rc-product-worktrees.
+  # ---- Lanes, land and push (§9.6), fleet (§8.6), workflow worktrees (§16.7): fleet controller / lane rc-product-worktrees.
   LANE_ABANDONED:           {slaMs: 86400000, severity: warn, owner: supervisor, autoAction: 'report, never delete'}
   LANE_CONFLICT_OVERDUE:    {slaMs: 3600000, severity: warn, owner: supervisor, autoAction: 'DI to the Supervisor'}
   LAND_QUEUE_STALL:         {slaMs: 1800000, severity: warn, owner: fleet-controller, autoAction: 'unstick the land queue'}

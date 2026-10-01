@@ -37,7 +37,6 @@ decisionDueMs: 900000
 effectUnknownMs: 300000
 dispatchEveryMs: 60000
 settledWindowMs: 3600000     # settled jobs this recent are close-verified
-worktreeRemoveSlaMs: 60000   # modules/kernel/product-land.yaml worktrees.opRemoveSlaMs
 allowedVerbs: [settle, check, reconcile, enqueue, incident]
 # Worker-health probe (scripts/reconciler/worker-health.mjs; owner-driven 2026-09-28): key health:all, one orca terminal
 # list per resync; working | rate-limited | done-without-report | idle-at-prompt | dead. Nudges via
@@ -63,4 +62,3 @@ sla:
   DEAD_WORKER_UNRECONCILED: 120000
   EFFECT_UNKNOWN_STUCK: 600000
   WORKER_RELEASE_LEAK: 60000
-  WORKTREE_REMOVE_OVERDUE: 60000

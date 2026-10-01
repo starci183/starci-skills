@@ -17,6 +17,7 @@ MACHINE_VERSION	schema version constant, not a code
 PROJECT_ANALYSIS_TOKEN	SonarQube token type label passed when minting a token
 STARCI_API_CHILD	env var name marking api child processes
 STARCI_ENGINE_START_REASON	env var name
+STARCI_GUARDS_ROOT	env var name (relocates the runtime guard directory; scripts/guards/guards-root.mjs)
 STARCI_HOST_RESOURCES_JSON	env var name (resource probe override)
 STARCI_HOST_WAIT_MS	env var name (timing setting)
 STARCI_KERNEL_DEATH_SETTLE_MS	env var name (timing setting)

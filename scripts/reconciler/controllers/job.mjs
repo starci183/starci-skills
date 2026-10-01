@@ -78,16 +78,13 @@ export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
       DEAD_WORKER_UNRECONCILED: num(sla.DEAD_WORKER_UNRECONCILED, 120_000),
       EFFECT_UNKNOWN_STUCK: num(sla.EFFECT_UNKNOWN_STUCK, 600_000),
       WORKER_RELEASE_LEAK: num(sla.WORKER_RELEASE_LEAK, 60_000),
-      WORKTREE_REMOVE_OVERDUE: num(sla.WORKTREE_REMOVE_OVERDUE, num(doc.worktreeRemoveSlaMs, 60_000)),
     },
-    worktreeRemoveSlaMs: num(doc.worktreeRemoveSlaMs, 60_000),
     health: Object.fromEntries(Object.entries(HEALTH_DEFAULTS).map(([k, v]) => [k, num(doc.health?.[k], v)])),
     allowedVerbs: Array.isArray(doc.allowedVerbs) && doc.allowedVerbs.length ? doc.allowedVerbs.map(String) : ['settle', 'check', 'reconcile', 'enqueue', 'incident'],
   };
 }
 export const CLOCK_CODES = Object.freeze(['READY_UNDISPATCHED', 'LEASE_STUCK', 'WORKER_START_STUCK', 'QUESTION_OVERDUE', 'CONSUME_OVERDUE',
-  'SETTLE_OVERDUE', 'DECISION_OVERDUE', 'DEAD_WORKER_UNRECONCILED', 'EFFECT_UNKNOWN_STUCK', 'WORKER_RELEASE_LEAK', 'WORKTREE_REMOVE_OVERDUE']);
-export const PRODUCT_EVENTS = Object.freeze({ worktreeRemoved: 'job-worktree-removed' });
+  'SETTLE_OVERDUE', 'DECISION_OVERDUE', 'DEAD_WORKER_UNRECONCILED', 'EFFECT_UNKNOWN_STUCK', 'WORKER_RELEASE_LEAK']);
 
 /* ------------------------------------------------------------------------------------------------ keys */
 
@@ -121,7 +118,6 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
   const reported = reportedJobs(db, { jobId })[0] ?? null;
   const handover = reported ? kernelHandoverOf(db, reported) : null;
   const released = db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(SETTLE_EVENTS.released, jobId) != null;
-  const releasedAt = Number(db.prepare('SELECT MAX(created_at) at FROM events WHERE kind=? AND entity_id=?').get(SETTLE_EVENTS.released, jobId)?.at) || null;
   const lastEventAt = (kind) => Number(db.prepare('SELECT MAX(created_at) at FROM events WHERE entity_id=? AND kind=?').get(jobId, kind)?.at) || null;
   return {
     jobId: row.job_id, workflowId: row.workflow_id, op: row.op_id, attempt: row.attempt, status: row.status, workerId: row.worker_id,
@@ -129,18 +125,6 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
     report: reported ? { dispatchId: reported.dispatchId, outcome: reported.outcome, filedAt: reported.filedAt, consumedAt: reported.consumedAt } : null,
     handover: handover ? { reason: handover.reason ?? null, detail: handover.detail ?? null, at: handover.at } : null,
     released, releaseProof: releaseProofOf(payload), settledAt: SETTLED.includes(row.status) ? Number(payload.settledAt ?? row.updated_at) : null,
-    releasedAt,
-    worktree: payload.productWorktree?.op?.path ? (() => {
-      const event = db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(PRODUCT_EVENTS.worktreeRemoved, jobId) != null;
-      const gone = !fs.existsSync(payload.productWorktree.op.path);
-      const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(row.workflow_id);
-      const ended = w?.phase === 'finished' || w?.phase === 'archived' || Boolean(w?.archived_at);
-      // Removed when the event exists OR the folder is gone (a failed first removal may have finished later); a
-      // gone folder with no event still gets the reap, which writes the missing job-worktree-removed - unless the
-      // workflow has ended: its reap removes the folder but writes no event (an archived ledger refuses it), so the
-      // folder gone is the end of the duty.
-      return { path: payload.productWorktree.op.path, removed: event || gone, eventMissing: !event && !(ended && gone), workflowEnded: ended };
-    })() : null,
     dispatchedAt: lastEventAt('op-dispatched'), questionAt: lastEventAt('worker-question-bridged'), now, windowMs: settings.settledWindowMs,
   };
 }
@@ -152,10 +136,7 @@ export function listKeysOf(db, ledgerId, { now = Date.now(), settings = jobSetti
   const settled = db.prepare(`SELECT job_id, workflow_id FROM jobs WHERE kind='op' AND status IN (${SETTLED.map(() => '?').join(',')}) AND updated_at>?`)
     .all(...SETTLED, now - settings.settledWindowMs);
   const keys = new Set();
-  const unreaped = db.prepare(`SELECT job_id FROM jobs j WHERE kind='op' AND status IN (${SETTLED.map(() => '?').join(',')})
-    AND json_extract(payload_json,'$.productWorktree.op.path') IS NOT NULL AND updated_at>?
-    AND NOT EXISTS (SELECT 1 FROM events e WHERE e.kind=? AND e.entity_id=j.job_id)`).all(...SETTLED, now - 7 * 86_400_000, PRODUCT_EVENTS.worktreeRemoved);
-  for (const r of [...live, ...settled, ...unreaped]) keys.add(jobKey(ledgerId, r.job_id));
+  for (const r of [...live, ...settled]) keys.add(jobKey(ledgerId, r.job_id));
   for (const id of openClockJobs) keys.add(jobKey(ledgerId, id));
   for (const r of live) keys.add(wfKey(ledgerId, r.workflow_id));
   return [...keys];
@@ -209,14 +190,6 @@ export function planJob(f, { frontier = {}, questions = [], settings = jobSettin
       if (!f.releaseProof) clock('WORKER_RELEASE_LEAK', f.settledAt ?? f.updatedAt);
       set({ kind: 'close-verify', concern: 'job.close-verify', proven: Boolean(f.releaseProof), handle });
     }
-  }
-  // released -> worktree-removed (DESIGN §16.7): an isolated op's worktree goes within worktreeRemoveSlaMs of its release;
-  // the settler's pass for the job reaps it.
-  if (SETTLED.includes(f.status) && f.worktree && f.worktree.eventMissing) {
-    if (!f.worktree.removed) clock('WORKTREE_REMOVE_OVERDUE', f.releasedAt ?? f.settledAt ?? f.updatedAt);
-    // product-worktree.mjs reap --job is idempotent: it removes and verifies, or records the missing event for a
-    // folder already gone, or records job-worktree-remove-failed and is retried on the next pass.
-    set({ kind: 'worktree-reap', concern: 'job.close-verify', worktree: f.worktree.path });
   }
   return { step, clocks };
 }
@@ -339,8 +312,6 @@ async function actJob(ctx, ledgerId, jobId, f, s, settings) {
       }
       return { action: 'questions', ok: bridged.ok !== false, decisions: opened.length };
     }
-    case 'worktree-reap':
-      return { action: 'worktree-reap', ...(await ctx.run('node', ['scripts/kernel/product-worktree.mjs', 'reap', '--repo', repo, '--job', jobId, '--json'], { timeoutMs: 300_000 })) };
     case 'close-verify': {
       if (s.proven) {
         // The settler records the release (job-settle-released) from the payload proof on its next pass; nothing to close.
@@ -437,7 +408,7 @@ async function reconcileHealth(ctx, settings, { list = null } = {}) {
     for (const j of jobs) {
       out.probed += 1;
       seen.add(j.job_id);
-      // A product-worktree terminal is not in the default list: read it by handle.
+      // A workflow-worktree terminal is not in the default list: read it by handle.
       if (!byHandle.has(j.worker_id)) byHandle.set(j.worker_id, await showTerminal(j.worker_id, ctx));
       const term = byHandle.get(j.worker_id) ?? null;
       const mem = healthMem.get(j.job_id) ?? {};
@@ -492,7 +463,7 @@ export default {
   timeoutMs: 960_000,
   routes: {
     'op-dispatched': jobRoute, 'op-reported': jobRoute, 'report-consumed': jobRoute, 'checks-recorded': jobRoute, 'op-settled': jobRoute,
-    'op-auto-settled': jobRoute, 'job-worktree-removed': jobRoute, 'job-settle-*': jobRoute, 'worker-*': jobRoute, 'incident-raised': wfRoute, 'incident-resolved': wfRoute,
+    'op-auto-settled': jobRoute, 'job-settle-*': jobRoute, 'worker-*': jobRoute, 'incident-raised': wfRoute, 'incident-resolved': wfRoute,
   },
   async list(ctx) {
     const settings = jobSettings();

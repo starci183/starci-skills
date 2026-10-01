@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { guardsRoot } from './guards-root.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -19,7 +20,7 @@ export function refusalLines(tool, verdict) {
 /** Append one refusal to runtime/guards/refusals.jsonl; the refusal stands without its log line. */
 export function logRefusal(entry, { root = skillRoot } = {}) {
   try {
-    const dir = path.join(root, 'runtime', 'guards');
+    const dir = guardsRoot(root);
     fs.mkdirSync(dir, { recursive: true });
     fs.appendFileSync(path.join(dir, 'refusals.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`);
   } catch { /* the refusal stands without its log line */ }

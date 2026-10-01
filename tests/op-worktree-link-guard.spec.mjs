@@ -8,6 +8,7 @@ import { classifyGit } from '../scripts/guards/git-policy.mjs';
 import { bindGuardTerminal, ensureHistoryHook, writeJobGuard } from '../scripts/guards/install.mjs';
 import { scanFootprint } from '../scripts/guards/footprint-scan.mjs';
 import { linksUnder, safeRemoveTree } from '../scripts/lib/safe-remove.mjs';
+import { guardsRoot } from '../scripts/guards/guards-root.mjs';
 
 // nivo-fe inc-c8fbf76aa499 (2026-09-25 05:47): Devin op worker op-interface.implement-2a43f63c6c ran, through Git Bash,
 // `git worktree add --detach D:/Repositories/nivo-fe-wt-r4`, junctioned six node_modules of live nivo-fe into it
@@ -148,7 +149,7 @@ test('the command guard hook refuses the incident\'s worktree and link commands 
   // A terminal with no guard bound (the Kernel, the owner) is never refused; neither is a tool that runs no command.
   assert.equal(hook({ tool_name: 'Bash', tool_input: { command: 'git reset --hard HEAD~1' }, cwd: repo }, 'term_kernel-unbound').status, 0);
   assert.equal(hook({ tool_name: 'Read', tool_input: { file_path: 'x' }, cwd: repo }, handle).status, 0);
-  const logged = fs.readFileSync(path.join(ROOT, 'runtime', 'guards', 'refusals.jsonl'), 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l)).filter((e) => e.jobId === 'op-interface.implement-2a43f63c6c' && e.via === 'pre-tool-use');
+  const logged = fs.readFileSync(path.join(guardsRoot(ROOT), 'refusals.jsonl'), 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l)).filter((e) => e.jobId === 'op-interface.implement-2a43f63c6c' && e.via === 'pre-tool-use');
   assert.ok(logged.some((e) => e.code === 'LINK_CREATE') && logged.some((e) => e.code === 'WORKTREE_NOT_OPS'), 'every refusal is logged');
 });
 

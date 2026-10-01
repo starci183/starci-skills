@@ -1,13 +1,12 @@
 # Workflow worktrees and the land (owner decision WFWT, final: ONE Orca-owned worktree per Kernel workflow; the per-op
 # worktree and its node_modules junction overlay are gone). Read by scripts/lib/worktrees.mjs worktreeSettings(),
-# scripts/kernel/product-worktree.mjs productSettings() and scripts/kernel/api-status/imports.mjs. Every value has the
+# and scripts/kernel/api-status/imports.mjs (invariant.importsCacheMs). Every value has the
 # same default in code.
 
 worktrees:
   capPerRepo: 10                # live runtime worktrees per repository; a workflow over it waits for its Kernel launch
   ownerGoneMs: 1800000          # the GC removes a tree whose owner has been gone this long (after preserving it)
   gcEveryMs: 300000             # the reconciler GC controller's worktree pass (key gc:worktrees, always active)
-  opRemoveSlaMs: 60000          # (per-op land, deleted by part B) an op worktree outliving its settle by more than this
   commandMs: 300000
 
 invariant:

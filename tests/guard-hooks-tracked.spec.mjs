@@ -32,8 +32,8 @@ const huskyRepo = (t) => {
   // what `husky` (npm prepare) generates in the main checkout only
   fs.mkdirSync(path.join(repo, '.husky', '_'));
   fs.writeFileSync(path.join(repo, '.husky', '_', '.gitignore'), '*');
-  // what product-worktree ensureRepoSetup does in a real product repo: the worktrees dir is git-excluded, so the main
-  // checkout's status stays about the hooks dir, not the op worktrees living under it
+  // what the runtime does in a real product repo (scripts/lib/worktrees.mjs): the worktrees dir is git-excluded, so the main
+  // checkout's status stays about the hooks dir, not the runtime trees living under it
   fs.appendFileSync(path.join(repo, '.git', 'info', 'exclude'), `${WORKTREES_EXCLUDE_LINE}
 `);
   const wt = path.join(repo, '.starciwork', 'worktrees', 'wf', 'op1');
