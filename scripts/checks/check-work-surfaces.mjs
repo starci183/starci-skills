@@ -4,6 +4,8 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
+import {isLocaleSegment} from '../work/layout-tree.mjs';
+import {createRequire} from 'node:module';
 import {APP_SIDES, readWorkspace, resolveOwnedDirs, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
 
 /**
@@ -156,8 +158,8 @@ function readCallArgs(text, openIndex) {
 
 const camelOf = kebab => kebab.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
 
-/** FE routes: every directory holding a page.tsx under each app's src/app. `[lang]` (the locale
- * wrapper) is dropped; other `[param]` segments become positional `:_` so they compare equal to a
+/** FE routes: every directory holding a page.tsx under each app's src/app. The leading locale segment
+ * (layout-tree isLocaleSegment: next-intl's `[locale]`) is transparent and dropped; other `[param]` segments become positional `:_` so they compare equal to a
  * claim's `:param` spelling. Returns {app, route, norm, file}. */
 function feRoutes(repoRoot) {
   const routes = [];
@@ -167,7 +169,8 @@ function feRoutes(repoRoot) {
     const app = appOf(srcRoot, repoRoot);
     for (const file of srcFiles(appDir, 'page.tsx')) {
       const segments = path.relative(appDir, path.dirname(file)).replaceAll('\\', '/').split('/')
-        .filter(s => s && s !== '[lang]');
+        .filter(Boolean);
+      if (segments.length && isLocaleSegment(segments[0])) segments.shift();
       const display = '/' + segments.join('/');
       const norm = '/' + segments.map(s => /^\[.*\]$/.test(s) ? ':_' : s).join('/');
       routes.push({app, route: display || '/', norm: norm === '/' ? '/' : norm.replace(/\/$/, ''), file});
@@ -176,17 +179,79 @@ function feRoutes(repoRoot) {
   return routes;
 }
 
+let typescript = null;
+const ts = () => (typescript ??= createRequire(import.meta.url)('typescript'));
+
+/** `Enum.Member` -> its string value, for every string-valued enum member declared in `files` ([{file, text}]). */
+function enumStringValues(files) {
+  const values = new Map();
+  for (const {file, text} of files) {
+    if (!/\benum\b/.test(text)) continue;
+    const t = ts(), source = t.createSourceFile(file, text, t.ScriptTarget.Latest, false, t.ScriptKind.TS);
+    const visit = node => {
+      if (t.isEnumDeclaration(node)) {
+        for (const member of node.members) {
+          if (member.initializer && t.isStringLiteralLike(member.initializer) && t.isIdentifier(member.name)) {
+            values.set(`${node.name.text}.${member.name.text}`, member.initializer.text);
+          }
+        }
+      }
+      t.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return values;
+}
+
+/**
+ * The event ids an outbox emission names, read structurally: inside a transaction callback (`x.transaction(async (m) =>
+ * ...)`) a call whose first argument is that callback's own transaction handle `m` enqueues a message in the write
+ * transaction (the standard emission: `outbox.enqueue(manager, toAuditAppendMessage({action: AuditAction.TaskCreated}))`).
+ * Every string the message argument carries - a literal or a string-valued enum member - is a candidate event name;
+ * `task.created` names `event.task.created`. A message whose strings name no event record emits nothing that counts.
+ */
+function outboxEmittedIds(files, enumValues) {
+  const ids = new Set();
+  const add = value => { if (typeof value !== 'string') return; ids.add(value); if (!value.startsWith('event.')) ids.add(`event.${value}`); };
+  for (const {file, text} of files) {
+    if (!/\.transaction\s*\(/.test(text)) continue;
+    const t = ts(), source = t.createSourceFile(file, text, t.ScriptTarget.Latest, false, t.ScriptKind.TS);
+    const strings = node => {
+      if (t.isStringLiteralLike(node)) add(node.text);
+      else if (t.isPropertyAccessExpression(node) && t.isIdentifier(node.expression)) add(enumValues.get(`${node.expression.text}.${node.name.text}`));
+      t.forEachChild(node, strings);
+    };
+    const visit = (node, handles) => {
+      let inner = handles;
+      if (t.isCallExpression(node) && t.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'transaction') {
+        const callback = node.arguments.find(arg => t.isArrowFunction(arg) || t.isFunctionExpression(arg));
+        const handle = callback?.parameters[0]?.name;
+        if (handle && t.isIdentifier(handle)) inner = new Set([...handles, handle.text]);
+      }
+      if (t.isCallExpression(node) && handles.size && node.arguments.length > 1) {
+        const first = node.arguments[0];
+        if (t.isIdentifier(first) && handles.has(first.text)) for (const arg of node.arguments.slice(1)) strings(arg);
+      }
+      t.forEachChild(node, child => visit(child, inner));
+    };
+    visit(source, new Set());
+  }
+  return ids;
+}
+
 /** The event vocabulary the code knows: `class XxxEvent` declarations paired with the `kind =
- * "event.<id>"` discriminant they carry, `new XxxEvent(` construction sites in production files
- * (emission), and `instanceof`/@EventsHandler subscriptions per file. */
+ * "event.<id>"` discriminant they carry, `new XxxEvent(` construction sites and outbox enqueues in the write
+ * transaction (outboxEmittedIds) in production files (emission), and `instanceof`/@EventsHandler subscriptions per file. */
 function eventSurface(repoRoot) {
   const classes = new Map();   // className -> {file, kind}
   const emitted = new Map();   // className -> file (production construction site)
   const emittedIds = new Set();// record ids emitted by literal ("event.x.y" inside a publish/emit file)
   const subscriptions = [];    // {file, classes: [className]}
+  const texts = [];
   for (const srcRoot of srcRootsOf(repoRoot)) {
     for (const file of prodFiles(srcRoot)) {
       const text = fs.readFileSync(file, 'utf8');
+      texts.push({file, text});
       const kinds = [...text.matchAll(/['"](event\.[a-z0-9-]+(?:\.[a-z0-9-]+)+)['"]/g)]
         .map(m => ({id: m[1], at: m.index}));
       const classDecls = [...text.matchAll(/class\s+(\w+Event)\b/g)];
@@ -205,6 +270,7 @@ function eventSurface(repoRoot) {
       }
     }
   }
+  for (const id of outboxEmittedIds(texts, enumStringValues(texts))) emittedIds.add(id);
   return {classes, emitted, emittedIds, subscriptions};
 }
 

@@ -70,6 +70,8 @@ function makeFixture() {
   ].join('\n'));
   write(workRoot, 'features/f/event/done-thing/index.yaml',
     'schema: work/event@1\nid: event.f.done-thing\nstate: done\n');
+  write(workRoot, 'features/f/event/outboxed/index.yaml',
+    'schema: work/event@1\nid: event.f.outboxed\nstate: done\n');
   write(workRoot, 'features/f/event/never/index.yaml',
     'schema: work/event@1\nid: event.f.never\nstate: done\n');
   write(workRoot, 'features/f/ui/orders/index.yaml', [
@@ -144,8 +146,27 @@ function makeFixture() {
     '',
   ].join('\n'));
 
-  write(fe, 'src/app/[lang]/orders/page.tsx', 'export default function Page() { return null; }\n');
-  write(fe, 'src/app/[lang]/extra/page.tsx', 'export default function Page() { return null; }\n');
+  // The standard emission: an outbox enqueue in the write transaction whose message names the event through a
+  // string-valued enum member (f.outboxed -> event.f.outboxed). No event class exists for it.
+  write(be, 'src/features/f/f.contracts.ts', 'export enum FAction {\n  Outboxed = "f.outboxed",\n}\n');
+  write(be, 'src/features/f/outboxed.service.ts', [
+    "import {FAction} from './f.contracts';",
+    '',
+    'export class OutboxedService {',
+    '  constructor(private readonly entityManager: any, private readonly outbox: any) {}',
+    '  run() {',
+    '    return this.entityManager.transaction(async (manager: unknown) => {',
+    '      await this.outbox.enqueue(manager, toMessage({action: FAction.Outboxed, target: 1}));',
+    '    });',
+    '  }',
+    '}',
+    'const toMessage = (body: object) => body;',
+    '',
+  ].join('\n'));
+
+  // next-intl's [locale] segment (FE_I18N_PLACEMENT) is transparent: app/[locale]/orders/page.tsx serves /orders.
+  write(fe, 'src/app/[locale]/orders/page.tsx', 'export default function Page() { return null; }\n');
+  write(fe, 'src/app/[locale]/extra/page.tsx', 'export default function Page() { return null; }\n');
 
   return {root, workRoot};
 }
@@ -175,6 +196,10 @@ test('checkWorkSurfaces: refused codes fire for declared surfaces nothing serves
   assert.ok(!all.some(l => l.includes('orderDetail')), all.join('\n'));
   assert.ok(!all.some(l => l.includes('DoneThingEvent')), all.join('\n'));
   assert.ok(!all.some(l => l.includes('contract.f.orders')), all.join('\n'));
+  // an outbox enqueue in the write transaction emits event.f.outboxed (event.f.never, with no emission, is refused above)
+  assert.ok(!all.some(l => l.includes('event.f.outboxed')), all.join('\n'));
+  // the [locale] page serves the claimed /orders
+  assert.ok(!all.some(l => l.includes('ui.f.orders')), all.join('\n'));
 });
 
 test('check-work-surfaces.mjs --tree: exits 1 with grouped findings on a violating tree', () => {

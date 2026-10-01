@@ -74,6 +74,10 @@ export function segmentKindOf(name) {
   return 'static';
 }
 
+/** The locale segment next-intl routes through: a dynamic segment directly under app/ whose parameter is a locale. It is
+ * transparent to the URL a page serves (app/[locale]/x/page.tsx serves /x); the scan and the surface checks share this. */
+export const isLocaleSegment = (name) => segmentKindOf(name) === 'dynamic' && LOCALE_PARAMS.has(name.slice(1, -1));
+
 const joinUrl = (base, part) => (base === '/' ? `/${part}` : `${base}/${part}`);
 const urlParts = (url) => url.split('/').filter(Boolean);
 
@@ -346,7 +350,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, name = nul
     if (inIntercept && node.files?.page) node.intercepts = pages.find((p) => p.url === node.url)?.id ?? undefined;
     if (node.intercepts === undefined) delete node.intercepts;
   }
-  const localeRoot = nodes.find((n) => n.parent === '/' && n.segmentKind === 'dynamic' && LOCALE_PARAMS.has(n.segment.slice(1, -1)));
+  const localeRoot = nodes.find((n) => n.parent === '/' && isLocaleSegment(n.segment));
   const localeParam = localeRoot ? localeRoot.segment.slice(1, -1) : null;
 
   // The catalogs stay out of source.digest: a catalog is shared and hot (every workflow adds strings to it), so
