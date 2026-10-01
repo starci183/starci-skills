@@ -31,8 +31,6 @@ const SKIP_DIR_NAMES = new Set([
   '.venv',
   'worktrees',
   'coverage',
-  // Synthetic checker fixtures under tests/fixtures must not pollute the skill-root walk.
-  'tests',
   // Fleet scratch (lint reports, perf baselines) under examples/; not authored source.
   'ex-testing',
   // Gitignored local credentials (ui/.secrets); never authored source and never committed.
@@ -58,6 +56,13 @@ const LOCAL_ONLY = new Set(['config.json', 'settings.local.json']);
  * remains part of the authored-source inventory.
  */
 const RUNTIME_OWNED_ROOTS = new Set(['.starciwork', 'runtime']);
+
+/**
+ * The skill-root spec tree: its synthetic checker fixtures (tests/fixtures) must not pollute the walk. Only this
+ * exact root is skipped; a product or template `tests` directory (src/tests/tsconfig.json, a fake's payloads) is
+ * authored source and stays in the inventory.
+ */
+const SPEC_ROOT = 'tests';
 
 /**
  * Generated mirrors of runtime files that the published packages carry: packages/hfs/scripts/sync-runtime.mjs writes each
@@ -126,7 +131,7 @@ function loadAllowlist(allowlistFile) {
 
 function shouldSkipDir(relativePosix, name) {
   if (SKIP_DIR_NAMES.has(name)) return true;
-  if (relativePosix === '' && RUNTIME_OWNED_ROOTS.has(name)) return true;
+  if (relativePosix === '' && (RUNTIME_OWNED_ROOTS.has(name) || name === SPEC_ROOT)) return true;
   if (GENERATED_MIRROR_SET.has(relativePosix ? `${relativePosix}/${name}` : name)) return true;
   if (relativePosix.startsWith('sites/') && (name === '.next' || name === 'out')) return true;
   return false;

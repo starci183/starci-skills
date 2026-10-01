@@ -1,0 +1,15 @@
+id: json-exceptions-exact-tests-root
+effectiveAt: '2026-10-01T22:00:00+07:00'
+summary: >-
+  check-json-exceptions skips only the skill-root tests/ tree, no longer every directory named tests, so product and
+  template test trees (src/tests/tsconfig.json, the sepay fake payloads) are authored source in the inventory.
+  json-exceptions.yaml drops six template paths deleted from disk, registers templates/app/package-scripts/package.json,
+  .claude/settings.json and the src/tests JSON, and directories[] may name a fake's recorded third-party payloads.
+  npm run check now runs check-json-exceptions, which already fails on an entry missing from disk.
+reach: new-legs
+paths:
+  - scripts/checks/check-json-exceptions.mjs
+  - modules/schemas/json-exceptions.yaml
+  - package.json
+  - tests/json-exceptions.spec.mjs
+  - modules/kernel/contract-changes/json-exceptions-exact-tests-root.yaml

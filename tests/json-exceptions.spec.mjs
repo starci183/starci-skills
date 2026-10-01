@@ -200,6 +200,25 @@ test('the shipped allowlist registers benchmark/snapshots as a directory, not fi
   );
 });
 
+test('only the skill-root tests tree is skipped; a product or template tests directory stays in the inventory', async t => {
+  const checkJsonExceptions = await loadChecker();
+  const dir = disposable(t, 'starci-json-tests-');
+  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'schemas', 'json-exceptions.yaml'), 'schema: starci/json-exceptions@1\nexceptions: []\n');
+  const nested = [
+    'examples/app/src/tests/tsconfig.json',
+    'examples/app/src/tests/world/fakes/idp/payloads/token.json',
+    'packages/hfs/templates/be/tool-config/src/tests/tsconfig.json',
+  ];
+  for (const relative of ['tests/fixtures/sample/package.json', ...nested]) {
+    const file = path.join(dir, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, '{}\n');
+  }
+  const result = checkJsonExceptions({ root: dir, allowlistFile: path.join(dir, 'schemas', 'json-exceptions.yaml') });
+  assert.deepEqual(result.offenders, nested, 'a nested tests directory is authored source, not the spec root');
+});
+
 test('checker CLI succeeds only when the installed authored source is clean', () => {
   const cli = spawnSync(process.execPath, [checkerFile], {
     cwd: skillRoot,

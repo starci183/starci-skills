@@ -4,7 +4,8 @@ description: >
   while declarative sources are YAML. No wildcards. exceptions[] names one file
   each; directories[] names one exact directory whose direct *.json children are
   all admitted: an append-only record written one file per entry, or a package whose
-  every direct JSON is toolchain config (subdirectories are not admitted, and the
+  every direct JSON is toolchain config, or a test-world fake's recorded payloads in the
+  third party's own JSON wire format (subdirectories are not admitted, and the
   directory must exist). Generated runtime mirrors (GENERATED_MIRROR_ROOTS in
   scripts/checks/check-json-exceptions.mjs) are not authored source and are not listed.
 directories:
@@ -22,10 +23,16 @@ directories:
   - path: examples/ecommerce-app/fe/packages/ecommerce-ui
     reason: >
       npm workspace package of the ecommerce-app front end: its package.json, tsconfig.json and tsconfig.build.json are toolchain config npm and tsc read as JSON.
+  - path: examples/todo-app/be/src/tests/world/fakes/sepay/payloads
+    reason: >
+      Recorded SePay API responses and webhook deliveries the todo-app back end's test-world fake serves at the network edge; JSON is SePay's wire format, and a new payload needs no new line here.
   - path: packages/tsconfig
     reason: >
       The @starci/tsconfig package: its package.json and the shared presets (base, be, build, e2e, next) that product tsconfig files extend; tsc reads JSON, and a new preset needs no new line here.
 exceptions:
+  - path: .claude/settings.json
+    reason: >
+      Claude Code project settings for the runtime checkout (the PreToolUse seat-tools guard hook); Claude Code reads JSON.
   - path: engine/yaml-license.json
     reason: >
       License metadata for the bundled yaml runtime in engine/yaml.mjs;
@@ -39,6 +46,9 @@ exceptions:
   - path: examples/ecommerce-app/be/nest-cli.json
     reason: >
       Nest CLI monorepo map inside the ecommerce-app back end; the nest toolchain reads JSON.
+  - path: examples/ecommerce-app/be/src/tests/tsconfig.json
+    reason: >
+      TypeScript config for the ecommerce-app back-end test tree (src/tests); tsc reads JSON (with comments).
   - path: examples/ecommerce-app/be/tsconfig.build.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app back end; tsc reads JSON (with comments).
@@ -109,6 +119,9 @@ exceptions:
       the rendering contract.
   - path: examples/todo-app/be/nest-cli.json
     reason: Nest CLI configuration for the todo-app example (be side); the nest toolchain reads JSON.
+  - path: examples/todo-app/be/src/tests/tsconfig.json
+    reason: >
+      TypeScript config for the todo-app back-end test tree (src/tests); tsc reads JSON (with comments).
   - path: examples/todo-app/be/tsconfig.build.json
     reason: TypeScript build project config for the todo-app example (be side); tsc expects a JSON tsconfig file.
   - path: examples/todo-app/be/tsconfig.json
@@ -183,28 +196,16 @@ exceptions:
   - path: packages/hfs/package.json
     reason: >
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
-  - path: packages/hfs/templates/be/package-scripts/package.json
+  - path: packages/hfs/templates/app/package-scripts/package.json
     reason: >
-      Managed package-scripts template @starci/hfs writes into a product repository (README script names the architecture machine reads); npm requires JSON.
+      Managed app-root package-scripts template @starci/hfs writes into a product repository (README script names the architecture machine reads); npm requires JSON.
+  - path: packages/hfs/templates/be/tool-config/src/tests/tsconfig.json
+    reason: >
+      TypeScript config template for the back-end test tree (src/tests) @starci/hfs writes into a product repository; tsc reads JSON (with comments).
   - path: packages/hfs/templates/be/tool-config/tsconfig.build.json
     reason: >
       TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
   - path: packages/hfs/templates/be/tool-config/tsconfig.json
-    reason: >
-      TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
-  - path: packages/hfs/templates/fe/package-scripts/package.json
-    reason: >
-      Managed package-scripts template @starci/hfs writes into a product repository (README script names the architecture machine reads); npm requires JSON.
-  - path: packages/hfs/templates/fe/skeleton-shared/packages/__family__-api/package.json
-    reason: >
-      npm workspace manifest template for a scaffolded FE shared package; npm requires JSON.
-  - path: packages/hfs/templates/fe/skeleton-shared/packages/__family__-api/tsconfig.json
-    reason: >
-      TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
-  - path: packages/hfs/templates/fe/skeleton-shared/packages/__family__-i18n/package.json
-    reason: >
-      npm workspace manifest template for a scaffolded FE shared package; npm requires JSON.
-  - path: packages/hfs/templates/fe/skeleton-shared/packages/__family__-i18n/tsconfig.json
     reason: >
       TypeScript config template @starci/hfs writes into a product repository; tsc reads JSON (with comments).
   - path: packages/hfs/templates/fe/skeleton/apps/__app__/src/modules/i18n/messages/vi.json
