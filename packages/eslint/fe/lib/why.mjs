@@ -53,8 +53,8 @@ export const why = {
   },
   "no-hand-typed-wire": {
     code: "FE_WIRE_GENERATED",
-    vi: "`<file>` tự gõ kiểu wire hoặc ép kiểu phản hồi. Dùng kiểu sinh từ `contract/`.",
-    fixVi: "Chạy codegen từ bản sao hợp đồng ở `modules/api/contract/` và nhập kiểu sinh ra; đưa tài liệu GraphQL vào tệp `.graphql`.",
+    vi: "`<file>` tự gõ kiểu wire hoặc ép kiểu phản hồi. Dùng kiểu sinh từ `be/contracts/`.",
+    fixVi: "Chạy codegen từ ảnh chụp hợp đồng của be (`be/contracts/`) và nhập kiểu sinh ra; đưa tài liệu GraphQL vào tệp `.graphql`.",
   },
   "use-client-only-at-boundary": {
     code: "FE_CLIENT_BOUNDARY",

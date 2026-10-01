@@ -36,7 +36,7 @@ const CLIENT = at("apps/web/src/modules/api/client.ts")
 const PKG_CLIENT = at("packages/nivo-api/src/client.ts")
 const PKG_TRANSPORT = at("packages/nivo-api/src/transport.ts")
 const READER = at("apps/web/src/modules/api/course/read-course.ts")
-const CONTRACT = at("apps/web/src/modules/api/contract/types.ts")
+const GENERATED = at("apps/web/src/modules/api/__generated__/types.ts")
 const HOOK = at("apps/web/src/hooks/course/useCourse.ts")
 
 test("every rule this law declares is a rule", () => {
@@ -142,13 +142,13 @@ test("FE-TRANSPORT-3: no module-level mutable state in the API layer", () => {
       { filename: PKG_CLIENT, code: "export const f = () => { let n = 0; return n }" },
       { filename: HOOK, code: "let token = null" },
       { filename: at("packages/nivo-ui/src/leaves/Menu/component.tsx"), code: "let count = 0" },
-      { filename: CONTRACT, code: "let x = 1" },
+      { filename: GENERATED, code: "let x = 1" },
       { filename: at("apps/web/src/modules/api/__generated__/graphql.ts"), code: "let x = 1" },
       // a folder named api below another module is not the API layer
       { filename: at("apps/web/src/modules/config/api/state.ts"), code: "let x = 1" },
     ],
     invalid: [
-      // only the slot's own data folders (contract/, __generated__/) are data: one nested in a domain is code
+      // only the slot's own data folder (__generated__/) is data: one nested in a domain is code
       { filename: at("apps/web/src/modules/api/course/contract/read-state.ts"), code: "let x = 1", errors: [{ messageId: "shared" }] },
       { filename: CLIENT, code: "let token = null", errors: [{ messageId: "shared" }] },
       { filename: READER, code: "export let locale = \"vi\"", errors: [{ messageId: "shared" }] },
@@ -273,7 +273,7 @@ test("FE-WIRE-1: a response body is narrowed from unknown or typed by a generate
       { filename: READER, code: "import type { CourseQuery } from \"../__generated__/graphql\"\nconst x: CourseQuery = y" },
       { filename: READER, code: "const q = loadDocument(\"course.graphql\")" },
       // hand-declared shapes are not the rule's business: only a value read from a response and typed by hand is
-      { filename: CONTRACT, code: "export interface CourseResponse { id: string }" },
+      { filename: GENERATED, code: "export interface CourseResponse { id: string }" },
       { filename: HOOK, code: "export interface CourseResponse { id: string }" },
       { filename: READER, code: "export interface CourseResponse { id: string }" },
       { filename: CLIENT, code: "export type LoginPayload = { email: string }" },

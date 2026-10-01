@@ -566,7 +566,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R49 | `FE_ENV_OWNER` | Only `modules/config` reads the environment; no localhost fallback. |
 | R50 | `FE_TRANSPORT_OWNER` | One `fetch` per repository, in the transport client: `apps/<app>/src/modules/api/client.ts` of a one-app repository or `packages/<family>-api/src/client.ts` shared by every app; timeout and abort; a client read is SWR whose key carries the identity of its result, and a mutation is tied to its resource. |
 | R51 | `FE_HTTP_STATUS_COLLAPSE` | One `Outcome<T>` union per repository (the api slot's `outcome.ts`); 401 and 403 become `refused`. |
-| R52 | `FE_WIRE_GENERATED` | Wire types generated from the contract copy. |
+| R52 | `FE_WIRE_GENERATED` | Wire types generated from the be contract snapshots the fe side reads. |
 | R53 | `FE_ERROR_BOUNDARY_MISSING` | Global, locale error, not-found and loading boundaries exist. |
 | R54 | `FE_ROUTE_FILES_THIN` | Route files mount one owner; Next conventions (`proxy.ts`, metadata). |
 | R55 | `FE_CLIENT_BOUNDARY` | Server first; `"use client"` only where allowed. |

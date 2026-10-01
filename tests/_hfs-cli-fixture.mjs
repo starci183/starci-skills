@@ -6,8 +6,10 @@ import { createRequire } from 'node:module';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../scripts/lib/hfs-slots.mjs';
 import { renderTargets, writeTargets } from '../packages/hfs/sync/index.mjs';
 import { loadSonarGate } from '../scripts/checks/sonar-gate.mjs';
+import { parseYaml } from '../engine/yaml.mjs';
 
 const jestPreset = createRequire(import.meta.url)('../packages/jest-preset/index.cjs');
+const PINS = parseYaml(fs.readFileSync(path.resolve(import.meta.dirname, '..', 'knowledge', 'hfs', 'canon-pins.yaml'), 'utf8')).pins;
 /** The Sonar exclusions `hfs sync` would load from the jest preset an app installs for its be side. */
 export const PRESETS = { sonarExclusions: jestPreset.sonarExclusions() };
 
@@ -43,7 +45,8 @@ export function writeCleanRepo(declaration = APP, { declare = true, into, name =
     if (!fs.existsSync(target)) fs.writeFileSync(target, text);
   };
   const write = (relative, text) => { const target = path.join(dir, ...relative.split('/')); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, text); };
-  put('package.json', `${JSON.stringify({ name: path.basename(dir), private: true })}\n`);
+  // The one package.json of the app: the fe side's next-intl stack is a dependency of it (R59).
+  put('package.json', `${JSON.stringify({ name: path.basename(dir), private: true, dependencies: { 'next-intl': PINS['next-intl'].version } })}\n`);
   writeTargets(dir, renderTargets(declaration, PRESETS));
   // The file a rule reads the content of that the render does not write: the be side's stack declaration.
   put('be/.starcistacks/application-stacks.yaml', STACKS_DECLARATION);

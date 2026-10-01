@@ -11115,11 +11115,11 @@ FE_HTTP_STATUS_COLLAPSE:
   kind: check-finding
 
 FE_WIRE_GENERATED:
-  title: "Wire types generated from the contract copy"
+  title: "Wire types generated from the be contract snapshots the fe side reads"
   title_vi: "Kiểu wire gõ tay"
-  meaning_vi: "`<file>` tự gõ kiểu wire/ép kiểu phản hồi. Dùng kiểu sinh từ `contract/`."
+  meaning_vi: "`<file>` tự gõ kiểu wire/ép kiểu phản hồi, hoặc kiểu sinh ra cũ hơn ảnh chụp hợp đồng. Dùng kiểu sinh từ `be/contracts/`."
   causes_vi:
-    - "Vi phạm luật R52: Kiểu wire sinh từ bản hợp đồng (`codegen`); tài liệu GraphQL trong `.graphql`; cấm `as GraphqlResult<T>`; enum wire không phải `string`."
+    - "Vi phạm luật R52: Kiểu wire sinh từ ảnh chụp hợp đồng của be (`be/contracts/`, chạy `npm run codegen` ở gốc app); tài liệu GraphQL trong `.graphql`; cấm `as GraphqlResult<T>`; enum wire không phải `string`."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding

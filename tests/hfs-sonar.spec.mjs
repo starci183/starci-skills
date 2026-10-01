@@ -10,7 +10,7 @@ import { renderTargets } from '../packages/hfs/sync/index.mjs';
 import { managedFindings } from '../packages/hfs/sync/managed.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import { loadSonarGate, serverConditions } from '../scripts/checks/sonar-gate.mjs';
-import { BE, FE, FORMATTED, PRESETS, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { APP, TWO_FE_APPS, FORMATTED, PRESETS, cleanup, gitAdd, installTypeScript, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 
 // One Sonar mechanism (contract change hfs-sonar-import, rules R11, R20, R21): the findings of `hfs check` and the eslint and stylelint
 // results become Sonar Generic Issue Import documents through one placement rule; the managed configuration names the reports; the gate holds them at zero.
@@ -174,7 +174,7 @@ const cli = async (argv, presets) => {
   const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets, prettier: FORMATTED }); // this spec is not about formatting
   return { code, out, err };
 };
-const repo = (declaration, mutate) => {
+const repo = (declaration = APP, mutate) => {
   const dir = writeCleanRepo(declaration);
   made.push(dir);
   if (mutate) mutate(dir);
@@ -188,62 +188,62 @@ const scratch = () => {
 
 test('the superseded Sonar commands are gone, not aliased: hfs check --sonar and hfs report are refused', async () => {
   const out = scratch();
-  const violating = repo(BE, (dir) => fs.appendFileSync(path.join(dir, 'sonar-project.properties'), 'sonar.host.url=https://sonar.example.org\n'));
-  assert.equal((await cli(['check', '--repo', violating, '--sonar', path.join(out, 'x.json')], PRESETS.be)).code, 2, 'hfs check --sonar is gone');
+  const violating = repo(APP, (dir) => fs.appendFileSync(path.join(dir, 'sonar-project.properties'), 'sonar.host.url=https://sonar.example.org\n'));
+  assert.equal((await cli(['check', '--repo', violating, '--sonar', path.join(out, 'x.json')], PRESETS)).code, 2, 'hfs check --sonar is gone');
   assert.equal((await cli(['report', 'eslint', 'a.json', 'b.json', '--repo', violating])).code, 2, 'hfs report is gone');
   assert.equal(fs.existsSync(path.join(out, 'x.json')), false);
 });
 
-const managed = async (dir, declaration) => {
+const managed = async (dir) => {
   const tracked = execFileSync('git', ['-C', dir, 'ls-files'], { encoding: 'utf8' }).split('\n').filter(Boolean);
-  return (await managedFindings({ repoRoot: dir, tracked, presets: PRESETS[declaration.profile] })).filter((f) => f.code === 'HFS_SONAR_CONFIG').map((f) => f.path);
+  return (await managedFindings({ repoRoot: dir, tracked, presets: PRESETS })).filter((f) => f.code === 'HFS_SONAR_CONFIG').map((f) => f.path);
 };
 
-test('HFS_SONAR_CONFIG: a host URL, a dropped report path or any edit of sonar-project.properties is one finding; the render is clean for both profiles', async () => {
-  for (const declaration of [BE, FE]) {
+test('HFS_SONAR_CONFIG: a host URL, a dropped report path or any edit of the app sonar-project.properties is one finding; the render is clean', async () => {
+  for (const declaration of [APP, TWO_FE_APPS]) {
     const dir = repo(declaration);
-    assert.deepEqual(await managed(dir, declaration), [], `${declaration.profile}: the rendered configuration is clean`);
+    assert.deepEqual(await managed(dir), [], `${declaration.sides.fe.apps.length} fe app(s): the rendered configuration is clean`);
     const file = path.join(dir, 'sonar-project.properties');
     const text = fs.readFileSync(file, 'utf8');
     fs.writeFileSync(file, `${text}sonar.host.url=https://sonar.example.org\n`);
-    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: a host URL`);
+    assert.deepEqual(await managed(dir), ['sonar-project.properties'], `${declaration.sides.fe.apps.length} fe app(s): a host URL`);
     fs.writeFileSync(file, text.replace('reports/lint.sonar.json', 'reports/eslint.json'));
-    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: the lint import path dropped`);
+    assert.deepEqual(await managed(dir), ['sonar-project.properties'], `${declaration.sides.fe.apps.length} fe app(s): the lint import path dropped`);
     fs.writeFileSync(file, `${text}sonar.eslint.reportPaths=reports/eslint.json\n`);
-    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: Sonar's own ESLint import is not used`);
+    assert.deepEqual(await managed(dir), ['sonar-project.properties'], `${declaration.sides.fe.apps.length} fe app(s): Sonar's own ESLint import is not used`);
     fs.writeFileSync(file, text.replace(/^sonar\.externalIssuesReportPaths=.*\n/m, ''));
-    assert.deepEqual(await managed(dir, declaration), ['sonar-project.properties'], `${declaration.profile}: the import path dropped`);
+    assert.deepEqual(await managed(dir), ['sonar-project.properties'], `${declaration.sides.fe.apps.length} fe app(s): the import path dropped`);
     fs.writeFileSync(file, text);
-    assert.deepEqual(await managed(dir, declaration), []);
+    assert.deepEqual(await managed(dir), []);
   }
 });
 
 test('HFS_SONAR_CONFIG: a stack declaration that names another quality gate than the bundled gate file is a finding; the gate name, a disabled Sonar and no declaration are not', async () => {
   const gate = loadSonarGate().gate.name;
   const declare = (dir, sonar) => {
-    fs.mkdirSync(path.join(dir, '.starcistacks'), { recursive: true });
-    fs.writeFileSync(path.join(dir, '.starcistacks', 'application-stacks.yaml'), `schema: starci/application-stacks@1\nservices:\n  sonar:\n${sonar}\n`);
+    fs.mkdirSync(path.join(dir, 'be', '.starcistacks'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'be', '.starcistacks', 'application-stacks.yaml'), `schema: starci/application-stacks@1\nservices:\n  sonar:\n${sonar}\n`);
   };
-  const dir = repo(BE);
-  const tracked = ['.starcistacks/application-stacks.yaml'];
-  const found = async () => (await managedFindings({ repoRoot: dir, tracked, presets: PRESETS.be })).filter((f) => f.code === 'HFS_SONAR_CONFIG');
+  const dir = repo(APP);
+  const tracked = ['be/.starcistacks/application-stacks.yaml'];
+  const found = async () => (await managedFindings({ repoRoot: dir, tracked, presets: PRESETS })).filter((f) => f.code === 'HFS_SONAR_CONFIG');
   declare(dir, `    provider: sonarqube\n    mode: local\n    qualityGate: ${gate}`);
   assert.deepEqual(await found(), []);
   declare(dir, '    provider: sonarqube\n    mode: local\n    qualityGate: my-own-gate');
   const [wrong] = await found();
-  assert.equal(wrong.path, '.starcistacks/application-stacks.yaml');
+  assert.equal(wrong.path, 'be/.starcistacks/application-stacks.yaml');
   assert.match(wrong.message, new RegExp(`my-own-gate.*${gate}`));
   declare(dir, '    provider: sonarqube\n    mode: local');
   assert.match((await found())[0].message, /is absent/);
   declare(dir, '    provider: sonarqube\n    mode: disabled\n    qualityGate: other');
   assert.deepEqual(await found(), []);
-  fs.rmSync(path.join(dir, '.starcistacks'), { recursive: true });
+  fs.rmSync(path.join(dir, 'be', '.starcistacks'), { recursive: true });
   assert.deepEqual(await found(), []);
 });
 
 test('the managed configuration wires the one report: properties name reports/lint.sonar.json, the workflow produces it once through npm run lint before the scan, no step swallows a failure', () => {
-  for (const declaration of [BE, FE]) {
-    const files = Object.fromEntries(renderTargets(declaration, PRESETS[declaration.profile]).map((target) => [target.path, target.content]));
+  for (const declaration of [APP, TWO_FE_APPS]) {
+    const files = Object.fromEntries(renderTargets(declaration, PRESETS).map((target) => [target.path, target.content]));
     const properties = files['sonar-project.properties'];
     assert.doesNotMatch(properties, /sonar\.eslint\.reportPaths/, 'no second import path for eslint');
     assert.match(properties, /^sonar\.externalIssuesReportPaths=reports\/lint\.sonar\.json$/m);
@@ -251,8 +251,8 @@ test('the managed configuration wires the one report: properties name reports/li
     const steps = parseYaml(files['.github/workflows/ci.yml']).jobs.ci.steps;
     const scan = steps.findIndex((step) => String(step.uses).startsWith('SonarSource/sonarqube-scan-action'));
     const producers = steps.map((step, index) => [step, index]).filter(([step]) => /npm run lint|hfs |eslint|stylelint/.test(step.run ?? ''));
-    assert.deepEqual(producers.map(([step]) => step.run), ['npm run lint -- --sonar reports/lint.sonar.json'], `${declaration.profile}: one lint step produces the one report`);
-    for (const [, index] of producers) assert.ok(index < scan, `${declaration.profile}: the report is produced before the Sonar scan`);
+    assert.deepEqual(producers.map(([step]) => step.run), ['npm run lint -- --sonar reports/lint.sonar.json'], `${declaration.sides.fe.apps.length} fe app(s): one lint step produces the one report`);
+    for (const [, index] of producers) assert.ok(index < scan, `${declaration.sides.fe.apps.length} fe app(s): the report is produced before the Sonar scan`);
     for (const step of steps) assert.equal(step['continue-on-error'], undefined, 'no step swallows a failure');
     for (const step of [steps[scan], steps[scan + 1]]) assert.match(String(step.if), /!cancelled\(\)/, 'a failed lint still reaches Sonar');
   }

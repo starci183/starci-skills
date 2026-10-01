@@ -52,7 +52,7 @@ import { posixPath } from './path-key.mjs';
 import { readTree, treeFacts, untrackedEntries } from './hfs-tree.mjs';
 import { contractFindings } from './hfs-rules/contract.mjs';
 import { depFindings } from './hfs-rules/deps.mjs';
-import { frontendFindings } from './hfs-rules/frontend.mjs';
+import { appFrontendFindings, frontendFindings } from './hfs-rules/frontend.mjs';
 import { lintSuppressionFindings } from './hfs-rules/lint-suppression.mjs';
 import { pipelineFindings } from './hfs-rules/pipeline.mjs';
 import { proofCommandFindings } from './hfs-rules/proof-commands.mjs';
@@ -265,6 +265,7 @@ function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, sco
       ...pipelineFindings({ repoRoot, files, pins }),
       ...testTopologyFindings({ repoRoot, files }),
       ...proofCommandFindings({ repoRoot, files: all, resolver }),
+      ...appFrontendFindings({ repoRoot, files: all, repo }),
       // The tree check of the app root the machine runs per side for a side folder: README, root entries, automatic gates, hooks path.
       ...checkAppRoot({ root: repoRoot, resolver, tree: trackedTreeView(all) }).violations.map((item) => ({ code: item.ruleId, level: 'error', path: item.path, line: item.line, column: item.column, source: 'machine', message: `${item.path}: ${item.message}` })),
     );

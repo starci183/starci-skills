@@ -8,6 +8,7 @@ import { allowsFile } from './hfs-allows.mjs';
 import { isFeTestPath } from './hfs-rules/fe-no-tests.mjs';
 import { slotOwnsSecrets } from './hfs-rules/secrets.mjs';
 import { specPlacementFindings } from './hfs-rules/spec-placement.mjs';
+import { APP_SCOPE } from './hfs-slots.mjs';
 
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SOURCE_ROOT = /^(?:src|apps)\//;
@@ -85,6 +86,8 @@ export function pathFindings({ files, resolver, profile }) {
   }
 
   if (profile === 'be') findings.push(...sourceFormFindings({ files, resolver }), ...specPlacementFindings({ files, resolver }));
+  // The app root (scripts/, CI, hooks) holds no test layer: a spec there is the same finding as a spec of an operational script.
+  else if (profile === APP_SCOPE) findings.push(...specPlacementFindings({ files, resolver }));
   // The lint canon's project graph serves these findings on a TypeScript file; the origin keeps them apart from the machine's.
   return findings.map((finding) => ({ ...finding, origin: 'repo' }));
 }

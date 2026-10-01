@@ -13,10 +13,10 @@ import { main } from '../packages/hfs/bin/hfs.mjs';
 import { SyncError } from '../packages/hfs/sync/index.mjs';
 import { formatFindings, loadPrettier } from '../packages/hfs/sync/format.mjs';
 import { managedFindings } from '../packages/hfs/sync/managed.mjs';
-import { BE, FE, FORMATTED, PRESETS, cleanup, gitAdd, writeCleanRepo } from './_hfs-cli-fixture.mjs';
+import { APP, FORMATTED, PRESETS, cleanup, gitAdd, writeCleanRepo } from './_hfs-cli-fixture.mjs';
 
 const made = [];
-const repoOf = (declaration, mutate) => {
+const repoOf = (declaration = APP, mutate) => {
   const dir = writeCleanRepo(declaration);
   made.push(dir);
   if (mutate) mutate(dir);
@@ -31,31 +31,31 @@ const write = (dir, relative, text) => {
   fs.writeFileSync(target, text);
 };
 const only = (findings, code) => findings.filter((f) => f.code === code);
-const managed = (dir, profile) => managedFindings({ repoRoot: dir, tracked: trackedFiles(dir), presets: PRESETS[profile] });
+const managed = (dir) => managedFindings({ repoRoot: dir, tracked: trackedFiles(dir), presets: PRESETS });
 
 // ------------------------------------------------------------------------------------------------ R04 HFS_GITIGNORE_BLOCK_DRIFT
 
-test('HFS_GITIGNORE_BLOCK_DRIFT: an edited block, and a .gitignore with no block, are refused; the repository\'s own lines are not judged', async () => {
-  const edited = repoOf(BE, (dir) => write(dir, '.gitignore', read(dir, '.gitignore').replace('node_modules/\n', '')));
-  const [drift] = only(await managed(edited, 'be'), 'HFS_GITIGNORE_BLOCK_DRIFT');
+test('HFS_GITIGNORE_BLOCK_DRIFT: an edited block of the app .gitignore, and one with no block, are refused; the app\'s own lines are not judged', async () => {
+  const edited = repoOf(APP, (dir) => write(dir, '.gitignore', read(dir, '.gitignore').replace('node_modules/\n', '')));
+  const [drift] = only(await managed(edited), 'HFS_GITIGNORE_BLOCK_DRIFT');
   assert.equal(drift.path, '.gitignore');
   assert.match(drift.message, /not its render/);
   assert.match(drift.message, /line \d+ expected "node_modules\/"/);
-  const unmanaged = repoOf(FE, (dir) => write(dir, '.gitignore', 'node_modules/\n'));
-  assert.match(only(await managed(unmanaged, 'fe'), 'HFS_GITIGNORE_BLOCK_DRIFT')[0].message, /block of \.gitignore is missing/);
+  const unmanaged = repoOf(APP, (dir) => write(dir, '.gitignore', 'node_modules/\n'));
+  assert.match(only(await managed(unmanaged), 'HFS_GITIGNORE_BLOCK_DRIFT')[0].message, /block of \.gitignore is missing/);
 });
 
 test('HFS_GITIGNORE_BLOCK_DRIFT: the rendered block, with the repository\'s own lines around it, is clean', async () => {
-  const dir = repoOf(BE, (d) => write(d, '.gitignore', `# ours\nlocal-notes/\n${read(d, '.gitignore')}\n.idea/\n`));
-  assert.deepEqual(only(await managed(dir, 'be'), 'HFS_GITIGNORE_BLOCK_DRIFT'), []);
-  assert.deepEqual(only(await managed(repoOf(FE), 'fe'), 'HFS_GITIGNORE_BLOCK_DRIFT'), []);
+  const dir = repoOf(APP, (d) => write(d, '.gitignore', `# ours\nlocal-notes/\n${read(d, '.gitignore')}\n.idea/\n`));
+  assert.deepEqual(only(await managed(dir), 'HFS_GITIGNORE_BLOCK_DRIFT'), []);
+  assert.deepEqual(only(await managed(repoOf()), 'HFS_GITIGNORE_BLOCK_DRIFT'), []);
 });
 
-test('the CLI reports the block drift with its Vietnamese why, and a repository with no preset installed is a refusal', async () => {
-  const dir = repoOf(BE, (d) => write(d, '.gitignore', 'dist/\n'));
+test('the CLI reports the block drift with its Vietnamese why, and an app with no preset installed is a refusal', async () => {
+  const dir = repoOf(APP, (d) => write(d, '.gitignore', 'dist/\n'));
   let out = '';
   let err = '';
-  const seams = { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets: PRESETS.be, prettier: FORMATTED };
+  const seams = { stdout: (s) => { out += s; }, stderr: (s) => { err += s; }, presets: PRESETS, prettier: FORMATTED };
   const code = await main(['check', '--repo', dir, '--json'], seams);
   assert.equal(code, 1);
   const [finding] = JSON.parse(out).findings.filter((f) => f.code === 'HFS_GITIGNORE_BLOCK_DRIFT');
@@ -84,9 +84,9 @@ test('HFS_FORMAT: the runtime declares and resolves its pinned prettier from thi
 
 const prettierOf = path.dirname(createRequire(import.meta.url).resolve('prettier/package.json'));
 
-/** A tracked repository whose node_modules holds the runtime's own prettier, the way `npm ci` would have installed it. */
+/** A tracked app whose root node_modules holds the runtime's own prettier, the way `npm ci` would have installed it. */
 function withPrettier(files) {
-  const dir = writeCleanRepo(BE);
+  const dir = writeCleanRepo(APP);
   made.push(dir);
   for (const [relative, text] of Object.entries(files)) write(dir, relative, text);
   gitAdd(dir);
@@ -97,30 +97,30 @@ function withPrettier(files) {
 const formatOf = (dir, files) => formatFindings({ repoRoot: dir, files });
 
 test('HFS_FORMAT: a file the repository\'s own prettier would change, and one it cannot parse, are refused', async () => {
-  const dir = withPrettier({ 'src/a.ts': 'const a = {b:1}\n', 'src/broken.ts': 'const = ;\n', 'src/ok.ts': 'export const ok = 1;\n', '.prettierrc': '{ "semi": true }\n' });
-  const found = only(await formatOf(dir, ['src/a.ts', 'src/broken.ts', 'src/ok.ts']), 'HFS_FORMAT');
-  assert.deepEqual(found.map((f) => f.path).sort(), ['src/a.ts', 'src/broken.ts']);
-  assert.match(found.find((f) => f.path === 'src/broken.ts').message, /cannot be formatted/);
+  const dir = withPrettier({ 'be/src/a.ts': 'const a = {b:1}\n', 'be/src/broken.ts': 'const = ;\n', 'be/src/ok.ts': 'export const ok = 1;\n', '.prettierrc': '{ "semi": true }\n' });
+  const found = only(await formatOf(dir, ['be/src/a.ts', 'be/src/broken.ts', 'be/src/ok.ts']), 'HFS_FORMAT');
+  assert.deepEqual(found.map((f) => f.path).sort(), ['be/src/a.ts', 'be/src/broken.ts']);
+  assert.match(found.find((f) => f.path === 'be/src/broken.ts').message, /cannot be formatted/);
   assert.equal(found[0].level, 'error');
 });
 
 test('HFS_FORMAT: formatted files, a .prettierignore entry and a lockfile are clean; the repository\'s prettier config is the judge', async () => {
   const dir = withPrettier({
-    'src/ok.ts': 'export const ok = 1;\n',
-    'src/generated.ts': 'const   generated = {a:1}\n',
-    '.prettierignore': 'src/generated.ts\n',
+    'be/src/ok.ts': 'export const ok = 1;\n',
+    'be/src/generated.ts': 'const   generated = {a:1}\n',
+    '.prettierignore': 'be/src/generated.ts\n',
     'package-lock.json': '{"lockfileVersion":3,"packages":{}}',
     '.prettierrc': '{ "semi": true }\n',
   });
-  assert.deepEqual(only(await formatOf(dir, ['src/ok.ts', 'src/generated.ts', 'package-lock.json']), 'HFS_FORMAT'), []);
-  write(dir, 'src/no-semi.ts', 'export const ok = 1\n');
-  assert.deepEqual(only(await formatOf(dir, ['src/no-semi.ts']), 'HFS_FORMAT').map((f) => f.path), ['src/no-semi.ts']);
+  assert.deepEqual(only(await formatOf(dir, ['be/src/ok.ts', 'be/src/generated.ts', 'package-lock.json']), 'HFS_FORMAT'), []);
+  write(dir, 'be/src/no-semi.ts', 'export const ok = 1\n');
+  assert.deepEqual(only(await formatOf(dir, ['be/src/no-semi.ts']), 'HFS_FORMAT').map((f) => f.path), ['be/src/no-semi.ts']);
   write(dir, '.prettierrc', '{ "semi": false }\n');
-  assert.deepEqual(only(await formatOf(dir, ['src/no-semi.ts']), 'HFS_FORMAT'), []);
+  assert.deepEqual(only(await formatOf(dir, ['be/src/no-semi.ts']), 'HFS_FORMAT'), []);
 });
 
-test('HFS_FORMAT: a repository without prettier is a refusal (HFS_FORMAT_TOOL_MISSING), never a pass', async () => {
-  const dir = repoOf(BE);
+test('HFS_FORMAT: an app without prettier is a refusal (HFS_FORMAT_TOOL_MISSING), never a pass', async () => {
+  const dir = repoOf();
   assert.throws(() => loadPrettier(dir), (error) => error instanceof SyncError && error.code === 'HFS_FORMAT_TOOL_MISSING');
   await assert.rejects(formatFindings({ repoRoot: dir, files: ['README.md'] }), /HFS_FORMAT_TOOL_MISSING/);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-format-'));

@@ -195,8 +195,8 @@ export const clientFetchHasSignal = {
 const API_LAYER_SLOTS = ["fe.modules.api", "fe.transport.client", "fe.transport.outcome", "fe.package.api", "fe.package.api.client", "fe.package.api.outcome"]
 
 /**
- * True for a file of the API layer, except the data folders its slot allows (`contract/`, `__generated__/`: the contract copy
- * and generated output are data, not code the wire law governs).
+ * True for a file of the API layer, except the data folders its slot allows (`__generated__/`: the types generated from the be
+ * contract snapshots are data, not code the wire law governs).
  */
 const isTransportFile = (context) => {
   const slotId = slotOfFile(context)
@@ -569,7 +569,7 @@ export const noHandTypedWire = {
     schema: [],
     messages: {
       cast:
-        "A response body is typed by hand here. An assertion or annotation is a claim nobody checks: when the backend changes the shape this still compiles and fails at a reader's screen. Narrow the body from `unknown` (`(await response.json()) as unknown`, then a check), or use the type generated from `modules/api/contract` (imported from `__generated__/`), and validate at the client.",
+        "A response body is typed by hand here. An assertion or annotation is a claim nobody checks: when the backend changes the shape this still compiles and fails at a reader's screen. Narrow the body from `unknown` (`(await response.json()) as unknown`, then a check), or use the type generated from the be contract snapshot (`be/contracts/`, imported from `__generated__/`), and validate at the client.",
       document:
         "A GraphQL document written inline in TypeScript. Documents live in `.graphql` files so codegen can generate their types and the contract check can read them.",
     },

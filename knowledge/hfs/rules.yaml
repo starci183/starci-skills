@@ -543,7 +543,7 @@ rules:
       - {kind: eslint-fe, id: one-outcome-union}
   - id: R52
     code: "FE_WIRE_GENERATED"
-    law: "Wire types generated from the contract copy."
+    law: "Wire types generated from the be contract snapshots the fe side reads."
     kinds: [lint, check, design]
     gates: [settle, land, ci]
     failureCodes: ["FE_WIRE_GENERATED"]

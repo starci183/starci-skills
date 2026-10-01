@@ -1042,7 +1042,7 @@ slots:
     # client.ts/outcome.ts (fe.transport.client/outcome) in a one-app repository, or the api package's
     # (fe.package.api.client/outcome) when the repository shares it (FE_TRANSPORT_OWNER, machine).
     requires: [index.ts]
-    allows: [index.ts, client.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/*.graphql", "<domain>/<domain>.mapper.ts", contract/, __generated__/]
+    allows: [index.ts, client.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/*.graphql", "<domain>/<domain>.mapper.ts", __generated__/]
     roles: {entry: index.ts, reader: "read-*.ts"}   # a reader is a server module (FE_CLIENT_REACHES_SERVER)
     tests: none
     rules: [FE_TRANSPORT_OWNER, FE_HTTP_STATUS_COLLAPSE, FE_WIRE_GENERATED]
