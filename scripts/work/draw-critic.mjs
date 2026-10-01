@@ -203,6 +203,28 @@ function clientOf(orca) {
 }
 
 /**
+ * The critic's placement: a clean directory that holds only what the critic may read. {dir}. removeCriticWorkspace
+ * takes it away again once the worker is released.
+ */
+export function criticWorkspace({ tmpRoot = os.tmpdir() } = {}) {
+  return { dir: fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-critic-')) };
+}
+
+export function removeCriticWorkspace(dir) {
+  return safeRemoveTree(dir);
+}
+
+/**
+ * Start the critic worker on its placement `dir` through worker-start (startAgent: run-create --from `entry`,
+ * task-create, worker-start --agent --model --effort, worker-show attestation). `orca` replaces the Orca client
+ * (clientOf). The launch receipt of scripts/agent/lib.mjs startAgent.
+ */
+export function launchCriticWorker({ critic, dir, prompt, entry = null, orca = null }) {
+  return clientOf(orca).launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir,
+    title: `[Critic] draw ${critic.model}`, prompt, objective: 'independent critique of one draw-loop round', entry });
+}
+
+/**
  * Wait for the critic worker through the orchestration commands: its worker_done or escalation (the non-consuming
  * inbox, matched by the worker's terminal, dispatch or Task), else the worker ending (worker-show), else the deadline.
  * {signal: 'worker_done'|'escalation'|'ended'|'timeout', message?, state?}.
@@ -242,7 +264,7 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
       error: 'no critic is configured (modules/models/runtimes.yaml allocation.drawLoop.critic needs provider, model and timeoutMs)' };
   }
   const client = clientOf(orca);
-  const dir = fs.mkdtempSync(path.join(tmpRoot, 'starci-draw-critic-'));
+  const { dir } = criticWorkspace({ tmpRoot });
   const files = images.map((img, i) => ({ file: `render-${i + 1}${path.extname(img.path) || '.png'}`, label: img.label, from: img.path }));
   const base = { schema: CRITIQUE_SCHEMA, critic: { provider: critic.provider, model: critic.model, effort: critic.effort ?? null, timeoutMs: Number(critic.timeoutMs),
     launch: 'orchestration worker-start', independent: !orca, cleanDir: true }, rubric: rubricInfo };
@@ -256,9 +278,7 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
     base.critic.prompt = prompt.split(slash(dir)).join('<clean-dir>');
     base.critic.promptSha256 = sha256(prompt);
     const started = now();
-    const title = `[Critic] draw ${critic.model}`;
-    launched = client.launch({ provider: critic.provider, model: critic.model, effort: critic.effort ?? null, worktree: dir, title, prompt,
-      objective: 'independent critique of one draw-loop round', entry });
+    launched = launchCriticWorker({ critic, dir, prompt, entry, orca });
     if (!launched?.ok) {
       return failed('launch-failed', `the critic worker did not start (${launched?.step ?? 'worker-start'}${launched?.errorCode ? ` ${launched.errorCode}` : ''}): ${launched?.error ?? 'no receipt'}`);
     }
@@ -285,6 +305,6 @@ export async function runCritic({ images, html, rubric, critic, orca = null, ent
       const task = settle(() => client.taskUpdate({ id: launched.taskId, status: TASK_CLOSED, run: launched.runId, ...(entry ? { from: entry } : {}) }));
       base.critic.cleanup = { stopped: stop?.ok === true, released: release?.ok === true, taskClosed: task?.ok === true };
     }
-    safeRemoveTree(dir);
+    removeCriticWorkspace(dir);
   }
 }
