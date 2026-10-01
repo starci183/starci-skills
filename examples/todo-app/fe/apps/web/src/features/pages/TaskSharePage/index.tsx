@@ -5,5 +5,5 @@ type TaskSharePageProps = { readonly taskId: string }
 
 /** The share route's connected half: it hands the task the segment names down to the screen. */
 export const TaskSharePage = (props: TaskSharePageProps) => (
-    <TaskSharePageBase state="ready" props={{ taskId: props.taskId }} on={{}} />
+    <TaskSharePageBase props={{ taskId: props.taskId }} />
 )

@@ -9,5 +9,5 @@ type NotifyUnsubscribePageProps = { readonly token: string | null }
  * token exists - so the page's whole situation space is "ready".
  */
 export const NotifyUnsubscribePage = (props: NotifyUnsubscribePageProps) => (
-    <NotifyUnsubscribePageBase state="ready" props={{ token: props.token }} on={{}} />
+    <NotifyUnsubscribePageBase props={{ token: props.token }} />
 )

@@ -12,8 +12,6 @@ type RecurPageProps = { readonly task: string | undefined }
  */
 export const RecurPage = (props: RecurPageProps) => (
     <RecurPageBase
-        state="ready"
         props={{ taskTitle: props.task === undefined || props.task === "" ? null : props.task }}
-        on={{}}
     />
 )

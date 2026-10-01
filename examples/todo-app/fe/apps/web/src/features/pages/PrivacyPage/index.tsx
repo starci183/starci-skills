@@ -6,5 +6,5 @@ import { PrivacyPageBase } from "./component"
  * /privacy; the deviation is recorded on impl.audit.fe.privacy.
  */
 export const PrivacyPage = () => {
-    return <PrivacyPageBase state="ready" props={{}} on={{}} />
+    return <PrivacyPageBase />
 }

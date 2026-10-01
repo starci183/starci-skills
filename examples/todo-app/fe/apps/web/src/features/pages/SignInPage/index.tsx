@@ -5,5 +5,5 @@ import { SignInPageBase } from "./component"
  * a token exists - so the page's whole situation space is "ready".
  */
 export const SignInPage = () => {
-    return <SignInPageBase state="ready" props={{}} on={{}} />
+    return <SignInPageBase />
 }

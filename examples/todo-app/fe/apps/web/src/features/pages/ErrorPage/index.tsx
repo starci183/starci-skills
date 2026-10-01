@@ -12,7 +12,6 @@ export const ErrorPage = (props: ErrorPageProps) => {
     const t = useTranslations("errors.page")
     return (
         <ErrorPageBase
-            state="failed"
             props={{ title: t("title"), retryLabel: t("retry") }}
             on={{ retry: props.onRetry }}
         />

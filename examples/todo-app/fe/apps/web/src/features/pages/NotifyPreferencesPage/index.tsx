@@ -5,5 +5,5 @@ import { NotifyPreferencesPageBase } from "./component"
  * its own session gate, so the page's whole situation space is "ready".
  */
 export const NotifyPreferencesPage = () => {
-    return <NotifyPreferencesPageBase state="ready" props={{}} on={{}} />
+    return <NotifyPreferencesPageBase />
 }
