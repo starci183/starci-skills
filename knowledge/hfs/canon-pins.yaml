@@ -31,14 +31,14 @@ pins:
     source: packages/grammar/package.json
     why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.8.0 (the brand layer sets `--font-sans` and `--font-mono`; the grammar reads them; 0.7.2 added the Input tel kind and IconButton disclosure props).
   '@starci/eslint-canon-be':
-    version: 3.0.6
+    version: 3.0.7
     group: starci
     install: registry
     side: be
     source: packages/eslint/be/package.json
     why: '3.0.3: its bundled canon-pins copy pins stylelint-canon 2.0.2 and hfs 4.0.3; no rule changed. 3.0.2: its bundled runtime copies (slots, canon-pins, failure codes, the architecture machine) put .starcistacks and .sops.yaml at the app root (app.starcistacks, app.sops) and pin hfs 4.0.2. 3.0.1: its bundled canon-pins copy pins hfs 4.0.1. 3.0.0: `loadHfs(import.meta.url)` of be/eslint.config.mjs finds the app-root hfs.json (kind app) and gives every linted file the view of the be side; the project graph is built per side. 2.0.0 (C0 release): starciBeConfig({ hfs: loadHfs(import.meta.url) }) typed factory and the BE-CONVENTION laws.'
   '@starci/eslint-canon-fe':
-    version: 8.0.6
+    version: 8.0.7
     group: starci
     install: registry
     side: fe
@@ -78,7 +78,7 @@ pins:
     source: packages/test-world/package.json
     why: '1.0.5: a modules world boots real peer apps beside its modules, world.apps.<name>.during(fn) is the outage of a peer app, and w.keycloak.clientSecret(client) answers the run-generated secret of a confidential realm client. 1.0.4: world.resolve and scope.resolve take any Nest token (class, string or symbol). 1.0.3: the globalSetup registers the path aliases as TypeScript resolves them (the extends chain, paths from the config that declares them, the effective baseUrl), so a tests tsconfig that only extends the side config loads the declaration. 1.0.2: every path a declaration names (`stack`, seeds, the realm, Dockerfiles) resolves from the app root (the directory of hfs.json), where .starcistacks lives, never from the be side. The shared e2e library of every back end (R47, R48): the warm stack behind toxiproxy, the network-edge fakes, the Nest boot, the typed useTestWorld handle, useSandbox for contract specs, the outage lock and the starci-test-stack bin behind the managed test:stack script; a devDependency of every back end. 1.0.1: world.keycloak.events/sessions (the user events of the realm and live sessions through the admin API) and world.infra.postgresql.connection(name) (the database of one connection down while the others serve, under the outage lock).'
   '@starci/hfs':
-    version: 4.0.6
+    version: 4.0.7
     group: starci
     install: registry
     side: both

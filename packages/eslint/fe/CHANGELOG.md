@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.0.7 - 2026-10-01
+
+- Changed: the same bundled runtime layer move.
+
 ## 8.0.6 - 2026-10-01
 
 - Changed: the runtime api layer move and the new pins.

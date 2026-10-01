@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.7 - 2026-10-01
+
+- Changed: the runtime layer check (scripts/api/<system>, a pure scripts/lib) in its bundled runtime.
+
 ## 4.0.6 - 2026-10-01
 
 - Changed: R112 integration specs, the runtime api layer, the examples-root CI scope and the new pins.

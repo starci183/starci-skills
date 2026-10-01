@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.7 - 2026-10-01
+
+- Changed: the runtime layer check moves test-secrets onto api/sops/decrypt.mjs; bundled copies follow.
+
 ## 3.0.6 - 2026-10-01
 
 - Changed: the runtime api layer (lib/git.mjs became api/git/lib.mjs), R112 and the dead-exports pairing, test-world 1.0.5 and the integration test shape.
