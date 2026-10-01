@@ -51,9 +51,11 @@ ops:
       - specification
       - feasibility
       - profile
+      - standard
     writes:
       - node
       - work-graph
+      - read-digest
     route:
       nodeKinds:
         - architecture
@@ -201,12 +203,14 @@ ops:
       - knowledge
       - direction
       - profile
+      - standard
     writes:
       - node
       - brandAssets
       - shellNode
       - shellAssets
       - evidence
+      - read-digest
     route:
       nodeKinds:
         - brand
@@ -244,9 +248,11 @@ ops:
       - intent
       - specification
       - profile
+      - standard
     writes:
       - node
       - work-graph
+      - read-digest
     route:
       nodeKinds:
         - business
@@ -339,10 +345,12 @@ ops:
       - repo
       - brief
       - profile
+      - standard
     writes:
       - node
       - source
       - evidence
+      - read-digest
     route:
       nodeKinds:
         - implementation
@@ -369,8 +377,10 @@ ops:
       - question
       - decided
       - environment
+      - standard
     writes:
       - decision
+      - read-digest
     route:
       nodeKinds:
         - business
@@ -389,6 +399,10 @@ ops:
     family: docs
     goal: Author or update the documentation one selected scope needs, derived from the decided records
       and the actual code - a reader's document, never a restated transcript.
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - operations
     completionProfile: operations
@@ -398,10 +412,13 @@ ops:
       - repo
       - conventions
       - profile
+      - standard
     writes:
       - node
       - docs
       - evidence
+      - read-digest
+      - doc-gate
     route:
       nodeKinds:
         - operations
@@ -448,6 +465,7 @@ ops:
       - evidence
       - read-digest
       - gate-proof
+      - test-world-run
     route:
       nodeKinds:
         - implementation
@@ -585,9 +603,9 @@ ops:
       - integration
     completionProfile: integration
     sideEffects:
-      count: 3
-      summary: one live exchange with the declared provider's sandbox account, inside the scenario's
-        declared scope
+      count: 4
+      summary: integration and contract spec authoring inside the selected allowlist
+        (be/src/tests/integration/, be/src/tests/contract/)
     reads:
       - application-stacks
       - official-docs
@@ -600,11 +618,15 @@ ops:
       - profile
       - workflow
       - op-loop
+      - world
     writes:
       - node
       - evidence
       - read-digest
       - gate-proof
+      - source
+      - test-world-integration
+      - test-world-contract
     route:
       nodeKinds:
         - integration
@@ -628,6 +650,10 @@ ops:
     goal: Generate every artwork the approved interface candidate embeds as a real repository asset at
       the size, format and brand references the design record declares, and bind each produced file
       back to its s
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - ui
     completionProfile: ui
@@ -645,6 +671,7 @@ ops:
       - node
       - placeholder
       - evidence
+      - lint
     route:
       nodeKinds:
         - ui
@@ -699,6 +726,7 @@ ops:
     writes:
       - node
       - evidence
+      - lint
     route:
       nodeKinds:
         - operations
@@ -733,6 +761,9 @@ ops:
       candidatesPerScreen:
         default: 1
         setBy: owner
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - ui
     completionProfile: ui
@@ -761,6 +792,7 @@ ops:
       - evidence
       - draws
       - work-graph
+      - lint
     route:
       nodeKinds:
         - ui
@@ -902,6 +934,10 @@ ops:
     family: knowledge
     goal: Repair one challenged canonical instruction/rule and affected references from concrete
       applicability evidence.
+    params:
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
     completionProfile: implementation
@@ -913,10 +949,13 @@ ops:
       - repo
       - rule
       - profile
+      - standard
     writes:
       - node
       - source
       - evidence
+      - read-digest
+      - doc-gate
     route:
       nodeKinds:
         - implementation
@@ -1078,9 +1117,11 @@ ops:
       - target
       - selection
       - profile
+      - release-proof
     writes:
       - node
       - evidence
+      - release-proof
     route:
       nodeKinds:
         - operations
@@ -1150,9 +1191,12 @@ ops:
       - target
       - selection
       - profile
+      - review-gate
     writes:
       - node
       - evidence
+      - gate-proof
+      - review-defects
     route:
       nodeKinds:
         - operations
@@ -1187,6 +1231,7 @@ ops:
       - target
       - selection
       - profile
+      - worktree-api
     writes:
       - node
       - evidence
@@ -1222,12 +1267,14 @@ ops:
       - records
       - repo
       - profile
+      - standard
     writes:
       - node
       - scope
       - work-graph
       - catalog
       - evidence
+      - read-digest
     route:
       nodeKinds:
         - operations
@@ -1258,9 +1305,11 @@ ops:
       - inventory
       - authority
       - profile
+      - standard
     writes:
       - node
       - evidence
+      - read-digest
     route:
       nodeKinds:
         - operations
@@ -1301,6 +1350,8 @@ ops:
     writes:
       - node
       - evidence
+      - lint
+      - security-findings
     route:
       nodeKinds:
         - implementation
@@ -1561,11 +1612,13 @@ ops:
       - request
       - profile
       - op-loop
+      - unit-kit
     writes:
       - node
       - evidence
       - read-digest
       - gate-proof
+      - unit-run
     route:
       nodeKinds:
         - implementation
@@ -1596,6 +1649,9 @@ ops:
       componentsTriggeringCut:
         default: 3
         setBy: kernel
+      gateRounds:
+        default: 5
+        setBy: owner
     nodeKinds:
       - implementation
       - uat
@@ -1610,6 +1666,7 @@ ops:
       - source
       - scripts
       - profile
+      - standard
     writes:
       - node
       - integration
@@ -1620,6 +1677,8 @@ ops:
       - parts
       - evidence
       - work-graph
+      - read-digest
+      - doc-gate
     route:
       nodeKinds:
         - implementation
@@ -1658,6 +1717,7 @@ ops:
       - target
       - selection
       - profile
+      - worktree-api
     writes:
       - node
       - evidence
