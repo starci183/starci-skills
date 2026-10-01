@@ -1,0 +1,14 @@
+id: package-clean-install-proof
+effectiveAt: '2026-10-01T18:00:00+07:00'
+summary: "Every published @starci package proves itself from a clean install. @starci/test-world 1.0.0 shipped while its own tests failed on a clean npm ci (@nestjs/platform-express undeclared; a hoisted node_modules and Nest's dynamic loadPackage hid it), because no check ran a package's own test suite outside this checkout. scripts/checks/package-clean-test.mjs reads the publish set from the starci pins of knowledge/hfs/canon-pins.yaml, copies each package (no node_modules, dist or links; the other published packages' sources beside it at their runtime paths) to a temp dir with no node_modules above it, installs it from its own manifest and lock (npm ci, or npm install when it has none), and runs its own test script; a workspace member (the eslint canons) installs as its workspace. Codes PACKAGE_INSTALL_RED, PACKAGE_TEST_RED, PACKAGE_NO_TEST (exit 1) and PACKAGE_PROOF_UNRUN (exit 2, never a pass). The land gate runs it for the packages a land changes (land.mjs packageProofCheck), CI and the release checklists (packages/README.md, supervise.yaml grammarRelease step 5) for every package. tests/package-declared-deps.spec.mjs holds every bare import of a package's sources and tests to that package's own manifest."
+reach: new-legs
+adds:
+  codes:
+    - PACKAGE_INSTALL_RED
+    - PACKAGE_NO_TEST
+    - PACKAGE_PROOF_UNRUN
+    - PACKAGE_TEST_RED
+paths:
+  - modules/kernel/failure-codes.yaml
+  - modules/supervisor/supervise.yaml
+  - modules/kernel/contract-changes/package-clean-install-proof.yaml

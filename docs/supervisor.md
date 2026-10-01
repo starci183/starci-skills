@@ -151,7 +151,8 @@ pin registry semver, never a `file:` link.
 3. Move the CHANGELOG entry under the version with its date; `node scripts/checks/grammar-knowledge.mjs --write`
    and register the knowledge edit in `modules/kernel/contract-changes/<id>.yaml`.
 4. Land through the gate; `dist/` is untracked, so rebuild `packages/grammar/dist` on live main afterwards.
-5. `npm pack --dry-run` from live `packages/grammar`: the file list is dist, README.md, LICENSE, package.json.
+5. `npm pack --dry-run` from live `packages/grammar`: the file list is dist, README.md, LICENSE, package.json; and
+   `node scripts/checks/package-clean-test.mjs` is green for every package of the publish set.
 6. `npm publish --access public`, then `npm view @starci/grammar version`.
 7. Tell the owner afterwards, and the consumer Kernels whose pinned range does not cover the new version.
 

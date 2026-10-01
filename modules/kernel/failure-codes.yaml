@@ -3600,6 +3600,52 @@ OWNER_PATH_MISSING:
   owner: other-op:work.author
   kind: check-finding
 
+PACKAGE_INSTALL_RED:
+  title: "Published package does not install clean"
+  title_vi: "Gói phát hành không cài sạch được"
+  meaning_vi: "Gói @starci không cài được từ chính manifest và lockfile của nó trong một thư mục tạm không có node_modules nào phía trên; bản phát hành sẽ hỏng y như vậy ở máy người dùng."
+  causes_vi:
+    - "package.json và package-lock.json của gói lệch nhau, npm ci từ chối"
+    - "Một phụ thuộc khai báo không tồn tại hoặc không phân giải được trên npm registry"
+  nextStep_vi: "Sửa manifest hoặc tạo lại lockfile của gói (npm install --package-lock-only trong một thư mục tạm), rồi chạy lại node scripts/checks/package-clean-test.mjs."
+  owner: runtime-core
+  kind: check-finding
+
+PACKAGE_NO_TEST:
+  title: "Published package declares no test"
+  title_vi: "Gói phát hành không khai báo bài kiểm tra"
+  meaning_vi: "package.json của gói @starci không có script test, nên không có gì chứng minh gói chạy được khi cài sạch; một gói phát hành phải tự chứng minh mình."
+  causes_vi:
+    - "Gói mới chưa có bài kiểm tra riêng"
+    - "Bài kiểm tra của gói chỉ nằm ở tests/ của runtime, chạy bằng node_modules của runtime"
+  nextStep_vi: "Thêm script test vào package.json của gói, chạy bài kiểm tra riêng của gói chỉ với phụ thuộc gói tự khai báo, rồi chạy lại package-clean-test."
+  owner: runtime-core
+  kind: check-finding
+
+PACKAGE_PROOF_UNRUN:
+  title: "Clean package proof could not run"
+  title_vi: "Không chạy được bước chứng minh cài sạch của gói"
+  meaning_vi: "Bước chứng minh cài sạch không chạy được nên gói chưa được phán xét (thoát 2); đây không bao giờ là một lần đạt."
+  causes_vi:
+    - "Không gọi được npm, hoặc mạng không tới được npm registry"
+    - "Thư mục tạm nằm dưới một thư mục có node_modules, nên bản cài không còn sạch"
+    - "Hết thời gian cài hoặc chạy bài kiểm tra"
+  nextStep_vi: "Khôi phục npm và mạng (hoặc chọn thư mục tạm không có node_modules phía trên) rồi chạy lại node scripts/checks/package-clean-test.mjs."
+  owner: runtime-core
+  kind: check-finding
+
+PACKAGE_TEST_RED:
+  title: "Published package fails its tests on a clean install"
+  title_vi: "Gói phát hành trượt bài kiểm tra khi cài sạch"
+  meaning_vi: "Sau khi cài sạch từ chính manifest và lockfile của gói, script test của gói thất bại; thường là một phụ thuộc chưa khai báo vốn chỉ được node_modules dùng chung của runtime che đi."
+  causes_vi:
+    - "Mã hoặc bài kiểm tra của gói dùng một gói chưa khai báo trong package.json của nó"
+    - "Bài kiểm tra trỏ tới đường dẫn nằm ngoài gói, như node_modules của runtime"
+    - "Bài kiểm tra cần kiểu của một thư viện mà gói chưa khai báo"
+  nextStep_vi: "Khai báo phụ thuộc còn thiếu trong package.json của gói (kèm lockfile nếu gói có), bỏ mọi đường dẫn ra ngoài gói, rồi chạy lại package-clean-test."
+  owner: runtime-core
+  kind: check-finding
+
 PALETTE_IMAGE_UNREADABLE:
   title: "Palette image cannot be decoded"
   title_vi: "Không đọc được ảnh để so màu"

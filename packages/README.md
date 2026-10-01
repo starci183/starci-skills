@@ -21,7 +21,7 @@ The exact version of each, and of every framework a repository pins, is
 
 Set each `@starci/*` dependency (root and every workspace) to the exact version in `knowledge/hfs/canon-pins.yaml`, then `npm install`. CI needs nothing else: `npm ci` reads the registry.
 
-**Publishing.** Raise the version in the package and in `knowledge/hfs/canon-pins.yaml` in the same change (`node scripts/checks/check-canon-pins.mjs` proves they agree), `npm publish` from the package directory (each has `publishConfig.access: public` and a `files` allowlist; check it with `npm pack --dry-run`), verify with `npm view <name>@<version> version`, then move the repositories to the new pin in their own upgrade lanes. A version already on the registry is never republished: bump it.
+**Publishing.** Raise the version in the package and in `knowledge/hfs/canon-pins.yaml` in the same change (`node scripts/checks/check-canon-pins.mjs` proves they agree), run `node scripts/checks/package-clean-test.mjs` and publish only when every package of the publish set is green (each one copied to a temp dir, installed from its own manifest and lockfile with nothing hoisted, its own `npm test` run there; the eslint canons install as the `packages/` workspace; exit 1 is a red package, 2 a proof that could not run), `npm publish` from the package directory (each has `publishConfig.access: public` and a `files` allowlist; check it with `npm pack --dry-run`), verify with `npm view <name>@<version> version`, then move the repositories to the new pin in their own upgrade lanes. A version already on the registry is never republished: bump it.
 
 ---
 
