@@ -561,7 +561,7 @@ rules:
     requirement: |-
       The unit run (`npm test`) writes `be/coverage/lcov.info` (the jest preset's lcov reporter) and both coverage services import
       it with ONE scope, the services: `sonar-project.properties` has `sonar.javascript.lcov.reportPaths=be/coverage/lcov.info` and
-      `sonar.coverage.inclusions=be/src/**/*.service.ts` and no other coverage key; the managed `codecov.yml` holds the same paths at
+      `sonar.coverage.exclusions` listing every executable file that is not a service (SonarQube has no coverage inclusions: hfs sync renders the complement from the preset's `COVERAGE_SOURCES` and the slot manifest's role vocabulary, fe/** included) and no other coverage key; the managed `codecov.yml` holds the same paths at
       100 on the project and the patch and ignores fe/; CI uploads that lcov to Codecov with the `CODECOV_TOKEN` secret. hfs sync
       renders the scope into both files from the jest preset's `COVERAGE_SOURCES`, so it can never drift. The Sonar gate
       (`knowledge/sonar-gate.yaml`) holds coverage at 100 overall and on new code, and the runtime judges it per file: one service
@@ -572,7 +572,7 @@ rules:
     cases:
       - id: case-1
         when: sonar-project.properties
-        write: 'sonar.javascript.lcov.reportPaths=be/coverage/lcov.info and sonar.coverage.inclusions=be/src/**/*.service.ts, no coverage exclusion; hfs sync renders the file'
+        write: 'sonar.javascript.lcov.reportPaths=be/coverage/lcov.info and sonar.coverage.exclusions = every non-service file (fe/** included), no coverage exclusion; hfs sync renders the file'
       - id: case-2
         when: CI
         write: 'the workflow runs `npm test` (which enforces per-file 100 and writes the lcov) and uploads be/coverage/lcov.info with codecov/codecov-action and the CODECOV_TOKEN secret'

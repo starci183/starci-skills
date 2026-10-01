@@ -247,7 +247,8 @@ test("FILE-9: a route slot default-exports a component named after the slot", ()
       { filename: at(`${app}/loading.tsx`), code: "const Loading = () => null; export default Loading" },
       { filename: at(`${app}/not-found.tsx`), code: "const NotFound = () => null; export default NotFound" },
       { filename: at(`${app}/global-error.tsx`), code: "const GlobalError = () => null; export default GlobalError" },
-      { filename: at(`${app}/error.tsx`), code: "export { Error as default } from './boundary'" },
+      { filename: at(`${app}/error.tsx`), code: "export { ErrorBoundary as default } from './boundary'" },
+      { filename: at(`${app}/error.tsx`), code: "const ErrorBoundary = () => null; export default ErrorBoundary" },
       { filename: at(`${app}/default.tsx`), code: "const Anything = () => null; export default Anything" },
       { filename: at(`${app}/route.ts`), code: "export const GET = () => null" },
       // outside the route tree entirely, including a feature owner entry and a folder that is merely named `app`
@@ -260,6 +261,8 @@ test("FILE-9: a route slot default-exports a component named after the slot", ()
       { filename: at(`${app}/[lang]/page.tsx`), code: "export default () => null", errors: [{ messageId: "anonymous" }] },
       { filename: at(`${app}/[lang]/layout.tsx`), code: "const Shell = () => null; export default Shell", errors: [{ messageId: "wrong" }] },
       { filename: at(`${app}/global-error.tsx`), code: "const Oops = () => null; export default Oops", errors: [{ messageId: "wrong" }] },
+      // `Error` shadows the global constructor (Sonar S2137): the error slot is `ErrorBoundary`.
+      { filename: at(`${app}/error.tsx`), code: "const Error = () => null; export default Error", errors: [{ messageId: "wrong" }] },
       { filename: at("apps/admin/src/app/[locale]/page.tsx"), code: "export const metadata = {}", errors: [{ messageId: "missing" }] },
     ],
   })

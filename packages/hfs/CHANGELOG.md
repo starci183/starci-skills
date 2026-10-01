@@ -3,6 +3,15 @@
 ## Unreleased
 
 - Changed: the managed fe scripts (`dev:fe`, `start:<app>`, `build:fe`) run `next` from the app directory (`cd fe/apps/<app> && next ...`) so next-intl finds its request config; the fe skeleton reads the request locale through `next/root-params` (`experimental.rootParams`), pins the workspace root three levels above the app and uses the `.*[.].*` proxy matcher; the bundled runtime carries the `&&`/`||`-aware FE_SWR_KEY_IDENTITY check.
+## Unreleased (C0 batch)
+
+- Fixed (contract change `sonar-coverage-exclusions`): SonarQube has no `sonar.coverage.inclusions` property, so Sonar ignored it and counted every executable be/ file at 0% (overall coverage 65.8% and 45.2% on the examples, although every service was at 100). The managed `sonar-project.properties` now renders `sonar.coverage.exclusions` as the complement of the services. `coverageExclusions(presets, manifest)` in `sync/index.mjs` derives it from the preset's `COVERAGE_SOURCES` and the slot manifest, and lists:
+  - every be role of the R89 suffix vocabulary other than `service`;
+  - the be file names a slot declares outside it (`main.ts`, `index.ts`, `connection.ts`, the migrations, the test world's files);
+  - `fe/**`.
+
+  A coverage source whose complement Sonar's globs cannot write is refused (`HFS_SYNC_COVERAGE_SCOPE`). `sonar.coverage.inclusions` is deleted.
+- Fixed: the fe skeleton's `[locale]/error.tsx` exports `ErrorBoundary` (Sonar S2137: `Error` shadowed the global).
 
 ## 4.0.7 - 2026-10-01
 

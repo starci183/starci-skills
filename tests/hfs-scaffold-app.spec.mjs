@@ -16,6 +16,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { main } from '../packages/hfs/bin/hfs.mjs';
 import { scaffoldApp } from '../packages/hfs/scaffold/app.mjs';
+import { coverageExclusions } from '../packages/hfs/sync/index.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import { LINT_DEPENDENCIES, RUNTIME, installInto, missingFrom, runtimeInstalls, uninstall } from './_hfs-app-install.mjs';
 
@@ -116,9 +117,10 @@ const propertiesOf = (text) => Object.fromEntries(text.split(/\r?\n/).filter((li
 function assertCoverageContract(app) {
   const sonar = propertiesOf(fs.readFileSync(path.join(app, 'sonar-project.properties'), 'utf8'));
   const coverageKeys = Object.keys(sonar).filter((key) => /coverage|lcov/i.test(key)).sort();
-  assert.deepEqual(coverageKeys, ['sonar.coverage.inclusions', 'sonar.javascript.lcov.reportPaths'], 'exactly the lcov import and the inclusions: no exclusion, no other report');
+  assert.deepEqual(coverageKeys, ['sonar.coverage.exclusions', 'sonar.javascript.lcov.reportPaths'], 'exactly the lcov import and the complement of the services: no other coverage key');
   assert.equal(sonar['sonar.javascript.lcov.reportPaths'], LCOV);
-  assert.deepEqual(sonar['sonar.coverage.inclusions'].split(','), COVERAGE_SCOPE);
+  assert.deepEqual(sonar['sonar.coverage.exclusions'].split(','), coverageExclusions(PRESETS));
+  assert.ok(sonar['sonar.coverage.exclusions'].split(',').includes('fe/**') && !/\.service\.ts/.test(sonar['sonar.coverage.exclusions']), 'fe/ is out, the services are in');
   const codecov = parseYaml(fs.readFileSync(path.join(app, 'codecov.yml'), 'utf8'));
   for (const kind of ['project', 'patch']) {
     assert.deepEqual(codecov.coverage.status[kind].default, { target: '100%', threshold: '0%', paths: COVERAGE_SCOPE }, `codecov ${kind} status: the services at 100`);
@@ -311,8 +313,7 @@ test('the scaffolded be unit run (the test script) writes the lcov Sonar and Cod
   assert.ok(fs.existsSync(lcov), `${LCOV} is written by the unit run`);
   const files = fs.readFileSync(lcov, 'utf8').split(/\r?\n/).filter((line) => line.startsWith('SF:')).map((line) => line.slice(3).replace(/\\/g, '/'));
   assert.ok(files.length > 0, 'the lcov names the services it measured');
-  // lcov SF: entries are relative to the jest rootDir (be/), so a service is src/<...>.service.ts.
-  for (const file of files) assert.match(file, /^src\/.*\.service\.ts$/, `${file}: only services are measured`);
+  for (const file of files) assert.match(file, /(^|\/)src\/.*\.service\.ts$/, `${file}: only services are measured (jest names the file relative to be/ or absolute)`);
 });
 
 /** What the fe build loads besides the lint set: the server-only marker the skeleton's request config imports. */

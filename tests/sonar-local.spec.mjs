@@ -178,6 +178,7 @@ function fakeCustody(root){
   const sops=write(root,'fake-sops.mjs',`import fs from 'node:fs';
 if(process.env.SOPS_AGE_KEY_FILE!==${JSON.stringify(identity)}){process.stderr.write('wrong identity');process.exit(3);}
 const file=process.argv.at(-1);
+if(process.argv.includes('--encrypt')){if(!process.argv.includes('--age')){process.stderr.write('no recipient');process.exit(5);}process.stdout.write('ENC:'+fs.readFileSync(file,'utf8'));process.exit(0);}
 process.stdout.write(fs.readFileSync(file,'utf8').replace(/^ENC:/,''));`);
   const stackSecret=write(root,'fake-stack-secret.mjs',`import fs from 'node:fs';import path from 'node:path';
 const [cmd,target,flag,from]=process.argv.slice(2);
@@ -364,6 +365,48 @@ test('a declared or explicit token reference the server rejects is repaired in p
   assert.equal(events.length,1);
 });
 
+// A runtime extension's custody (ext/<service>/secrets, where the example apps' analysis tokens live) has no stack-secret
+// tool: the runtime seals a minted token itself, with sops, to the recipient its sealed members already share.
+const extCustody=(root,{sealed=true}={})=>{
+  const dir=path.join(root,'.claude','ext','sonar','secrets');
+  if(sealed)write(dir,'sonarqube-admin-token.key.enc',JSON.stringify({data:'ENC[x]',sops:{age:[{recipient:'age1fakerecipient'}]}}));
+  else fs.mkdirSync(dir,{recursive:true});
+  write(dir,'sonarqube-example-token.key.enc','ENC:fake-stale-token-0006');
+  return path.join(dir,'sonarqube-example-token.key');
+};
+
+test('a rejected example token sealed in a runtime extension custody is re-minted and sealed there, never via argv or plaintext', async t => {
+  const root=temporary(t,'ext-seal');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  const ref=extCustody(root);
+  state.mintValues.push(REMINTED);
+  const {exitCode,report}=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
+  assert.equal(exitCode,0,JSON.stringify(report));
+  assert.deepEqual([report.tokenCustody.via,report.tokenCustody.reminted,report.tokenCustody.name],['minted',true,ref.split(path.sep).join('/')]);
+  assert.equal(fs.readFileSync(`${ref}.enc`,'utf8'),`ENC:${REMINTED}`,'sealed over the rejected member');
+  assert.ok(!fs.existsSync(ref),'no plaintext twin is written');
+  assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/revoke').length,0);
+  assertNoSecret(report,'ensure report');
+  const again=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
+  assert.equal(again.report.tokenCustody.via,'sops','the sealed member is read back, not minted again');
+});
+
+test('a token that cannot be sealed into an extension custody with no recipient is refused with the reason and revoked', async t => {
+  const root=temporary(t,'ext-refuse');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  fs.rmSync(path.join(custody.stack,'runtime/files/sonarqube-analysis-token.txt.enc'));
+  const ref=extCustody(root,{sealed:false});
+  state.mintValues.push(REMINTED);
+  const {report}=await sonarLocalMain(['ensure-project','--key','example','--with-token','--token-ref',ref],{config:configFor(host,custody)});
+  assert.notEqual(report.tokenCustody.via,'minted');
+  assert.match(JSON.stringify(report),/holds no sealed member with exactly one age recipient/);
+  assert.equal(fs.readFileSync(`${ref}.enc`,'utf8'),'ENC:fake-stale-token-0006','the member is left as it was');
+  assert.equal(state.requests.filter(r=>r.path==='/api/user_tokens/revoke').length,1,'the minted value is revoked again');
+  assertNoSecret(report,'refused report');
+});
+
 test('token runs a child with the analysis token in its env only, and alone reports presence', async t => {
   const root=temporary(t,'token');
   const {host}=await fakeSonar(t);
@@ -393,8 +436,8 @@ const numbered=(count,label)=>Array.from({length:count},(_,i)=>`const ${label}${
 function fakeRepo(root,{scanner=true,specFile=false,services=false}={}){
   const repo=path.join(root,'product-repo');
   write(repo,'package.json',JSON.stringify({name:'product-repo',scripts:{'sonar:check':'node scanner.mjs'}}));
-  // services: the repository declares the coverage scope the way the managed properties do (only *.service.js counts).
-  write(repo,'sonar-project.properties',`sonar.projectKey=product-repo\nsonar.host.url=https://sonar.example.invalid\nsonar.sources=src\nsonar.tests=src\nsonar.test.inclusions=**/*.spec.js\n${services?'sonar.javascript.lcov.reportPaths=coverage/lcov.info\nsonar.coverage.inclusions=src/**/*.service.js\n':''}`);
+  // services: the repository declares the coverage scope the way the managed properties do (the complement of *.service.js is excluded).
+  write(repo,'sonar-project.properties',`sonar.projectKey=product-repo\nsonar.host.url=https://sonar.example.invalid\nsonar.sources=src\nsonar.tests=src\nsonar.test.inclusions=**/*.spec.js\n${services?'sonar.javascript.lcov.reportPaths=coverage/lcov.info\nsonar.coverage.exclusions=src/*.js,src/**/*.resolver.js\n':''}`);
   write(repo,'src/legacy.js',numbered(5,'legacy'));
   write(repo,'src/app.js',numbered(5,'app'));
   // The fake scanner echoes the token (the helper must scrub it) and writes report-task.txt into the
@@ -473,7 +516,7 @@ test('scan runs the repository scanner against the local host, mints the project
   assert.deepEqual(report.slice.changedFiles.sort(),['src/app.js','src/new.js']);
   assert.equal(report.slice.base,'HEAD');
   assert.deepEqual([report.slice.verdict,report.slice.newIssues.total,report.slice.newHotspots.total],['pass',0,0],'debt on unchanged lines is not the slice\'s');
-  assert.deepEqual([report.slice.coverage.applied,report.slice.coverage.files],[false,[]],'a repository without sonar.coverage.inclusions has no coverage target');
+  assert.deepEqual([report.slice.coverage.applied,report.slice.coverage.files],[false,[]],'a repository without sonar.coverage.exclusions has no coverage target');
   assert.deepEqual([report.slice.duplication.changedLines,report.slice.duplication.duplicatedLines,report.slice.duplication.applied],[28,0,true]);
   assert.equal('coverageReport' in report,false);
   assert.equal(report.issues.total,4);
@@ -980,7 +1023,7 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
   assert.equal(pass.exitCode,0,JSON.stringify(pass.report));
   assert.deepEqual(pass.report.numbers,{bugs:0,code_smells:0,vulnerabilities:0,security_hotspots:2,security_hotspots_reviewed:100,coverage:100});
   assert.deepEqual(pass.report.coverage.files.map(f=>[f.path,f.coverage]),[['src/orders/order.service.js',100],['src/orders/payment.service.js',100]],'the per-file coverage lists the services only');
-  assert.deepEqual(pass.report.coverageInclusions,['src/**/*.service.js']);
+  assert.deepEqual(pass.report.coverageExclusions,['src/*.js','src/**/*.resolver.js']);
   const red=await run('dash-red',{projectMeasures:{...clean,bugs:1,code_smells:3,security_hotspots_reviewed:50,coverage:96.4},coverage:{...files,'src/orders/payment.service.js':92.9}});
   assert.equal(red.exitCode,1);
   assert.deepEqual(red.report.failures,['bugs 1 > 0','code_smells 3 > 0','security_hotspots_reviewed 50% < 100%','coverage of src/orders/payment.service.js 92.9% < 100%','coverage 96.4% < 100%']);
@@ -990,7 +1033,7 @@ test('dashboard prints the project numbers and fails unless bugs, smells and vul
   const {host}=await fakeSonar(t,{projectMeasures:clean,coverage:files});
   const unscoped=await sonarLocalMain(['dashboard','--cwd',fakeRepo(temporary(t,'dash-unscoped'))],{config:configFor(host,custody)});
   assert.equal(unscoped.exitCode,1);
-  assert.match(unscoped.report.reason,/declares no sonar\.coverage\.inclusions/);
+  assert.match(unscoped.report.reason,/declares no sonar\.coverage\.exclusions/);
   assertNoSecret(red.report,'dashboard report');
 });
 
@@ -1021,4 +1064,23 @@ test('the runtime host holds the runtime main checkout; .claude/ custody paths o
   const other=temporary(t,'other');
   assert.equal(resolveCustodyFile(other,'.claude/ext/x'),path.join(other,'.claude','ext','x'),'only the runtime host .claude is this tree');
   assert.equal(resolveCustodyFile(fake,'../escape'),null);
+});
+
+test('a project token is the declared credential that names the project, else the one declared credential whose purpose is analysis', t => {
+  const root=path.resolve(import.meta.dirname,'..');
+  // The examples declare their own analysis credential, sealed in the host's ext/sonar custody: no --token-ref is needed.
+  for(const [app,key] of [['todo-app','starci-todo-app'],['ecommerce-app','starci-ecommerce-app']]){
+    const declared=readSonarDeclaration(path.join(root,'examples',app,'.starcistacks','application-stacks.yaml'));
+    assert.equal(declared.projects.find(p=>p.key===key).tokenRef,path.join(root,'ext','sonar','secrets',`sonarqube-${key}-token.key`));
+    assert.ok(fs.existsSync(`${declared.projects[0].tokenRef}.enc`),`${app}: the analysis credential is sealed`);
+  }
+  const dir=temporary(t,'purpose');
+  const decl=(credentials)=>write(dir,`repo-${credentials.length}-${Math.random().toString(36).slice(2,6)}/.starcistacks/application-stacks.yaml`,
+    `services:\n  sonar:\n    provider: sonarqube\n    mode: local\n    projects:\n      - {repository: repo, key: proj-key}\n    credentials:\n${credentials.map(c=>`      - {id: ${c.id}, purpose: "${c.purpose}", env: SONAR_TOKEN, custody: {repository: repo, path: .starcistacks/dev/runtime/files/${c.file}}}`).join('\n')}\n`);
+  const one=readSonarDeclaration(decl([{id:'admin',purpose:'project provisioning and analysis',file:'admin.key'},{id:'scanner',purpose:'Local analysis of this project',file:'scanner.key'}]));
+  assert.match(one.projects[0].tokenRef,/scanner\.key$/,'the one analysis credential, never the admin one');
+  const two=readSonarDeclaration(decl([{id:'a',purpose:'analysis one',file:'a.key'},{id:'b',purpose:'analysis two',file:'b.key'}]));
+  assert.equal(two.projects[0].tokenRef,null,'two analysis credentials and none naming the project: no guess');
+  const named=readSonarDeclaration(decl([{id:'proj-key',purpose:'ci',file:'p.key'},{id:'b',purpose:'analysis',file:'b.key'}]));
+  assert.match(named.projects[0].tokenRef,/p\.key$/,'a credential naming the project wins');
 });

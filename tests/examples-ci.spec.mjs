@@ -1,5 +1,5 @@
 // examples-ci.spec.mjs - every example app runs in the ONE root workflow through a derived matrix and has a Codecov flag over
-// the same coverage scope as its own sonar.coverage.inclusions (scripts/checks/examples-ci.mjs, contract change examples-root-ci).
+// the same coverage scope as its own codecov.yml, whose complement is its sonar.coverage.exclusions (scripts/checks/examples-ci.mjs, contract change examples-root-ci).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,6 +8,9 @@ import path from 'node:path';
 import { parseYaml } from '../engine/yaml.mjs';
 import { CODECOV, WORKFLOW, appCoverageScope, checkExamplesCi, examplesCiMain, exampleApps, renderCodecov } from '../scripts/checks/examples-ci.mjs';
 import { readProperties } from '../scripts/checks/sonar-local.mjs';
+import { coverageScopeOf, coverageTargetOf } from '../scripts/checks/sonar-gate.mjs';
+import { braceVariants, globExpression } from '../scripts/lib/glob.mjs';
+import { execFileSync } from 'node:child_process';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const codes = (root) => checkExamplesCi(root).findings.map((finding) => finding.code).sort();
@@ -25,18 +28,41 @@ test('the repository: every example app is in the derived matrix and has a flag;
   for (const gone of ['example-unit.yml', 'todo-app-example.yml', 'todo-app-live-e2e.yml']) assert.ok(!fs.existsSync(path.join(ROOT, '.github', 'workflows', gone)), `${gone} is folded in`);
 });
 
-test('the root codecov flag of each app is its own Sonar coverage scope under examples/<app>/ (one source, no drift)', () => {
+test('the root codecov flag of each app is its own codecov.yml scope under examples/<app>/ (one source, no drift)', () => {
   const flags = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.individual_flags;
   for (const app of exampleApps(ROOT)) {
-    const inclusions = readProperties(path.join(ROOT, 'examples', app, 'sonar-project.properties'))['sonar.coverage.inclusions'].split(',');
     const own = parseYaml(fs.readFileSync(path.join(ROOT, 'examples', app, 'codecov.yml'), 'utf8')).coverage.status.project.default.paths;
     const flag = flags.find((entry) => entry.name === app);
-    assert.deepEqual(flag.paths, inclusions.map((glob) => `examples/${app}/${glob}`), `${app}: root flag = the app's sonar.coverage.inclusions`);
     assert.deepEqual(flag.paths, own.map((glob) => `examples/${app}/${glob}`), `${app}: root flag = the app's own codecov.yml paths`);
     assert.deepEqual(flag.paths, appCoverageScope(app, ROOT));
   }
   const rules = parseYaml(fs.readFileSync(path.join(ROOT, CODECOV), 'utf8')).flag_management.default_rules.statuses;
   assert.deepEqual(rules.map((rule) => [rule.type, rule.target]), [['project', '100%'], ['patch', '100%']]);
+});
+
+test('every executable be file of each example is a service or matched by a Sonar coverage exclusion, never both, never neither; Sonar and Codecov describe one file set', () => {
+  for (const app of exampleApps(ROOT)) {
+    const dir = path.join(ROOT, 'examples', app);
+    const props = readProperties(path.join(dir, 'sonar-project.properties'));
+    assert.ok(!('sonar.coverage.inclusions' in props), `${app}: Sonar has no coverage inclusions`);
+    const excluded = props['sonar.coverage.exclusions'].split(',').flatMap(braceVariants).map(globExpression);
+    const services = parseYaml(fs.readFileSync(path.join(dir, 'codecov.yml'), 'utf8')).coverage.status.project.default.paths.map(globExpression);
+    const files = execFileSync('git', ['ls-files', 'be'], { cwd: dir, encoding: 'utf8' }).trim().split('\n').filter((file) => /^be\/(?:src|apps)\/.*\.[cm]?[jt]sx?$/.test(file));
+    assert.ok(files.length > 50, `${app}: the be tree is read`);
+    const both = [], neither = [];
+    for (const file of files) {
+      const service = services.some((glob) => glob.test(file)), out = excluded.some((glob) => glob.test(file));
+      if (service && out) both.push(file);
+      if (!service && !out) neither.push(file);
+    }
+    assert.deepEqual(both, [], `${app}: a service is never excluded`);
+    assert.deepEqual(neither, [], `${app}: every other executable be file is excluded`);
+    // The runtime's own scope (what Sonar measures) is exactly the services Codecov judges.
+    const target = coverageTargetOf(coverageScopeOf(props));
+    assert.deepEqual(files.filter(target), files.filter((file) => services.some((glob) => glob.test(file))), `${app}: Sonar's coverage set = Codecov's`);
+    assert.ok(files.filter(target).every((file) => file.endsWith('.service.ts')));
+    assert.ok(excluded.some((glob) => glob.test('fe/apps/web/src/app/page.tsx')), `${app}: fe/ is outside coverage`);
+  }
 });
 
 test('integration and e2e run on workflow_dispatch only; the automatic steps hold coverage, the upload and Sonar', () => {

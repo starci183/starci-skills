@@ -381,7 +381,9 @@ const ROUTE_SLOT_NAME = {
   layout: "Layout",
   template: "Template",
   loading: "Loading",
-  error: "Error",
+  // Not `Error`: that name shadows the global Error constructor (Sonar typescript:S2137, a bug), and React calls this
+  // component an error boundary.
+  error: "ErrorBoundary",
   "global-error": "GlobalError",
   "not-found": "NotFound",
 }

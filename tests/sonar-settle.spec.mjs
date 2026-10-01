@@ -8,7 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileReport,inspectLedger,ledgerFileFor,openLedger,writeContract,recordCheckRun} from '../engine/ledger-db.mjs';
-import {coverageInclusionsOf,judgeCoverage,judgeDashboard,judgeSummary,loadSonarGate,serverConditions,thresholdsOf} from '../scripts/checks/sonar-gate.mjs';
+import {readProperties} from '../scripts/checks/sonar-local.mjs';
+import {coverageScopeOf,judgeCoverage,judgeDashboard,judgeSummary,loadSonarGate,serverConditions,thresholdsOf} from '../scripts/checks/sonar-gate.mjs';
 import {enforcesOp,judgeJob,readSonarSummary,recordSonarJudgment,SONAR_CHECK,SONAR_ENFORCE_CHANGE,SONAR_INCIDENT_TAG} from '../scripts/kernel/sonar-settle.mjs';
 import {independentChecksOf} from '../scripts/kernel/api-lib/check-evidence.mjs';
 import {loadContractChanges} from '../scripts/kernel/contract-version.mjs';
@@ -49,9 +50,9 @@ test('the gate is one file: the thresholds, the enforced ops and the server cond
 });
 
 test('the gate judges coverage per service: one service below 100 fails, a non-service file is not part of the measure', () => {
-  // The scope is the one the managed sonar-project.properties renders (hfs sync, from the preset's COVERAGE_SOURCES).
-  const inclusions=coverageInclusionsOf({'sonar.coverage.inclusions':'be/src/**/*.service.ts'});
-  assert.deepEqual(inclusions,['be/src/**/*.service.ts']);
+  // The scope is the one the managed sonar-project.properties renders (hfs sync: the complement of the preset's COVERAGE_SOURCES).
+  const scope=coverageScopeOf(readProperties(path.join(ROOT,'examples','todo-app','sonar-project.properties')));
+  assert.ok(scope.exclusions.includes('fe/**')&&scope.exclusions.includes('be/**/*.resolver.ts'));
   const minPercent=thresholdsOf(gate).coverageMinPercent;
   const files=[
     {path:'be/src/features/orders/order.service.ts',coverage:'100.0'},
@@ -61,22 +62,22 @@ test('the gate judges coverage per service: one service below 100 fails, a non-s
     {path:'be/src/features/orders/order.service.spec.ts',coverage:null},
     {path:'fe/apps/web/src/lib/cart.service.ts',coverage:'0.0'},
   ];
-  const red=judgeCoverage(files,{inclusions,minPercent});
+  const red=judgeCoverage(files,{scope,minPercent});
   assert.deepEqual(red.files.map(f=>[f.path,f.coverage,f.ok]),[
     ['be/src/features/orders/order.service.ts',100,true],
     ['be/src/features/orders/payment.service.ts',99.4,false],
   ],'a resolver, a module, a spec and anything under fe/ are not coverage targets');
   assert.deepEqual(red.failures,['coverage of be/src/features/orders/payment.service.ts 99.4% < 100%']);
   // The project average can round to 100 while one service is below: the per-file verdict still fails.
-  const dashboard=judgeDashboard({measures:{bugs:'0',code_smells:'0',vulnerabilities:'0',security_hotspots:'0',coverage:'100.0'},files,inclusions},gate);
+  const dashboard=judgeDashboard({measures:{bugs:'0',code_smells:'0',vulnerabilities:'0',security_hotspots:'0',coverage:'100.0'},files,scope},gate);
   assert.equal(dashboard.verdict,'fail');
   assert.deepEqual(dashboard.failures,['coverage of be/src/features/orders/payment.service.ts 99.4% < 100%']);
   // The same project with every service at 100 passes, whatever the resolver, the module and fe/ show.
   const green=files.map(f=>f.path.endsWith('payment.service.ts')?{...f,coverage:'100.0'}:f);
-  assert.deepEqual(judgeCoverage(green,{inclusions,minPercent}).failures,[]);
-  assert.equal(judgeDashboard({measures:{bugs:'0',code_smells:'0',vulnerabilities:'0',security_hotspots:'0',coverage:'100.0'},files:green,inclusions},gate).verdict,'pass');
+  assert.deepEqual(judgeCoverage(green,{scope,minPercent}).failures,[]);
+  assert.equal(judgeDashboard({measures:{bugs:'0',code_smells:'0',vulnerabilities:'0',security_hotspots:'0',coverage:'100.0'},files:green,scope},gate).verdict,'pass');
   // A service the lcov does not name is never a pass.
-  assert.deepEqual(judgeCoverage([{path:'be/src/a.service.ts',coverage:null}],{inclusions,minPercent}).failures,["be/src/a.service.ts has no coverage measure (the be unit run's lcov is not imported or does not name it)"]);
+  assert.deepEqual(judgeCoverage([{path:'be/src/a.service.ts',coverage:null}],{scope,minPercent}).failures,["be/src/a.service.ts has no coverage measure (the be unit run's lcov is not imported or does not name it)"]);
   // A slice whose scan failed on coverage is a red settle like any other failing condition.
   const settle=judgeSummary(scan({outcome:'fail',slice:{verdict:'fail',failures:red.failures}}),gate);
   assert.deepEqual([settle.status,settle.code,settle.findings],['red','sonar-gate-red',red.failures]);

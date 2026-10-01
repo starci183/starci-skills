@@ -83,6 +83,10 @@ services:
         purpose: Host SonarQube project provisioning for this example; no CI analysis token is declared.
         env: SONAR_TOKEN
         custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-admin-token.key}
+      - id: starci-ecommerce-app
+        purpose: Local analysis of this example (a PROJECT_ANALYSIS_TOKEN of project starci-ecommerce-app, sealed in the host's ext/sonar custody).
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-starci-ecommerce-app-token.key}
     ci:
       workflow: .github/workflows/ci.yml
       wiring: optional-follow-up

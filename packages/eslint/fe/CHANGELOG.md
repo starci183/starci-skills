@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Changed: `public-component-signature` accepts a component with no parameter; `no-raw-structural-element` names `Region`, `NavLandmark`, `List` and `ListItem` as owners of section, nav, ul/ol and li; FE-I18N-1 and FE-TYPING-6 canon text (request locale through `next/root-params`, no `void props`); the FE_SWR_KEY_IDENTITY check reads `&&` and `||` gates in its bundled runtime.
+## Unreleased (C0 batch)
+
+- Changed (contract change `sonar-coverage-exclusions`): `route-slot-fixed-name` holds `error.tsx` to `ErrorBoundary`, no longer `Error`. `Error` shadows the global Error constructor (Sonar typescript:S2137, a bug), and React calls this component an error boundary. A slot still named `Error` is now reported.
 
 ## 8.0.7 - 2026-10-01
 

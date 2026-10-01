@@ -2889,6 +2889,16 @@ HFS_SYNC_PRESET_MISSING:
   owner: op-retry
   kind: check-finding
 
+HFS_SYNC_COVERAGE_SCOPE:
+  title: "Coverage source has no Sonar complement"
+  title_vi: "Nguồn độ phủ không viết được phần bù cho Sonar"
+  meaning_vi: "SonarQube không có coverage inclusions, nên hfs sync viết `sonar.coverage.exclusions` là phần bù của các nguồn độ phủ; nguồn `<detail>` không có dạng `<thư mục>/**/*.<vai trò>.ts` nên phần bù của nó không viết được bằng glob của Sonar."
+  causes_vi:
+    - "COVERAGE_SOURCES của @starci/jest-preset có một glob không kết thúc bằng `*.<vai trò>.ts`"
+  nextStep_vi: "Giữ nguồn độ phủ ở dạng `src/**/*.<vai trò>.ts` (dịch vụ: `src/**/*.service.ts`) rồi chạy lại hfs sync."
+  owner: runtime-core
+  kind: check-finding
+
 HFS_SYNC_SONAR_KEY:
   title: "Ambiguous Sonar project key"
   title_vi: "Khóa dự án Sonar không rõ ràng"
@@ -11326,7 +11336,7 @@ HFS_SONAR_CONFIG:
   title_vi: "Cấu hình Sonar lệch"
   meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Sonar phải đọc đúng cấu hình sinh ra và nhập báo cáo độ phủ lcov của be, chỉ tính các service."
   causes_vi:
-    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, nhập lcov của be (`sonar.javascript.lcov.reportPaths=be/coverage/lcov.info`) với `sonar.coverage.inclusions=be/src/**/*.service.ts` và không khóa độ phủ nào khác, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `sonar.exclusions` = đúng danh sách loại trừ của jest, nhập lcov của be (`sonar.javascript.lcov.reportPaths=be/coverage/lcov.info`) với `sonar.coverage.exclusions` loại mọi tệp không phải service (SonarQube không có coverage inclusions; hfs sync sinh phần bù từ COVERAGE_SOURCES và bộ hậu tố của slot manifest, gồm cả fe/**) và không khóa độ phủ nào khác, không nhắc kiểu spec đã bỏ, và nhận báo cáo ESLint cùng tệp nhập lỗi HFS (`sonar.eslint.reportPaths`, `sonar.externalIssuesReportPaths`) để mọi lỗi canon hiện trong Sonar."
     - "Khối `services.sonar.qualityGate` của khai báo stack phải gọi đúng cổng chất lượng duy nhất của `knowledge/sonar-gate.yaml`; repo không tự ghi ngưỡng."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
   owner: op-retry

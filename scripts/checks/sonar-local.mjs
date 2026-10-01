@@ -16,7 +16,7 @@ import {posixPath} from '../lib/path-key.mjs';
 import { runGit } from '../api/git/lib.mjs';
 import { unquoteDiffPath } from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
-import {coverageInclusionsOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
+import {coverageScopeOf,coverageTargetOf,judgeCoverage,judgeDashboard,loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
 import {text} from '../lib/stack-declaration.mjs';
 import {inspectOwnerConfig,specsSettings} from '../../engine/config.mjs';
 import {createRequire} from 'node:module';
@@ -29,7 +29,8 @@ import {createRequire} from 'node:module';
  * published as https://sonar.starci.org, with the admin token in its custody at
  * .starcistacks/dev/runtime/files/sonarqube-admin-token.key(.enc). Each project scans with its own
  * PROJECT_ANALYSIS_TOKEN at runtime/files/sonarqube-KEY-token.key, minted with the admin token and stored
- * through the stack-secret tool the first time. No op ever asks the owner for a Sonar token or a GitHub
+ * through the stack-secret tool the first time (the example apps' tokens, whose declared custody is a runtime extension's
+ * ext/<service>/secrets directory, are sealed there by sealExtCustody). No op ever asks the owner for a Sonar token or a GitHub
  * setting. A stored token is validated (/api/authentication/validate) before use: one the server rejects
  * (a container and database recreated behind custody - starci-next inc-733bf51f2d75) is re-minted with a
  * valid admin token through the same mint path, stored over the rejected member through the same
@@ -45,7 +46,7 @@ import {createRequire} from 'node:module';
  *        [--isolate]
  *   dashboard --cwd REPO [--key K]           the project's dashboard numbers from its last analysis (bugs, code
  *                                            smells, vulnerabilities, hotspots reviewed, coverage and the coverage
- *                                            of every file inside sonar.coverage.inclusions), judged by judgeDashboard
+ *                                            of every file of the coverage scope), judged by judgeDashboard
  *
  * --cwd takes the repository root; a bare repository name (the brief's <app>) resolves to that
  * directory beside or above the current one, never to <cwd>/<name> (starci-next learn-content
@@ -65,7 +66,7 @@ import {createRequire} from 'node:module';
  * blocker or critical issue and no to-review security hotspot on a line it changed (a line-less one only
  * on a file it added), its duplicated share of the changed source lines is within the duplication
  * threshold (like the server's ignoreSmallChanges, fewer changed lines than the gate's floor are not held to it),
- * and every service it touched (a changed file inside the repository's sonar.coverage.inclusions) is at the coverage
+ * and every service it touched (a changed file of the repository's coverage scope, coverageScopeOf) is at the coverage
  * threshold on its own Sonar measure, imported from the be unit run's lcov. Lesser issues are
  * listed on the summary and never fail it. The scan also makes the server's gate of that name carry the
  * same conditions and selects it for the project (`qualityGate` on the summary). The whole-project
@@ -187,11 +188,14 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   }else if(text(sonar.stack)&&sonar.stack!=='source-host')stackDir=path.join(repoRoot,'.starcistacks',sonar.stack);
   const projects=(Array.isArray(sonar.projects)?sonar.projects.filter(plain).map(p=>({repository:text(p.repository),key:text(p.key),name:text(p.name)}))
     :plain(sonar.projects)?Object.entries(sonar.projects).map(([repository,v])=>({repository,key:text(v)??text(v?.key),name:text(v?.name)})):[]).filter(p=>p.key);
-  const credentials=(Array.isArray(sonar.credentials)?sonar.credentials:[]).filter(plain).map(c=>({id:text(c.id)??'',env:text(c.env),
+  const credentials=(Array.isArray(sonar.credentials)?sonar.credentials:[]).filter(plain).map(c=>({id:text(c.id)??'',env:text(c.env),purpose:text(c.purpose)??'',
     file:resolveCustodyFile(repoDir(text(c.custody?.repository)),text(c.custody?.path))})).filter(c=>c.file);
   const isAdmin=c=>/admin/i.test(c.id)||/admin/i.test(path.basename(c.file));
   const analysis=credentials.filter(c=>!isAdmin(c)&&(!c.env||c.env==='SONAR_TOKEN'));
-  const forProject=key=>analysis.find(c=>c.id.includes(key)||path.basename(c.file).includes(key))?.file??null;
+  // A project's analysis token: the credential that names the project, else the one declared credential whose purpose is
+  // analysis (the declaration says what it is for; a name that matches nothing never guesses).
+  const forAnalysis=analysis.filter(c=>/\banalysis\b/i.test(c.purpose));
+  const forProject=key=>analysis.find(c=>c.id.includes(key)||path.basename(c.file).includes(key))?.file??(forAnalysis.length===1?forAnalysis[0].file:null);
   for(const p of projects)p.tokenRef=forProject(p.key);
   return {
     file,repoRoot,
@@ -332,21 +336,63 @@ const stackRootOf=file=>{
   return at?file.slice(0,at.index+at[0].length):null;
 };
 
+/** A runtime extension's custody directory: <runtime>/ext/<service>/secrets, a host tree no stack-secret tool manages. */
+const extSecretsDir=file=>{
+  const dir=path.dirname(file);
+  if(path.basename(dir)!=='secrets')return null;
+  const ext=path.dirname(path.dirname(dir));
+  return path.basename(ext)==='ext'&&(path.dirname(ext)===skillRoot||path.basename(path.dirname(ext))==='.claude')?dir:null;
+};
+
+/** The one age recipient the sealed members of an extension custody directory share; null when there is none or they differ. */
+function extRecipient(dir){
+  const recipients=new Set();
+  for(const name of fs.existsSync(dir)?fs.readdirSync(dir):[]){
+    if(!name.endsWith('.enc'))continue;
+    try{for(const r of JSON.parse(fs.readFileSync(path.join(dir,name),'utf8')).sops?.age??[])if(typeof r.recipient==='string')recipients.add(r.recipient);}catch{/* not a sops json member */}
+  }
+  return recipients.size===1?[...recipients][0]:null;
+}
+
 /**
- * Store a value as an encrypted custody member through the stack's own tool (scripts/stack-secret.mjs of the
- * repository whose .starcistacks holds the member). An absolute reference (a declaration credential
- * resolved from its repository root) names that tree directly - a project token minted into the declaring
- * repository while the sonar stack itself is the host extension; a relative one stays a member of the
- * configured stack. Host-extension custody (.claude/ext) has no stack-secret tool: minting there is refused
- * and mintToken revokes the value again. The value travels through a 0600 temp file only - never argv.
+ * Seal a value as a member of a runtime extension's custody (ext/<service>/secrets) with sops, to the recipient its
+ * sealed siblings already share: the same recipient, never a new key. Only the .enc twin is written. The value
+ * travels through a 0600 temp file read by sops - never argv.
+ */
+function sealExtCustody(cfg,file,value){
+  const dir=extSecretsDir(file);
+  const recipient=extRecipient(dir);
+  if(!recipient)return {ok:false,reason:`${path.basename(dir)} holds no sealed member with exactly one age recipient to seal to`};
+  const sops=cfg.sops??resolveCommand('sops');
+  if(!sops)return {ok:false,reason:'sops is not installed'};
+  const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
+  try{
+    fs.writeFileSync(tmp,value,{mode:0o600});
+    const [bin,args]=launcher(sops,['--encrypt','--age',recipient,'--input-type','binary','--output-type','json',tmp]);
+    const result=spawnSync(bin,args,{encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,SOPS_AGE_KEY_FILE:cfg.identity},maxBuffer:1024*1024,timeout:cfg.timeoutMs});
+    if(result.status!==0||!String(result.stdout??'').trim())return {ok:false,reason:scrub(`sops --encrypt of ${path.basename(file)} exited ${result.status}: ${String(result.stderr).trim().split(/\r?\n/).slice(-2).join(' ')}`)};
+    fs.writeFileSync(`${file}.enc`,result.stdout);
+    return {ok:true};
+  }finally{
+    try{fs.rmSync(tmp,{force:true});}catch{/* best effort */}
+  }
+}
+
+/**
+ * Store a value as an encrypted custody member. Two managed custodies exist: a repository's .starcistacks tree, written
+ * through that repository's own tool (scripts/stack-secret.mjs; an absolute reference names that tree directly - a project
+ * token minted into the declaring repository while the sonar stack itself is the host extension - and a relative one stays a
+ * member of the configured stack), and a runtime extension's ext/<service>/secrets directory (the example apps' analysis
+ * tokens), sealed by sealExtCustody. Anything else is refused and mintToken revokes the value again. Never argv.
  */
 function writeCustody(cfg,ref,value){
   const file=path.resolve(cfg.stackDir,ref);
+  if(extSecretsDir(file))return sealExtCustody(cfg,file,value);
   const managed=path.isAbsolute(String(ref))?stackRootOf(file):path.dirname(cfg.stackDir);
   const stacksRoot=managed??path.dirname(cfg.stackDir);
   const tool=cfg.stackSecret??path.join(path.dirname(stacksRoot),'scripts','stack-secret.mjs');
   if((!managed||path.basename(managed)!=='.starcistacks')&&!cfg.stackSecret)
-    return {ok:false,reason:`the custody member ${ref} is not under a .starcistacks tree a stack-secret tool manages`};
+    return {ok:false,reason:`the custody member ${ref} is neither under a .starcistacks tree a stack-secret tool manages nor in a runtime extension's secrets directory`};
   if(!fs.existsSync(tool))return {ok:false,reason:`no stack-secret tool at ${tool}`};
   const target=path.relative(stacksRoot,file).replace(/\\/g,'/');
   const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
@@ -371,9 +417,10 @@ export async function tokenAccepted(cfg,value){
 }
 
 /** A custody reference writeCustody may store over: a member of the configured stack, or an absolute
- *  declaration credential inside a repository's .starcistacks tree (host-extension custody is not). */
+ *  declaration credential inside a repository's .starcistacks tree or a runtime extension's secrets directory. */
 const inStack=(cfg,ref)=>{
   const file=path.resolve(cfg.stackDir,ref);
+  if(extSecretsDir(file))return true;
   if(!path.isAbsolute(String(ref))&&!file.startsWith(cfg.stackDir+path.sep))return false;
   return stackRootOf(file)!==null;
 };
@@ -842,7 +889,7 @@ export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
 }
 
 /**
- * Before a slice scan: the services the slice touched (changed files inside sonar.coverage.inclusions) get a fresh lcov at
+ * Before a slice scan: the services the slice touched (changed files of the coverage scope) get a fresh lcov at
  * sonar.javascript.lcov.reportPaths, written by the be unit run over their related specs (cfg.coverageRunner, default
  * runSliceCoverage), so Sonar imports this slice's coverage and never a stale report. With the owner's specs.unit off
  * (config.yaml `specs`, scripts/kernel/spec-deferral.mjs) the op writes no unit test and is held to no coverage: nothing
@@ -852,11 +899,11 @@ export function runSliceCoverage({jestCwd,files,timeoutMs=900_000}){
 export const OWNER_MODE_NOTE='owner mode specs.unit=false (config.yaml specs): the slice wrote and ran no unit test, so its coverage is NOT MEASURED - the coverage conditions are neither green nor red, and the slice passes on the other conditions only';
 
 export function prepareSliceCoverage(cfg,{cwd,props,slice}){
-  const inclusions=coverageInclusionsOf(props);
-  if(!inclusions.length)return {judged:true,targets:[],note:'the repository declares no sonar.coverage.inclusions'};
+  const scope=coverageScopeOf(props);
+  if(!scope.exclusions.length)return {judged:true,targets:[],note:'the repository declares no sonar.coverage.exclusions'};
   const specs=cfg.specs??specsSettings(inspectOwnerConfig().config);
   if(specs.unit===false)return {judged:false,targets:[],ownerMode:'specs.unit=false',note:OWNER_MODE_NOTE};
-  const isTarget=coverageTargetOf(inclusions);
+  const isTarget=coverageTargetOf(scope);
   const targets=slice.files.map(f=>f.path).filter(file=>isTarget(file)&&fs.existsSync(path.join(cwd,file)));
   if(!targets.length)return {judged:true,targets};
   const lcov=String(props['sonar.javascript.lcov.reportPaths']??'').split(',').map(p=>p.trim()).filter(Boolean)[0];
@@ -883,7 +930,7 @@ async function fileCoverage(cfg,tokens,fileKey){
  * Judge the slice on the processed analysis against `gate` (thresholdsOf(knowledge/sonar-gate.yaml)): open
  * blocker and critical issues and to-review hotspots on its changed lines (a line-less one only on a file
  * it added), the duplicated share of its changed source lines, and the coverage of every service it touched
- * (a changed file inside sonar.coverage.inclusions of `props`; any other file is not a coverage target).
+ * (a changed file of the coverage scope of `props`, coverageScopeOf; any other file is not a coverage target).
  * A changed file the server does not know (excluded, not source) is listed as not analyzed.
  */
 export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate=thresholdsOf(loadSonarGate()),coverageRun=null}){
@@ -951,8 +998,8 @@ export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate
   if(blocking.length>gate.blockingIssuesMax)failures.push(`${blocking.length} open ${gate.blockingSeverities.join('/')} issue(s) on changed lines`);
   if(hotspots.length>gate.unreviewedHotspotsMax)failures.push(`${hotspots.length} security hotspot(s) to review on changed lines`);
   // Coverage: each service the slice touched, on its own measure (one service below the threshold fails the slice).
-  const inclusions=coverageInclusionsOf(props);
-  const isTarget=coverageTargetOf(inclusions);
+  const scope=coverageScopeOf(props);
+  const isTarget=coverageTargetOf(scope);
   const measured=[];
   for(const fileKey of coverageRun?.judged===false?[]:keys){
     const file=analyzed.get(fileKey);
@@ -962,8 +1009,8 @@ export async function evaluateSlice(cfg,tokens,{key,slice,props={},pkg=null,gate
     measured.push({path:file.path,coverage:got.coverage});
   }
   const coverage=coverageRun?.judged===false
-    ?{applied:false,status:'not-measured',ownerMode:coverageRun.ownerMode,inclusions,minPercent:gate.coverageMinPercent,files:[],failures:[],note:coverageRun.note}
-    :judgeCoverage(measured,{inclusions,minPercent:gate.coverageMinPercent});
+    ?{applied:false,status:'not-measured',ownerMode:coverageRun.ownerMode,exclusions:scope.exclusions,minPercent:gate.coverageMinPercent,files:[],failures:[],note:coverageRun.note}
+    :judgeCoverage(measured,{scope,minPercent:gate.coverageMinPercent});
   if(coverageRun?.judged!==false&&coverageRun?.error)coverage.failures.unshift(`the slice's services could not be measured: ${coverageRun.error}`);
   if(!coverage.status)coverage.status=!coverage.applied?'no-scope':coverage.failures.length?'red':coverage.files.length?'green':'no-target';
   failures.push(...coverage.failures);
@@ -1193,7 +1240,7 @@ export const dashboardMetrics=gate=>[...Object.keys(gate.overall.issues.types),'
 /**
  * The dashboard of a project as its last analysis left it, judged by judgeDashboard: bugs, code smells and
  * vulnerabilities 0, every hotspot reviewed, coverage at the threshold on every file inside the repository's
- * sonar.coverage.inclusions (the services) and overall. It reads, it never scans: run `scan --project-gate --wait`
+ * coverage scope (the services: what sonar.coverage.exclusions leaves) and overall. It reads, it never scans: run `scan --project-gate --wait`
  * first. Exit 0 pass, 1 fail, 2 blocked (server down, no token, no analysis).
  */
 export async function dashboard(cfg,options={}){
@@ -1201,8 +1248,8 @@ export async function dashboard(cfg,options={}){
   const props=readProperties(path.join(cwd,'sonar-project.properties'));
   const key=options.key??cfg.declaredKey??props['sonar.projectKey']??null;
   const gate=loadSonarGate();
-  const inclusions=coverageInclusionsOf(props);
-  const summary={schema:SCHEMA,command:'dashboard',at:new Date().toISOString(),host:cfg.host,cwd,projectKey:key,coverageInclusions:inclusions};
+  const scope=coverageScopeOf(props);
+  const summary={schema:SCHEMA,command:'dashboard',at:new Date().toISOString(),host:cfg.host,cwd,projectKey:key,coverageExclusions:scope.exclusions};
   const finish=(outcome,reason,extra={})=>Object.assign(summary,extra,{outcome,...(reason?{reason}:{})});
   if(cfg.disabled)return finish('disabled',`Sonar is disabled for this repository: ${cfg.disabled}`);
   if(!key)return finish('blocked','no project key: pass --key or set sonar.projectKey');
@@ -1220,7 +1267,7 @@ export async function dashboard(cfg,options={}){
   const tree=await readAll(cfg,tokens,`/api/measures/component_tree?component=${component}&metricKeys=${gate.overall.coverage.metric}&qualifiers=FIL`,'components');
   if(tree.error)return finish('blocked',`the per-file coverage of ${key} could not be read: ${tree.error}`);
   const files=tree.items.map(item=>({path:item.path,coverage:(item.measures??[]).find(m=>m.metric===gate.overall.coverage.metric)?.value??null}));
-  const judged=judgeDashboard({measures,files,inclusions},gate);
+  const judged=judgeDashboard({measures,files,scope},gate);
   summary.dashboardUrl=`${cfg.host}/dashboard?id=${component}`;
   summary.numbers=judged.numbers;
   summary.coverage=judged.coverage;
@@ -1244,7 +1291,7 @@ const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
        [--isolate] [--keep-slice-project] analyse only --paths in a throwaway project (minutes, not a whole-repo scan)
   dashboard --cwd REPO [--key K]          the dashboard numbers of the project's last analysis: bugs, code smells,
                                           vulnerabilities, hotspots reviewed, coverage and the coverage of every
-                                          file inside sonar.coverage.inclusions; fails unless all are at the gate
+                                          file of the coverage scope; fails unless all are at the gate
 
   common: [--cwd REPO] [--declaration FILE] [--host URL] [--stack DIR]
           host, stack, custody and project keys come from the repository's .starcistacks/application-stacks.yaml

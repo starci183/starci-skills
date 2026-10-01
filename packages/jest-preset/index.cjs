@@ -14,7 +14,7 @@ const { fakeIds, FakeIds } = require("./ids.cjs")
  * resolvers, controllers and consumers are thin, and helpers called by a service are covered through the service's own
  * spec, so every `*.service.ts` under `src` is the whole denominator and every file in it must reach 100 on every metric.
  * The unit run also writes `coverage/lcov.info`: Sonar imports it (`sonar.javascript.lcov.reportPaths`) with the same scope
- * (`sonar.coverage.inclusions=be/src/**\/*.service.ts`) and its quality gate holds coverage at 100 on those files.
+ * (`sonar.coverage.exclusions` holds every other file, rendered by hfs sync) and its quality gate holds coverage at 100 on those files.
  */
 const COVERAGE_SOURCES = ["src/**/*.service.ts"]
 const COVERAGE_EXCLUDES = ["src/tests/**", "**/dist/**", "**/coverage/**"]

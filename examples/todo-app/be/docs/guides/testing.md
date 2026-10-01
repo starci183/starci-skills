@@ -54,7 +54,7 @@ database call. Example: `src/modules/domain/commission/commission.service.spec.t
 
 `npm test` runs `jest --selectProjects unit --coverage`. Coverage is collected from `src/**/*.service.ts` and each file has a
 threshold of 100 for lines, branches, functions and statements, so the run fails below it. The run writes `be/coverage/lcov.info`:
-Sonar imports it (`sonar.coverage.inclusions=be/src/**/*.service.ts`) and CI uploads it to Codecov (`codecov.yml`, the same paths).
+Sonar imports it with every non-service file in `sonar.coverage.exclusions` (SonarQube has no coverage inclusions, so the managed file excludes the complement of the services) and CI uploads it to Codecov (`codecov.yml`, the same paths).
 That `codecov.yml` is the app-repository form: inside the runtime repository the root `.github/workflows/examples.yml` uploads the
 lcov under the flag `todo-app` and the root `codecov.yml` (rendered from the same scope) judges it. The upload needs the
 `CODECOV_TOKEN` secret once per repository (the runtime repository has one; each product monorepo adds its own).

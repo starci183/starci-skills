@@ -13,6 +13,7 @@
 //   HFS_SYNC_DRIFT              printed by `hfs sync --check`, the hash view of the same drift (listed so the catalog knows its emitter)
 //   HFS_SYNC_HFS_INVALID        hfs.json is missing or invalid
 //   HFS_SYNC_PRESET_MISSING     the jest preset the back end's coverage exclusions come from is not installed
+//   HFS_SYNC_COVERAGE_SCOPE     a coverage source whose complement Sonar's coverage exclusions cannot write
 //   HFS_SYNC_SONAR_KEY          the stack declaration names two Sonar keys for the repository
 //   HFS_SYNC_TEMPLATE_VARIABLE  a template names a variable sync does not provide (runtime defect)
 //   HFS_SYNC_TEMPLATE_MISSING   a managedBy slot lists a file no template renders (runtime defect)
@@ -30,7 +31,7 @@ import { judge, trackedFiles } from '../../packages/hfs/sync/hygiene.mjs';
 
 export const CODES = Object.freeze([
   'HFS_MANAGED_FILE_DRIFT', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_TS_STRICT', 'HFS_SYNC_HFS_INVALID',
-  'HFS_SYNC_DRIFT', 'HFS_SYNC_TEMPLATE_MISSING', 'HFS_SYNC_MANIFEST_MANAGED', 'HFS_SYNC_PRESET_MISSING', 'HFS_SYNC_SONAR_KEY',
+  'HFS_SYNC_DRIFT', 'HFS_SYNC_TEMPLATE_MISSING', 'HFS_SYNC_MANIFEST_MANAGED', 'HFS_SYNC_PRESET_MISSING', 'HFS_SYNC_COVERAGE_SCOPE', 'HFS_SYNC_SONAR_KEY',
   'HFS_SYNC_TEMPLATE_VARIABLE', 'HFS_WORK_AGENT_DATA', 'HFS_PLAINTEXT_SECRET',
 ]);
 

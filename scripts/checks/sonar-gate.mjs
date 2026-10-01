@@ -34,7 +34,7 @@ export function loadSonarGate({ base = root, file = null } = {}) {
  * The conditions the server gate carries: [{metric, op, error}] (SonarQube api/qualitygates conditions): the new-code ones
  * (coverage, duplication, hotspots, blocking issues), then the overall-code ones (coverage, open issues of any origin,
  * imported HFS/ESLint/stylelint findings included, reviewed hotspots and duplication). Coverage is the services' coverage:
- * the scope is sonar.coverage.inclusions of the managed sonar-project.properties.
+ * the scope is what sonar.coverage.exclusions of the managed sonar-project.properties leaves (coverageScopeOf).
  */
 export function serverConditions(gate) {
   const n = gate.newCode;
@@ -71,15 +71,32 @@ export function thresholdsOf(gate) {
   };
 }
 
-/** The `sonar.coverage.inclusions` globs of a sonar-project.properties map (readProperties). */
-export function coverageInclusionsOf(props = {}) {
-  return String(props['sonar.coverage.inclusions'] ?? '').split(',').map((glob) => glob.trim()).filter(Boolean);
+const listOf = (props, key) => String(props[key] ?? '').split(',').map((glob) => glob.trim()).filter(Boolean);
+
+/**
+ * The coverage scope of a sonar-project.properties map (readProperties), as Sonar computes it: SonarQube has no coverage
+ * inclusions, so the files it measures coverage on are the source files of `sonar.sources` that neither `sonar.exclusions`,
+ * `sonar.coverage.exclusions` nor the test patterns (`sonar.test.inclusions`) take. The managed properties render
+ * sonar.coverage.exclusions as the complement of the services (hfs sync coverageExclusions), so what is left is the services.
+ * Returns {exclusions, sources, excluded, tests}; `exclusions` empty means the repository declares no coverage scope.
+ */
+export function coverageScopeOf(props = {}) {
+  return { exclusions: listOf(props, 'sonar.coverage.exclusions'), sources: listOf(props, 'sonar.sources'), excluded: listOf(props, 'sonar.exclusions'), tests: listOf(props, 'sonar.test.inclusions') };
 }
 
-/** True for a repository-relative path inside the coverage inclusions (Sonar's glob subset, scripts/lib/glob.mjs). */
-export function coverageTargetOf(inclusions) {
-  const patterns = inclusions.flatMap(braceVariants).map(globExpression);
-  return (file) => patterns.some((pattern) => pattern.test(String(file).split('\\').join('/')));
+const SOURCE_FILE = /\.(?:[cm]?[jt]sx?)$/;
+
+/** True for a repository-relative path Sonar measures coverage on under `scope` (coverageScopeOf; Sonar's glob subset, scripts/lib/glob.mjs). */
+export function coverageTargetOf(scope) {
+  const patterns = (globs) => (globs ?? []).flatMap(braceVariants).map(globExpression);
+  const excluded = patterns([...(scope.exclusions ?? []), ...(scope.excluded ?? [])]);
+  const tests = patterns(scope.tests);
+  const roots = (scope.sources ?? []).map((dir) => `${String(dir).replace(/\/+$/, '')}/`);
+  return (file) => {
+    const rel = String(file).split('\\').join('/');
+    return SOURCE_FILE.test(rel) && (!roots.length || roots.some((dir) => rel.startsWith(dir)))
+      && !excluded.some((pattern) => pattern.test(rel)) && !tests.some((pattern) => pattern.test(rel));
+  };
 }
 
 const asNumber = (value) => (value === undefined || value === null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value));
@@ -87,17 +104,17 @@ const byPath = (a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 
 /**
  * The per-file coverage verdict: `files` are [{path, coverage}] (coverage the Sonar `coverage` measure of the file, a number
- * or null when Sonar has none), `inclusions` the repository's sonar.coverage.inclusions. Only a file inside the inclusions
- * is a coverage target: every other file (a handler, a resolver, a module, a config file, a test, anything under fe/) is
- * not judged and not listed, whatever its measure. A target below `minPercent` fails, and so does a target Sonar holds no
+ * or null when Sonar has none), `scope` the repository's coverage scope (coverageScopeOf). Only a file of the scope is a
+ * coverage target: every other file (a handler, a resolver, a module, a config file, a test, anything under fe/) is not
+ * judged and not listed, whatever its measure. A target below `minPercent` fails, and so does a target Sonar holds no
  * coverage for (the lcov report was not imported or does not name it): a missing number is never a pass. With no
- * inclusions the repository declares no coverage scope and nothing is judged (`applied` false).
- * Returns {applied, inclusions, minPercent, files: [{path, coverage, ok}], failures: [text]}.
+ * sonar.coverage.exclusions the repository declares no coverage scope and nothing is judged (`applied` false).
+ * Returns {applied, exclusions, minPercent, files: [{path, coverage, ok}], failures: [text]}.
  */
-export function judgeCoverage(files, { inclusions = [], minPercent }) {
-  const isTarget = coverageTargetOf(inclusions);
-  const result = { applied: inclusions.length > 0, inclusions: [...inclusions], minPercent, files: [], failures: [] };
-  if (!result.applied) return { ...result, note: 'the repository declares no sonar.coverage.inclusions: no coverage target' };
+export function judgeCoverage(files, { scope = coverageScopeOf(), minPercent }) {
+  const isTarget = coverageTargetOf(scope);
+  const result = { applied: scope.exclusions.length > 0, exclusions: [...scope.exclusions], minPercent, files: [], failures: [] };
+  if (!result.applied) return { ...result, note: 'the repository declares no sonar.coverage.exclusions: no coverage scope' };
   for (const file of [...files].sort(byPath)) {
     const rel = String(file.path).split('\\').join('/');
     if (!isTarget(rel)) continue;
@@ -113,11 +130,11 @@ export function judgeCoverage(files, { inclusions = [], minPercent }) {
 /**
  * The dashboard verdict of a whole project (`sonar-local dashboard`): `measures` the project's measures by metric key
  * (bugs, code_smells, vulnerabilities, security_hotspots, security_hotspots_reviewed, coverage), `files` the per-file
- * coverage of the project (as judgeCoverage takes it), `inclusions` its sonar.coverage.inclusions. It fails unless every
+ * coverage of the project (as judgeCoverage takes it), `scope` its coverage scope (coverageScopeOf). It fails unless every
  * issue type of `overall.issues.types` is at `overall.issues.max`, every hotspot is reviewed (a project with no hotspot has
  * none to review), and every service is at the coverage threshold. Returns {verdict, numbers, coverage, failures}.
  */
-export function judgeDashboard({ measures = {}, files = [], inclusions = [] }, gate) {
+export function judgeDashboard({ measures = {}, files = [], scope = coverageScopeOf() }, gate) {
   const o = gate.overall;
   const failures = [];
   const numbers = {};
@@ -132,9 +149,9 @@ export function judgeDashboard({ measures = {}, files = [], inclusions = [] }, g
   if (numbers[o.hotspots.metric] === null) failures.push(`${o.hotspots.metric} is not measured`);
   else if (numbers[o.hotspots.metric] < o.hotspots.minReviewedPercent) failures.push(`${o.hotspots.metric} ${numbers[o.hotspots.metric]}% < ${o.hotspots.minReviewedPercent}%`);
   numbers[o.coverage.metric] = asNumber(measures[o.coverage.metric]);
-  const coverage = judgeCoverage(files, { inclusions, minPercent: o.coverage.minPercent });
-  if (!coverage.applied) failures.push("the repository declares no sonar.coverage.inclusions: the services' coverage cannot be judged");
-  else if (!coverage.files.length) failures.push(`no file inside ${inclusions.join(',')} is measured: the coverage scope is empty or the lcov report was not imported`);
+  const coverage = judgeCoverage(files, { scope, minPercent: o.coverage.minPercent });
+  if (!coverage.applied) failures.push("the repository declares no sonar.coverage.exclusions: the services' coverage cannot be judged");
+  else if (!coverage.files.length) failures.push('no file of the coverage scope is measured: the scope is empty or the lcov report was not imported');
   failures.push(...coverage.failures);
   if (numbers[o.coverage.metric] === null) failures.push(`${o.coverage.metric} is not measured`);
   else if (numbers[o.coverage.metric] < o.coverage.minPercent) failures.push(`${o.coverage.metric} ${numbers[o.coverage.metric]}% < ${o.coverage.minPercent}%`);
